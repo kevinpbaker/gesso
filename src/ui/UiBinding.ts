@@ -11,7 +11,7 @@ export class UiBinding<T> {
     public readonly id: BindingId,
     public readonly nodeId: NodeId,
     public readonly property: NodeProperty,
-    private readonly observable: Observable<T>,
+    public readonly observable: Observable<T>,
     private readonly graph: UiGraph,
     private readonly dirtyFlags: DirtyFlags
   ) {}

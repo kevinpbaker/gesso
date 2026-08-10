@@ -5,5 +5,6 @@ export enum DirtyFlags {
   Layout = 1 << 2,
   SubtreeLayout = 1 << 3,
   Children = 1 << 4,
-  Transform = 1 << 5
+  Transform = 1 << 5,
+  Properties = 1 << 6
 }

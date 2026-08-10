@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { UiGraph } from '../UiGraph';
 import { UiNodeType } from '../UiNodeType';
+import { type UiNode } from '../UiNode';
 import { Button, Column, Row, Text } from './UiComponents';
 import { UiGraphBuilder } from './UiGraphBuilder';
 
@@ -192,12 +193,8 @@ describe('UiGraphBuilder', () => {
  * This helper intentionally uses the public tree relationships
  * rather than reaching into UiGraph's internal storage.
  */
-function getChildren(node: {
-  firstChild: {
-    nextSibling: typeof node.firstChild;
-  } | null;
-}) {
-  const children: (typeof node.firstChild)[] = [];
+function getChildren(node: UiNode): UiNode[] {
+  const children: UiNode[] = [];
   let child = node.firstChild;
   while (child !== null) {
     children.push(child);

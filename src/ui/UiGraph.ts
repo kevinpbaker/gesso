@@ -87,6 +87,37 @@ export class UiGraph {
     parent.lastChild = child;
   }
 
+  /**
+   * Inserts a child before the reference child.
+   *
+   * When reference is null the child is appended to the end.
+   */
+  public insertBefore(parent: UiNode, child: UiNode, reference: UiNode | null): void {
+    if (child.parent !== null) {
+      throw new Error(`Node '${child.id}' already has a parent.`);
+    }
+    if (reference !== null && reference.parent !== parent) {
+      throw new Error(`Reference node '${reference.id}' is not a child of '${parent.id}'.`);
+    }
+    if (reference === null) {
+      this.appendChild(parent, child);
+      return;
+    }
+    const previous = reference.previousSibling;
+    if (previous !== null) {
+      previous.nextSibling = child;
+    } else {
+      parent.firstChild = child;
+    }
+    child.parent = parent;
+    child.previousSibling = previous;
+    child.nextSibling = reference;
+    reference.previousSibling = child;
+    if (parent.lastChild === reference) {
+      parent.lastChild = child;
+    }
+  }
+
   public removeNode(node: UiNode): void {
     // First stop all reactive subscriptions.
     this.unbindNode(node);
@@ -124,7 +155,7 @@ export class UiGraph {
   // Bindings
   // ---------------------------------------------------------------------------
 
-  private getBindingForProperty(nodeId: string, property: NodeProperty): UiBinding | undefined {
+  private getBindingForProperty(nodeId: string, property: NodeProperty): UiBinding<unknown> | undefined {
     const bindingIds = this.nodeBindings.get(nodeId);
     if (!bindingIds) {
       return undefined;
@@ -138,7 +169,12 @@ export class UiGraph {
     return undefined;
   }
 
-  public bind(node: UiNode, property: NodeProperty, observable: Observable, dirtyFlags: DirtyFlags): UiBinding {
+  public bind(
+    node: UiNode,
+    property: NodeProperty,
+    observable: Observable<unknown>,
+    dirtyFlags: DirtyFlags
+  ): UiBinding<unknown> {
     const existingBinding = this.getBindingForProperty(node.id, property);
     if (existingBinding) {
       throw new Error(`Property '${property}' on node '${node.id}' is already bound.`);
@@ -205,12 +241,12 @@ export class UiGraph {
     this.unbind(binding);
   }
 
-  public getBindingsForNode(node: UiNode): UiBinding[] {
+  public getBindingsForNode(node: UiNode): UiBinding<unknown>[] {
     const bindingIds = this.nodeBindings.get(node.id);
     if (!bindingIds) {
       return [];
     }
-    const bindings: UiBinding[] = [];
+    const bindings: UiBinding<unknown>[] = [];
     for (const bindingId of bindingIds) {
       const binding = this.bindings.get(bindingId);
       if (binding) {

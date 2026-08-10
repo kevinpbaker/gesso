@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { DirtyFlags } from './DirtyFlags';
 import { UiGraph } from './UiGraph';
 import { UiNodeType } from './UiNodeType';
+import type { UiNode } from './UiNode';
 
 describe('UiGraph', () => {
   describe('construction', () => {
@@ -137,6 +138,86 @@ describe('UiGraph', () => {
       const child = graph.createNode('child', UiNodeType.Text);
       graph.appendChild(parentA, child);
       expect(() => graph.appendChild(parentB, child)).toThrow("Node 'child' already has a parent.");
+    });
+  });
+
+  describe('insertBefore', () => {
+    it('inserts before the first child', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const a = graph.createNode('a', UiNodeType.Text);
+      const b = graph.createNode('b', UiNodeType.Text);
+      const c = graph.createNode('c', UiNodeType.Text);
+      graph.appendChild(parent, a);
+      graph.appendChild(parent, b);
+      graph.insertBefore(parent, c, a);
+      expect(parent.firstChild).toBe(c);
+      expect(parent.lastChild).toBe(b);
+      expect(c.nextSibling).toBe(a);
+      expect(a.previousSibling).toBe(c);
+    });
+
+    it('inserts before a middle child', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const a = graph.createNode('a', UiNodeType.Text);
+      const b = graph.createNode('b', UiNodeType.Text);
+      const c = graph.createNode('c', UiNodeType.Text);
+      graph.appendChild(parent, a);
+      graph.appendChild(parent, b);
+      graph.appendChild(parent, c);
+      const d = graph.createNode('d', UiNodeType.Text);
+      graph.insertBefore(parent, d, b);
+      expect(d.previousSibling).toBe(a);
+      expect(d.nextSibling).toBe(b);
+      expect(a.nextSibling).toBe(d);
+      expect(b.previousSibling).toBe(d);
+      expect(parent.lastChild).toBe(c);
+    });
+
+    it('appends when the reference is null', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const a = graph.createNode('a', UiNodeType.Text);
+      const b = graph.createNode('b', UiNodeType.Text);
+      graph.appendChild(parent, a);
+      graph.insertBefore(parent, b, null);
+      expect(parent.lastChild).toBe(b);
+      expect(a.nextSibling).toBe(b);
+    });
+
+    it('becomes the last child when inserted before the last child', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const a = graph.createNode('a', UiNodeType.Text);
+      const b = graph.createNode('b', UiNodeType.Text);
+      graph.appendChild(parent, a);
+      graph.appendChild(parent, b);
+      const c = graph.createNode('c', UiNodeType.Text);
+      graph.insertBefore(parent, c, b);
+      expect(parent.lastChild).toBe(c);
+      expect(c.nextSibling).toBe(b);
+    });
+
+    it('rejects a child that already has a parent', () => {
+      const graph = new UiGraph();
+      const parentA = graph.createNode('parent-a', UiNodeType.Column);
+      const parentB = graph.createNode('parent-b', UiNodeType.Column);
+      const child = graph.createNode('child', UiNodeType.Text);
+      graph.appendChild(parentA, child);
+      expect(() => graph.insertBefore(parentB, child, null)).toThrow("Node 'child' already has a parent.");
+    });
+
+    it('rejects a reference that belongs to a different parent', () => {
+      const graph = new UiGraph();
+      const parentA = graph.createNode('parent-a', UiNodeType.Column);
+      const parentB = graph.createNode('parent-b', UiNodeType.Column);
+      const child = graph.createNode('child', UiNodeType.Text);
+      const reference = graph.createNode('reference', UiNodeType.Text);
+      graph.appendChild(parentA, reference);
+      expect(() => graph.insertBefore(parentB, child, reference)).toThrow(
+        "Reference node 'reference' is not a child of 'parent-b'."
+      );
     });
   });
 
