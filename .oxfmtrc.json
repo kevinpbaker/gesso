@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "trailingComma": "none",
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": true,
+  "bracketSpacing": true,
+  "bracketSameLine": true,
+  "printWidth": 120,
+  "arrowParens": "avoid",
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "dist/",
+    "build/",
+    "out/",
+    "public/build/",
+    "coverage/",
+    ".cache/",
+    ".turbo/",
+    "node_modules/",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    ".pnp.*",
+    "*.min.js",
+    "*.min.css",
+    "vendor/",
+    ".env",
+    ".env.*"
+  ]
+}
