@@ -124,25 +124,38 @@ export class UiGraph {
   // Bindings
   // ---------------------------------------------------------------------------
 
-  public bind<T>(
-    node: UiNode,
-    property: NodeProperty,
-    observable: Observable<T>,
-    dirtyFlags: DirtyFlags
-  ): UiBinding<T> {
+  private getBindingForProperty(nodeId: string, property: NodeProperty): UiBinding | undefined {
+    const bindingIds = this.nodeBindings.get(nodeId);
+    if (!bindingIds) {
+      return undefined;
+    }
+    for (const bindingId of bindingIds) {
+      const binding = this.bindings.get(bindingId);
+      if (binding && binding.property === property) {
+        return binding;
+      }
+    }
+    return undefined;
+  }
+
+  public bind(node: UiNode, property: NodeProperty, observable: Observable, dirtyFlags: DirtyFlags): UiBinding {
+    const existingBinding = this.getBindingForProperty(node.id, property);
+    if (existingBinding) {
+      throw new Error(`Property '${property}' on node '${node.id}' is already bound.`);
+    }
     // Make sure the node actually belongs to this graph.
     const registeredNode = this.nodes.get(node.id);
     if (registeredNode !== node) {
       throw new Error(`Cannot bind to node '${node.id}' because it does not belong to this graph.`);
     }
     const bindingId = this.nextBindingId++;
-    const binding = new UiBinding<T>(bindingId, node.id, property, observable, this, dirtyFlags);
+    const binding = new UiBinding(bindingId, node.id, property, observable, this, dirtyFlags);
     // Global binding lookup.
-    this.bindings.set(bindingId, binding as UiBinding<unknown>);
+    this.bindings.set(bindingId, binding);
     // Node → bindings lookup.
     let nodeBindingIds = this.nodeBindings.get(node.id);
     if (!nodeBindingIds) {
-      nodeBindingIds = new Set<BindingId>();
+      nodeBindingIds = new Set<number>();
       this.nodeBindings.set(node.id, nodeBindingIds);
     }
     nodeBindingIds.add(bindingId);
@@ -192,6 +205,21 @@ export class UiGraph {
     this.unbind(binding);
   }
 
+  public getBindingsForNode(node: UiNode): UiBinding[] {
+    const bindingIds = this.nodeBindings.get(node.id);
+    if (!bindingIds) {
+      return [];
+    }
+    const bindings: UiBinding[] = [];
+    for (const bindingId of bindingIds) {
+      const binding = this.bindings.get(bindingId);
+      if (binding) {
+        bindings.push(binding);
+      }
+    }
+    return bindings;
+  }
+
   // ---------------------------------------------------------------------------
   // Dirty state
   // ---------------------------------------------------------------------------
@@ -215,14 +243,20 @@ export class UiGraph {
     this.dirtyRoots.delete(node);
   }
 
-  public updateProperty<T>(nodeId: string, property: string, value: T, dirtyFlags: DirtyFlags): void {
+  public updateProperty<T>(
+    nodeId: string,
+    property: string,
+    value: T,
+    dirtyFlags: DirtyFlags = DirtyFlags.Properties
+  ): boolean {
     const node = this.requireNode(nodeId);
-    const previousValue = node.properties.get(property);
+    const previousValue = node.getProperty<T>(property);
     if (Object.is(previousValue, value)) {
-      return;
+      return false;
     }
-    node.properties.set(property, value);
-    this.markDirty(node, dirtyFlags);
+    node.setProperty(property, value);
+    this.markDirtyById(nodeId, dirtyFlags);
+    return true;
   }
 
   // ---------------------------------------------------------------------------

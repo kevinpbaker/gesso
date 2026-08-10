@@ -46,4 +46,12 @@ export class UiNode {
   isDirty(): boolean {
     return this.dirtyFlags !== DirtyFlags.None;
   }
+
+  getProperty<T>(property: NodeProperty): T | undefined {
+    return this.properties.get(property) as T | undefined;
+  }
+
+  setProperty<T>(property: NodeProperty, value: T): void {
+    this.properties.set(property, value);
+  }
 }
