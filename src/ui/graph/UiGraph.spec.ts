@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BehaviorSubject } from 'rxjs';
 
 import { DirtyFlags } from './DirtyFlags';
 import { UiGraph } from './UiGraph';
@@ -303,6 +304,50 @@ describe('UiGraph', () => {
       expect(child.parent).toBeNull();
       expect(parent.firstChild).toBeNull();
       expect(parent.lastChild).toBeNull();
+    });
+
+    it('removes descendants of the removed node', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const child = graph.createNode('child', UiNodeType.Column);
+      const grandchild = graph.createNode('grandchild', UiNodeType.Text);
+      graph.appendChild(parent, child);
+      graph.appendChild(child, grandchild);
+      const sizeBefore = graph.size;
+      graph.removeNode(child);
+      expect(graph.hasNode('child')).toBe(false);
+      expect(graph.hasNode('grandchild')).toBe(false);
+      expect(graph.size).toBe(sizeBefore - 2);
+      expect(grandchild.parent).toBeNull();
+    });
+
+    it('clears dirty state of removed descendants', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const child = graph.createNode('child', UiNodeType.Column);
+      const grandchild = graph.createNode('grandchild', UiNodeType.Text);
+      graph.appendChild(parent, child);
+      graph.appendChild(child, grandchild);
+      graph.markDirty(grandchild, DirtyFlags.Layout);
+      graph.markDirty(child, DirtyFlags.Layout);
+      graph.removeNode(child);
+      expect(graph.getDirtyNodes().has(grandchild)).toBe(false);
+      expect(graph.getDirtyNodes().has(child)).toBe(false);
+      expect(graph.getDirtyNodes().size).toBe(1);
+    });
+
+    it('destroys bindings of removed descendants', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const child = graph.createNode('child', UiNodeType.Column);
+      const grandchild = graph.createNode('grandchild', UiNodeType.Text);
+      graph.appendChild(parent, child);
+      graph.appendChild(child, grandchild);
+      const text$ = new BehaviorSubject('Hello');
+      const binding = graph.bind(grandchild, 'text', text$, DirtyFlags.Content);
+      graph.removeNode(child);
+      expect(graph.getBindingsForNode(grandchild)).toHaveLength(0);
+      expect(binding.connected()).toBe(false);
     });
   });
 

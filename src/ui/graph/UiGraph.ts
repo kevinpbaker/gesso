@@ -137,20 +137,32 @@ export class UiGraph {
   }
 
   public removeNode(node: UiNode): void {
-    // First stop all reactive subscriptions.
-    this.unbindNode(node);
     const parent = node.parent;
-    // Then remove it from the tree.
-    this.detachNode(node);
-    // Remove it from the node index.
-    this.nodes.delete(node.id);
-    // Remove any dirty state.
-    this.dirtyNodes.delete(node);
+    // Remove the whole subtree, not just the node itself: a
+    // detached child would otherwise stay indexed with stale
+    // dirty state and live bindings.
+    const stack: UiNode[] = [node];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      // First stop all reactive subscriptions.
+      this.unbindNode(current);
+      // Then remove it from the tree.
+      this.detachNode(current);
+      // Remove it from the node index.
+      this.nodes.delete(current.id);
+      // Remove any dirty state.
+      this.dirtyNodes.delete(current);
+      for (let child = current.firstChild; child !== null; child = child.nextSibling) {
+        stack.push(child);
+      }
+    }
     // Structure change: the parent must be re-laid out.
     if (parent !== null) {
       this.markDirty(parent, DirtyFlags.Children);
     }
-    // Notify projection consumers (layout engine) last.
+    // Notify projection consumers (layout engine) last. The
+    // engine's detachNode walks the subtree itself, so a single
+    // notification covers every removed record.
     this.nodeRemovedListener?.(node);
   }
 

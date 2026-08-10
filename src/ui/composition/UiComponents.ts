@@ -18,6 +18,16 @@ export function Button(props: UiProps = {}, ...children: UiElement[]): UiElement
 }
 
 /**
+ * Creates a Box element.
+ *
+ * Boxes are leaves or plain stacked containers sized by
+ * explicit width/height (or flex props).
+ */
+export function Box(props: UiProps = {}, ...children: UiElement[]): UiElement {
+  return createElement(UiNodeType.Box, props, children);
+}
+
+/**
  * Creates a Row element.
  *
  * Accepts either children only or props followed by children.

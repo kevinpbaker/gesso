@@ -126,15 +126,15 @@ describe('UiFactory', () => {
 
   describe('element-as-props guard', () => {
     it('throws when Text receives an element as props', () => {
-      expect(() => Text(Text({ text: 'Hello' }) as UiProps)).toThrow(/UiElement/);
+      expect(() => Text(Text({ text: 'Hello' }) as unknown as UiProps)).toThrow(/UiElement/);
     });
 
     it('throws when Button receives an element as props', () => {
-      expect(() => Button(Text({ text: 'Save' }) as UiProps)).toThrow(/UiElement/);
+      expect(() => Button(Text({ text: 'Save' }) as unknown as UiProps)).toThrow(/UiElement/);
     });
 
     it('throws when ScrollView receives an element as props', () => {
-      expect(() => ScrollView(Text({ text: 'Hello' }) as UiProps)).toThrow(/UiElement/);
+      expect(() => ScrollView(Text({ text: 'Hello' }) as unknown as UiProps)).toThrow(/UiElement/);
     });
 
     it('allows elements as children alongside props', () => {
