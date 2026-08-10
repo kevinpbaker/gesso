@@ -30,6 +30,15 @@ export class UiGraph {
    */
   private dirtyListener: (() => void) | null = null;
 
+  /**
+   * Notified whenever a node is removed from the graph.
+   *
+   * Consumers that keep per-node projections (such as the
+   * layout engine) subscribe here so their state stays in sync
+   * with tree lifetime.
+   */
+  private nodeRemovedListener: ((node: UiNode) => void) | null = null;
+
   public readonly root: UiNode;
 
   private readonly bindings = new Map<BindingId, UiBinding<unknown>>();
@@ -130,12 +139,19 @@ export class UiGraph {
   public removeNode(node: UiNode): void {
     // First stop all reactive subscriptions.
     this.unbindNode(node);
+    const parent = node.parent;
     // Then remove it from the tree.
     this.detachNode(node);
     // Remove it from the node index.
     this.nodes.delete(node.id);
     // Remove any dirty state.
     this.dirtyNodes.delete(node);
+    // Structure change: the parent must be re-laid out.
+    if (parent !== null) {
+      this.markDirty(parent, DirtyFlags.Children);
+    }
+    // Notify projection consumers (layout engine) last.
+    this.nodeRemovedListener?.(node);
   }
 
   public detachNode(node: UiNode): void {
@@ -295,6 +311,16 @@ export class UiGraph {
    */
   public setDirtyListener(listener: (() => void) | null): void {
     this.dirtyListener = listener;
+  }
+
+  /**
+   * Subscribes to node removals.
+   *
+   * The listener is invoked once per removed node. Pass null to
+   * clear the subscription.
+   */
+  public setNodeRemovedListener(listener: ((node: UiNode) => void) | null): void {
+    this.nodeRemovedListener = listener;
   }
 
   /**

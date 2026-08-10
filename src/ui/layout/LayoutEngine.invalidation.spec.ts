@@ -1,0 +1,177 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { Column, ScrollView, Text } from '../composition/UiComponents';
+import { UiGraphBuilder } from '../composition/UiGraphBuilder';
+import { DirtyFlags } from '../graph/DirtyFlags';
+import { UiGraph } from '../graph/UiGraph';
+import type { UiNode } from '../graph/UiNode';
+import { UiFrame } from '../scheduler/UiFrame';
+import { UiManualFrameClock } from '../scheduler/UiFrameClock';
+import { UiScheduler } from '../scheduler/UiScheduler';
+import { LayoutEngine } from './LayoutEngine';
+import { Constraints } from './LayoutTypes';
+
+describe('LayoutEngine invalidation', () => {
+  function createHarness(constraints: Constraints = Constraints.loose(400, 400)) {
+    const graph = new UiGraph();
+    const engine = new LayoutEngine();
+    const clock = new UiManualFrameClock(() => {});
+    const builder = new UiGraphBuilder(graph);
+    let root: UiNode | undefined;
+    const onFrame = vi.fn((frame: UiFrame) => {
+      engine.layoutForFrame(frame, constraints, root!);
+    });
+    const scheduler = new UiScheduler({
+      clock: callback => {
+        clock.setCallback(callback);
+        return clock;
+      },
+      dirty: graph.getDirtyNodes(),
+      onFrame
+    });
+    graph.setDirtyListener(() => scheduler.notifyDirty());
+    graph.setNodeRemovedListener(node => engine.detachNode(node));
+    return {
+      graph,
+      engine,
+      clock,
+      builder,
+      scheduler,
+      onFrame,
+      get root() {
+        if (root === undefined) {
+          throw new Error('No root built yet.');
+        }
+        return root;
+      },
+      set root(node: UiNode | undefined) {
+        root = node;
+      }
+    };
+  }
+
+  function firstFrame(h: ReturnType<typeof createHarness>): UiFrame {
+    h.clock.tick(0);
+    return h.onFrame.mock.calls[0][0];
+  }
+
+  describe('build and measure', () => {
+    it('lays out the initial build', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      firstFrame(h);
+      const text = h.root.firstChild!;
+      expect(h.engine.recordFor(text)!.measuredWidth).toBe(30);
+      expect(h.engine.recordFor(text)!.measuredHeight).toBe(12);
+    });
+  });
+
+  describe('property invalidation', () => {
+    it('re-measures a text node when its content changes', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      firstFrame(h);
+      const text = h.root.firstChild!;
+      expect(h.engine.recordFor(text)!.measuredWidth).toBe(30);
+
+      h.graph.updateProperty(text.id, 'text', 'HelloWorld', DirtyFlags.Content | DirtyFlags.Layout);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(text)!.measuredWidth).toBe(60);
+    });
+
+    it('re-measures when a layout property changes', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      firstFrame(h);
+      const root = h.root;
+      expect(h.engine.recordFor(root)!.measuredWidth).toBe(30);
+
+      h.graph.updateProperty(root.id, 'padding', 10, DirtyFlags.Layout);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(root)!.measuredWidth).toBe(50);
+      expect(h.engine.recordFor(root.firstChild!)!.x).toBe(10);
+    });
+
+    it('skips measurement for a transform-only change', () => {
+      const h = createHarness();
+      h.root = h.builder.build(
+        Column(
+          ScrollView(
+            { width: 200, height: 100 },
+            Text({ text: 'A', fontSize: 50 }),
+            Text({ text: 'B', fontSize: 50 }),
+            Text({ text: 'C', fontSize: 50 })
+          )
+        )
+      );
+      const scroll = h.root.firstChild!;
+      firstFrame(h);
+      expect(h.engine.recordFor(scroll)!.scrollY).toBe(0);
+      expect(h.engine.recordFor(scroll)!.contentHeight).toBe(180);
+
+      h.graph.updateProperty(scroll.id, 'scrollY', 30, DirtyFlags.Transform);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(scroll)!.scrollY).toBe(30);
+    });
+
+    it('clears dirty state after the frame', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      const text = h.root.firstChild!;
+      firstFrame(h);
+      expect(text.isDirty()).toBe(false);
+    });
+  });
+
+  describe('structure invalidation', () => {
+    it('drops layout records for removed nodes', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(Text({ text: 'A' }), Text({ text: 'B' })));
+      firstFrame(h);
+      const second = h.root.lastChild!;
+      expect(h.engine.recordFor(second)).toBeDefined();
+
+      h.root = h.builder.build(Column(Text({ text: 'A' })));
+      h.clock.tick(0);
+      expect(h.engine.recordFor(second)).toBeUndefined();
+    });
+
+    it('lays out newly added children', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(Text({ text: 'A', fontSize: 10 })));
+      firstFrame(h);
+      expect(h.root.firstChild!.nextSibling).toBeNull();
+
+      h.root = h.builder.build(Column(Text({ text: 'A', fontSize: 10 }), Text({ text: 'B', fontSize: 10 })));
+      h.clock.tick(0);
+      const second = h.root.firstChild!.nextSibling!;
+      expect(h.engine.recordFor(second)).toBeDefined();
+      expect(h.engine.recordFor(second)!.y).toBe(12);
+    });
+  });
+
+  describe('node type handling', () => {
+    it('lays out a ScrollView subtree built via the builder', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column(ScrollView({ width: 200, height: 100 }, Text({ text: 'Hello', fontSize: 10 }))));
+      firstFrame(h);
+      const scroll = h.root.firstChild!;
+      const rec = h.engine.recordFor(scroll)!;
+      expect(rec.width).toBe(200);
+      expect(rec.height).toBe(100);
+      expect(h.engine.recordFor(scroll.firstChild!)).toBeDefined();
+    });
+  });
+
+  it('marks the parent dirty when children change via build', () => {
+    const h = createHarness();
+    h.root = h.builder.build(Column(Text({ text: 'A' })));
+    firstFrame(h);
+    h.onFrame.mockClear();
+
+    h.root = h.builder.build(Column(Text({ text: 'A' }), Text({ text: 'B' })));
+    const frame = firstFrame(h);
+    expect(frame.nodes).toContain(h.root);
+    expect(frame.dirtyFlagsFor(h.root)).toBe(DirtyFlags.Children);
+  });
+});

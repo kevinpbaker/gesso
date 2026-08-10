@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
+import { propertyEffects } from '../layout/propertyEffects';
 import type { UiElement } from './UiElement';
 import type { UiProps } from './UiProps';
 
@@ -45,7 +46,7 @@ export class UiGraphBuilder {
    */
   build(definition: UiElement, parentId?: string): UiNode {
     const parent = parentId === undefined ? this.graph.root : this.graph.requireNode(parentId);
-    return this.reconcileChildren(parent, [definition])[0];
+    return this.reconcileChildren(parent, [definition]).nodes[0];
   }
 
   /**
@@ -57,10 +58,11 @@ export class UiGraphBuilder {
    * definitions are created, stale children destroyed, and
    * keyed children moved into definition order.
    */
-  private reconcileChildren(parent: UiNode, definitions: readonly UiElement[]): UiNode[] {
+  private reconcileChildren(parent: UiNode, definitions: readonly UiElement[]): { nodes: UiNode[]; changed: boolean } {
     const existing = this.collectChildren(parent);
     const matched = new Set<UiNode>();
     const result: UiNode[] = [];
+    let changed = false;
     let cursor: UiNode | null = parent.firstChild;
 
     for (const [index, definition] of definitions.entries()) {
@@ -80,15 +82,21 @@ export class UiGraphBuilder {
           this.graph.removeNode(stale);
           // Prevent the final cleanup from removing it a second time.
           matched.add(stale);
+          changed = true;
         }
         node = this.createNode(parent, definition, index);
         matched.add(node);
+        changed = true;
       } else {
         matched.add(node);
         this.reconcileProps(node, definition.props);
-        this.reconcileChildren(node, definition.children);
+        if (this.reconcileChildren(node, definition.children).changed) {
+          changed = true;
+        }
       }
-      this.moveBefore(parent, node, cursor);
+      if (this.moveBefore(parent, node, cursor)) {
+        changed = true;
+      }
       cursor = node.nextSibling;
       result.push(node);
     }
@@ -96,9 +104,13 @@ export class UiGraphBuilder {
     for (const node of existing) {
       if (!matched.has(node)) {
         this.graph.removeNode(node);
+        changed = true;
       }
     }
-    return result;
+    if (changed) {
+      this.graph.markDirty(parent, DirtyFlags.Children);
+    }
+    return { nodes: result, changed };
   }
 
   /**
@@ -147,16 +159,17 @@ export class UiGraphBuilder {
   /**
    * Positions a node immediately before the reference node.
    */
-  private moveBefore(parent: UiNode, node: UiNode, reference: UiNode | null): void {
+  private moveBefore(parent: UiNode, node: UiNode, reference: UiNode | null): boolean {
     if (node.parent !== parent) {
       this.graph.insertBefore(parent, node, reference);
-      return;
+      return true;
     }
     if (node === reference || node.nextSibling === reference) {
-      return;
+      return false;
     }
     this.graph.detachNode(node);
     this.graph.insertBefore(parent, node, reference);
+    return true;
   }
 
   /**
@@ -185,13 +198,13 @@ export class UiGraphBuilder {
         if (existingBinding !== undefined) {
           this.graph.unbind(existingBinding);
         }
-        this.graph.bind(node, property as NodeProperty, value, DirtyFlags.Properties);
+        this.graph.bind(node, property as NodeProperty, value, propertyEffects(property));
         continue;
       }
       if (existingBinding !== undefined) {
         this.graph.unbind(existingBinding);
       }
-      this.graph.updateProperty(node.id, property as NodeProperty, value, DirtyFlags.Properties);
+      this.graph.updateProperty(node.id, property as NodeProperty, value, propertyEffects(property));
     }
 
     for (const [property, binding] of bindingByProperty) {

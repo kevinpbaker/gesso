@@ -4,5 +4,6 @@ export enum UiNodeType {
   Row = 'row',
   Box = 'box',
   Text = 'text',
-  Button = 'button'
+  Button = 'button',
+  ScrollView = 'scroll-view'
 }

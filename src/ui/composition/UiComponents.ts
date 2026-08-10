@@ -30,3 +30,10 @@ export function Row(...children: UiElement[]): UiElement {
 export function Column(...children: UiElement[]): UiElement {
   return createElement(UiNodeType.Column, {}, children);
 }
+
+/**
+ * Creates a ScrollView element.
+ */
+export function ScrollView(props: UiProps = {}, ...children: UiElement[]): UiElement {
+  return createElement(UiNodeType.ScrollView, props, children);
+}

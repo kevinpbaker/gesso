@@ -1,0 +1,63 @@
+import { Constraints } from './LayoutTypes';
+import type { UiNode } from '../graph/UiNode';
+
+/**
+ * Mutable per-node layout projection owned by LayoutEngine.
+ *
+ * Records are keyed by UiNode identity and survive graph
+ * reconciliation when the node survives. All geometry is
+ * scalar so the projection can later migrate to typed-array
+ * slabs for Worker/shared-memory transfer.
+ */
+export class LayoutRecord {
+  constructor(public readonly node: UiNode) {}
+
+  /** Final border box, parent-content coordinates, pre-scroll. */
+  x = 0;
+  y = 0;
+  width = 0;
+  height = 0;
+
+  /** Desired size under the last constraints. */
+  measuredWidth = 0;
+  measuredHeight = 0;
+
+  /** Measured size plus margins: contribution to the parent. */
+  outerWidth = 0;
+  outerHeight = 0;
+
+  paddingLeft = 0;
+  paddingRight = 0;
+  paddingTop = 0;
+  paddingBottom = 0;
+
+  marginLeft = 0;
+  marginRight = 0;
+  marginTop = 0;
+  marginBottom = 0;
+
+  /** Own min/max resolved from properties (grow/shrink clamps). */
+  minWidth = 0;
+  maxWidth = Infinity;
+  minHeight = 0;
+  maxHeight = Infinity;
+
+  flexGrow = 0;
+  flexShrink = 1;
+  flexBasis: number | undefined = undefined;
+
+  /** Effective scroll offset of a scroll container. */
+  scrollX = 0;
+  scrollY = 0;
+
+  /** Content extent of a scroll container, pre-scroll. */
+  contentWidth = 0;
+  contentHeight = 0;
+
+  /** Constraints this record was last measured under. */
+  lastConstraints: Constraints = Constraints.unbounded();
+
+  measureDirty = true;
+  placeDirty = true;
+  transformDirty = false;
+}
