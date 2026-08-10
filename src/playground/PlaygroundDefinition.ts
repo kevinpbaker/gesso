@@ -79,8 +79,20 @@ export function createDefinition(state: PlaygroundState): UiElement {
     Text({ text: 'Layout Playground', color: state.color$ }),
     Row(
       { gap: 10, alignSelf: 'stretch' },
-      Box({ width: state.boxWidth$, height: state.boxHeight$, backgroundColor: '#1f6feb', borderRadius: 4 }),
-      Box({ flexGrow: state.flexGrow$, height: state.boxHeight$, backgroundColor: '#6f42c1', borderRadius: 4 })
+      Box({
+        width: state.boxWidth$,
+        height: state.boxHeight$,
+        backgroundColor: '#1f6feb',
+        borderRadius: 4,
+        focusable: true
+      }),
+      Box({
+        flexGrow: state.flexGrow$,
+        height: state.boxHeight$,
+        backgroundColor: '#6f42c1',
+        borderRadius: 4,
+        focusable: true
+      })
     ),
     Column(
       {
