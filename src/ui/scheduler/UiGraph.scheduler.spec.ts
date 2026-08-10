@@ -2,14 +2,14 @@ import { Subject } from 'rxjs';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { DirtyFlags } from './DirtyFlags';
+import { DirtyFlags } from '../DirtyFlags';
 import { UiFrame } from './UiFrame';
 import { UiManualFrameClock } from './UiFrameClock';
-import { UiGraph } from './UiGraph';
-import { UiNodeType } from './UiNodeType';
+import { UiGraph } from '../UiGraph';
+import { UiNodeType } from '../UiNodeType';
 import { UiScheduler } from './UiScheduler';
-import { Text } from './composition/UiComponents';
-import { UiGraphBuilder } from './composition/UiGraphBuilder';
+import { Text } from '../composition/UiComponents';
+import { UiGraphBuilder } from '../composition/UiGraphBuilder';
 
 describe('UiGraph with UiScheduler', () => {
   function createRenderedGraph() {

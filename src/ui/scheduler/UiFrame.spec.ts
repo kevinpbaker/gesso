@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { DirtyFlags } from './DirtyFlags';
+import { DirtyFlags } from '../DirtyFlags';
 import { UiFrame } from './UiFrame';
-import { UiNode } from './UiNode';
-import { UiNodeType } from './UiNodeType';
+import { UiNode } from '../UiNode';
+import { UiNodeType } from '../UiNodeType';
 
 describe('UiFrame', () => {
   function createNode(id: string): UiNode {

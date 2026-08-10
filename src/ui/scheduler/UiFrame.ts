@@ -1,6 +1,6 @@
-import { DirtyFlags } from './DirtyFlags';
+import { DirtyFlags } from '../DirtyFlags';
 import type { UiFrameTime } from './UiFrameClock';
-import type { UiNode } from './UiNode';
+import type { UiNode } from '../UiNode';
 
 /**
  * The unit of work produced by one scheduler frame.
