@@ -36,10 +36,29 @@ body {
 }
 
 .pg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.75rem 1rem;
   font-weight: 600;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+}
+
+.pg-nav {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.pg-link {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pg-link:hover {
+  text-decoration: underline;
 }
 
 .pg-main {
@@ -121,6 +140,10 @@ body {
   height: 100%;
 }
 
+.pg-preview canvas.pg-canvas {
+  display: block;
+}
+
 .pg-box {
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -194,4 +217,18 @@ body {
   font-size: 0.8rem;
   font-family: var(--mono);
   color: var(--text);
+}
+
+.pg-status {
+  font-size: 0.8rem;
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+.pg-status + .pg-status {
+  margin-top: 0.25rem;
+}
+
+.pg-status-dim {
+  color: var(--text-dim);
 }

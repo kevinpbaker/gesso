@@ -98,8 +98,9 @@ export class CanvasSurface {
 }
 
 /**
- * Wraps either an HTMLCanvasElement or an OffscreenCanvas.
+ * Wraps any canvas host (HTMLCanvasElement, OffscreenCanvas, or a
+ * test double) in the logical/physical viewport bookkeeping.
  */
-export function createCanvasSurface(canvas: HTMLCanvasElement | OffscreenCanvas): CanvasSurface {
-  return new CanvasSurface(canvas);
+export function createCanvasSurface(host: CanvasHost): CanvasSurface {
+  return new CanvasSurface(host);
 }

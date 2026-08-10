@@ -437,6 +437,15 @@ export class LayoutEngine {
     totalOuterMain += gap * (items.length - 1);
     let freeSpace = contentMain - totalOuterMain;
 
+    if (node.type === UiNodeType.ScrollView) {
+      // Scroll content overflows its viewport instead of compressing
+      // into it: flex shrink/grow on the scroll axis would crush
+      // (or stretch) items that merely need to scroll. Items keep
+      // their measured main size; the viewport is a window, and only
+      // the cross axis still constrains stretch.
+      freeSpace = 0;
+    }
+
     if (freeSpace > 0) {
       let sumGrow = 0;
       for (const item of items) {

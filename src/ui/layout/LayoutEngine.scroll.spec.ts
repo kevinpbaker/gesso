@@ -43,6 +43,23 @@ describe('LayoutEngine scrolling', () => {
       expect(harness.box(c)).toEqual({ x: 0, y: 100, width: 40, height: 50 });
     });
 
+    it('does not shrink content into the viewport without flexShrink', () => {
+      const harness = new LayoutHarness();
+      const scroll = harness.createNode('scroll', UiNodeType.ScrollView);
+      scroll.setProperty('width', 200);
+      scroll.setProperty('height', 100);
+      for (const c of ['a', 'b', 'c']) {
+        const node = harness.createNode(c, UiNodeType.Box);
+        node.setProperty('width', 40);
+        node.setProperty('height', 50);
+        harness.append(scroll, node);
+      }
+      harness.layout(scroll, Constraints.tight(200, 100));
+      expect(harness.box(harness.graph.requireNode('a'))).toEqual({ x: 0, y: 0, width: 40, height: 50 });
+      expect(harness.box(harness.graph.requireNode('b')).y).toBe(50);
+      expect(harness.box(harness.graph.requireNode('c')).y).toBe(100);
+    });
+
     it('scrolls content within the viewport', () => {
       const { harness, scroll } = scrollHarness();
       scroll.setProperty('scrollY', 40);

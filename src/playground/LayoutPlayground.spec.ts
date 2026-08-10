@@ -272,7 +272,7 @@ describe('LayoutPlayground integration', () => {
       const scroll = recordFor(h, 'root:0:4');
       expect(scroll.width).toBe(300);
       expect(scroll.height).toBe(120);
-      expect(scroll.contentHeight).toBeCloseTo(201.6);
+      expect(scroll.contentHeight).toBeCloseTo(267.6);
       expect(scroll.scrollY).toBe(0);
     });
 
@@ -291,7 +291,7 @@ describe('LayoutPlayground integration', () => {
       tick(h);
       h.state.scrollY$.next(500);
       tick(h);
-      expect(recordFor(h, 'root:0:4').scrollY).toBeCloseTo(81.6);
+      expect(recordFor(h, 'root:0:4').scrollY).toBeCloseTo(147.6);
     });
   });
 

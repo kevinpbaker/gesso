@@ -7,7 +7,7 @@ const SCROLL_ITEM_COUNT = 12;
 function scrollItems(): UiElement[] {
   const items: UiElement[] = [];
   for (let i = 1; i <= SCROLL_ITEM_COUNT; i++) {
-    items.push(Text({ text: `Scroll item ${i}` }));
+    items.push(Text({ text: `Scroll item ${i}`, color: '#d1d5db' }));
   }
   return items;
 }
@@ -17,7 +17,10 @@ function scrollItems(): UiElement[] {
  * the runtime node id stays `${parent}:${key}` across reorders.
  */
 function keyedItem(key: string): UiElement {
-  return Column({ key, gap: 4 }, Text({ text: `Item ${key}` }));
+  return Column(
+    { key, gap: 4, backgroundColor: 'rgba(31,111,235,0.12)', borderColor: '#1f6feb', borderWidth: 1, borderRadius: 4 },
+    Text({ text: `Item ${key}`, color: '#111827' })
+  );
 }
 
 /**
@@ -76,17 +79,37 @@ export function createDefinition(state: PlaygroundState): UiElement {
     Text({ text: 'Layout Playground', color: state.color$ }),
     Row(
       { gap: 10, alignSelf: 'stretch' },
-      Box({ width: state.boxWidth$, height: state.boxHeight$ }),
-      Box({ flexGrow: state.flexGrow$, height: state.boxHeight$ })
+      Box({ width: state.boxWidth$, height: state.boxHeight$, backgroundColor: '#1f6feb', borderRadius: 4 }),
+      Box({ flexGrow: state.flexGrow$, height: state.boxHeight$, backgroundColor: '#6f42c1', borderRadius: 4 })
     ),
     Column(
-      { gap: 8, minWidth: state.minWidth$, maxWidth: state.maxWidth$ },
-      Text({ text: 'Nested Column' }),
-      Button({ text: 'Button A' }),
-      Button({ text: 'Button B' })
+      {
+        gap: 8,
+        minWidth: state.minWidth$,
+        maxWidth: state.maxWidth$,
+        backgroundColor: 'rgba(31,111,235,0.06)',
+        borderColor: '#60a5fa',
+        borderWidth: 1,
+        borderRadius: 6
+      },
+      Text({ text: 'Nested Column', color: '#1e293b' }),
+      Button({ text: 'Button A', color: '#ffffff', backgroundColor: '#1f6feb', textAlign: 'center', borderRadius: 4 }),
+      Button({ text: 'Button B', color: '#ffffff', backgroundColor: '#1f6feb', textAlign: 'center', borderRadius: 4 })
     ),
     Column({ gap: 6 }, ...keyedItems),
-    ScrollView({ width: 300, height: 120, scrollY: state.scrollY$ }, ...scrollItems())
+    ScrollView(
+      {
+        width: 300,
+        height: 120,
+        scrollY: state.scrollY$,
+        gap: 6,
+        backgroundColor: 'rgba(16,185,129,0.06)',
+        borderColor: '#10b981',
+        borderWidth: 1,
+        borderRadius: 6
+      },
+      ...scrollItems()
+    )
   ];
   if (stress !== undefined) {
     children.push(stress);
