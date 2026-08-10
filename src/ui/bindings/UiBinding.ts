@@ -1,10 +1,9 @@
 import { Observable, Subscription } from 'rxjs';
-import { DirtyFlags } from './DirtyFlags';
-import { type NodeId } from './UiNode';
-import { UiGraph } from './UiGraph';
+import type { DirtyFlags } from '../graph/DirtyFlags';
+import type { NodeId, NodeProperty } from '../graph/UiNode';
+import type { UiGraph } from '../graph/UiGraph';
 
 export type BindingId = number;
-export type NodeProperty = string;
 
 export class UiBinding<T> {
   constructor(

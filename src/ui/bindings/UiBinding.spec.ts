@@ -1,6 +1,6 @@
 import { BehaviorSubject, Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DirtyFlags } from './DirtyFlags';
+import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiBinding } from './UiBinding';
 
 describe('UiBinding', () => {

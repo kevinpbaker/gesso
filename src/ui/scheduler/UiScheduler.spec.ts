@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DirtyFlags } from '../DirtyFlags';
-import { DirtyNodeSet } from '../DirtyNodeSet';
+import { DirtyFlags } from '../graph/DirtyFlags';
+import { DirtyNodeSet } from '../graph/DirtyNodeSet';
 import { UiFrame } from './UiFrame';
 import { UiManualFrameClock } from './UiFrameClock';
-import { UiNode } from '../UiNode';
-import { UiNodeType } from '../UiNodeType';
+import { UiNode } from '../graph/UiNode';
+import { UiNodeType } from '../graph/UiNodeType';
 import { UiScheduler } from './UiScheduler';
 
 describe('UiScheduler', () => {

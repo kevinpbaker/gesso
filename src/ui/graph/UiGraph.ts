@@ -1,8 +1,8 @@
 import { DirtyFlags } from './DirtyFlags';
 import { DirtyNodeSet } from './DirtyNodeSet';
-import { type NodeId, UiNode } from './UiNode';
+import { type NodeId, type NodeProperty, UiNode } from './UiNode';
 import { UiNodeType } from './UiNodeType';
-import { type BindingId, type NodeProperty, UiBinding } from './UiBinding.ts';
+import { type BindingId, UiBinding } from '../bindings/UiBinding';
 import type { Observable } from 'rxjs';
 
 export class UiGraph {

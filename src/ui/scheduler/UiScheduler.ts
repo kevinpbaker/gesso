@@ -1,8 +1,8 @@
-import { DirtyFlags } from '../DirtyFlags';
-import { DirtyNodeSet } from '../DirtyNodeSet';
+import { DirtyFlags } from '../graph/DirtyFlags';
+import { DirtyNodeSet } from '../graph/DirtyNodeSet';
 import { UiFrame } from './UiFrame';
 import type { UiFrameClock, UiFrameClockFactory, UiFrameTime } from './UiFrameClock';
-import type { UiNode } from '../UiNode';
+import type { UiNode } from '../graph/UiNode';
 
 export type UiFrameCallback = (frame: UiFrame) => void;
 

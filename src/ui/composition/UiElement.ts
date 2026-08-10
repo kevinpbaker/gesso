@@ -1,4 +1,4 @@
-import type { UiNodeType } from '../UiNodeType';
+import type { UiNodeType } from '../graph/UiNodeType';
 import type { UiProps } from './UiProps';
 
 /**

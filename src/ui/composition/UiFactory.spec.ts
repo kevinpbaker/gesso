@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { UiNodeType } from '../UiNodeType';
+import { UiNodeType } from '../graph/UiNodeType';
 import { Button, Column, Row, Text } from './UiComponents';
 import { createElement } from './UiFactory';
 

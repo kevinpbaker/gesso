@@ -1,8 +1,8 @@
 import { Observable } from 'rxjs';
 
-import { DirtyFlags } from '../DirtyFlags';
-import { UiGraph } from '../UiGraph';
-import type { NodeProperty, UiNode } from '../UiNode';
+import { DirtyFlags } from '../graph/DirtyFlags';
+import { UiGraph } from '../graph/UiGraph';
+import type { NodeProperty, UiNode } from '../graph/UiNode';
 import type { UiElement } from './UiElement';
 import type { UiProps } from './UiProps';
 

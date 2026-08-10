@@ -2,9 +2,9 @@ import { BehaviorSubject, Subject } from 'rxjs';
 
 import { describe, expect, it } from 'vitest';
 
-import { UiGraph } from '../UiGraph';
-import { UiNodeType } from '../UiNodeType';
-import type { UiNode } from '../UiNode';
+import { UiGraph } from '../graph/UiGraph';
+import { UiNodeType } from '../graph/UiNodeType';
+import type { UiNode } from '../graph/UiNode';
 import { Button, Column, Row, Text } from './UiComponents';
 import { UiGraphBuilder } from './UiGraphBuilder';
 

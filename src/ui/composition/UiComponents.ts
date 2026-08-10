@@ -1,4 +1,4 @@
-import { UiNodeType } from '../UiNodeType';
+import { UiNodeType } from '../graph/UiNodeType';
 import { createElement } from './UiFactory';
 import type { UiElement } from './UiElement';
 import type { UiProps } from './UiProps';
