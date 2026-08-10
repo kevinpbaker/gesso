@@ -1,3 +1,5 @@
+import { BehaviorSubject } from 'rxjs';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { Column, ScrollView, Text } from '../composition/UiComponents';
@@ -160,6 +162,37 @@ describe('LayoutEngine invalidation', () => {
       expect(rec.width).toBe(200);
       expect(rec.height).toBe(100);
       expect(h.engine.recordFor(scroll.firstChild!)).toBeDefined();
+    });
+  });
+
+  describe('declarative props', () => {
+    it('lays out a Column built with gap and padding props', () => {
+      const h = createHarness();
+      h.root = h.builder.build(
+        Column({ gap: 8, padding: 4 }, Text({ text: 'Hello', fontSize: 10 }), Text({ text: 'World', fontSize: 10 }))
+      );
+      firstFrame(h);
+      const first = h.root.firstChild!;
+      const second = first.nextSibling!;
+      expect(h.engine.recordFor(first)!.x).toBe(4);
+      expect(h.engine.recordFor(first)!.y).toBe(4);
+      expect(h.engine.recordFor(second)!.x).toBe(4);
+      expect(h.engine.recordFor(second)!.y).toBe(24);
+    });
+
+    it('re-lays out when a declarative gap prop changes via binding', () => {
+      const h = createHarness();
+      const gap$ = new BehaviorSubject(8);
+      h.root = h.builder.build(
+        Column({ gap: gap$, padding: 4 }, Text({ text: 'Hello', fontSize: 10 }), Text({ text: 'World', fontSize: 10 }))
+      );
+      firstFrame(h);
+      const second = h.root.firstChild!.nextSibling!;
+      expect(h.engine.recordFor(second)!.y).toBe(24);
+
+      gap$.next(20);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(second)!.y).toBe(36);
     });
   });
 

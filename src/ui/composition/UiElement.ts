@@ -1,4 +1,4 @@
-import type { UiNodeType } from '../graph/UiNodeType';
+import { UiNodeType } from '../graph/UiNodeType';
 import type { UiProps } from './UiProps';
 
 /**
@@ -25,4 +25,23 @@ export interface UiElement {
    * Child elements.
    */
   readonly children: readonly UiElement[];
+}
+
+/**
+ * Returns true when the value structurally matches a UiElement.
+ *
+ * Used to distinguish a UiElement from a plain UiProps record at runtime.
+ */
+export function isUiElement(value: unknown): value is UiElement {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Partial<UiElement>;
+  return (
+    (Object.values(UiNodeType) as unknown[]).includes(candidate.type) &&
+    typeof candidate.props === 'object' &&
+    candidate.props !== null &&
+    !Array.isArray(candidate.props) &&
+    Array.isArray(candidate.children)
+  );
 }

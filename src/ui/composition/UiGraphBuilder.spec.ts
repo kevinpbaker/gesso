@@ -122,6 +122,27 @@ describe('UiGraphBuilder', () => {
     });
   });
 
+  describe('container props', () => {
+    it('writes flex props declared on a Column', () => {
+      const { builder } = createBuilder();
+      const root = builder.build(Column({ gap: 8, padding: 4 }, Text({ text: 'A' }), Text({ text: 'B' })));
+      expect(root.type).toBe(UiNodeType.Column);
+      expect(root.getProperty('gap')).toBe(8);
+      expect(root.getProperty('padding')).toBe(4);
+      const children = getChildren(root);
+      expect(children).toHaveLength(2);
+      expect(children.map(child => child.getProperty('text'))).toEqual(['A', 'B']);
+    });
+
+    it('writes alignment props declared on a Row', () => {
+      const { builder } = createBuilder();
+      const root = builder.build(Row({ justifyContent: 'center', alignItems: 'center' }, Text({ text: 'A' })));
+      expect(root.type).toBe(UiNodeType.Row);
+      expect(root.getProperty('justifyContent')).toBe('center');
+      expect(root.getProperty('alignItems')).toBe('center');
+    });
+  });
+
   describe('reactive properties', () => {
     it('creates a binding for an Observable property', () => {
       const { graph, builder } = createBuilder();

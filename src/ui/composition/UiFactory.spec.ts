@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { UiNodeType } from '../graph/UiNodeType';
-import { Button, Column, Row, Text } from './UiComponents';
+import { Button, Column, Row, ScrollView, Text } from './UiComponents';
 import { createElement } from './UiFactory';
+import type { UiProps } from './UiProps';
 
 describe('UiFactory', () => {
   describe('createElement', () => {
@@ -76,6 +77,19 @@ describe('UiFactory', () => {
       const row = Row(first, second);
       expect(row.children).toEqual([first, second]);
     });
+
+    it('forwards props alongside children', () => {
+      const first = Text({
+        text: 'A'
+      });
+      const second = Text({
+        text: 'B'
+      });
+      const row = Row({ gap: 8 }, first, second);
+      expect(row.type).toBe(UiNodeType.Row);
+      expect(row.props).toEqual({ gap: 8 });
+      expect(row.children).toEqual([first, second]);
+    });
   });
 
   describe('Column', () => {
@@ -94,6 +108,39 @@ describe('UiFactory', () => {
       });
       const column = Column(first, second);
       expect(column.children).toEqual([first, second]);
+    });
+
+    it('forwards props alongside children', () => {
+      const first = Text({
+        text: 'A'
+      });
+      const second = Text({
+        text: 'B'
+      });
+      const column = Column({ padding: 4, gap: 8 }, first, second);
+      expect(column.type).toBe(UiNodeType.Column);
+      expect(column.props).toEqual({ padding: 4, gap: 8 });
+      expect(column.children).toEqual([first, second]);
+    });
+  });
+
+  describe('element-as-props guard', () => {
+    it('throws when Text receives an element as props', () => {
+      expect(() => Text(Text({ text: 'Hello' }) as UiProps)).toThrow(/UiElement/);
+    });
+
+    it('throws when Button receives an element as props', () => {
+      expect(() => Button(Text({ text: 'Save' }) as UiProps)).toThrow(/UiElement/);
+    });
+
+    it('throws when ScrollView receives an element as props', () => {
+      expect(() => ScrollView(Text({ text: 'Hello' }) as UiProps)).toThrow(/UiElement/);
+    });
+
+    it('allows elements as children alongside props', () => {
+      const child = Text({ text: 'Save' });
+      const button = Button({ text: 'Save' }, child);
+      expect(button.children).toEqual([child]);
     });
   });
 
