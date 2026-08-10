@@ -38,7 +38,20 @@ const LAYOUT_PROPERTIES = new Set([
   'direction'
 ]);
 
-const PAINT_PROPERTIES = new Set(['color', 'backgroundColor', 'opacity', 'visible']);
+const PAINT_PROPERTIES = new Set([
+  'color',
+  'backgroundColor',
+  'opacity',
+  'visible',
+  'borderColor',
+  'borderWidth',
+  'borderRadius',
+  'transform',
+  'textAlign',
+  'verticalAlign',
+  'image',
+  'objectFit'
+]);
 
 /**
  * Classifies a property's effect so dirty flags encode the

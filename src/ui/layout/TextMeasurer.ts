@@ -4,6 +4,16 @@ export interface TextMeasureRequest {
   text: string;
   fontSize: number;
   maxWidth?: number;
+  /**
+   * Font family for platforms that can shape text.
+   *
+   * Deterministic measurers may ignore every style field; they
+   * are hints for platform-backed implementations only.
+   */
+  fontFamily?: string;
+  fontWeight?: string | number;
+  lineHeight?: number;
+  letterSpacing?: number;
 }
 
 /**

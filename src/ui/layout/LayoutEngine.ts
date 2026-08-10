@@ -337,7 +337,14 @@ export class LayoutEngine {
       if (isFinite(effective.maxWidth)) {
         maxWidth = effective.maxWidth;
       }
-      return this.textMeasurer.measure({ text, fontSize, maxWidth });
+      return this.textMeasurer.measure({
+        text,
+        fontSize,
+        fontFamily: this.stringProp(node, 'fontFamily'),
+        fontWeight: this.weightProp(node),
+        lineHeight: this.numberProp(node, 'lineHeight'),
+        maxWidth
+      });
     }
     return { width: 0, height: 0 };
   }
@@ -603,10 +610,14 @@ export class LayoutEngine {
     const constraints = this.rootConstraints;
     let width = rec.measuredWidth;
     let height = rec.measuredHeight;
-    if (constraints.hasBoundedWidth()) {
+    // A root without an explicit size fills the bounded constraints
+    // (app-viewport behavior); an explicit size wins instead.
+    const explicitWidth = this.numberProp(this.layoutRoot!, 'width');
+    const explicitHeight = this.numberProp(this.layoutRoot!, 'height');
+    if (explicitWidth === undefined && constraints.hasBoundedWidth()) {
       width = constraints.maxWidth;
     }
-    if (constraints.hasBoundedHeight()) {
+    if (explicitHeight === undefined && constraints.hasBoundedHeight()) {
       height = constraints.maxHeight;
     }
     width = Math.max(width, constraints.minWidth);
@@ -644,8 +655,16 @@ export class LayoutEngine {
     });
   }
 
+  /**
+   * Constraints for measuring a child of a container.
+   *
+   * Children are measured under the container's max bounds with a
+   * zero minimum, so a tight parent (e.g. the root under the
+   * viewport) never forces a child to fill it: explicit sizes and
+   * flex grow/shrink decide the final box, like CSS replaced sizing.
+   */
   private childConstraints(child: UiNode, content: Constraints): Constraints {
-    return tightenConstraints(content, {
+    return tightenConstraints(new Constraints(0, content.maxWidth, 0, content.maxHeight), {
       width: this.numberProp(child, 'width'),
       height: this.numberProp(child, 'height'),
       minWidth: this.numberProp(child, 'minWidth'),
@@ -689,6 +708,25 @@ export class LayoutEngine {
 
   private numberProp(node: UiNode, property: string): number | undefined {
     const value = node.properties.get(property);
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    return undefined;
+  }
+
+  private stringProp(node: UiNode, property: string): string | undefined {
+    const value = node.properties.get(property);
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+    return undefined;
+  }
+
+  private weightProp(node: UiNode): string | number | undefined {
+    const value = node.properties.get('fontWeight');
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
     if (typeof value === 'number' && Number.isFinite(value)) {
       return value;
     }
