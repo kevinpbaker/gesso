@@ -1,0 +1,138 @@
+import { DirtyFlags } from './DirtyFlags';
+import { DirtyNodeSet } from './DirtyNodeSet';
+import { UiFrame } from './UiFrame';
+import type { UiFrameClock, UiFrameClockFactory, UiFrameTime } from './UiFrameClock';
+import type { UiNode } from './UiNode';
+
+export type UiFrameCallback = (frame: UiFrame) => void;
+
+export interface UiSchedulerOptions {
+  /**
+   * Builds the frame clock for this scheduler.
+   */
+  clock: UiFrameClockFactory;
+  /**
+   * The shared dirty set. The graph marks into it and the
+   * scheduler drains it on each frame.
+   */
+  dirty: DirtyNodeSet;
+  /**
+   * Receives one UiFrame per processed tick.
+   */
+  onFrame: UiFrameCallback;
+}
+
+/**
+ * Decides when a dirty graph gets processed.
+ *
+ * No observable emission reaches this directly. Marking a node
+ * dirty only calls notifyDirty(), which arms a frame at most
+ * once. Additional marks are coalesced into the pending frame.
+ *
+ * The scheduler is timing agnostic: it drives whatever clock it
+ * is given, so the same runtime works on the main thread, in a
+ * Worker, and in tests.
+ */
+export class UiScheduler {
+  private readonly clock: UiFrameClock;
+  private readonly dirty: DirtyNodeSet;
+  private readonly onFrame: UiFrameCallback;
+
+  private disposed = false;
+  private active = true;
+  private pending = false;
+  private frames = 0;
+
+  constructor(options: UiSchedulerOptions) {
+    this.dirty = options.dirty;
+    this.onFrame = options.onFrame;
+    this.clock = options.clock((time: UiFrameTime) => {
+      this.handleFrame(time);
+    });
+  }
+
+  /**
+   * Called whenever a node becomes dirty.
+   *
+   * Arms a frame only when none is already pending.
+   */
+  notifyDirty(): void {
+    if (this.disposed || !this.active || this.pending) {
+      return;
+    }
+    this.pending = true;
+    this.clock.requestFrame();
+  }
+
+  start(): void {
+    if (this.disposed) {
+      throw new Error('UiScheduler is disposed.');
+    }
+    if (this.active) {
+      return;
+    }
+    this.active = true;
+    if (!this.dirty.isEmpty()) {
+      this.notifyDirty();
+    }
+  }
+
+  stop(): void {
+    if (!this.active) {
+      return;
+    }
+    this.active = false;
+    this.pending = false;
+    this.clock.cancelFrame();
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.active = false;
+    this.pending = false;
+    this.clock.cancelFrame();
+  }
+
+  get running(): boolean {
+    return this.active;
+  }
+
+  get framePending(): boolean {
+    return this.pending;
+  }
+
+  get frameCount(): number {
+    return this.frames;
+  }
+
+  private handleFrame(time: UiFrameTime): void {
+    this.pending = false;
+    const frame = this.collectFrame(time);
+    if (frame.size > 0) {
+      this.onFrame(frame);
+    }
+    // Work may have arrived while the frame was being processed.
+    // The dirty listener also arms a frame, but this covers a
+    // scheduler used without a listener wired to the graph.
+    if (!this.dirty.isEmpty()) {
+      this.notifyDirty();
+    }
+  }
+
+  private collectFrame(time: UiFrameTime): UiFrame {
+    const nodes = this.dirty.take();
+    const dirty = new Map<UiNode, DirtyFlags>();
+    for (const node of nodes) {
+      dirty.set(node, node.dirtyFlags);
+      node.dirtyFlags = DirtyFlags.None;
+    }
+    const frame = new UiFrame(this.frames, time, dirty);
+    if (dirty.size > 0) {
+      this.frames++;
+    }
+    return frame;
+  }
+}

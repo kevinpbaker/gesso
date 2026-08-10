@@ -1,4 +1,5 @@
 import { DirtyFlags } from './DirtyFlags';
+import { DirtyNodeSet } from './DirtyNodeSet';
 import { type NodeId, UiNode } from './UiNode';
 import { UiNodeType } from './UiNodeType';
 import { type BindingId, type NodeProperty, UiBinding } from './UiBinding.ts';
@@ -19,7 +20,15 @@ export class UiGraph {
    * A single subtree-invalidated node can represent thousands
    * of affected descendants.
    */
-  private readonly dirtyRoots = new Set<UiNode>();
+  private readonly dirtyNodes = new DirtyNodeSet();
+
+  /**
+   * Notified whenever a node newly becomes dirty.
+   *
+   * A scheduler subscribes here so that marking dirty can arm
+   * a frame without the graph knowing about timing.
+   */
+  private dirtyListener: (() => void) | null = null;
 
   public readonly root: UiNode;
 
@@ -126,7 +135,7 @@ export class UiGraph {
     // Remove it from the node index.
     this.nodes.delete(node.id);
     // Remove any dirty state.
-    this.dirtyRoots.delete(node);
+    this.dirtyNodes.delete(node);
   }
 
   public detachNode(node: UiNode): void {
@@ -261,12 +270,11 @@ export class UiGraph {
   // ---------------------------------------------------------------------------
 
   public markDirty(node: UiNode, flags: DirtyFlags): void {
+    const newlyDirty = this.dirtyNodes.mark(node);
     node.dirtyFlags |= flags;
-    if (flags & DirtyFlags.SubtreeLayout) {
-      this.dirtyRoots.add(node);
-      return;
+    if (newlyDirty) {
+      this.dirtyListener?.();
     }
-    this.dirtyRoots.add(node);
   }
 
   public markDirtyById(id: NodeId, flags: DirtyFlags): void {
@@ -276,7 +284,24 @@ export class UiGraph {
 
   public clearDirty(node: UiNode): void {
     node.dirtyFlags = DirtyFlags.None;
-    this.dirtyRoots.delete(node);
+    this.dirtyNodes.delete(node);
+  }
+
+  /**
+   * Subscribes to new dirty marks.
+   *
+   * The listener is invoked once per node that newly enters the
+   * dirty set. Pass null to clear the subscription.
+   */
+  public setDirtyListener(listener: (() => void) | null): void {
+    this.dirtyListener = listener;
+  }
+
+  /**
+   * The shared dirty set, for a scheduler to drain.
+   */
+  public getDirtyNodes(): DirtyNodeSet {
+    return this.dirtyNodes;
   }
 
   public updateProperty<T>(
@@ -300,10 +325,9 @@ export class UiGraph {
   // ---------------------------------------------------------------------------
 
   public processDirty(callback: (node: UiNode) => void): void {
-    for (const root of this.dirtyRoots) {
+    for (const root of this.dirtyNodes.take()) {
       this.traverse(root, callback);
     }
-    this.dirtyRoots.clear();
   }
 
   public traverse(node: UiNode, callback: (node: UiNode) => void): void {
