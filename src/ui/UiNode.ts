@@ -27,7 +27,7 @@ export class UiNode {
    *   public firstChild: UiNode | null = null;
    *   public lastChild: UiNode | null = null;
    *
-   *   public previousSibling: UINode | null = null;
+   *   public previousSibling: UiNode | null = null;
    *   public nextSibling: UiNode | null = null;
    *
    *   public dirtyFlags: DirtyFlags = DirtyFlags.None;

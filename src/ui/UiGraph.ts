@@ -279,7 +279,7 @@ export class UiGraph {
     }
   }
 
-  public traverseChildren(node: UINode, callback: (child: UINode) => void): void {
+  public traverseChildren(node: UiNode, callback: (child: UiNode) => void): void {
     let child = node.firstChild;
     while (child !== null) {
       callback(child);

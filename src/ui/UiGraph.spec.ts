@@ -361,7 +361,7 @@ describe('UiGraph', () => {
     graph.markDirty(node, DirtyFlags.Content);
     graph.markDirty(node, DirtyFlags.Paint);
     graph.markDirty(node, DirtyFlags.Layout);
-    const processed: UINode[] = [];
+    const processed: UiNode[] = [];
     graph.processDirty(current => {
       processed.push(current);
     });
