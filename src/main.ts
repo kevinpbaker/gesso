@@ -2,12 +2,18 @@ import './style.css';
 import { mountBindingDemo } from './playground/BindingDemoView';
 import { mountCanvasPlayground } from './playground/CanvasPlaygroundView';
 import { mountPlayground } from './playground/PlaygroundView';
+import { mountWebGPUPlayground } from './playground/WebGPUPlaygroundView';
+import { mountWebGPUBenchmark } from './playground/WebGPUBenchmarkView';
+import { mountComparison } from './playground/ComparisonView';
 
 type Mount = (host: HTMLElement) => () => void;
 
 const ROUTES: Record<string, Mount> = {
   debug: mountPlayground,
   canvas: mountCanvasPlayground,
+  webgpu: mountWebGPUPlayground,
+  compare: mountComparison,
+  benchmark: mountWebGPUBenchmark,
   binding: mountBindingDemo,
   nothing: mountBindingDemo
 };

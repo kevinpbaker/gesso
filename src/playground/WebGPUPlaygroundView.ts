@@ -1,7 +1,7 @@
 import type { Observable } from 'rxjs';
 
 import { UiAnimationFrameClock } from '../ui/scheduler';
-import { CanvasPreview } from './CanvasPreview';
+import { WebGPUPreview } from './WebGPUPreview';
 import { LayoutPlayground } from './LayoutPlayground';
 import { mountPlaygroundShell, scrollStatsText } from './PlaygroundControls';
 import { createDefinition } from './PlaygroundDefinition';
@@ -9,19 +9,16 @@ import { PlaygroundState } from './PlaygroundState';
 import { rewireFocusableBoxes, wirePlaygroundInput } from './PlaygroundInput';
 
 /**
- * Route that proves the runtime works end-to-end: the same
- * playground scenes the DOM-box route shows are painted by the real
- * library renderer (Canvas2DRenderer) onto a canvas, sharing a
- * canvas-backed text measurer with the layout engine.
+ * Route that renders the playground through the WebGPU backend.
  *
- * This version also wires the full input layer: hit testing,
- * dispatch, pointer/wheel/keyboard controllers, focus management
- * and a platform adapter so user interactions (hover, press, click,
- * wheel scroll, Tab navigation) are visible on the canvas.
+ * It reuses the same LayoutPlayground, UiGraph and definition as the
+ * Canvas2D route; only the preview object changes. If WebGPU is
+ * unavailable, the canvas is replaced with a fallback message.
  *
- * Returns a dispose function so the hash router can swap routes.
+ * Input is wired through the same renderer-agnostic platform adapter
+ * used by the Canvas2D route.
  */
-export function mountCanvasPlayground(host: HTMLElement): () => void {
+export function mountWebGPUPlayground(host: HTMLElement): () => void {
   const state = new PlaygroundState();
   const shell = mountPlaygroundShell(host, state);
 
@@ -31,7 +28,7 @@ export function mountCanvasPlayground(host: HTMLElement): () => void {
   canvas.style.touchAction = 'none';
   shell.preview.appendChild(canvas);
 
-  const preview = new CanvasPreview(canvas);
+  const preview = new WebGPUPreview(canvas);
   const playground = new LayoutPlayground({
     clock: callback => new UiAnimationFrameClock(callback),
     textMeasurer: preview.textMeasurer
@@ -45,18 +42,17 @@ export function mountCanvasPlayground(host: HTMLElement): () => void {
     });
   }
 
+  let initialized = false;
+
   playground.setOnUpdate(refresh);
   playground.build(createDefinition(state));
   rewireFocusableBoxes(playground.layoutRoot);
 
   // -------------------------------------------------------------------------
-  // Input layer wiring (shared with WebGPU route)
+  // Input layer wiring (shared with Canvas2D route)
   // -------------------------------------------------------------------------
   const detachInput = wirePlaygroundInput(playground, state, canvas, shell);
 
-  // -------------------------------------------------------------------------
-  // Resize + render
-  // -------------------------------------------------------------------------
   const resizeObserver = new ResizeObserver(entries => {
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
@@ -68,18 +64,31 @@ export function mountCanvasPlayground(host: HTMLElement): () => void {
   });
   resizeObserver.observe(shell.preview);
 
+  preview
+    .initialize()
+    .then(() => {
+      initialized = true;
+      refresh();
+      shell.updateSelected('WebGPU initialized with input.');
+    })
+    .catch(error => {
+      shell.updateSelected(`WebGPU unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    });
+
   function refresh(): void {
+    if (!initialized) {
+      return;
+    }
     preview.render(playground.layoutRoot, playground.engine);
     const info = playground.inspect();
     shell.updateMetrics(playground.metrics());
     shell.updateScrollStats(scrollStatsText(info));
   }
 
-  shell.updateSelected('Canvas input demo: hover, press, click, wheel-scroll and Tab are wired.');
-
   return () => {
     detachInput();
     resizeObserver.disconnect();
+    preview.dispose();
     playground.dispose();
   };
 }

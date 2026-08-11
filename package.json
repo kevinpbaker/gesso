@@ -19,6 +19,7 @@
     "*.{js,jsx,ts,tsx,mjs,cjs}": "pnpm run lint"
   },
   "devDependencies": {
+    "@webgpu/types": "^0.1.71",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",
     "typescript": "~6.0.2",
