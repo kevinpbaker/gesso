@@ -1,5 +1,14 @@
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutBox } from '../layout/LayoutTypes';
+import { resolveProperty, resolveNumber, resolveString, resolveBoolean } from '../properties/UiPropertyResolver';
+import { UiProperties } from '../properties/UiProperty';
+import type { UiColor } from '../properties/UiColor';
+import { UiColors, colorToHex, colorToRgba, normalizeColor } from '../properties/UiColor';
+import type { UiBorderRadius } from '../properties/UiBorderRadius';
+import { normalizeBorderRadius } from '../properties/UiBorderRadius';
+import type { UiBoxShadow } from '../properties/UiBoxShadow';
+import type { UiTransform } from '../properties/UiTransform';
+import { parseTransform } from '../properties/UiTransform';
 
 /**
  * Renderer-facing image type.
@@ -9,19 +18,6 @@ import type { LayoutBox } from '../layout/LayoutTypes';
  * HTMLImageElement. Decoding/caching is a separate future layer.
  */
 export type UiImage = ImageBitmap;
-
-/**
- * Affine transform applied around a node's top-left corner.
- */
-export interface UiTransform {
-  /** Additional translation, applied before rotate/scale. */
-  x: number;
-  y: number;
-  scaleX: number;
-  scaleY: number;
-  /** Rotation in radians. */
-  rotation: number;
-}
 
 export type TextAlign = 'left' | 'center' | 'right';
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
@@ -38,12 +34,13 @@ export type ObjectFit = 'fill' | 'cover' | 'contain' | 'none';
 export interface PaintState {
   visible: boolean;
   opacity: number;
-  backgroundColor: string | undefined;
+  backgroundColor: UiColor | undefined;
   image: UiImage | undefined;
   objectFit: ObjectFit;
-  borderColor: string | undefined;
+  borderColor: UiColor | undefined;
   borderWidth: number;
-  borderRadius: number;
+  borderRadius: UiBorderRadius;
+  boxShadows: readonly UiBoxShadow[];
   hasTransform: boolean;
   transform: UiTransform;
   text: string | undefined;
@@ -51,7 +48,7 @@ export interface PaintState {
   fontFamily: string;
   fontWeight: string | number;
   lineHeight: number;
-  textColor: string;
+  textColor: UiColor;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
 }
@@ -59,7 +56,7 @@ export interface PaintState {
 export const DEFAULT_FONT_SIZE = 14;
 export const DEFAULT_FONT_FAMILY = 'sans-serif';
 export const DEFAULT_FONT_WEIGHT = 'normal';
-export const DEFAULT_TEXT_COLOR = '#000';
+export const DEFAULT_TEXT_COLOR = UiColors.black;
 export const DEFAULT_LINE_HEIGHT_FACTOR = 1.2;
 
 export function normalizeTextAlign(value: unknown): TextAlign {
@@ -83,69 +80,6 @@ export function normalizeVerticalAlign(value: unknown): VerticalAlign {
 }
 
 /**
- * Parses a node transform property into an identity-or-transformed
- * description. Any single-field object that equals the identity is
- * reported as "no transform".
- */
-export function parseTransform(value: unknown): UiTransform | undefined {
-  if (typeof value !== 'object' || value === null) {
-    return undefined;
-  }
-  const candidate = value as Partial<UiTransform>;
-  const transform: UiTransform = {
-    x: toFinite(candidate.x) ?? 0,
-    y: toFinite(candidate.y) ?? 0,
-    scaleX: toFinite(candidate.scaleX) ?? 1,
-    scaleY: toFinite(candidate.scaleY) ?? 1,
-    rotation: toFinite(candidate.rotation) ?? 0
-  };
-  if (isIdentityTransform(transform)) {
-    return undefined;
-  }
-  return transform;
-}
-
-function isIdentityTransform(transform: UiTransform): boolean {
-  return (
-    transform.x === 0 &&
-    transform.y === 0 &&
-    transform.scaleX === 1 &&
-    transform.scaleY === 1 &&
-    transform.rotation === 0
-  );
-}
-
-/**
- * Creates a fresh default PaintState with its transform scratch
- * pre-allocated. The result is meant to be reused across nodes.
- */
-export function createPaintState(): PaintState {
-  return {
-    visible: true,
-    opacity: 1,
-    backgroundColor: undefined,
-    image: undefined,
-    objectFit: 'fill',
-    borderColor: undefined,
-    borderWidth: 0,
-    borderRadius: 0,
-    hasTransform: false,
-    transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
-    text: undefined,
-    fontSize: DEFAULT_FONT_SIZE,
-    fontFamily: DEFAULT_FONT_FAMILY,
-    fontWeight: DEFAULT_FONT_WEIGHT,
-    // 0 means "unset": derive from fontSize, since fontSize itself
-    // is a mutable default that callers may override after this
-    // factory runs.
-    lineHeight: 0,
-    textColor: DEFAULT_TEXT_COLOR,
-    textAlign: 'left',
-    verticalAlign: 'top'
-  };
-}
-
-/**
  * Folds a node's properties into the supplied paint state.
  *
  * Mutates `out` and returns it. The renderer owns one scratch and
@@ -153,47 +87,40 @@ export function createPaintState(): PaintState {
  * objects are allocated per frame.
  */
 export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
-  const props = node.properties;
-  out.visible = props.get('visible') !== false;
+  out.visible = resolveBoolean(node, 'visible') ?? true;
 
-  const opacity = toFinite(props.get('opacity'));
+  const opacity = resolveNumber(node, 'opacity');
   out.opacity = opacity === undefined ? 1 : Math.min(Math.max(opacity, 0), 1);
 
-  out.backgroundColor = stringOrUndefined(props.get('backgroundColor'));
-  out.borderColor = stringOrUndefined(props.get('borderColor'));
-  out.borderWidth = toFinite(props.get('borderWidth')) ?? 0;
-  out.borderRadius = Math.max(0, toFinite(props.get('borderRadius')) ?? 0);
-  out.image = parseImage(props.get('image'));
-  out.objectFit = parseObjectFit(props.get('objectFit'));
+  out.backgroundColor = normalizeColor(resolveProperty(node, UiProperties.backgroundColor));
+  out.borderColor = normalizeColor(resolveProperty(node, UiProperties.borderColor));
+  out.borderWidth = resolveNumber(node, 'borderWidth') ?? 0;
+  out.borderRadius = normalizeBorderRadius(resolveProperty(node, UiProperties.borderRadius));
+  out.boxShadows = resolveProperty(node, UiProperties.boxShadows);
+  out.image = parseImage(node.properties.get('image'));
+  out.objectFit = parseObjectFit(node.properties.get('objectFit'));
 
-  const rawTransform = props.get('transform');
-  if (rawTransform !== undefined) {
-    const parsed = parseTransform(rawTransform);
-    out.hasTransform = parsed !== undefined;
-    if (parsed !== undefined) {
-      out.transform.x = parsed.x;
-      out.transform.y = parsed.y;
-      out.transform.scaleX = parsed.scaleX;
-      out.transform.scaleY = parsed.scaleY;
-      out.transform.rotation = parsed.rotation;
-    }
+  const rawTransform = node.properties.get('transform');
+  const parsedTransform = rawTransform !== undefined ? parseTransform(rawTransform) : undefined;
+  if (parsedTransform !== undefined) {
+    out.hasTransform = true;
+    out.transform = parsedTransform;
   } else {
     out.hasTransform = false;
   }
 
-  const text = props.get('text');
-  out.text = typeof text === 'string' && text.length > 0 ? text : undefined;
+  const text = resolveString(node, 'text');
+  out.text = text;
 
-  const fontSize = toFinite(props.get('fontSize'));
-  out.fontSize = fontSize === undefined ? DEFAULT_FONT_SIZE : fontSize;
-  out.fontFamily = stringOrUndefined(props.get('fontFamily')) ?? DEFAULT_FONT_FAMILY;
-  const fontWeight = props.get('fontWeight');
-  out.fontWeight = parseFontWeight(fontWeight) ?? DEFAULT_FONT_WEIGHT;
-  const lineHeight = toFinite(props.get('lineHeight'));
+  out.fontSize = resolveNumber(node, 'fontSize') ?? DEFAULT_FONT_SIZE;
+  out.fontFamily = resolveString(node, 'fontFamily') ?? DEFAULT_FONT_FAMILY;
+  const fontWeight = resolveString(node, 'fontWeight') ?? resolveNumber(node, 'fontWeight');
+  out.fontWeight = fontWeight ?? DEFAULT_FONT_WEIGHT;
+  const lineHeight = resolveNumber(node, 'lineHeight');
   out.lineHeight = lineHeight === undefined || lineHeight <= 0 ? out.fontSize * DEFAULT_LINE_HEIGHT_FACTOR : lineHeight;
-  out.textColor = stringOrUndefined(props.get('color')) ?? DEFAULT_TEXT_COLOR;
-  out.textAlign = normalizeTextAlign(props.get('textAlign'));
-  out.verticalAlign = normalizeVerticalAlign(props.get('verticalAlign'));
+  out.textColor = normalizeColor(resolveProperty(node, UiProperties.color)) ?? UiColors.black;
+  out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
+  out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
 
   return out;
 }
@@ -251,20 +178,43 @@ function parseObjectFit(value: unknown): ObjectFit {
   return 'fill';
 }
 
-function parseFontWeight(value: unknown): string | number | undefined {
-  if (typeof value === 'string' && value.length > 0) {
-    return value;
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  return undefined;
+/**
+ * Creates a fresh default PaintState with its transform scratch
+ * pre-allocated. The result is meant to be reused across nodes.
+ */
+export function createPaintState(): PaintState {
+  return {
+    visible: true,
+    opacity: 1,
+    backgroundColor: undefined,
+    image: undefined,
+    objectFit: 'fill',
+    borderColor: undefined,
+    borderWidth: 0,
+    borderRadius: { topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 },
+    boxShadows: [],
+    hasTransform: false,
+    transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+    text: undefined,
+    fontSize: DEFAULT_FONT_SIZE,
+    fontFamily: DEFAULT_FONT_FAMILY,
+    fontWeight: DEFAULT_FONT_WEIGHT,
+    lineHeight: 0,
+    textColor: DEFAULT_TEXT_COLOR,
+    textAlign: 'left',
+    verticalAlign: 'top'
+  };
 }
 
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function toFinite(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+/**
+ * Converts a UiColor to a CSS color string for renderer consumption.
+ *
+ * Uses hex for fully opaque colors and rgba() when transparency is
+ * involved, matching common Canvas2D conventions.
+ */
+export function colorToCss(color: UiColor): string {
+  if (color.a === 1) {
+    return colorToHex(color);
+  }
+  return colorToRgba(color);
 }

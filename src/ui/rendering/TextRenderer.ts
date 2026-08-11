@@ -2,7 +2,7 @@ import type { TextMeasurer } from '../layout/TextMeasurer';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { Canvas2DContext } from './canvas2d/Canvas2DContext';
 import type { PaintState } from './PaintState';
-import { DEFAULT_LINE_HEIGHT_FACTOR } from './PaintState';
+import { colorToCss, DEFAULT_LINE_HEIGHT_FACTOR } from './PaintState';
 
 /**
  * A positioned line ready to draw.
@@ -76,7 +76,7 @@ export function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState
     return;
   }
   ctx.font = buildFontString(state);
-  ctx.fillStyle = state.textColor;
+  ctx.fillStyle = colorToCss(state.textColor);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   const maxWidth = box.width > 0 ? box.width : undefined;

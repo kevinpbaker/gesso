@@ -78,7 +78,7 @@ describe('CanvasPreview', () => {
     render(h);
 
     const fills = callArgs(h.context, 'set:fillStyle') as unknown as string[];
-    expect(fills).toContain('#ff0000');
+    expect(fills).toContain('#f00');
   });
 
   it('translates scrolled content by the bound scroll offset', () => {

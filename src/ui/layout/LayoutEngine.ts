@@ -381,8 +381,10 @@ export class LayoutEngine {
     if (children.length === 0) {
       return;
     }
-    const justifyContent = parseMainAxisAlignment(node.properties.get('justifyContent'));
-    const alignItems = parseCrossAxisAlignment(node.properties.get('alignItems')) ?? CrossAxisAlignment.Start;
+    const mainAlign = parseMainAxisAlignment(node.properties.get(direction === FlexDirection.Row ? 'x' : 'y'));
+    const crossAlign =
+      parseCrossAxisAlignment(node.properties.get(direction === FlexDirection.Row ? 'y' : 'x')) ??
+      CrossAxisAlignment.Start;
     const gap = this.numberProp(node, 'gap') ?? 0;
 
     const paddingH = rec.paddingLeft + rec.paddingRight;
@@ -412,7 +414,9 @@ export class LayoutEngine {
       const marginMainEnd = direction === FlexDirection.Row ? cRec.marginRight : cRec.marginBottom;
       const marginCrossStart = direction === FlexDirection.Row ? cRec.marginTop : cRec.marginLeft;
       const marginCrossEnd = direction === FlexDirection.Row ? cRec.marginBottom : cRec.marginRight;
-      const alignSelf = parseCrossAxisAlignment(child.properties.get('alignSelf'));
+      const selfAlign = parseCrossAxisAlignment(
+        child.properties.get(direction === FlexDirection.Row ? 'selfY' : 'selfX')
+      );
       items.push({
         child,
         baseMain,
@@ -426,7 +430,7 @@ export class LayoutEngine {
         maxMain,
         grow: cRec.flexGrow,
         shrink: cRec.flexShrink,
-        align: alignSelf ?? alignItems
+        align: selfAlign ?? crossAlign
       });
     }
 
@@ -485,7 +489,7 @@ export class LayoutEngine {
     let leading = 0;
     let between = gap;
     if (freeSpace > 0 && items.length > 0) {
-      switch (justifyContent) {
+      switch (mainAlign) {
         case MainAxisAlignment.Center:
           leading = freeSpace / 2;
           break;

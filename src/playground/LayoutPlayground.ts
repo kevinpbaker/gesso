@@ -99,6 +99,7 @@ export class LayoutPlayground {
    */
   build(definition: UiElement): UiNode {
     this.root = this.builder.build(definition);
+    this.graph.propagateEnvironment(this.root);
     this.trackCreated();
     this.onUpdate?.();
     return this.root;
@@ -170,6 +171,7 @@ export class LayoutPlayground {
     if (root === undefined) {
       return;
     }
+    this.graph.processEnvironmentDirty();
     const start = performance.now();
     this.engine.layoutForFrame(frame, this.constraints, root);
     const duration = performance.now() - start;

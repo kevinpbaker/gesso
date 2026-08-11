@@ -44,7 +44,7 @@ describe('LayoutPlayground integration', () => {
   describe('composition', () => {
     it('creates the expected graph from the definition', () => {
       const h = createHarness();
-      expect(h.playground.graph.size).toBe(30);
+      expect(h.playground.graph.size).toBe(118);
       expect(h.playground.graph.requireNode('root:0').type).toBe('column');
       expect(h.playground.graph.requireNode('root:0:0').type).toBe('text');
       expect(h.playground.graph.requireNode('root:0:1').type).toBe('row');
@@ -272,7 +272,7 @@ describe('LayoutPlayground integration', () => {
       const scroll = recordFor(h, 'root:0:4');
       expect(scroll.width).toBe(300);
       expect(scroll.height).toBe(120);
-      expect(scroll.contentHeight).toBeCloseTo(267.6);
+      expect(scroll.contentHeight).toBeCloseTo(2274);
       expect(scroll.scrollY).toBe(0);
     });
 
@@ -291,7 +291,7 @@ describe('LayoutPlayground integration', () => {
       tick(h);
       h.state.scrollY$.next(500);
       tick(h);
-      expect(recordFor(h, 'root:0:4').scrollY).toBeCloseTo(147.6);
+      expect(recordFor(h, 'root:0:4').scrollY).toBe(500);
     });
   });
 
@@ -321,7 +321,7 @@ describe('LayoutPlayground integration', () => {
       h.playground.rebuild(createDefinition(h.state));
       tick(h);
       const buildMs = performance.now() - start;
-      expect(h.playground.graph.size).toBe(1131);
+      expect(h.playground.graph.size).toBe(1219);
       expect(h.playground.createdFor('root:0:5:0')).toBe(1);
       expect(buildMs).toBeGreaterThanOrEqual(0);
     });

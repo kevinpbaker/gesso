@@ -78,7 +78,7 @@ export function createDefinition(state: PlaygroundState): UiElement {
   const children: UiElement[] = [
     Text({ text: 'Layout Playground', color: state.color$ }),
     Row(
-      { gap: 10, alignSelf: 'stretch' },
+      { gap: 10, selfX: 'stretch' },
       Box({
         width: state.boxWidth$,
         height: state.boxHeight$,

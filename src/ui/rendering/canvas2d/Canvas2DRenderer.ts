@@ -3,8 +3,9 @@ import type { UiNode } from '../../graph/UiNode';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { Canvas2DContext } from './Canvas2DContext';
 import type { CanvasSurface } from './CanvasSurface';
-import { computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
+import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
 import type { PaintState } from '../PaintState';
+import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import type { RenderContext } from '../RenderContext';
 import { drawText } from '../TextRenderer';
 import type { UiRenderer } from '../UiRenderer';
@@ -172,9 +173,9 @@ export class Canvas2DRenderer implements UiRenderer {
     if (paint.backgroundColor === undefined) {
       return;
     }
-    ctx.fillStyle = paint.backgroundColor;
-    if (paint.borderRadius > 0) {
-      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, paint.borderRadius);
+    ctx.fillStyle = colorToCss(paint.backgroundColor);
+    if (!borderRadiusIsZero(paint.borderRadius)) {
+      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
       ctx.fill();
     } else {
       ctx.fillRect(rec.x, rec.y, rec.width, rec.height);
@@ -196,11 +197,11 @@ export class Canvas2DRenderer implements UiRenderer {
     if (paint.borderWidth <= 0) {
       return;
     }
-    ctx.strokeStyle = paint.borderColor ?? '#000';
+    ctx.strokeStyle = paint.borderColor !== undefined ? colorToCss(paint.borderColor) : '#000';
     ctx.lineWidth = paint.borderWidth;
     ctx.lineJoin = 'round';
-    if (paint.borderRadius > 0) {
-      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, paint.borderRadius);
+    if (!borderRadiusIsZero(paint.borderRadius)) {
+      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
       ctx.stroke();
     } else {
       ctx.strokeRect(rec.x, rec.y, rec.width, rec.height);

@@ -3,8 +3,10 @@ import type { UiNode } from '../../graph/UiNode';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import { resolvePaintState, createPaintState } from '../PaintState';
+import { colorToCss } from '../PaintState';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
+import { uniformBorderRadius } from '../../properties/UiBorderRadius';
 
 export const INSTANCE_STRIDE_FLOATS = 18;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
@@ -173,7 +175,7 @@ export function buildRenderList(
           rec.width,
           rec.height,
           color,
-          paint.borderRadius,
+          uniformBorderRadius(paint.borderRadius),
           effectiveOpacity,
           0,
           PrimitiveKind.Fill,
@@ -193,7 +195,7 @@ export function buildRenderList(
           rec.width,
           rec.height,
           color,
-          paint.borderRadius,
+          uniformBorderRadius(paint.borderRadius),
           effectiveOpacity,
           paint.borderWidth,
           PrimitiveKind.Border,
@@ -216,7 +218,7 @@ export function buildRenderList(
         fontFamily: paint.fontFamily,
         fontWeight: paint.fontWeight,
         lineHeight: paint.lineHeight,
-        textColor: paint.textColor,
+        textColor: colorToCss(paint.textColor),
         textAlign: paint.textAlign,
         verticalAlign: paint.verticalAlign,
         scissor: currentScissor

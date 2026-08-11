@@ -1,3 +1,5 @@
+import type { UiColor } from '../../properties/UiColor';
+
 export interface RgbaColor {
   r: number;
   g: number;
@@ -5,10 +7,19 @@ export interface RgbaColor {
   a: number;
 }
 
+function isUiColor(value: unknown): value is UiColor {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const c = value as Partial<UiColor>;
+  return typeof c.r === 'number' && typeof c.g === 'number' && typeof c.b === 'number' && typeof c.a === 'number';
+}
+
 /**
- * Parses a CSS color string into normalized RGBA.
+ * Parses a color value into normalized RGBA.
  *
- * Supports:
+ * Accepts either a renderer-independent UiColor object or a CSS
+ * color string. Supports:
  *   #rgb, #rgba, #rrggbb, #rrggbbaa
  *   rgb(r,g,b), rgba(r,g,b,a)
  *   named colors: transparent, black, white, red, green, blue
@@ -17,6 +28,9 @@ export interface RgbaColor {
  * drawing instead of crashing.
  */
 export function parseColor(value: unknown): RgbaColor | undefined {
+  if (isUiColor(value)) {
+    return { r: value.r, g: value.g, b: value.b, a: value.a };
+  }
   if (typeof value !== 'string') {
     return undefined;
   }

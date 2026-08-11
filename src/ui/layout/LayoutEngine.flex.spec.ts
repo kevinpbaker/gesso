@@ -191,7 +191,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('centers on the main axis', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('justifyContent', 'center');
+      root.setProperty('y', 'center');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('width', 40);
       a.setProperty('height', 20);
@@ -203,7 +203,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('pins to the end', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('justifyContent', 'end');
+      root.setProperty('y', 'end');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('height', 20);
       harness.append(root, a);
@@ -214,7 +214,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('spaces children evenly', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('justifyContent', 'space-evenly');
+      root.setProperty('y', 'space-evenly');
       const a = harness.createNode('a', UiNodeType.Box);
       const b = harness.createNode('b', UiNodeType.Box);
       a.setProperty('height', 20);
@@ -228,7 +228,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('splits space between children', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('justifyContent', 'space-between');
+      root.setProperty('y', 'space-between');
       const a = harness.createNode('a', UiNodeType.Box);
       const b = harness.createNode('b', UiNodeType.Box);
       a.setProperty('height', 20);
@@ -242,7 +242,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('leaves space around children', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('justifyContent', 'space-around');
+      root.setProperty('y', 'space-around');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('height', 20);
       harness.append(root, a);
@@ -257,10 +257,10 @@ describe('LayoutEngine flex (Row/Column)', () => {
       expect(harness.box(harness.graph.requireNode('a')).x).toBe(0);
     });
 
-    it('centers with alignItems', () => {
+    it('centers with y cross-axis alignment', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('alignItems', 'center');
+      root.setProperty('x', 'center');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('width', 40);
       a.setProperty('height', 20);
@@ -269,10 +269,10 @@ describe('LayoutEngine flex (Row/Column)', () => {
       expect(harness.box(a).x).toBe(130);
     });
 
-    it('pins to the end with alignItems', () => {
+    it('pins to the end with cross-axis alignment', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('alignItems', 'end');
+      root.setProperty('x', 'end');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('width', 40);
       a.setProperty('height', 20);
@@ -284,7 +284,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('stretches to the cross size', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('alignItems', 'stretch');
+      root.setProperty('x', 'stretch');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('height', 20);
       harness.append(root, a);
@@ -295,7 +295,7 @@ describe('LayoutEngine flex (Row/Column)', () => {
     it('aligns a row child vertically to center', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Row);
-      root.setProperty('alignItems', 'center');
+      root.setProperty('y', 'center');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('width', 40);
       a.setProperty('height', 20);
@@ -304,14 +304,14 @@ describe('LayoutEngine flex (Row/Column)', () => {
       expect(harness.box(a).y).toBe(90);
     });
 
-    it('overrides alignItems with alignSelf', () => {
+    it('overrides cross-axis alignment with selfX', () => {
       const harness = new LayoutHarness();
       const root = harness.createNode('app', UiNodeType.Column);
-      root.setProperty('alignItems', 'start');
+      root.setProperty('x', 'start');
       const a = harness.createNode('a', UiNodeType.Box);
       a.setProperty('width', 40);
       a.setProperty('height', 20);
-      a.setProperty('alignSelf', 'end');
+      a.setProperty('selfX', 'end');
       harness.append(root, a);
       harness.layout(root, Constraints.loose(300, 200));
       expect(harness.box(a).x).toBe(260);

@@ -9,15 +9,17 @@ export {
   resolvePaintState,
   normalizeTextAlign,
   normalizeVerticalAlign,
-  parseTransform,
   computeObjectFitRect,
+  colorToCss,
   DEFAULT_FONT_SIZE,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_WEIGHT,
   DEFAULT_TEXT_COLOR,
   DEFAULT_LINE_HEIGHT_FACTOR
 } from './PaintState';
-export type { PaintState, UiTransform, UiImage, TextAlign, VerticalAlign, ObjectFit } from './PaintState';
+export type { PaintState, UiImage, TextAlign, VerticalAlign, ObjectFit } from './PaintState';
+export { parseTransform } from '../properties/UiTransform';
+export type { UiTransform } from '../properties/UiTransform';
 export type { LayoutReader, RenderContext } from './RenderContext';
 export { layoutTextLines, drawText, buildFontString } from './TextRenderer';
 export type { TextLinePlacement } from './TextRenderer';

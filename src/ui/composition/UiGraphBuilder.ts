@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
-import { propertyEffects } from '../layout/propertyEffects';
+import { propertyEffects } from '../properties/UiPropertyRegistry';
 import type { UiElement } from './UiElement';
 import type { UiProps } from './UiProps';
 

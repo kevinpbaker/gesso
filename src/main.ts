@@ -5,6 +5,7 @@ import { mountPlayground } from './playground/PlaygroundView';
 import { mountWebGPUPlayground } from './playground/WebGPUPlaygroundView';
 import { mountWebGPUBenchmark } from './playground/WebGPUBenchmarkView';
 import { mountComparison } from './playground/ComparisonView';
+import { mountThemePlayground } from './playground/ThemePlaygroundView';
 
 type Mount = (host: HTMLElement) => () => void;
 
@@ -15,6 +16,7 @@ const ROUTES: Record<string, Mount> = {
   compare: mountComparison,
   benchmark: mountWebGPUBenchmark,
   binding: mountBindingDemo,
+  theme: mountThemePlayground,
   nothing: mountBindingDemo
 };
 

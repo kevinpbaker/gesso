@@ -6,6 +6,6 @@ export { Constraints, clampSize, constraintsEqual, tightenConstraints } from './
 export type { LayoutBox, LayoutResult, Size, TightenOptions } from './LayoutTypes';
 export { FlexDirection, parseFlexDirection } from './FlexDirection';
 export { CrossAxisAlignment, MainAxisAlignment, parseCrossAxisAlignment, parseMainAxisAlignment } from './Alignment';
-export { propertyEffects } from './propertyEffects';
+export { propertyEffects } from '../properties/UiPropertyRegistry';
 export { contentOffset, accumulatedOffsetTo } from './LayoutTransform';
 export type { Transform } from './LayoutTransform';

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
+import { parseTransform } from '../properties/UiTransform';
 import {
   computeObjectFitRect,
   createPaintState,
@@ -11,7 +12,6 @@ import {
   DEFAULT_TEXT_COLOR,
   normalizeTextAlign,
   normalizeVerticalAlign,
-  parseTransform,
   resolvePaintState
 } from './PaintState';
 
@@ -33,14 +33,14 @@ describe('resolvePaintState', () => {
     expect(state.objectFit).toBe('fill');
     expect(state.borderColor).toBeUndefined();
     expect(state.borderWidth).toBe(0);
-    expect(state.borderRadius).toBe(0);
+    expect(state.borderRadius).toEqual({ topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 });
     expect(state.hasTransform).toBe(false);
     expect(state.text).toBeUndefined();
     expect(state.fontSize).toBe(DEFAULT_FONT_SIZE);
     expect(state.fontFamily).toBe(DEFAULT_FONT_FAMILY);
     expect(state.fontWeight).toBe(DEFAULT_FONT_WEIGHT);
     expect(state.lineHeight).toBe(DEFAULT_FONT_SIZE * 1.2);
-    expect(state.textColor).toBe(DEFAULT_TEXT_COLOR);
+    expect(state.textColor).toEqual(DEFAULT_TEXT_COLOR);
     expect(state.textAlign).toBe('left');
     expect(state.verticalAlign).toBe('top');
   });
@@ -57,16 +57,21 @@ describe('resolvePaintState', () => {
     expect(resolve({ opacity: -0.2 }).opacity).toBe(0);
   });
 
-  it('reads background and border colors', () => {
-    expect(resolve({ backgroundColor: '#ff0000' }).backgroundColor).toBe('#ff0000');
-    expect(resolve({ borderColor: 'blue' }).borderColor).toBe('blue');
+  it('reads background and border colors as UiColor', () => {
+    expect(resolve({ backgroundColor: '#ff0000' }).backgroundColor).toEqual({ r: 1, g: 0, b: 0, a: 1 });
+    expect(resolve({ borderColor: 'blue' }).borderColor).toEqual({ r: 0, g: 0, b: 1, a: 1 });
   });
 
   it('reads border width and radius, clamping radius at zero', () => {
     const state = resolve({ borderWidth: 3, borderRadius: -4 });
     expect(state.borderWidth).toBe(3);
-    expect(state.borderRadius).toBe(0);
-    expect(resolve({ borderRadius: 8 }).borderRadius).toBe(8);
+    expect(state.borderRadius).toEqual({ topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 });
+    expect(resolve({ borderRadius: 8 }).borderRadius).toEqual({
+      topLeft: 8,
+      topRight: 8,
+      bottomRight: 8,
+      bottomLeft: 8
+    });
   });
 
   it('reads an image only when it carries dimensions', () => {
@@ -97,7 +102,7 @@ describe('resolvePaintState', () => {
     expect(state.fontFamily).toBe('Arial');
     expect(state.fontWeight).toBe(700);
     expect(state.lineHeight).toBe(30);
-    expect(state.textColor).toBe('#0f0');
+    expect(state.textColor).toEqual({ r: 0, g: 1, b: 0, a: 1 });
   });
 
   it('treats empty text and invalid numeric styles as absent', () => {
@@ -106,7 +111,7 @@ describe('resolvePaintState', () => {
     expect(state.fontSize).toBe(DEFAULT_FONT_SIZE);
     expect(state.fontWeight).toBe(DEFAULT_FONT_WEIGHT);
     expect(state.lineHeight).toBe(DEFAULT_FONT_SIZE * 1.2);
-    expect(state.textColor).toBe(DEFAULT_TEXT_COLOR);
+    expect(state.textColor).toEqual(DEFAULT_TEXT_COLOR);
   });
 
   it('normalizes text alignment', () => {

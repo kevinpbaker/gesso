@@ -100,7 +100,7 @@ describe('buildFontString', () => {
 describe('drawText', () => {
   it('installs the text style and draws each line', () => {
     const ctx = new RecordingCanvasContext();
-    const textState = state({ text: 'Hi', fontSize: 10, textColor: '#0a0', textAlign: 'center' });
+    const textState = state({ text: 'Hi', fontSize: 10, textColor: { r: 0, g: 1, b: 0, a: 1 }, textAlign: 'center' });
     drawText(ctx, { x: 10, y: 20, width: 100, height: 40 }, textState, measurer);
 
     const names = ctx.calls.map(call => call.name);
