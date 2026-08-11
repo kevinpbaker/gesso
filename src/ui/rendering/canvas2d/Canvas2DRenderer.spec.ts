@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { UiNodeType } from '../graph/UiNodeType';
-import type { UiNode } from '../graph/UiNode';
-import { Constraints } from '../layout/LayoutTypes';
-import { callArgs, callNames, RenderHarness, savedDepth } from './RenderTestUtils';
+import { UiNodeType } from '../../graph/UiNodeType';
+import type { UiNode } from '../../graph/UiNode';
+import { Constraints } from '../../layout/LayoutTypes';
+import { callArgs, callNames, RenderHarness, savedDepth } from '../RenderTestUtils';
 
 function box(harness: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
   const node = harness.createNode(id, UiNodeType.Box);

@@ -1,9 +1,9 @@
-export { Canvas2DRenderer, traceRoundedRect } from './Canvas2DRenderer';
-export type { Canvas2DRendererOptions } from './Canvas2DRenderer';
-export type { Canvas2DContext } from './Canvas2DContext';
-export { CanvasSurface, createCanvasSurface } from './CanvasSurface';
-export type { CanvasHost } from './CanvasSurface';
-export { CanvasTextMeasurer } from './CanvasTextMeasurer';
+export { Canvas2DRenderer, traceRoundedRect } from './canvas2d/Canvas2DRenderer';
+export type { Canvas2DRendererOptions } from './canvas2d/Canvas2DRenderer';
+export type { Canvas2DContext } from './canvas2d/Canvas2DContext';
+export { CanvasSurface, createCanvasSurface } from './canvas2d/CanvasSurface';
+export type { CanvasHost } from './canvas2d/CanvasSurface';
+export { CanvasTextMeasurer } from './canvas2d/CanvasTextMeasurer';
 export {
   createPaintState,
   resolvePaintState,

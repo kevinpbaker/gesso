@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 import { Box, Column, Row, ScrollView, Text } from '../ui/composition';
 import type { UiElement } from '../ui/composition';
 
-const SCROLL_ITEM_COUNT = 12;
+const SCROLL_ITEM_COUNT = 100;
 
 const MESSAGES = ['Binding 0', 'Binding 1', 'Binding 2', 'Binding 3', 'Binding 4'];
 const COLORS = ['#1f6feb', '#6f42c1', '#10b981', '#f59e0b', '#ef4444'];

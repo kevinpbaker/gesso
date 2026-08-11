@@ -282,3 +282,33 @@ describe('buildRenderList text', () => {
     expect(list.textItems[0].textColor).toBe('#123456');
   });
 });
+
+describe('buildRenderList scrolling', () => {
+  it('translates scrolled children by the scroll offset', () => {
+    const h = new RenderHarness();
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 200);
+    scroll.setProperty('height', 100);
+    scroll.setProperty('scrollY', 30);
+    const child = box(h, 'child', { width: 200, height: 200, backgroundColor: '#aaa', flexShrink: 0 });
+    h.graph.appendChild(scroll, child);
+    h.layout(scroll, Constraints.loose(800, 600));
+    const list = buildRenderList(scroll, h.engine, 800, 600, 1);
+    const inst = readInstance(list, 0);
+    expect(inst.transform[5]).toBe(-30);
+  });
+
+  it('keeps the scissor fixed at the scroll viewport while content scrolls', () => {
+    const h = new RenderHarness();
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 200);
+    scroll.setProperty('height', 100);
+    scroll.setProperty('scrollY', 30);
+    const child = box(h, 'child', { width: 200, height: 200, backgroundColor: '#aaa', flexShrink: 0 });
+    h.graph.appendChild(scroll, child);
+    h.layout(scroll, Constraints.loose(800, 600));
+    const list = buildRenderList(scroll, h.engine, 800, 600, 1);
+    expect(list.commands.length).toBeGreaterThan(0);
+    expect(list.commands[0].scissor).toEqual({ x: 0, y: 0, width: 200, height: 100 });
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CanvasTextMeasurer } from './CanvasTextMeasurer';
-import { RecordingCanvasContext } from './RenderTestUtils';
+import { RecordingCanvasContext } from '../RenderTestUtils';
 
 describe('CanvasTextMeasurer', () => {
   it('measures text through the context with the requested font', () => {

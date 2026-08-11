@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CanvasSurface } from './CanvasSurface';
-import { FakeCanvasHost, RecordingCanvasContext } from './RenderTestUtils';
+import { FakeCanvasHost, RecordingCanvasContext } from '../RenderTestUtils';
 
 describe('CanvasSurface', () => {
   it('starts empty with a default dpr of one', () => {

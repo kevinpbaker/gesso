@@ -1,7 +1,7 @@
-import type { Size } from '../layout/LayoutTypes';
-import type { TextMeasurer, TextMeasureRequest } from '../layout/TextMeasurer';
+import type { Size } from '../../layout/LayoutTypes';
+import type { TextMeasurer, TextMeasureRequest } from '../../layout/TextMeasurer';
 import type { Canvas2DContext } from './Canvas2DContext';
-import { buildFontString } from './TextRenderer';
+import { buildFontString } from '../TextRenderer';
 
 const DEFAULT_LINE_HEIGHT_FACTOR = 1.2;
 const MAX_CACHE_ENTRIES = 4096;

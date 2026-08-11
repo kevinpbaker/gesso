@@ -2,7 +2,7 @@ import { Box, Button, Column, Row, ScrollView, Text } from '../ui/composition';
 import type { UiElement, UiProps } from '../ui/composition';
 import type { PlaygroundState } from './PlaygroundState';
 
-const SCROLL_ITEM_COUNT = 12;
+const SCROLL_ITEM_COUNT = 100;
 
 function scrollItems(): UiElement[] {
   const items: UiElement[] = [];

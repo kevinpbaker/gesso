@@ -1,13 +1,13 @@
-import { UiNodeType } from '../graph/UiNodeType';
-import type { UiNode } from '../graph/UiNode';
-import type { LayoutRecord } from '../layout/LayoutRecord';
+import { UiNodeType } from '../../graph/UiNodeType';
+import type { UiNode } from '../../graph/UiNode';
+import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { Canvas2DContext } from './Canvas2DContext';
 import type { CanvasSurface } from './CanvasSurface';
-import { computeObjectFitRect, createPaintState, resolvePaintState } from './PaintState';
-import type { PaintState } from './PaintState';
-import type { RenderContext } from './RenderContext';
-import { drawText } from './TextRenderer';
-import type { UiRenderer } from './UiRenderer';
+import { computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
+import type { PaintState } from '../PaintState';
+import type { RenderContext } from '../RenderContext';
+import { drawText } from '../TextRenderer';
+import type { UiRenderer } from '../UiRenderer';
 
 export interface Canvas2DRendererOptions {
   /**

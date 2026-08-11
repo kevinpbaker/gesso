@@ -7,10 +7,10 @@ import type { TextMeasurer } from '../layout/TextMeasurer';
 import { Constraints } from '../layout/LayoutTypes';
 import type { LayoutBox, LayoutResult } from '../layout/LayoutTypes';
 import type { LayoutRecord } from '../layout/LayoutRecord';
-import { Canvas2DRenderer } from './Canvas2DRenderer';
-import type { Canvas2DContext } from './Canvas2DContext';
-import { CanvasSurface } from './CanvasSurface';
-import type { CanvasHost } from './CanvasSurface';
+import { Canvas2DRenderer } from './canvas2d/Canvas2DRenderer';
+import type { Canvas2DContext } from './canvas2d/Canvas2DContext';
+import { CanvasSurface } from './canvas2d/CanvasSurface';
+import type { CanvasHost } from './canvas2d/CanvasSurface';
 
 export interface RecordedCall {
   name: string;

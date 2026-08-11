@@ -63,17 +63,18 @@ interface RenderState {
    * translations. Children inherit this; drawing uses ctm * T(rec).
    */
   ctm: [number, number, number, number, number, number];
-  /** Current clip in layout (logical) coordinates. */
-  clip: LayoutBox | null;
-  /** Whether the current clip should be applied via scissor. */
-  hasClip: boolean;
+  /**
+   * Current clip as a screen-space scissor rectangle in physical
+   * pixels. It is already transformed, so descendants that live in a
+   * scrolled/translated coordinate space can use it directly.
+   */
+  clip: ScissorRect | null;
 }
 
 interface StackFrame {
   opacity: number;
   ctm: [number, number, number, number, number, number];
-  clip: LayoutBox | null;
-  hasClip: boolean;
+  clip: ScissorRect | null;
 }
 
 const IDENTITY_TRANSFORM: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
@@ -104,8 +105,7 @@ export function buildRenderList(
   const state: RenderState = {
     opacity: 1,
     ctm: [...IDENTITY_TRANSFORM],
-    clip: null,
-    hasClip: false
+    clip: null
   };
 
   function flushIfScissorChanged(next: ScissorRect | null): void {
@@ -140,11 +140,27 @@ export function buildRenderList(
     const effectiveTransform = translateTransform(nodeCtm, rec.x, rec.y);
 
     const isScroll = node.type === UiNodeType.ScrollView;
-    const nextClip = isScroll ? scrollClip(rec, state.clip) : state.clip;
-    const nextHasClip = nextClip !== null;
+    let nextClip = state.clip;
+    if (isScroll) {
+      // The scroll viewport lives in the container's own (pre-scroll)
+      // coordinate space, so it must be transformed by the container's
+      // CTM, not by the scrolled content CTM inherited by children.
+      const viewportScissor = logicalClipToScissor(
+        { x: rec.x, y: rec.y, width: rec.width, height: rec.height },
+        nodeCtm,
+        logicalWidth,
+        logicalHeight,
+        dpr
+      );
+      nextClip =
+        viewportScissor === null
+          ? null
+          : state.clip === null
+            ? viewportScissor
+            : intersectScissors(state.clip, viewportScissor);
+    }
 
-    const scissor = nextHasClip ? logicalClipToScissor(nextClip!, nodeCtm, logicalWidth, logicalHeight, dpr) : null;
-    flushIfScissorChanged(scissor);
+    flushIfScissorChanged(nextClip);
 
     // Background fill.
     if (paint.backgroundColor !== undefined) {
@@ -212,13 +228,11 @@ export function buildRenderList(
       const saved: StackFrame = {
         opacity: state.opacity,
         ctm: state.ctm,
-        clip: state.clip,
-        hasClip: state.hasClip
+        clip: state.clip
       };
       state.opacity = effectiveOpacity;
       state.ctm = nodeCtm;
       state.clip = nextClip;
-      state.hasClip = nextHasClip;
 
       // Scroll containers translate their content by the scroll offset.
       if (isScroll) {
@@ -234,7 +248,6 @@ export function buildRenderList(
       state.opacity = saved.opacity;
       state.ctm = saved.ctm;
       state.clip = saved.clip;
-      state.hasClip = saved.hasClip;
     }
   }
 
@@ -335,26 +348,23 @@ function translateTransform(
   return [transform[0], transform[1], transform[2], transform[3], transform[4] + dx, transform[5] + dy];
 }
 
-function scrollClip(rec: LayoutRecord, parentClip: LayoutBox | null): LayoutBox {
-  const viewport: LayoutBox = {
-    x: rec.x,
-    y: rec.y,
-    width: rec.width,
-    height: rec.height
-  };
-  if (parentClip === null) {
-    return viewport;
+function intersectScissors(a: ScissorRect | null, b: ScissorRect | null): ScissorRect | null {
+  if (a === null) {
+    return b;
   }
-  const left = Math.max(parentClip.x, viewport.x);
-  const top = Math.max(parentClip.y, viewport.y);
-  const right = Math.min(parentClip.x + parentClip.width, viewport.x + viewport.width);
-  const bottom = Math.min(parentClip.y + parentClip.height, viewport.y + viewport.height);
-  return {
-    x: left,
-    y: top,
-    width: Math.max(0, right - left),
-    height: Math.max(0, bottom - top)
-  };
+  if (b === null) {
+    return a;
+  }
+  const left = Math.max(a.x, b.x);
+  const top = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.width, b.x + b.width);
+  const bottom = Math.min(a.y + a.height, b.y + b.height);
+  const width = Math.max(0, right - left);
+  const height = Math.max(0, bottom - top);
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+  return { x: left, y: top, width, height };
 }
 
 function logicalClipToScissor(
