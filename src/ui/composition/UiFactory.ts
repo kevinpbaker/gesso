@@ -1,5 +1,5 @@
 import { UiNodeType } from '../graph/UiNodeType';
-import { type UiElement, isUiElement } from './UiElement';
+import { type UiChild, type UiElement, isUiElement } from './UiElement';
 import type { UiProps } from './UiProps';
 
 /**
@@ -7,7 +7,7 @@ import type { UiProps } from './UiProps';
  *
  * This does not create a UiNode and does not interact with UiGraph.
  */
-export function createElement(type: UiNodeType, props: UiProps = {}, children: readonly UiElement[] = []): UiElement {
+export function createElement(type: UiNodeType, props: UiProps = {}, children: readonly UiChild[] = []): UiElement {
   if (isUiElement(props)) {
     throw new Error(
       `createElement: props for '${type}' look like a UiElement. ` +

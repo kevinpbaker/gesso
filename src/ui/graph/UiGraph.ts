@@ -3,6 +3,7 @@ import { DirtyNodeSet } from './DirtyNodeSet';
 import { type NodeId, type NodeProperty, UiNode } from './UiNode';
 import { UiNodeType } from './UiNodeType';
 import { type BindingId, UiBinding } from '../bindings/UiBinding';
+import type { UiChildrenBinding } from '../bindings/UiChildrenBinding';
 import { UiEnvironment } from '../environment/UiEnvironment';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
@@ -49,6 +50,8 @@ export class UiGraph {
   private readonly bindings = new Map<BindingId, UiBinding<unknown>>();
 
   private readonly nodeBindings = new Map<NodeId, Set<BindingId>>();
+
+  private readonly childrenBindings = new Map<NodeId, UiChildrenBinding>();
 
   private nextBindingId = 0;
 
@@ -151,6 +154,7 @@ export class UiGraph {
       const current = stack.pop()!;
       // First stop all reactive subscriptions.
       this.unbindNode(current);
+      this.unbindChildren(current);
       // Then remove it from the tree.
       this.detachNode(current);
       // Remove it from the node index.
@@ -296,6 +300,32 @@ export class UiGraph {
       }
     }
     return bindings;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Children bindings
+  // ---------------------------------------------------------------------------
+
+  public getChildrenBindingForNode(node: UiNode): UiChildrenBinding | undefined {
+    return this.childrenBindings.get(node.id);
+  }
+
+  public bindChildren(fragmentNode: UiNode, binding: UiChildrenBinding): void {
+    const registeredNode = this.nodes.get(fragmentNode.id);
+    if (registeredNode !== fragmentNode) {
+      throw new Error(`Cannot bind children to node '${fragmentNode.id}' because it does not belong to this graph.`);
+    }
+    this.childrenBindings.set(fragmentNode.id, binding);
+    binding.connect();
+  }
+
+  public unbindChildren(node: UiNode): void {
+    const binding = this.childrenBindings.get(node.id);
+    if (binding === undefined) {
+      return;
+    }
+    binding.disconnect();
+    this.childrenBindings.delete(node.id);
   }
 
   // ---------------------------------------------------------------------------

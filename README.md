@@ -33,15 +33,15 @@ pnpm dev
 
 Open the URL Vite prints (usually `http://localhost:5173`). The default view is the debug/layout playground. Use URL hashes to switch between demos:
 
-| Route | Description |
-|-------|-------------|
-| `#debug` | Layout and rendering debug playground |
-| `#canvas` | Canvas2D renderer playground |
-| `#webgpu` | WebGPU renderer playground |
-| `#compare` | Side-by-side renderer comparison |
-| `#benchmark` | WebGPU benchmark |
-| `#binding` | Reactive binding demo |
-| `#theme` | Theme system playground |
+| Route        | Description                           |
+| ------------ | ------------------------------------- |
+| `#debug`     | Layout and rendering debug playground |
+| `#canvas`    | Canvas2D renderer playground          |
+| `#webgpu`    | WebGPU renderer playground            |
+| `#compare`   | Side-by-side renderer comparison      |
+| `#benchmark` | WebGPU benchmark                      |
+| `#binding`   | Reactive binding demo                 |
+| `#theme`     | Theme system playground               |
 
 ## Build and test
 
@@ -88,18 +88,18 @@ pnpm format:check
 
 ### Core modules
 
-| Module | Purpose |
-|--------|---------|
-| `src/ui/graph` | Retained `UiNode` graph and tree structure |
-| `src/ui/composition` | Node composition helpers |
-| `src/ui/bindings` | RxJS-based reactive bindings between state and nodes |
-| `src/ui/layout` | Incremental box layout: measure, place, and scroll projection |
-| `src/ui/scheduler` | Frame scheduler and dirty-flag dispatch |
-| `src/ui/rendering` | Renderer interface, Canvas2D backend, and WebGPU backend |
-| `src/ui/input` | Pointer, wheel, keyboard, focus, gesture, and hit-testing |
-| `src/ui/properties` | Resolved visual properties (colors, radii, transforms, text styles, shadows) |
-| `src/ui/environment` | Theme and environment values (typography, colors, shapes) |
-| `src/playground` | Interactive demos and debug views |
+| Module               | Purpose                                                                      |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `src/ui/graph`       | Retained `UiNode` graph and tree structure                                   |
+| `src/ui/composition` | Node composition helpers                                                     |
+| `src/ui/bindings`    | RxJS-based reactive bindings between state and nodes                         |
+| `src/ui/layout`      | Incremental box layout: measure, place, and scroll projection                |
+| `src/ui/scheduler`   | Frame scheduler and dirty-flag dispatch                                      |
+| `src/ui/rendering`   | Renderer interface, Canvas2D backend, and WebGPU backend                     |
+| `src/ui/input`       | Pointer, wheel, keyboard, focus, gesture, and hit-testing                    |
+| `src/ui/properties`  | Resolved visual properties (colors, radii, transforms, text styles, shadows) |
+| `src/ui/environment` | Theme and environment values (typography, colors, shapes)                    |
+| `src/playground`     | Interactive demos and debug views                                            |
 
 ### Key design decisions
 
@@ -113,17 +113,17 @@ See [`docs/decisions/0002-complexity.md`](docs/decisions/0002-complexity.md) and
 
 ## Scripts
 
-| Script | Command |
-|--------|---------|
-| `dev` | `vite` |
-| `build` | `tsc && vite build` |
-| `preview` | `vite preview` |
-| `test` | `vitest` |
-| `test:run` | `vitest run` |
-| `lint` | `oxlint` |
-| `lint:fix` | `oxlint --fix` |
-| `format` | `oxfmt` |
-| `format:check` | `oxfmt --check` |
+| Script         | Command             |
+| -------------- | ------------------- |
+| `dev`          | `vite`              |
+| `build`        | `tsc && vite build` |
+| `preview`      | `vite preview`      |
+| `test`         | `vitest`            |
+| `test:run`     | `vitest run`        |
+| `lint`         | `oxlint`            |
+| `lint:fix`     | `oxlint --fix`      |
+| `format`       | `oxfmt`             |
+| `format:check` | `oxfmt --check`     |
 
 ## License
 

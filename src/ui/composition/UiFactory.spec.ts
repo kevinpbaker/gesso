@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import { Button, Column, Row, ScrollView, Text } from './UiComponents';
 import { createElement } from './UiFactory';
+import type { UiElement } from './UiElement';
 import type { UiProps } from './UiProps';
 
 describe('UiFactory', () => {
@@ -161,13 +162,13 @@ describe('UiFactory', () => {
       );
       expect(ui.type).toBe(UiNodeType.Column);
       expect(ui.children).toHaveLength(2);
-      const text = ui.children[0];
+      const text = ui.children[0] as UiElement;
       expect(text.type).toBe(UiNodeType.Text);
-      const row = ui.children[1];
+      const row = ui.children[1] as UiElement;
       expect(row.type).toBe(UiNodeType.Row);
       expect(row.children).toHaveLength(2);
-      expect(row.children[0].type).toBe(UiNodeType.Text);
-      expect(row.children[1].type).toBe(UiNodeType.Button);
+      expect((row.children[0] as UiElement).type).toBe(UiNodeType.Text);
+      expect((row.children[1] as UiElement).type).toBe(UiNodeType.Button);
     });
   });
 });

@@ -1,5 +1,14 @@
+import type { Observable } from 'rxjs';
+
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiProps } from './UiProps';
+
+/**
+ * A child definition may be a static element or an observable stream
+ * of elements. Observable children are reconciled dynamically by the
+ * framework without re-rendering the parent component.
+ */
+export type UiChild = UiElement | Observable<UiElement | UiElement[]>;
 
 /**
  * Declarative representation of a UI element.
@@ -22,9 +31,30 @@ export interface UiElement {
   readonly props: UiProps;
 
   /**
-   * Child elements.
+   * Child elements or observable streams of elements.
    */
-  readonly children: readonly UiElement[];
+  readonly children: readonly UiChild[];
+}
+
+/**
+ * Returns true when the value is an RxJS Observable.
+ *
+ * Uses structural detection so Observable subclasses and instances
+ * from different bundles are recognized.
+ */
+export function isObservable(value: unknown): value is Observable<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Partial<Observable<unknown>>).subscribe === 'function'
+  );
+}
+
+/**
+ * Returns true when the value is a UiChild (element or observable).
+ */
+export function isUiChild(value: unknown): value is UiChild {
+  return isUiElement(value) || isObservable(value);
 }
 
 /**

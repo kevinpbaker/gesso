@@ -163,6 +163,12 @@ export class UiHitTester implements HitTester {
 
   private hitTestChildren(parent: UiNode, x: number, y: number): boolean {
     for (let child = parent.lastChild; child !== null; child = child.previousSibling) {
+      if (child.type === UiNodeType.Fragment) {
+        if (this.hitTestChildren(child, x, y)) {
+          return true;
+        }
+        continue;
+      }
       if (this.hitTestNode(child, x, y)) {
         return true;
       }

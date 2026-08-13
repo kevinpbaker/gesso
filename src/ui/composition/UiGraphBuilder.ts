@@ -1,10 +1,12 @@
 import { Observable } from 'rxjs';
 
+import { UiChildrenBinding } from '../bindings/UiChildrenBinding';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
+import { UiNodeType } from '../graph/UiNodeType';
 import { propertyEffects } from '../properties/UiPropertyRegistry';
-import type { UiElement } from './UiElement';
+import { type UiChild, type UiElement, isObservable } from './UiElement';
 import type { UiProps } from './UiProps';
 
 /**
@@ -30,8 +32,11 @@ const KEY_PROP = 'key';
  *   - new node      → create
  *   - missing node  → destroy
  *   - keyed move    → reorder
+ *   - observable child → fragment anchor + children binding
  */
 export class UiGraphBuilder {
+  private nextChildrenBindingId = 0;
+
   constructor(private readonly graph: UiGraph) {}
 
   /**
@@ -57,8 +62,12 @@ export class UiGraphBuilder {
    * by position and type. Matched nodes are reused; missing
    * definitions are created, stale children destroyed, and
    * keyed children moved into definition order.
+   *
+   * Observable children are anchored by invisible Fragment nodes.
+   * A UiChildrenBinding subscribes to the observable and reconciles
+   * the fragment's children on each emission.
    */
-  private reconcileChildren(parent: UiNode, definitions: readonly UiElement[]): { nodes: UiNode[]; changed: boolean } {
+  reconcileChildren(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
     const existing = this.collectChildren(parent);
     const matched = new Set<UiNode>();
     const result: UiNode[] = [];
@@ -66,6 +75,18 @@ export class UiGraphBuilder {
     let cursor: UiNode | null = parent.firstChild;
 
     for (const [index, definition] of definitions.entries()) {
+      if (isObservable(definition)) {
+        const fragment = this.reconcileObservableChild(parent, index, definition, matched, cursor);
+        if (fragment !== undefined) {
+          if (this.moveBefore(parent, fragment, cursor)) {
+            changed = true;
+          }
+          cursor = fragment.nextSibling;
+          result.push(fragment);
+        }
+        continue;
+      }
+
       let node = this.matchNode(parent, definition, existing, matched);
       if (node === undefined) {
         const id = this.createNodeId(parent, definition, index);
@@ -111,6 +132,53 @@ export class UiGraphBuilder {
       this.graph.markDirty(parent, DirtyFlags.Children);
     }
     return { nodes: result, changed };
+  }
+
+  /**
+   * Reconciles a single observable child definition.
+   *
+   * Creates or reuses a Fragment anchor under the parent and ensures
+   * a UiChildrenBinding is subscribed to the observable.
+   */
+  private reconcileObservableChild(
+    parent: UiNode,
+    index: number,
+    observable: Observable<UiElement | UiElement[]>,
+    matched: Set<UiNode>,
+    cursor: UiNode | null
+  ): UiNode {
+    const fragmentId = this.createFragmentId(parent, index);
+    let fragment = this.graph.getNode(fragmentId);
+
+    if (fragment !== undefined && fragment.type !== UiNodeType.Fragment) {
+      // A non-fragment node occupied this slot; remove it so the
+      // fragment can take its place.
+      if (cursor === fragment) {
+        cursor = fragment.nextSibling;
+      }
+      this.graph.removeNode(fragment);
+      matched.add(fragment);
+      fragment = undefined;
+    }
+
+    if (fragment === undefined) {
+      fragment = this.graph.createNode(fragmentId, UiNodeType.Fragment);
+      this.graph.insertBefore(parent, fragment, cursor);
+    } else {
+      matched.add(fragment);
+    }
+
+    const existingBinding = this.graph.getChildrenBindingForNode(fragment);
+    if (existingBinding === undefined || existingBinding.observable !== observable) {
+      if (existingBinding !== undefined) {
+        this.graph.unbindChildren(fragment);
+      }
+      const bindingId = this.nextChildrenBindingId++;
+      const binding = new UiChildrenBinding(bindingId, parent.id, fragment.id, observable, this.graph, this);
+      this.graph.bindChildren(fragment, binding);
+    }
+
+    return fragment;
   }
 
   /**
@@ -256,5 +324,12 @@ export class UiGraphBuilder {
       return `${parent.id}:${key}`;
     }
     return `${parent.id}:${index}`;
+  }
+
+  /**
+   * Generates a stable id for an observable-child fragment anchor.
+   */
+  private createFragmentId(parent: UiNode, index: number): string {
+    return `${parent.id}:fragment:${index}`;
   }
 }

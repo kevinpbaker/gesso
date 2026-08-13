@@ -195,6 +195,17 @@ export class LayoutEngine {
 
   private measure(node: UiNode, constraints: Constraints): void {
     const rec = this.record(node);
+    if (this.isFragment(node)) {
+      // Fragments are transparent graph anchors. Their children are
+      // measured, but the fragment itself contributes zero size.
+      this.forEachLayoutChild(node, child => this.measure(child, constraints));
+      rec.measuredWidth = 0;
+      rec.measuredHeight = 0;
+      rec.outerWidth = 0;
+      rec.outerHeight = 0;
+      rec.measureDirty = false;
+      return;
+    }
     if (!rec.measureDirty && constraintsEqual(rec.lastConstraints, constraints)) {
       return;
     }
@@ -277,12 +288,12 @@ export class LayoutEngine {
   private measureStack(node: UiNode, rec: LayoutRecord, content: Constraints): Size {
     let maxWidth = 0;
     let maxHeight = 0;
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+    this.forEachLayoutChild(node, child => {
       this.measure(child, this.childConstraints(child, content));
       const cRec = this.record(child);
       maxWidth = Math.max(maxWidth, cRec.outerWidth);
       maxHeight = Math.max(maxHeight, cRec.outerHeight);
-    }
+    });
     return {
       width: rec.paddingLeft + rec.paddingRight + maxWidth,
       height: rec.paddingTop + rec.paddingBottom + maxHeight
@@ -298,7 +309,7 @@ export class LayoutEngine {
     let mainTotal = 0;
     let crossMax = 0;
     let childCount = 0;
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+    this.forEachLayoutChild(node, child => {
       const childBase = new Constraints(
         0,
         vertical ? content.maxWidth : Infinity,
@@ -314,7 +325,7 @@ export class LayoutEngine {
       mainTotal += measuredMain + marginMain;
       crossMax = Math.max(crossMax, measuredCross + marginCross);
       childCount++;
-    }
+    });
     mainTotal += gap * Math.max(0, childCount - 1);
     const contentMain = mainTotal + paddingMain;
     const contentCross = crossMax + paddingCross;
@@ -355,6 +366,16 @@ export class LayoutEngine {
 
   private place(node: UiNode): void {
     const rec = this.record(node);
+    if (this.isFragment(node)) {
+      // Fragments are transparent: pass placement through to children.
+      rec.placeDirty = false;
+      this.forEachLayoutChild(node, child => {
+        if (this.record(child).placeDirty) {
+          this.place(child);
+        }
+      });
+      return;
+    }
     if (!rec.placeDirty) {
       return;
     }
@@ -369,11 +390,11 @@ export class LayoutEngine {
     } else {
       this.placeStack(node, rec);
     }
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+    this.forEachLayoutChild(node, child => {
       if (this.record(child).placeDirty) {
         this.place(child);
       }
-    }
+    });
   }
 
   private placeFlex(node: UiNode, rec: LayoutRecord, direction: FlexDirection): void {
@@ -565,10 +586,10 @@ export class LayoutEngine {
   private placeStack(node: UiNode, rec: LayoutRecord): void {
     const contentX = rec.x + rec.paddingLeft;
     const contentY = rec.y + rec.paddingTop;
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+    this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
       this.assignBox(child, contentX, contentY, cRec.measuredWidth, cRec.measuredHeight);
-    }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -713,10 +734,27 @@ export class LayoutEngine {
 
   private collectChildren(node: UiNode): UiNode[] {
     const children: UiNode[] = [];
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      children.push(child);
-    }
+    this.forEachLayoutChild(node, child => children.push(child));
     return children;
+  }
+
+  /**
+   * Iterates over a node's children, transparently expanding Fragment
+   * anchors so their children participate in layout as if they were
+   * direct children of the parent.
+   */
+  private forEachLayoutChild(node: UiNode, callback: (child: UiNode) => void): void {
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      if (this.isFragment(child)) {
+        this.forEachLayoutChild(child, callback);
+      } else {
+        callback(child);
+      }
+    }
+  }
+
+  private isFragment(node: UiNode): boolean {
+    return node.type === UiNodeType.Fragment;
   }
 
   private numberProp(node: UiNode, property: string): number | undefined {

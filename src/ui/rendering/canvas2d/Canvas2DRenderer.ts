@@ -160,7 +160,11 @@ export class Canvas2DRenderer implements UiRenderer {
   private renderChildren(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean): void {
     let child = node.firstChild;
     while (child !== null) {
-      this.renderNode(child, context, ctx, cull);
+      if (child.type === UiNodeType.Fragment) {
+        this.renderChildren(child, context, ctx, cull);
+      } else {
+        this.renderNode(child, context, ctx, cull);
+      }
       child = child.nextSibling;
     }
   }
