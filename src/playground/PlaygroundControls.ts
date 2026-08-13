@@ -3,6 +3,13 @@ import { BehaviorSubject } from 'rxjs';
 import { UiNodeType } from '../ui/graph/UiNodeType';
 import type { PlaygroundMetrics, PlaygroundNodeInfo } from './LayoutPlayground';
 import type { PlaygroundDirection, PlaygroundState } from './PlaygroundState';
+import type { PlaygroundStateSnapshot } from './StatePatch';
+
+/**
+ * Callback invoked by a playground shell when a control changes.
+ * When omitted, the shell writes directly to the supplied state.
+ */
+export type ControlDispatcher = (path: keyof PlaygroundStateSnapshot, value: unknown) => void;
 
 /**
  * The parts of the playground page shared by both routes: the
@@ -21,9 +28,13 @@ export interface PlaygroundShell {
   updateSelected(text: string): void;
 }
 
-export function mountPlaygroundShell(host: HTMLElement, state: PlaygroundState): PlaygroundShell {
+export function mountPlaygroundShell(
+  host: HTMLElement,
+  state: PlaygroundState,
+  dispatch?: ControlDispatcher
+): PlaygroundShell {
   host.innerHTML = renderShellTemplate();
-  wireControls(state);
+  wireControls(state, dispatch);
   const shell: PlaygroundShell = {
     preview: requireElement('.pg-preview'),
     updateMetrics,
@@ -134,7 +145,7 @@ function renderShellTemplate(): string {
   </div>`;
 }
 
-function wireControls(state: PlaygroundState): void {
+function wireControls(state: PlaygroundState, dispatch?: ControlDispatcher): void {
   const fitPreview = requireElement('#pg-fit') as HTMLInputElement;
   const widthInput = requireElement('#pg-width') as HTMLInputElement;
   const heightInput = requireElement('#pg-height') as HTMLInputElement;
@@ -144,26 +155,34 @@ function wireControls(state: PlaygroundState): void {
     heightInput.disabled = fitPreview.checked;
   };
   fitPreview.addEventListener('change', () => {
-    state.fitPreview$.next(fitPreview.checked);
+    if (dispatch !== undefined) {
+      dispatch('fitPreview', fitPreview.checked);
+    } else {
+      state.fitPreview$.next(fitPreview.checked);
+    }
     syncFit();
   });
   syncFit();
 
-  bindNumber(requireElement('#pg-width'), state.width$);
-  bindNumber(requireElement('#pg-height'), state.height$);
-  bindNumber(requireElement('#pg-padding'), state.padding$);
-  bindNumber(requireElement('#pg-gap'), state.gap$);
-  bindNumber(requireElement('#pg-box-width'), state.boxWidth$);
-  bindNumber(requireElement('#pg-box-height'), state.boxHeight$);
-  bindNumber(requireElement('#pg-flex'), state.flexGrow$);
-  bindNumber(requireElement('#pg-min-width'), state.minWidth$);
-  bindNumber(requireElement('#pg-max-width'), state.maxWidth$);
-  bindColor(requireElement('#pg-color'), state.color$);
+  bindNumber(requireElement('#pg-width'), state.width$, dispatch, 'width');
+  bindNumber(requireElement('#pg-height'), state.height$, dispatch, 'height');
+  bindNumber(requireElement('#pg-padding'), state.padding$, dispatch, 'padding');
+  bindNumber(requireElement('#pg-gap'), state.gap$, dispatch, 'gap');
+  bindNumber(requireElement('#pg-box-width'), state.boxWidth$, dispatch, 'boxWidth');
+  bindNumber(requireElement('#pg-box-height'), state.boxHeight$, dispatch, 'boxHeight');
+  bindNumber(requireElement('#pg-flex'), state.flexGrow$, dispatch, 'flexGrow');
+  bindNumber(requireElement('#pg-min-width'), state.minWidth$, dispatch, 'minWidth');
+  bindNumber(requireElement('#pg-max-width'), state.maxWidth$, dispatch, 'maxWidth');
+  bindColor(requireElement('#pg-color'), state.color$, dispatch, 'color');
 
   const direction = requireElement('#pg-direction') as HTMLSelectElement;
   direction.value = state.direction$.getValue();
   direction.addEventListener('change', () => {
-    state.direction$.next(direction.value as PlaygroundDirection);
+    if (dispatch !== undefined) {
+      dispatch('direction', direction.value as PlaygroundDirection);
+    } else {
+      state.direction$.next(direction.value as PlaygroundDirection);
+    }
   });
 
   const scrollSlider = requireElement('#pg-scroll-y') as HTMLInputElement;
@@ -171,26 +190,49 @@ function wireControls(state: PlaygroundState): void {
   state.scrollY$.subscribe(value => {
     scrollSlider.value = String(value);
   });
-  scrollSlider.addEventListener('input', () => state.scrollY$.next(Number(scrollSlider.value)));
+  scrollSlider.addEventListener('input', () => {
+    if (dispatch !== undefined) {
+      dispatch('scrollY', Number(scrollSlider.value));
+    } else {
+      state.scrollY$.next(Number(scrollSlider.value));
+    }
+  });
 
   const orderLabel = requireElement('#pg-order') as HTMLSpanElement;
   const showOrder = (): void => {
     orderLabel.textContent = state.order$.getValue().join(' ');
   };
   state.order$.subscribe(showOrder);
-  requireElement('#pg-order-left').addEventListener('click', () =>
-    state.order$.next(rotateOrder(state.order$.getValue(), -1))
-  );
-  requireElement('#pg-order-right').addEventListener('click', () =>
-    state.order$.next(rotateOrder(state.order$.getValue(), 1))
-  );
-  requireElement('#pg-order-reset').addEventListener('click', () => state.order$.next(['a', 'b', 'c']));
+  requireElement('#pg-order-left').addEventListener('click', () => {
+    const next = rotateOrder(state.order$.getValue(), -1);
+    if (dispatch !== undefined) {
+      dispatch('order', next);
+    } else {
+      state.order$.next(next);
+    }
+  });
+  requireElement('#pg-order-right').addEventListener('click', () => {
+    const next = rotateOrder(state.order$.getValue(), 1);
+    if (dispatch !== undefined) {
+      dispatch('order', next);
+    } else {
+      state.order$.next(next);
+    }
+  });
+  requireElement('#pg-order-reset').addEventListener('click', () => {
+    const next = ['a', 'b', 'c'];
+    if (dispatch !== undefined) {
+      dispatch('order', next);
+    } else {
+      state.order$.next(next);
+    }
+  });
   showOrder();
 
-  bindStress(requireElement('#pg-stress-0'), state, 0);
-  bindStress(requireElement('#pg-stress-1k'), state, 1000);
-  bindStress(requireElement('#pg-stress-5k'), state, 5000);
-  bindStress(requireElement('#pg-stress-10k'), state, 10000);
+  bindStress(requireElement('#pg-stress-0'), state, dispatch, 0);
+  bindStress(requireElement('#pg-stress-1k'), state, dispatch, 1000);
+  bindStress(requireElement('#pg-stress-5k'), state, dispatch, 5000);
+  bindStress(requireElement('#pg-stress-10k'), state, dispatch, 10000);
 }
 
 function updateMetrics(metrics: PlaygroundMetrics): void {
@@ -206,25 +248,56 @@ function updateScrollStats(text: string): void {
   setText('#pg-scroll', text);
 }
 
-function bindNumber(input: Element, subject: BehaviorSubject<number>): void {
+function bindNumber(
+  input: Element,
+  subject: BehaviorSubject<number>,
+  dispatch: ControlDispatcher | undefined,
+  path: keyof PlaygroundStateSnapshot
+): void {
   const field = input as HTMLInputElement;
   field.value = String(subject.getValue());
   field.addEventListener('input', () => {
     const value = Number(field.value);
     if (Number.isFinite(value)) {
-      subject.next(value);
+      if (dispatch !== undefined) {
+        dispatch(path, value);
+      } else {
+        subject.next(value);
+      }
     }
   });
 }
 
-function bindColor(input: Element, subject: BehaviorSubject<string>): void {
+function bindColor(
+  input: Element,
+  subject: BehaviorSubject<string>,
+  dispatch: ControlDispatcher | undefined,
+  path: keyof PlaygroundStateSnapshot
+): void {
   const field = input as HTMLInputElement;
   field.value = subject.getValue();
-  field.addEventListener('input', () => subject.next(field.value));
+  field.addEventListener('input', () => {
+    if (dispatch !== undefined) {
+      dispatch(path, field.value);
+    } else {
+      subject.next(field.value);
+    }
+  });
 }
 
-function bindStress(button: Element, state: PlaygroundState, count: number): void {
-  button.addEventListener('click', () => state.stressCount$.next(count));
+function bindStress(
+  button: Element,
+  state: PlaygroundState,
+  dispatch: ControlDispatcher | undefined,
+  count: number
+): void {
+  button.addEventListener('click', () => {
+    if (dispatch !== undefined) {
+      dispatch('stressCount', count);
+    } else {
+      state.stressCount$.next(count);
+    }
+  });
 }
 
 function rotateOrder(order: readonly string[], step: number): string[] {

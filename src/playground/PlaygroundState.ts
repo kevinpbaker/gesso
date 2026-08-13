@@ -31,6 +31,13 @@ export class PlaygroundState {
   /** Paint-only property: must not invalidate layout. */
   readonly color$ = new BehaviorSubject('#1f6feb');
 
+  /**
+   * Derived paint property. In the worker route this is computed in the
+   * data worker to demonstrate heavy observable pipelines running off the
+   * render thread; other routes keep it at its initial value.
+   */
+  readonly computedColor$ = new BehaviorSubject('#60a5fa');
+
   /** Fixed box width in the child row. */
   readonly boxWidth$ = new BehaviorSubject(100);
   /** Fixed box height in the child row. */

@@ -100,7 +100,7 @@ export function createDefinition(state: PlaygroundState): UiElement {
         minWidth: state.minWidth$,
         maxWidth: state.maxWidth$,
         backgroundColor: 'rgba(31,111,235,0.06)',
-        borderColor: '#60a5fa',
+        borderColor: state.computedColor$,
         borderWidth: 1,
         borderRadius: 6
       },
