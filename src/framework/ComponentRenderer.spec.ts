@@ -9,10 +9,12 @@ import { UiNodeType } from '../ui/graph/UiNodeType';
 import type { UiNode } from '../ui/graph/UiNode';
 import { Column, Text } from '../ui/composition/UiComponents';
 import { Component } from './Component';
-import { Define, Input, State } from './decorators';
+import { Define, Input } from './decorators';
+import { State } from './store/decorators';
 import { createComponent } from './createComponent';
 import { ComponentRenderer } from './ComponentRenderer';
 import { state } from './State';
+import { StoreRegistry } from './store/StoreRegistry';
 
 function getChildren(node: UiNode): UiNode[] {
   const children: UiNode[] = [];
@@ -25,8 +27,9 @@ function getChildren(node: UiNode): UiNode[] {
 function createRenderer() {
   const graph = new UiGraph();
   const builder = new UiGraphBuilder(graph);
-  const renderer = new ComponentRenderer();
-  return { graph, builder, renderer };
+  const stores = new StoreRegistry();
+  const renderer = new ComponentRenderer(stores);
+  return { graph, builder, renderer, stores };
 }
 
 // ---------------------------------------------------------------------------

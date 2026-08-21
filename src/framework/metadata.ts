@@ -4,6 +4,7 @@ export interface ComponentMetadata {
   tag: string;
   inputs: Set<string>;
   states: Set<string>;
+  injects: Map<string, Function>;
 }
 
 const metadataStore = new WeakMap<Function, ComponentMetadata>();
@@ -11,7 +12,7 @@ const metadataStore = new WeakMap<Function, ComponentMetadata>();
 export function getComponentMetadata(constructor: Function): ComponentMetadata {
   let metadata = metadataStore.get(constructor);
   if (metadata === undefined) {
-    metadata = { tag: constructor.name, inputs: new Set(), states: new Set() };
+    metadata = { tag: constructor.name, inputs: new Set(), states: new Set(), injects: new Map() };
     metadataStore.set(constructor, metadata);
   }
   return metadata;

@@ -27,14 +27,14 @@ export function Input(): PropertyDecorator {
 }
 
 /**
- * Declares a property as reactive component state.
+ * Declares a property as an injected store.
  *
- * The property should be initialized with `state(initialValue)`.
+ * The store must be registered with createApp().useStore().
  */
-export function State(): PropertyDecorator {
+export function Inject<T extends Function>(StoreClass: T): PropertyDecorator {
   return (target, propertyKey) => {
     const constructor = target.constructor as unknown as new () => unknown;
     const metadata = getComponentMetadata(constructor);
-    metadata.states.add(propertyKey as string);
+    metadata.injects.set(propertyKey as string, StoreClass);
   };
 }

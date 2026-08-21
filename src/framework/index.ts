@@ -1,6 +1,12 @@
 export { Component } from './Component';
 export { State as StateCell, state } from './State';
-export { Define, Input, State } from './decorators';
+export { Define, Input, Inject } from './decorators';
+export { State, Action, Projection } from './store/decorators';
+export { Store } from './store/Store';
+export { StoreRegistry } from './store/StoreRegistry';
 export { createComponent } from './createComponent';
 export { ComponentRenderer, type FrameworkChild } from './ComponentRenderer';
 export { isComponentElement, type ComponentElement } from './ComponentElement';
+export { createApp } from './app/createApp';
+export { NodalAppBuilder } from './app/NodalAppBuilder';
+export { NodalApp, type NodalAppOptions } from './app/NodalApp';

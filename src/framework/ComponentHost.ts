@@ -2,6 +2,8 @@ import type { UiElement } from '../ui/composition/UiElement';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
 import { getComponentMetadata } from './metadata';
+import type { Store } from './store/Store';
+import type { StoreRegistry } from './store/StoreRegistry';
 
 /**
  * Owns a single component instance and its lifecycle.
@@ -19,10 +21,14 @@ export class ComponentHost<P extends Record<string, unknown>> {
 
   private mounted = false;
 
-  constructor(element: ComponentElement<P>) {
+  constructor(
+    element: ComponentElement<P>,
+    private readonly stores: StoreRegistry
+  ) {
     this.element = element;
     this.instance = new element.componentClass();
     this.wireInputs();
+    this.wireInjects();
     this.validateState();
   }
 
@@ -60,6 +66,14 @@ export class ComponentHost<P extends Record<string, unknown>> {
     for (const inputName of metadata.inputs) {
       const value = (this.element.props as Record<string, unknown>)[inputName];
       (this.instance as unknown as Record<string, unknown>)[inputName] = value;
+    }
+  }
+
+  private wireInjects(): void {
+    const metadata = getComponentMetadata(this.element.componentClass);
+    for (const [propertyName, StoreClass] of metadata.injects) {
+      const store = this.stores.get(StoreClass as unknown as new () => Store);
+      (this.instance as unknown as Record<string, unknown>)[propertyName] = store;
     }
   }
 

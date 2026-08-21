@@ -1,6 +1,7 @@
 import { isComponentLikeElement, isObservable, type UiChild, type UiElement } from '../ui/composition/UiElement';
 import { type ComponentElement } from './ComponentElement';
 import { ComponentHost } from './ComponentHost';
+import { StoreRegistry } from './store/StoreRegistry';
 
 export type FrameworkChild = UiChild | ComponentElement;
 
@@ -18,6 +19,8 @@ export type FrameworkChild = UiChild | ComponentElement;
 export class ComponentRenderer {
   private readonly hosts = new Map<string, ComponentHost<Record<string, unknown>>>();
   private readonly activeHosts = new Set<string>();
+
+  constructor(private readonly stores: StoreRegistry) {}
 
   /**
    * Renders a component/element tree to a pure UiElement tree.
@@ -60,7 +63,7 @@ export class ComponentRenderer {
       if (host !== undefined) {
         host.unmount();
       }
-      host = new ComponentHost(element);
+      host = new ComponentHost(element, this.stores);
       this.hosts.set(hostId, host);
       host.mount();
     } else {
