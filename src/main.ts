@@ -1,6 +1,7 @@
 import './style.css';
 import { mountBindingDemo } from './playground/BindingDemoView';
 import { mountCanvasPlayground } from './playground/CanvasPlaygroundView';
+import { mountFrameworkPlayground } from './playground/FrameworkPlaygroundView';
 import { mountPlayground } from './playground/PlaygroundView';
 import { mountWebGPUPlayground } from './playground/WebGPUPlaygroundView';
 import { mountWebGPUBenchmark } from './playground/WebGPUBenchmarkView';
@@ -12,6 +13,7 @@ type Mount = (host: HTMLElement) => () => void;
 const ROUTES: Record<string, Mount> = {
   debug: mountPlayground,
   canvas: mountCanvasPlayground,
+  framework: mountFrameworkPlayground,
   webgpu: mountWebGPUPlayground,
   compare: mountComparison,
   benchmark: mountWebGPUBenchmark,

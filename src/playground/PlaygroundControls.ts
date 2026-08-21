@@ -68,6 +68,7 @@ function renderShellTemplate(): string {
       <nav class="pg-nav">
         <a class="pg-link" href="#debug">DOM boxes</a>
         <a class="pg-link" href="#canvas">Canvas render</a>
+        <a class="pg-link" href="#framework">Framework</a>
         <a class="pg-link" href="#webgpu">WebGPU render</a>
         <a class="pg-link" href="#compare">Compare</a>
         <a class="pg-link" href="#benchmark">Benchmark</a>

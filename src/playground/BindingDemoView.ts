@@ -81,6 +81,7 @@ function renderTemplate(): string {
       <nav class="pg-nav">
         <a class="pg-link" href="#debug">DOM boxes</a>
         <a class="pg-link" href="#canvas">Canvas render</a>
+        <a class="pg-link" href="#framework">Framework</a>
         <a class="pg-link" href="#binding">Bindings</a>
       </nav>
     </header>
