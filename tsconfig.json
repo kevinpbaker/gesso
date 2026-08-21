@@ -14,6 +14,10 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* Decorators */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

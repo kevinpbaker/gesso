@@ -4,11 +4,29 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiProps } from './UiProps';
 
 /**
- * A child definition may be a static element or an observable stream
- * of elements. Observable children are reconciled dynamically by the
- * framework without re-rendering the parent component.
+ * Opaque marker for component definitions.
+ *
+ * The runtime does not know how to mount components; it only
+ * recognizes this shape so factory functions can accept components
+ * as children. The framework layer resolves ComponentLikeElements
+ * into plain UiElements before passing them to UiGraphBuilder.
  */
-export type UiChild = UiElement | Observable<UiElement | UiElement[]>;
+export interface ComponentLikeElement {
+  readonly kind: 'component';
+  readonly tag: string;
+  readonly componentClass: new () => unknown;
+  readonly props: Record<string, unknown>;
+  readonly key?: string | number;
+}
+
+/**
+ * A child definition may be a static element, an observable stream
+ * of elements, or a component definition. Observable children are
+ * reconciled dynamically by the framework without re-rendering the
+ * parent component. Component children are resolved by the framework
+ * layer before graph construction.
+ */
+export type UiChild = UiElement | Observable<UiElement | UiElement[]> | ComponentLikeElement;
 
 /**
  * Declarative representation of a UI element.
@@ -31,9 +49,17 @@ export interface UiElement {
   readonly props: UiProps;
 
   /**
-   * Child elements or observable streams of elements.
+   * Child elements, observable streams of elements, or component
+   * definitions.
    */
   readonly children: readonly UiChild[];
+}
+
+/**
+ * Returns true when the value is a component definition.
+ */
+export function isComponentLikeElement(value: unknown): value is ComponentLikeElement {
+  return typeof value === 'object' && value !== null && (value as Partial<ComponentLikeElement>).kind === 'component';
 }
 
 /**
@@ -46,15 +72,17 @@ export function isObservable(value: unknown): value is Observable<unknown> {
   return (
     typeof value === 'object' &&
     value !== null &&
+    !isComponentLikeElement(value) &&
     typeof (value as Partial<Observable<unknown>>).subscribe === 'function'
   );
 }
 
 /**
- * Returns true when the value is a UiChild (element or observable).
+ * Returns true when the value is a UiChild (element, observable, or
+ * component definition).
  */
 export function isUiChild(value: unknown): value is UiChild {
-  return isUiElement(value) || isObservable(value);
+  return isUiElement(value) || isObservable(value) || isComponentLikeElement(value);
 }
 
 /**

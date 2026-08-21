@@ -1,6 +1,13 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import { createElement } from './UiFactory';
-import { type UiChild, type UiElement, isUiChild, isUiElement, isObservable } from './UiElement';
+import {
+  type UiChild,
+  type UiElement,
+  isComponentLikeElement,
+  isUiChild,
+  isUiElement,
+  isObservable
+} from './UiElement';
 import type { UiProps } from './UiProps';
 
 /**
@@ -68,5 +75,11 @@ export function ScrollView(props: UiProps = {}, ...children: UiChild[]): UiEleme
  * Props are plain objects. Children are UiElements or Observables.
  */
 function isPlainProps(value: unknown): value is UiProps {
-  return typeof value === 'object' && value !== null && !isUiElement(value) && !isObservable(value);
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !isUiElement(value) &&
+    !isObservable(value) &&
+    !isComponentLikeElement(value)
+  );
 }

@@ -6,7 +6,7 @@ import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { propertyEffects } from '../properties/UiPropertyRegistry';
-import { type UiChild, type UiElement, isObservable } from './UiElement';
+import { type UiChild, type UiElement, isComponentLikeElement, isObservable } from './UiElement';
 import type { UiProps } from './UiProps';
 
 /**
@@ -85,6 +85,13 @@ export class UiGraphBuilder {
           result.push(fragment);
         }
         continue;
+      }
+
+      if (isComponentLikeElement(definition)) {
+        throw new Error(
+          `Component '${definition.tag}' was passed directly to UiGraphBuilder. ` +
+            `Components must be resolved through ComponentRenderer before graph construction.`
+        );
       }
 
       let node = this.matchNode(parent, definition, existing, matched);
