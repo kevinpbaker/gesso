@@ -11,6 +11,7 @@ interface CartItem {
 
 class CartStore extends Store {
   @State() items = state<CartItem[]>([]);
+  @State() unrelated = state('idle');
 
   @Projection()
   get summary() {
@@ -28,6 +29,16 @@ class CartStore extends Store {
   @Action()
   clear() {
     this.items.value = [];
+  }
+
+  @Action()
+  renameFirst(name: string) {
+    this.items.value = this.items.value.map((item, index) => (index === 0 ? { ...item, name } : item));
+  }
+
+  @Action()
+  touchUnrelated() {
+    this.unrelated.value = `tick-${Math.random()}`;
   }
 }
 
@@ -86,5 +97,104 @@ describe('Store', () => {
     }
     const store = new BadStore();
     expect(() => store.init()).toThrow("Store 'BadStore' declares @State() 'count' but it is not a State cell");
+  });
+
+  describe('projections', () => {
+    it('exposes a @Projection() getter as an observable', () => {
+      const cart = createCartStore();
+      const seen: { itemCount: number; totalPrice: number }[] = [];
+      cart.projection.summary.subscribe(value => seen.push(value));
+
+      expect(seen).toEqual([{ itemCount: 0, totalPrice: 0 }]);
+
+      cart.dispatch('addItem', { id: '1', name: 'Hat', price: 20 });
+
+      expect(seen).toHaveLength(2);
+      expect(seen[1]).toEqual({ itemCount: 1, totalPrice: 20 });
+    });
+
+    it('does not emit when unrelated state changes', () => {
+      // The projection allocates a fresh object every evaluation, so
+      // under reference equality this emits on every state change.
+      // This is the bug Phase C exists to fix.
+      const cart = createCartStore();
+      const seen: unknown[] = [];
+      cart.projection.summary.subscribe(value => seen.push(value));
+
+      expect(seen).toHaveLength(1);
+
+      cart.dispatch('touchUnrelated');
+      cart.dispatch('touchUnrelated');
+
+      expect(seen).toHaveLength(1);
+    });
+
+    it('does not emit when projected state changes but the projection does not', () => {
+      const cart = createCartStore();
+      cart.dispatch('addItem', { id: '1', name: 'Hat', price: 20 });
+
+      const seen: unknown[] = [];
+      cart.projection.summary.subscribe(value => seen.push(value));
+      expect(seen).toHaveLength(1);
+
+      // Renaming rebuilds the items array the projection reads, but
+      // summary projects only count and total, so the view model is
+      // unchanged and the view must not be disturbed.
+      cart.dispatch('renameFirst', 'Fedora');
+
+      expect(cart.items.value[0].name).toBe('Fedora');
+      expect(seen).toHaveLength(1);
+    });
+
+    it('shares one evaluation across subscribers', () => {
+      const cart = createCartStore();
+      let evaluations = 0;
+      Object.defineProperty(cart, 'summary', {
+        get() {
+          evaluations++;
+          return { itemCount: this.items.value.length };
+        }
+      });
+
+      const projection = cart.projection.summary;
+      const a = projection.subscribe();
+      const b = projection.subscribe();
+
+      expect(evaluations).toBe(1);
+
+      a.unsubscribe();
+      b.unsubscribe();
+    });
+
+    it('throws when accessing a member that is not a projection', () => {
+      const cart = createCartStore();
+
+      expect(() => cart.projection.addItem).toThrow(/is not a @Projection\(\) on store 'CartStore'/);
+    });
+  });
+
+  describe('selector comparison', () => {
+    it('does not re-emit an object selector when its value is unchanged', () => {
+      const cart = createCartStore();
+      const seen: unknown[] = [];
+      cart.select(s => ({ count: s.items.value.length })).subscribe(value => seen.push(value));
+
+      expect(seen).toEqual([{ count: 0 }]);
+
+      cart.dispatch('touchUnrelated');
+      cart.dispatch('touchUnrelated');
+
+      expect(seen).toHaveLength(1);
+    });
+
+    it('emits when an object selector value actually changes', () => {
+      const cart = createCartStore();
+      const seen: unknown[] = [];
+      cart.select(s => ({ count: s.items.value.length })).subscribe(value => seen.push(value));
+
+      cart.dispatch('addItem', { id: '1', name: 'Hat', price: 20 });
+
+      expect(seen).toEqual([{ count: 0 }, { count: 1 }]);
+    });
   });
 });

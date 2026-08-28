@@ -1,4 +1,4 @@
-import { BehaviorSubject, type Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,7 @@ import { State } from './store/decorators';
 import { createComponent } from './createComponent';
 import { ComponentHostResolver } from './ComponentHostResolver';
 import { state } from './State';
+import { input } from './Input';
 import { StoreRegistry } from './store/StoreRegistry';
 
 // ---------------------------------------------------------------------------
@@ -83,10 +84,10 @@ class Hello extends Component {
 
 @Define('greeting')
 class Greeting extends Component {
-  @Input() name = 'World';
+  @Input() name = input('World');
 
   override render() {
-    return Text({ text: `Hello ${this.name}` });
+    return Text({ text: this.name.pipe(map(name => `Hello ${name}`)) });
   }
 }
 
@@ -108,9 +109,18 @@ class BadState extends Component {
   }
 }
 
+@Define('bad-input')
+class BadInput extends Component {
+  @Input() label = 'not a cell';
+
+  override render() {
+    return Text({ text: 'bad' });
+  }
+}
+
 @Define('labeled')
 class Labeled extends Component {
-  @Input() label: string | Observable<string> = '';
+  @Input() label = input('');
 
   override render() {
     return Text({ text: this.label });
@@ -172,14 +182,14 @@ const unmountedLabels: string[] = [];
 
 @Define('item')
 class Item extends Component {
-  @Input() label = '';
+  @Input() label = input('');
 
   override onMount() {
-    mountedLabels.push(this.label);
+    mountedLabels.push(this.label.value);
   }
 
   override onUnmount() {
-    unmountedLabels.push(this.label);
+    unmountedLabels.push(this.label.value);
   }
 
   override render() {
@@ -189,10 +199,10 @@ class Item extends Component {
 
 @Define('switcher')
 class Switcher extends Component {
-  @Input() route: Observable<string> = new BehaviorSubject('home');
+  @Input() route = input('home');
 
   override render(): UiChild {
-    return (this.route as Observable<string>).pipe(map(route => Text({ text: route })));
+    return this.route.pipe(map(route => Text({ text: route })));
   }
 }
 
@@ -268,18 +278,76 @@ describe('ComponentHostResolver', () => {
       expect(node.getProperty('text')).toBe('B');
     });
 
-    it('updates the instance field but not the rendered tree for plain inputs', () => {
-      // render() runs once, so a plain value read during render is
-      // captured for the life of the component. Phase C replaces plain
-      // inputs with cells; until then this is the documented behaviour,
-      // and passing an Observable is the way to make an input reactive.
+    it('updates the rendered tree when the parent supplies a new plain input', () => {
+      // render() still runs once. The input cell is what carries the
+      // new value into the tree that render() already produced.
       const { builder, resolver } = createHarness();
 
       builder.build(Column(createComponent(Greeting, { name: 'First' })));
       const node = builder.build(Column(createComponent(Greeting, { name: 'Second' })));
 
-      expect(getLayoutChildren(node)[0].getProperty('text')).toBe('Hello First');
+      expect(getLayoutChildren(node)[0].getProperty('text')).toBe('Hello Second');
+      // The same instance was reused, not rebuilt.
       expect(resolver.size).toBe(1);
+    });
+
+    it('keeps the declared default when the parent omits the input', () => {
+      const { builder } = createHarness();
+
+      const anchor = builder.build(createComponent(Greeting));
+
+      expect(getChildren(anchor)[0].getProperty('text')).toBe('Hello World');
+    });
+
+    it('does not resubscribe when the parent passes the same observable', () => {
+      const { builder } = createHarness();
+      const label$ = new BehaviorSubject('A');
+      let subscribeCount = 0;
+      const counted = new Observable<string>(subscriber => {
+        subscribeCount++;
+        return label$.subscribe(subscriber);
+      });
+
+      builder.build(Column(createComponent(Labeled, { label: counted })));
+      builder.build(Column(createComponent(Labeled, { label: counted })));
+
+      expect(subscribeCount).toBe(1);
+    });
+
+    it('switches to a new observable input and drops the previous one', () => {
+      const { builder } = createHarness();
+      const first$ = new BehaviorSubject('first');
+      const second$ = new BehaviorSubject('second');
+
+      const node = builder.build(Column(createComponent(Labeled, { label: first$ })));
+      expect(getLayoutChildren(node)[0].getProperty('text')).toBe('first');
+
+      builder.build(Column(createComponent(Labeled, { label: second$ })));
+      expect(getLayoutChildren(node)[0].getProperty('text')).toBe('second');
+
+      // The abandoned source must no longer reach the tree.
+      first$.next('stale');
+      expect(getLayoutChildren(node)[0].getProperty('text')).toBe('second');
+    });
+
+    it('unsubscribes observable inputs when the component is released', () => {
+      const { builder } = createHarness();
+      const label$ = new BehaviorSubject('live');
+
+      builder.build(Column(createComponent(Labeled, { label: label$ })));
+      expect(label$.observed).toBe(true);
+
+      builder.build(Column());
+
+      expect(label$.observed).toBe(false);
+    });
+
+    it('throws when an @Input field is not an input cell', () => {
+      const { builder } = createHarness();
+
+      expect(() => builder.build(createComponent(BadInput))).toThrow(
+        "Component 'bad-input' declares @Input() 'label' but it is not an input cell"
+      );
     });
   });
 

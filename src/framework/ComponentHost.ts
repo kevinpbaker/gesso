@@ -1,6 +1,7 @@
 import { Subscription } from 'rxjs';
 
-import type { UiChild } from '../ui/composition/UiElement';
+import { isObservable, type UiChild } from '../ui/composition/UiElement';
+import { InputCell } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
 import { getComponentMetadata } from './metadata';
@@ -12,7 +13,7 @@ import type { StoreRegistry } from './store/StoreRegistry';
  *
  * The host is responsible for:
  *   - instantiating the component class
- *   - assigning input values from props
+ *   - feeding parent props into @Input() cells
  *   - resolving @Inject() stores
  *   - validating that @State fields are initialized
  *   - calling render() exactly once and caching its output
@@ -38,12 +39,22 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   private mounted = false;
   private output: UiChild | undefined;
 
+  /**
+   * What the parent most recently supplied for each input, so an
+   * unchanged Observable is not resubscribed on every reconcile.
+   */
+  private readonly inputSources = new Map<string, unknown>();
+
+  /** Live subscription per Observable-valued input. */
+  private readonly inputSubscriptions = new Map<string, Subscription>();
+
   constructor(
     element: ComponentElement<P>,
     private readonly stores: StoreRegistry
   ) {
     this.element = element;
     this.instance = new element.componentClass();
+    this.validateInputs();
     this.wireInputs();
     this.wireInjects();
     this.validateState();
@@ -87,12 +98,11 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   }
 
   /**
-   * Updates input values when the parent supplies new props.
+   * Feeds new parent props into the input cells.
    *
-   * The already-rendered tree is not rebuilt: a component that read a
-   * plain input value during render() keeps the value it captured.
-   * Passing an Observable input (or, from Phase C, an input cell) is
-   * what makes an input update the rendered output.
+   * The rendered tree is not rebuilt. Because inputs are cells and
+   * render() bound them into the tree, pushing a new value through the
+   * cell is what updates the output.
    */
   updateProps(props: P): void {
     (this.element as { props: P }).props = props;
@@ -101,9 +111,57 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
 
   private wireInputs(): void {
     const metadata = getComponentMetadata(this.element.componentClass);
+    const props = this.element.props as Record<string, unknown>;
     for (const inputName of metadata.inputs) {
-      const value = (this.element.props as Record<string, unknown>)[inputName];
-      (this.instance as unknown as Record<string, unknown>)[inputName] = value;
+      const cell = (this.instance as unknown as Record<string, InputCell<unknown>>)[inputName];
+      this.applyInput(inputName, cell, props[inputName]);
+    }
+  }
+
+  /**
+   * Connects one input cell to whatever the parent supplied.
+   *
+   * An absent prop leaves the cell's default in place, so a parent that
+   * does not mention an input never clobbers it.
+   */
+  private applyInput(inputName: string, cell: InputCell<unknown>, provided: unknown): void {
+    if (this.inputSources.has(inputName) && this.inputSources.get(inputName) === provided) {
+      return;
+    }
+
+    const previous = this.inputSubscriptions.get(inputName);
+    if (previous !== undefined) {
+      previous.unsubscribe();
+      this.subscriptions.remove(previous);
+      this.inputSubscriptions.delete(inputName);
+    }
+
+    this.inputSources.set(inputName, provided);
+
+    if (provided === undefined) {
+      return;
+    }
+
+    if (isObservable(provided)) {
+      const subscription = provided.subscribe(value => cell.next(value));
+      this.inputSubscriptions.set(inputName, subscription);
+      this.subscriptions.add(subscription);
+      return;
+    }
+
+    cell.next(provided);
+  }
+
+  private validateInputs(): void {
+    const metadata = getComponentMetadata(this.element.componentClass);
+    for (const inputName of metadata.inputs) {
+      const value = (this.instance as unknown as Record<string, unknown>)[inputName];
+      if (!(value instanceof InputCell)) {
+        throw new Error(
+          `Component '${metadata.tag}' declares @Input() '${inputName}' but it is not an input cell. ` +
+            `Initialize it with input(defaultValue).`
+        );
+      }
     }
   }
 

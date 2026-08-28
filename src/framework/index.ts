@@ -1,8 +1,10 @@
 export { Component } from './Component';
 export { State as StateCell, state } from './State';
+export { InputCell, input } from './Input';
 export { Define, Input, Inject } from './decorators';
 export { State, Action, Projection } from './store/decorators';
-export { Store } from './store/Store';
+export { Store, type StoreProjections } from './store/Store';
+export { structurallyEqual } from './store/structuralEquals';
 export { StoreRegistry } from './store/StoreRegistry';
 export { createComponent } from './createComponent';
 export { ComponentHostResolver } from './ComponentHostResolver';

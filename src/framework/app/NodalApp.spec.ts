@@ -10,6 +10,7 @@ import { State as StateDecorator, Action } from '../store/decorators';
 import { Box, Column, Text } from '../../ui/composition/UiComponents';
 import { FakePlatformSurface } from '../../ui/input/UiInputTestUtils';
 import { state as cell } from '../State';
+import { input } from '../Input';
 import { State as ComponentState } from '../store/decorators';
 import type { UiChild, UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -96,14 +97,14 @@ const itemUnmounts: string[] = [];
 
 @Define('list-item')
 class ListItem extends Component {
-  @Input() label = '';
+  @Input() label = input('');
 
   override onMount() {
-    itemMounts.push(this.label);
+    itemMounts.push(this.label.value);
   }
 
   override onUnmount() {
-    itemUnmounts.push(this.label);
+    itemUnmounts.push(this.label.value);
   }
 
   override render() {

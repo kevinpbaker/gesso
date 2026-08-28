@@ -6,8 +6,9 @@ import { Component } from '../framework/Component';
 import { createComponent } from '../framework/createComponent';
 import { Define, Inject, Input } from '../framework/decorators';
 import { state } from '../framework/State';
+import { input } from '../framework/Input';
 import { Store } from '../framework/store/Store';
-import { Action, State } from '../framework/store/decorators';
+import { Action, Projection, State } from '../framework/store/decorators';
 
 /**
  * Demo store used by the framework playground.
@@ -17,6 +18,19 @@ import { Action, State } from '../framework/store/decorators';
  */
 export class DemoStore extends Store {
   @State() clicks = state(0);
+
+  /**
+   * Derived read model. Exposed to components as an Observable that
+   * emits only when the projected value actually changes, which is
+   * what a data worker will send over the wire in Phase E.
+   */
+  @Projection()
+  get summary(): { clicks: number; parity: string } {
+    return {
+      clicks: this.clicks.value,
+      parity: this.clicks.value % 2 === 0 ? 'even' : 'odd'
+    };
+  }
 
   @Action()
   increment(): void {
@@ -77,7 +91,7 @@ export class StoreCounter extends Component {
     return Row(
       { gap: 12, alignItems: 'center' },
       Text({
-        text: this.demo.select(s => s.clicks.value).pipe(map(c => `Store count: ${c}`)),
+        text: this.demo.projection.summary.pipe(map(s => `Store count: ${s.clicks} (${s.parity})`)),
         color: '#e5e7eb'
       }),
       Button(
@@ -105,7 +119,7 @@ export class StoreCounter extends Component {
  */
 @Define('tick-item')
 export class TickItem extends Component {
-  @Input() label = '';
+  @Input() label = input('');
 
   override render(): UiElement {
     return Row(
