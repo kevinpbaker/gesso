@@ -17,7 +17,7 @@ import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
 import { Input } from '../decorators';
 import { map } from 'rxjs/operators';
-import { UiTimerFrameClock } from '../../ui/scheduler';
+import { UiManualFrameClock, UiTimerFrameClock } from '../../ui/scheduler';
 import type { CanvasHost } from '../../ui/rendering';
 
 function createMockCanvas(width = 600, height = 600): CanvasHost {
@@ -41,7 +41,9 @@ function createMockCanvas(width = 600, height = 600): CanvasHost {
     fill: vi.fn(),
     stroke: vi.fn(),
     fillText: vi.fn(),
-    measureText: vi.fn(() => ({ width: 0 })),
+    // A real canvas never measures non-empty text as zero-width, and
+    // a zero-width glyph run is indistinguishable from 'nothing drawn'.
+    measureText: vi.fn((text: string) => ({ width: String(text).length * 7 })),
     drawImage: vi.fn(),
     fillStyle: '#000',
     strokeStyle: '#000',
@@ -256,5 +258,68 @@ describe('NodalApp', () => {
     expect(collectText(root)).toEqual(['clicks: 1']);
 
     app.dispose();
+  });
+
+  describe('surface sizing', () => {
+    function mountWithManualClock() {
+      let clock: UiManualFrameClock | undefined;
+      const canvas = createMockCanvas();
+      const app = new NodalApp({
+        host: createMockHost(),
+        canvas,
+        root: createComponent(ClickCounter),
+        clock: callback => {
+          clock = new UiManualFrameClock(callback);
+          return clock;
+        }
+      });
+      app.mount();
+      return { app, canvas, clock: clock! };
+    }
+
+    it('paints on the first frame', () => {
+      const { canvas, clock } = mountWithManualClock();
+      const ctx = canvas.getContext('2d') as unknown as { fillText: ReturnType<typeof vi.fn> };
+
+      expect(clock.isPending).toBe(true);
+      clock.tick(0);
+
+      expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
+    });
+
+    it('schedules a repaint when the surface is resized', () => {
+      // Resizing the backing store clears it. Without an explicit dirty
+      // mark the canvas stayed blank until something unrelated happened
+      // to schedule a frame.
+      const { app, canvas, clock } = mountWithManualClock();
+      clock.tick(0);
+      expect(clock.isPending).toBe(false);
+
+      const ctx = canvas.getContext('2d') as unknown as { fillText: ReturnType<typeof vi.fn> };
+      ctx.fillText.mockClear();
+
+      app.resize(900, 700);
+
+      expect(clock.isPending).toBe(true);
+      clock.tick(16);
+      expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
+    });
+
+    it('ignores a zero-sized report rather than blanking the surface', () => {
+      // A hidden or detached host reports 0x0. A zero logical size makes
+      // the renderer's cull rectangle empty, discarding every node.
+      const { app, canvas, clock } = mountWithManualClock();
+      clock.tick(0);
+
+      app.resize(0, 0);
+      expect(clock.isPending).toBe(false);
+
+      const ctx = canvas.getContext('2d') as unknown as { fillText: ReturnType<typeof vi.fn> };
+      ctx.fillText.mockClear();
+      app.resize(900, 700);
+      clock.tick(16);
+
+      expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
+    });
   });
 });

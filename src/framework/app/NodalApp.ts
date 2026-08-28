@@ -133,7 +133,7 @@ export class NodalApp {
     }
 
     this.observeResize();
-    this.applySize();
+    this.resize(this.host.clientWidth || this.canvas.width || 600, this.host.clientHeight || this.canvas.height || 600);
     this.attachInput();
     this.scheduler.start();
   }
@@ -156,6 +156,34 @@ export class NodalApp {
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.resolver.dispose();
+  }
+
+  /**
+   * Resizes the surface and schedules a repaint.
+   *
+   * Public because the size of the drawing surface is owned by whoever
+   * hosts it: a ResizeObserver here, and a forwarded resize message in
+   * a worker runtime.
+   *
+   * Zero-sized reports are ignored. A hidden or detached host delivers
+   * 0x0, and a zero logical size makes the renderer's cull rectangle
+   * empty, which discards every node.
+   */
+  resize(width: number, height: number): void {
+    if (!(width > 0) || !(height > 0)) {
+      return;
+    }
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    this.surface.setLogicalSize(width, height, dpr);
+    this.constraints = Constraints.loose(width, height);
+    if (this.root === undefined) {
+      return;
+    }
+    this.engine.layout(this.root, this.constraints);
+    // Resizing the backing store clears whatever was drawn, and layout
+    // marks nothing dirty on its own, so without this the canvas stays
+    // blank until some unrelated change happens to schedule a frame.
+    this.graph.markDirty(this.root, DirtyFlags.Paint);
   }
 
   /**
@@ -302,22 +330,12 @@ export class NodalApp {
       if (entry === undefined) {
         return;
       }
-      const { width, height } = entry.contentRect;
-      this.canvas.width = width;
-      this.canvas.height = height;
-      this.applySize();
+      // contentRect is the logical CSS size. The surface owns the
+      // backing store, so the canvas attributes are never written here:
+      // round-tripping the size through them once meant the second
+      // resize read device pixels back as logical pixels.
+      this.resize(entry.contentRect.width, entry.contentRect.height);
     });
     this.resizeObserver.observe(this.host);
-  }
-
-  private applySize(): void {
-    const width = this.canvas.width || this.host.clientWidth || 600;
-    const height = this.canvas.height || this.host.clientHeight || 600;
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    this.surface.setLogicalSize(width, height, dpr);
-    this.constraints = Constraints.loose(width, height);
-    if (this.root !== undefined) {
-      this.engine.layout(this.root, this.constraints);
-    }
   }
 }

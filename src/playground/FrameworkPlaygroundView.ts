@@ -43,7 +43,7 @@ function renderTemplate(): string {
       <section class="pg-preview"></section>
     </main>
     <footer class="pg-debug">
-      <div class="pg-status">Two counters should auto-increment every second via local state and store dispatch.</div>
+      <div class="pg-status">Click +1 and Add: local state, store dispatch, and a keyed component list.</div>
     </footer>
   </div>`;
 }
