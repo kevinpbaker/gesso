@@ -7,6 +7,7 @@ import type { UiFrameClockFactory } from '../../ui/scheduler';
 import type { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
 import { NodalRuntime, type FrameMetrics } from './NodalRuntime';
+import type { StoreReplica } from '../store/worker/StoreReplica';
 
 export interface NodalAppOptions {
   host: HTMLElement;
@@ -103,6 +104,11 @@ export class NodalApp {
     this.resize(this.host.clientWidth || this.canvas.width || 600, this.host.clientHeight || this.canvas.height || 600);
     this.attachInput();
     this.runtime.start();
+  }
+
+  /** Aligns patch delivery from worker-owned stores to the frame. */
+  deferPatchesFrom(replicas: readonly StoreReplica[]): void {
+    this.runtime.deferPatchesFrom(replicas);
   }
 
   /**

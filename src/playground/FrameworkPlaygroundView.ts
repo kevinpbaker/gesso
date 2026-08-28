@@ -71,12 +71,18 @@ export function mountFrameworkSyncPlayground(host: HTMLElement): () => void {
  * Reports frame counts and rate identically for both configurations,
  * so the comparison between them is like for like.
  */
-function createFrameReporter(label: string): (metrics: { durationMs: number; at: number }) => void {
+function createFrameReporter(
+  label: string
+): (metrics: { durationMs: number; at: number; phases: Record<string, number> }) => void {
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
   let previousFrameAt: number | null = null;
   let worstGap = 0;
+  // Peak rather than latest: patches and environment run on a small
+  // minority of frames, so sampling the current frame would almost
+  // always show them as idle even when they are doing the work.
+  const worstPhase: Record<string, number> = {};
   return metrics => {
     frames++;
     // Measured on the rendering thread's clock. Across a worker
@@ -86,6 +92,9 @@ function createFrameReporter(label: string): (metrics: { durationMs: number; at:
       worstGap = Math.max(worstGap, metrics.at - previousFrameAt);
     }
     previousFrameAt = metrics.at;
+    for (const [name, ms] of Object.entries(metrics.phases)) {
+      worstPhase[name] = Math.max(worstPhase[name] ?? 0, ms);
+    }
 
     const now = performance.now();
     if (now - lastReport < 500) {
@@ -95,6 +104,12 @@ function createFrameReporter(label: string): (metrics: { durationMs: number; at:
     requireElement('.pg-status').textContent =
       `${label} · ${frames} frames · ${fps.toFixed(0)} fps · ` +
       `last frame ${metrics.durationMs.toFixed(1)}ms · worst gap ${worstGap.toFixed(0)}ms`;
+    requireElement('.pg-phases').textContent =
+      'worst phase · ' +
+      Object.entries(worstPhase)
+        .map(([name, ms]) => `${name} ${ms.toFixed(2)}ms`)
+        .join(' · ') +
+      '   (0 means the phase never had work)';
     lastReport = now;
     framesAtLastReport = frames;
   };
@@ -144,6 +159,7 @@ function renderTemplate(title: string, mode: 'worker' | 'sync'): string {
     </main>
     <footer class="pg-debug">
       <div class="pg-status">Starting ${mode === 'worker' ? 'render worker' : 'single-thread app'}…</div>
+      <div class="pg-status pg-status-dim pg-phases">Phase timings appear once frames start.</div>
       <button class="pg-block" type="button">Block main thread ${BLOCK_MS}ms</button>
     </footer>
   </div>`;

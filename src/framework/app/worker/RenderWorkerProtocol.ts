@@ -1,4 +1,5 @@
 import type { UiModifiers } from '../../../ui/input/UiInputEvent';
+import type { FramePhaseTimings } from '../NodalRuntime';
 
 /**
  * Messages the main-thread shell sends to the render worker.
@@ -28,7 +29,7 @@ export type ShellToRuntimeMessage =
  */
 export type RuntimeToShellMessage =
   | { type: 'ready' }
-  | { type: 'frame'; frame: number; durationMs: number; nodes: number; at: number }
+  | { type: 'frame'; frame: number; durationMs: number; nodes: number; at: number; phases: FramePhaseTimings }
   | { type: 'error'; message: string; stack?: string };
 
 export function modifiersFrom(event: {

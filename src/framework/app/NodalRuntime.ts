@@ -25,6 +25,27 @@ import { UiScheduler, UiTimerFrameClock } from '../../ui/scheduler';
 import type { UiFrame, UiFrameClockFactory } from '../../ui/scheduler';
 import { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
+import type { StoreReplica } from '../store/worker/StoreReplica';
+
+/**
+ * The ordered work of one frame.
+ *
+ * Only four of the seven stages the design document imagined are real
+ * phases. Component reconciliation and input dispatch are driven by
+ * events, not by the clock: an observable emission reconciles its
+ * subtree immediately and a pointer event routes immediately, each
+ * marking nodes dirty so the *effects* land in the next frame. Giving
+ * them frame slots would add latency and describe the system falsely.
+ *
+ * `patches` and `environment` run before the dirty set is snapshotted,
+ * because both produce dirt that this frame must see. `layout` and
+ * `render` run against the snapshot.
+ */
+export const UI_FRAME_PHASES = ['patches', 'environment', 'layout', 'render'] as const;
+
+export type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
+
+export type FramePhaseTimings = Record<UiFramePhase, number>;
 
 /**
  * Guard against a root component that only ever renders another
@@ -95,6 +116,8 @@ export class NodalRuntime {
   private pixelRatio: number;
   private lastFrameMs = 0;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
+  private replicas: readonly StoreReplica[] = [];
+  private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
 
   constructor(options: NodalRuntimeOptions) {
     this.stores = options.stores ?? new StoreRegistry();
@@ -114,6 +137,7 @@ export class NodalRuntime {
     this.scheduler = new UiScheduler({
       clock: options.clock ?? (callback => new UiTimerFrameClock(callback)),
       dirty: this.graph.getDirtyNodes(),
+      beforeCollect: () => this.runPreCollectPhases(),
       onFrame: frame => this.handleFrame(frame)
     });
 
@@ -125,6 +149,19 @@ export class NodalRuntime {
 
     if (options.width !== undefined && options.height !== undefined) {
       this.resize(options.width, options.height, this.pixelRatio);
+    }
+  }
+
+  /**
+   * Aligns patch delivery from worker-owned stores to the frame.
+   *
+   * Without this a burst of patches rebuilds the bound subtree once per
+   * patch, even though only the final state is ever drawn.
+   */
+  deferPatchesFrom(replicas: readonly StoreReplica[]): void {
+    this.replicas = replicas;
+    for (const replica of replicas) {
+      replica.deferPatches(() => this.scheduler.notifyDirty());
     }
   }
 
@@ -283,19 +320,87 @@ export class NodalRuntime {
     };
   }
 
+  /**
+   * Work that must happen before the frame's dirty set is snapshotted.
+   *
+   * Environment propagation belongs here and nowhere else: rebuilding a
+   * node's environment marks its descendants dirty, and those nodes
+   * have to be in the frame that is about to be collected. Run after
+   * collection it saw an already-drained set and silently did nothing,
+   * so a theme change never reached descendants at all.
+   */
+  /**
+   * The phases that run before the frame's dirty set is snapshotted.
+   *
+   * Both produce dirt of their own — applying a patch updates bound
+   * properties, rebuilding an environment marks descendants — and those
+   * nodes have to belong to the frame about to be collected. Run after
+   * collection, the environment phase saw an already-drained set and
+   * silently did nothing, so a theme change never reached descendants.
+   */
+  private runPreCollectPhases(): void {
+    this.phaseTimings = emptyPhaseTimings();
+
+    this.phaseTimings.patches = this.timePhase(
+      () => this.replicas.some(replica => replica.hasPendingPatches),
+      () => {
+        for (const replica of this.replicas) {
+          replica.flush();
+        }
+      }
+    );
+
+    this.phaseTimings.environment = this.timePhase(
+      () => this.graph.hasEnvironmentDirty(),
+      () => this.graph.processEnvironmentDirty()
+    );
+  }
+
   private handleFrame(frame: UiFrame): void {
     const root = this.root;
     if (root === undefined) {
       return;
     }
     const started = now();
-    this.graph.processEnvironmentDirty();
-    this.engine.layoutForFrame(frame, this.constraints, root);
-    this.canvasRenderer.render(root, { layout: this.engine, text: this.textMeasurer });
+
+    this.phaseTimings.layout = this.timePhase(
+      () => frameNeedsLayout(frame),
+      () => this.engine.layoutForFrame(frame, this.constraints, root)
+    );
+
+    // Render is unconditional: the Canvas2D backend redraws the whole
+    // scene, so any frame that got this far changes pixels.
+    this.phaseTimings.render = this.timePhase(
+      () => true,
+      () => this.canvasRenderer.render(root, { layout: this.engine, text: this.textMeasurer })
+    );
+
     const finished = now();
     const elapsed = finished - started;
     this.lastFrameMs = elapsed;
-    this.frameListener?.({ frame: frame.id, durationMs: elapsed, nodes: frame.size, at: finished });
+    this.frameListener?.({
+      frame: frame.id,
+      durationMs: elapsed,
+      nodes: frame.size,
+      at: finished,
+      phases: this.phaseTimings
+    });
+  }
+
+  /**
+   * Runs a phase when it has work, returning what it cost.
+   *
+   * A skipped phase reports 0, which is what makes the breakdown
+   * useful: a frame doing nothing but scrolling should show zeroes
+   * everywhere but render.
+   */
+  private timePhase(hasWork: () => boolean, run: () => void): number {
+    if (!hasWork()) {
+      return 0;
+    }
+    const started = now();
+    run();
+    return now() - started;
   }
 
   /** Duration of the most recent frame, in milliseconds. */
@@ -308,6 +413,8 @@ export interface FrameMetrics {
   frame: number;
   durationMs: number;
   nodes: number;
+  /** Milliseconds per phase. A phase with no work reports 0. */
+  phases: FramePhaseTimings;
   /**
    * When the frame finished, on the clock of the thread that rendered
    * it. Gaps between consecutive values are the only honest measure of
@@ -320,4 +427,20 @@ export interface FrameMetrics {
 
 function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function emptyPhaseTimings(): FramePhaseTimings {
+  return { patches: 0, environment: 0, layout: 0, render: 0 };
+}
+
+/**
+ * Whether anything in the frame needs measuring or placing.
+ *
+ * Mirrors what LayoutEngine.layoutForFrame decides internally, so a
+ * scroll-only frame is reported as skipping layout rather than
+ * spending an immeasurable amount of time deciding to do nothing.
+ */
+function frameNeedsLayout(frame: UiFrame): boolean {
+  const layoutFlags = DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform;
+  return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & layoutFlags) !== 0);
 }

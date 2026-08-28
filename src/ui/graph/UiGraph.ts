@@ -65,6 +65,9 @@ export class UiGraph {
 
   private nextBindingId = 0;
 
+  /** Set when any node is marked DirtyFlags.Environment. */
+  private environmentDirty = false;
+
   // ---------------------------------------------------------------------------
   // Node lookup
   // ---------------------------------------------------------------------------
@@ -396,9 +399,22 @@ export class UiGraph {
   public markDirty(node: UiNode, flags: DirtyFlags): void {
     const newlyDirty = this.dirtyNodes.mark(node);
     node.dirtyFlags |= flags;
+    if ((flags & DirtyFlags.Environment) !== 0) {
+      this.environmentDirty = true;
+    }
     if (newlyDirty) {
       this.dirtyListener?.();
     }
+  }
+
+  /**
+   * Whether any node is waiting for its environment to be rebuilt.
+   *
+   * Lets a frame skip the environment phase outright, which is the
+   * common case: themes change far less often than anything else.
+   */
+  public hasEnvironmentDirty(): boolean {
+    return this.environmentDirty;
   }
 
   public markDirtyById(id: NodeId, flags: DirtyFlags): void {
@@ -539,6 +555,7 @@ export class UiGraph {
    * the change to descendants and clearing the flag.
    */
   public processEnvironmentDirty(): void {
+    this.environmentDirty = false;
     const inheritedFlags = this.computeInheritedFlags();
     const snapshot = [...this.dirtyNodes.take()];
     for (const node of snapshot) {

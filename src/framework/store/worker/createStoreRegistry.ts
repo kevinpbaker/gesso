@@ -1,6 +1,7 @@
 import type { Store } from '../Store';
 import { StoreRegistry } from '../StoreRegistry';
 import { attachStore } from './attachStore';
+import type { StoreReplica } from './StoreReplica';
 import type { StorePort } from './StoreWorkerProtocol';
 
 export interface StoreRegistration {
@@ -17,6 +18,8 @@ export interface StoreRegistration {
 
 export interface RegistryHandle {
   registry: StoreRegistry;
+  /** Replicas of worker-owned stores, for frame-aligned patch flushing. */
+  replicas: StoreReplica[];
   dispose(): void;
 }
 
@@ -33,6 +36,7 @@ export function createStoreRegistry(
 ): RegistryHandle {
   const registry = new StoreRegistry();
   const workers: Worker[] = [];
+  const replicas: StoreReplica[] = [];
 
   for (const registration of registrations) {
     if (registration.worker === undefined) {
@@ -49,11 +53,13 @@ export function createStoreRegistry(
         console.error(`[nodal store ${registration.storeClass.name}] ${message}`, stack);
       }
     });
+    replicas.push(replica);
     registry.registerRemote(registration.storeClass, replica);
   }
 
   return {
     registry,
+    replicas,
     dispose: () => {
       for (const worker of workers) {
         worker.terminate();

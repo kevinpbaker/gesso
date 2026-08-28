@@ -157,13 +157,15 @@ export class RenderWorkerApp {
       height,
       dpr
     });
+    this.runtime.deferPatchesFrom(this.registry.replicas);
     this.runtime.onFrame(metrics => {
       this.host.postMessage({
         type: 'frame',
         frame: metrics.frame,
         durationMs: metrics.durationMs,
         nodes: metrics.nodes,
-        at: metrics.at
+        at: metrics.at,
+        phases: metrics.phases
       });
     });
     this.runtime.start();

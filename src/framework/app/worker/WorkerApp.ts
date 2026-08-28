@@ -1,3 +1,4 @@
+import type { FramePhaseTimings } from '../NodalRuntime';
 import { modifiersFrom, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 export interface WorkerAppOptions {
@@ -16,7 +17,13 @@ export interface WorkerAppOptions {
    */
   worker: (() => Worker) | URL | string;
   /** Receives frame timings reported by the render worker. */
-  onFrame?: (metrics: { frame: number; durationMs: number; nodes: number; at: number }) => void;
+  onFrame?: (metrics: {
+    frame: number;
+    durationMs: number;
+    nodes: number;
+    at: number;
+    phases: FramePhaseTimings;
+  }) => void;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
 }
@@ -112,7 +119,8 @@ export class WorkerApp {
         frame: message.frame,
         durationMs: message.durationMs,
         nodes: message.nodes,
-        at: message.at
+        at: message.at,
+        phases: message.phases
       });
       return;
     }

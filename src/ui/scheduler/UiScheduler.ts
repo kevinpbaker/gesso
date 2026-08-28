@@ -20,6 +20,17 @@ export interface UiSchedulerOptions {
    * Receives one UiFrame per processed tick.
    */
   onFrame: UiFrameCallback;
+
+  /**
+   * Runs immediately before the dirty set is snapshotted.
+   *
+   * For work that produces dirt of its own — applying store patches,
+   * propagating environment — so the nodes it dirties belong to the
+   * frame about to be collected rather than the one after it. Anything
+   * reading the dirty set after collection sees an empty one, so this
+   * hook is the only place such work can go.
+   */
+  beforeCollect?: () => void;
 }
 
 /**
@@ -37,6 +48,7 @@ export class UiScheduler {
   private readonly clock: UiFrameClock;
   private readonly dirty: DirtyNodeSet;
   private readonly onFrame: UiFrameCallback;
+  private readonly beforeCollect: (() => void) | undefined;
 
   private disposed = false;
   private active = true;
@@ -46,6 +58,7 @@ export class UiScheduler {
   constructor(options: UiSchedulerOptions) {
     this.dirty = options.dirty;
     this.onFrame = options.onFrame;
+    this.beforeCollect = options.beforeCollect;
     this.clock = options.clock((time: UiFrameTime) => {
       this.handleFrame(time);
     });
@@ -110,6 +123,7 @@ export class UiScheduler {
 
   private handleFrame(time: UiFrameTime): void {
     this.pending = false;
+    this.beforeCollect?.();
     const frame = this.collectFrame(time);
     if (frame.size > 0) {
       this.onFrame(frame);

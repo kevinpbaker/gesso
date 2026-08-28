@@ -51,6 +51,7 @@ export class NodalAppBuilder {
     const rootElement = typeof this.root === 'function' ? createComponent(this.root) : this.root;
     const stores = createStoreRegistry(this.registrations);
     const app = new NodalApp({ host: element, root: rootElement, stores: stores.registry });
+    app.deferPatchesFrom(stores.replicas);
     if (this.frameListener !== undefined) {
       app.onFrame(this.frameListener);
     }

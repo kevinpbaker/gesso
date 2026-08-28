@@ -83,6 +83,9 @@ export class LayoutPlayground {
     this.scheduler = new UiScheduler({
       clock: options.clock,
       dirty: this.graph.getDirtyNodes(),
+      // Environment propagation dirties descendants, so it has to run
+      // before the frame is collected or those nodes miss it entirely.
+      beforeCollect: () => this.graph.processEnvironmentDirty(),
       onFrame: frame => this.handleFrame(frame)
     });
     this.graph.setDirtyListener(() => this.scheduler.notifyDirty());
@@ -171,7 +174,6 @@ export class LayoutPlayground {
     if (root === undefined) {
       return;
     }
-    this.graph.processEnvironmentDirty();
     const start = performance.now();
     this.engine.layoutForFrame(frame, this.constraints, root);
     const duration = performance.now() - start;

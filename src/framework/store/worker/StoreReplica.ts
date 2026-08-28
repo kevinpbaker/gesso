@@ -22,6 +22,8 @@ export class StoreReplica<T extends Store = Store> {
   private readonly projectionNames: ReadonlySet<string>;
   private readonly projectionProxy: StoreProjections<T>;
   private errorListener: ((message: string, stack?: string) => void) | null = null;
+  private pending: Patch[] | null = null;
+  private scheduleFlush: (() => void) | null = null;
 
   constructor(
     private readonly storeClass: Function,
@@ -88,7 +90,48 @@ export class StoreReplica<T extends Store = Store> {
       report(data.message, data.stack);
       return;
     }
-    this.applyPatches(data.patches);
+    this.receivePatches(data.patches);
+  }
+
+  /**
+   * Defers patch application to the next frame.
+   *
+   * A chatty data worker can deliver many patches between two frames.
+   * Applied on arrival, each one pushes a value through the bindings
+   * watching it, so the tree is rebuilt once per patch even though only
+   * the last state is ever drawn. Queued instead, a burst costs one
+   * pass. The runtime calls `flush()` from the frame's first phase.
+   *
+   * Immediate application stays the default, so a replica used outside
+   * a runtime still behaves synchronously.
+   */
+  deferPatches(scheduleFlush: () => void): void {
+    this.scheduleFlush = scheduleFlush;
+    this.pending = [];
+  }
+
+  /** Whether queued patches are waiting for the next frame. */
+  get hasPendingPatches(): boolean {
+    return this.pending !== null && this.pending.length > 0;
+  }
+
+  /** Applies everything queued since the last flush. */
+  flush(): void {
+    if (this.pending === null || this.pending.length === 0) {
+      return;
+    }
+    const batch = this.pending;
+    this.pending = [];
+    this.applyPatches(batch);
+  }
+
+  private receivePatches(patches: readonly Patch[]): void {
+    if (this.pending === null) {
+      this.applyPatches(patches);
+      return;
+    }
+    this.pending.push(...patches);
+    this.scheduleFlush?.();
   }
 
   /**
