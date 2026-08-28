@@ -13,3 +13,7 @@ export { isComponentElement, type ComponentElement, type FrameworkChild } from '
 export { createApp } from './app/createApp';
 export { NodalAppBuilder } from './app/NodalAppBuilder';
 export { NodalApp, type NodalAppOptions } from './app/NodalApp';
+export { NodalRuntime, type NodalRuntimeOptions, type RuntimeInput, type FrameMetrics } from './app/NodalRuntime';
+export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
+export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';
+export type { ShellToRuntimeMessage, RuntimeToShellMessage } from './app/worker/RenderWorkerProtocol';

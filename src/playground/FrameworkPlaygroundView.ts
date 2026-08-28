@@ -1,49 +1,146 @@
 import { createApp } from '../framework';
 import { DemoStore, FrameworkDemoRoot } from './FrameworkPlayground';
 
+const BLOCK_MS = 2000;
+
 /**
- * Route that proves the framework layer works end-to-end.
+ * Worker-hosted framework route.
  *
- * Uses the single-thread bootstrapper (`createApp().useStore().mount()`)
- * created in Phase 3. The app owns the component runtime, the local
- * store, the graph, the scheduler, and the Canvas2D renderer. Two
- * counters auto-increment every second: one using local `@State()` and
- * one using a dispatched store action.
+ * The main thread here owns only the page shell: it creates the
+ * canvas, hands its drawing surface to the render worker, and
+ * forwards events. Components, layout and rendering all run in the
+ * worker, so the "Block main thread" button below freezes this
+ * thread for two seconds without costing the UI a single frame.
  *
- * Returns a dispose function so the hash router can swap routes.
+ * Compare with #framework-sync, which runs the same app on the main
+ * thread and visibly stalls.
  */
 export function mountFrameworkPlayground(host: HTMLElement): () => void {
-  host.innerHTML = renderTemplate();
+  host.innerHTML = renderTemplate('Framework (render worker)', 'worker');
 
-  const preview = requireElement('.pg-preview');
-  const disposeApp = createApp(FrameworkDemoRoot).useStore(DemoStore).mount(preview);
+  const report = createFrameReporter('Rendering in a worker');
+
+  const app = createApp({
+    // Written out literally so the bundler can see and split it.
+    worker: () => new Worker(new URL('./FrameworkWorker.ts', import.meta.url), { type: 'module' }),
+    onFrame: report,
+    onError: (message, stack) => {
+      requireElement('.pg-status').textContent = `Render worker error: ${message}`;
+      console.error('[nodal render worker]', message, stack);
+    }
+  });
+
+  const dispose = app.mount(requireElement('.pg-preview'));
+  const detachBlock = wireBlockButton();
 
   return () => {
-    disposeApp();
+    detachBlock();
+    dispose();
   };
 }
 
-function renderTemplate(): string {
+/**
+ * Single-thread framework route, for comparison.
+ *
+ * Identical app, mounted with mountSync so components, layout and
+ * rendering share the main thread. Blocking the main thread here
+ * stalls the UI, which is exactly what the worker route avoids.
+ */
+export function mountFrameworkSyncPlayground(host: HTMLElement): () => void {
+  host.innerHTML = renderTemplate('Framework (single thread)', 'sync');
+
+  const report = createFrameReporter('Rendering on the main thread');
+
+  const dispose = createApp(FrameworkDemoRoot)
+    .useStore(DemoStore)
+    .onFrame(report)
+    .mountSync(requireElement('.pg-preview'));
+  const detachBlock = wireBlockButton();
+
+  return () => {
+    detachBlock();
+    dispose();
+  };
+}
+
+/**
+ * Reports frame counts and rate identically for both configurations,
+ * so the comparison between them is like for like.
+ */
+function createFrameReporter(label: string): (metrics: { durationMs: number; at: number }) => void {
+  let frames = 0;
+  let lastReport = performance.now();
+  let framesAtLastReport = 0;
+  let previousFrameAt: number | null = null;
+  let worstGap = 0;
+  return metrics => {
+    frames++;
+    // Measured on the rendering thread's clock. Across a worker
+    // boundary the messages queue behind a blocked main thread and
+    // arrive together, so only these timestamps reveal a real stall.
+    if (previousFrameAt !== null) {
+      worstGap = Math.max(worstGap, metrics.at - previousFrameAt);
+    }
+    previousFrameAt = metrics.at;
+
+    const now = performance.now();
+    if (now - lastReport < 500) {
+      return;
+    }
+    const fps = ((frames - framesAtLastReport) * 1000) / (now - lastReport);
+    requireElement('.pg-status').textContent =
+      `${label} · ${frames} frames · ${fps.toFixed(0)} fps · ` +
+      `last frame ${metrics.durationMs.toFixed(1)}ms · worst gap ${worstGap.toFixed(0)}ms`;
+    lastReport = now;
+    framesAtLastReport = frames;
+  };
+}
+
+/**
+ * Busy-loops the main thread so the difference between the two
+ * configurations is directly observable.
+ */
+function wireBlockButton(): () => void {
+  const button = requireElement('.pg-block') as HTMLButtonElement;
+  const onClick = (): void => {
+    const status = requireElement('.pg-status');
+    const previous = status.textContent;
+    status.textContent = `Blocking the main thread for ${BLOCK_MS}ms…`;
+    // Yield once so the status text paints before the thread locks up.
+    setTimeout(() => {
+      const until = performance.now() + BLOCK_MS;
+      while (performance.now() < until) {
+        // Deliberately spinning.
+      }
+      status.textContent = previous;
+    }, 32);
+  };
+  button.addEventListener('click', onClick);
+  return () => button.removeEventListener('click', onClick);
+}
+
+function renderTemplate(title: string, mode: 'worker' | 'sync'): string {
   return `
   <div class="pg-app">
     <header class="pg-header">
-      <span class="pg-title">Framework Playground</span>
+      <span class="pg-title">${title}</span>
       <nav class="pg-nav">
         <a class="pg-link" href="#debug">DOM boxes</a>
         <a class="pg-link" href="#canvas">Canvas render</a>
-        <a class="pg-link" href="#framework">Framework</a>
+        <a class="pg-link" href="#framework">Worker</a>
+        <a class="pg-link" href="#framework-sync">Single thread</a>
         <a class="pg-link" href="#binding">Bindings</a>
         <a class="pg-link" href="#theme">Theme</a>
         <a class="pg-link" href="#webgpu">WebGPU</a>
         <a class="pg-link" href="#compare">Compare</a>
-        <a class="pg-link" href="#benchmark">Benchmark</a>
       </nav>
     </header>
     <main class="pg-main">
       <section class="pg-preview"></section>
     </main>
     <footer class="pg-debug">
-      <div class="pg-status">Click +1 and Add: local state, store dispatch, and a keyed component list.</div>
+      <div class="pg-status">Starting ${mode === 'worker' ? 'render worker' : 'single-thread app'}…</div>
+      <button class="pg-block" type="button">Block main thread ${BLOCK_MS}ms</button>
     </footer>
   </div>`;
 }

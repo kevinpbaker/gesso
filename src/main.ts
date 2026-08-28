@@ -1,7 +1,7 @@
 import './style.css';
 import { mountBindingDemo } from './playground/BindingDemoView';
 import { mountCanvasPlayground } from './playground/CanvasPlaygroundView';
-import { mountFrameworkPlayground } from './playground/FrameworkPlaygroundView';
+import { mountFrameworkPlayground, mountFrameworkSyncPlayground } from './playground/FrameworkPlaygroundView';
 import { mountPlayground } from './playground/PlaygroundView';
 import { mountWebGPUPlayground } from './playground/WebGPUPlaygroundView';
 import { mountWebGPUBenchmark } from './playground/WebGPUBenchmarkView';
@@ -14,6 +14,7 @@ const ROUTES: Record<string, Mount> = {
   debug: mountPlayground,
   canvas: mountCanvasPlayground,
   framework: mountFrameworkPlayground,
+  'framework-sync': mountFrameworkSyncPlayground,
   webgpu: mountWebGPUPlayground,
   compare: mountComparison,
   benchmark: mountWebGPUBenchmark,

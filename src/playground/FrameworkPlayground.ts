@@ -131,6 +131,53 @@ export class TickItem extends Component {
 }
 
 /**
+ * A component that animates continuously from a timer it owns.
+ *
+ * The timer runs on whichever thread the component runtime lives on.
+ * In the worker configuration that is the render worker, so blocking
+ * the main thread leaves this ticking; in the single-thread
+ * configuration it freezes along with everything else. That contrast
+ * is the whole point of the two routes.
+ */
+@Define('heartbeat')
+export class Heartbeat extends Component {
+  @State() ticks = state(0);
+
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  override onMount(): void {
+    this.timer = setInterval(() => {
+      this.ticks.value++;
+    }, 100);
+  }
+
+  override onUnmount(): void {
+    if (this.timer !== null) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  override render(): UiElement {
+    return Column(
+      { gap: 6, alignItems: 'flex-start' },
+      Text({
+        text: this.ticks.pipe(map(t => `Heartbeat: ${t} (10/sec while the UI thread is free)`)),
+        color: '#e5e7eb'
+      }),
+      Box({
+        // A bar that sweeps back and forth, so a stalled frame is
+        // obvious at a glance rather than needing a number read.
+        width: this.ticks.pipe(map(t => 40 + Math.abs(((t % 60) - 30) * 8))),
+        height: 12,
+        backgroundColor: '#38bdf8',
+        borderRadius: 6
+      })
+    );
+  }
+}
+
+/**
  * Root component for the framework playground.
  *
  * Composes static and dynamic content to verify that the framework
@@ -173,6 +220,7 @@ export class FrameworkDemoRoot extends Component {
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(LocalCounter),
       createComponent(StoreCounter),
+      createComponent(Heartbeat),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, alignItems: 'flex-start' }, this.recentTicks())
     );
