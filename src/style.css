@@ -195,6 +195,19 @@ body {
   padding: 0.5rem 1rem;
 }
 
+/*
+ * The framework routes update their status line several times a
+ * second. Left to reflow, a longer string wraps, the footer grows,
+ * the preview shrinks, and the ResizeObserver fires a full relayout
+ * and repaint — the readout would keep disturbing what it measures.
+ */
+.pg-debug .pg-status {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 1.2em;
+}
+
 .pg-metrics {
   display: flex;
   flex-wrap: wrap;

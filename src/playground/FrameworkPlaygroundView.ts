@@ -1,5 +1,6 @@
 import { createApp } from '../framework';
 import { DemoStore, FrameworkDemoRoot } from './FrameworkPlayground';
+import { HeavyStore } from './HeavyStore';
 
 const BLOCK_MS = 2000;
 
@@ -53,6 +54,9 @@ export function mountFrameworkSyncPlayground(host: HTMLElement): () => void {
 
   const dispose = createApp(FrameworkDemoRoot)
     .useStore(DemoStore)
+    .useStore(HeavyStore, {
+      worker: () => new Worker(new URL('./HeavyWorker.ts', import.meta.url), { type: 'module' })
+    })
     .onFrame(report)
     .mountSync(requireElement('.pg-preview'));
   const detachBlock = wireBlockButton();

@@ -12,6 +12,8 @@ export interface NodalAppOptions {
   host: HTMLElement;
   root: FrameworkChild;
   storeClasses?: (new () => Store)[];
+  /** A registry built elsewhere, when some stores live in data workers. */
+  stores?: StoreRegistry;
   canvas?: CanvasHost;
   clock?: UiFrameClockFactory;
   /**
@@ -55,6 +57,7 @@ export class NodalApp {
       root: options.root,
       canvas: this.canvas,
       storeClasses: options.storeClasses,
+      stores: options.stores,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
       dpr: devicePixelRatio()
     });

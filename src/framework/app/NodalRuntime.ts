@@ -53,6 +53,11 @@ export interface NodalRuntimeOptions {
   /** Canvas to draw into: HTMLCanvasElement, OffscreenCanvas, or a test double. */
   canvas: CanvasHost;
   storeClasses?: (new () => Store)[];
+  /**
+   * A registry built elsewhere, when some stores live in data workers.
+   * Takes the place of storeClasses.
+   */
+  stores?: StoreRegistry;
   /** Defaults to a timer clock, which is the only option inside a worker. */
   clock?: UiFrameClockFactory;
   /** Initial logical size. Callers normally follow with resize(). */
@@ -72,7 +77,7 @@ export interface NodalRuntimeOptions {
  * and renderRoot() in a render worker.
  */
 export class NodalRuntime {
-  readonly stores = new StoreRegistry();
+  readonly stores: StoreRegistry;
   readonly input: RuntimeInput;
 
   private readonly resolver: ComponentHostResolver;
@@ -92,6 +97,7 @@ export class NodalRuntime {
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
 
   constructor(options: NodalRuntimeOptions) {
+    this.stores = options.stores ?? new StoreRegistry();
     this.surface = createCanvasSurface(options.canvas);
     this.textMeasurer = new CanvasTextMeasurer(this.surface.getContext2D());
     this.engine = new LayoutEngine(this.textMeasurer);

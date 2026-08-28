@@ -9,6 +9,7 @@ import { state } from '../framework/State';
 import { input } from '../framework/Input';
 import { Store } from '../framework/store/Store';
 import { Action, Projection, State } from '../framework/store/decorators';
+import { HeavyStore } from './HeavyStore';
 
 /**
  * Demo store used by the framework playground.
@@ -178,6 +179,48 @@ export class Heartbeat extends Component {
 }
 
 /**
+ * Drives a store that lives in a data worker.
+ *
+ * The button dispatches an action that burns 1.5 seconds of CPU. It
+ * runs in the data worker, so neither this thread nor the main thread
+ * notices: the heartbeat above keeps its cadence throughout.
+ */
+@Define('heavy-panel')
+export class HeavyPanel extends Component {
+  @Inject(HeavyStore) heavy!: HeavyStore;
+
+  override render(): UiElement {
+    return Column(
+      { gap: 8, alignItems: 'flex-start' },
+      Row(
+        { gap: 12, alignItems: 'center' },
+        Text({
+          text: this.heavy.projection.status.pipe(
+            map(status =>
+              status === undefined
+                ? 'Data worker: connecting…'
+                : `Data worker: ${status.runs} runs · checksum ${status.checksum} · last ${status.lastDurationMs}ms`
+            )
+          ),
+          color: '#e5e7eb'
+        }),
+        Button(
+          {
+            onClick: () => this.heavy.dispatch('compute'),
+            color: '#ffffff',
+            backgroundColor: '#a855f7',
+            width: 150,
+            height: 32,
+            borderRadius: 4
+          },
+          Text({ text: 'Burn 1.5s', color: '#ffffff' })
+        )
+      )
+    );
+  }
+}
+
+/**
  * Root component for the framework playground.
  *
  * Composes static and dynamic content to verify that the framework
@@ -221,6 +264,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(LocalCounter),
       createComponent(StoreCounter),
       createComponent(Heartbeat),
+      createComponent(HeavyPanel),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, alignItems: 'flex-start' }, this.recentTicks())
     );

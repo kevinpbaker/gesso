@@ -2,6 +2,11 @@ import type { Component } from '../../Component';
 import type { FrameworkChild } from '../../ComponentElement';
 import { createComponent } from '../../createComponent';
 import type { Store } from '../../store/Store';
+import {
+  createStoreRegistry,
+  type RegistryHandle,
+  type StoreRegistration
+} from '../../store/worker/createStoreRegistry';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
 import { NodalRuntime } from '../NodalRuntime';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
@@ -36,11 +41,12 @@ export function renderRoot(root: FrameworkChild | (new () => Component)): Render
 }
 
 export class RenderWorkerApp {
-  private readonly storeClasses: (new () => Store)[] = [];
+  private readonly registrations: StoreRegistration[] = [];
   private readonly root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
   private runtime: NodalRuntime | undefined;
+  private registry: RegistryHandle | undefined;
 
   constructor(root: FrameworkChild | (new () => Component), host: WorkerGlobal = self as unknown as WorkerGlobal) {
     this.root = typeof root === 'function' ? createComponent(root as new () => Component) : root;
@@ -48,11 +54,23 @@ export class RenderWorkerApp {
     this.host.onmessage = event => this.receive(event.data);
   }
 
-  useStore(StoreClass: new () => Store): this {
+  /**
+   * Registers a store.
+   *
+   * With no options the store lives here, in the render worker. Pass a
+   * worker factory to put it in a data worker instead, so its actions,
+   * business logic and projection computation stay off this thread and
+   * cannot delay a frame:
+   *
+   *   .useStore(CartStore, {
+   *     worker: () => new Worker(new URL('./cart.worker.ts', import.meta.url), { type: 'module' })
+   *   })
+   */
+  useStore(StoreClass: new () => Store, options: { worker?: () => Worker } = {}): this {
     if (this.runtime !== undefined) {
       throw new Error(`Store '${StoreClass.name}' was registered after the runtime started.`);
     }
-    this.storeClasses.push(StoreClass);
+    this.registrations.push({ storeClass: StoreClass, worker: options.worker });
     return this;
   }
 
@@ -115,6 +133,8 @@ export class RenderWorkerApp {
         break;
       case 'dispose':
         runtime.dispose();
+        this.registry?.dispose();
+        this.registry = undefined;
         this.runtime = undefined;
         break;
     }
@@ -122,10 +142,14 @@ export class RenderWorkerApp {
 
   private initialize(canvas: OffscreenCanvas, width: number, height: number, dpr: number): void {
     this.runtime?.dispose();
+    this.registry?.dispose();
+    this.registry = createStoreRegistry(this.registrations, (storeName, message, stack) => {
+      this.host.postMessage({ type: 'error', message: `store ${storeName}: ${message}`, stack });
+    });
     this.runtime = new NodalRuntime({
       root: this.root,
       canvas,
-      storeClasses: this.storeClasses,
+      stores: this.registry.registry,
       // A worker has no requestAnimationFrame tied to the compositor,
       // so frames are timer-paced. See FRAMEWORK_DESIGN section 13.
       clock: callback => new UiTimerFrameClock(callback),

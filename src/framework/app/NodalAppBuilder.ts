@@ -2,6 +2,7 @@ import type { Component } from '../Component';
 import { createComponent } from '../createComponent';
 import type { FrameworkChild } from '../ComponentElement';
 import type { Store } from '../store/Store';
+import { createStoreRegistry, type StoreRegistration } from '../store/worker/createStoreRegistry';
 import { NodalApp } from './NodalApp';
 import type { FrameMetrics } from './NodalRuntime';
 
@@ -9,16 +10,21 @@ import type { FrameMetrics } from './NodalRuntime';
  * Fluent builder for the single-thread configuration.
  */
 export class NodalAppBuilder {
-  private readonly storeClasses: (new () => Store)[] = [];
+  private readonly registrations: StoreRegistration[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
 
   constructor(private readonly root: FrameworkChild | (new () => Component)) {}
 
   /**
-   * Registers a store class with the application.
+   * Registers a store.
+   *
+   * With no options the store lives on this thread. Pass a worker
+   * factory to move it into a data worker, which is worth doing even
+   * here: rendering stays on the main thread in this configuration,
+   * so keeping heavy state work off it still buys smoother frames.
    */
-  useStore(StoreClass: new () => Store): this {
-    this.storeClasses.push(StoreClass);
+  useStore(StoreClass: new () => Store, options: { worker?: () => Worker } = {}): this {
+    this.registrations.push({ storeClass: StoreClass, worker: options.worker });
     return this;
   }
 
@@ -43,12 +49,16 @@ export class NodalAppBuilder {
   mountSync(host: HTMLElement | string): () => void {
     const element = typeof host === 'string' ? requireElement(host) : host;
     const rootElement = typeof this.root === 'function' ? createComponent(this.root) : this.root;
-    const app = new NodalApp({ host: element, root: rootElement, storeClasses: this.storeClasses });
+    const stores = createStoreRegistry(this.registrations);
+    const app = new NodalApp({ host: element, root: rootElement, stores: stores.registry });
     if (this.frameListener !== undefined) {
       app.onFrame(this.frameListener);
     }
     app.mount();
-    return () => app.dispose();
+    return () => {
+      app.dispose();
+      stores.dispose();
+    };
   }
 }
 
