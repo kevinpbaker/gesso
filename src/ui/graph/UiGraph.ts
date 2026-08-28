@@ -4,6 +4,7 @@ import { type NodeId, type NodeProperty, UiNode } from './UiNode';
 import { UiNodeType } from './UiNodeType';
 import { type BindingId, UiBinding } from '../bindings/UiBinding';
 import type { UiChildrenBinding } from '../bindings/UiChildrenBinding';
+import type { UiEventBinding } from '../bindings/UiEventBinding';
 import { UiEnvironment } from '../environment/UiEnvironment';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
@@ -52,6 +53,15 @@ export class UiGraph {
   private readonly nodeBindings = new Map<NodeId, Set<BindingId>>();
 
   private readonly childrenBindings = new Map<NodeId, UiChildrenBinding>();
+
+  /**
+   * Declarative `on*` handlers, keyed by node then event type.
+   *
+   * Stored here rather than only in the dispatcher so that removing a
+   * node tears its handlers down through the same path as its property
+   * and children bindings.
+   */
+  private readonly eventBindings = new Map<NodeId, Map<string, UiEventBinding>>();
 
   private nextBindingId = 0;
 
@@ -155,6 +165,7 @@ export class UiGraph {
       // First stop all reactive subscriptions.
       this.unbindNode(current);
       this.unbindChildren(current);
+      this.unbindEvents(current);
       // Then remove it from the tree.
       this.detachNode(current);
       // Remove it from the node index.
@@ -326,6 +337,56 @@ export class UiGraph {
     }
     binding.disconnect();
     this.childrenBindings.delete(node.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Event bindings
+  // ---------------------------------------------------------------------------
+
+  public getEventBindingsForNode(node: UiNode): UiEventBinding[] {
+    const byType = this.eventBindings.get(node.id);
+    return byType === undefined ? [] : [...byType.values()];
+  }
+
+  public bindEvent(node: UiNode, binding: UiEventBinding): void {
+    const registeredNode = this.nodes.get(node.id);
+    if (registeredNode !== node) {
+      throw new Error(`Cannot bind events to node '${node.id}' because it does not belong to this graph.`);
+    }
+    let byType = this.eventBindings.get(node.id);
+    if (byType === undefined) {
+      byType = new Map();
+      this.eventBindings.set(node.id, byType);
+    }
+    const existing = byType.get(binding.type);
+    if (existing !== undefined) {
+      existing.disconnect();
+    }
+    byType.set(binding.type, binding);
+    binding.connect();
+  }
+
+  public unbindEvent(node: UiNode, binding: UiEventBinding): void {
+    const byType = this.eventBindings.get(node.id);
+    if (byType === undefined || byType.get(binding.type) !== binding) {
+      return;
+    }
+    binding.disconnect();
+    byType.delete(binding.type);
+    if (byType.size === 0) {
+      this.eventBindings.delete(node.id);
+    }
+  }
+
+  public unbindEvents(node: UiNode): void {
+    const byType = this.eventBindings.get(node.id);
+    if (byType === undefined) {
+      return;
+    }
+    this.eventBindings.delete(node.id);
+    for (const binding of byType.values()) {
+      binding.disconnect();
+    }
   }
 
   // ---------------------------------------------------------------------------

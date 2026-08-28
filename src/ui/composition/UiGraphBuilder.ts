@@ -1,11 +1,14 @@
 import { Observable } from 'rxjs';
 
 import { UiChildrenBinding } from '../bindings/UiChildrenBinding';
+import { UiEventBinding } from '../bindings/UiEventBinding';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
+import type { UiEventListener, UiInputDispatcher } from '../input/UiInputDispatcher';
 import { propertyEffects } from '../properties/UiPropertyRegistry';
+import { eventTypeForProp, isEventProp, knownEventPropNames } from './UiEventProps';
 import type { ComponentResolver } from './ComponentResolver';
 import {
   type ComponentLikeElement,
@@ -31,6 +34,15 @@ export interface UiGraphBuilderOptions {
    * and observable children; encountering a component throws.
    */
   components?: ComponentResolver;
+
+  /**
+   * Receives listeners declared with `on*` props.
+   *
+   * Without a dispatcher those props are ignored (with one warning),
+   * which keeps headless graph construction and non-interactive
+   * renders working.
+   */
+  dispatcher?: UiInputDispatcher;
 }
 
 /**
@@ -67,11 +79,17 @@ export class UiGraphBuilder {
 
   private readonly components: ComponentResolver | undefined;
 
+  private readonly dispatcher: UiInputDispatcher | undefined;
+
+  /** Ensures the missing-dispatcher warning is emitted at most once. */
+  private warnedAboutDispatcher = false;
+
   constructor(
     private readonly graph: UiGraph,
     options: UiGraphBuilderOptions = {}
   ) {
     this.components = options.components;
+    this.dispatcher = options.dispatcher;
   }
 
   /**
@@ -395,10 +413,16 @@ export class UiGraphBuilder {
   private reconcileProps(node: UiNode, props: UiProps): void {
     const bindings = this.graph.getBindingsForNode(node);
     const bindingByProperty = new Map(bindings.map(binding => [binding.property, binding]));
+    const eventByType = new Map(this.graph.getEventBindingsForNode(node).map(binding => [binding.type, binding]));
     const present = new Set<string>();
+    const presentEvents = new Set<string>();
 
     for (const [property, value] of Object.entries(props)) {
       if (property === KEY_PROP) {
+        continue;
+      }
+      if (isEventProp(property, value)) {
+        this.reconcileEventProp(node, property, value as UiEventListener, eventByType, presentEvents);
         continue;
       }
       present.add(property);
@@ -424,6 +448,62 @@ export class UiGraphBuilder {
         this.graph.unbind(binding);
       }
     }
+
+    for (const [type, binding] of eventByType) {
+      if (!presentEvents.has(type)) {
+        this.graph.unbindEvent(node, binding);
+      }
+    }
+  }
+
+  /**
+   * Binds one `on*` prop to the input dispatcher.
+   *
+   * An existing binding for the same event is kept when the handler
+   * identity is unchanged, so re-reconciling a stable tree does not
+   * churn listener registrations.
+   */
+  private reconcileEventProp(
+    node: UiNode,
+    property: string,
+    handler: UiEventListener,
+    eventByType: Map<string, UiEventBinding>,
+    presentEvents: Set<string>
+  ): void {
+    const type = eventTypeForProp(property);
+    if (type === undefined) {
+      throw new Error(
+        `Unknown event prop '${property}' on node '${node.id}'. ` +
+          `Expected one of: ${knownEventPropNames().join(', ')}.`
+      );
+    }
+    presentEvents.add(type);
+
+    const existing = eventByType.get(type);
+    if (existing !== undefined) {
+      if (existing.listener === handler) {
+        return;
+      }
+      this.graph.unbindEvent(node, existing);
+      eventByType.delete(type);
+    }
+
+    if (this.dispatcher === undefined) {
+      this.warnMissingDispatcher(property);
+      return;
+    }
+    this.graph.bindEvent(node, new UiEventBinding(node, type, handler, this.dispatcher));
+  }
+
+  private warnMissingDispatcher(property: string): void {
+    if (this.warnedAboutDispatcher) {
+      return;
+    }
+    this.warnedAboutDispatcher = true;
+    console.warn(
+      `UiGraphBuilder received event prop '${property}' but was constructed without a dispatcher, ` +
+        `so it and any further event props are ignored. Pass { dispatcher } to make the tree interactive.`
+    );
   }
 
   /**

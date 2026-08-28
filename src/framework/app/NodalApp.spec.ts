@@ -7,7 +7,10 @@ import { NodalApp } from './NodalApp';
 import { Store } from '../store/Store';
 import { state } from '../State';
 import { State as StateDecorator, Action } from '../store/decorators';
-import { Column, Text } from '../../ui/composition/UiComponents';
+import { Box, Column, Text } from '../../ui/composition/UiComponents';
+import { FakePlatformSurface } from '../../ui/input/UiInputTestUtils';
+import { state as cell } from '../State';
+import { State as ComponentState } from '../store/decorators';
 import type { UiChild, UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
@@ -129,6 +132,24 @@ class ListRoot extends Component {
   }
 }
 
+@Define('click-counter')
+class ClickCounter extends Component {
+  @ComponentState() count = cell(0);
+
+  override render() {
+    return Column(
+      Text({ text: this.count.pipe(map(c => `clicks: ${c}`)) }),
+      Box({
+        width: 100,
+        height: 40,
+        onClick: () => {
+          this.count.value++;
+        }
+      })
+    );
+  }
+}
+
 /** Text values of the tree in order, with Fragment anchors expanded. */
 function collectText(node: UiNode, into: string[] = []): string[] {
   if (node.type === UiNodeType.Text) {
@@ -184,6 +205,54 @@ describe('NodalApp', () => {
     store.dispatch('decrement');
     expect(collectText(root)).toEqual(['item-1']);
     expect(itemUnmounts).toEqual(['item-2']);
+
+    app.dispose();
+  });
+
+  it('routes a real click through hit-testing into a component handler', () => {
+    const app = new NodalApp({
+      host: createMockHost(),
+      canvas: createMockCanvas(),
+      root: createComponent(ClickCounter),
+      clock: callback => new UiTimerFrameClock(callback)
+    });
+
+    app.mount();
+
+    const root = app.debugRoot();
+    expect(collectText(root)).toEqual(['clicks: 0']);
+
+    // Drive the same adapter the DOM would, so the click travels the
+    // full path: surface -> pointer controller -> hit test -> Click
+    // synthesis -> dispatcher -> onClick -> state -> node property.
+    const surface = new FakePlatformSurface();
+    app.input.attach(surface);
+
+    // The Box sits below the text line, inside its 100x40 box.
+    surface.localX = 20;
+    surface.localY = 30;
+    surface.pointerTarget.emit('pointerdown', {
+      clientX: 20,
+      clientY: 30,
+      buttons: 1,
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      preventDefault: () => {}
+    } as unknown as Event);
+    surface.pointerTarget.emit('pointerup', {
+      clientX: 20,
+      clientY: 30,
+      buttons: 0,
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      preventDefault: () => {}
+    } as unknown as Event);
+
+    expect(collectText(root)).toEqual(['clicks: 1']);
 
     app.dispose();
   });

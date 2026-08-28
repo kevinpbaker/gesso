@@ -4,6 +4,15 @@ import { UiGraph } from '../../ui/graph/UiGraph';
 import { UiGraphBuilder } from '../../ui/composition/UiGraphBuilder';
 import { isComponentLikeElement, isObservable, type UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
+import { UiInputDispatcher } from '../../ui/input/UiInputDispatcher';
+import { UiHitTester } from '../../ui/input/UiHitTester';
+import { UiPointerController } from '../../ui/input/UiPointerController';
+import { UiWheelController } from '../../ui/input/UiWheelController';
+import type { ScrollContainerState, ScrollSink } from '../../ui/input/UiWheelController';
+import { UiFocusManager } from '../../ui/input/UiFocusManager';
+import { UiKeyboardController } from '../../ui/input/UiKeyboardController';
+import { CanvasPlatformSurface, UiPlatformAdapter } from '../../ui/input/UiPlatformAdapter';
+import { DirtyFlags } from '../../ui/graph/DirtyFlags';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import { Constraints } from '../../ui/layout/LayoutTypes';
 import { CanvasTextMeasurer, createCanvasSurface, type CanvasHost, type CanvasSurface } from '../../ui/rendering';
@@ -26,6 +35,12 @@ export interface NodalAppOptions {
   storeClasses?: (new () => Store)[];
   canvas?: CanvasHost;
   clock?: UiFrameClockFactory;
+  /**
+   * Set false to build the tree without attaching platform input.
+   * Handlers declared with `on*` props are still registered, so they
+   * can be driven directly through `app.input`.
+   */
+  input?: boolean;
 }
 
 /**
@@ -46,6 +61,10 @@ export class NodalApp {
   private readonly textMeasurer: CanvasTextMeasurer;
   private readonly canvasRenderer: Canvas2DRenderer;
   private readonly host: HTMLElement;
+  private readonly dispatcher = new UiInputDispatcher();
+  private readonly inputEnabled: boolean;
+
+  private adapter: UiPlatformAdapter | undefined;
 
   private root: UiNode | undefined;
   private constraints: Constraints;
@@ -59,7 +78,8 @@ export class NodalApp {
     this.textMeasurer = new CanvasTextMeasurer(this.surface.getContext2D());
     this.engine = new LayoutEngine(this.textMeasurer);
     this.resolver = new ComponentHostResolver(this.stores);
-    this.builder = new UiGraphBuilder(this.graph, { components: this.resolver });
+    this.builder = new UiGraphBuilder(this.graph, { components: this.resolver, dispatcher: this.dispatcher });
+    this.inputEnabled = options.input ?? true;
     this.canvasRenderer = new Canvas2DRenderer({ surface: this.surface });
     this.constraints = Constraints.loose(this.canvas.width || 600, this.canvas.height || 600);
 
@@ -77,6 +97,18 @@ export class NodalApp {
     this.graph.setNodeRemovedListener(node => this.engine.detachNode(node));
 
     this.buildRoot(options.root);
+    this.adapter = this.createInputAdapter();
+  }
+
+  /**
+   * The input adapter, for tests and for callers that drive input
+   * from a non-DOM source (a worker receiving forwarded events).
+   */
+  get input(): UiPlatformAdapter {
+    if (this.adapter === undefined) {
+      throw new Error('Input is not available: the app root has not been built.');
+    }
+    return this.adapter;
   }
 
   /**
@@ -102,6 +134,7 @@ export class NodalApp {
 
     this.observeResize();
     this.applySize();
+    this.attachInput();
     this.scheduler.start();
   }
 
@@ -119,6 +152,7 @@ export class NodalApp {
     ) {
       this.host.removeChild(this.canvas);
     }
+    this.adapter?.detach();
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.resolver.dispose();
@@ -172,6 +206,81 @@ export class NodalApp {
       return this.resolveRootElement(output as FrameworkChild, depth + 1);
     }
     return definition;
+  }
+
+  /**
+   * Builds the input stack over the freshly built tree.
+   *
+   * Handlers are registered on the dispatcher by the builder as it
+   * reconciles `on*` props; this wires the other half — hit-testing,
+   * pointer/wheel/keyboard routing, and focus — so those handlers
+   * actually receive events.
+   */
+  private createInputAdapter(): UiPlatformAdapter {
+    const root = this.debugRoot();
+    const hitTester = new UiHitTester(this.engine, root);
+    const focusManager = new UiFocusManager(root, this.dispatcher);
+    return new UiPlatformAdapter({
+      pointerController: new UiPointerController(hitTester, this.dispatcher, {
+        onPress: node => {
+          if (node !== null) {
+            focusManager.focusOnPress(node);
+          }
+        }
+      }),
+      wheelController: new UiWheelController(hitTester, this.dispatcher, this.createScrollSink()),
+      keyboardController: new UiKeyboardController(this.dispatcher, focusManager, root)
+    });
+  }
+
+  private attachInput(): void {
+    if (!this.inputEnabled || this.adapter === undefined) {
+      return;
+    }
+    if (typeof HTMLCanvasElement === 'undefined' || !(this.canvas instanceof HTMLCanvasElement)) {
+      // A headless or offscreen canvas has no DOM events to forward.
+      return;
+    }
+    this.canvas.tabIndex = 0;
+    this.canvas.style.touchAction = 'none';
+    this.adapter.attach(new CanvasPlatformSurface(this.canvas));
+  }
+
+  /**
+   * Scrolling backed directly by layout records and node properties.
+   *
+   * The layout engine clamps scrollX/scrollY against content size on
+   * every pass, so writing the raw offset here is enough.
+   */
+  private createScrollSink(): ScrollSink {
+    return {
+      containerState: (node): ScrollContainerState | undefined => {
+        const record = this.engine.recordFor(node);
+        if (record === undefined) {
+          return undefined;
+        }
+        return {
+          scrollX: record.scrollX,
+          scrollY: record.scrollY,
+          maxScrollX: Math.max(0, record.contentWidth - record.width),
+          maxScrollY: Math.max(0, record.contentHeight - record.height),
+          horizontal: node.getProperty('direction') === 'row'
+        };
+      },
+      scrollBy: (node, dx, dy): void => {
+        const record = this.engine.recordFor(node);
+        if (record === undefined) {
+          return;
+        }
+        if (dx !== 0) {
+          node.setProperty('scrollX', record.scrollX + dx);
+        }
+        if (dy !== 0) {
+          node.setProperty('scrollY', record.scrollY + dy);
+        }
+        this.graph.markDirty(node, DirtyFlags.Transform);
+      }
+    };
   }
 
   private handleFrame(frame: UiFrame): void {

@@ -25,31 +25,19 @@ export class DemoStore extends Store {
 }
 
 /**
- * A component that demonstrates local `@State()`.
+ * A component that demonstrates local `@State()` driven by a click.
  *
- * It starts a timer on mount that increments its own counter every
- * second, proving that component state emissions flow through the
- * framework binding pipeline to the canvas renderer.
+ * The button carries a declarative `onClick` prop, so the handler is
+ * registered on the input dispatcher during reconciliation. Pressing
+ * it mutates local state, whose emission flows through the binding
+ * pipeline to the canvas with no re-render.
  */
 @Define('local-counter')
 export class LocalCounter extends Component {
   @State() count = state(0);
 
-  private timer: ReturnType<typeof setInterval> | null = null;
-
   increment(): void {
     this.count.value++;
-  }
-
-  override onMount(): void {
-    this.timer = setInterval(() => this.increment(), 1000);
-  }
-
-  override onUnmount(): void {
-    if (this.timer !== null) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
   }
 
   override render(): UiElement {
@@ -61,42 +49,29 @@ export class LocalCounter extends Component {
       }),
       Button(
         {
-          text: '+',
+          onClick: () => this.increment(),
           color: '#ffffff',
           backgroundColor: '#10b981',
-          width: 40,
+          width: 44,
           height: 32,
           borderRadius: 4
         },
-        Text({ text: '+' })
+        Text({ text: '+1', color: '#ffffff' })
       )
     );
   }
 }
 
 /**
- * A component that demonstrates store injection and selectors.
+ * A component that demonstrates store injection and dispatched actions.
  *
- * It starts a timer on mount that dispatches a store action every
- * second, proving that store changes reach the canvas through the
- * framework's reactive selector pipeline.
+ * Clicking dispatches a store action; the store's state emission
+ * reaches this component's text binding and the keyed list below
+ * through the same selector pipeline.
  */
 @Define('store-counter')
 export class StoreCounter extends Component {
   @Inject(DemoStore) demo!: DemoStore;
-
-  private timer: ReturnType<typeof setInterval> | null = null;
-
-  override onMount(): void {
-    this.timer = setInterval(() => this.demo.dispatch('increment'), 1000);
-  }
-
-  override onUnmount(): void {
-    if (this.timer !== null) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-  }
 
   override render(): UiElement {
     return Row(
@@ -107,14 +82,14 @@ export class StoreCounter extends Component {
       }),
       Button(
         {
-          text: 'Add',
+          onClick: () => this.demo.dispatch('increment'),
           color: '#ffffff',
           backgroundColor: '#1f6feb',
           width: 80,
           height: 32,
           borderRadius: 4
         },
-        Text({ text: 'Add' })
+        Text({ text: 'Add', color: '#ffffff' })
       )
     );
   }
@@ -178,13 +153,13 @@ export class FrameworkDemoRoot extends Component {
       { padding: 24, gap: 20, alignItems: 'flex-start' },
       Text({ text: 'Framework Playground', color: '#ffffff', fontSize: 24, fontWeight: 600 }),
       Text({
-        text: 'If this renders, createApp + components + Canvas2D is working.',
+        text: 'Click the buttons: input, components, stores and Canvas2D are wired end to end.',
         color: '#9ca3af'
       }),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(LocalCounter),
       createComponent(StoreCounter),
-      Text({ text: 'Keyed components from an observable list:', color: '#9ca3af' }),
+      Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, alignItems: 'flex-start' }, this.recentTicks())
     );
   }
