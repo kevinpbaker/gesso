@@ -6,7 +6,14 @@ import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { propertyEffects } from '../properties/UiPropertyRegistry';
-import { type UiChild, type UiElement, isComponentLikeElement, isObservable } from './UiElement';
+import type { ComponentResolver } from './ComponentResolver';
+import {
+  type ComponentLikeElement,
+  type UiChild,
+  type UiElement,
+  isComponentLikeElement,
+  isObservable
+} from './UiElement';
 import type { UiProps } from './UiProps';
 
 /**
@@ -15,6 +22,16 @@ import type { UiProps } from './UiProps';
  * The key never becomes a runtime property on the UiNode.
  */
 const KEY_PROP = 'key';
+
+export interface UiGraphBuilderOptions {
+  /**
+   * Mounts components encountered during reconciliation.
+   *
+   * Without a resolver the builder still reconciles plain elements
+   * and observable children; encountering a component throws.
+   */
+  components?: ComponentResolver;
+}
 
 /**
  * Converts declarative UiElements into runtime UiNodes.
@@ -33,14 +50,32 @@ const KEY_PROP = 'key';
  *   - missing node  → destroy
  *   - keyed move    → reorder
  *   - observable child → fragment anchor + children binding
+ *   - component child  → fragment anchor + mounted host
  */
 export class UiGraphBuilder {
   private nextChildrenBindingId = 0;
 
-  constructor(private readonly graph: UiGraph) {}
+  /**
+   * Depth of the currently running reconcile pass.
+   *
+   * reconcileChildren recurses into itself and is also re-entered by
+   * UiChildrenBinding when an observable emits. Only the outermost
+   * pass flushes onMount hooks, so components observe a fully built
+   * subtree rather than a half-reconciled one.
+   */
+  private reconcileDepth = 0;
+
+  private readonly components: ComponentResolver | undefined;
+
+  constructor(
+    private readonly graph: UiGraph,
+    options: UiGraphBuilderOptions = {}
+  ) {
+    this.components = options.components;
+  }
 
   /**
-   * Builds (or reconciles) a UiElement subtree.
+   * Builds (or reconciles) a subtree.
    *
    * Returns the runtime UiNode corresponding to the root of
    * the supplied definition.
@@ -48,8 +83,12 @@ export class UiGraphBuilder {
    * When no parent is supplied the definition is rendered as
    * the child of the graph root, so repeated calls update the
    * previously rendered tree in place.
+   *
+   * Note that observable and component definitions produce a
+   * transparent Fragment anchor, which is never a valid layout root.
+   * Callers that need a layout root must supply a plain UiElement.
    */
-  build(definition: UiElement, parentId?: string): UiNode {
+  build(definition: UiChild, parentId?: string): UiNode {
     const parent = parentId === undefined ? this.graph.root : this.graph.requireNode(parentId);
     return this.reconcileChildren(parent, [definition]).nodes[0];
   }
@@ -68,6 +107,23 @@ export class UiGraphBuilder {
    * the fragment's children on each emission.
    */
   reconcileChildren(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
+    this.reconcileDepth++;
+    let result: { nodes: UiNode[]; changed: boolean };
+    try {
+      result = this.reconcile(parent, definitions);
+    } finally {
+      this.reconcileDepth--;
+    }
+    // Deliberately outside the finally: a pass that threw left the
+    // tree half-built, and mounting components onto it would only
+    // widen the damage.
+    if (this.reconcileDepth === 0) {
+      this.components?.flushMounts();
+    }
+    return result;
+  }
+
+  private reconcile(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
     const existing = this.collectChildren(parent);
     const matched = new Set<UiNode>();
     const result: UiNode[] = [];
@@ -88,10 +144,13 @@ export class UiGraphBuilder {
       }
 
       if (isComponentLikeElement(definition)) {
-        throw new Error(
-          `Component '${definition.tag}' was passed directly to UiGraphBuilder. ` +
-            `Components must be resolved through ComponentRenderer before graph construction.`
-        );
+        const anchor = this.reconcileComponentChild(parent, index, definition, matched, cursor);
+        if (this.moveBefore(parent, anchor, cursor)) {
+          changed = true;
+        }
+        cursor = anchor.nextSibling;
+        result.push(anchor);
+        continue;
       }
 
       let node = this.matchNode(parent, definition, existing, matched);
@@ -107,7 +166,7 @@ export class UiGraphBuilder {
           if (cursor === stale) {
             cursor = stale.nextSibling;
           }
-          this.graph.removeNode(stale);
+          this.removeSubtree(stale);
           // Prevent the final cleanup from removing it a second time.
           matched.add(stale);
           changed = true;
@@ -131,7 +190,7 @@ export class UiGraphBuilder {
 
     for (const node of existing) {
       if (!matched.has(node)) {
-        this.graph.removeNode(node);
+        this.removeSubtree(node);
         changed = true;
       }
     }
@@ -163,7 +222,7 @@ export class UiGraphBuilder {
       if (cursor === fragment) {
         cursor = fragment.nextSibling;
       }
-      this.graph.removeNode(fragment);
+      this.removeSubtree(fragment);
       matched.add(fragment);
       fragment = undefined;
     }
@@ -186,6 +245,84 @@ export class UiGraphBuilder {
     }
 
     return fragment;
+  }
+
+  /**
+   * Reconciles a single component child definition.
+   *
+   * Creates or reuses a Fragment anchor under the parent, asks the
+   * resolver for the component's current output, and reconciles that
+   * output as the anchor's children.
+   *
+   * The anchor — not the rendered node — is the component's identity.
+   * That keeps identity stable when the component renders a different
+   * root element type, lets the output be an Observable (which becomes
+   * a children binding on the anchor for free), and makes host
+   * teardown a plain consequence of the anchor being removed.
+   */
+  private reconcileComponentChild(
+    parent: UiNode,
+    index: number,
+    element: ComponentLikeElement,
+    matched: Set<UiNode>,
+    cursor: UiNode | null
+  ): UiNode {
+    const resolver = this.components;
+    if (resolver === undefined) {
+      throw new Error(
+        `Component '${element.tag}' was passed to a UiGraphBuilder with no ComponentResolver. ` +
+          `Construct the builder with { components } to mount components.`
+      );
+    }
+
+    const anchorId = this.createComponentAnchorId(parent, element, index);
+    let anchor = this.graph.getNode(anchorId);
+
+    if (anchor !== undefined && anchor.type !== UiNodeType.Fragment) {
+      // A non-fragment node occupied this slot; remove it so the
+      // anchor can take its place.
+      if (cursor === anchor) {
+        cursor = anchor.nextSibling;
+      }
+      this.removeSubtree(anchor);
+      matched.add(anchor);
+      anchor = undefined;
+    }
+
+    if (anchor === undefined) {
+      anchor = this.graph.createNode(anchorId, UiNodeType.Fragment);
+      this.graph.insertBefore(parent, anchor, cursor);
+    } else {
+      matched.add(anchor);
+    }
+
+    this.reconcileChildren(anchor, [resolver.resolve(element, anchorId)]);
+    return anchor;
+  }
+
+  /**
+   * Removes a subtree, releasing any component hosts it anchors.
+   *
+   * Every node removal in this class goes through here so that a host
+   * can never outlive the nodes it produced. Hosts are released from
+   * the outside in: a parent component's onUnmount runs before its
+   * children's, matching the order in which the subtree is leaving.
+   */
+  private removeSubtree(node: UiNode): void {
+    const resolver = this.components;
+    if (resolver !== undefined) {
+      const stack: UiNode[] = [node];
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (current.type === UiNodeType.Fragment) {
+          resolver.release(current.id);
+        }
+        for (let child = current.firstChild; child !== null; child = child.nextSibling) {
+          stack.push(child);
+        }
+      }
+    }
+    this.graph.removeNode(node);
   }
 
   /**
@@ -338,5 +475,18 @@ export class UiGraphBuilder {
    */
   private createFragmentId(parent: UiNode, index: number): string {
     return `${parent.id}:fragment:${index}`;
+  }
+
+  /**
+   * Generates a stable id for a component's fragment anchor.
+   *
+   * Keyed components use their key, so a component keeps its instance
+   * across reorders. Unkeyed components fall back to position, which
+   * is stable only while the surrounding structure does not reorder —
+   * the same trade-off unkeyed elements make.
+   */
+  private createComponentAnchorId(parent: UiNode, element: ComponentLikeElement, index: number): string {
+    const key = element.key === undefined || element.key === null ? index : element.key;
+    return `${parent.id}:component:${String(key)}`;
   }
 }

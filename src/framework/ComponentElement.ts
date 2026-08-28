@@ -1,3 +1,4 @@
+import type { UiChild } from '../ui/composition/UiElement';
 import type { Component } from './Component';
 
 /**
@@ -17,3 +18,9 @@ export interface ComponentElement<P = Record<string, unknown>> {
 export function isComponentElement(value: unknown): value is ComponentElement {
   return typeof value === 'object' && value !== null && (value as Partial<ComponentElement>).kind === 'component';
 }
+
+/**
+ * Anything the framework accepts as a child: a runtime element, an
+ * observable stream of elements, or a component definition.
+ */
+export type FrameworkChild = UiChild | ComponentElement;

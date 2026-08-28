@@ -1,4 +1,4 @@
-import type { UiElement } from '../ui/composition/UiElement';
+import type { UiChild } from '../ui/composition/UiElement';
 
 /**
  * Base class for all Nodal framework components.
@@ -23,9 +23,13 @@ export abstract class Component {
   /**
    * Returns the component's UI definition.
    *
-   * This is called exactly once per component instance. Dynamic
-   * content should be expressed through Observable props or children,
-   * not by re-invoking render().
+   * Called exactly once per component instance. Dynamic content is
+   * expressed through Observable props and children, never by
+   * re-invoking render().
+   *
+   * Returning an Observable is allowed for structural changes that
+   * cannot be expressed as observable children (routing, for example).
+   * The framework reconciles the component's root on each emission.
    */
-  abstract render(): UiElement;
+  abstract render(): UiChild;
 }

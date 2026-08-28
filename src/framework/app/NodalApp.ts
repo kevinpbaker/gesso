@@ -1,7 +1,8 @@
-import type { FrameworkChild } from '../ComponentRenderer';
-import { ComponentRenderer } from '../ComponentRenderer';
+import type { FrameworkChild } from '../ComponentElement';
+import { ComponentHostResolver } from '../ComponentHostResolver';
 import { UiGraph } from '../../ui/graph/UiGraph';
 import { UiGraphBuilder } from '../../ui/composition/UiGraphBuilder';
+import { isComponentLikeElement, isObservable, type UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import { Constraints } from '../../ui/layout/LayoutTypes';
@@ -12,6 +13,12 @@ import { UiAnimationFrameClock } from '../../ui/scheduler';
 import type { UiFrame, UiFrameClockFactory } from '../../ui/scheduler';
 import { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
+
+/**
+ * Guard against a root component that only ever renders another
+ * component, which would otherwise recurse until the stack gives out.
+ */
+const MAX_ROOT_COMPONENT_DEPTH = 32;
 
 export interface NodalAppOptions {
   host: HTMLElement;
@@ -29,7 +36,7 @@ export interface NodalAppOptions {
  */
 export class NodalApp {
   readonly stores = new StoreRegistry();
-  private readonly renderer: ComponentRenderer;
+  private readonly resolver: ComponentHostResolver;
   private readonly graph = new UiGraph();
   private readonly engine: LayoutEngine;
   private readonly builder: UiGraphBuilder;
@@ -51,8 +58,8 @@ export class NodalApp {
     this.surface = createCanvasSurface(this.canvas);
     this.textMeasurer = new CanvasTextMeasurer(this.surface.getContext2D());
     this.engine = new LayoutEngine(this.textMeasurer);
-    this.builder = new UiGraphBuilder(this.graph);
-    this.renderer = new ComponentRenderer(this.stores);
+    this.resolver = new ComponentHostResolver(this.stores);
+    this.builder = new UiGraphBuilder(this.graph, { components: this.resolver });
     this.canvasRenderer = new Canvas2DRenderer({ surface: this.surface });
     this.constraints = Constraints.loose(this.canvas.width || 600, this.canvas.height || 600);
 
@@ -114,16 +121,57 @@ export class NodalApp {
     }
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
+    this.resolver.dispose();
+  }
+
+  /**
+   * The root UiNode of the built tree.
+   *
+   * Exposed for tests and devtools that need to inspect the retained
+   * graph without reaching into private state.
+   */
+  debugRoot(): UiNode {
+    if (this.root === undefined) {
+      throw new Error('App root has not been built.');
+    }
+    return this.root;
   }
 
   private createCanvas(): HTMLCanvasElement {
     return document.createElement('canvas');
   }
 
+  /**
+   * Resolves the root definition down to a plain element and builds it.
+   *
+   * The root is the one component slot the builder cannot anchor for
+   * us: anchors are transparent Fragments, and a Fragment is never a
+   * valid layout root — it contributes no box, so the layout engine
+   * would have nothing to size the tree against. The app therefore
+   * mounts the root host itself and hands the builder real geometry.
+   *
+   * Root hosts are still mounted through the resolver, so their
+   * onMount() fires from the build pass below, once their nodes exist.
+   */
   private buildRoot(rootDefinition: FrameworkChild): void {
-    const definition = this.renderer.render(rootDefinition);
-    this.root = this.builder.build(definition);
+    this.root = this.builder.build(this.resolveRootElement(rootDefinition, 0));
     this.graph.propagateEnvironment(this.root);
+  }
+
+  private resolveRootElement(definition: FrameworkChild, depth: number): UiElement {
+    if (isObservable(definition)) {
+      throw new Error('Root definition cannot be an Observable. Wrap it in a component or static element.');
+    }
+    if (isComponentLikeElement(definition)) {
+      if (depth > MAX_ROOT_COMPONENT_DEPTH) {
+        throw new Error(
+          `Root component chain exceeded ${MAX_ROOT_COMPONENT_DEPTH} levels without producing an element.`
+        );
+      }
+      const output = this.resolver.resolve(definition, `app:component:${depth}`);
+      return this.resolveRootElement(output as FrameworkChild, depth + 1);
+    }
+    return definition;
   }
 
   private handleFrame(frame: UiFrame): void {

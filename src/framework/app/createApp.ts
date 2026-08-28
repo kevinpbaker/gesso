@@ -1,5 +1,5 @@
 import type { Component } from '../Component';
-import type { FrameworkChild } from '../ComponentRenderer';
+import type { FrameworkChild } from '../ComponentElement';
 import { NodalAppBuilder } from './NodalAppBuilder';
 
 /**

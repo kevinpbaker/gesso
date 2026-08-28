@@ -1,6 +1,6 @@
 import type { Component } from '../Component';
 import { createComponent } from '../createComponent';
-import type { FrameworkChild } from '../ComponentRenderer';
+import type { FrameworkChild } from '../ComponentElement';
 import type { Store } from '../store/Store';
 import { NodalApp } from './NodalApp';
 

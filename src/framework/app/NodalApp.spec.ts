@@ -7,7 +7,12 @@ import { NodalApp } from './NodalApp';
 import { Store } from '../store/Store';
 import { state } from '../State';
 import { State as StateDecorator, Action } from '../store/decorators';
-import { Text } from '../../ui/composition/UiComponents';
+import { Column, Text } from '../../ui/composition/UiComponents';
+import type { UiChild, UiElement } from '../../ui/composition/UiElement';
+import type { UiNode } from '../../ui/graph/UiNode';
+import { UiNodeType } from '../../ui/graph/UiNodeType';
+import { Input } from '../decorators';
+import { map } from 'rxjs/operators';
 import { UiTimerFrameClock } from '../../ui/scheduler';
 import type { CanvasHost } from '../../ui/rendering';
 
@@ -67,6 +72,11 @@ class CounterStore extends Store {
   increment() {
     this.count.value++;
   }
+
+  @Action()
+  decrement() {
+    this.count.value--;
+  }
 }
 
 @Define('counter-view')
@@ -76,6 +86,58 @@ class CounterView extends Component {
   override render() {
     return Text({ text: `Count: ${this.store.select(s => s.count.value)}` });
   }
+}
+
+const itemMounts: string[] = [];
+const itemUnmounts: string[] = [];
+
+@Define('list-item')
+class ListItem extends Component {
+  @Input() label = '';
+
+  override onMount() {
+    itemMounts.push(this.label);
+  }
+
+  override onUnmount() {
+    itemUnmounts.push(this.label);
+  }
+
+  override render() {
+    return Text({ text: this.label });
+  }
+}
+
+@Define('list-root')
+class ListRoot extends Component {
+  @Inject(CounterStore) store!: CounterStore;
+
+  override render(): UiChild {
+    return Column(
+      this.store
+        .select(s => s.count.value)
+        .pipe(
+          map(count => {
+            const labels: string[] = [];
+            for (let i = 1; i <= count; i++) {
+              labels.push(`item-${i}`);
+            }
+            return labels.map(label => createComponent(ListItem, { label }, label) as unknown as UiElement);
+          })
+        )
+    );
+  }
+}
+
+/** Text values of the tree in order, with Fragment anchors expanded. */
+function collectText(node: UiNode, into: string[] = []): string[] {
+  if (node.type === UiNodeType.Text) {
+    into.push(String(node.getProperty('text')));
+  }
+  for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+    collectText(child, into);
+  }
+  return into;
 }
 
 describe('NodalApp', () => {
@@ -93,6 +155,35 @@ describe('NodalApp', () => {
     expect(app.stores.has(CounterStore)).toBe(true);
 
     app.mount();
+
+    app.dispose();
+  });
+
+  it('mounts and unmounts components emitted by an observable list', () => {
+    itemMounts.length = 0;
+    itemUnmounts.length = 0;
+
+    const app = new NodalApp({
+      host: createMockHost(),
+      canvas: createMockCanvas(),
+      root: createComponent(ListRoot),
+      storeClasses: [CounterStore],
+      clock: callback => new UiTimerFrameClock(callback)
+    });
+
+    const store = app.stores.get(CounterStore);
+    const root = app.debugRoot();
+
+    expect(collectText(root)).toEqual([]);
+
+    store.dispatch('increment');
+    store.dispatch('increment');
+    expect(collectText(root)).toEqual(['item-1', 'item-2']);
+    expect(itemMounts).toEqual(['item-1', 'item-2']);
+
+    store.dispatch('decrement');
+    expect(collectText(root)).toEqual(['item-1']);
+    expect(itemUnmounts).toEqual(['item-2']);
 
     app.dispose();
   });
