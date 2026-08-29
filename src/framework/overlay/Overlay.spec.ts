@@ -1,35 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
 import { NodalRuntime } from '../app/NodalRuntime';
+import { mockCanvas } from '../app/RuntimeTestUtils';
 import { OverlayStore } from './OverlayStore';
 import { Box, Button, Column, Text } from '../../ui/composition/UiComponents';
 import type { UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { noModifiers } from '../../ui/input/UiInputEvent';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import type { CanvasHost } from '../../ui/rendering';
-
-function mockCanvas(): CanvasHost {
-  const ctx = new Proxy({} as Record<string, unknown>, {
-    get: (target, key) => {
-      if (key === 'measureText') {
-        return (text: string) => ({ width: String(text).length * 7 });
-      }
-      if (typeof key === 'string' && !(key in target)) {
-        target[key] = vi.fn();
-      }
-      return target[key as string];
-    },
-    set: (target, key, value) => {
-      target[key as string] = value;
-      return true;
-    }
-  });
-  return { width: 400, height: 300, getContext: () => ctx as unknown as CanvasRenderingContext2D };
-}
 
 const pressed: string[] = [];
 
@@ -77,7 +58,7 @@ function mount() {
   let clock!: UiManualFrameClock;
   const runtime = new NodalRuntime({
     root: createComponent(OverlayHostApp),
-    canvas: mockCanvas(),
+    canvas: mockCanvas(400, 300),
     width: 400,
     height: 300,
     clock: callback => (clock = new UiManualFrameClock(callback))

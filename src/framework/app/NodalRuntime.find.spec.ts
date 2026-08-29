@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { Button, Column, Text } from '../../ui/composition/UiComponents';
 import type { UiElement } from '../../ui/composition/UiElement';
@@ -7,31 +7,12 @@ import { matchRangesOf } from '../../ui/find/UiTextMatches';
 import { selectionRangeOf } from '../../ui/selection/UiSelectable';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
-import type { CanvasHost } from '../../ui/rendering';
 import { UiManualFrameClock } from '../../ui/scheduler';
 import { FindStore } from './FindStore';
 import { NodalRuntime } from './NodalRuntime';
+import { mockCanvas } from './RuntimeTestUtils';
 
 /** 7px per character, so an offset's x is 7 × offset in the default 14px font. */
-function mockCanvas(): CanvasHost {
-  const ctx: Record<string, unknown> = {};
-  for (const method of [
-    'save',
-    'restore',
-    'setTransform',
-    'clearRect',
-    'fillRect',
-    'beginPath',
-    'rect',
-    'clip',
-    'fillText'
-  ]) {
-    ctx[method] = vi.fn();
-  }
-  ctx.measureText = vi.fn((t: string) => ({ width: String(t).length * 7 }));
-  Object.assign(ctx, { fillStyle: '#000', globalAlpha: 1, font: '14px sans-serif' });
-  return { width: 800, height: 600, getContext: () => ctx as unknown as CanvasRenderingContext2D };
-}
 
 const ctrl = (): UiModifiers => ({ ...noModifiers(), ctrl: true });
 
@@ -39,7 +20,7 @@ function mount(root: UiElement) {
   let clock!: UiManualFrameClock;
   const runtime = new NodalRuntime({
     root,
-    canvas: mockCanvas(),
+    canvas: mockCanvas(800, 600),
     width: 800,
     height: 600,
     clock: cb => (clock = new UiManualFrameClock(cb))

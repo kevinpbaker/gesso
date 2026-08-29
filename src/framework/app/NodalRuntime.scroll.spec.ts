@@ -1,30 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { NodalRuntime } from './NodalRuntime';
+import { mockCanvas } from './RuntimeTestUtils';
 import { Button, Column } from '../../ui/composition/UiComponents';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { noModifiers } from '../../ui/input/UiInputEvent';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import type { CanvasHost } from '../../ui/rendering';
-
-function mockCanvas(): CanvasHost {
-  const ctx = new Proxy({} as Record<string, unknown>, {
-    get: (target, key) => {
-      if (key === 'measureText') {
-        return (text: string) => ({ width: String(text).length * 7 });
-      }
-      if (typeof key === 'string' && !(key in target)) {
-        target[key] = vi.fn();
-      }
-      return target[key as string];
-    },
-    set: (target, key, value) => {
-      target[key as string] = value;
-      return true;
-    }
-  });
-  return { width: 300, height: 200, getContext: () => ctx as unknown as CanvasRenderingContext2D };
-}
 
 /**
  * Keyboard navigation keeps the focused control visible: focusing a
@@ -36,7 +17,7 @@ describe('NodalRuntime scrollIntoView', () => {
     const rows = Array.from({ length: 10 }, (_, i) => Button({ height: 20, text: `row ${i}`, flexShrink: 0 }));
     const runtime = new NodalRuntime({
       root: Column({ height: 50, overflow: 'scroll' }, ...rows),
-      canvas: mockCanvas(),
+      canvas: mockCanvas(300, 200),
       width: 300,
       height: 200,
       clock: callback => (clock = new UiManualFrameClock(callback))

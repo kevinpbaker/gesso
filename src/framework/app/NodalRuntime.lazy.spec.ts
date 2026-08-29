@@ -1,31 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { NodalRuntime } from './NodalRuntime';
+import { mockCanvas } from './RuntimeTestUtils';
 import { LazyColumn, Row, Text } from '../../ui/composition';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
 import { noModifiers } from '../../ui/input/UiInputEvent';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import type { CanvasHost } from '../../ui/rendering';
-
-function mockCanvas(): CanvasHost {
-  const ctx = new Proxy({} as Record<string, unknown>, {
-    get: (target, key) => {
-      if (key === 'measureText') {
-        return (text: string) => ({ width: String(text).length * 7 });
-      }
-      if (typeof key === 'string' && !(key in target)) {
-        target[key] = vi.fn();
-      }
-      return target[key as string];
-    },
-    set: (target, key, value) => {
-      target[key as string] = value;
-      return true;
-    }
-  });
-  return { width: 400, height: 300, getContext: () => ctx as unknown as CanvasRenderingContext2D };
-}
 
 function countNodes(root: UiNode, type: UiNodeType): number {
   let count = root.type === type ? 1 : 0;
@@ -52,7 +33,7 @@ describe('NodalRuntime lazy lists', () => {
           return Row({ height: 20 }, Text({ text: `row ${index}` }));
         }
       ),
-      canvas: mockCanvas(),
+      canvas: mockCanvas(400, 300),
       width: 400,
       height: 300,
       clock: callback => (clock = new UiManualFrameClock(callback))

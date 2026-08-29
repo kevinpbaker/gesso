@@ -4,8 +4,6 @@ import { BehaviorSubject } from 'rxjs';
 import { Box, Button, Column, Row, Text } from '../../ui/composition/UiComponents';
 import type { UiCursor } from '../../ui/properties/UiPropertyValues';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
-import type { FrameMetrics } from './NodalRuntime';
-import type { FrameworkChild } from '../ComponentElement';
 import { attachStore } from '../store/worker/attachStore';
 import type { StorePort } from '../store/worker/StoreWorkerProtocol';
 import { Store } from '../store/Store';
@@ -13,47 +11,8 @@ import { state } from '../State';
 import { Projection, State } from '../store/decorators';
 import { UiEnvironmentKeys } from '../../ui/environment/UiEnvironmentKeys';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import type { CanvasHost } from '../../ui/rendering';
 import { NodalRuntime } from './NodalRuntime';
-
-function mockCanvas(): CanvasHost {
-  const ctx: Record<string, unknown> = {};
-  for (const m of [
-    'save',
-    'restore',
-    'translate',
-    'scale',
-    'rotate',
-    'setTransform',
-    'clearRect',
-    'fillRect',
-    'strokeRect',
-    'beginPath',
-    'moveTo',
-    'lineTo',
-    'arcTo',
-    'closePath',
-    'rect',
-    'clip',
-    'fill',
-    'stroke',
-    'fillText',
-    'drawImage'
-  ])
-    ctx[m] = vi.fn();
-  ctx.measureText = vi.fn((t: string) => ({ width: String(t).length * 7 }));
-  Object.assign(ctx, {
-    fillStyle: '#000',
-    strokeStyle: '#000',
-    lineWidth: 1,
-    lineJoin: 'miter',
-    globalAlpha: 1,
-    font: '14px sans-serif',
-    textAlign: 'start',
-    textBaseline: 'alphabetic'
-  });
-  return { width: 800, height: 600, getContext: () => ctx as unknown as CanvasRenderingContext2D };
-}
+import { mockCanvas, mountRuntime } from './RuntimeTestUtils';
 
 describe('NodalRuntime frame pipeline', () => {
   it('propagates environment to descendants when a provider property changes', () => {
@@ -65,7 +24,7 @@ describe('NodalRuntime frame pipeline', () => {
 
     const runtime = new NodalRuntime({
       root: Column({ contentColor: contentColor$ }, Text({ text: 'hello' })),
-      canvas: mockCanvas(),
+      canvas: mockCanvas(800, 600),
       width: 800,
       height: 600,
       clock: cb => (clock = new UiManualFrameClock(cb))
@@ -84,21 +43,6 @@ describe('NodalRuntime frame pipeline', () => {
     expect(before).toBe('#ff0000');
     expect(child.environment?.get(UiEnvironmentKeys.contentColor)).toBe('#00ff00');
   });
-
-  function mountRuntime(root: FrameworkChild) {
-    let clock!: UiManualFrameClock;
-    const frames: FrameMetrics[] = [];
-    const runtime = new NodalRuntime({
-      root,
-      canvas: mockCanvas(),
-      width: 800,
-      height: 600,
-      clock: cb => (clock = new UiManualFrameClock(cb))
-    });
-    runtime.onFrame(metrics => frames.push(metrics));
-    runtime.start();
-    return { runtime, clock, frames };
-  }
 
   describe('phase timings', () => {
     it('skips the environment phase when no provider property changed', () => {
@@ -216,7 +160,7 @@ describe('NodalRuntime frame pipeline', () => {
 describe('NodalRuntime layout inspector', () => {
   function mountInspectable() {
     let clock!: UiManualFrameClock;
-    const canvas = mockCanvas();
+    const canvas = mockCanvas(800, 600);
     const runtime = new NodalRuntime({
       root: Column({ padding: 10 }, Box({ width: 200, height: 100, padding: 4 }, Text({ text: 'inside' }))),
       canvas,
@@ -283,7 +227,7 @@ describe('NodalRuntime cursor', () => {
         Button({ width: 100, height: 50, cursor: 'pointer' }, Text({ text: 'Save' })),
         Box({ width: 100, height: 50, cursor: cursorProp })
       ),
-      canvas: mockCanvas(),
+      canvas: mockCanvas(800, 600),
       width: 800,
       height: 600,
       clock: cb => (clock = new UiManualFrameClock(cb))

@@ -1,30 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { NodalRuntime } from './NodalRuntime';
+import { mockCanvas } from './RuntimeTestUtils';
 import { Box, Column } from '../../ui/composition/UiComponents';
 import { noModifiers } from '../../ui/input/UiInputEvent';
 import { scrollbarThumb, SCROLLBAR_THICKNESS } from '../../ui/layout/Scrollbars';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import type { CanvasHost } from '../../ui/rendering';
-
-function mockCanvas(): CanvasHost {
-  const ctx = new Proxy({} as Record<string, unknown>, {
-    get: (target, key) => {
-      if (key === 'measureText') {
-        return (text: string) => ({ width: String(text).length * 7 });
-      }
-      if (typeof key === 'string' && !(key in target)) {
-        target[key] = vi.fn();
-      }
-      return target[key as string];
-    },
-    set: (target, key, value) => {
-      target[key as string] = value;
-      return true;
-    }
-  });
-  return { width: 300, height: 300, getContext: () => ctx as unknown as CanvasRenderingContext2D };
-}
 
 /**
  * Scrollbars are grabbable: dragging the thumb scrolls the content in
@@ -41,7 +22,7 @@ describe('NodalRuntime scrollbars', () => {
     const runtime = new NodalRuntime({
       // 200 wide, 100 tall, 1000 of content: maxScroll 900.
       root: Column({ width: 200, height: 100, overflow: 'scroll' }, ...rows),
-      canvas: mockCanvas(),
+      canvas: mockCanvas(300, 300),
       width: 300,
       height: 300,
       clock: callback => (clock = new UiManualFrameClock(callback))
