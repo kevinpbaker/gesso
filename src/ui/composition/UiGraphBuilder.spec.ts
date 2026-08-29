@@ -156,10 +156,43 @@ describe('UiGraphBuilder', () => {
 
     it('writes alignment props declared on a Row', () => {
       const { builder } = createBuilder();
-      const root = builder.build(Row({ justifyContent: 'center', alignItems: 'center' }, Text({ text: 'A' })));
+      const root = builder.build(Row({ x: 'center', y: 'center' }, Text({ text: 'A' })));
       expect(root.type).toBe(UiNodeType.Row);
-      expect(root.getProperty('justifyContent')).toBe('center');
-      expect(root.getProperty('alignItems')).toBe('center');
+      expect(root.getProperty('x')).toBe('center');
+      expect(root.getProperty('y')).toBe('center');
+    });
+
+    it('rejects a prop no property definition declares, naming the closest one', () => {
+      expect(() => createBuilder().builder.build(Row({ widht: 100 }))).toThrow(
+        /Unknown prop 'widht' on node 'root:0'. Did you mean 'width'\?/
+      );
+      // CSS names that Nodal spells differently are the common case.
+      expect(() => createBuilder().builder.build(Row({ alignItems: 'center' }))).toThrow(/Unknown prop 'alignItems'/);
+      // A misspelled event handler with a non-function value is still an event prop.
+      expect(() => createBuilder().builder.build(Row({ onClik: 'x' }))).toThrow(
+        /Unknown prop 'onClik'.*Did you mean 'onClick'/
+      );
+    });
+
+    it('rejects an unknown prop bound to an Observable as well', () => {
+      const { builder } = createBuilder();
+      expect(() => builder.build(Row({ colour: new BehaviorSubject('#fff') }))).toThrow(
+        /Unknown prop 'colour' on node 'root:0'. Did you mean 'color'\?/
+      );
+    });
+
+    it('accepts every registered property, key and ref', () => {
+      const { builder } = createBuilder();
+      const seen: unknown[] = [];
+      const root = builder.build(
+        Column(
+          { key: 'k', ref: (node: unknown) => seen.push(node), hitTestable: false, virtualIndex: 3 },
+          Text({ text: 'A' })
+        )
+      );
+      expect(root.getProperty('hitTestable')).toBe(false);
+      expect(root.getProperty('virtualIndex')).toBe(3);
+      expect(seen).toEqual([root]);
     });
   });
 

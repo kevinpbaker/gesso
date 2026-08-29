@@ -22,6 +22,8 @@ import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
 import { accumulatedOffsetTo } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
+import { buildAxisExplanation, labelNode } from './LayoutExplanation';
+import type { AxisFacts, FlexFacts, LayoutExplanation } from './LayoutExplanation';
 
 const DEFAULT_FONT_SIZE = 14;
 /** How long overlay scrollbars stay after the last scroll change. */
@@ -150,6 +152,246 @@ export class LayoutEngine {
 
   recordFor(node: UiNode): LayoutRecord | undefined {
     return this.records.get(node);
+  }
+
+  /** The node the last `layout` / `layoutForFrame` started from, if any. */
+  get root(): UiNode | null {
+    return this.layoutRoot;
+  }
+
+  /**
+   * Why a node has the box it has: the constraints it was handed, what
+   * its content asked for, which rule fixed each axis (a flex
+   * resolution, a stretch, an explicit size, a clamp) and where a
+   * change to it is laid out from. Reads the record and the node's
+   * properties; computes nothing layout did not.
+   *
+   * `formatExplanation` prints the result; the playground's inspector
+   * shows it for the hovered node.
+   */
+  explain(node: UiNode): LayoutExplanation {
+    const rec = this.records.get(node);
+    const flowParent = this.flowParentOf(node);
+    const parent = node === this.layoutRoot ? null : flowParent;
+    if (rec === undefined) {
+      return this.unexplained(node, parent);
+    }
+    const isRoot = node === this.layoutRoot;
+    const absolute = rec.absolute && !isRoot;
+    const pRec = parent === null ? undefined : this.records.get(parent);
+    const block = absolute ? this.containingBlockOf(node) : undefined;
+    // Percentages resolve against what they resolved against in layout:
+    // the containing block, the parent's content box, or the viewport.
+    const savedBase = this.percentBase;
+    this.percentBase =
+      block !== undefined
+        ? { width: block.width, height: block.height }
+        : pRec === undefined
+          ? this.rootPercentBase(this.rootConstraints)
+          : {
+              width: Math.max(0, pRec.width - pRec.paddingLeft - pRec.paddingRight),
+              height: Math.max(0, pRec.height - pRec.paddingTop - pRec.paddingBottom)
+            };
+    const constraints = rec.lastConstraints;
+    const effective = this.effectiveConstraints(node, constraints);
+    const parentLabel = parent === null ? 'the viewport' : labelNode(parent);
+    const clipsContent =
+      rec.clips ||
+      node.properties.get('textOverflow') === 'ellipsis' ||
+      this.numberProp(node, 'maxLines') !== undefined;
+    const isText = node.type === UiNodeType.Text || node.type === UiNodeType.Button;
+    let childCount = 0;
+    this.forEachLayoutChild(node, () => childCount++);
+    const flexContainer =
+      parent !== null &&
+      !absolute &&
+      (parent.type === UiNodeType.Row || parent.type === UiNodeType.Column || parent.type === UiNodeType.ScrollView);
+    const flexFacts = (axis: 'width' | 'height'): FlexFacts | undefined => {
+      if (!flexContainer || rec.flexMain !== (axis === 'width' ? 1 : 2)) {
+        return undefined;
+      }
+      return {
+        base: rec.flexBase,
+        min: rec.flexMin,
+        max: rec.flexMax,
+        minAuto: rec.flexMinAuto,
+        grow: rec.flexGrow,
+        shrink: rec.flexShrink,
+        basis: this.flexBasis(node, rec, axis === 'width' ? this.percentBase.width : this.percentBase.height),
+        containerLabel: parentLabel,
+        scroller: parent.type === UiNodeType.ScrollView
+      };
+    };
+    const facts = (axis: 'width' | 'height'): AxisFacts => {
+      const horizontal = axis === 'width';
+      const base = horizontal ? this.percentBase.width : this.percentBase.height;
+      const explicit = this.lengthProp(node, axis, base);
+      const flex = flexFacts(axis);
+      const parentMin = horizontal ? constraints.minWidth : constraints.minHeight;
+      const parentMax = horizontal ? constraints.maxWidth : constraints.maxHeight;
+      const tight = parentMin === parentMax && isFinite(parentMax);
+      const inset =
+        absolute &&
+        (horizontal
+          ? rec.left !== undefined && rec.right !== undefined
+          : rec.top !== undefined && rec.bottom !== undefined) &&
+        explicit === undefined;
+      return {
+        axis,
+        isRoot,
+        parentLabel,
+        parentMin,
+        parentMax,
+        effectiveMin: horizontal ? effective.minWidth : effective.minHeight,
+        effectiveMax: horizontal ? effective.maxWidth : effective.maxHeight,
+        explicit,
+        explicitRaw: node.properties.get(axis),
+        ownMin: this.lengthProp(node, horizontal ? 'minWidth' : 'minHeight', base),
+        ownMax: this.lengthProp(node, horizontal ? 'maxWidth' : 'maxHeight', base),
+        content: horizontal ? rec.intrinsicWidth : rec.intrinsicHeight,
+        measured: horizontal ? rec.measuredWidth : rec.measuredHeight,
+        final: horizontal ? rec.width : rec.height,
+        contentMin: horizontal ? rec.minContentWidth : rec.intrinsicHeight,
+        padding: horizontal ? rec.paddingLeft + rec.paddingRight : rec.paddingTop + rec.paddingBottom,
+        aspectRatio: rec.aspectRatio,
+        flex,
+        stretched: tight && !isRoot && explicit === undefined && flex === undefined && !inset,
+        inset,
+        gridArea: tight && parent !== null && parent.type === UiNodeType.Grid && explicit === undefined,
+        clipsContent,
+        isText,
+        childCount
+      };
+    };
+    const width = buildAxisExplanation(facts('width'));
+    const height = buildAxisExplanation(facts('height'));
+    this.percentBase = savedBase;
+
+    const position = rec.absolute ? 'absolute' : rec.sticky ? 'sticky' : rec.positioned ? 'relative' : 'static';
+    return {
+      node,
+      laidOut: true,
+      parent,
+      box: { x: rec.x, y: rec.y, width: rec.width, height: rec.height },
+      content: { width: rec.intrinsicWidth, height: rec.intrinsicHeight },
+      measured: { width: rec.measuredWidth, height: rec.measuredHeight },
+      constraints,
+      effective,
+      padding: { top: rec.paddingTop, right: rec.paddingRight, bottom: rec.paddingBottom, left: rec.paddingLeft },
+      margin: { top: rec.marginTop, right: rec.marginRight, bottom: rec.marginBottom, left: rec.marginLeft },
+      width,
+      height,
+      relayout: this.explainRelayout(node, rec),
+      state: {
+        measureDirty: rec.measureDirty,
+        placeDirty: rec.placeDirty,
+        measuredLastPass: this.trace ? this.stats.measuredNodes.includes(node) : undefined,
+        position,
+        clips: rec.clips
+      },
+      scroll: rec.scrollable
+        ? {
+            scrollX: rec.scrollX,
+            scrollY: rec.scrollY,
+            contentWidth: rec.contentWidth,
+            contentHeight: rec.contentHeight
+          }
+        : undefined
+    };
+  }
+
+  private unexplained(node: UiNode, parent: UiNode | null): LayoutExplanation {
+    let reason: string;
+    if (this.layoutRoot === null) {
+      reason = 'nothing has been laid out yet';
+    } else if (this.isFragment(node)) {
+      reason = 'fragments are transparent anchors with no box of their own; explain one of its children';
+    } else if (!this.isUnderRoot(node)) {
+      reason = `it is not under the layout root ${labelNode(this.layoutRoot)}`;
+    } else if (this.hiddenAncestor(node) !== null) {
+      reason = `an ancestor (${labelNode(this.hiddenAncestor(node)!)}) has not been laid out`;
+    } else {
+      reason = 'it was added after the last layout pass and no frame has run since';
+    }
+    const empty = Constraints.unbounded();
+    const zero = { width: 0, height: 0 };
+    const axis = (name: 'width' | 'height') => ({
+      axis: name,
+      content: 0,
+      measured: 0,
+      final: 0,
+      decidedBy: 'content' as const,
+      reasons: [] as string[]
+    });
+    return {
+      node,
+      laidOut: false,
+      notLaidOutReason: reason,
+      parent,
+      box: { x: 0, y: 0, width: 0, height: 0 },
+      content: zero,
+      measured: zero,
+      constraints: empty,
+      effective: empty,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      width: axis('width'),
+      height: axis('height'),
+      relayout: {
+        boundary: false,
+        contentMatters: true,
+        root: this.layoutRoot ?? node,
+        rootIsLayoutRoot: true,
+        depth: this.depthOf(node)
+      },
+      state: { measureDirty: true, placeDirty: true, measuredLastPass: undefined, position: 'static', clips: false }
+    };
+  }
+
+  /**
+   * Where a change to the node's own layout properties is laid out
+   * from — the same walk `markLayoutDirty` takes, without marking.
+   */
+  private explainRelayout(node: UiNode, rec: LayoutRecord): LayoutExplanation['relayout'] {
+    let current: UiNode = node;
+    let depth = 0;
+    for (;;) {
+      if (current === this.layoutRoot || current.parent === null) {
+        break;
+      }
+      const cRec = this.records.get(current);
+      if (current !== node && cRec?.relayoutBoundary && !cRec.positioned) {
+        break;
+      }
+      current = current.parent;
+      depth++;
+    }
+    return {
+      boundary: rec.relayoutBoundary,
+      contentMatters: rec.contentMatters,
+      root: current,
+      rootIsLayoutRoot: current === this.layoutRoot,
+      depth
+    };
+  }
+
+  private isUnderRoot(node: UiNode): boolean {
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      if (current === this.layoutRoot) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The nearest non-fragment ancestor without a record, if any. */
+  private hiddenAncestor(node: UiNode): UiNode | null {
+    for (let current = node.parent; current !== null; current = current.parent) {
+      if (!this.isFragment(current) && !this.records.has(current)) {
+        return current;
+      }
+    }
+    return null;
   }
 
   /**
@@ -610,8 +852,10 @@ export class LayoutEngine {
     if (rec.aspectRatio !== undefined) {
       size = this.applyAspectRatio(size, rec.aspectRatio, effective);
     }
-    // The content's own height, before any explicit or parent size: the
-    // "content size suggestion" a column uses for automatic minimums.
+    // The content's own size, before any explicit or parent size: the
+    // "content size suggestion" a column uses for automatic minimums,
+    // and what explain() reports the content asked for.
+    rec.intrinsicWidth = size.width;
     rec.intrinsicHeight = size.height;
     // A tight axis is the parent's decision (a flexed main size, a
     // stretched cross size, the viewport) and wins outright. A loose
@@ -1060,6 +1304,12 @@ export class LayoutEngine {
       const physicalEnd = row ? cRec.marginRight : cRec.marginBottom;
       const physicalStartAuto = row ? cRec.marginLeftAuto : cRec.marginTopAuto;
       const physicalEndAuto = row ? cRec.marginRightAuto : cRec.marginBottomAuto;
+      // Kept on the record so explain() can say how the item flexed.
+      cRec.flexMain = row ? 1 : 2;
+      cRec.flexBase = baseMain;
+      cRec.flexMin = minMain;
+      cRec.flexMax = maxMain;
+      cRec.flexMinAuto = row ? cRec.minWidthAuto : cRec.minHeightAuto;
       items.push({
         child,
         rec: cRec,

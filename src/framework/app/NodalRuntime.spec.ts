@@ -211,3 +211,61 @@ describe('NodalRuntime frame pipeline', () => {
     });
   });
 });
+
+describe('NodalRuntime layout inspector', () => {
+  function mountInspectable() {
+    let clock!: UiManualFrameClock;
+    const canvas = mockCanvas();
+    const runtime = new NodalRuntime({
+      root: Column({ padding: 10 }, Box({ width: 200, height: 100, padding: 4 }, Text({ text: 'inside' }))),
+      canvas,
+      width: 800,
+      height: 600,
+      clock: cb => (clock = new UiManualFrameClock(cb))
+    });
+    const explanations: (string | null)[] = [];
+    runtime.onInspect(text => explanations.push(text));
+    runtime.start();
+    if (clock.isPending) clock.tick(0);
+    const ctx = canvas.getContext('2d') as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    return { runtime, clock, ctx, explanations };
+  }
+
+  it('paints nothing extra and traces nothing while off', () => {
+    const { runtime, ctx } = mountInspectable();
+    expect(runtime.inspector.isEnabled).toBe(false);
+    const strokes = ctx.strokeRect.mock.calls.length;
+    runtime.input.pointer.pointerMove(50, 50);
+    expect(ctx.strokeRect.mock.calls.length).toBe(strokes);
+  });
+
+  it('follows the hovered node, explains it, and paints its boxes over the frame', () => {
+    const { runtime, clock, ctx, explanations } = mountInspectable();
+
+    runtime.setInspectorEnabled(true);
+    expect(explanations).toEqual([null]);
+    expect(clock.isPending).toBe(true);
+    clock.tick(16);
+
+    // Hover the 200×100 box: the pointer controller reports the change,
+    // the runtime explains it and schedules a repaint with the overlay.
+    ctx.strokeRect.mockClear();
+    runtime.input.pointer.pointerMove(50, 50);
+    const box = runtime.debugRoot().firstChild!;
+    expect(runtime.inspector.hoveredNode).toBe(box);
+    expect(explanations.at(-1)).toMatch(/^box '.*' — 200 × 100 at \(10, 10\)/);
+    expect(explanations.at(-1)).toContain('width: 200 (explicit)');
+    expect(clock.isPending).toBe(true);
+    clock.tick(32);
+    // The border-box outline of the hovered node, in logical pixels.
+    expect(ctx.strokeRect.mock.calls).toContainEqual([10.5, 10.5, 199, 99]);
+    expect(ctx.fillText.mock.calls.some(call => String(call[0]).startsWith("box '"))).toBe(true);
+
+    // explain() is available directly too, for tests and devtools.
+    expect(runtime.explain(box).width.decidedBy).toBe('explicit');
+
+    runtime.setInspectorEnabled(false);
+    expect(explanations.at(-1)).toBeNull();
+    expect(runtime.inspector.hoveredNode).toBeNull();
+  });
+});

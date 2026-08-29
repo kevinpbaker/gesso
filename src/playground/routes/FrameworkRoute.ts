@@ -2,6 +2,7 @@ import { createApp } from '../../framework';
 import { DemoStore, FrameworkDemoRoot } from '../FrameworkPlayground';
 import { HeavyStore } from '../HeavyStore';
 import { mountShell, type AppShell } from '../shell/AppShell';
+import { addInspectAction, mountInspectorPanel } from '../shell/InspectorPanel';
 
 const BLOCK_MS = 2000;
 /** How often the reporter is allowed to touch the DOM. */
@@ -30,6 +31,7 @@ interface FrameMetrics {
 export function mountFrameworkRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework', metrics: true });
   const report = createFrameReporter(shell, 'Render worker');
+  const inspectorPanel = mountInspectorPanel(shell.preview);
 
   const app = createApp({
     // Written out literally so the bundler can see and split it.
@@ -38,15 +40,20 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     onError: (message, stack) => {
       shell.setStatus(`Render worker error: ${message}`);
       console.error('[nodal render worker]', message, stack);
-    }
+    },
+    // The explanation is computed in the worker, where the layout
+    // records are; only its text crosses to this thread.
+    onInspect: text => inspectorPanel.set(text)
   });
 
   shell.setStatus('Starting the render worker…');
   const dispose = app.mount(shell.preview);
+  addInspectAction(shell, enabled => app.setInspector(enabled));
   addBlockAction(shell);
 
   return () => {
     dispose();
+    inspectorPanel.dispose();
     shell.dispose();
   };
 }
@@ -61,19 +68,23 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
 export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework-sync', metrics: true });
   const report = createFrameReporter(shell, 'Main thread');
+  const inspectorPanel = mountInspectorPanel(shell.preview);
 
   shell.setStatus('Starting the single-threaded app…');
-  const dispose = createApp(FrameworkDemoRoot)
+  const builder = createApp(FrameworkDemoRoot)
     .useStore(DemoStore)
     .useStore(HeavyStore, {
       worker: () => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })
     })
     .onFrame(report)
-    .mountSync(shell.preview);
+    .onInspect(text => inspectorPanel.set(text));
+  const dispose = builder.mountSync(shell.preview);
+  addInspectAction(shell, enabled => builder.setInspector(enabled));
   addBlockAction(shell);
 
   return () => {
     dispose();
+    inspectorPanel.dispose();
     shell.dispose();
   };
 }

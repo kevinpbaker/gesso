@@ -25,11 +25,13 @@ import type { ScrollContainerState, ScrollSink } from '../../ui/input/UiWheelCon
 import { UiFocusManager } from '../../ui/input/UiFocusManager';
 import { UiKeyboardController } from '../../ui/input/UiKeyboardController';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
+import type { LayoutExplanation } from '../../ui/layout/LayoutExplanation';
 import { Constraints } from '../../ui/layout/LayoutTypes';
 import {
   Canvas2DRenderer,
   CanvasTextMeasurer,
   createCanvasSurface,
+  LayoutInspector,
   type CanvasHost,
   type CanvasSurface
 } from '../../ui/rendering';
@@ -112,6 +114,12 @@ export interface NodalRuntimeOptions {
 export class NodalRuntime {
   readonly stores: StoreRegistry;
   readonly input: RuntimeInput;
+  /**
+   * The layout inspector: hover boxes, a heatmap of measured nodes and
+   * `engine.explain` for the hovered node, painted over each frame
+   * while enabled. Off by default; see `setInspectorEnabled`.
+   */
+  readonly inspector: LayoutInspector;
 
   private readonly resolver: ComponentHostResolver;
   private readonly graph = new UiGraph();
@@ -131,7 +139,10 @@ export class NodalRuntime {
   private pixelRatio: number;
   private lastFrameMs = 0;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
+  private inspectListener: ((text: string | null) => void) | null = null;
+  private lastInspection: string | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
+  private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
   private replicas: readonly StoreReplica[] = [];
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
 
@@ -140,6 +151,7 @@ export class NodalRuntime {
     this.surface = createCanvasSurface(options.canvas);
     this.textMeasurer = new CanvasTextMeasurer(this.surface.getContext2D());
     this.engine = new LayoutEngine(this.textMeasurer);
+    this.inspector = new LayoutInspector(this.engine);
     this.resolver = new ComponentHostResolver(this.stores);
     this.builder = new UiGraphBuilder(this.graph, { components: this.resolver, dispatcher: this.dispatcher });
     this.canvasRenderer = new Canvas2DRenderer({ surface: this.surface });
@@ -230,6 +242,42 @@ export class NodalRuntime {
   }
 
   /**
+   * Turns the layout inspector on or off. While on, every frame paints
+   * the hovered node's boxes and the measure heatmap over the scene, and
+   * the inspect listener receives the hovered node's explanation.
+   */
+  setInspectorEnabled(enabled: boolean): void {
+    if (this.inspector.isEnabled === enabled) {
+      return;
+    }
+    this.inspector.setEnabled(enabled);
+    if (enabled) {
+      this.inspector.setHovered(this.input.pointer.hoveredNode);
+    }
+    // Always sent, so a listener learns the toggle even when the text
+    // happens to match (null before and after).
+    this.lastInspection = this.inspector.explainHoveredText();
+    this.inspectListener?.(this.lastInspection);
+    if (this.root !== undefined) {
+      this.graph.markDirty(this.root, DirtyFlags.Paint);
+    }
+  }
+
+  /**
+   * Receives the hovered node's layout explanation as text whenever it
+   * changes while the inspector is on, and null when nothing is hovered
+   * or the inspector is turned off.
+   */
+  onInspect(listener: ((text: string | null) => void) | null): void {
+    this.inspectListener = listener;
+  }
+
+  /** `engine.explain` for any node, for tests and devtools. */
+  explain(node: UiNode): LayoutExplanation {
+    return this.engine.explain(node);
+  }
+
+  /**
    * The UiNode the app's root definition produced.
    *
    * For tests and devtools that inspect the retained graph without
@@ -278,6 +326,11 @@ export class NodalRuntime {
       clearTimeout(this.scrollbarTimer);
       this.scrollbarTimer = null;
     }
+    if (this.inspectorTimer !== null) {
+      clearTimeout(this.inspectorTimer);
+      this.inspectorTimer = null;
+    }
+    this.inspectListener = null;
     this.scheduler.stop();
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
@@ -350,11 +403,26 @@ export class NodalRuntime {
             focus.focusOnPress(node);
           }
         },
-        scrollSink
+        scrollSink,
+        onHoverChange: node => this.handleHoverChange(node)
       }),
       wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
       keyboard: new UiKeyboardController(this.dispatcher, focus, root)
     };
+  }
+
+  /**
+   * With the inspector on, a hover change repaints (the overlay follows
+   * the pointer) and re-explains the hovered node for the listener.
+   */
+  private handleHoverChange(node: UiNode | null): void {
+    if (!this.inspector.isEnabled || !this.inspector.setHovered(node)) {
+      return;
+    }
+    this.sendInspection();
+    if (this.root !== undefined) {
+      this.graph.markDirty(this.root, DirtyFlags.Paint);
+    }
   }
 
   /**
@@ -515,10 +583,14 @@ export class NodalRuntime {
     }
     const started = now();
 
+    const laidOut = frameNeedsLayout(frame);
     this.phaseTimings.layout = this.timePhase(
-      () => frameNeedsLayout(frame),
+      () => laidOut,
       () => this.engine.layoutForFrame(frame, this.constraints, root)
     );
+    if (laidOut) {
+      this.inspector.recordLayout(started);
+    }
 
     // Render is unconditional: the Canvas2D backend redraws the whole
     // scene, so any frame that got this far changes pixels.
@@ -526,6 +598,16 @@ export class NodalRuntime {
       () => true,
       () => this.canvasRenderer.render(root, { layout: this.engine, text: this.textMeasurer, now: started })
     );
+    // The inspector paints over the finished scene; the hovered node's
+    // explanation only changes with layout, so it is re-read then and
+    // sent when it differs from what the listener already has.
+    if (this.inspector.isEnabled) {
+      const nextChange = this.inspector.paint(this.surface.getContext2D(), started);
+      if (laidOut) {
+        this.sendInspection();
+      }
+      this.scheduleInspectorRepaint(nextChange);
+    }
 
     const finished = now();
     const elapsed = finished - started;
@@ -561,6 +643,35 @@ export class NodalRuntime {
       },
       Math.max(16, next - now)
     );
+  }
+
+  /**
+   * The heatmap cools in steps, which needs frames nothing else asks
+   * for; one pending timer marks a repaint for the next step due.
+   */
+  private scheduleInspectorRepaint(nextChange: number | undefined): void {
+    if (nextChange === undefined || this.inspectorTimer !== null) {
+      return;
+    }
+    this.inspectorTimer = setTimeout(
+      () => {
+        this.inspectorTimer = null;
+        if (this.root !== undefined && this.inspector.isEnabled) {
+          this.graph.markDirty(this.root, DirtyFlags.Paint);
+        }
+      },
+      Math.max(16, nextChange)
+    );
+  }
+
+  /** Hands the listener the hovered node's explanation, when it changed. */
+  private sendInspection(): void {
+    const text = this.inspector.explainHoveredText();
+    if (text === this.lastInspection) {
+      return;
+    }
+    this.lastInspection = text;
+    this.inspectListener?.(text);
   }
 
   /**

@@ -4,6 +4,7 @@ export type { Canvas2DContext } from './canvas2d/Canvas2DContext';
 export { CanvasSurface, createCanvasSurface } from './canvas2d/CanvasSurface';
 export type { CanvasHost } from './canvas2d/CanvasSurface';
 export { CanvasTextMeasurer } from './canvas2d/CanvasTextMeasurer';
+export { LayoutInspector, INSPECTOR_HEAT_MS } from './LayoutInspector';
 export {
   createPaintState,
   resolvePaintState,

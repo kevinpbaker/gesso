@@ -631,6 +631,43 @@ canvas.pg-canvas:focus-visible {
 }
 
 /* --------------------------------------------------------------- */
+/* Layout inspector readout                                         */
+/* --------------------------------------------------------------- */
+
+/*
+ * Floats over the preview instead of sitting in the status bar: the
+ * explanation is several lines and the bar's height is fixed on
+ * purpose (see .pg-status). Absolutely positioned, so showing or
+ * hiding it never resizes the preview it describes; pointer events
+ * pass through so the canvas underneath keeps its hover.
+ */
+.pg-inspector {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 2;
+  max-width: calc(100% - 2 * var(--space-3));
+  max-height: 45%;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
+  background: rgba(13, 17, 23, 0.92);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.pg-inspector[hidden] {
+  display: none;
+}
+
+/* --------------------------------------------------------------- */
 /* Status bar                                                       */
 /* --------------------------------------------------------------- */
 

@@ -57,7 +57,7 @@ export function createBindingDefinition(state: BindingDemoState): UiElement {
     { padding: 24, gap: 16 },
     Text({ text: state.message$, color: state.color$, fontSize: 20 }),
     Row(
-      { gap: 12, alignSelf: 'stretch' },
+      { gap: 12, selfX: 'stretch' },
       Box({ width: 60, height: 40, backgroundColor: '#1f6feb', borderRadius: 4 }),
       Box({ width: state.barWidth$, height: 40, backgroundColor: state.barColor$, borderRadius: 4 }),
       Box({ flexGrow: state.flexGrow$, height: 40, backgroundColor: '#6f42c1', borderRadius: 4 })

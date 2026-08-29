@@ -79,7 +79,22 @@ export class LayoutRecord {
    */
   minContentWidth = 0;
   maxContentWidth = 0;
+  intrinsicWidth = 0;
   intrinsicHeight = 0;
+
+  /**
+   * What the last flex container this node was an item of decided
+   * about it, kept for `LayoutEngine.explain`: which axis was the main
+   * axis (0 when the node is not a flex item), the flex base size, and
+   * the minimum and maximum the resolution clamped it between —
+   * `flexMinAuto` when that minimum was CSS's automatic minimum (the
+   * content's min-content size) rather than an explicit one.
+   */
+  flexMain: 0 | 1 | 2 = 0;
+  flexBase = 0;
+  flexMin = 0;
+  flexMax = Infinity;
+  flexMinAuto = false;
 
   /**
    * Positioning. An absolute node is out of flow: it neither takes
@@ -174,6 +189,7 @@ export class LayoutRecord {
       this.outerHeight,
       this.minContentWidth,
       this.maxContentWidth,
+      this.intrinsicWidth,
       this.intrinsicHeight,
       this.hasBaseline ? 1 : 0,
       this.baseline,
@@ -189,11 +205,12 @@ export class LayoutRecord {
     this.outerHeight = outputs[3];
     this.minContentWidth = outputs[4];
     this.maxContentWidth = outputs[5];
-    this.intrinsicHeight = outputs[6];
-    this.hasBaseline = outputs[7] === 1;
-    this.baseline = outputs[8];
-    this.contentWidth = outputs[9];
-    this.contentHeight = outputs[10];
+    this.intrinsicWidth = outputs[6];
+    this.intrinsicHeight = outputs[7];
+    this.hasBaseline = outputs[8] === 1;
+    this.baseline = outputs[9];
+    this.contentWidth = outputs[10];
+    this.contentHeight = outputs[11];
   }
 
   /**

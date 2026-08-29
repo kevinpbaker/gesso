@@ -28,6 +28,11 @@ export interface WorkerAppOptions {
   }) => void;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
+  /**
+   * Receives the hovered node's layout explanation while the inspector
+   * is on (see `setInspector`), and null when nothing is hovered.
+   */
+  onInspect?: (text: string | null) => void;
 }
 
 /**
@@ -96,6 +101,14 @@ export class WorkerApp {
     return () => this.dispose();
   }
 
+  /**
+   * Turns the layout inspector on or off in the worker: hover boxes and
+   * a measure heatmap over the scene, and explanations via `onInspect`.
+   */
+  setInspector(enabled: boolean): void {
+    this.post({ type: 'inspector', enabled });
+  }
+
   dispose(): void {
     this.detachInput?.();
     this.detachInput = null;
@@ -131,6 +144,10 @@ export class WorkerApp {
     if (message.type === 'error') {
       const report = this.options.onError ?? ((text, stack) => console.error(`[nodal render worker] ${text}`, stack));
       report(message.message, message.stack);
+      return;
+    }
+    if (message.type === 'inspect') {
+      this.options.onInspect?.(message.text);
     }
   };
 

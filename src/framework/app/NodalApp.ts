@@ -124,6 +124,16 @@ export class NodalApp {
     this.runtime.resize(width, height, devicePixelRatio());
   }
 
+  /** Turns the layout inspector on or off; see NodalRuntime.setInspectorEnabled. */
+  setInspector(enabled: boolean): void {
+    this.runtime.setInspectorEnabled(enabled);
+  }
+
+  /** Receives the hovered node's explanation while the inspector is on. */
+  onInspect(listener: ((text: string | null) => void) | null): void {
+    this.runtime.onInspect(listener);
+  }
+
   debugRoot(): UiNode {
     return this.runtime.debugRoot();
   }

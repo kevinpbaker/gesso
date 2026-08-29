@@ -41,6 +41,49 @@ export function propertyEffects(name: string): DirtyFlags {
 }
 
 /**
+ * The registered property name closest to `name`, for the error a
+ * misspelled prop raises; undefined when nothing is reasonably close.
+ * Case differences count as one edit so `Width` suggests `width`.
+ */
+export function closestPropertyName(name: string, candidates: Iterable<string> = registry.keys()): string | undefined {
+  let best: string | undefined;
+  let bestDistance = Infinity;
+  const target = name.toLowerCase();
+  for (const candidate of candidates) {
+    const distance = editDistance(target, candidate.toLowerCase());
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+  // Allow more edits for longer names; a two-letter prop must be exact.
+  return best !== undefined && bestDistance <= Math.max(1, Math.floor(name.length / 3)) ? best : undefined;
+}
+
+/** Edits between two strings, an adjacent transposition (`widht`) counting as one. */
+function editDistance(a: string, b: string): number {
+  const rows: number[][] = [];
+  for (let i = 0; i <= a.length; i++) {
+    rows.push(Array.from({ length: b.length + 1 }, () => 0));
+    rows[i][0] = i;
+  }
+  for (let j = 0; j <= b.length; j++) {
+    rows[0][j] = j;
+  }
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let best = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        best = Math.min(best, rows[i - 2][j - 2] + 1);
+      }
+      rows[i][j] = best;
+    }
+  }
+  return rows[a.length][b.length];
+}
+
+/**
  * Returns true when the named property is declared as inherited.
  */
 export function propertyIsInherited(name: string): boolean {

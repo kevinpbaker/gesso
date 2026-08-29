@@ -18,6 +18,7 @@ export type ShellToRuntimeMessage =
   | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiModifiers }
   | { type: 'keyDown'; key: string; modifiers: UiModifiers }
   | { type: 'keyUp'; key: string; modifiers: UiModifiers }
+  | { type: 'inspector'; enabled: boolean }
   | { type: 'dispose' };
 
 /**
@@ -39,7 +40,9 @@ export type RuntimeToShellMessage =
       at: number;
       phases: FramePhaseTimings;
     }
-  | { type: 'error'; message: string; stack?: string };
+  | { type: 'error'; message: string; stack?: string }
+  /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */
+  | { type: 'inspect'; text: string | null };
 
 export function modifiersFrom(event: {
   shiftKey: boolean;

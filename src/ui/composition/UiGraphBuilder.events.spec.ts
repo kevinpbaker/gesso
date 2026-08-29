@@ -121,12 +121,12 @@ describe('UiGraphBuilder event props', () => {
     expect(() => builder.build(Column(Box({ onClicked: () => {} })))).toThrow(/Unknown event prop 'onClicked'/);
   });
 
-  it('leaves non-function on* props as ordinary properties', () => {
+  it('rejects a non-function value on a known on* prop', () => {
     const { builder } = createHarness();
 
-    const column = builder.build(Column(Box({ onClick: 'label' })));
-
-    expect(firstChild(column).getProperty('onClick')).toBe('label');
+    expect(() => builder.build(Column(Box({ onClick: 'label' })))).toThrow(
+      /Event prop 'onClick' on node '.*' must be a function, got a string/
+    );
   });
 
   it('warns once and ignores handlers when built without a dispatcher', () => {

@@ -12,6 +12,8 @@ import type { FrameMetrics } from './NodalRuntime';
 export class NodalAppBuilder {
   private readonly registrations: StoreRegistration[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
+  private inspectListener: ((text: string | null) => void) | undefined;
+  private app: NodalApp | undefined;
 
   constructor(private readonly root: FrameworkChild | (new () => Component)) {}
 
@@ -38,6 +40,23 @@ export class NodalAppBuilder {
   }
 
   /**
+   * Receives the hovered node's layout explanation while the inspector
+   * is on, mirroring WorkerAppOptions.onInspect.
+   */
+  onInspect(listener: (text: string | null) => void): this {
+    this.inspectListener = listener;
+    return this;
+  }
+
+  /**
+   * Turns the layout inspector on or off on the mounted app, mirroring
+   * WorkerApp.setInspector. A no-op before mountSync.
+   */
+  setInspector(enabled: boolean): void {
+    this.app?.setInspector(enabled);
+  }
+
+  /**
    * Mounts the app on the calling thread.
    *
    * Named for what it costs: everything — components, layout and
@@ -55,8 +74,13 @@ export class NodalAppBuilder {
     if (this.frameListener !== undefined) {
       app.onFrame(this.frameListener);
     }
+    if (this.inspectListener !== undefined) {
+      app.onInspect(this.inspectListener);
+    }
+    this.app = app;
     app.mount();
     return () => {
+      this.app = undefined;
       app.dispose();
       stores.dispose();
     };

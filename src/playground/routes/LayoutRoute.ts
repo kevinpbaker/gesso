@@ -8,6 +8,8 @@ import { createDefinition } from '../PlaygroundDefinition';
 import { PlaygroundState } from '../PlaygroundState';
 import { scrollStatsText } from '../scrollStats';
 import { createElement, observeSize } from '../shell/dom';
+import { mountInspectorPanel } from '../shell/InspectorPanel';
+import { formatExplanation } from '../../ui/layout';
 
 /**
  * Wires the LayoutPlayground harness to the page: controls, a DOM-box
@@ -27,6 +29,7 @@ export function mountLayoutRoute(host: HTMLElement): () => void {
   let selectedId: string | null = null;
   const canvas = createElement('div', { className: 'pg-canvas' });
   panel.preview.appendChild(canvas);
+  const inspectorPanel = mountInspectorPanel(panel.preview);
   const debugView = new LayoutDebugView(canvas, node => {
     selectedId = node.id;
     refresh();
@@ -63,13 +66,18 @@ export function mountLayoutRoute(host: HTMLElement): () => void {
     }
     if (selectedId === null) {
       panel.updateSelected('Click a box in the preview to inspect it.');
+      inspectorPanel.set(null);
       return;
     }
     const info = playground.inspect().find(entry => entry.node.id === selectedId);
     if (info === undefined) {
       panel.updateSelected('The selected node no longer exists.');
+      inspectorPanel.set(null);
       return;
     }
+    // The engine's own account of the box: the answer to "why is it
+    // this size" comes from explain(), not from reading the record.
+    inspectorPanel.set(formatExplanation(playground.engine.explain(info.node)));
     const record = info.record;
     const box =
       record === undefined
@@ -85,6 +93,7 @@ export function mountLayoutRoute(host: HTMLElement): () => void {
     for (const subscription of subscriptions) {
       subscription.unsubscribe();
     }
+    inspectorPanel.dispose();
     playground.dispose();
     panel.dispose();
   };

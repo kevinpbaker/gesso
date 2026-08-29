@@ -751,6 +751,34 @@ export const UiProperties = {
   }),
 
   // -------------------------------------------------------------------------
+  // Interaction and internal markers
+  // -------------------------------------------------------------------------
+
+  /** False skips the node itself in hit testing; its children still hit. */
+  hitTestable: defineProperty<boolean | undefined>({
+    name: 'hitTestable',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /** Set by LazyColumn/LazyRow on each mounted item wrapper: its index. */
+  virtualIndex: defineProperty<number | undefined>({
+    name: 'virtualIndex',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /** Set by LazyColumn/LazyRow on the scroll container: its UiVirtualWindow. */
+  virtualWindow: defineProperty<unknown | undefined>({
+    name: 'virtualWindow',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  // -------------------------------------------------------------------------
   // Environment provider properties
   // -------------------------------------------------------------------------
 

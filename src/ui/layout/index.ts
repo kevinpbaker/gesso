@@ -11,6 +11,15 @@ export {
   type ScrollbarThumb
 } from './Scrollbars';
 export { LayoutRecord } from './LayoutRecord';
+export { formatExplanation, formatConstraints, describeLength, labelNode } from './LayoutExplanation';
+export type {
+  LayoutExplanation,
+  AxisExplanation,
+  SizeDecision,
+  RelayoutExplanation,
+  LayoutStateExplanation,
+  Edges
+} from './LayoutExplanation';
 export { CharacterCountTextMeasurer, ParagraphTextMeasurer } from './TextMeasurer';
 export type {
   TextMeasurer,

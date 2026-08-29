@@ -29,6 +29,12 @@ export interface PointerControllerOptions {
    * them. Without it scrollbars are display only.
    */
   scrollSink?: ScrollSink;
+  /**
+   * Invoked when the hovered node changes, after the PointerLeave and
+   * PointerEnter events have been dispatched. The layout inspector
+   * follows the pointer through this.
+   */
+  onHoverChange?: (node: UiNode | null) => void;
 }
 
 /** A thumb drag in progress. */
@@ -79,6 +85,7 @@ export class UiPointerController {
   private readonly gestures: GestureInput | null;
   private readonly onPress: ((node: UiNode) => void) | null;
   private readonly scrollSink: ScrollSink | null;
+  private readonly onHoverChange: ((node: UiNode | null) => void) | null;
 
   private hoverNode: UiNode | null = null;
 
@@ -98,6 +105,7 @@ export class UiPointerController {
     this.gestures = options.gestures ?? null;
     this.onPress = options.onPress ?? null;
     this.scrollSink = options.scrollSink ?? null;
+    this.onHoverChange = options.onHoverChange ?? null;
   }
 
   /** The node currently under the pointer, or null over empty space. */
@@ -342,6 +350,7 @@ export class UiPointerController {
         this.dispatchBoundary(UiEventType.PointerEnter, node, x, y, buttons, modifiers);
       }
     }
+    this.onHoverChange?.(next);
   }
 
   /** The node itself followed by its ancestors, innermost first. */

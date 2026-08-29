@@ -7,7 +7,12 @@ import { UiGraph } from '../graph/UiGraph';
 import type { NodeProperty, UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiEventListener, UiInputDispatcher } from '../input/UiInputDispatcher';
-import { propertyEffects } from '../properties/UiPropertyRegistry';
+import {
+  closestPropertyName,
+  findPropertyDefinition,
+  getPropertyNames,
+  propertyEffects
+} from '../properties/UiPropertyRegistry';
 import { eventTypeForProp, isEventProp, knownEventPropNames } from './UiEventProps';
 import type { ComponentResolver } from './ComponentResolver';
 import {
@@ -33,6 +38,20 @@ const KEY_PROP = 'key';
 const REF_PROP = 'ref';
 
 export type UiNodeRef = (node: UiNode | null) => void;
+
+function knownPropertyNames(): string[] {
+  return getPropertyNames();
+}
+
+function describeValueType(value: unknown): string {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'an array';
+  }
+  return typeof value === 'object' ? 'an object' : `a ${typeof value}`;
+}
 
 export interface UiGraphBuilderOptions {
   /**
@@ -465,6 +484,7 @@ export class UiGraphBuilder {
         this.reconcileEventProp(node, property, value as UiEventListener, eventByType, presentEvents);
         continue;
       }
+      this.assertKnownProp(node, property, value);
       present.add(property);
       const existingBinding = bindingByProperty.get(property);
       if (this.isObservable(value)) {
@@ -494,6 +514,32 @@ export class UiGraphBuilder {
         this.graph.unbindEvent(node, binding);
       }
     }
+  }
+
+  /**
+   * Rejects a prop nothing will ever read.
+   *
+   * Every property layout, paint, input or the environment consults is
+   * registered in UiProperties, so a name outside the registry is a
+   * typo (`widht`) or a prop meant for a component rather than an
+   * element. Either would otherwise be stored on the node and silently
+   * ignored; `on*` typos have always thrown, and so does this now.
+   */
+  private assertKnownProp(node: UiNode, property: string, value: unknown): void {
+    if (findPropertyDefinition(property) !== undefined) {
+      return;
+    }
+    if (eventTypeForProp(property) !== undefined) {
+      throw new Error(
+        `Event prop '${property}' on node '${node.id}' must be a function, got ${describeValueType(value)}.`
+      );
+    }
+    const suggestion = closestPropertyName(property, [...knownPropertyNames(), ...knownEventPropNames()]);
+    throw new Error(
+      `Unknown prop '${property}' on node '${node.id}'.` +
+        (suggestion !== undefined ? ` Did you mean '${suggestion}'?` : '') +
+        ` Props must be registered UI properties (width, padding, backgroundColor, …), 'key', 'ref', or on* event handlers.`
+    );
   }
 
   /**

@@ -131,6 +131,9 @@ export class RenderWorkerApp {
       case 'keyUp':
         runtime.input.keyboard.keyUp(message.key, message.modifiers);
         break;
+      case 'inspector':
+        runtime.setInspectorEnabled(message.enabled);
+        break;
       case 'dispose':
         runtime.dispose();
         this.registry?.dispose();
@@ -158,6 +161,9 @@ export class RenderWorkerApp {
       dpr
     });
     this.runtime.deferPatchesFrom(this.registry.replicas);
+    this.runtime.onInspect(text => {
+      this.host.postMessage({ type: 'inspect', text });
+    });
     this.runtime.onFrame(metrics => {
       this.host.postMessage({
         type: 'frame',
