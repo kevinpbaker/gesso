@@ -72,7 +72,8 @@ const NODE_TYPES: Record<CaseNode['type'], UiNodeType> = {
   row: UiNodeType.Row,
   column: UiNodeType.Column,
   box: UiNodeType.Box,
-  text: UiNodeType.Text
+  text: UiNodeType.Text,
+  grid: UiNodeType.Grid
 };
 
 /**

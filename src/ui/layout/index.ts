@@ -35,8 +35,21 @@ export {
   parseCrossAxisAlignment,
   parseMainAxisAlignment
 } from './Alignment';
-export { percent, auto, resolveLength, isAutoLength, isPercentLength } from './UiLength';
-export type { UiLength, PercentLength, AutoLength } from './UiLength';
+export {
+  percent,
+  auto,
+  fr,
+  minmax,
+  repeat,
+  resolveLength,
+  isAutoLength,
+  isPercentLength,
+  isFrLength,
+  isMinMaxTrack
+} from './UiLength';
+export type { UiLength, PercentLength, AutoLength, FrLength, MinMaxTrack, UiTrackSize } from './UiLength';
+export { placeGridItems, sizeGridTracks } from './GridLayout';
+export type { GridItemRequest, GridPlacement, GridTrack, GridContribution } from './GridLayout';
 export { propertyEffects } from '../properties/UiPropertyRegistry';
 export { contentOffset, accumulatedOffsetTo } from './LayoutTransform';
 export type { Transform } from './LayoutTransform';

@@ -26,6 +26,61 @@ export interface AutoLength {
 
 export type UiLength = number | PercentLength | AutoLength;
 
+/** A grid track that takes a share of free space, `fr(1)`. */
+export interface FrLength {
+  readonly unit: 'fr';
+  readonly value: number;
+}
+
+/** A grid track bounded below and above, `minmax(100, fr(1))`. */
+export interface MinMaxTrack {
+  readonly unit: 'minmax';
+  readonly min: number | PercentLength | AutoLength;
+  readonly max: number | PercentLength | AutoLength | FrLength;
+}
+
+/** What a grid's `columns` / `rows` arrays hold. */
+export type UiTrackSize = number | PercentLength | AutoLength | FrLength | MinMaxTrack;
+
+export function fr(value: number): FrLength {
+  if (!(value >= 0) || !Number.isFinite(value)) {
+    throw new Error(`fr(): expected a non-negative finite number, got ${String(value)}.`);
+  }
+  return { unit: 'fr', value };
+}
+
+export function minmax(min: MinMaxTrack['min'], max: MinMaxTrack['max']): MinMaxTrack {
+  return { unit: 'minmax', min, max };
+}
+
+/** `repeat(3, fr(1))` → three `fr(1)` tracks; several sizes repeat as a pattern. */
+export function repeat(count: number, ...sizes: UiTrackSize[]): UiTrackSize[] {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error(`repeat(): expected a non-negative integer count, got ${String(count)}.`);
+  }
+  if (sizes.length === 0) {
+    throw new Error('repeat(): expected at least one track size.');
+  }
+  const tracks: UiTrackSize[] = [];
+  for (let i = 0; i < count; i++) {
+    tracks.push(...sizes);
+  }
+  return tracks;
+}
+
+export function isFrLength(value: unknown): value is FrLength {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as FrLength).unit === 'fr' &&
+    typeof (value as FrLength).value === 'number'
+  );
+}
+
+export function isMinMaxTrack(value: unknown): value is MinMaxTrack {
+  return typeof value === 'object' && value !== null && (value as MinMaxTrack).unit === 'minmax';
+}
+
 export function percent(value: number): PercentLength {
   if (!Number.isFinite(value)) {
     throw new Error(`percent(): expected a finite number, got ${String(value)}.`);

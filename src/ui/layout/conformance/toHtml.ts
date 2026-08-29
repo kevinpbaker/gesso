@@ -1,4 +1,4 @@
-import type { Alignment, CaseLength, CaseNode, LayoutCase } from './cases.ts';
+import type { Alignment, CaseLength, CaseNode, CaseTrack, LayoutCase } from './cases.ts';
 import { TEXT_GLYPH_WIDTH_FACTOR, TEXT_LINE_HEIGHT_FACTOR, DEFAULT_CASE_FONT_SIZE } from './cases.ts';
 
 /**
@@ -208,9 +208,35 @@ function containerStyles(node: CaseNode): string[] {
         `justify-items:${gridAlignment(props.x)}`,
         `align-items:${gridAlignment(props.y)}`
       ];
+    case 'grid':
+      return [
+        'display:grid',
+        ...(props.columns !== undefined ? [`grid-template-columns:${props.columns.map(track).join(' ')}`] : []),
+        ...(props.rows !== undefined ? [`grid-template-rows:${props.rows.map(track).join(' ')}`] : []),
+        ...(props.autoColumns !== undefined ? [`grid-auto-columns:${track(props.autoColumns)}`] : []),
+        ...(props.autoRows !== undefined ? [`grid-auto-rows:${track(props.autoRows)}`] : []),
+        ...(props.autoFlow !== undefined ? [`grid-auto-flow:${props.autoFlow}`] : []),
+        // Items stretch in their cells unless the grid says otherwise.
+        `justify-items:${gridAlignment(props.x ?? 'stretch')}`,
+        `align-items:${gridAlignment(props.y ?? 'stretch')}`,
+        ...(props.justifyContent !== undefined ? [`justify-content:${mainAlignment(props.justifyContent)}`] : []),
+        ...(props.alignContent !== undefined ? [`align-content:${mainAlignment(props.alignContent)}`] : []),
+        ...gapStyles(node)
+      ];
     case 'text':
       return [];
   }
+}
+
+/** A grid track size. */
+function track(value: CaseTrack): string {
+  if (typeof value === 'number' || value.unit === 'percent' || value.unit === 'auto') {
+    return length(value);
+  }
+  if (value.unit === 'fr') {
+    return `${value.value}fr`;
+  }
+  return `minmax(${length(value.min)}, ${value.max !== null && typeof value.max === 'object' && value.max.unit === 'fr' ? `${value.max.value}fr` : length(value.max as CaseLength)})`;
 }
 
 /** Styles a node carries as a child of its parent. */
@@ -219,6 +245,20 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   const styles: string[] = [];
   if (parent !== null && parent.type === 'box' && props.position !== 'absolute') {
     styles.push('grid-area:1/1');
+    if (props.selfX !== undefined) {
+      styles.push(`justify-self:${gridAlignment(props.selfX)}`);
+    }
+    if (props.selfY !== undefined) {
+      styles.push(`align-self:${gridAlignment(props.selfY)}`);
+    }
+  }
+  if (parent !== null && parent.type === 'grid') {
+    if (props.column !== undefined || props.columnSpan !== undefined) {
+      styles.push(`grid-column:${props.column ?? 'auto'} / span ${props.columnSpan ?? 1}`);
+    }
+    if (props.row !== undefined || props.rowSpan !== undefined) {
+      styles.push(`grid-row:${props.row ?? 'auto'} / span ${props.rowSpan ?? 1}`);
+    }
     if (props.selfX !== undefined) {
       styles.push(`justify-self:${gridAlignment(props.selfX)}`);
     }

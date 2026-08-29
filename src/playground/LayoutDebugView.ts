@@ -9,7 +9,8 @@ const TYPE_CLASS: Record<string, string> = {
   [UiNodeType.Box]: 'box',
   [UiNodeType.Text]: 'text',
   [UiNodeType.Button]: 'button',
-  [UiNodeType.ScrollView]: 'scroll'
+  [UiNodeType.ScrollView]: 'scroll',
+  [UiNodeType.Grid]: 'grid'
 };
 
 /**

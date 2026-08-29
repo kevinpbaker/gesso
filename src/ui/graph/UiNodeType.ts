@@ -6,5 +6,6 @@ export enum UiNodeType {
   Text = 'text',
   Button = 'button',
   ScrollView = 'scroll-view',
+  Grid = 'grid',
   Fragment = 'fragment'
 }

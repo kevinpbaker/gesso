@@ -1,6 +1,7 @@
 import { map } from 'rxjs';
 
-import { Box, Button, Column, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
+import { Box, Button, Column, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
+import { auto, fr, repeat } from '../ui/layout';
 import type { UiNode } from '../ui/graph/UiNode';
 import { OverlayStore } from '../framework/overlay/OverlayStore';
 import type { UiElement } from '../ui/composition';
@@ -453,6 +454,97 @@ export class ScrollDemo extends Component {
 }
 
 /**
+ * Grid (roadmap L6): the two layouts every application needs and flex
+ * cannot express without hand-aligned widths — a settings form whose
+ * label column is as wide as its widest label, and a table whose header
+ * and body share one set of tracks — plus a tile board with spans.
+ */
+@Define('grid-demo')
+export class GridDemo extends Component {
+  private static readonly ROWS: readonly [string, string, string, string][] = [
+    ['1042', 'Nightly build', 'passed', '2m 14s'],
+    ['1043', 'Deploy preview for the marketing site redesign', 'running', '48s'],
+    ['1044', 'Lint', 'failed', '9s'],
+    ['1045', 'Unit tests', 'passed', '1m 02s']
+  ];
+
+  private cell(text: string, extra: Record<string, unknown> = {}): UiElement {
+    return Text({ text, fontSize: 13, color: '#d1d5db', padding: 6, ...extra });
+  }
+
+  override render(): UiElement {
+    const statusColor: Record<string, string> = { passed: '#22c55e', running: '#f59e0b', failed: '#ef4444' };
+    return Column(
+      { gap: 8 },
+      Text({
+        text: 'Grid: the label column is auto, the control column 1fr; the table header and body share tracks; tiles span cells.',
+        color: '#9ca3af'
+      }),
+      Row(
+        { gap: 16, y: 'start' },
+        Grid(
+          {
+            width: 300,
+            columns: [auto, fr(1)],
+            gap: 8,
+            y: 'center',
+            padding: 12,
+            backgroundColor: '#111827',
+            borderRadius: 6
+          },
+          Text({ text: 'Name', color: '#e5e7eb', fontSize: 13 }),
+          Box({ height: 28, backgroundColor: '#1f2937', borderRadius: 4 }),
+          Text({ text: 'Email address', color: '#e5e7eb', fontSize: 13 }),
+          Box({ height: 28, backgroundColor: '#1f2937', borderRadius: 4 }),
+          Text({ text: 'Notifications', color: '#e5e7eb', fontSize: 13 }),
+          Row(
+            { gap: 6 },
+            Button({ text: 'Email', fontSize: 12, padding: 6, color: '#d1d5db', backgroundColor: '#1f2937' }),
+            Button({ text: 'Push', fontSize: 12, padding: 6, color: '#d1d5db', backgroundColor: '#1f2937' })
+          ),
+          Button({
+            text: 'Save',
+            column: 2,
+            selfX: 'end',
+            fontSize: 12,
+            padding: 6,
+            color: '#ffffff',
+            backgroundColor: '#3b82f6'
+          })
+        ),
+        Grid(
+          { columns: repeat(3, fr(1)), rows: [40, 40], gap: 6, width: 220 },
+          Box({ columnSpan: 2, rowSpan: 2, backgroundColor: '#3b82f6', borderRadius: 6 }),
+          Box({ backgroundColor: '#f59e0b', borderRadius: 6 }),
+          Box({ backgroundColor: '#22c55e', borderRadius: 6 })
+        )
+      ),
+      Grid(
+        {
+          columns: [auto, fr(1), auto, auto],
+          width: 540,
+          backgroundColor: '#111827',
+          borderRadius: 6,
+          overflow: 'hidden'
+        },
+        ...['Id', 'Job', 'Status', 'Duration'].map(h =>
+          this.cell(h, { color: '#9ca3af', fontWeight: 600, backgroundColor: '#1f2937' })
+        ),
+        ...GridDemo.ROWS.flatMap(([id, job, status, duration], i) => {
+          const backgroundColor = i % 2 === 0 ? '#0f172a' : '#111827';
+          return [
+            this.cell(id, { backgroundColor }),
+            this.cell(job, { backgroundColor }),
+            this.cell(status, { backgroundColor, color: statusColor[status] }),
+            this.cell(duration, { backgroundColor, selfX: 'end' })
+          ];
+        })
+      )
+    );
+  }
+}
+
+/**
  * Virtualization (roadmap L5): a hundred thousand rows, of which only
  * the visible ones plus an overscan band exist as nodes. The status bar
  * shows layout cost staying flat while it scrolls.
@@ -523,6 +615,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(MenuDemo),
       createComponent(ScrollDemo),
       createComponent(LazyListDemo),
+      createComponent(GridDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, x: 'start' }, this.recentTicks())
     );

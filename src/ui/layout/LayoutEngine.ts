@@ -12,6 +12,9 @@ import {
 } from './Alignment';
 import { resolveString } from '../properties/UiPropertyResolver';
 import { resolveLength } from './UiLength';
+import type { UiTrackSize } from './UiLength';
+import { placeGridItems, sizeGridTracks } from './GridLayout';
+import type { GridContribution, GridItemRequest, GridPlacement, GridTrackSizingResult } from './GridLayout';
 import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { LayoutRecord } from './LayoutRecord';
 import { CharacterCountTextMeasurer } from './TextMeasurer';
@@ -469,7 +472,220 @@ export class LayoutEngine {
         node.type === UiNodeType.Row ? FlexDirection.Row : FlexDirection.Column
       );
     }
+    if (node.type === UiNodeType.Grid) {
+      return this.measureGrid(node, rec, content);
+    }
     return this.measureStack(node, rec, content);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Grid
+  // ---------------------------------------------------------------------------
+
+  private measureGrid(node: UiNode, rec: LayoutRecord, content: Constraints): Size {
+    const paddingH = rec.paddingLeft + rec.paddingRight;
+    const paddingV = rec.paddingTop + rec.paddingBottom;
+    const grid = this.layoutGrid(
+      node,
+      content,
+      this.definiteAxis(content, 'width'),
+      this.definiteAxis(content, 'height')
+    );
+    rec.minContentWidth = paddingH + grid.columns.minTotal;
+    const first = grid.placements[0];
+    if (first !== undefined) {
+      const cRec = this.record(first.item);
+      rec.hasBaseline = true;
+      rec.baseline =
+        rec.paddingTop +
+        grid.rows.tracks[first.rowStart].offset +
+        cRec.marginTop +
+        (cRec.hasBaseline ? cRec.baseline : cRec.measuredHeight);
+    }
+    return { width: paddingH + grid.columns.total, height: paddingV + grid.rows.total };
+  }
+
+  private placeGrid(node: UiNode, rec: LayoutRecord): void {
+    const contentX = rec.x + rec.paddingLeft;
+    const contentY = rec.y + rec.paddingTop;
+    const contentWidth = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
+    const contentHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
+    // The box is final: tracks are sized against it, percentages resolve.
+    const content = new Constraints(contentWidth, contentWidth, contentHeight, contentHeight);
+    const grid = this.layoutGrid(node, content, contentWidth, contentHeight);
+    const gridX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Stretch;
+    const gridY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Stretch;
+    const savedBase = this.percentBase;
+    for (const placement of grid.placements) {
+      const child = placement.item;
+      const cRec = this.record(child);
+      const area = this.gridArea(grid, placement);
+      this.percentBase = { width: area.width, height: area.height };
+      this.resolveLayoutProps(child, cRec);
+      const alignX = this.stackAlignment(child, 'selfX', 'width', gridX);
+      const alignY = this.stackAlignment(child, 'selfY', 'height', gridY);
+      const availableWidth = Math.max(0, area.width - cRec.marginLeft - cRec.marginRight);
+      const availableHeight = Math.max(0, area.height - cRec.marginTop - cRec.marginBottom);
+      this.measure(
+        child,
+        new Constraints(
+          alignX === CrossAxisAlignment.Stretch ? availableWidth : 0,
+          availableWidth,
+          alignY === CrossAxisAlignment.Stretch ? availableHeight : 0,
+          availableHeight
+        )
+      );
+      const x = contentX + area.x + cRec.marginLeft + this.stackOffset(alignX, availableWidth, cRec.measuredWidth);
+      const y = contentY + area.y + cRec.marginTop + this.stackOffset(alignY, availableHeight, cRec.measuredHeight);
+      this.assignBox(child, x, y, cRec.measuredWidth, cRec.measuredHeight);
+    }
+    this.percentBase = savedBase;
+  }
+
+  /**
+   * Places the grid's items and sizes both axes' tracks (GridLayout.ts
+   * does the arithmetic). Columns are sized from the items' intrinsic
+   * widths, then rows from the items' heights at their column widths —
+   * the same two-step CSS Grid takes, which is what lets text in a cell
+   * wrap at its column and decide its row's height.
+   */
+  private layoutGrid(
+    node: UiNode,
+    content: Constraints,
+    availableWidth: number | undefined,
+    availableHeight: number | undefined
+  ): { columns: GridTrackSizingResult; rows: GridTrackSizingResult; placements: GridPlacement<UiNode>[] } {
+    const columnsProp = this.trackList(node, 'columns');
+    const rowsProp = this.trackList(node, 'rows');
+    const autoColumns = this.trackSize(node, 'autoColumns');
+    const autoRows = this.trackSize(node, 'autoRows');
+    const flow = node.properties.get('autoFlow') === 'column' ? 'column' : 'row';
+    const gap = this.numberProp(node, 'gap') ?? 0;
+    const columnGap = this.numberProp(node, 'columnGap') ?? gap;
+    const rowGap = this.numberProp(node, 'rowGap') ?? gap;
+    const gridX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Stretch;
+
+    const requests: GridItemRequest<UiNode>[] = [];
+    this.forEachLayoutChild(node, child => {
+      requests.push({
+        item: child,
+        column: this.lineProp(child, 'column'),
+        row: this.lineProp(child, 'row'),
+        columnSpan: Math.max(1, Math.floor(this.numberProp(child, 'columnSpan') ?? 1)),
+        rowSpan: Math.max(1, Math.floor(this.numberProp(child, 'rowSpan') ?? 1))
+      });
+    });
+    const placed = placeGridItems(requests, columnsProp.length, rowsProp.length, flow);
+    const columnSizes = this.fillTracks(columnsProp, placed.columnCount, autoColumns);
+    const rowSizes = this.fillTracks(rowsProp, placed.rowCount, autoRows);
+
+    const savedBase = this.percentBase;
+    this.percentBase = { width: availableWidth, height: availableHeight };
+
+    // Columns: from each item's min- and max-content width.
+    const columnItems = placed.placements.map(placement => {
+      const cRec = this.record(placement.item);
+      this.resolveLayoutProps(placement.item, cRec);
+      this.measure(placement.item, new Constraints(0, Infinity, 0, Infinity));
+      const marginH = cRec.marginLeft + cRec.marginRight;
+      const contribution: GridContribution = {
+        min: this.minContentContribution(placement.item, cRec) + marginH,
+        max: cRec.measuredWidth + marginH
+      };
+      return { start: placement.columnStart, end: placement.columnEnd, contribution };
+    });
+    const columns = sizeGridTracks({
+      sizes: columnSizes,
+      available: availableWidth,
+      gap: columnGap,
+      distribution: parseAlignContent(node.properties.get('justifyContent')),
+      items: columnItems
+    });
+
+    // Rows: from each item's height at the width its column area gives it.
+    const rowItems = placed.placements.map(placement => {
+      const cRec = this.record(placement.item);
+      const areaWidth = this.spanExtent(columns, placement.columnStart, placement.columnEnd, columnGap);
+      const alignX = this.stackAlignment(placement.item, 'selfX', 'width', gridX);
+      const marginH = cRec.marginLeft + cRec.marginRight;
+      const width = Math.max(0, areaWidth - marginH);
+      this.percentBase = { width: areaWidth, height: availableHeight };
+      this.measure(
+        placement.item,
+        new Constraints(alignX === CrossAxisAlignment.Stretch ? width : 0, width, 0, Infinity)
+      );
+      const height = cRec.measuredHeight + cRec.marginTop + cRec.marginBottom;
+      return { start: placement.rowStart, end: placement.rowEnd, contribution: { min: height, max: height } };
+    });
+    const rows = sizeGridTracks({
+      sizes: rowSizes,
+      available: availableHeight,
+      gap: rowGap,
+      distribution: parseAlignContent(node.properties.get('alignContent')),
+      items: rowItems
+    });
+    this.percentBase = savedBase;
+    void content;
+    return { columns, rows, placements: placed.placements };
+  }
+
+  private gridArea(
+    grid: { columns: GridTrackSizingResult; rows: GridTrackSizingResult },
+    placement: GridPlacement<UiNode>
+  ): LayoutBox {
+    const x = grid.columns.tracks[placement.columnStart].offset;
+    const y = grid.rows.tracks[placement.rowStart].offset;
+    const lastColumn = grid.columns.tracks[placement.columnEnd - 1];
+    const lastRow = grid.rows.tracks[placement.rowEnd - 1];
+    return { x, y, width: lastColumn.offset + lastColumn.size - x, height: lastRow.offset + lastRow.size - y };
+  }
+
+  private spanExtent(result: GridTrackSizingResult, start: number, end: number, gap: number): number {
+    if (end <= start || result.tracks.length === 0) {
+      return 0;
+    }
+    const first = result.tracks[Math.min(start, result.tracks.length - 1)];
+    const last = result.tracks[Math.min(end - 1, result.tracks.length - 1)];
+    void gap;
+    return last.offset + last.size - first.offset;
+  }
+
+  private fillTracks(explicit: readonly UiTrackSize[], count: number, implicit: UiTrackSize): UiTrackSize[] {
+    const sizes = [...explicit];
+    while (sizes.length < count) {
+      sizes.push(implicit);
+    }
+    return sizes;
+  }
+
+  private trackList(node: UiNode, property: string): readonly UiTrackSize[] {
+    const value = node.properties.get(property);
+    if (value === undefined || value === null) {
+      return [];
+    }
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `Property '${property}' must be an array of track sizes (numbers, percent(), auto, fr(), minmax()).`
+      );
+    }
+    return value as UiTrackSize[];
+  }
+
+  private trackSize(node: UiNode, property: string): UiTrackSize {
+    const value = node.properties.get(property);
+    return value === undefined || value === null ? { unit: 'auto' } : (value as UiTrackSize);
+  }
+
+  /** A 1-based grid line, or undefined for auto placement. */
+  private lineProp(node: UiNode, property: string): number | undefined {
+    const value = this.numberProp(node, property);
+    if (value === undefined) {
+      return undefined;
+    }
+    if (!Number.isInteger(value) || value < 1) {
+      throw new Error(`Property '${property}' must be a positive integer grid line, got ${String(value)}.`);
+    }
+    return value;
   }
 
   /** Constraints for a container's content box: the border box less padding. */
@@ -1116,6 +1332,8 @@ export class LayoutEngine {
       this.placeFlex(node, rec, node.type === UiNodeType.Row ? FlexDirection.Row : FlexDirection.Column);
     } else if (node.type === UiNodeType.ScrollView) {
       this.placeFlex(node, rec, this.scrollDirection(node));
+    } else if (node.type === UiNodeType.Grid) {
+      this.placeGrid(node, rec);
     } else {
       this.placeStack(node, rec);
     }

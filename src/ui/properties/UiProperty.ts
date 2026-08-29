@@ -13,7 +13,7 @@ import { transformsEqual } from './UiTransform';
 import type { UiTextStyle } from './UiTextStyle';
 import { defaultTextStyle } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
-import type { UiLength } from '../layout/UiLength';
+import type { UiLength, UiTrackSize } from '../layout/UiLength';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 
 const L = DirtyFlags.Layout;
@@ -185,6 +185,90 @@ export const UiProperties = {
    */
   alignContent: defineProperty<string | undefined>({
     name: 'alignContent',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  // -------------------------------------------------------------------------
+  // Grid
+  // -------------------------------------------------------------------------
+
+  /** Explicit column tracks: numbers, percent(), auto, fr(), minmax(). */
+  columns: defineProperty<readonly UiTrackSize[] | undefined>({
+    name: 'columns',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Explicit row tracks. Rows beyond them are implicit, sized by autoRows. */
+  rows: defineProperty<readonly UiTrackSize[] | undefined>({
+    name: 'rows',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Size of implicit columns (default auto). */
+  autoColumns: defineProperty<UiTrackSize | undefined>({
+    name: 'autoColumns',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Size of implicit rows (default auto). */
+  autoRows: defineProperty<UiTrackSize | undefined>({
+    name: 'autoRows',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** 'row' (default) fills rows left to right; 'column' fills columns top to bottom. */
+  autoFlow: defineProperty<string | undefined>({
+    name: 'autoFlow',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Distribution of a grid's columns across spare width: 'stretch' (default), 'start', 'center', 'end', 'space-*'. */
+  justifyContent: defineProperty<string | undefined>({
+    name: 'justifyContent',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** 1-based column line a grid item starts at. */
+  column: defineProperty<number | undefined>({
+    name: 'column',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Columns a grid item spans (default 1). */
+  columnSpan: defineProperty<number | undefined>({
+    name: 'columnSpan',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** 1-based row line a grid item starts at. */
+  row: defineProperty<number | undefined>({
+    name: 'row',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Rows a grid item spans (default 1). */
+  rowSpan: defineProperty<number | undefined>({
+    name: 'rowSpan',
     defaultValue: undefined,
     inherited: false,
     affects: L

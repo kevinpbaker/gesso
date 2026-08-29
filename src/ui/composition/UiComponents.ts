@@ -45,6 +45,19 @@ export function Stack(props: UiProps = {}, ...children: UiChild[]): UiElement {
 }
 
 /**
+ * Creates a Grid element.
+ *
+ * Children fill cells of the tracks in `columns` / `rows` (numbers,
+ * `percent()`, `auto`, `fr()`, `minmax()`), by `autoFlow` order or by
+ * explicit `column` / `row` (1-based lines) and `columnSpan` / `rowSpan`.
+ * `x` / `y` align items in their cells (stretch by default),
+ * `justifyContent` / `alignContent` distribute the tracks.
+ */
+export function Grid(props: UiProps = {}, ...children: UiChild[]): UiElement {
+  return createElement(UiNodeType.Grid, props, children);
+}
+
+/**
  * Creates a Row element.
  *
  * Accepts either children only or props followed by children.

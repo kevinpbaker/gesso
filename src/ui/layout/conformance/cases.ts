@@ -20,7 +20,7 @@
  * what roadmap item L3 removes.
  */
 
-export type CaseNodeType = 'row' | 'column' | 'box' | 'text';
+export type CaseNodeType = 'row' | 'column' | 'box' | 'text' | 'grid';
 
 export type Alignment =
   | 'start'
@@ -42,6 +42,27 @@ export function pct(value: number): CaseLength {
 }
 
 export const autoLength: CaseLength = { unit: 'auto' };
+
+/** Same shape as the runtime's UiTrackSize. */
+export type CaseTrack =
+  | CaseLength
+  | { readonly unit: 'fr'; readonly value: number }
+  | {
+      readonly unit: 'minmax';
+      readonly min: CaseLength;
+      readonly max: CaseLength | { readonly unit: 'fr'; readonly value: number };
+    };
+
+export function frTrack(value: number): CaseTrack {
+  return { unit: 'fr', value };
+}
+
+export function minmaxTrack(
+  min: CaseLength,
+  max: CaseLength | { readonly unit: 'fr'; readonly value: number }
+): CaseTrack {
+  return { unit: 'minmax', min, max };
+}
 export type TextOverflow = 'clip' | 'ellipsis';
 
 /**
@@ -101,6 +122,16 @@ export interface CaseProps {
   left?: CaseLength;
   inset?: CaseLength;
   zIndex?: number;
+  columns?: readonly CaseTrack[];
+  rows?: readonly CaseTrack[];
+  autoColumns?: CaseTrack;
+  autoRows?: CaseTrack;
+  autoFlow?: 'row' | 'column';
+  justifyContent?: Alignment;
+  column?: number;
+  columnSpan?: number;
+  row?: number;
+  rowSpan?: number;
   text?: string;
   fontSize?: number;
   lineHeight?: number;
@@ -149,6 +180,10 @@ export function column(props: CaseProps = {}, ...children: CaseNode[]): CaseNode
 
 export function box(props: CaseProps = {}, ...children: CaseNode[]): CaseNode {
   return { type: 'box', props, children };
+}
+
+export function grid(props: CaseProps = {}, ...children: CaseNode[]): CaseNode {
+  return { type: 'grid', props, children };
 }
 
 /**
@@ -924,6 +959,209 @@ export const layoutCases: readonly LayoutCase[] = [
     row(
       { x: 'center', y: 'center' },
       column({ x: 'center', y: 'center', width: 120, height: 80 }, leaf(30, 10), leaf(50, 10))
+    )
+  ),
+
+  // ---------------------------------------------------------------------------
+  // Grid (L6). A column around the grid keeps its height content-sized,
+  // as it would be on a page; its width fills the 300px viewport.
+  // ---------------------------------------------------------------------------
+  testCase('grid/fixed-tracks', column({}, grid({ columns: [50, 100], rows: [20, 30] }, box(), box(), box(), box()))),
+  testCase(
+    'grid/gaps',
+    column({}, grid({ columns: [50, 50], rows: [20, 20], gap: 10, rowGap: 4 }, box(), box(), box(), box()))
+  ),
+  testCase(
+    'grid/fr-shares-free-space',
+    column({}, grid({ columns: [100, frTrack(1), frTrack(3)] }, leaf(10, 20), leaf(10, 20), leaf(10, 20)))
+  ),
+  testCase(
+    'grid/fr-keeps-min-content',
+    column({}, grid({ width: 200, columns: [frTrack(1), frTrack(1)] }, text('aaaaaaaaaaaaaaaaaaaa'), leaf(10, 10)))
+  ),
+  testCase(
+    'grid/auto-column-takes-widest',
+    column(
+      {},
+      grid({ columns: [autoLength, frTrack(1)] }, text('Name'), leaf(10, 24), text('Email address'), leaf(10, 24))
+    )
+  ),
+  testCase(
+    'grid/percent-tracks',
+    column({}, grid({ width: 200, columns: [pct(25), pct(50)], rows: [20] }, box(), box()))
+  ),
+  testCase(
+    'grid/minmax-maximises-before-fr',
+    column(
+      {},
+      grid({ columns: [pct(25), minmaxTrack(50, 80), frTrack(1), frTrack(3)], rows: [30] }, box(), box(), box(), box())
+    )
+  ),
+  testCase(
+    'grid/minmax-auto-max',
+    column(
+      {},
+      grid(
+        { columns: [minmaxTrack(20, autoLength), 40], rows: [20], justifyContent: 'start' },
+        text('abcdefghij'),
+        box()
+      )
+    )
+  ),
+  testCase(
+    'grid/implicit-rows',
+    column({}, grid({ columns: [50, 50], autoRows: 30 }, box(), box(), box(), box(), box()))
+  ),
+  testCase(
+    'grid/auto-flow-column',
+    column(
+      {},
+      grid(
+        { rows: [20, 20], autoColumns: 40, autoFlow: 'column', justifyContent: 'start' },
+        box(),
+        box(),
+        box(),
+        box(),
+        box()
+      )
+    )
+  ),
+  testCase(
+    'grid/explicit-placement-and-span',
+    column(
+      {},
+      grid(
+        { columns: [50, 50, 50], rows: [20, 20], justifyContent: 'start' },
+        box({ column: 1, row: 1, columnSpan: 2 }),
+        box(),
+        box(),
+        box()
+      )
+    )
+  ),
+  testCase(
+    'grid/row-span',
+    column(
+      {},
+      grid(
+        { columns: [50, 50], rows: [20, 20, 20], justifyContent: 'start' },
+        box({ column: 1, row: 1, rowSpan: 2 }),
+        box(),
+        box(),
+        box(),
+        box()
+      )
+    )
+  ),
+  testCase(
+    'grid/locked-row',
+    column(
+      {},
+      grid({ columns: [50, 50], rows: [20, 20], justifyContent: 'start' }, box({ row: 2 }), box(), box(), box())
+    )
+  ),
+  testCase(
+    'grid/span-wraps-to-next-row',
+    column({}, grid({ columns: [50, 50], autoRows: 20, justifyContent: 'start' }, box(), box({ columnSpan: 2 }), box()))
+  ),
+  testCase(
+    'grid/items-align-in-cells',
+    column(
+      {},
+      grid(
+        { width: 200, height: 100, columns: [50, 50], rows: [40], x: 'center', y: 'end', alignContent: 'start' },
+        leaf(20, 10),
+        leaf(20, 10, { selfX: 'start', selfY: 'start' }),
+        leaf(20, 10, { selfX: 'end', selfY: 'center' })
+      )
+    )
+  ),
+  testCase(
+    'grid/distribute-space-between-and-end',
+    column(
+      {},
+      grid(
+        {
+          width: 200,
+          height: 100,
+          columns: [50, 50],
+          rows: [40],
+          justifyContent: 'space-between',
+          alignContent: 'end'
+        },
+        box(),
+        box()
+      )
+    )
+  ),
+  testCase(
+    'grid/distribute-center',
+    column(
+      {},
+      grid(
+        { width: 200, height: 100, columns: [50, 50], rows: [40], justifyContent: 'center', alignContent: 'center' },
+        box(),
+        box()
+      )
+    )
+  ),
+  testCase(
+    'grid/stretch-auto-tracks',
+    column({}, grid({ columns: [autoLength, autoLength], rows: [20] }, leaf(10, 10), leaf(30, 10)))
+  ),
+  testCase(
+    'grid/margins-and-padding',
+    column({}, grid({ columns: [100], rows: [50], padding: 5 }, box({ margin: 4 })))
+  ),
+  testCase(
+    'grid/shrink-wraps-in-a-row',
+    row({ x: 'start', y: 'start' }, grid({ columns: [autoLength, frTrack(1)], gap: 6 }, text('label'), leaf(40, 10)))
+  ),
+  testCase(
+    'grid/fills-definite-height',
+    grid(
+      { columns: [50, frTrack(1)], rows: [autoLength, autoLength] },
+      leaf(10, 10),
+      leaf(10, 10),
+      leaf(10, 20),
+      leaf(10, 10)
+    )
+  ),
+  ahem(
+    'grid/text-wraps-at-its-column',
+    column({}, grid({ columns: [60, 60], justifyContent: 'start' }, paragraph('aaaa bbbb cccc dddd'), box()))
+  ),
+  ahem(
+    'grid/settings-page',
+    column(
+      {},
+      grid(
+        { columns: [autoLength, frTrack(1)], gap: 8, y: 'center' },
+        paragraph('Name'),
+        leaf(10, 24),
+        paragraph('Email address'),
+        leaf(10, 24),
+        paragraph('Notifications'),
+        leaf(10, 40)
+      )
+    )
+  ),
+  ahem(
+    'grid/table-header-and-body',
+    column(
+      {},
+      grid(
+        { columns: [autoLength, frTrack(1), autoLength], gap: 4 },
+        paragraph('Id'),
+        paragraph('Name'),
+        paragraph('Status'),
+        paragraph('1234'),
+        paragraph('A long name that wraps inside its cell'),
+        paragraph('ok'),
+        paragraph('5'),
+        paragraph('B'),
+        paragraph('failed')
+      )
     )
   )
 ];
