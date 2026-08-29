@@ -670,6 +670,11 @@ function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
   return (
     <scrollview
       width={306}
+      // The rail keeps the width it asks for. Without this it is a
+      // flex item like any other, and the board's longest unbreakable
+      // token — the source path in its footer — pushes hard enough to
+      // shrink the rail and clip its own labels.
+      flexShrink={0}
       padding={22}
       gap={22}
       backgroundColor={PANEL}
