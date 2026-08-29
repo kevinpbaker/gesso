@@ -164,7 +164,9 @@ describe('NodalRuntime editing', () => {
   });
 
   it('moves the caret through typed spaces, including trailing ones', () => {
-    const { runtime, press, type, tick, states } = mount(Column({ x: 'start' }, EditableText({ value: '', width: 200 })));
+    const { runtime, press, type, tick, states } = mount(
+      Column({ x: 'start' }, EditableText({ value: '', width: 200 }))
+    );
     press(0, 5);
     type('a');
     tick();
