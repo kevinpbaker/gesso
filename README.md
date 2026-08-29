@@ -66,7 +66,12 @@ pnpm format
 
 # Check formatting
 pnpm format:check
+
+# Regenerate the layout conformance fixtures from headless Chrome
+pnpm fixtures:layout
 ```
+
+Layout is checked against Chrome: `src/ui/layout/conformance/` holds cases written in Nodal's vocabulary, the boxes Chrome produces for them, and a spec asserting `LayoutEngine` agrees. See [`docs/decisions/0004-layout-conformance.md`](docs/decisions/0004-layout-conformance.md).
 
 ## Architecture overview
 
@@ -113,17 +118,18 @@ See [`docs/decisions/0002-complexity.md`](docs/decisions/0002-complexity.md) and
 
 ## Scripts
 
-| Script         | Command             |
-| -------------- | ------------------- |
-| `dev`          | `vite`              |
-| `build`        | `tsc && vite build` |
-| `preview`      | `vite preview`      |
-| `test`         | `vitest`            |
-| `test:run`     | `vitest run`        |
-| `lint`         | `oxlint`            |
-| `lint:fix`     | `oxlint --fix`      |
-| `format`       | `oxfmt`             |
-| `format:check` | `oxfmt --check`     |
+| Script            | Command                               |
+| ----------------- | ------------------------------------- |
+| `dev`             | `vite`                                |
+| `build`           | `tsc && vite build`                   |
+| `preview`         | `vite preview`                        |
+| `test`            | `vitest`                              |
+| `test:run`        | `vitest run`                          |
+| `lint`            | `oxlint`                              |
+| `lint:fix`        | `oxlint --fix`                        |
+| `format`          | `oxfmt`                               |
+| `format:check`    | `oxfmt --check`                       |
+| `fixtures:layout` | `node scripts/gen-layout-fixtures.ts` |
 
 ## License
 

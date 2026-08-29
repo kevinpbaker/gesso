@@ -12,7 +12,8 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "fixtures:layout": "node scripts/gen-layout-fixtures.ts"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",
