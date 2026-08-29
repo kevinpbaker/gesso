@@ -199,7 +199,7 @@ function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
           </text>
         </button>
       </row>
-      <scrollview gap={4} flexGrow={1}>
+      <scrollview gap={4} flex={1}>
         {rows}
       </scrollview>
     </column>
@@ -237,8 +237,14 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
       return `Edited ${when} · ${words} word${words === 1 ? '' : 's'} · ${v.selected.body.length} characters`;
     })
   );
+  // `flex={1}` rather than `flexGrow={1}` here and on the title, as in
+  // CSS `flex: 1`: it sets the flex basis to 0, so the editor takes the
+  // width the row has left over. With the default content basis the
+  // editor's base is the note's max-content width — one long line makes
+  // it wider than the row, and the sidebar, shrinkable like any flex
+  // item, gives up width with every character typed.
   return (
-    <column flexGrow={1} padding={32} gap={16}>
+    <column flex={1} padding={32} gap={16}>
       <row x="space-between" y="center" gap={16}>
         <editabletext
           value={title}
@@ -248,7 +254,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
           fontSize={24}
           fontWeight={600}
           textWrap="none"
-          flexGrow={1}
+          flex={1}
           padding={6}
           borderRadius={6}
         />
@@ -296,13 +302,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
       <text color={FAINT} fontSize={12} paddingLeft={6}>
         {meta}
       </text>
-      <scrollview
-        flexGrow={1}
-        backgroundColor={CARD}
-        borderColor={BORDER}
-        borderWidth={1}
-        borderRadius={12}
-        padding={20}>
+      <scrollview flex={1} backgroundColor={CARD} borderColor={BORDER} borderWidth={1} borderRadius={12} padding={20}>
         <editabletext
           value={body}
           multiline
@@ -324,7 +324,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
 
 function EmptyState() {
   return (
-    <column flexGrow={1} x="center" y="center" gap={12}>
+    <column flex={1} x="center" y="center" gap={12}>
       <text color={MUTED} fontSize={15}>
         No notes. Create one to start writing.
       </text>
