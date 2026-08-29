@@ -24,6 +24,7 @@ import {
 } from './UiElement';
 import type { UiNodeRef } from './UiElementProps';
 import type { UiProps } from './UiProps';
+import { UiModifierSet, assertModifierList } from '../modifiers/UiModifierSet';
 
 /**
  * Property reserved for reconciliation identity.
@@ -37,6 +38,12 @@ const KEY_PROP = 'key';
  * to `anchor`, or to focus imperatively.
  */
 const REF_PROP = 'ref';
+/**
+ * `modifiers` attaches behaviour to an element without wrapping it.
+ * Reconciled like children — matched by kind and slot — and detached
+ * with the node. See `src/ui/modifiers`.
+ */
+const MODIFIERS_PROP = 'modifiers';
 
 export type { UiNodeRef } from './UiElementProps';
 
@@ -94,6 +101,7 @@ export interface UiGraphBuilderOptions {
  */
 export class UiGraphBuilder {
   private readonly refs = new Map<UiNode, UiNodeRef>();
+  private readonly modifiers = new Map<UiNode, UiModifierSet>();
   private nextChildrenBindingId = 0;
 
   /**
@@ -321,6 +329,15 @@ export class UiGraphBuilder {
           `Construct the builder with { components } to mount components.`
       );
     }
+    if ((element.props as Record<string, unknown>)[MODIFIERS_PROP] !== undefined) {
+      // A component's root may be a fragment or an observable, so
+      // "the host node" a modifier would attach to is not well
+      // defined. Put them on an element inside the component instead.
+      throw new Error(
+        `Component '${element.tag}' cannot take 'modifiers': a component has no single host node. ` +
+          `Attach them to an element the component renders.`
+      );
+    }
 
     const anchorId = this.createComponentAnchorId(parent, element, index);
     let anchor = this.graph.getNode(anchorId);
@@ -367,6 +384,13 @@ export class UiGraphBuilder {
       if (ref !== undefined) {
         this.refs.delete(current);
         ref(null);
+      }
+      // Before graph.removeNode, so a modifier's teardown still sees an
+      // intact node and its bindings.
+      const modifiers = this.modifiers.get(current);
+      if (modifiers !== undefined) {
+        this.modifiers.delete(current);
+        modifiers.detach();
       }
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
@@ -469,6 +493,7 @@ export class UiGraphBuilder {
   private reconcileProps(node: UiNode, props: UiProps): void {
     const present = new Set<string>();
     const presentEvents = new Set<string>();
+    let declaredModifiers: unknown;
 
     for (const [property, value] of Object.entries(props)) {
       if (property === KEY_PROP) {
@@ -476,6 +501,10 @@ export class UiGraphBuilder {
       }
       if (property === REF_PROP) {
         this.reconcileRef(node, value);
+        continue;
+      }
+      if (property === MODIFIERS_PROP) {
+        declaredModifiers = value;
         continue;
       }
       if (isEventProp(property, value)) {
@@ -519,6 +548,38 @@ export class UiGraphBuilder {
         this.graph.unbindEvent(node, binding);
       }
     }
+
+    this.reconcileModifiers(node, declaredModifiers);
+  }
+
+  /**
+   * Attaches, updates and detaches the node's modifiers.
+   *
+   * Called once the declared props are written and before the
+   * children are reconciled, so a modifier sees the element's own
+   * values first. An element that stops declaring `modifiers` gets an
+   * empty list, which detaches everything it had.
+   */
+  private reconcileModifiers(node: UiNode, declared: unknown): void {
+    const existing = this.modifiers.get(node);
+    if (declared === undefined) {
+      if (existing !== undefined) {
+        existing.detach();
+        this.modifiers.delete(node);
+      }
+      return;
+    }
+    const list = assertModifierList(node, declared);
+    const set = existing ?? new UiModifierSet(node, this.graph);
+    if (existing === undefined) {
+      this.modifiers.set(node, set);
+    }
+    set.reconcile(list);
+  }
+
+  /** The modifiers attached to a node, for the inspector and for tests. */
+  modifiersFor(node: UiNode): UiModifierSet | undefined {
+    return this.modifiers.get(node);
   }
 
   /**

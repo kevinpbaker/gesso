@@ -1,4 +1,5 @@
 import type { Observable } from 'rxjs';
+import type { UiModifier } from '../modifiers/UiModifier';
 
 import type { UiNode } from '../graph/UiNode';
 import type {
@@ -147,6 +148,16 @@ export type SemanticsProps = PropsOf<
 /** Environment values an element provides to its subtree. */
 export type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor'>;
 
+/**
+ * Behaviour attached to an element without wrapping it: hover and
+ * press state, a focus ring, a tooltip, drag. See `src/ui/modifiers`.
+ * The list is static per element — a modifier's own arguments may be
+ * Observables, as props are.
+ */
+export type ModifierProps = {
+  modifiers?: readonly UiModifier[];
+};
+
 /** Props every element accepts. */
 export type CommonProps = IdentityProps &
   UiEventProps &
@@ -158,6 +169,7 @@ export type CommonProps = IdentityProps &
   TypographyProps &
   InteractionProps &
   SemanticsProps &
+  ModifierProps &
   EnvironmentProps;
 
 /** Props of an element that has children. */
