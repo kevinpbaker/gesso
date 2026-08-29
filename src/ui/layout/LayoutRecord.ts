@@ -44,7 +44,22 @@ export class LayoutRecord {
 
   flexGrow = 0;
   flexShrink = 1;
-  flexBasis: number | undefined = undefined;
+  /** `flex: n` shorthand without an explicit flexBasis: basis is 0. */
+  flexBasisZero = false;
+
+  /**
+   * True when the minimum on that axis is `auto` (unset): as a flex item
+   * the node then has CSS's automatic minimum, its min-content size.
+   */
+  minWidthAuto = true;
+  minHeightAuto = true;
+
+  marginLeftAuto = false;
+  marginRightAuto = false;
+  marginTopAuto = false;
+  marginBottomAuto = false;
+
+  aspectRatio: number | undefined = undefined;
 
   /**
    * Distance from the box top to the first alphabetic baseline, when
@@ -56,9 +71,15 @@ export class LayoutRecord {
   hasBaseline = false;
   baseline = 0;
 
-  /** Intrinsic widths of a text node under its wrap mode. */
+  /**
+   * Intrinsic sizes. `minContentWidth` is the narrowest the content can
+   * be (a text's longest word, a row's summed items); `intrinsicHeight`
+   * is the content's height before explicit or parent sizes. Flex uses
+   * both for the automatic minimum size of items.
+   */
   minContentWidth = 0;
   maxContentWidth = 0;
+  intrinsicHeight = 0;
 
   /**
    * Positioning. An absolute node is out of flow: it neither takes

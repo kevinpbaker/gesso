@@ -108,8 +108,9 @@ describe('LayoutEngine flex (Row/Column)', () => {
       b.setProperty('height', 30);
       harness.append(root, a, b);
       harness.layout(root, Constraints.loose(300, 200));
-      expect(harness.box(a)).toEqual({ x: 10, y: 10, width: 0, height: 20 });
-      expect(harness.box(b)).toEqual({ x: 10, y: 30, width: 0, height: 30 });
+      // Children without a width stretch across the padded content box.
+      expect(harness.box(a)).toEqual({ x: 10, y: 10, width: 280, height: 20 });
+      expect(harness.box(b)).toEqual({ x: 10, y: 30, width: 280, height: 30 });
     });
   });
 

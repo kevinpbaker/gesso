@@ -60,7 +60,7 @@ describe('LayoutEngine invalidation', () => {
   describe('build and measure', () => {
     it('lays out the initial build', () => {
       const h = createHarness();
-      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      h.root = h.builder.build(Column({ x: 'start' }, Text({ text: 'Hello', fontSize: 10 })));
       firstFrame(h);
       const text = h.root.firstChild!;
       expect(h.engine.recordFor(text)!.measuredWidth).toBe(30);
@@ -71,7 +71,7 @@ describe('LayoutEngine invalidation', () => {
   describe('property invalidation', () => {
     it('re-measures a text node when its content changes', () => {
       const h = createHarness();
-      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      h.root = h.builder.build(Column({ x: 'start' }, Text({ text: 'Hello', fontSize: 10 })));
       firstFrame(h);
       const text = h.root.firstChild!;
       expect(h.engine.recordFor(text)!.measuredWidth).toBe(30);
@@ -83,7 +83,7 @@ describe('LayoutEngine invalidation', () => {
 
     it('re-measures when a layout property changes', () => {
       const h = createHarness();
-      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      h.root = h.builder.build(Column({ x: 'start' }, Text({ text: 'Hello', fontSize: 10 })));
       firstFrame(h);
       const root = h.root;
       expect(h.engine.recordFor(root)!.measuredWidth).toBe(30);
@@ -118,7 +118,7 @@ describe('LayoutEngine invalidation', () => {
 
     it('clears dirty state after the frame', () => {
       const h = createHarness();
-      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10 })));
+      h.root = h.builder.build(Column({ x: 'start' }, Text({ text: 'Hello', fontSize: 10 })));
       const text = h.root.firstChild!;
       firstFrame(h);
       expect(text.isDirty()).toBe(false);

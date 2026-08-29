@@ -13,6 +13,7 @@ import { transformsEqual } from './UiTransform';
 import type { UiTextStyle } from './UiTextStyle';
 import { defaultTextStyle } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
+import type { UiLength } from '../layout/UiLength';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 
 const L = DirtyFlags.Layout;
@@ -26,42 +27,42 @@ const E = DirtyFlags.Environment;
 // ---------------------------------------------------------------------------
 
 export const UiProperties = {
-  width: defineProperty<number | undefined>({
+  width: defineProperty<UiLength | undefined>({
     name: 'width',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  height: defineProperty<number | undefined>({
+  height: defineProperty<UiLength | undefined>({
     name: 'height',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  minWidth: defineProperty<number | undefined>({
+  minWidth: defineProperty<UiLength | undefined>({
     name: 'minWidth',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  maxWidth: defineProperty<number | undefined>({
+  maxWidth: defineProperty<UiLength | undefined>({
     name: 'maxWidth',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  minHeight: defineProperty<number | undefined>({
+  minHeight: defineProperty<UiLength | undefined>({
     name: 'minHeight',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  maxHeight: defineProperty<number | undefined>({
+  maxHeight: defineProperty<UiLength | undefined>({
     name: 'maxHeight',
     defaultValue: undefined,
     inherited: false,
@@ -103,35 +104,35 @@ export const UiProperties = {
     affects: L
   }),
 
-  margin: defineProperty<number | undefined>({
+  margin: defineProperty<UiLength | undefined>({
     name: 'margin',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  marginTop: defineProperty<number | undefined>({
+  marginTop: defineProperty<UiLength | undefined>({
     name: 'marginTop',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  marginRight: defineProperty<number | undefined>({
+  marginRight: defineProperty<UiLength | undefined>({
     name: 'marginRight',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  marginBottom: defineProperty<number | undefined>({
+  marginBottom: defineProperty<UiLength | undefined>({
     name: 'marginBottom',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  marginLeft: defineProperty<number | undefined>({
+  marginLeft: defineProperty<UiLength | undefined>({
     name: 'marginLeft',
     defaultValue: undefined,
     inherited: false,
@@ -140,6 +141,58 @@ export const UiProperties = {
 
   gap: defineProperty<number | undefined>({
     name: 'gap',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Gap between rows (lines of a wrapping row, items of a column). */
+  rowGap: defineProperty<number | undefined>({
+    name: 'rowGap',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Gap between columns (items of a row, lines of a wrapping column). */
+  columnGap: defineProperty<number | undefined>({
+    name: 'columnGap',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** `flex: n` — grow n, shrink 1, basis 0, as in CSS. */
+  flex: defineProperty<number | undefined>({
+    name: 'flex',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** 'nowrap' (default), 'wrap' or 'wrap-reverse'. */
+  flexWrap: defineProperty<string | undefined>({
+    name: 'flexWrap',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /**
+   * How a wrapping container distributes its lines along the cross
+   * axis: 'stretch' (default), 'start', 'center', 'end',
+   * 'space-between', 'space-around', 'space-evenly'.
+   */
+  alignContent: defineProperty<string | undefined>({
+    name: 'alignContent',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Width divided by height; the decided axis drives the other. */
+  aspectRatio: defineProperty<number | undefined>({
+    name: 'aspectRatio',
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -159,7 +212,7 @@ export const UiProperties = {
     affects: L
   }),
 
-  flexBasis: defineProperty<number | undefined>({
+  flexBasis: defineProperty<UiLength | undefined>({
     name: 'flexBasis',
     defaultValue: undefined,
     inherited: false,
@@ -227,28 +280,28 @@ export const UiProperties = {
     affects: L
   }),
 
-  top: defineProperty<number | undefined>({
+  top: defineProperty<UiLength | undefined>({
     name: 'top',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  right: defineProperty<number | undefined>({
+  right: defineProperty<UiLength | undefined>({
     name: 'right',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  bottom: defineProperty<number | undefined>({
+  bottom: defineProperty<UiLength | undefined>({
     name: 'bottom',
     defaultValue: undefined,
     inherited: false,
     affects: L
   }),
 
-  left: defineProperty<number | undefined>({
+  left: defineProperty<UiLength | undefined>({
     name: 'left',
     defaultValue: undefined,
     inherited: false,
@@ -311,7 +364,7 @@ export const UiProperties = {
     affects: L
   }),
 
-  inset: defineProperty<number | undefined>({
+  inset: defineProperty<UiLength | undefined>({
     name: 'inset',
     defaultValue: undefined,
     inherited: false,

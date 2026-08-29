@@ -90,7 +90,8 @@ describe('LayoutPlayground integration', () => {
     it('clamps a nested column to its min/max width', () => {
       const h = createHarness();
       tick(h);
-      expect(recordFor(h, 'root:0:2').width).toBe(120);
+      // Stretched across the 360 content width, clamped by maxWidth 320.
+      expect(recordFor(h, 'root:0:2').width).toBe(320);
     });
 
     it('lays out nested children in a column', () => {
@@ -299,11 +300,12 @@ describe('LayoutPlayground integration', () => {
     it('responds reactively to min/max width changes', () => {
       const h = createHarness();
       tick(h);
-      expect(recordFor(h, 'root:0:2').width).toBe(120);
+      expect(recordFor(h, 'root:0:2').width).toBe(320);
 
+      // A larger minimum changes nothing while the max still binds.
       h.state.minWidth$.next(200);
       tick(h);
-      expect(recordFor(h, 'root:0:2').width).toBe(200);
+      expect(recordFor(h, 'root:0:2').width).toBe(320);
 
       h.state.minWidth$.next(0);
       h.state.maxWidth$.next(60);

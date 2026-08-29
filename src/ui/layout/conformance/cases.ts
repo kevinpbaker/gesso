@@ -33,6 +33,15 @@ export type Alignment =
   | 'space-around';
 
 export type TextWrap = 'word' | 'char' | 'none';
+
+/** Same shape as the runtime's UiLength; this file cannot import it. */
+export type CaseLength = number | { readonly unit: 'percent'; readonly value: number } | { readonly unit: 'auto' };
+
+export function pct(value: number): CaseLength {
+  return { unit: 'percent', value };
+}
+
+export const autoLength: CaseLength = { unit: 'auto' };
 export type TextOverflow = 'clip' | 'ellipsis';
 
 /**
@@ -47,26 +56,35 @@ export type TextOverflow = 'clip' | 'ellipsis';
 export type CaseFont = 'fixed' | 'ahem';
 
 export interface CaseProps {
-  width?: number;
-  height?: number;
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
+  width?: CaseLength;
+  height?: CaseLength;
+  minWidth?: CaseLength;
+  maxWidth?: CaseLength;
+  minHeight?: CaseLength;
+  maxHeight?: CaseLength;
   padding?: number;
   paddingTop?: number;
   paddingRight?: number;
   paddingBottom?: number;
   paddingLeft?: number;
-  margin?: number;
-  marginTop?: number;
-  marginRight?: number;
-  marginBottom?: number;
-  marginLeft?: number;
+  margin?: CaseLength;
+  marginTop?: CaseLength;
+  marginRight?: CaseLength;
+  marginBottom?: CaseLength;
+  marginLeft?: CaseLength;
   gap?: number;
+  rowGap?: number;
+  columnGap?: number;
+  flex?: number;
   flexGrow?: number;
   flexShrink?: number;
-  flexBasis?: number;
+  flexBasis?: CaseLength;
+  flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
+  alignContent?: Alignment;
+  /** 'row-reverse' on a row, 'column-reverse' on a column. */
+  direction?: 'row' | 'row-reverse' | 'column' | 'column-reverse';
+  textDirection?: 'ltr' | 'rtl';
+  aspectRatio?: number;
   /** Alignment of children along the x axis (main for rows, cross for columns). */
   x?: Alignment;
   /** Alignment of children along the y axis (main for columns, cross for rows). */
@@ -74,11 +92,11 @@ export interface CaseProps {
   selfX?: Alignment;
   selfY?: Alignment;
   position?: 'static' | 'relative' | 'absolute';
-  top?: number;
-  right?: number;
-  bottom?: number;
-  left?: number;
-  inset?: number;
+  top?: CaseLength;
+  right?: CaseLength;
+  bottom?: CaseLength;
+  left?: CaseLength;
+  inset?: CaseLength;
   zIndex?: number;
   text?: string;
   fontSize?: number;
@@ -255,11 +273,7 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('grow/single-max-clamped', row({}, box({ height: 20, flexGrow: 1, maxWidth: 100 }), leaf(50, 20))),
   testCase(
     'grow/clamped-remainder-redistributes',
-    row({}, box({ height: 20, flexGrow: 1, maxWidth: 60 }), box({ height: 20, flexGrow: 1 })),
-    {
-      divergence:
-        'Nodal leaves space freed by a max clamp to alignment instead of redistributing it to unfrozen growers.'
-    }
+    row({}, box({ height: 20, flexGrow: 1, maxWidth: 60 }), box({ height: 20, flexGrow: 1 }))
   ),
   testCase(
     'grow/alignment-ignored-when-no-free-space',
@@ -279,9 +293,7 @@ export const layoutCases: readonly LayoutCase[] = [
     'shrink/respects-min-width-single',
     row({}, leaf(200, 20, { minWidth: 150 }), leaf(200, 20, { flexShrink: 0 }))
   ),
-  testCase('shrink/clamped-remainder-redistributes', row({}, leaf(200, 20, { minWidth: 180 }), leaf(200, 20)), {
-    divergence: 'Nodal does not redistribute the deficit a min clamp leaves behind onto the remaining shrinkable items.'
-  }),
+  testCase('shrink/clamped-remainder-redistributes', row({}, leaf(200, 20, { minWidth: 180 }), leaf(200, 20))),
   testCase('shrink/no-shrink-overflows-parent', row({}, leaf(400, 20, { flexShrink: 0 }))),
 
   // ---------------------------------------------------------------------------
@@ -295,7 +307,7 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('basis/clamped-by-max', row({}, leaf(40, 20, { flexBasis: 100, maxWidth: 70 }), leaf(40, 20))),
   testCase(
     'basis/sizes-container',
-    column({}, row({}, box({ height: 20, flexBasis: 90 }), box({ height: 20, flexBasis: 60 }))),
+    column({ x: 'start' }, row({}, box({ height: 20, flexBasis: 90 }), box({ height: 20, flexBasis: 60 }))),
     {
       divergence:
         "Nodal counts flex-basis toward a shrink-wrapped container's size; Chrome sizes the container from item content and ignores flex-basis (browsers disagree with each other here)."
@@ -516,6 +528,245 @@ export const layoutCases: readonly LayoutCase[] = [
     row({}, paragraph('ab', { selfY: 'baseline' }), paragraph('cd', { fontSize: 20, selfY: 'baseline' }), leaf(10, 40))
   ),
   ahem('paragraph/custom-line-height', column({}, paragraph('ab cd', { lineHeight: 20, width: 20 }))),
+
+  // ---------------------------------------------------------------------------
+  // Stretch is the default cross alignment
+  // ---------------------------------------------------------------------------
+  testCase('stretch/row-children-fill-height', row({ height: 60 }, box({ width: 40 }), leaf(40, 20))),
+  testCase('stretch/column-children-fill-width', column({ width: 200 }, box({ height: 20 }), leaf(40, 20))),
+  testCase('stretch/clamped-by-max', column({ width: 200 }, box({ height: 20, maxWidth: 120 }))),
+  testCase(
+    'stretch/nested-row-fills-column',
+    column({ width: 200 }, row({}, leaf(40, 20), box({ height: 20, flexGrow: 1 })))
+  ),
+  ahem('stretch/text-fills-column-width', column({ width: 100 }, paragraph('ab'))),
+
+  // ---------------------------------------------------------------------------
+  // Automatic minimum size
+  // ---------------------------------------------------------------------------
+  ahem(
+    'automin/text-keeps-longest-word',
+    row({ width: 60 }, paragraph('abcdefghij kl'), leaf(30, 10, { flexShrink: 0 }))
+  ),
+  ahem(
+    'automin/explicit-min-zero-shrinks',
+    row({ width: 60 }, paragraph('abcdefghij', { minWidth: 0 }), leaf(30, 10, { flexShrink: 0 }))
+  ),
+  ahem('automin/column-keeps-content-height', column({ height: 20 }, paragraph('ab'), paragraph('cd'))),
+  ahem(
+    'automin/nested-row-min-content',
+    column({ width: 50, x: 'start' }, row({}, paragraph('abcdef'), paragraph('gh')))
+  ),
+  testCase('automin/empty-boxes-still-shrink', row({ width: 100 }, leaf(80, 20), leaf(80, 20))),
+
+  // ---------------------------------------------------------------------------
+  // Redistribution
+  // ---------------------------------------------------------------------------
+  testCase(
+    'redistribute/grow-two-clamped',
+    row(
+      {},
+      box({ height: 20, flexGrow: 1, maxWidth: 40 }),
+      box({ height: 20, flexGrow: 1, maxWidth: 60 }),
+      box({ height: 20, flexGrow: 1 })
+    )
+  ),
+  testCase(
+    'redistribute/shrink-two-clamped',
+    row({}, leaf(200, 20, { minWidth: 180 }), leaf(200, 20, { minWidth: 150 }), leaf(200, 20))
+  ),
+  testCase(
+    'redistribute/factor-sum-below-one',
+    row({}, box({ height: 20, flexGrow: 0.25 }), box({ height: 20, flexGrow: 0.25 }))
+  ),
+
+  // ---------------------------------------------------------------------------
+  // Wrapping
+  // ---------------------------------------------------------------------------
+  testCase(
+    'wrap/two-lines',
+    column(
+      { x: 'start' },
+      row({ width: 100, flexWrap: 'wrap', gap: 5 }, leaf(40, 20), leaf(40, 20), leaf(40, 20), leaf(40, 20))
+    )
+  ),
+  testCase(
+    'wrap/oversized-item-alone',
+    column({ x: 'start' }, row({ width: 100, flexWrap: 'wrap' }, leaf(40, 20), leaf(120, 20), leaf(40, 20)))
+  ),
+  testCase(
+    'wrap/row-gap-and-column-gap',
+    column(
+      { x: 'start' },
+      row({ width: 100, flexWrap: 'wrap', rowGap: 8, columnGap: 4 }, leaf(45, 20), leaf(45, 20), leaf(45, 20))
+    )
+  ),
+  testCase(
+    'wrap/lines-stretch-by-default',
+    row({ width: 100, height: 100, flexWrap: 'wrap' }, box({ width: 40 }), box({ width: 40 }), box({ width: 40 }))
+  ),
+  testCase(
+    'wrap/align-content-start',
+    row({ width: 100, height: 100, flexWrap: 'wrap', alignContent: 'start' }, leaf(40, 20), leaf(40, 20), leaf(40, 20))
+  ),
+  testCase(
+    'wrap/align-content-center',
+    row({ width: 100, height: 100, flexWrap: 'wrap', alignContent: 'center' }, leaf(40, 20), leaf(40, 20), leaf(40, 20))
+  ),
+  testCase(
+    'wrap/align-content-end',
+    row({ width: 100, height: 100, flexWrap: 'wrap', alignContent: 'end' }, leaf(40, 20), leaf(40, 20), leaf(40, 20))
+  ),
+  testCase(
+    'wrap/align-content-space-between',
+    row(
+      { width: 100, height: 100, flexWrap: 'wrap', alignContent: 'space-between' },
+      leaf(40, 20),
+      leaf(40, 20),
+      leaf(40, 20)
+    )
+  ),
+  testCase(
+    'wrap/align-content-space-around',
+    row(
+      { width: 100, height: 100, flexWrap: 'wrap', alignContent: 'space-around' },
+      leaf(40, 20),
+      leaf(40, 20),
+      leaf(40, 20)
+    )
+  ),
+  testCase(
+    'wrap/align-content-space-evenly',
+    row(
+      { width: 100, height: 100, flexWrap: 'wrap', alignContent: 'space-evenly' },
+      leaf(40, 20),
+      leaf(40, 20),
+      leaf(40, 20)
+    )
+  ),
+  testCase(
+    'wrap/wrap-reverse',
+    row(
+      { width: 100, height: 100, flexWrap: 'wrap-reverse', alignContent: 'start' },
+      leaf(40, 20),
+      leaf(40, 20),
+      leaf(40, 20)
+    )
+  ),
+  testCase(
+    'wrap/grow-within-lines',
+    row(
+      { width: 100, flexWrap: 'wrap' },
+      box({ width: 60, height: 20, flexGrow: 1 }),
+      box({ width: 60, height: 20, flexGrow: 1 }),
+      box({ width: 30, height: 20, flexGrow: 1 })
+    )
+  ),
+  testCase(
+    'wrap/column-wraps-into-columns',
+    column({ height: 100, flexWrap: 'wrap', y: 'start' }, leaf(20, 40), leaf(20, 40), leaf(20, 40))
+  ),
+  testCase(
+    'wrap/center-items-in-each-line',
+    row(
+      { width: 100, flexWrap: 'wrap', x: 'center', y: 'start' },
+      leaf(30, 20),
+      leaf(30, 20),
+      leaf(30, 20),
+      leaf(30, 20)
+    )
+  ),
+
+  // ---------------------------------------------------------------------------
+  // Reversed directions and rtl
+  // ---------------------------------------------------------------------------
+  testCase('reverse/row-reverse', row({ direction: 'row-reverse', y: 'start' }, leaf(40, 20), leaf(60, 20))),
+  testCase(
+    'reverse/row-reverse-center',
+    row({ direction: 'row-reverse', x: 'center', y: 'start', gap: 10 }, leaf(40, 20), leaf(60, 20))
+  ),
+  testCase(
+    'reverse/row-reverse-space-between',
+    row({ direction: 'row-reverse', x: 'space-between', y: 'start' }, leaf(40, 20), leaf(60, 20), leaf(20, 20))
+  ),
+  testCase('reverse/column-reverse', column({ direction: 'column-reverse', x: 'start' }, leaf(40, 20), leaf(40, 30))),
+  testCase('reverse/rtl-row', row({ textDirection: 'rtl', y: 'start' }, leaf(40, 20), leaf(60, 20))),
+  testCase('reverse/rtl-row-end', row({ textDirection: 'rtl', x: 'end', y: 'start' }, leaf(40, 20), leaf(60, 20))),
+  testCase(
+    'reverse/rtl-row-reverse-cancels',
+    row({ textDirection: 'rtl', direction: 'row-reverse', y: 'start' }, leaf(40, 20), leaf(60, 20))
+  ),
+  testCase(
+    'reverse/rtl-auto-margin',
+    row({ textDirection: 'rtl', y: 'start' }, leaf(40, 20), leaf(40, 20, { marginLeft: autoLength }))
+  ),
+
+  // ---------------------------------------------------------------------------
+  // Auto margins
+  // ---------------------------------------------------------------------------
+  testCase('automargin/pushes-to-end', row({ y: 'start' }, leaf(40, 20), leaf(40, 20, { marginLeft: autoLength }))),
+  testCase(
+    'automargin/centers-with-both',
+    row({ y: 'start' }, leaf(40, 20, { marginLeft: autoLength, marginRight: autoLength }))
+  ),
+  testCase(
+    'automargin/shared-between-items',
+    row({ y: 'start' }, leaf(40, 20, { marginRight: autoLength }), leaf(40, 20, { marginRight: autoLength }))
+  ),
+  testCase(
+    'automargin/beats-alignment',
+    row({ x: 'center', y: 'start' }, leaf(40, 20), leaf(40, 20, { marginLeft: autoLength }))
+  ),
+  testCase(
+    'automargin/cross-centers',
+    row({ height: 100 }, leaf(40, 20, { marginTop: autoLength, marginBottom: autoLength }), leaf(40, 20))
+  ),
+  testCase('automargin/cross-pushes-to-end', row({ height: 100 }, leaf(40, 20, { marginTop: autoLength }))),
+  testCase(
+    'automargin/column-main',
+    column({ height: 200, x: 'start' }, leaf(40, 20), leaf(40, 20, { marginTop: autoLength }))
+  ),
+
+  // ---------------------------------------------------------------------------
+  // flex shorthand, percentages, aspect ratio
+  // ---------------------------------------------------------------------------
+  testCase(
+    'flex/equal-shares-ignore-content',
+    row({ y: 'start' }, box({ height: 20, flex: 1 }), leaf(120, 20, { flex: 1 }), box({ height: 20, flex: 1 }))
+  ),
+  testCase('flex/weighted', row({ y: 'start' }, box({ height: 20, flex: 1 }), box({ height: 20, flex: 2 }))),
+  testCase(
+    'flex/explicit-basis-wins',
+    row({ y: 'start' }, box({ height: 20, flex: 1, flexBasis: 100 }), box({ height: 20, flex: 1 }))
+  ),
+  testCase('percent/width-of-definite-parent', column({ width: 200, x: 'start' }, box({ width: pct(50), height: 20 }))),
+  testCase(
+    'percent/height-of-definite-parent',
+    column({ height: 200, x: 'start' }, box({ width: 20, height: pct(25) }))
+  ),
+  testCase('percent/max-width', column({ width: 200, x: 'start' }, box({ width: 150, maxWidth: pct(50), height: 20 }))),
+  testCase(
+    'percent/flex-basis',
+    row({ width: 200, y: 'start' }, box({ height: 20, flexBasis: pct(25) }), box({ height: 20, flexBasis: pct(25) }))
+  ),
+  testCase(
+    'percent/absolute-insets',
+    column(
+      {},
+      box(
+        { position: 'relative', width: 200, height: 100 },
+        box({ position: 'absolute', left: pct(10), top: pct(50), width: pct(30), height: pct(25) })
+      )
+    )
+  ),
+  testCase(
+    'percent/padded-parent-uses-content-box',
+    column({ width: 200, padding: 20, x: 'start' }, box({ width: pct(50), height: 20 }))
+  ),
+  testCase('aspect/width-drives-height', column({ x: 'start' }, box({ width: 100, aspectRatio: 2 }))),
+  testCase('aspect/height-drives-width', row({ y: 'start' }, box({ height: 50, aspectRatio: 2 }))),
+  testCase('aspect/stretched-width-drives-height', column({ width: 200 }, box({ aspectRatio: 4 }))),
+  testCase('aspect/stretched-height-drives-width', row({ height: 50 }, box({ aspectRatio: 2 }), leaf(10, 10))),
 
   // ---------------------------------------------------------------------------
   // Nesting

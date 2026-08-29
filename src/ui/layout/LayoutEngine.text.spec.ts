@@ -56,6 +56,7 @@ describe('LayoutEngine text', () => {
       const harness = new LayoutHarness();
       const column = harness.createNode('column', UiNodeType.Column);
       column.setProperty('width', 30);
+      column.setProperty('x', 'start');
       const paragraph = text(harness, 'p', 'abcdefgh ij');
       harness.append(column, paragraph);
       harness.layout(column, Constraints.unbounded());
@@ -79,6 +80,7 @@ describe('LayoutEngine text', () => {
       const harness = new LayoutHarness();
       const column = harness.createNode('column', UiNodeType.Column);
       column.setProperty('width', 30);
+      column.setProperty('x', 'start');
       const nowrap = text(harness, 'nowrap', 'ab cd ef', { textWrap: 'none' });
       const clamped = text(harness, 'clamped', 'ab cd ef gh', { maxLines: 2, textOverflow: 'ellipsis' });
       harness.append(column, nowrap, clamped);

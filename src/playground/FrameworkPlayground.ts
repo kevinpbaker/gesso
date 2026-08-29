@@ -59,7 +59,7 @@ export class LocalCounter extends Component {
 
   override render(): UiElement {
     return Row(
-      { gap: 12, alignItems: 'center' },
+      { gap: 12, y: 'center' },
       Text({
         text: this.count.pipe(map(c => `Local count: ${c}`)),
         color: '#e5e7eb'
@@ -92,7 +92,7 @@ export class StoreCounter extends Component {
 
   override render(): UiElement {
     return Row(
-      { gap: 12, alignItems: 'center' },
+      { gap: 12, y: 'center' },
       Text({
         text: this.demo.projection.summary.pipe(map(s => `Store count: ${s.clicks} (${s.parity})`)),
         color: '#e5e7eb'
@@ -126,7 +126,7 @@ export class TickItem extends Component {
 
   override render(): UiElement {
     return Row(
-      { gap: 8, alignItems: 'center' },
+      { gap: 8, y: 'center' },
       Box({ width: 10, height: 10, backgroundColor: '#38bdf8', borderRadius: 5 }),
       Text({ text: this.label, color: '#cbd5f5' })
     );
@@ -163,7 +163,7 @@ export class Heartbeat extends Component {
 
   override render(): UiElement {
     return Column(
-      { gap: 6, alignItems: 'flex-start' },
+      { gap: 6, x: 'start' },
       Text({
         text: this.ticks.pipe(map(t => `Heartbeat: ${t} (10/sec while the UI thread is free)`)),
         color: '#e5e7eb'
@@ -193,9 +193,9 @@ export class HeavyPanel extends Component {
 
   override render(): UiElement {
     return Column(
-      { gap: 8, alignItems: 'flex-start' },
+      { gap: 8, x: 'start' },
       Row(
-        { gap: 12, alignItems: 'center' },
+        { gap: 12, y: 'center' },
         Text({
           text: this.heavy.projection.status.pipe(
             map(status =>
@@ -429,7 +429,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(HeavyPanel),
       createComponent(MenuDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
-      Column({ gap: 6, alignItems: 'flex-start' }, this.recentTicks())
+      Column({ gap: 6, x: 'start' }, this.recentTicks())
     );
   }
 }

@@ -1,4 +1,4 @@
-import type { Alignment, CaseNode, LayoutCase } from './cases.ts';
+import type { Alignment, CaseLength, CaseNode, LayoutCase } from './cases.ts';
 import { TEXT_GLYPH_WIDTH_FACTOR, TEXT_LINE_HEIGHT_FACTOR, DEFAULT_CASE_FONT_SIZE } from './cases.ts';
 
 /**
@@ -7,13 +7,10 @@ import { TEXT_GLYPH_WIDTH_FACTOR, TEXT_LINE_HEIGHT_FACTOR, DEFAULT_CASE_FONT_SIZ
  * case's viewport.
  *
  * The mapping is deliberately literal — Nodal borrowed CSS names, so
- * `flexGrow` is `flex-grow` and `gap` is `gap`. Two places encode
- * Nodal's *current* semantics where they differ from CSS defaults, so
- * the fixtures describe the engine as it is meant to behave today.
- * Roadmap item L3 removes both:
- *
- *   1. Cross-axis alignment defaults to `start`, not `stretch`.
- *   2. The automatic minimum size of a flex item is 0, not min-content.
+ * `flexGrow` is `flex-grow` and `gap` is `gap`, and since roadmap item
+ * L3 the defaults match too: cross-axis `stretch`, automatic minimum
+ * size. The one deliberate difference left is that a stack (grid here)
+ * aligns its children `start` by default.
  *
  * Text renders one of two ways, chosen per case:
  *
@@ -76,9 +73,6 @@ export function casesToHtml(cases: readonly LayoutCase[], options: HtmlOptions =
     'html,body{background:#fff;}',
     'body{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:8px;}',
     '.case{position:relative;overflow:hidden;flex:none;}',
-    // Nodal's automatic minimum size is 0 (L3 delta 2). Explicit
-    // minWidth/minHeight props override this per node.
-    '.case div{min-width:0;min-height:0;}',
     '</style></head><body>',
     `<div id="probe" style="font:10px/12px Ahem;white-space:nowrap;width:max-content">abcde</div>`,
     ...sections,
@@ -151,10 +145,17 @@ function nodeToHtml(node: CaseNode, parent: CaseNode | null, path: string, layou
     ...itemStyles(node, parent),
     ...sizeStyles(node, parent === null ? layoutCase : null, layoutCase)
   ];
-  const inner =
-    node.type === 'text' && layoutCase.font === 'ahem'
-      ? escapeText(node.props.text ?? '').replace(/\n/g, '<br>')
-      : node.children.map((child, index) => nodeToHtml(child, node, `${path}/${index}`, layoutCase)).join('');
+  let inner: string;
+  if (node.type === 'text' && layoutCase.font === 'ahem') {
+    inner = escapeText(node.props.text ?? '').replace(/\n/g, '<br>');
+  } else if (node.type === 'text') {
+    // Fixed text: an unbreakable inline block of the deterministic
+    // size inside an auto-sized div, so the div stretches, shrinks and
+    // has the min-content width a real single-line text would.
+    inner = `<span style="${fixedTextSpanStyles(node).join(';')}"></span>`;
+  } else {
+    inner = node.children.map((child, index) => nodeToHtml(child, node, `${path}/${index}`, layoutCase)).join('');
+  }
   return `<div data-path="${path}" data-type="${node.type}" style="${styles.join(';')}">${inner}</div>`;
 }
 
@@ -167,9 +168,9 @@ function containerStyles(node: CaseNode): string[] {
         'display:flex',
         'flex-direction:row',
         `justify-content:${mainAlignment(props.x)}`,
-        // L3 delta 1: Nodal's cross default is start.
         `align-items:${crossAlignment(props.y)}`,
-        ...gapStyles(node)
+        ...gapStyles(node),
+        ...flexContainerStyles(node)
       ];
     case 'column':
       return [
@@ -179,7 +180,8 @@ function containerStyles(node: CaseNode): string[] {
         // Baseline alignment has no meaning along a column's cross axis;
         // Nodal treats it as start, as CSS does.
         `align-items:${crossAlignment(props.x === 'baseline' ? 'start' : props.x)}`,
-        ...gapStyles(node)
+        ...gapStyles(node),
+        ...flexContainerStyles(node)
       ];
     case 'box':
       if (node.children.length === 0) {
@@ -217,11 +219,11 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
     styles.push(`position:${props.position}`);
   }
   if (props.inset !== undefined) {
-    styles.push(`inset:${px(props.inset)}`);
+    styles.push(`inset:${length(props.inset)}`);
   }
   for (const edge of ['top', 'right', 'bottom', 'left'] as const) {
     if (props[edge] !== undefined) {
-      styles.push(`${edge}:${px(props[edge]!)}`);
+      styles.push(`${edge}:${length(props[edge]!)}`);
     }
   }
   if (props.zIndex !== undefined) {
@@ -233,8 +235,16 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   if (props.flexShrink !== undefined) {
     styles.push(`flex-shrink:${props.flexShrink}`);
   }
+  // `flex` first: an explicit flexBasis wins over the shorthand's 0 in
+  // Nodal, and in CSS the later declaration wins.
+  if (props.flex !== undefined) {
+    styles.push(`flex:${props.flex}`);
+  }
   if (props.flexBasis !== undefined) {
-    styles.push(`flex-basis:${px(props.flexBasis)}`);
+    styles.push(`flex-basis:${length(props.flexBasis)}`);
+  }
+  if (props.aspectRatio !== undefined) {
+    styles.push(`aspect-ratio:${props.aspectRatio}`);
   }
   // Nodal reads only the cross-axis self alignment: selfY under a row,
   // selfX under a column. The main-axis one has no CSS equivalent.
@@ -247,7 +257,7 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
     const value = props[`margin${side}`] ?? props.margin;
     if (value !== undefined) {
-      styles.push(`margin-${side.toLowerCase()}:${px(value)}`);
+      styles.push(`margin-${side.toLowerCase()}:${length(value)}`);
     }
   }
   return styles;
@@ -275,15 +285,15 @@ function sizeStyles(node: CaseNode, rootCase: LayoutCase | null, layoutCase: Lay
   const width = props.width ?? (rootCase !== null ? rootCase.viewport.width : undefined);
   const height = props.height ?? (rootCase !== null ? rootCase.viewport.height : undefined);
   if (width !== undefined) {
-    styles.push(`width:${px(width)}`);
+    styles.push(`width:${length(width)}`);
   }
   if (height !== undefined) {
-    styles.push(`height:${px(height)}`);
+    styles.push(`height:${length(height)}`);
   }
   for (const name of ['minWidth', 'maxWidth', 'minHeight', 'maxHeight'] as const) {
     const value = props[name];
     if (value !== undefined) {
-      styles.push(`${kebab(name)}:${px(value)}`);
+      styles.push(`${kebab(name)}:${length(value)}`);
     }
   }
   for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
@@ -295,12 +305,25 @@ function sizeStyles(node: CaseNode, rootCase: LayoutCase | null, layoutCase: Lay
   return styles;
 }
 
-/** A box the deterministic measurer's size, for 'fixed' cases. */
-function fixedTextStyles(node: CaseNode): string[] {
+/**
+ * The div around a fixed text: no line box of its own (zero font and
+ * line height), so its size is exactly the inline block inside it.
+ */
+function fixedTextStyles(_node: CaseNode): string[] {
+  return ['font-size:0', 'line-height:0', 'white-space:nowrap'];
+}
+
+/** The inline block that gives a fixed text its deterministic size. */
+function fixedTextSpanStyles(node: CaseNode): string[] {
   const fontSize = node.props.fontSize ?? DEFAULT_CASE_FONT_SIZE;
   const glyphs = (node.props.text ?? '').length;
   const lineHeight = node.props.lineHeight ?? fontSize * TEXT_LINE_HEIGHT_FACTOR;
-  return [`width:${px(glyphs * fontSize * TEXT_GLYPH_WIDTH_FACTOR)}`, `height:${px(lineHeight)}`];
+  return [
+    'display:inline-block',
+    'vertical-align:top',
+    `width:${px(glyphs * fontSize * TEXT_GLYPH_WIDTH_FACTOR)}`,
+    `height:${px(lineHeight)}`
+  ];
 }
 
 /**
@@ -338,13 +361,44 @@ function ahemTextStyles(node: CaseNode): string[] {
 }
 
 function gapStyles(node: CaseNode): string[] {
-  return node.props.gap !== undefined ? [`gap:${px(node.props.gap)}`] : [];
+  const styles: string[] = [];
+  if (node.props.gap !== undefined) {
+    styles.push(`gap:${px(node.props.gap)}`);
+  }
+  if (node.props.rowGap !== undefined) {
+    styles.push(`row-gap:${px(node.props.rowGap)}`);
+  }
+  if (node.props.columnGap !== undefined) {
+    styles.push(`column-gap:${px(node.props.columnGap)}`);
+  }
+  return styles;
+}
+
+/** Wrapping, line distribution, reversal and writing direction. */
+function flexContainerStyles(node: CaseNode): string[] {
+  const { props } = node;
+  const styles: string[] = [];
+  if (props.flexWrap !== undefined) {
+    styles.push(`flex-wrap:${props.flexWrap}`);
+  }
+  if (props.alignContent !== undefined) {
+    styles.push(`align-content:${mainAlignment(props.alignContent)}`);
+  }
+  if (props.direction !== undefined) {
+    styles.push(`flex-direction:${props.direction}`);
+  }
+  if (props.textDirection !== undefined) {
+    styles.push(`direction:${props.textDirection}`);
+  }
+  return styles;
 }
 
 function mainAlignment(value: Alignment | undefined): string {
   switch (value) {
     case 'center':
       return 'center';
+    case 'stretch':
+      return 'stretch';
     case 'end':
       return 'flex-end';
     case 'space-between':
@@ -372,19 +426,31 @@ function gridAlignment(value: Alignment | undefined): string {
   }
 }
 
+/** Cross alignment; the unset default is stretch, as in CSS and Nodal. */
 function crossAlignment(value: Alignment | undefined): string {
   switch (value) {
+    case 'start':
+      return 'flex-start';
     case 'center':
       return 'center';
     case 'end':
       return 'flex-end';
-    case 'stretch':
-      return 'stretch';
     case 'baseline':
       return 'baseline';
     default:
-      return 'flex-start';
+      return 'stretch';
   }
+}
+
+/** A length: pixels, a percentage, or auto. */
+function length(value: CaseLength): string {
+  if (typeof value === 'number') {
+    return px(value);
+  }
+  if (value.unit === 'percent') {
+    return `${value.value}%`;
+  }
+  return 'auto';
 }
 
 function px(value: number): string {
