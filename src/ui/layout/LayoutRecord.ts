@@ -46,6 +46,20 @@ export class LayoutRecord {
   flexShrink = 1;
   flexBasis: number | undefined = undefined;
 
+  /**
+   * Distance from the box top to the first alphabetic baseline, when
+   * the node has one: its own text, or a descendant's along the start
+   * edge. Boxes without one synthesise a baseline from their bottom
+   * edge at alignment time (as CSS does), which is why this is a flag
+   * and not a sentinel value.
+   */
+  hasBaseline = false;
+  baseline = 0;
+
+  /** Intrinsic widths of a text node under its wrap mode. */
+  minContentWidth = 0;
+  maxContentWidth = 0;
+
   /** Effective scroll offset of a scroll container. */
   scrollX = 0;
   scrollY = 0;

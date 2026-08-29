@@ -398,6 +398,37 @@ export const UiProperties = {
     affects: P
   }),
 
+  /**
+   * How text breaks into lines: 'word' (default), 'char', or 'none'.
+   */
+  textWrap: defineProperty<string | undefined>({
+    name: 'textWrap',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P
+  }),
+
+  /**
+   * Maximum number of lines a text node keeps.
+   */
+  maxLines: defineProperty<number | undefined>({
+    name: 'maxLines',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P
+  }),
+
+  /**
+   * What happens to a line that does not fit: 'clip' (default) or
+   * 'ellipsis'.
+   */
+  textOverflow: defineProperty<string | undefined>({
+    name: 'textOverflow',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P
+  }),
+
   // -------------------------------------------------------------------------
   // Interaction
   // -------------------------------------------------------------------------

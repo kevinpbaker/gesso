@@ -8,6 +8,7 @@ import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import type { RenderContext } from '../RenderContext';
 import { drawText } from '../TextRenderer';
+import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { UiRenderer } from '../UiRenderer';
 
 export interface Canvas2DRendererOptions {
@@ -52,6 +53,8 @@ export interface Canvas2DRendererOptions {
  * scrolling large lists only issues draws for the visible window.
  */
 export class Canvas2DRenderer implements UiRenderer {
+  /** Scratch for the padded box text is drawn in; reused across nodes. */
+  private readonly contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
   private readonly paint = createPaintState();
   private cullX = 0;
   private cullY = 0;
@@ -214,7 +217,13 @@ export class Canvas2DRenderer implements UiRenderer {
 
   private paintContent(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, context: RenderContext): void {
     if (paint.text !== undefined) {
-      drawText(ctx, rec, paint, context.text);
+      // Text lives in the content box: layout sized the paragraph inside
+      // the padding, so paint must place it there too.
+      this.contentBox.x = rec.x + rec.paddingLeft;
+      this.contentBox.y = rec.y + rec.paddingTop;
+      this.contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
+      this.contentBox.height = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
+      drawText(ctx, this.contentBox, paint, context.text);
     }
   }
 

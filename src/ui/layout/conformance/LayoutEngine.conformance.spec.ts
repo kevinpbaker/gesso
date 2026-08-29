@@ -4,6 +4,7 @@ import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import { LayoutHarness } from '../LayoutTestUtils';
 import { Constraints } from '../LayoutTypes';
+import { CharacterCountTextMeasurer } from '../TextMeasurer';
 import type { LayoutBox } from '../LayoutTypes';
 import { caseFingerprint, layoutCases } from './cases';
 import type { CaseNode, LayoutCase } from './cases';
@@ -74,8 +75,18 @@ const NODE_TYPES: Record<CaseNode['type'], UiNodeType> = {
   text: UiNodeType.Text
 };
 
+/**
+ * 'fixed' cases use the default measurer (0.6em glyphs); 'ahem' cases
+ * reproduce the Ahem font Chrome rendered them with (1em glyphs).
+ */
+function measurerFor(layoutCase: LayoutCase): CharacterCountTextMeasurer {
+  return layoutCase.font === 'ahem'
+    ? new CharacterCountTextMeasurer({ glyphWidth: 1, ascent: 0.8, descent: 0.2 })
+    : new CharacterCountTextMeasurer();
+}
+
 function layoutWithNodal(layoutCase: LayoutCase): MeasuredBox[] {
-  const harness = new LayoutHarness();
+  const harness = new LayoutHarness(measurerFor(layoutCase));
   const paths = new Map<UiNode, string>();
   const root = buildNode(harness, layoutCase.root, 'root', paths);
   harness.layout(root, Constraints.loose(layoutCase.viewport.width, layoutCase.viewport.height));

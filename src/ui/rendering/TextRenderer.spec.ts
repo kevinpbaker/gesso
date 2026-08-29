@@ -20,7 +20,8 @@ describe('layoutTextLines', () => {
       measurer
     );
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toEqual({ text: 'Hello', x: 10, y: 20, width: 30, height: 12 });
+    // 12px line box around a 10px font: 1 half-leading + 8 ascent.
+    expect(lines[0]).toEqual({ text: 'Hello', x: 10, y: 20, baselineY: 29, width: 30, height: 12 });
   });
 
   it('centers horizontally', () => {
@@ -80,6 +81,32 @@ describe('layoutTextLines', () => {
     expect(lines[1].y).toBe(20);
   });
 
+  it('wraps at spaces within the box width and stacks the lines', () => {
+    const lines = layoutTextLines(
+      { x: 0, y: 0, width: 40, height: 60 },
+      state({ text: 'ab cd ef', fontSize: 10 }),
+      measurer
+    );
+    expect(lines.map(line => line.text)).toEqual(['ab cd', 'ef']);
+    expect(lines[1].y).toBe(12);
+  });
+
+  it('honours textWrap none, maxLines and ellipsis from the paint state', () => {
+    const single = layoutTextLines(
+      { x: 0, y: 0, width: 40, height: 60 },
+      state({ text: 'ab cd ef', fontSize: 10, textWrap: 'none' }),
+      measurer
+    );
+    expect(single.map(line => line.text)).toEqual(['ab cd ef']);
+
+    const clamped = layoutTextLines(
+      { x: 0, y: 0, width: 40, height: 60 },
+      state({ text: 'ab cd ef gh', fontSize: 10, maxLines: 1, textOverflow: 'ellipsis' }),
+      measurer
+    );
+    expect(clamped.map(line => line.text)).toEqual(['ab cd…']);
+  });
+
   it('returns no lines for empty text or non-positive font size', () => {
     expect(
       layoutTextLines({ x: 0, y: 0, width: 100, height: 20 }, state({ text: undefined, fontSize: 10 }), measurer)
@@ -109,12 +136,14 @@ describe('drawText', () => {
     expect(names).toContain('set:textBaseline');
     expect(names).toContain('set:textAlign');
     expect(ctx.font).toBe('normal 10px sans-serif');
-    expect(ctx.textBaseline).toBe('top');
+    expect(ctx.textBaseline).toBe('alphabetic');
     expect(ctx.textAlign).toBe('left');
 
+    // Drawn on the baseline at the measured width — never squeezed
+    // with fillText's maxWidth.
     const draws = ctx.calls.filter(call => call.name === 'fillText');
     expect(draws).toHaveLength(1);
-    expect(draws[0].args).toEqual(['Hi', 10 + (100 - 12) / 2, 20, 100]);
+    expect(draws[0].args).toEqual(['Hi', 10 + (100 - 12) / 2, 29]);
   });
 
   it('draws nothing for empty text', () => {

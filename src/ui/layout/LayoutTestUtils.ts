@@ -5,6 +5,7 @@ import { LayoutEngine } from './LayoutEngine';
 import { Constraints } from './LayoutTypes';
 import type { LayoutBox, LayoutResult } from './LayoutTypes';
 import type { LayoutRecord } from './LayoutRecord';
+import type { TextMeasurer } from './TextMeasurer';
 
 /**
  * Shared helpers for layout specs: builds UiNode trees through
@@ -12,7 +13,11 @@ import type { LayoutRecord } from './LayoutRecord';
  */
 export class LayoutHarness {
   readonly graph = new UiGraph();
-  readonly engine = new LayoutEngine();
+  readonly engine: LayoutEngine;
+
+  constructor(textMeasurer?: TextMeasurer) {
+    this.engine = new LayoutEngine(textMeasurer);
+  }
 
   createNode(id: string, type: UiNodeType): UiNode {
     return this.graph.createNode(id, type);

@@ -1,5 +1,6 @@
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutBox } from '../layout/LayoutTypes';
+import type { TextOverflow, TextWrap } from '../layout/TextMeasurer';
 import { resolveProperty, resolveNumber, resolveString, resolveBoolean } from '../properties/UiPropertyResolver';
 import { UiProperties } from '../properties/UiProperty';
 import type { UiColor } from '../properties/UiColor';
@@ -51,6 +52,9 @@ export interface PaintState {
   textColor: UiColor;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
+  textWrap: TextWrap;
+  maxLines: number | undefined;
+  textOverflow: TextOverflow;
 }
 
 export const DEFAULT_FONT_SIZE = 14;
@@ -67,6 +71,20 @@ export function normalizeTextAlign(value: unknown): TextAlign {
     return 'right';
   }
   return 'left';
+}
+
+export function normalizeTextWrap(value: unknown): TextWrap {
+  if (value === 'none' || value === 'nowrap') {
+    return 'none';
+  }
+  if (value === 'char') {
+    return 'char';
+  }
+  return 'word';
+}
+
+export function normalizeTextOverflow(value: unknown): TextOverflow {
+  return value === 'ellipsis' ? 'ellipsis' : 'clip';
 }
 
 export function normalizeVerticalAlign(value: unknown): VerticalAlign {
@@ -121,6 +139,10 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.textColor = normalizeColor(resolveProperty(node, UiProperties.color)) ?? UiColors.black;
   out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
   out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
+  out.textWrap = normalizeTextWrap(resolveString(node, 'textWrap'));
+  const maxLines = resolveNumber(node, 'maxLines');
+  out.maxLines = maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined;
+  out.textOverflow = normalizeTextOverflow(resolveString(node, 'textOverflow'));
 
   return out;
 }
@@ -202,7 +224,10 @@ export function createPaintState(): PaintState {
     lineHeight: 0,
     textColor: DEFAULT_TEXT_COLOR,
     textAlign: 'left',
-    verticalAlign: 'top'
+    verticalAlign: 'top',
+    textWrap: 'word',
+    maxLines: undefined,
+    textOverflow: 'clip'
   };
 }
 

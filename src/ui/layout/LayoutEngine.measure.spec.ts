@@ -109,7 +109,10 @@ describe('LayoutEngine measurement', () => {
       expect(rec.measuredHeight).toBe(50);
     });
 
-    it('clamps to a bounded max', () => {
+    it('overflows a loose parent bound its content cannot fit', () => {
+      // A loose max is the available space, not a clamp: like CSS
+      // fit-content, a child with an explicit 60 width makes the
+      // column 60 wide inside a 50 slot rather than being squeezed.
       const harness = new LayoutHarness();
       const column = harness.createNode('column', UiNodeType.Column);
       const a = harness.createNode('a', UiNodeType.Box);
@@ -120,8 +123,30 @@ describe('LayoutEngine measurement', () => {
       b.setProperty('height', 30);
       harness.append(column, a, b);
       harness.layout(column, new Constraints(0, 50, 0, Infinity));
-      expect(harness.record(column).measuredWidth).toBe(50);
+      expect(harness.record(column).measuredWidth).toBe(60);
       expect(harness.record(column).measuredHeight).toBe(50);
+    });
+
+    it('clamps to its own maxWidth', () => {
+      const harness = new LayoutHarness();
+      const column = harness.createNode('column', UiNodeType.Column);
+      column.setProperty('maxWidth', 50);
+      const b = harness.createNode('b', UiNodeType.Box);
+      b.setProperty('width', 60);
+      b.setProperty('height', 30);
+      harness.append(column, b);
+      harness.layout(column, Constraints.unbounded());
+      expect(harness.record(column).measuredWidth).toBe(50);
+    });
+
+    it('obeys a tight parent bound over its content', () => {
+      const harness = new LayoutHarness();
+      const column = harness.createNode('column', UiNodeType.Column);
+      const b = harness.createNode('b', UiNodeType.Box);
+      b.setProperty('width', 60);
+      harness.append(column, b);
+      harness.layout(column, new Constraints(50, 50, 0, Infinity));
+      expect(harness.record(column).measuredWidth).toBe(50);
     });
 
     it('fills tight constraints when placed as the layout root', () => {

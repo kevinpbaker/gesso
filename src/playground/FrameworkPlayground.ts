@@ -227,6 +227,48 @@ export class HeavyPanel extends Component {
  * component runtime, store injection, local state, and Canvas2D
  * renderer all work together in a single-thread app.
  */
+@Define('text-showcase')
+export class TextShowcase extends Component {
+  /**
+   * Text as a layout citizen (roadmap L1), in one card: a title clamped
+   * to two lines with an ellipsis, a paragraph that wraps at the card's
+   * content width, and a label/value row whose different font sizes
+   * share a baseline.
+   */
+  override render(): UiElement {
+    return Column(
+      {
+        width: 340,
+        padding: 16,
+        gap: 10,
+        backgroundColor: '#1f2937',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#374151'
+      },
+      Text({
+        text: 'A title long enough that it cannot possibly fit on two lines of this card, so it is clamped with an ellipsis',
+        color: '#ffffff',
+        fontSize: 18,
+        fontWeight: 600,
+        maxLines: 2,
+        textOverflow: 'ellipsis'
+      }),
+      Text({
+        text: "Text now wraps at the width layout gives it. Flex measures items at max-content for their base size, resolves the main axis, and measures again at the final size, so this paragraph's height is known before the card is placed.",
+        color: '#d1d5db',
+        fontSize: 13
+      }),
+      Row(
+        { gap: 8, y: 'baseline' },
+        Text({ text: 'Frame', color: '#9ca3af', fontSize: 12 }),
+        Text({ text: '2.4 ms', color: '#ffffff', fontSize: 24, fontWeight: 600 }),
+        Text({ text: 'worst 4.1 ms', color: '#9ca3af', fontSize: 12 })
+      )
+    );
+  }
+}
+
 @Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoStore) demo!: DemoStore;
@@ -261,6 +303,7 @@ export class FrameworkDemoRoot extends Component {
         color: '#9ca3af'
       }),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
+      createComponent(TextShowcase),
       createComponent(LocalCounter),
       createComponent(StoreCounter),
       createComponent(Heartbeat),

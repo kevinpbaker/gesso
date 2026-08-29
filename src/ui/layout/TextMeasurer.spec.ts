@@ -10,17 +10,48 @@ describe('CharacterCountTextMeasurer', () => {
     expect(size.height).toBe(12);
   });
 
-  it('returns zero for empty text', () => {
+  it('gives empty text one empty line', () => {
     const measurer = new CharacterCountTextMeasurer();
     const size = measurer.measure({ text: '', fontSize: 10 });
     expect(size.width).toBe(0);
     expect(size.height).toBe(12);
   });
 
-  it('clamps width to maxWidth', () => {
+  it('wraps at spaces to fit maxWidth', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    const size = measurer.measure({ text: 'ab cd', fontSize: 10, maxWidth: 20 });
+    expect(size.width).toBe(20);
+    expect(size.height).toBe(24);
+  });
+
+  it('keeps an unbreakable word at its own width', () => {
+    // CSS fit-content: never narrower than the widest unbreakable segment.
     const measurer = new CharacterCountTextMeasurer();
     const size = measurer.measure({ text: 'Hello', fontSize: 10, maxWidth: 20 });
-    expect(size.width).toBe(20);
+    expect(size.width).toBe(30);
     expect(size.height).toBe(12);
+  });
+
+  it('honours the line height when given', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    expect(measurer.measure({ text: 'x', fontSize: 10, lineHeight: 20 }).height).toBe(20);
+  });
+
+  it('reports font metrics proportional to the font size', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    const paragraph = measurer.layout({ text: 'x', fontSize: 10 });
+    expect(paragraph.ascent).toBe(8);
+    expect(paragraph.descent).toBe(2);
+    expect(paragraph.firstBaseline).toBe(9);
+  });
+
+  it('can reproduce the Ahem test font with 1em glyphs', () => {
+    const measurer = new CharacterCountTextMeasurer({ glyphWidth: 1 });
+    expect(measurer.measure({ text: 'abcde', fontSize: 10 }).width).toBe(50);
+  });
+
+  it('counts code points, not UTF-16 units', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    expect(measurer.measure({ text: '😀', fontSize: 10 }).width).toBe(6);
   });
 });

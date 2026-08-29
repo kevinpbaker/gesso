@@ -49,6 +49,9 @@ export interface TextRenderItem {
   textColor: string;
   textAlign: string;
   verticalAlign: string;
+  textWrap: string;
+  maxLines: number | undefined;
+  textOverflow: string;
   scissor: ScissorRect | null;
 }
 
@@ -207,11 +210,13 @@ export function buildRenderList(
 
     // Text: collect for the GPU text renderer.
     if (paint.text !== undefined && paint.text.length > 0) {
+      // Text lives in the content box, inside the padding layout sized
+      // the paragraph against.
       textItems.push({
-        x: rec.x,
-        y: rec.y,
-        width: rec.width,
-        height: rec.height,
+        x: rec.x + rec.paddingLeft,
+        y: rec.y + rec.paddingTop,
+        width: Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight),
+        height: Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom),
         transform: effectiveTransform,
         opacity: effectiveOpacity,
         text: paint.text,
@@ -222,6 +227,9 @@ export function buildRenderList(
         textColor: colorToCss(paint.textColor),
         textAlign: paint.textAlign,
         verticalAlign: paint.verticalAlign,
+        textWrap: paint.textWrap,
+        maxLines: paint.maxLines,
+        textOverflow: paint.textOverflow,
         scissor: currentScissor
       });
     }

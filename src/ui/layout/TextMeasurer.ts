@@ -1,8 +1,13 @@
 import type { Size } from './LayoutTypes';
+import { layoutParagraph, proportionalFontMetrics } from './ParagraphLayout';
+
+export type TextWrap = 'word' | 'char' | 'none';
+export type TextOverflow = 'clip' | 'ellipsis';
 
 export interface TextMeasureRequest {
   text: string;
   fontSize: number;
+  /** Available width. Wrapping and fit-content sizing happen against it. */
   maxWidth?: number;
   /**
    * Font family for platforms that can shape text.
@@ -14,6 +19,49 @@ export interface TextMeasureRequest {
   fontWeight?: string | number;
   lineHeight?: number;
   letterSpacing?: number;
+  /** Default 'word'. */
+  wrap?: TextWrap;
+  /** Keep at most this many lines. */
+  maxLines?: number;
+  /** What happens to a line that does not fit. Default 'clip'. */
+  overflow?: TextOverflow;
+}
+
+/** One laid-out line. `text` is what gets drawn and may end in an ellipsis. */
+export interface TextLine {
+  /** Offsets into the source text; hanging spaces and the ellipsis are outside them. */
+  start: number;
+  end: number;
+  text: string;
+  width: number;
+}
+
+export interface FontMetrics {
+  /** Distance from the alphabetic baseline to the top of the glyph box. */
+  ascent: number;
+  /** Distance from the alphabetic baseline to the bottom of the glyph box. */
+  descent: number;
+}
+
+/**
+ * A measured paragraph: everything layout, alignment and painting need.
+ *
+ * `width` is fit-content, `height` is lines × lineHeight, and
+ * `firstBaseline` is the distance from the paragraph top to the first
+ * line's alphabetic baseline (half-leading plus ascent).
+ */
+export interface ParagraphLayout {
+  lines: TextLine[];
+  width: number;
+  height: number;
+  lineHeight: number;
+  ascent: number;
+  descent: number;
+  firstBaseline: number;
+  /** Widest unbreakable segment under the requested wrap mode. */
+  minContentWidth: number;
+  /** Width with no wrapping at all. */
+  maxContentWidth: number;
 }
 
 /**
@@ -24,22 +72,75 @@ export interface TextMeasureRequest {
  */
 export interface TextMeasurer {
   measure(request: TextMeasureRequest): Size;
+  layout(request: TextMeasureRequest): ParagraphLayout;
 }
 
 /**
- * Deterministic proxy measurer: each character is
- * fontSize * 0.6 wide and the line is fontSize * 1.2 tall.
- *
- * Intended for tests and headless environments until a
- * platform measurer is injected.
+ * The primitive a platform has to provide: the advance width of one
+ * run of text, and the font's vertical metrics. Everything above it
+ * is shared (see ParagraphLayout.ts).
  */
-export class CharacterCountTextMeasurer implements TextMeasurer {
+export interface TextRunMeasurer {
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  fontMetrics(request: TextMeasureRequest): FontMetrics;
+}
+
+/**
+ * Base class for measurers: implement the two primitives and the
+ * paragraph algorithm does the rest.
+ */
+export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
+  abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
+  abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
+
+  layout(request: TextMeasureRequest): ParagraphLayout {
+    return layoutParagraph(request, this);
+  }
+
   measure(request: TextMeasureRequest): Size {
-    const fontSize = request.fontSize;
-    let width = request.text.length * fontSize * 0.6;
-    if (request.maxWidth !== undefined && request.maxWidth >= 0) {
-      width = Math.min(width, request.maxWidth);
+    const paragraph = this.layout(request);
+    return { width: paragraph.width, height: paragraph.height };
+  }
+}
+
+export interface FixedMetricsOptions {
+  /** Advance of every glyph as a fraction of the font size. Default 0.6. */
+  glyphWidth?: number;
+  /** Ascent as a fraction of the font size. Default 0.8. */
+  ascent?: number;
+  /** Descent as a fraction of the font size. Default 0.2. */
+  descent?: number;
+}
+
+/**
+ * Deterministic measurer: every glyph is `glyphWidth` em wide, the
+ * font is `ascent + descent` em tall, and the default line is 1.2em.
+ *
+ * Intended for tests and headless environments. With `glyphWidth: 1`
+ * it reproduces the Ahem test font exactly, which is how the layout
+ * conformance fixtures compare real wrapping text against Chrome.
+ */
+export class CharacterCountTextMeasurer extends ParagraphTextMeasurer {
+  private readonly glyphWidth: number;
+  private readonly ascentFactor: number;
+  private readonly descentFactor: number;
+
+  constructor(options: FixedMetricsOptions = {}) {
+    super();
+    this.glyphWidth = options.glyphWidth ?? 0.6;
+    this.ascentFactor = options.ascent ?? 0.8;
+    this.descentFactor = options.descent ?? 0.2;
+  }
+
+  measureRunWidth(text: string, request: TextMeasureRequest): number {
+    let glyphs = 0;
+    for (const _character of text) {
+      glyphs++;
     }
-    return { width, height: fontSize * 1.2 };
+    return glyphs * request.fontSize * this.glyphWidth;
+  }
+
+  fontMetrics(request: TextMeasureRequest): FontMetrics {
+    return proportionalFontMetrics(request.fontSize, this.ascentFactor, this.descentFactor);
   }
 }

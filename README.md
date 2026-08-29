@@ -71,7 +71,7 @@ pnpm format:check
 pnpm fixtures:layout
 ```
 
-Layout is checked against Chrome: `src/ui/layout/conformance/` holds cases written in Nodal's vocabulary, the boxes Chrome produces for them, and a spec asserting `LayoutEngine` agrees. See [`docs/decisions/0004-layout-conformance.md`](docs/decisions/0004-layout-conformance.md).
+Layout is checked against Chrome: `src/ui/layout/conformance/` holds cases written in Nodal's vocabulary, the boxes Chrome produces for them, and a spec asserting `LayoutEngine` agrees. Text cases render in the Ahem font so wrapping and baselines are compared for real. See [`docs/decisions/0004-layout-conformance.md`](docs/decisions/0004-layout-conformance.md) and [`0005-text-layout.md`](docs/decisions/0005-text-layout.md).
 
 ## Architecture overview
 
@@ -110,6 +110,7 @@ Layout is checked against Chrome: `src/ui/layout/conformance/` holds cases writt
 
 - **No DOM layout.** The framework owns layout, scrolling, transforms, and rendering. The DOM is only used as a host element for the canvas.
 - **Incremental layout.** Only dirty subtrees are re-measured and re-placed; scroll changes run in O(number of scroll containers).
+- **Text wraps, and flex is two-pass.** `Text` breaks lines like CSS (`textWrap`, `maxLines`, `textOverflow`), flex items are measured at max-content and again at their final size, and rows can align baselines (`y: 'baseline'`).
 - **Renderer-agnostic core.** The layout engine outputs `LayoutRecord`s consumed through a narrow `LayoutReader` interface. Both Canvas2D and WebGPU implement the same `UiRenderer` contract.
 - **Full Canvas2D redraw.** The current renderer redraws the whole scene each frame; dirty regions are a future optimization. Bounds culling already skips off-screen subtrees.
 - **Logical pixels everywhere.** The `CanvasSurface` handles device pixel ratio; layout and drawing operate in logical pixels.

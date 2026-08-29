@@ -22,7 +22,29 @@
 
 export type CaseNodeType = 'row' | 'column' | 'box' | 'text';
 
-export type Alignment = 'start' | 'center' | 'end' | 'stretch' | 'space-between' | 'space-evenly' | 'space-around';
+export type Alignment =
+  | 'start'
+  | 'center'
+  | 'end'
+  | 'stretch'
+  | 'baseline'
+  | 'space-between'
+  | 'space-evenly'
+  | 'space-around';
+
+export type TextWrap = 'word' | 'char' | 'none';
+export type TextOverflow = 'clip' | 'ellipsis';
+
+/**
+ * How a case's text is rendered on the Chrome side.
+ *
+ *   'fixed' — a box the size CharacterCountTextMeasurer would report
+ *             (0.6em per glyph, 1.2em per line). Tests box algebra.
+ *   'ahem'  — real text in the Ahem font, whose glyphs are 1em squares
+ *             (ascent 0.8, descent 0.2). Tests wrapping and baselines;
+ *             the Nodal side measures with `glyphWidth: 1`.
+ */
+export type CaseFont = 'fixed' | 'ahem';
 
 export interface CaseProps {
   width?: number;
@@ -53,6 +75,10 @@ export interface CaseProps {
   selfY?: Alignment;
   text?: string;
   fontSize?: number;
+  lineHeight?: number;
+  textWrap?: TextWrap;
+  maxLines?: number;
+  textOverflow?: TextOverflow;
 }
 
 export interface CaseNode {
@@ -66,6 +92,8 @@ export interface LayoutCase {
   readonly name: string;
   readonly viewport: { readonly width: number; readonly height: number };
   readonly root: CaseNode;
+  /** Default 'fixed'. */
+  readonly font?: CaseFont;
   /**
    * Set when Nodal is known to disagree with Chrome. The spec then
    * expects the comparison to fail, so fixing the engine surfaces as a
@@ -95,7 +123,20 @@ export function box(props: CaseProps = {}, ...children: CaseNode[]): CaseNode {
   return { type: 'box', props, children };
 }
 
+/**
+ * Fixed-box text: a single line the deterministic measurer's size. It
+ * never wraps, because the box Chrome renders for it cannot.
+ */
 export function text(value: string, props: CaseProps = {}): CaseNode {
+  return {
+    type: 'text',
+    props: { fontSize: DEFAULT_CASE_FONT_SIZE, textWrap: 'none', ...props, text: value },
+    children: []
+  };
+}
+
+/** Real text for `font: 'ahem'` cases: wraps by default like CSS. */
+export function paragraph(value: string, props: CaseProps = {}): CaseNode {
   return { type: 'text', props: { fontSize: DEFAULT_CASE_FONT_SIZE, ...props, text: value }, children: [] };
 }
 
@@ -103,6 +144,10 @@ const VIEWPORT = { width: 300, height: 200 } as const;
 
 function testCase(name: string, root: CaseNode, extra: Partial<Omit<LayoutCase, 'name' | 'root'>> = {}): LayoutCase {
   return { name, viewport: VIEWPORT, root, ...extra };
+}
+
+function ahem(name: string, root: CaseNode): LayoutCase {
+  return { name, viewport: VIEWPORT, root, font: 'ahem' };
 }
 
 /** A fixed-size leaf: the workhorse of most cases. */
@@ -136,6 +181,7 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('size/container-grows-to-padded-content', column({}, row({ padding: 8 }, leaf(40, 20), leaf(40, 30)))),
   testCase('size/empty-row-with-padding', column({}, row({ padding: 6 }))),
   testCase('size/empty-column-with-gap-is-zero', column({}, column({ gap: 10 }))),
+  testCase('size/empty-leaf-is-its-padding', column({}, box({ padding: 6 }))),
 
   // ---------------------------------------------------------------------------
   // Row main-axis alignment
@@ -184,9 +230,7 @@ export const layoutCases: readonly LayoutCase[] = [
     row({}, leaf(40, 20), box({ width: 40, selfY: 'stretch' }), leaf(40, 50))
   ),
   testCase('cross/column-self-center', column({}, leaf(40, 20), leaf(40, 20, { selfX: 'center' }), leaf(100, 20))),
-  testCase('cross/stretch-does-not-override-explicit-cross-size', row({ y: 'stretch' }, leaf(40, 20), leaf(40, 50)), {
-    divergence: 'Nodal stretches an item that has an explicit cross size; CSS leaves a definite cross size alone.'
-  }),
+  testCase('cross/stretch-does-not-override-explicit-cross-size', row({ y: 'stretch' }, leaf(40, 20), leaf(40, 50))),
 
   // ---------------------------------------------------------------------------
   // Flex grow
@@ -231,10 +275,7 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('shrink/clamped-remainder-redistributes', row({}, leaf(200, 20, { minWidth: 180 }), leaf(200, 20)), {
     divergence: 'Nodal does not redistribute the deficit a min clamp leaves behind onto the remaining shrinkable items.'
   }),
-  testCase('shrink/no-shrink-overflows-parent', row({}, leaf(400, 20, { flexShrink: 0 })), {
-    divergence:
-      "Nodal clamps a child to its parent's max constraint at measure time; CSS lets an unshrinkable item overflow."
-  }),
+  testCase('shrink/no-shrink-overflows-parent', row({}, leaf(400, 20, { flexShrink: 0 }))),
 
   // ---------------------------------------------------------------------------
   // Flex basis
@@ -291,10 +332,7 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('stack/children-at-origin', column({}, box({}, leaf(40, 20), leaf(60, 10)))),
   testCase('stack/sizes-to-largest-child', column({}, box({ padding: 5 }, leaf(40, 20), leaf(20, 50)))),
   testCase('stack/explicit-size-with-children', column({}, box({ width: 100, height: 80 }, leaf(40, 20)))),
-  testCase('stack/child-wider-than-explicit-box', column({}, box({ width: 50, height: 50 }, leaf(80, 20))), {
-    divergence:
-      "Nodal clamps a child to its parent's max constraint at measure time; CSS lets it overflow at its explicit size."
-  }),
+  testCase('stack/child-wider-than-explicit-box', column({}, box({ width: 50, height: 50 }, leaf(80, 20)))),
   testCase(
     'stack/nested-row-inside-box',
     column({}, box({ padding: 10 }, row({ gap: 5 }, leaf(20, 20), leaf(20, 20))))
@@ -321,6 +359,66 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('text/explicit-width-wins', column({}, text('hello world', { width: 30 }))),
   testCase('text/cross-centered-in-row', row({ y: 'center' }, text('hi'), leaf(20, 40))),
   testCase('text/column-of-lines', column({ gap: 4 }, text('one'), text('three'), text('fourteen'))),
+
+  // ---------------------------------------------------------------------------
+  // Paragraphs: real text in Ahem (1em glyphs, 12px lines at 10px)
+  // ---------------------------------------------------------------------------
+  ahem('paragraph/natural-width-when-it-fits', column({}, paragraph('abcd efgh'))),
+  ahem('paragraph/wraps-at-column-width', column({ width: 100 }, paragraph('abcd efgh ijkl mnop'))),
+  ahem(
+    'paragraph/fit-content-is-available-width-once-wrapped',
+    column({ width: 80 }, paragraph('abcd efgh ijkl'), leaf(20, 10))
+  ),
+  ahem('paragraph/long-word-overflows', column({ width: 50 }, paragraph('abcdefghij kl'))),
+  ahem('paragraph/char-wrap-breaks-anywhere', column({ width: 50 }, paragraph('abcdefghijkl', { textWrap: 'char' }))),
+  ahem('paragraph/nowrap-single-line', column({ width: 50 }, paragraph('abcd efgh', { textWrap: 'none' }))),
+  ahem('paragraph/hard-break', column({}, paragraph('ab\ncdef'))),
+  ahem('paragraph/blank-line', column({}, paragraph('ab\n\ncd'))),
+  ahem(
+    'paragraph/max-lines-clamps-height',
+    column({ width: 100 }, paragraph('abcd efgh ijkl mnop qrst', { maxLines: 2 }))
+  ),
+  ahem(
+    'paragraph/max-lines-ellipsis-keeps-geometry',
+    column({ width: 100 }, paragraph('abcd efgh ijkl mnop qrst', { maxLines: 2, textOverflow: 'ellipsis' }))
+  ),
+  ahem('paragraph/padding-narrows-the-wrap-width', column({ width: 100 }, paragraph('abcd efgh ijkl', { padding: 5 }))),
+  ahem(
+    'paragraph/stretched-in-column-wraps-at-full-width',
+    column({ width: 100, x: 'stretch' }, paragraph('abcd efgh ijkl'))
+  ),
+  ahem(
+    'paragraph/text-in-row-shrinks-and-wraps',
+    row({ width: 100 }, paragraph('abcd efgh ijkl'), leaf(40, 10, { flexShrink: 0 }))
+  ),
+  ahem('paragraph/two-texts-shrink-by-max-content', row({ width: 100 }, paragraph('abcd efgh'), paragraph('ab cd'))),
+  ahem(
+    'paragraph/ellipsis-in-shrunk-row-item',
+    row({ width: 60 }, paragraph('abcdefghij', { textWrap: 'none', textOverflow: 'ellipsis' }))
+  ),
+  ahem(
+    'paragraph/grown-column-rewraps-wider',
+    row({ width: 120 }, column({ flexGrow: 1, x: 'stretch' }, paragraph('ab cd ef gh ij kl')))
+  ),
+  ahem(
+    'paragraph/baseline-aligns-different-sizes',
+    row({ y: 'baseline' }, paragraph('ab'), paragraph('cd', { fontSize: 20 }))
+  ),
+  ahem('paragraph/baseline-with-padding', row({ y: 'baseline' }, paragraph('ab', { paddingTop: 10 }), paragraph('cd'))),
+  ahem(
+    'paragraph/baseline-with-margin',
+    row({ y: 'baseline' }, paragraph('ab', { marginTop: 4 }), paragraph('cd', { fontSize: 20 }))
+  ),
+  ahem('paragraph/baseline-synthesized-from-box-bottom', row({ y: 'baseline' }, leaf(20, 30), paragraph('ab'))),
+  ahem(
+    'paragraph/baseline-of-nested-column-is-first-child',
+    row({ y: 'baseline' }, column({}, paragraph('ab', { fontSize: 20 }), paragraph('cd')), paragraph('ef'))
+  ),
+  ahem(
+    'paragraph/self-baseline-in-start-row',
+    row({}, paragraph('ab', { selfY: 'baseline' }), paragraph('cd', { fontSize: 20, selfY: 'baseline' }), leaf(10, 40))
+  ),
+  ahem('paragraph/custom-line-height', column({}, paragraph('ab cd', { lineHeight: 20, width: 20 }))),
 
   // ---------------------------------------------------------------------------
   // Nesting

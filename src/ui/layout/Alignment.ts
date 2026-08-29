@@ -11,7 +11,9 @@ export enum CrossAxisAlignment {
   Start = 0,
   Center = 1,
   End = 2,
-  Stretch = 3
+  Stretch = 3,
+  /** Rows only: align first baselines. A column treats it as Start. */
+  Baseline = 4
 }
 
 export function parseMainAxisAlignment(value: unknown): MainAxisAlignment {
@@ -44,6 +46,8 @@ export function parseCrossAxisAlignment(value: unknown): CrossAxisAlignment | un
         return CrossAxisAlignment.End;
       case 'stretch':
         return CrossAxisAlignment.Stretch;
+      case 'baseline':
+        return CrossAxisAlignment.Baseline;
     }
   }
   if (typeof value === 'number') {

@@ -314,7 +314,6 @@ describe('buildRenderList scrolling', () => {
   });
 });
 
-
 /**
  * Logical sizes and device pixel ratios that put the clip rect's
  * edges at awkward fractions of a physical pixel. The 1.3333333730697632

@@ -233,7 +233,8 @@ describe('Canvas2DRenderer paint order', () => {
       [0, 0, 100, 80],
       [0, 0, 50, 50]
     ]);
-    expect(callArgs(h.context, 'fillText')).toEqual([['T', 0, 0, 100]]);
+    // Glyphs sit on the alphabetic baseline: half-leading plus ascent below the line top.
+    expect(callArgs(h.context, 'fillText')).toEqual([['T', 0, 11.4]]);
   });
 });
 
@@ -428,8 +429,24 @@ describe('Canvas2DRenderer text', () => {
     h.render(root);
     expect(callArgs(h.context, 'set:font')).toEqual(['normal 14px sans-serif']);
     expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#000']);
-    expect(callArgs(h.context, 'set:textBaseline')).toEqual(['top']);
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, 10, 42]]);
+    expect(callArgs(h.context, 'set:textBaseline')).toEqual(['alphabetic']);
+    // 16.8 line box around a 14px font: 1.4 half-leading + 11.2 ascent.
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, 22.6]]);
+  });
+
+  it("draws text inside the node's own padding", () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const text = h.createNode('text', UiNodeType.Text);
+    text.setProperty('text', 'Hello');
+    text.setProperty('fontSize', 14);
+    text.setProperty('padding', 6);
+    h.append(root, text);
+    h.layout(root);
+    h.render(root);
+    // Box is 42 + 12 wide; the glyphs start after the left padding and
+    // sit on the baseline 6 + 12.6 below the box top.
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 6, 18.6]]);
   });
 
   it('centers text within a wider box', () => {
@@ -444,7 +461,7 @@ describe('Canvas2DRenderer text', () => {
     h.append(root, text);
     h.layout(root);
     h.render(root);
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 39, 10, 100]]);
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 39, 22.6]]);
   });
 
   it('aligns text vertically within the box', () => {
@@ -460,7 +477,7 @@ describe('Canvas2DRenderer text', () => {
     h.append(root, text);
     h.layout(root);
     h.render(root);
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, 26.6, 100]]);
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, 39.2]]);
   });
 });
 

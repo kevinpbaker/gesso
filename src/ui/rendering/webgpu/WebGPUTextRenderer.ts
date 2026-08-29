@@ -1,7 +1,13 @@
 import type { TextMeasurer } from '../../layout/TextMeasurer';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import { layoutTextLines, buildFontString } from '../TextRenderer';
-import { createPaintState, type TextAlign, type VerticalAlign } from '../PaintState';
+import {
+  createPaintState,
+  normalizeTextOverflow,
+  normalizeTextWrap,
+  type TextAlign,
+  type VerticalAlign
+} from '../PaintState';
 import { createTextPipeline, TEXT_INSTANCE_STRIDE_FLOATS, type TextPipeline } from './WebGPUTextPipeline';
 import type { TextRenderItem } from './WebGPURenderData';
 import { viewportScissor } from './WebGPURenderData';
@@ -174,6 +180,9 @@ export class WebGPUTextRenderer {
     paint.lineHeight = item.lineHeight;
     paint.textAlign = item.textAlign as TextAlign;
     paint.verticalAlign = item.verticalAlign as VerticalAlign;
+    paint.textWrap = normalizeTextWrap(item.textWrap);
+    paint.maxLines = item.maxLines;
+    paint.textOverflow = normalizeTextOverflow(item.textOverflow);
 
     const placements = layoutTextLines(box, paint, measurer);
     if (placements.length === 0) {
@@ -183,11 +192,11 @@ export class WebGPUTextRenderer {
     ctx.font = buildFontString(paint);
     ctx.fillStyle = item.textColor;
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'alphabetic';
 
     for (const placement of placements) {
       const drawX = Math.round((placement.x - snapX) * dpr) / dpr;
-      const drawY = Math.round((placement.y - snapY) * dpr) / dpr;
+      const drawY = Math.round((placement.baselineY - snapY) * dpr) / dpr;
       ctx.fillText(placement.text, drawX, drawY);
     }
 
@@ -233,6 +242,9 @@ function cacheKey(item: TextRenderItem, width: number, height: number): string {
     String(item.lineHeight),
     item.textAlign,
     item.verticalAlign,
+    item.textWrap,
+    String(item.maxLines ?? ''),
+    item.textOverflow,
     item.textColor,
     String(width),
     String(height)
