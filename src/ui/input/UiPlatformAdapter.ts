@@ -1,4 +1,4 @@
-import { type UiModifiers } from './UiInputEvent';
+import { type UiKeyModifiers } from './UiInputEvent';
 import type { UiKeyboardController } from './UiKeyboardController';
 import type { UiPointerController } from './UiPointerController';
 import type { UiWheelController } from './UiWheelController';
@@ -167,7 +167,7 @@ function modifiersFromEvent(event: {
   ctrlKey: boolean;
   altKey: boolean;
   metaKey: boolean;
-}): UiModifiers {
+}): UiKeyModifiers {
   return {
     shift: event.shiftKey,
     ctrl: event.ctrlKey,

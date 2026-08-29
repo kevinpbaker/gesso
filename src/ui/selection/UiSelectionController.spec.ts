@@ -7,7 +7,7 @@ import { LayoutEngine } from '../layout/LayoutEngine';
 import { Constraints } from '../layout/LayoutTypes';
 import { CharacterCountTextMeasurer } from '../layout/TextMeasurer';
 import { UiHitTester } from '../input/UiHitTester';
-import { noModifiers, type UiModifiers } from '../input/UiInputEvent';
+import { noKeyModifiers, type UiKeyModifiers } from '../input/UiInputEvent';
 import { UiSelectionController } from './UiSelectionController';
 import { selectionRangeOf } from './UiSelectable';
 
@@ -33,7 +33,7 @@ interface Scene {
   copied: string[];
   blurred: number;
   dirty: UiNode[];
-  press(node: UiNode | null, x: number, y: number, modifiers?: UiModifiers): void;
+  press(node: UiNode | null, x: number, y: number, modifiers?: UiKeyModifiers): void;
   drag(x: number, y: number): void;
 }
 
@@ -91,7 +91,7 @@ function scene(): Scene {
       return state.blurred;
     },
     dirty,
-    press: (target, x, y, modifiers = noModifiers()) => controller.pointerDown(target, x, y, modifiers),
+    press: (target, x, y, modifiers = noKeyModifiers()) => controller.pointerDown(target, x, y, modifiers),
     drag: (x, y) => controller.pointerMove(x, y)
   };
 }
@@ -160,7 +160,7 @@ describe('UiSelectionController', () => {
     it('extends from the existing anchor when Shift is held', () => {
       const s = scene();
       s.press(s.first, 20, 5);
-      s.press(s.second, 30, 17, { ...noModifiers(), shift: true });
+      s.press(s.second, 30, 17, { ...noKeyModifiers(), shift: true });
       expect(ranges(s)).toEqual(['2-11', '0-3', undefined]);
     });
 
@@ -214,7 +214,7 @@ describe('UiSelectionController', () => {
   });
 
   describe('keyboard', () => {
-    const ctrl = { ...noModifiers(), ctrl: true };
+    const ctrl = { ...noKeyModifiers(), ctrl: true };
 
     it('copies the selection', () => {
       const s = scene();
@@ -239,17 +239,17 @@ describe('UiSelectionController', () => {
 
     it('clears on Escape, and only when there is something to clear', () => {
       const s = scene();
-      expect(s.controller.handleKey('Escape', noModifiers())).toBe(false);
+      expect(s.controller.handleKey('Escape', noKeyModifiers())).toBe(false);
       s.controller.handleKey('a', ctrl);
-      expect(s.controller.handleKey('Escape', noModifiers())).toBe(true);
+      expect(s.controller.handleKey('Escape', noKeyModifiers())).toBe(true);
       expect(s.controller.hasSelection).toBe(false);
     });
 
     it('ignores the same keys without the platform modifier', () => {
       const s = scene();
       s.controller.handleKey('a', ctrl);
-      expect(s.controller.handleKey('c', noModifiers())).toBe(false);
-      expect(s.controller.handleKey('a', noModifiers())).toBe(false);
+      expect(s.controller.handleKey('c', noKeyModifiers())).toBe(false);
+      expect(s.controller.handleKey('a', noKeyModifiers())).toBe(false);
       expect(s.copied).toEqual([]);
     });
   });
@@ -257,7 +257,7 @@ describe('UiSelectionController', () => {
   describe('lifetime', () => {
     it('drops the selection when one of its nodes leaves the tree', () => {
       const s = scene();
-      s.controller.handleKey('a', { ...noModifiers(), ctrl: true });
+      s.controller.handleKey('a', { ...noKeyModifiers(), ctrl: true });
       expect(s.controller.hasSelection).toBe(true);
       s.controller.handleNodeRemoved(s.second);
       expect(s.controller.hasSelection).toBe(false);
@@ -266,7 +266,7 @@ describe('UiSelectionController', () => {
 
     it('ignores a node that was never part of it', () => {
       const s = scene();
-      s.controller.handleKey('a', { ...noModifiers(), ctrl: true });
+      s.controller.handleKey('a', { ...noKeyModifiers(), ctrl: true });
       s.controller.handleNodeRemoved(s.label);
       expect(s.controller.hasSelection).toBe(true);
     });

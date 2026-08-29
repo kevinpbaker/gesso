@@ -101,7 +101,7 @@ function initMessage(canvas: CanvasHost, width = 800, height = 600): ShellToRunt
   return { type: 'init', canvas: canvas as unknown as OffscreenCanvas, width, height, dpr: 2 };
 }
 
-const noModifiers = { shift: false, ctrl: false, alt: false, meta: false };
+const noKeyModifiers = { shift: false, ctrl: false, alt: false, meta: false };
 
 describe('RenderWorkerApp', () => {
   it('builds and paints when the shell sends the canvas', async () => {
@@ -140,8 +140,8 @@ describe('RenderWorkerApp', () => {
 
     send(initMessage(createMockCanvas()));
     // The Box sits below the text line, inside its 200x100 box.
-    send({ type: 'pointerDown', x: 40, y: 40, buttons: 1, modifiers: noModifiers });
-    send({ type: 'pointerUp', x: 40, y: 40, buttons: 0, modifiers: noModifiers });
+    send({ type: 'pointerDown', x: 40, y: 40, buttons: 1, modifiers: noKeyModifiers });
+    send({ type: 'pointerUp', x: 40, y: 40, buttons: 0, modifiers: noKeyModifiers });
 
     expect(clicks).toEqual(['clicked']);
   });
@@ -180,7 +180,7 @@ describe('RenderWorkerApp', () => {
     const { host, sent, send } = createFakeWorkerGlobal();
     new RenderWorkerApp(createComponent(WorkerRoot), host);
 
-    expect(() => send({ type: 'pointerDown', x: 10, y: 10, buttons: 1, modifiers: noModifiers })).not.toThrow();
+    expect(() => send({ type: 'pointerDown', x: 10, y: 10, buttons: 1, modifiers: noKeyModifiers })).not.toThrow();
     expect(clicks).toEqual([]);
     expect(sent.filter(m => m.type === 'error')).toHaveLength(0);
   });
@@ -222,7 +222,7 @@ describe('RenderWorkerApp inspector', () => {
     expect(sent.filter(m => m.type === 'inspect').at(-1)).toEqual({ type: 'inspect', text: null });
 
     // Hover the 200×100 box below the text line.
-    send({ type: 'pointerMove', x: 40, y: 40, buttons: 0, modifiers: noModifiers });
+    send({ type: 'pointerMove', x: 40, y: 40, buttons: 0, modifiers: noKeyModifiers });
     const inspect = sent.filter(m => m.type === 'inspect').at(-1);
     expect(inspect && 'text' in inspect && inspect.text).toMatch(/^box '.*' — 200 × 100 at/);
     expect(inspect && 'text' in inspect && inspect.text).toMatch(/width {2}200 {5}width: 200 \(explicit\)/);
@@ -240,11 +240,11 @@ describe('RenderWorkerApp cursor', () => {
     await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
 
     // Over the box, which asks for a pointer.
-    send({ type: 'pointerMove', x: 40, y: 40, buttons: 0, modifiers: noModifiers });
+    send({ type: 'pointerMove', x: 40, y: 40, buttons: 0, modifiers: noKeyModifiers });
     expect(sent.filter(m => m.type === 'cursor').at(-1)).toEqual({ type: 'cursor', cursor: 'pointer' });
 
     // Off it: the shell restores the default.
-    send({ type: 'pointerMove', x: 700, y: 500, buttons: 0, modifiers: noModifiers });
+    send({ type: 'pointerMove', x: 700, y: 500, buttons: 0, modifiers: noKeyModifiers });
     expect(sent.filter(m => m.type === 'cursor').at(-1)).toEqual({ type: 'cursor', cursor: null });
   });
 });

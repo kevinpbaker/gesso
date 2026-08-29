@@ -5,7 +5,7 @@ import { mockCanvas } from './RuntimeTestUtils';
 import { LazyColumn, Row, Text } from '../../ui/composition';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
-import { noModifiers } from '../../ui/input/UiInputEvent';
+import { noKeyModifiers } from '../../ui/input/UiInputEvent';
 import { UiManualFrameClock } from '../../ui/scheduler';
 
 function countNodes(root: UiNode, type: UiNodeType): number {
@@ -63,7 +63,7 @@ describe('NodalRuntime lazy lists', () => {
 
   it('mounts new rows on the frame that scrolls to them and unmounts the old ones', () => {
     const { runtime, frame, list, renders } = mount();
-    runtime.input.wheel.wheel(100, 100, 0, 2000, noModifiers());
+    runtime.input.wheel.wheel(100, 100, 0, 2000, noKeyModifiers());
     frame();
     // Scrolled 2000: rows 100..110 touch the viewport (110 at its edge),
     // plus 2 overscan each side → 98..112.
@@ -89,7 +89,7 @@ describe('NodalRuntime lazy lists', () => {
     const { runtime, list } = mount(1000);
     const rec = runtime.debugLayoutBox(list);
     expect(rec.height).toBe(200);
-    runtime.input.wheel.wheel(100, 100, 0, 1_000_000, noModifiers());
+    runtime.input.wheel.wheel(100, 100, 0, 1_000_000, noKeyModifiers());
     // Clamped by the engine to content − viewport: 1000 × 20 − 200.
     expect(list.getProperty('scrollY')).toBe(1_000_000);
     runtime.dispose();

@@ -35,15 +35,21 @@ export enum UiEventType {
   PanEnd = 'panend'
 }
 
-/** Keyboard modifier state attached to events that carry one. */
-export interface UiModifiers {
+/**
+ * Keyboard modifier state attached to events that carry one.
+ *
+ * Named `UiKeyModifiers`, not `UiModifiers`: a modifier in
+ * `MODIFIERS_ROADMAP.md` is a behaviour attached to an element, and one
+ * word meaning two things in one package is a permanent tax.
+ */
+export interface UiKeyModifiers {
   ctrl: boolean;
   shift: boolean;
   alt: boolean;
   meta: boolean;
 }
 
-export function noModifiers(): UiModifiers {
+export function noKeyModifiers(): UiKeyModifiers {
   return { ctrl: false, shift: false, alt: false, meta: false };
 }
 
@@ -146,7 +152,7 @@ export class UiPointerEvent extends UiInputEvent {
     readonly x: number,
     readonly y: number,
     readonly buttons: number = 0,
-    readonly modifiers: UiModifiers = noModifiers()
+    readonly modifiers: UiKeyModifiers = noKeyModifiers()
   ) {
     super(type);
   }
@@ -163,7 +169,7 @@ export class UiKeyboardEvent extends UiInputEvent {
   constructor(
     type: UiEventType.KeyDown | UiEventType.KeyUp,
     readonly key: string,
-    readonly modifiers: UiModifiers = noModifiers()
+    readonly modifiers: UiKeyModifiers = noKeyModifiers()
   ) {
     super(type);
   }
@@ -218,7 +224,7 @@ export class UiWheelEvent extends UiInputEvent {
     readonly y: number,
     readonly deltaX: number,
     readonly deltaY: number,
-    readonly modifiers: UiModifiers = noModifiers()
+    readonly modifiers: UiKeyModifiers = noKeyModifiers()
   ) {
     super(type);
   }

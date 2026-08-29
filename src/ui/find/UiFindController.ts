@@ -7,7 +7,7 @@ import { createPaintState, resolvePaintState } from '../rendering/PaintState';
 import { selectableTextNodes, selectableTextOf, type TextRange } from '../selection/UiSelectable';
 import { paragraphGeometry, selectionRectsIn } from '../selection/TextSelectionGeometry';
 import type { UiSelectionController } from '../selection/UiSelectionController';
-import type { UiModifiers } from '../input/UiInputEvent';
+import type { UiKeyModifiers } from '../input/UiInputEvent';
 import { detectEditingPlatform, type EditingPlatform } from '../editing/EditingKeymap';
 import { findMatchesIn, type FindMatch, type FindOptions } from './TextFind';
 import { clearMatchRanges, setMatchRanges } from './UiTextMatches';
@@ -138,7 +138,7 @@ export class UiFindController {
    * while a session is running, so it still clears a selection
    * otherwise.
    */
-  handleKey(key: string, modifiers: UiModifiers): boolean {
+  handleKey(key: string, modifiers: UiKeyModifiers): boolean {
     const primary = this.platform === 'mac' ? modifiers.meta : modifiers.ctrl;
     if (primary && !modifiers.alt && (key === 'f' || key === 'F')) {
       this.open();

@@ -11,7 +11,7 @@ import { wordRangeAt, lineStartAt, lineEndAt } from '../editing/TextBoundaries';
 import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
-import { UiBeforeInputEvent, UiTextChangeEvent, type UiModifiers } from './UiInputEvent';
+import { UiBeforeInputEvent, UiTextChangeEvent, type UiKeyModifiers } from './UiInputEvent';
 
 /**
  * What the controller needs from the runtime around it: geometry,
@@ -118,7 +118,7 @@ export class UiEditingController {
    * when the key was an editing command, so the caller can mark the
    * event handled.
    */
-  handleKey(node: UiNode, key: string, modifiers: UiModifiers): boolean {
+  handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers): boolean {
     if (!isEditableNode(node)) {
       return false;
     }
@@ -361,7 +361,7 @@ export class UiEditingController {
    * selects the word, a third the line. Dragging afterwards extends the
    * selection from the anchor.
    */
-  pointerDown(node: UiNode, x: number, y: number, modifiers: UiModifiers): void {
+  pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void {
     if (!isEditableNode(node)) {
       return;
     }

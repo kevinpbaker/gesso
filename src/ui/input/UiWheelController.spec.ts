@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType, type UiModifiers } from './UiInputEvent';
+import { UiEventType, type UiKeyModifiers } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import type { UiWheelController } from './UiWheelController';
 
@@ -132,9 +132,9 @@ describe('UiWheelController', () => {
 
   it('carries the modifiers on the event', () => {
     const { h, controller } = setupVertical();
-    const received: UiModifiers[] = [];
+    const received: UiKeyModifiers[] = [];
     h.dispatcher.addEventListener(h.root, UiEventType.Wheel, event => {
-      received.push((event as unknown as { modifiers: UiModifiers }).modifiers);
+      received.push((event as unknown as { modifiers: UiKeyModifiers }).modifiers);
     });
 
     controller.wheel(50, 50, 0, 10, { shift: true, ctrl: false, alt: false, meta: false });

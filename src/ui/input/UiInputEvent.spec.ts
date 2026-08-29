@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UiEventType, UiFocusEvent, UiInputEvent, noModifiers } from './UiInputEvent';
+import { UiEventType, UiFocusEvent, UiInputEvent, noKeyModifiers } from './UiInputEvent';
 
 describe('UiInputEvent', () => {
   it('starts with a clean dispatch state', () => {
@@ -54,7 +54,7 @@ describe('UiInputEvent', () => {
     expect(event.relatedNode?.id).toBe('next');
   });
 
-  it('noModifiers returns an all-false modifier set', () => {
-    expect(noModifiers()).toEqual({ ctrl: false, shift: false, alt: false, meta: false });
+  it('noKeyModifiers returns an all-false modifier set', () => {
+    expect(noKeyModifiers()).toEqual({ ctrl: false, shift: false, alt: false, meta: false });
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Button, Column, Text } from '../../ui/composition/UiComponents';
 import type { UiElement } from '../../ui/composition/UiElement';
-import { noModifiers, type UiModifiers } from '../../ui/input/UiInputEvent';
+import { noKeyModifiers, type UiKeyModifiers } from '../../ui/input/UiInputEvent';
 import { matchRangesOf } from '../../ui/find/UiTextMatches';
 import { selectionRangeOf } from '../../ui/selection/UiSelectable';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -14,7 +14,7 @@ import { mockCanvas } from './RuntimeTestUtils';
 
 /** 7px per character, so an offset's x is 7 × offset in the default 14px font. */
 
-const ctrl = (): UiModifiers => ({ ...noModifiers(), ctrl: true });
+const ctrl = (): UiKeyModifiers => ({ ...noKeyModifiers(), ctrl: true });
 
 function mount(root: UiElement) {
   let clock!: UiManualFrameClock;
@@ -48,7 +48,7 @@ function mount(root: UiElement) {
     texts,
     find: runtime.input.find,
     store: runtime.stores.get(FindStore),
-    key: (name: string, modifiers: UiModifiers = noModifiers()) => runtime.input.keyboard.keyDown(name, modifiers)
+    key: (name: string, modifiers: UiKeyModifiers = noKeyModifiers()) => runtime.input.keyboard.keyDown(name, modifiers)
   };
 }
 

@@ -1,5 +1,5 @@
 import type { UiNode } from '../graph/UiNode';
-import { noModifiers, UiEventType, UiPointerEvent, type UiModifiers } from './UiInputEvent';
+import { noKeyModifiers, UiEventType, UiPointerEvent, type UiKeyModifiers } from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
 import { UiInputDispatcher } from './UiInputDispatcher';
 import type { GestureInput } from './UiGestureRecognizer';
@@ -43,7 +43,7 @@ export interface PointerControllerOptions {
    */
   editing?: {
     isEditable(node: UiNode): boolean;
-    pointerDown(node: UiNode, x: number, y: number, modifiers: UiModifiers): void;
+    pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
     pointerMove(node: UiNode, x: number, y: number): void;
     pointerUp(): void;
   };
@@ -59,7 +59,7 @@ export interface PointerControllerOptions {
    * node boundaries while the press is captured.
    */
   selection?: {
-    pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiModifiers): void;
+    pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiKeyModifiers): void;
     pointerMove(x: number, y: number): void;
     pointerUp(): void;
     clear(): void;
@@ -161,7 +161,7 @@ export class UiPointerController {
    * dispatches PointerDown to the pressed node. Subsequent moves and
    * the up are routed to that node until release.
    */
-  pointerDown(x: number, y: number, buttons = 1, modifiers: UiModifiers = noModifiers()): UiPointerEvent {
+  pointerDown(x: number, y: number, buttons = 1, modifiers: UiKeyModifiers = noKeyModifiers()): UiPointerEvent {
     const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers);
     if (this.downTarget !== null || this.scrollbarDrag !== null) {
       return event;
@@ -202,7 +202,7 @@ export class UiPointerController {
    * hover enter/leave, and dispatches PointerMove to the hovered
    * node. Returns null when the move lands on empty space.
    */
-  pointerMove(x: number, y: number, buttons = 0, modifiers: UiModifiers = noModifiers()): UiPointerEvent | null {
+  pointerMove(x: number, y: number, buttons = 0, modifiers: UiKeyModifiers = noKeyModifiers()): UiPointerEvent | null {
     if (this.scrollbarDrag !== null) {
       this.dragScrollbar(x, y);
       return null;
@@ -245,7 +245,7 @@ export class UiPointerController {
    * cancelled via preventDefault on the down, synthesizes a Click on
    * the same node. Returns null when nothing was pressed.
    */
-  pointerUp(x: number, y: number, buttons = 0, modifiers: UiModifiers = noModifiers()): UiPointerEvent | null {
+  pointerUp(x: number, y: number, buttons = 0, modifiers: UiKeyModifiers = noKeyModifiers()): UiPointerEvent | null {
     if (this.scrollbarDrag !== null) {
       this.dragScrollbar(x, y);
       this.scrollbarDrag = null;
@@ -286,7 +286,7 @@ export class UiPointerController {
     if (this.downTarget === null) {
       return;
     }
-    const event = new UiPointerEvent(UiEventType.PointerCancel, this.downX, this.downY, 0, noModifiers());
+    const event = new UiPointerEvent(UiEventType.PointerCancel, this.downX, this.downY, 0, noKeyModifiers());
     this.dispatcher.dispatch(event, this.downTarget);
     this.gestures?.pointerCancel();
     this.downTarget = null;
@@ -380,7 +380,7 @@ export class UiPointerController {
    * between the two hovered nodes (the lowest common ancestor is
    * shared and never fires), matching mouseenter/mouseleave.
    */
-  private updateHover(next: UiNode | null, x: number, y: number, buttons: number, modifiers: UiModifiers): void {
+  private updateHover(next: UiNode | null, x: number, y: number, buttons: number, modifiers: UiKeyModifiers): void {
     if (next === this.hoverNode) {
       return;
     }
@@ -423,7 +423,7 @@ export class UiPointerController {
     x: number,
     y: number,
     buttons: number,
-    modifiers: UiModifiers
+    modifiers: UiKeyModifiers
   ): void {
     const event = new UiPointerEvent(type, x, y, buttons, modifiers);
     this.dispatcher.dispatch(event, node);

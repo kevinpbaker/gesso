@@ -1,4 +1,4 @@
-import type { UiModifiers } from '../input/UiInputEvent';
+import type { UiKeyModifiers } from '../input/UiInputEvent';
 import type { EditUnit } from './EditableTextModel';
 
 /** Which keyboard conventions apply: Command on a Mac, Control elsewhere. */
@@ -46,7 +46,7 @@ export function detectEditingPlatform(): EditingPlatform {
  */
 export function commandForKey(
   key: string,
-  modifiers: UiModifiers,
+  modifiers: UiKeyModifiers,
   platform: EditingPlatform,
   textFromKeys: boolean
 ): EditCommand | null {

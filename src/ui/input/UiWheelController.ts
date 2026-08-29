@@ -1,6 +1,6 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { noModifiers, UiEventType, UiWheelEvent, type UiModifiers } from './UiInputEvent';
+import { noKeyModifiers, UiEventType, UiWheelEvent, type UiKeyModifiers } from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
 import type { ScrollbarThumb } from '../layout/Scrollbars';
 import type { UiInputDispatcher } from './UiInputDispatcher';
@@ -47,7 +47,13 @@ export class UiWheelController {
     private readonly scrollSink: ScrollSink
   ) {}
 
-  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers: UiModifiers = noModifiers()): UiWheelEvent {
+  wheel(
+    x: number,
+    y: number,
+    deltaX: number,
+    deltaY: number,
+    modifiers: UiKeyModifiers = noKeyModifiers()
+  ): UiWheelEvent {
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
     const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers);
     if (target !== null) {

@@ -1,4 +1,4 @@
-import type { UiModifiers } from '../ui/input/UiInputEvent';
+import type { UiKeyModifiers } from '../ui/input/UiInputEvent';
 import type { PlaygroundMetrics } from './LayoutPlayground';
 
 /**
@@ -14,13 +14,13 @@ export type RenderWorkerMessage =
       port: MessagePort;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
-  | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiModifiers }
-  | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiModifiers }
-  | { type: 'pointerUp'; x: number; y: number; buttons: number; modifiers: UiModifiers }
+  | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers }
+  | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers }
+  | { type: 'pointerUp'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers }
   | { type: 'pointerCancel' }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiModifiers }
-  | { type: 'keyDown'; key: string; modifiers: UiModifiers }
-  | { type: 'keyUp'; key: string; modifiers: UiModifiers }
+  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiKeyModifiers }
+  | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers }
+  | { type: 'keyUp'; key: string; modifiers: UiKeyModifiers }
   | { type: 'dispose' };
 
 /**

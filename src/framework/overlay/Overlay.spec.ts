@@ -9,7 +9,7 @@ import { OverlayStore } from './OverlayStore';
 import { Box, Button, Column, Text } from '../../ui/composition/UiComponents';
 import type { UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
-import { noModifiers } from '../../ui/input/UiInputEvent';
+import { noKeyModifiers } from '../../ui/input/UiInputEvent';
 import { UiManualFrameClock } from '../../ui/scheduler';
 
 const pressed: string[] = [];
@@ -172,21 +172,21 @@ describe('overlays', () => {
     frame();
 
     // Inside the menu item (20..140 × 50..80): the item, not the box under it.
-    runtime.input.pointer.pointerDown(60, 65, 1, noModifiers());
-    runtime.input.pointer.pointerUp(60, 65, 0, noModifiers());
+    runtime.input.pointer.pointerDown(60, 65, 1, noKeyModifiers());
+    runtime.input.pointer.pointerUp(60, 65, 0, noKeyModifiers());
     expect(pressed).toEqual(['menu-item']);
     expect(overlays.isOpen('menu')).toBe(true);
 
     // Outside: the backdrop takes the press, closes the menu, and the
     // app underneath does not see it.
-    runtime.input.pointer.pointerDown(300, 250, 1, noModifiers());
-    runtime.input.pointer.pointerUp(300, 250, 0, noModifiers());
+    runtime.input.pointer.pointerDown(300, 250, 1, noKeyModifiers());
+    runtime.input.pointer.pointerUp(300, 250, 0, noKeyModifiers());
     expect(overlays.isOpen('menu')).toBe(false);
     expect(pressed).toEqual(['menu-item']);
     frame();
 
     // With the menu gone the app receives presses again.
-    runtime.input.pointer.pointerDown(300, 250, 1, noModifiers());
+    runtime.input.pointer.pointerDown(300, 250, 1, noKeyModifiers());
     expect(pressed).toEqual(['menu-item', 'underneath']);
     runtime.dispose();
   });
@@ -201,7 +201,7 @@ describe('overlays', () => {
       content: Box({ width: 120, height: 30 })
     });
     frame();
-    runtime.input.wheel.wheel(300, 250, 0, 40, noModifiers());
+    runtime.input.wheel.wheel(300, 250, 0, 40, noKeyModifiers());
     expect(overlays.isOpen('menu')).toBe(false);
     runtime.dispose();
   });

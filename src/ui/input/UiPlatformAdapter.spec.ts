@@ -150,7 +150,7 @@ describe('UiPlatformAdapter', () => {
     expect(up).toHaveBeenCalledTimes(1);
   });
 
-  it('maps DOM modifier keys to UiModifiers', () => {
+  it('maps DOM modifier keys to UiKeyModifiers', () => {
     const { a, h, surface } = setup();
     const received: { shift: boolean; ctrl: boolean; alt: boolean; meta: boolean }[] = [];
     h.dispatcher.addEventListener(a, UiEventType.PointerDown, event => {

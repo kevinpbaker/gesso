@@ -7,7 +7,7 @@ import { createPaintState, resolvePaintState } from '../rendering/PaintState';
 import { detectEditingPlatform, type EditingPlatform } from '../editing/EditingKeymap';
 import { lineEndAt, lineStartAt } from '../editing/TextBoundaries';
 import type { HitTester } from '../input/UiHitTester';
-import type { UiModifiers } from '../input/UiInputEvent';
+import type { UiKeyModifiers } from '../input/UiInputEvent';
 import {
   clearSelectionRange,
   selectableTextNodes,
@@ -126,7 +126,7 @@ export class UiSelectionController {
    * Returns true when a selection is now in progress, so the caller
    * knows the press was consumed.
    */
-  pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiModifiers): boolean {
+  pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiKeyModifiers): boolean {
     if (node === null || !this.isSelectable(node)) {
       this.clear();
       return false;
@@ -208,7 +208,7 @@ export class UiSelectionController {
    * selection, select everything, or clear it. Returns true when the
    * key was consumed.
    */
-  handleKey(key: string, modifiers: UiModifiers): boolean {
+  handleKey(key: string, modifiers: UiKeyModifiers): boolean {
     const primary = this.platform === 'mac' ? modifiers.meta : modifiers.ctrl;
     if (primary && (key === 'c' || key === 'C')) {
       const text = this.selectedText();

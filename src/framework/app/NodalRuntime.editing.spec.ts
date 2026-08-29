@@ -6,7 +6,7 @@ import type { UiElement } from '../../ui/composition/UiElement';
 import { editorOf } from '../../ui/editing/UiEditable';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
-import { noModifiers, type UiModifiers, type UiTextChangeEvent } from '../../ui/input/UiInputEvent';
+import { noKeyModifiers, type UiKeyModifiers, type UiTextChangeEvent } from '../../ui/input/UiInputEvent';
 import type { EditingState } from '../../ui/input/UiEditingController';
 import type { CanvasHost } from '../../ui/rendering';
 import { UiManualFrameClock } from '../../ui/scheduler';
@@ -52,7 +52,7 @@ function mockCanvas(): CanvasHost {
   return { width: 800, height: 600, getContext: () => ctx as unknown as CanvasRenderingContext2D };
 }
 
-const mods = (partial: Partial<UiModifiers>): UiModifiers => ({ ...noModifiers(), ...partial });
+const mods = (partial: Partial<UiKeyModifiers>): UiKeyModifiers => ({ ...noKeyModifiers(), ...partial });
 
 function mount(root: UiElement) {
   let clock!: UiManualFrameClock;
@@ -99,8 +99,9 @@ function mount(root: UiElement) {
       runtime.input.keyboard.keyUp(character);
     }
   };
-  const key = (name: string, modifiers: UiModifiers = noModifiers()) => runtime.input.keyboard.keyDown(name, modifiers);
-  const press = (x: number, y: number, modifiers: UiModifiers = noModifiers()): void => {
+  const key = (name: string, modifiers: UiKeyModifiers = noKeyModifiers()) =>
+    runtime.input.keyboard.keyDown(name, modifiers);
+  const press = (x: number, y: number, modifiers: UiKeyModifiers = noKeyModifiers()): void => {
     runtime.input.pointer.pointerDown(x, y, 1, modifiers);
     runtime.input.pointer.pointerUp(x, y, 0, modifiers);
   };
@@ -321,8 +322,8 @@ describe('NodalRuntime editing', () => {
 
   it('selects a word on double-click and the line on triple-click', () => {
     const { runtime, model } = mount(Column(EditableText({ value: 'one two three' })));
-    const down = () => runtime.input.pointer.pointerDown(7 * 5, 5, 1, noModifiers());
-    const up = () => runtime.input.pointer.pointerUp(7 * 5, 5, 0, noModifiers());
+    const down = () => runtime.input.pointer.pointerDown(7 * 5, 5, 1, noKeyModifiers());
+    const up = () => runtime.input.pointer.pointerUp(7 * 5, 5, 0, noKeyModifiers());
     down();
     up();
     down();
@@ -335,12 +336,12 @@ describe('NodalRuntime editing', () => {
 
   it('extends the selection while dragging', () => {
     const { runtime, model } = mount(Column(EditableText({ value: 'hello' })));
-    runtime.input.pointer.pointerDown(7, 5, 1, noModifiers());
-    runtime.input.pointer.pointerMove(7 * 4, 5, 1, noModifiers());
+    runtime.input.pointer.pointerDown(7, 5, 1, noKeyModifiers());
+    runtime.input.pointer.pointerMove(7 * 4, 5, 1, noKeyModifiers());
     expect(model().anchor).toBe(1);
     expect(model().focus).toBe(4);
-    runtime.input.pointer.pointerUp(7 * 4, 5, 0, noModifiers());
-    runtime.input.pointer.pointerMove(0, 5, 0, noModifiers());
+    runtime.input.pointer.pointerUp(7 * 4, 5, 0, noKeyModifiers());
+    runtime.input.pointer.pointerMove(0, 5, 0, noKeyModifiers());
     expect(model().focus).toBe(4);
   });
 
@@ -388,7 +389,7 @@ describe('NodalRuntime editing', () => {
     press(100, 5);
     key('Tab');
     expect(runtime.input.focus.focusedNode).toBe(find(UiNodeType.Button));
-    runtime.input.pointer.pointerMove(5, 5, 0, noModifiers());
+    runtime.input.pointer.pointerMove(5, 5, 0, noKeyModifiers());
     tick();
     expect(runtime.cursor).toBe('text');
   });

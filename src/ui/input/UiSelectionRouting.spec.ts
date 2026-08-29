@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { CharacterCountTextMeasurer } from '../layout/TextMeasurer';
-import { noModifiers, UiEventType, type UiModifiers } from './UiInputEvent';
+import { noKeyModifiers, UiEventType, type UiKeyModifiers } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import { UiKeyboardController } from './UiKeyboardController';
 import { UiPointerController } from './UiPointerController';
@@ -104,7 +104,7 @@ describe('selection routing', () => {
     function keyboard(h: InputTestHarness, handled: string[], claim: (key: string) => boolean) {
       return new UiKeyboardController(h.dispatcher, h.createFocusManager(), h.root, {
         selection: {
-          handleKey: (key: string, _modifiers: UiModifiers) => {
+          handleKey: (key: string, _modifiers: UiKeyModifiers) => {
             handled.push(key);
             return claim(key);
           }
@@ -115,7 +115,7 @@ describe('selection routing', () => {
     it('marks a key the selection claimed as handled', () => {
       const { h } = scene();
       const handled: string[] = [];
-      const event = keyboard(h, handled, () => true).keyDown('c', { ...noModifiers(), ctrl: true });
+      const event = keyboard(h, handled, () => true).keyDown('c', { ...noKeyModifiers(), ctrl: true });
       expect(handled).toEqual(['c']);
       expect(event.defaultPrevented).toBe(true);
     });
@@ -132,7 +132,7 @@ describe('selection routing', () => {
       const { h } = scene();
       const handled: string[] = [];
       h.dispatcher.addEventListener(h.root, UiEventType.KeyDown, event => event.preventDefault());
-      keyboard(h, handled, () => true).keyDown('c', { ...noModifiers(), ctrl: true });
+      keyboard(h, handled, () => true).keyDown('c', { ...noKeyModifiers(), ctrl: true });
       expect(handled).toEqual([]);
     });
   });

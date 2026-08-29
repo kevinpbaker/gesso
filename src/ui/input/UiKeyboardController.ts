@@ -1,5 +1,5 @@
 import type { UiNode } from '../graph/UiNode';
-import { noModifiers, UiEventType, UiKeyboardEvent, type UiModifiers } from './UiInputEvent';
+import { noKeyModifiers, UiEventType, UiKeyboardEvent, type UiKeyModifiers } from './UiInputEvent';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
 
@@ -15,20 +15,20 @@ export interface KeyboardControllerOptions {
    * after the app's KeyDown listeners and only if none called
    * preventDefault(); a key it handles is marked default-prevented.
    */
-  editing?: { handleKey(node: UiNode, key: string, modifiers: UiModifiers): boolean };
+  editing?: { handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers): boolean };
   /**
    * Default keyboard behaviour for a canvas text selection: copy it,
    * select everything, or clear it. Runs only when no focused editable
    * claimed the key first, so Cmd/Ctrl+A and Cmd/Ctrl+C inside a field
    * still belong to the field.
    */
-  selection?: { handleKey(key: string, modifiers: UiModifiers): boolean };
+  selection?: { handleKey(key: string, modifiers: UiKeyModifiers): boolean };
   /**
    * Default keyboard behaviour for find: Cmd/Ctrl+F opens a session,
    * Escape closes one. Runs before the selection's, so Escape ends the
    * find rather than clearing the match it has selected.
    */
-  find?: { handleKey(key: string, modifiers: UiModifiers): boolean };
+  find?: { handleKey(key: string, modifiers: UiKeyModifiers): boolean };
 }
 
 /**
@@ -63,7 +63,7 @@ export class UiKeyboardController {
     this.find = options.find;
   }
 
-  keyDown(key: string, modifiers: UiModifiers = noModifiers()): UiKeyboardEvent {
+  keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
     const event = new UiKeyboardEvent(UiEventType.KeyDown, key, modifiers);
     const focused = this.focusManager.focusedNode;
     const target = focused ?? this.root;
@@ -95,7 +95,7 @@ export class UiKeyboardController {
     return event;
   }
 
-  keyUp(key: string, modifiers: UiModifiers = noModifiers()): UiKeyboardEvent {
+  keyUp(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
     const event = new UiKeyboardEvent(UiEventType.KeyUp, key, modifiers);
     const target = this.focusManager.focusedNode ?? this.root;
     this.dispatcher.dispatch(event, target);

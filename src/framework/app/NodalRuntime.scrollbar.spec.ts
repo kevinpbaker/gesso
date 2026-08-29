@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { NodalRuntime } from './NodalRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 import { Box, Column } from '../../ui/composition/UiComponents';
-import { noModifiers } from '../../ui/input/UiInputEvent';
+import { noKeyModifiers } from '../../ui/input/UiInputEvent';
 import { scrollbarThumb, SCROLLBAR_THICKNESS } from '../../ui/layout/Scrollbars';
 import { UiManualFrameClock } from '../../ui/scheduler';
 
@@ -43,16 +43,16 @@ describe('NodalRuntime scrollbars', () => {
     const bar = scrollbarThumb(record(), 'y')!;
     const x = bar.thumb.x + SCROLLBAR_THICKNESS / 2;
     const y = bar.thumb.y + bar.thumb.height / 2;
-    runtime.input.pointer.pointerDown(x, y, 1, noModifiers());
+    runtime.input.pointer.pointerDown(x, y, 1, noKeyModifiers());
     expect(runtime.input.pointer.draggingScrollbarOf).toBe(list);
     expect(pressed).toEqual([]);
 
     // Moving the thumb half its travel scrolls half the range.
-    runtime.input.pointer.pointerMove(x, y + bar.travel / 2, 1, noModifiers());
+    runtime.input.pointer.pointerMove(x, y + bar.travel / 2, 1, noKeyModifiers());
     frame();
     expect(list.getProperty('scrollY')).toBeCloseTo(450, 5);
 
-    runtime.input.pointer.pointerUp(x, y + bar.travel, 0, noModifiers());
+    runtime.input.pointer.pointerUp(x, y + bar.travel, 0, noKeyModifiers());
     frame();
     expect(list.getProperty('scrollY')).toBeCloseTo(900, 5);
     expect(runtime.input.pointer.draggingScrollbarOf).toBeNull();
@@ -63,11 +63,11 @@ describe('NodalRuntime scrollbars', () => {
   it('pages one viewport when the visible track is pressed beside the thumb', () => {
     const { runtime, frame, list, record } = mount();
     // Reveal the bar (a wheel would too), then press below the thumb.
-    runtime.input.wheel.wheel(50, 50, 0, 20, noModifiers());
+    runtime.input.wheel.wheel(50, 50, 0, 20, noKeyModifiers());
     frame();
     const bar = scrollbarThumb(record(), 'y')!;
-    runtime.input.pointer.pointerDown(bar.thumb.x + 2, bar.thumb.y + bar.thumb.height + 20, 1, noModifiers());
-    runtime.input.pointer.pointerUp(bar.thumb.x + 2, bar.thumb.y + bar.thumb.height + 20, 0, noModifiers());
+    runtime.input.pointer.pointerDown(bar.thumb.x + 2, bar.thumb.y + bar.thumb.height + 20, 1, noKeyModifiers());
+    runtime.input.pointer.pointerUp(bar.thumb.x + 2, bar.thumb.y + bar.thumb.height + 20, 0, noKeyModifiers());
     frame();
     // 20 from the wheel plus one viewport of 100.
     expect(list.getProperty('scrollY')).toBeCloseTo(120, 5);
@@ -78,7 +78,7 @@ describe('NodalRuntime scrollbars', () => {
     const { runtime, pressed, record } = mount();
     const rec = record();
     // Bottom of the bar band, far below the (top) thumb, bar not shown.
-    runtime.input.pointer.pointerDown(rec.x + rec.width - 3, rec.y + rec.height - 5, 1, noModifiers());
+    runtime.input.pointer.pointerDown(rec.x + rec.width - 3, rec.y + rec.height - 5, 1, noKeyModifiers());
     expect(pressed).toEqual([4]);
     runtime.dispose();
   });
@@ -86,7 +86,7 @@ describe('NodalRuntime scrollbars', () => {
   it('reveals the bar when the pointer nears the edge', () => {
     const { runtime, record } = mount();
     expect(record().scrollbarVisibleUntil).toBe(0);
-    runtime.input.pointer.pointerMove(record().x + record().width - 4, 50, 0, noModifiers());
+    runtime.input.pointer.pointerMove(record().x + record().width - 4, 50, 0, noKeyModifiers());
     expect(record().scrollbarVisibleUntil).toBeGreaterThan(0);
     runtime.dispose();
   });

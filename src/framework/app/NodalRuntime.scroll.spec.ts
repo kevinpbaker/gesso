@@ -4,7 +4,7 @@ import { NodalRuntime } from './NodalRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 import { Button, Column } from '../../ui/composition/UiComponents';
 import type { UiNode } from '../../ui/graph/UiNode';
-import { noModifiers } from '../../ui/input/UiInputEvent';
+import { noKeyModifiers } from '../../ui/input/UiInputEvent';
 import { UiManualFrameClock } from '../../ui/scheduler';
 
 /**
@@ -47,9 +47,9 @@ describe('NodalRuntime scrollIntoView', () => {
     expect(runtime.debugLayoutBox(list)).toMatchObject({ height: 50 });
 
     // Tab to row 3 (60..80): the 50-tall viewport must scroll.
-    runtime.input.keyboard.keyDown('Tab', noModifiers());
-    runtime.input.keyboard.keyDown('Tab', noModifiers());
-    runtime.input.keyboard.keyDown('Tab', noModifiers());
+    runtime.input.keyboard.keyDown('Tab', noKeyModifiers());
+    runtime.input.keyboard.keyDown('Tab', noKeyModifiers());
+    runtime.input.keyboard.keyDown('Tab', noKeyModifiers());
     frame();
     expect(runtime.input.focus.focusedNode).toBe(rowNode(list, 3));
     expect(list.getProperty('scrollY')).toBe(38);

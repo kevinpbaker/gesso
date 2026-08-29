@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { noModifiers, type UiModifiers } from '../input/UiInputEvent';
+import { noKeyModifiers, type UiKeyModifiers } from '../input/UiInputEvent';
 import { commandForKey } from './EditingKeymap';
 
-const mods = (partial: Partial<UiModifiers>): UiModifiers => ({ ...noModifiers(), ...partial });
+const mods = (partial: Partial<UiKeyModifiers>): UiKeyModifiers => ({ ...noKeyModifiers(), ...partial });
 
 describe('commandForKey', () => {
   it('moves by grapheme with the arrows and extends with shift', () => {
-    expect(commandForKey('ArrowLeft', noModifiers(), 'other', true)).toEqual({
+    expect(commandForKey('ArrowLeft', noKeyModifiers(), 'other', true)).toEqual({
       kind: 'move',
       unit: 'grapheme',
       direction: -1,
@@ -26,13 +26,16 @@ describe('commandForKey', () => {
     expect(commandForKey('ArrowRight', mods({ alt: true }), 'mac', true)).toMatchObject({ unit: 'word' });
     expect(commandForKey('ArrowRight', mods({ meta: true }), 'mac', true)).toMatchObject({ unit: 'line' });
     expect(commandForKey('ArrowUp', mods({ meta: true }), 'mac', true)).toMatchObject({ unit: 'document' });
-    expect(commandForKey('ArrowUp', noModifiers(), 'other', true)).toMatchObject({ unit: 'vertical', direction: -1 });
-    expect(commandForKey('Home', noModifiers(), 'other', true)).toMatchObject({ unit: 'line', direction: -1 });
+    expect(commandForKey('ArrowUp', noKeyModifiers(), 'other', true)).toMatchObject({
+      unit: 'vertical',
+      direction: -1
+    });
+    expect(commandForKey('Home', noKeyModifiers(), 'other', true)).toMatchObject({ unit: 'line', direction: -1 });
     expect(commandForKey('End', mods({ ctrl: true }), 'other', true)).toMatchObject({ unit: 'document', direction: 1 });
   });
 
   it('deletes by grapheme, word and line', () => {
-    expect(commandForKey('Backspace', noModifiers(), 'other', true)).toEqual({
+    expect(commandForKey('Backspace', noKeyModifiers(), 'other', true)).toEqual({
       kind: 'delete',
       unit: 'grapheme',
       direction: -1
@@ -40,7 +43,7 @@ describe('commandForKey', () => {
     expect(commandForKey('Backspace', mods({ ctrl: true }), 'other', true)).toMatchObject({ unit: 'word' });
     expect(commandForKey('Backspace', mods({ alt: true }), 'mac', true)).toMatchObject({ unit: 'word' });
     expect(commandForKey('Backspace', mods({ meta: true }), 'mac', true)).toMatchObject({ unit: 'line' });
-    expect(commandForKey('Delete', noModifiers(), 'other', true)).toMatchObject({ direction: 1 });
+    expect(commandForKey('Delete', noKeyModifiers(), 'other', true)).toMatchObject({ direction: 1 });
   });
 
   it('maps the edit shortcuts with the platform primary modifier', () => {
@@ -55,15 +58,15 @@ describe('commandForKey', () => {
   });
 
   it('inserts printable keys only when text comes from keys', () => {
-    expect(commandForKey('a', noModifiers(), 'other', true)).toEqual({ kind: 'insert', text: 'a' });
-    expect(commandForKey('😀', noModifiers(), 'other', true)).toEqual({ kind: 'insert', text: '😀' });
-    expect(commandForKey('a', noModifiers(), 'other', false)).toBeNull();
-    expect(commandForKey('Shift', noModifiers(), 'other', true)).toBeNull();
+    expect(commandForKey('a', noKeyModifiers(), 'other', true)).toEqual({ kind: 'insert', text: 'a' });
+    expect(commandForKey('😀', noKeyModifiers(), 'other', true)).toEqual({ kind: 'insert', text: '😀' });
+    expect(commandForKey('a', noKeyModifiers(), 'other', false)).toBeNull();
+    expect(commandForKey('Shift', noKeyModifiers(), 'other', true)).toBeNull();
     expect(commandForKey('a', mods({ ctrl: true, alt: true }), 'other', true)).toBeNull();
   });
 
   it('turns Enter into a newline and leaves modified Enter alone', () => {
-    expect(commandForKey('Enter', noModifiers(), 'other', true)).toEqual({ kind: 'newline' });
+    expect(commandForKey('Enter', noKeyModifiers(), 'other', true)).toEqual({ kind: 'newline' });
     expect(commandForKey('Enter', mods({ ctrl: true }), 'other', true)).toBeNull();
   });
 });
