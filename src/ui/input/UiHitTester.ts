@@ -102,6 +102,8 @@ export class UiHitTester implements HitTester {
   private readonly result = new HitScratch();
   /** True while answering scrollbarZoneAt: bands count, content does not. */
   private zoneOnly = false;
+  /** Root-to-node scratch for toLocal, reused so a pointer drag allocates nothing. */
+  private readonly path: UiNode[] = [];
 
   constructor(
     private layout: HitTestLayoutReader,
@@ -139,15 +141,58 @@ export class UiHitTester implements HitTester {
     return null;
   }
 
+  /**
+   * A canvas point in a node's local coordinates.
+   *
+   * This has to replay the descent `hitTest` makes rather than undo
+   * the node's own transform alone: records stay in pre-scroll
+   * coordinates, so a node inside a scrolled container sits at a
+   * record y the pointer's canvas y knows nothing about. The walk
+   * applies each ancestor's inverse transform, sticky shift and
+   * scroll offset in the same order the traversal does, so the answer
+   * agrees with `hitTest`'s `localX`/`localY` for the node it hit —
+   * which is what places the caret from a click inside a scrolled
+   * editable.
+   */
   toLocal(node: UiNode, x: number, y: number): UiPoint {
     const rec = this.layout.recordFor(node);
     if (rec === undefined) {
       return { x, y };
     }
-    if (this.invertPoint(node, rec, x, y)) {
-      return { x: this.point.x - rec.x, y: this.point.y - rec.y };
+    const path = this.path;
+    path.length = 0;
+    // Fragments carry no record and are traversed transparently.
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      if (current.type !== UiNodeType.Fragment) {
+        path.push(current);
+      }
+      if (current === this.root) {
+        break;
+      }
     }
-    return { x: x - rec.x, y: y - rec.y };
+    let px = x;
+    let py = y;
+    for (let i = path.length - 1; i >= 0; i--) {
+      const ancestor = path[i];
+      const record = this.layout.recordFor(ancestor);
+      if (record === undefined) {
+        continue;
+      }
+      // A degenerate transform draws nothing, so there is no sensible
+      // point to map through it: leave it as the identity.
+      if (this.invertPoint(ancestor, record, px, py)) {
+        px = this.point.x;
+        py = this.point.y;
+      }
+      px -= record.stickyOffsetX;
+      py -= record.stickyOffsetY;
+      if (i > 0 && record.clips && record.scrollable) {
+        px += record.scrollX;
+        py += record.scrollY;
+      }
+    }
+    path.length = 0;
+    return { x: px - rec.x, y: py - rec.y };
   }
 
   // -------------------------------------------------------------------------

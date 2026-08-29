@@ -365,6 +365,42 @@ describe('UiHitTester', () => {
       expect(local).toEqual({ x: 75, y: 75 });
     });
 
+    it('agrees with the hit test for content inside a scroll container', () => {
+      const h = new InputTestHarness();
+      const scroll = h.node('scroll', UiNodeType.ScrollView, { width: 200, height: 100, scrollY: 40 });
+      const item = h.node('item', UiNodeType.Box, { width: 100, height: 200 });
+      h.add(scroll, item);
+      h.add(h.root, scroll);
+      h.root.setProperty('hitTestable', false);
+      scroll.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // Records stay pre-scroll: content y=45 is seen at screen y=5.
+      const hit = tester.hitTest(10, 5)!;
+      expect(tester.toLocal(item, 10, 5)).toEqual({ x: hit.localX, y: hit.localY });
+      expect(tester.toLocal(item, 10, 5).y).toBe(45);
+    });
+
+    it('applies every scroll ancestor when nested', () => {
+      const h = new InputTestHarness();
+      const outer = h.node('outer', UiNodeType.ScrollView, { width: 200, height: 200, scrollY: 100 });
+      const inner = h.node('inner', UiNodeType.ScrollView, { width: 200, height: 150, scrollY: 50 });
+      const spacer = h.node('spacer', UiNodeType.Box, { width: 100, height: 100 });
+      const item = h.node('item', UiNodeType.Box, { width: 100, height: 300 });
+      h.add(inner, item);
+      h.add(outer, spacer, inner);
+      h.add(h.root, outer);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // Outer scrollY 100 clamps to 50, so the inner viewport starts at
+      // screen y=50; the inner scrolls its own content up by 50 again.
+      const hit = tester.hitTest(10, 60)!;
+      expect(hit.node).toBe(item);
+      expect(tester.toLocal(item, 10, 60)).toEqual({ x: hit.localX, y: hit.localY });
+    });
+
     it('falls back to offset when a node has no layout record', () => {
       const h = new InputTestHarness();
       h.layoutTree();
