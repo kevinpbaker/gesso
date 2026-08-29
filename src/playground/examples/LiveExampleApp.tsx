@@ -15,9 +15,10 @@ import { Action, Projection, State } from '../../framework/store/decorators';
  * does not run again, the tree is not diffed, and nothing is created,
  * moved or destroyed. This example exists to make that visible at a
  * scale where it could not be faked: three channels, forty bars each,
- * a rolling event log and a saturation meter, all moving up to sixty
- * times a second and adding up to a few thousand property updates per
- * second — over a tree that is built exactly once.
+ * a rolling event log and a saturation meter, all sampled up to three
+ * hundred and sixty times a second and adding up to tens of thousands
+ * of property updates per second — over a tree that is built exactly
+ * once.
  *
  * The panel on the left is the proof. `Property updates / second` is
  * measured by the feed; `Component bodies run` is the number of
@@ -51,6 +52,13 @@ import { Action, Projection, State } from '../../framework/store/decorators';
  * two frames simply coalesce, and the frame paints the latest value of
  * every binding. Watch `Property updates / second` against the FPS in
  * the status bar to see the two rates come apart.
+ *
+ * The rates above 60 Hz exist to push that gap as far as it goes: at
+ * 360 Hz the feed takes six samples for every frame the clock can
+ * paint, and the board is still never stale, because a bound property
+ * has no queue to fall behind in — it holds one value, the latest.
+ * Those rates are reached by taking more than one sample per timer
+ * firing; `restart` explains why the timer alone cannot get there.
  *
  * The store holds only the controls — running, and the tick rate —
  * because those are app state a projection should carry. The stream
@@ -99,15 +107,36 @@ const RECOVER_AT = 0.9;
 const BAR_MIN = 3;
 const BAR_MAX = 46;
 
-export type RateName = 'calm' | 'live' | 'flood';
+export type RateName = 'calm' | 'live' | 'flood' | 'surge' | 'torrent' | 'deluge';
 
 export const RATES: Record<RateName, { readonly label: string; readonly hz: number }> = {
   calm: { label: '4 Hz', hz: 4 },
   live: { label: '20 Hz', hz: 20 },
-  flood: { label: '60 Hz', hz: 60 }
+  flood: { label: '60 Hz', hz: 60 },
+  surge: { label: '120 Hz', hz: 120 },
+  torrent: { label: '240 Hz', hz: 240 },
+  deluge: { label: '360 Hz', hz: 360 }
 };
 
-export const RATE_ORDER: readonly RateName[] = ['calm', 'live', 'flood'];
+/**
+ * How the rate buttons sit in the rail. Six across one 306 px column
+ * would leave each one narrower than its own label, so the rail lays
+ * them out as two rows of three.
+ */
+export const RATE_ROWS: readonly (readonly RateName[])[] = [
+  ['calm', 'live', 'flood'],
+  ['surge', 'torrent', 'deluge']
+];
+
+export const RATE_ORDER: readonly RateName[] = RATE_ROWS.flat();
+
+/**
+ * The fastest a repeating timer is worth asking for. Browsers clamp
+ * `setInterval` to 4 ms once it has fired a few times, so an interval
+ * below that buys nothing; the feed makes up the difference by taking
+ * a batch of samples per firing instead.
+ */
+const MAX_TIMER_HZ = 200;
 
 export interface ChannelSpec {
   readonly id: string;
@@ -552,7 +581,22 @@ export class LiveStore extends Store {
       this.updates$.next(0);
       return;
     }
-    this.timer = setInterval(() => this.tick(), 1000 / RATES[this.rate.value].hz);
+    // Above `MAX_TIMER_HZ` the timer cannot be the sample rate — the
+    // clamp would hold it at 4 ms whatever we ask for, and the feed
+    // would quietly run slower than the button it is under. So the
+    // interval stops at that floor and each firing takes the whole
+    // batch of samples that fell due, which is what a collector at
+    // these rates delivers anyway.
+    const hz = RATES[this.rate.value].hz;
+    const perTick = Math.max(1, Math.ceil(hz / MAX_TIMER_HZ));
+    this.timer = setInterval(
+      () => {
+        for (let i = 0; i < perTick; i++) {
+          this.tick();
+        }
+      },
+      (1000 * perTick) / hz
+    );
   }
 }
 
@@ -707,11 +751,13 @@ function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
           primary
           onPress={() => store.dispatch('toggle')}
         />
-        <row gap={7} selfX="stretch">
-          {RATE_ORDER.map(rate => (
-            <RateButton key={rate} rate={rate} />
-          ))}
-        </row>
+        {RATE_ROWS.map((rates, index) => (
+          <row key={index} gap={7} selfX="stretch">
+            {rates.map(rate => (
+              <RateButton key={rate} rate={rate} />
+            ))}
+          </row>
+        ))}
         <RailButton label="Inject a spike" onPress={() => store.dispatch('spike')} />
       </column>
 
@@ -963,8 +1009,9 @@ function Board(_props: Inputs<{}>, ctx: ComponentContext) {
 
       <text color={FAINT} fontSize={11.5} lineHeight={17.5}>
         Source: src/playground/examples/LiveExampleApp.tsx. The rates above are sampling rates, not frame rates: a
-        render worker paces frames on a timer rather than the compositor, so at 60 Hz the feed outruns it and several
-        emissions coalesce into one frame — which paints the latest value of every binding, never a stale one.
+        render worker paces frames on a timer rather than the compositor, so from 60 Hz up the feed outruns it and many
+        emissions coalesce into one frame — which paints the latest value of every binding, never a stale one. At 360 Hz
+        that is six samples to a frame, and nothing on screen is behind.
       </text>
     </scrollview>
   );
