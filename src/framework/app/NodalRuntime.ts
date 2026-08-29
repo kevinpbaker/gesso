@@ -203,6 +203,7 @@ export class NodalRuntime {
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
   private replicas: readonly StoreReplica[] = [];
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
+  private started = false;
 
   constructor(options: NodalRuntimeOptions) {
     this.stores = options.stores ?? new StoreRegistry();
@@ -328,6 +329,7 @@ export class NodalRuntime {
 
   /** Starts the frame scheduler. */
   start(): void {
+    this.started = true;
     this.scheduler.start();
   }
 
@@ -401,6 +403,15 @@ export class NodalRuntime {
     // marks nothing dirty on its own, so without this the canvas stays
     // blank until some unrelated change happens to schedule a frame.
     this.graph.markDirty(this.root, DirtyFlags.Paint);
+    // Drawn here, in the task that cleared the surface, rather than on
+    // the next tick: a cleared canvas is committed to the compositor at
+    // the end of this task, so a deferred repaint shows one blank frame
+    // per resize notification, which reads as flicker while dragging.
+    // Before start() there is nothing on screen to protect, and the
+    // host has not wired its frame listeners yet.
+    if (this.started) {
+      this.scheduler.flush(now());
+    }
   }
 
   /**

@@ -130,6 +130,22 @@ export class UiScheduler {
     return this.frames;
   }
 
+  /**
+   * Processes the pending frame now, in the caller's task.
+   *
+   * For work that has already made the surface stale — a resize clears
+   * the backing store — where waiting for the clock would present the
+   * cleared surface for a frame.
+   */
+  flush(time: UiFrameTime): void {
+    if (this.disposed || !this.active) {
+      return;
+    }
+    this.clock.cancelFrame();
+    this.pending = false;
+    this.handleFrame(time);
+  }
+
   private handleFrame(time: UiFrameTime): void {
     this.pending = false;
     this.beforeCollect?.();

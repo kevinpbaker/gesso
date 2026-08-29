@@ -287,10 +287,11 @@ describe('NodalApp', () => {
       expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
     });
 
-    it('schedules a repaint when the surface is resized', () => {
-      // Resizing the backing store clears it. Without an explicit dirty
-      // mark the canvas stayed blank until something unrelated happened
-      // to schedule a frame.
+    it('repaints in the same task that resizes the surface', () => {
+      // Resizing the backing store clears it, and the cleared surface
+      // is committed to the compositor at the end of this task. A
+      // repaint left to the next tick therefore showed one blank frame
+      // per resize notification, which reads as flicker while dragging.
       const { app, canvas, clock } = mountWithManualClock();
       clock.tick(0);
       expect(clock.isPending).toBe(false);
@@ -300,9 +301,10 @@ describe('NodalApp', () => {
 
       app.resize(900, 700);
 
-      expect(clock.isPending).toBe(true);
-      clock.tick(16);
       expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
+      // And exactly one paint: the flushed frame is not left pending
+      // for the clock to draw a second time.
+      expect(clock.isPending).toBe(false);
     });
 
     it('ignores a zero-sized report rather than blanking the surface', () => {
@@ -317,7 +319,6 @@ describe('NodalApp', () => {
       const ctx = canvas.getContext('2d') as unknown as { fillText: ReturnType<typeof vi.fn> };
       ctx.fillText.mockClear();
       app.resize(900, 700);
-      clock.tick(16);
 
       expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
     });
