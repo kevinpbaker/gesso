@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code: local worktree checkouts and personal settings; shared config (.claude/settings.json, agents, skills) is committed
+.claude/worktrees/
+.claude/settings.local.json
