@@ -148,7 +148,13 @@ describe('NodalRuntime frame pipeline', () => {
       const { clock, frames } = mountRuntime(Column(Text({ text: text$ })));
       if (clock.isPending) clock.tick(0);
 
-      expect(Object.keys(frames[0].phases).sort()).toEqual(['environment', 'layout', 'patches', 'render']);
+      expect(Object.keys(frames[0].phases).sort()).toEqual([
+        'environment',
+        'layout',
+        'patches',
+        'render',
+        'virtualize'
+      ]);
     });
   });
 

@@ -1,6 +1,6 @@
 import { map } from 'rxjs';
 
-import { Box, Button, Column, Row, ScrollView, Text } from '../ui/composition';
+import { Box, Button, Column, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
 import type { UiNode } from '../ui/graph/UiNode';
 import { OverlayStore } from '../framework/overlay/OverlayStore';
 import type { UiElement } from '../ui/composition';
@@ -452,6 +452,32 @@ export class ScrollDemo extends Component {
   }
 }
 
+/**
+ * Virtualization (roadmap L5): a hundred thousand rows, of which only
+ * the visible ones plus an overscan band exist as nodes. The status bar
+ * shows layout cost staying flat while it scrolls.
+ */
+@Define('lazy-list-demo')
+export class LazyListDemo extends Component {
+  override render(): UiElement {
+    const count = 100000;
+    return Column(
+      { gap: 8 },
+      Text({ text: `LazyColumn: ${count.toLocaleString()} rows, only the visible ones are nodes.`, color: '#9ca3af' }),
+      LazyColumn(
+        { width: 360, height: 180, count, estimatedExtent: 28, backgroundColor: '#111827', borderRadius: 6 },
+        index =>
+          Row(
+            { padding: 6, gap: 10, y: 'center', backgroundColor: index % 2 === 0 ? '#0f172a' : '#111827' },
+            Box({ width: 12, height: 12, borderRadius: 6, backgroundColor: `hsl(${(index * 7) % 360} 70% 55%)` }),
+            Text({ text: `Row ${index.toLocaleString()}`, color: '#d1d5db', fontSize: 13, flexGrow: 1 }),
+            Text({ text: index % 3 === 0 ? 'three lines' : 'one', color: '#6b7280', fontSize: 11 })
+          )
+      )
+    );
+  }
+}
+
 @Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoStore) demo!: DemoStore;
@@ -496,6 +522,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(HeavyPanel),
       createComponent(MenuDemo),
       createComponent(ScrollDemo),
+      createComponent(LazyListDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, x: 'start' }, this.recentTicks())
     );

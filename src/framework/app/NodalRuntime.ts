@@ -4,6 +4,12 @@ import { UiGraph } from '../../ui/graph/UiGraph';
 import { UiGraphBuilder } from '../../ui/composition/UiGraphBuilder';
 import { isComponentLikeElement, isObservable, type UiElement } from '../../ui/composition/UiElement';
 import { Stack } from '../../ui/composition/UiComponents';
+import {
+  UiVirtualWindow,
+  VIRTUAL_INDEX_PROP,
+  VIRTUAL_WINDOW_PROP,
+  type VirtualItemMeasure
+} from '../../ui/composition/UiVirtualWindow';
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayStore } from '../overlay/OverlayStore';
@@ -46,7 +52,7 @@ import type { StoreReplica } from '../store/worker/StoreReplica';
  * because both produce dirt that this frame must see. `layout` and
  * `render` run against the snapshot.
  */
-export const UI_FRAME_PHASES = ['patches', 'environment', 'layout', 'render'] as const;
+export const UI_FRAME_PHASES = ['patches', 'environment', 'virtualize', 'layout', 'render'] as const;
 
 export type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
 
@@ -419,6 +425,76 @@ export class NodalRuntime {
       () => this.graph.hasEnvironmentDirty(),
       () => this.graph.processEnvironmentDirty()
     );
+
+    // Lazy lists decide which rows to mount from the scroll offset the
+    // frame is about to lay out with, so rows a scroll reveals are built,
+    // measured and painted on that same frame.
+    this.phaseTimings.virtualize = this.timePhase(
+      () => this.hasVirtualWindows(),
+      () => this.updateVirtualWindows()
+    );
+  }
+
+  private hasVirtualWindows(): boolean {
+    for (const node of this.engine.scrollContainers()) {
+      if (node.properties.get(VIRTUAL_WINDOW_PROP) instanceof UiVirtualWindow) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Advances every lazy list's window: reports the container's scroll
+   * offset and viewport, and the measured extent of each mounted item,
+   * then applies any scroll adjustment the window asks for to keep its
+   * first item anchored while estimates above it are corrected.
+   */
+  private updateVirtualWindows(): void {
+    for (const node of this.engine.scrollContainers()) {
+      const window = node.properties.get(VIRTUAL_WINDOW_PROP);
+      if (!(window instanceof UiVirtualWindow)) {
+        continue;
+      }
+      const rec = this.engine.recordFor(node);
+      if (rec === undefined) {
+        continue;
+      }
+      const column = window.axis === 'column';
+      // A wheel may have written a newer offset than the record holds.
+      const scrollProp = node.properties.get(column ? 'scrollY' : 'scrollX');
+      const scroll = typeof scrollProp === 'number' ? scrollProp : column ? rec.scrollY : rec.scrollX;
+      const measures: VirtualItemMeasure[] = [];
+      this.collectVirtualMeasures(node, column, measures);
+      const result = window.update({ scroll, extent: column ? rec.height : rec.width }, measures);
+      if (result.scrollAdjust !== 0) {
+        node.setProperty(column ? 'scrollY' : 'scrollX', scroll + result.scrollAdjust);
+        this.graph.markDirty(node, DirtyFlags.Transform);
+      }
+    }
+  }
+
+  private collectVirtualMeasures(parent: UiNode, column: boolean, out: VirtualItemMeasure[]): void {
+    for (let child = parent.firstChild; child !== null; child = child.nextSibling) {
+      if (child.type === UiNodeType.Fragment) {
+        this.collectVirtualMeasures(child, column, out);
+        continue;
+      }
+      const index = child.properties.get(VIRTUAL_INDEX_PROP);
+      if (typeof index !== 'number') {
+        continue;
+      }
+      const rec = this.engine.recordFor(child);
+      if (rec === undefined) {
+        continue;
+      }
+      out.push({
+        index,
+        extent: column
+          ? rec.measuredHeight + rec.marginTop + rec.marginBottom
+          : rec.measuredWidth + rec.marginLeft + rec.marginRight
+      });
+    }
   }
 
   private handleFrame(frame: UiFrame): void {
@@ -517,7 +593,7 @@ function now(): number {
 }
 
 function emptyPhaseTimings(): FramePhaseTimings {
-  return { patches: 0, environment: 0, layout: 0, render: 0 };
+  return { patches: 0, environment: 0, virtualize: 0, layout: 0, render: 0 };
 }
 
 /**

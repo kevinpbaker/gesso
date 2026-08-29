@@ -330,6 +330,11 @@ export class LayoutEngine {
     return adjustments;
   }
 
+  /** Every scroll container that has been laid out. */
+  scrollContainers(): Iterable<UiNode> {
+    return this.scrollNodes;
+  }
+
   /**
    * When the next scrollbar changes appearance (starts fading or
    * disappears), or undefined when none is showing. Lets a host schedule
