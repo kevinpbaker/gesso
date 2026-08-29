@@ -185,15 +185,15 @@ function containerStyles(node: CaseNode): string[] {
       if (node.children.length === 0) {
         return [];
       }
-      // A stack: every child in the same cell, at the content origin,
-      // at its own natural size. Grid with one max-content track does
-      // exactly that once each child is pinned to cell 1/1.
+      // A stack: every child in the same cell, aligned by x / y. One fr
+      // track fills a definite box and shrink-wraps an auto one, and
+      // grid honours margins and per-child self alignment like Nodal.
       return [
         'display:grid',
-        'grid-template-columns:max-content',
-        'grid-template-rows:max-content',
-        'justify-items:start',
-        'align-items:start'
+        'grid-template-columns:1fr',
+        'grid-template-rows:1fr',
+        `justify-items:${gridAlignment(props.x)}`,
+        `align-items:${gridAlignment(props.y)}`
       ];
     case 'text':
       return [];
@@ -204,8 +204,28 @@ function containerStyles(node: CaseNode): string[] {
 function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   const { props } = node;
   const styles: string[] = [];
-  if (parent !== null && parent.type === 'box') {
+  if (parent !== null && parent.type === 'box' && props.position !== 'absolute') {
     styles.push('grid-area:1/1');
+    if (props.selfX !== undefined) {
+      styles.push(`justify-self:${gridAlignment(props.selfX)}`);
+    }
+    if (props.selfY !== undefined) {
+      styles.push(`align-self:${gridAlignment(props.selfY)}`);
+    }
+  }
+  if (props.position !== undefined && props.position !== 'static') {
+    styles.push(`position:${props.position}`);
+  }
+  if (props.inset !== undefined) {
+    styles.push(`inset:${px(props.inset)}`);
+  }
+  for (const edge of ['top', 'right', 'bottom', 'left'] as const) {
+    if (props[edge] !== undefined) {
+      styles.push(`${edge}:${px(props[edge]!)}`);
+    }
+  }
+  if (props.zIndex !== undefined) {
+    styles.push(`z-index:${props.zIndex}`);
   }
   if (props.flexGrow !== undefined) {
     styles.push(`flex-grow:${props.flexGrow}`);
@@ -247,6 +267,11 @@ function sizeStyles(node: CaseNode, rootCase: LayoutCase | null, layoutCase: Lay
     styles.push(...(layoutCase.font === 'ahem' ? ahemTextStyles(node) : fixedTextStyles(node)));
   }
 
+  if (rootCase !== null && props.position === undefined) {
+    // Nodal's fallback containing block is the layout root; the case
+    // viewport would be CSS's. Make the root the block in both.
+    styles.push('position:relative');
+  }
   const width = props.width ?? (rootCase !== null ? rootCase.viewport.width : undefined);
   const height = props.height ?? (rootCase !== null ? rootCase.viewport.height : undefined);
   if (width !== undefined) {
@@ -330,6 +355,20 @@ function mainAlignment(value: Alignment | undefined): string {
       return 'space-around';
     default:
       return 'flex-start';
+  }
+}
+
+/** Grid self/items alignment for stacks. */
+function gridAlignment(value: Alignment | undefined): string {
+  switch (value) {
+    case 'center':
+      return 'center';
+    case 'end':
+      return 'end';
+    case 'stretch':
+      return 'stretch';
+    default:
+      return 'start';
   }
 }
 

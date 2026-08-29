@@ -60,6 +60,29 @@ export class LayoutRecord {
   minContentWidth = 0;
   maxContentWidth = 0;
 
+  /**
+   * Positioning. An absolute node is out of flow: it neither takes
+   * space in its parent nor is measured with it; the parent positions
+   * it against its containing block after the flow is placed. A
+   * relative node is in flow and shifted by its offsets afterwards.
+   * Both are containing blocks for absolute descendants.
+   */
+  positioned = false;
+  absolute = false;
+  top: number | undefined = undefined;
+  right: number | undefined = undefined;
+  bottom: number | undefined = undefined;
+  left: number | undefined = undefined;
+
+  zIndex = 0;
+
+  /**
+   * Children (fragments expanded) in paint order when any of them has
+   * a non-zero zIndex; null means tree order. Hit testing walks it in
+   * reverse. Rebuilt whenever the node is placed.
+   */
+  paintOrder: UiNode[] | null = null;
+
   /** Effective scroll offset of a scroll container. */
   scrollX = 0;
   scrollY = 0;

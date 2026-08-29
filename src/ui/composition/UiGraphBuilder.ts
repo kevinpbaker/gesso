@@ -25,6 +25,14 @@ import type { UiProps } from './UiProps';
  * The key never becomes a runtime property on the UiNode.
  */
 const KEY_PROP = 'key';
+/**
+ * `ref` receives the UiNode an element produced, and null when the
+ * node is removed. It is how a component gets hold of a node to hand
+ * to `anchor`, or to focus imperatively.
+ */
+const REF_PROP = 'ref';
+
+export type UiNodeRef = (node: UiNode | null) => void;
 
 export interface UiGraphBuilderOptions {
   /**
@@ -65,6 +73,7 @@ export interface UiGraphBuilderOptions {
  *   - component child  → fragment anchor + mounted host
  */
 export class UiGraphBuilder {
+  private readonly refs = new Map<UiNode, UiNodeRef>();
   private nextChildrenBindingId = 0;
 
   /**
@@ -328,19 +337,46 @@ export class UiGraphBuilder {
    */
   private removeSubtree(node: UiNode): void {
     const resolver = this.components;
-    if (resolver !== undefined) {
-      const stack: UiNode[] = [node];
-      while (stack.length > 0) {
-        const current = stack.pop()!;
-        if (current.type === UiNodeType.Fragment) {
-          resolver.release(current.id);
-        }
-        for (let child = current.firstChild; child !== null; child = child.nextSibling) {
-          stack.push(child);
-        }
+    const stack: UiNode[] = [node];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (resolver !== undefined && current.type === UiNodeType.Fragment) {
+        resolver.release(current.id);
+      }
+      const ref = this.refs.get(current);
+      if (ref !== undefined) {
+        this.refs.delete(current);
+        ref(null);
+      }
+      for (let child = current.firstChild; child !== null; child = child.nextSibling) {
+        stack.push(child);
       }
     }
     this.graph.removeNode(node);
+  }
+
+  /**
+   * Hands the node to a `ref` callback once, and again only when the
+   * callback identity changes. Removal calls the current one with null.
+   */
+  private reconcileRef(node: UiNode, value: unknown): void {
+    const previous = this.refs.get(node);
+    if (typeof value !== 'function') {
+      if (previous !== undefined) {
+        this.refs.delete(node);
+        previous(null);
+      }
+      return;
+    }
+    const ref = value as UiNodeRef;
+    if (previous === ref) {
+      return;
+    }
+    if (previous !== undefined) {
+      previous(null);
+    }
+    this.refs.set(node, ref);
+    ref(node);
   }
 
   /**
@@ -419,6 +455,10 @@ export class UiGraphBuilder {
 
     for (const [property, value] of Object.entries(props)) {
       if (property === KEY_PROP) {
+        continue;
+      }
+      if (property === REF_PROP) {
+        this.reconcileRef(node, value);
         continue;
       }
       if (isEventProp(property, value)) {

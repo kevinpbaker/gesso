@@ -214,8 +214,88 @@ export const UiProperties = {
     affects: L
   }),
 
+  /**
+   * 'static' (default), 'relative' (in flow, then offset by
+   * top/right/bottom/left, and a containing block for absolute
+   * descendants) or 'absolute' (out of flow, positioned against the
+   * nearest positioned ancestor or the layout root).
+   */
   position: defineProperty<string | undefined>({
     name: 'position',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  top: defineProperty<number | undefined>({
+    name: 'top',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  right: defineProperty<number | undefined>({
+    name: 'right',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  bottom: defineProperty<number | undefined>({
+    name: 'bottom',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  left: defineProperty<number | undefined>({
+    name: 'left',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /**
+   * Paint and hit-test order among siblings; higher paints later and
+   * is hit first. Ties keep tree order.
+   */
+  zIndex: defineProperty<number | undefined>({
+    name: 'zIndex',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P
+  }),
+
+  /**
+   * The UiNode an absolutely positioned node is placed next to. With
+   * an anchor, top/right/bottom/left are ignored and `placement`
+   * decides the side; the node flips to the opposite side when it
+   * would overflow its containing block and shifts along the anchor
+   * to stay inside it.
+   */
+  anchor: defineProperty<unknown | undefined>({
+    name: 'anchor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /**
+   * Side and alignment against the anchor: 'bottom' (default),
+   * 'bottom-start', 'bottom-end', 'top', 'top-start', 'top-end',
+   * 'left', 'left-start', 'left-end', 'right', 'right-start',
+   * 'right-end'.
+   */
+  placement: defineProperty<string | undefined>({
+    name: 'placement',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Gap between an anchored node and its anchor. */
+  anchorOffset: defineProperty<number | undefined>({
+    name: 'anchorOffset',
     defaultValue: undefined,
     inherited: false,
     affects: L

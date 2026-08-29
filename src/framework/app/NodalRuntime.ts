@@ -3,6 +3,10 @@ import { ComponentHostResolver } from '../ComponentHostResolver';
 import { UiGraph } from '../../ui/graph/UiGraph';
 import { UiGraphBuilder } from '../../ui/composition/UiGraphBuilder';
 import { isComponentLikeElement, isObservable, type UiElement } from '../../ui/composition/UiElement';
+import { Stack } from '../../ui/composition/UiComponents';
+import { createComponent } from '../createComponent';
+import { OverlayLayer } from '../overlay/OverlayLayer';
+import { OverlayStore } from '../overlay/OverlayStore';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiInputDispatcher } from '../../ui/input/UiInputDispatcher';
@@ -111,7 +115,10 @@ export class NodalRuntime {
   private readonly canvasRenderer: Canvas2DRenderer;
   private readonly dispatcher = new UiInputDispatcher();
 
+  /** The layout root: a stack holding the app root and the overlay layer. */
   private root: UiNode | undefined;
+  /** The node the app's root definition produced. */
+  private appRoot: UiNode | undefined;
   private constraints: Constraints;
   private pixelRatio: number;
   private lastFrameMs = 0;
@@ -132,6 +139,11 @@ export class NodalRuntime {
 
     for (const StoreClass of options.storeClasses ?? []) {
       this.stores.register(StoreClass);
+    }
+    // Every runtime has an overlay layer; the store behind it is local
+    // by necessity (its entries hold elements and nodes).
+    if (!this.stores.has(OverlayStore)) {
+      this.stores.register(OverlayStore);
     }
 
     this.scheduler = new UiScheduler({
@@ -203,12 +215,30 @@ export class NodalRuntime {
   }
 
   /**
-   * The root UiNode of the built tree.
+   * The UiNode the app's root definition produced.
    *
    * For tests and devtools that inspect the retained graph without
-   * reaching into private state.
+   * reaching into private state. It is the first child of the layout
+   * root, whose only other child is the overlay layer.
    */
   debugRoot(): UiNode {
+    if (this.appRoot === undefined) {
+      throw new Error('App root has not been built.');
+    }
+    return this.appRoot;
+  }
+
+  /** The laid-out box of a node, for tests and devtools. */
+  debugLayoutBox(node: UiNode): { x: number; y: number; width: number; height: number } {
+    return this.engine.worldBox(node);
+  }
+
+  /**
+   * The node layout, hit testing and painting start from: a stack that
+   * stretches the app root over the viewport with the overlay layer on
+   * top of it.
+   */
+  layoutRoot(): UiNode {
     if (this.root === undefined) {
       throw new Error('App root has not been built.');
     }
@@ -236,7 +266,17 @@ export class NodalRuntime {
    * onMount() fires from the build pass below, once their nodes exist.
    */
   private buildRoot(rootDefinition: FrameworkChild): void {
-    this.root = this.builder.build(this.resolveRootElement(rootDefinition, 0));
+    const appElement = this.resolveRootElement(rootDefinition, 0);
+    // The app root stretches over the viewport exactly as it did when
+    // it was the layout root; the overlay layer floats above it.
+    this.root = this.builder.build(
+      Stack({ x: 'stretch', y: 'stretch', position: 'relative' }, appElement, createComponent(OverlayLayer))
+    );
+    const appRoot = this.root.firstChild;
+    if (appRoot === null) {
+      throw new Error('The app root produced no node.');
+    }
+    this.appRoot = appRoot;
     this.graph.propagateEnvironment(this.root);
   }
 
@@ -265,7 +305,7 @@ export class NodalRuntime {
    * actually receive events.
    */
   private createInput(): RuntimeInput {
-    const root = this.debugRoot();
+    const root = this.layoutRoot();
     const hitTester = new UiHitTester(this.engine, root);
     const focus = new UiFocusManager(root, this.dispatcher);
     return {

@@ -35,6 +35,16 @@ export function Box(props: UiProps = {}, ...children: UiChild[]): UiElement {
 }
 
 /**
+ * Creates a Stack element: a Box whose children overlap in one content
+ * box, aligned by `x` / `y` (start, center, end, stretch) and per child
+ * by `selfX` / `selfY`. Same runtime node as Box; the name says what
+ * the children do.
+ */
+export function Stack(props: UiProps = {}, ...children: UiChild[]): UiElement {
+  return createElement(UiNodeType.Box, props, children);
+}
+
+/**
  * Creates a Row element.
  *
  * Accepts either children only or props followed by children.

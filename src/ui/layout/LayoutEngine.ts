@@ -59,6 +59,8 @@ interface FlexItem {
 export class LayoutEngine {
   private readonly records = new Map<UiNode, LayoutRecord>();
   private readonly scrollNodes = new Set<UiNode>();
+  /** Absolutely positioned nodes placed against an anchor node. */
+  private readonly anchoredNodes = new Set<UiNode>();
   private readonly textMeasurer: TextMeasurer;
   private layoutRoot: UiNode | null = null;
   private rootConstraints: Constraints = Constraints.unbounded();
@@ -129,6 +131,15 @@ export class LayoutEngine {
       if ((flags & DirtyFlags.Transform) !== 0) {
         this.record(node).transformDirty = true;
         this.scrollNodes.add(node);
+        // An anchored node sits next to something that may just have
+        // scrolled; it is re-placed, cheaply, on the same frame.
+        if (this.anchoredNodes.size > 0) {
+          this.applyScroll();
+          for (const anchored of this.anchoredNodes) {
+            this.markLayoutDirty(anchored);
+          }
+          anyLayout = true;
+        }
       }
     }
 
@@ -192,6 +203,7 @@ export class LayoutEngine {
       const current = stack.pop()!;
       this.records.delete(current);
       this.scrollNodes.delete(current);
+      this.anchoredNodes.delete(current);
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
       }
@@ -691,11 +703,215 @@ export class LayoutEngine {
     } else {
       this.placeStack(node, rec);
     }
-    this.forEachLayoutChild(node, child => {
+    // Out-of-flow children are positioned once the flow has settled,
+    // against containing blocks that are already placed.
+    this.placeAbsoluteChildren(node);
+    this.updatePaintOrder(node, rec);
+    this.forEachChild(node, child => {
       if (this.record(child).placeDirty) {
         this.place(child);
       }
     });
+  }
+
+  /**
+   * Positions the absolutely positioned children of `parent`.
+   *
+   * Each is measured now, against its containing block — the nearest
+   * positioned ancestor, or the layout root — since it took no part in
+   * the flow. With both edges of an axis set and no explicit size the
+   * axis is tight; otherwise the child is its own size and one edge
+   * decides where it goes, `left`/`top` winning over `right`/`bottom`.
+   * A child with an `anchor` ignores its edges and is placed next to
+   * the anchor instead.
+   */
+  private placeAbsoluteChildren(parent: UiNode): void {
+    this.forEachAbsoluteChild(parent, child => {
+      const cRec = this.record(child);
+      this.resolveLayoutProps(child, cRec);
+      const block = this.containingBlockOf(child);
+      const anchor = child.properties.get('anchor');
+      if (anchor !== undefined && anchor !== null) {
+        this.anchoredNodes.add(child);
+        const anchorRec = this.records.get(anchor as UiNode);
+        if (anchorRec !== undefined) {
+          this.placeAnchored(child, cRec, anchorRec, anchor as UiNode, block);
+          return;
+        }
+      } else {
+        this.anchoredNodes.delete(child);
+      }
+
+      const marginH = cRec.marginLeft + cRec.marginRight;
+      const marginV = cRec.marginTop + cRec.marginBottom;
+      const availableWidth = Math.max(0, block.width - (cRec.left ?? 0) - (cRec.right ?? 0) - marginH);
+      const availableHeight = Math.max(0, block.height - (cRec.top ?? 0) - (cRec.bottom ?? 0) - marginV);
+      const tightWidth =
+        cRec.left !== undefined && cRec.right !== undefined && this.numberProp(child, 'width') === undefined;
+      const tightHeight =
+        cRec.top !== undefined && cRec.bottom !== undefined && this.numberProp(child, 'height') === undefined;
+      this.measure(
+        child,
+        new Constraints(
+          tightWidth ? availableWidth : 0,
+          availableWidth,
+          tightHeight ? availableHeight : 0,
+          availableHeight
+        )
+      );
+      const width = cRec.measuredWidth;
+      const height = cRec.measuredHeight;
+      let x: number;
+      if (cRec.left !== undefined) {
+        x = block.x + cRec.left + cRec.marginLeft;
+      } else if (cRec.right !== undefined) {
+        x = block.x + block.width - cRec.right - cRec.marginRight - width;
+      } else {
+        x = block.x + cRec.marginLeft;
+      }
+      let y: number;
+      if (cRec.top !== undefined) {
+        y = block.y + cRec.top + cRec.marginTop;
+      } else if (cRec.bottom !== undefined) {
+        y = block.y + block.height - cRec.bottom - cRec.marginBottom - height;
+      } else {
+        y = block.y + cRec.marginTop;
+      }
+      this.assignBox(child, x, y, width, height);
+    });
+  }
+
+  /**
+   * Places an anchored node beside its anchor.
+   *
+   * `placement` names a side and, after a dash, an alignment along it
+   * ('bottom-start', 'right-end'; the bare side centres). The node
+   * flips to the opposite side when it would overflow the containing
+   * block there and the opposite side has more room, and shifts along
+   * the anchor so it stays inside the block. Anchor and node may live
+   * under different scroll containers, so both positions are brought
+   * into the same visible space before comparing them.
+   */
+  private placeAnchored(
+    child: UiNode,
+    cRec: LayoutRecord,
+    anchorRec: LayoutRecord,
+    anchor: UiNode,
+    block: LayoutBox
+  ): void {
+    this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
+    const width = cRec.measuredWidth;
+    const height = cRec.measuredHeight;
+    const gap = this.numberProp(child, 'anchorOffset') ?? 0;
+    const { side, align } = this.parsePlacement(child.properties.get('placement'));
+
+    // Anchor box in the child's coordinate space.
+    const scrollAnchor = this.scrollOffsetOf(anchor);
+    const scrollChild = this.scrollOffsetOf(child);
+    const ax = anchorRec.x - scrollAnchor.x + scrollChild.x;
+    const ay = anchorRec.y - scrollAnchor.y + scrollChild.y;
+    const aw = anchorRec.width;
+    const ah = anchorRec.height;
+
+    const vertical = side === 'top' || side === 'bottom';
+    let resolvedSide = side;
+    if (vertical) {
+      const roomBelow = block.y + block.height - (ay + ah + gap);
+      const roomAbove = ay - gap - block.y;
+      if (side === 'bottom' && height > roomBelow && roomAbove > roomBelow) {
+        resolvedSide = 'top';
+      } else if (side === 'top' && height > roomAbove && roomBelow > roomAbove) {
+        resolvedSide = 'bottom';
+      }
+    } else {
+      const roomRight = block.x + block.width - (ax + aw + gap);
+      const roomLeft = ax - gap - block.x;
+      if (side === 'right' && width > roomRight && roomLeft > roomRight) {
+        resolvedSide = 'left';
+      } else if (side === 'left' && width > roomLeft && roomRight > roomLeft) {
+        resolvedSide = 'right';
+      }
+    }
+
+    let x: number;
+    let y: number;
+    if (vertical) {
+      y = resolvedSide === 'bottom' ? ay + ah + gap : ay - gap - height;
+      x = align === 'start' ? ax : align === 'end' ? ax + aw - width : ax + (aw - width) / 2;
+      x = this.clamp(x, block.x, Math.max(block.x, block.x + block.width - width));
+    } else {
+      x = resolvedSide === 'right' ? ax + aw + gap : ax - gap - width;
+      y = align === 'start' ? ay : align === 'end' ? ay + ah - height : ay + (ah - height) / 2;
+      y = this.clamp(y, block.y, Math.max(block.y, block.y + block.height - height));
+    }
+    this.assignBox(child, x, y, width, height);
+  }
+
+  private parsePlacement(value: unknown): {
+    side: 'top' | 'bottom' | 'left' | 'right';
+    align: 'start' | 'center' | 'end';
+  } {
+    const text = typeof value === 'string' ? value : 'bottom';
+    const [rawSide, rawAlign] = text.split('-');
+    const side = rawSide === 'top' || rawSide === 'left' || rawSide === 'right' ? rawSide : ('bottom' as const);
+    const align = rawAlign === 'start' || rawAlign === 'end' ? rawAlign : ('center' as const);
+    return { side, align };
+  }
+
+  /** Sum of the scroll offsets of a node's scroll-container ancestors. */
+  private scrollOffsetOf(node: UiNode): { x: number; y: number } {
+    let x = 0;
+    let y = 0;
+    for (let current = node.parent; current !== null; current = current.parent) {
+      if (current.type === UiNodeType.ScrollView) {
+        const rec = this.records.get(current);
+        if (rec !== undefined) {
+          x += rec.scrollX;
+          y += rec.scrollY;
+        }
+      }
+    }
+    return { x, y };
+  }
+
+  /**
+   * The box an absolute child is positioned against: the nearest
+   * positioned ancestor's, else the layout root's.
+   */
+  private containingBlockOf(child: UiNode): LayoutBox {
+    for (let current = child.parent; current !== null; current = current.parent) {
+      if (this.isFragment(current)) {
+        continue;
+      }
+      const rec = this.records.get(current);
+      if (rec !== undefined && (rec.positioned || current === this.layoutRoot)) {
+        return { x: rec.x, y: rec.y, width: rec.width, height: rec.height };
+      }
+    }
+    const root = this.record(this.layoutRoot!);
+    return { x: root.x, y: root.y, width: root.width, height: root.height };
+  }
+
+  /**
+   * Records the children's paint order when zIndex reorders them, so
+   * renderers and hit testing agree on who is on top.
+   */
+  private updatePaintOrder(node: UiNode, rec: LayoutRecord): void {
+    let reorder = false;
+    const children: UiNode[] = [];
+    this.forEachChild(node, child => {
+      children.push(child);
+      if (this.record(child).zIndex !== 0) {
+        reorder = true;
+      }
+    });
+    if (!reorder) {
+      rec.paintOrder = null;
+      return;
+    }
+    // Array.prototype.sort is stable: equal zIndex keeps tree order.
+    children.sort((a, b) => this.record(a).zIndex - this.record(b).zIndex);
+    rec.paintOrder = children;
   }
 
   private placeFlex(node: UiNode, rec: LayoutRecord, direction: FlexDirection): void {
@@ -818,13 +1034,73 @@ export class LayoutEngine {
     }
   }
 
+  /**
+   * A stack lays every child over the same content box. `x` and `y`
+   * on the stack align them all (start, center, end, stretch), and
+   * `selfX` / `selfY` on a child override. Margins are honoured.
+   */
   private placeStack(node: UiNode, rec: LayoutRecord): void {
     const contentX = rec.x + rec.paddingLeft;
     const contentY = rec.y + rec.paddingTop;
+    const contentWidth = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
+    const contentHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
+    const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Start;
+    const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Start;
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
-      this.assignBox(child, contentX, contentY, cRec.measuredWidth, cRec.measuredHeight);
+      const alignX = this.stackAlignment(child, 'selfX', 'width', stackX);
+      const alignY = this.stackAlignment(child, 'selfY', 'height', stackY);
+      const availableWidth = Math.max(0, contentWidth - cRec.marginLeft - cRec.marginRight);
+      const availableHeight = Math.max(0, contentHeight - cRec.marginTop - cRec.marginBottom);
+      const stretchX = alignX === CrossAxisAlignment.Stretch;
+      const stretchY = alignY === CrossAxisAlignment.Stretch;
+      if (stretchX || stretchY) {
+        // A stretched axis is tight, so the child lays out at that size.
+        const last = cRec.lastConstraints;
+        this.measure(
+          child,
+          new Constraints(
+            stretchX ? availableWidth : last.minWidth,
+            stretchX ? availableWidth : last.maxWidth,
+            stretchY ? availableHeight : last.minHeight,
+            stretchY ? availableHeight : last.maxHeight
+          )
+        );
+      }
+      const width = cRec.measuredWidth;
+      const height = cRec.measuredHeight;
+      const x = contentX + cRec.marginLeft + this.stackOffset(alignX, availableWidth, width);
+      const y = contentY + cRec.marginTop + this.stackOffset(alignY, availableHeight, height);
+      this.assignBox(child, x, y, width, height);
     });
+  }
+
+  private stackAlignment(
+    child: UiNode,
+    selfProp: string,
+    sizeProp: string,
+    fallback: CrossAxisAlignment
+  ): CrossAxisAlignment {
+    let align = parseCrossAxisAlignment(child.properties.get(selfProp)) ?? fallback;
+    if (align === CrossAxisAlignment.Baseline) {
+      align = CrossAxisAlignment.Start;
+    }
+    // Stretch never overrides an explicit size, as in CSS.
+    if (align === CrossAxisAlignment.Stretch && this.numberProp(child, sizeProp) !== undefined) {
+      align = CrossAxisAlignment.Start;
+    }
+    return align;
+  }
+
+  private stackOffset(align: CrossAxisAlignment, available: number, size: number): number {
+    switch (align) {
+      case CrossAxisAlignment.Center:
+        return (available - size) / 2;
+      case CrossAxisAlignment.End:
+        return available - size;
+      default:
+        return 0;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -911,6 +1187,15 @@ export class LayoutEngine {
     rec.marginRight = this.spacingProp(props, 'margin', 'marginRight');
     rec.marginTop = this.spacingProp(props, 'margin', 'marginTop');
     rec.marginBottom = this.spacingProp(props, 'margin', 'marginBottom');
+    const position = props.get('position');
+    rec.absolute = position === 'absolute';
+    rec.positioned = rec.absolute || position === 'relative';
+    const inset = this.numberProp(node, 'inset');
+    rec.top = this.numberProp(node, 'top') ?? inset;
+    rec.right = this.numberProp(node, 'right') ?? inset;
+    rec.bottom = this.numberProp(node, 'bottom') ?? inset;
+    rec.left = this.numberProp(node, 'left') ?? inset;
+    rec.zIndex = this.numberProp(node, 'zIndex') ?? 0;
   }
 
   /**
@@ -985,6 +1270,11 @@ export class LayoutEngine {
 
   private assignBox(node: UiNode, x: number, y: number, width: number, height: number): void {
     const rec = this.record(node);
+    if (rec.positioned && !rec.absolute && node !== this.layoutRoot) {
+      // A relative node keeps its place in the flow and is drawn offset.
+      x += rec.left ?? (rec.right !== undefined ? -rec.right : 0);
+      y += rec.top ?? (rec.bottom !== undefined ? -rec.bottom : 0);
+    }
     if (rec.x !== x || rec.y !== y || rec.width !== width || rec.height !== height) {
       rec.x = x;
       rec.y = y;
@@ -999,18 +1289,45 @@ export class LayoutEngine {
   }
 
   /**
-   * Iterates over a node's children, transparently expanding Fragment
-   * anchors so their children participate in layout as if they were
-   * direct children of the parent.
+   * Iterates over a node's in-flow children, transparently expanding
+   * Fragment anchors so their children participate in layout as if
+   * they were direct children of the parent. Absolutely positioned
+   * children are skipped: they take no space and are placed separately.
    */
   private forEachLayoutChild(node: UiNode, callback: (child: UiNode) => void): void {
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
       if (this.isFragment(child)) {
         this.forEachLayoutChild(child, callback);
+      } else if (!this.isAbsolute(child)) {
+        callback(child);
+      }
+    }
+  }
+
+  /** The absolutely positioned children, fragments expanded. */
+  private forEachAbsoluteChild(node: UiNode, callback: (child: UiNode) => void): void {
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      if (this.isFragment(child)) {
+        this.forEachAbsoluteChild(child, callback);
+      } else if (this.isAbsolute(child)) {
+        callback(child);
+      }
+    }
+  }
+
+  /** Every child, in flow or not, fragments expanded, in tree order. */
+  private forEachChild(node: UiNode, callback: (child: UiNode) => void): void {
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      if (this.isFragment(child)) {
+        this.forEachChild(child, callback);
       } else {
         callback(child);
       }
     }
+  }
+
+  private isAbsolute(node: UiNode): boolean {
+    return node.properties.get('position') === 'absolute';
   }
 
   private isFragment(node: UiNode): boolean {

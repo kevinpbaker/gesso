@@ -110,6 +110,7 @@ Layout is checked against Chrome: `src/ui/layout/conformance/` holds cases writt
 
 - **No DOM layout.** The framework owns layout, scrolling, transforms, and rendering. The DOM is only used as a host element for the canvas.
 - **Incremental layout.** Only dirty subtrees are re-measured and re-placed; scroll changes run in O(number of scroll containers).
+- **Positioning and overlays.** `position: 'absolute' | 'relative'`, `zIndex`, aligned `Stack`s, and engine-level anchored placement (`anchor`, `placement`) that flips and shifts to stay on screen. Every runtime mounts an overlay layer; components open menus and dialogs through the `OverlayStore`.
 - **Text wraps, and flex is two-pass.** `Text` breaks lines like CSS (`textWrap`, `maxLines`, `textOverflow`), flex items are measured at max-content and again at their final size, and rows can align baselines (`y: 'baseline'`).
 - **Renderer-agnostic core.** The layout engine outputs `LayoutRecord`s consumed through a narrow `LayoutReader` interface. Both Canvas2D and WebGPU implement the same `UiRenderer` contract.
 - **Full Canvas2D redraw.** The current renderer redraws the whole scene each frame; dirty regions are a future optimization. Bounds culling already skips off-screen subtrees.

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { UiGraph } from '../graph/UiGraph';
 import { UiNodeType } from '../graph/UiNodeType';
 import { type UiNode } from '../graph/UiNode';
-import { Button, Column, Row, Text } from './UiComponents';
+import { Box, Button, Column, Row, Text } from './UiComponents';
 import { UiGraphBuilder } from './UiGraphBuilder';
 
 describe('UiGraphBuilder', () => {
@@ -96,6 +96,26 @@ describe('UiGraphBuilder', () => {
       const text = getChildren(row2)[0];
       expect(text.type).toBe(UiNodeType.Text);
       expect(text.getProperty('text')).toBe('Deep');
+    });
+  });
+
+  describe('ref prop', () => {
+    it('hands the node to ref once, and null when the node is removed', () => {
+      const graph = new UiGraph();
+      const builder = new UiGraphBuilder(graph);
+      const seen: (UiNode | null)[] = [];
+      const ref = (node: UiNode | null) => seen.push(node);
+      const root = builder.build(Column({}, Box({ ref, width: 10 })));
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.type).toBe(UiNodeType.Box);
+      expect(root.firstChild?.properties.has('ref')).toBe(false);
+
+      // Same callback identity: not called again.
+      builder.build(Column({}, Box({ ref, width: 20 })));
+      expect(seen).toHaveLength(1);
+
+      builder.build(Column({}));
+      expect(seen).toEqual([seen[0], null]);
     });
   });
 

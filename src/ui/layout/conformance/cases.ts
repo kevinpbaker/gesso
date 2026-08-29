@@ -73,6 +73,13 @@ export interface CaseProps {
   y?: Alignment;
   selfX?: Alignment;
   selfY?: Alignment;
+  position?: 'static' | 'relative' | 'absolute';
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+  inset?: number;
+  zIndex?: number;
   text?: string;
   fontSize?: number;
   lineHeight?: number;
@@ -337,9 +344,99 @@ export const layoutCases: readonly LayoutCase[] = [
     'stack/nested-row-inside-box',
     column({}, box({ padding: 10 }, row({ gap: 5 }, leaf(20, 20), leaf(20, 20))))
   ),
-  testCase('stack/child-margin-offsets', column({}, box({}, leaf(40, 20, { marginLeft: 10, marginTop: 5 }))), {
-    divergence: 'Nodal places stack children at the content origin and ignores their margins.'
-  }),
+  testCase('stack/child-margin-offsets', column({}, box({}, leaf(40, 20, { marginLeft: 10, marginTop: 5 })))),
+
+  // ---------------------------------------------------------------------------
+  // Stack alignment
+  // ---------------------------------------------------------------------------
+  testCase('stack/align-center', column({}, box({ width: 200, height: 100, x: 'center', y: 'center' }, leaf(40, 20)))),
+  testCase('stack/align-end', column({}, box({ width: 200, height: 100, x: 'end', y: 'end' }, leaf(40, 20)))),
+  testCase(
+    'stack/self-overrides-stack',
+    column(
+      {},
+      box({ width: 200, height: 100, x: 'center' }, leaf(40, 20, { selfX: 'end', selfY: 'center' }), leaf(20, 10))
+    )
+  ),
+  testCase(
+    'stack/end-with-margins',
+    column({}, box({ width: 200, height: 100, x: 'end', y: 'end' }, leaf(40, 20, { marginRight: 10, marginBottom: 5 })))
+  ),
+  testCase(
+    'stack/stretch-auto-child-only',
+    column({}, box({ width: 200, height: 100, x: 'stretch', y: 'stretch', padding: 10 }, box({}), leaf(40, 20)))
+  ),
+
+  // ---------------------------------------------------------------------------
+  // Positioning
+  // ---------------------------------------------------------------------------
+  testCase(
+    'position/absolute-top-left-takes-no-space',
+    column({}, leaf(50, 20), box({ position: 'absolute', top: 30, left: 40, width: 10, height: 10 }), leaf(50, 20))
+  ),
+  testCase(
+    'position/absolute-right-bottom',
+    column({}, box({ position: 'absolute', right: 10, bottom: 20, width: 30, height: 30 }))
+  ),
+  testCase('position/absolute-inset-is-tight', column({}, box({ position: 'absolute', inset: 10 }))),
+  testCase(
+    'position/absolute-two-edges-one-axis',
+    column({}, box({ position: 'absolute', left: 20, right: 50, top: 5, height: 15 }))
+  ),
+  testCase(
+    'position/absolute-with-margin',
+    column({}, box({ position: 'absolute', top: 10, left: 10, margin: 5, width: 20, height: 20 }))
+  ),
+  testCase(
+    'position/absolute-in-row-takes-no-space',
+    row({}, leaf(40, 20), box({ position: 'absolute', left: 100, top: 50, width: 10, height: 10 }), leaf(40, 20))
+  ),
+  testCase(
+    'position/containing-block-is-positioned-ancestor',
+    column(
+      { padding: 20 },
+      column(
+        { padding: 5 },
+        box(
+          { position: 'relative', width: 100, height: 80, margin: 7 },
+          box({ position: 'absolute', top: 5, right: 5, width: 20, height: 10 })
+        )
+      )
+    )
+  ),
+  testCase(
+    'position/absolute-skips-static-ancestors',
+    column(
+      { padding: 20 },
+      column(
+        { padding: 5 },
+        box({ width: 100, height: 80 }, box({ position: 'absolute', top: 5, right: 5, width: 20, height: 10 }))
+      )
+    )
+  ),
+  testCase(
+    'position/relative-offset-keeps-flow-slot',
+    column({}, leaf(50, 20, { position: 'relative', left: 15, top: 5 }), leaf(50, 20))
+  ),
+  testCase(
+    'position/relative-right-bottom-are-negative',
+    column({}, leaf(50, 20, { position: 'relative', right: 15, bottom: 5 }), leaf(50, 20))
+  ),
+  testCase(
+    'position/absolute-inside-flex-child',
+    row(
+      { gap: 10 },
+      box(
+        { width: 60, height: 40, position: 'relative' },
+        box({ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10 })
+      ),
+      leaf(60, 40)
+    )
+  ),
+  ahem(
+    'position/absolute-text-wraps-between-edges',
+    column({}, paragraph('ab cd ef', { position: 'absolute', left: 10, right: 230, top: 0 }))
+  ),
 
   // ---------------------------------------------------------------------------
   // Text (deterministic metrics: 0.6em per glyph, 1.2em line)

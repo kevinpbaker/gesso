@@ -1,6 +1,8 @@
 import { map } from 'rxjs';
 
-import { Box, Button, Column, Row, Text } from '../ui/composition';
+import { Box, Button, Column, Row, ScrollView, Text } from '../ui/composition';
+import type { UiNode } from '../ui/graph/UiNode';
+import { OverlayStore } from '../framework/overlay/OverlayStore';
 import type { UiElement } from '../ui/composition';
 import { Component } from '../framework/Component';
 import { createComponent } from '../framework/createComponent';
@@ -220,13 +222,6 @@ export class HeavyPanel extends Component {
   }
 }
 
-/**
- * Root component for the framework playground.
- *
- * Composes static and dynamic content to verify that the framework
- * component runtime, store injection, local state, and Canvas2D
- * renderer all work together in a single-thread app.
- */
 @Define('text-showcase')
 export class TextShowcase extends Component {
   /**
@@ -269,6 +264,127 @@ export class TextShowcase extends Component {
   }
 }
 
+/**
+ * Overlays (roadmap L2): a menu anchored to a button through a `ref`,
+ * opened through the OverlayStore. The button sits inside a short
+ * scroll view near the bottom of the page, so the menu flips upward
+ * when there is no room below and follows the button as the list
+ * scrolls; a press anywhere else closes it.
+ */
+@Define('menu-demo')
+export class MenuDemo extends Component {
+  @Inject(OverlayStore) overlays!: OverlayStore;
+
+  private anchor: UiNode | null = null;
+  private noteAnchor: UiNode | null = null;
+  private choice = state('Nothing chosen yet');
+
+  /**
+   * A popover with no backdrop: it stays open while the page and the
+   * list scroll, and the engine keeps it beside its button.
+   */
+  private toggleNote(): void {
+    if (this.overlays.isOpen('menu-demo-note')) {
+      this.overlays.dispatch('close', 'menu-demo-note');
+      return;
+    }
+    this.overlays.dispatch('open', {
+      id: 'menu-demo-note',
+      anchor: this.noteAnchor,
+      placement: 'right-start',
+      offset: 8,
+      content: Column(
+        { backgroundColor: '#3b2f0b', borderColor: '#a16207', borderWidth: 1, borderRadius: 6, padding: 8, width: 200 },
+        Text({
+          text: 'Pinned: no backdrop, so scrolling underneath keeps working and I follow my button.',
+          color: '#fde68a',
+          fontSize: 12
+        })
+      )
+    });
+  }
+
+  private open(): void {
+    this.overlays.dispatch('open', {
+      id: 'menu-demo',
+      anchor: this.anchor,
+      placement: 'bottom-start',
+      offset: 4,
+      dismissOnOutsidePress: true,
+      content: Column(
+        {
+          backgroundColor: '#1f2937',
+          borderColor: '#374151',
+          borderWidth: 1,
+          borderRadius: 6,
+          padding: 4,
+          gap: 2,
+          width: 180
+        },
+        ...['Rename', 'Duplicate', 'Move to…', 'Delete'].map(label =>
+          Button({
+            text: label,
+            color: label === 'Delete' ? '#f87171' : '#e5e7eb',
+            fontSize: 13,
+            padding: 8,
+            borderRadius: 4,
+            onClick: () => {
+              this.choice.value = `Chose “${label}”`;
+              this.overlays.dispatch('close', 'menu-demo');
+            }
+          })
+        )
+      )
+    });
+  }
+
+  override render(): UiElement {
+    return Column(
+      { gap: 8 },
+      Text({ text: 'Anchored menu: opens below, flips up near the edge, follows the scroll.', color: '#9ca3af' }),
+      Row(
+        { gap: 12, y: 'center' },
+        ScrollView(
+          { width: 220, height: 72, backgroundColor: '#111827', borderRadius: 6, padding: 8, gap: 8 },
+          Text({ text: 'Scroll me ↓', color: '#6b7280', fontSize: 12 }),
+          Text({ text: 'The button is below.', color: '#6b7280', fontSize: 12 }),
+          Button({
+            ref: (node: UiNode | null) => {
+              this.anchor = node;
+            },
+            text: 'Actions ▾',
+            color: '#ffffff',
+            backgroundColor: '#1f6feb',
+            padding: 8,
+            borderRadius: 4,
+            onClick: () => this.open()
+          }),
+          Button({
+            ref: (node: UiNode | null) => {
+              this.noteAnchor = node;
+            },
+            text: 'Pin a note',
+            color: '#fde68a',
+            backgroundColor: '#3b2f0b',
+            padding: 8,
+            borderRadius: 4,
+            onClick: () => this.toggleNote()
+          }),
+          Text({ text: 'More content underneath.', color: '#6b7280', fontSize: 12 })
+        ),
+        Text({ text: this.choice, color: '#d1d5db' })
+      )
+    );
+  }
+}
+
+/**
+ * Root component for the framework playground.
+ *
+ * Composes static and dynamic content to verify that the framework
+ * component runtime, store injection, local state, and Canvas2D
+ * renderer all work together in a single-thread app.
+ */
 @Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoStore) demo!: DemoStore;
@@ -295,8 +411,11 @@ export class FrameworkDemoRoot extends Component {
   }
 
   override render(): UiElement {
-    return Column(
-      { padding: 24, gap: 20, alignItems: 'flex-start' },
+    // A scrolling page: content taller than the viewport scrolls instead
+    // of being flex-shrunk into it, and the anchored menu below has to
+    // follow its button through two nested scroll containers.
+    return ScrollView(
+      { padding: 24, gap: 20 },
       Text({ text: 'Framework Playground', color: '#ffffff', fontSize: 24, fontWeight: 600 }),
       Text({
         text: 'Click the buttons: input, components, stores and Canvas2D are wired end to end.',
@@ -308,6 +427,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(StoreCounter),
       createComponent(Heartbeat),
       createComponent(HeavyPanel),
+      createComponent(MenuDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, alignItems: 'flex-start' }, this.recentTicks())
     );

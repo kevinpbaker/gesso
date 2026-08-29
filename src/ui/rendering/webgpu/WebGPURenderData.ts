@@ -250,10 +250,18 @@ export function buildRenderList(
         state.ctm = translateTransform(state.ctm, -rec.scrollX, -rec.scrollY);
       }
 
-      let child = node.firstChild;
-      while (child !== null) {
-        visit(child);
-        child = child.nextSibling;
+      const order = rec.paintOrder;
+      if (order !== null) {
+        // zIndex reordered these children; fragments are already expanded.
+        for (const child of order) {
+          visit(child);
+        }
+      } else {
+        let child = node.firstChild;
+        while (child !== null) {
+          visit(child);
+          child = child.nextSibling;
+        }
       }
 
       state.opacity = saved.opacity;

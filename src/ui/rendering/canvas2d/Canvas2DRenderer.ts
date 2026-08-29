@@ -161,6 +161,15 @@ export class Canvas2DRenderer implements UiRenderer {
   }
 
   private renderChildren(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean): void {
+    // zIndex reordered these children: layout recorded the order (with
+    // fragments already expanded) so paint and hit testing agree.
+    const order = context.layout.recordFor(node)?.paintOrder;
+    if (order !== null && order !== undefined) {
+      for (const child of order) {
+        this.renderNode(child, context, ctx, cull);
+      }
+      return;
+    }
     let child = node.firstChild;
     while (child !== null) {
       if (child.type === UiNodeType.Fragment) {

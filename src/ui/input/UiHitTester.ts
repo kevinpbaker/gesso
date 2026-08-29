@@ -162,6 +162,17 @@ export class UiHitTester implements HitTester {
   }
 
   private hitTestChildren(parent: UiNode, x: number, y: number): boolean {
+    // zIndex reordered these children: the topmost paints last, so it
+    // is tested first. Fragments are already expanded in the order.
+    const order = this.layout.recordFor(parent)?.paintOrder;
+    if (order !== null && order !== undefined) {
+      for (let i = order.length - 1; i >= 0; i--) {
+        if (this.hitTestNode(order[i], x, y)) {
+          return true;
+        }
+      }
+      return false;
+    }
     for (let child = parent.lastChild; child !== null; child = child.previousSibling) {
       if (child.type === UiNodeType.Fragment) {
         if (this.hitTestChildren(child, x, y)) {
