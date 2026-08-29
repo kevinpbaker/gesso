@@ -48,5 +48,17 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'it offers, and one card in the preview runs under a theme of its own.',
     source: 'src/playground/examples/ThemeExampleApp.tsx',
     tags: ['theme', 'environment', 'palette names', 'typography', 'JSX', 'render worker']
+  },
+  {
+    route: 'example-live',
+    title: 'Live feed',
+    description:
+      'An operations board fed by a stream that never stops: three channels with a forty-bar sparkline each, a ' +
+      'saturation meter, a rolling event log and a scanner, sampling at up to 60 Hz. Every moving thing is a prop ' +
+      'bound to an Observable, so a few thousand property updates a second reach the canvas over a tree that is ' +
+      'built exactly once — which the panel on the left proves by counting both. Pause it, change the rate, or ' +
+      'inject a spike and watch a threshold crossing repaint forty bars from one push.',
+    source: 'src/playground/examples/LiveExampleApp.tsx',
+    tags: ['bindings', 'observables', 'no rebuilds', 'streaming data', 'JSX', 'render worker']
   }
 ];

@@ -1,7 +1,6 @@
 import './playground/shell/theme.css';
 
 import { mountBenchmarkRoute } from './playground/routes/BenchmarkRoute';
-import { mountBindingRoute } from './playground/routes/BindingRoute';
 import { mountCanvasRoute } from './playground/routes/CanvasRoute';
 import { mountCompareRoute } from './playground/routes/CompareRoute';
 import { mountExamplesRoute } from './playground/routes/ExamplesRoute';
@@ -9,6 +8,7 @@ import { mountFrameworkRoute, mountFrameworkSyncRoute } from './playground/route
 import { mountSignInExampleRoute } from './playground/routes/SignInExampleRoute';
 import { mountNotesExampleRoute } from './playground/routes/NotesExampleRoute';
 import { mountLayoutRoute } from './playground/routes/LayoutRoute';
+import { mountLiveExampleRoute } from './playground/routes/LiveExampleRoute';
 import { mountThemeExampleRoute } from './playground/routes/ThemeExampleRoute';
 import { mountWebGPURoute } from './playground/routes/WebGPURoute';
 import { DEFAULT_ROUTE_ID, findRoute, ROUTES } from './playground/shell/routes';
@@ -33,11 +33,11 @@ const MOUNTS: Record<string, Mount> = {
   webgpu: mountWebGPURoute,
   compare: mountCompareRoute,
   benchmark: mountBenchmarkRoute,
-  binding: mountBindingRoute,
   examples: mountExamplesRoute,
   'example-signin': mountSignInExampleRoute,
   'example-notes': mountNotesExampleRoute,
-  'example-theme': mountThemeExampleRoute
+  'example-theme': mountThemeExampleRoute,
+  'example-live': mountLiveExampleRoute
 };
 
 if (import.meta.env.DEV) {

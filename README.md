@@ -177,7 +177,7 @@ pnpm install
 pnpm dev          # then open the URL Vite prints
 ```
 
-One shell, nine routes, switched by hash:
+One shell, eight routes, switched by hash:
 
 | Route             | What you'll see                                                                                 |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
@@ -188,8 +188,7 @@ One shell, nine routes, switched by hash:
 | `#webgpu`         | The WebGPU renderer drawing the real framework tree                                             |
 | `#compare`        | Canvas2D and WebGPU side by side with a live pixel diff                                         |
 | `#benchmark`      | WebGPU throughput                                                                               |
-| `#binding`        | Reactive bindings flowing straight to the canvas, no re-render                                  |
-| `#examples`       | Small complete apps: a passcode sign-in, a notes app, a theming pane                            |
+| `#examples`       | Small complete apps: a passcode sign-in, a notes app, a theming pane, a live feed               |
 
 ## Architecture
 
@@ -235,7 +234,7 @@ Single-thread mode exists too — `createApp(AppRoot).useStore(X).mountSync('#ap
 | `src/ui/properties`  | The property registry — every layout/paint/input property with its dirty flags; unknown props throw                                                          |
 | `src/ui/environment` | Theme, typography, colors, shapes, shadows; scoped reactive environment keys                                                                                 |
 | `src/framework`      | `Component`, decorators, `Store`, replication (`exposeStore`/`attachStore`/patches), `OverlayStore`, `createApp`/`renderRoot`/`NodalRuntime`                 |
-| `src/playground`     | The demo harness — nine routes and one shell. Not the framework.                                                                                             |
+| `src/playground`     | The demo harness — eight routes and one shell. Not the framework.                                                                                            |
 | `scripts/`           | `gen-layout-fixtures.ts` (Chrome → `expected.json`), `check-webgpu-parity.ts` (Chrome pixel diff over DevTools protocol)                                     |
 | `docs/`              | Design doc, roadmaps, and thirteen decision records                                                                                                          |
 
