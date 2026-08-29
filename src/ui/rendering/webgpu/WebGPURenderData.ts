@@ -1,5 +1,6 @@
 import type { UiNode } from '../../graph/UiNode';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
+import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import { resolvePaintState, createPaintState } from '../PaintState';
@@ -305,8 +306,8 @@ export function buildRenderList(
 }
 
 /**
- * Overlay scrollbars as fill primitives: a thin rounded thumb along the
- * end edge of each overflowing axis, fading out before it disappears.
+ * Overlay scrollbars as fill primitives, from the shared geometry the
+ * Canvas2D renderer draws and the hit tester grabs.
  */
 function pushScrollbars(
   out: number[],
@@ -321,46 +322,13 @@ function pushScrollbars(
   }
   const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
   const color: RgbaColor = { r: 0.5, g: 0.5, b: 0.5, a: alpha };
-  const thickness = 4;
-  const inset = 2;
-  const minThumb = 20;
-  if (rec.contentHeight > rec.height && rec.height > 0) {
-    const track = rec.height - inset * 2;
-    const thumb = Math.max(minThumb, (track * rec.height) / rec.contentHeight);
-    const maxScroll = rec.contentHeight - rec.height;
-    const y = rec.y + inset + (maxScroll > 0 ? ((track - thumb) * rec.scrollY) / maxScroll : 0);
-    pushInstance(
-      out,
-      rec.x + rec.width - inset - thickness,
-      y,
-      thickness,
-      thumb,
-      color,
-      thickness / 2,
-      opacity,
-      0,
-      PrimitiveKind.Fill,
-      transform
-    );
-  }
-  if (rec.contentWidth > rec.width && rec.width > 0) {
-    const track = rec.width - inset * 2;
-    const thumb = Math.max(minThumb, (track * rec.width) / rec.contentWidth);
-    const maxScroll = rec.contentWidth - rec.width;
-    const x = rec.x + inset + (maxScroll > 0 ? ((track - thumb) * rec.scrollX) / maxScroll : 0);
-    pushInstance(
-      out,
-      x,
-      rec.y + rec.height - inset - thickness,
-      thumb,
-      thickness,
-      color,
-      thickness / 2,
-      opacity,
-      0,
-      PrimitiveKind.Fill,
-      transform
-    );
+  const { vertical, horizontal } = scrollbarThumbs(rec);
+  for (const bar of [vertical, horizontal]) {
+    if (bar === null) {
+      continue;
+    }
+    const { x, y, width, height } = bar.thumb;
+    pushInstance(out, x, y, width, height, color, SCROLLBAR_THICKNESS / 2, opacity, 0, PrimitiveKind.Fill, transform);
   }
 }
 

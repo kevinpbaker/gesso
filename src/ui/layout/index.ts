@@ -1,4 +1,15 @@
 export { LayoutEngine, SCROLLBAR_LINGER_MS, SCROLLBAR_FADE_MS, type ScrollAdjustment } from './LayoutEngine';
+export {
+  scrollbarThumb,
+  scrollbarThumbs,
+  scrollbarZoneAt,
+  SCROLLBAR_THICKNESS,
+  SCROLLBAR_INSET,
+  SCROLLBAR_MIN_THUMB,
+  SCROLLBAR_HOVER_ZONE,
+  type ScrollbarAxis,
+  type ScrollbarThumb
+} from './Scrollbars';
 export { LayoutRecord } from './LayoutRecord';
 export { CharacterCountTextMeasurer, ParagraphTextMeasurer } from './TextMeasurer';
 export type {

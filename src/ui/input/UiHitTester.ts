@@ -2,6 +2,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import { isNodeHitTestable, isNodeInert } from './UiInteraction';
+import { pointInBox, scrollbarThumb, scrollbarZoneAt, type ScrollbarAxis } from '../layout/Scrollbars';
 
 /**
  * Read access to layout records for hit testing.
@@ -29,6 +30,13 @@ export interface HitTestResult {
   node: UiNode;
   localX: number;
   localY: number;
+  /**
+   * Set when the point is on a scroll container's scrollbar: which axis,
+   * and whether it is on the thumb (drag) or the track beside it (page).
+   * `node` is the container. Only a visible bar, or its thumb, takes the
+   * hit; otherwise content underneath wins.
+   */
+  scrollbar?: { axis: ScrollbarAxis; onThumb: boolean };
 }
 
 /**
@@ -44,6 +52,12 @@ export interface HitTester {
   hitTest(x: number, y: number): HitTestResult | null;
   /** Converts a canvas-space point into a node's local coordinates. */
   toLocal(node: UiNode, x: number, y: number): UiPoint;
+  /**
+   * The scroll container whose scrollbar band the point is in, visible
+   * or not — the pointer controller reveals bars as the pointer nears
+   * them. Null away from any bar.
+   */
+  scrollbarZoneAt(x: number, y: number): { node: UiNode; axis: ScrollbarAxis } | null;
 }
 
 /**
@@ -86,6 +100,8 @@ interface TransformScratch {
 export class UiHitTester implements HitTester {
   private readonly point: TransformScratch = { x: 0, y: 0 };
   private readonly result = new HitScratch();
+  /** True while answering scrollbarZoneAt: bands count, content does not. */
+  private zoneOnly = false;
 
   constructor(
     private layout: HitTestLayoutReader,
@@ -98,8 +114,27 @@ export class UiHitTester implements HitTester {
   }
 
   hitTest(x: number, y: number): HitTestResult | null {
+    this.result.scrollbar = undefined;
+    this.zoneOnly = false;
     if (this.hitTestNode(this.root, x, y)) {
-      return { node: this.result.node!, localX: this.result.localX, localY: this.result.localY };
+      const result: HitTestResult = { node: this.result.node!, localX: this.result.localX, localY: this.result.localY };
+      const scrollbar = this.result.takeScrollbar();
+      if (scrollbar !== undefined) {
+        result.scrollbar = scrollbar;
+      }
+      return result;
+    }
+    return null;
+  }
+
+  scrollbarZoneAt(x: number, y: number): { node: UiNode; axis: ScrollbarAxis } | null {
+    this.result.scrollbar = undefined;
+    this.zoneOnly = true;
+    const hit = this.hitTestNode(this.root, x, y);
+    this.zoneOnly = false;
+    const scrollbar = this.result.takeScrollbar();
+    if (hit && scrollbar !== undefined) {
+      return { node: this.result.node!, axis: scrollbar.axis };
     }
     return null;
   }
@@ -144,6 +179,15 @@ export class UiHitTester implements HitTester {
       if (px < rec.x || px >= rec.x + rec.width || py < rec.y || py >= rec.y + rec.height) {
         return false;
       }
+      if (rec.scrollable && this.hitScrollbar(node, rec, px, py)) {
+        return true;
+      }
+      if (this.zoneOnly) {
+        // Looking for a bar band only: descend, but never land on content.
+        const shiftX = rec.scrollX;
+        const shiftY = rec.scrollY;
+        return this.hitTestChildren(node, px + shiftX, py + shiftY);
+      }
       const shiftX = rec.scrollable ? rec.scrollX : 0;
       const shiftY = rec.scrollable ? rec.scrollY : 0;
       if (this.hitTestChildren(node, px + shiftX, py + shiftY)) {
@@ -157,7 +201,7 @@ export class UiHitTester implements HitTester {
     if (this.hitTestChildren(node, px, py)) {
       return true;
     }
-    if (!isNodeHitTestable(node)) {
+    if (this.zoneOnly || !isNodeHitTestable(node)) {
       return false;
     }
     if (px < rec.x || px >= rec.x + rec.width || py < rec.y || py >= rec.y + rec.height) {
@@ -196,6 +240,30 @@ export class UiHitTester implements HitTester {
     this.result.node = node;
     this.result.localX = px - rec.x;
     this.result.localY = py - rec.y;
+    return true;
+  }
+
+  /**
+   * Scrollbars paint above a container's children, so they are tested
+   * before them. The thumb always takes the hit; the rest of the band
+   * only while the bar is showing (or when asked for the band alone).
+   */
+  private hitScrollbar(node: UiNode, rec: LayoutRecord, px: number, py: number): boolean {
+    const axis = scrollbarZoneAt(rec, px, py);
+    if (axis === null) {
+      return false;
+    }
+    const bar = scrollbarThumb(rec, axis);
+    if (bar === null) {
+      return false;
+    }
+    const onThumb = pointInBox(bar.thumb, px, py);
+    const visible = rec.scrollbarVisibleUntil > (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (!onThumb && !visible && !this.zoneOnly) {
+      return false;
+    }
+    this.recordHit(node, rec, px, py);
+    this.result.scrollbar = { axis, onThumb };
     return true;
   }
 
@@ -249,6 +317,12 @@ class HitScratch {
   node: UiNode | null = null;
   localX = 0;
   localY = 0;
+  scrollbar: { axis: ScrollbarAxis; onThumb: boolean } | undefined = undefined;
+
+  /** Read through a method so a prior reset does not narrow the field to undefined. */
+  takeScrollbar(): { axis: ScrollbarAxis; onThumb: boolean } | undefined {
+    return this.scrollbar;
+  }
 }
 
 function toFinite(value: unknown): number | undefined {

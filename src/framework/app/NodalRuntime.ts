@@ -4,6 +4,7 @@ import { UiGraph } from '../../ui/graph/UiGraph';
 import { UiGraphBuilder } from '../../ui/composition/UiGraphBuilder';
 import { isComponentLikeElement, isObservable, type UiElement } from '../../ui/composition/UiElement';
 import { Stack } from '../../ui/composition/UiComponents';
+import { scrollbarThumb } from '../../ui/layout/Scrollbars';
 import {
   UiVirtualWindow,
   VIRTUAL_INDEX_PROP,
@@ -339,6 +340,7 @@ export class NodalRuntime {
     const root = this.layoutRoot();
     const hitTester = new UiHitTester(this.engine, root);
     const focus = new UiFocusManager(root, this.dispatcher);
+    const scrollSink = this.createScrollSink();
     return {
       dispatcher: this.dispatcher,
       focus,
@@ -347,9 +349,10 @@ export class NodalRuntime {
           if (node !== null) {
             focus.focusOnPress(node);
           }
-        }
+        },
+        scrollSink
       }),
-      wheel: new UiWheelController(hitTester, this.dispatcher, this.createScrollSink()),
+      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
       keyboard: new UiKeyboardController(this.dispatcher, focus, root)
     };
   }
@@ -387,6 +390,14 @@ export class NodalRuntime {
           node.setProperty('scrollY', record.scrollY + dy);
         }
         this.graph.markDirty(node, DirtyFlags.Transform);
+      },
+      revealScrollbars: (node): void => {
+        this.engine.revealScrollbars(node);
+        this.graph.markDirty(node, DirtyFlags.Paint);
+      },
+      scrollbar: (node, axis) => {
+        const record = this.engine.recordFor(node);
+        return record === undefined ? null : scrollbarThumb(record, axis);
       }
     };
   }

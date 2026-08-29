@@ -176,7 +176,9 @@ describe('LayoutEngine overflow', () => {
       const clipped = box(h, 'clipped', { width: 50, height: 50, overflow: 'hidden' });
       const spill = box(h, 'spill', { width: 200, height: 20 });
       h.append(clipped, spill);
-      const list = column(h, 'list', { height: 60, overflow: 'scroll', scrollY: 30, x: 'start' });
+      // Wide enough that the scrollbar band along the right edge stays
+      // clear of the points tested.
+      const list = column(h, 'list', { width: 200, height: 60, overflow: 'scroll', scrollY: 30, x: 'start' });
       const header = box(h, 'header', { position: 'sticky', top: 0, width: 20, height: 10, flexShrink: 0 });
       const body = box(h, 'body', { width: 20, height: 200, flexShrink: 0 });
       h.append(list, header, body);

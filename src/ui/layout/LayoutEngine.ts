@@ -330,6 +330,17 @@ export class LayoutEngine {
     return adjustments;
   }
 
+  /**
+   * Shows a scroll container's scrollbars as if it had just scrolled:
+   * the pointer is near them, or dragging one.
+   */
+  revealScrollbars(node: UiNode): void {
+    const rec = this.records.get(node);
+    if (rec !== undefined) {
+      rec.scrollbarVisibleUntil = this.now() + SCROLLBAR_LINGER_MS;
+    }
+  }
+
   /** Every scroll container that has been laid out. */
   scrollContainers(): Iterable<UiNode> {
     return this.scrollNodes;

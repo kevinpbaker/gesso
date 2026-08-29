@@ -2,6 +2,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { noModifiers, UiEventType, UiWheelEvent, type UiModifiers } from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
+import type { ScrollbarThumb } from '../layout/Scrollbars';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 
 /**
@@ -27,6 +28,10 @@ export interface ScrollContainerState {
 export interface ScrollSink {
   containerState(node: UiNode): ScrollContainerState | undefined;
   scrollBy(node: UiNode, dx: number, dy: number): void;
+  /** Show the container's scrollbars, as hovering near them or dragging one does. */
+  revealScrollbars?(node: UiNode): void;
+  /** Geometry of one scrollbar, for dragging its thumb. */
+  scrollbar?(node: UiNode, axis: 'x' | 'y'): ScrollbarThumb | null;
 }
 
 /**

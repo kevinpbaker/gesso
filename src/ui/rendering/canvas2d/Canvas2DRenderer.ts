@@ -9,6 +9,7 @@ import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBord
 import type { RenderContext } from '../RenderContext';
 import { drawText } from '../TextRenderer';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
+import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { UiRenderer } from '../UiRenderer';
 
@@ -303,26 +304,14 @@ export class Canvas2DRenderer implements UiRenderer {
       return;
     }
     const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
-    const thickness = 4;
-    const inset = 2;
-    const minThumb = 20;
     ctx.fillStyle = `rgba(128,128,128,${alpha.toFixed(3)})`;
-    if (rec.contentHeight > rec.height && rec.height > 0) {
-      const track = rec.height - inset * 2;
-      const thumb = Math.max(minThumb, (track * rec.height) / rec.contentHeight);
-      const travel = track - thumb;
-      const maxScroll = rec.contentHeight - rec.height;
-      const y = rec.y + inset + (maxScroll > 0 ? (travel * rec.scrollY) / maxScroll : 0);
-      traceRoundedRect(ctx, rec.x + rec.width - inset - thickness, y, thickness, thumb, thickness / 2);
-      ctx.fill();
-    }
-    if (rec.contentWidth > rec.width && rec.width > 0) {
-      const track = rec.width - inset * 2;
-      const thumb = Math.max(minThumb, (track * rec.width) / rec.contentWidth);
-      const travel = track - thumb;
-      const maxScroll = rec.contentWidth - rec.width;
-      const x = rec.x + inset + (maxScroll > 0 ? (travel * rec.scrollX) / maxScroll : 0);
-      traceRoundedRect(ctx, x, rec.y + rec.height - inset - thickness, thumb, thickness, thickness / 2);
+    const { vertical, horizontal } = scrollbarThumbs(rec);
+    for (const bar of [vertical, horizontal]) {
+      if (bar === null) {
+        continue;
+      }
+      const { x, y, width, height } = bar.thumb;
+      traceRoundedRect(ctx, x, y, width, height, SCROLLBAR_THICKNESS / 2);
       ctx.fill();
     }
   }

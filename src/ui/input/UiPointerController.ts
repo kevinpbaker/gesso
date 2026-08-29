@@ -3,6 +3,8 @@ import { noModifiers, UiEventType, UiPointerEvent, type UiModifiers } from './Ui
 import type { HitTester } from './UiHitTester';
 import { UiInputDispatcher } from './UiInputDispatcher';
 import type { GestureInput } from './UiGestureRecognizer';
+import type { ScrollSink } from './UiWheelController';
+import type { ScrollbarAxis } from '../layout/Scrollbars';
 
 export interface PointerControllerOptions {
   /**
@@ -21,6 +23,24 @@ export interface PointerControllerOptions {
    * a focus manager's `focusOnPress`.
    */
   onPress?: (node: UiNode) => void;
+  /**
+   * Scrolling backend for scrollbar interaction: dragging a thumb,
+   * paging on a track press, and revealing bars as the pointer nears
+   * them. Without it scrollbars are display only.
+   */
+  scrollSink?: ScrollSink;
+}
+
+/** A thumb drag in progress. */
+interface ScrollbarDrag {
+  node: UiNode;
+  axis: ScrollbarAxis;
+  /** Pointer position along the axis when the drag started. */
+  startPointer: number;
+  /** Scroll offset when the drag started. */
+  startScroll: number;
+  /** Scroll offset per pixel of thumb travel. */
+  scale: number;
 }
 
 /**
@@ -42,6 +62,11 @@ export interface PointerControllerOptions {
  *     `slop` px, pointerdown did not call preventDefault(), and no
  *     gesture recognizer claimed the press.
  *   - pointercancel aborts the press and never produces a Click.
+ *   - Scrollbars: a press on a scroll container's thumb starts a drag
+ *     that moves the content with the pointer; a press on the track
+ *     beside a visible thumb pages one viewport toward the pointer.
+ *     Neither reaches the content under the bar. Nearing a bar while
+ *     idle reveals it.
  *
  * When a gesture recognizer is supplied it is fed the press sequence
  * and synthesizes LongPress/Pan/Drag through the same dispatcher.
@@ -53,6 +78,7 @@ export class UiPointerController {
   private readonly slop: number;
   private readonly gestures: GestureInput | null;
   private readonly onPress: ((node: UiNode) => void) | null;
+  private readonly scrollSink: ScrollSink | null;
 
   private hoverNode: UiNode | null = null;
 
@@ -60,6 +86,8 @@ export class UiPointerController {
   private downX = 0;
   private downY = 0;
   private downDefaultPrevented = false;
+
+  private scrollbarDrag: ScrollbarDrag | null = null;
 
   constructor(
     private readonly hitTester: HitTester,
@@ -69,6 +97,7 @@ export class UiPointerController {
     this.slop = options.slop ?? 4;
     this.gestures = options.gestures ?? null;
     this.onPress = options.onPress ?? null;
+    this.scrollSink = options.scrollSink ?? null;
   }
 
   /** The node currently under the pointer, or null over empty space. */
@@ -81,6 +110,11 @@ export class UiPointerController {
     return this.downTarget;
   }
 
+  /** The scroll container whose thumb is being dragged, or null. */
+  get draggingScrollbarOf(): UiNode | null {
+    return this.scrollbarDrag?.node ?? null;
+  }
+
   /**
    * Pointer press. Hit-tests at the point, establishes hover, and
    * dispatches PointerDown to the pressed node. Subsequent moves and
@@ -88,10 +122,15 @@ export class UiPointerController {
    */
   pointerDown(x: number, y: number, buttons = 1, modifiers: UiModifiers = noModifiers()): UiPointerEvent {
     const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers);
-    if (this.downTarget !== null) {
+    if (this.downTarget !== null || this.scrollbarDrag !== null) {
       return event;
     }
-    const target = this.hitTester.hitTest(x, y)?.node ?? null;
+    const hit = this.hitTester.hitTest(x, y);
+    if (hit?.scrollbar !== undefined && this.scrollSink !== null) {
+      this.pressScrollbar(hit.node, hit.scrollbar.axis, hit.scrollbar.onThumb, x, y);
+      return event;
+    }
+    const target = hit?.node ?? null;
     this.updateHover(target, x, y, buttons, modifiers);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
@@ -114,11 +153,22 @@ export class UiPointerController {
    * node. Returns null when the move lands on empty space.
    */
   pointerMove(x: number, y: number, buttons = 0, modifiers: UiModifiers = noModifiers()): UiPointerEvent | null {
+    if (this.scrollbarDrag !== null) {
+      this.dragScrollbar(x, y);
+      return null;
+    }
     if (this.downTarget !== null) {
       const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers);
       this.dispatcher.dispatch(event, this.downTarget);
       this.gestures?.pointerMove(event, this.downTarget);
       return event;
+    }
+    if (this.scrollSink?.revealScrollbars !== undefined) {
+      // Nearing a bar shows it, so there is something to grab.
+      const zone = this.hitTester.scrollbarZoneAt(x, y);
+      if (zone !== null) {
+        this.scrollSink.revealScrollbars(zone.node);
+      }
     }
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
     this.updateHover(target, x, y, buttons, modifiers);
@@ -137,6 +187,11 @@ export class UiPointerController {
    * the same node. Returns null when nothing was pressed.
    */
   pointerUp(x: number, y: number, buttons = 0, modifiers: UiModifiers = noModifiers()): UiPointerEvent | null {
+    if (this.scrollbarDrag !== null) {
+      this.dragScrollbar(x, y);
+      this.scrollbarDrag = null;
+      return null;
+    }
     const target = this.downTarget;
     if (target === null) {
       return null;
@@ -164,6 +219,7 @@ export class UiPointerController {
    * node and clears press state so no Click is synthesized.
    */
   pointerCancel(): void {
+    this.scrollbarDrag = null;
     if (this.downTarget === null) {
       return;
     }
@@ -171,6 +227,81 @@ export class UiPointerController {
     this.dispatcher.dispatch(event, this.downTarget);
     this.gestures?.pointerCancel();
     this.downTarget = null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Scrollbars
+  // -------------------------------------------------------------------------
+
+  /**
+   * A press on the thumb starts a drag that maps pointer travel to
+   * scroll offset through the thumb's travel range. A press on the
+   * track pages one viewport toward the pointer, as classic scrollbars
+   * do.
+   */
+  private pressScrollbar(node: UiNode, axis: ScrollbarAxis, onThumb: boolean, x: number, y: number): void {
+    const sink = this.scrollSink!;
+    const state = sink.containerState(node);
+    const bar = sink.scrollbar?.(node, axis) ?? null;
+    if (state === undefined || bar === null) {
+      return;
+    }
+    sink.revealScrollbars?.(node);
+    const scroll = axis === 'y' ? state.scrollY : state.scrollX;
+    if (onThumb) {
+      this.scrollbarDrag = {
+        node,
+        axis,
+        startPointer: axis === 'y' ? y : x,
+        startScroll: scroll,
+        scale: bar.travel > 0 ? bar.maxScroll / bar.travel : 0
+      };
+      return;
+    }
+    // The thumb is in the container's record space; so is the pointer
+    // once mapped with toLocal (which is relative to the record origin).
+    const local = this.hitTester.toLocal(node, x, y);
+    const pointer = axis === 'y' ? local.y : local.x;
+    const thumbStartLocal =
+      axis === 'y' ? bar.thumb.y - this.recordOrigin(node, 'y') : bar.thumb.x - this.recordOrigin(node, 'x');
+    const delta = (pointer < thumbStartLocal ? -1 : 1) * bar.viewport;
+    if (axis === 'y') {
+      sink.scrollBy(node, 0, delta);
+    } else {
+      sink.scrollBy(node, delta, 0);
+    }
+  }
+
+  /**
+   * The record origin along an axis, recovered from toLocal: local
+   * coordinates are record coordinates minus the record origin, so
+   * mapping the origin itself yields the offset.
+   */
+  private recordOrigin(node: UiNode, axis: ScrollbarAxis): number {
+    const zero = this.hitTester.toLocal(node, 0, 0);
+    return axis === 'y' ? -zero.y : -zero.x;
+  }
+
+  private dragScrollbar(x: number, y: number): void {
+    const drag = this.scrollbarDrag!;
+    const sink = this.scrollSink!;
+    const state = sink.containerState(drag.node);
+    if (state === undefined) {
+      return;
+    }
+    const pointer = drag.axis === 'y' ? y : x;
+    const target = drag.startScroll + (pointer - drag.startPointer) * drag.scale;
+    const current = drag.axis === 'y' ? state.scrollY : state.scrollX;
+    const max = drag.axis === 'y' ? state.maxScrollY : state.maxScrollX;
+    const clamped = Math.min(Math.max(target, 0), max);
+    if (clamped !== current) {
+      if (drag.axis === 'y') {
+        sink.scrollBy(drag.node, 0, clamped - current);
+      } else {
+        sink.scrollBy(drag.node, clamped - current, 0);
+      }
+    }
+    sink.revealScrollbars?.(drag.node);
   }
 
   // -------------------------------------------------------------------------
