@@ -4,7 +4,8 @@ import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import { Constraints } from '../../layout/LayoutTypes';
 import { RenderHarness } from '../RenderTestUtils';
-import { buildRenderList, INSTANCE_STRIDE_FLOATS, PrimitiveKind } from './WebGPURenderData';
+import { buildRenderList, viewportScissor, INSTANCE_STRIDE_FLOATS, PrimitiveKind } from './WebGPURenderData';
+import { WebGPUSurface, toPhysicalPixels } from './WebGPUSurface';
 
 function box(h: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
   const node = h.createNode(id, UiNodeType.Box);
@@ -310,5 +311,95 @@ describe('buildRenderList scrolling', () => {
     const list = buildRenderList(scroll, h.engine, 800, 600, 1);
     expect(list.commands.length).toBeGreaterThan(0);
     expect(list.commands[0].scissor).toEqual({ x: 0, y: 0, width: 200, height: 100 });
+  });
+});
+
+
+/**
+ * Logical sizes and device pixel ratios that put the clip rect's
+ * edges at awkward fractions of a physical pixel. The 1.3333333730697632
+ * ratio is what a 4/3 browser zoom actually reports: a float32 value a
+ * hair above 4/3, so `logical * dpr` lands just past an integer for
+ * most sizes.
+ */
+const FRACTIONAL_DPRS = [1, 1.25, 1.3333333730697632, 1.5, 1.7999999523162842, 2, 2.625, 3];
+
+describe('buildRenderList scissor bounds', () => {
+  /**
+   * Every scissor rectangle must fit inside the attachment. WebGPU
+   * treats one that does not as a validation error and discards the
+   * whole command buffer, so a single overflowing rectangle blanks the
+   * entire frame — every other draw in it included — with nothing
+   * drawn and no error thrown on the calling side.
+   */
+  function assertWithinAttachment(logicalWidth: number, logicalHeight: number, dpr: number): void {
+    const h = new RenderHarness(logicalWidth, logicalHeight, dpr);
+    // A scroll view larger than the viewport clips to the viewport's
+    // own edges, which is the case that overflows: the far edge lands
+    // exactly on the attachment boundary.
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', logicalWidth + 200);
+    scroll.setProperty('height', logicalHeight + 200);
+    const child = box(h, 'child', {
+      width: 40,
+      height: 50,
+      backgroundColor: '#aaa',
+      text: 'label',
+      flexShrink: 0
+    });
+    h.graph.appendChild(scroll, child);
+    h.layout(scroll, Constraints.loose(logicalWidth, logicalHeight));
+
+    const list = buildRenderList(scroll, h.engine, logicalWidth, logicalHeight, dpr);
+    const maxX = toPhysicalPixels(logicalWidth, dpr);
+    const maxY = toPhysicalPixels(logicalHeight, dpr);
+
+    const rects = [
+      viewportScissor(logicalWidth, logicalHeight, dpr),
+      ...list.commands.map(command => command.scissor),
+      ...list.textItems.map(item => item.scissor)
+    ];
+
+    const where = `${logicalWidth}x${logicalHeight}@${dpr}`;
+    for (const rect of rects) {
+      if (rect === null) {
+        continue;
+      }
+      expect(rect.x, where).toBeGreaterThanOrEqual(0);
+      expect(rect.y, where).toBeGreaterThanOrEqual(0);
+      expect(rect.width, where).toBeGreaterThan(0);
+      expect(rect.height, where).toBeGreaterThan(0);
+      expect(rect.x + rect.width, where).toBeLessThanOrEqual(maxX);
+      expect(rect.y + rect.height, where).toBeLessThanOrEqual(maxY);
+    }
+  }
+
+  it('keeps every scissor inside the attachment for fractional sizes and dprs', () => {
+    for (const dpr of FRACTIONAL_DPRS) {
+      for (let width = 800; width < 804; width += 0.25) {
+        for (let height = 600; height < 604; height += 0.25) {
+          assertWithinAttachment(width, height, dpr);
+        }
+      }
+    }
+  });
+
+  it('sizes the full-viewport scissor exactly like the backing store', () => {
+    // The two were derived by different roundings — Math.ceil here,
+    // Math.round there — which is what made the viewport-wide scissor
+    // one pixel too tall and threw away the frame.
+    for (const dpr of FRACTIONAL_DPRS) {
+      for (let size = 700; size < 704; size += 0.125) {
+        const host = { width: 0, height: 0, getContext: () => null };
+        const surface = new WebGPUSurface(host);
+        surface.setLogicalSize(size, size, dpr);
+        expect(viewportScissor(size, size, dpr), `${size}@${dpr}`).toEqual({
+          x: 0,
+          y: 0,
+          width: host.width,
+          height: host.height
+        });
+      }
+    }
   });
 });

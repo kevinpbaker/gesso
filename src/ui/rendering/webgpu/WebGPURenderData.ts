@@ -7,6 +7,7 @@ import { colorToCss } from '../PaintState';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
 import { uniformBorderRadius } from '../../properties/UiBorderRadius';
+import { toPhysicalPixels } from './WebGPUSurface';
 
 export const INSTANCE_STRIDE_FLOATS = 18;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
@@ -408,17 +409,48 @@ function logicalClipToScissor(
   maxX = Math.min(logicalWidth, maxX);
   maxY = Math.min(logicalHeight, maxY);
 
-  const width = maxX - minX;
-  const height = maxY - minY;
-  if (width <= 0 || height <= 0) {
+  if (maxX - minX <= 0 || maxY - minY <= 0) {
     return null;
   }
 
+  // Round the edges, never the extent. Rounding the origin and the
+  // width independently lets x + width land a pixel past the
+  // attachment whenever both products have a fractional part of a
+  // half or more — and an out-of-bounds scissor is a validation error
+  // that discards the entire command buffer, losing the whole frame
+  // rather than this one rectangle. Clamping to the backing store,
+  // derived through the same rule the surface sizes it with, keeps
+  // the result inside the attachment for any size and dpr.
+  const physicalWidth = toPhysicalPixels(logicalWidth, dpr);
+  const physicalHeight = toPhysicalPixels(logicalHeight, dpr);
+  const x0 = clamp(Math.round(minX * dpr), 0, physicalWidth);
+  const x1 = clamp(Math.round(maxX * dpr), 0, physicalWidth);
+  const y0 = clamp(Math.round(minY * dpr), 0, physicalHeight);
+  const y1 = clamp(Math.round(maxY * dpr), 0, physicalHeight);
+  if (x1 <= x0 || y1 <= y0) {
+    return null;
+  }
+
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return value < min ? min : value > max ? max : value;
+}
+
+/**
+ * The scissor rectangle covering the whole attachment.
+ *
+ * Callers that need to *undo* a scissor have to set one explicitly:
+ * a render pass keeps the last rectangle it was given, so "no clip"
+ * means the full viewport, not the absence of a call.
+ */
+export function viewportScissor(logicalWidth: number, logicalHeight: number, dpr: number): ScissorRect {
   return {
-    x: Math.round(minX * dpr),
-    y: Math.round(minY * dpr),
-    width: Math.round(width * dpr),
-    height: Math.round(height * dpr)
+    x: 0,
+    y: 0,
+    width: toPhysicalPixels(logicalWidth, dpr),
+    height: toPhysicalPixels(logicalHeight, dpr)
   };
 }
 

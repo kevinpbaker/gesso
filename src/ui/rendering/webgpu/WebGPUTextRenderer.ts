@@ -4,6 +4,7 @@ import { layoutTextLines, buildFontString } from '../TextRenderer';
 import { createPaintState, type TextAlign, type VerticalAlign } from '../PaintState';
 import { createTextPipeline, TEXT_INSTANCE_STRIDE_FLOATS, type TextPipeline } from './WebGPUTextPipeline';
 import type { TextRenderItem } from './WebGPURenderData';
+import { viewportScissor } from './WebGPURenderData';
 
 interface TextTexture {
   texture: GPUTexture;
@@ -48,6 +49,7 @@ export class WebGPUTextRenderer {
     }
 
     this.generation++;
+    const viewport = viewportScissor(logicalWidth, logicalHeight, dpr);
 
     const instanceData = new Float32Array(items.length * TEXT_INSTANCE_STRIDE_FLOATS);
     for (let i = 0; i < items.length; i++) {
@@ -111,11 +113,8 @@ export class WebGPUTextRenderer {
       }
       cached.generation = this.generation;
 
-      if (item.scissor !== null) {
-        pass.setScissorRect(item.scissor.x, item.scissor.y, item.scissor.width, item.scissor.height);
-      } else {
-        pass.setScissorRect(0, 0, Math.ceil(logicalWidth * dpr), Math.ceil(logicalHeight * dpr));
-      }
+      const scissor = item.scissor ?? viewport;
+      pass.setScissorRect(scissor.x, scissor.y, scissor.width, scissor.height);
 
       const bindGroup = this.device.createBindGroup({
         layout: this.pipeline.uniformBindGroupLayout,

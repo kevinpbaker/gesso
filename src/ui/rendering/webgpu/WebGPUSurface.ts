@@ -1,6 +1,21 @@
 import { WebGPUError } from './WebGPUError';
 
 /**
+ * Converts a logical dimension to the physical pixel count of the
+ * backing store.
+ *
+ * This is the single definition of that rule, and everything that
+ * derives a physical rectangle — scissor rects above all — must go
+ * through it. WebGPU rejects a scissor that extends past its
+ * attachment by even one pixel, and the rejection discards the whole
+ * command buffer, so a backing store rounded one way and a scissor
+ * rounded another silently drops every draw in the frame.
+ */
+export function toPhysicalPixels(logical: number, dpr: number): number {
+  return Math.max(1, Math.round(logical * dpr));
+}
+
+/**
  * Something that can host a WebGPU drawing surface.
  *
  * HTMLCanvasElement and OffscreenCanvas both satisfy this
@@ -99,8 +114,8 @@ export class WebGPUSurface {
     this.logicalW = width;
     this.logicalH = height;
     this.pixelRatio = dpr;
-    const physicalWidth = Math.max(1, Math.round(width * dpr));
-    const physicalHeight = Math.max(1, Math.round(height * dpr));
+    const physicalWidth = toPhysicalPixels(width, dpr);
+    const physicalHeight = toPhysicalPixels(height, dpr);
     const changed = this.canvas.width !== physicalWidth || this.canvas.height !== physicalHeight;
     if (changed) {
       this.canvas.width = physicalWidth;
