@@ -1,4 +1,5 @@
 import { map } from 'rxjs';
+import { interactive } from '../ui/modifiers';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
 import { auto, fr, percent, repeat } from '../ui/layout';
@@ -453,6 +454,81 @@ export class MenuDemo extends Component {
  * it, and a list with a sticky header scrolls under it while Tab moves
  * focus through rows that scroll themselves into view.
  */
+/**
+ * Modifiers (roadmap B1): behaviour attached to an element.
+ *
+ * The options are module constants because a modifier's arguments are
+ * compared by identity, as props are — rebuilt objects would re-attach
+ * the modifier on every render. Toggling the plain box's modifier off
+ * shows the override layer handing the declared colour back.
+ */
+const CARD_INTERACTION = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: '#1f2937', borderColor: '#60a5fa' },
+  pressed: { backgroundColor: '#0b1220', borderColor: '#93c5fd' }
+});
+
+const BUTTON_STYLES = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: '#1d4ed8' },
+  pressed: { backgroundColor: '#1e3a8a' }
+});
+
+@Define('modifier-demo')
+export class ModifierDemo extends Component {
+  private attached = state(true);
+
+  private card(attached: boolean): UiElement {
+    return Box(
+      {
+        modifiers: attached ? [CARD_INTERACTION] : [],
+        width: 160,
+        height: 56,
+        padding: 10,
+        backgroundColor: '#111827',
+        borderColor: '#374151',
+        borderWidth: 1,
+        borderRadius: 8
+      },
+      Text({ text: attached ? 'A plain box' : 'Detached', color: '#e5e7eb', fontSize: 12 })
+    );
+  }
+
+  override render(): UiElement {
+    return Column(
+      { gap: 8, x: 'start' },
+      Text({ text: 'Modifiers (B1)', color: '#e5e7eb', fontWeight: 600 }),
+      Text({
+        text: 'Hover and press: one modifier writes visualState and the colours, and detaching restores what the element declared.',
+        color: '#9ca3af',
+        fontSize: 12,
+        maxLines: 2
+      }),
+      Row(
+        { gap: 12, y: 'center' },
+        Button({
+          text: 'Hover me',
+          modifiers: [BUTTON_STYLES],
+          padding: 10,
+          backgroundColor: '#2563eb',
+          borderRadius: 6,
+          color: '#ffffff'
+        }),
+        // The list of modifiers is static per element, as props are, so
+        // detaching means rendering a different element — an observable
+        // child, which is the framework's existing answer to structural
+        // change.
+        this.attached.pipe(map(on => this.card(on))),
+        stepButton('Attach / detach', () => {
+          this.attached.value = !this.attached.value;
+        })
+      )
+    );
+  }
+}
+
 @Define('scroll-demo')
 export class ScrollDemo extends Component {
   override render(): UiElement {
@@ -760,6 +836,7 @@ export class FrameworkDemoRoot extends Component {
         color: '#9ca3af'
       }),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
+      createComponent(ModifierDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),

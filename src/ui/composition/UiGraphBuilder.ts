@@ -570,7 +570,7 @@ export class UiGraphBuilder {
       return;
     }
     const list = assertModifierList(node, declared);
-    const set = existing ?? new UiModifierSet(node, this.graph);
+    const set = existing ?? new UiModifierSet(node, this.graph, this.dispatcher);
     if (existing === undefined) {
       this.modifiers.set(node, set);
     }

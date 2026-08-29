@@ -1,4 +1,5 @@
 import { DirtyFlags } from './DirtyFlags';
+import { writeDeclaredProperty } from './UiPropertyOverrides';
 import { DirtyNodeSet } from './DirtyNodeSet';
 import { type NodeId, type NodeProperty, UiNode } from './UiNode';
 import { UiNodeType } from './UiNodeType';
@@ -482,7 +483,39 @@ export class UiGraph {
     value: T,
     dirtyFlags: DirtyFlags = DirtyFlags.Properties
   ): boolean {
-    const previousValue = node.getProperty<T>(property);
+    if (node.overrides !== null) {
+      // A modifier is writing over something on this node, so the
+      // element's value goes into the cascade rather than onto the
+      // node. One field read for every node that has no modifiers.
+      return writeDeclaredProperty(this, node, property, value, dirtyFlags);
+    }
+    return this.applyResolvedProperty(node, property, true, value, dirtyFlags);
+  }
+
+  /**
+   * Writes the value a cascade resolved to, or removes the property
+   * when it resolved to nothing.
+   *
+   * Removing rather than writing a default is what lets a detaching
+   * modifier restore inheritance: a node that never declared `color`
+   * reads it from the environment again, as it did before.
+   */
+  public applyResolvedProperty(
+    node: UiNode,
+    property: NodeProperty,
+    present: boolean,
+    value: unknown,
+    dirtyFlags: DirtyFlags
+  ): boolean {
+    if (!present) {
+      if (!node.properties.has(property)) {
+        return false;
+      }
+      node.properties.delete(property);
+      this.markDirty(node, dirtyFlags);
+      return true;
+    }
+    const previousValue = node.getProperty(property);
     if (Object.is(previousValue, value)) {
       return false;
     }

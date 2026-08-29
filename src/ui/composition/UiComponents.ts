@@ -1,4 +1,5 @@
 import { UiNodeType } from '../graph/UiNodeType';
+import { BUTTON_INTERACTION } from '../modifiers/interaction';
 import { createElement } from './UiFactory';
 import {
   type UiChild,
@@ -39,10 +40,20 @@ export function EditableText(props: EditableTextProps = {}): UiElement {
 
 /**
  * Creates a Button element.
+ *
+ * Every button is interactive: it carries the modifier that publishes
+ * hover and press as `visualState`, so a themed control can paint from
+ * it without the app keeping a boolean per widget. A button that
+ * declares its own modifiers keeps them, with the interaction one
+ * first, so a caller's write of the same property wins.
  */
 export function Button(props: ButtonProps = {}, ...children: UiChild[]): UiElement {
-  return createElement(UiNodeType.Button, props, children);
+  const declared = props.modifiers;
+  const modifiers = declared === undefined ? DEFAULT_BUTTON_MODIFIERS : [BUTTON_INTERACTION, ...declared];
+  return createElement(UiNodeType.Button, { ...props, modifiers }, children);
 }
+
+const DEFAULT_BUTTON_MODIFIERS = Object.freeze([BUTTON_INTERACTION]);
 
 /**
  * Creates a Box element.

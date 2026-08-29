@@ -1,4 +1,8 @@
+import type { Observable } from 'rxjs';
+
 import type { UiNode } from '../graph/UiNode';
+import type { UiEventListener, UiEventListenerOptions } from '../input/UiInputDispatcher';
+import type { UiEventType } from '../input/UiInputEvent';
 
 /** Anything a modifier can hand to `own` to have released on detach. */
 export type UiModifierTeardown = (() => void) | { unsubscribe(): void };
@@ -13,12 +17,34 @@ export type UiModifierTeardown = (() => void) | { unsubscribe(): void };
  * add or remove children (a behaviour that needs children is a
  * component, and component identity is node identity).
  *
- * This is the B0 surface. Property access, events, layout, environment
- * and focus arrive in B1 and B2.
+ * Layout, environment and focus arrive in B2.
  */
 export interface UiModifierHost {
   /** The node the modifier is attached to. */
   readonly node: UiNode;
+  /**
+   * The property's effective value: what this or another modifier has
+   * written, else the element's own value, else what it inherits from
+   * the environment, else the property's default.
+   */
+  get<T>(property: string): T;
+  /**
+   * Writes over the element's value until `clear` or detach, when the
+   * element's own value comes back with the property's dirty flags.
+   * An Observable is subscribed for as long as the modifier is
+   * attached, each emission writing the override.
+   */
+  set(property: string, value: unknown | Observable<unknown>): void;
+  /** Drops this modifier's write of the property. */
+  clear(property: string): void;
+  /**
+   * Listens to input on the node, unregistered on detach.
+   *
+   * The element's own `on*` handler is registered first, so at the
+   * target it runs before any modifier's; `stopImmediatePropagation`
+   * from it stops the modifiers behind it.
+   */
+  on(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   /**
    * Registers something to release when the modifier detaches.
    * Teardowns run in reverse order, as a stack unwinds.

@@ -1,6 +1,13 @@
+import { isObservable, type Observable, type Subscription } from 'rxjs';
+
 import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
+import { clearOverrideProperty, writeOverrideProperty } from '../graph/UiPropertyOverrides';
+import type { UiEventListener, UiEventListenerOptions, UiInputDispatcher } from '../input/UiInputDispatcher';
+import type { UiEventType } from '../input/UiInputEvent';
+import { findPropertyDefinition, propertyEffects } from '../properties/UiPropertyRegistry';
+import { resolveProperty } from '../properties/UiPropertyResolver';
 import { isUiModifier, type UiModifier, type UiModifierKind } from './UiModifier';
 import type { UiModifierHost, UiModifierTeardown } from './UiModifierHost';
 
@@ -30,7 +37,8 @@ export class UiModifierSet {
 
   constructor(
     private readonly node: UiNode,
-    private readonly graph: UiGraph
+    private readonly graph: UiGraph,
+    private readonly dispatcher?: UiInputDispatcher
   ) {}
 
   /** The names of what is attached, in order, for the inspector. */
@@ -69,6 +77,10 @@ export class UiModifierSet {
       next.push(this.update(match, modifier.args));
     }
 
+    for (const [order, entry] of next.entries()) {
+      entry.host.setOrder(order);
+    }
+
     for (const entry of previous) {
       if (!taken.has(entry)) {
         this.detachOne(entry);
@@ -86,7 +98,7 @@ export class UiModifierSet {
   }
 
   private attach(kind: UiModifierKind<unknown>, slot: string | number, args: unknown): Attached {
-    const host = new Host(this.node, this.graph);
+    const host = new Host(this.node, this.graph, kind.name, this.dispatcher);
     const entry: Attached = { kind, slot, host, args };
     kind.attach(host, args);
     return entry;
@@ -115,14 +127,85 @@ export class UiModifierSet {
   }
 }
 
-/** The host handed to one attached modifier. B0's surface. */
+/**
+ * The host handed to one attached modifier.
+ *
+ * Its `source` symbol is what the override cascade records, so two
+ * instances of one kind on a node write independently and each
+ * restores only its own.
+ */
 class Host implements UiModifierHost {
   private teardowns: UiModifierTeardown[] = [];
+  private readonly source: symbol;
+  private readonly written = new Set<string>();
+  private readonly subscriptions = new Map<string, Subscription>();
+  private order = 0;
 
   constructor(
     readonly node: UiNode,
-    private readonly graph: UiGraph
-  ) {}
+    private readonly graph: UiGraph,
+    private readonly name: string,
+    private readonly dispatcher?: UiInputDispatcher
+  ) {
+    this.source = Symbol(name);
+  }
+
+  /** The modifier's position in the element's list; later wins. */
+  setOrder(order: number): void {
+    if (order === this.order) {
+      return;
+    }
+    this.order = order;
+    for (const property of this.written) {
+      this.write(property, this.node.properties.get(property));
+    }
+  }
+
+  get<T>(property: string): T {
+    const definition = findPropertyDefinition<T>(property);
+    if (definition === undefined) {
+      throw new Error(`Modifier '${this.name}' read unknown property '${property}' on node '${this.node.id}'.`);
+    }
+    return resolveProperty(this.node, definition);
+  }
+
+  set(property: string, value: unknown): void {
+    if (findPropertyDefinition(property) === undefined) {
+      throw new Error(`Modifier '${this.name}' wrote unknown property '${property}' on node '${this.node.id}'.`);
+    }
+    this.subscriptions.get(property)?.unsubscribe();
+    this.subscriptions.delete(property);
+    if (isObservable(value)) {
+      // Held for as long as the modifier is attached; each emission is
+      // another write of the same override.
+      this.subscriptions.set(
+        property,
+        (value as Observable<unknown>).subscribe(next => this.write(property, next))
+      );
+      this.written.add(property);
+      return;
+    }
+    this.write(property, value);
+  }
+
+  clear(property: string): void {
+    this.subscriptions.get(property)?.unsubscribe();
+    this.subscriptions.delete(property);
+    if (!this.written.delete(property)) {
+      return;
+    }
+    clearOverrideProperty(this.graph, this.node, property, this.source, propertyEffects(property));
+  }
+
+  on(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void {
+    if (this.dispatcher === undefined) {
+      warnMissingDispatcher(this.name);
+      return;
+    }
+    const dispatcher = this.dispatcher;
+    dispatcher.addEventListener(this.node, type, listener, options);
+    this.own(() => dispatcher.removeEventListener(this.node, type, listener, options));
+  }
 
   own(teardown: UiModifierTeardown): void {
     this.teardowns.push(teardown);
@@ -132,8 +215,28 @@ class Host implements UiModifierHost {
     this.graph.markDirty(this.node, DirtyFlags.Paint);
   }
 
-  /** Runs the teardowns in reverse, as a stack unwinds. */
+  private write(property: string, value: unknown): void {
+    this.written.add(property);
+    writeOverrideProperty(
+      this.graph,
+      this.node,
+      property,
+      { source: this.source, name: this.name, order: this.order, value },
+      propertyEffects(property)
+    );
+  }
+
+  /**
+   * Restores everything this modifier wrote, then runs its teardowns
+   * in reverse, as a stack unwinds.
+   */
   release(): void {
+    // clear() deletes the entry it is given, which is the one being
+    // visited; removing the current element of a Set mid-iteration is
+    // defined and does not skip the next.
+    for (const property of this.written) {
+      this.clear(property);
+    }
     const teardowns = this.teardowns;
     this.teardowns = [];
     for (let index = teardowns.length - 1; index >= 0; index--) {
@@ -145,6 +248,19 @@ class Host implements UiModifierHost {
       }
     }
   }
+}
+
+let warnedAboutDispatcher = false;
+
+function warnMissingDispatcher(name: string): void {
+  if (warnedAboutDispatcher) {
+    return;
+  }
+  warnedAboutDispatcher = true;
+  console.warn(
+    `Modifier '${name}' asked to listen for input, but the UiGraphBuilder was constructed without a dispatcher. ` +
+      `Construct it with { dispatcher } for modifiers to receive events.`
+  );
 }
 
 /**

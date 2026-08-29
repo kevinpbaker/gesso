@@ -5,6 +5,26 @@ import type { UiEnvironment } from '../environment/UiEnvironment';
 export type NodeId = string;
 export type NodeProperty = string;
 
+/** One modifier's write of one property. `order` is its position in the list. */
+export interface UiPropertyOverride {
+  readonly source: symbol;
+  /** The modifier kind's name, for the conflict warning and the inspector. */
+  readonly name: string;
+  order: number;
+  value: unknown;
+}
+
+/**
+ * The cascade for one overridden property: the element's own value,
+ * and the modifier writes stacked on top of it in list order.
+ */
+export interface UiPropertyOverrides {
+  /** What the element declared. Absent means it declared nothing. */
+  declared: { present: boolean; value: unknown };
+  /** Ordered by `order`; the last one wins. */
+  entries: UiPropertyOverride[];
+}
+
 export class UiNode {
   constructor(
     public readonly id: NodeId,
@@ -30,6 +50,15 @@ export class UiNode {
    *   width    → 200
    */
   public readonly properties = new Map<NodeProperty, unknown>();
+
+  /**
+   * Values a modifier has written over the element's own.
+   *
+   * Null until the first modifier writes, so a tree without modifiers
+   * pays one field read per property write and nothing else. See
+   * `UiPropertyOverrides.ts` for how the effective value is resolved.
+   */
+  public overrides: Map<NodeProperty, UiPropertyOverrides> | null = null;
 
   /**
    * The scoped environment this node reads inherited values from.

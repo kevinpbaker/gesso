@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BUTTON_INTERACTION } from '../modifiers/interaction';
 
 import { UiNodeType } from '../graph/UiNodeType';
 import { Button, Column, Row, ScrollView, Text } from './UiComponents';
@@ -47,8 +48,11 @@ describe('UiFactory', () => {
         text: 'Save'
       });
       expect(element.type).toBe(UiNodeType.Button);
+      // Every button carries the interaction modifier that publishes
+      // hover and press; see UiComponents.Button.
       expect(element.props).toEqual({
-        text: 'Save'
+        text: 'Save',
+        modifiers: [BUTTON_INTERACTION]
       });
     });
 
