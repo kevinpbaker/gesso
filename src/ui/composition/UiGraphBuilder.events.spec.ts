@@ -4,7 +4,9 @@ import { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
 import { UiInputDispatcher } from '../input/UiInputDispatcher';
 import { UiEventType, UiPointerEvent } from '../input/UiInputEvent';
+import { UiNodeType } from '../graph/UiNodeType';
 import { Box, Column } from './UiComponents';
+import { createElement } from './UiFactory';
 import { UiGraphBuilder } from './UiGraphBuilder';
 
 function createHarness() {
@@ -118,13 +120,16 @@ describe('UiGraphBuilder event props', () => {
   it('throws on an unrecognized on* handler name', () => {
     const { builder } = createHarness();
 
-    expect(() => builder.build(Column(Box({ onClicked: () => {} })))).toThrow(/Unknown event prop 'onClicked'/);
+    // A compile error through the typed factories; createElement is the untyped path.
+    expect(() => builder.build(Column(createElement(UiNodeType.Box, { onClicked: () => {} })))).toThrow(
+      /Unknown event prop 'onClicked'/
+    );
   });
 
   it('rejects a non-function value on a known on* prop', () => {
     const { builder } = createHarness();
 
-    expect(() => builder.build(Column(Box({ onClick: 'label' })))).toThrow(
+    expect(() => builder.build(Column(createElement(UiNodeType.Box, { onClick: 'label' })))).toThrow(
       /Event prop 'onClick' on node '.*' must be a function, got a string/
     );
   });

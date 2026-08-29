@@ -1,11 +1,19 @@
 import { UiNodeType } from '../graph/UiNodeType';
-import type { UiNode } from '../graph/UiNode';
 import { createElement } from './UiFactory';
 import type { UiElement } from './UiElement';
-import type { UiProps } from './UiProps';
+import type { ScrollViewProps } from './UiElementProps';
 import { UiVirtualWindow, VIRTUAL_WINDOW_PROP, type LazyItemRenderer, type LazyListOptions } from './UiVirtualWindow';
 
-export type LazyListProps = UiProps & LazyListOptions;
+/**
+ * A LazyColumn / LazyRow takes every ScrollView prop plus the window
+ * options. The per-item key is `itemKey`, since `key` is the element's
+ * own reconciliation key.
+ */
+export type LazyListProps = ScrollViewProps &
+  Omit<LazyListOptions, 'key'> & {
+    /** Stable identity per index, so a row keeps its node when the list shifts. */
+    itemKey?: LazyListOptions['key'];
+  };
 
 /**
  * A vertical list that mounts only the rows in view.
@@ -30,20 +38,18 @@ export function LazyRow(props: LazyListProps, renderItem: LazyItemRenderer): UiE
 }
 
 function lazyList(axis: 'column' | 'row', props: LazyListProps, renderItem: LazyItemRenderer): UiElement {
-  const { count, estimatedExtent, overscan, key, initialViewportExtent, ...rest } = props;
+  const { count, estimatedExtent, overscan, itemKey, initialViewportExtent, ...rest } = props;
   const window = new UiVirtualWindow(
     axis,
-    { count, estimatedExtent, overscan, key, initialViewportExtent },
+    { count, estimatedExtent, overscan, key: itemKey, initialViewportExtent },
     renderItem
   );
-  const userRef = rest.ref as ((node: UiNode | null) => void) | undefined;
   return createElement(
     UiNodeType.ScrollView,
     {
       ...rest,
       direction: axis,
-      [VIRTUAL_WINDOW_PROP]: window,
-      ref: userRef
+      [VIRTUAL_WINDOW_PROP]: window
     },
     [window.children$]
   );

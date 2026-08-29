@@ -235,7 +235,10 @@ describe('Canvas2DRenderer paint order', () => {
       [0, 0, 50, 50]
     ]);
     // Glyphs sit on the alphabetic baseline: half-leading plus ascent below the line top.
-    expect(callArgs(h.context, 'fillText')).toEqual([['T', 0, 11.4]]);
+    // 10px text with no lineHeight has a 12px line (×1.2): the baseline
+    // sits at half-leading 1 + ascent 8. Paint used to inherit the default
+    // style's 16.8px line here while layout used 12, drawing text high.
+    expect(callArgs(h.context, 'fillText')).toEqual([['T', 0, 9]]);
   });
 });
 

@@ -4,6 +4,13 @@ import { isObservable, type UiChild } from '../ui/composition/UiElement';
 import { InputCell } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
+import {
+  type ClassComponent,
+  type ComponentContext,
+  type ComponentType,
+  type FunctionComponent,
+  isClassComponent
+} from './FunctionComponent';
 import { getComponentMetadata } from './metadata';
 import type { Store } from './store/Store';
 import type { StoreRegistry } from './store/StoreRegistry';
@@ -12,20 +19,27 @@ import type { StoreRegistry } from './store/StoreRegistry';
  * Owns a single component instance and its lifecycle.
  *
  * The host is responsible for:
- *   - instantiating the component class
- *   - feeding parent props into @Input() cells
- *   - resolving @Inject() stores
+ *   - instantiating the component class, or preparing a function's
+ *     input cells and context
+ *   - feeding parent props into input cells
+ *   - resolving injected stores
  *   - validating that @State fields are initialized
- *   - calling render() exactly once and caching its output
+ *   - calling render() (or the function) exactly once and caching its output
  *   - invoking onMount / onUnmount hooks
  *   - owning subscriptions that must not outlive the component
  *
  * A host is created and released by the ComponentHostResolver, which
  * in turn is driven by graph reconciliation. The host never decides
  * when it lives or dies.
+ *
+ * A functional component is a class component with its `render()` in
+ * the function and its inputs in the props record: the record hands
+ * out one InputCell per prop name, created on first access, and the
+ * host keeps every cell it handed out fed from the parent's props.
  */
 export class ComponentHost<P extends Record<string, unknown> = Record<string, unknown>> {
-  readonly instance: Component;
+  /** The class instance; undefined for a functional component. */
+  readonly instance: Component | undefined;
   readonly element: ComponentElement<P>;
 
   /**
@@ -48,20 +62,32 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   /** Live subscription per Observable-valued input. */
   private readonly inputSubscriptions = new Map<string, Subscription>();
 
+  /** A functional component's cells, by prop name, as they were handed out. */
+  private readonly functionalCells = new Map<string, InputCell<unknown>>();
+  private readonly mountHooks: Array<() => void> = [];
+  private readonly unmountHooks: Array<() => void> = [];
+  /** True only while the component function runs; hooks may register then. */
+  private rendering = false;
+
   constructor(
     element: ComponentElement<P>,
     private readonly stores: StoreRegistry
   ) {
     this.element = element;
-    this.instance = new element.componentClass();
-    this.validateInputs();
-    this.wireInputs();
-    this.wireInjects();
-    this.validateState();
+    if (isClassComponent(element.component)) {
+      this.instance = new element.component();
+      this.validateInputs();
+      this.wireInputs();
+      this.wireInjects();
+      this.validateState();
+    } else {
+      this.instance = undefined;
+    }
   }
 
-  get componentClass(): new () => Component {
-    return this.element.componentClass;
+  /** The class or function this host mounts. */
+  get component(): ComponentType {
+    return this.element.component;
   }
 
   /**
@@ -73,7 +99,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
    */
   render(): UiChild {
     if (this.output === undefined) {
-      this.output = this.instance.render();
+      this.output = this.instance !== undefined ? this.instance.render() : this.renderFunction();
     }
     return this.output;
   }
@@ -83,7 +109,10 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       return;
     }
     this.mounted = true;
-    this.instance.onMount?.();
+    this.instance?.onMount?.();
+    for (const hook of this.mountHooks) {
+      hook();
+    }
   }
 
   /**
@@ -92,9 +121,17 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   dispose(): void {
     if (this.mounted) {
       this.mounted = false;
-      this.instance.onUnmount?.();
+      this.instance?.onUnmount?.();
+      for (const hook of this.unmountHooks) {
+        hook();
+      }
     }
     this.subscriptions.unsubscribe();
+    // Completing the cells ends anything derived from them, such as the
+    // defaulted cells `input(props.x, fallback)` returns.
+    for (const cell of this.functionalCells.values()) {
+      cell.complete();
+    }
   }
 
   /**
@@ -106,25 +143,102 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
    */
   updateProps(props: P): void {
     (this.element as { props: P }).props = props;
-    this.wireInputs();
+    if (this.instance !== undefined) {
+      this.wireInputs();
+      return;
+    }
+    for (const [name, cell] of this.functionalCells) {
+      this.applyInput(name, cell, props[name], true);
+    }
+  }
+
+  private renderFunction(): UiChild {
+    const component = this.element.component as FunctionComponent<Record<string, unknown>>;
+    const context = this.createContext();
+    this.rendering = true;
+    try {
+      return component(this.createInputRecord(), context);
+    } finally {
+      this.rendering = false;
+    }
+  }
+
+  /**
+   * The props record a functional component reads: a cell per name,
+   * created when first asked for and fed from the parent's props.
+   *
+   * Creating cells on demand is what lets the parent omit a prop
+   * without the function having to check for a missing cell, and lets
+   * a cell asked for later — in an event handler, say — still be live.
+   */
+  private createInputRecord(): Record<string, InputCell<unknown>> {
+    const cellFor = (name: string): InputCell<unknown> => {
+      let cell = this.functionalCells.get(name);
+      if (cell === undefined) {
+        cell = new InputCell<unknown>(undefined);
+        this.functionalCells.set(name, cell);
+        this.applyInput(name, cell, (this.element.props as Record<string, unknown>)[name], true);
+      }
+      return cell;
+    };
+    return new Proxy({} as Record<string, InputCell<unknown>>, {
+      get: (_target, name) => (typeof name === 'string' ? cellFor(name) : undefined),
+      has: (_target, name) => typeof name === 'string',
+      ownKeys: () => Array.from(new Set([...Object.keys(this.element.props), ...this.functionalCells.keys()])),
+      getOwnPropertyDescriptor: (_target, name) =>
+        typeof name === 'string'
+          ? { value: cellFor(name), enumerable: true, configurable: true, writable: false }
+          : undefined,
+      set: (_target, name) => {
+        throw new Error(
+          `Component '${this.element.tag}' tried to assign props.${String(name)}. ` +
+            `Props are input cells written by the host; read props.${String(name)}.value or bind the cell.`
+        );
+      }
+    });
+  }
+
+  private createContext(): ComponentContext {
+    const requireRendering = (method: string): void => {
+      if (!this.rendering) {
+        throw new Error(
+          `Component '${this.element.tag}' called ctx.${method}() outside its function body. ` +
+            `Register lifecycle hooks while the component function runs.`
+        );
+      }
+    };
+    return {
+      inject: <S extends Store>(StoreClass: new () => S): S => this.stores.get(StoreClass),
+      onMount: hook => {
+        requireRendering('onMount');
+        this.mountHooks.push(hook);
+      },
+      onUnmount: hook => {
+        requireRendering('onUnmount');
+        this.unmountHooks.push(hook);
+      }
+    };
   }
 
   private wireInputs(): void {
-    const metadata = getComponentMetadata(this.element.componentClass);
+    const metadata = getComponentMetadata(this.element.component);
     const props = this.element.props as Record<string, unknown>;
     for (const inputName of metadata.inputs) {
       const cell = (this.instance as unknown as Record<string, InputCell<unknown>>)[inputName];
-      this.applyInput(inputName, cell, props[inputName]);
+      this.applyInput(inputName, cell, props[inputName], false);
     }
   }
 
   /**
    * Connects one input cell to whatever the parent supplied.
    *
-   * An absent prop leaves the cell's default in place, so a parent that
-   * does not mention an input never clobbers it.
+   * For a class, an absent prop leaves the cell's default in place, so
+   * a parent that does not mention an input never clobbers it. For a
+   * function the cell has no default of its own — `input(cell,
+   * fallback)` supplies one — so a prop the parent stops passing is
+   * pushed through as `undefined`, which re-applies the fallback.
    */
-  private applyInput(inputName: string, cell: InputCell<unknown>, provided: unknown): void {
+  private applyInput(inputName: string, cell: InputCell<unknown>, provided: unknown, resetWhenAbsent: boolean): void {
     if (this.inputSources.has(inputName) && this.inputSources.get(inputName) === provided) {
       return;
     }
@@ -136,9 +250,13 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       this.inputSubscriptions.delete(inputName);
     }
 
+    const hadSource = this.inputSources.has(inputName) && this.inputSources.get(inputName) !== undefined;
     this.inputSources.set(inputName, provided);
 
     if (provided === undefined) {
+      if (resetWhenAbsent && hadSource) {
+        cell.next(undefined);
+      }
       return;
     }
 
@@ -153,7 +271,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   }
 
   private validateInputs(): void {
-    const metadata = getComponentMetadata(this.element.componentClass);
+    const metadata = getComponentMetadata(this.element.component);
     for (const inputName of metadata.inputs) {
       const value = (this.instance as unknown as Record<string, unknown>)[inputName];
       if (!(value instanceof InputCell)) {
@@ -166,7 +284,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   }
 
   private wireInjects(): void {
-    const metadata = getComponentMetadata(this.element.componentClass);
+    const metadata = getComponentMetadata(this.element.component);
     for (const [propertyName, StoreClass] of metadata.injects) {
       const store = this.stores.get(StoreClass as unknown as new () => Store);
       (this.instance as unknown as Record<string, unknown>)[propertyName] = store;
@@ -174,7 +292,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   }
 
   private validateState(): void {
-    const metadata = getComponentMetadata(this.element.componentClass);
+    const metadata = getComponentMetadata(this.element.component);
     for (const stateName of metadata.states) {
       const value = (this.instance as unknown as Record<string, unknown>)[stateName];
       if (value === undefined) {
@@ -186,3 +304,5 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     }
   }
 }
+
+export type { ClassComponent };

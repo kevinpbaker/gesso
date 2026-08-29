@@ -1,6 +1,6 @@
-import type { Component } from '../../Component';
 import type { FrameworkChild } from '../../ComponentElement';
 import { createComponent } from '../../createComponent';
+import type { ComponentType } from '../../FunctionComponent';
 import type { Store } from '../../store/Store';
 import {
   createStoreRegistry,
@@ -36,7 +36,7 @@ interface WorkerGlobal {
  * useStore() calls always land before the shell's init message is
  * processed.
  */
-export function renderRoot(root: FrameworkChild | (new () => Component)): RenderWorkerApp {
+export function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerApp {
   return new RenderWorkerApp(root);
 }
 
@@ -48,8 +48,8 @@ export class RenderWorkerApp {
   private runtime: NodalRuntime | undefined;
   private registry: RegistryHandle | undefined;
 
-  constructor(root: FrameworkChild | (new () => Component), host: WorkerGlobal = self as unknown as WorkerGlobal) {
-    this.root = typeof root === 'function' ? createComponent(root as new () => Component) : root;
+  constructor(root: FrameworkChild | ComponentType, host: WorkerGlobal = self as unknown as WorkerGlobal) {
+    this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
     this.host = host;
     this.host.onmessage = event => this.receive(event.data);
   }
@@ -170,6 +170,9 @@ export class RenderWorkerApp {
     this.runtime.deferPatchesFrom(this.registry.replicas);
     this.runtime.onInspect(text => {
       this.host.postMessage({ type: 'inspect', text });
+    });
+    this.runtime.onCursor(cursor => {
+      this.host.postMessage({ type: 'cursor', cursor });
     });
     this.runtime.onRendererError(message => {
       this.host.postMessage({ type: 'error', message: `renderer: ${message}` });

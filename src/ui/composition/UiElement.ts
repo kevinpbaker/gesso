@@ -14,19 +14,20 @@ import type { UiProps } from './UiProps';
 export interface ComponentLikeElement {
   readonly kind: 'component';
   readonly tag: string;
-  readonly componentClass: new () => unknown;
+  /** The class or function to mount; compared by identity across reconciles. */
+  readonly component: Function;
   readonly props: Record<string, unknown>;
   readonly key?: string | number;
 }
 
 /**
- * A child definition may be a static element, an observable stream
- * of elements, or a component definition. Observable children are
- * reconciled dynamically by the framework without re-rendering the
- * parent component. Component children are resolved by the framework
- * layer before graph construction.
+ * A child definition may be a static element, a component definition,
+ * or an observable stream of either (or of lists of them). Observable
+ * children are reconciled dynamically by the framework without
+ * re-rendering the parent component; components inside them are
+ * mounted by the framework's resolver as the builder reaches them.
  */
-export type UiChild = UiElement | Observable<UiElement | UiElement[]> | ComponentLikeElement;
+export type UiChild = UiElement | ComponentLikeElement | Observable<UiChild | readonly UiChild[]>;
 
 /**
  * Declarative representation of a UI element.

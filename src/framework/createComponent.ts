@@ -1,27 +1,33 @@
-import type { Component } from './Component';
 import type { ComponentElement } from './ComponentElement';
+import type { ComponentArgs, ComponentProps, ComponentType } from './FunctionComponent';
 import { getComponentMetadata } from './metadata';
 
 /**
  * Creates a ComponentElement for use as a child of a UiElement.
  *
- * Example:
- *
  *   Column(
- *     createComponent(Counter, { label: 'Count' })
+ *     createComponent(Counter, { label: 'Count' }),
+ *     createComponent(TodoItem, { todo }, todo.id)
  *   )
+ *
+ * The component may be a class extending Component or a function
+ * `(props, ctx) => UiChild`. Props are typed from the component: a
+ * class's `input()` fields, or a function's `Inputs<P>` parameter. A
+ * misspelled prop, a value of the wrong type, and a missing required
+ * prop are compile errors; props may be omitted only when none is
+ * required.
  */
-export function createComponent<P extends Record<string, unknown>>(
-  componentClass: new () => Component,
-  props: P = {} as P,
-  key?: string | number
-): ComponentElement<P> {
-  const metadata = getComponentMetadata(componentClass);
+export function createComponent<C extends ComponentType>(
+  component: C,
+  ...args: ComponentArgs<C>
+): ComponentElement<ComponentProps<C>> {
+  const [props, key] = args as [ComponentProps<C> | undefined, string | number | undefined];
+  const metadata = getComponentMetadata(component);
   return {
     kind: 'component',
     tag: metadata.tag,
-    componentClass,
-    props,
+    component,
+    props: (props ?? {}) as ComponentProps<C>,
     key
   };
 }

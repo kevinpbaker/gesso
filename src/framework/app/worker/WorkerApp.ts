@@ -166,6 +166,14 @@ export class WorkerApp {
     }
     if (message.type === 'inspect') {
       this.options.onInspect?.(message.text);
+      return;
+    }
+    if (message.type === 'cursor') {
+      // The worker decided what the pointer is over; only the DOM can
+      // show it. An empty string restores the stylesheet's cursor.
+      if (this.canvas !== undefined) {
+        this.canvas.style.cursor = message.cursor ?? '';
+      }
     }
   };
 

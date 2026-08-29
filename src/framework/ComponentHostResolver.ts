@@ -25,7 +25,7 @@ export class ComponentHostResolver implements ComponentResolver {
   resolve(element: ComponentLikeElement, anchorId: string): UiChild {
     let host = this.hosts.get(anchorId);
 
-    if (host !== undefined && host.componentClass !== element.componentClass) {
+    if (host !== undefined && host.component !== element.component) {
       // The slot changed component type. The old instance cannot be
       // reused, so retire it and mount a fresh one in its place.
       host.dispose();

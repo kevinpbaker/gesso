@@ -106,6 +106,11 @@ export class NodalApp {
     this.observeResize();
     this.resize(this.host.clientWidth || this.canvas.width || 600, this.host.clientHeight || this.canvas.height || 600);
     this.attachInput();
+    this.runtime.onCursor(cursor => {
+      if (isCanvasElement(this.canvas)) {
+        this.canvas.style.cursor = cursor ?? '';
+      }
+    });
     this.runtime.start();
   }
 

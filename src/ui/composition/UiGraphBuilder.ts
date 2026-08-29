@@ -22,6 +22,7 @@ import {
   isComponentLikeElement,
   isObservable
 } from './UiElement';
+import type { UiNodeRef } from './UiElementProps';
 import type { UiProps } from './UiProps';
 
 /**
@@ -37,7 +38,7 @@ const KEY_PROP = 'key';
  */
 const REF_PROP = 'ref';
 
-export type UiNodeRef = (node: UiNode | null) => void;
+export type { UiNodeRef } from './UiElementProps';
 
 function knownPropertyNames(): string[] {
   return getPropertyNames();
@@ -255,7 +256,7 @@ export class UiGraphBuilder {
   private reconcileObservableChild(
     parent: UiNode,
     index: number,
-    observable: Observable<UiElement | UiElement[]>,
+    observable: Observable<UiChild | readonly UiChild[]>,
     matched: Set<UiNode>,
     cursor: UiNode | null
   ): UiNode {

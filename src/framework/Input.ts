@@ -28,17 +28,35 @@ export class InputCell<T> extends BehaviorSubject<T> {
 /**
  * Creates a component input cell.
  *
- * Usage inside a component:
+ * Inside a class component the argument is the default the cell holds
+ * until the parent supplies a value:
  *
  *   @Input() label = input('Count');
  *
- *   render() {
- *     return Text({ text: this.label });
+ * Inside a functional component the props are already cells; the
+ * two-argument form derives a cell that replaces `undefined` with a
+ * fallback, which is how an optional prop gets its default:
+ *
+ *   function Counter(props: Inputs<{ label?: string }>) {
+ *     const label = input(props.label, 'Count');   // InputCell<string>
+ *     return Text({ text: label });
  *   }
  *
- * The argument is the default used when the parent supplies no value
- * for the input.
+ * The derived cell follows the source for the life of the component
+ * and completes when the source does, so it needs no teardown.
  */
-export function input<T>(initialValue: T): InputCell<T> {
-  return new InputCell(initialValue);
+export function input<T>(initialValue: T): InputCell<T>;
+export function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
+export function input<T>(first: T | InputCell<T | undefined>, fallback?: T): InputCell<T> {
+  if (arguments.length < 2 || !(first instanceof InputCell)) {
+    return new InputCell(first as T);
+  }
+  const source = first as InputCell<T | undefined>;
+  const withFallback = (value: T | undefined): T => (value === undefined ? (fallback as T) : value);
+  const derived = new InputCell<T>(withFallback(source.value));
+  source.subscribe({
+    next: value => derived.next(withFallback(value)),
+    complete: () => derived.complete()
+  });
+  return derived;
 }

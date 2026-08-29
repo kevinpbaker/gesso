@@ -8,19 +8,29 @@ import {
   isUiElement,
   isObservable
 } from './UiElement';
+import type {
+  BoxProps,
+  ButtonProps,
+  ColumnProps,
+  GridProps,
+  RowProps,
+  ScrollViewProps,
+  StackProps,
+  TextProps
+} from './UiElementProps';
 import type { UiProps } from './UiProps';
 
 /**
  * Creates a Text element.
  */
-export function Text(props: UiProps = {}): UiElement {
+export function Text(props: TextProps = {}): UiElement {
   return createElement(UiNodeType.Text, props);
 }
 
 /**
  * Creates a Button element.
  */
-export function Button(props: UiProps = {}, ...children: UiChild[]): UiElement {
+export function Button(props: ButtonProps = {}, ...children: UiChild[]): UiElement {
   return createElement(UiNodeType.Button, props, children);
 }
 
@@ -30,7 +40,7 @@ export function Button(props: UiProps = {}, ...children: UiChild[]): UiElement {
  * Boxes are leaves or plain stacked containers sized by
  * explicit width/height (or flex props).
  */
-export function Box(props: UiProps = {}, ...children: UiChild[]): UiElement {
+export function Box(props: BoxProps = {}, ...children: UiChild[]): UiElement {
   return createElement(UiNodeType.Box, props, children);
 }
 
@@ -40,7 +50,7 @@ export function Box(props: UiProps = {}, ...children: UiChild[]): UiElement {
  * by `selfX` / `selfY`. Same runtime node as Box; the name says what
  * the children do.
  */
-export function Stack(props: UiProps = {}, ...children: UiChild[]): UiElement {
+export function Stack(props: StackProps = {}, ...children: UiChild[]): UiElement {
   return createElement(UiNodeType.Box, props, children);
 }
 
@@ -53,7 +63,7 @@ export function Stack(props: UiProps = {}, ...children: UiChild[]): UiElement {
  * `x` / `y` align items in their cells (stretch by default),
  * `justifyContent` / `alignContent` distribute the tracks.
  */
-export function Grid(props: UiProps = {}, ...children: UiChild[]): UiElement {
+export function Grid(props: GridProps = {}, ...children: UiChild[]): UiElement {
   return createElement(UiNodeType.Grid, props, children);
 }
 
@@ -63,8 +73,8 @@ export function Grid(props: UiProps = {}, ...children: UiChild[]): UiElement {
  * Accepts either children only or props followed by children.
  */
 export function Row(...children: UiChild[]): UiElement;
-export function Row(props: UiProps, ...children: UiChild[]): UiElement;
-export function Row(first: UiProps | UiChild = {}, ...rest: UiChild[]): UiElement {
+export function Row(props: RowProps, ...children: UiChild[]): UiElement;
+export function Row(first: RowProps | UiChild = {}, ...rest: UiChild[]): UiElement {
   if (isUiChild(first) && !isPlainProps(first)) {
     return createElement(UiNodeType.Row, {}, [first, ...rest]);
   }
@@ -77,8 +87,8 @@ export function Row(first: UiProps | UiChild = {}, ...rest: UiChild[]): UiElemen
  * Accepts either children only or props followed by children.
  */
 export function Column(...children: UiChild[]): UiElement;
-export function Column(props: UiProps, ...children: UiChild[]): UiElement;
-export function Column(first: UiProps | UiChild = {}, ...rest: UiChild[]): UiElement {
+export function Column(props: ColumnProps, ...children: UiChild[]): UiElement;
+export function Column(first: ColumnProps | UiChild = {}, ...rest: UiChild[]): UiElement {
   if (isUiChild(first) && !isPlainProps(first)) {
     return createElement(UiNodeType.Column, {}, [first, ...rest]);
   }
@@ -88,7 +98,7 @@ export function Column(first: UiProps | UiChild = {}, ...rest: UiChild[]): UiEle
 /**
  * Creates a ScrollView element.
  */
-export function ScrollView(props: UiProps = {}, ...children: UiChild[]): UiElement {
+export function ScrollView(props: ScrollViewProps = {}, ...children: UiChild[]): UiElement {
   return createElement(UiNodeType.ScrollView, props, children);
 }
 

@@ -14,6 +14,14 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* JSX — optional surface over the factory API; see src/framework/jsx */
+    "jsx": "react-jsx",
+    "jsxImportSource": "nodal",
+    "paths": {
+      "nodal/jsx-runtime": ["./src/framework/jsx/jsx-runtime.ts"],
+      "nodal/jsx-dev-runtime": ["./src/framework/jsx/jsx-dev-runtime.ts"]
+    },
+
     /* Decorators */
     "experimentalDecorators": true,
     "emitDecoratorMetadata": false,

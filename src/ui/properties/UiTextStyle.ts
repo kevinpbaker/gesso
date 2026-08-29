@@ -1,4 +1,5 @@
 import type { UiColor } from './UiColor';
+import type { UiFontWeight, UiTextAlign, UiTextDirection } from './UiPropertyValues';
 
 /**
  * A coherent typography value.
@@ -10,12 +11,12 @@ import type { UiColor } from './UiColor';
 export interface UiTextStyle {
   readonly fontFamily: string;
   readonly fontSize: number;
-  readonly fontWeight: number | string;
+  readonly fontWeight: UiFontWeight;
   readonly lineHeight: number;
   readonly letterSpacing: number;
   readonly color: UiColor;
-  readonly textAlign: 'left' | 'center' | 'right';
-  readonly textDirection: 'ltr' | 'rtl';
+  readonly textAlign: UiTextAlign;
+  readonly textDirection: UiTextDirection;
 }
 
 export const defaultTextStyle: UiTextStyle = {

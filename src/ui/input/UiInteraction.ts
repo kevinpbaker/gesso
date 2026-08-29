@@ -71,3 +71,19 @@ export function isNodeFocusable(node: UiNode): boolean {
   }
   return node.type === UiNodeType.Button;
 }
+
+/**
+ * The cursor to show over a node: its own `cursor`, else the nearest
+ * ancestor's, as CSS inherits it — so a button sets `cursor: 'pointer'`
+ * once and its label inherits it. Null when nothing along the path
+ * sets one, which the shell shows as the default arrow.
+ */
+export function resolveCursor(node: UiNode | null): string | null {
+  for (let current = node; current !== null; current = current.parent) {
+    const cursor = current.properties.get('cursor');
+    if (typeof cursor === 'string' && cursor.length > 0) {
+      return cursor;
+    }
+  }
+  return null;
+}

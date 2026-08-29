@@ -4,7 +4,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import type { NodeId } from '../graph/UiNode';
 import type { UiGraph } from '../graph/UiGraph';
 import type { UiGraphBuilder } from '../composition/UiGraphBuilder';
-import type { UiElement } from '../composition/UiElement';
+import type { UiChild } from '../composition/UiElement';
 
 export type ChildrenBindingId = number;
 
@@ -23,7 +23,7 @@ export class UiChildrenBinding {
     public readonly id: ChildrenBindingId,
     public readonly parentId: NodeId,
     public readonly fragmentId: NodeId,
-    public readonly observable: Observable<UiElement | UiElement[]>,
+    public readonly observable: Observable<UiChild | readonly UiChild[]>,
     private readonly graph: UiGraph,
     private readonly builder: UiGraphBuilder
   ) {}
@@ -52,8 +52,8 @@ export class UiChildrenBinding {
     this.subscription = null;
   }
 
-  private handleValue(value: UiElement | UiElement[]): void {
-    const definitions = Array.isArray(value) ? value : [value];
+  private handleValue(value: UiChild | readonly UiChild[]): void {
+    const definitions = Array.isArray(value) ? (value as readonly UiChild[]) : [value as UiChild];
     const fragment = this.graph.requireNode(this.fragmentId);
     this.builder.reconcileChildren(fragment, definitions);
     const parent = this.graph.requireNode(this.parentId);

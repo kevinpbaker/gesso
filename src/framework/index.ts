@@ -13,6 +13,15 @@ export { createStoreRegistry, type StoreRegistration, type RegistryHandle } from
 export type { StorePort, StoreClientMessage, StoreHostMessage } from './store/worker/StoreWorkerProtocol';
 export { StoreRegistry } from './store/StoreRegistry';
 export { createComponent } from './createComponent';
+export {
+  isClassComponent,
+  type ComponentContext,
+  type ComponentType,
+  type ClassComponent,
+  type FunctionComponent,
+  type Inputs,
+  type ComponentProps
+} from './FunctionComponent';
 export { OverlayStore, type OverlayEntry, type OverlayPlacement } from './overlay/OverlayStore';
 export { OverlayLayer } from './overlay/OverlayLayer';
 export { ComponentHostResolver } from './ComponentHostResolver';

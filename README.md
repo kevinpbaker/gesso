@@ -117,6 +117,27 @@ Most canvas UI kits ship flexbox-ish. Nodal shipped the CSS you actually reach f
 
 Lengths are tagged values, never strings. `columns: '1fr 1fr'` throws at layout and names the property. So does `widht: 200`.
 
+### Authoring that the compiler checks
+
+Every factory is typed from the property registry, so a prop's type is by construction the type layout and paint read. `Row({ y: 'middle' })`, `Box({ width: '100%' })` and `Button({ onClick: (e: UiKeyboardEvent) => … })` are compile errors; `backgroundColor: 'primary'` completes and paints the inherited theme's primary. Components can be classes or functions, and `createComponent` is typed from either:
+
+```ts
+function Counter(props: Inputs<{ label?: string }>, ctx: ComponentContext) {
+  const label = input(props.label, 'Count'); // props are cells; this one has a default
+  const count = state(0);
+  const store = ctx.inject(CounterStore);
+  return Row(
+    { gap: 8, y: 'center' },
+    Text({ text: combineLatest([label, count]).pipe(map(([l, c]) => `${l}: ${c}`)) }),
+    Button({ onClick: () => count.value++ }, Text({ text: '+1' }))
+  );
+}
+
+createComponent(Counter, { label: 'Clicks' }); // { lable: … } is a compile error
+```
+
+The body runs once, like a class `render()`; the host keeps the cells fed when the parent's props change. JSX is optional and costs nothing — `<row gap={8}><Counter label="Clicks" /></row>` compiles to the same `createElement` / `createComponent` calls, with the same types.
+
 ### A frame that runs as guarded, timed phases
 
 ```

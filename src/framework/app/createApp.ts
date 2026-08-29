@@ -1,5 +1,5 @@
-import type { Component } from '../Component';
 import type { FrameworkChild } from '../ComponentElement';
+import type { ComponentType } from '../FunctionComponent';
 import { NodalAppBuilder } from './NodalAppBuilder';
 import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
 
@@ -25,8 +25,8 @@ import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
  *   createApp(AppRoot).useStore(DemoStore).mountSync('#app');
  */
 export function createApp(options: WorkerAppOptions): WorkerApp;
-export function createApp(root: FrameworkChild | (new () => Component)): NodalAppBuilder;
-export function createApp(arg: WorkerAppOptions | FrameworkChild | (new () => Component)): WorkerApp | NodalAppBuilder {
+export function createApp(root: FrameworkChild | ComponentType): NodalAppBuilder;
+export function createApp(arg: WorkerAppOptions | FrameworkChild | ComponentType): WorkerApp | NodalAppBuilder {
   if (isWorkerAppOptions(arg)) {
     return new WorkerApp(arg);
   }

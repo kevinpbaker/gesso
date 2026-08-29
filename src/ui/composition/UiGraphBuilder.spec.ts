@@ -6,6 +6,7 @@ import { UiGraph } from '../graph/UiGraph';
 import { UiNodeType } from '../graph/UiNodeType';
 import { type UiNode } from '../graph/UiNode';
 import { Box, Button, Column, Row, Text } from './UiComponents';
+import { createElement } from './UiFactory';
 import { UiGraphBuilder } from './UiGraphBuilder';
 
 describe('UiGraphBuilder', () => {
@@ -163,20 +164,24 @@ describe('UiGraphBuilder', () => {
     });
 
     it('rejects a prop no property definition declares, naming the closest one', () => {
-      expect(() => createBuilder().builder.build(Row({ widht: 100 }))).toThrow(
+      // The typed factories reject these at compile time; createElement
+      // is the untyped path, which is where the runtime check matters.
+      expect(() => createBuilder().builder.build(createElement(UiNodeType.Row, { widht: 100 }))).toThrow(
         /Unknown prop 'widht' on node 'root:0'. Did you mean 'width'\?/
       );
       // CSS names that Nodal spells differently are the common case.
-      expect(() => createBuilder().builder.build(Row({ alignItems: 'center' }))).toThrow(/Unknown prop 'alignItems'/);
+      expect(() => createBuilder().builder.build(createElement(UiNodeType.Row, { alignItems: 'center' }))).toThrow(
+        /Unknown prop 'alignItems'/
+      );
       // A misspelled event handler with a non-function value is still an event prop.
-      expect(() => createBuilder().builder.build(Row({ onClik: 'x' }))).toThrow(
+      expect(() => createBuilder().builder.build(createElement(UiNodeType.Row, { onClik: 'x' }))).toThrow(
         /Unknown prop 'onClik'.*Did you mean 'onClick'/
       );
     });
 
     it('rejects an unknown prop bound to an Observable as well', () => {
       const { builder } = createBuilder();
-      expect(() => builder.build(Row({ colour: new BehaviorSubject('#fff') }))).toThrow(
+      expect(() => builder.build(createElement(UiNodeType.Row, { colour: new BehaviorSubject('#fff') }))).toThrow(
         /Unknown prop 'colour' on node 'root:0'. Did you mean 'color'\?/
       );
     });
@@ -185,9 +190,10 @@ describe('UiGraphBuilder', () => {
       const { builder } = createBuilder();
       const seen: unknown[] = [];
       const root = builder.build(
-        Column(
+        createElement(
+          UiNodeType.Column,
           { key: 'k', ref: (node: unknown) => seen.push(node), hitTestable: false, virtualIndex: 3 },
-          Text({ text: 'A' })
+          [Text({ text: 'A' })]
         )
       );
       expect(root.getProperty('hitTestable')).toBe(false);

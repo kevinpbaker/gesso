@@ -4,21 +4,17 @@ import type { TextOverflow, TextWrap } from '../layout/TextMeasurer';
 import { resolveProperty, resolveNumber, resolveString, resolveBoolean } from '../properties/UiPropertyResolver';
 import { UiProperties } from '../properties/UiProperty';
 import type { UiColor } from '../properties/UiColor';
-import { UiColors, colorToHex, colorToRgba, normalizeColor } from '../properties/UiColor';
+import { UiColors, colorToHex, colorToRgba } from '../properties/UiColor';
 import type { UiBorderRadius } from '../properties/UiBorderRadius';
 import { normalizeBorderRadius } from '../properties/UiBorderRadius';
 import type { UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
+import type { UiImage } from '../properties/UiImage';
+import { resolveColor } from '../properties/UiThemeColor';
+import { resolveFont } from '../properties/UiTextFont';
 import { parseTransform } from '../properties/UiTransform';
 
-/**
- * Renderer-facing image type.
- *
- * ImageBitmap is available on the main thread and in Workers
- * (createImageBitmap), so the rendering core never depends on
- * HTMLImageElement. Decoding/caching is a separate future layer.
- */
-export type UiImage = ImageBitmap;
+export type { UiImage } from '../properties/UiImage';
 
 export type TextAlign = 'left' | 'center' | 'right';
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
@@ -61,7 +57,7 @@ export const DEFAULT_FONT_SIZE = 14;
 export const DEFAULT_FONT_FAMILY = 'sans-serif';
 export const DEFAULT_FONT_WEIGHT = 'normal';
 export const DEFAULT_TEXT_COLOR = UiColors.black;
-export const DEFAULT_LINE_HEIGHT_FACTOR = 1.2;
+export { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 
 export function normalizeTextAlign(value: unknown): TextAlign {
   if (value === 'center') {
@@ -110,8 +106,8 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   const opacity = resolveNumber(node, 'opacity');
   out.opacity = opacity === undefined ? 1 : Math.min(Math.max(opacity, 0), 1);
 
-  out.backgroundColor = normalizeColor(resolveProperty(node, UiProperties.backgroundColor));
-  out.borderColor = normalizeColor(resolveProperty(node, UiProperties.borderColor));
+  out.backgroundColor = resolveColor(node, UiProperties.backgroundColor);
+  out.borderColor = resolveColor(node, UiProperties.borderColor);
   out.borderWidth = resolveNumber(node, 'borderWidth') ?? 0;
   out.borderRadius = normalizeBorderRadius(resolveProperty(node, UiProperties.borderRadius));
   out.boxShadows = resolveProperty(node, UiProperties.boxShadows);
@@ -130,13 +126,13 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   const text = resolveString(node, 'text');
   out.text = text;
 
-  out.fontSize = resolveNumber(node, 'fontSize') ?? DEFAULT_FONT_SIZE;
-  out.fontFamily = resolveString(node, 'fontFamily') ?? DEFAULT_FONT_FAMILY;
-  const fontWeight = resolveString(node, 'fontWeight') ?? resolveNumber(node, 'fontWeight');
-  out.fontWeight = fontWeight ?? DEFAULT_FONT_WEIGHT;
-  const lineHeight = resolveNumber(node, 'lineHeight');
-  out.lineHeight = lineHeight === undefined || lineHeight <= 0 ? out.fontSize * DEFAULT_LINE_HEIGHT_FACTOR : lineHeight;
-  out.textColor = normalizeColor(resolveProperty(node, UiProperties.color)) ?? UiColors.black;
+  // Resolved the same way layout measured it (see resolveFont).
+  const font = resolveFont(node);
+  out.fontSize = font.fontSize;
+  out.fontFamily = font.fontFamily;
+  out.fontWeight = font.fontWeight;
+  out.lineHeight = font.lineHeight;
+  out.textColor = resolveColor(node, UiProperties.color) ?? UiColors.black;
   out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
   out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
   out.textWrap = normalizeTextWrap(resolveString(node, 'textWrap'));

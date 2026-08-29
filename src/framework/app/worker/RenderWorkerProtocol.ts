@@ -45,7 +45,9 @@ export type RuntimeToShellMessage =
     }
   | { type: 'error'; message: string; stack?: string }
   /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */
-  | { type: 'inspect'; text: string | null };
+  | { type: 'inspect'; text: string | null }
+  /** The CSS cursor the hovered node asks for; null for the default arrow. */
+  | { type: 'cursor'; cursor: string | null };
 
 export function modifiersFrom(event: {
   shiftKey: boolean;

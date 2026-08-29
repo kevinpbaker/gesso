@@ -1,6 +1,7 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
+import { resolveFont } from '../properties/UiTextFont';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
   AlignContent,
@@ -25,7 +26,6 @@ import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
 import { buildAxisExplanation, labelNode } from './LayoutExplanation';
 import type { AxisFacts, FlexFacts, LayoutExplanation } from './LayoutExplanation';
 
-const DEFAULT_FONT_SIZE = 14;
 /** How long overlay scrollbars stay after the last scroll change. */
 export const SCROLLBAR_LINGER_MS = 1200;
 /** Portion of the linger during which the scrollbar fades out. */
@@ -1814,14 +1814,17 @@ export class LayoutEngine {
     const paddingV = rec.paddingTop + rec.paddingBottom;
     if (node.type === UiNodeType.Text || node.type === UiNodeType.Button) {
       const text = String(node.properties.get('text') ?? '');
-      const fontSize = this.numberProp(node, 'fontSize') ?? DEFAULT_FONT_SIZE;
+      // The same resolution paint uses, so the line box measured here is
+      // the one the glyphs are drawn in.
+      const font = resolveFont(node);
       const maxLines = this.numberProp(node, 'maxLines');
       const paragraph = this.textMeasurer.layout({
         text,
-        fontSize,
-        fontFamily: this.stringProp(node, 'fontFamily'),
-        fontWeight: this.weightProp(node),
-        lineHeight: this.numberProp(node, 'lineHeight'),
+        fontSize: font.fontSize,
+        fontFamily: font.fontFamily,
+        fontWeight: font.fontWeight,
+        lineHeight: font.lineHeight,
+        letterSpacing: font.letterSpacing,
         maxWidth: isFinite(effective.maxWidth) ? Math.max(0, effective.maxWidth - paddingH) : undefined,
         wrap: this.textWrapProp(node),
         maxLines: maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined,
@@ -2873,14 +2876,6 @@ export class LayoutEngine {
     return resolveLength(value, undefined, side, true) ?? 0;
   }
 
-  private stringProp(node: UiNode, property: string): string | undefined {
-    const value = node.properties.get(property);
-    if (typeof value === 'string' && value.length > 0) {
-      return value;
-    }
-    return undefined;
-  }
-
   private textWrapProp(node: UiNode): TextWrap | undefined {
     const value = node.properties.get('textWrap');
     if (value === 'none' || value === 'nowrap') {
@@ -2895,17 +2890,6 @@ export class LayoutEngine {
   private textOverflowProp(node: UiNode): TextOverflow | undefined {
     const value = node.properties.get('textOverflow');
     return value === 'ellipsis' ? 'ellipsis' : undefined;
-  }
-
-  private weightProp(node: UiNode): string | number | undefined {
-    const value = node.properties.get('fontWeight');
-    if (typeof value === 'string' && value.length > 0) {
-      return value;
-    }
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value;
-    }
-    return undefined;
   }
 
   private spacingProp(props: ReadonlyMap<string, unknown>, base: string, side: string): number {

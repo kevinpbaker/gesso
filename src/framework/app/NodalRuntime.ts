@@ -15,6 +15,7 @@ import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayStore } from '../overlay/OverlayStore';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
+import { resolveCursor } from '../../ui/input/UiInteraction';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
 import { UiInputDispatcher } from '../../ui/input/UiInputDispatcher';
@@ -174,6 +175,8 @@ export class NodalRuntime {
   private gpuTimings: GpuStageTimings | null = null;
   private inspectListener: ((text: string | null) => void) | null = null;
   private lastInspection: string | null = null;
+  private cursorListener: ((cursor: string | null) => void) | null = null;
+  private lastCursor: string | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
   private replicas: readonly StoreReplica[] = [];
@@ -399,6 +402,21 @@ export class NodalRuntime {
     this.inspectListener = listener;
   }
 
+  /**
+   * Receives the cursor the hovered node asks for (`cursor: 'pointer'`
+   * on it or an ancestor) whenever it changes, and null when nothing
+   * under the pointer sets one. The shell applies it to the canvas —
+   * the runtime has no DOM, in a worker least of all.
+   */
+  onCursor(listener: ((cursor: string | null) => void) | null): void {
+    this.cursorListener = listener;
+  }
+
+  /** The cursor currently reported to the shell; null is the default arrow. */
+  get cursor(): string | null {
+    return this.lastCursor;
+  }
+
   /** `engine.explain` for any node, for tests and devtools. */
   explain(node: UiNode): LayoutExplanation {
     return this.engine.explain(node);
@@ -458,6 +476,7 @@ export class NodalRuntime {
       this.inspectorTimer = null;
     }
     this.inspectListener = null;
+    this.cursorListener = null;
     this.rendererErrorListener = null;
     this.scheduler.stop();
     this.graph.setDirtyListener(null);
@@ -545,6 +564,7 @@ export class NodalRuntime {
    * the pointer) and re-explains the hovered node for the listener.
    */
   private handleHoverChange(node: UiNode | null): void {
+    this.sendCursor();
     if (!this.inspector.isEnabled || !this.inspector.setHovered(node)) {
       return;
     }
@@ -755,6 +775,9 @@ export class NodalRuntime {
     const elapsed = finished - started;
     this.lastFrameMs = elapsed;
     this.scheduleScrollbarFade(finished);
+    // A frame can change the cursor without the pointer moving: the
+    // hovered node's `cursor` prop, or the node itself, may have changed.
+    this.sendCursor();
     this.frameListener?.({
       frame: frame.id,
       durationMs: elapsed,
@@ -806,6 +829,16 @@ export class NodalRuntime {
       },
       Math.max(16, nextChange)
     );
+  }
+
+  /** Hands the listener the hovered node's cursor, when it changed. */
+  private sendCursor(): void {
+    const cursor = resolveCursor(this.input.pointer.hoveredNode);
+    if (cursor === this.lastCursor) {
+      return;
+    }
+    this.lastCursor = cursor;
+    this.cursorListener?.(cursor);
   }
 
   /** Hands the listener the hovered node's explanation, when it changed. */

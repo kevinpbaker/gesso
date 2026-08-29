@@ -227,3 +227,22 @@ export function normalizeColor(value: unknown): UiColor | undefined {
   }
   return undefined;
 }
+
+/**
+ * Equality for color property values, used by the registry to decide
+ * whether a change repaints. Two literal colors compare by channel; a
+ * theme palette name compares by name, because what it paints depends
+ * on a theme this comparison cannot see. Lives here rather than with
+ * the theme lookup so the registry can import it without a cycle.
+ */
+export function colorValuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  const normalizedA = normalizeColor(a);
+  const normalizedB = normalizeColor(b);
+  if (normalizedA === undefined || normalizedB === undefined) {
+    return false;
+  }
+  return colorsEqual(normalizedA, normalizedB);
+}

@@ -80,6 +80,7 @@ class WorkerRoot extends Component {
       Box({
         width: 200,
         height: 100,
+        cursor: 'pointer',
         onClick: () => {
           clicks.push('clicked');
           this.count.value++;
@@ -228,5 +229,22 @@ describe('RenderWorkerApp inspector', () => {
 
     send({ type: 'inspector', enabled: false });
     expect(sent.filter(m => m.type === 'inspect').at(-1)).toEqual({ type: 'inspect', text: null });
+  });
+});
+
+describe('RenderWorkerApp cursor', () => {
+  it("reports the hovered node's cursor to the shell and clears it on leaving", async () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+    send(initMessage(createMockCanvas()));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+
+    // Over the box, which asks for a pointer.
+    send({ type: 'pointerMove', x: 40, y: 40, buttons: 0, modifiers: noModifiers });
+    expect(sent.filter(m => m.type === 'cursor').at(-1)).toEqual({ type: 'cursor', cursor: 'pointer' });
+
+    // Off it: the shell restores the default.
+    send({ type: 'pointerMove', x: 700, y: 500, buttons: 0, modifiers: noModifiers });
+    expect(sent.filter(m => m.type === 'cursor').at(-1)).toEqual({ type: 'cursor', cursor: null });
   });
 });

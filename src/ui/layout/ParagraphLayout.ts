@@ -7,7 +7,8 @@ import type {
   TextWrap
 } from './TextMeasurer';
 
-export const DEFAULT_LINE_HEIGHT_FACTOR = 1.2;
+export { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
+import { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 export const ELLIPSIS = '…';
 
 type Measure = (segment: string) => number;

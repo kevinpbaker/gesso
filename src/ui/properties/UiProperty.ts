@@ -1,19 +1,43 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
-import { defineProperty } from './UiPropertyDefinition';
+import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinition';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
-import type { UiColor } from './UiColor';
-import { UiColors, colorsEqual, normalizeColor } from './UiColor';
+import { UiColors, colorValuesEqual } from './UiColor';
 import type { UiBorderRadius } from './UiBorderRadius';
 import { UiBorderRadiuses, borderRadiusEqual, normalizeBorderRadius } from './UiBorderRadius';
 import type { UiBoxShadow } from './UiBoxShadow';
 import { boxShadowArraysEqual } from './UiBoxShadow';
 import type { UiTransform } from './UiTransform';
-import { transformsEqual } from './UiTransform';
+import { transform, transformsEqual } from './UiTransform';
 import type { UiTextStyle } from './UiTextStyle';
 import { defaultTextStyle } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
 import type { UiLength, UiTrackSize } from '../layout/UiLength';
+import type { UiNode } from '../graph/UiNode';
+import type { UiTheme } from '../environment/UiTheme';
+import type { UiImage } from './UiImage';
+import type { UiVirtualWindow } from '../composition/UiVirtualWindow';
+import type {
+  UiAlignment,
+  UiColorValue,
+  UiContentDistribution,
+  UiCursor,
+  UiDirection,
+  UiFlexWrap,
+  UiFontWeight,
+  UiGridAutoFlow,
+  UiObjectFit,
+  UiOverflow,
+  UiPlacement,
+  UiPointerEvents,
+  UiPosition,
+  UiSelfAlignment,
+  UiTextAlign,
+  UiTextDirection,
+  UiTextOverflowValue,
+  UiTextWrapValue,
+  UiVerticalAlign
+} from './UiPropertyValues';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 
 const L = DirtyFlags.Layout;
@@ -171,7 +195,7 @@ export const UiProperties = {
   }),
 
   /** 'nowrap' (default), 'wrap' or 'wrap-reverse'. */
-  flexWrap: defineProperty<string | undefined>({
+  flexWrap: defineProperty<UiFlexWrap | undefined>({
     name: 'flexWrap',
     defaultValue: undefined,
     inherited: false,
@@ -183,7 +207,7 @@ export const UiProperties = {
    * axis: 'stretch' (default), 'start', 'center', 'end',
    * 'space-between', 'space-around', 'space-evenly'.
    */
-  alignContent: defineProperty<string | undefined>({
+  alignContent: defineProperty<UiContentDistribution | undefined>({
     name: 'alignContent',
     defaultValue: undefined,
     inherited: false,
@@ -227,7 +251,7 @@ export const UiProperties = {
   }),
 
   /** 'row' (default) fills rows left to right; 'column' fills columns top to bottom. */
-  autoFlow: defineProperty<string | undefined>({
+  autoFlow: defineProperty<UiGridAutoFlow | undefined>({
     name: 'autoFlow',
     defaultValue: undefined,
     inherited: false,
@@ -235,7 +259,7 @@ export const UiProperties = {
   }),
 
   /** Distribution of a grid's columns across spare width: 'stretch' (default), 'start', 'center', 'end', 'space-*'. */
-  justifyContent: defineProperty<string | undefined>({
+  justifyContent: defineProperty<UiContentDistribution | undefined>({
     name: 'justifyContent',
     defaultValue: undefined,
     inherited: false,
@@ -310,7 +334,7 @@ export const UiProperties = {
    * axis. The value is axis-relative and does not flip meaning when
    * the flex direction changes.
    */
-  x: defineProperty<string | undefined>({
+  x: defineProperty<UiAlignment | undefined>({
     name: 'x',
     defaultValue: undefined,
     inherited: false,
@@ -324,7 +348,7 @@ export const UiProperties = {
    * axis. The value is axis-relative and does not flip meaning when
    * the flex direction changes.
    */
-  y: defineProperty<string | undefined>({
+  y: defineProperty<UiAlignment | undefined>({
     name: 'y',
     defaultValue: undefined,
     inherited: false,
@@ -334,7 +358,7 @@ export const UiProperties = {
   /**
    * Per-child override for x-axis alignment.
    */
-  selfX: defineProperty<string | undefined>({
+  selfX: defineProperty<UiSelfAlignment | undefined>({
     name: 'selfX',
     defaultValue: undefined,
     inherited: false,
@@ -344,7 +368,7 @@ export const UiProperties = {
   /**
    * Per-child override for y-axis alignment.
    */
-  selfY: defineProperty<string | undefined>({
+  selfY: defineProperty<UiSelfAlignment | undefined>({
     name: 'selfY',
     defaultValue: undefined,
     inherited: false,
@@ -360,7 +384,7 @@ export const UiProperties = {
    * top/right/bottom/left while the container scrolls, until its
    * parent's box ends).
    */
-  position: defineProperty<string | undefined>({
+  position: defineProperty<UiPosition | undefined>({
     name: 'position',
     defaultValue: undefined,
     inherited: false,
@@ -413,7 +437,7 @@ export const UiProperties = {
    * would overflow its containing block and shifts along the anchor
    * to stay inside it.
    */
-  anchor: defineProperty<unknown | undefined>({
+  anchor: defineProperty<UiNode | null | undefined>({
     name: 'anchor',
     defaultValue: undefined,
     inherited: false,
@@ -426,7 +450,7 @@ export const UiProperties = {
    * 'left', 'left-start', 'left-end', 'right', 'right-start',
    * 'right-end'.
    */
-  placement: defineProperty<string | undefined>({
+  placement: defineProperty<UiPlacement | undefined>({
     name: 'placement',
     defaultValue: undefined,
     inherited: false,
@@ -444,7 +468,7 @@ export const UiProperties = {
   /**
    * Layout direction for flex and scroll containers.
    */
-  direction: defineProperty<string | undefined>({
+  direction: defineProperty<UiDirection | undefined>({
     name: 'direction',
     defaultValue: undefined,
     inherited: false,
@@ -458,7 +482,7 @@ export const UiProperties = {
    * apply, overlay scrollbars show while scrolling, and sticky
    * descendants stick to its edges.
    */
-  overflow: defineProperty<string | undefined>({
+  overflow: defineProperty<UiOverflow | undefined>({
     name: 'overflow',
     defaultValue: undefined,
     inherited: false,
@@ -476,21 +500,15 @@ export const UiProperties = {
   // Paint
   // -------------------------------------------------------------------------
 
-  backgroundColor: defineProperty<UiColor | string | undefined>({
+  backgroundColor: defineProperty<UiColorValue | undefined>({
     name: 'backgroundColor',
     defaultValue: undefined,
     inherited: false,
     affects: P,
-    compare: (a, b) => {
-      const normalizedA = normalizeColor(a);
-      const normalizedB = normalizeColor(b);
-      if (normalizedA === undefined && normalizedB === undefined) return true;
-      if (normalizedA === undefined || normalizedB === undefined) return false;
-      return colorsEqual(normalizedA, normalizedB);
-    }
+    compare: colorValuesEqual
   }),
 
-  color: defineProperty<UiColor | string>({
+  color: defineProperty<UiColorValue>({
     name: 'color',
     defaultValue: UiColors.black,
     inherited: true,
@@ -500,25 +518,15 @@ export const UiProperties = {
       const textStyle = value as UiTextStyle;
       return textStyle.color;
     },
-    compare: (a, b) => {
-      const normalizedA = normalizeColor(a) ?? UiColors.black;
-      const normalizedB = normalizeColor(b) ?? UiColors.black;
-      return colorsEqual(normalizedA, normalizedB);
-    }
+    compare: colorValuesEqual
   }),
 
-  borderColor: defineProperty<UiColor | string | undefined>({
+  borderColor: defineProperty<UiColorValue | undefined>({
     name: 'borderColor',
     defaultValue: undefined,
     inherited: false,
     affects: P,
-    compare: (a, b) => {
-      const normalizedA = normalizeColor(a);
-      const normalizedB = normalizeColor(b);
-      if (normalizedA === undefined && normalizedB === undefined) return true;
-      if (normalizedA === undefined || normalizedB === undefined) return false;
-      return colorsEqual(normalizedA, normalizedB);
-    }
+    compare: colorValuesEqual
   }),
 
   borderWidth: defineProperty<number | undefined>({
@@ -580,7 +588,7 @@ export const UiProperties = {
     resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).fontSize
   }),
 
-  fontWeight: defineProperty<number | string>({
+  fontWeight: defineProperty<UiFontWeight>({
     name: 'fontWeight',
     defaultValue: defaultTextStyle.fontWeight,
     inherited: true,
@@ -607,7 +615,7 @@ export const UiProperties = {
     resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).letterSpacing
   }),
 
-  textAlign: defineProperty<'left' | 'center' | 'right'>({
+  textAlign: defineProperty<UiTextAlign>({
     name: 'textAlign',
     defaultValue: defaultTextStyle.textAlign,
     inherited: true,
@@ -616,7 +624,7 @@ export const UiProperties = {
     resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).textAlign
   }),
 
-  textDirection: defineProperty<'ltr' | 'rtl'>({
+  textDirection: defineProperty<UiTextDirection>({
     name: 'textDirection',
     defaultValue: defaultTextStyle.textDirection,
     inherited: true,
@@ -625,7 +633,7 @@ export const UiProperties = {
     resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).textDirection
   }),
 
-  verticalAlign: defineProperty<string | undefined>({
+  verticalAlign: defineProperty<UiVerticalAlign | undefined>({
     name: 'verticalAlign',
     defaultValue: undefined,
     inherited: false,
@@ -635,7 +643,7 @@ export const UiProperties = {
   /**
    * How text breaks into lines: 'word' (default), 'char', or 'none'.
    */
-  textWrap: defineProperty<string | undefined>({
+  textWrap: defineProperty<UiTextWrapValue | undefined>({
     name: 'textWrap',
     defaultValue: undefined,
     inherited: false,
@@ -656,7 +664,7 @@ export const UiProperties = {
    * What happens to a line that does not fit: 'clip' (default) or
    * 'ellipsis'.
    */
-  textOverflow: defineProperty<string | undefined>({
+  textOverflow: defineProperty<UiTextOverflowValue | undefined>({
     name: 'textOverflow',
     defaultValue: undefined,
     inherited: false,
@@ -667,14 +675,19 @@ export const UiProperties = {
   // Interaction
   // -------------------------------------------------------------------------
 
-  cursor: defineProperty<string | undefined>({
+  /**
+   * CSS cursor shown while the pointer is over this node or a
+   * descendant that sets none. Resolved by the runtime on hover and
+   * applied to the canvas by the shell.
+   */
+  cursor: defineProperty<UiCursor | undefined>({
     name: 'cursor',
     defaultValue: undefined,
     inherited: false,
     affects: DirtyFlags.Properties
   }),
 
-  pointerEvents: defineProperty<string | undefined>({
+  pointerEvents: defineProperty<UiPointerEvents | undefined>({
     name: 'pointerEvents',
     defaultValue: undefined,
     inherited: false,
@@ -699,7 +712,8 @@ export const UiProperties = {
   // Transform
   // -------------------------------------------------------------------------
 
-  transform: defineProperty<UiTransform | undefined>({
+  /** Any subset of x, y, scaleX, scaleY, rotation; the rest is identity. */
+  transform: defineProperty<Partial<UiTransform> | undefined>({
     name: 'transform',
     defaultValue: undefined,
     inherited: false,
@@ -707,7 +721,7 @@ export const UiProperties = {
     compare: (a, b) => {
       if (a === undefined && b === undefined) return true;
       if (a === undefined || b === undefined) return false;
-      return transformsEqual(a, b);
+      return transformsEqual(transform(a), transform(b));
     }
   }),
 
@@ -722,14 +736,14 @@ export const UiProperties = {
     affects: C | L
   }),
 
-  image: defineProperty<unknown | undefined>({
+  image: defineProperty<UiImage | undefined>({
     name: 'image',
     defaultValue: undefined,
     inherited: false,
     affects: P
   }),
 
-  objectFit: defineProperty<string | undefined>({
+  objectFit: defineProperty<UiObjectFit | undefined>({
     name: 'objectFit',
     defaultValue: undefined,
     inherited: false,
@@ -771,7 +785,7 @@ export const UiProperties = {
   }),
 
   /** Set by LazyColumn/LazyRow on the scroll container: its UiVirtualWindow. */
-  virtualWindow: defineProperty<unknown | undefined>({
+  virtualWindow: defineProperty<UiVirtualWindow | undefined>({
     name: 'virtualWindow',
     defaultValue: undefined,
     inherited: false,
@@ -782,21 +796,21 @@ export const UiProperties = {
   // Environment provider properties
   // -------------------------------------------------------------------------
 
-  theme: defineProperty<unknown | undefined>({
+  theme: defineProperty<UiTheme | undefined>({
     name: 'theme',
     defaultValue: undefined,
     inherited: false,
     affects: E
   }),
 
-  textStyle: defineProperty<unknown | undefined>({
+  textStyle: defineProperty<UiTextStyle | undefined>({
     name: 'textStyle',
     defaultValue: undefined,
     inherited: false,
     affects: E
   }),
 
-  contentColor: defineProperty<unknown | undefined>({
+  contentColor: defineProperty<UiColorValue | undefined>({
     name: 'contentColor',
     defaultValue: undefined,
     inherited: false,
@@ -817,3 +831,15 @@ export const UiProperties = {
 } as const;
 
 export type UiPropertyName = keyof typeof UiProperties;
+
+/** The value type a property definition was declared with. */
+export type UiPropertyValueOf<D> = D extends UiPropertyDefinition<infer T> ? T : never;
+
+/**
+ * Property name → value type, derived from the registry so that the
+ * authoring types (`TextProps`, `RowProps`, …) can never disagree with
+ * what the runtime reads.
+ */
+export type UiPropertyValues = {
+  readonly [K in UiPropertyName]: UiPropertyValueOf<(typeof UiProperties)[K]>;
+};

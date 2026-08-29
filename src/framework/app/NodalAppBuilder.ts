@@ -1,6 +1,6 @@
-import type { Component } from '../Component';
 import { createComponent } from '../createComponent';
 import type { FrameworkChild } from '../ComponentElement';
+import type { ComponentType } from '../FunctionComponent';
 import type { Store } from '../store/Store';
 import { createStoreRegistry, type StoreRegistration } from '../store/worker/createStoreRegistry';
 import { NodalApp } from './NodalApp';
@@ -16,7 +16,7 @@ export class NodalAppBuilder {
   private rendererChoice: RendererChoice | undefined;
   private app: NodalApp | undefined;
 
-  constructor(private readonly root: FrameworkChild | (new () => Component)) {}
+  constructor(private readonly root: FrameworkChild | ComponentType) {}
 
   /**
    * Registers a store.
@@ -78,7 +78,7 @@ export class NodalAppBuilder {
    */
   mountSync(host: HTMLElement | string): () => void {
     const element = typeof host === 'string' ? requireElement(host) : host;
-    const rootElement = typeof this.root === 'function' ? createComponent(this.root) : this.root;
+    const rootElement = typeof this.root === 'function' ? createComponent(this.root as ComponentType) : this.root;
     const stores = createStoreRegistry(this.registrations);
     const app = new NodalApp({
       host: element,

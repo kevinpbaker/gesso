@@ -1,5 +1,5 @@
 import type { UiChild } from '../ui/composition/UiElement';
-import type { Component } from './Component';
+import type { ComponentType } from './FunctionComponent';
 
 /**
  * Declarative representation of a component instance in the tree.
@@ -10,7 +10,8 @@ import type { Component } from './Component';
 export interface ComponentElement<P = Record<string, unknown>> {
   readonly kind: 'component';
   readonly tag: string;
-  readonly componentClass: new () => Component;
+  /** The class or function to mount. */
+  readonly component: ComponentType;
   readonly props: P;
   readonly key?: string | number;
 }

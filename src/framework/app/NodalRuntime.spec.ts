@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Column, Text } from '../../ui/composition/UiComponents';
+import { Box, Button, Column, Row, Text } from '../../ui/composition/UiComponents';
+import type { UiCursor } from '../../ui/properties/UiPropertyValues';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
 import type { FrameMetrics } from './NodalRuntime';
 import type { FrameworkChild } from '../ComponentElement';
@@ -267,5 +268,60 @@ describe('NodalRuntime layout inspector', () => {
     runtime.setInspectorEnabled(false);
     expect(explanations.at(-1)).toBeNull();
     expect(runtime.inspector.hoveredNode).toBeNull();
+  });
+});
+
+describe('NodalRuntime cursor', () => {
+  function mountWithCursor() {
+    let clock!: UiManualFrameClock;
+    const cursorProp = new BehaviorSubject<UiCursor | undefined>(undefined);
+    const runtime = new NodalRuntime({
+      // A button that sets the cursor, with a label that inherits it, and a
+      // plain box beside it that sets none.
+      root: Row(
+        { padding: 10, gap: 10 },
+        Button({ width: 100, height: 50, cursor: 'pointer' }, Text({ text: 'Save' })),
+        Box({ width: 100, height: 50, cursor: cursorProp })
+      ),
+      canvas: mockCanvas(),
+      width: 800,
+      height: 600,
+      clock: cb => (clock = new UiManualFrameClock(cb))
+    });
+    const cursors: (string | null)[] = [];
+    runtime.onCursor(cursor => cursors.push(cursor));
+    runtime.start();
+    if (clock.isPending) clock.tick(0);
+    return { runtime, clock, cursors, cursorProp };
+  }
+
+  it('reports the cursor of the hovered node, inherited from an ancestor, and null when leaving', () => {
+    const { runtime, cursors } = mountWithCursor();
+    // The label inside the button: the button's cursor applies.
+    runtime.input.pointer.pointerMove(20, 20);
+    expect(cursors).toEqual(['pointer']);
+    expect(runtime.cursor).toBe('pointer');
+
+    // Still inside the button: no repeat.
+    runtime.input.pointer.pointerMove(100, 50);
+    expect(cursors).toEqual(['pointer']);
+
+    // The box sets none.
+    runtime.input.pointer.pointerMove(170, 30);
+    expect(cursors).toEqual(['pointer', null]);
+
+    // Empty canvas: still none, so nothing new is reported.
+    runtime.input.pointer.pointerMove(700, 500);
+    expect(cursors).toEqual(['pointer', null]);
+  });
+
+  it('reports a cursor that changes under a still pointer on the next frame', () => {
+    const { runtime, clock, cursors, cursorProp } = mountWithCursor();
+    runtime.input.pointer.pointerMove(170, 30);
+    expect(cursors).toEqual([]);
+
+    cursorProp.next('grab');
+    if (clock.isPending) clock.tick(16);
+    expect(cursors).toEqual(['grab']);
   });
 });
