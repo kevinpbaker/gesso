@@ -3,9 +3,9 @@
  *
  * Before this list the nav was written out by hand in four separate
  * HTML templates, which is why each route used to show a different
- * subset of the others and why `#theme` was reachable only by typing
- * the hash. The shell renders the nav from this array and the router
- * resolves hashes against it, so a route added here appears
+ * subset of the others and why some routes were reachable only by
+ * typing the hash. The shell renders the nav from this array and the
+ * router resolves hashes against it, so a route added here appears
  * everywhere at once.
  *
  * Deliberately free of any import from the route modules: the shell
@@ -39,10 +39,10 @@ export const ROUTES: readonly RouteMeta[] = [
   { id: 'compare', label: 'Compare', title: 'Canvas2D and WebGPU, side by side' },
   { id: 'benchmark', label: 'Benchmark', title: 'WebGPU renderer benchmark' },
   { id: 'binding', label: 'Bindings', title: 'Reactive bindings to the canvas' },
-  { id: 'theme', label: 'Theme', title: 'Theme and environment propagation' },
   { id: 'examples', label: 'Examples', title: 'Examples · small complete apps' },
   { id: 'example-signin', label: 'Sign in', title: 'Example · passcode sign-in, written in JSX', parent: 'examples' },
-  { id: 'example-notes', label: 'Notes', title: 'Example · notes with text editing and IME', parent: 'examples' }
+  { id: 'example-notes', label: 'Notes', title: 'Example · notes with text editing and IME', parent: 'examples' },
+  { id: 'example-theme', label: 'Theming', title: 'Example · theming through the environment', parent: 'examples' }
 ];
 
 export const DEFAULT_ROUTE_ID = 'debug';

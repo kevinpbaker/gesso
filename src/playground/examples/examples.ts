@@ -36,5 +36,17 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'through the ShellStore.',
     source: 'src/playground/examples/NotesExampleApp.tsx',
     tags: ['text editing', 'IME', 'clipboard', 'JSX', 'store', 'render worker']
+  },
+  {
+    route: 'example-theme',
+    title: 'Theming',
+    description:
+      'A settings pane wired to the page it restyles: pick a palette, an accent, how square the corners are and how ' +
+      'big the text is, and the whole page repaints. Nothing below the root names a color — each one is a palette ' +
+      'name, resolved against whatever theme the node inherits — and no node is rebuilt, which the timestamp under ' +
+      'the preview is there to prove. The environment is scoped, so every palette chip paints itself in the palette ' +
+      'it offers, and one card in the preview runs under a theme of its own.',
+    source: 'src/playground/examples/ThemeExampleApp.tsx',
+    tags: ['theme', 'environment', 'palette names', 'typography', 'JSX', 'render worker']
   }
 ];

@@ -189,7 +189,7 @@ One shell, nine routes, switched by hash:
 | `#compare`        | Canvas2D and WebGPU side by side with a live pixel diff                                         |
 | `#benchmark`      | WebGPU throughput                                                                               |
 | `#binding`        | Reactive bindings flowing straight to the canvas, no re-render                                  |
-| `#theme`          | Theme and environment propagation                                                               |
+| `#examples`       | Small complete apps: a passcode sign-in, a notes app, a theming pane                            |
 
 ## Architecture
 
