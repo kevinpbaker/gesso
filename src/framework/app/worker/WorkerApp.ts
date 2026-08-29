@@ -111,8 +111,16 @@ export class WorkerApp {
     this.worker = worker;
     worker.addEventListener('message', this.handleWorkerMessage);
 
-    const width = element.clientWidth || 600;
-    const height = element.clientHeight || 600;
+    // The canvas's own box, not the host's. `clientWidth`/`clientHeight`
+    // include the host's padding, while the canvas is sized to its
+    // content box — so a padded host (the playground's preview pane has
+    // 16px) started the runtime with a viewport wider and taller than
+    // the surface it draws on. Everything came out scaled, and pointer
+    // coordinates, which `attachInput` takes from this same rect,
+    // landed off by the same ratio. The ResizeObserver below reports
+    // `contentRect` and so already agreed with this measurement; the
+    // first frame was the only one that did not.
+    const { width, height } = measure(canvas, element);
     worker.postMessage(
       {
         type: 'init',
@@ -365,4 +373,25 @@ function isSelectAll(event: KeyboardEvent): boolean {
 /** Ctrl+F, or Cmd+F on a Mac: open the app's find bar. */
 function isFind(event: KeyboardEvent): boolean {
   return (event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'f' || event.key === 'F');
+}
+
+/**
+ * The logical size to start a runtime at, in CSS pixels.
+ *
+ * The canvas's border box is what the runtime draws into and what
+ * pointer coordinates are measured against, so it is the measurement
+ * that matters. It is zero before the first layout — a host mounted
+ * while detached, or a test double — so the host's content box is the
+ * fallback, and a fixed default the last resort.
+ */
+export function measure(canvas: HTMLCanvasElement, host: HTMLElement): { width: number; height: number } {
+  const box = canvas.getBoundingClientRect();
+  if (box.width > 0 && box.height > 0) {
+    return { width: box.width, height: box.height };
+  }
+  const style = typeof getComputedStyle === 'function' ? getComputedStyle(host) : undefined;
+  const pad = (value: string | undefined): number => parseFloat(value ?? '0') || 0;
+  const width = host.clientWidth - pad(style?.paddingLeft) - pad(style?.paddingRight);
+  const height = host.clientHeight - pad(style?.paddingTop) - pad(style?.paddingBottom);
+  return { width: width > 0 ? width : 600, height: height > 0 ? height : 600 };
 }

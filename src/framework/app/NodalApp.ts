@@ -8,6 +8,7 @@ import type { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
 import { NodalRuntime, type FrameMetrics, type RendererChoice } from './NodalRuntime';
 import { EditingProxy, writeClipboard } from './EditingProxy';
+import { measure } from './worker/WorkerApp';
 import type { StoreReplica } from '../store/worker/StoreReplica';
 
 export interface NodalAppOptions {
@@ -107,7 +108,14 @@ export class NodalApp {
     }
 
     this.observeResize();
-    this.resize(this.host.clientWidth || this.canvas.width || 600, this.host.clientHeight || this.canvas.height || 600);
+    // The canvas's box rather than the host's: clientWidth/clientHeight
+    // include the host's padding, and starting the runtime a padding
+    // wider than the surface it draws on leaves the first frame scaled
+    // and every pointer coordinate off by the same ratio. See
+    // `measure` in worker/WorkerApp for the same reasoning on the
+    // worker path.
+    const box = isCanvasElement(this.canvas) ? measure(this.canvas, this.host) : undefined;
+    this.resize(box?.width ?? this.canvas.width ?? 600, box?.height ?? this.canvas.height ?? 600);
     this.attachInput();
     this.runtime.onCursor(cursor => {
       if (isCanvasElement(this.canvas)) {
