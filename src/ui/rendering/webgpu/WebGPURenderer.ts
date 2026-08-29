@@ -119,7 +119,13 @@ export class WebGPURenderer implements UiRenderer {
       return;
     }
 
-    const prepareStart = this.hooks.onPrepareStart !== undefined ? performance.now() : 0;
+    // Each stage samples its start clock when either of its hooks is
+    // set. Sampling only for the Start hook meant a caller that wants
+    // durations alone — which the benchmark route does — measured
+    // every stage from 0, so all three reported the absolute clock
+    // instead of an elapsed time, and looked identical to each other.
+    const prepareStart =
+      this.hooks.onPrepareStart !== undefined || this.hooks.onPrepareEnd !== undefined ? performance.now() : 0;
     const list = buildRenderList(
       root,
       context.layout,
@@ -135,7 +141,8 @@ export class WebGPURenderer implements UiRenderer {
     const pipeline = this.pipeline!;
     const textRenderer = this.textRenderer!;
 
-    const uploadStart = this.hooks.onUploadStart !== undefined ? performance.now() : 0;
+    const uploadStart =
+      this.hooks.onUploadStart !== undefined || this.hooks.onUploadEnd !== undefined ? performance.now() : 0;
     if (list.instanceCount > 0) {
       this.ensureInstanceBuffer(list.instanceData.byteLength);
       this.uploadInstanceData(list.instanceData);
@@ -144,7 +151,8 @@ export class WebGPURenderer implements UiRenderer {
       this.hooks.onUploadEnd(performance.now() - uploadStart);
     }
 
-    const encodeStart = this.hooks.onEncodeStart !== undefined ? performance.now() : 0;
+    const encodeStart =
+      this.hooks.onEncodeStart !== undefined || this.hooks.onEncodeEnd !== undefined ? performance.now() : 0;
     const commandEncoder = device.createCommandEncoder();
     const texture = this.surface.getCurrentTexture();
     const view = texture.createView();
