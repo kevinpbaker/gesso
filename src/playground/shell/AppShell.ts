@@ -139,13 +139,19 @@ function renderHeader(routeId: string, title: string): HTMLElement {
   titleEl.appendChild(createElement('span', { className: 'pg-title-text', text: title }));
 
   const nav = createElement('nav', { className: 'pg-nav', attrs: { 'aria-label': 'Playground routes' } });
+  // A child route (an example page) highlights its parent's nav item.
+  const current = findRoute(routeId);
+  const currentNavId = current?.parent ?? routeId;
   for (const route of ROUTES) {
+    if (route.parent !== undefined) {
+      continue;
+    }
     const link = createElement('a', {
       className: 'pg-link',
       text: route.label,
       attrs: { href: `#${route.id}` }
     });
-    if (route.id === routeId) {
+    if (route.id === currentNavId) {
       link.setAttribute('aria-current', 'page');
     }
     nav.appendChild(link);

@@ -673,7 +673,7 @@ export class FrameworkDemoRoot extends Component {
           for (let tick = count; tick > count - 4 && tick > 0; tick--) {
             ticks.push(tick);
           }
-          return ticks.map(tick => createComponent(TickItem, { label: `Tick #${tick}` }, tick) as unknown as UiElement);
+          return ticks.map(tick => createComponent(TickItem, { label: `Tick #${tick}` }, tick));
         })
       );
   }

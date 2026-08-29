@@ -4,7 +4,9 @@ import { mountBenchmarkRoute } from './playground/routes/BenchmarkRoute';
 import { mountBindingRoute } from './playground/routes/BindingRoute';
 import { mountCanvasRoute } from './playground/routes/CanvasRoute';
 import { mountCompareRoute } from './playground/routes/CompareRoute';
+import { mountExamplesRoute } from './playground/routes/ExamplesRoute';
 import { mountFrameworkRoute, mountFrameworkSyncRoute } from './playground/routes/FrameworkRoute';
+import { mountSignInExampleRoute } from './playground/routes/SignInExampleRoute';
 import { mountLayoutRoute } from './playground/routes/LayoutRoute';
 import { mountThemeRoute } from './playground/routes/ThemeRoute';
 import { mountWebGPURoute } from './playground/routes/WebGPURoute';
@@ -31,7 +33,9 @@ const MOUNTS: Record<string, Mount> = {
   compare: mountCompareRoute,
   benchmark: mountBenchmarkRoute,
   binding: mountBindingRoute,
-  theme: mountThemeRoute
+  theme: mountThemeRoute,
+  examples: mountExamplesRoute,
+  'example-signin': mountSignInExampleRoute
 };
 
 if (import.meta.env.DEV) {

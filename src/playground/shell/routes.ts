@@ -21,6 +21,13 @@ export interface RouteMeta {
   readonly label: string;
   /** Full title shown in the header of the route itself. */
   readonly title: string;
+  /**
+   * The nav item this route belongs under, for pages reached from
+   * another route rather than from the nav. A route with a parent is
+   * not listed in the nav; its parent is marked current while it is
+   * mounted.
+   */
+  readonly parent?: string;
 }
 
 export const ROUTES: readonly RouteMeta[] = [
@@ -32,7 +39,9 @@ export const ROUTES: readonly RouteMeta[] = [
   { id: 'compare', label: 'Compare', title: 'Canvas2D and WebGPU, side by side' },
   { id: 'benchmark', label: 'Benchmark', title: 'WebGPU renderer benchmark' },
   { id: 'binding', label: 'Bindings', title: 'Reactive bindings to the canvas' },
-  { id: 'theme', label: 'Theme', title: 'Theme and environment propagation' }
+  { id: 'theme', label: 'Theme', title: 'Theme and environment propagation' },
+  { id: 'examples', label: 'Examples', title: 'Examples · small complete apps' },
+  { id: 'example-signin', label: 'Sign in', title: 'Example · passcode sign-in, written in JSX', parent: 'examples' }
 ];
 
 export const DEFAULT_ROUTE_ID = 'debug';
