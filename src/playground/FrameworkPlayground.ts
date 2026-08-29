@@ -385,6 +385,73 @@ export class MenuDemo extends Component {
  * component runtime, store injection, local state, and Canvas2D
  * renderer all work together in a single-thread app.
  */
+/**
+ * Overflow (roadmap L4): a rounded card clips a box that spills past
+ * it, and a list with a sticky header scrolls under it while Tab moves
+ * focus through rows that scroll themselves into view.
+ */
+@Define('scroll-demo')
+export class ScrollDemo extends Component {
+  override render(): UiElement {
+    return Column(
+      { gap: 8 },
+      Text({
+        text: 'Overflow: the rounded card clips; the list has a sticky header, overlay scrollbars, and Tab scrolls the focused row into view.',
+        color: '#9ca3af'
+      }),
+      Row(
+        { gap: 16, y: 'start' },
+        Box(
+          {
+            width: 160,
+            height: 100,
+            overflow: 'hidden',
+            borderRadius: 16,
+            backgroundColor: '#111827',
+            position: 'relative'
+          },
+          Box({
+            position: 'absolute',
+            left: -40,
+            top: -30,
+            width: 140,
+            height: 140,
+            backgroundColor: '#f59e0b',
+            borderRadius: 70
+          }),
+          Box({
+            position: 'absolute',
+            left: 90,
+            top: 40,
+            width: 120,
+            height: 120,
+            backgroundColor: '#3b82f6',
+            borderRadius: 60
+          }),
+          Text({ text: 'clipped', color: '#ffffff', fontSize: 12, position: 'absolute', left: 8, bottom: 8 })
+        ),
+        Column(
+          { width: 220, height: 140, overflow: 'scroll', backgroundColor: '#111827', borderRadius: 6 },
+          Row(
+            { position: 'sticky', top: 0, padding: 6, backgroundColor: '#1f2937', flexShrink: 0 },
+            Text({ text: 'Sticky header — Tab through the rows', color: '#e5e7eb', fontSize: 12 })
+          ),
+          ...Array.from({ length: 14 }, (_, i) =>
+            Button({
+              text: `Row ${i + 1}`,
+              color: '#d1d5db',
+              fontSize: 13,
+              padding: 6,
+              flexShrink: 0,
+              backgroundColor: i % 2 === 0 ? '#0f172a' : '#111827'
+            })
+          )
+        )
+      )
+    );
+  }
+}
+
 @Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoStore) demo!: DemoStore;
@@ -428,6 +495,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(Heartbeat),
       createComponent(HeavyPanel),
       createComponent(MenuDemo),
+      createComponent(ScrollDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, x: 'start' }, this.recentTicks())
     );

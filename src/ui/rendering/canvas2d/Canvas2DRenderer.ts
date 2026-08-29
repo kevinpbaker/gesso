@@ -8,6 +8,7 @@ import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import type { RenderContext } from '../RenderContext';
 import { drawText } from '../TextRenderer';
+import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { UiRenderer } from '../UiRenderer';
 
@@ -106,7 +107,8 @@ export class Canvas2DRenderer implements UiRenderer {
     if (rec === undefined) {
       return;
     }
-    if (cull && !this.intersectsCull(rec.x, rec.y, rec.width, rec.height)) {
+    const sticky = rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0;
+    if (cull && !this.intersectsCull(rec.x + rec.stickyOffsetX, rec.y + rec.stickyOffsetY, rec.width, rec.height)) {
       return;
     }
 
@@ -114,9 +116,14 @@ export class Canvas2DRenderer implements UiRenderer {
     const hasText = paint.text !== undefined;
 
     let saves = 0;
-    if (paint.opacity < 1 || paint.hasTransform) {
+    if (paint.opacity < 1 || paint.hasTransform || sticky) {
       ctx.save();
       saves++;
+      if (sticky) {
+        // A sticky node is drawn shifted to its scroll container's edge,
+        // children included; its record keeps the flow position.
+        ctx.translate(rec.stickyOffsetX, rec.stickyOffsetY);
+      }
       if (paint.opacity < 1) {
         ctx.globalAlpha *= paint.opacity;
       }
@@ -129,21 +136,34 @@ export class Canvas2DRenderer implements UiRenderer {
     this.paintImage(ctx, rec, paint);
     this.paintBorder(ctx, rec, paint);
 
-    const isScroll = node.type === UiNodeType.ScrollView;
-    if (isScroll) {
+    if (rec.clips) {
+      // overflow hidden/scroll/auto and ScrollView: children are clipped
+      // to the box (following its corner radius) and, for a scroll
+      // container, translated by the scroll offset.
       ctx.save();
-      saves++;
-      ctx.beginPath();
-      ctx.rect(rec.x, rec.y, rec.width, rec.height);
+      if (!borderRadiusIsZero(paint.borderRadius)) {
+        traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
+      } else {
+        ctx.beginPath();
+        ctx.rect(rec.x, rec.y, rec.width, rec.height);
+      }
       ctx.clip();
-      ctx.translate(-rec.scrollX, -rec.scrollY);
+      if (rec.scrollable) {
+        ctx.translate(-rec.scrollX, -rec.scrollY);
+      }
       this.pushCull(rec);
     }
 
-    this.renderChildren(node, context, ctx, cull && !paint.hasTransform);
+    // Culling works in record coordinates; a transform or a sticky shift
+    // moves what is drawn away from them, so descendants are not culled.
+    this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
 
-    if (isScroll) {
+    if (rec.clips) {
       this.popCull();
+      ctx.restore();
+    }
+    if (rec.scrollable) {
+      this.paintScrollbars(ctx, rec, context.now ?? performance.now());
     }
 
     if (hasText) {
@@ -271,6 +291,42 @@ export class Canvas2DRenderer implements UiRenderer {
    * by its scroll offset, so child boxes (absolute, pre-scroll) can
    * be tested against the region their screen pixels occupy.
    */
+  /**
+   * Overlay scrollbars: a thin rounded thumb along the end edge of each
+   * overflowing axis, sized by viewport/content and placed by the
+   * scroll offset. Shown while scrolling and for a moment after, fading
+   * out over the last part of that time.
+   */
+  private paintScrollbars(ctx: Canvas2DContext, rec: LayoutRecord, now: number): void {
+    const remaining = rec.scrollbarVisibleUntil - now;
+    if (remaining <= 0) {
+      return;
+    }
+    const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
+    const thickness = 4;
+    const inset = 2;
+    const minThumb = 20;
+    ctx.fillStyle = `rgba(128,128,128,${alpha.toFixed(3)})`;
+    if (rec.contentHeight > rec.height && rec.height > 0) {
+      const track = rec.height - inset * 2;
+      const thumb = Math.max(minThumb, (track * rec.height) / rec.contentHeight);
+      const travel = track - thumb;
+      const maxScroll = rec.contentHeight - rec.height;
+      const y = rec.y + inset + (maxScroll > 0 ? (travel * rec.scrollY) / maxScroll : 0);
+      traceRoundedRect(ctx, rec.x + rec.width - inset - thickness, y, thickness, thumb, thickness / 2);
+      ctx.fill();
+    }
+    if (rec.contentWidth > rec.width && rec.width > 0) {
+      const track = rec.width - inset * 2;
+      const thumb = Math.max(minThumb, (track * rec.width) / rec.contentWidth);
+      const travel = track - thumb;
+      const maxScroll = rec.contentWidth - rec.width;
+      const x = rec.x + inset + (maxScroll > 0 ? (travel * rec.scrollX) / maxScroll : 0);
+      traceRoundedRect(ctx, x, rec.y + rec.height - inset - thickness, thumb, thickness, thickness / 2);
+      ctx.fill();
+    }
+  }
+
   private pushCull(rec: LayoutRecord): void {
     const right = Math.min(this.cullX + this.cullWidth, rec.x + rec.width);
     const bottom = Math.min(this.cullY + this.cullHeight, rec.y + rec.height);

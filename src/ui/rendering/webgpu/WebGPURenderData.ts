@@ -1,5 +1,5 @@
-import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
+import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import { resolvePaintState, createPaintState } from '../PaintState';
@@ -100,7 +100,8 @@ export function buildRenderList(
   layout: { recordFor(node: UiNode): LayoutRecord | undefined },
   logicalWidth: number,
   logicalHeight: number,
-  dpr: number
+  dpr: number,
+  now: number = typeof performance !== 'undefined' ? performance.now() : Date.now()
 ): RenderList {
   const instanceData: number[] = [];
   const commands: RenderCommand[] = [];
@@ -142,12 +143,21 @@ export function buildRenderList(
 
     const effectiveOpacity = state.opacity * paint.opacity;
     const ownTransform = paint.hasTransform ? buildOwnTransform(rec, paint.transform) : IDENTITY_TRANSFORM;
-    const nodeCtm = multiplyTransform(state.ctm, ownTransform);
+    // A sticky node (and its children) is shifted to its scroll
+    // container's edge; the record keeps the flow position.
+    const baseCtm =
+      rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0
+        ? translateTransform(state.ctm, rec.stickyOffsetX, rec.stickyOffsetY)
+        : state.ctm;
+    const nodeCtm = multiplyTransform(baseCtm, ownTransform);
     const effectiveTransform = translateTransform(nodeCtm, rec.x, rec.y);
 
-    const isScroll = node.type === UiNodeType.ScrollView;
+    // Clipping (overflow hidden/scroll/auto, ScrollView) is a scissor:
+    // rectangular only, so a rounded clip is honoured by Canvas2D but
+    // not here until a stencil or SDF mask exists.
+    const isScroll = rec.scrollable;
     let nextClip = state.clip;
-    if (isScroll) {
+    if (rec.clips) {
       // The scroll viewport lives in the container's own (pre-scroll)
       // coordinate space, so it must be transformed by the container's
       // CTM, not by the scrolled content CTM inherited by children.
@@ -268,6 +278,10 @@ export function buildRenderList(
       state.ctm = saved.ctm;
       state.clip = saved.clip;
     }
+
+    if (isScroll) {
+      pushScrollbars(instanceData, rec, effectiveOpacity, effectiveTransform, now);
+    }
   }
 
   visit(root);
@@ -288,6 +302,66 @@ export function buildRenderList(
     commands,
     textItems
   };
+}
+
+/**
+ * Overlay scrollbars as fill primitives: a thin rounded thumb along the
+ * end edge of each overflowing axis, fading out before it disappears.
+ */
+function pushScrollbars(
+  out: number[],
+  rec: LayoutRecord,
+  opacity: number,
+  transform: [number, number, number, number, number, number],
+  now: number
+): void {
+  const remaining = rec.scrollbarVisibleUntil - now;
+  if (remaining <= 0) {
+    return;
+  }
+  const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
+  const color: RgbaColor = { r: 0.5, g: 0.5, b: 0.5, a: alpha };
+  const thickness = 4;
+  const inset = 2;
+  const minThumb = 20;
+  if (rec.contentHeight > rec.height && rec.height > 0) {
+    const track = rec.height - inset * 2;
+    const thumb = Math.max(minThumb, (track * rec.height) / rec.contentHeight);
+    const maxScroll = rec.contentHeight - rec.height;
+    const y = rec.y + inset + (maxScroll > 0 ? ((track - thumb) * rec.scrollY) / maxScroll : 0);
+    pushInstance(
+      out,
+      rec.x + rec.width - inset - thickness,
+      y,
+      thickness,
+      thumb,
+      color,
+      thickness / 2,
+      opacity,
+      0,
+      PrimitiveKind.Fill,
+      transform
+    );
+  }
+  if (rec.contentWidth > rec.width && rec.width > 0) {
+    const track = rec.width - inset * 2;
+    const thumb = Math.max(minThumb, (track * rec.width) / rec.contentWidth);
+    const maxScroll = rec.contentWidth - rec.width;
+    const x = rec.x + inset + (maxScroll > 0 ? ((track - thumb) * rec.scrollX) / maxScroll : 0);
+    pushInstance(
+      out,
+      x,
+      rec.y + rec.height - inset - thickness,
+      thumb,
+      thickness,
+      color,
+      thickness / 2,
+      opacity,
+      0,
+      PrimitiveKind.Fill,
+      transform
+    );
+  }
 }
 
 function pushInstance(

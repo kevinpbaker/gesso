@@ -62,7 +62,7 @@ export class UiWheelController {
 
   private nearestScrollable(node: UiNode): UiNode | null {
     for (let current: UiNode | null = node; current !== null; current = current.parent) {
-      if (current.type === UiNodeType.ScrollView) {
+      if (isScrollContainer(current)) {
         return current;
       }
     }
@@ -76,4 +76,13 @@ export class UiWheelController {
       this.scrollSink.scrollBy(container, 0, deltaY);
     }
   }
+}
+
+/** A ScrollView, or any node with overflow 'scroll' or 'auto'. */
+export function isScrollContainer(node: UiNode): boolean {
+  if (node.type === UiNodeType.ScrollView) {
+    return true;
+  }
+  const overflow = node.properties.get('overflow');
+  return overflow === 'scroll' || overflow === 'auto';
 }

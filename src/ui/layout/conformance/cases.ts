@@ -91,7 +91,10 @@ export interface CaseProps {
   y?: Alignment;
   selfX?: Alignment;
   selfY?: Alignment;
-  position?: 'static' | 'relative' | 'absolute';
+  position?: 'static' | 'relative' | 'absolute' | 'sticky';
+  overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
+  scrollX?: number;
+  scrollY?: number;
   top?: CaseLength;
   right?: CaseLength;
   bottom?: CaseLength;
@@ -767,6 +770,106 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase('aspect/height-drives-width', row({ y: 'start' }, box({ height: 50, aspectRatio: 2 }))),
   testCase('aspect/stretched-width-drives-height', column({ width: 200 }, box({ aspectRatio: 4 }))),
   testCase('aspect/stretched-height-drives-width', row({ height: 50 }, box({ aspectRatio: 2 }), leaf(10, 10))),
+
+  // ---------------------------------------------------------------------------
+  // Overflow, scrolling and sticky (Chrome scrolls the elements before measuring)
+  // ---------------------------------------------------------------------------
+  testCase(
+    'overflow/hidden-keeps-layout',
+    column({ x: 'start' }, box({ width: 100, height: 50, overflow: 'hidden' }, leaf(150, 80)))
+  ),
+  ahem(
+    'overflow/scroll-children-keep-content-height',
+    column({ height: 40, overflow: 'scroll' }, paragraph('ab'), paragraph('cd'), paragraph('ef'), paragraph('gh'))
+  ),
+  ahem(
+    'overflow/scrolled-content-shifts',
+    column(
+      { height: 40, overflow: 'scroll', scrollY: 8 },
+      paragraph('ab'),
+      paragraph('cd'),
+      paragraph('ef'),
+      paragraph('gh')
+    )
+  ),
+  testCase(
+    'overflow/scroll-offset-clamps-to-content',
+    column(
+      { height: 40, overflow: 'scroll', x: 'start' },
+      leaf(20, 30, { flexShrink: 0 }),
+      leaf(20, 30, { flexShrink: 0 })
+    ),
+    {}
+  ),
+  testCase(
+    'overflow/nested-scroll-offsets-add',
+    column(
+      { height: 60, overflow: 'scroll', scrollY: 10, x: 'start' },
+      column(
+        { height: 40, overflow: 'scroll', scrollY: 5, x: 'start', flexShrink: 0 },
+        leaf(20, 30, { flexShrink: 0 }),
+        leaf(20, 30, { flexShrink: 0 })
+      ),
+      leaf(20, 50, { flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'overflow/row-scrolls-horizontally',
+    row(
+      { width: 60, overflow: 'scroll', scrollX: 20, y: 'start' },
+      leaf(40, 20, { flexShrink: 0 }),
+      leaf(40, 20, { flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'sticky/header-holds-at-scrollport-top',
+    column(
+      { height: 60, overflow: 'scroll', scrollY: 30, x: 'start' },
+      box({ position: 'sticky', top: 0, width: 20, height: 10, flexShrink: 0 }),
+      leaf(20, 200, { flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'sticky/with-top-inset',
+    column(
+      { height: 60, overflow: 'scroll', scrollY: 30, x: 'start' },
+      box({ position: 'sticky', top: 5, width: 20, height: 10, flexShrink: 0 }),
+      leaf(20, 200, { flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'sticky/unscrolled-stays-in-flow',
+    column(
+      { height: 60, overflow: 'scroll', x: 'start' },
+      leaf(20, 15, { flexShrink: 0 }),
+      box({ position: 'sticky', top: 0, width: 20, height: 10, flexShrink: 0 }),
+      leaf(20, 200, { flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'sticky/leaves-with-its-parent',
+    column(
+      { height: 60, overflow: 'scroll', scrollY: 50, x: 'start' },
+      column({ x: 'start', flexShrink: 0 }, box({ position: 'sticky', top: 0, width: 20, height: 10 }), leaf(20, 30)),
+      leaf(20, 200, { flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'sticky/bottom-holds-at-scrollport-bottom',
+    column(
+      { height: 60, overflow: 'scroll', x: 'start' },
+      leaf(20, 200, { flexShrink: 0 }),
+      box({ position: 'sticky', bottom: 0, width: 20, height: 10, flexShrink: 0 })
+    )
+  ),
+  testCase(
+    'sticky/left-in-horizontal-scroll',
+    row(
+      { width: 60, overflow: 'scroll', scrollX: 25, y: 'start' },
+      box({ position: 'sticky', left: 0, width: 10, height: 20, flexShrink: 0 }),
+      leaf(200, 20, { flexShrink: 0 })
+    )
+  ),
 
   // ---------------------------------------------------------------------------
   // Nesting

@@ -416,6 +416,49 @@ describe('Canvas2DRenderer transforms', () => {
   });
 });
 
+describe('Canvas2DRenderer overflow', () => {
+  it('clips an overflow-hidden box to its rounded corners', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('x', 'start');
+    const card = box(h, 'card', { width: 100, height: 60, overflow: 'hidden', borderRadius: 8 });
+    const spill = box(h, 'spill', { width: 300, height: 300, backgroundColor: '#f00' });
+    h.append(card, spill);
+    h.append(root, card);
+    h.layout(root);
+    h.render(root);
+    const names = h.context.calls.map(call => call.name);
+    // A rounded path is traced and clipped before the child paints.
+    expect(names.indexOf('clip')).toBeGreaterThan(-1);
+    expect(names.indexOf('arcTo')).toBeLessThan(names.indexOf('clip'));
+    expect(names.indexOf('clip')).toBeLessThan(names.indexOf('fillRect'));
+    expect(callArgs(h.context, 'fillRect')).toEqual([[0, 0, 300, 300]]);
+  });
+
+  it('draws an overlay scrollbar while a scroll container is freshly scrolled, and none once faded', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('x', 'start');
+    const list = h.createNode('list', UiNodeType.Column);
+    list.setProperty('height', 40);
+    list.setProperty('overflow', 'scroll');
+    list.setProperty('scrollY', 10);
+    const tall = box(h, 'tall', { width: 20, height: 200, flexShrink: 0 });
+    h.append(list, tall);
+    h.append(root, list);
+    h.layout(root);
+
+    const until = h.record(list).scrollbarVisibleUntil;
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: until - 1000 });
+    const fills = h.context.calls.filter(call => call.name === 'fill');
+    expect(fills.length).toBe(1);
+
+    h.context.calls.length = 0;
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: until + 1 });
+    expect(h.context.calls.filter(call => call.name === 'fill')).toHaveLength(0);
+  });
+});
+
 describe('Canvas2DRenderer text', () => {
   it('draws text with the resolved style and measured box', () => {
     const h = new RenderHarness();

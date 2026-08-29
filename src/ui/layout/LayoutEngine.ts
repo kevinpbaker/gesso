@@ -21,6 +21,16 @@ import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, Size } from './LayoutTypes';
 
 const DEFAULT_FONT_SIZE = 14;
+/** How long overlay scrollbars stay after the last scroll change. */
+export const SCROLLBAR_LINGER_MS = 1200;
+/** Portion of the linger during which the scrollbar fades out. */
+export const SCROLLBAR_FADE_MS = 350;
+
+export interface ScrollAdjustment {
+  container: UiNode;
+  scrollX: number;
+  scrollY: number;
+}
 
 interface FlexItem {
   child: UiNode;
@@ -106,6 +116,8 @@ export class LayoutEngine {
   private readonly scrollNodes = new Set<UiNode>();
   /** Absolutely positioned nodes placed against an anchor node. */
   private readonly anchoredNodes = new Set<UiNode>();
+  /** position: 'sticky' nodes, re-offset whenever anything scrolls. */
+  private readonly stickyNodes = new Set<UiNode>();
   private readonly textMeasurer: TextMeasurer;
   /**
    * The definite size percentages resolve against while a container's
@@ -239,6 +251,108 @@ export class LayoutEngine {
   }
 
   /**
+   * Where a node is actually seen: its record box shifted by every
+   * scroll ancestor's offset and by the sticky offsets of the node and
+   * its ancestors. Records stay in pre-scroll coordinates; this is the
+   * projection renderers and hit testing agree on.
+   */
+  visibleBox(node: UiNode): LayoutBox {
+    const rec = this.records.get(node);
+    if (rec === undefined) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    let x = rec.x + rec.stickyOffsetX;
+    let y = rec.y + rec.stickyOffsetY;
+    for (let current = node.parent; current !== null; current = current.parent) {
+      const ancestor = this.records.get(current);
+      if (ancestor === undefined) {
+        continue;
+      }
+      x += ancestor.stickyOffsetX;
+      y += ancestor.stickyOffsetY;
+      if (ancestor.scrollable) {
+        x -= ancestor.scrollX;
+        y -= ancestor.scrollY;
+      }
+    }
+    return { x, y, width: rec.width, height: rec.height };
+  }
+
+  /**
+   * The scroll offsets each scroll ancestor would need so that `node`
+   * is inside its viewport, `padding` pixels from the nearest edge,
+   * innermost first. Nothing is changed: the caller writes the offsets
+   * (scrollX/scrollY properties) and marks the containers dirty, which
+   * is how NodalRuntime.scrollIntoView keeps a focused row on screen.
+   */
+  revealAdjustments(node: UiNode, padding = 0): ScrollAdjustment[] {
+    const rec = this.records.get(node);
+    if (rec === undefined) {
+      return [];
+    }
+    const adjustments: ScrollAdjustment[] = [];
+    // The target's edges in the layout root's pre-scroll frame, brought
+    // into each successive scroller's content space by removing the
+    // offsets of the scrollers passed on the way up.
+    let innerScrollX = 0;
+    let innerScrollY = 0;
+    for (let current = node.parent; current !== null; current = current.parent) {
+      const container = this.records.get(current);
+      if (container === undefined || !container.scrollable) {
+        continue;
+      }
+      const left = rec.x - innerScrollX - padding;
+      const right = rec.x + rec.width - innerScrollX + padding;
+      const top = rec.y - innerScrollY - padding;
+      const bottom = rec.y + rec.height - innerScrollY + padding;
+      const viewLeft = container.x + container.scrollX;
+      const viewTop = container.y + container.scrollY;
+      let scrollX = container.scrollX;
+      let scrollY = container.scrollY;
+      if (left < viewLeft) {
+        scrollX -= viewLeft - left;
+      } else if (right > viewLeft + container.width) {
+        scrollX += right - (viewLeft + container.width);
+      }
+      if (top < viewTop) {
+        scrollY -= viewTop - top;
+      } else if (bottom > viewTop + container.height) {
+        scrollY += bottom - (viewTop + container.height);
+      }
+      scrollX = this.clamp(scrollX, 0, Math.max(0, container.contentWidth - container.width));
+      scrollY = this.clamp(scrollY, 0, Math.max(0, container.contentHeight - container.height));
+      if (scrollX !== container.scrollX || scrollY !== container.scrollY) {
+        adjustments.push({ container: current, scrollX, scrollY });
+      }
+      innerScrollX += scrollX;
+      innerScrollY += scrollY;
+    }
+    return adjustments;
+  }
+
+  /**
+   * When the next scrollbar changes appearance (starts fading or
+   * disappears), or undefined when none is showing. Lets a host schedule
+   * the repaint that a fade needs without polling.
+   */
+  nextScrollbarChange(now: number): number | undefined {
+    let next: number | undefined;
+    for (const node of this.scrollNodes) {
+      const rec = this.records.get(node);
+      if (rec === undefined || rec.scrollbarVisibleUntil <= now) {
+        continue;
+      }
+      if (rec.contentWidth <= rec.width && rec.contentHeight <= rec.height) {
+        continue;
+      }
+      const fadeStart = rec.scrollbarVisibleUntil - SCROLLBAR_FADE_MS;
+      const candidate = now < fadeStart ? fadeStart : now + 16;
+      next = next === undefined ? candidate : Math.min(next, candidate);
+    }
+    return next;
+  }
+
+  /**
    * The visible window of a scroll container over its content,
    * in content coordinates.
    */
@@ -261,6 +375,7 @@ export class LayoutEngine {
       this.records.delete(current);
       this.scrollNodes.delete(current);
       this.anchoredNodes.delete(current);
+      this.stickyNodes.delete(current);
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
       }
@@ -992,11 +1107,40 @@ export class LayoutEngine {
     // against containing blocks that are already placed.
     this.placeAbsoluteChildren(node);
     this.updatePaintOrder(node, rec);
+    if (rec.clips) {
+      this.updateContentExtent(node, rec);
+    }
+    if (rec.scrollable) {
+      this.scrollNodes.add(node);
+    }
     this.forEachChild(node, child => {
-      if (this.record(child).placeDirty) {
+      const cRec = this.record(child);
+      if (cRec.sticky) {
+        this.stickyNodes.add(child);
+      } else {
+        this.stickyNodes.delete(child);
+      }
+      if (cRec.placeDirty) {
         this.place(child);
       }
     });
+  }
+
+  /**
+   * How far a clipping node's children reach, from its placed boxes:
+   * the scrollable extent of a scroll container. A ScrollView measured
+   * this already, but placement is the truth for any container.
+   */
+  private updateContentExtent(node: UiNode, rec: LayoutRecord): void {
+    let right = rec.x + rec.paddingLeft;
+    let bottom = rec.y + rec.paddingTop;
+    this.forEachChild(node, child => {
+      const cRec = this.record(child);
+      right = Math.max(right, cRec.x + cRec.width + cRec.marginRight);
+      bottom = Math.max(bottom, cRec.y + cRec.height + cRec.marginBottom);
+    });
+    rec.contentWidth = right - rec.x + rec.paddingRight;
+    rec.contentHeight = bottom - rec.y + rec.paddingBottom;
   }
 
   /**
@@ -1155,12 +1299,10 @@ export class LayoutEngine {
     let x = 0;
     let y = 0;
     for (let current = node.parent; current !== null; current = current.parent) {
-      if (current.type === UiNodeType.ScrollView) {
-        const rec = this.records.get(current);
-        if (rec !== undefined) {
-          x += rec.scrollX;
-          y += rec.scrollY;
-        }
+      const rec = this.records.get(current);
+      if (rec !== undefined && rec.scrollable) {
+        x += rec.scrollX;
+        y += rec.scrollY;
       }
     }
     return { x, y };
@@ -1185,15 +1327,19 @@ export class LayoutEngine {
   }
 
   /**
-   * Records the children's paint order when zIndex reorders them, so
-   * renderers and hit testing agree on who is on top.
+   * Records the children's paint order when it differs from tree order,
+   * so renderers and hit testing agree on who is on top: by zIndex, and
+   * within a zIndex positioned children (relative, sticky, absolute)
+   * after in-flow ones — CSS's stacking rule, and what lets a sticky
+   * header paint over the rows that scroll under it.
    */
   private updatePaintOrder(node: UiNode, rec: LayoutRecord): void {
     let reorder = false;
     const children: UiNode[] = [];
     this.forEachChild(node, child => {
+      const cRec = this.record(child);
       children.push(child);
-      if (this.record(child).zIndex !== 0) {
+      if (cRec.zIndex !== 0 || cRec.positioned) {
         reorder = true;
       }
     });
@@ -1201,8 +1347,12 @@ export class LayoutEngine {
       rec.paintOrder = null;
       return;
     }
-    // Array.prototype.sort is stable: equal zIndex keeps tree order.
-    children.sort((a, b) => this.record(a).zIndex - this.record(b).zIndex);
+    // Array.prototype.sort is stable: equal keys keep tree order.
+    const key = (child: UiNode): number => {
+      const cRec = this.record(child);
+      return cRec.zIndex * 2 + (cRec.positioned ? 1 : 0);
+    };
+    children.sort((a, b) => key(a) - key(b));
     rec.paintOrder = children;
   }
 
@@ -1563,10 +1713,105 @@ export class LayoutEngine {
       const rawY = this.numberProp(node, 'scrollY') ?? 0;
       const maxX = Math.max(0, rec.contentWidth - rec.width);
       const maxY = Math.max(0, rec.contentHeight - rec.height);
-      rec.scrollX = this.clamp(rawX, 0, maxX);
-      rec.scrollY = this.clamp(rawY, 0, maxY);
+      const scrollX = this.clamp(rawX, 0, maxX);
+      const scrollY = this.clamp(rawY, 0, maxY);
+      if (scrollX !== rec.scrollX || scrollY !== rec.scrollY) {
+        rec.scrollX = scrollX;
+        rec.scrollY = scrollY;
+        // Overlay scrollbars show while the user scrolls and linger a
+        // moment after; the host repaints when they fade.
+        rec.scrollbarVisibleUntil = this.now() + SCROLLBAR_LINGER_MS;
+      }
       rec.transformDirty = false;
     }
+    this.applySticky();
+  }
+
+  /**
+   * Holds each sticky node at its scroll container's edge.
+   *
+   * A sticky node keeps its flow position until scrolling would carry
+   * it past the edge named by top/right/bottom/left (CSS: the inset is
+   * measured from the scrollport); it is then shifted just enough to
+   * stay there, but never beyond its parent's box — when the parent
+   * scrolls away, the node goes with it. For a node whose parent is the
+   * scroll container itself, the parent's box is the scrollable extent.
+   */
+  private applySticky(): void {
+    for (const node of this.stickyNodes) {
+      const rec = this.records.get(node);
+      if (rec === undefined) {
+        continue;
+      }
+      rec.stickyOffsetX = 0;
+      rec.stickyOffsetY = 0;
+      const scroller = this.scrollAncestorOf(node);
+      const parent = this.flowParentOf(node);
+      if (scroller === null || parent === null) {
+        continue;
+      }
+      const sRec = this.record(scroller);
+      const pRec = this.record(parent);
+      const parentIsScroller = parent === scroller;
+      // Bounds the node may move within: its parent's content box, in
+      // the same pre-scroll frame as the node's record.
+      const boundTop = pRec.y + pRec.paddingTop;
+      const boundLeft = pRec.x + pRec.paddingLeft;
+      const boundBottom = parentIsScroller
+        ? pRec.y + pRec.contentHeight - pRec.paddingBottom
+        : pRec.y + pRec.height - pRec.paddingBottom;
+      const boundRight = parentIsScroller
+        ? pRec.x + pRec.contentWidth - pRec.paddingRight
+        : pRec.x + pRec.width - pRec.paddingRight;
+      // The scrollport's edges in that frame.
+      const viewTop = sRec.y + sRec.scrollY + (parentIsScroller ? 0 : 0);
+      const viewLeft = sRec.x + sRec.scrollX;
+      const viewBottom = viewTop + sRec.height;
+      const viewRight = viewLeft + sRec.width;
+
+      if (rec.top !== undefined) {
+        const wanted = viewTop + rec.top - rec.y;
+        const limit = boundBottom - rec.height - rec.y;
+        rec.stickyOffsetY = this.clamp(wanted, 0, Math.max(0, limit));
+      } else if (rec.bottom !== undefined) {
+        const wanted = viewBottom - rec.bottom - rec.height - rec.y;
+        const limit = boundTop - rec.y;
+        rec.stickyOffsetY = this.clamp(wanted, Math.min(0, limit), 0);
+      }
+      if (rec.left !== undefined) {
+        const wanted = viewLeft + rec.left - rec.x;
+        const limit = boundRight - rec.width - rec.x;
+        rec.stickyOffsetX = this.clamp(wanted, 0, Math.max(0, limit));
+      } else if (rec.right !== undefined) {
+        const wanted = viewRight - rec.right - rec.width - rec.x;
+        const limit = boundLeft - rec.x;
+        rec.stickyOffsetX = this.clamp(wanted, Math.min(0, limit), 0);
+      }
+    }
+  }
+
+  private scrollAncestorOf(node: UiNode): UiNode | null {
+    for (let current = node.parent; current !== null; current = current.parent) {
+      const rec = this.records.get(current);
+      if (rec !== undefined && rec.scrollable) {
+        return current;
+      }
+    }
+    return null;
+  }
+
+  /** The nearest non-fragment ancestor. */
+  private flowParentOf(node: UiNode): UiNode | null {
+    for (let current = node.parent; current !== null; current = current.parent) {
+      if (!this.isFragment(current)) {
+        return current;
+      }
+    }
+    return null;
+  }
+
+  private now(): number {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now();
   }
 
   // ---------------------------------------------------------------------------
@@ -1636,7 +1881,11 @@ export class LayoutEngine {
     rec.marginBottom = typeof marginBottom === 'number' ? marginBottom : 0;
     const position = props.get('position');
     rec.absolute = position === 'absolute';
-    rec.positioned = rec.absolute || position === 'relative';
+    rec.sticky = position === 'sticky';
+    rec.positioned = rec.absolute || rec.sticky || position === 'relative';
+    const overflow = props.get('overflow');
+    rec.scrollable = node.type === UiNodeType.ScrollView || overflow === 'scroll' || overflow === 'auto';
+    rec.clips = rec.scrollable || overflow === 'hidden';
     const insetH = this.lengthProp(node, 'inset', base.width);
     const insetV = this.lengthProp(node, 'inset', base.height);
     rec.top = this.lengthProp(node, 'top', base.height) ?? insetV;

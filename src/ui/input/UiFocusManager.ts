@@ -23,6 +23,7 @@ import type { UiInputDispatcher } from './UiInputDispatcher';
 export class UiFocusManager {
   private root: UiNode;
   private focused: UiNode | null = null;
+  private readonly listeners = new Set<(node: UiNode | null) => void>();
 
   constructor(
     root: UiNode,
@@ -63,7 +64,25 @@ export class UiFocusManager {
       this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Blur, node), previous);
     }
     this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Focus, previous), node);
+    this.notify(node);
     return true;
+  }
+
+  /**
+   * Called after focus moves or clears, with the new focused node. The
+   * runtime uses it to scroll the focused node into view.
+   */
+  onFocusChange(listener: (node: UiNode | null) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(node: UiNode | null): void {
+    for (const listener of this.listeners) {
+      listener(node);
+    }
   }
 
   /** Drops focus without moving it anywhere. */
@@ -74,6 +93,7 @@ export class UiFocusManager {
     const previous = this.focused;
     this.focused = null;
     this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Blur, null), previous);
+    this.notify(null);
   }
 
   /** Focus-on-press hook: focuses the node when it is focusable. */

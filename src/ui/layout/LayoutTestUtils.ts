@@ -49,4 +49,9 @@ export class LayoutHarness {
   boxOf(node: UiNode): LayoutBox {
     return this.engine.worldBox(node);
   }
+
+  /** Where the node is seen: scroll offsets and sticky shifts applied. */
+  visibleBox(node: UiNode): LayoutBox {
+    return this.engine.visibleBox(node);
+  }
 }

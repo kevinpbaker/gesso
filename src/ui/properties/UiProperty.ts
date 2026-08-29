@@ -270,8 +270,11 @@ export const UiProperties = {
   /**
    * 'static' (default), 'relative' (in flow, then offset by
    * top/right/bottom/left, and a containing block for absolute
-   * descendants) or 'absolute' (out of flow, positioned against the
-   * nearest positioned ancestor or the layout root).
+   * descendants), 'absolute' (out of flow, positioned against the
+   * nearest positioned ancestor or the layout root) or 'sticky' (in
+   * flow, but held at the edge of its scroll container by
+   * top/right/bottom/left while the container scrolls, until its
+   * parent's box ends).
    */
   position: defineProperty<string | undefined>({
     name: 'position',
@@ -362,6 +365,20 @@ export const UiProperties = {
     defaultValue: undefined,
     inherited: false,
     affects: L
+  }),
+
+  /**
+   * 'visible' (default): children may paint outside the box. 'hidden'
+   * clips them to it (following borderRadius in Canvas2D). 'scroll' and
+   * 'auto' clip and make the box a scroll container: scrollX/scrollY
+   * apply, overlay scrollbars show while scrolling, and sticky
+   * descendants stick to its edges.
+   */
+  overflow: defineProperty<string | undefined>({
+    name: 'overflow',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P
   }),
 
   inset: defineProperty<UiLength | undefined>({

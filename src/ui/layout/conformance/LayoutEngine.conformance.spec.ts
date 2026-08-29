@@ -91,11 +91,11 @@ function layoutWithNodal(layoutCase: LayoutCase): MeasuredBox[] {
   const root = buildNode(harness, layoutCase.root, 'root', paths);
   harness.layout(root, Constraints.loose(layoutCase.viewport.width, layoutCase.viewport.height));
 
-  // Records hold absolute layout-root coordinates, the same frame the
-  // page script reports (relative to the case's viewport element).
+  // Chrome reports what is seen, so compare visible boxes: records in
+  // layout-root coordinates with scroll offsets and sticky shifts applied.
   const boxes: MeasuredBox[] = [];
   const visit = (node: UiNode): void => {
-    const box: LayoutBox = harness.box(node);
+    const box: LayoutBox = harness.visibleBox(node);
     boxes.push({ path: paths.get(node)!, ...box });
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
       visit(child);

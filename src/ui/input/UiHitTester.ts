@@ -131,24 +131,29 @@ export class UiHitTester implements HitTester {
       // Degenerate (zero-scale) transform: nothing is drawn, nothing hits.
       return false;
     }
-    const px = this.point.x;
-    const py = this.point.y;
+    // A sticky node is drawn shifted from its record; undo the shift
+    // so the record box (and the children, drawn with it) can be tested.
+    const px = this.point.x - rec.stickyOffsetX;
+    const py = this.point.y - rec.stickyOffsetY;
 
-    if (node.type === UiNodeType.ScrollView) {
-      // The viewport clip is the node's own box. Descendants live in
+    if (rec.clips) {
+      // The clip is the node's own box: outside it nothing of this
+      // subtree can be hit. Descendants of a scroll container live in
       // pre-scroll content coordinates, so the point is shifted by the
       // scroll offset after the clip passes.
       if (px < rec.x || px >= rec.x + rec.width || py < rec.y || py >= rec.y + rec.height) {
         return false;
       }
-      if (this.hitTestChildren(node, px + rec.scrollX, py + rec.scrollY)) {
+      const shiftX = rec.scrollable ? rec.scrollX : 0;
+      const shiftY = rec.scrollable ? rec.scrollY : 0;
+      if (this.hitTestChildren(node, px + shiftX, py + shiftY)) {
         return true;
       }
       return isNodeHitTestable(node) && this.recordHit(node, rec, px, py);
     }
 
-    // Non-scroll nodes never clip, so children are tested regardless
-    // of whether the point falls inside the parent box.
+    // Non-clipping nodes let children paint outside them, so children
+    // are tested regardless of whether the point falls inside the box.
     if (this.hitTestChildren(node, px, py)) {
       return true;
     }

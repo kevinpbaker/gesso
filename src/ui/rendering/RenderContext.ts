@@ -25,4 +25,9 @@ export interface LayoutReader {
 export interface RenderContext {
   readonly layout: LayoutReader;
   readonly text: TextMeasurer;
+  /**
+   * The frame's timestamp (ms, same clock as performance.now), used to
+   * fade overlay scrollbars. Defaults to the current time.
+   */
+  readonly now?: number;
 }

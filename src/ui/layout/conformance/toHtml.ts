@@ -102,6 +102,14 @@ function reportScript(): string {
 (function () {
   function round(value) { return Math.round(value * 1000) / 1000; }
   function report() {
+    // Scroll containers the case scrolled: Chrome clamps like Nodal does.
+    var scrolled = document.querySelectorAll('[data-scroll-x],[data-scroll-y]');
+    for (var s = 0; s < scrolled.length; s++) {
+      var sx = scrolled[s].getAttribute('data-scroll-x');
+      var sy = scrolled[s].getAttribute('data-scroll-y');
+      if (sx !== null) scrolled[s].scrollLeft = Number(sx);
+      if (sy !== null) scrolled[s].scrollTop = Number(sy);
+    }
     var results = [];
     var sections = document.querySelectorAll('section.case');
     for (var i = 0; i < sections.length; i++) {
@@ -156,7 +164,10 @@ function nodeToHtml(node: CaseNode, parent: CaseNode | null, path: string, layou
   } else {
     inner = node.children.map((child, index) => nodeToHtml(child, node, `${path}/${index}`, layoutCase)).join('');
   }
-  return `<div data-path="${path}" data-type="${node.type}" style="${styles.join(';')}">${inner}</div>`;
+  const scroll =
+    (node.props.scrollX !== undefined ? ` data-scroll-x="${node.props.scrollX}"` : '') +
+    (node.props.scrollY !== undefined ? ` data-scroll-y="${node.props.scrollY}"` : '');
+  return `<div data-path="${path}" data-type="${node.type}"${scroll} style="${styles.join(';')}">${inner}</div>`;
 }
 
 /** Styles a node applies to lay out its own children. */
@@ -217,6 +228,13 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   }
   if (props.position !== undefined && props.position !== 'static') {
     styles.push(`position:${props.position}`);
+  }
+  if (props.overflow !== undefined) {
+    styles.push(`overflow:${props.overflow}`);
+    if (props.overflow === 'scroll' || props.overflow === 'auto') {
+      // Nodal's scrollbars are overlays; classic ones would take layout space.
+      styles.push('scrollbar-width:none');
+    }
   }
   if (props.inset !== undefined) {
     styles.push(`inset:${length(props.inset)}`);

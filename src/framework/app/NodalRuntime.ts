@@ -9,6 +9,7 @@ import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayStore } from '../overlay/OverlayStore';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
 import type { UiNode } from '../../ui/graph/UiNode';
+import { UiNodeType } from '../../ui/graph/UiNodeType';
 import { UiInputDispatcher } from '../../ui/input/UiInputDispatcher';
 import { UiHitTester } from '../../ui/input/UiHitTester';
 import { UiPointerController } from '../../ui/input/UiPointerController';
@@ -123,6 +124,7 @@ export class NodalRuntime {
   private pixelRatio: number;
   private lastFrameMs = 0;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
+  private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
   private replicas: readonly StoreReplica[] = [];
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
 
@@ -158,6 +160,12 @@ export class NodalRuntime {
 
     this.buildRoot(options.root);
     this.input = this.createInput();
+    // Keyboard navigation must keep the focused control visible.
+    this.input.focus.onFocusChange(node => {
+      if (node !== null) {
+        this.scrollIntoView(node);
+      }
+    });
 
     if (options.width !== undefined && options.height !== undefined) {
       this.resize(options.width, options.height, this.pixelRatio);
@@ -245,7 +253,24 @@ export class NodalRuntime {
     return this.root;
   }
 
+  /**
+   * Scrolls every scroll container above `node` just enough that the
+   * node is inside its viewport, `padding` pixels from the nearest edge.
+   * Nothing moves when it is already visible.
+   */
+  scrollIntoView(node: UiNode, padding = 8): void {
+    for (const adjustment of this.engine.revealAdjustments(node, padding)) {
+      adjustment.container.setProperty('scrollX', adjustment.scrollX);
+      adjustment.container.setProperty('scrollY', adjustment.scrollY);
+      this.graph.markDirty(adjustment.container, DirtyFlags.Transform);
+    }
+  }
+
   dispose(): void {
+    if (this.scrollbarTimer !== null) {
+      clearTimeout(this.scrollbarTimer);
+      this.scrollbarTimer = null;
+    }
     this.scheduler.stop();
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
@@ -341,7 +366,7 @@ export class NodalRuntime {
           scrollY: record.scrollY,
           maxScrollX: Math.max(0, record.contentWidth - record.width),
           maxScrollY: Math.max(0, record.contentHeight - record.height),
-          horizontal: node.getProperty('direction') === 'row'
+          horizontal: node.getProperty('direction') === 'row' || node.type === UiNodeType.Row
         };
       },
       scrollBy: (node, dx, dy): void => {
@@ -412,12 +437,13 @@ export class NodalRuntime {
     // scene, so any frame that got this far changes pixels.
     this.phaseTimings.render = this.timePhase(
       () => true,
-      () => this.canvasRenderer.render(root, { layout: this.engine, text: this.textMeasurer })
+      () => this.canvasRenderer.render(root, { layout: this.engine, text: this.textMeasurer, now: started })
     );
 
     const finished = now();
     const elapsed = finished - started;
     this.lastFrameMs = elapsed;
+    this.scheduleScrollbarFade(finished);
     this.frameListener?.({
       frame: frame.id,
       durationMs: elapsed,
@@ -425,6 +451,27 @@ export class NodalRuntime {
       at: finished,
       phases: this.phaseTimings
     });
+  }
+
+  /**
+   * Overlay scrollbars fade after scrolling stops, which needs frames no
+   * property change asks for. The engine says when the next change is
+   * due; one pending timer marks a repaint for it.
+   */
+  private scheduleScrollbarFade(now: number): void {
+    const next = this.engine.nextScrollbarChange(now);
+    if (next === undefined || this.scrollbarTimer !== null) {
+      return;
+    }
+    this.scrollbarTimer = setTimeout(
+      () => {
+        this.scrollbarTimer = null;
+        if (this.root !== undefined) {
+          this.graph.markDirty(this.root, DirtyFlags.Paint);
+        }
+      },
+      Math.max(16, next - now)
+    );
   }
 
   /**

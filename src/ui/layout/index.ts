@@ -1,4 +1,4 @@
-export { LayoutEngine } from './LayoutEngine';
+export { LayoutEngine, SCROLLBAR_LINGER_MS, SCROLLBAR_FADE_MS, type ScrollAdjustment } from './LayoutEngine';
 export { LayoutRecord } from './LayoutRecord';
 export { CharacterCountTextMeasurer, ParagraphTextMeasurer } from './TextMeasurer';
 export type {

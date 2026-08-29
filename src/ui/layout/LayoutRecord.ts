@@ -98,6 +98,28 @@ export class LayoutRecord {
   zIndex = 0;
 
   /**
+   * Overflow. A clipping node paints and hit-tests its children inside
+   * its own box; a scrollable one (a ScrollView, or overflow 'scroll'
+   * / 'auto') also translates them by its scroll offset and clamps
+   * that offset to its content extent.
+   */
+  clips = false;
+  scrollable = false;
+
+  /**
+   * position: 'sticky'. The offsets are how far the node is shifted from
+   * its flow position to stay at its scroll container's edge; they are
+   * recomputed whenever anything scrolls and are part of the node's
+   * visible position, not its record box.
+   */
+  sticky = false;
+  stickyOffsetX = 0;
+  stickyOffsetY = 0;
+
+  /** Time (ms) until which this scroll container's scrollbars are shown. */
+  scrollbarVisibleUntil = 0;
+
+  /**
    * Children (fragments expanded) in paint order when any of them has
    * a non-zero zIndex; null means tree order. Hit testing walks it in
    * reverse. Rebuilt whenever the node is placed.

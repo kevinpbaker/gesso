@@ -283,7 +283,9 @@ export class RenderHarness {
   }
 
   render(node: UiNode): void {
-    this.renderer.render(node, { layout: this.engine, text: this.measurer });
+    // Far in the future: overlay scrollbars have faded, so draw-call
+    // assertions see only the scene. Pass `now` yourself to test them.
+    this.renderer.render(node, { layout: this.engine, text: this.measurer, now: Number.MAX_SAFE_INTEGER });
   }
 
   record(node: UiNode): LayoutRecord {
