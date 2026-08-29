@@ -5,6 +5,8 @@ import type { UiNode } from '../graph/UiNode';
 import { Constraints } from '../layout/LayoutTypes';
 import { auto, fr } from '../layout/UiLength';
 import { normalizeColor } from '../properties/UiColor';
+import { setSelectionRange } from '../selection/UiSelectable';
+import { setMatchRanges } from '../find/UiTextMatches';
 import { RenderHarness } from './RenderTestUtils';
 import type { RecordedCall } from './RenderTestUtils';
 import { parseColor } from './webgpu/WebGPUColor';
@@ -383,6 +385,55 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     h.append(root, card);
     const draws = expectParity(h, root);
     expect(draws.filter(d => d.kind === 'text').length).toBeGreaterThan(1);
+  });
+
+  it('a selection spanning two wrapped paragraphs', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('width', 160);
+    // An explicit selection colour: the theme's default is written as
+    // rounded decimals, which Canvas2D quantises to 1/255 on its way
+    // through an rgba() string and WebGPU does not, and this spec
+    // compares colours exactly.
+    const selectionColor = '#66aaff';
+    const heading = box(
+      h,
+      'heading',
+      { text: 'A heading that wraps', fontSize: 16, color: '#111', selectionColor },
+      UiNodeType.Text
+    );
+    const body = box(
+      h,
+      'body',
+      { text: 'and a body under it', fontSize: 12, color: '#555', selectionColor },
+      UiNodeType.Text
+    );
+    h.append(root, heading, body);
+    // The tail of the first and the head of the second, as a drag
+    // across both leaves them.
+    setSelectionRange(heading, 6, 20);
+    setSelectionRange(body, 0, 9);
+    const draws = expectParity(h, root);
+    expect(draws.filter(d => d.kind === 'fill').length).toBeGreaterThan(1);
+  });
+
+  it('find matches under an active one, across two paragraphs', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('width', 160);
+    const style = { fontSize: 12, color: '#333', selectionColor: '#66aaff', matchColor: '#ffcc00' };
+    const first = box(h, 'first', { text: 'the one and the other', ...style }, UiNodeType.Text);
+    const second = box(h, 'second', { text: 'and the last one', ...style }, UiNodeType.Text);
+    h.append(root, first, second);
+    setMatchRanges(first, [
+      { start: 0, end: 3 },
+      { start: 12, end: 15 }
+    ]);
+    setMatchRanges(second, [{ start: 4, end: 7 }]);
+    // The active match is also a selection, drawn over its own highlight.
+    setSelectionRange(second, 4, 7);
+    const draws = expectParity(h, root);
+    expect(draws.filter(d => d.kind === 'fill')).toHaveLength(4);
   });
 
   it('children under fragments, plain and zIndex-ordered', () => {

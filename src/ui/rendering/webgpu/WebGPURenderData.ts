@@ -19,6 +19,7 @@ import { toPhysicalPixels } from './WebGPUSurface';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
 import { caretVisibleAt } from '../../editing/UiEditable';
+import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSelectionGeometry';
 import { CARET_WIDTH } from '../canvas2d/Canvas2DRenderer';
 
 /**
@@ -597,7 +598,28 @@ export function buildRenderList(
           }
         }
       } else {
-        pushTextRun(layoutTextLines(contentBox, text, measurer), colorToCss(text.textColor), text.text!);
+        const lines = layoutTextLines(contentBox, text, measurer);
+        if (text.textMatches !== undefined || text.textSelection !== undefined) {
+          // Static text with part of it highlighted, in the order
+          // Canvas2D paints it: find matches, the selection over them,
+          // then the run. The lines are the ones laid out for the run.
+          const geometry = paragraphGeometryFrom(lines, text.text!, contentBox, text, measurer);
+          const match = text.textMatches === undefined ? undefined : parseColor(text.matchColor);
+          if (match !== undefined) {
+            for (const range of text.textMatches!) {
+              for (const box of selectionRectsIn(geometry, range.start, range.end)) {
+                pushContentRect(box, match);
+              }
+            }
+          }
+          const selection = text.textSelection === undefined ? undefined : parseColor(text.selectionColor);
+          if (selection !== undefined) {
+            for (const box of selectionRectsIn(geometry, text.textSelection!.start, text.textSelection!.end)) {
+              pushContentRect(box, selection);
+            }
+          }
+        }
+        pushTextRun(lines, colorToCss(text.textColor), text.text!);
       }
     }
 

@@ -78,6 +78,31 @@ export function isEditableNode(node: UiNode): boolean {
 }
 
 /**
+ * Whether the user may select this node's text with the pointer.
+ *
+ * `selectable` inherits down the tree the way CSS `user-select` does:
+ * the nearest ancestor that sets it decides, and text is selectable
+ * when nothing along the path says otherwise. A `Button` opts its
+ * subtree out, as browsers' default stylesheets do — dragging across a
+ * control should press it, not highlight its label.
+ */
+export function isNodeSelectable(node: UiNode): boolean {
+  for (let current: UiNode | null = node; current !== null; current = current.parent) {
+    const value = current.properties.get('selectable');
+    if (value === true) {
+      return true;
+    }
+    if (value === false) {
+      return false;
+    }
+    if (current.type === UiNodeType.Button) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * The cursor to show over a node: its own `cursor`, else the nearest
  * ancestor's, as CSS inherits it — so a button sets `cursor: 'pointer'`
  * once and its label inherits it. Null when nothing along the path

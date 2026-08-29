@@ -123,7 +123,7 @@ export type TypographyProps = PropsOf<
 >;
 
 export type InteractionProps = PropsOf<
-  'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState'
+  'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'
 >;
 
 /** Environment values an element provides to its subtree. */
@@ -149,7 +149,9 @@ export type FlexContainerProps = ContainerProps &
   PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 
 /** The text an element draws and how it wraps. */
-export type TextContentProps = PropsOf<'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign'>;
+export type TextContentProps = PropsOf<
+  'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'
+>;
 
 export type TextProps = CommonProps & TextContentProps;
 

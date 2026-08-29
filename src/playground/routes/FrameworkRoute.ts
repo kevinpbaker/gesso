@@ -49,6 +49,9 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
       // Written out literally so the bundler can see and split it.
       worker: () => new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module' }),
       renderer,
+      // The app has a find bar, so it takes Ctrl/Cmd+F; the browser's
+      // own cannot see a canvas anyway.
+      interceptFind: true,
       onFrame: report,
       onError: (message, stack) => {
         shell.setStatus(`Render worker error: ${message}`);

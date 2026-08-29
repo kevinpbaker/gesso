@@ -13,6 +13,8 @@ import type { UiImage } from '../properties/UiImage';
 import { resolveColor, themeColor } from '../properties/UiThemeColor';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import { editorFor, isEditableNode } from '../editing/UiEditable';
+import { selectionRangeOf, type TextRange } from '../selection/UiSelectable';
+import { matchRangesOf } from '../find/UiTextMatches';
 import { resolveFont } from '../properties/UiTextFont';
 import { parseTransform } from '../properties/UiTransform';
 
@@ -61,9 +63,23 @@ export interface PaintState {
    * is drawn in. Undefined for every other node.
    */
   editor: EditableTextModel | undefined;
+  /**
+   * Set for a `Text` node the user has selected part of: the range of
+   * `text`, in source offsets, drawn behind the glyphs in
+   * `selectionColor`. Undefined for everything else, including
+   * editables, whose selection lives in `editor`.
+   */
+  textSelection: TextRange | undefined;
+  /**
+   * Set for a `Text` node the current find query matched: the ranges of
+   * `text` drawn in `matchColor`, under the selection, so the active
+   * match reads as the strongest of them.
+   */
+  textMatches: readonly TextRange[] | undefined;
   placeholder: string | undefined;
   placeholderColor: UiColor;
   selectionColor: UiColor;
+  matchColor: UiColor;
   caretColor: UiColor;
 }
 
@@ -150,10 +166,23 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
     out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
     out.caretColor =
       resolveColor(node, UiProperties.caretColor) ?? resolveColor(node, UiProperties.color) ?? UiColors.black;
+    out.textSelection = undefined;
+    out.textMatches = undefined;
   } else {
     out.editor = undefined;
     out.text = resolveString(node, 'text');
     out.placeholder = undefined;
+    // Only a selected paragraph pays for the colour: the scratch is
+    // reused across nodes, so an unselected one must not resolve it and
+    // must not read the last node's either.
+    out.textSelection = out.text === undefined ? undefined : selectionRangeOf(node);
+    if (out.textSelection !== undefined) {
+      out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
+    }
+    out.textMatches = out.text === undefined ? undefined : matchRangesOf(node);
+    if (out.textMatches !== undefined) {
+      out.matchColor = resolveColor(node, UiProperties.matchColor) ?? defaultMatchColor(node);
+    }
   }
   out.rtl = resolveProperty(node, UiProperties.textDirection) === 'rtl';
 
@@ -257,20 +286,34 @@ export function createPaintState(): PaintState {
     textOverflow: 'clip',
     rtl: false,
     editor: undefined,
+    textSelection: undefined,
+    textMatches: undefined,
     placeholder: undefined,
     placeholderColor: DEFAULT_PLACEHOLDER_COLOR,
     selectionColor: DEFAULT_SELECTION_COLOR,
+    matchColor: DEFAULT_MATCH_COLOR,
     caretColor: DEFAULT_TEXT_COLOR
   };
 }
 
 const DEFAULT_PLACEHOLDER_COLOR: UiColor = { r: 0.4, g: 0.4, b: 0.4, a: 1 };
 const DEFAULT_SELECTION_COLOR: UiColor = { r: 0.13, g: 0.59, b: 0.95, a: 0.35 };
+const DEFAULT_MATCH_COLOR: UiColor = { r: 0.61, g: 0.15, b: 0.69, a: 0.3 };
 
 /** The theme's primary at a third of its strength, behind selected text. */
 function defaultSelectionColor(node: UiNode): UiColor {
   const primary = themeColor(node, 'primary');
   return primary === undefined ? DEFAULT_SELECTION_COLOR : { r: primary.r, g: primary.g, b: primary.b, a: 0.35 };
+}
+
+/**
+ * The theme's secondary, weaker than the selection. Find matches are
+ * drawn under the active one, which is a real selection in the theme's
+ * primary, so the two have to be told apart at a glance.
+ */
+function defaultMatchColor(node: UiNode): UiColor {
+  const secondary = themeColor(node, 'secondary');
+  return secondary === undefined ? DEFAULT_MATCH_COLOR : { r: secondary.r, g: secondary.g, b: secondary.b, a: 0.3 };
 }
 
 /**

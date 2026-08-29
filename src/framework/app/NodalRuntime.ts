@@ -26,7 +26,10 @@ import type { ScrollContainerState, ScrollSink } from '../../ui/input/UiWheelCon
 import { UiFocusManager } from '../../ui/input/UiFocusManager';
 import { UiKeyboardController } from '../../ui/input/UiKeyboardController';
 import { UiEditingController, type EditingState } from '../../ui/input/UiEditingController';
+import { UiSelectionController } from '../../ui/selection/UiSelectionController';
+import { UiFindController } from '../../ui/find/UiFindController';
 import { ShellStore, type ShellRequest } from './ShellStore';
+import { FindStore } from './FindStore';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import type { LayoutExplanation } from '../../ui/layout/LayoutExplanation';
 import { Constraints } from '../../ui/layout/LayoutTypes';
@@ -90,6 +93,10 @@ export interface RuntimeInput {
   readonly focus: UiFocusManager;
   /** Text editing: the shell's beforeinput, composition and paste land here. */
   readonly editing: UiEditingController;
+  /** Selecting and copying text nobody types into. */
+  readonly selection: UiSelectionController;
+  /** Finding text in the app's own content; the find bar's engine. */
+  readonly find: UiFindController;
 }
 
 /**
@@ -182,6 +189,13 @@ export class NodalRuntime {
   private cursorListener: ((cursor: string | null) => void) | null = null;
   private lastCursor: string | null = null;
   private editingListener: ((state: EditingState | null) => void) | null = null;
+  /**
+   * The selection controller, reachable before `input` is assigned:
+   * the graph's node-removed listener is installed in the constructor
+   * and fires for nodes taken out from under a live selection.
+   */
+  private selectionController: UiSelectionController | null = null;
+  private findController: UiFindController | null = null;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
@@ -262,6 +276,11 @@ export class NodalRuntime {
       this.stores.register(ShellStore);
     }
     this.stores.get(ShellStore).setHandler(request => this.shellListener?.(request));
+    // And the find session, so a component can drive the search the
+    // browser's own find bar cannot do over a canvas.
+    if (!this.stores.has(FindStore)) {
+      this.stores.register(FindStore);
+    }
 
     this.scheduler = new UiScheduler({
       clock: options.clock ?? (callback => new UiTimerFrameClock(callback)),
@@ -271,7 +290,14 @@ export class NodalRuntime {
     });
 
     this.graph.setDirtyListener(() => this.scheduler.notifyDirty());
-    this.graph.setNodeRemovedListener(node => this.engine.detachNode(node));
+    this.graph.setNodeRemovedListener(node => {
+      this.engine.detachNode(node);
+      // Neither a selection nor a set of find matches can outlive its
+      // nodes: virtualization and route changes both take them out from
+      // under one.
+      this.selectionController?.handleNodeRemoved(node);
+      this.findController?.handleNodeRemoved(node);
+    });
 
     this.buildRoot(options.root);
     this.input = this.createInput();
@@ -540,6 +566,7 @@ export class NodalRuntime {
     this.cursorListener = null;
     this.rendererErrorListener = null;
     this.scheduler.stop();
+    this.stores.get(FindStore).setController(null);
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.frameListener = null;
@@ -619,10 +646,58 @@ export class NodalRuntime {
       this.dispatcher,
       focus
     );
+    // Text that is not an editable has no model of its own, so its
+    // selection is the controller's; it reaches the clipboard through
+    // the same ShellStore request a component would use.
+    const selection = new UiSelectionController(
+      {
+        recordFor: node => this.engine.recordFor(node),
+        visibleBox: node => this.engine.visibleBox(node),
+        measurer: this.textMeasurer,
+        markDirty: (node, flags) => this.graph.markDirty(node, flags),
+        root: () => this.layoutRoot(),
+        copy: text => this.stores.get(ShellStore).copyText(text),
+        blurEditable: () => {
+          if (editing.focused !== null) {
+            focus.blur();
+          }
+        },
+        now
+      },
+      hitTester
+    );
+    // Focus moving into a field ends a canvas selection, so only one of
+    // the two is ever lit.
+    focus.onFocusChange(node => {
+      if (node !== null) {
+        selection.clear();
+      }
+    });
+    this.selectionController = selection;
+    // The browser's find bar cannot see a canvas, so the app gets its
+    // own; the active match is a selection, which is why this is built
+    // on top of the selection controller rather than beside it.
+    const find = new UiFindController(
+      {
+        recordFor: node => this.engine.recordFor(node),
+        measurer: this.textMeasurer,
+        markDirty: (node, flags) => this.graph.markDirty(node, flags),
+        reveal: (node, box) => this.revealBox(node, box),
+        root: () => this.layoutRoot(),
+        focus: node => {
+          focus.focus(node);
+        }
+      },
+      selection
+    );
+    this.findController = find;
+    this.stores.get(FindStore).setController(find);
     return {
       dispatcher: this.dispatcher,
       focus,
       editing,
+      selection,
+      find,
       pointer: new UiPointerController(hitTester, this.dispatcher, {
         onPress: node => {
           if (node !== null) {
@@ -631,10 +706,11 @@ export class NodalRuntime {
         },
         scrollSink,
         onHoverChange: node => this.handleHoverChange(node),
-        editing
+        editing,
+        selection
       }),
       wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
-      keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing })
+      keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing, selection, find })
     };
   }
 

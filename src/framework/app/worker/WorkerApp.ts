@@ -43,6 +43,18 @@ export interface WorkerAppOptions {
    * is on (see `setInspector`), and null when nothing is hovered.
    */
   onInspect?: (text: string | null) => void;
+  /**
+   * Cancel the browser's Ctrl/Cmd+F on the canvas, so the app's own
+   * find bar takes it. Off by default: the browser's find bar cannot
+   * see a canvas, but taking the shortcut from an app that has no find
+   * of its own would leave the user with neither.
+   *
+   * A flag rather than something the runtime decides, because the
+   * worker's answer cannot come back in time to cancel a default —
+   * unlike `NodalApp`, where the platform adapter cancels whatever the
+   * app's own KeyDown listener claimed.
+   */
+  interceptFind?: boolean;
 }
 
 /**
@@ -135,7 +147,15 @@ export class WorkerApp {
   }
 
   private forwardKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Tab') {
+    if (this.options.interceptFind === true && isFind(event)) {
+      event.preventDefault();
+    }
+    if (event.key === 'Tab' || isSelectAll(event)) {
+      // The worker's answer cannot come back in time to cancel a
+      // default, so the shell cancels the two that would be wrong
+      // whatever it is: Tab moving focus out of the canvas, and
+      // Ctrl/Cmd+A selecting the page around it while the app selects
+      // its own text.
       event.preventDefault();
     }
     this.post({ type: 'keyDown', key: event.key, modifiers: modifiersFrom(event) });
@@ -247,8 +267,9 @@ export class WorkerApp {
    * whether to call preventDefault() from the returned event's
    * defaultPrevented flag, and that answer lives in the worker and
    * cannot come back synchronously. The shell instead prevents the
-   * two defaults that matter — page scroll on wheel, and focus
-   * stealing on Tab — and lets the worker route everything else.
+   * defaults that matter — page scroll on wheel, focus stealing on
+   * Tab, and the page's own select-all — and lets the worker route
+   * everything else.
    */
   private attachInput(canvas: HTMLCanvasElement): () => void {
     const toLocal = (clientX: number, clientY: number) => {
@@ -334,4 +355,14 @@ function resolveHost(host: HTMLElement | string): HTMLElement {
     throw new Error(`Mount host '${host}' was not found.`);
   }
   return element;
+}
+
+/** Ctrl+A, or Cmd+A on a Mac: select every selectable text in the app. */
+function isSelectAll(event: KeyboardEvent): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'a' || event.key === 'A');
+}
+
+/** Ctrl+F, or Cmd+F on a Mac: open the app's find bar. */
+function isFind(event: KeyboardEvent): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'f' || event.key === 'F');
 }

@@ -7,10 +7,11 @@ import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState }
 import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import type { RenderContext } from '../RenderContext';
-import { buildFontString, drawText, drawTextLines } from '../TextRenderer';
+import { buildFontString, drawText, drawTextLines, layoutTextLines } from '../TextRenderer';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
 import { caretVisibleAt } from '../../editing/UiEditable';
+import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSelectionGeometry';
 
 /** Logical width of the caret, as a textarea's. */
 export const CARET_WIDTH = 1;
@@ -325,8 +326,39 @@ export class Canvas2DRenderer implements UiRenderer {
         this.paintEditable(ctx, paint, context);
         return;
       }
+      if (paint.textSelection !== undefined || paint.textMatches !== undefined) {
+        this.paintHighlightedText(ctx, paint, context);
+        return;
+      }
       drawText(ctx, this.contentBox, paint, context.text);
     }
+  }
+
+  /**
+   * Static text with part of it highlighted: find matches, then the
+   * selection over them, then the glyphs — so the active match, which
+   * is both, reads as the strongest. The lines are laid out once and
+   * shared, so a highlighted paragraph is measured no more often than a
+   * plain one.
+   */
+  private paintHighlightedText(ctx: Canvas2DContext, paint: PaintState, context: RenderContext): void {
+    const lines = layoutTextLines(this.contentBox, paint, context.text);
+    const geometry = paragraphGeometryFrom(lines, paint.text!, this.contentBox, paint, context.text);
+    if (paint.textMatches !== undefined) {
+      ctx.fillStyle = colorToCss(paint.matchColor);
+      for (const range of paint.textMatches) {
+        for (const box of selectionRectsIn(geometry, range.start, range.end)) {
+          ctx.fillRect(box.x, box.y, box.width, box.height);
+        }
+      }
+    }
+    if (paint.textSelection !== undefined) {
+      ctx.fillStyle = colorToCss(paint.selectionColor);
+      for (const box of selectionRectsIn(geometry, paint.textSelection.start, paint.textSelection.end)) {
+        ctx.fillRect(box.x, box.y, box.width, box.height);
+      }
+    }
+    drawTextLines(ctx, lines, buildFontString(paint), colorToCss(paint.textColor));
   }
 
   /**

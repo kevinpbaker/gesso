@@ -1,7 +1,7 @@
 import { map } from 'rxjs';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
-import { auto, fr, repeat } from '../ui/layout';
+import { auto, fr, percent, repeat } from '../ui/layout';
 import type { UiNode } from '../ui/graph/UiNode';
 import { OverlayStore } from '../framework/overlay/OverlayStore';
 import type { UiElement } from '../ui/composition';
@@ -14,6 +14,7 @@ import { input } from '../framework/Input';
 import { Store } from '../framework/store/Store';
 import { Action, Projection, State } from '../framework/store/decorators';
 import { HeavyStore } from './HeavyStore';
+import { FindStore } from '../framework/app/FindStore';
 
 /**
  * Demo store used by the framework playground.
@@ -741,7 +742,16 @@ export class FrameworkDemoRoot extends Component {
   override render(): UiElement {
     // A scrolling page: content taller than the viewport scrolls instead
     // of being flex-shrunk into it, and the anchored menu below has to
-    // follow its button through two nested scroll containers.
+    // follow its button through two nested scroll containers. The find
+    // bar floats over it, so opening one does not reflow the page.
+    return Box(
+      { width: percent(100), height: percent(100), position: 'relative' },
+      this.page(),
+      createComponent(FindBar)
+    );
+  }
+
+  private page(): UiElement {
     return ScrollView(
       { padding: 24, gap: 20 },
       Text({ text: 'Framework Playground', color: '#ffffff', fontSize: 24, fontWeight: 600 }),
@@ -765,4 +775,98 @@ export class FrameworkDemoRoot extends Component {
       Column({ gap: 6, x: 'start' }, this.recentTicks())
     );
   }
+}
+
+/**
+ * Find (roadmap F2): the bar Ctrl/Cmd+F opens.
+ *
+ * The framework owns the search — `FindStore` is the reactive face of
+ * `UiFindController` — and this is all an app has to write for it: a
+ * field bound to `search`, a count, and two steps. The matches light up
+ * on the page as you type and the active one scrolls into view, which
+ * is the part a canvas cannot get from the browser.
+ */
+@Define('find-bar')
+export class FindBar extends Component {
+  @Inject(FindStore) find!: FindStore;
+
+  private query = state('');
+
+  private search(value: string): void {
+    this.query.value = value;
+    this.find.search(value);
+  }
+
+  override render(): UiElement {
+    return Row(
+      {
+        visible: this.find.open,
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        gap: 8,
+        y: 'center',
+        padding: 8,
+        backgroundColor: '#1f2937',
+        borderColor: '#374151',
+        borderWidth: 1,
+        borderRadius: 8
+      },
+      EditableText({
+        ref: node => this.find.setField(node),
+        value: this.query,
+        placeholder: 'Find on page',
+        onInput: event => this.search(event.value),
+        // Enter is the app's in a single-line field, so it steps here.
+        onKeyDown: event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            if (event.modifiers.shift) {
+              this.find.previous();
+            } else {
+              this.find.next();
+            }
+          }
+        },
+        width: 180,
+        textWrap: 'none',
+        color: '#ffffff',
+        fontSize: 13,
+        padding: 6,
+        borderRadius: 4,
+        backgroundColor: '#111827',
+        borderWidth: 1,
+        borderColor: '#374151'
+      }),
+      Text({
+        text: this.find.matchCount.pipe(
+          map(count => (count === 0 ? (this.query.value.length === 0 ? '' : 'no matches') : `of ${count}`))
+        ),
+        color: '#9ca3af',
+        fontSize: 12,
+        width: 70
+      }),
+      stepButton('‹', () => this.find.previous()),
+      stepButton('›', () => this.find.next()),
+      stepButton('✕', () => this.find.close())
+    );
+  }
+}
+
+function stepButton(label: string, onClick: () => void): UiElement {
+  return Button({
+    text: label,
+    onClick,
+    color: '#e5e7eb',
+    fontSize: 14,
+    width: 26,
+    height: 26,
+    // A Button draws its own `text` in its content box, so the glyph is
+    // centred with textAlign/verticalAlign; `x` and `y` align children,
+    // and this button has none.
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    borderRadius: 4,
+    backgroundColor: '#374151'
+  });
 }

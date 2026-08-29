@@ -41,6 +41,7 @@ export {
 } from './app/NodalRuntime';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellStore, type ShellRequest } from './app/ShellStore';
+export { FindStore } from './app/FindStore';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export type { EditingState } from '../ui/input/UiEditingController';
 export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';

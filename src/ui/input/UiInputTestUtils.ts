@@ -10,6 +10,7 @@ import { UiFocusManager } from './UiFocusManager';
 import { UiKeyboardController } from './UiKeyboardController';
 import { UiWheelController, type ScrollContainerState, type ScrollSink } from './UiWheelController';
 import { UiPlatformAdapter, type PlatformEventTarget, type PlatformSurface } from './UiPlatformAdapter';
+import type { TextMeasurer } from '../layout/TextMeasurer';
 
 /**
  * Shared harness for input specs.
@@ -19,11 +20,13 @@ import { UiPlatformAdapter, type PlatformEventTarget, type PlatformSurface } fro
  * layout geometry rather than hand-written boxes.
  */
 export class InputTestHarness {
-  readonly layout = new LayoutHarness();
+  readonly layout: LayoutHarness;
   readonly root: UiNode;
   readonly dispatcher = new UiInputDispatcher();
 
-  constructor(width = 400, height = 400) {
+  /** A measurer is needed only by specs whose trees contain real text. */
+  constructor(width = 400, height = 400, textMeasurer?: TextMeasurer) {
+    this.layout = new LayoutHarness(textMeasurer);
     this.root = this.layout.createNode('app', UiNodeType.Column);
     this.root.setProperty('width', width);
     this.root.setProperty('height', height);

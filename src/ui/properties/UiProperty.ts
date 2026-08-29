@@ -730,6 +730,15 @@ export const UiProperties = {
     compare: colorValuesEqual
   }),
 
+  /** Colour behind text a find query matched; defaults to a translucent theme secondary. */
+  matchColor: defineProperty<UiColorValue | undefined>({
+    name: 'matchColor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P,
+    compare: colorValuesEqual
+  }),
+
   /** Colour of the placeholder; defaults to the theme's muted text. */
   placeholderColor: defineProperty<UiColorValue | undefined>({
     name: 'placeholderColor',
@@ -758,6 +767,19 @@ export const UiProperties = {
    */
   cursor: defineProperty<UiCursor | undefined>({
     name: 'cursor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /**
+   * Whether the user may select this subtree's text with the pointer.
+   * Read up the ancestor chain like CSS `user-select`, so setting it
+   * once on a container covers everything inside; a Button opts its
+   * label out by default.
+   */
+  selectable: defineProperty<boolean | undefined>({
+    name: 'selectable',
     defaultValue: undefined,
     inherited: false,
     affects: DirtyFlags.Properties

@@ -47,6 +47,23 @@ export interface PointerControllerOptions {
     pointerMove(node: UiNode, x: number, y: number): void;
     pointerUp(): void;
   };
+  /**
+   * Default pointer behaviour for text nobody types into: a press on
+   * it starts a selection, a drag extends it, a press anywhere else
+   * clears it. Applied after the app's listeners, on the same terms as
+   * `editing`, and never for a press that landed on an editable —
+   * that one has its own selection.
+   *
+   * The drag is fed raw canvas coordinates rather than the pressed
+   * node, because a selection is the one gesture that has to cross
+   * node boundaries while the press is captured.
+   */
+  selection?: {
+    pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiModifiers): void;
+    pointerMove(x: number, y: number): void;
+    pointerUp(): void;
+    clear(): void;
+  };
 }
 
 /** A thumb drag in progress. */
@@ -99,6 +116,7 @@ export class UiPointerController {
   private readonly scrollSink: ScrollSink | null;
   private readonly onHoverChange: ((node: UiNode | null) => void) | null;
   private readonly editing: PointerControllerOptions['editing'];
+  private readonly selection: PointerControllerOptions['selection'];
 
   private hoverNode: UiNode | null = null;
 
@@ -120,6 +138,7 @@ export class UiPointerController {
     this.scrollSink = options.scrollSink ?? null;
     this.onHoverChange = options.onHoverChange ?? null;
     this.editing = options.editing;
+    this.selection = options.selection;
   }
 
   /** The node currently under the pointer, or null over empty space. */
@@ -161,8 +180,14 @@ export class UiPointerController {
         this.onPress?.(target);
         if (this.editing !== undefined && this.editing.isEditable(target)) {
           this.editing.pointerDown(target, x, y, modifiers);
+          this.selection?.clear();
+        } else {
+          this.selection?.pointerDown(target, x, y, modifiers);
         }
       }
+    } else {
+      // A press on empty space drops the selection, as it does on a page.
+      this.selection?.pointerDown(null, x, y, modifiers);
     }
     this.downTarget = target;
     this.downX = x;
@@ -186,8 +211,14 @@ export class UiPointerController {
       const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers);
       this.dispatcher.dispatch(event, this.downTarget);
       this.gestures?.pointerMove(event, this.downTarget);
-      if (!event.defaultPrevented && this.editing !== undefined && this.editing.isEditable(this.downTarget)) {
-        this.editing.pointerMove(this.downTarget, x, y);
+      if (!event.defaultPrevented) {
+        if (this.editing !== undefined && this.editing.isEditable(this.downTarget)) {
+          this.editing.pointerMove(this.downTarget, x, y);
+        } else if (!this.downDefaultPrevented) {
+          // A press the app cancelled started no selection, so the
+          // moves after it are not extending one either.
+          this.selection?.pointerMove(x, y);
+        }
       }
       return event;
     }
@@ -226,6 +257,7 @@ export class UiPointerController {
     }
     this.downTarget = null;
     this.editing?.pointerUp();
+    this.selection?.pointerUp();
 
     const event = new UiPointerEvent(UiEventType.PointerUp, x, y, buttons, modifiers);
     this.dispatcher.dispatch(event, target);
@@ -250,6 +282,7 @@ export class UiPointerController {
   pointerCancel(): void {
     this.scrollbarDrag = null;
     this.editing?.pointerUp();
+    this.selection?.pointerUp();
     if (this.downTarget === null) {
       return;
     }
