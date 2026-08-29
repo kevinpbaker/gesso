@@ -44,7 +44,7 @@ describe('LayoutPlayground integration', () => {
   describe('composition', () => {
     it('creates the expected graph from the definition', () => {
       const h = createHarness();
-      expect(h.playground.graph.size).toBe(118);
+      expect(h.playground.graph.size).toBe(138);
       expect(h.playground.graph.requireNode('root:0').type).toBe('column');
       expect(h.playground.graph.requireNode('root:0:0').type).toBe('text');
       expect(h.playground.graph.requireNode('root:0:1').type).toBe('row');
@@ -323,7 +323,7 @@ describe('LayoutPlayground integration', () => {
       h.playground.rebuild(createDefinition(h.state));
       tick(h);
       const buildMs = performance.now() - start;
-      expect(h.playground.graph.size).toBe(1219);
+      expect(h.playground.graph.size).toBe(1239);
       expect(h.playground.createdFor('root:0:5:0')).toBe(1);
       expect(buildMs).toBeGreaterThanOrEqual(0);
     });

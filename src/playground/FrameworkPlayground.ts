@@ -9,6 +9,7 @@ import { Component } from '../framework/Component';
 import { createComponent } from '../framework/createComponent';
 import { Define, Inject, Input } from '../framework/decorators';
 import { state } from '../framework/State';
+import { createDemoBitmap } from './demoBitmap';
 import { input } from '../framework/Input';
 import { Store } from '../framework/store/Store';
 import { Action, Projection, State } from '../framework/store/decorators';
@@ -447,6 +448,88 @@ export class ScrollDemo extends Component {
               backgroundColor: i % 2 === 0 ? '#0f172a' : '#111827'
             })
           )
+        ),
+        // Nested rounded clips: a rounded card inside a rounded scroller.
+        // Both corners have to cut — the scroller's on the outside, the
+        // card's on the inside — as the card scrolls past the edge.
+        Column(
+          { width: 150, height: 140, overflow: 'scroll', backgroundColor: '#111827', borderRadius: 24, scrollY: 18 },
+          Box(
+            {
+              width: 150,
+              height: 110,
+              overflow: 'hidden',
+              borderRadius: 12,
+              backgroundColor: '#1f2937',
+              flexShrink: 0,
+              position: 'relative'
+            },
+            Box({
+              position: 'absolute',
+              left: -30,
+              top: -30,
+              width: 110,
+              height: 110,
+              backgroundColor: '#10b981',
+              borderRadius: 55
+            }),
+            Box({
+              position: 'absolute',
+              left: 80,
+              top: 50,
+              width: 110,
+              height: 110,
+              backgroundColor: '#f59e0b',
+              borderRadius: 55
+            }),
+            Text({ text: 'nested', color: '#ffffff', fontSize: 12, position: 'absolute', left: 8, bottom: 8 })
+          ),
+          Box({ width: 150, height: 120, backgroundColor: '#374151', flexShrink: 0 })
+        )
+      )
+    );
+  }
+}
+
+/**
+ * Images (WebGPU roadmap G5): a bitmap decoded on the rendering thread
+ * — drawn here with OffscreenCanvas, in an application it would come
+ * from `createImageBitmap(blob)` — shown under every `objectFit`
+ * inside rounded, clipping boxes.
+ */
+@Define('image-demo')
+export class ImageDemo extends Component {
+  @State() image = state<ImageBitmap | undefined>(undefined);
+
+  onMount(): void {
+    void createDemoBitmap().then(bitmap => {
+      this.image.value = bitmap;
+    });
+  }
+
+  override render(): UiElement {
+    const fits = ['fill', 'cover', 'contain', 'none'] as const;
+    return Column(
+      { gap: 8 },
+      Text({ text: 'Images: one bitmap under each objectFit, clipped by its rounded box.', color: '#9ca3af' }),
+      Row(
+        { gap: 12 },
+        ...fits.map(fit =>
+          Box(
+            {
+              width: 120,
+              height: 80,
+              overflow: 'hidden',
+              borderRadius: 10,
+              backgroundColor: '#111827',
+              borderWidth: 1,
+              borderColor: '#374151',
+              image: this.image,
+              objectFit: fit,
+              position: 'relative'
+            },
+            Text({ text: fit, color: '#ffffff', fontSize: 11, position: 'absolute', left: 6, bottom: 4 })
+          )
         )
       )
     );
@@ -614,6 +697,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(HeavyPanel),
       createComponent(MenuDemo),
       createComponent(ScrollDemo),
+      createComponent(ImageDemo),
       createComponent(LazyListDemo),
       createComponent(GridDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),

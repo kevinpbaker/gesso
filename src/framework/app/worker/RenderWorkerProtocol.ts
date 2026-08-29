@@ -1,5 +1,5 @@
 import type { UiModifiers } from '../../../ui/input/UiInputEvent';
-import type { FramePhaseTimings, RendererChoice } from '../NodalRuntime';
+import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../NodalRuntime';
 import type { RendererBackend } from '../../../ui/rendering';
 
 /**
@@ -41,6 +41,7 @@ export type RuntimeToShellMessage =
       at: number;
       phases: FramePhaseTimings;
       renderer: RendererBackend | 'pending';
+      gpu: GpuStageTimings | null;
     }
   | { type: 'error'; message: string; stack?: string }
   /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */

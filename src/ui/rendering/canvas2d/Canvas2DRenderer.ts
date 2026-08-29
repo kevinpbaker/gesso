@@ -248,6 +248,11 @@ export class Canvas2DRenderer implements UiRenderer {
     }
   }
 
+  /**
+   * The image is clipped to the node's (rounded) box, as CSS clips
+   * `object-fit`: `cover` and `none` produce a rectangle larger than
+   * the box, and only the box shows.
+   */
   private paintImage(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
     if (paint.image === undefined) {
       return;
@@ -256,7 +261,21 @@ export class Canvas2DRenderer implements UiRenderer {
     if (rect.width <= 0 || rect.height <= 0) {
       return;
     }
+    const overflows =
+      rect.x < rec.x ||
+      rect.y < rec.y ||
+      rect.x + rect.width > rec.x + rec.width ||
+      rect.y + rect.height > rec.y + rec.height;
+    const rounded = !borderRadiusIsZero(paint.borderRadius);
+    if (!overflows && !rounded) {
+      ctx.drawImage(paint.image, rect.x, rect.y, rect.width, rect.height);
+      return;
+    }
+    ctx.save();
+    traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? uniformBorderRadius(paint.borderRadius) : 0);
+    ctx.clip();
     ctx.drawImage(paint.image, rect.x, rect.y, rect.width, rect.height);
+    ctx.restore();
   }
 
   /**

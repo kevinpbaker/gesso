@@ -47,6 +47,80 @@ function stressSubtree(count: number): UiElement | undefined {
 }
 
 /**
+ * The renderer-parity section (WEBGPU_ROADMAP.md G0): everything the
+ * two backends once disagreed on, in one row the compare route diffs
+ * pixel by pixel — a rounded clipped card with rotated children and
+ * text, an image under `objectFit: cover` in a rounded box, bordered
+ * boxes with and without radii, and a scrolled list with a sticky
+ * header.
+ */
+function paritySection(state: PlaygroundState): UiElement {
+  return Row(
+    { gap: 10, y: 'start' },
+    Box(
+      {
+        width: 120,
+        height: 80,
+        overflow: 'hidden',
+        borderRadius: 14,
+        backgroundColor: '#1e293b',
+        position: 'relative'
+      },
+      Box({
+        position: 'absolute',
+        left: -20,
+        top: 20,
+        width: 90,
+        height: 90,
+        backgroundColor: '#f59e0b',
+        transform: { rotation: 0.4 }
+      }),
+      Box({
+        position: 'absolute',
+        left: 70,
+        top: -30,
+        width: 90,
+        height: 90,
+        backgroundColor: '#3b82f6',
+        borderRadius: 45
+      }),
+      Text({ text: 'clipped', color: '#ffffff', fontSize: 12, position: 'absolute', left: 8, bottom: 6 })
+    ),
+    Box({
+      width: 120,
+      height: 80,
+      overflow: 'hidden',
+      borderRadius: 10,
+      backgroundColor: '#1e293b',
+      image: state.image$,
+      objectFit: 'cover'
+    }),
+    Column(
+      { gap: 6 },
+      Box({
+        width: 90,
+        height: 34,
+        borderWidth: 2,
+        borderColor: '#10b981',
+        borderRadius: 8,
+        backgroundColor: 'rgba(16,185,129,0.15)'
+      }),
+      Box({ width: 90, height: 34, borderWidth: 3, borderColor: '#f43f5e' })
+    ),
+    Column(
+      { width: 130, height: 80, overflow: 'scroll', scrollY: 22, backgroundColor: '#0f172a', borderRadius: 6 },
+      Row(
+        { position: 'sticky', top: 0, padding: 4, backgroundColor: '#334155', flexShrink: 0 },
+        Text({ text: 'Sticky', color: '#e2e8f0', fontSize: 11 })
+      ),
+      ...Array.from({ length: 8 }, (_, i) =>
+        Text({ text: `Line ${i + 1}`, color: '#cbd5e1', fontSize: 11, padding: 4, flexShrink: 0 })
+      )
+    )
+  );
+}
+
+/**
  * Builds the declarative definition of the whole playground from
  * the current reactive state.
  *
@@ -121,7 +195,10 @@ export function createDefinition(state: PlaygroundState): UiElement {
         borderRadius: 6
       },
       ...scrollItems()
-    )
+    ),
+    // After the scroll view: the playground's scroll inspection reports
+    // the first scroll container it finds, and that is this one.
+    paritySection(state)
   ];
   if (stress !== undefined) {
     children.push(stress);

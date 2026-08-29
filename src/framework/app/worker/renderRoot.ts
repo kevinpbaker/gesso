@@ -184,7 +184,8 @@ export class RenderWorkerApp {
         relayoutRoots: metrics.relayoutRoots,
         at: metrics.at,
         phases: metrics.phases,
-        renderer: metrics.renderer
+        renderer: metrics.renderer,
+        gpu: metrics.gpu
       });
     });
     this.runtime.start();

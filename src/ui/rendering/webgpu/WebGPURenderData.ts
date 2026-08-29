@@ -24,12 +24,11 @@ import { toPhysicalPixels } from './WebGPUSurface';
  *   8  radius, opacity, borderWidth
  *   11 kind               (u32: PrimitiveKind)
  *   12 transform          3x2 affine, absolute layout → logical screen
- *   18 clipRect.xywh      rounded clip in its own space; w <= 0 = none
- *   22 clipRadius, pad
- *   24 clipInverse        3x2 affine, logical screen → clip space
- *   30 (end)
+ *   18 clipIndex          index into the clip chain, -1 for none
+ *   19 pad
+ *   20 (end)
  */
-export const INSTANCE_STRIDE_FLOATS = 30;
+export const INSTANCE_STRIDE_FLOATS = 20;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
 
 /**
@@ -37,15 +36,29 @@ export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
  *
  *   0  pos.xy
  *   2  size.xy
- *   4  opacity, pad
+ *   4  opacity
+ *   5  clipIndex
  *   6  transform          3x2
- *   12 clipRect.xywh
- *   16 clipRadius, pad
- *   18 clipInverse        3x2
- *   24 (end)
+ *   12 (end)
  */
-export const TEXTURED_STRIDE_FLOATS = 24;
+export const TEXTURED_STRIDE_FLOATS = 12;
 export const TEXTURED_STRIDE_BYTES = TEXTURED_STRIDE_FLOATS * 4;
+
+/**
+ * Clip chain node layout, in floats (four vec4s):
+ *
+ *   0  rect.xywh          the clipping box in its own layout space
+ *   4  radius, parentIndex (-1 at the root), pad, pad
+ *   8  inverse a, b, c, d 3x2 affine, logical screen → clip space
+ *   12 inverse tx, ty, pad, pad
+ *   16 (end)
+ *
+ * An instance names its innermost rounded clip; the fragment shader
+ * walks parent links to the root, so every rounded ancestor applies.
+ */
+export const CLIP_STRIDE_FLOATS = 16;
+export const CLIP_STRIDE_BYTES = CLIP_STRIDE_FLOATS * 4;
+export const NO_CLIP_INDEX = -1;
 
 export const enum PrimitiveKind {
   Fill = 0,
@@ -125,21 +138,10 @@ export interface RenderList {
   instanceCount: number;
   texturedData: Float32Array;
   texturedCount: number;
+  /** The frame's rounded clips, CLIP_STRIDE_FLOATS each; see the layout above. */
+  clipData: Float32Array;
+  clipCount: number;
   commands: RenderCommand[];
-}
-
-/**
- * The innermost clipping ancestor with a corner radius, as the
- * fragment shader needs it: the box in that ancestor's absolute
- * layout space and the inverse of its transform.
- */
-interface RoundedClip {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  radius: number;
-  inverse: Affine;
 }
 
 interface CullRect {
@@ -159,7 +161,8 @@ interface RenderState {
   ctm: Affine;
   /** Current rectangular clip as a physical-pixel scissor. */
   clip: ScissorRect | null;
-  rounded: RoundedClip | null;
+  /** Innermost rounded clip in the chain, or NO_CLIP_INDEX. */
+  rounded: number;
   /**
    * Visible region in the coordinate space children's records use,
    * or null while culling is suspended under a transform or a sticky
@@ -169,7 +172,6 @@ interface RenderState {
 }
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
-const NO_CLIP: RoundedClip = { x: 0, y: 0, width: 0, height: 0, radius: 0, inverse: IDENTITY };
 
 /**
  * Padding around a rasterised run, in em. Glyphs overhang their line
@@ -202,6 +204,7 @@ export function buildRenderList(
 ): RenderList {
   const instanceData: number[] = [];
   const texturedData: number[] = [];
+  const clipData: number[] = [];
   const commands: RenderCommand[] = [];
 
   /** Primitive instances emitted since the last primitive command was closed. */
@@ -212,7 +215,7 @@ export function buildRenderList(
     opacity: 1,
     ctm: [...IDENTITY] as Affine,
     clip: null,
-    rounded: null,
+    rounded: NO_CLIP_INDEX,
     cull: { x: 0, y: 0, width: logicalWidth, height: logicalHeight }
   };
 
@@ -290,7 +293,7 @@ export function buildRenderList(
     // clipped by its ancestors, as Canvas2D paints them outside the
     // node's own clip; children and the node's own text go under it.
     const ownScissor = state.clip;
-    const ownRounded = state.rounded ?? NO_CLIP;
+    const ownRounded = state.rounded;
 
     // Clipping (overflow hidden/scroll/auto, ScrollView). The rectangle
     // becomes a scissor; a corner radius becomes the rounded clip the
@@ -311,20 +314,19 @@ export function buildRenderList(
       if (!borderRadiusIsZero(paint.borderRadius)) {
         const inverse = invertTransform(nodeCtm);
         if (inverse !== null) {
-          nextRounded = {
-            x: rec.x,
-            y: rec.y,
-            width: rec.width,
-            height: rec.height,
-            radius: uniformBorderRadius(paint.borderRadius),
-            inverse
-          };
+          // A new node in the chain whose parent is the enclosing rounded
+          // clip, so descendants are tested against both.
+          nextRounded = clipData.length / CLIP_STRIDE_FLOATS;
+          clipData.push(rec.x, rec.y, rec.width, rec.height);
+          clipData.push(uniformBorderRadius(paint.borderRadius), state.rounded, 0, 0);
+          clipData.push(inverse[0], inverse[1], inverse[2], inverse[3]);
+          clipData.push(inverse[4], inverse[5], 0, 0);
         }
       }
     }
 
     const contentScissor = nextClip;
-    const contentRounded = nextRounded ?? NO_CLIP;
+    const contentRounded = nextRounded;
 
     // Background fill.
     if (paint.backgroundColor !== undefined) {
@@ -348,10 +350,40 @@ export function buildRenderList(
       }
     }
 
-    // Background image, fitted into the box.
+    // Background image, fitted into the box and clipped to it as CSS
+    // clips `object-fit`: `cover` and `none` overflow the box, and only
+    // the box shows. The box is a scissor, plus a clip-chain node when
+    // it has a radius.
     if (paint.image !== undefined) {
       const rect = computeObjectFitRect(paint.objectFit, paint.image.width, paint.image.height, rec);
       if (rect.width > 0 && rect.height > 0) {
+        const overflows =
+          rect.x < rec.x ||
+          rect.y < rec.y ||
+          rect.x + rect.width > rec.x + rec.width ||
+          rect.y + rect.height > rec.y + rec.height;
+        const rounded = !borderRadiusIsZero(paint.borderRadius);
+        let imageScissor = ownScissor;
+        let imageRounded = ownRounded;
+        if (overflows || rounded) {
+          const boxScissor = logicalClipToScissor(rec, nodeCtm, logicalWidth, logicalHeight, dpr);
+          imageScissor =
+            boxScissor === null
+              ? emptyScissor()
+              : ownScissor === null
+                ? boxScissor
+                : intersectScissors(ownScissor, boxScissor);
+        }
+        if (rounded) {
+          const inverse = invertTransform(nodeCtm);
+          if (inverse !== null) {
+            imageRounded = clipData.length / CLIP_STRIDE_FLOATS;
+            clipData.push(rec.x, rec.y, rec.width, rec.height);
+            clipData.push(uniformBorderRadius(paint.borderRadius), ownRounded, 0, 0);
+            clipData.push(inverse[0], inverse[1], inverse[2], inverse[3]);
+            clipData.push(inverse[4], inverse[5], 0, 0);
+          }
+        }
         closePrimitives();
         const instance = pushTextured(
           texturedData,
@@ -361,9 +393,9 @@ export function buildRenderList(
           rect.height,
           effectiveOpacity,
           nodeCtm,
-          ownRounded
+          imageRounded
         );
-        commands.push({ kind: CommandKind.Image, instance, scissor: ownScissor, image: paint.image });
+        commands.push({ kind: CommandKind.Image, instance, scissor: imageScissor, image: paint.image });
       }
     }
 
@@ -507,6 +539,8 @@ export function buildRenderList(
     instanceCount: instanceData.length / INSTANCE_STRIDE_FLOATS,
     texturedData: new Float32Array(texturedData),
     texturedCount: texturedData.length / TEXTURED_STRIDE_FLOATS,
+    clipData: new Float32Array(clipData),
+    clipCount: clipData.length / CLIP_STRIDE_FLOATS,
     commands
   };
 }
@@ -548,7 +582,7 @@ function pushScrollbars(
   rec: LayoutRecord,
   opacity: number,
   transform: Affine,
-  rounded: RoundedClip,
+  rounded: number,
   now: number
 ): void {
   const remaining = rec.scrollbarVisibleUntil - now;
@@ -592,7 +626,7 @@ function pushInstance(
   borderWidth: number,
   kind: PrimitiveKind,
   transform: Affine,
-  clip: RoundedClip
+  clip: number
 ): void {
   out.push(x, y);
   out.push(width, height);
@@ -600,7 +634,7 @@ function pushInstance(
   out.push(radius, opacity, borderWidth);
   out.push(kind);
   out.push(transform[0], transform[1], transform[2], transform[3], transform[4], transform[5]);
-  pushClip(out, clip);
+  out.push(clip, 0);
 }
 
 function pushTextured(
@@ -611,22 +645,14 @@ function pushTextured(
   height: number,
   opacity: number,
   transform: Affine,
-  clip: RoundedClip
+  clip: number
 ): number {
   const index = out.length / TEXTURED_STRIDE_FLOATS;
   out.push(x, y);
   out.push(width, height);
-  out.push(opacity, 0);
+  out.push(opacity, clip);
   out.push(transform[0], transform[1], transform[2], transform[3], transform[4], transform[5]);
-  pushClip(out, clip);
   return index;
-}
-
-function pushClip(out: number[], clip: RoundedClip): void {
-  out.push(clip.x, clip.y, clip.width, clip.height);
-  out.push(clip.radius, 0);
-  const inv = clip.inverse;
-  out.push(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5]);
 }
 
 function buildOwnTransform(

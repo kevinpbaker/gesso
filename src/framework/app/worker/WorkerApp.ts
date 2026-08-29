@@ -1,4 +1,4 @@
-import type { FramePhaseTimings, RendererChoice } from '../NodalRuntime';
+import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../NodalRuntime';
 import type { RendererBackend } from '../../../ui/rendering';
 import { modifiersFrom, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
@@ -33,6 +33,7 @@ export interface WorkerAppOptions {
     at: number;
     phases: FramePhaseTimings;
     renderer: RendererBackend | 'pending';
+    gpu: GpuStageTimings | null;
   }) => void;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
@@ -153,7 +154,8 @@ export class WorkerApp {
         relayoutRoots: message.relayoutRoots,
         at: message.at,
         phases: message.phases,
-        renderer: message.renderer
+        renderer: message.renderer,
+        gpu: message.gpu
       });
       return;
     }

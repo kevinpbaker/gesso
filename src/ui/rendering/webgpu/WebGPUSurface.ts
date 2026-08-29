@@ -89,10 +89,14 @@ export class WebGPUSurface {
    */
   configure(device: GPUDevice, format: GPUTextureFormat): void {
     const ctx = this.getContext();
+    const renderAttachment = typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.RENDER_ATTACHMENT : 0x10;
+    const copySrc = typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.COPY_SRC : 0x1;
     ctx.configure({
       device,
       format,
-      alphaMode: 'premultiplied'
+      alphaMode: 'premultiplied',
+      // COPY_SRC lets a frame be read back for the parity check.
+      usage: renderAttachment | copySrc
     });
     this.configured = true;
   }

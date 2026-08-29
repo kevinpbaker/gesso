@@ -8,8 +8,10 @@ import {
   buildRenderList,
   textItems,
   viewportScissor,
+  CLIP_STRIDE_FLOATS,
   CommandKind,
   INSTANCE_STRIDE_FLOATS,
+  TEXTURED_STRIDE_FLOATS,
   PrimitiveKind,
   type ImageCommand,
   type PrimitiveCommand,
@@ -56,21 +58,29 @@ function readInstance(list: ReturnType<typeof buildRenderList>, index: number) {
       data[offset + 16],
       data[offset + 17]
     ] as [number, number, number, number, number, number],
-    clip: {
-      x: data[offset + 18],
-      y: data[offset + 19],
-      width: data[offset + 20],
-      height: data[offset + 21],
-      radius: data[offset + 22]
-    },
-    clipInverse: [
-      data[offset + 24],
-      data[offset + 25],
-      data[offset + 26],
-      data[offset + 27],
-      data[offset + 28],
-      data[offset + 29]
-    ] as [number, number, number, number, number, number]
+    clipIndex: data[offset + 18]
+  };
+}
+
+/** A node of the clip chain: box, radius, parent link and inverse transform. */
+function readClip(list: ReturnType<typeof buildRenderList>, index: number) {
+  const o = index * CLIP_STRIDE_FLOATS;
+  const d = list.clipData;
+  return {
+    x: d[o],
+    y: d[o + 1],
+    width: d[o + 2],
+    height: d[o + 3],
+    radius: d[o + 4],
+    parent: d[o + 5],
+    inverse: [d[o + 8], d[o + 9], d[o + 10], d[o + 11], d[o + 12], d[o + 13]] as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number
+    ]
   };
 }
 
@@ -368,7 +378,7 @@ describe('buildRenderList text', () => {
     expect(item.width).toBeGreaterThan(20);
     const command = list.commands.find((c): c is TextCommand => c.kind === CommandKind.Text)!;
     // The instance covers the run; the box does not clip it.
-    expect(list.texturedData[command.instance * 24 + 2]).toBe(item.width);
+    expect(list.texturedData[command.instance * TEXTURED_STRIDE_FLOATS + 2]).toBe(item.width);
   });
 
   it('keeps the same texture key while the run moves', () => {
@@ -566,7 +576,7 @@ describe('buildRenderList images', () => {
     const command = list.commands[1] as ImageCommand;
     expect(command.image).toBe(image);
     // contain: 100x50 into 100x100 sits at y = 25.
-    const offset = command.instance * 24;
+    const offset = command.instance * TEXTURED_STRIDE_FLOATS;
     expect(Array.from(list.texturedData.slice(offset, offset + 4))).toEqual([0, 25, 100, 50]);
   });
 });
@@ -641,7 +651,7 @@ describe('buildRenderList culling', () => {
 });
 
 describe('buildRenderList rounded clipping', () => {
-  it('hands descendants the innermost rounded clip in its own space', () => {
+  it('hands descendants the innermost rounded clip through the chain', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     root.setProperty('padding', 10);
@@ -656,14 +666,25 @@ describe('buildRenderList rounded clipping', () => {
     h.graph.appendChild(card, spill);
     h.graph.appendChild(root, card);
     const list = layoutAndBuild(h, root);
+    // The card's own background is clipped by its ancestors only.
+    expect(readInstance(list, 0).clipIndex).toBe(-1);
     const spillInstance = readInstance(list, 1);
-    expect(spillInstance.clip).toEqual({ x: 10, y: 10, width: 100, height: 60, radius: 8 });
-    expect(spillInstance.clipInverse).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(spillInstance.clipIndex).toBe(0);
+    expect(list.clipCount).toBe(1);
+    expect(readClip(list, 0)).toEqual({
+      x: 10,
+      y: 10,
+      width: 100,
+      height: 60,
+      radius: 8,
+      parent: -1,
+      inverse: [1, 0, 0, 1, 0, 0]
+    });
     // The scissor still does the rectangular part.
     expect(primitiveCommands(list).at(-1)!.scissor).toEqual({ x: 10, y: 10, width: 100, height: 60 });
   });
 
-  it('leaves the clip empty when no rounded ancestor clips', () => {
+  it('leaves instances unclipped when no rounded ancestor clips', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     const card = box(h, 'card', { width: 100, height: 60, overflow: 'hidden' });
@@ -671,7 +692,33 @@ describe('buildRenderList rounded clipping', () => {
     h.graph.appendChild(card, spill);
     h.graph.appendChild(root, card);
     const list = layoutAndBuild(h, root);
-    expect(readInstance(list, 0).clip.width).toBe(0);
+    expect(readInstance(list, 0).clipIndex).toBe(-1);
+    expect(list.clipCount).toBe(0);
+  });
+
+  it('chains nested rounded clips so both apply', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const outer = box(h, 'outer', { width: 200, height: 200, overflow: 'hidden', borderRadius: 24 });
+    const inner = box(h, 'inner', {
+      width: 100,
+      height: 100,
+      overflow: 'hidden',
+      borderRadius: 8,
+      backgroundColor: '#eee'
+    });
+    const spill = box(h, 'spill', { width: 300, height: 300, backgroundColor: '#f00' });
+    h.graph.appendChild(inner, spill);
+    h.graph.appendChild(outer, inner);
+    h.graph.appendChild(root, outer);
+    const list = layoutAndBuild(h, root);
+    expect(list.clipCount).toBe(2);
+    // The inner card's background sits under the outer clip; its child
+    // under the inner clip, whose parent is the outer.
+    expect(readInstance(list, 0).clipIndex).toBe(0);
+    expect(readInstance(list, 1).clipIndex).toBe(1);
+    expect(readClip(list, 0)).toMatchObject({ radius: 24, parent: -1 });
+    expect(readClip(list, 1)).toMatchObject({ radius: 8, parent: 0 });
   });
 
   it('inverts a scrolled and translated clip so the shader can test screen pixels', () => {
@@ -687,8 +734,28 @@ describe('buildRenderList rounded clipping', () => {
     // The content is scrolled (drawn 30 up), the clip is not: its
     // inverse maps the screen back into the card's unscrolled space.
     expect(inst.transform[5]).toBe(-30);
-    expect(inst.clip).toEqual({ x: 20, y: 20, width: 100, height: 60, radius: 8 });
-    expect(inst.clipInverse).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(readClip(list, inst.clipIndex)).toMatchObject({ x: 20, y: 20, width: 100, height: 60, radius: 8 });
+    expect(readClip(list, inst.clipIndex).inverse).toEqual([1, 0, 0, 1, 0, 0]);
+  });
+
+  it('inverts a scaled ancestor so the clip is tested in its own space', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const card = box(h, 'card', {
+      width: 100,
+      height: 60,
+      overflow: 'hidden',
+      borderRadius: 8,
+      transform: { scaleX: 2 }
+    });
+    const spill = box(h, 'spill', { width: 300, height: 300, backgroundColor: '#f00' });
+    h.graph.appendChild(card, spill);
+    h.graph.appendChild(root, card);
+    const list = layoutAndBuild(h, root);
+    const clip = readClip(list, 0);
+    // Screen x = 2·local x, so the inverse halves it.
+    expect(clip.inverse[0]).toBe(0.5);
+    expect(clip.inverse[3]).toBe(1);
   });
 });
 

@@ -26,7 +26,7 @@ export { layoutTextLines, drawText, buildFontString } from './TextRenderer';
 export type { TextLinePlacement } from './TextRenderer';
 export type { UiRenderer, RendererBackend } from './UiRenderer';
 export { WebGPURenderer } from './webgpu/WebGPURenderer';
-export type { WebGPURendererOptions, RenderHooks } from './webgpu/WebGPURenderer';
+export type { WebGPURendererOptions, RenderHooks, DrawStats, CapturedFrame } from './webgpu/WebGPURenderer';
 export { createWebGPUSurface, WebGPUSurface } from './webgpu/WebGPUSurface';
 export type { WebGPUCanvasHost } from './webgpu/WebGPUSurface';
 export { WebGPUError } from './webgpu/WebGPUError';
@@ -40,6 +40,9 @@ export {
   INSTANCE_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
   TEXTURED_STRIDE_BYTES,
+  CLIP_STRIDE_FLOATS,
+  CLIP_STRIDE_BYTES,
+  NO_CLIP_INDEX,
   CommandKind,
   PrimitiveKind
 } from './webgpu/WebGPURenderData';

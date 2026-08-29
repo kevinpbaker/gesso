@@ -12,7 +12,8 @@ function createMockDevice(): GPUDevice {
     lost: new Promise(() => {}),
     queue: {
       writeBuffer: vi.fn(),
-      submit: vi.fn()
+      submit: vi.fn(),
+      copyExternalImageToTexture: vi.fn()
     },
     createShaderModule: vi.fn(() => ({})),
     createBindGroupLayout: vi.fn(() => ({})),
@@ -261,6 +262,68 @@ describe('WebGPURenderer text', () => {
         value: originalNavigator,
         configurable: true
       });
+    }
+  });
+});
+
+describe('WebGPURenderer text batching', () => {
+  it('draws consecutive identical text runs under one scissor as a single instanced call', async () => {
+    const device = createMockDevice();
+    const adapter = createMockAdapter(device);
+    const originalNavigator = globalThis.navigator;
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        gpu: {
+          requestAdapter: vi.fn(async () => adapter),
+          getPreferredCanvasFormat: vi.fn(() => 'bgra8unorm')
+        }
+      },
+      configurable: true
+    });
+    const originalOffscreen = (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas;
+    // A canvas double so text can rasterise outside a browser.
+    (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas = class {
+      width: number;
+      height: number;
+      constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+      }
+      getContext() {
+        return { scale: vi.fn(), fillText: vi.fn(), font: '', fillStyle: '', textAlign: '', textBaseline: '' };
+      }
+    };
+
+    try {
+      const context = createMockContext();
+      const { host } = createMockHost(context);
+      const surface = new WebGPUSurface(host);
+      const renderer = new WebGPURenderer({ surface });
+      await renderer.initialize();
+      renderer.resize(800, 600, 1);
+
+      const h = new RenderHarness();
+      const root = h.createNode('app', UiNodeType.Column);
+      for (let i = 0; i < 5; i++) {
+        const label = h.createNode(`same${i}`, UiNodeType.Text);
+        label.setProperty('text', 'one');
+        label.setProperty('fontSize', 12);
+        h.graph.appendChild(root, label);
+      }
+      const other = h.createNode('other', UiNodeType.Text);
+      other.setProperty('text', 'different');
+      other.setProperty('fontSize', 12);
+      h.graph.appendChild(root, other);
+      h.layout(root);
+
+      renderer.render(root, { layout: h.engine, text: h.measurer });
+      // Five "one" runs share a texture and draw once; "different" draws once.
+      expect(renderer.lastDraws.texturedDraws).toBe(2);
+      expect(renderer.lastDraws.texturedInstances).toBe(6);
+      renderer.dispose();
+    } finally {
+      (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas = originalOffscreen;
+      Object.defineProperty(globalThis, 'navigator', { value: originalNavigator, configurable: true });
     }
   });
 });

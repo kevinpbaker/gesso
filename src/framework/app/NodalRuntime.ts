@@ -170,6 +170,8 @@ export class NodalRuntime {
   private lastFrameMs = 0;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
   private rendererErrorListener: ((message: string) => void) | null = null;
+  /** WebGPU stage timings of the frame being rendered; null on Canvas2D. */
+  private gpuTimings: GpuStageTimings | null = null;
   private inspectListener: ((text: string | null) => void) | null = null;
   private lastInspection: string | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
@@ -200,7 +202,12 @@ export class NodalRuntime {
       this.textMeasurer = new CanvasTextMeasurer(measureSurface.getContext2D());
       const webgpu = new WebGPURenderer({
         surface: createWebGPUSurface(options.canvas as unknown as WebGPUCanvasHost),
-        onError: message => this.reportRendererError(message)
+        onError: message => this.reportRendererError(message),
+        hooks: {
+          onPrepareEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), prepare: ms }),
+          onUploadEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), upload: ms }),
+          onEncodeEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), encode: ms })
+        }
       });
       this.renderer = webgpu;
       this.rendererState = 'pending';
@@ -721,6 +728,7 @@ export class NodalRuntime {
     if (this.renderer.backend === 'webgpu' && (this.renderer as WebGPURenderer).isLost) {
       this.fallBackToCanvas2D(this.renderer);
     }
+    this.gpuTimings = null;
     this.phaseTimings.render = this.timePhase(
       () => this.renderer.isReady,
       () => this.renderer.render(root, { layout: this.engine, text: this.textMeasurer, now: started })
@@ -751,7 +759,8 @@ export class NodalRuntime {
       relayoutRoots: this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
       at: finished,
       phases: this.phaseTimings,
-      renderer: this.rendererState
+      renderer: this.rendererState,
+      gpu: this.gpuTimings
     });
   }
 
@@ -840,6 +849,12 @@ export interface FrameMetrics {
   /** The backend that drew this frame, or `pending` while WebGPU initialises. */
   renderer: RendererBackend | 'pending';
   /**
+   * The WebGPU render phase split into its stages — building the render
+   * list, uploading buffers, encoding and submitting — or null when
+   * Canvas2D drew. Their sum is the render phase's cost on the GPU path.
+   */
+  gpu: GpuStageTimings | null;
+  /**
    * When the frame finished, on the clock of the thread that rendered
    * it. Gaps between consecutive values are the only honest measure of
    * a stall: across a worker boundary the messages themselves queue up
@@ -865,6 +880,17 @@ function createMeasureCanvas(): CanvasHost {
     return canvas;
   }
   throw new Error('NodalRuntime: no canvas is available for text measurement; pass `measureCanvas`.');
+}
+
+/** Milliseconds per WebGPU stage of one frame. */
+export interface GpuStageTimings {
+  prepare: number;
+  upload: number;
+  encode: number;
+}
+
+function emptyGpuTimings(): GpuStageTimings {
+  return { prepare: 0, upload: 0, encode: 0 };
 }
 
 function emptyPhaseTimings(): FramePhaseTimings {

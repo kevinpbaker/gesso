@@ -55,4 +55,11 @@ export class PlaygroundState {
 
   /** Stress-test subtree size (0 disables it). */
   readonly stressCount$ = new BehaviorSubject(0);
+
+  /**
+   * The parity section's bitmap, decoded asynchronously by the route
+   * that mounts the state; undefined until then, and on routes that
+   * never set it (the boxes then show their backgrounds).
+   */
+  readonly image$ = new BehaviorSubject<ImageBitmap | undefined>(undefined);
 }

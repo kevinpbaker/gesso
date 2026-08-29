@@ -12,6 +12,16 @@ export interface PrimitivePipeline {
   uniformLayout: GPUBindGroupLayout;
 }
 
+/**
+ * The bind group layout for the clip chain (group 1), shared by both
+ * pipelines so one bind group serves the whole pass.
+ */
+export function createClipBindGroupLayout(device: GPUDevice): GPUBindGroupLayout {
+  return device.createBindGroupLayout({
+    entries: [{ binding: 0, visibility: fragmentStage(), buffer: { type: 'read-only-storage' } }]
+  });
+}
+
 export interface TexturedPipeline {
   pipeline: GPURenderPipeline;
   vertexBuffer: GPUBuffer;
@@ -37,9 +47,16 @@ const usage = {
   copyDst: (): number => (typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.COPY_DST : 0x8)
 };
 
+/**
+ * Source-over for a straight-alpha source onto a premultiplied target,
+ * which is what the canvas is configured as. Colour is scaled by the
+ * source alpha; alpha itself is not — with `src-alpha` there too, a
+ * half-transparent fill over a transparent canvas came out a quarter
+ * transparent, and every faint panel drew dimmer than on Canvas2D.
+ */
 const STRAIGHT_ALPHA_BLEND: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-  alpha: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' }
+  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
 };
 
 /**
@@ -48,7 +65,11 @@ const STRAIGHT_ALPHA_BLEND: GPUBlendState = {
  * Static resources (quad geometry, pipeline, bind group layout) are
  * created once and reused for the lifetime of the renderer.
  */
-export function createPrimitivePipeline(device: GPUDevice, format: GPUTextureFormat): PrimitivePipeline {
+export function createPrimitivePipeline(
+  device: GPUDevice,
+  format: GPUTextureFormat,
+  clipLayout: GPUBindGroupLayout
+): PrimitivePipeline {
   const module = device.createShaderModule({ code: PRIMITIVE_SHADER });
 
   const uniformLayout = device.createBindGroupLayout({
@@ -56,7 +77,7 @@ export function createPrimitivePipeline(device: GPUDevice, format: GPUTextureFor
   });
 
   const pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({ bindGroupLayouts: [uniformLayout] }),
+    layout: device.createPipelineLayout({ bindGroupLayouts: [uniformLayout, clipLayout] }),
     vertex: { module, entryPoint: 'vs', buffers: [quadVertexLayout(), primitiveInstanceLayout()] },
     fragment: { module, entryPoint: 'fs', targets: [{ format, blend: STRAIGHT_ALPHA_BLEND }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }
@@ -90,7 +111,11 @@ export function createPrimitivePipeline(device: GPUDevice, format: GPUTextureFor
  * Creates the textured pipeline: one quad per rasterised text run or
  * image, each command binding its own texture.
  */
-export function createTexturedPipeline(device: GPUDevice, format: GPUTextureFormat): TexturedPipeline {
+export function createTexturedPipeline(
+  device: GPUDevice,
+  format: GPUTextureFormat,
+  clipLayout: GPUBindGroupLayout
+): TexturedPipeline {
   const module = device.createShaderModule({ code: TEXTURED_SHADER });
 
   const bindGroupLayout = device.createBindGroupLayout({
@@ -102,7 +127,7 @@ export function createTexturedPipeline(device: GPUDevice, format: GPUTextureForm
   });
 
   const pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
+    layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, clipLayout] }),
     vertex: { module, entryPoint: 'vs', buffers: [quadVertexLayout(), texturedInstanceLayout()] },
     fragment: { module, entryPoint: 'fs', targets: [{ format, blend: STRAIGHT_ALPHA_BLEND }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }
@@ -170,11 +195,7 @@ function primitiveInstanceLayout(): GPUVertexBufferLayout {
       { shaderLocation: 6, offset: 48, format: 'float32x2' }, // transform a
       { shaderLocation: 7, offset: 56, format: 'float32x2' }, // transform b
       { shaderLocation: 8, offset: 64, format: 'float32x2' }, // transform c
-      { shaderLocation: 9, offset: 72, format: 'float32x4' }, // clip rect
-      { shaderLocation: 10, offset: 88, format: 'float32x2' }, // clip radius, pad
-      { shaderLocation: 11, offset: 96, format: 'float32x2' }, // clip inverse a
-      { shaderLocation: 12, offset: 104, format: 'float32x2' }, // clip inverse b
-      { shaderLocation: 13, offset: 112, format: 'float32x2' } // clip inverse c
+      { shaderLocation: 9, offset: 72, format: 'float32' } // clip index
     ]
   };
 }
@@ -188,14 +209,10 @@ function texturedInstanceLayout(): GPUVertexBufferLayout {
       { shaderLocation: 1, offset: 0, format: 'float32x2' }, // pos
       { shaderLocation: 2, offset: 8, format: 'float32x2' }, // size
       { shaderLocation: 3, offset: 16, format: 'float32' }, // opacity
-      { shaderLocation: 4, offset: 24, format: 'float32x2' }, // transform a
-      { shaderLocation: 5, offset: 32, format: 'float32x2' }, // transform b
-      { shaderLocation: 6, offset: 40, format: 'float32x2' }, // transform c
-      { shaderLocation: 7, offset: 48, format: 'float32x4' }, // clip rect
-      { shaderLocation: 8, offset: 64, format: 'float32x2' }, // clip radius, pad
-      { shaderLocation: 9, offset: 72, format: 'float32x2' }, // clip inverse a
-      { shaderLocation: 10, offset: 80, format: 'float32x2' }, // clip inverse b
-      { shaderLocation: 11, offset: 88, format: 'float32x2' } // clip inverse c
+      { shaderLocation: 4, offset: 20, format: 'float32' }, // clip index
+      { shaderLocation: 5, offset: 24, format: 'float32x2' }, // transform a
+      { shaderLocation: 6, offset: 32, format: 'float32x2' }, // transform b
+      { shaderLocation: 7, offset: 40, format: 'float32x2' } // transform c
     ]
   };
 }

@@ -6,6 +6,7 @@ import type { WebGPUSurface } from './WebGPUSurface';
 import { initializeWebGPU, onDeviceLost } from './WebGPUDevice';
 import { WebGPUError } from './WebGPUError';
 import {
+  createClipBindGroupLayout,
   createPrimitivePipeline,
   createTexturedPipeline,
   type PrimitivePipeline,
@@ -13,11 +14,14 @@ import {
 } from './WebGPUPipeline';
 import {
   buildRenderList,
+  CLIP_STRIDE_BYTES,
   CommandKind,
   INSTANCE_STRIDE_BYTES,
   TEXTURED_STRIDE_BYTES,
   viewportScissor,
-  type ScissorRect
+  type RenderCommand,
+  type ScissorRect,
+  type TextCommand
 } from './WebGPURenderData';
 import { VIEW_UNIFORM_FLOATS } from './WebGPUShader';
 import { WebGPUTextureCache } from './WebGPUTextureCache';
@@ -45,7 +49,31 @@ export interface RenderHooks {
 }
 
 const vertexBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.VERTEX : 0x20;
+const storageBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.STORAGE : 0x80;
 const copyDstBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.COPY_DST : 0x8;
+
+/** A frame read back from the GPU: RGBA, straight alpha, row-major. */
+export interface CapturedFrame {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+
+interface PendingCapture {
+  resolve: (frame: CapturedFrame) => void;
+  reject: (error: Error) => void;
+}
+
+const copyDstUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.COPY_DST : 0x8;
+const mapReadUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.MAP_READ : 0x1;
+const mapModeRead = typeof GPUMapMode !== 'undefined' ? GPUMapMode.READ : 0x1;
+
+/** Draw calls issued for one frame, by kind; for tests and the profiler. */
+export interface DrawStats {
+  primitiveDraws: number;
+  texturedDraws: number;
+  texturedInstances: number;
+}
 
 /**
  * WebGPU rendering backend for the retained UI tree.
@@ -69,7 +97,13 @@ export class WebGPURenderer implements UiRenderer {
   private textures: WebGPUTextureCache | null = null;
   private instanceBuffer: GPUBuffer | null = null;
   private texturedBuffer: GPUBuffer | null = null;
+  private clipBuffer: GPUBuffer | null = null;
+  private clipLayout: GPUBindGroupLayout | null = null;
+  private clipBindGroup: GPUBindGroup | null = null;
   private cachedInstanceData: Float32Array | null = null;
+  /** Draw calls of the most recent frame. */
+  readonly lastDraws: DrawStats = { primitiveDraws: 0, texturedDraws: 0, texturedInstances: 0 };
+  private pendingCapture: PendingCapture | null = null;
   private lost = false;
   private disposed = false;
   private readonly removeLostListener: () => void;
@@ -114,8 +148,9 @@ export class WebGPURenderer implements UiRenderer {
       this.onError(`WebGPU error: ${event.error.message}`);
     };
     this.surface.configure(init.device, init.format);
-    this.primitives = createPrimitivePipeline(init.device, init.format);
-    this.textured = createTexturedPipeline(init.device, init.format);
+    this.clipLayout = createClipBindGroupLayout(init.device);
+    this.primitives = createPrimitivePipeline(init.device, init.format, this.clipLayout);
+    this.textured = createTexturedPipeline(init.device, init.format, this.clipLayout);
     this.textures = new WebGPUTextureCache(init.device, this.textured);
     this.lost = false;
   }
@@ -138,6 +173,18 @@ export class WebGPURenderer implements UiRenderer {
   /** True once the device has been lost; frames are skipped from then on. */
   get isLost(): boolean {
     return this.lost;
+  }
+
+  /**
+   * Resolves with the pixels of the next frame `render()` draws, read
+   * back from the GPU rather than from the canvas, so the result does
+   * not depend on when the compositor presents. For the parity check.
+   */
+  capture(): Promise<CapturedFrame> {
+    return new Promise((resolve, reject) => {
+      this.pendingCapture?.reject(new Error('Superseded by a later capture.'));
+      this.pendingCapture = { resolve, reject };
+    });
   }
 
   /**
@@ -200,6 +247,24 @@ export class WebGPURenderer implements UiRenderer {
       this.texturedBuffer = this.ensureBuffer(this.texturedBuffer, list.texturedData.byteLength, TEXTURED_STRIDE_BYTES);
       device.queue.writeBuffer(this.texturedBuffer, 0, list.texturedData.buffer, 0, list.texturedData.byteLength);
     }
+    // The clip chain is bound even when empty: the shader declares it and
+    // every instance names -1. The bind group follows the buffer.
+    const clipBuffer = this.ensureBuffer(
+      this.clipBuffer,
+      list.clipData.byteLength,
+      CLIP_STRIDE_BYTES,
+      storageBufferUsage
+    );
+    if (clipBuffer !== this.clipBuffer || this.clipBindGroup === null) {
+      this.clipBuffer = clipBuffer;
+      this.clipBindGroup = device.createBindGroup({
+        layout: this.clipLayout!,
+        entries: [{ binding: 0, resource: { buffer: clipBuffer } }]
+      });
+    }
+    if (list.clipCount > 0) {
+      device.queue.writeBuffer(clipBuffer, 0, list.clipData.buffer, 0, list.clipData.byteLength);
+    }
     const view = new Float32Array(VIEW_UNIFORM_FLOATS);
     view[0] = this.surface.logicalWidth || 1;
     view[1] = this.surface.logicalHeight || 1;
@@ -227,8 +292,14 @@ export class WebGPURenderer implements UiRenderer {
     const viewport = viewportScissor(this.surface.logicalWidth, this.surface.logicalHeight, this.surface.dpr);
     let currentScissor: ScissorRect | null = null;
     let currentKind: CommandKind | null = null;
+    pass.setBindGroup(1, this.clipBindGroup!);
+    this.lastDraws.primitiveDraws = 0;
+    this.lastDraws.texturedDraws = 0;
+    this.lastDraws.texturedInstances = 0;
 
-    for (const command of list.commands) {
+    const commands = list.commands;
+    for (let i = 0; i < commands.length; i++) {
+      const command = commands[i];
       const scissor = command.scissor ?? viewport;
       if (scissor.width <= 0 || scissor.height <= 0) {
         // Everything under this clip is off screen; a zero scissor
@@ -249,6 +320,7 @@ export class WebGPURenderer implements UiRenderer {
         }
         currentScissor = setScissor(pass, currentScissor, scissor);
         pass.drawIndexed(primitives.indexCount, command.end - command.start, 0, 0, command.start);
+        this.lastDraws.primitiveDraws++;
         continue;
       }
 
@@ -268,15 +340,69 @@ export class WebGPURenderer implements UiRenderer {
       }
       currentScissor = setScissor(pass, currentScissor, scissor);
       pass.setBindGroup(0, bindGroup);
-      pass.drawIndexed(textured.indexCount, 1, 0, 0, command.instance);
+      // Consecutive runs of the same text under the same scissor — a
+      // list of repeated labels — share a texture and draw as one call.
+      const count = command.kind === CommandKind.Text ? sameTextureRun(commands, i) : 1;
+      pass.drawIndexed(textured.indexCount, count, 0, 0, command.instance);
+      this.lastDraws.texturedDraws++;
+      this.lastDraws.texturedInstances += count;
+      i += count - 1;
     }
 
     pass.end();
+    const capture = this.takeCapture(device, commandEncoder, texture);
     device.queue.submit([commandEncoder.finish()]);
+    capture?.();
     textures.endFrame();
     if (this.hooks.onEncodeEnd !== undefined) {
       this.hooks.onEncodeEnd(performance.now() - encodeStart);
     }
+  }
+
+  /**
+   * When a capture is pending, encodes a copy of the frame into a
+   * mappable buffer and returns the step that maps it after submit.
+   */
+  private takeCapture(device: GPUDevice, encoder: GPUCommandEncoder, texture: GPUTexture): (() => void) | null {
+    const pending = this.pendingCapture;
+    if (pending === null) {
+      return null;
+    }
+    this.pendingCapture = null;
+    const width = texture.width;
+    const height = texture.height;
+    // Rows are padded to 256 bytes, as copyTextureToBuffer requires.
+    const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
+    const buffer = device.createBuffer({ size: bytesPerRow * height, usage: copyDstUsage | mapReadUsage });
+    encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow }, { width, height });
+    const bgra = this.format === 'bgra8unorm' || this.format === 'bgra8unorm-srgb';
+    return () => {
+      buffer
+        .mapAsync(mapModeRead)
+        .then(() => {
+          const mapped = new Uint8Array(buffer.getMappedRange());
+          const data = new Uint8ClampedArray(width * height * 4);
+          for (let y = 0; y < height; y++) {
+            const row = y * bytesPerRow;
+            const out = y * width * 4;
+            for (let x = 0; x < width; x++) {
+              const i = row + x * 4;
+              const o = out + x * 4;
+              data[o] = mapped[bgra ? i + 2 : i];
+              data[o + 1] = mapped[i + 1];
+              data[o + 2] = mapped[bgra ? i : i + 2];
+              data[o + 3] = mapped[i + 3];
+            }
+          }
+          buffer.unmap();
+          buffer.destroy();
+          pending.resolve({ width, height, data });
+        })
+        .catch((error: unknown) => {
+          buffer.destroy();
+          pending.reject(error instanceof Error ? error : new Error(String(error)));
+        });
+    };
   }
 
   /**
@@ -322,6 +448,10 @@ export class WebGPURenderer implements UiRenderer {
     this.instanceBuffer = null;
     this.texturedBuffer?.destroy();
     this.texturedBuffer = null;
+    this.clipBuffer?.destroy();
+    this.clipBuffer = null;
+    this.clipBindGroup = null;
+    this.clipLayout = null;
     this.primitives = null;
     this.textured = null;
     // The device is owned by the WebGPU initialization layer; the
@@ -341,7 +471,12 @@ export class WebGPURenderer implements UiRenderer {
    * Returns a vertex buffer of at least `byteLength`, reusing the
    * current one when it is big enough and replacing it otherwise.
    */
-  private ensureBuffer(current: GPUBuffer | null, byteLength: number, stride: number): GPUBuffer {
+  private ensureBuffer(
+    current: GPUBuffer | null,
+    byteLength: number,
+    stride: number,
+    usage: number = vertexBufferUsage
+  ): GPUBuffer {
     if (current !== null && current.size >= byteLength) {
       return current;
     }
@@ -349,8 +484,40 @@ export class WebGPURenderer implements UiRenderer {
     // Round up to whole instances, with headroom so a growing list does
     // not reallocate every frame.
     const size = Math.max(Math.ceil((byteLength * 1.5) / stride) * stride, stride * 16);
-    return this.device!.createBuffer({ size, usage: vertexBufferUsage | copyDstBufferUsage });
+    return this.device!.createBuffer({ size, usage: usage | copyDstBufferUsage });
   }
+}
+
+/**
+ * How many commands from `start` are text runs with the same texture
+ * key and scissor as the first, occupying consecutive instances.
+ */
+function sameTextureRun(commands: readonly RenderCommand[], start: number): number {
+  const first = commands[start] as TextCommand;
+  let count = 1;
+  for (let j = start + 1; j < commands.length; j++) {
+    const next = commands[j];
+    if (
+      next.kind !== CommandKind.Text ||
+      next.item.key !== first.item.key ||
+      next.instance !== first.instance + count ||
+      !sameScissor(next.scissor, first.scissor)
+    ) {
+      break;
+    }
+    count++;
+  }
+  return count;
+}
+
+function sameScissor(a: ScissorRect | null, b: ScissorRect | null): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (a === null || b === null) {
+    return false;
+  }
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
 function setScissor(pass: GPURenderPassEncoder, current: ScissorRect | null, next: ScissorRect): ScissorRect {

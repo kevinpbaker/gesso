@@ -18,6 +18,7 @@ interface FrameMetrics {
   at: number;
   phases: Record<string, number>;
   renderer: string;
+  gpu: { prepare: number; upload: number; encode: number } | null;
 }
 
 /**
@@ -184,6 +185,11 @@ function createFrameReporter(
   // minority of frames, so sampling the current frame would almost
   // always show them as idle even when they are doing the work.
   const worstPhase: Record<string, number> = {};
+  // Steady-state render cost: the mean over the report window, so the
+  // Canvas2D and WebGPU backends can be compared on the same screen.
+  let renderSum = 0;
+  let renderCount = 0;
+  const gpuSum = { prepare: 0, upload: 0, encode: 0 };
 
   return metrics => {
     frames++;
@@ -196,6 +202,15 @@ function createFrameReporter(
     previousFrameAt = metrics.at;
     for (const [name, ms] of Object.entries(metrics.phases)) {
       worstPhase[name] = Math.max(worstPhase[name] ?? 0, ms);
+    }
+    if (metrics.phases.render > 0) {
+      renderSum += metrics.phases.render;
+      renderCount++;
+      if (metrics.gpu !== null) {
+        gpuSum.prepare += metrics.gpu.prepare;
+        gpuSum.upload += metrics.gpu.upload;
+        gpuSum.encode += metrics.gpu.encode;
+      }
     }
 
     const now = performance.now();
@@ -223,12 +238,20 @@ function createFrameReporter(
       { label: 'Frame', value: `${metrics.durationMs.toFixed(1)} ms` },
       { label: 'Worst gap', value: `${worstGap.toFixed(0)} ms` }
     ]);
+    const meanRender = renderCount > 0 ? renderSum / renderCount : 0;
+    const gpuText =
+      metrics.gpu !== null && renderCount > 0
+        ? ` (prepare ${(gpuSum.prepare / renderCount).toFixed(2)} · upload ${(gpuSum.upload / renderCount).toFixed(2)} · encode ${(gpuSum.encode / renderCount).toFixed(2)})`
+        : '';
     shell.setStatus(
-      'Worst phase · ' +
+      `Render ${meanRender.toFixed(2)}ms mean${gpuText} · worst · ` +
         Object.entries(worstPhase)
           .map(([name, ms]) => `${name} ${ms.toFixed(2)}ms`)
           .join(' · ')
     );
+    renderSum = 0;
+    renderCount = 0;
+    gpuSum.prepare = gpuSum.upload = gpuSum.encode = 0;
     shell.setDetail(
       `Last frame laid out ${metrics.measured} node${metrics.measured === 1 ? '' : 's'}` +
         (metrics.relayoutRoots > 0
