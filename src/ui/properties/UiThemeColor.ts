@@ -39,4 +39,9 @@ export function resolveColor<T extends UiColorValue | undefined>(
   return normalizeColor(value);
 }
 
+/** A palette entry of the theme the node inherits, for defaults that follow the theme. */
+export function themeColor(node: UiNode, name: UiThemeColorName): UiColor | undefined {
+  return themeColorFor(node, name);
+}
+
 export { colorValuesEqual } from './UiColor';

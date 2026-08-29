@@ -1,4 +1,4 @@
-import type { TextMeasurer } from '../layout/TextMeasurer';
+import type { ParagraphLayout, TextMeasureRequest, TextMeasurer } from '../layout/TextMeasurer';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { Canvas2DContext } from './canvas2d/Canvas2DContext';
 import type { PaintState } from './PaintState';
@@ -9,6 +9,9 @@ import { colorToCss } from './PaintState';
  */
 export interface TextLinePlacement {
   text: string;
+  /** Offsets into the source text the line covers; see TextLine. */
+  start: number;
+  end: number;
   /** Left edge of the line box after horizontal alignment. */
   x: number;
   /** Top edge of the line box. */
@@ -38,7 +41,19 @@ export function layoutTextLines(box: LayoutBox, state: PaintState, measurer: Tex
   if (text === undefined || text.length === 0 || state.fontSize <= 0) {
     return [];
   }
-  const paragraph = measurer.layout({
+  return placeLines(box, state, measurer.layout(textMeasureRequest(text, state, box)));
+}
+
+/** The measure request paint makes for a node's text: the one layout made too. */
+export function textMeasureRequest(
+  text: string,
+  state: Pick<
+    PaintState,
+    'fontSize' | 'fontFamily' | 'fontWeight' | 'lineHeight' | 'textWrap' | 'maxLines' | 'textOverflow'
+  >,
+  box: LayoutBox
+): TextMeasureRequest {
+  return {
     text,
     fontSize: state.fontSize,
     fontFamily: state.fontFamily,
@@ -48,7 +63,18 @@ export function layoutTextLines(box: LayoutBox, state: PaintState, measurer: Tex
     wrap: state.textWrap,
     maxLines: state.maxLines,
     overflow: state.textOverflow
-  });
+  };
+}
+
+/**
+ * Positions a measured paragraph's lines in a box: x per line from the
+ * horizontal alignment, y from the vertical alignment and line index.
+ */
+export function placeLines(
+  box: LayoutBox,
+  state: Pick<PaintState, 'textAlign' | 'verticalAlign'>,
+  paragraph: ParagraphLayout
+): TextLinePlacement[] {
   const offsetY = verticalOffset(state.verticalAlign, box.height, paragraph.height);
   const placements: TextLinePlacement[] = [];
   for (let i = 0; i < paragraph.lines.length; i++) {
@@ -57,6 +83,8 @@ export function layoutTextLines(box: LayoutBox, state: PaintState, measurer: Tex
     const y = box.y + offsetY + i * paragraph.lineHeight;
     placements.push({
       text: line.text,
+      start: line.start,
+      end: line.end,
       x,
       y,
       baselineY: y + paragraph.firstBaseline,
@@ -85,16 +113,27 @@ export function buildFontString(state: Pick<PaintState, 'fontWeight' | 'fontSize
  * would.
  */
 export function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState, measurer: TextMeasurer): void {
-  const placements = layoutTextLines(box, state, measurer);
+  drawTextLines(ctx, layoutTextLines(box, state, measurer), buildFontString(state), colorToCss(state.textColor));
+}
+
+/** Draws already-placed lines in one font and colour. */
+export function drawTextLines(
+  ctx: Canvas2DContext,
+  placements: readonly TextLinePlacement[],
+  font: string,
+  color: string
+): void {
   if (placements.length === 0) {
     return;
   }
-  ctx.font = buildFontString(state);
-  ctx.fillStyle = colorToCss(state.textColor);
+  ctx.font = font;
+  ctx.fillStyle = color;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   for (const placement of placements) {
-    ctx.fillText(placement.text, placement.x, placement.baselineY);
+    if (placement.text.length > 0) {
+      ctx.fillText(placement.text, placement.x, placement.baselineY);
+    }
   }
 }
 

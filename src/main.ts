@@ -7,6 +7,7 @@ import { mountCompareRoute } from './playground/routes/CompareRoute';
 import { mountExamplesRoute } from './playground/routes/ExamplesRoute';
 import { mountFrameworkRoute, mountFrameworkSyncRoute } from './playground/routes/FrameworkRoute';
 import { mountSignInExampleRoute } from './playground/routes/SignInExampleRoute';
+import { mountNotesExampleRoute } from './playground/routes/NotesExampleRoute';
 import { mountLayoutRoute } from './playground/routes/LayoutRoute';
 import { mountThemeRoute } from './playground/routes/ThemeRoute';
 import { mountWebGPURoute } from './playground/routes/WebGPURoute';
@@ -35,7 +36,8 @@ const MOUNTS: Record<string, Mount> = {
   binding: mountBindingRoute,
   theme: mountThemeRoute,
   examples: mountExamplesRoute,
-  'example-signin': mountSignInExampleRoute
+  'example-signin': mountSignInExampleRoute,
+  'example-notes': mountNotesExampleRoute
 };
 
 if (import.meta.env.DEV) {

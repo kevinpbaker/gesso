@@ -1,7 +1,14 @@
 import type { Observable } from 'rxjs';
 
 import type { UiNode } from '../graph/UiNode';
-import type { UiFocusEvent, UiKeyboardEvent, UiPointerEvent, UiWheelEvent } from '../input/UiInputEvent';
+import type {
+  UiBeforeInputEvent,
+  UiFocusEvent,
+  UiKeyboardEvent,
+  UiPointerEvent,
+  UiTextChangeEvent,
+  UiWheelEvent
+} from '../input/UiInputEvent';
 import type { UiPropertyName, UiPropertyValues } from '../properties/UiProperty';
 
 /**
@@ -54,6 +61,10 @@ export type UiEventProps = {
   onKeyUp?: (event: UiKeyboardEvent) => void;
   onFocus?: (event: UiFocusEvent) => void;
   onBlur?: (event: UiFocusEvent) => void;
+  /** An edit is about to reach an editable; preventDefault() rejects it. */
+  onBeforeInput?: (event: UiBeforeInputEvent) => void;
+  /** An editable's text changed. */
+  onInput?: (event: UiTextChangeEvent) => void;
 };
 
 /** Reconciliation identity and node access; never stored on the node. */
@@ -141,6 +152,25 @@ export type FlexContainerProps = ContainerProps &
 export type TextContentProps = PropsOf<'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign'>;
 
 export type TextProps = CommonProps & TextContentProps;
+
+/**
+ * Text the user types into. `value` sets the text; `onInput` reports
+ * every change; `multiline` lets Enter insert a newline. Wrapping
+ * follows `textWrap` (use `'none'` for a single-line field that scrolls
+ * rather than wraps).
+ */
+export type EditableTextProps = CommonProps &
+  PropsOf<
+    | 'value'
+    | 'placeholder'
+    | 'multiline'
+    | 'readOnly'
+    | 'textWrap'
+    | 'verticalAlign'
+    | 'caretColor'
+    | 'selectionColor'
+    | 'placeholderColor'
+  >;
 
 /**
  * A Box stacks its children in one content box, aligned by `x` / `y`,

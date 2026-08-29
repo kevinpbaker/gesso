@@ -12,6 +12,7 @@ import type {
   BoxProps,
   ButtonProps,
   ColumnProps,
+  EditableTextProps,
   GridProps,
   RowProps,
   ScrollViewProps,
@@ -25,6 +26,15 @@ import type { UiProps } from './UiProps';
  */
 export function Text(props: TextProps = {}): UiElement {
   return createElement(UiNodeType.Text, props);
+}
+
+/**
+ * Creates an EditableText element: text the user can type into, with
+ * a caret, a selection and IME composition. The runtime owns the
+ * editing; the app sets `value` and listens to `onInput`.
+ */
+export function EditableText(props: EditableTextProps = {}): UiElement {
+  return createElement(UiNodeType.EditableText, props);
 }
 
 /**

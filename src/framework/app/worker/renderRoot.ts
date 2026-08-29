@@ -96,6 +96,7 @@ export class RenderWorkerApp {
   private dispatch(message: ShellToRuntimeMessage): void {
     if (message.type === 'init') {
       this.initialize(message.canvas, message.width, message.height, message.dpr, message.renderer);
+      this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
     }
 
@@ -130,6 +131,27 @@ export class RenderWorkerApp {
         break;
       case 'keyUp':
         runtime.input.keyboard.keyUp(message.key, message.modifiers);
+        break;
+      case 'beforeInput':
+        runtime.input.editing.beforeInput(message.inputType, message.data);
+        break;
+      case 'compositionStart':
+        runtime.input.editing.compositionStart();
+        break;
+      case 'compositionUpdate':
+        runtime.input.editing.compositionUpdate(message.text, message.caret);
+        break;
+      case 'compositionEnd':
+        runtime.input.editing.compositionEnd(message.text);
+        break;
+      case 'paste':
+        runtime.input.editing.paste(message.text);
+        break;
+      case 'blur':
+        runtime.input.focus.blur();
+        break;
+      case 'visibility':
+        runtime.setVisible(message.visible);
         break;
       case 'inspector':
         runtime.setInspectorEnabled(message.enabled);
@@ -173,6 +195,14 @@ export class RenderWorkerApp {
     });
     this.runtime.onCursor(cursor => {
       this.host.postMessage({ type: 'cursor', cursor });
+    });
+    this.runtime.onEditingState(state => {
+      this.host.postMessage({ type: 'editing', state });
+    });
+    this.runtime.onShellRequest(request => {
+      this.host.postMessage(
+        request.type === 'clipboard' ? { type: 'clipboard', text: request.text } : { type: 'openUrl', url: request.url }
+      );
     });
     this.runtime.onRendererError(message => {
       this.host.postMessage({ type: 'error', message: `renderer: ${message}` });

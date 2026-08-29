@@ -21,7 +21,7 @@ describe('layoutTextLines', () => {
     );
     expect(lines).toHaveLength(1);
     // 12px line box around a 10px font: 1 half-leading + 8 ascent.
-    expect(lines[0]).toEqual({ text: 'Hello', x: 10, y: 20, baselineY: 29, width: 30, height: 12 });
+    expect(lines[0]).toEqual({ text: 'Hello', start: 0, end: 5, x: 10, y: 20, baselineY: 29, width: 30, height: 12 });
   });
 
   it('centers horizontally', () => {

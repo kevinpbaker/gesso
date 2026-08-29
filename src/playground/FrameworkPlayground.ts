@@ -1,6 +1,6 @@
 import { map } from 'rxjs';
 
-import { Box, Button, Column, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
+import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
 import { auto, fr, repeat } from '../ui/layout';
 import type { UiNode } from '../ui/graph/UiNode';
 import { OverlayStore } from '../framework/overlay/OverlayStore';
@@ -262,6 +262,66 @@ export class TextShowcase extends Component {
         Text({ text: '2.4 ms', color: '#ffffff', fontSize: 24, fontWeight: 600 }),
         Text({ text: 'worst 4.1 ms', color: '#9ca3af', fontSize: 12 })
       )
+    );
+  }
+}
+
+/**
+ * Text editing (roadmap F2): a single-line field and a multi-line one.
+ * Both are `EditableText` nodes; the runtime owns the caret, selection,
+ * composition and undo, and reports every change through `onInput`.
+ * The fields here are controlled — the value written back is the value
+ * shown — and the character count follows the same cell.
+ */
+@Define('text-field-demo')
+export class TextFieldDemo extends Component {
+  @State() name = state('Ada');
+  @State() notes = state('Type here. Enter makes a new line; the field grows with it.');
+
+  override render(): UiElement {
+    return Column(
+      {
+        width: 340,
+        padding: 16,
+        gap: 10,
+        backgroundColor: '#1f2937',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#374151'
+      },
+      Text({ text: 'Text fields (F2)', color: '#ffffff', fontSize: 16, fontWeight: 600 }),
+      EditableText({
+        value: this.name,
+        placeholder: 'Your name',
+        onInput: event => (this.name.value = event.value),
+        color: '#ffffff',
+        fontSize: 14,
+        textWrap: 'none',
+        padding: 8,
+        borderRadius: 6,
+        backgroundColor: '#111827',
+        borderWidth: 1,
+        borderColor: '#374151'
+      }),
+      EditableText({
+        value: this.notes,
+        multiline: true,
+        placeholder: 'Notes',
+        onInput: event => (this.notes.value = event.value),
+        color: '#d1d5db',
+        fontSize: 13,
+        padding: 8,
+        minHeight: 60,
+        borderRadius: 6,
+        backgroundColor: '#111827',
+        borderWidth: 1,
+        borderColor: '#374151'
+      }),
+      Text({
+        text: this.notes.pipe(map(text => `${text.length} characters · hello, ${this.name.value || 'stranger'}`)),
+        color: '#9ca3af',
+        fontSize: 12
+      })
     );
   }
 }
@@ -691,6 +751,7 @@ export class FrameworkDemoRoot extends Component {
       }),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(TextShowcase),
+      createComponent(TextFieldDemo),
       createComponent(LocalCounter),
       createComponent(StoreCounter),
       createComponent(Heartbeat),

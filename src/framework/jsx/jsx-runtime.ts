@@ -4,6 +4,7 @@ import {
   type BoxProps,
   type ButtonProps,
   type ColumnProps,
+  type EditableTextProps,
   type GridProps,
   type RowProps,
   type ScrollViewProps,
@@ -34,7 +35,8 @@ import type { ClassComponent, ComponentContext, ComponentProps, ComponentType } 
  * in tsconfig (the repository maps `nodal/jsx-runtime` to this file).
  *
  * Intrinsic tags are the element factories in lowercase: `text`,
- * `button`, `box`, `stack`, `row`, `column`, `scrollview`, `grid`.
+ * `editabletext`, `button`, `box`, `stack`, `row`, `column`,
+ * `scrollview`, `grid`.
  * A `text` or `button` with a string (or Observable string) child
  * takes it as its `text` prop.
  */
@@ -50,6 +52,7 @@ type TextChildren = string | number | Observable<string | number>;
 
 const INTRINSIC_TYPES = {
   text: UiNodeType.Text,
+  editabletext: UiNodeType.EditableText,
   button: UiNodeType.Button,
   box: UiNodeType.Box,
   stack: UiNodeType.Box,
@@ -83,6 +86,8 @@ export namespace JSX {
 
   export interface IntrinsicElements {
     text: WithChildren<TextProps, TextChildren>;
+    /** Editable text; takes no children — its text is `value`. */
+    editabletext: EditableTextProps & { children?: never };
     button: WithChildren<ButtonProps, JsxChildren | TextChildren>;
     box: WithChildren<BoxProps>;
     stack: WithChildren<StackProps>;

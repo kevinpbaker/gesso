@@ -41,7 +41,8 @@ export const ROUTES: readonly RouteMeta[] = [
   { id: 'binding', label: 'Bindings', title: 'Reactive bindings to the canvas' },
   { id: 'theme', label: 'Theme', title: 'Theme and environment propagation' },
   { id: 'examples', label: 'Examples', title: 'Examples · small complete apps' },
-  { id: 'example-signin', label: 'Sign in', title: 'Example · passcode sign-in, written in JSX', parent: 'examples' }
+  { id: 'example-signin', label: 'Sign in', title: 'Example · passcode sign-in, written in JSX', parent: 'examples' },
+  { id: 'example-notes', label: 'Notes', title: 'Example · notes with text editing and IME', parent: 'examples' }
 ];
 
 export const DEFAULT_ROUTE_ID = 'debug';

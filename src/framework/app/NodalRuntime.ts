@@ -25,6 +25,8 @@ import { UiWheelController } from '../../ui/input/UiWheelController';
 import type { ScrollContainerState, ScrollSink } from '../../ui/input/UiWheelController';
 import { UiFocusManager } from '../../ui/input/UiFocusManager';
 import { UiKeyboardController } from '../../ui/input/UiKeyboardController';
+import { UiEditingController, type EditingState } from '../../ui/input/UiEditingController';
+import { ShellStore, type ShellRequest } from './ShellStore';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import type { LayoutExplanation } from '../../ui/layout/LayoutExplanation';
 import { Constraints } from '../../ui/layout/LayoutTypes';
@@ -86,6 +88,8 @@ export interface RuntimeInput {
   readonly wheel: UiWheelController;
   readonly keyboard: UiKeyboardController;
   readonly focus: UiFocusManager;
+  /** Text editing: the shell's beforeinput, composition and paste land here. */
+  readonly editing: UiEditingController;
 }
 
 /**
@@ -177,6 +181,10 @@ export class NodalRuntime {
   private lastInspection: string | null = null;
   private cursorListener: ((cursor: string | null) => void) | null = null;
   private lastCursor: string | null = null;
+  private editingListener: ((state: EditingState | null) => void) | null = null;
+  private lastEditingState: EditingState | null = null;
+  private shellListener: ((request: ShellRequest) => void) | null = null;
+  private caretTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
   private replicas: readonly StoreReplica[] = [];
@@ -248,6 +256,12 @@ export class NodalRuntime {
     if (!this.stores.has(OverlayStore)) {
       this.stores.register(OverlayStore);
     }
+    // And the shell's services: clipboard and URLs, which only the host
+    // thread can reach.
+    if (!this.stores.has(ShellStore)) {
+      this.stores.register(ShellStore);
+    }
+    this.stores.get(ShellStore).setHandler(request => this.shellListener?.(request));
 
     this.scheduler = new UiScheduler({
       clock: options.clock ?? (callback => new UiTimerFrameClock(callback)),
@@ -417,6 +431,47 @@ export class NodalRuntime {
     return this.lastCursor;
   }
 
+  /**
+   * Receives the focused editable's text, selection and caret box after
+   * any frame that changed them, and null when no editable has focus.
+   * The shell's editing proxy mirrors it; see `EditingProxy`.
+   */
+  onEditingState(listener: ((state: EditingState | null) => void) | null): void {
+    this.editingListener = listener;
+  }
+
+  /** The editing state last reported to the shell. */
+  get editingState(): EditingState | null {
+    return this.lastEditingState;
+  }
+
+  /**
+   * Receives what components ask of the shell through `ShellStore`:
+   * clipboard writes and URLs to open. Without a listener they are
+   * dropped.
+   */
+  onShellRequest(listener: ((request: ShellRequest) => void) | null): void {
+    this.shellListener = listener;
+  }
+
+  /**
+   * Where typed text comes from. A shell with an editing proxy delivers
+   * it through `input.editing.beforeInput` and the composition methods,
+   * so printable key presses must not be inserted a second time; with
+   * `keys` (the default) they are all there is.
+   */
+  setTextInputSource(source: 'proxy' | 'keys'): void {
+    this.input.editing.textFromKeys = source === 'keys';
+  }
+
+  /**
+   * The page was hidden or shown. A hidden page stops the caret blink,
+   * so a background tab with a focused field schedules no frames.
+   */
+  setVisible(visible: boolean): void {
+    this.input.editing.setVisible(visible);
+  }
+
   /** `engine.explain` for any node, for tests and devtools. */
   explain(node: UiNode): LayoutExplanation {
     return this.engine.explain(node);
@@ -471,6 +526,12 @@ export class NodalRuntime {
       clearTimeout(this.scrollbarTimer);
       this.scrollbarTimer = null;
     }
+    if (this.caretTimer !== null) {
+      clearTimeout(this.caretTimer);
+      this.caretTimer = null;
+    }
+    this.editingListener = null;
+    this.shellListener = null;
     if (this.inspectorTimer !== null) {
       clearTimeout(this.inspectorTimer);
       this.inspectorTimer = null;
@@ -542,9 +603,26 @@ export class NodalRuntime {
     const hitTester = new UiHitTester(this.engine, root);
     const focus = new UiFocusManager(root, this.dispatcher);
     const scrollSink = this.createScrollSink();
+    // Editing is a default behaviour of the pointer and keyboard
+    // controllers for EditableText targets; the shell's text input
+    // (beforeinput, composition, paste) reaches the controller directly.
+    const editing = new UiEditingController(
+      {
+        recordFor: node => this.engine.recordFor(node),
+        visibleBox: node => this.engine.visibleBox(node),
+        toLocal: (node, x, y) => hitTester.toLocal(node, x, y),
+        measurer: this.textMeasurer,
+        markDirty: (node, flags) => this.graph.markDirty(node, flags),
+        reveal: (node, box) => this.revealBox(node, box),
+        now
+      },
+      this.dispatcher,
+      focus
+    );
     return {
       dispatcher: this.dispatcher,
       focus,
+      editing,
       pointer: new UiPointerController(hitTester, this.dispatcher, {
         onPress: node => {
           if (node !== null) {
@@ -552,11 +630,21 @@ export class NodalRuntime {
           }
         },
         scrollSink,
-        onHoverChange: node => this.handleHoverChange(node)
+        onHoverChange: node => this.handleHoverChange(node),
+        editing
       }),
       wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
-      keyboard: new UiKeyboardController(this.dispatcher, focus, root)
+      keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing })
     };
+  }
+
+  /** Scrolls every scroll container above `node` so a node-local box is visible. */
+  private revealBox(node: UiNode, box: { x: number; y: number; width: number; height: number }): void {
+    for (const adjustment of this.engine.revealAdjustments(node, 0, box)) {
+      adjustment.container.setProperty('scrollX', adjustment.scrollX);
+      adjustment.container.setProperty('scrollY', adjustment.scrollY);
+      this.graph.markDirty(adjustment.container, DirtyFlags.Transform);
+    }
   }
 
   /**
@@ -775,9 +863,12 @@ export class NodalRuntime {
     const elapsed = finished - started;
     this.lastFrameMs = elapsed;
     this.scheduleScrollbarFade(finished);
+    this.scheduleCaretBlink(finished);
     // A frame can change the cursor without the pointer moving: the
     // hovered node's `cursor` prop, or the node itself, may have changed.
     this.sendCursor();
+    // Layout has run, so the caret box the shell mirrors is current.
+    this.sendEditingState();
     this.frameListener?.({
       frame: frame.id,
       durationMs: elapsed,
@@ -810,6 +901,40 @@ export class NodalRuntime {
       },
       Math.max(16, next - now)
     );
+  }
+
+  /**
+   * The caret blinks, which needs frames no property change asks for.
+   * The editing controller says when it next toggles; one pending timer
+   * repaints the focused editable then. Nothing is scheduled while no
+   * editable has focus, a composition holds the caret steady, or the
+   * page is hidden.
+   */
+  private scheduleCaretBlink(now: number): void {
+    const next = this.input.editing.nextCaretChange(now);
+    if (next === undefined || this.caretTimer !== null) {
+      return;
+    }
+    this.caretTimer = setTimeout(
+      () => {
+        this.caretTimer = null;
+        const focused = this.input.editing.focused;
+        if (focused !== null) {
+          this.graph.markDirty(focused, DirtyFlags.Paint);
+        }
+      },
+      Math.max(16, next - now)
+    );
+  }
+
+  /** Hands the listener the focused editable's state, when it changed. */
+  private sendEditingState(): void {
+    const state = this.input.editing.state();
+    if (editingStatesEqual(state, this.lastEditingState)) {
+      return;
+    }
+    this.lastEditingState = state;
+    this.editingListener?.(state);
   }
 
   /**
@@ -903,6 +1028,23 @@ export interface FrameMetrics {
 
 function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function editingStatesEqual(a: EditingState | null, b: EditingState | null): boolean {
+  if (a === null || b === null) {
+    return a === b;
+  }
+  return (
+    a.text === b.text &&
+    a.selectionStart === b.selectionStart &&
+    a.selectionEnd === b.selectionEnd &&
+    a.multiline === b.multiline &&
+    a.composing === b.composing &&
+    a.caret.x === b.caret.x &&
+    a.caret.y === b.caret.y &&
+    a.caret.width === b.caret.width &&
+    a.caret.height === b.caret.height
+  );
 }
 
 /** A canvas for the text measurer when the draw canvas is not a 2D one. */

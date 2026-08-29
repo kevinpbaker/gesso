@@ -28,6 +28,8 @@ const EVENT_PROPS: Readonly<Record<string, UiEventType>> = {
   onKeyUp: UiEventType.KeyUp,
   onFocus: UiEventType.Focus,
   onBlur: UiEventType.Blur,
+  onBeforeInput: UiEventType.BeforeInput,
+  onInput: UiEventType.Input,
   onClick: UiEventType.Click,
   onLongPress: UiEventType.LongPress,
   onDragStart: UiEventType.DragStart,

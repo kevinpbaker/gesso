@@ -25,5 +25,16 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'the render worker. The passcode is 246813.',
     source: 'src/playground/examples/SignInExampleApp.tsx',
     tags: ['JSX', 'functional components', 'store', 'theme colors', 'render worker']
+  },
+  {
+    route: 'example-notes',
+    title: 'Notes',
+    description:
+      'A notes app you can type into: a list of notes, a single-line title and a multi-line body. Caret, selection, ' +
+      'word and line navigation, undo, copy, cut and paste, and IME composition for CJK input all work, with the text ' +
+      'edited in the render worker and only a hidden textarea on the main thread. Copy note uses the clipboard ' +
+      'through the ShellStore.',
+    source: 'src/playground/examples/NotesExampleApp.tsx',
+    tags: ['text editing', 'IME', 'clipboard', 'JSX', 'store', 'render worker']
   }
 ];

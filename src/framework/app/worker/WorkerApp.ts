@@ -1,6 +1,7 @@
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../NodalRuntime';
 import type { RendererBackend } from '../../../ui/rendering';
 import { modifiersFrom, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
+import { EditingProxy, writeClipboard } from '../EditingProxy';
 
 export interface WorkerAppOptions {
   /**
@@ -61,6 +62,7 @@ export class WorkerApp {
   private host: HTMLElement | undefined;
   private resizeObserver: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
+  private proxy: EditingProxy | null = null;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -106,15 +108,41 @@ export class WorkerApp {
         width,
         height,
         dpr: window.devicePixelRatio || 1,
-        renderer: this.options.renderer
+        renderer: this.options.renderer,
+        // Text comes through the editing proxy below, IME and all.
+        textInput: 'proxy'
       } as ShellToRuntimeMessage,
       [offscreen]
     );
 
     this.observeResize(element);
     this.detachInput = this.attachInput(canvas);
+    // The hidden textarea that turns keystrokes into text for the
+    // worker. It has DOM focus while the worker reports a focused
+    // editable, so its key events are forwarded like the canvas's.
+    this.proxy = new EditingProxy(canvas, {
+      beforeInput: (inputType, data) => this.post({ type: 'beforeInput', inputType, data }),
+      compositionStart: () => this.post({ type: 'compositionStart' }),
+      compositionUpdate: (text, caret) => this.post({ type: 'compositionUpdate', text, caret }),
+      compositionEnd: text => this.post({ type: 'compositionEnd', text }),
+      paste: text => this.post({ type: 'paste', text }),
+      blur: () => this.post({ type: 'blur' }),
+      keyDown: event => this.forwardKeyDown(event),
+      keyUp: event => this.forwardKeyUp(event)
+    });
 
     return () => this.dispose();
+  }
+
+  private forwardKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+    }
+    this.post({ type: 'keyDown', key: event.key, modifiers: modifiersFrom(event) });
+  }
+
+  private forwardKeyUp(event: KeyboardEvent): void {
+    this.post({ type: 'keyUp', key: event.key, modifiers: modifiersFrom(event) });
   }
 
   /**
@@ -126,6 +154,8 @@ export class WorkerApp {
   }
 
   dispose(): void {
+    this.proxy?.dispose();
+    this.proxy = null;
     this.detachInput?.();
     this.detachInput = null;
     this.resizeObserver?.disconnect();
@@ -174,6 +204,18 @@ export class WorkerApp {
       if (this.canvas !== undefined) {
         this.canvas.style.cursor = message.cursor ?? '';
       }
+      return;
+    }
+    if (message.type === 'editing') {
+      this.proxy?.update(message.state);
+      return;
+    }
+    if (message.type === 'clipboard') {
+      writeClipboard(message.text);
+      return;
+    }
+    if (message.type === 'openUrl') {
+      window.open(message.url, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -216,8 +258,22 @@ export class WorkerApp {
 
     const onPointerDown = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
-      canvas.focus();
+      // While an editable has focus the proxy's textarea holds DOM
+      // focus; the worker decides whether this press keeps it there.
+      if (!(this.proxy?.active ?? false)) {
+        canvas.focus();
+      }
       this.post({ type: 'pointerDown', x, y, buttons: event.buttons, modifiers: modifiersFrom(event) });
+    };
+    const onMouseDown = (event: MouseEvent): void => {
+      if (this.proxy?.active ?? false) {
+        // The default would move focus to the canvas before the worker
+        // has said where the press landed.
+        event.preventDefault();
+      }
+    };
+    const onVisibilityChange = (): void => {
+      this.post({ type: 'visibility', visible: document.visibilityState !== 'hidden' });
     };
     const onPointerMove = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
@@ -242,16 +298,11 @@ export class WorkerApp {
         modifiers: modifiersFrom(event)
       });
     };
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Tab') {
-        event.preventDefault();
-      }
-      this.post({ type: 'keyDown', key: event.key, modifiers: modifiersFrom(event) });
-    };
-    const onKeyUp = (event: KeyboardEvent): void => {
-      this.post({ type: 'keyUp', key: event.key, modifiers: modifiersFrom(event) });
-    };
+    const onKeyDown = (event: KeyboardEvent): void => this.forwardKeyDown(event);
+    const onKeyUp = (event: KeyboardEvent): void => this.forwardKeyUp(event);
 
+    canvas.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', onPointerUp);
@@ -261,6 +312,8 @@ export class WorkerApp {
     canvas.addEventListener('keyup', onKeyUp);
 
     return () => {
+      canvas.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);

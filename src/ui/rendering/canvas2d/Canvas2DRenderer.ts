@@ -7,7 +7,13 @@ import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState }
 import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import type { RenderContext } from '../RenderContext';
-import { drawText } from '../TextRenderer';
+import { buildFontString, drawText, drawTextLines } from '../TextRenderer';
+import { EditableLayout } from '../../editing/EditableLayout';
+import { lineIndexForOffset } from '../../editing/TextGeometry';
+import { caretVisibleAt } from '../../editing/UiEditable';
+
+/** Logical width of the caret, as a textarea's. */
+export const CARET_WIDTH = 1;
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutBox } from '../../layout/LayoutTypes';
@@ -315,7 +321,47 @@ export class Canvas2DRenderer implements UiRenderer {
       this.contentBox.y = rec.y + rec.paddingTop;
       this.contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
       this.contentBox.height = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
+      if (paint.editor !== undefined) {
+        this.paintEditable(ctx, paint, context);
+        return;
+      }
       drawText(ctx, this.contentBox, paint, context.text);
+    }
+  }
+
+  /**
+   * An editable: the selection behind the text, the text (or the
+   * placeholder while it is empty), the underline of an IME composition,
+   * and the caret — only while focused, and in the lit half of its
+   * blink. The geometry is `EditableLayout`'s, the same the input
+   * layer places the caret with.
+   */
+  private paintEditable(ctx: Canvas2DContext, paint: PaintState, context: RenderContext): void {
+    const model = paint.editor!;
+    const layout = new EditableLayout(model, this.contentBox, paint, context.text);
+    if (model.focused && !model.collapsed) {
+      ctx.fillStyle = colorToCss(paint.selectionColor);
+      for (const box of layout.selectionBoxes()) {
+        ctx.fillRect(box.x, box.y, box.width, box.height);
+      }
+    }
+    if (layout.placeholderLines.length > 0) {
+      drawTextLines(ctx, layout.placeholderLines, buildFontString(paint), colorToCss(paint.placeholderColor));
+    } else {
+      drawTextLines(ctx, layout.lines, buildFontString(paint), colorToCss(paint.textColor));
+    }
+    if (model.composing) {
+      ctx.fillStyle = colorToCss(paint.textColor);
+      for (const box of layout.compositionBoxes()) {
+        const line = layout.lines[lineIndexForOffset(layout.lines, model.composition!.start)];
+        const underlineY = Math.round(line.baselineY + 1);
+        ctx.fillRect(box.x, underlineY, box.width, 1);
+      }
+    }
+    if (model.focused && model.collapsed && caretVisibleAt(model, context.now ?? performance.now())) {
+      const caret = layout.caretRect();
+      ctx.fillStyle = colorToCss(paint.caretColor);
+      ctx.fillRect(Math.round(caret.x), caret.y, CARET_WIDTH, caret.height);
     }
   }
 

@@ -1,4 +1,5 @@
 import type { UiModifiers } from '../../../ui/input/UiInputEvent';
+import type { EditingState } from '../../../ui/input/UiEditingController';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../NodalRuntime';
 import type { RendererBackend } from '../../../ui/rendering';
 
@@ -10,7 +11,21 @@ import type { RendererBackend } from '../../../ui/rendering';
  * boundary — they are constructed in the worker and stay there.
  */
 export type ShellToRuntimeMessage =
-  | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number; dpr: number; renderer?: RendererChoice }
+  | {
+      type: 'init';
+      canvas: OffscreenCanvas;
+      width: number;
+      height: number;
+      dpr: number;
+      renderer?: RendererChoice;
+      /**
+       * How typed text reaches the runtime: `proxy` when the shell has
+       * an editing proxy that sends `beforeInput` and composition (then
+       * printable key presses are not text); `keys` (default) when key
+       * presses are all there is.
+       */
+      textInput?: 'proxy' | 'keys';
+    }
   | { type: 'resize'; width: number; height: number; dpr: number }
   | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiModifiers }
   | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiModifiers }
@@ -19,6 +34,18 @@ export type ShellToRuntimeMessage =
   | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiModifiers }
   | { type: 'keyDown'; key: string; modifiers: UiModifiers }
   | { type: 'keyUp'; key: string; modifiers: UiModifiers }
+  /** A `beforeinput` from the editing proxy, in the DOM's inputType vocabulary. */
+  | { type: 'beforeInput'; inputType: string; data: string | null }
+  | { type: 'compositionStart' }
+  /** The composition text so far and the caret offset within it. */
+  | { type: 'compositionUpdate'; text: string; caret: number }
+  /** The committed text; empty when the composition was cancelled. */
+  | { type: 'compositionEnd'; text: string }
+  | { type: 'paste'; text: string }
+  /** The editing proxy lost focus to something outside the app. */
+  | { type: 'blur' }
+  /** The page was hidden or shown (document.visibilityState). */
+  | { type: 'visibility'; visible: boolean }
   | { type: 'inspector'; enabled: boolean }
   | { type: 'dispose' };
 
@@ -47,7 +74,16 @@ export type RuntimeToShellMessage =
   /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */
   | { type: 'inspect'; text: string | null }
   /** The CSS cursor the hovered node asks for; null for the default arrow. */
-  | { type: 'cursor'; cursor: string | null };
+  | { type: 'cursor'; cursor: string | null }
+  /**
+   * The focused editable's text, selection and caret box for the
+   * editing proxy to mirror; null when no editable has focus.
+   */
+  | { type: 'editing'; state: EditingState | null }
+  /** Put text on the clipboard (ShellStore.copyText). */
+  | { type: 'clipboard'; text: string }
+  /** Open a URL in a new tab (ShellStore.openUrl). */
+  | { type: 'openUrl'; url: string };
 
 export function modifiersFrom(event: {
   shiftKey: boolean;

@@ -16,6 +16,10 @@ import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBord
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
 import { toPhysicalPixels } from './WebGPUSurface';
+import { EditableLayout } from '../../editing/EditableLayout';
+import { lineIndexForOffset } from '../../editing/TextGeometry';
+import { caretVisibleAt } from '../../editing/UiEditable';
+import { CARET_WIDTH } from '../canvas2d/Canvas2DRenderer';
 
 /**
  * Primitive instance layout, in floats:
@@ -424,8 +428,9 @@ export function buildRenderList(
       }
     }
 
-    // Captured before children reuse the shared scratch below.
-    const hasText = paint.text !== undefined && paint.text.length > 0;
+    // Captured before children reuse the shared scratch below. An
+    // editable always has foreground work: its caret and placeholder.
+    const hasText = paint.editor !== undefined || (paint.text !== undefined && paint.text.length > 0);
 
     // Children.
     if (node.hasChildren()) {
@@ -470,17 +475,24 @@ export function buildRenderList(
       contentBox.y = 0;
       contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
       contentBox.height = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
-      const lines = layoutTextLines(contentBox, text, measurer);
-      if (lines.length > 0) {
+      const offsetX = rec.x + rec.paddingLeft;
+      const offsetY = rec.y + rec.paddingTop;
+
+      /** One rasterised run of placed lines (content-box coordinates). */
+      const pushTextRun = (lines: readonly TextLinePlacement[], color: string, cacheText: string): void => {
+        const drawn = lines.filter(line => line.text.length > 0);
+        if (drawn.length === 0) {
+          return;
+        }
         const pad = Math.ceil(text.fontSize * TEXT_PADDING_EM);
         let minX = Infinity;
         let maxX = -Infinity;
-        for (const line of lines) {
+        for (const line of drawn) {
           minX = Math.min(minX, line.x);
           maxX = Math.max(maxX, line.x + line.width);
         }
-        const minY = lines[0].y;
-        const maxY = lines[lines.length - 1].y + lines[lines.length - 1].height;
+        const minY = drawn[0].y;
+        const maxY = drawn[drawn.length - 1].y + drawn[drawn.length - 1].height;
         // The texture is relative to the run's own padded bounds, so its
         // pixels do not depend on where the run sits; the instance's
         // screen origin is snapped to a physical pixel below. Whole
@@ -489,8 +501,10 @@ export function buildRenderList(
         const originY = minY - pad;
         const width = Math.ceil((maxX - minX + 2 * pad) * dpr) / dpr;
         const height = Math.ceil((maxY - minY + 2 * pad) * dpr) / dpr;
-        const relative: TextLinePlacement[] = lines.map(line => ({
+        const relative: TextLinePlacement[] = drawn.map(line => ({
           text: line.text,
+          start: line.start,
+          end: line.end,
           x: line.x - originX,
           y: line.y - originY,
           baselineY: line.baselineY - originY,
@@ -498,9 +512,8 @@ export function buildRenderList(
           height: line.height
         }));
         const font = buildFontString(text);
-        const color = colorToCss(text.textColor);
         const item: TextRenderItem = {
-          key: textCacheKey(text.text!, font, color, text.textAlign, contentBox.width, dpr),
+          key: textCacheKey(cacheText, font, color, text.textAlign, contentBox.width, dpr),
           font,
           color,
           lines: relative,
@@ -510,8 +523,8 @@ export function buildRenderList(
         };
         // Snap the run's screen origin to a physical pixel so glyphs
         // rasterised on pixel boundaries land on them.
-        const runX = rec.x + rec.paddingLeft + originX;
-        const runY = rec.y + rec.paddingTop + originY;
+        const runX = offsetX + originX;
+        const runY = offsetY + originY;
         const snapped = snapTranslation(nodeCtm, runX, runY, dpr);
         closePrimitives();
         const instance = pushTextured(
@@ -525,6 +538,66 @@ export function buildRenderList(
           contentRounded
         );
         commands.push({ kind: CommandKind.Text, instance, scissor: contentScissor, item });
+      };
+
+      /** A plain rectangle in the content box, clipped like the text. */
+      const pushContentRect = (box: LayoutBox, color: RgbaColor): void => {
+        beginPrimitives(contentScissor);
+        pushInstance(
+          instanceData,
+          offsetX + box.x,
+          offsetY + box.y,
+          box.width,
+          box.height,
+          color,
+          0,
+          effectiveOpacity,
+          0,
+          PrimitiveKind.Fill,
+          nodeCtm,
+          contentRounded
+        );
+      };
+
+      if (text.editor !== undefined) {
+        // An editable, in the order Canvas2D paints it: selection, text
+        // or placeholder, composition underline, caret.
+        const model = text.editor;
+        const editable = new EditableLayout(model, contentBox, text, measurer);
+        if (model.focused && !model.collapsed) {
+          const selection = parseColor(text.selectionColor);
+          if (selection !== undefined) {
+            for (const box of editable.selectionBoxes()) {
+              pushContentRect(box, selection);
+            }
+          }
+        }
+        if (editable.placeholderLines.length > 0) {
+          pushTextRun(editable.placeholderLines, colorToCss(text.placeholderColor), ` ${text.placeholder}`);
+        } else {
+          pushTextRun(editable.lines, colorToCss(text.textColor), model.text);
+        }
+        if (model.composing) {
+          const underline = parseColor(text.textColor);
+          if (underline !== undefined) {
+            const line = editable.lines[lineIndexForOffset(editable.lines, model.composition!.start)];
+            for (const box of editable.compositionBoxes()) {
+              pushContentRect({ x: box.x, y: Math.round(line.baselineY + 1), width: box.width, height: 1 }, underline);
+            }
+          }
+        }
+        if (model.focused && model.collapsed && caretVisibleAt(model, now)) {
+          const caretColor = parseColor(text.caretColor);
+          if (caretColor !== undefined) {
+            const caret = editable.caretRect();
+            pushContentRect(
+              { x: Math.round(caret.x), y: caret.y, width: CARET_WIDTH, height: caret.height },
+              caretColor
+            );
+          }
+        }
+      } else {
+        pushTextRun(layoutTextLines(contentBox, text, measurer), colorToCss(text.textColor), text.text!);
       }
     }
 

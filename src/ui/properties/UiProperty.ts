@@ -17,6 +17,7 @@ import type { UiNode } from '../graph/UiNode';
 import type { UiTheme } from '../environment/UiTheme';
 import type { UiImage } from './UiImage';
 import type { UiVirtualWindow } from '../composition/UiVirtualWindow';
+import type { EditableTextModel } from '../editing/EditableTextModel';
 import type {
   UiAlignment,
   UiColorValue,
@@ -669,6 +670,81 @@ export const UiProperties = {
     defaultValue: undefined,
     inherited: false,
     affects: L | P
+  }),
+
+  // -------------------------------------------------------------------------
+  // Editing (EditableText)
+  // -------------------------------------------------------------------------
+
+  /**
+   * The text of an editable node. Writing it replaces what the user
+   * typed; the runtime reports edits through `onInput`, and an app that
+   * writes the reported value back gets a controlled field.
+   */
+  value: defineProperty<string | undefined>({
+    name: 'value',
+    defaultValue: undefined,
+    inherited: false,
+    affects: C | L
+  }),
+
+  /** Shown, muted, while an editable is empty. */
+  placeholder: defineProperty<string | undefined>({
+    name: 'placeholder',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P
+  }),
+
+  /** Enter inserts a newline (default false: Enter is left to the app). */
+  multiline: defineProperty<boolean | undefined>({
+    name: 'multiline',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /** The text can be selected and copied but not changed. */
+  readOnly: defineProperty<boolean | undefined>({
+    name: 'readOnly',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /** Colour of the caret; defaults to the text colour. */
+  caretColor: defineProperty<UiColorValue | undefined>({
+    name: 'caretColor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P,
+    compare: colorValuesEqual
+  }),
+
+  /** Colour behind selected text; defaults to a translucent theme primary. */
+  selectionColor: defineProperty<UiColorValue | undefined>({
+    name: 'selectionColor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P,
+    compare: colorValuesEqual
+  }),
+
+  /** Colour of the placeholder; defaults to the theme's muted text. */
+  placeholderColor: defineProperty<UiColorValue | undefined>({
+    name: 'placeholderColor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P,
+    compare: colorValuesEqual
+  }),
+
+  /** Set by the runtime on each editable node: its EditableTextModel. */
+  editor: defineProperty<EditableTextModel | undefined>({
+    name: 'editor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
   }),
 
   // -------------------------------------------------------------------------

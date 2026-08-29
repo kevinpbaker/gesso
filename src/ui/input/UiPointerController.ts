@@ -35,6 +35,18 @@ export interface PointerControllerOptions {
    * follows the pointer through this.
    */
   onHoverChange?: (node: UiNode | null) => void;
+  /**
+   * Default pointer behaviour for editable text: a press places the
+   * caret (or selects a word, a line), a drag extends the selection.
+   * Applied after the app's listeners, and skipped when the pointerdown
+   * was defaultPrevented.
+   */
+  editing?: {
+    isEditable(node: UiNode): boolean;
+    pointerDown(node: UiNode, x: number, y: number, modifiers: UiModifiers): void;
+    pointerMove(node: UiNode, x: number, y: number): void;
+    pointerUp(): void;
+  };
 }
 
 /** A thumb drag in progress. */
@@ -86,6 +98,7 @@ export class UiPointerController {
   private readonly onPress: ((node: UiNode) => void) | null;
   private readonly scrollSink: ScrollSink | null;
   private readonly onHoverChange: ((node: UiNode | null) => void) | null;
+  private readonly editing: PointerControllerOptions['editing'];
 
   private hoverNode: UiNode | null = null;
 
@@ -106,6 +119,7 @@ export class UiPointerController {
     this.onPress = options.onPress ?? null;
     this.scrollSink = options.scrollSink ?? null;
     this.onHoverChange = options.onHoverChange ?? null;
+    this.editing = options.editing;
   }
 
   /** The node currently under the pointer, or null over empty space. */
@@ -145,6 +159,9 @@ export class UiPointerController {
       this.gestures?.pointerDown(event, target);
       if (!event.defaultPrevented) {
         this.onPress?.(target);
+        if (this.editing !== undefined && this.editing.isEditable(target)) {
+          this.editing.pointerDown(target, x, y, modifiers);
+        }
       }
     }
     this.downTarget = target;
@@ -169,6 +186,9 @@ export class UiPointerController {
       const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers);
       this.dispatcher.dispatch(event, this.downTarget);
       this.gestures?.pointerMove(event, this.downTarget);
+      if (!event.defaultPrevented && this.editing !== undefined && this.editing.isEditable(this.downTarget)) {
+        this.editing.pointerMove(this.downTarget, x, y);
+      }
       return event;
     }
     if (this.scrollSink?.revealScrollbars !== undefined) {
@@ -205,6 +225,7 @@ export class UiPointerController {
       return null;
     }
     this.downTarget = null;
+    this.editing?.pointerUp();
 
     const event = new UiPointerEvent(UiEventType.PointerUp, x, y, buttons, modifiers);
     this.dispatcher.dispatch(event, target);
@@ -228,6 +249,7 @@ export class UiPointerController {
    */
   pointerCancel(): void {
     this.scrollbarDrag = null;
+    this.editing?.pointerUp();
     if (this.downTarget === null) {
       return;
     }

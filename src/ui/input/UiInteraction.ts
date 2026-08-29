@@ -69,7 +69,12 @@ export function isNodeFocusable(node: UiNode): boolean {
   if (focusable === false) {
     return false;
   }
-  return node.type === UiNodeType.Button;
+  return node.type === UiNodeType.Button || node.type === UiNodeType.EditableText;
+}
+
+/** Whether the node is text the user can type into. */
+export function isEditableNode(node: UiNode): boolean {
+  return node.type === UiNodeType.EditableText;
 }
 
 /**
@@ -83,6 +88,11 @@ export function resolveCursor(node: UiNode | null): string | null {
     const cursor = current.properties.get('cursor');
     if (typeof cursor === 'string' && cursor.length > 0) {
       return cursor;
+    }
+    if (current.type === UiNodeType.EditableText) {
+      // An editable shows the I-beam unless told otherwise, as a
+      // textarea does.
+      return 'text';
     }
   }
   return null;

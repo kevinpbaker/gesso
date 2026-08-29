@@ -10,7 +10,9 @@ import { normalizeBorderRadius } from '../properties/UiBorderRadius';
 import type { UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
 import type { UiImage } from '../properties/UiImage';
-import { resolveColor } from '../properties/UiThemeColor';
+import { resolveColor, themeColor } from '../properties/UiThemeColor';
+import type { EditableTextModel } from '../editing/EditableTextModel';
+import { editorFor, isEditableNode } from '../editing/UiEditable';
 import { resolveFont } from '../properties/UiTextFont';
 import { parseTransform } from '../properties/UiTransform';
 
@@ -51,6 +53,18 @@ export interface PaintState {
   textWrap: TextWrap;
   maxLines: number | undefined;
   textOverflow: TextOverflow;
+  /** Right-to-left paragraph direction. */
+  rtl: boolean;
+  /**
+   * Set for an EditableText node: the model whose text `text` is, with
+   * its selection and composition, and the colours the editing chrome
+   * is drawn in. Undefined for every other node.
+   */
+  editor: EditableTextModel | undefined;
+  placeholder: string | undefined;
+  placeholderColor: UiColor;
+  selectionColor: UiColor;
+  caretColor: UiColor;
 }
 
 export const DEFAULT_FONT_SIZE = 14;
@@ -123,8 +137,25 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
     out.hasTransform = false;
   }
 
-  const text = resolveString(node, 'text');
-  out.text = text;
+  if (isEditableNode(node)) {
+    // The user's text lives in the model, not in a property; see
+    // UiEditable. It is always a string here, so an empty field still
+    // paints its caret and placeholder.
+    const model = editorFor(node);
+    out.editor = model;
+    out.text = model.text;
+    out.placeholder = resolveString(node, 'placeholder');
+    out.placeholderColor =
+      resolveColor(node, UiProperties.placeholderColor) ?? themeColor(node, 'textMuted') ?? DEFAULT_PLACEHOLDER_COLOR;
+    out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
+    out.caretColor =
+      resolveColor(node, UiProperties.caretColor) ?? resolveColor(node, UiProperties.color) ?? UiColors.black;
+  } else {
+    out.editor = undefined;
+    out.text = resolveString(node, 'text');
+    out.placeholder = undefined;
+  }
+  out.rtl = resolveProperty(node, UiProperties.textDirection) === 'rtl';
 
   // Resolved the same way layout measured it (see resolveFont).
   const font = resolveFont(node);
@@ -223,8 +254,23 @@ export function createPaintState(): PaintState {
     verticalAlign: 'top',
     textWrap: 'word',
     maxLines: undefined,
-    textOverflow: 'clip'
+    textOverflow: 'clip',
+    rtl: false,
+    editor: undefined,
+    placeholder: undefined,
+    placeholderColor: DEFAULT_PLACEHOLDER_COLOR,
+    selectionColor: DEFAULT_SELECTION_COLOR,
+    caretColor: DEFAULT_TEXT_COLOR
   };
+}
+
+const DEFAULT_PLACEHOLDER_COLOR: UiColor = { r: 0.4, g: 0.4, b: 0.4, a: 1 };
+const DEFAULT_SELECTION_COLOR: UiColor = { r: 0.13, g: 0.59, b: 0.95, a: 0.35 };
+
+/** The theme's primary at a third of its strength, behind selected text. */
+function defaultSelectionColor(node: UiNode): UiColor {
+  const primary = themeColor(node, 'primary');
+  return primary === undefined ? DEFAULT_SELECTION_COLOR : { r: primary.r, g: primary.g, b: primary.b, a: 0.35 };
 }
 
 /**

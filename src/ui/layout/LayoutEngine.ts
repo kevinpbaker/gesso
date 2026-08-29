@@ -2,6 +2,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { resolveFont } from '../properties/UiTextFont';
+import { editorFor } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
   AlignContent,
@@ -199,7 +200,8 @@ export class LayoutEngine {
       rec.clips ||
       node.properties.get('textOverflow') === 'ellipsis' ||
       this.numberProp(node, 'maxLines') !== undefined;
-    const isText = node.type === UiNodeType.Text || node.type === UiNodeType.Button;
+    const isText =
+      node.type === UiNodeType.Text || node.type === UiNodeType.Button || node.type === UiNodeType.EditableText;
     let childCount = 0;
     this.forEachLayoutChild(node, () => childCount++);
     const flexContainer =
@@ -687,12 +689,19 @@ export class LayoutEngine {
    * innermost first. Nothing is changed: the caller writes the offsets
    * (scrollX/scrollY properties) and marks the containers dirty, which
    * is how NodalRuntime.scrollIntoView keeps a focused row on screen.
+   *
+   * `inner`, a box in the node's own coordinates, reveals that part of
+   * the node instead of the whole — the caret of a tall editable.
    */
-  revealAdjustments(node: UiNode, padding = 0): ScrollAdjustment[] {
+  revealAdjustments(node: UiNode, padding = 0, inner?: LayoutBox): ScrollAdjustment[] {
     const rec = this.records.get(node);
     if (rec === undefined) {
       return [];
     }
+    const targetX = rec.x + (inner?.x ?? 0);
+    const targetY = rec.y + (inner?.y ?? 0);
+    const targetWidth = inner?.width ?? rec.width;
+    const targetHeight = inner?.height ?? rec.height;
     const adjustments: ScrollAdjustment[] = [];
     // The target's edges in the layout root's pre-scroll frame, brought
     // into each successive scroller's content space by removing the
@@ -704,10 +713,10 @@ export class LayoutEngine {
       if (container === undefined || !container.scrollable) {
         continue;
       }
-      const left = rec.x - innerScrollX - padding;
-      const right = rec.x + rec.width - innerScrollX + padding;
-      const top = rec.y - innerScrollY - padding;
-      const bottom = rec.y + rec.height - innerScrollY + padding;
+      const left = targetX - innerScrollX - padding;
+      const right = targetX + targetWidth - innerScrollX + padding;
+      const top = targetY - innerScrollY - padding;
+      const bottom = targetY + targetHeight - innerScrollY + padding;
       const viewLeft = container.x + container.scrollX;
       const viewTop = container.y + container.scrollY;
       let scrollX = container.scrollX;
@@ -1277,8 +1286,11 @@ export class LayoutEngine {
         // Scroll containers and text that clips (ellipsis, maxLines) do
         // not have visible overflow, so CSS gives them no automatic
         // minimum; everything else keeps its min-content size.
+        // An editable is a field, not a label: it shrinks to what the
+        // row gives it and its text scrolls or wraps inside.
         const clips =
           child.type === UiNodeType.ScrollView ||
+          child.type === UiNodeType.EditableText ||
           child.properties.get('textOverflow') === 'ellipsis' ||
           this.numberProp(child, 'maxLines') !== undefined;
         const contentSuggestion = clips ? 0 : row ? cRec.minContentWidth : cRec.intrinsicHeight;
@@ -1812,13 +1824,20 @@ export class LayoutEngine {
   private measureLeaf(node: UiNode, rec: LayoutRecord, effective: Constraints): Size {
     const paddingH = rec.paddingLeft + rec.paddingRight;
     const paddingV = rec.paddingTop + rec.paddingBottom;
-    if (node.type === UiNodeType.Text || node.type === UiNodeType.Button) {
-      const text = String(node.properties.get('text') ?? '');
+    const editable = node.type === UiNodeType.EditableText;
+    if (node.type === UiNodeType.Text || node.type === UiNodeType.Button || editable) {
+      // An editable's text is the user's, held by its model rather than
+      // a property; its placeholder sizes it while it is empty, so an
+      // empty field is as wide as the hint it shows.
+      const text = editable ? editorFor(node).text : String(node.properties.get('text') ?? '');
+      const placeholderProp = node.properties.get('placeholder');
+      const placeholder =
+        editable && text.length === 0 && typeof placeholderProp === 'string' ? placeholderProp : undefined;
       // The same resolution paint uses, so the line box measured here is
       // the one the glyphs are drawn in.
       const font = resolveFont(node);
-      const maxLines = this.numberProp(node, 'maxLines');
-      const paragraph = this.textMeasurer.layout({
+      const maxLines = editable ? undefined : this.numberProp(node, 'maxLines');
+      const request = {
         text,
         fontSize: font.fontSize,
         fontFamily: font.fontFamily,
@@ -1828,13 +1847,23 @@ export class LayoutEngine {
         maxWidth: isFinite(effective.maxWidth) ? Math.max(0, effective.maxWidth - paddingH) : undefined,
         wrap: this.textWrapProp(node),
         maxLines: maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined,
-        overflow: this.textOverflowProp(node)
-      });
+        overflow: editable ? ('clip' as const) : this.textOverflowProp(node)
+      };
+      const paragraph = this.textMeasurer.layout(request);
+      let width = paragraph.width;
+      let minContentWidth = paragraph.minContentWidth;
+      let maxContentWidth = paragraph.maxContentWidth;
+      if (placeholder !== undefined && placeholder.length > 0) {
+        const hint = this.textMeasurer.layout({ ...request, text: placeholder });
+        width = Math.max(width, hint.width);
+        minContentWidth = Math.max(minContentWidth, hint.minContentWidth);
+        maxContentWidth = Math.max(maxContentWidth, hint.maxContentWidth);
+      }
       rec.hasBaseline = true;
       rec.baseline = rec.paddingTop + paragraph.firstBaseline;
-      rec.minContentWidth = paragraph.minContentWidth + paddingH;
-      rec.maxContentWidth = paragraph.maxContentWidth + paddingH;
-      return { width: paragraph.width + paddingH, height: paragraph.height + paddingV };
+      rec.minContentWidth = minContentWidth + paddingH;
+      rec.maxContentWidth = maxContentWidth + paddingH;
+      return { width: width + paddingH, height: paragraph.height + paddingV };
     }
     rec.minContentWidth = paddingH;
     rec.maxContentWidth = paddingH;

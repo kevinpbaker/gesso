@@ -106,7 +106,7 @@ Most canvas UI kits ship flexbox-ish. Nodal shipped the CSS you actually reach f
 
 | Capability                   | The short version                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Flexbox, complete**        | `stretch` by default, automatic minimum size, CSS §9.7 freeze-and-redistribute, `flexWrap` + `alignContent`, reverse directions, RTL, `margin: auto`, `flex: n`, `aspectRatio`, `percent(50)`.                                                                                                                                    |
+| **Flexbox, complete**        | `stretch` by default, automatic minimum size, CSS §9.7 freeze-and-redistribute, `flexWrap` + `alignContent`, reverse directions, RTL, `margin: auto`, `flex: n`, `aspectRatio`, `percent(50)`.                                                                                                                                      |
 | **Text as a layout citizen** | One paragraph algorithm shared by the engine and both renderers. `textWrap: 'word' \| 'char' \| 'none'`, `maxLines`, `textOverflow: 'ellipsis'`, hanging spaces, fit-content width, real baselines (`y: 'baseline'`). Flex measures items twice — max-content, then final — like the spec says.                                     |
 | **Grid**                     | `Grid({ columns: [auto, fr(1)] })`. Tracks are typed: `px`, `percent()`, `auto`, `fr()`, `minmax()`, `repeat()`. Explicit lines and spans, sparse auto-flow, per-cell alignment, `justifyContent`/`alignContent` track distribution. CSS Grid §8.5 and §11, implemented apart from any node so it can be tested as pure arithmetic. |
 | **Positioning & overlays**   | `position: 'absolute' \| 'relative' \| 'sticky'`, `inset`, `zIndex` paint order, aligned `Stack`s. Anchored placement (`anchor`, `placement: 'bottom-start'`) that flips and shifts to stay on screen. Every runtime mounts an `OverlayLayer`; menus, popovers and dialogs go through the `OverlayStore`.                           |
@@ -273,6 +273,10 @@ The decision records are the real documentation. Each one states the problem, th
 | [0011](docs/decisions/0011-relayout-boundaries.md)  | Relayout boundaries and budgets — parents decide                                  |
 | [0012](docs/decisions/0012-explainability.md)       | Explainability — `explain()` reads, it does not recompute                         |
 | [0013](docs/decisions/0013-webgpu-parity.md)        | WebGPU parity — one ordered command list, a pluggable renderer                    |
+| [0014](docs/decisions/0014-typed-authoring.md)      | Typed authoring — types derived from the registry, functional components, JSX     |
+| [0015](docs/decisions/0015-font-resolution.md)      | Font resolution — layout and paint resolve the font the same way                  |
+| [0016](docs/decisions/0016-cursor.md)               | Cursor — the runtime decides, the shell shows                                     |
+| [0017](docs/decisions/0017-text-editing.md)         | Text editing — worker-owned buffer, main-thread editing proxy                     |
 
 Then [`FRAMEWORK_DESIGN.md`](docs/FRAMEWORK_DESIGN.md) for the component model and thread architecture, and the roadmaps below.
 
@@ -280,8 +284,8 @@ Then [`FRAMEWORK_DESIGN.md`](docs/FRAMEWORK_DESIGN.md) for the component model a
 
 Layout (L0–L8) and WebGPU parity are done. What's honestly missing, in the order [`ROADMAP.md`](docs/ROADMAP.md) intends to tackle it:
 
-- **F1 Typed authoring** — `UiProps` is still `Record<string, unknown>`; the registry throws on typos at runtime, the compiler should catch them first.
-- **F2 Editing** — keyboard routing exists; caret, selection, IME and clipboard do not. The hardest single piece.
+- ~~**F1 Typed authoring**~~ — done: element props are derived from the property registry, functional components and optional JSX ([0014](docs/decisions/0014-typed-authoring.md)).
+- ~~**F2 Editing**~~ — done in Chrome: `EditableText` with caret, selection, undo, IME composition and clipboard, edited in the render worker through a hidden textarea on the main thread ([0017](docs/decisions/0017-text-editing.md)). WKWebView and WebView2 wait on E2.
 - **F3 Component library**, **F4 Animation**, **F5 Routing**, **F6 Accessibility** (a no-DOM canvas needs a semantics tree).
 - **F9 Rendering maturity** — glyph atlas, dirty regions, gradients, `boxShadow` (resolved into `PaintState`, painted by nobody yet).
 - **[Modifiers](docs/MODIFIERS_ROADMAP.md)** — Compose-style element behaviour (`hoverable`, `focusRing`, `tooltip`, `draggable`) without wrapper components.

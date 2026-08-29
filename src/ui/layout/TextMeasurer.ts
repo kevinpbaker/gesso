@@ -73,6 +73,12 @@ export interface ParagraphLayout {
 export interface TextMeasurer {
   measure(request: TextMeasureRequest): Size;
   layout(request: TextMeasureRequest): ParagraphLayout;
+  /**
+   * The advance width of one run in the request's font. Caret and
+   * selection geometry is built from prefix widths, so it has to come
+   * from the same source as the line widths.
+   */
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
 }
 
 /**

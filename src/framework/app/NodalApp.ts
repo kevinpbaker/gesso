@@ -7,6 +7,7 @@ import type { UiFrameClockFactory } from '../../ui/scheduler';
 import type { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
 import { NodalRuntime, type FrameMetrics, type RendererChoice } from './NodalRuntime';
+import { EditingProxy, writeClipboard } from './EditingProxy';
 import type { StoreReplica } from '../store/worker/StoreReplica';
 
 export interface NodalAppOptions {
@@ -50,6 +51,8 @@ export class NodalApp {
 
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
+  private proxy: EditingProxy | null = null;
+  private detachVisibility: (() => void) | null = null;
 
   constructor(options: NodalAppOptions) {
     this.host = options.host;
@@ -156,6 +159,10 @@ export class NodalApp {
    */
   dispose(): void {
     this.running = false;
+    this.proxy?.dispose();
+    this.proxy = null;
+    this.detachVisibility?.();
+    this.detachVisibility = null;
     this.adapter.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
@@ -173,6 +180,35 @@ export class NodalApp {
     this.canvas.tabIndex = 0;
     this.canvas.style.touchAction = 'none';
     this.adapter.attach(new CanvasPlatformSurface(this.canvas));
+
+    // Text editing goes through a hidden textarea, exactly as in the
+    // worker configuration, so the IME works the same on both. Keys are
+    // not forwarded from it: the surface above listens on `window` and
+    // already sees them.
+    const editing = this.runtime.input.editing;
+    const canvas = this.canvas;
+    this.proxy = new EditingProxy(canvas, {
+      beforeInput: (inputType, data) => editing.beforeInput(inputType, data),
+      compositionStart: () => editing.compositionStart(),
+      compositionUpdate: (text, caret) => editing.compositionUpdate(text, caret),
+      compositionEnd: text => editing.compositionEnd(text),
+      paste: text => editing.paste(text),
+      blur: () => this.runtime.input.focus.blur()
+    });
+    this.runtime.setTextInputSource('proxy');
+    this.runtime.onEditingState(state => this.proxy?.update(state));
+    this.runtime.onShellRequest(request => {
+      if (request.type === 'clipboard') {
+        writeClipboard(request.text, canvas.ownerDocument);
+      } else {
+        canvas.ownerDocument.defaultView?.open(request.url, '_blank', 'noopener,noreferrer');
+      }
+    });
+    if (typeof document !== 'undefined') {
+      const onVisibility = (): void => this.runtime.setVisible(document.visibilityState !== 'hidden');
+      document.addEventListener('visibilitychange', onVisibility);
+      this.detachVisibility = () => document.removeEventListener('visibilitychange', onVisibility);
+    }
   }
 
   private observeResize(): void {

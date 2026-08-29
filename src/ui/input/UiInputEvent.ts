@@ -21,6 +21,10 @@ export enum UiEventType {
   KeyUp = 'keyup',
   Focus = 'focus',
   Blur = 'blur',
+  /** An edit is about to be applied to an editable; preventDefault() drops it. */
+  BeforeInput = 'beforeinput',
+  /** An editable's text changed. */
+  Input = 'input',
   Click = 'click',
   LongPress = 'longpress',
   DragStart = 'dragstart',
@@ -162,6 +166,40 @@ export class UiKeyboardEvent extends UiInputEvent {
     readonly modifiers: UiModifiers = noModifiers()
   ) {
     super(type);
+  }
+}
+
+/**
+ * An edit about to reach an editable node's text.
+ *
+ * `inputType` follows the DOM Input Events vocabulary
+ * (`insertText`, `insertLineBreak`, `insertFromPaste`,
+ * `deleteContentBackward`, `deleteWordForward`, …) whether the edit
+ * came from a shell's `beforeinput`, a key the runtime resolved itself,
+ * or a paste. `data` is the text an insertion carries, else null.
+ * preventDefault() cancels the edit — the way a numeric field rejects
+ * letters.
+ */
+export class UiBeforeInputEvent extends UiInputEvent {
+  constructor(
+    readonly inputType: string,
+    readonly data: string | null
+  ) {
+    super(UiEventType.BeforeInput);
+  }
+}
+
+/**
+ * An editable node's text changed: the new value and the selection
+ * after the change. Bubbles, so a form can watch all its fields.
+ */
+export class UiTextChangeEvent extends UiInputEvent {
+  constructor(
+    readonly value: string,
+    readonly selectionStart: number,
+    readonly selectionEnd: number
+  ) {
+    super(UiEventType.Input);
   }
 }
 
