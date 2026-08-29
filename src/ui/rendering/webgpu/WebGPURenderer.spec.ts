@@ -105,6 +105,7 @@ describe('WebGPURenderer initialization', () => {
       const renderer = new WebGPURenderer({ surface });
       expect(renderer.isReady).toBe(false);
       await renderer.initialize();
+      renderer.resize(800, 600, 1);
       expect(renderer.isReady).toBe(true);
       renderer.dispose();
     } finally {
@@ -189,6 +190,7 @@ describe('WebGPURenderer incremental upload', () => {
       const surface = new WebGPUSurface(host);
       const renderer = new WebGPURenderer({ surface });
       await renderer.initialize();
+      renderer.resize(800, 600, 1);
 
       const h = new RenderHarness();
       const root = h.createNode('app', UiNodeType.Column);
@@ -241,6 +243,7 @@ describe('WebGPURenderer text', () => {
       const surface = new WebGPUSurface(host);
       const renderer = new WebGPURenderer({ surface });
       await renderer.initialize();
+      renderer.resize(800, 600, 1);
 
       const h = new RenderHarness();
       const root = h.createNode('app', UiNodeType.Column);

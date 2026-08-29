@@ -8,7 +8,7 @@ import {
   type StoreRegistration
 } from '../../store/worker/createStoreRegistry';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
-import { NodalRuntime } from '../NodalRuntime';
+import { NodalRuntime, type RendererChoice } from '../NodalRuntime';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
@@ -95,7 +95,7 @@ export class RenderWorkerApp {
 
   private dispatch(message: ShellToRuntimeMessage): void {
     if (message.type === 'init') {
-      this.initialize(message.canvas, message.width, message.height, message.dpr);
+      this.initialize(message.canvas, message.width, message.height, message.dpr, message.renderer);
       return;
     }
 
@@ -143,7 +143,13 @@ export class RenderWorkerApp {
     }
   }
 
-  private initialize(canvas: OffscreenCanvas, width: number, height: number, dpr: number): void {
+  private initialize(
+    canvas: OffscreenCanvas,
+    width: number,
+    height: number,
+    dpr: number,
+    renderer: RendererChoice | undefined
+  ): void {
     this.runtime?.dispose();
     this.registry?.dispose();
     this.registry = createStoreRegistry(this.registrations, (storeName, message, stack) => {
@@ -152,6 +158,7 @@ export class RenderWorkerApp {
     this.runtime = new NodalRuntime({
       root: this.root,
       canvas,
+      renderer,
       stores: this.registry.registry,
       // A worker has no requestAnimationFrame tied to the compositor,
       // so frames are timer-paced. See FRAMEWORK_DESIGN section 13.
@@ -164,6 +171,9 @@ export class RenderWorkerApp {
     this.runtime.onInspect(text => {
       this.host.postMessage({ type: 'inspect', text });
     });
+    this.runtime.onRendererError(message => {
+      this.host.postMessage({ type: 'error', message: `renderer: ${message}` });
+    });
     this.runtime.onFrame(metrics => {
       this.host.postMessage({
         type: 'frame',
@@ -173,7 +183,8 @@ export class RenderWorkerApp {
         measured: metrics.measured,
         relayoutRoots: metrics.relayoutRoots,
         at: metrics.at,
-        phases: metrics.phases
+        phases: metrics.phases,
+        renderer: metrics.renderer
       });
     });
     this.runtime.start();

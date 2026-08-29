@@ -1,4 +1,5 @@
-import type { FramePhaseTimings } from '../NodalRuntime';
+import type { FramePhaseTimings, RendererChoice } from '../NodalRuntime';
+import type { RendererBackend } from '../../../ui/rendering';
 import { modifiersFrom, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 export interface WorkerAppOptions {
@@ -16,6 +17,12 @@ export interface WorkerAppOptions {
    * runtime, but a bundled build will not emit a chunk for it.
    */
   worker: (() => Worker) | URL | string;
+  /**
+   * The rendering backend the worker draws with. Defaults to Canvas2D;
+   * `webgpu` and `auto` fall back to it when the browser has no WebGPU
+   * in workers, and the frame metrics say which one is drawing.
+   */
+  renderer?: RendererChoice;
   /** Receives frame timings reported by the render worker. */
   onFrame?: (metrics: {
     frame: number;
@@ -25,6 +32,7 @@ export interface WorkerAppOptions {
     relayoutRoots: number;
     at: number;
     phases: FramePhaseTimings;
+    renderer: RendererBackend | 'pending';
   }) => void;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
@@ -91,7 +99,14 @@ export class WorkerApp {
     const width = element.clientWidth || 600;
     const height = element.clientHeight || 600;
     worker.postMessage(
-      { type: 'init', canvas: offscreen, width, height, dpr: window.devicePixelRatio || 1 } as ShellToRuntimeMessage,
+      {
+        type: 'init',
+        canvas: offscreen,
+        width,
+        height,
+        dpr: window.devicePixelRatio || 1,
+        renderer: this.options.renderer
+      } as ShellToRuntimeMessage,
       [offscreen]
     );
 
@@ -137,7 +152,8 @@ export class WorkerApp {
         measured: message.measured,
         relayoutRoots: message.relayoutRoots,
         at: message.at,
-        phases: message.phases
+        phases: message.phases,
+        renderer: message.renderer
       });
       return;
     }

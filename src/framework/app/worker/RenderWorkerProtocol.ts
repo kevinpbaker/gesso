@@ -1,5 +1,6 @@
 import type { UiModifiers } from '../../../ui/input/UiInputEvent';
-import type { FramePhaseTimings } from '../NodalRuntime';
+import type { FramePhaseTimings, RendererChoice } from '../NodalRuntime';
+import type { RendererBackend } from '../../../ui/rendering';
 
 /**
  * Messages the main-thread shell sends to the render worker.
@@ -9,7 +10,7 @@ import type { FramePhaseTimings } from '../NodalRuntime';
  * boundary — they are constructed in the worker and stay there.
  */
 export type ShellToRuntimeMessage =
-  | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number; dpr: number }
+  | { type: 'init'; canvas: OffscreenCanvas; width: number; height: number; dpr: number; renderer?: RendererChoice }
   | { type: 'resize'; width: number; height: number; dpr: number }
   | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiModifiers }
   | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiModifiers }
@@ -39,6 +40,7 @@ export type RuntimeToShellMessage =
       relayoutRoots: number;
       at: number;
       phases: FramePhaseTimings;
+      renderer: RendererBackend | 'pending';
     }
   | { type: 'error'; message: string; stack?: string }
   /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */

@@ -6,7 +6,7 @@ import { UiAnimationFrameClock } from '../../ui/scheduler';
 import type { UiFrameClockFactory } from '../../ui/scheduler';
 import type { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
-import { NodalRuntime, type FrameMetrics } from './NodalRuntime';
+import { NodalRuntime, type FrameMetrics, type RendererChoice } from './NodalRuntime';
 import type { StoreReplica } from '../store/worker/StoreReplica';
 
 export interface NodalAppOptions {
@@ -16,6 +16,8 @@ export interface NodalAppOptions {
   /** A registry built elsewhere, when some stores live in data workers. */
   stores?: StoreRegistry;
   canvas?: CanvasHost;
+  /** The rendering backend; see RendererChoice. Defaults to `canvas2d`. */
+  renderer?: RendererChoice;
   clock?: UiFrameClockFactory;
   /**
    * Set false to build the tree without attaching DOM input.
@@ -57,6 +59,7 @@ export class NodalApp {
     this.runtime = new NodalRuntime({
       root: options.root,
       canvas: this.canvas,
+      renderer: options.renderer,
       storeClasses: options.storeClasses,
       stores: options.stores,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
@@ -117,6 +120,11 @@ export class NodalApp {
    */
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void {
     this.runtime.onFrame(listener);
+  }
+
+  /** Resolves with the backend that ended up drawing. */
+  get rendererReady(): Promise<'canvas2d' | 'webgpu'> {
+    return this.runtime.rendererReady;
   }
 
   /** Resizes the drawing surface and schedules a repaint. */

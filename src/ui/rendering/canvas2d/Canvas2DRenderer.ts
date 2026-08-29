@@ -11,7 +11,7 @@ import { drawText } from '../TextRenderer';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutBox } from '../../layout/LayoutTypes';
-import type { UiRenderer } from '../UiRenderer';
+import type { RendererBackend, UiRenderer } from '../UiRenderer';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -55,6 +55,9 @@ export interface Canvas2DRendererOptions {
  * scrolling large lists only issues draws for the visible window.
  */
 export class Canvas2DRenderer implements UiRenderer {
+  readonly backend: RendererBackend = 'canvas2d';
+  private disposed = false;
+
   /** Scratch for the padded box text is drawn in; reused across nodes. */
   private readonly contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
   private readonly paint = createPaintState();
@@ -68,6 +71,23 @@ export class Canvas2DRenderer implements UiRenderer {
 
   private get surface(): CanvasSurface {
     return this.options.surface;
+  }
+
+  /** A 2D context needs no asynchronous setup. */
+  initialize(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  get isReady(): boolean {
+    return !this.disposed;
+  }
+
+  resize(width: number, height: number, dpr: number): void {
+    this.surface.setLogicalSize(width, height, dpr);
+  }
+
+  dispose(): void {
+    this.disposed = true;
   }
 
   render(root: UiNode, context: RenderContext): void {
@@ -138,9 +158,10 @@ export class Canvas2DRenderer implements UiRenderer {
     this.paintBorder(ctx, rec, paint);
 
     if (rec.clips) {
-      // overflow hidden/scroll/auto and ScrollView: children are clipped
-      // to the box (following its corner radius) and, for a scroll
-      // container, translated by the scroll offset.
+      // overflow hidden/scroll/auto and ScrollView: children and the
+      // node's own text are clipped to the box (following its corner
+      // radius); for a scroll container the children are also
+      // translated by the scroll offset.
       ctx.save();
       if (!borderRadiusIsZero(paint.borderRadius)) {
         traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
@@ -149,30 +170,38 @@ export class Canvas2DRenderer implements UiRenderer {
         ctx.rect(rec.x, rec.y, rec.width, rec.height);
       }
       ctx.clip();
-      if (rec.scrollable) {
-        ctx.translate(-rec.scrollX, -rec.scrollY);
-      }
       this.pushCull(rec);
+    }
+    if (rec.scrollable) {
+      ctx.save();
+      ctx.translate(-rec.scrollX, -rec.scrollY);
     }
 
     // Culling works in record coordinates; a transform or a sticky shift
     // moves what is drawn away from them, so descendants are not culled.
     this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
 
+    if (rec.scrollable) {
+      ctx.restore();
+    }
     if (rec.clips) {
       this.popCull();
+    }
+
+    if (hasText) {
+      // Foreground text is painted after children, inside the node's
+      // own clip and in its own (unscrolled) space. Children have
+      // reused the shared PaintState scratch, so re-resolve this node's
+      // style so the text renders with its own color/size/alignment.
+      resolvePaintState(node, this.paint);
+      this.paintContent(ctx, rec, this.paint, context);
+    }
+
+    if (rec.clips) {
       ctx.restore();
     }
     if (rec.scrollable) {
       this.paintScrollbars(ctx, rec, context.now ?? performance.now());
-    }
-
-    if (hasText) {
-      // Foreground text is painted after children, but children have
-      // reused the shared PaintState scratch. Re-resolve this node's
-      // style so the text renders with its own color/size/alignment.
-      resolvePaintState(node, this.paint);
-      this.paintContent(ctx, rec, this.paint, context);
     }
 
     while (saves > 0) {
@@ -230,18 +259,28 @@ export class Canvas2DRenderer implements UiRenderer {
     ctx.drawImage(paint.image, rect.x, rect.y, rect.width, rect.height);
   }
 
+  /**
+   * Borders lie inside the box, as CSS draws them and as the WebGPU
+   * backend's border band does: the stroke is centred on a path inset
+   * by half its width, so its outer edge is the box edge.
+   */
   private paintBorder(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
     if (paint.borderWidth <= 0) {
       return;
     }
+    const inset = paint.borderWidth / 2;
+    const x = rec.x + inset;
+    const y = rec.y + inset;
+    const width = Math.max(0, rec.width - paint.borderWidth);
+    const height = Math.max(0, rec.height - paint.borderWidth);
     ctx.strokeStyle = paint.borderColor !== undefined ? colorToCss(paint.borderColor) : '#000';
     ctx.lineWidth = paint.borderWidth;
     ctx.lineJoin = 'round';
     if (!borderRadiusIsZero(paint.borderRadius)) {
-      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
+      traceRoundedRect(ctx, x, y, width, height, Math.max(0, uniformBorderRadius(paint.borderRadius) - inset));
       ctx.stroke();
     } else {
-      ctx.strokeRect(rec.x, rec.y, rec.width, rec.height);
+      ctx.strokeRect(x, y, width, height);
     }
   }
 

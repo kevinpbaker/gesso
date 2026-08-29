@@ -98,7 +98,8 @@ describe('Canvas2DRenderer colors and borders', () => {
     h.append(root, node);
     h.layout(root);
     h.render(root);
-    expect(callArgs(h.context, 'strokeRect')).toEqual([[0, 0, 60, 40]]);
+    // Inset by half the width: the stroke's outer edge is the box edge, as in CSS.
+    expect(callArgs(h.context, 'strokeRect')).toEqual([[1, 1, 58, 38]]);
     expect(callArgs(h.context, 'set:strokeStyle')).toEqual(['#00f']);
     expect(callArgs(h.context, 'set:lineWidth')).toEqual([2]);
   });

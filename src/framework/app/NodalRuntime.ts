@@ -31,9 +31,14 @@ import {
   Canvas2DRenderer,
   CanvasTextMeasurer,
   createCanvasSurface,
+  createWebGPUSurface,
   LayoutInspector,
+  WebGPURenderer,
   type CanvasHost,
-  type CanvasSurface
+  type CanvasSurface,
+  type RendererBackend,
+  type UiRenderer,
+  type WebGPUCanvasHost
 } from '../../ui/rendering';
 import { UiScheduler, UiTimerFrameClock } from '../../ui/scheduler';
 import type { UiFrame, UiFrameClockFactory } from '../../ui/scheduler';
@@ -82,11 +87,29 @@ export interface RuntimeInput {
   readonly focus: UiFocusManager;
 }
 
+/**
+ * Which backend draws.
+ *
+ * `canvas2d` is the default and the portable choice: WKWebView and
+ * WebKitGTK do not ship WebGPU. `webgpu` asks for it and falls back to
+ * Canvas2D when the adapter or device cannot be had, reporting the
+ * fallback once; `auto` does the same without the report.
+ */
+export type RendererChoice = RendererBackend | 'auto';
+
 export interface NodalRuntimeOptions {
   /** Root component or element. */
   root: FrameworkChild;
   /** Canvas to draw into: HTMLCanvasElement, OffscreenCanvas, or a test double. */
   canvas: CanvasHost;
+  /** The rendering backend. Defaults to `canvas2d`; see RendererChoice. */
+  renderer?: RendererChoice;
+  /**
+   * A canvas for text measurement when the draw canvas is WebGPU's — a
+   * canvas holds one context, so the measurer needs its own. Defaults
+   * to a 1×1 OffscreenCanvas; tests pass a double.
+   */
+  measureCanvas?: CanvasHost;
   storeClasses?: (new () => Store)[];
   /**
    * A registry built elsewhere, when some stores live in data workers.
@@ -126,10 +149,17 @@ export class NodalRuntime {
   private readonly engine: LayoutEngine;
   private readonly builder: UiGraphBuilder;
   private readonly scheduler: UiScheduler;
-  private readonly surface: CanvasSurface;
+  private readonly canvas: CanvasHost;
   private readonly textMeasurer: CanvasTextMeasurer;
-  private readonly canvasRenderer: Canvas2DRenderer;
+  /** The 2D surface when Canvas2D draws; the inspector paints on it. */
+  private canvasSurface: CanvasSurface | null = null;
+  private renderer: UiRenderer;
+  private rendererState: RendererBackend | 'pending';
+  /** Resolves with the backend that ended up drawing. */
+  readonly rendererReady: Promise<RendererBackend>;
   private readonly dispatcher = new UiInputDispatcher();
+  private width: number;
+  private height: number;
 
   /** The layout root: a stack holding the app root and the overlay layer. */
   private root: UiNode | undefined;
@@ -139,6 +169,7 @@ export class NodalRuntime {
   private pixelRatio: number;
   private lastFrameMs = 0;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
+  private rendererErrorListener: ((message: string) => void) | null = null;
   private inspectListener: ((text: string | null) => void) | null = null;
   private lastInspection: string | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
@@ -148,15 +179,56 @@ export class NodalRuntime {
 
   constructor(options: NodalRuntimeOptions) {
     this.stores = options.stores ?? new StoreRegistry();
-    this.surface = createCanvasSurface(options.canvas);
-    this.textMeasurer = new CanvasTextMeasurer(this.surface.getContext2D());
+    this.canvas = options.canvas;
+    this.pixelRatio = options.dpr ?? 1;
+    this.width = options.width ?? 600;
+    this.height = options.height ?? 600;
+    this.constraints = Constraints.loose(this.width, this.height);
+
+    const choice = options.renderer ?? 'canvas2d';
+    if (choice === 'canvas2d') {
+      this.canvasSurface = createCanvasSurface(options.canvas);
+      this.textMeasurer = new CanvasTextMeasurer(this.canvasSurface.getContext2D());
+      this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
+      this.rendererState = 'canvas2d';
+      this.rendererReady = Promise.resolve('canvas2d');
+    } else {
+      // The draw canvas will hold the WebGPU context, so text is measured
+      // on a canvas of its own. One measurer still serves layout and the
+      // renderer, which is what keeps line breaks identical.
+      const measureSurface = createCanvasSurface(options.measureCanvas ?? createMeasureCanvas());
+      this.textMeasurer = new CanvasTextMeasurer(measureSurface.getContext2D());
+      const webgpu = new WebGPURenderer({
+        surface: createWebGPUSurface(options.canvas as unknown as WebGPUCanvasHost),
+        onError: message => this.reportRendererError(message)
+      });
+      this.renderer = webgpu;
+      this.rendererState = 'pending';
+      this.rendererReady = webgpu
+        .initialize()
+        .then((): RendererBackend => {
+          if (this.renderer !== webgpu) {
+            return this.rendererState === 'pending' ? 'canvas2d' : this.rendererState;
+          }
+          this.rendererState = 'webgpu';
+          this.renderer.resize(this.width, this.height, this.pixelRatio);
+          this.requestRepaint();
+          return 'webgpu';
+        })
+        .catch((error: unknown): RendererBackend => {
+          if (choice === 'webgpu') {
+            // eslint-disable-next-line no-console
+            console.error('WebGPU was requested but is unavailable; drawing with Canvas2D.', error);
+          }
+          this.fallBackToCanvas2D(webgpu);
+          return 'canvas2d';
+        });
+    }
+
     this.engine = new LayoutEngine(this.textMeasurer);
     this.inspector = new LayoutInspector(this.engine);
     this.resolver = new ComponentHostResolver(this.stores);
     this.builder = new UiGraphBuilder(this.graph, { components: this.resolver, dispatcher: this.dispatcher });
-    this.canvasRenderer = new Canvas2DRenderer({ surface: this.surface });
-    this.pixelRatio = options.dpr ?? 1;
-    this.constraints = Constraints.loose(options.width ?? 600, options.height ?? 600);
 
     for (const StoreClass of options.storeClasses ?? []) {
       this.stores.register(StoreClass);
@@ -209,6 +281,52 @@ export class NodalRuntime {
     this.scheduler.start();
   }
 
+  /** The backend drawing frames, or `pending` while WebGPU initialises. */
+  get rendererBackend(): RendererBackend | 'pending' {
+    return this.rendererState;
+  }
+
+  /**
+   * Receives renderer errors — GPU validation failures, device loss —
+   * that would otherwise only reach the console of whichever thread
+   * renders. Without a listener they are logged.
+   */
+  onRendererError(listener: ((message: string) => void) | null): void {
+    this.rendererErrorListener = listener;
+  }
+
+  private reportRendererError(message: string): void {
+    if (this.rendererErrorListener !== null) {
+      this.rendererErrorListener(message);
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.error(message);
+  }
+
+  /**
+   * Replaces a WebGPU renderer that could not start, or lost its
+   * device, with Canvas2D on the same canvas. The WebGPU path does not
+   * touch the canvas until it has a device, so the 2D context is free.
+   */
+  private fallBackToCanvas2D(failed: UiRenderer): void {
+    if (this.renderer !== failed) {
+      return;
+    }
+    failed.dispose();
+    this.canvasSurface = createCanvasSurface(this.canvas);
+    this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
+    this.rendererState = 'canvas2d';
+    this.renderer.resize(this.width, this.height, this.pixelRatio);
+    this.requestRepaint();
+  }
+
+  private requestRepaint(): void {
+    if (this.root !== undefined) {
+      this.graph.markDirty(this.root, DirtyFlags.Paint);
+    }
+  }
+
   /**
    * Resizes the surface and schedules a repaint.
    *
@@ -221,7 +339,9 @@ export class NodalRuntime {
       return;
     }
     this.pixelRatio = dpr;
-    this.surface.setLogicalSize(width, height, dpr);
+    this.width = width;
+    this.height = height;
+    this.renderer.resize(width, height, dpr);
     this.constraints = Constraints.loose(width, height);
     if (this.root === undefined) {
       return;
@@ -331,11 +451,13 @@ export class NodalRuntime {
       this.inspectorTimer = null;
     }
     this.inspectListener = null;
+    this.rendererErrorListener = null;
     this.scheduler.stop();
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.frameListener = null;
     this.resolver.dispose();
+    this.renderer.dispose();
   }
 
   /**
@@ -592,17 +714,25 @@ export class NodalRuntime {
       this.inspector.recordLayout(started);
     }
 
-    // Render is unconditional: the Canvas2D backend redraws the whole
-    // scene, so any frame that got this far changes pixels.
+    // Render is unconditional once the backend is ready: both backends
+    // redraw the whole scene, so any frame that got this far changes
+    // pixels. Before WebGPU has a device there is nothing to draw with;
+    // a lost device falls back to Canvas2D and repaints.
+    if (this.renderer.backend === 'webgpu' && (this.renderer as WebGPURenderer).isLost) {
+      this.fallBackToCanvas2D(this.renderer);
+    }
     this.phaseTimings.render = this.timePhase(
-      () => true,
-      () => this.canvasRenderer.render(root, { layout: this.engine, text: this.textMeasurer, now: started })
+      () => this.renderer.isReady,
+      () => this.renderer.render(root, { layout: this.engine, text: this.textMeasurer, now: started })
     );
     // The inspector paints over the finished scene; the hovered node's
     // explanation only changes with layout, so it is re-read then and
-    // sent when it differs from what the listener already has.
+    // sent when it differs from what the listener already has. The
+    // overlay is a 2D painting and so exists on the Canvas2D backend
+    // only; explanations are sent on both.
     if (this.inspector.isEnabled) {
-      const nextChange = this.inspector.paint(this.surface.getContext2D(), started);
+      const nextChange =
+        this.canvasSurface !== null ? this.inspector.paint(this.canvasSurface.getContext2D(), started) : undefined;
       if (laidOut) {
         this.sendInspection();
       }
@@ -620,7 +750,8 @@ export class NodalRuntime {
       measured: this.engine.stats.measured,
       relayoutRoots: this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
       at: finished,
-      phases: this.phaseTimings
+      phases: this.phaseTimings,
+      renderer: this.rendererState
     });
   }
 
@@ -706,6 +837,8 @@ export interface FrameMetrics {
   relayoutRoots: number;
   /** Milliseconds per phase. A phase with no work reports 0. */
   phases: FramePhaseTimings;
+  /** The backend that drew this frame, or `pending` while WebGPU initialises. */
+  renderer: RendererBackend | 'pending';
   /**
    * When the frame finished, on the clock of the thread that rendered
    * it. Gaps between consecutive values are the only honest measure of
@@ -718,6 +851,20 @@ export interface FrameMetrics {
 
 function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+/** A canvas for the text measurer when the draw canvas is not a 2D one. */
+function createMeasureCanvas(): CanvasHost {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    return new OffscreenCanvas(1, 1) as unknown as CanvasHost;
+  }
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas;
+  }
+  throw new Error('NodalRuntime: no canvas is available for text measurement; pass `measureCanvas`.');
 }
 
 function emptyPhaseTimings(): FramePhaseTimings {

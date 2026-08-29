@@ -4,7 +4,17 @@ import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import { Constraints } from '../../layout/LayoutTypes';
 import { RenderHarness } from '../RenderTestUtils';
-import { buildRenderList, viewportScissor, INSTANCE_STRIDE_FLOATS, PrimitiveKind } from './WebGPURenderData';
+import {
+  buildRenderList,
+  textItems,
+  viewportScissor,
+  CommandKind,
+  INSTANCE_STRIDE_FLOATS,
+  PrimitiveKind,
+  type ImageCommand,
+  type PrimitiveCommand,
+  type TextCommand
+} from './WebGPURenderData';
 import { WebGPUSurface, toPhysicalPixels } from './WebGPUSurface';
 
 function box(h: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
@@ -17,7 +27,7 @@ function box(h: RenderHarness, id: string, props: Record<string, unknown>): UiNo
 
 function layoutAndBuild(h: RenderHarness, root: UiNode) {
   h.layout(root);
-  return buildRenderList(root, h.engine, h.surface.logicalWidth, h.surface.logicalHeight, h.surface.dpr);
+  return buildRenderList(root, h.engine, h.measurer, h.surface.logicalWidth, h.surface.logicalHeight, h.surface.dpr);
 }
 
 function readInstance(list: ReturnType<typeof buildRenderList>, index: number) {
@@ -45,8 +55,39 @@ function readInstance(list: ReturnType<typeof buildRenderList>, index: number) {
       data[offset + 15],
       data[offset + 16],
       data[offset + 17]
+    ] as [number, number, number, number, number, number],
+    clip: {
+      x: data[offset + 18],
+      y: data[offset + 19],
+      width: data[offset + 20],
+      height: data[offset + 21],
+      radius: data[offset + 22]
+    },
+    clipInverse: [
+      data[offset + 24],
+      data[offset + 25],
+      data[offset + 26],
+      data[offset + 27],
+      data[offset + 28],
+      data[offset + 29]
     ] as [number, number, number, number, number, number]
   };
+}
+
+/** Screen-space box of a primitive instance: its rectangle through its transform. */
+function screenBox(list: ReturnType<typeof buildRenderList>, index: number) {
+  const inst = readInstance(list, index);
+  const t = inst.transform;
+  return {
+    x: inst.x * t[0] + inst.y * t[2] + t[4],
+    y: inst.x * t[1] + inst.y * t[3] + t[5],
+    width: inst.width * t[0],
+    height: inst.height * t[3]
+  };
+}
+
+function primitiveCommands(list: ReturnType<typeof buildRenderList>): PrimitiveCommand[] {
+  return list.commands.filter((c): c is PrimitiveCommand => c.kind === CommandKind.Primitives);
 }
 
 describe('buildRenderList geometry', () => {
@@ -54,7 +95,14 @@ describe('buildRenderList geometry', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     h.layout(root);
-    const list = buildRenderList(root, h.engine, h.surface.logicalWidth, h.surface.logicalHeight, h.surface.dpr);
+    const list = buildRenderList(
+      root,
+      h.engine,
+      h.measurer,
+      h.surface.logicalWidth,
+      h.surface.logicalHeight,
+      h.surface.dpr
+    );
     expect(list.instanceCount).toBe(0);
     expect(list.commands).toHaveLength(0);
   });
@@ -111,8 +159,8 @@ describe('buildRenderList geometry', () => {
     const node = box(h, 'box', { width: 100, height: 50, backgroundColor: '#f00' });
     h.graph.appendChild(root, node);
     h.layout(root);
-    const first = buildRenderList(root, h.engine, 800, 600, 1);
-    const second = buildRenderList(root, h.engine, 800, 600, 1);
+    const first = buildRenderList(root, h.engine, h.measurer, 800, 600, 1);
+    const second = buildRenderList(root, h.engine, h.measurer, 800, 600, 1);
     expect(first.instanceCount).toBe(second.instanceCount);
     for (let i = 0; i < first.instanceData.length; i++) {
       expect(first.instanceData[i]).toBe(second.instanceData[i]);
@@ -192,7 +240,7 @@ describe('buildRenderList clipping', () => {
     h.graph.appendChild(scroll, a);
     h.graph.appendChild(scroll, b);
     h.layout(scroll, Constraints.loose(800, 600));
-    const list = buildRenderList(scroll, h.engine, 800, 600, 1);
+    const list = buildRenderList(scroll, h.engine, h.measurer, 800, 600, 1);
     expect(list.commands.length).toBeGreaterThan(0);
     const command = list.commands[0];
     expect(command.scissor).toEqual({ x: 0, y: 0, width: 200, height: 100 });
@@ -206,14 +254,14 @@ describe('buildRenderList clipping', () => {
     const child = box(h, 'a', { width: 40, height: 50, backgroundColor: '#aaa', flexShrink: 0 });
     h.graph.appendChild(scroll, child);
     h.layout(scroll, Constraints.loose(800, 600));
-    const list = buildRenderList(scroll, h.engine, 800, 600, 2);
+    const list = buildRenderList(scroll, h.engine, h.measurer, 800, 600, 2);
     const command = list.commands[0];
     expect(command.scissor).toEqual({ x: 0, y: 0, width: 400, height: 200 });
   });
 });
 
 describe('buildRenderList transforms', () => {
-  it('includes the layout position in the transform', () => {
+  it('keeps the layout position on the instance, not in the transform', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     root.setProperty('padding', 10);
@@ -221,10 +269,10 @@ describe('buildRenderList transforms', () => {
     h.graph.appendChild(root, node);
     const list = layoutAndBuild(h, root);
     const inst = readInstance(list, 0);
-    expect(inst.transform[0]).toBe(1);
-    expect(inst.transform[3]).toBe(1);
-    expect(inst.transform[4]).toBe(10);
-    expect(inst.transform[5]).toBe(10);
+    expect(inst.x).toBe(10);
+    expect(inst.y).toBe(10);
+    expect(inst.transform).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(screenBox(list, 0)).toEqual({ x: 10, y: 10, width: 50, height: 50 });
   });
 
   it('encodes a scale transform', () => {
@@ -238,7 +286,7 @@ describe('buildRenderList transforms', () => {
     expect(inst.transform[3]).toBe(1);
   });
 
-  it('does not double-count parent positions in nested transforms', () => {
+  it('does not double-count parent positions in nested boxes', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     root.setProperty('padding', 10);
@@ -252,19 +300,25 @@ describe('buildRenderList transforms', () => {
     h.graph.appendChild(outer, inner);
     h.graph.appendChild(root, outer);
     const list = layoutAndBuild(h, root);
-    const outerTx = readInstance(list, 0).transform[4];
-    const innerTx = readInstance(list, 1).transform[4];
-    const outerTy = readInstance(list, 0).transform[5];
-    const innerTy = readInstance(list, 1).transform[5];
-    expect(outerTx).toBe(10);
-    expect(outerTy).toBe(10);
-    expect(innerTx).toBe(30);
-    expect(innerTy).toBe(25);
+    expect(screenBox(list, 0)).toMatchObject({ x: 10, y: 10 });
+    expect(screenBox(list, 1)).toMatchObject({ x: 30, y: 25 });
+  });
+
+  it('scales about the node origin like the Canvas2D renderer', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    root.setProperty('padding', 10);
+    const node = box(h, 'box', { width: 50, height: 50, backgroundColor: '#f00', transform: { scaleX: 2 } });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    // Canvas2D: translate(10,10) scale(2,1) translate(-10,-10) → the box
+    // keeps its left edge at 10 and doubles its width.
+    expect(screenBox(list, 0)).toEqual({ x: 10, y: 10, width: 100, height: 50 });
   });
 });
 
 describe('buildRenderList text', () => {
-  it('collects text items instead of emitting placeholder instances', () => {
+  it('collects a text command in paint order instead of a primitive', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     const node = box(h, 'label', {
@@ -277,10 +331,70 @@ describe('buildRenderList text', () => {
     h.graph.appendChild(root, node);
     const list = layoutAndBuild(h, root);
     expect(list.instanceCount).toBe(0);
-    expect(list.textItems).toHaveLength(1);
-    expect(list.textItems[0].text).toBe('Hello');
-    expect(list.textItems[0].fontSize).toBe(14);
-    expect(list.textItems[0].textColor).toBe('#123456');
+    expect(list.texturedCount).toBe(1);
+    const items = textItems(list);
+    expect(items).toHaveLength(1);
+    expect(items[0].lines.map(line => line.text)).toEqual(['Hello']);
+    expect(items[0].font).toBe('normal 14px sans-serif');
+    expect(items[0].color).toBe('#123456');
+  });
+
+  it('sizes the texture to the run, padded, not to the box', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    // The run is far narrower than its 300-wide box; a texture the size
+    // of the box would waste pixels and, worse, cut off a run wider
+    // than its box.
+    const node = box(h, 'label', { width: 300, height: 100, text: 'Hello', fontSize: 10, textWrap: 'none' });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    const [item] = textItems(list);
+    const pad = 5;
+    const runWidth = item.lines[0].width;
+    expect(runWidth).toBeLessThan(100);
+    expect(item.width).toBe(runWidth + 2 * pad);
+    expect(item.height).toBe(Math.ceil(item.lines[0].height + 2 * pad));
+    expect(item.lines[0].x).toBe(pad);
+    expect(item.lines[0].y).toBe(pad);
+  });
+
+  it('draws text that overflows a tight box, as Canvas2D does', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const node = box(h, 'label', { width: 20, height: 12, text: 'Overflowing', fontSize: 10, textWrap: 'none' });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    const [item] = textItems(list);
+    expect(item.width).toBeGreaterThan(20);
+    const command = list.commands.find((c): c is TextCommand => c.kind === CommandKind.Text)!;
+    // The instance covers the run; the box does not clip it.
+    expect(list.texturedData[command.instance * 24 + 2]).toBe(item.width);
+  });
+
+  it('keeps the same texture key while the run moves', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    root.setProperty('padding', 0);
+    const node = box(h, 'label', { width: 100, height: 30, text: 'Hello', fontSize: 14 });
+    h.graph.appendChild(root, node);
+    const before = textItems(layoutAndBuild(h, root))[0].key;
+    root.setProperty('padding', 37);
+    node.setProperty('verticalAlign', 'bottom');
+    const after = textItems(layoutAndBuild(h, root))[0].key;
+    expect(after).toBe(before);
+  });
+
+  it('paints text above earlier siblings and below later ones', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Box);
+    const label = box(h, 'label', { width: 100, height: 30, text: 'Under', fontSize: 14 });
+    const cover = box(h, 'cover', { width: 100, height: 30, backgroundColor: '#fff' });
+    h.graph.appendChild(root, label);
+    h.graph.appendChild(root, cover);
+    const list = layoutAndBuild(h, root);
+    // Text is a command in the ordered list, not a pass after all fills:
+    // the covering box's fill comes after it.
+    expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Text, CommandKind.Primitives]);
   });
 });
 
@@ -294,7 +408,7 @@ describe('buildRenderList scrolling', () => {
     const child = box(h, 'child', { width: 200, height: 200, backgroundColor: '#aaa', flexShrink: 0 });
     h.graph.appendChild(scroll, child);
     h.layout(scroll, Constraints.loose(800, 600));
-    const list = buildRenderList(scroll, h.engine, 800, 600, 1);
+    const list = buildRenderList(scroll, h.engine, h.measurer, 800, 600, 1);
     const inst = readInstance(list, 0);
     expect(inst.transform[5]).toBe(-30);
   });
@@ -308,7 +422,7 @@ describe('buildRenderList scrolling', () => {
     const child = box(h, 'child', { width: 200, height: 200, backgroundColor: '#aaa', flexShrink: 0 });
     h.graph.appendChild(scroll, child);
     h.layout(scroll, Constraints.loose(800, 600));
-    const list = buildRenderList(scroll, h.engine, 800, 600, 1);
+    const list = buildRenderList(scroll, h.engine, h.measurer, 800, 600, 1);
     expect(list.commands.length).toBeGreaterThan(0);
     expect(list.commands[0].scissor).toEqual({ x: 0, y: 0, width: 200, height: 100 });
   });
@@ -349,15 +463,11 @@ describe('buildRenderList scissor bounds', () => {
     h.graph.appendChild(scroll, child);
     h.layout(scroll, Constraints.loose(logicalWidth, logicalHeight));
 
-    const list = buildRenderList(scroll, h.engine, logicalWidth, logicalHeight, dpr);
+    const list = buildRenderList(scroll, h.engine, h.measurer, logicalWidth, logicalHeight, dpr);
     const maxX = toPhysicalPixels(logicalWidth, dpr);
     const maxY = toPhysicalPixels(logicalHeight, dpr);
 
-    const rects = [
-      viewportScissor(logicalWidth, logicalHeight, dpr),
-      ...list.commands.map(command => command.scissor),
-      ...list.textItems.map(item => item.scissor)
-    ];
+    const rects = [viewportScissor(logicalWidth, logicalHeight, dpr), ...list.commands.map(command => command.scissor)];
 
     const where = `${logicalWidth}x${logicalHeight}@${dpr}`;
     for (const rect of rects) {
@@ -400,5 +510,240 @@ describe('buildRenderList scissor bounds', () => {
         });
       }
     }
+  });
+});
+
+describe('buildRenderList fragments', () => {
+  it('draws children that live under a Fragment', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const parent = box(h, 'parent', { width: 200, height: 200 });
+    h.graph.appendChild(root, parent);
+    const fragment = h.createNode('fragment', UiNodeType.Fragment);
+    h.graph.appendChild(parent, fragment);
+    const child = box(h, 'child', { width: 50, height: 50, backgroundColor: '#f00' });
+    h.graph.appendChild(fragment, child);
+    const list = layoutAndBuild(h, root);
+    expect(list.instanceCount).toBe(1);
+    expect(screenBox(list, 0)).toEqual({ x: 0, y: 0, width: 50, height: 50 });
+  });
+
+  it('draws nested fragments in tree order', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const outer = h.createNode('outer', UiNodeType.Fragment);
+    const inner = h.createNode('inner', UiNodeType.Fragment);
+    const a = box(h, 'a', { width: 50, height: 50, backgroundColor: '#f00' });
+    const b = box(h, 'b', { width: 50, height: 50, backgroundColor: '#0f0' });
+    h.graph.appendChild(root, outer);
+    h.graph.appendChild(outer, inner);
+    h.graph.appendChild(inner, a);
+    h.graph.appendChild(outer, b);
+    const list = layoutAndBuild(h, root);
+    expect(list.instanceCount).toBe(2);
+    expect(readInstance(list, 0).color.r).toBe(1);
+    expect(readInstance(list, 1).color.g).toBe(1);
+  });
+});
+
+describe('buildRenderList images', () => {
+  it('emits an image command between the background and the border', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const image = { width: 100, height: 50 } as ImageBitmap;
+    const node = box(h, 'node', {
+      width: 100,
+      height: 100,
+      backgroundColor: '#eee',
+      borderWidth: 1,
+      borderColor: '#000',
+      image,
+      objectFit: 'contain'
+    });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Primitives, CommandKind.Image, CommandKind.Primitives]);
+    const command = list.commands[1] as ImageCommand;
+    expect(command.image).toBe(image);
+    // contain: 100x50 into 100x100 sits at y = 25.
+    const offset = command.instance * 24;
+    expect(Array.from(list.texturedData.slice(offset, offset + 4))).toEqual([0, 25, 100, 50]);
+  });
+});
+
+describe('buildRenderList culling', () => {
+  it('skips subtrees entirely outside the viewport', () => {
+    const h = new RenderHarness(200, 100);
+    const root = h.graph.root;
+    const visible = box(h, 'visible', { width: 50, height: 50, backgroundColor: '#f00' });
+    const offscreen = box(h, 'offscreen', {
+      width: 50,
+      height: 50,
+      backgroundColor: '#0f0',
+      position: 'absolute',
+      left: 500,
+      top: 500
+    });
+    const grandchild = box(h, 'grandchild', { width: 10, height: 10, backgroundColor: '#00f' });
+    h.graph.appendChild(offscreen, grandchild);
+    h.graph.appendChild(root, visible);
+    h.graph.appendChild(root, offscreen);
+    h.layout(root, Constraints.tight(200, 100));
+    const list = buildRenderList(root, h.engine, h.measurer, 200, 100, 1);
+    expect(list.instanceCount).toBe(1);
+  });
+
+  it('keeps the instance count proportional to the visible window of a long list', () => {
+    const h = new RenderHarness(200, 100);
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 200);
+    scroll.setProperty('height', 100);
+    for (let i = 0; i < 2000; i++) {
+      h.graph.appendChild(
+        scroll,
+        box(h, `row${i}`, { width: 200, height: 20, backgroundColor: '#ccc', flexShrink: 0 })
+      );
+    }
+    for (const scrollY of [0, 10_000, 39_900]) {
+      scroll.setProperty('scrollY', scrollY);
+      h.layout(scroll, Constraints.loose(200, 100));
+      const list = buildRenderList(scroll, h.engine, h.measurer, 200, 100, 1);
+      expect(list.instanceCount, `scrollY ${scrollY}`).toBeLessThanOrEqual(7);
+      expect(list.instanceCount, `scrollY ${scrollY}`).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('does not cull under a transform, where records no longer say where pixels land', () => {
+    const h = new RenderHarness(200, 100);
+    const root = h.graph.root;
+    const moved = box(h, 'moved', {
+      width: 50,
+      height: 50,
+      position: 'absolute',
+      left: 500,
+      top: 0,
+      transform: { x: -500 }
+    });
+    const child = box(h, 'child', { width: 50, height: 50, backgroundColor: '#f00' });
+    h.graph.appendChild(moved, child);
+    h.graph.appendChild(root, moved);
+    h.layout(root, Constraints.tight(200, 100));
+    const list = buildRenderList(root, h.engine, h.measurer, 200, 100, 1);
+    // The transformed parent itself is tested against its record and
+    // culled the way Canvas2D culls it; this pins that its children
+    // are not culled once inside the transform.
+    expect(list.instanceCount).toBe(0);
+    moved.setProperty('left', 150);
+    h.layout(root, Constraints.tight(200, 100));
+    const inside = buildRenderList(root, h.engine, h.measurer, 200, 100, 1);
+    expect(inside.instanceCount).toBe(1);
+  });
+});
+
+describe('buildRenderList rounded clipping', () => {
+  it('hands descendants the innermost rounded clip in its own space', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    root.setProperty('padding', 10);
+    const card = box(h, 'card', {
+      width: 100,
+      height: 60,
+      overflow: 'hidden',
+      borderRadius: 8,
+      backgroundColor: '#eee'
+    });
+    const spill = box(h, 'spill', { width: 300, height: 300, backgroundColor: '#f00' });
+    h.graph.appendChild(card, spill);
+    h.graph.appendChild(root, card);
+    const list = layoutAndBuild(h, root);
+    const spillInstance = readInstance(list, 1);
+    expect(spillInstance.clip).toEqual({ x: 10, y: 10, width: 100, height: 60, radius: 8 });
+    expect(spillInstance.clipInverse).toEqual([1, 0, 0, 1, 0, 0]);
+    // The scissor still does the rectangular part.
+    expect(primitiveCommands(list).at(-1)!.scissor).toEqual({ x: 10, y: 10, width: 100, height: 60 });
+  });
+
+  it('leaves the clip empty when no rounded ancestor clips', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const card = box(h, 'card', { width: 100, height: 60, overflow: 'hidden' });
+    const spill = box(h, 'spill', { width: 300, height: 300, backgroundColor: '#f00' });
+    h.graph.appendChild(card, spill);
+    h.graph.appendChild(root, card);
+    const list = layoutAndBuild(h, root);
+    expect(readInstance(list, 0).clip.width).toBe(0);
+  });
+
+  it('inverts a scrolled and translated clip so the shader can test screen pixels', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    root.setProperty('padding', 20);
+    const card = box(h, 'card', { width: 100, height: 60, overflow: 'scroll', borderRadius: 8, scrollY: 30 });
+    const spill = box(h, 'spill', { width: 100, height: 300, backgroundColor: '#f00', flexShrink: 0 });
+    h.graph.appendChild(card, spill);
+    h.graph.appendChild(root, card);
+    const list = layoutAndBuild(h, root);
+    const inst = readInstance(list, 0);
+    // The content is scrolled (drawn 30 up), the clip is not: its
+    // inverse maps the screen back into the card's unscrolled space.
+    expect(inst.transform[5]).toBe(-30);
+    expect(inst.clip).toEqual({ x: 20, y: 20, width: 100, height: 60, radius: 8 });
+    expect(inst.clipInverse).toEqual([1, 0, 0, 1, 0, 0]);
+  });
+});
+
+describe('buildRenderList scrollbars and sticky', () => {
+  it('places the scrollbar thumb at its own geometry, not the node origin', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    root.setProperty('padding', 10);
+    const list = h.createNode('list', UiNodeType.Column);
+    list.setProperty('width', 200);
+    list.setProperty('height', 100);
+    list.setProperty('overflow', 'scroll');
+    list.setProperty('scrollY', 50);
+    const tall = box(h, 'tall', { width: 20, height: 400, flexShrink: 0 });
+    h.graph.appendChild(list, tall);
+    h.graph.appendChild(root, list);
+    h.layout(root);
+    const until = h.record(list).scrollbarVisibleUntil;
+    const rendered = buildRenderList(root, h.engine, h.measurer, 800, 600, 1, until - 1000);
+    expect(rendered.instanceCount).toBe(1);
+    const thumb = screenBox(rendered, 0);
+    // Along the right edge of the 200-wide list at x = 10, below its top.
+    expect(thumb.x).toBeGreaterThan(200);
+    expect(thumb.x + thumb.width).toBeLessThanOrEqual(210);
+    expect(thumb.y).toBeGreaterThan(10);
+  });
+
+  it('shifts a sticky node and its children by the sticky offset', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 200);
+    scroll.setProperty('height', 100);
+    scroll.setProperty('scrollY', 50);
+    const header = box(h, 'header', {
+      width: 200,
+      height: 20,
+      backgroundColor: '#f00',
+      position: 'sticky',
+      top: 0,
+      flexShrink: 0
+    });
+    const body = box(h, 'body', { width: 200, height: 400, backgroundColor: '#0f0', flexShrink: 0 });
+    h.graph.appendChild(scroll, header);
+    h.graph.appendChild(scroll, body);
+    h.graph.appendChild(root, scroll);
+    h.layout(root);
+    const list = layoutAndBuild(h, root);
+    expect(h.record(header).stickyOffsetY).toBe(50);
+    // Sticky nodes paint above their siblings, so find them by colour.
+    const boxes = [0, 1].map(i => ({ ...screenBox(list, i), red: readInstance(list, i).color.r === 1 }));
+    const headerBox = boxes.find(b => b.red)!;
+    const bodyBox = boxes.find(b => !b.red)!;
+    // Scrolled 50 up, stuck 50 down: the header stays at the top.
+    expect(headerBox).toMatchObject({ x: 0, y: 0 });
+    expect(bodyBox).toMatchObject({ y: -30 });
   });
 });

@@ -24,7 +24,7 @@ export type { UiTransform } from '../properties/UiTransform';
 export type { LayoutReader, RenderContext } from './RenderContext';
 export { layoutTextLines, drawText, buildFontString } from './TextRenderer';
 export type { TextLinePlacement } from './TextRenderer';
-export type { UiRenderer } from './UiRenderer';
+export type { UiRenderer, RendererBackend } from './UiRenderer';
 export { WebGPURenderer } from './webgpu/WebGPURenderer';
 export type { WebGPURendererOptions, RenderHooks } from './webgpu/WebGPURenderer';
 export { createWebGPUSurface, WebGPUSurface } from './webgpu/WebGPUSurface';
@@ -33,5 +33,24 @@ export { WebGPUError } from './webgpu/WebGPUError';
 export { parseColor } from './webgpu/WebGPUColor';
 export type { RgbaColor } from './webgpu/WebGPUColor';
 export { initializeWebGPU } from './webgpu/WebGPUDevice';
-export { buildRenderList, INSTANCE_STRIDE_FLOATS, INSTANCE_STRIDE_BYTES } from './webgpu/WebGPURenderData';
-export type { RenderList, RenderCommand, ScissorRect, PrimitiveKind } from './webgpu/WebGPURenderData';
+export {
+  buildRenderList,
+  textItems,
+  INSTANCE_STRIDE_FLOATS,
+  INSTANCE_STRIDE_BYTES,
+  TEXTURED_STRIDE_FLOATS,
+  TEXTURED_STRIDE_BYTES,
+  CommandKind,
+  PrimitiveKind
+} from './webgpu/WebGPURenderData';
+export type {
+  RenderList,
+  RenderCommand,
+  PrimitiveCommand,
+  TextCommand,
+  ImageCommand,
+  TextRenderItem,
+  ScissorRect,
+  Affine
+} from './webgpu/WebGPURenderData';
+export { WebGPUTextureCache } from './webgpu/WebGPUTextureCache';

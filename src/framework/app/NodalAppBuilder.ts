@@ -4,7 +4,7 @@ import type { FrameworkChild } from '../ComponentElement';
 import type { Store } from '../store/Store';
 import { createStoreRegistry, type StoreRegistration } from '../store/worker/createStoreRegistry';
 import { NodalApp } from './NodalApp';
-import type { FrameMetrics } from './NodalRuntime';
+import type { FrameMetrics, RendererChoice } from './NodalRuntime';
 
 /**
  * Fluent builder for the single-thread configuration.
@@ -13,6 +13,7 @@ export class NodalAppBuilder {
   private readonly registrations: StoreRegistration[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((text: string | null) => void) | undefined;
+  private rendererChoice: RendererChoice | undefined;
   private app: NodalApp | undefined;
 
   constructor(private readonly root: FrameworkChild | (new () => Component)) {}
@@ -27,6 +28,16 @@ export class NodalAppBuilder {
    */
   useStore(StoreClass: new () => Store, options: { worker?: () => Worker } = {}): this {
     this.registrations.push({ storeClass: StoreClass, worker: options.worker });
+    return this;
+  }
+
+  /**
+   * Chooses the rendering backend, mirroring WorkerAppOptions.renderer.
+   * Defaults to Canvas2D; `webgpu` and `auto` fall back to it when the
+   * browser has no WebGPU.
+   */
+  renderer(choice: RendererChoice): this {
+    this.rendererChoice = choice;
     return this;
   }
 
@@ -69,7 +80,12 @@ export class NodalAppBuilder {
     const element = typeof host === 'string' ? requireElement(host) : host;
     const rootElement = typeof this.root === 'function' ? createComponent(this.root) : this.root;
     const stores = createStoreRegistry(this.registrations);
-    const app = new NodalApp({ host: element, root: rootElement, stores: stores.registry });
+    const app = new NodalApp({
+      host: element,
+      root: rootElement,
+      stores: stores.registry,
+      renderer: this.rendererChoice
+    });
     app.deferPatchesFrom(stores.replicas);
     if (this.frameListener !== undefined) {
       app.onFrame(this.frameListener);
