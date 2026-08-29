@@ -467,9 +467,6 @@ export class UiGraphBuilder {
    * being reactive.
    */
   private reconcileProps(node: UiNode, props: UiProps): void {
-    const bindings = this.graph.getBindingsForNode(node);
-    const bindingByProperty = new Map(bindings.map(binding => [binding.property, binding]));
-    const eventByType = new Map(this.graph.getEventBindingsForNode(node).map(binding => [binding.type, binding]));
     const present = new Set<string>();
     const presentEvents = new Set<string>();
 
@@ -482,12 +479,15 @@ export class UiGraphBuilder {
         continue;
       }
       if (isEventProp(property, value)) {
-        this.reconcileEventProp(node, property, value as UiEventListener, eventByType, presentEvents);
+        this.reconcileEventProp(node, property, value as UiEventListener, presentEvents);
         continue;
       }
       this.assertKnownProp(node, property, value);
       present.add(property);
-      const existingBinding = bindingByProperty.get(property);
+      // The graph indexes bindings by node and property, so this asks
+      // it directly rather than copying the node's whole binding set
+      // into a lookup table on every reconcile.
+      const existingBinding = this.graph.getBindingForProperty(node, property as NodeProperty);
       if (this.isObservable(value)) {
         if (existingBinding !== undefined && existingBinding.observable === value) {
           continue;
@@ -501,17 +501,20 @@ export class UiGraphBuilder {
       if (existingBinding !== undefined) {
         this.graph.unbind(existingBinding);
       }
-      this.graph.updateProperty(node.id, property as NodeProperty, value, propertyEffects(property));
+      this.graph.updateNodeProperty(node, property as NodeProperty, value, propertyEffects(property));
     }
 
-    for (const [property, binding] of bindingByProperty) {
-      if (!present.has(property)) {
+    // Tear down what this render stopped declaring. Both lists are
+    // materialised up front because unbinding mutates the indexes they
+    // come from.
+    for (const binding of this.graph.getBindingsForNode(node)) {
+      if (!present.has(binding.property)) {
         this.graph.unbind(binding);
       }
     }
 
-    for (const [type, binding] of eventByType) {
-      if (!presentEvents.has(type)) {
+    for (const binding of this.graph.getEventBindingsForNode(node)) {
+      if (!presentEvents.has(binding.type)) {
         this.graph.unbindEvent(node, binding);
       }
     }
@@ -554,7 +557,6 @@ export class UiGraphBuilder {
     node: UiNode,
     property: string,
     handler: UiEventListener,
-    eventByType: Map<string, UiEventBinding>,
     presentEvents: Set<string>
   ): void {
     const type = eventTypeForProp(property);
@@ -566,13 +568,12 @@ export class UiGraphBuilder {
     }
     presentEvents.add(type);
 
-    const existing = eventByType.get(type);
+    const existing = this.graph.getEventBindingForType(node, type);
     if (existing !== undefined) {
       if (existing.listener === handler) {
         return;
       }
       this.graph.unbindEvent(node, existing);
-      eventByType.delete(type);
     }
 
     if (this.dispatcher === undefined) {

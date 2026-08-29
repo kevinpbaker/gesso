@@ -109,6 +109,39 @@ describe('DirtyNodeSet', () => {
     });
   });
 
+  describe('drainInto', () => {
+    it('fills the buffer in insertion order and empties the set', () => {
+      const set = new DirtyNodeSet();
+      const a = createNode('a');
+      const b = createNode('b');
+      set.mark(a);
+      set.mark(b);
+      const buffer: UiNode[] = [];
+
+      expect(set.drainInto(buffer)).toBe(2);
+      expect(buffer).toEqual([a, b]);
+      expect(set.isEmpty()).toBe(true);
+    });
+
+    it('reuses a buffer without leaving the previous drain behind', () => {
+      const set = new DirtyNodeSet();
+      const a = createNode('a');
+      const b = createNode('b');
+      const c = createNode('c');
+      const buffer: UiNode[] = [];
+      set.mark(a);
+      set.mark(b);
+      set.mark(c);
+      set.drainInto(buffer);
+
+      set.mark(a);
+      expect(set.drainInto(buffer)).toBe(1);
+      // The buffer is the same array, trimmed — not the old contents
+      // with one slot overwritten.
+      expect(buffer).toEqual([a]);
+    });
+  });
+
   describe('clear', () => {
     it('removes every node', () => {
       const set = new DirtyNodeSet();

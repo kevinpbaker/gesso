@@ -103,4 +103,68 @@ describe('UiGraph environment propagation', () => {
     expect(parent.isDirty()).toBe(false);
     expect(child.isDirty()).toBe(false);
   });
+
+  it('keeps the same environment instance when nothing changed', () => {
+    const graph = new UiGraph();
+    const parent = graph.createNode('parent', UiNodeType.Box);
+    const child = graph.createNode('child', UiNodeType.Text);
+    graph.appendChild(graph.root, parent);
+    graph.appendChild(parent, child);
+    parent.setProperty('theme', lightTheme);
+    graph.propagateEnvironment(parent);
+
+    const parentEnvironment = parent.environment;
+    const childEnvironment = child.environment;
+
+    graph.propagateEnvironment(parent);
+
+    // Identity has to survive a propagation that changed nothing:
+    // environments are immutable snapshots, and consumers are entitled
+    // to treat a stable instance as a stable value.
+    expect(parent.environment).toBe(parentEnvironment);
+    expect(child.environment).toBe(childEnvironment);
+  });
+
+  it('replaces the environment instance when a provider value changes', () => {
+    const graph = new UiGraph();
+    const parent = graph.createNode('parent', UiNodeType.Box);
+    graph.appendChild(graph.root, parent);
+    parent.setProperty('theme', lightTheme);
+    graph.propagateEnvironment(parent);
+    const before = parent.environment;
+
+    parent.setProperty('theme', {
+      ...lightTheme,
+      colors: { ...lightTheme.colors, background: { r: 0, g: 0, b: 0, a: 1 } }
+    });
+    graph.propagateEnvironment(parent);
+
+    expect(parent.environment).not.toBe(before);
+    expect(parent.isDirty()).toBe(true);
+  });
+
+  it('does not arm another frame while processing environment dirt', () => {
+    const graph = new UiGraph();
+    const parent = graph.createNode('parent', UiNodeType.Box);
+    const child = graph.createNode('child', UiNodeType.Text);
+    graph.appendChild(graph.root, parent);
+    graph.appendChild(parent, child);
+    graph.propagateEnvironment(graph.root);
+    graph.clearDirty(parent);
+    graph.clearDirty(child);
+
+    parent.setProperty('theme', lightTheme);
+    graph.markDirty(parent, DirtyFlags.Environment);
+
+    // The phase runs from inside the frame that is about to collect,
+    // so the nodes it dirties belong to that frame already.
+    let notifications = 0;
+    graph.setDirtyListener(() => {
+      notifications++;
+    });
+    graph.processEnvironmentDirty();
+
+    expect(notifications).toBe(0);
+    expect(child.isDirty()).toBe(true);
+  });
 });

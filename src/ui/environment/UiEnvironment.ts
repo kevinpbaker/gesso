@@ -68,4 +68,35 @@ export class UiEnvironment {
   providedKeys(): Iterable<string> {
     return this.values.keys();
   }
+
+  /**
+   * How many keys this environment provides itself.
+   *
+   * Comparing two environments starts here: differing counts settle it
+   * without looking at a single value.
+   */
+  get providedSize(): number {
+    return this.values.size;
+  }
+
+  /**
+   * This environment's own value for a name, without consulting the
+   * parent chain.
+   *
+   * Comparison needs the value a given environment provides rather
+   * than the one it resolves, and needs it by name — the key object is
+   * looked up separately, so probing through `get()` would mean
+   * allocating a throwaway key per name per node.
+   */
+  getOwn(name: string): unknown {
+    return this.values.get(name);
+  }
+
+  /**
+   * Whether this environment provides a name itself, ignoring the
+   * parent chain.
+   */
+  providesOwn(name: string): boolean {
+    return this.values.has(name);
+  }
 }

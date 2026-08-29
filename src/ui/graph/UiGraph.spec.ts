@@ -349,6 +349,23 @@ describe('UiGraph', () => {
       expect(graph.getBindingsForNode(grandchild)).toHaveLength(0);
       expect(binding.connected()).toBe(false);
     });
+
+    it('looks a binding up by the property it drives', () => {
+      const graph = new UiGraph();
+      const node = graph.createNode('text', UiNodeType.Text);
+      const text$ = new BehaviorSubject('Hello');
+      const opacity$ = new BehaviorSubject(1);
+      const textBinding = graph.bind(node, 'text', text$, DirtyFlags.Content);
+      const opacityBinding = graph.bind(node, 'opacity', opacity$, DirtyFlags.Paint);
+
+      expect(graph.getBindingForProperty(node, 'text')).toBe(textBinding);
+      expect(graph.getBindingForProperty(node, 'opacity')).toBe(opacityBinding);
+      expect(graph.getBindingForProperty(node, 'width')).toBeUndefined();
+
+      graph.unbind(textBinding);
+      expect(graph.getBindingForProperty(node, 'text')).toBeUndefined();
+      expect(graph.getBindingForProperty(node, 'opacity')).toBe(opacityBinding);
+    });
   });
 
   describe('properties', () => {
@@ -479,6 +496,24 @@ describe('UiGraph', () => {
       });
       expect(visited).toEqual(['a', 'b']);
     });
+  });
+
+  it('visits a node once when it and an ancestor are both dirty', () => {
+    const graph = new UiGraph();
+    const parent = graph.createNode('parent', UiNodeType.Column);
+    const child = graph.createNode('child', UiNodeType.Text);
+    graph.appendChild(graph.root, parent);
+    graph.appendChild(parent, child);
+    graph.markDirty(parent, DirtyFlags.Paint);
+    graph.markDirty(child, DirtyFlags.Paint);
+
+    const processed: string[] = [];
+    graph.processDirty(current => {
+      processed.push(current.id);
+    });
+
+    // The parent's subtree already covered the child.
+    expect(processed).toEqual(['parent', 'child']);
   });
 
   it('only stores a dirty node once', () => {

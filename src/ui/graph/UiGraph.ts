@@ -6,9 +6,9 @@ import { type BindingId, UiBinding } from '../bindings/UiBinding';
 import type { UiChildrenBinding } from '../bindings/UiChildrenBinding';
 import type { UiEventBinding } from '../bindings/UiEventBinding';
 import { UiEnvironment } from '../environment/UiEnvironment';
-import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
+import { findEnvironmentKey, type UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
-import { findPropertyDefinition, inheritedPropertyNames } from '../properties/UiPropertyRegistry';
+import { inheritedPropertyFlags } from '../properties/UiPropertyRegistry';
 import type { Observable } from 'rxjs';
 
 export class UiGraph {
@@ -50,9 +50,18 @@ export class UiGraph {
 
   private readonly bindings = new Map<BindingId, UiBinding<unknown>>();
 
-  private readonly nodeBindings = new Map<NodeId, Set<BindingId>>();
+  /**
+   * Property bindings, keyed by node then by the property they drive.
+   *
+   * Keyed by node object rather than by id: the id is a concatenated
+   * path whose length grows with depth, so hashing it costs more the
+   * deeper the tree, and every teardown and rebind would pay it. The
+   * inner map means finding the binding for one property is a lookup
+   * rather than a scan of everything bound on the node.
+   */
+  private readonly nodeBindings = new Map<UiNode, Map<NodeProperty, UiBinding<unknown>>>();
 
-  private readonly childrenBindings = new Map<NodeId, UiChildrenBinding>();
+  private readonly childrenBindings = new Map<UiNode, UiChildrenBinding>();
 
   /**
    * Declarative `on*` handlers, keyed by node then event type.
@@ -61,12 +70,22 @@ export class UiGraph {
    * node tears its handlers down through the same path as its property
    * and children bindings.
    */
-  private readonly eventBindings = new Map<NodeId, Map<string, UiEventBinding>>();
+  private readonly eventBindings = new Map<UiNode, Map<string, UiEventBinding>>();
 
   private nextBindingId = 0;
 
   /** Set when any node is marked DirtyFlags.Environment. */
   private environmentDirty = false;
+
+  /**
+   * Set while the environment phase is rebuilding.
+   *
+   * That phase runs from the scheduler's pre-collect hook, so the
+   * nodes it dirties are collected by the frame already in flight.
+   * Letting those marks reach the dirty listener would arm a second,
+   * redundant frame behind it.
+   */
+  private suppressDirtyListener = false;
 
   // ---------------------------------------------------------------------------
   // Node lookup
@@ -215,18 +234,11 @@ export class UiGraph {
   // Bindings
   // ---------------------------------------------------------------------------
 
-  private getBindingForProperty(nodeId: string, property: NodeProperty): UiBinding<unknown> | undefined {
-    const bindingIds = this.nodeBindings.get(nodeId);
-    if (!bindingIds) {
-      return undefined;
-    }
-    for (const bindingId of bindingIds) {
-      const binding = this.bindings.get(bindingId);
-      if (binding && binding.property === property) {
-        return binding;
-      }
-    }
-    return undefined;
+  /**
+   * The binding driving one property of one node, if any.
+   */
+  public getBindingForProperty(node: UiNode, property: NodeProperty): UiBinding<unknown> | undefined {
+    return this.nodeBindings.get(node)?.get(property);
   }
 
   public bind(
@@ -235,26 +247,25 @@ export class UiGraph {
     observable: Observable<unknown>,
     dirtyFlags: DirtyFlags
   ): UiBinding<unknown> {
-    const existingBinding = this.getBindingForProperty(node.id, property);
-    if (existingBinding) {
-      throw new Error(`Property '${property}' on node '${node.id}' is already bound.`);
-    }
     // Make sure the node actually belongs to this graph.
     const registeredNode = this.nodes.get(node.id);
     if (registeredNode !== node) {
       throw new Error(`Cannot bind to node '${node.id}' because it does not belong to this graph.`);
     }
+    let byProperty = this.nodeBindings.get(node);
+    if (byProperty !== undefined && byProperty.has(property)) {
+      throw new Error(`Property '${property}' on node '${node.id}' is already bound.`);
+    }
     const bindingId = this.nextBindingId++;
-    const binding = new UiBinding(bindingId, node.id, property, observable, this, dirtyFlags);
+    const binding = new UiBinding(bindingId, node, property, observable, this, dirtyFlags);
     // Global binding lookup.
     this.bindings.set(bindingId, binding);
-    // Node → bindings lookup.
-    let nodeBindingIds = this.nodeBindings.get(node.id);
-    if (!nodeBindingIds) {
-      nodeBindingIds = new Set<number>();
-      this.nodeBindings.set(node.id, nodeBindingIds);
+    // Node → property → binding lookup.
+    if (byProperty === undefined) {
+      byProperty = new Map<NodeProperty, UiBinding<unknown>>();
+      this.nodeBindings.set(node, byProperty);
     }
-    nodeBindingIds.add(bindingId);
+    byProperty.set(property, binding);
     // Start receiving values.
     binding.connect();
     return binding;
@@ -271,28 +282,26 @@ export class UiGraph {
     // Remove global lookup.
     this.bindings.delete(binding.id);
     // Remove node → binding relationship.
-    const nodeBindingIds = this.nodeBindings.get(binding.nodeId);
-    if (nodeBindingIds) {
-      nodeBindingIds.delete(binding.id);
-      if (nodeBindingIds.size === 0) {
-        this.nodeBindings.delete(binding.nodeId);
+    const byProperty = this.nodeBindings.get(binding.node);
+    if (byProperty !== undefined && byProperty.get(binding.property) === binding) {
+      byProperty.delete(binding.property);
+      if (byProperty.size === 0) {
+        this.nodeBindings.delete(binding.node);
       }
     }
   }
 
   public unbindNode(node: UiNode): void {
-    const bindingIds = this.nodeBindings.get(node.id);
-    if (!bindingIds) {
+    const byProperty = this.nodeBindings.get(node);
+    if (byProperty === undefined) {
       return;
     }
-    // Copy the IDs because unbind() modifies
-    // the nodeBindings map.
-    const ids = [...bindingIds];
-    for (const bindingId of ids) {
-      const binding = this.bindings.get(bindingId);
-      if (binding) {
-        this.unbind(binding);
-      }
+    // Drop the index first so each unbind() below finds nothing left
+    // to remove and cannot mutate the map being iterated.
+    this.nodeBindings.delete(node);
+    for (const binding of byProperty.values()) {
+      binding.disconnect();
+      this.bindings.delete(binding.id);
     }
   }
 
@@ -302,18 +311,8 @@ export class UiGraph {
   }
 
   public getBindingsForNode(node: UiNode): UiBinding<unknown>[] {
-    const bindingIds = this.nodeBindings.get(node.id);
-    if (!bindingIds) {
-      return [];
-    }
-    const bindings: UiBinding<unknown>[] = [];
-    for (const bindingId of bindingIds) {
-      const binding = this.bindings.get(bindingId);
-      if (binding) {
-        bindings.push(binding);
-      }
-    }
-    return bindings;
+    const byProperty = this.nodeBindings.get(node);
+    return byProperty === undefined ? [] : [...byProperty.values()];
   }
 
   // ---------------------------------------------------------------------------
@@ -321,7 +320,7 @@ export class UiGraph {
   // ---------------------------------------------------------------------------
 
   public getChildrenBindingForNode(node: UiNode): UiChildrenBinding | undefined {
-    return this.childrenBindings.get(node.id);
+    return this.childrenBindings.get(node);
   }
 
   public bindChildren(fragmentNode: UiNode, binding: UiChildrenBinding): void {
@@ -329,17 +328,17 @@ export class UiGraph {
     if (registeredNode !== fragmentNode) {
       throw new Error(`Cannot bind children to node '${fragmentNode.id}' because it does not belong to this graph.`);
     }
-    this.childrenBindings.set(fragmentNode.id, binding);
+    this.childrenBindings.set(fragmentNode, binding);
     binding.connect();
   }
 
   public unbindChildren(node: UiNode): void {
-    const binding = this.childrenBindings.get(node.id);
+    const binding = this.childrenBindings.get(node);
     if (binding === undefined) {
       return;
     }
     binding.disconnect();
-    this.childrenBindings.delete(node.id);
+    this.childrenBindings.delete(node);
   }
 
   // ---------------------------------------------------------------------------
@@ -347,8 +346,15 @@ export class UiGraph {
   // ---------------------------------------------------------------------------
 
   public getEventBindingsForNode(node: UiNode): UiEventBinding[] {
-    const byType = this.eventBindings.get(node.id);
+    const byType = this.eventBindings.get(node);
     return byType === undefined ? [] : [...byType.values()];
+  }
+
+  /**
+   * The handler bound to one event type on one node, if any.
+   */
+  public getEventBindingForType(node: UiNode, type: string): UiEventBinding | undefined {
+    return this.eventBindings.get(node)?.get(type);
   }
 
   public bindEvent(node: UiNode, binding: UiEventBinding): void {
@@ -356,10 +362,10 @@ export class UiGraph {
     if (registeredNode !== node) {
       throw new Error(`Cannot bind events to node '${node.id}' because it does not belong to this graph.`);
     }
-    let byType = this.eventBindings.get(node.id);
+    let byType = this.eventBindings.get(node);
     if (byType === undefined) {
       byType = new Map();
-      this.eventBindings.set(node.id, byType);
+      this.eventBindings.set(node, byType);
     }
     const existing = byType.get(binding.type);
     if (existing !== undefined) {
@@ -370,23 +376,23 @@ export class UiGraph {
   }
 
   public unbindEvent(node: UiNode, binding: UiEventBinding): void {
-    const byType = this.eventBindings.get(node.id);
+    const byType = this.eventBindings.get(node);
     if (byType === undefined || byType.get(binding.type) !== binding) {
       return;
     }
     binding.disconnect();
     byType.delete(binding.type);
     if (byType.size === 0) {
-      this.eventBindings.delete(node.id);
+      this.eventBindings.delete(node);
     }
   }
 
   public unbindEvents(node: UiNode): void {
-    const byType = this.eventBindings.get(node.id);
+    const byType = this.eventBindings.get(node);
     if (byType === undefined) {
       return;
     }
-    this.eventBindings.delete(node.id);
+    this.eventBindings.delete(node);
     for (const binding of byType.values()) {
       binding.disconnect();
     }
@@ -402,7 +408,7 @@ export class UiGraph {
     if ((flags & DirtyFlags.Environment) !== 0) {
       this.environmentDirty = true;
     }
-    if (newlyDirty) {
+    if (newlyDirty && !this.suppressDirtyListener) {
       this.dirtyListener?.();
     }
   }
@@ -460,13 +466,28 @@ export class UiGraph {
     value: T,
     dirtyFlags: DirtyFlags = DirtyFlags.Properties
   ): boolean {
-    const node = this.requireNode(nodeId);
+    return this.updateNodeProperty(this.requireNode(nodeId), property, value, dirtyFlags);
+  }
+
+  /**
+   * Writes a property, marking the node dirty only when the value
+   * actually changed.
+   *
+   * The node-taking form of updateProperty, for callers that already
+   * hold the node and would otherwise pay for an id lookup.
+   */
+  public updateNodeProperty<T>(
+    node: UiNode,
+    property: string,
+    value: T,
+    dirtyFlags: DirtyFlags = DirtyFlags.Properties
+  ): boolean {
     const previousValue = node.getProperty<T>(property);
     if (Object.is(previousValue, value)) {
       return false;
     }
     node.setProperty(property, value);
-    this.markDirtyById(nodeId, dirtyFlags);
+    this.markDirty(node, dirtyFlags);
     return true;
   }
 
@@ -474,9 +495,44 @@ export class UiGraph {
   // Dirty traversal
   // ---------------------------------------------------------------------------
 
+  /**
+   * Drains the dirty set and visits every node of every dirty subtree.
+   *
+   * Dirty roots can nest, so a node reached from an outer root is not
+   * visited again when its own root comes up.
+   */
   public processDirty(callback: (node: UiNode) => void): void {
-    for (const root of this.dirtyNodes.take()) {
-      this.traverse(root, callback);
+    const roots = this.dirtyNodes.take();
+    if (roots.length <= 1) {
+      if (roots.length === 1) {
+        this.traverse(roots[0], callback);
+      }
+      return;
+    }
+    const visited = new Set<UiNode>();
+    for (const root of roots) {
+      this.traverseOnce(root, visited, callback);
+    }
+  }
+
+  /**
+   * Pre-order traversal that stops at anything an earlier root already
+   * covered.
+   *
+   * A visited node implies a visited subtree, because every traversal
+   * runs to the leaves, so the whole branch can be skipped rather than
+   * re-walked and filtered.
+   */
+  private traverseOnce(node: UiNode, visited: Set<UiNode>, callback: (node: UiNode) => void): void {
+    if (visited.has(node)) {
+      return;
+    }
+    visited.add(node);
+    callback(node);
+    let child = node.firstChild;
+    while (child !== null) {
+      this.traverseOnce(child, visited, callback);
+      child = child.nextSibling;
     }
   }
 
@@ -546,8 +602,7 @@ export class UiGraph {
    * with the flags of the inherited properties they may resolve.
    */
   public propagateEnvironment(node: UiNode): void {
-    const inheritedFlags = this.computeInheritedFlags();
-    this.rebuildEnvironment(node, inheritedFlags);
+    this.rebuildEnvironment(node, inheritedPropertyFlags);
   }
 
   /**
@@ -556,37 +611,37 @@ export class UiGraph {
    */
   public processEnvironmentDirty(): void {
     this.environmentDirty = false;
-    const inheritedFlags = this.computeInheritedFlags();
-    const snapshot = [...this.dirtyNodes.take()];
-    for (const node of snapshot) {
-      if ((node.dirtyFlags & DirtyFlags.Environment) !== 0) {
-        node.dirtyFlags &= ~DirtyFlags.Environment;
-        this.rebuildEnvironment(node, inheritedFlags);
+    const nodes = this.dirtyNodes.take();
+    // This runs inside the frame that is about to collect the dirty
+    // set, so the marks below belong to that frame; letting them reach
+    // the listener would arm a redundant one behind it.
+    this.suppressDirtyListener = true;
+    try {
+      for (const node of nodes) {
+        if ((node.dirtyFlags & DirtyFlags.Environment) !== 0) {
+          node.dirtyFlags &= ~DirtyFlags.Environment;
+          this.rebuildEnvironment(node, inheritedPropertyFlags);
+        }
+        if (node.dirtyFlags !== DirtyFlags.None) {
+          this.dirtyNodes.mark(node);
+        }
       }
-      if (node.dirtyFlags !== DirtyFlags.None) {
-        this.dirtyNodes.mark(node);
-      }
+    } finally {
+      this.suppressDirtyListener = false;
     }
-  }
-
-  private computeInheritedFlags(): DirtyFlags {
-    let flags = DirtyFlags.None;
-    for (const name of inheritedPropertyNames()) {
-      const definition = findPropertyDefinition<unknown>(name);
-      if (definition !== undefined) {
-        flags |= definition.affects;
-      }
-    }
-    return flags === DirtyFlags.None ? DirtyFlags.Paint : flags;
   }
 
   private rebuildEnvironment(node: UiNode, inheritedFlags: DirtyFlags): void {
     const previous = node.environment;
     const next = this.buildNodeEnvironment(node);
     const changed = previous === null || !this.environmentsEqual(previous, next);
-    node.environment = next;
 
+    // Keep the existing instance when the values match. Environments
+    // are immutable snapshots, so holding identity steady is what lets
+    // an unchanged subtree be recognised by a pointer compare instead
+    // of a key-by-key walk on every propagation.
     if (changed) {
+      node.environment = next;
       this.markDirty(node, inheritedFlags);
     }
 
@@ -598,32 +653,32 @@ export class UiGraph {
   }
 
   private environmentsEqual(a: UiEnvironment, b: UiEnvironment): boolean {
+    // The common case by far: a node that provides nothing gets its
+    // parent's environment handed straight back.
+    if (a === b) {
+      return true;
+    }
+    if (a.providedSize !== b.providedSize) {
+      return false;
+    }
     for (const keyName of a.providedKeys()) {
-      const key = this.findEnvironmentKey(keyName);
-      if (key === undefined) {
-        if (b.get({ name: keyName, defaultValue: undefined }) !== a.get({ name: keyName, defaultValue: undefined })) {
-          return false;
-        }
-        continue;
-      }
-      if (!b.has(key) || key.compare === undefined || !key.compare(a.get(key), b.get(key))) {
+      if (!b.providesOwn(keyName)) {
         return false;
       }
-    }
-    for (const keyName of b.providedKeys()) {
-      if (!a.has({ name: keyName, defaultValue: undefined } as never)) {
+      const previousValue = a.getOwn(keyName);
+      const nextValue = b.getOwn(keyName);
+      if (Object.is(previousValue, nextValue)) {
+        continue;
+      }
+      // A key without a comparison function falls back to identity
+      // rather than counting as a change, which would have re-dirtied
+      // the whole subtree on every propagation.
+      const key = findEnvironmentKey(keyName);
+      const compare = key?.compare;
+      if (compare === undefined || !compare(previousValue, nextValue)) {
         return false;
       }
     }
     return true;
-  }
-
-  private findEnvironmentKey(name: string): UiEnvironmentKey<unknown> | undefined {
-    for (const key of Object.values(UiEnvironmentKeys)) {
-      if (key.name === name) {
-        return key as UiEnvironmentKey<unknown>;
-      }
-    }
-    return undefined;
   }
 }

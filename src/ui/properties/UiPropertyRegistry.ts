@@ -105,6 +105,25 @@ export function inheritedPropertyNames(): string[] {
 }
 
 /**
+ * The union of the dirty flags every inherited property affects.
+ *
+ * This is what an environment change has to mark on the nodes it
+ * reaches, and the registry is fixed at module load, so it is computed
+ * once rather than on every propagation.
+ */
+export const inheritedPropertyFlags: DirtyFlags = (() => {
+  let flags = DirtyFlags.None;
+  for (const definition of registry.values()) {
+    if (definition.inherited) {
+      flags |= definition.affects;
+    }
+  }
+  // Nothing inherited still has to repaint: a node that resolved a
+  // default is drawn with it.
+  return flags === DirtyFlags.None ? DirtyFlags.Paint : flags;
+})();
+
+/**
  * Compares two values for the named property using the definition's
  * comparison function, falling back to Object.is.
  */

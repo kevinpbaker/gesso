@@ -44,6 +44,24 @@ export class DirtyNodeSet {
     return nodes;
   }
 
+  /**
+   * Drains the set into an existing array, in insertion order.
+   *
+   * The frame loop drains on every tick, so it keeps one buffer for
+   * the life of the scheduler rather than allocating an array per
+   * frame. The buffer is overwritten, not appended to, and its new
+   * length is returned for callers that keep it around.
+   */
+  drainInto(buffer: UiNode[]): number {
+    let count = 0;
+    for (const node of this.nodes) {
+      buffer[count++] = node;
+    }
+    buffer.length = count;
+    this.nodes.clear();
+    return count;
+  }
+
   clear(): void {
     this.nodes.clear();
   }

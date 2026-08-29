@@ -55,6 +55,15 @@ export class UiScheduler {
   private pending = false;
   private frames = 0;
 
+  /**
+   * Scratch space for draining the dirty set.
+   *
+   * Kept for the life of the scheduler: this drain happens on every
+   * frame, and the nodes are copied straight into the frame's map, so
+   * nothing outside collectFrame ever sees the array.
+   */
+  private readonly drained: UiNode[] = [];
+
   constructor(options: UiSchedulerOptions) {
     this.dirty = options.dirty;
     this.onFrame = options.onFrame;
@@ -137,9 +146,10 @@ export class UiScheduler {
   }
 
   private collectFrame(time: UiFrameTime): UiFrame {
-    const nodes = this.dirty.take();
+    const count = this.dirty.drainInto(this.drained);
     const dirty = new Map<UiNode, DirtyFlags>();
-    for (const node of nodes) {
+    for (let i = 0; i < count; i++) {
+      const node = this.drained[i];
       dirty.set(node, node.dirtyFlags);
       node.dirtyFlags = DirtyFlags.None;
     }

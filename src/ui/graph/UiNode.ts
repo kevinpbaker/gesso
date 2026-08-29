@@ -40,13 +40,6 @@ export class UiNode {
    */
   public environment: UiEnvironment | null = null;
 
-  /**
-   * Records environment values this node resolved so that reactive
-   * environment changes can invalidate only nodes that depend on
-   * them.
-   */
-  public readonly environmentDependencies = new Map<string, unknown>();
-
   hasChildren(): boolean {
     return this.firstChild !== null;
   }
