@@ -728,23 +728,27 @@ export class NodalRuntime {
     if (this.renderer.backend === 'webgpu' && (this.renderer as WebGPURenderer).isLost) {
       this.fallBackToCanvas2D(this.renderer);
     }
+    // The inspector's overlay rides along with the frame, so either
+    // backend draws it over the finished scene. The hovered node's
+    // explanation only changes with layout, so it is re-read then and
+    // sent when it differs from what the listener already has.
+    const overlay = this.inspector.isEnabled ? this.inspector.overlay(started) : null;
     this.gpuTimings = null;
     this.phaseTimings.render = this.timePhase(
       () => this.renderer.isReady,
-      () => this.renderer.render(root, { layout: this.engine, text: this.textMeasurer, now: started })
+      () =>
+        this.renderer.render(root, {
+          layout: this.engine,
+          text: this.textMeasurer,
+          now: started,
+          overlay: overlay?.shapes
+        })
     );
-    // The inspector paints over the finished scene; the hovered node's
-    // explanation only changes with layout, so it is re-read then and
-    // sent when it differs from what the listener already has. The
-    // overlay is a 2D painting and so exists on the Canvas2D backend
-    // only; explanations are sent on both.
-    if (this.inspector.isEnabled) {
-      const nextChange =
-        this.canvasSurface !== null ? this.inspector.paint(this.canvasSurface.getContext2D(), started) : undefined;
+    if (overlay !== null) {
       if (laidOut) {
         this.sendInspection();
       }
-      this.scheduleInspectorRepaint(nextChange);
+      this.scheduleInspectorRepaint(overlay.nextChange);
     }
 
     const finished = now();

@@ -4,6 +4,7 @@ import { formatExplanation, formatNumber, labelNode } from '../layout/LayoutExpl
 import type { LayoutExplanation } from '../layout/LayoutExplanation';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { Canvas2DContext } from './canvas2d/Canvas2DContext';
+import { drawOverlayShapes, type OverlayShape } from './OverlayShapes';
 
 /** How long a measured node stays warm in the heatmap. */
 export const INSPECTOR_HEAT_MS = 1500;
@@ -22,8 +23,17 @@ const MARGIN_FILL = 'rgba(217, 155, 58, 0.3)';
 const RELAYOUT_STROKE = 'rgba(168, 85, 247, 0.9)';
 const LABEL_FILL = 'rgba(13, 17, 23, 0.92)';
 const LABEL_TEXT = '#e6edf3';
-const LABEL_FONT = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+const LABEL_FONT_SIZE = 10;
+const LABEL_FONT_FAMILY = 'ui-monospace, SFMono-Regular, Menlo, monospace';
+const LABEL_FONT = `${LABEL_FONT_SIZE}px ${LABEL_FONT_FAMILY}`;
 const LABEL_HEIGHT = 16;
+
+/** The overlay for one frame: its shapes, and when the heatmap next changes. */
+export interface InspectorOverlay {
+  shapes: OverlayShape[];
+  /** Milliseconds until a node cools or expires, or undefined when nothing is warm. */
+  nextChange: number | undefined;
+}
 
 /**
  * The layout inspector (roadmap L8): what a developer sees when they
@@ -129,23 +139,35 @@ export class LayoutInspector {
   }
 
   /**
-   * Paints the overlay over a finished frame. The context is expected
-   * in logical pixels, as the renderer leaves it. Returns how many
-   * milliseconds until the heatmap next changes (a node cooling from
-   * hot to warm, or expiring), or undefined when nothing is warm.
+   * The overlay for a finished frame, as shapes either renderer draws
+   * after the scene. Returns them with how many milliseconds until the
+   * heatmap next changes (a node cooling from hot to warm, or
+   * expiring), or undefined when nothing is warm.
+   */
+  overlay(now: number): InspectorOverlay {
+    const shapes: OverlayShape[] = [];
+    if (!this.enabled) {
+      return { shapes, nextChange: undefined };
+    }
+    const nextChange = this.heatShapes(shapes, now);
+    if (this.hovered !== null) {
+      this.hoveredShapes(shapes, this.hovered);
+    }
+    return { shapes, nextChange };
+  }
+
+  /**
+   * Paints the overlay onto a 2D context left in logical pixels, as the
+   * Canvas2D renderer leaves it. Returns what `overlay` reports as the
+   * next change.
    */
   paint(ctx: Canvas2DContext, now: number): number | undefined {
-    if (!this.enabled) {
-      return undefined;
-    }
-    const nextChange = this.paintHeat(ctx, now);
-    if (this.hovered !== null) {
-      this.paintHovered(ctx, this.hovered);
-    }
+    const { shapes, nextChange } = this.overlay(now);
+    drawOverlayShapes(ctx, shapes);
     return nextChange;
   }
 
-  private paintHeat(ctx: Canvas2DContext, now: number): number | undefined {
+  private heatShapes(out: OverlayShape[], now: number): number | undefined {
     let nextChange: number | undefined;
     for (const [node, at] of this.heat) {
       const age = now - at;
@@ -161,17 +183,14 @@ export class LayoutInspector {
         continue;
       }
       if (!node.hasChildren()) {
-        ctx.fillStyle = hot ? HEAT_HOT_FILL : HEAT_WARM_FILL;
-        ctx.fillRect(box.x, box.y, box.width, box.height);
+        out.push({ kind: 'fill', ...box, color: hot ? HEAT_HOT_FILL : HEAT_WARM_FILL });
       }
-      ctx.strokeStyle = hot ? HEAT_HOT_STROKE : HEAT_WARM_STROKE;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(box.x + 0.5, box.y + 0.5, Math.max(0, box.width - 1), Math.max(0, box.height - 1));
+      out.push({ kind: 'stroke', ...box, color: hot ? HEAT_HOT_STROKE : HEAT_WARM_STROKE, lineWidth: 1 });
     }
     return nextChange;
   }
 
-  private paintHovered(ctx: Canvas2DContext, node: UiNode): void {
+  private hoveredShapes(out: OverlayShape[], node: UiNode): void {
     const rec = this.engine.recordFor(node);
     if (rec === undefined) {
       return;
@@ -181,72 +200,50 @@ export class LayoutInspector {
     if (relayoutRoot !== node) {
       const rootBox = this.clippedVisibleBox(relayoutRoot);
       if (rootBox !== null) {
-        ctx.strokeStyle = RELAYOUT_STROKE;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(rootBox.x + 1, rootBox.y + 1, Math.max(0, rootBox.width - 2), Math.max(0, rootBox.height - 2));
+        out.push({ kind: 'stroke', ...rootBox, color: RELAYOUT_STROKE, lineWidth: 2 });
       }
     }
 
     const box = this.engine.visibleBox(node);
+    const strip = (x: number, y: number, width: number, height: number, color: string): void => {
+      if (width > 0 && height > 0) {
+        out.push({ kind: 'fill', x, y, width, height, color });
+      }
+    };
     // Margin strips around the border box.
-    ctx.fillStyle = MARGIN_FILL;
-    strip(
-      ctx,
-      box.x - rec.marginLeft,
-      box.y - rec.marginTop,
-      box.width + rec.marginLeft + rec.marginRight,
-      rec.marginTop
-    );
-    strip(
-      ctx,
-      box.x - rec.marginLeft,
-      box.y + box.height,
-      box.width + rec.marginLeft + rec.marginRight,
-      rec.marginBottom
-    );
-    strip(ctx, box.x - rec.marginLeft, box.y, rec.marginLeft, box.height);
-    strip(ctx, box.x + box.width, box.y, rec.marginRight, box.height);
+    const marginWidth = box.width + rec.marginLeft + rec.marginRight;
+    strip(box.x - rec.marginLeft, box.y - rec.marginTop, marginWidth, rec.marginTop, MARGIN_FILL);
+    strip(box.x - rec.marginLeft, box.y + box.height, marginWidth, rec.marginBottom, MARGIN_FILL);
+    strip(box.x - rec.marginLeft, box.y, rec.marginLeft, box.height, MARGIN_FILL);
+    strip(box.x + box.width, box.y, rec.marginRight, box.height, MARGIN_FILL);
     // Padding strips inside it.
-    ctx.fillStyle = PADDING_FILL;
-    strip(ctx, box.x, box.y, box.width, rec.paddingTop);
-    strip(ctx, box.x, box.y + box.height - rec.paddingBottom, box.width, rec.paddingBottom);
-    strip(ctx, box.x, box.y + rec.paddingTop, rec.paddingLeft, box.height - rec.paddingTop - rec.paddingBottom);
-    strip(
-      ctx,
-      box.x + box.width - rec.paddingRight,
-      box.y + rec.paddingTop,
-      rec.paddingRight,
-      box.height - rec.paddingTop - rec.paddingBottom
-    );
+    const innerHeight = box.height - rec.paddingTop - rec.paddingBottom;
+    strip(box.x, box.y, box.width, rec.paddingTop, PADDING_FILL);
+    strip(box.x, box.y + box.height - rec.paddingBottom, box.width, rec.paddingBottom, PADDING_FILL);
+    strip(box.x, box.y + rec.paddingTop, rec.paddingLeft, innerHeight, PADDING_FILL);
+    strip(box.x + box.width - rec.paddingRight, box.y + rec.paddingTop, rec.paddingRight, innerHeight, PADDING_FILL);
     // Content box.
-    ctx.fillStyle = CONTENT_FILL;
     strip(
-      ctx,
       box.x + rec.paddingLeft,
       box.y + rec.paddingTop,
       box.width - rec.paddingLeft - rec.paddingRight,
-      box.height - rec.paddingTop - rec.paddingBottom
+      innerHeight,
+      CONTENT_FILL
     );
     // Border box outline, drawn even for a zero-sized node so it can be found.
-    ctx.strokeStyle = HOVER_STROKE;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(box.x + 0.5, box.y + 0.5, Math.max(0, box.width - 1), Math.max(0, box.height - 1));
+    out.push({ kind: 'stroke', ...box, color: HOVER_STROKE, lineWidth: 1 });
 
-    this.paintLabel(ctx, box, `${labelNode(node)} ${formatNumber(box.width)}×${formatNumber(box.height)}`);
-  }
-
-  private paintLabel(ctx: Canvas2DContext, box: LayoutBox, text: string): void {
-    ctx.font = LABEL_FONT;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    const width = ctx.measureText(text).width + 8;
-    // Above the box when there is room, else just inside its top edge.
-    const y = box.y >= LABEL_HEIGHT ? box.y - LABEL_HEIGHT : box.y;
-    const x = Math.max(0, box.x);
-    ctx.fillStyle = LABEL_FILL;
-    ctx.fillRect(x, y, width, LABEL_HEIGHT);
-    ctx.fillStyle = LABEL_TEXT;
-    ctx.fillText(text, x + 4, y + 12);
+    out.push({
+      kind: 'label',
+      box,
+      text: `${labelNode(node)} ${formatNumber(box.width)}×${formatNumber(box.height)}`,
+      font: LABEL_FONT,
+      fontSize: LABEL_FONT_SIZE,
+      fontFamily: LABEL_FONT_FAMILY,
+      textColor: LABEL_TEXT,
+      background: LABEL_FILL,
+      height: LABEL_HEIGHT
+    });
   }
 
   /**
@@ -278,11 +275,5 @@ export class LayoutInspector {
     // An unclipped box is returned as is, so its sizes are the record's
     // exactly rather than a sum and a difference of them.
     return clipped ? { x, y, width: right - x, height: bottom - y } : box;
-  }
-}
-
-function strip(ctx: Canvas2DContext, x: number, y: number, width: number, height: number): void {
-  if (width > 0 && height > 0) {
-    ctx.fillRect(x, y, width, height);
   }
 }

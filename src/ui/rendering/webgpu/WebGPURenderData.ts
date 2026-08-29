@@ -13,6 +13,8 @@ import type { TextLinePlacement } from '../TextRenderer';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
+import { normalizeColor } from '../../properties/UiColor';
+import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
 import { toPhysicalPixels } from './WebGPUSurface';
 
 /**
@@ -200,7 +202,8 @@ export function buildRenderList(
   logicalWidth: number,
   logicalHeight: number,
   dpr: number,
-  now: number = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  now: number = typeof performance !== 'undefined' ? performance.now() : Date.now(),
+  overlay: readonly OverlayShape[] = []
 ): RenderList {
   const instanceData: number[] = [];
   const texturedData: number[] = [];
@@ -534,6 +537,117 @@ export function buildRenderList(
   visit(root);
   closePrimitives();
 
+  // The debugging overlay: unclipped, untransformed, over everything.
+  for (const shape of overlay) {
+    switch (shape.kind) {
+      case 'fill': {
+        const color = cssColor(shape.color);
+        if (color !== undefined) {
+          beginPrimitives(null);
+          pushInstance(
+            instanceData,
+            shape.x,
+            shape.y,
+            shape.width,
+            shape.height,
+            color,
+            0,
+            1,
+            0,
+            PrimitiveKind.Fill,
+            IDENTITY,
+            NO_CLIP_INDEX
+          );
+        }
+        break;
+      }
+      case 'stroke': {
+        const color = cssColor(shape.color);
+        if (color !== undefined) {
+          beginPrimitives(null);
+          pushInstance(
+            instanceData,
+            shape.x,
+            shape.y,
+            shape.width,
+            shape.height,
+            color,
+            0,
+            1,
+            shape.lineWidth,
+            PrimitiveKind.Border,
+            IDENTITY,
+            NO_CLIP_INDEX
+          );
+        }
+        break;
+      }
+      case 'label': {
+        const lines = layoutTextLines(
+          { x: 0, y: 0, width: 0, height: shape.height },
+          {
+            ...createPaintState(),
+            text: shape.text,
+            fontSize: shape.fontSize,
+            fontFamily: shape.fontFamily,
+            lineHeight: shape.height,
+            textWrap: 'none',
+            verticalAlign: 'middle'
+          },
+          measurer
+        );
+        if (lines.length === 0) {
+          break;
+        }
+        const width = lines[0].width + 2 * LABEL_PADDING_X;
+        const origin = labelOrigin(shape);
+        const background = cssColor(shape.background);
+        if (background !== undefined) {
+          beginPrimitives(null);
+          pushInstance(
+            instanceData,
+            origin.x,
+            origin.y,
+            width,
+            shape.height,
+            background,
+            0,
+            1,
+            0,
+            PrimitiveKind.Fill,
+            IDENTITY,
+            NO_CLIP_INDEX
+          );
+        }
+        const pad = Math.ceil(shape.fontSize * TEXT_PADDING_EM);
+        const line = lines[0];
+        const item: TextRenderItem = {
+          key: textCacheKey(shape.text, shape.font, shape.textColor, 'left', 0, dpr),
+          font: shape.font,
+          color: shape.textColor,
+          lines: [{ ...line, x: pad, y: pad, baselineY: line.baselineY - line.y + pad }],
+          width: Math.ceil((line.width + 2 * pad) * dpr) / dpr,
+          height: Math.ceil((line.height + 2 * pad) * dpr) / dpr,
+          dpr
+        };
+        closePrimitives();
+        const instance = pushTextured(
+          texturedData,
+          origin.x + LABEL_PADDING_X - pad,
+          origin.y + line.y - pad,
+          item.width,
+          item.height,
+          1,
+          snapTranslation(IDENTITY, origin.x + LABEL_PADDING_X - pad, origin.y + line.y - pad, dpr),
+          NO_CLIP_INDEX
+        );
+        commands.push({ kind: CommandKind.Text, instance, scissor: null, item });
+        break;
+      }
+    }
+  }
+  closePrimitives();
+
   return {
     instanceData: new Float32Array(instanceData),
     instanceCount: instanceData.length / INSTANCE_STRIDE_FLOATS,
@@ -543,6 +657,11 @@ export function buildRenderList(
     clipCount: clipData.length / CLIP_STRIDE_FLOATS,
     commands
   };
+}
+
+function cssColor(css: string): RgbaColor | undefined {
+  const color = normalizeColor(css);
+  return color === undefined ? undefined : parseColor(color);
 }
 
 /**

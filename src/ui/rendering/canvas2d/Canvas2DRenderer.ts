@@ -12,6 +12,7 @@ import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { RendererBackend, UiRenderer } from '../UiRenderer';
+import { drawOverlayShapes } from '../OverlayShapes';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -99,6 +100,9 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullWidth = this.surface.logicalWidth;
     this.cullHeight = this.surface.logicalHeight;
     this.renderNode(root, context, ctx, true);
+    if (context.overlay !== undefined && context.overlay.length > 0) {
+      drawOverlayShapes(ctx, context.overlay);
+    }
   }
 
   // -------------------------------------------------------------------------

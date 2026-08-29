@@ -1,6 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import type { TextMeasurer } from '../layout/TextMeasurer';
+import type { OverlayShape } from './OverlayShapes';
 
 /**
  * Read access to the layout projection consumed by renderers.
@@ -30,4 +31,10 @@ export interface RenderContext {
    * fade overlay scrollbars. Defaults to the current time.
    */
   readonly now?: number;
+  /**
+   * Debugging shapes drawn over the finished scene in layout-root
+   * pixels — the layout inspector's boxes and heatmap. Both backends
+   * draw them, so the inspector looks the same on either.
+   */
+  readonly overlay?: readonly OverlayShape[];
 }

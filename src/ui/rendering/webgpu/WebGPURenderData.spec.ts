@@ -814,3 +814,45 @@ describe('buildRenderList scrollbars and sticky', () => {
     expect(bodyBox).toMatchObject({ y: -30 });
   });
 });
+
+describe('buildRenderList overlay', () => {
+  it('appends inspector shapes after the scene: fills, inside-band strokes and a label', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    h.graph.appendChild(root, box(h, 'a', { width: 50, height: 50, backgroundColor: '#f00' }));
+    h.layout(root);
+    const list = buildRenderList(root, h.engine, h.measurer, 800, 600, 1, Number.MAX_SAFE_INTEGER, [
+      { kind: 'fill', x: 10, y: 20, width: 30, height: 40, color: 'rgba(229, 83, 75, 0.35)' },
+      { kind: 'stroke', x: 10, y: 20, width: 30, height: 40, color: 'rgba(76, 141, 255, 0.95)', lineWidth: 2 },
+      {
+        kind: 'label',
+        box: { x: 10, y: 20, width: 30, height: 40 },
+        text: "box 'a' 50×50",
+        font: '10px monospace',
+        fontSize: 10,
+        fontFamily: 'monospace',
+        textColor: '#e6edf3',
+        background: 'rgba(13, 17, 23, 0.92)',
+        height: 16
+      }
+    ]);
+    // Scene fill, then overlay fill, stroke and label background; then the label text.
+    expect(list.instanceCount).toBe(4);
+    const fill = readInstance(list, 1);
+    expect(screenBox(list, 1)).toEqual({ x: 10, y: 20, width: 30, height: 40 });
+    expect(fill.kind).toBe(PrimitiveKind.Fill);
+    expect(fill.color.a).toBeCloseTo(0.35);
+    expect(fill.clipIndex).toBe(-1);
+    const stroke = readInstance(list, 2);
+    expect(stroke.kind).toBe(PrimitiveKind.Border);
+    expect(stroke.borderWidth).toBe(2);
+    // The label sits above its box (y = 20 - 16), with 4px side padding.
+    const label = screenBox(list, 3);
+    expect(label.y).toBe(4);
+    expect(label.x).toBe(10);
+    const text = textItems(list);
+    expect(text).toHaveLength(1);
+    expect(text[0].lines[0].text).toBe("box 'a' 50×50");
+    expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Primitives, CommandKind.Primitives, CommandKind.Text]);
+  });
+});

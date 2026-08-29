@@ -220,7 +220,8 @@ export class WebGPURenderer implements UiRenderer {
       this.surface.logicalWidth,
       this.surface.logicalHeight,
       this.surface.dpr,
-      context.now
+      context.now,
+      context.overlay ?? []
     );
     if (this.hooks.onPrepareEnd !== undefined) {
       this.hooks.onPrepareEnd(performance.now() - prepareStart);
