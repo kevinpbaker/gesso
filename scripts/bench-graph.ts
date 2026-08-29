@@ -10,11 +10,12 @@
  *   frame     — mark a scattered handful of nodes and drain the dirty
  *               set, the loop that runs on every animation frame
  *
- *   npx vite-node scripts/bench-graph.ts
- *   BENCH_NODES=20000 BENCH_ITERATIONS=50 npx vite-node scripts/bench-graph.ts
+ *   pnpm bench:graph
+ *   BENCH_NODES=20000 BENCH_ITERATIONS=50 pnpm bench:graph
  *
- * Run through vite-node rather than node directly: the graph's dirty
- * flags are a TypeScript enum, which node's strip-only loader rejects.
+ * The script runs through vite-node rather than node directly: the
+ * graph's dirty flags are a TypeScript enum, which node's strip-only
+ * loader rejects.
  *
  * Numbers are wall-clock milliseconds on the machine that runs it, so
  * they compare a change against its own baseline, not against another

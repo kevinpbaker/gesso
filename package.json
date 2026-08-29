@@ -14,7 +14,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "fixtures:layout": "node scripts/gen-layout-fixtures.ts",
-    "parity:webgpu": "node scripts/check-webgpu-parity.ts"
+    "parity:webgpu": "node scripts/check-webgpu-parity.ts",
+    "bench:graph": "vite-node scripts/bench-graph.ts"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",
@@ -26,6 +27,7 @@
     "oxlint": "^1.77.0",
     "typescript": "~7.0.2",
     "vite": "^8.2.0",
+    "vite-node": "^6.0.0",
     "vitest": "^4.1.10"
   },
   "dependencies": {
