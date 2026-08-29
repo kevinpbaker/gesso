@@ -122,7 +122,12 @@ describe('LayoutEngine measurement', () => {
       b.setProperty('width', 60);
       b.setProperty('height', 30);
       harness.append(column, a, b);
-      harness.layout(column, new Constraints(0, 50, 0, Infinity));
+      // A start-aligned 50-wide stack hands the column a loose 50.
+      const slot = harness.createNode('slot', UiNodeType.Box);
+      slot.setProperty('width', 50);
+      slot.setProperty('x', 'start');
+      harness.append(slot, column);
+      harness.layout(slot, new Constraints(0, 300, 0, Infinity));
       expect(harness.record(column).measuredWidth).toBe(60);
       expect(harness.record(column).measuredHeight).toBe(50);
     });

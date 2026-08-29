@@ -24,6 +24,9 @@ describe('LayoutEngine flex (Row/Column)', () => {
         { id: 'a', width: 40, height: 20 },
         { id: 'b', width: 60, height: 30 }
       ]);
+      // Shrink-wrapped: the root fills bounded constraints, so measure
+      // it without any.
+      harness.layout(root, Constraints.unbounded());
       const rec = harness.record(root);
       expect(rec.measuredWidth).toBe(60);
       expect(rec.measuredHeight).toBe(50);

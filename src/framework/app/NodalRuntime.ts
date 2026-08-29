@@ -535,6 +535,8 @@ export class NodalRuntime {
       frame: frame.id,
       durationMs: elapsed,
       nodes: frame.size,
+      measured: this.engine.stats.measured,
+      relayoutRoots: this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
       at: finished,
       phases: this.phaseTimings
     });
@@ -587,6 +589,10 @@ export interface FrameMetrics {
   frame: number;
   durationMs: number;
   nodes: number;
+  /** Nodes the layout phase measured (memo hits excluded). */
+  measured: number;
+  /** Relayout boundaries the layout phase started from; 0 when it ran from the root or not at all. */
+  relayoutRoots: number;
   /** Milliseconds per phase. A phase with no work reports 0. */
   phases: FramePhaseTimings;
   /**

@@ -164,6 +164,8 @@ export class RenderWorkerApp {
         frame: metrics.frame,
         durationMs: metrics.durationMs,
         nodes: metrics.nodes,
+        measured: metrics.measured,
+        relayoutRoots: metrics.relayoutRoots,
         at: metrics.at,
         phases: metrics.phases
       });

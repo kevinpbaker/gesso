@@ -21,7 +21,7 @@ import { CharacterCountTextMeasurer } from './TextMeasurer';
 import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
 import { accumulatedOffsetTo } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
-import type { LayoutBox, LayoutResult, Size } from './LayoutTypes';
+import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
 
 const DEFAULT_FONT_SIZE = 14;
 /** How long overlay scrollbars stay after the last scroll change. */
@@ -58,6 +58,11 @@ interface FlexItem {
   maxMain: number;
   grow: number;
   shrink: number;
+  /**
+   * Both of the item's first-pass sizes came from lengths or tight
+   * constraints, not from content — a candidate relayout boundary.
+   */
+  sizeFree: boolean;
   align: CrossAxisAlignment;
   /** Resolution state (CSS Flexbox §9.7). */
   frozen: boolean;
@@ -148,6 +153,20 @@ export class LayoutEngine {
   }
 
   /**
+   * Counters for the most recent `layout` / `layoutForFrame` call.
+   * `measured` and `placed` count nodes whose measure or place actually
+   * ran (memo hits are free and not counted); `relayoutRoots` counts
+   * subtrees laid out from a relayout boundary instead of the root.
+   */
+  readonly stats: LayoutStats = { measured: 0, placed: 0, relayoutRoots: 0, fullLayout: false, measuredNodes: [] };
+
+  /** Records the measured nodes in `stats.measuredNodes` (for inspectors and tests). */
+  trace = false;
+
+  /** Where the dirty walks of the current frame stopped. */
+  private readonly relayoutRoots = new Set<UiNode>();
+
+  /**
    * Full layout pass for a subtree. Every record in the subtree
    * is measured and placed; other records are dropped.
    */
@@ -156,12 +175,9 @@ export class LayoutEngine {
     this.rootConstraints = constraints;
     this.records.clear();
     this.scrollNodes.clear();
-    this.percentBase = this.rootPercentBase(constraints);
-    this.measure(node, constraints);
+    this.resetStats();
+    this.fullLayout(constraints);
     const rec = this.record(node);
-    const rootBox = this.computeRootBox();
-    this.assignBox(node, 0, 0, rootBox.width, rootBox.height);
-    this.place(node);
     this.applyScroll();
     const isScroll = node.type === UiNodeType.ScrollView;
     return {
@@ -192,12 +208,17 @@ export class LayoutEngine {
       this.rootConstraints = constraints;
     }
 
+    this.resetStats();
+    this.relayoutRoots.clear();
     let anyLayout = false;
     for (const node of frame.nodes) {
       const flags = frame.dirtyFlagsFor(node);
       if ((flags & (DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout)) !== 0) {
         anyLayout = true;
-        this.markLayoutDirty(node);
+        // A node whose own layout properties changed may have a new
+        // size, so it cannot bound its own relayout; one whose children
+        // changed keeps its size and can.
+        this.markLayoutDirty(node, (flags & DirtyFlags.Layout) === 0);
       }
       if ((flags & DirtyFlags.Transform) !== 0) {
         this.record(node).transformDirty = true;
@@ -219,15 +240,152 @@ export class LayoutEngine {
       return;
     }
 
-    this.percentBase = this.rootPercentBase(constraints);
-    this.measure(this.layoutRoot, constraints);
-    const rootRec = this.record(this.layoutRoot);
-    const rootBox = this.computeRootBox();
-    this.assignBox(this.layoutRoot, 0, 0, rootBox.width, rootBox.height);
-    if (rootRec.placeDirty) {
-      this.place(this.layoutRoot);
-    }
+    this.relayout(constraints);
     this.applyScroll();
+  }
+
+  /**
+   * Lays out what the frame dirtied: from the root when a dirty walk
+   * reached it, otherwise from each relayout boundary the walks stopped
+   * at. A boundary that turns out to have changed size after all
+   * (its flag was computed under an earlier layout) hands the work to
+   * its parent's walk, so the result is always the one a full layout
+   * would give.
+   */
+  private relayout(constraints: Constraints): void {
+    const root = this.layoutRoot!;
+    for (;;) {
+      if (this.relayoutRoots.has(root)) {
+        this.relayoutRoots.clear();
+        this.fullLayout(constraints);
+        return;
+      }
+      const next = this.outermostRelayoutRoot();
+      if (next === null) {
+        return;
+      }
+      this.relayoutRoots.delete(next);
+      // A root inside another root's subtree is kept: the walk that
+      // stopped at it did not dirty the nodes between the two, so the
+      // outer root's measure may memo-hit that path and never reach it.
+      // If the outer pass did reach it, its own pass is two memo hits.
+      if (!this.relayoutAt(next)) {
+        this.record(next).relayoutBoundary = false;
+        this.markLayoutDirty(next.parent ?? root, true);
+      }
+    }
+  }
+
+  private fullLayout(constraints: Constraints): void {
+    const root = this.layoutRoot!;
+    this.stats.fullLayout = true;
+    this.percentBase = this.rootPercentBase(constraints);
+    const rootRec = this.record(root);
+    rootRec.contentMatters = false;
+    this.measure(root, this.rootMeasureConstraints(root, constraints));
+    const rootBox = this.computeRootBox();
+    this.assignBox(root, 0, 0, rootBox.width, rootBox.height);
+    if (rootRec.placeDirty) {
+      this.place(root);
+    }
+  }
+
+  /**
+   * Re-measures a boundary under the constraints its parent last gave
+   * it and re-places its subtree in the box it already has. Returns
+   * false when its size came out different, which means the parent
+   * has to be involved after all.
+   */
+  private relayoutAt(node: UiNode): boolean {
+    const rec = this.record(node);
+    const flowParent = this.flowParentOf(node);
+    const pRec = flowParent === null ? undefined : this.records.get(flowParent);
+    // The node's own percentages resolve against the parent's content
+    // box, which is final.
+    this.percentBase =
+      pRec === undefined
+        ? this.rootPercentBase(this.rootConstraints)
+        : {
+            width: Math.max(0, pRec.width - pRec.paddingLeft - pRec.paddingRight),
+            height: Math.max(0, pRec.height - pRec.paddingTop - pRec.paddingBottom)
+          };
+    const width = rec.width;
+    const height = rec.height;
+    this.stats.relayoutRoots++;
+    this.measure(node, rec.lastConstraints);
+    if (rec.measuredWidth !== width || rec.measuredHeight !== height) {
+      return false;
+    }
+    rec.placeDirty = true;
+    this.place(node);
+    return true;
+  }
+
+  private outermostRelayoutRoot(): UiNode | null {
+    let best: UiNode | null = null;
+    let bestDepth = Infinity;
+    for (const node of this.relayoutRoots) {
+      const depth = this.depthOf(node);
+      if (depth < bestDepth) {
+        best = node;
+        bestDepth = depth;
+      }
+    }
+    return best;
+  }
+
+  private depthOf(node: UiNode): number {
+    let depth = 0;
+    for (let current = node.parent; current !== null; current = current.parent) {
+      depth++;
+    }
+    return depth;
+  }
+
+  /**
+   * A root without an explicit size fills bounded constraints
+   * (computeRootBox), so it is measured tight there: its children then
+   * see the definite size they will be placed in, and a stretched
+   * child is measured once at that size instead of loose and again at
+   * placement.
+   */
+  private rootMeasureConstraints(root: UiNode, constraints: Constraints): Constraints {
+    const base = this.rootPercentBase(constraints);
+    const fillsWidth = constraints.hasBoundedWidth() && this.lengthProp(root, 'width', base.width) === undefined;
+    const fillsHeight = constraints.hasBoundedHeight() && this.lengthProp(root, 'height', base.height) === undefined;
+    if (!fillsWidth && !fillsHeight) {
+      return constraints;
+    }
+    return new Constraints(
+      fillsWidth ? constraints.maxWidth : constraints.minWidth,
+      constraints.maxWidth,
+      fillsHeight ? constraints.maxHeight : constraints.minHeight,
+      constraints.maxHeight
+    );
+  }
+
+  private resetStats(): void {
+    this.stats.measured = 0;
+    this.stats.placed = 0;
+    this.stats.relayoutRoots = 0;
+    this.stats.fullLayout = false;
+    this.stats.measuredNodes.length = 0;
+  }
+
+  /** Marks every record in a subtree as no boundary, without measuring. */
+  private clearBoundaries(node: UiNode): void {
+    const stack: UiNode[] = [node];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const rec = this.records.get(current);
+      if (rec !== undefined) {
+        rec.relayoutBoundary = false;
+        rec.contentMatters = true;
+      }
+      for (let child = current.firstChild; child !== null; child = child.nextSibling) {
+        stack.push(child);
+      }
+    }
   }
 
   /**
@@ -418,8 +576,21 @@ export class LayoutEngine {
       rec.measureDirty = false;
       return;
     }
-    if (!rec.measureDirty && constraintsEqual(rec.lastConstraints, constraints)) {
-      return;
+    if (!rec.measureDirty) {
+      if (constraintsEqual(rec.lastConstraints, constraints)) {
+        return;
+      }
+      if (rec.altValid && constraintsEqual(rec.altConstraints, constraints)) {
+        rec.swapAlt();
+        return;
+      }
+      rec.saveAlt();
+    } else {
+      rec.altValid = false;
+    }
+    this.stats.measured++;
+    if (this.trace) {
+      this.stats.measuredNodes.push(node);
     }
     rec.lastConstraints = constraints;
     this.resolveLayoutProps(node, rec);
@@ -583,10 +754,19 @@ export class LayoutEngine {
     this.percentBase = { width: availableWidth, height: availableHeight };
 
     // Columns: from each item's min- and max-content width.
+    const gridRec = this.record(node);
     const columnItems = placed.placements.map(placement => {
       const cRec = this.record(placement.item);
       this.resolveLayoutProps(placement.item, cRec);
+      // Tracks are sized from the items' content unless both of an
+      // item's sizes are lengths.
+      const explicitBoth =
+        this.lengthProp(placement.item, 'width', undefined) !== undefined &&
+        this.lengthProp(placement.item, 'height', undefined) !== undefined;
+      cRec.contentMatters = gridRec.contentMatters || !explicitBoth;
       this.measure(placement.item, new Constraints(0, Infinity, 0, Infinity));
+      cRec.relayoutBoundary =
+        explicitBoth && !cRec.contentMatters && cRec.aspectRatio === undefined && !cRec.positioned;
       const marginH = cRec.marginLeft + cRec.marginRight;
       const contribution: GridContribution = {
         min: this.minContentContribution(placement.item, cRec) + marginH,
@@ -732,7 +912,12 @@ export class LayoutEngine {
       const lineTotal = this.lineOuterMain(line, config.gapMain, 'hypothetical');
       if (mainBounded && (mainDefinite || lineTotal > mainMax)) {
         this.resolveLine(line, mainMax - config.gapMain * (line.items.length - 1), config);
-        this.measureFlexedItems(line.items, content, direction, undefined);
+        this.measureFlexedItems(
+          line.items,
+          content,
+          direction,
+          crossDefinite && !config.wrap ? (row ? content.maxHeight : content.maxWidth) : undefined
+        );
         contentMain = Math.max(contentMain, this.lineOuterMain(line, config.gapMain, 'final'));
       } else {
         for (const item of line.items) {
@@ -744,6 +929,7 @@ export class LayoutEngine {
     if (mainDefinite) {
       contentMain = Math.max(mainMax, contentMain);
     }
+    this.markFlexBoundaries(lines);
 
     let contentCross = 0;
     for (const line of lines) {
@@ -807,6 +993,7 @@ export class LayoutEngine {
     crossTightForStretch: boolean
   ): FlexItem[] {
     const row = direction === FlexDirection.Row;
+    const rec = this.record(node);
     const items: FlexItem[] = [];
     const mainBase = this.definiteAxis(content, row ? 'width' : 'height');
     const crossBase = this.definiteAxis(content, row ? 'height' : 'width');
@@ -823,12 +1010,14 @@ export class LayoutEngine {
       }
       // Stretch only sizes an item whose cross size is auto; an explicit
       // one is left alone and start-aligned, as in CSS.
-      if (
-        align === CrossAxisAlignment.Stretch &&
-        this.lengthProp(child, row ? 'height' : 'width', row ? crossBase : crossBase) !== undefined
-      ) {
+      const explicitCross = this.lengthProp(child, row ? 'height' : 'width', crossBase) !== undefined;
+      if (align === CrossAxisAlignment.Stretch && explicitCross) {
         align = CrossAxisAlignment.Start;
       }
+      // What this container reads from the item beyond its size: its
+      // baseline when aligning by baseline, and whatever this container
+      // passes on to its own parent.
+      cRec.contentMatters = rec.contentMatters || align === CrossAxisAlignment.Baseline;
       this.measure(child, this.flexChildConstraints(cRec, content, direction, align, undefined, crossTightForStretch));
       const measuredMain = row ? cRec.measuredWidth : cRec.measuredHeight;
       const explicitMain = this.lengthProp(child, row ? 'width' : 'height', mainBase);
@@ -839,6 +1028,7 @@ export class LayoutEngine {
       // never crushes an item below its content. Explicit minimums win;
       // scroll containers have none.
       let minMain: number;
+      let minFromContent = false;
       if (row ? cRec.minWidthAuto : cRec.minHeightAuto) {
         // Scroll containers and text that clips (ellipsis, maxLines) do
         // not have visible overflow, so CSS gives them no automatic
@@ -849,11 +1039,20 @@ export class LayoutEngine {
           this.numberProp(child, 'maxLines') !== undefined;
         const contentSuggestion = clips ? 0 : row ? cRec.minContentWidth : cRec.intrinsicHeight;
         minMain = Math.min(contentSuggestion, explicitMain ?? Infinity, maxMain);
+        minFromContent = !clips && explicitMain === undefined;
       } else {
         minMain = row ? cRec.minWidth : cRec.minHeight;
       }
       const basis = this.flexBasis(child, cRec, mainBase);
       const baseMain = basis ?? measuredMain;
+      // The main size is content-free when it comes from a length or an
+      // explicit basis whose automatic minimum is not the content; the
+      // cross size when it is a length or tight for stretching.
+      const sizeFree =
+        (explicitMain !== undefined || (basis !== undefined && !minFromContent)) &&
+        (explicitCross || (align === CrossAxisAlignment.Stretch && crossTightForStretch)) &&
+        cRec.aspectRatio === undefined &&
+        !cRec.positioned;
       // Along a mirrored main axis (rtl, *-reverse) the physical start
       // margin is the logical end margin; positions are mirrored back
       // at placement, so the swap lands each margin on its own side.
@@ -880,6 +1079,7 @@ export class LayoutEngine {
         maxMain,
         grow: cRec.flexGrow,
         shrink: cRec.flexShrink,
+        sizeFree,
         align,
         frozen: false,
         violation: 0
@@ -887,6 +1087,26 @@ export class LayoutEngine {
     });
     this.percentBase = savedBase;
     return items;
+  }
+
+  /**
+   * Decides, once a line's main sizes are final, which items are
+   * relayout boundaries. An item that was shrunk below its hypothetical
+   * size had its automatic minimum — its content — consulted, so its
+   * content matters from now on; every boundary below it is cleared,
+   * because those were decided while it did not.
+   */
+  private markFlexBoundaries(lines: FlexLine[]): void {
+    for (const line of lines) {
+      for (const item of line.items) {
+        const shrunk = item.finalMain < item.hypotheticalMain - 1e-6;
+        if (shrunk && !item.rec.contentMatters) {
+          item.rec.contentMatters = true;
+          this.clearBoundaries(item.child);
+        }
+        item.rec.relayoutBoundary = item.sizeFree && !shrunk && !item.rec.contentMatters;
+      }
+    }
   }
 
   /** `flexBasis`, resolved: a number, a percent of the main size, or undefined for content. */
@@ -1089,7 +1309,14 @@ export class LayoutEngine {
     const row = direction === FlexDirection.Row;
     for (const item of items) {
       const measuredMain = row ? item.rec.measuredWidth : item.rec.measuredHeight;
-      const stretched = item.align === CrossAxisAlignment.Stretch && crossAvailable !== undefined;
+      // A stretched item of a single-line container whose cross size is
+      // known is measured at that size here, so the stretch pass finds
+      // it measured already: two constraint sets per item, not three.
+      const stretched =
+        item.align === CrossAxisAlignment.Stretch &&
+        crossAvailable !== undefined &&
+        !item.marginCrossStartAuto &&
+        !item.marginCrossEndAuto;
       if (item.finalMain === measuredMain && !stretched) {
         continue;
       }
@@ -1206,10 +1433,45 @@ export class LayoutEngine {
     let minContent = 0;
     let first = true;
     const savedBase = this.percentBase;
-    this.percentBase = { width: this.definiteAxis(content, 'width'), height: this.definiteAxis(content, 'height') };
+    const definiteWidth = this.definiteAxis(content, 'width');
+    const definiteHeight = this.definiteAxis(content, 'height');
+    this.percentBase = { width: definiteWidth, height: definiteHeight };
+    const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Start;
+    const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Start;
     this.forEachLayoutChild(node, child => {
-      this.measure(child, this.childConstraints(content));
       const cRec = this.record(child);
+      this.resolveLayoutProps(child, cRec);
+      // A stretched child of a definite stack is measured at the size
+      // it will be placed in, as a stretched flex item is; the loose
+      // measurement would only be repeated tight at placement.
+      const explicitWidth = this.lengthProp(child, 'width', definiteWidth) !== undefined;
+      const explicitHeight = this.lengthProp(child, 'height', definiteHeight) !== undefined;
+      const stretchX =
+        definiteWidth !== undefined &&
+        this.stackAlignment(child, 'selfX', 'width', stackX) === CrossAxisAlignment.Stretch;
+      const stretchY =
+        definiteHeight !== undefined &&
+        this.stackAlignment(child, 'selfY', 'height', stackY) === CrossAxisAlignment.Stretch;
+      const availableWidth = Math.max(0, content.maxWidth - cRec.marginLeft - cRec.marginRight);
+      const availableHeight = Math.max(0, content.maxHeight - cRec.marginTop - cRec.marginBottom);
+      // The stack passes its first child's baseline and every child's
+      // min-content on to its own parent.
+      cRec.contentMatters = rec.contentMatters;
+      this.measure(
+        child,
+        new Constraints(
+          stretchX ? availableWidth : 0,
+          stretchX ? availableWidth : content.maxWidth,
+          stretchY ? availableHeight : 0,
+          stretchY ? availableHeight : content.maxHeight
+        )
+      );
+      cRec.relayoutBoundary =
+        (explicitWidth || stretchX) &&
+        (explicitHeight || stretchY) &&
+        cRec.aspectRatio === undefined &&
+        !cRec.positioned &&
+        !cRec.contentMatters;
       maxWidth = Math.max(maxWidth, cRec.outerWidth);
       maxHeight = Math.max(maxHeight, cRec.outerHeight);
       minContent = Math.max(minContent, this.minContentContribution(child, cRec) + cRec.marginLeft + cRec.marginRight);
@@ -1237,16 +1499,37 @@ export class LayoutEngine {
     let crossMax = 0;
     let childCount = 0;
     const savedBase = this.percentBase;
-    this.percentBase = { width: this.definiteAxis(content, 'width'), height: this.definiteAxis(content, 'height') };
+    const definiteWidth = this.definiteAxis(content, 'width');
+    const definiteHeight = this.definiteAxis(content, 'height');
+    this.percentBase = { width: definiteWidth, height: definiteHeight };
+    const crossDefinite = vertical ? definiteWidth : definiteHeight;
+    const crossAlign = parseCrossAxisAlignment(node.properties.get(vertical ? 'x' : 'y')) ?? CrossAxisAlignment.Stretch;
     this.forEachLayoutChild(node, child => {
-      const childBase = new Constraints(
-        0,
-        vertical ? content.maxWidth : Infinity,
-        0,
-        vertical ? Infinity : content.maxHeight
-      );
-      this.measure(child, this.childConstraints(childBase));
       const cRec = this.record(child);
+      this.resolveLayoutProps(child, cRec);
+      const explicitMain = this.lengthProp(
+        child,
+        vertical ? 'height' : 'width',
+        vertical ? definiteHeight : definiteWidth
+      );
+      const explicitCross = this.lengthProp(child, vertical ? 'width' : 'height', crossDefinite) !== undefined;
+      const align = parseCrossAxisAlignment(child.properties.get(vertical ? 'selfX' : 'selfY')) ?? crossAlign;
+      // A stretched child of a definite scroller is measured at the
+      // cross size placement gives it; placeFlex then finds it measured.
+      const crossTight = crossDefinite !== undefined && align === CrossAxisAlignment.Stretch && !explicitCross;
+      const childMarginCross = vertical ? cRec.marginLeft + cRec.marginRight : cRec.marginTop + cRec.marginBottom;
+      const crossLimit = Math.max(0, (vertical ? content.maxWidth : content.maxHeight) - childMarginCross);
+      const childBase = vertical
+        ? new Constraints(crossTight ? crossLimit : 0, crossLimit, 0, Infinity)
+        : new Constraints(0, Infinity, crossTight ? crossLimit : 0, crossLimit);
+      // Scrollable content pushes on nothing outside the scroller.
+      cRec.contentMatters = false;
+      this.measure(child, childBase);
+      cRec.relayoutBoundary =
+        explicitMain !== undefined &&
+        (explicitCross || crossTight) &&
+        cRec.aspectRatio === undefined &&
+        !cRec.positioned;
       const measuredMain = vertical ? cRec.measuredHeight : cRec.measuredWidth;
       const measuredCross = vertical ? cRec.measuredWidth : cRec.measuredHeight;
       const marginMain = vertical ? cRec.marginTop + cRec.marginBottom : cRec.marginLeft + cRec.marginRight;
@@ -1324,6 +1607,7 @@ export class LayoutEngine {
     if (!rec.placeDirty) {
       return;
     }
+    this.stats.placed++;
     rec.placeDirty = false;
     if (!node.hasChildren()) {
       return;
@@ -1616,9 +1900,10 @@ export class LayoutEngine {
     for (const line of lines) {
       line.free = this.resolveLine(line, contentMain - config.gapMain * (line.items.length - 1), config);
       this.distributeAutoMargins(line);
-      this.measureFlexedItems(line.items, content, direction, undefined);
+      this.measureFlexedItems(line.items, content, direction, config.wrap ? undefined : contentCross);
       line.cross = this.flexLineCross(line.items, row);
     }
+    this.markFlexBoundaries(lines);
 
     // Cross axis. A single-line container's line is the container's
     // inner cross size; multiple lines share it by alignContent.
@@ -1923,18 +2208,32 @@ export class LayoutEngine {
   // Invalidation
   // ---------------------------------------------------------------------------
 
-  private markLayoutDirty(node: UiNode): void {
-    let current: UiNode | null = node;
-    while (current !== null) {
-      if (current === this.layoutRoot) {
-        this.record(current).measureDirty = true;
-        this.record(current).placeDirty = true;
-        return;
-      }
+  /**
+   * Marks a node and its ancestors for re-measure and re-place, up to
+   * the first relayout boundary — a node whose parent cannot be
+   * affected by anything inside it — or the root. The node itself may
+   * be that boundary only when `selfCanBound` says its own size is
+   * not in question.
+   */
+  private markLayoutDirty(node: UiNode, selfCanBound = false): void {
+    let current: UiNode = node;
+    for (;;) {
+      // Only nodes that have been laid out have records. Fragments never
+      // do — measure and place look through them to their children —
+      // and must not get one here: renderers treat a record as a box
+      // to cull against, and a fragment's would be empty.
       const rec = this.records.get(current);
       if (rec !== undefined) {
         rec.measureDirty = true;
         rec.placeDirty = true;
+      }
+      if (current === this.layoutRoot || current.parent === null) {
+        this.relayoutRoots.add(this.layoutRoot ?? current);
+        return;
+      }
+      if (rec?.relayoutBoundary && !rec.positioned && (current !== node || selfCanBound)) {
+        this.relayoutRoots.add(current);
+        return;
       }
       current = current.parent;
     }
@@ -2233,10 +2532,6 @@ export class LayoutEngine {
    * parent never forces a child to fill it. The child applies its own
    * size properties itself, in measure().
    */
-  private childConstraints(content: Constraints): Constraints {
-    return new Constraints(0, content.maxWidth, 0, content.maxHeight);
-  }
-
   private assignBox(node: UiNode, x: number, y: number, width: number, height: number): void {
     const rec = this.record(node);
     if (rec.positioned && !rec.absolute && node !== this.layoutRoot) {

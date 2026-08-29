@@ -109,7 +109,7 @@ Layout is checked against Chrome: `src/ui/layout/conformance/` holds cases writt
 ### Key design decisions
 
 - **No DOM layout.** The framework owns layout, scrolling, transforms, and rendering. The DOM is only used as a host element for the canvas.
-- **Incremental layout.** Only dirty subtrees are re-measured and re-placed; scroll changes run in O(number of scroll containers).
+- **Incremental layout.** A change is laid out from the nearest relayout boundary — a node whose parent cannot be affected by its content — not from the root: a text edit deep in a 10k-node tree measures 3 nodes, a scroll frame none. `LayoutEngine.budget.spec` holds those numbers as CI budgets.
 - **Positioning and overlays.** `position: 'absolute' | 'relative'`, `zIndex`, aligned `Stack`s, and engine-level anchored placement (`anchor`, `placement`) that flips and shifts to stay on screen. Every runtime mounts an overlay layer; components open menus and dialogs through the `OverlayStore`.
 - **Grid.** `Grid` lays children out on tracks of `px`, `percent()`, `auto`, `fr()` and `minmax()` with gaps, auto-flow or explicit lines and spans, per-cell alignment and track distribution — a settings form is `columns: [auto, fr(1)]`, a table shares one set of tracks between header and body.
 - **Virtualized lists.** `LazyColumn`/`LazyRow` mount only the visible rows plus an overscan band, with estimated extents corrected by measurement, so a 100k-row list costs what the viewport shows.

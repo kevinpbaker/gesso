@@ -36,7 +36,8 @@ describe('LayoutEngine positioning', () => {
       h.layout(root, Constraints.loose(300, 200));
       expect(h.box(floating)).toEqual({ x: 40, y: 30, width: 10, height: 10 });
       expect(h.box(after)).toEqual({ x: 0, y: 20, width: 50, height: 20 });
-      expect(h.record(root).measuredHeight).toBe(40);
+      // The root fills its viewport; the flow inside it is 40 tall.
+      expect(h.box(root).height).toBe(200);
     });
 
     it('positions by right/bottom from the far edges', () => {

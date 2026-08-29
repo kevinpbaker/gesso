@@ -25,7 +25,7 @@ export type {
 } from './TextMeasurer';
 export { layoutParagraph, proportionalFontMetrics, DEFAULT_LINE_HEIGHT_FACTOR, ELLIPSIS } from './ParagraphLayout';
 export { Constraints, clampSize, constraintsEqual, tightenConstraints } from './LayoutTypes';
-export type { LayoutBox, LayoutResult, Size, TightenOptions } from './LayoutTypes';
+export type { LayoutBox, LayoutResult, LayoutStats, Size, TightenOptions } from './LayoutTypes';
 export { FlexDirection, parseFlexDirection } from './FlexDirection';
 export {
   AlignContent,

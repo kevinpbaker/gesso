@@ -21,6 +21,8 @@ export interface WorkerAppOptions {
     frame: number;
     durationMs: number;
     nodes: number;
+    measured: number;
+    relayoutRoots: number;
     at: number;
     phases: FramePhaseTimings;
   }) => void;
@@ -119,6 +121,8 @@ export class WorkerApp {
         frame: message.frame,
         durationMs: message.durationMs,
         nodes: message.nodes,
+        measured: message.measured,
+        relayoutRoots: message.relayoutRoots,
         at: message.at,
         phases: message.phases
       });

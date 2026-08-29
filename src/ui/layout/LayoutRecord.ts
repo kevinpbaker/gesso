@@ -137,6 +137,83 @@ export class LayoutRecord {
   /** Constraints this record was last measured under. */
   lastConstraints: Constraints = Constraints.unbounded();
 
+  /**
+   * A second memoised measurement. Flex measures every item twice —
+   * loose for its max-content size, then tight at its final size — and
+   * a one-entry memo would miss on every pass of every later frame. The
+   * outputs of the previous constraints are kept here and swapped back
+   * in when those constraints come round again, so an unchanged item
+   * costs nothing in either pass.
+   */
+  altValid = false;
+  altConstraints: Constraints = Constraints.unbounded();
+  private altOutputs: number[] = [];
+
+  /** Keeps the current measurement as the alternate before a fresh one overwrites it. */
+  saveAlt(): void {
+    this.altValid = true;
+    this.altConstraints = this.lastConstraints;
+    this.altOutputs = this.outputs();
+  }
+
+  /** Makes the alternate measurement current, and the current one alternate. */
+  swapAlt(): void {
+    const constraints = this.lastConstraints;
+    const outputs = this.outputs();
+    this.lastConstraints = this.altConstraints;
+    this.restore(this.altOutputs);
+    this.altConstraints = constraints;
+    this.altOutputs = outputs;
+  }
+
+  private outputs(): number[] {
+    return [
+      this.measuredWidth,
+      this.measuredHeight,
+      this.outerWidth,
+      this.outerHeight,
+      this.minContentWidth,
+      this.maxContentWidth,
+      this.intrinsicHeight,
+      this.hasBaseline ? 1 : 0,
+      this.baseline,
+      this.contentWidth,
+      this.contentHeight
+    ];
+  }
+
+  private restore(outputs: number[]): void {
+    this.measuredWidth = outputs[0];
+    this.measuredHeight = outputs[1];
+    this.outerWidth = outputs[2];
+    this.outerHeight = outputs[3];
+    this.minContentWidth = outputs[4];
+    this.maxContentWidth = outputs[5];
+    this.intrinsicHeight = outputs[6];
+    this.hasBaseline = outputs[7] === 1;
+    this.baseline = outputs[8];
+    this.contentWidth = outputs[9];
+    this.contentHeight = outputs[10];
+  }
+
+  /**
+   * Set by the parent before measuring this node: something outside it
+   * reads a content-derived output beyond its constrained size — its
+   * min-content width, intrinsic height or baseline. True until a
+   * parent says otherwise, so an unflagged node is never a boundary.
+   */
+  contentMatters = true;
+
+  /**
+   * Set by the parent after measuring this node: the parent's layout
+   * cannot change when this node's content does, because the sizes the
+   * parent read were fixed by constraints or explicit lengths and
+   * nothing content-derived was consulted. A change inside such a node
+   * is laid out from the node itself (a relayout boundary, as Flutter
+   * calls it) instead of from the root.
+   */
+  relayoutBoundary = false;
+
   measureDirty = true;
   placeDirty = true;
   transformDirty = false;

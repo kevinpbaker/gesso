@@ -61,6 +61,20 @@ export class Constraints {
   }
 }
 
+/** What one layout call did; see LayoutEngine.stats. */
+export interface LayoutStats {
+  /** Nodes whose measure ran (memo hits excluded). */
+  measured: number;
+  /** Nodes whose place ran. */
+  placed: number;
+  /** Subtrees laid out from a relayout boundary instead of the root. */
+  relayoutRoots: number;
+  /** Whether the pass started from the root. */
+  fullLayout: boolean;
+  /** Every node whose measure ran, in order, when `LayoutEngine.trace` is on. */
+  measuredNodes: UiNode[];
+}
+
 /**
  * The result of a full layout pass for the layout root.
  *

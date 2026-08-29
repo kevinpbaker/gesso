@@ -9,6 +9,8 @@ const REPORT_INTERVAL_MS = 500;
 
 interface FrameMetrics {
   durationMs: number;
+  measured: number;
+  relayoutRoots: number;
   at: number;
   phases: Record<string, number>;
 }
@@ -125,7 +127,15 @@ function createFrameReporter(shell: AppShell, label: string): (metrics: FrameMet
           .map(([name, ms]) => `${name} ${ms.toFixed(2)}ms`)
           .join(' · ')
     );
-    shell.setDetail('A phase reading of 0 means that phase never had work to do.');
+    shell.setDetail(
+      `Last frame laid out ${metrics.measured} node${metrics.measured === 1 ? '' : 's'}` +
+        (metrics.relayoutRoots > 0
+          ? ` from ${metrics.relayoutRoots} relayout boundar${metrics.relayoutRoots === 1 ? 'y' : 'ies'}.`
+          : metrics.measured > 0
+            ? ' from the root.'
+            : '.') +
+        ' A phase reading of 0 means that phase never had work to do.'
+    );
   };
 }
 

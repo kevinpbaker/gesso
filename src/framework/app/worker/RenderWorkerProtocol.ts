@@ -29,7 +29,16 @@ export type ShellToRuntimeMessage =
  */
 export type RuntimeToShellMessage =
   | { type: 'ready' }
-  | { type: 'frame'; frame: number; durationMs: number; nodes: number; at: number; phases: FramePhaseTimings }
+  | {
+      type: 'frame';
+      frame: number;
+      durationMs: number;
+      nodes: number;
+      measured: number;
+      relayoutRoots: number;
+      at: number;
+      phases: FramePhaseTimings;
+    }
   | { type: 'error'; message: string; stack?: string };
 
 export function modifiersFrom(event: {

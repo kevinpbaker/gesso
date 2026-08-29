@@ -86,12 +86,14 @@ describe('LayoutEngine invalidation', () => {
       h.root = h.builder.build(Column({ x: 'start' }, Text({ text: 'Hello', fontSize: 10 })));
       firstFrame(h);
       const root = h.root;
-      expect(h.engine.recordFor(root)!.measuredWidth).toBe(30);
+      const text = root.firstChild!;
+      expect(h.engine.recordFor(text)!.measuredWidth).toBe(30);
+      expect(h.engine.recordFor(text)!.x).toBe(0);
 
       h.graph.updateProperty(root.id, 'padding', 10, DirtyFlags.Layout);
       h.clock.tick(0);
-      expect(h.engine.recordFor(root)!.measuredWidth).toBe(50);
-      expect(h.engine.recordFor(root.firstChild!)!.x).toBe(10);
+      expect(h.engine.recordFor(text)!.measuredWidth).toBe(30);
+      expect(h.engine.recordFor(text)!.x).toBe(10);
     });
 
     it('skips measurement for a transform-only change', () => {
