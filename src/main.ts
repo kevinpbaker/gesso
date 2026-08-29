@@ -1,39 +1,64 @@
-import './style.css';
-import { mountBindingDemo } from './playground/BindingDemoView';
-import { mountCanvasPlayground } from './playground/CanvasPlaygroundView';
-import { mountFrameworkPlayground, mountFrameworkSyncPlayground } from './playground/FrameworkPlaygroundView';
-import { mountPlayground } from './playground/PlaygroundView';
-import { mountWebGPUPlayground } from './playground/WebGPUPlaygroundView';
-import { mountWebGPUBenchmark } from './playground/WebGPUBenchmarkView';
-import { mountComparison } from './playground/ComparisonView';
-import { mountThemePlayground } from './playground/ThemePlaygroundView';
+import './playground/shell/theme.css';
 
+import { mountBenchmarkRoute } from './playground/routes/BenchmarkRoute';
+import { mountBindingRoute } from './playground/routes/BindingRoute';
+import { mountCanvasRoute } from './playground/routes/CanvasRoute';
+import { mountCompareRoute } from './playground/routes/CompareRoute';
+import { mountFrameworkRoute, mountFrameworkSyncRoute } from './playground/routes/FrameworkRoute';
+import { mountLayoutRoute } from './playground/routes/LayoutRoute';
+import { mountThemeRoute } from './playground/routes/ThemeRoute';
+import { mountWebGPURoute } from './playground/routes/WebGPURoute';
+import { DEFAULT_ROUTE_ID, findRoute, ROUTES } from './playground/shell/routes';
+
+/** Mounts a route into `host` and returns its teardown. */
 type Mount = (host: HTMLElement) => () => void;
 
-const ROUTES: Record<string, Mount> = {
-  debug: mountPlayground,
-  canvas: mountCanvasPlayground,
-  framework: mountFrameworkPlayground,
-  'framework-sync': mountFrameworkSyncPlayground,
-  webgpu: mountWebGPUPlayground,
-  compare: mountComparison,
-  benchmark: mountWebGPUBenchmark,
-  binding: mountBindingDemo,
-  theme: mountThemePlayground,
-  nothing: mountBindingDemo
+/**
+ * Maps each declared route to its implementation.
+ *
+ * The route list itself lives in shell/routes so the nav can be
+ * rendered without importing any of these modules. This is the one
+ * place the two halves meet, and the check below keeps them honest:
+ * a route added to the list but never wired up used to fail silently,
+ * by quietly falling back to the layout route.
+ */
+const MOUNTS: Record<string, Mount> = {
+  debug: mountLayoutRoute,
+  canvas: mountCanvasRoute,
+  framework: mountFrameworkRoute,
+  'framework-sync': mountFrameworkSyncRoute,
+  webgpu: mountWebGPURoute,
+  compare: mountCompareRoute,
+  benchmark: mountBenchmarkRoute,
+  binding: mountBindingRoute,
+  theme: mountThemeRoute
 };
+
+if (import.meta.env.DEV) {
+  const missing = ROUTES.filter(route => MOUNTS[route.id] === undefined).map(route => route.id);
+  if (missing.length > 0) {
+    throw new Error(`Routes declared with no mount function: ${missing.join(', ')}.`);
+  }
+}
+
+let unmount: (() => void) | null = null;
 
 function mountRoute(): void {
   const host = document.querySelector<HTMLElement>('#app');
   if (host === null) {
     throw new Error("Missing '#app' element.");
   }
-  const key = window.location.hash.replace('#', '') || 'debug';
-  const mount = ROUTES[key] ?? mountPlayground;
+
+  const requested = window.location.hash.replace('#', '');
+  const id = findRoute(requested) === undefined ? DEFAULT_ROUTE_ID : requested;
+
   unmount?.();
-  unmount = mount(host);
+  // Cleared before the next mount so that a route which throws
+  // part-way through cannot leave the previous route's teardown in
+  // place, to be run a second time on the next navigation.
+  unmount = null;
+  unmount = MOUNTS[id](host);
 }
 
-let unmount: (() => void) | null = null;
 window.addEventListener('hashchange', mountRoute);
 mountRoute();

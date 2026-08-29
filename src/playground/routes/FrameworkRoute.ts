@@ -1,0 +1,152 @@
+import { createApp } from '../../framework';
+import { DemoStore, FrameworkDemoRoot } from '../FrameworkPlayground';
+import { HeavyStore } from '../HeavyStore';
+import { mountShell, type AppShell } from '../shell/AppShell';
+
+const BLOCK_MS = 2000;
+/** How often the reporter is allowed to touch the DOM. */
+const REPORT_INTERVAL_MS = 500;
+
+interface FrameMetrics {
+  durationMs: number;
+  at: number;
+  phases: Record<string, number>;
+}
+
+/**
+ * Worker-hosted framework route.
+ *
+ * The main thread owns only the page shell: it creates the canvas,
+ * hands its drawing surface to the render worker, and forwards
+ * events. Components, layout and rendering all run in the worker, so
+ * "Block main thread" freezes this thread for two seconds without
+ * costing the UI a single frame.
+ *
+ * Compare with #framework-sync, which runs the same app on the main
+ * thread and visibly stalls.
+ */
+export function mountFrameworkRoute(host: HTMLElement): () => void {
+  const shell = mountShell(host, { routeId: 'framework', metrics: true });
+  const report = createFrameReporter(shell, 'Render worker');
+
+  const app = createApp({
+    // Written out literally so the bundler can see and split it.
+    worker: () => new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module' }),
+    onFrame: report,
+    onError: (message, stack) => {
+      shell.setStatus(`Render worker error: ${message}`);
+      console.error('[nodal render worker]', message, stack);
+    }
+  });
+
+  shell.setStatus('Starting the render worker…');
+  const dispose = app.mount(shell.preview);
+  addBlockAction(shell);
+
+  return () => {
+    dispose();
+    shell.dispose();
+  };
+}
+
+/**
+ * Single-thread framework route, for comparison.
+ *
+ * The identical app, mounted so that components, layout and rendering
+ * share the main thread. Blocking the main thread here stalls the UI,
+ * which is exactly what the worker route avoids.
+ */
+export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
+  const shell = mountShell(host, { routeId: 'framework-sync', metrics: true });
+  const report = createFrameReporter(shell, 'Main thread');
+
+  shell.setStatus('Starting the single-threaded app…');
+  const dispose = createApp(FrameworkDemoRoot)
+    .useStore(DemoStore)
+    .useStore(HeavyStore, {
+      worker: () => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })
+    })
+    .onFrame(report)
+    .mountSync(shell.preview);
+  addBlockAction(shell);
+
+  return () => {
+    dispose();
+    shell.dispose();
+  };
+}
+
+/**
+ * Reports frame counts and rate identically for both configurations,
+ * so the comparison between them is like for like.
+ */
+function createFrameReporter(shell: AppShell, label: string): (metrics: FrameMetrics) => void {
+  let frames = 0;
+  let lastReport = performance.now();
+  let framesAtLastReport = 0;
+  let previousFrameAt: number | null = null;
+  let worstGap = 0;
+  // Peak rather than latest: patches and environment run on a small
+  // minority of frames, so sampling the current frame would almost
+  // always show them as idle even when they are doing the work.
+  const worstPhase: Record<string, number> = {};
+
+  return metrics => {
+    frames++;
+    // Measured on the rendering thread's clock. Across a worker
+    // boundary the messages queue behind a blocked main thread and
+    // arrive together, so only these timestamps reveal a real stall.
+    if (previousFrameAt !== null) {
+      worstGap = Math.max(worstGap, metrics.at - previousFrameAt);
+    }
+    previousFrameAt = metrics.at;
+    for (const [name, ms] of Object.entries(metrics.phases)) {
+      worstPhase[name] = Math.max(worstPhase[name] ?? 0, ms);
+    }
+
+    const now = performance.now();
+    if (now - lastReport < REPORT_INTERVAL_MS) {
+      return;
+    }
+    const fps = ((frames - framesAtLastReport) * 1000) / (now - lastReport);
+    lastReport = now;
+    framesAtLastReport = frames;
+
+    shell.setMetrics([
+      { label: 'Thread', value: label },
+      { label: 'Frames', value: String(frames) },
+      { label: 'FPS', value: fps.toFixed(0) },
+      { label: 'Frame', value: `${metrics.durationMs.toFixed(1)} ms` },
+      { label: 'Worst gap', value: `${worstGap.toFixed(0)} ms` }
+    ]);
+    shell.setStatus(
+      'Worst phase · ' +
+        Object.entries(worstPhase)
+          .map(([name, ms]) => `${name} ${ms.toFixed(2)}ms`)
+          .join(' · ')
+    );
+    shell.setDetail('A phase reading of 0 means that phase never had work to do.');
+  };
+}
+
+/**
+ * Busy-loops the main thread so the difference between the two
+ * configurations is directly observable.
+ */
+function addBlockAction(shell: AppShell): void {
+  shell.addAction(
+    `Block main thread ${BLOCK_MS / 1000}s`,
+    () => {
+      shell.setStatus(`Blocking the main thread for ${BLOCK_MS}ms…`);
+      // Yield once so that status text actually paints before the
+      // thread locks up and stops painting anything.
+      setTimeout(() => {
+        const until = performance.now() + BLOCK_MS;
+        while (performance.now() < until) {
+          // Deliberately spinning.
+        }
+      }, 32);
+    },
+    { danger: true }
+  );
+}

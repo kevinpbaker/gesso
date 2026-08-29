@@ -1,0 +1,742 @@
+/*
+ * Nodal playground design system.
+ *
+ * Everything the page chrome draws comes from the tokens below, so a
+ * route never hard-codes a color. The palette is a dark developer
+ * tool: a near-black ground, two raised surfaces, one accent, and a
+ * small set of semantic colors for status. The canvas preview keeps
+ * its own darker ground so rendered output reads as content rather
+ * than as more chrome.
+ */
+
+:root {
+  /* Surfaces, from the page ground upward. */
+  --surface-sunken: #07090c;
+  --surface: #0d1117;
+  --surface-raised: #131922;
+  --surface-overlay: #1a2130;
+
+  /* Strokes. --border-strong is for edges that separate regions, */
+  /* --border for edges that merely group within one region. */
+  --border: #1f2733;
+  --border-strong: #2a3441;
+
+  --text: #e6edf3;
+  --text-dim: #8b98a9;
+  --text-faint: #5d6a7b;
+
+  --accent: #4c8dff;
+  --accent-soft: rgba(76, 141, 255, 0.14);
+  --accent-text: #ffffff;
+
+  --positive: #2ea88a;
+  --warning: #d99b3a;
+  --danger: #e5534b;
+
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* A 4px spacing scale. Chrome sticks to these steps so unrelated */
+  /* panels still line up with each other. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.24);
+
+  --duration: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--surface);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  height: 100%;
+}
+
+/* Every number that updates while you watch it is tabular, so digits */
+/* changing width never shifts the text around them. */
+.pg-num,
+.pg-metric-value,
+.pg-field input,
+.pg-status,
+.pg-selected,
+.pg-readout {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* --------------------------------------------------------------- */
+/* Scrollbars                                                       */
+/* --------------------------------------------------------------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #3b4757;
+  background-clip: content-box;
+}
+
+/* --------------------------------------------------------------- */
+/* App frame                                                        */
+/* --------------------------------------------------------------- */
+
+.pg-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+}
+
+.pg-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex: none;
+  height: 48px;
+  padding: 0 var(--space-4);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.pg-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.pg-brand svg {
+  display: block;
+  color: var(--accent);
+}
+
+.pg-brand-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The route title sits after a hairline divider rather than in its */
+/* own row, so the header stays one line tall on every route. */
+.pg-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.pg-title::before {
+  content: '';
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+}
+
+.pg-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Below this width the route title and the nav cannot both fit, and
+ * the nav would scroll with its last route clipped in a way that
+ * reads as a mistake. The title is the redundant half — the active
+ * nav item already names the route — so it is what gives way.
+ */
+@media (max-width: 1200px) {
+  .pg-title {
+    display: none;
+  }
+}
+
+.pg-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pg-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.pg-link {
+  flex: none;
+  padding: 5px var(--space-3);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--duration) var(--ease),
+    color var(--duration) var(--ease);
+}
+
+.pg-link:hover {
+  background: var(--surface-overlay);
+  color: var(--text);
+}
+
+.pg-link[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pg-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* --------------------------------------------------------------- */
+/* Sidebar                                                          */
+/* --------------------------------------------------------------- */
+
+.pg-controls {
+  width: 268px;
+  flex: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border-right: 1px solid var(--border-strong);
+}
+
+/* The benchmark's results table needs more room than a column of
+   labelled controls does. */
+.pg-controls-wide {
+  width: 420px;
+}
+
+.pg-group + .pg-group {
+  margin-top: var(--space-5);
+}
+
+.pg-group-title {
+  margin: 0 0 var(--space-3);
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pg-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 28px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.pg-field + .pg-field {
+  margin-top: var(--space-1);
+}
+
+.pg-field-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------- */
+/* Inputs                                                           */
+/* --------------------------------------------------------------- */
+
+.pg-field input[type='number'],
+.pg-field select {
+  width: 88px;
+  flex: none;
+  height: 26px;
+  padding: 0 var(--space-2);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.pg-field select {
+  font-family: var(--sans);
+  cursor: pointer;
+  appearance: none;
+  /* Chevron drawn as a background image so the control keeps the */
+  /* same box model as the number inputs beside it. */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-faint) 50%),
+    linear-gradient(135deg, var(--text-faint) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 11px,
+    calc(100% - 9px) 11px;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: var(--space-5);
+}
+
+.pg-field input[type='number']:hover,
+.pg-field select:hover {
+  border-color: var(--border-strong);
+}
+
+.pg-field input[type='number']:focus-visible,
+.pg-field select:focus-visible,
+.pg-button:focus-visible,
+.pg-link:focus-visible,
+.pg-check:focus-within {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.pg-field input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pg-field input[type='color'] {
+  width: 32px;
+  height: 26px;
+  flex: none;
+  padding: 0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.pg-field input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.pg-field input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+/* Checkbox rendered as a switch: the label is the hit target and the */
+/* native input is visually replaced but kept for focus and a11y. */
+.pg-check {
+  cursor: pointer;
+}
+
+.pg-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pg-switch {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  flex: none;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    background var(--duration) var(--ease),
+    border-color var(--duration) var(--ease);
+}
+
+.pg-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--text-faint);
+  border-radius: 50%;
+  transition:
+    transform var(--duration) var(--ease),
+    background var(--duration) var(--ease);
+}
+
+.pg-check input:checked + .pg-switch {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.pg-check input:checked + .pg-switch::after {
+  transform: translateX(12px);
+  background: var(--accent-text);
+}
+
+.pg-field input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pg-field input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.pg-field input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  transition: transform var(--duration) var(--ease);
+}
+
+.pg-field input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.pg-field input[type='range']::-moz-range-track {
+  height: 4px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.pg-field input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+}
+
+/* --------------------------------------------------------------- */
+/* Buttons                                                          */
+/* --------------------------------------------------------------- */
+
+.pg-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.pg-button {
+  height: 26px;
+  padding: 0 8px;
+  white-space: nowrap;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--duration) var(--ease),
+    color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease);
+}
+
+.pg-button:hover {
+  background: #202938;
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.pg-button:active {
+  transform: translateY(0.5px);
+}
+
+.pg-button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: rgba(76, 141, 255, 0.4);
+  color: var(--accent);
+}
+
+.pg-button-grow {
+  flex: 1;
+}
+
+.pg-button-danger {
+  color: var(--danger);
+}
+
+.pg-button-danger:hover {
+  background: rgba(229, 83, 75, 0.12);
+  border-color: rgba(229, 83, 75, 0.4);
+  color: var(--danger);
+}
+
+/* --------------------------------------------------------------- */
+/* Preview                                                          */
+/* --------------------------------------------------------------- */
+
+.pg-preview {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  /* A faint grid, so an unpainted preview still reads as a surface */
+  /* and rendered geometry has something to sit against. */
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+.pg-preview-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.pg-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pg-preview canvas.pg-canvas {
+  display: block;
+  border-radius: var(--radius);
+}
+
+canvas.pg-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------- */
+/* Debug boxes (LayoutDebugView / ThemeDebugView)                   */
+/* --------------------------------------------------------------- */
+
+.pg-box {
+  position: absolute;
+  border: 1px solid rgba(230, 237, 243, 0.16);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: outline-color var(--duration) var(--ease);
+}
+
+.pg-box.text,
+.pg-box.button,
+.pg-box.column,
+.pg-box.row {
+  background: rgba(230, 237, 243, 0.04);
+}
+
+.pg-box.box {
+  background: rgba(76, 141, 255, 0.28);
+  border-color: rgba(76, 141, 255, 0.5);
+}
+
+.pg-box.scroll {
+  background: rgba(46, 168, 138, 0.18);
+  border-color: rgba(46, 168, 138, 0.45);
+}
+
+.pg-box:hover {
+  outline: 1px solid rgba(230, 237, 243, 0.35);
+}
+
+.pg-box.selected {
+  outline: 2px solid var(--warning);
+  outline-offset: -1px;
+}
+
+.pg-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0 3px;
+  color: rgba(230, 237, 243, 0.75);
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.pg-note {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------- */
+/* Status bar                                                       */
+/* --------------------------------------------------------------- */
+
+.pg-debug {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-strong);
+}
+
+.pg-debug-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pg-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.pg-metric {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 11px;
+}
+
+.pg-metric-label {
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.pg-metric-value {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/*
+ * The framework routes rewrite these lines several times a second.
+ * Left to reflow, a longer string wraps, the bar grows, the preview
+ * shrinks, and the ResizeObserver fires a full relayout and repaint —
+ * the readout would keep disturbing what it measures. Clipping to one
+ * line keeps the bar's height fixed no matter what it says.
+ */
+.pg-status,
+.pg-selected,
+.pg-readout {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-height: 16px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.pg-selected,
+.pg-status-strong {
+  color: var(--text);
+}
+
+.pg-status-dim {
+  color: var(--text-faint);
+}
+
+.pg-debug .pg-buttons {
+  flex: none;
+}
+
+/* --------------------------------------------------------------- */
+/* Benchmark output                                                 */
+/* --------------------------------------------------------------- */
+
+.pg-output {
+  margin: 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

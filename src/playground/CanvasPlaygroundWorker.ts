@@ -12,7 +12,7 @@ import { UiKeyboardController } from '../ui/input/UiKeyboardController';
 import { UiTimerFrameClock } from '../ui/scheduler';
 import { CanvasPreview } from './CanvasPreview';
 import { LayoutPlayground } from './LayoutPlayground';
-import { scrollStatsText } from './PlaygroundControls';
+import { scrollStatsText } from './scrollStats';
 import { createDefinition } from './PlaygroundDefinition';
 import { rewireFocusableBoxes } from './PlaygroundInput';
 import { PlaygroundState } from './PlaygroundState';

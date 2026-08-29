@@ -83,6 +83,11 @@ export class WebGPURenderer implements UiRenderer {
     this.pipeline = createPrimitivePipeline(init.device, init.format);
     this.textRenderer = new WebGPUTextRenderer(init.device, init.format);
     this.textRenderer.initialize();
+    // TEMP-DIAG
+    init.device.onuncapturederror = (ev: any) => {
+      // eslint-disable-next-line no-console
+      console.error('[GPU-ERR]', ev.error && ev.error.message);
+    };
     this.lost = false;
   }
 
@@ -156,6 +161,22 @@ export class WebGPURenderer implements UiRenderer {
     const commandEncoder = device.createCommandEncoder();
     const texture = this.surface.getCurrentTexture();
     const view = texture.createView();
+    // TEMP-DIAG
+    const diag = (globalThis as any).__gpuDiag ?? ((globalThis as any).__gpuDiag = { n: 0 });
+    const logThis = diag.n++ < 6;
+    if (logThis) {
+      device.pushErrorScope('validation');
+      // eslint-disable-next-line no-console
+      console.log('[DIAG] frame', diag.n, JSON.stringify({
+        tex: [texture.width, texture.height],
+        phys: [this.surface.physicalWidth, this.surface.physicalHeight],
+        logical: [this.surface.logicalWidth, this.surface.logicalHeight],
+        dpr: this.surface.dpr,
+        instances: list.instanceCount,
+        commands: list.commands.map(c => ({ s: c.start, e: c.end, sc: c.scissor })),
+        text: list.textItems.length
+      }));
+    }
 
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
@@ -212,6 +233,13 @@ export class WebGPURenderer implements UiRenderer {
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
+    // TEMP-DIAG
+    if (logThis) {
+      void device.popErrorScope().then(err => {
+        // eslint-disable-next-line no-console
+        console.log('[DIAG] scope', diag.n, err ? 'ERROR: ' + err.message : 'clean');
+      });
+    }
     if (this.hooks.onEncodeEnd !== undefined) {
       this.hooks.onEncodeEnd(performance.now() - encodeStart);
     }
