@@ -33,6 +33,7 @@ export {
 export {
   EDITOR_PROP,
   CARET_BLINK_MS,
+  CARET_WIDTH,
   editorFor,
   editorOf,
   syncEditorValue,

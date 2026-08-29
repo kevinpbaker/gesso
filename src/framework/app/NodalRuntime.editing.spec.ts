@@ -409,6 +409,51 @@ describe('NodalRuntime editing', () => {
     expect(scroller.properties.get('scrollY')).toBeGreaterThan(0);
   });
 
+  it('scrolls its own text so the caret stays inside a field narrower than its line', () => {
+    // 26 characters at 7px in a 70px field: ten fit, the caret is at 182.
+    const { runtime, field, model, press, key, tick } = mount(
+      Column(EditableText({ value: 'abcdefghijklmnopqrstuvwxyz', width: 70 }))
+    );
+    press(5, 5);
+    key('End');
+    tick();
+    expect(model().focus).toBe(26);
+    const scroll = runtime.explain(field).scroll!;
+    expect(scroll.contentWidth).toBe(182);
+    // Far enough that the caret at the end of the text is the last
+    // pixel inside the box, and no further.
+    expect(scroll.scrollX).toBe(182 + 1 - 70);
+    // Home brings it back to the start of the line.
+    key('Home');
+    tick();
+    expect(runtime.explain(field).scroll!.scrollX).toBe(0);
+  });
+
+  it("reads a press through the field's own scroll, and keeps the shell caret inside the box", () => {
+    const { runtime, field, model, press, key, tick, states } = mount(
+      Column(EditableText({ value: 'abcdefghijklmnopqrstuvwxyz', width: 70 }))
+    );
+    press(5, 5);
+    key('End');
+    tick();
+    // 60px into a field scrolled by 113 is the boundary nearest 173.
+    press(60, 5);
+    expect(model().focus).toBe(25);
+    const box = runtime.debugLayoutBox(field);
+    const caret = states[states.length - 1]!.caret;
+    expect(caret.x).toBeGreaterThanOrEqual(box.x);
+    expect(caret.x).toBeLessThan(box.x + box.width);
+  });
+
+  it('clips a field to its box and scrolls nothing when the text fits', () => {
+    const { runtime, field, key, press, tick } = mount(Column(EditableText({ value: 'ab', width: 70 })));
+    press(5, 5);
+    key('End');
+    tick();
+    expect(runtime.explain(field).state.clips).toBe(true);
+    expect(runtime.explain(field).scroll!.scrollX).toBe(0);
+  });
+
   it('sizes an empty field by its placeholder', () => {
     const { runtime, field, tick } = mount(Column({ x: 'start' }, EditableText({ value: '', placeholder: 'Search…' })));
     tick();

@@ -57,6 +57,20 @@ describe('Canvas2D editable painting', () => {
     expect(callsOf(h.context, 'fillRect')).toHaveLength(0);
   });
 
+  it('scrolls a field narrower than its line, under the clip of its own box', () => {
+    const h = new RenderHarness();
+    // Eight 8.4px glyphs in a 30px field, scrolled 20px along.
+    const { root, model } = scene(h, { value: 'abcdefgh', width: 30, scrollX: 20 });
+    model.focused = true;
+    model.select(8);
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: model.blinkOrigin });
+    expect(callArgs(h.context, 'fillText')).toEqual([['abcdefgh', -20, expect.any(Number)]]);
+    // The caret is at the end of the text, inside the box rather than
+    // past its right edge, and the box clips what runs off it.
+    expect(callArgs(h.context, 'fillRect')).toEqual([[47, 0, 1, expect.closeTo(16.8, 5)]]);
+    expect(callsOf(h.context, 'clip')).not.toHaveLength(0);
+  });
+
   it('fills the selection behind the text instead of a caret', () => {
     const h = new RenderHarness();
     const { root, model } = scene(h, { value: 'abcd', selectionColor: '#ff0012' });
@@ -130,6 +144,17 @@ describe('WebGPU editable render list', () => {
     expect(caret.instanceData[0]).toBe(34);
     expect(caret.instanceData[2]).toBe(1);
     expect(caret.commands.map(command => command.kind)).toEqual([CommandKind.Text, CommandKind.Primitives]);
+  });
+
+  it('shifts a scrolled field by its own offset', () => {
+    const h = new RenderHarness();
+    const { root, model } = scene(h, { value: 'abcdefgh', width: 30, scrollX: 20 });
+    model.focused = true;
+    model.select(8);
+    const list = build(h, root, model.blinkOrigin);
+    expect(textItems(list).map(item => item.lines.map(line => line.text))).toEqual([['abcdefgh']]);
+    expect(list.instanceCount).toBe(1);
+    expect(list.instanceData[0]).toBe(47);
   });
 
   it('rasterises the placeholder in its own colour when the text is empty', () => {

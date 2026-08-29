@@ -565,15 +565,25 @@ export class UiEditingController {
     this.revealCaret(node);
   }
 
-  /** Asks the host to scroll the caret into view, when the node has been laid out. */
+  /**
+   * Asks the host to scroll the caret into view, when the node has been
+   * laid out: the field's own text first, then any scroll container
+   * around it.
+   *
+   * `layoutOf` places the text where it is seen, so the caret comes
+   * back with the field's own scroll already taken off; the reveal is
+   * asked for in the node's unscrolled coordinates, which is where the
+   * offset it wants is measured from.
+   */
   private revealCaret(node: UiNode): void {
-    if (this.host.recordFor(node) === undefined) {
+    const rec = this.host.recordFor(node);
+    if (rec === undefined) {
       return;
     }
     const caret = this.layoutOf(node).caretRect();
     this.host.reveal(node, {
-      x: caret.x - CARET_REVEAL_PADDING,
-      y: caret.y - CARET_REVEAL_PADDING,
+      x: caret.x + rec.scrollX - CARET_REVEAL_PADDING,
+      y: caret.y + rec.scrollY - CARET_REVEAL_PADDING,
       width: 1 + 2 * CARET_REVEAL_PADDING,
       height: caret.height + 2 * CARET_REVEAL_PADDING
     });
@@ -581,9 +591,12 @@ export class UiEditingController {
 
   /**
    * The node's text laid out in node-local coordinates: the content box
-   * starts at the padding, as it does for the renderers in the parent's
-   * space. Before the first layout the record is empty and the lines
-   * fall at the origin, which is still a valid place for a caret.
+   * starts at the padding and is shifted by the field's own scroll, as
+   * it is for the renderers in the parent's space. Points from the
+   * pointer and the caret box the shell is given are both in that same
+   * seen space, so neither has to know the offset. Before the first
+   * layout the record is empty and the lines fall at the origin, which
+   * is still a valid place for a caret.
    */
   private layoutOf(node: UiNode): EditableLayout {
     const rec = this.host.recordFor(node);
@@ -592,8 +605,8 @@ export class UiEditingController {
       rec === undefined
         ? { x: 0, y: 0, width: 0, height: 0 }
         : {
-            x: rec.paddingLeft,
-            y: rec.paddingTop,
+            x: rec.paddingLeft - rec.scrollX,
+            y: rec.paddingTop - rec.scrollY,
             width: Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight),
             height: Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom)
           };

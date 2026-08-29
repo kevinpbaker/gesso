@@ -10,11 +10,8 @@ import type { RenderContext } from '../RenderContext';
 import { buildFontString, drawText, drawTextLines, layoutTextLines } from '../TextRenderer';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
-import { caretVisibleAt } from '../../editing/UiEditable';
+import { CARET_WIDTH, caretVisibleAt } from '../../editing/UiEditable';
 import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSelectionGeometry';
-
-/** Logical width of the caret, as a textarea's. */
-export const CARET_WIDTH = 1;
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutBox } from '../../layout/LayoutTypes';
@@ -317,9 +314,12 @@ export class Canvas2DRenderer implements UiRenderer {
   private paintContent(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, context: RenderContext): void {
     if (paint.text !== undefined) {
       // Text lives in the content box: layout sized the paragraph inside
-      // the padding, so paint must place it there too.
-      this.contentBox.x = rec.x + rec.paddingLeft;
-      this.contentBox.y = rec.y + rec.paddingTop;
+      // the padding, so paint must place it there too. A field also
+      // scrolls its own text — the offset is zero for everything else —
+      // and the node's clip is already open, so the line is cut at the
+      // box rather than painted over what is beside it.
+      this.contentBox.x = rec.x + rec.paddingLeft - rec.scrollX;
+      this.contentBox.y = rec.y + rec.paddingTop - rec.scrollY;
       this.contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
       this.contentBox.height = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
       if (paint.editor !== undefined) {

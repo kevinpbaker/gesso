@@ -9,6 +9,13 @@ export const EDITOR_PROP = 'editor';
 export const CARET_BLINK_MS = 530;
 
 /**
+ * How wide the caret is drawn. Both renderers paint it, and layout
+ * keeps this much room past the end of a field's text so that a caret
+ * at the end of a scrolled line is still inside the box.
+ */
+export const CARET_WIDTH = 1;
+
+/**
  * The model behind an EditableText node.
  *
  * The node is the identity — it survives reconciliation exactly as

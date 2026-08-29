@@ -35,7 +35,7 @@ export interface LayoutExplanation {
   readonly height: AxisExplanation;
   readonly relayout: RelayoutExplanation;
   readonly state: LayoutStateExplanation;
-  /** Scroll container facts, when the node is one. */
+  /** Scroll facts, for a scroll container or a field that scrolls its text. */
   readonly scroll?: { scrollX: number; scrollY: number; contentWidth: number; contentHeight: number };
 }
 

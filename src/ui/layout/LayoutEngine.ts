@@ -2,7 +2,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { resolveFont } from '../properties/UiTextFont';
-import { editorFor } from '../editing/UiEditable';
+import { CARET_WIDTH, editorFor } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
   AlignContent,
@@ -125,6 +125,13 @@ interface FlexConfig {
 export class LayoutEngine {
   private readonly records = new Map<UiNode, LayoutRecord>();
   private readonly scrollNodes = new Set<UiNode>();
+  /**
+   * Editables, which scroll their own text inside their box the way a
+   * scroll container scrolls its children — the offset lives on the
+   * record and is clamped every pass, but there are no scrollbars and
+   * no children to translate, so they are kept apart from `scrollNodes`.
+   */
+  private readonly textScrollNodes = new Set<UiNode>();
   /** Absolutely positioned nodes placed against an anchor node. */
   private readonly anchoredNodes = new Set<UiNode>();
   /** position: 'sticky' nodes, re-offset whenever anything scrolls. */
@@ -291,14 +298,17 @@ export class LayoutEngine {
         position,
         clips: rec.clips
       },
-      scroll: rec.scrollable
-        ? {
-            scrollX: rec.scrollX,
-            scrollY: rec.scrollY,
-            contentWidth: rec.contentWidth,
-            contentHeight: rec.contentHeight
-          }
-        : undefined
+      // A field scrolls its own text, so "why is the line cut off here"
+      // has the same answer for it as for a scroll container.
+      scroll:
+        rec.scrollable || this.textScrollNodes.has(node)
+          ? {
+              scrollX: rec.scrollX,
+              scrollY: rec.scrollY,
+              contentWidth: rec.contentWidth,
+              contentHeight: rec.contentHeight
+            }
+          : undefined
     };
   }
 
@@ -419,6 +429,7 @@ export class LayoutEngine {
     this.rootConstraints = constraints;
     this.records.clear();
     this.scrollNodes.clear();
+    this.textScrollNodes.clear();
     this.resetStats();
     this.fullLayout(constraints);
     const rec = this.record(node);
@@ -466,7 +477,7 @@ export class LayoutEngine {
       }
       if ((flags & DirtyFlags.Transform) !== 0) {
         this.record(node).transformDirty = true;
-        this.scrollNodes.add(node);
+        (node.type === UiNodeType.EditableText ? this.textScrollNodes : this.scrollNodes).add(node);
         // An anchored node sits next to something that may just have
         // scrolled; it is re-placed, cheaply, on the same frame.
         if (this.anchoredNodes.size > 0) {
@@ -708,6 +719,17 @@ export class LayoutEngine {
     // offsets of the scrollers passed on the way up.
     let innerScrollX = 0;
     let innerScrollY = 0;
+    // A field scrolls its own text first: the caret comes into the
+    // field's content box, and the ancestors then only have to bring
+    // the field itself into view.
+    if (inner !== undefined && this.textScrollNodes.has(node)) {
+      const self = this.textScrollAdjustment(rec, targetX, targetY, targetWidth, targetHeight, padding);
+      if (self.scrollX !== rec.scrollX || self.scrollY !== rec.scrollY) {
+        adjustments.push({ container: node, scrollX: self.scrollX, scrollY: self.scrollY });
+      }
+      innerScrollX = self.scrollX;
+      innerScrollY = self.scrollY;
+    }
     for (let current = node.parent; current !== null; current = current.parent) {
       const container = this.records.get(current);
       if (container === undefined || !container.scrollable) {
@@ -743,6 +765,48 @@ export class LayoutEngine {
   }
 
   /**
+   * Where a field must scroll its own text so that `target` — the caret,
+   * padded — is inside its content box.
+   *
+   * The offset is not clamped to the record's content size, only to
+   * zero: the caret is placed from the text as it is now, while the
+   * record's extent is from the last pass and so is a keystroke behind
+   * while typing at the end of a line. `applyScroll` clamps against the
+   * fresh extent on the pass that follows, which is what pulls the
+   * offset back when text is deleted.
+   */
+  private textScrollAdjustment(
+    rec: LayoutRecord,
+    targetX: number,
+    targetY: number,
+    targetWidth: number,
+    targetHeight: number,
+    padding: number
+  ): { scrollX: number; scrollY: number } {
+    const viewLeft = rec.x + rec.paddingLeft + rec.scrollX;
+    const viewTop = rec.y + rec.paddingTop + rec.scrollY;
+    const viewWidth = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
+    const viewHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
+    const left = targetX - padding;
+    const right = targetX + targetWidth + padding;
+    const top = targetY - padding;
+    const bottom = targetY + targetHeight + padding;
+    let scrollX = rec.scrollX;
+    let scrollY = rec.scrollY;
+    if (left < viewLeft) {
+      scrollX -= viewLeft - left;
+    } else if (right > viewLeft + viewWidth) {
+      scrollX += right - (viewLeft + viewWidth);
+    }
+    if (top < viewTop) {
+      scrollY -= viewTop - top;
+    } else if (bottom > viewTop + viewHeight) {
+      scrollY += bottom - (viewTop + viewHeight);
+    }
+    return { scrollX: Math.max(0, scrollX), scrollY: Math.max(0, scrollY) };
+  }
+
+  /**
    * Shows a scroll container's scrollbars as if it had just scrolled:
    * the pointer is near them, or dragging one.
    */
@@ -767,7 +831,7 @@ export class LayoutEngine {
     let next: number | undefined;
     for (const node of this.scrollNodes) {
       const rec = this.records.get(node);
-      if (rec === undefined || rec.scrollbarVisibleUntil <= now) {
+      if (rec === undefined || !rec.scrollable || rec.scrollbarVisibleUntil <= now) {
         continue;
       }
       if (rec.contentWidth <= rec.width && rec.contentHeight <= rec.height) {
@@ -802,6 +866,7 @@ export class LayoutEngine {
       const current = stack.pop()!;
       this.records.delete(current);
       this.scrollNodes.delete(current);
+      this.textScrollNodes.delete(current);
       this.anchoredNodes.delete(current);
       this.stickyNodes.delete(current);
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
@@ -1680,9 +1745,17 @@ export class LayoutEngine {
    * What a child contributes to its parent's min-content width: its
    * explicit width when it has one, else its own min-content width,
    * clamped to its min/max.
+   *
+   * A scroll container contributes nothing it does not ask for: its
+   * content scrolls rather than widening it. An editable is the same
+   * kind of box — a field whose text scrolls or wraps inside it, not a
+   * label that must be shown whole — so it passes nothing up either.
+   * Without that, an unwrapped field's whole line would become its
+   * parent's minimum, and a row would push its siblings narrower with
+   * every character typed.
    */
   private minContentContribution(child: UiNode, cRec: LayoutRecord): number {
-    if (child.type === UiNodeType.ScrollView) {
+    if (child.type === UiNodeType.ScrollView || child.type === UiNodeType.EditableText) {
       return this.lengthProp(child, 'width', undefined) ?? 0;
     }
     const explicit = this.lengthProp(child, 'width', undefined);
@@ -1863,6 +1936,16 @@ export class LayoutEngine {
       rec.baseline = rec.paddingTop + paragraph.firstBaseline;
       rec.minContentWidth = minContentWidth + paddingH;
       rec.maxContentWidth = maxContentWidth + paddingH;
+      if (editable) {
+        // The field's scrollable extent. A wrapped field's paragraph is
+        // no wider than the box and only its height can overflow; an
+        // unwrapped one keeps its whole line here, which is what the
+        // caret scrolls along. `applyScroll` clamps the offset to it,
+        // so a field that grows short again scrolls back on its own.
+        rec.contentWidth = width + paddingH;
+        rec.contentHeight = paragraph.height + paddingV;
+        this.textScrollNodes.add(node);
+      }
       return { width: width + paddingH, height: paragraph.height + paddingV };
     }
     rec.minContentWidth = paddingH;
@@ -2523,23 +2606,50 @@ export class LayoutEngine {
 
   private applyScroll(): void {
     for (const node of this.scrollNodes) {
-      const rec = this.record(node);
-      const rawX = this.numberProp(node, 'scrollX') ?? 0;
-      const rawY = this.numberProp(node, 'scrollY') ?? 0;
-      const maxX = Math.max(0, rec.contentWidth - rec.width);
-      const maxY = Math.max(0, rec.contentHeight - rec.height);
-      const scrollX = this.clamp(rawX, 0, maxX);
-      const scrollY = this.clamp(rawY, 0, maxY);
-      if (scrollX !== rec.scrollX || scrollY !== rec.scrollY) {
-        rec.scrollX = scrollX;
-        rec.scrollY = scrollY;
+      this.applyScrollOffset(node, false);
+    }
+    // A field has no scrollbars, so nothing lingers after it scrolls;
+    // it does keep room for the caret past the end of its text.
+    for (const node of this.textScrollNodes) {
+      this.applyScrollOffset(node, true);
+    }
+    this.applySticky();
+  }
+
+  /**
+   * Brings a record's scroll offset up to date with its `scrollX` and
+   * `scrollY` properties, clamped to what there is to scroll. This runs
+   * every pass, so an offset written against a larger content — a field
+   * whose text has since been deleted, a list that lost rows — comes
+   * back into range on its own.
+   *
+   * A field that scrolls may go one caret width further than its text,
+   * so that a caret at the very end is inside the box and not on its
+   * edge, where the clip would take it. A field wide enough for its
+   * text does not: the allowance would shift the line by a pixel the
+   * moment the caret reached the end.
+   */
+  private applyScrollOffset(node: UiNode, field: boolean): void {
+    const rec = this.record(node);
+    const rawX = this.numberProp(node, 'scrollX') ?? 0;
+    const rawY = this.numberProp(node, 'scrollY') ?? 0;
+    const caret = field ? CARET_WIDTH : 0;
+    const overflowX = rec.contentWidth - rec.width;
+    const overflowY = rec.contentHeight - rec.height;
+    const maxX = overflowX > 0 ? overflowX + caret : 0;
+    const maxY = overflowY > 0 ? overflowY + caret : 0;
+    const scrollX = this.clamp(rawX, 0, maxX);
+    const scrollY = this.clamp(rawY, 0, maxY);
+    if (scrollX !== rec.scrollX || scrollY !== rec.scrollY) {
+      rec.scrollX = scrollX;
+      rec.scrollY = scrollY;
+      if (!field) {
         // Overlay scrollbars show while the user scrolls and linger a
         // moment after; the host repaints when they fade.
         rec.scrollbarVisibleUntil = this.now() + SCROLLBAR_LINGER_MS;
       }
-      rec.transformDirty = false;
     }
-    this.applySticky();
+    rec.transformDirty = false;
   }
 
   /**
@@ -2700,7 +2810,11 @@ export class LayoutEngine {
     rec.positioned = rec.absolute || rec.sticky || position === 'relative';
     const overflow = props.get('overflow');
     rec.scrollable = node.type === UiNodeType.ScrollView || overflow === 'scroll' || overflow === 'auto';
-    rec.clips = rec.scrollable || overflow === 'hidden';
+    // An editable clips like a form control: its box is a window on the
+    // text, which scrolls behind it (see `measureLeaf`). Without this a
+    // field narrower than its line would paint the overflow across
+    // whatever sits beside it.
+    rec.clips = rec.scrollable || overflow === 'hidden' || node.type === UiNodeType.EditableText;
     const insetH = this.lengthProp(node, 'inset', base.width);
     const insetV = this.lengthProp(node, 'inset', base.height);
     rec.top = this.lengthProp(node, 'top', base.height) ?? insetV;

@@ -18,9 +18,8 @@ import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShape
 import { toPhysicalPixels } from './WebGPUSurface';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
-import { caretVisibleAt } from '../../editing/UiEditable';
+import { CARET_WIDTH, caretVisibleAt } from '../../editing/UiEditable';
 import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSelectionGeometry';
-import { CARET_WIDTH } from '../canvas2d/Canvas2DRenderer';
 
 /**
  * Primitive instance layout, in floats:
@@ -476,8 +475,10 @@ export function buildRenderList(
       contentBox.y = 0;
       contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
       contentBox.height = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
-      const offsetX = rec.x + rec.paddingLeft;
-      const offsetY = rec.y + rec.paddingTop;
+      // A field scrolls its own text inside its box, as Canvas2D paints
+      // it; the offset is zero for every other kind of text.
+      const offsetX = rec.x + rec.paddingLeft - rec.scrollX;
+      const offsetY = rec.y + rec.paddingTop - rec.scrollY;
 
       /** One rasterised run of placed lines (content-box coordinates). */
       const pushTextRun = (lines: readonly TextLinePlacement[], color: string, cacheText: string): void => {

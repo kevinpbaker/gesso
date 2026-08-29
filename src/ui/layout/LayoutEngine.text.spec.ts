@@ -253,6 +253,62 @@ describe('LayoutEngine text', () => {
     });
   });
 
+  describe('an editable is a field, not a label', () => {
+    function field(harness: LayoutHarness, id: string, value: string): UiNode {
+      const node = harness.createNode(id, UiNodeType.EditableText);
+      node.setProperty('value', value);
+      node.setProperty('fontSize', 10);
+      node.setProperty('textWrap', 'none');
+      node.setProperty('flex', 1);
+      return node;
+    }
+
+    /** A row of a fixed sidebar and a flexible pane holding the field. */
+    function pane(harness: LayoutHarness, child: UiNode): UiNode {
+      const row = harness.createNode('row', UiNodeType.Row);
+      const sidebar = harness.createNode('sidebar', UiNodeType.Box);
+      sidebar.setProperty('width', 100);
+      const editor = harness.createNode('editor', UiNodeType.Column);
+      editor.setProperty('flex', 1);
+      harness.append(editor, child);
+      harness.append(row, sidebar, editor);
+      harness.layout(row, Constraints.tight(200, 50));
+      return sidebar;
+    }
+
+    it("does not pass an unwrapped field's line on to its parent as a minimum", () => {
+      const harness = new LayoutHarness();
+      const sidebar = pane(harness, field(harness, 'title', 'a title far wider than the pane it sits in'));
+      expect(harness.record(harness.graph.requireNode('editor')).minContentWidth).toBe(0);
+      expect(harness.box(sidebar).width).toBe(100);
+    });
+
+    it('keeps its whole line as scrollable content, clipped to the box', () => {
+      const harness = new LayoutHarness();
+      // Ten 6px glyphs in a 30px field: 60 of content behind a 30 window.
+      const title = field(harness, 'title', 'abcdefghij');
+      title.setProperty('width', 30);
+      title.setProperty('scrollX', 1000);
+      harness.layout(title, Constraints.tight(30, 20));
+      const record = harness.record(title);
+      expect(record.clips).toBe(true);
+      expect(record.contentWidth).toBe(60);
+      // Clamped to the line plus the caret's own width, so a caret at
+      // the end of the text is the last pixel inside the box.
+      expect(record.scrollX).toBe(31);
+    });
+
+    it('still passes an unwrapped label on, which is what makes the field different', () => {
+      const harness = new LayoutHarness();
+      const label = text(harness, 'title', 'a title far wider than the pane it sits in', {
+        textWrap: 'none',
+        flex: 1
+      });
+      const sidebar = pane(harness, label);
+      expect(harness.box(sidebar).width).toBeLessThan(100);
+    });
+  });
+
   it('records intrinsic widths on the text record', () => {
     const harness = new LayoutHarness();
     const paragraph = text(harness, 'p', 'ab cdef g');
