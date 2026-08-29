@@ -30,6 +30,7 @@ import { UiSelectionController } from '../../ui/selection/UiSelectionController'
 import { UiFindController } from '../../ui/find/UiFindController';
 import { ShellStore, type ShellRequest } from './ShellStore';
 import { FindStore } from './FindStore';
+import { FocusStore } from './FocusStore';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import type { LayoutExplanation } from '../../ui/layout/LayoutExplanation';
 import { Constraints } from '../../ui/layout/LayoutTypes';
@@ -196,6 +197,8 @@ export class NodalRuntime {
    */
   private selectionController: UiSelectionController | null = null;
   private findController: UiFindController | null = null;
+  /** Reachable before `input` is assigned, for the same reason. */
+  private focusManager: UiFocusManager | null = null;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
@@ -282,6 +285,11 @@ export class NodalRuntime {
     if (!this.stores.has(FindStore)) {
       this.stores.register(FindStore);
     }
+    // And focus, which lives in the input stack and is therefore out
+    // of a component's reach without a store in front of it.
+    if (!this.stores.has(FocusStore)) {
+      this.stores.register(FocusStore);
+    }
 
     this.scheduler = new UiScheduler({
       clock: options.clock ?? (callback => new UiTimerFrameClock(callback)),
@@ -298,10 +306,14 @@ export class NodalRuntime {
       // under one.
       this.selectionController?.handleNodeRemoved(node);
       this.findController?.handleNodeRemoved(node);
+      // Nor can focus: a closed dialog or a recycled row takes the
+      // focused node with it.
+      this.focusManager?.handleNodeRemoved(node);
     });
 
     this.buildRoot(options.root);
     this.input = this.createInput();
+    this.stores.get(FocusStore).setManager(this.input.focus);
     // Keyboard navigation must keep the focused control visible.
     this.input.focus.onFocusChange(node => {
       if (node !== null) {
@@ -578,6 +590,7 @@ export class NodalRuntime {
     this.rendererErrorListener = null;
     this.scheduler.stop();
     this.stores.get(FindStore).setController(null);
+    this.stores.get(FocusStore).setManager(null);
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.frameListener = null;
@@ -640,6 +653,7 @@ export class NodalRuntime {
     const root = this.layoutRoot();
     const hitTester = new UiHitTester(this.engine, root);
     const focus = new UiFocusManager(root, this.dispatcher);
+    this.focusManager = focus;
     const scrollSink = this.createScrollSink();
     // Editing is a default behaviour of the pointer and keyboard
     // controllers for EditableText targets; the shell's text input
@@ -906,6 +920,12 @@ export class NodalRuntime {
       return;
     }
     const started = now();
+
+    // The tree for this frame exists now. A focus trap taken from a
+    // `ref` — which fires before the node has children — enters its
+    // subtree here, so a dialog opened this frame gets the caret in
+    // it before the frame is laid out and revealed.
+    this.focusManager?.settleScope();
 
     const laidOut = frameNeedsLayout(frame);
     this.phaseTimings.layout = this.timePhase(

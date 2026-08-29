@@ -1,0 +1,121 @@
+import type { UiNode } from '../../ui/graph/UiNode';
+import type { UiFocusManager } from '../../ui/input/UiFocusManager';
+import { state } from '../State';
+import { Store } from '../store/Store';
+import { Action, State } from '../store/decorators';
+
+/**
+ * Keyboard focus, as a store components can inject.
+ *
+ * `UiFocusManager` lives in the runtime and a component cannot reach
+ * it — components reach the world through stores, as they do for the
+ * clipboard (`ShellStore`), overlays (`OverlayStore`) and find
+ * (`FindStore`). Without this a component cannot autofocus a field,
+ * trap the keyboard in a dialog, or put the caret in the input that
+ * failed validation.
+ *
+ * Nodes come from a `ref` prop. A tree's refs fire before the runtime
+ * installs the manager, so an action taken during the first build is
+ * queued and replayed once there is one; that is the same problem
+ * `FindStore` solves for its query field, and the reason `autoFocus`
+ * in a dialog works on the frame it mounts.
+ *
+ * It must stay on the render thread: its actions take `UiNode`s, which
+ * never cross a worker boundary.
+ */
+export class FocusStore extends Store {
+  /** The node holding focus, or null. A control binds its focus ring to this. */
+  @State() focused = state<UiNode | null>(null);
+  /** Whether focus is confined to a subtree by an open trap. */
+  @State() trapped = state(false);
+
+  private manager: UiFocusManager | null = null;
+  private detach: (() => void) | null = null;
+  /** Actions taken before the runtime installed a manager, in order. */
+  private queued: ((manager: UiFocusManager) => void)[] = [];
+
+  /** Installed by the runtime; without one every action is queued. */
+  setManager(manager: UiFocusManager | null): void {
+    this.detach?.();
+    this.detach = null;
+    this.manager = manager;
+    if (manager === null) {
+      this.queued = [];
+      return;
+    }
+    const focusChange = manager.onFocusChange(node => {
+      this.focused.value = node;
+    });
+    const scopeChange = manager.onScopeChange(() => {
+      this.trapped.value = manager.trapped;
+    });
+    this.detach = () => {
+      focusChange();
+      scopeChange();
+    };
+    const pending = this.queued;
+    this.queued = [];
+    for (const action of pending) {
+      action(manager);
+    }
+    this.sync(manager);
+  }
+
+  /** Gives the node keyboard focus. Non-focusable nodes are ignored. */
+  @Action()
+  focus(node: UiNode): void {
+    this.run(manager => manager.focus(node));
+  }
+
+  /** Drops focus without moving it anywhere. */
+  @Action()
+  blur(): void {
+    this.run(manager => manager.blur());
+  }
+
+  /** Moves focus to the next focusable node, wrapping around. */
+  @Action()
+  focusNext(): void {
+    this.run(manager => manager.focusNext());
+  }
+
+  /** Moves focus to the previous focusable node, wrapping around. */
+  @Action()
+  focusPrevious(): void {
+    this.run(manager => manager.focusPrevious());
+  }
+
+  /**
+   * Confines focus to `scope` until `releaseTrap`, moving it inside if
+   * it was elsewhere. Traps nest: a dialog opened over a dialog traps
+   * again, and each release restores its own opener.
+   */
+  @Action()
+  trap(scope: UiNode): void {
+    this.run(manager => manager.pushScope(scope));
+  }
+
+  /**
+   * Ends the innermost trap and returns focus to whatever held it when
+   * the trap was taken — the button that opened the dialog.
+   */
+  @Action()
+  releaseTrap(): void {
+    this.run(manager => manager.popScope());
+  }
+
+  private run(action: (manager: UiFocusManager) => void): void {
+    const manager = this.manager;
+    if (manager === null) {
+      this.queued.push(action);
+      return;
+    }
+    action(manager);
+    this.sync(manager);
+  }
+
+  private sync(manager: UiFocusManager): void {
+    this.focused.value = manager.focusedNode;
+    this.trapped.value = manager.trapped;
+  }
+}
