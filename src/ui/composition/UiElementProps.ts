@@ -126,6 +126,24 @@ export type InteractionProps = PropsOf<
   'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'
 >;
 
+/**
+ * What the element means, for assistive technology. Legal on any
+ * element; a component sets them on the node that *is* the control,
+ * not on a wrapper. See `UiSemantics.ts`.
+ */
+export type SemanticsProps = PropsOf<
+  | 'role'
+  | 'label'
+  | 'description'
+  | 'states'
+  | 'valueNow'
+  | 'valueMin'
+  | 'valueMax'
+  | 'valueText'
+  | 'posInSet'
+  | 'setSize'
+>;
+
 /** Environment values an element provides to its subtree. */
 export type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor'>;
 
@@ -139,6 +157,7 @@ export type CommonProps = IdentityProps &
   PaintProps &
   TypographyProps &
   InteractionProps &
+  SemanticsProps &
   EnvironmentProps;
 
 /** Props of an element that has children. */

@@ -40,12 +40,15 @@ import type {
   UiVerticalAlign
 } from './UiPropertyValues';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
+import type { UiRole, UiSemanticStates } from './UiSemantics';
+import { statesEqual, validateRole, validateStates } from './UiSemantics';
 
 const L = DirtyFlags.Layout;
 const P = DirtyFlags.Paint;
 const C = DirtyFlags.Content;
 const T = DirtyFlags.Transform;
 const E = DirtyFlags.Environment;
+const S = DirtyFlags.Semantics;
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -803,7 +806,97 @@ export const UiProperties = {
     name: 'disabled',
     defaultValue: undefined,
     inherited: false,
-    affects: DirtyFlags.Properties
+    // Inert-ness is a semantic fact as well as an input one: a
+    // disabled control is announced as unavailable, not hidden.
+    affects: DirtyFlags.Properties | S
+  }),
+
+  // -------------------------------------------------------------------------
+  // Semantics
+  //
+  // What the node means. Read by the semantics phase, diffed per frame
+  // and (F6b) mirrored into an off-screen DOM. See UiSemantics.ts.
+  // -------------------------------------------------------------------------
+
+  /** What this node is, in ARIA's vocabulary. Closed: a typo throws. */
+  role: defineProperty<UiRole | undefined>({
+    name: 'role',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S,
+    validate: validateRole
+  }),
+
+  /** The node's accessible name. Without one it is named by its text. */
+  label: defineProperty<string | undefined>({
+    name: 'label',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /** Supplementary text read after the name: a hint, an error. */
+  description: defineProperty<string | undefined>({
+    name: 'description',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /** Conditions beyond role and value: checked, expanded, invalid, … */
+  states: defineProperty<UiSemanticStates | undefined>({
+    name: 'states',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S,
+    compare: statesEqual,
+    validate: validateStates
+  }),
+
+  /** A range control's current position; with valueMin and valueMax. */
+  valueNow: defineProperty<number | undefined>({
+    name: 'valueNow',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  valueMin: defineProperty<number | undefined>({
+    name: 'valueMin',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  valueMax: defineProperty<number | undefined>({
+    name: 'valueMax',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /** How the value should be spoken, when the number is not it ("40%"). */
+  valueText: defineProperty<string | undefined>({
+    name: 'valueText',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /** 1-based position in a set, for a virtualized list's rows. */
+  posInSet: defineProperty<number | undefined>({
+    name: 'posInSet',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /** How many items the set holds, including the ones not mounted. */
+  setSize: defineProperty<number | undefined>({
+    name: 'setSize',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
   }),
 
   // -------------------------------------------------------------------------

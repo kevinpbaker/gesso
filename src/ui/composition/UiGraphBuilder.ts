@@ -484,6 +484,7 @@ export class UiGraphBuilder {
       }
       this.assertKnownProp(node, property, value);
       present.add(property);
+      this.assertValidValue(node, property, value);
       // The graph indexes bindings by node and property, so this asks
       // it directly rather than copying the node's whole binding set
       // into a lookup table on every reconcile.
@@ -544,6 +545,26 @@ export class UiGraphBuilder {
         (suggestion !== undefined ? ` Did you mean '${suggestion}'?` : '') +
         ` Props must be registered UI properties (width, padding, backgroundColor, …), 'key', 'ref', or on* event handlers.`
     );
+  }
+
+  /**
+   * Rejects a value a registered property cannot hold.
+   *
+   * Only properties with a closed set of values declare a `validate`,
+   * so this is one undefined check for the other ninety-odd. An
+   * Observable is not checked here — its values arrive later, and a
+   * bound value is the reader's to reject, as a bound length is
+   * rejected at layout.
+   */
+  private assertValidValue(node: UiNode, property: string, value: unknown): void {
+    const definition = findPropertyDefinition<unknown>(property);
+    if (definition?.validate === undefined || this.isObservable(value)) {
+      return;
+    }
+    const message = definition.validate(value);
+    if (message !== undefined) {
+      throw new Error(`Invalid '${property}' on node '${node.id}': ${message}`);
+    }
   }
 
   /**

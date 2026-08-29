@@ -45,5 +45,7 @@ export { FindStore } from './app/FindStore';
 export { FocusStore } from './app/FocusStore';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export type { EditingState } from '../ui/input/UiEditingController';
+export type { UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from '../ui/semantics';
+export { UI_ROLES, UI_SEMANTIC_STATES, type UiRole, type UiSemanticState } from '../ui/properties/UiSemantics';
 export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';
 export type { ShellToRuntimeMessage, RuntimeToShellMessage } from './app/worker/RenderWorkerProtocol';

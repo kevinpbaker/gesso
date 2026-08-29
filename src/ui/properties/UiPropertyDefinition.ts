@@ -25,6 +25,15 @@ export interface UiPropertyDefinition<T> {
   readonly compare?: (a: T, b: T) => boolean;
   readonly environmentKey?: UiEnvironmentKey<unknown>;
   readonly resolveFromEnvironment?: (value: unknown) => T;
+  /**
+   * Rejects a value the property cannot hold, returning the message
+   * for the error the builder throws. Declared only by properties with
+   * a closed set of values, such as `role`; the builder checks it when
+   * a plain value is written, so it costs nothing on the graph's own
+   * write path. A value arriving through an Observable is checked by
+   * whatever reads it, as a bound length is checked at layout.
+   */
+  readonly validate?: (value: T) => string | undefined;
 }
 
 /**
@@ -42,7 +51,8 @@ export function defineProperty<T>(
     affects: options.affects,
     compare: options.compare,
     environmentKey: options.environmentKey,
-    resolveFromEnvironment: options.resolveFromEnvironment
+    resolveFromEnvironment: options.resolveFromEnvironment,
+    validate: options.validate
   };
 }
 

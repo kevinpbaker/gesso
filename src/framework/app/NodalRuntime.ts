@@ -31,6 +31,8 @@ import { UiFindController } from '../../ui/find/UiFindController';
 import { ShellStore, type ShellRequest } from './ShellStore';
 import { FindStore } from './FindStore';
 import { FocusStore } from './FocusStore';
+import { buildSemanticsTree, diffSemantics } from '../../ui/semantics';
+import type { UiSemanticsMap, UiSemanticsPatch } from '../../ui/semantics';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import type { LayoutExplanation } from '../../ui/layout/LayoutExplanation';
 import { Constraints } from '../../ui/layout/LayoutTypes';
@@ -67,7 +69,7 @@ import type { StoreReplica } from '../store/worker/StoreReplica';
  * because both produce dirt that this frame must see. `layout` and
  * `render` run against the snapshot.
  */
-export const UI_FRAME_PHASES = ['patches', 'environment', 'virtualize', 'layout', 'render'] as const;
+export const UI_FRAME_PHASES = ['patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'] as const;
 
 export type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
 
@@ -199,6 +201,8 @@ export class NodalRuntime {
   private findController: UiFindController | null = null;
   /** Reachable before `input` is assigned, for the same reason. */
   private focusManager: UiFocusManager | null = null;
+  private semantics: UiSemanticsMap = new Map();
+  private semanticsListener: ((patches: readonly UiSemanticsPatch[]) => void) | null = null;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
@@ -581,6 +585,7 @@ export class NodalRuntime {
     }
     this.editingListener = null;
     this.shellListener = null;
+    this.semanticsListener = null;
     if (this.inspectorTimer !== null) {
       clearTimeout(this.inspectorTimer);
       this.inspectorTimer = null;
@@ -737,6 +742,40 @@ export class NodalRuntime {
       wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
       keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing, selection, find })
     };
+  }
+
+  /**
+   * Receives what changed in the semantics tree, after any frame that
+   * changed it.
+   *
+   * Nothing consumes this yet: the off-screen DOM mirror an assistive
+   * technology reads is roadmap F6b, and it owns the wire format, so
+   * there is deliberately no protocol message here. What exists now is
+   * the tree, the diff, and the guarantee that every component written
+   * from today emits semantics — which is the half that cannot be
+   * retrofitted later.
+   */
+  onSemantics(listener: ((patches: readonly UiSemanticsPatch[]) => void) | null): void {
+    this.semanticsListener = listener;
+    if (listener !== null && this.semantics.size > 0) {
+      // A listener attached after the first frame still needs the tree
+      // that already exists, as one patch per record.
+      listener([...this.semantics.values()].map(node => ({ op: 'add', node }) as const));
+    }
+  }
+
+  /** The semantics tree as of the last frame that changed it. */
+  semanticsTree(): UiSemanticsMap {
+    return this.semantics;
+  }
+
+  private updateSemantics(): void {
+    const next = buildSemanticsTree(this.layoutRoot());
+    const patches = diffSemantics(this.semantics, next);
+    this.semantics = next;
+    if (patches.length > 0) {
+      this.semanticsListener?.(patches);
+    }
   }
 
   /** Scrolls every scroll container above `node` so a node-local box is visible. */
@@ -935,6 +974,14 @@ export class NodalRuntime {
     if (laidOut) {
       this.inspector.recordLayout(started);
     }
+
+    // What the tree *means* changes far less often than where it sits,
+    // so this phase reads 0 on a scrolled or animated frame and only
+    // walks when a semantics property or the shape of the tree moved.
+    this.phaseTimings.semantics = this.timePhase(
+      () => frameNeedsSemantics(frame),
+      () => this.updateSemantics()
+    );
 
     // Render is unconditional once the backend is ready: both backends
     // redraw the whole scene, so any frame that got this far changes
@@ -1180,7 +1227,7 @@ function emptyGpuTimings(): GpuStageTimings {
 }
 
 function emptyPhaseTimings(): FramePhaseTimings {
-  return { patches: 0, environment: 0, virtualize: 0, layout: 0, render: 0 };
+  return { patches: 0, environment: 0, virtualize: 0, layout: 0, semantics: 0, render: 0 };
 }
 
 /**
@@ -1193,4 +1240,14 @@ function emptyPhaseTimings(): FramePhaseTimings {
 function frameNeedsLayout(frame: UiFrame): boolean {
   const layoutFlags = DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform;
   return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & layoutFlags) !== 0);
+}
+
+/**
+ * Semantics follow the properties that carry them and the shape of the
+ * tree — a removed node marks its parent Children-dirty, which is how
+ * a closed dialog leaves the tree.
+ */
+function frameNeedsSemantics(frame: UiFrame): boolean {
+  const flags = DirtyFlags.Semantics | DirtyFlags.Children;
+  return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & flags) !== 0);
 }

@@ -7,5 +7,6 @@ export enum DirtyFlags {
   Children = 1 << 4,
   Transform = 1 << 5,
   Properties = 1 << 6,
-  Environment = 1 << 7
+  Environment = 1 << 7,
+  Semantics = 1 << 8
 }
