@@ -782,9 +782,21 @@ canvas.pg-canvas:focus-visible {
 /* Examples index                                                   */
 /* --------------------------------------------------------------- */
 
+/*
+ * The index scrolls itself, rather than the preview scrolling.
+ *
+ * `.pg-preview` is `overflow: hidden` on purpose: every other route
+ * puts a canvas in it and sizes that canvas from the element, so a
+ * scrollbar appearing there would change the width it reports and
+ * resize the canvas. So the page inside it takes a definite height and
+ * does its own scrolling — `overflow-y: auto` was already asked for
+ * here and did nothing, because a block whose height is its content
+ * has nothing to overflow.
+ */
 .pg-examples {
   width: 100%;
   max-width: 880px;
+  height: 100%;
   margin: 0 auto;
   padding: var(--space-6) var(--space-5);
   overflow-y: auto;
