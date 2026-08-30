@@ -5,6 +5,8 @@ export * from './UiProperty';
 export * from './UiPropertyDefinition';
 export * from './UiPropertyRegistry';
 export * from './UiPropertyResolver';
+export * from './UiPropertyValues';
+export * from './UiSemantics';
 export * from './UiTextStyle';
 export * from './UiTransform';
 export * from './UiVisualState';
