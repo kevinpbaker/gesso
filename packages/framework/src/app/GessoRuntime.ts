@@ -20,6 +20,7 @@ import {
   UiInputDispatcher,
   UiPointerEvent,
   UiEventType,
+  UiGestureRecognizer,
   UiHitTester,
   UiPointerController,
   UiWheelController,
@@ -1010,6 +1011,12 @@ export class GessoRuntime {
       selection,
       find,
       pointer: new UiPointerController(hitTester, this.dispatcher, {
+        // Without this the controller has no recognizer to feed, and
+        // `onPan*` / `onDrag*` never fire anywhere in a real app: the
+        // events exist, components declare handlers for them, and
+        // nothing ever synthesizes one. A `SplitPane` could be moved
+        // from the keyboard and not with the pointer.
+        gestures: new UiGestureRecognizer(this.dispatcher),
         onPress: node => {
           if (node !== null) {
             focus.focusOnPress(node);

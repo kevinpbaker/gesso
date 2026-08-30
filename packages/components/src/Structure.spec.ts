@@ -157,6 +157,34 @@ describe('SplitPane', () => {
     expect(changes).toEqual([0.25]);
   });
 
+  it('follows a real pointer press and drag, not just a synthesized pan', () => {
+    const split = new BehaviorSubject(0.5);
+    const changes: number[] = [];
+    const ui = mount(
+      createComponent(SplitPane, {
+        split,
+        first: Box({}),
+        second: Box({}),
+        onSplitChange: (value: number) => changes.push(value)
+      })
+    );
+    ui.frame();
+
+    // `fireEvent.pan` dispatches PanMove straight at the node, which
+    // tests the handler and not the machinery that has to deliver it.
+    // This goes through the pointer controller and the hit tester, so
+    // it only passes when the runtime actually feeds a gesture
+    // recognizer — which it did not, leaving every `onPan*` and
+    // `onDrag*` handler in every app dead while both halves' own specs
+    // stayed green.
+    ui.fireEvent.pointerDown(202, 150);
+    ui.fireEvent.pointerMove(300, 150, { buttons: 1 });
+    ui.fireEvent.pointerUp(300, 150);
+
+    // The track is the full 400, so the pointer at 300 is 0.75 along.
+    expect(changes.at(-1)).toBeCloseTo(0.75, 5);
+  });
+
   it('puts the divider at the fraction even when a pane holds wider content', () => {
     const split = new BehaviorSubject(0.4);
     const ui = mount(
