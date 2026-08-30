@@ -2047,6 +2047,7 @@ declare class UiEditingController {
   private move;
   beforeInput(inputType: string, data: string | null): boolean;
   insertText(text: string): boolean;
+  replaceText(text: string): boolean;
   paste(text: string): boolean;
   private insert;
   compositionStart(): void;
@@ -3082,6 +3083,20 @@ type UiSemanticsPatch = {
 };
 declare function diffSemantics(previous: UiSemanticsMap, next: UiSemanticsMap): UiSemanticsPatch[];
 declare function recordsEqual(a: UiSemanticsRecord, b: UiSemanticsRecord): boolean;
+interface UiSemanticsBox {
+  readonly id: string;
+  readonly box: LayoutBox;
+}
+interface UiSemanticsUpdate {
+  readonly patches: readonly UiSemanticsPatch[];
+  readonly boxes: readonly UiSemanticsBox[];
+  readonly focused?: string | null;
+}
+interface UiSemanticsAction {
+  readonly id: string;
+  readonly action: 'click' | 'focus' | 'setValue';
+  readonly value?: string;
+}
 export {
   accumulatedOffsetTo,
   Affine,
@@ -3253,7 +3268,6 @@ export {
   HitTestLayoutReader,
   HitTestResult,
   hoverable,
-  hs,
   IconCanvas,
   IconContext,
   iconKey,
@@ -3587,11 +3601,14 @@ export {
   UiSchedulerOptions,
   UiSelectionController,
   UiSelfAlignment,
+  UiSemanticsAction,
+  UiSemanticsBox,
   UiSemanticsMap,
   UiSemanticsPatch,
   UiSemanticsRecord,
   UiSemanticState,
   UiSemanticStates,
+  UiSemanticsUpdate,
   UiShadows,
   UiShapes,
   UiSpring,
@@ -3636,6 +3653,7 @@ export {
   VirtualViewport,
   visualState,
   visualStatesEqual,
+  vs,
   WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
@@ -4155,11 +4173,14 @@ import {
   UiSchedulerOptions,
   UiSelectionController,
   UiSelfAlignment,
+  UiSemanticsAction,
+  UiSemanticsBox,
   UiSemanticsMap,
   UiSemanticsPatch,
   UiSemanticsRecord,
   UiSemanticState,
   UiSemanticStates,
+  UiSemanticsUpdate,
   UiShadows,
   UiShapes,
   UiSpring,
@@ -4216,7 +4237,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-Bvt3Xllm.js";
+} from "./index-2mFXG1gJ.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4656,9 +4677,12 @@ export {
   type UiReducedMotionPolicy,
   type UiRenderer,
   type UiSchedulerOptions,
+  type UiSemanticsAction,
+  type UiSemanticsBox,
   type UiSemanticsMap,
   type UiSemanticsPatch,
   type UiSemanticsRecord,
+  type UiSemanticsUpdate,
   type UiSpringOptions,
   type UiTimerFrameClockOptions,
   type UiTrackSize,
@@ -4809,7 +4833,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-Bvt3Xllm.js";
+} from "./index-2mFXG1gJ.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

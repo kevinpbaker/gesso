@@ -296,6 +296,26 @@ export class UiEditingController {
     return this.insert(node, editorFor(node), 'insertText', text);
   }
 
+  /**
+   * Replaces the focused editable's whole text, as an assistive
+   * technology's "set value" does.
+   *
+   * `insertReplacementText` is the DOM's own input type for this, so an
+   * `onBeforeInput` that vets edits sees the same vocabulary it sees
+   * for typing, and an app that rejects the edit rejects this one too.
+   * Selecting everything first is what makes it one undo step and one
+   * `onInput` rather than a delete and an insert.
+   */
+  replaceText(text: string): boolean {
+    const node = this.focusedEditable;
+    if (node === null || isReadOnly(node)) {
+      return false;
+    }
+    const model = editorFor(node);
+    model.selectAll();
+    return this.insert(node, model, 'insertReplacementText', text);
+  }
+
   /** Pastes text: newlines are kept in a multiline field and become spaces in a single-line one. */
   paste(text: string): boolean {
     const node = this.focusedEditable;
