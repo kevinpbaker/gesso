@@ -6,7 +6,7 @@ import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventListener, UiEventListenerOptions } from '../input/UiInputDispatcher';
 import type { UiEventType } from '../input/UiInputEvent';
 import type { DecorationShape } from '../rendering/Decorations';
-import type { AnimatedCell, UiSpringOptions, UiTweenOptions } from '../animation';
+import type { AnimatedCell, UiSharedElements, UiSpringOptions, UiTweenOptions } from '../animation';
 
 /** Anything a modifier can hand to `own` to have released on detach. */
 export type UiModifierTeardown = (() => void) | { unsubscribe(): void };
@@ -69,9 +69,21 @@ export interface UiModifierHost {
    */
   flowBox(): LayoutBox | null;
   /**
+   * How far this node is scrolled, or null for one that is not a
+   * scroll container.
+   *
+   * The container's **effective** offset, from the layout record: a
+   * wheel writes the `scrollY` property unclamped and the engine clamps
+   * it to the content on the next layout, so the property can name a
+   * place the list never went. See `scrollPosition` for why observing
+   * a scroll is a modifier and restoring one is a binding.
+   */
+  scrollOffset(): { x: number; y: number } | null;
+  /**
    * Called after any frame that moved the node's box — including a
-   * scroll, which moves everything under the scroller. Removed on
-   * detach.
+   * scroll, which moves everything under the scroller — or that
+   * changed the node's own scroll offset, which moves everything
+   * inside it and leaves its box alone. Removed on detach.
    *
    * A scroll is a superset of what a listener may care about: read
    * `flowBox()` inside the listener when what matters is the node's
@@ -124,6 +136,31 @@ export interface UiModifierHost {
   animate<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): Observable<T>;
   /** The same, on a spring. See `UiSpring` for why springs take numbers only. */
   spring(cell: AnimatedCell<number>, to: number, options: UiSpringOptions): Observable<number>;
+  /**
+   * Stops whatever is driving a cell, leaving it exactly where it
+   * stands.
+   *
+   * What a modifier that puts a value somewhere *without* animating it
+   * needs: writing the cell while an animation still owns it would be
+   * overwritten on the next tick. `AnimationService.stop` is the same
+   * call from the framework's side.
+   */
+  stopAnimation<T>(cell: AnimatedCell<T>): void;
+  /**
+   * Who else has been called what, so a node arriving under a name
+   * another node was using can find out where that node is.
+   *
+   * Null when the builder was given no registry, which is every
+   * headless graph and every spec that does not ask for one; a
+   * modifier that needs it warns once and does nothing, as `onLayout`
+   * does without layout access.
+   *
+   * This is one capability rather than three methods because the
+   * registry *is* the contract — `MODIFIERS_ROADMAP.md` §4's budget is
+   * about what a modifier may reach, and what it reaches here is a
+   * name-to-box map that holds no nodes it did not put there itself.
+   */
+  readonly shared: UiSharedElements | null;
   /** Asks for a repaint, for a modifier whose own state changed. */
   requestFrame(): void;
 }

@@ -50,6 +50,7 @@ export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellService, type ShellRequest } from './app/ShellService';
 export { RouterService, type RouteMatch, type RouterHistorySink, type RouterRoutes } from './router/RouterService';
 export { RouterOutlet } from './router/RouterOutlet';
+export { Presence, type PresenceProps } from './Presence';
 export {
   route,
   to,

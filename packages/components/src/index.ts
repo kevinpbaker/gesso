@@ -39,10 +39,12 @@ export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } f
 export { Tree, type TreeNode, type TreeProps } from './Tree';
 export {
   Image,
+  Video,
   Icon,
   Spinner,
   ProgressBar,
   type ImageProps,
+  type VideoProps,
   type IconProps,
   type SpinnerProps,
   type ProgressBarProps

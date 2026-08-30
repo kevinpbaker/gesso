@@ -22,7 +22,8 @@ import {
   keymap,
   layoutOf,
   quantize,
-  type ControlLayoutProps
+  type ControlLayoutProps,
+  modifiersOf
 } from './internals';
 
 /**
@@ -106,7 +107,7 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: [CONTROL_FOCUS_RING],
+      modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
       gap: 6,
       role: 'slider',
       label,

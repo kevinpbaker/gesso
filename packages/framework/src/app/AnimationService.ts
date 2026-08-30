@@ -33,6 +33,8 @@ export interface AnimateOptions {
   repeat?: boolean;
   /** What a reduced-motion preference does to it. Defaults to `snap`. */
   reducedMotion?: UiReducedMotionPolicy;
+  /** Wait this long before the first sample; see `UiAnimationOptions.delay`. */
+  delay?: number;
 }
 
 export interface SpringOptions {
@@ -46,6 +48,8 @@ export interface SpringOptions {
   velocity?: number;
   restDelta?: number;
   reducedMotion?: UiReducedMotionPolicy;
+  /** Wait this long before the first sample; see `UiAnimationOptions.delay`. */
+  delay?: number;
 }
 
 /**
@@ -138,7 +142,8 @@ export class AnimationService {
       easing: this.resolveEasing(options.easing ?? 'standard'),
       stepMs: options.stepMs,
       repeat: options.repeat,
-      reducedMotion: options.reducedMotion
+      reducedMotion: options.reducedMotion,
+      delay: options.delay
     });
     if (tween === undefined) {
       // Not blendable: write it and say so. See `interpolatorFor`.
@@ -174,7 +179,8 @@ export class AnimationService {
       },
       velocity: options.velocity ?? (previous instanceof UiSpring ? previous.currentVelocity : 0),
       restDelta: options.restDelta,
-      reducedMotion: options.reducedMotion
+      reducedMotion: options.reducedMotion,
+      delay: options.delay
     });
     if (driver === null) {
       animation.snap();

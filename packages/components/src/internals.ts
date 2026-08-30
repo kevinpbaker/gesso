@@ -137,6 +137,29 @@ export interface ControlLayoutProps {
   flexBasis?: UiLength;
   selfX?: UiSelfAlignment;
   selfY?: UiSelfAlignment;
+  /**
+   * Modifiers to attach to the component's own root element, beside
+   * whatever the component attaches itself.
+   *
+   * The seam a motion needs. `sharedElement`, `motion` and
+   * `animateLayout` all describe an *element*, and a component that
+   * offers no way to reach its root element cannot be animated from
+   * outside at all — it has to be wrapped in a box that exists only to
+   * carry the modifier.
+   *
+   * Named `rootModifiers` rather than `modifiers` because `modifiers`
+   * is reserved on an element and a component may not take it: a
+   * component's node is its anchor fragment, which has no box and no
+   * paint, so the builder rejects it rather than attach a modifier to
+   * something that cannot use one. This prop is the component
+   * answering that question for itself — *these go on my root* — and
+   * the name says which element that is.
+   *
+   * The component's own modifiers are listed first, so a caller's
+   * write of a property wins over the component's, which is the same
+   * rule as everywhere else in the cascade.
+   */
+  rootModifiers?: readonly UiModifier[];
 }
 
 const LAYOUT_PROPS: readonly (keyof ControlLayoutProps)[] = [
@@ -158,6 +181,18 @@ const LAYOUT_PROPS: readonly (keyof ControlLayoutProps)[] = [
   'selfX',
   'selfY'
 ];
+
+/**
+ * The component's own modifiers, then the caller's.
+ *
+ * In that order because the override cascade resolves a conflict in
+ * favour of whichever modifier is later, and a caller who attached
+ * something to a control means it.
+ */
+export function modifiersOf(props: Inputs<ControlLayoutProps>, ...own: readonly UiModifier[]): readonly UiModifier[] {
+  const supplied = props.rootModifiers?.value;
+  return supplied === undefined || supplied.length === 0 ? own : [...own, ...supplied];
+}
 
 /** The layout props the caller actually supplied, as cells to bind. */
 export function layoutOf(props: Inputs<ControlLayoutProps>): Record<string, unknown> {

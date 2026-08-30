@@ -258,6 +258,12 @@ describe('a declared transition', () => {
   });
 });
 
+/** The translation a FLIP wrote, or zeroes when it wrote nothing. */
+function translationOf(node: UiNode): { x: number; y: number } {
+  const transform = node.properties.get('transform') as { translateX?: number; translateY?: number } | undefined;
+  return { x: transform?.translateX ?? 0, y: transform?.translateY ?? 0 };
+}
+
 describe('animateLayout', () => {
   /** Stable per-id ref callbacks, so each one fires once. */
   function refs(into: Map<number, UiNode>): (id: number) => (node: UiNode | null) => void {
@@ -295,16 +301,20 @@ describe('animateLayout', () => {
       time += 16;
       mounted.clock.tick(time);
     }
-    expect(seen.get(2)!.properties.has('top')).toBe(false);
+    expect(seen.get(2)!.properties.has('transform')).toBe(false);
 
     order.value = [2, 0, 1];
     time += 16;
     mounted.clock.tick(time);
 
-    // Both are drawn where they were, not where layout has put them.
-    expect(seen.get(2)!.properties.get('top')).toBeCloseTo(80, 3);
-    expect(seen.get(0)!.properties.get('top')).toBeCloseTo(-40, 3);
-    expect(seen.get(2)!.properties.get('position')).toBe('relative');
+    // Both are drawn where they were, not where layout has put them —
+    // through the transform's translation, which is paint-only, so the
+    // node is offset without the layout engine running for it.
+    expect(translationOf(seen.get(2)!).y).toBeCloseTo(80, 3);
+    expect(translationOf(seen.get(0)!).y).toBeCloseTo(-40, 3);
+    // And not by moving it in the flow, which is what it used to do.
+    expect(seen.get(2)!.properties.has('top')).toBe(false);
+    expect(seen.get(2)!.properties.has('position')).toBe(false);
 
     let frames = 0;
     while (mounted.clock.isPending && frames < 300) {
@@ -312,9 +322,8 @@ describe('animateLayout', () => {
       frames++;
       mounted.clock.tick(time);
     }
-    // Home, and the overrides handed back rather than left at zero.
-    expect(seen.get(2)!.properties.has('top')).toBe(false);
-    expect(seen.get(2)!.properties.has('position')).toBe(false);
+    // Home, and the override handed back rather than left at identity.
+    expect(seen.get(2)!.properties.has('transform')).toBe(false);
     expect(frames).toBeGreaterThan(4);
   });
 
@@ -342,8 +351,7 @@ describe('animateLayout', () => {
       height.value = next;
       time += 16;
       mounted.clock.tick(time);
-      expect(below!.properties.has('top')).toBe(false);
-      expect(below!.properties.has('position')).toBe(false);
+      expect(below!.properties.has('transform')).toBe(false);
     }
     // And no frames are being asked for on its behalf.
     expect(mounted.clock.isPending).toBe(false);
@@ -374,8 +382,7 @@ describe('animateLayout and scrolling', () => {
     time += 16;
     mounted.clock.tick(time);
 
-    expect(row!.properties.has('top')).toBe(false);
-    expect(row!.properties.has('position')).toBe(false);
+    expect(row!.properties.has('transform')).toBe(false);
   });
 });
 

@@ -19,9 +19,10 @@ import {
   type UiColorValue,
   type UiSemanticState,
   iconSource,
-  imageSource
+  imageSource,
+  videoSource
 } from '@gesso/core';
-import { layoutOf, type ControlLayoutProps } from './internals';
+import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 
 /**
  * The Media tier (`COMPONENTS_ROADMAP.md` C7).
@@ -83,7 +84,7 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
   return Box({
     ...layoutOf(props),
     ref: props.ref?.value,
-    modifiers: [imageSource(source)],
+    modifiers: modifiersOf(props, imageSource(source)),
     objectFit,
     borderRadius: radius,
     // A tint of the surface while it decodes and after it fails, so a
@@ -96,6 +97,71 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
     label: alt,
     // A picture is not selectable text and must not swallow a drag
     // meant for the list it sits in.
+    selectable: false
+  });
+}
+
+export interface VideoProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  /** A URL to an MP4 the resolver can fetch; see `Mp4Demuxer` for what it reads. */
+  src: string;
+  /**
+   * What a screen reader reads instead of the picture.
+   *
+   * The same rule `Image` follows: omitting it makes the video
+   * decorative, which is a decision rather than a default, so there is
+   * no way to get a nameless `image` record.
+   */
+  alt?: string;
+  objectFit?: ObjectFit;
+  borderRadius?: number;
+  /** Start again when it ends. Defaults to true. */
+  loop?: boolean;
+  /** Start playing as soon as it is decoded. Defaults to true. */
+  autoplay?: boolean;
+}
+
+/**
+ * A moving picture, decoded off the main thread.
+ *
+ * Deliberately the same shape as `Image`, because from an application's
+ * side that is what it is: a rectangle with a picture in it, fitted and
+ * clipped by the same props. What differs is underneath — see
+ * `videoSource` for the pacing, and `UiVideo` for why the renderers are
+ * handed a surface rather than a frame.
+ *
+ * Playback is shared by source. Two `Video`s pointed at one file watch
+ * one decode, and a `Video` that appears on a new screen while the old
+ * one is still leaving picks up the playback already running rather
+ * than starting over.
+ */
+export function Video(props: Inputs<VideoProps>, ctx: ComponentContext): UiChild {
+  const store = ctx.inject(MediaService);
+  const alt = input(props.alt, undefined);
+  const objectFit = input(props.objectFit, 'cover' as ObjectFit);
+  const radius = input(props.borderRadius, 0);
+  const status = internalState<'loading' | 'playing' | 'failed'>('loading');
+
+  // Built once, in the body, for the reason `Image`'s source is: the
+  // component's body runs once, and a `Video` whose src changes is a
+  // different video — give it a `key`.
+  const source = {
+    resolver: store.videos,
+    source: props.src.value,
+    loop: props.loop.value,
+    autoplay: props.autoplay.value,
+    onState: (next: 'loading' | 'playing' | 'failed') => (status.value = next)
+  };
+
+  return Box({
+    ...layoutOf(props),
+    ref: props.ref?.value,
+    modifiers: modifiersOf(props, videoSource(source)),
+    objectFit,
+    borderRadius: radius,
+    backgroundColor: status.pipe(map(current => (current === 'playing' ? undefined : 'controlBackground'))),
+    role: alt.pipe(map(text => (text === undefined ? undefined : ('image' as const)))),
+    label: alt,
     selectable: false
   });
 }
@@ -113,6 +179,8 @@ export interface IconProps extends ControlLayoutProps {
   style?: 'fill' | 'stroke';
   /** Line width for a stroked icon, in viewBox units. */
   strokeWidth?: number;
+  /** How a filled path decides what is inside it; see `IconSpec.fillRule`. */
+  fillRule?: 'nonzero' | 'evenodd';
   /** What a screen reader reads. Omitted makes the icon decorative. */
   label?: string;
 }
@@ -139,13 +207,14 @@ export function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild {
     size,
     color: props.color.value ?? 'controlForeground',
     style: props.style.value ?? 'fill',
-    strokeWidth: props.strokeWidth.value ?? 2
+    strokeWidth: props.strokeWidth.value ?? 2,
+    fillRule: props.fillRule.value ?? 'nonzero'
   };
 
   return Box({
     ...layoutOf(props),
     ref: props.ref?.value,
-    modifiers: [iconSource(spec)],
+    modifiers: modifiersOf(props, iconSource(spec)),
     width: size,
     height: size,
     flexShrink: 0,

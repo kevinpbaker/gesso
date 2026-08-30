@@ -19,7 +19,8 @@ import {
   foregroundToken,
   keymap,
   layoutOf,
-  type ControlLayoutProps
+  type ControlLayoutProps,
+  modifiersOf
 } from './internals';
 
 export interface RadioOption {
@@ -112,7 +113,7 @@ export function RadioGroup(props: Inputs<RadioGroupProps>, ctx: ComponentContext
     ref: focus.ref,
     focusable: true,
     disabled,
-    modifiers: [CONTROL_FOCUS_RING],
+    modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
     gap: 4,
     role: 'radiogroup' as const,
     label,

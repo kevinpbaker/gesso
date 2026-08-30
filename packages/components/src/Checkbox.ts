@@ -11,7 +11,8 @@ import {
   foregroundToken,
   keymap,
   layoutOf,
-  type ControlLayoutProps
+  type ControlLayoutProps,
+  modifiersOf
 } from './internals';
 
 /**
@@ -63,7 +64,7 @@ export function Checkbox(props: Inputs<CheckboxProps>, ctx: ComponentContext): U
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
+      modifiers: modifiersOf(props, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
       gap: 8,
       y: 'center',
       padding: 4,

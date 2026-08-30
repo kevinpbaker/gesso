@@ -2,6 +2,7 @@ import { EMPTY, isObservable, type Observable, type Subscription } from 'rxjs';
 
 import {
   AnimationDriver,
+  UiSharedElements,
   UiSpring,
   createTween,
   type AnimatedCell,
@@ -36,6 +37,8 @@ export interface UiModifierLayout {
   box(node: UiNode): LayoutBox | null;
   /** The same node in pre-scroll layout coordinates; see `UiModifierHost.flowBox`. */
   flowBox(node: UiNode): LayoutBox | null;
+  /** The node's own scroll offset; see `UiModifierHost.scrollOffset`. */
+  scroll(node: UiNode): { x: number; y: number } | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 
@@ -84,7 +87,8 @@ export class UiModifierSet {
     private readonly layout?: UiModifierLayout,
     private readonly focus?: UiModifierFocus,
     private readonly environment?: UiModifierEnvironment,
-    private readonly animations?: AnimationDriver
+    private readonly animations?: AnimationDriver,
+    private readonly sharedElements?: UiSharedElements
   ) {}
 
   /** The merged decoration list, created on demand. */
@@ -160,7 +164,8 @@ export class UiModifierSet {
       layout: this.layout,
       focus: this.focus,
       environment: this.environment,
-      animations: this.animations
+      animations: this.animations,
+      sharedElements: this.sharedElements
     });
     const entry: Attached = { kind, slot, host, args };
     kind.attach(host, args);
@@ -203,6 +208,7 @@ interface HostServices {
   focus?: UiModifierFocus;
   environment?: UiModifierEnvironment;
   animations?: AnimationDriver;
+  sharedElements?: UiSharedElements;
 }
 
 class Host implements UiModifierHost {
@@ -381,6 +387,23 @@ class Host implements UiModifierHost {
 
   own(teardown: UiModifierTeardown): void {
     this.teardowns.push(teardown);
+  }
+
+  scrollOffset(): { x: number; y: number } | null {
+    return this.services.layout?.scroll(this.node) ?? null;
+  }
+
+  stopAnimation<T>(cell: AnimatedCell<T>): void {
+    this.services.animations?.stop(cell as AnimatedCell<unknown>);
+  }
+
+  get shared(): UiSharedElements | null {
+    const registry = this.services.sharedElements;
+    if (registry === undefined) {
+      warnMissing(this.name, 'share an element across a tree change', 'sharedElements');
+      return null;
+    }
+    return registry;
   }
 
   requestFrame(): void {

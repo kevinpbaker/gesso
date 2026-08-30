@@ -19,7 +19,8 @@ import {
   foregroundToken,
   keymap,
   layoutOf,
-  type ControlLayoutProps
+  type ControlLayoutProps,
+  modifiersOf
 } from './internals';
 
 /**
@@ -100,7 +101,7 @@ function textField(props: Inputs<TextInputProps>, ctx: ComponentContext, forceMu
     ),
     EditableText({
       ref: focus.ref,
-      modifiers: [CONTROL_FOCUS_RING],
+      modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
       value: value.value,
       placeholder: props.placeholder,
       disabled,

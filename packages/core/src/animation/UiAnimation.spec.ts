@@ -61,7 +61,16 @@ describe('interpolation', () => {
     ).toEqual({ r: 0.5, g: 0.5, b: 0.5, a: 1 });
     expect(
       interpolatorFor({ scaleX: 1 }, { scaleX: 2 })?.({ scaleX: 1 } as never, { scaleX: 2 } as never, 0.5)
-    ).toEqual({ x: 0, y: 0, scaleX: 1.5, scaleY: 1, rotation: 0 });
+    ).toEqual({ x: 0, y: 0, translateX: 0, translateY: 0, scaleX: 1.5, scaleY: 1, rotation: 0 });
+    // A translation blends like any other field, which is what makes a
+    // node slide rather than jump.
+    expect(
+      interpolatorFor({ translateY: 0 }, { translateY: 20 })?.(
+        { translateY: 0 } as never,
+        { translateY: 20 } as never,
+        0.25
+      )
+    ).toEqual({ x: 0, y: 0, translateX: 0, translateY: 5, scaleX: 1, scaleY: 1, rotation: 0 });
   });
 
   it('declines what it cannot honestly blend', () => {
@@ -84,6 +93,26 @@ describe('a tween', () => {
     tween.advance(1199);
     expect(tween.isFinished).toBe(false);
     tween.advance(1200);
+    expect(target.value).toBe(100);
+    expect(tween.isFinished).toBe(true);
+  });
+
+  it('leaves the cell alone until its delay is up, and reports when that is', () => {
+    const target = cell(0);
+    const tween = new UiTween(target, 100, { duration: 100, easing: linear, delay: 50 }, (a, b, t) => a + (b - a) * t);
+    tween.advance(1000);
+    // The clock has started but the tween has not: the cell is
+    // deliberately not written, so a delayed animation dirties nothing
+    // while it waits.
+    expect(target.value).toBe(0);
+    // And it asks for exactly one frame — the one the delay ends on —
+    // rather than every frame in between.
+    expect(tween.dueAt(1016)).toBe(1050);
+    tween.advance(1050);
+    expect(target.value).toBe(0);
+    tween.advance(1100);
+    expect(target.value).toBeCloseTo(50, 6);
+    tween.advance(1150);
     expect(target.value).toBe(100);
     expect(tween.isFinished).toBe(true);
   });

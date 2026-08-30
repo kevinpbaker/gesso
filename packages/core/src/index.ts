@@ -25,6 +25,7 @@ export * from './layout';
 export * from './modifiers';
 export * from './properties';
 export * from './rendering';
+export * from './media';
 export * from './scheduler';
 export * from './selection';
 export * from './semantics';

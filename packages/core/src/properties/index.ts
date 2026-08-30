@@ -10,3 +10,4 @@ export * from './UiSemantics';
 export * from './UiTextStyle';
 export * from './UiTransform';
 export * from './UiVisualState';
+export { isVideoSurface, videoFrameSize, type UiVideoSurface } from './UiVideo';

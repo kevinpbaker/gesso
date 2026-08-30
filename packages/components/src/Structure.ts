@@ -4,7 +4,14 @@ import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { Box, Column, Row, Text, type UiChild, type UiElement, type UiSemanticState } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import {
+  CONTROL_FOCUS_RING,
+  CONTROL_INTERACTION,
+  keymap,
+  layoutOf,
+  type ControlLayoutProps,
+  modifiersOf
+} from './internals';
 
 /**
  * The pieces a screen is assembled from: a surface, a rule, a row of
@@ -167,7 +174,7 @@ export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
       {
         ref: focus.ref,
         focusable: true,
-        modifiers: [CONTROL_FOCUS_RING],
+        modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
         gap: 4,
         role: 'tablist',
         label,

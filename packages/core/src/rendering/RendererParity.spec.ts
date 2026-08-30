@@ -702,6 +702,31 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     expect(draws.map(d => d.opacity)).toEqual([0.25, 0.25, 0.25]);
   });
 
+  it('a subtree moved by a translation, with a pivot transform under it', () => {
+    // The two pairs must not be confused: `translateX/Y` moves the
+    // node, `x/y` moves where it turns. A node carrying both proves
+    // both backends compose them in the same order.
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const slid = box(h, 'slid', {
+      width: 120,
+      height: 60,
+      backgroundColor: '#f00',
+      transform: { translateX: 40, translateY: -25 }
+    });
+    h.append(
+      slid,
+      box(h, 'spun', {
+        width: 40,
+        height: 40,
+        backgroundColor: '#0f0',
+        transform: { x: 20, y: 20, rotation: Math.PI / 4, translateX: 8 }
+      })
+    );
+    h.append(root, slid);
+    expectParity(h, root);
+  });
+
   it('a rotated subtree keeps the same draws, boxes compared as bounds', () => {
     const h = new RenderHarness();
     const root = h.createNode('app', UiNodeType.Column);

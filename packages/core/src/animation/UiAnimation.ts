@@ -47,6 +47,20 @@ export interface UiAnimationOptions {
   stepMs?: number;
   /** What a reduced-motion preference does to it. Defaults to `snap`. */
   reducedMotion?: UiReducedMotionPolicy;
+  /**
+   * Wait this many milliseconds before the first sample.
+   *
+   * The cell is left alone while it waits — not written with its
+   * starting value — so a delayed animation costs nothing until it
+   * begins, and `nextTickAt` reports the moment it will, which is what
+   * keeps the scheduler asleep in between rather than spinning through
+   * the delay.
+   *
+   * This is where staggering comes from: a list that enters with
+   * `delay: index * 40` is forty milliseconds of offset per row and no
+   * orchestration mechanism at all.
+   */
+  delay?: number;
 }
 
 export interface UiTweenOptions extends UiAnimationOptions {
@@ -85,7 +99,8 @@ export abstract class UiAnimation<T> {
   protected constructor(
     readonly cell: AnimatedCell<T>,
     private readonly stepMs: number,
-    readonly reducedMotionPolicy: UiReducedMotionPolicy
+    readonly reducedMotionPolicy: UiReducedMotionPolicy,
+    private readonly delayMs = 0
   ) {}
 
   /**
@@ -104,6 +119,12 @@ export abstract class UiAnimation<T> {
 
   /** When this animation next wants a frame. */
   dueAt(now: number): number {
+    // Still waiting out its delay: the next frame it has any use for is
+    // the one the delay ends on, so the scheduler can sleep until then
+    // rather than waking sixty times to decide it is not ready.
+    if (this.begun && now - this.startedAt < this.delayMs) {
+      return this.startedAt + this.delayMs;
+    }
     return this.lastSampledAt === null ? now : this.lastSampledAt + this.stepMs;
   }
 
@@ -140,7 +161,15 @@ export abstract class UiAnimation<T> {
       return;
     }
     this.begin(now);
-    const { value, done } = this.sample(now, now - this.startedAt);
+    const elapsed = now - this.startedAt;
+    if (elapsed < this.delayMs) {
+      // Waiting. The cell is deliberately not written: whoever asked
+      // for the delay has already put the cell where it wants it, and
+      // writing it again would dirty a node for nothing.
+      this.lastSampledAt = now;
+      return;
+    }
+    const { value, done } = this.sample(now, elapsed - this.delayMs);
     this.lastSampledAt = now;
     // A stepped easing holds one value across many frames, and a
     // spring at rest holds its target: writing an unchanged value
@@ -202,7 +231,7 @@ export class UiTween<T> extends UiAnimation<T> {
   private readonly interpolate: UiInterpolator<T>;
 
   constructor(cell: AnimatedCell<T>, to: T, options: UiTweenOptions, interpolate: UiInterpolator<T>) {
-    super(cell, options.stepMs ?? 0, options.reducedMotion ?? 'snap');
+    super(cell, options.stepMs ?? 0, options.reducedMotion ?? 'snap', options.delay ?? 0);
     this.from = cell.value;
     this.to = to;
     this.duration = options.duration;
@@ -276,7 +305,7 @@ export class UiSpring extends UiAnimation<number> {
   private simulatedTo: number;
 
   constructor(cell: AnimatedCell<number>, to: number, options: UiSpringOptions) {
-    super(cell, options.stepMs ?? 0, options.reducedMotion ?? 'snap');
+    super(cell, options.stepMs ?? 0, options.reducedMotion ?? 'snap', options.delay ?? 0);
     this.position = cell.value;
     this.velocity = options.velocity ?? 0;
     this.to = to;

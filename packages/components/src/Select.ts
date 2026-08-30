@@ -20,7 +20,8 @@ import {
   foregroundToken,
   keymap,
   layoutOf,
-  type ControlLayoutProps
+  type ControlLayoutProps,
+  modifiersOf
 } from './internals';
 import { useOverlay } from './overlay';
 
@@ -200,7 +201,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
         ref: focus.ref,
         focusable: true,
         disabled,
-        modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
+        modifiers: modifiersOf(props, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
         y: 'center',
         padding: 8,
         gap: 8,

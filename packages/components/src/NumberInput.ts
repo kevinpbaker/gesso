@@ -21,7 +21,8 @@ import {
   keymap,
   layoutOf,
   quantize,
-  type ControlLayoutProps
+  type ControlLayoutProps,
+  modifiersOf
 } from './internals';
 
 /**
@@ -105,7 +106,7 @@ export function NumberInput(props: Inputs<NumberInputProps>, ctx: ComponentConte
       { gap: 4, y: 'center' },
       EditableText({
         ref: focus.ref,
-        modifiers: [CONTROL_FOCUS_RING],
+        modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
         value: text,
         disabled,
         textWrap: 'none',

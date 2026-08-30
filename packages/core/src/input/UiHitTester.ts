@@ -326,22 +326,30 @@ export class UiHitTester implements HitTester {
     let rotation = 0;
     let offsetX = 0;
     let offsetY = 0;
+    let translateX = 0;
+    let translateY = 0;
     const raw = node.properties.get('transform');
     if (typeof raw === 'object' && raw !== null) {
-      const transform = raw as Partial<Record<'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation', unknown>>;
+      const transform = raw as Partial<
+        Record<'x' | 'y' | 'translateX' | 'translateY' | 'scaleX' | 'scaleY' | 'rotation', unknown>
+      >;
       scaleX = toFinite(transform.scaleX) ?? 1;
       scaleY = toFinite(transform.scaleY) ?? 1;
       rotation = toFinite(transform.rotation) ?? 0;
       offsetX = toFinite(transform.x) ?? 0;
       offsetY = toFinite(transform.y) ?? 0;
+      translateX = toFinite(transform.translateX) ?? 0;
+      translateY = toFinite(transform.translateY) ?? 0;
     }
     if (scaleX <= 0 || scaleY <= 0) {
       return false;
     }
     const originX = rec.x + offsetX;
     const originY = rec.y + offsetY;
-    const dx = x - originX;
-    const dy = y - originY;
+    // The translation is the outermost factor of the forward transform,
+    // so undoing it is the first thing the inverse does.
+    const dx = x - translateX - originX;
+    const dy = y - translateY - originY;
     if (rotation === 0) {
       this.point.x = dx / scaleX + originX;
       this.point.y = dy / scaleY + originY;

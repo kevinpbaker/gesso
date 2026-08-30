@@ -35,6 +35,7 @@ import {
   UiSelectionController,
   UiFindController,
   AnimationDriver,
+  UiSharedElements,
   type ImageResolver,
   type IconRasterizer,
   buildSemanticsTree,
@@ -294,6 +295,14 @@ export class GessoRuntime {
    * `animate()` can happen.
    */
   private readonly animations = new AnimationDriver();
+  /**
+   * Which node currently answers to each shared-element name.
+   *
+   * Per runtime for the same reason the driver above is: several
+   * runtimes share a worker in the playground, and a shared registry
+   * would let one runtime's element morph from another's.
+   */
+  private readonly sharedElements = new UiSharedElements();
   private readonly focusNotifier = new FocusNotifier();
   private readonly environmentNotifier = new EnvironmentNotifier();
   private semantics: UiSemanticsMap = new Map();
@@ -417,9 +426,18 @@ export class GessoRuntime {
         // sits in the layout rather than where it is seen — a layout
         // animation, which must not mistake a scroll for a move.
         flowBox: node => (this.engine.recordFor(node) === undefined ? null : this.engine.worldBox(node)),
+        // The container's *effective* offset, which is the record's and
+        // not the property's: a wheel writes the property unclamped and
+        // the engine clamps it to the content on the next layout, so the
+        // property can name a place the list never went.
+        scroll: node => {
+          const record = this.engine.recordFor(node);
+          return record === undefined ? null : { x: record.scrollX, y: record.scrollY };
+        },
         onLayout: (node, listener) => this.layoutNotifier.add(node, listener)
       },
-      animations: this.animations
+      animations: this.animations,
+      sharedElements: this.sharedElements
     });
 
     // Every runtime has an overlay layer; its entries hold elements and
@@ -793,6 +811,11 @@ export class GessoRuntime {
     return this.animations.isReducedMotion;
   }
 
+  /** Which shared-element names are currently held, for specs and devtools. */
+  get sharedElementNames(): readonly string[] {
+    return this.sharedElements.names;
+  }
+
   /** `engine.explain` for any node, for tests and devtools. */
   explain(node: UiNode): LayoutExplanation {
     return this.engine.explain(node);
@@ -869,6 +892,7 @@ export class GessoRuntime {
     // An animation holds its cell, and a cell holds whatever the
     // component that made it captured. A disposed runtime must not.
     this.animations.stopAll();
+    this.sharedElements.clear();
     this.animations.setWakeListener(null);
     this.services.get(AnimationService).setDriver(null);
     this.services.get(FindService).setController(null);
@@ -1403,7 +1427,14 @@ export class GessoRuntime {
     // the boxes are final and before anything paints from them. Nothing
     // listening means nothing walked.
     if (!this.layoutNotifier.isEmpty()) {
-      this.layoutNotifier.notify(node => this.engine.visibleBox(node));
+      this.layoutNotifier.notify(node => {
+        const record = this.engine.recordFor(node);
+        return {
+          box: this.engine.visibleBox(node),
+          scrollX: record?.scrollX ?? 0,
+          scrollY: record?.scrollY ?? 0
+        };
+      });
     }
 
     // Before the semantics phase, not after the frame: the mirror

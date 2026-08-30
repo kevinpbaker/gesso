@@ -10,6 +10,7 @@ import { normalizeBorderRadius } from '../properties/UiBorderRadius';
 import type { UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
 import type { UiImage } from '../properties/UiImage';
+import { isVideoSurface, type UiVideoSurface } from '../properties/UiVideo';
 import { resolveColor, themeColor } from '../properties/UiThemeColor';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import { editorFor, isEditableNode } from '../editing/UiEditable';
@@ -19,6 +20,7 @@ import { resolveFont } from '../properties/UiTextFont';
 import { parseTransform } from '../properties/UiTransform';
 
 export type { UiImage } from '../properties/UiImage';
+export type { UiVideoSurface } from '../properties/UiVideo';
 
 export type TextAlign = 'left' | 'center' | 'right';
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
@@ -37,6 +39,15 @@ export interface PaintState {
   opacity: number;
   backgroundColor: UiColor | undefined;
   image: UiImage | undefined;
+  /**
+   * A moving picture, drawn where `image` would be and under the same
+   * `objectFit` and rounded clip.
+   *
+   * A slot of its own rather than a widened `image`, because the two
+   * are cached differently: an image is its pixels and a video is a
+   * surface whose pixels change. See `UiVideo.ts`.
+   */
+  video: UiVideoSurface | undefined;
   objectFit: ObjectFit;
   borderColor: UiColor | undefined;
   borderWidth: number;
@@ -142,6 +153,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.borderRadius = normalizeBorderRadius(resolveProperty(node, UiProperties.borderRadius));
   out.boxShadows = resolveProperty(node, UiProperties.boxShadows);
   out.image = parseImage(node.properties.get('image'));
+  out.video = parseVideo(node.properties.get('video'));
   out.objectFit = parseObjectFit(node.properties.get('objectFit'));
 
   const rawTransform = node.properties.get('transform');
@@ -238,6 +250,10 @@ export function computeObjectFitRect(
   }
 }
 
+function parseVideo(value: unknown): UiVideoSurface | undefined {
+  return isVideoSurface(value) ? value : undefined;
+}
+
 function parseImage(value: unknown): UiImage | undefined {
   if (typeof value !== 'object' || value === null) {
     return undefined;
@@ -266,13 +282,14 @@ export function createPaintState(): PaintState {
     opacity: 1,
     backgroundColor: undefined,
     image: undefined,
+    video: undefined,
     objectFit: 'fill',
     borderColor: undefined,
     borderWidth: 0,
     borderRadius: { topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 },
     boxShadows: [],
     hasTransform: false,
-    transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+    transform: { x: 0, y: 0, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotation: 0 },
     text: undefined,
     fontSize: DEFAULT_FONT_SIZE,
     fontFamily: DEFAULT_FONT_FAMILY,

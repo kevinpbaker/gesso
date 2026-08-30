@@ -26,3 +26,22 @@ export {
   type UiTransitionValue
 } from './UiTransition';
 export { AnimationDriver } from './AnimationDriver';
+export { UiSharedElements, type SharedClaim } from './UiSharedElements';
+export {
+  MOTION_CHANNELS,
+  MOTION_REST,
+  fade,
+  isMotionRest,
+  pop,
+  resolveMotionState,
+  rotateFrom,
+  scaleFrom,
+  slideDown,
+  slideFrom,
+  slideUp,
+  type MotionChannel,
+  type MotionState,
+  type MotionStateInput,
+  type MotionTiming,
+  type ResolvedMotionState
+} from './UiMotionState';

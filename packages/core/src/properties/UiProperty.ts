@@ -16,6 +16,7 @@ import type { UiLength, UiTrackSize } from '../layout/UiLength';
 import type { UiNode } from '../graph/UiNode';
 import type { UiTheme } from '../environment/UiTheme';
 import type { UiImage } from './UiImage';
+import type { UiVideoSurface } from './UiVideo';
 import type { UiVirtualWindow } from '../composition/UiVirtualWindow';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import type {
@@ -961,6 +962,21 @@ export const UiProperties = {
 
   image: defineProperty<UiImage | undefined>({
     name: 'image',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P
+  }),
+
+  /**
+   * A moving picture, drawn where `image` is and under the same
+   * `objectFit` and rounded clip.
+   *
+   * Paint only, like `image`: a video's box comes from the element, so
+   * a new frame arriving never moves anything. See `UiVideo.ts` for
+   * why the value is a surface with a version rather than a frame.
+   */
+  video: defineProperty<UiVideoSurface | undefined>({
+    name: 'video',
     defaultValue: undefined,
     inherited: false,
     affects: P

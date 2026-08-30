@@ -5,4 +5,7 @@ export { interactive, hoverable, pressable, measure, BUTTON_INTERACTION, type In
 export { decorated, focusRing, type FocusRingOptions } from './decoration';
 export { animateLayout, type AnimateLayoutOptions } from './animation';
 export { imageSource, iconSource, type ImageSourceArgs, type IconSourceArgs } from './media';
+export { motion, sharedElement, type MotionArgs, type SharedElementArgs } from './motion';
+export { videoSource, type VideoSourceArgs } from './video';
+export { scrollPosition, type ScrollOffset, type ScrollPositionArgs } from './scroll';
 export type { UiModifierEnvironment, UiModifierFocus, UiModifierLayout } from './UiModifierSet';

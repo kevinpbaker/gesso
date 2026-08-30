@@ -31,7 +31,7 @@ import {
   type UiModifierFocus,
   type UiModifierLayout
 } from '../modifiers/UiModifierSet';
-import { assertTransitionMap, type AnimationDriver, type UiTransitionSpec } from '../animation';
+import { assertTransitionMap, type AnimationDriver, type UiSharedElements, type UiTransitionSpec } from '../animation';
 import { NodeTransitions } from '../graph/UiPropertyTransitions';
 
 /**
@@ -137,6 +137,20 @@ export interface UiGraphBuilderOptions {
    * final values.
    */
   animations?: AnimationDriver;
+
+  /**
+   * Remembers which node currently answers to each shared-element
+   * name, so a node arriving under a name can morph from where the
+   * node leaving under it stood.
+   *
+   * Supplied by the runtime, one per runtime, for the reason the
+   * driver is: several runtimes share a worker in the playground, and
+   * a shared registry would let one runtime's element morph from
+   * another's. Without one the `sharedElement` modifier warns once and
+   * the element simply appears, which is the correct degraded
+   * behaviour — no animation rather than a wrong one.
+   */
+  sharedElements?: UiSharedElements;
 }
 
 /**
@@ -181,6 +195,7 @@ export class UiGraphBuilder {
   private readonly focus: UiModifierFocus | undefined;
   private readonly modifierEnvironment: UiModifierEnvironment | undefined;
   private readonly animations: AnimationDriver | undefined;
+  private readonly sharedElements: UiSharedElements | undefined;
 
   /** Ensures the missing-dispatcher warning is emitted at most once. */
   private warnedAboutDispatcher = false;
@@ -197,6 +212,7 @@ export class UiGraphBuilder {
     this.focus = options.focus;
     this.modifierEnvironment = options.environment;
     this.animations = options.animations;
+    this.sharedElements = options.sharedElements;
   }
 
   /**
@@ -404,8 +420,10 @@ export class UiGraphBuilder {
       // "the host node" a modifier would attach to is not well
       // defined. Put them on an element inside the component instead.
       throw new Error(
-        `Component '${element.tag}' cannot take 'modifiers': a component has no single host node. ` +
-          `Attach them to an element the component renders.`
+        `Component '${element.tag}' cannot take 'modifiers': a component's node is its anchor, which is a ` +
+          `fragment with no box and no paint, so there is nothing for a modifier to attach to. Put them on an ` +
+          `element the component renders — or, if the component offers it, pass 'rootModifiers', which is the ` +
+          `convention for a component that places them on its own root element (see 'modifiersOf').`
       );
     }
 
@@ -677,7 +695,8 @@ export class UiGraphBuilder {
         this.layout,
         this.focus,
         this.modifierEnvironment,
-        this.animations
+        this.animations,
+        this.sharedElements
       );
     if (existing === undefined) {
       this.modifiers.set(node, set);

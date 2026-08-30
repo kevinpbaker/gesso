@@ -86,6 +86,8 @@ export interface IconSourceArgs {
   readonly color: UiColorValue;
   readonly style: 'fill' | 'stroke';
   readonly strokeWidth: number;
+  /** How a filled path decides what is inside it; see `IconSpec.fillRule`. */
+  readonly fillRule?: 'nonzero' | 'evenodd';
 }
 
 /**
@@ -115,7 +117,8 @@ export const iconSource = defineModifier<IconSourceArgs>({
         size: args.size,
         color,
         style: args.style,
-        strokeWidth: args.strokeWidth
+        strokeWidth: args.strokeWidth,
+        fillRule: args.fillRule
       };
       if (current !== null && sameSpec(current, spec)) {
         return;
@@ -159,6 +162,7 @@ function sameSpec(a: IconSpec, b: IconSpec): boolean {
     a.size === b.size &&
     a.style === b.style &&
     a.strokeWidth === b.strokeWidth &&
+    (a.fillRule ?? 'nonzero') === (b.fillRule ?? 'nonzero') &&
     a.color.r === b.color.r &&
     a.color.g === b.color.g &&
     a.color.b === b.color.b &&

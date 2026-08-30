@@ -4,7 +4,14 @@ import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { Box, Column, Row, type UiChild, type UiPointerEvent, type LayoutBox, percent, measure } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import {
+  CONTROL_FOCUS_RING,
+  CONTROL_INTERACTION,
+  keymap,
+  layoutOf,
+  type ControlLayoutProps,
+  modifiersOf
+} from './internals';
 
 /**
  * Two panes and a divider the user can move.
@@ -103,7 +110,7 @@ export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext):
     ...layoutOf(props),
     // The track measures itself, so the divider knows what a pointer
     // position means without anything reaching into the engine.
-    modifiers: [measure(track)],
+    modifiers: modifiersOf(props, measure(track)),
     width: percent(100),
     height: percent(100)
   };

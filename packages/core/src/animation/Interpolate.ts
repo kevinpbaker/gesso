@@ -35,12 +35,13 @@ export const interpolateColor: UiInterpolator<UiColor> = (from, to, t) => ({
  *
  * `x` and `y` are the pivot, not a translation (see `UiTransform`), so
  * blending them moves where the rotation happens rather than moving
- * the node — which is right, and is also why a layout animation
- * translates with `left`/`top` and not with this.
+ * the node. `translateX` and `translateY` are the pair that moves it.
  */
 export const interpolateTransform: UiInterpolator<Partial<UiTransform>> = (from, to, t) => ({
   x: interpolateNumber(from.x ?? 0, to.x ?? 0, t),
   y: interpolateNumber(from.y ?? 0, to.y ?? 0, t),
+  translateX: interpolateNumber(from.translateX ?? 0, to.translateX ?? 0, t),
+  translateY: interpolateNumber(from.translateY ?? 0, to.translateY ?? 0, t),
   scaleX: interpolateNumber(from.scaleX ?? 1, to.scaleX ?? 1, t),
   scaleY: interpolateNumber(from.scaleY ?? 1, to.scaleY ?? 1, t),
   rotation: interpolateNumber(from.rotation ?? 0, to.rotation ?? 0, t)
@@ -56,7 +57,7 @@ function isColor(value: object): boolean {
   );
 }
 
-const TRANSFORM_FIELDS = ['x', 'y', 'scaleX', 'scaleY', 'rotation'] as const;
+const TRANSFORM_FIELDS = ['x', 'y', 'translateX', 'translateY', 'scaleX', 'scaleY', 'rotation'] as const;
 
 function isTransform(value: object): boolean {
   const candidate = value as Record<string, unknown>;

@@ -27,7 +27,13 @@ export interface Canvas2DContext {
   stroke(): void;
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
-  drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  /**
+   * A `VideoFrame` as well as an `ImageBitmap`: both are
+   * `CanvasImageSource`, and the frame is what WebCodecs hands back.
+   * Kept to these two rather than the whole union because those are
+   * the only two anything in this renderer can produce.
+   */
+  drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
 
   fillStyle: string | CanvasGradient | CanvasPattern;
   strokeStyle: string | CanvasGradient | CanvasPattern;

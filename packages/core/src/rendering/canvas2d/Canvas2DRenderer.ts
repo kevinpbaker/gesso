@@ -6,6 +6,7 @@ import type { CanvasSurface } from './CanvasSurface';
 import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
 import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
+import { videoFrameSize } from '../../properties/UiVideo';
 import type { RenderContext } from '../RenderContext';
 import { buildFontString, drawText, drawTextLines, layoutTextLines } from '../TextRenderer';
 import { EditableLayout } from '../../editing/EditableLayout';
@@ -276,10 +277,19 @@ export class Canvas2DRenderer implements UiRenderer {
    * the box, and only the box shows.
    */
   private paintImage(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
-    if (paint.image === undefined) {
+    // A video draws exactly where an image would, under the same
+    // object-fit and the same rounded clip — the only difference is
+    // where the pixels came from, which `drawImage` does not care
+    // about. It wins over a still on the same node: an element with
+    // both has a poster it has finished with.
+    const video = paint.video;
+    const source = video?.frame ?? paint.image;
+    if (source === undefined || source === null) {
       return;
     }
-    const rect = computeObjectFitRect(paint.objectFit, paint.image.width, paint.image.height, rec);
+    const size =
+      video === undefined ? { width: paint.image!.width, height: paint.image!.height } : videoFrameSize(video);
+    const rect = computeObjectFitRect(paint.objectFit, size.width, size.height, rec);
     if (rect.width <= 0 || rect.height <= 0) {
       return;
     }
@@ -290,13 +300,13 @@ export class Canvas2DRenderer implements UiRenderer {
       rect.y + rect.height > rec.y + rec.height;
     const rounded = !borderRadiusIsZero(paint.borderRadius);
     if (!overflows && !rounded) {
-      ctx.drawImage(paint.image, rect.x, rect.y, rect.width, rect.height);
+      ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height);
       return;
     }
     ctx.save();
     traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? uniformBorderRadius(paint.borderRadius) : 0);
     ctx.clip();
-    ctx.drawImage(paint.image, rect.x, rect.y, rect.width, rect.height);
+    ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
   }
 
@@ -475,6 +485,11 @@ export class Canvas2DRenderer implements UiRenderer {
     const transform = paint.transform;
     const originX = rec.x + transform.x;
     const originY = rec.y + transform.y;
+    // Outside the pivot dance, so it moves the node rather than moving
+    // where it turns. See `UiTransform` for the difference.
+    if (transform.translateX !== 0 || transform.translateY !== 0) {
+      ctx.translate(transform.translateX, transform.translateY);
+    }
     ctx.translate(originX, originY);
     if (transform.rotation !== 0) {
       ctx.rotate(transform.rotation);

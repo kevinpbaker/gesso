@@ -4,7 +4,14 @@ import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { Row, Text, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import {
+  CONTROL_FOCUS_RING,
+  CONTROL_INTERACTION,
+  keymap,
+  layoutOf,
+  type ControlLayoutProps,
+  modifiersOf
+} from './internals';
 import { stepIndex, virtualList } from './virtual';
 
 /**
@@ -222,7 +229,7 @@ export function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: [list.viewport, CONTROL_FOCUS_RING],
+      modifiers: modifiersOf(props, list.viewport, CONTROL_FOCUS_RING),
       scrollY: list.scrollY,
       focusable: true,
       count,

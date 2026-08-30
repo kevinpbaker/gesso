@@ -30,16 +30,19 @@ export interface AnimateLayoutOptions {
  * the old/new pair, it costs nothing when nothing is listening, and
  * building a second mechanism beside it would have been the mistake.
  *
- * **The offset is `left`/`top` on a relative node, not a transform.**
- * `UiTransform.x`/`.y` are the transform's *pivot* — both renderers
- * compose `T(pivot)·R·S·T(-pivot)`, so `{ x: 50, y: 50 }` alone moves
- * nothing — and there is no translation field. A relative offset is
- * CSS's own answer (`assignBox` already applies one: the node keeps
- * its place in the flow and is drawn offset), it is tested, and it
- * needs no renderer change, which §F4 asks for above everything else.
- * What it costs is that a tick marks Layout rather than Paint, so the
- * animating subtree is re-placed each frame from its relayout
- * boundary; `decisions/0029` has the measurement.
+ * **The offset is the transform's translation.** It used to be a
+ * relative `left`/`top` on a `position: relative` node, and
+ * `decisions/0029` §4 explains why: `UiTransform.x`/`.y` are the
+ * transform's *pivot*, both renderers compose `T(pivot)·R·S·T(-pivot)`,
+ * and there was no translation field to use. The cost it recorded was
+ * that a tick marked Layout rather than Paint, so the animating
+ * subtree was re-placed from its relayout boundary on every frame of
+ * every animation. `UiTransform` now has `translateX`/`translateY`,
+ * which both renderers and the hit tester apply outside the pivot, so
+ * that cost is simply gone: a reordering list marks Paint and the
+ * layout engine does not run. It also means the modifier no longer
+ * cares what an element's own `position`, `left` or `top` are, and the
+ * two warnings that existed only to say so are gone with it.
  *
  * **It animates a reorder, and follows everything else.** The two look
  * identical to anything watching boxes and want opposite behaviour: a
@@ -80,35 +83,19 @@ class LayoutAnimation {
   private offsetX = 0;
   private offsetY = 0;
   /** What the element declared, which our offset is added to. */
-  private baseLeft = 0;
-  private baseTop = 0;
-  private usable = true;
+  private basePivotX = 0;
+  private basePivotY = 0;
+  private baseScaleX = 1;
+  private baseScaleY = 1;
+  private baseRotation = 0;
 
-  /** Built in `attach`, once the element's own left/top are known. */
-  private cellX: AnimatedCell<number> | null = null;
-  private cellY: AnimatedCell<number> | null = null;
+  private readonly cellX: AnimatedCell<number>;
+  private readonly cellY: AnimatedCell<number>;
 
   constructor(
     private readonly host: UiModifierHost,
     private readonly options: AnimateLayoutOptions
-  ) {}
-
-  attach(): void {
-    const position = this.host.get<string | undefined>('position');
-    if (position === 'absolute' || position === 'sticky') {
-      warnPositioned(position);
-      this.usable = false;
-      return;
-    }
-    const left = this.host.get<unknown>('left');
-    const top = this.host.get<unknown>('top');
-    if ((left !== undefined && typeof left !== 'number') || (top !== undefined && typeof top !== 'number')) {
-      warnTypedOffset();
-      this.usable = false;
-      return;
-    }
-    this.baseLeft = typeof left === 'number' ? left : 0;
-    this.baseTop = typeof top === 'number' ? top : 0;
+  ) {
     // Each write is one override, which the cascade restores on detach.
     this.cellX = this.makeCell(
       () => this.offsetX,
@@ -118,6 +105,20 @@ class LayoutAnimation {
       () => this.offsetY,
       next => this.setOffset(this.offsetX, next)
     );
+  }
+
+  attach(): void {
+    // Read once, in the element's own values: what the modifier writes
+    // is the element's transform with a translation added, so a node
+    // that also rotates keeps rotating while it slides.
+    const declared = this.host.get<Record<string, unknown> | undefined>('transform');
+    if (declared !== undefined && declared !== null) {
+      this.basePivotX = numberOr(declared.x, 0);
+      this.basePivotY = numberOr(declared.y, 0);
+      this.baseScaleX = numberOr(declared.scaleX, 1);
+      this.baseScaleY = numberOr(declared.scaleY, 1);
+      this.baseRotation = numberOr(declared.rotation, 0);
+    }
     // The listener fires on any frame that moved the node's *visible*
     // box, which includes a scroll; what it reads is `flowBox`, which
     // does not. So a scroll wakes it and it correctly decides nothing
@@ -138,47 +139,44 @@ class LayoutAnimation {
   }
 
   /**
-   * Writes the offset as a relative `left`/`top`, or takes it away.
+   * Writes the offset as the transform's translation, or takes it away.
    *
-   * Back at zero the overrides are dropped rather than written as
-   * zeroes, so the node ends up with exactly what the element declared
-   * — which for nearly every element is no `position` at all, and
-   * therefore a static node again. `decisions/0022` calls that
-   * restoring "nothing at all", and it matters here because a node
-   * left `position: relative` is a positioned node for paint order and
-   * for anything anchored to it.
+   * Back at zero the override is dropped rather than written as an
+   * identity translation, so the node ends up with exactly what the
+   * element declared — which for nearly every element is no transform
+   * at all, and therefore no `hasTransform` in its paint state and no
+   * matrix multiply per frame.
    */
   private setOffset(x: number, y: number): void {
     this.offsetX = x;
     this.offsetY = y;
     if (x === 0 && y === 0) {
-      this.host.clear('left');
-      this.host.clear('top');
-      this.host.clear('position');
+      this.host.clear('transform');
       return;
     }
-    this.host.set('position', 'relative');
-    if (x === 0) {
-      this.host.clear('left');
-    } else {
-      this.host.set('left', this.baseLeft + x);
-    }
-    if (y === 0) {
-      this.host.clear('top');
-    } else {
-      this.host.set('top', this.baseTop + y);
-    }
+    this.host.set('transform', {
+      x: this.basePivotX,
+      y: this.basePivotY,
+      translateX: x,
+      translateY: y,
+      scaleX: this.baseScaleX,
+      scaleY: this.baseScaleY,
+      rotation: this.baseRotation
+    });
   }
 
   private handleLayout(): void {
-    const cellX = this.cellX;
-    const cellY = this.cellY;
     const box = this.host.flowBox();
-    if (!this.usable || cellX === null || cellY === null || box === null) {
+    if (box === null) {
       return;
     }
-    const flowX = box.x - this.offsetX;
-    const flowY = box.y - this.offsetY;
+    // The translation is paint-only, so the flow box the notifier
+    // reports never contains it — but the subtraction is kept because
+    // the node's place in the flow is still what this watches, and a
+    // renderer that ever folded the transform into layout would break
+    // silently without it.
+    const flowX = box.x;
+    const flowY = box.y;
     const parent = this.host.node.parent;
     const childOrder = parent === null ? -1 : parent.childOrderVersion;
     const reordered = parent !== this.parent || childOrder !== this.childOrder;
@@ -210,10 +208,10 @@ class LayoutAnimation {
     // Keep it where it appears, then let it go. Adding to the current
     // offset rather than replacing it is what makes an interrupted
     // reorder continue from where it had got to.
-    cellX.value = this.offsetX + dx;
-    cellY.value = this.offsetY + dy;
-    this.release(cellX);
-    this.release(cellY);
+    this.cellX.value = this.offsetX + dx;
+    this.cellY.value = this.offsetY + dy;
+    this.release(this.cellX);
+    this.release(this.cellY);
   }
 
   private release(cell: AnimatedCell<number>): void {
@@ -235,28 +233,6 @@ class LayoutAnimation {
   }
 }
 
-let warnedPositioned = false;
-
-function warnPositioned(position: string): void {
-  if (warnedPositioned) {
-    return;
-  }
-  warnedPositioned = true;
-  console.warn(
-    `animateLayout() does nothing on a '${position}' node: it animates by writing a relative left/top offset, ` +
-      `and those properties are that node's actual position. Put it on the element inside instead.`
-  );
-}
-
-let warnedTypedOffset = false;
-
-function warnTypedOffset(): void {
-  if (warnedTypedOffset) {
-    return;
-  }
-  warnedTypedOffset = true;
-  console.warn(
-    `animateLayout() does nothing on an element whose 'left' or 'top' is a typed length (percent, fr, auto): ` +
-      `the animation adds pixels to whatever the element declared, and there is no pixel value to add to.`
-  );
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }

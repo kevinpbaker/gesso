@@ -614,7 +614,7 @@ describe('buildRenderList images', () => {
     const list = layoutAndBuild(h, root);
     expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Primitives, CommandKind.Image, CommandKind.Primitives]);
     const command = list.commands[1] as ImageCommand;
-    expect(command.image).toBe(image);
+    expect(command.source).toBe(image);
     // contain: 100x50 into 100x100 sits at y = 25.
     const offset = command.instance * TEXTURED_STRIDE_FLOATS;
     expect(Array.from(list.texturedData.slice(offset, offset + 4))).toEqual([0, 25, 100, 50]);

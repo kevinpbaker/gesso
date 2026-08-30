@@ -15,6 +15,19 @@ export interface IconSpec {
   readonly style: 'fill' | 'stroke';
   /** Line width for a stroked icon, in viewBox units. */
   readonly strokeWidth: number;
+  /**
+   * Which points a filled path encloses: `'nonzero'` (the canvas
+   * default) or `'evenodd'`.
+   *
+   * It matters for any glyph with a hole in it — a clock face, a
+   * circle-and-slash, a downward arrow inside a cloud — because a
+   * subpath wound the same way as its container does not punch a hole
+   * under `nonzero` and does under `evenodd`. Icon sets author for one
+   * or the other and say which in the SVG's `fill-rule`; Heroicons'
+   * solid set says `evenodd`, and a Gesso `Icon` given that path
+   * without this renders a filled blob.
+   */
+  readonly fillRule?: 'nonzero' | 'evenodd';
 }
 
 /**
@@ -60,7 +73,7 @@ export interface IconContext {
   lineWidth: number;
   lineCap: CanvasLineCap;
   lineJoin: CanvasLineJoin;
-  fill(path: Path2D): void;
+  fill(path: Path2D, fillRule?: 'nonzero' | 'evenodd'): void;
   stroke(path: Path2D): void;
 }
 
@@ -76,7 +89,7 @@ const DEFAULT_CAPACITY = 64;
 
 export function iconKey(spec: IconSpec): string {
   const { r, g, b, a } = spec.color;
-  return `${spec.size}|${spec.viewBox}|${spec.style}|${spec.strokeWidth}|${r},${g},${b},${a}|${spec.path}`;
+  return `${spec.size}|${spec.viewBox}|${spec.style}|${spec.strokeWidth}|${spec.fillRule ?? 'nonzero'}|${r},${g},${b},${a}|${spec.path}`;
 }
 
 export class IconRasterizer {
@@ -175,7 +188,7 @@ export class IconRasterizer {
       ctx.stroke(path);
     } else {
       ctx.fillStyle = colorToCss(spec.color);
-      ctx.fill(path);
+      ctx.fill(path, spec.fillRule ?? 'nonzero');
     }
     return canvas.toBitmap();
   }

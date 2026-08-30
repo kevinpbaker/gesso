@@ -6,7 +6,8 @@ import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { TextMeasurer } from '../../layout/TextMeasurer';
 import { resolvePaintState, createPaintState, computeObjectFitRect } from '../PaintState';
-import type { UiImage } from '../PaintState';
+import { videoFrameSize } from '../../properties/UiVideo';
+import type { TextureSource } from './WebGPUTextureCache';
 import { colorToCss } from '../PaintState';
 import { layoutTextLines, buildFontString, textMeasureRequest } from '../TextRenderer';
 import type { TextLinePlacement } from '../TextRenderer';
@@ -123,7 +124,8 @@ export interface ImageCommand {
   kind: CommandKind.Image;
   instance: number;
   scissor: ScissorRect | null;
-  image: UiImage;
+  /** A still, or a video's surface; the texture cache tells them apart. */
+  source: TextureSource;
 }
 
 export type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
@@ -559,8 +561,16 @@ export function buildRenderList(
     // clips `object-fit`: `cover` and `none` overflow the box, and only
     // the box shows. The box is a scissor, plus a clip-chain node when
     // it has a radius.
-    if (paint.image !== undefined) {
-      const rect = computeObjectFitRect(paint.objectFit, paint.image.width, paint.image.height, rec);
+    // A video draws through the same path as a still — same fit, same
+    // clip, same textured quad — and wins on a node that has both.
+    const textureSource: TextureSource | undefined =
+      paint.video !== undefined && paint.video.frame !== null ? paint.video : paint.image;
+    if (textureSource !== undefined) {
+      const sourceSize =
+        paint.video !== undefined && paint.video.frame !== null
+          ? videoFrameSize(paint.video)
+          : { width: paint.image!.width, height: paint.image!.height };
+      const rect = computeObjectFitRect(paint.objectFit, sourceSize.width, sourceSize.height, rec);
       if (rect.width > 0 && rect.height > 0) {
         const overflows =
           rect.x < rec.x ||
@@ -601,7 +611,7 @@ export function buildRenderList(
           imageRounded,
           FULL_TEXTURE
         );
-        commands.push({ kind: CommandKind.Image, instance, scissor: imageScissor, image: paint.image });
+        commands.push({ kind: CommandKind.Image, instance, scissor: imageScissor, source: textureSource });
       }
     }
 
@@ -1122,7 +1132,15 @@ function pushTextured(
 
 function buildOwnTransform(
   rec: LayoutBox,
-  local: { x: number; y: number; scaleX: number; scaleY: number; rotation: number }
+  local: {
+    x: number;
+    y: number;
+    translateX: number;
+    translateY: number;
+    scaleX: number;
+    scaleY: number;
+    rotation: number;
+  }
 ): Affine {
   const originX = rec.x + local.x;
   const originY = rec.y + local.y;
@@ -1130,14 +1148,16 @@ function buildOwnTransform(
   const cos = Math.cos(local.rotation);
   const sin = Math.sin(local.rotation);
 
-  // Own transform: T(origin) * R * S * T(-origin), matching the
-  // Canvas2D renderer's translate/rotate/scale/translate sequence.
+  // Own transform: T(translate) * T(origin) * R * S * T(-origin),
+  // matching the Canvas2D renderer's translate sequence. Pre-composing
+  // a translation only adds to the translation column, which is why it
+  // costs two additions rather than a matrix multiply.
   const m00 = cos * local.scaleX;
   const m01 = sin * local.scaleX;
   const m10 = -sin * local.scaleY;
   const m11 = cos * local.scaleY;
-  const tx = originX - originX * m00 - originY * m10;
-  const ty = originY - originX * m01 - originY * m11;
+  const tx = originX - originX * m00 - originY * m10 + local.translateX;
+  const ty = originY - originX * m01 - originY * m11 + local.translateY;
 
   return [m00, m01, m10, m11, tx, ty];
 }

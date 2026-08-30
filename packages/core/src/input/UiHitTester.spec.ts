@@ -164,6 +164,50 @@ describe('UiHitTester', () => {
       expect(hit?.localY).toBeCloseTo(25);
     });
 
+    it('follows a translated node, and reports local coordinates unmoved', () => {
+      const h = new InputTestHarness();
+      const box = h.node('box', UiNodeType.Box, {
+        width: 100,
+        height: 100,
+        transform: { translateX: 60, translateY: -20 }
+      });
+      h.add(h.root, box);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // The node is drawn over x in [60, 160], y in [-20, 80]. Where it
+      // used to be is now empty, which is the point of a translation:
+      // the node moved, and the pointer has to move with it.
+      const hit = tester.hitTest(70, 0);
+      expect(hit?.node).toBe(box);
+      expect(hit?.localX).toBe(10);
+      expect(hit?.localY).toBe(20);
+
+      expect(tester.hitTest(10, 10)).toBeNull();
+    });
+
+    it('undoes the translation before the pivot, as the renderer applies it after', () => {
+      const h = new InputTestHarness();
+      const box = h.node('box', UiNodeType.Box, {
+        width: 100,
+        height: 100,
+        transform: { x: 50, y: 50, translateX: 30, scaleX: 2, scaleY: 2 }
+      });
+      h.add(h.root, box);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // Scaling 2x about the pivot (50, 50) maps local p to 2p - 50;
+      // the translation then adds 30 in x. Local (75, 75) is therefore
+      // world (130, 100).
+      const hit = tester.hitTest(130, 100);
+      expect(hit?.node).toBe(box);
+      expect(hit?.localX).toBeCloseTo(75);
+      expect(hit?.localY).toBeCloseTo(75);
+    });
+
     it('is unaffected by an identity transform', () => {
       const h = new InputTestHarness();
       const box = h.node('box', UiNodeType.Box, {

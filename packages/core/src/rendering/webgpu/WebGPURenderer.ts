@@ -336,7 +336,7 @@ export class WebGPURenderer implements UiRenderer {
       }
 
       const glyphs = command.kind === CommandKind.Glyphs;
-      const bindGroup = glyphs ? glyphPages.bindGroup(command.page) : textures.imageBindGroup(command.image);
+      const bindGroup = glyphs ? glyphPages.bindGroup(command.page) : textures.imageBindGroup(command.source);
       if (bindGroup === null) {
         continue;
       }

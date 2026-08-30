@@ -131,9 +131,17 @@ describe('resolvePaintState', () => {
 });
 
 describe('parseTransform', () => {
-  it('parses translation, scale and rotation', () => {
-    const transform = parseTransform({ x: 5, y: 3, scaleX: 2, scaleY: 0.5, rotation: 1.5 });
-    expect(transform).toEqual({ x: 5, y: 3, scaleX: 2, scaleY: 0.5, rotation: 1.5 });
+  it('parses the pivot, a translation, scale and rotation', () => {
+    const transform = parseTransform({
+      x: 5,
+      y: 3,
+      translateX: 9,
+      translateY: -4,
+      scaleX: 2,
+      scaleY: 0.5,
+      rotation: 1.5
+    });
+    expect(transform).toEqual({ x: 5, y: 3, translateX: 9, translateY: -4, scaleX: 2, scaleY: 0.5, rotation: 1.5 });
   });
 
   it('reports identity transforms as absent', () => {
@@ -144,7 +152,15 @@ describe('parseTransform', () => {
   });
 
   it('fills defaults for partial transforms', () => {
-    expect(parseTransform({ scaleX: 2 })).toEqual({ x: 0, y: 0, scaleX: 2, scaleY: 1, rotation: 0 });
+    expect(parseTransform({ scaleX: 2 })).toEqual({
+      x: 0,
+      y: 0,
+      translateX: 0,
+      translateY: 0,
+      scaleX: 2,
+      scaleY: 1,
+      rotation: 0
+    });
   });
 });
 
