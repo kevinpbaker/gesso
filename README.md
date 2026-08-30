@@ -111,11 +111,11 @@ Single-thread mode exists too — `createApp(NotesApp).useChannel(Notes, { sourc
 
 ## Three threads and a declared barrier
 
-| Thread            | Owns                                                                                                                                                       |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Shell** (main)  | the `<canvas>`, input forwarding, the editing proxy for IME, `ResizeObserver`, and the APIs that exist only here — History, `localStorage`, clipboard, IPC |
-| **App worker**    | api → storage → domain → view models. Plain RxJS                                                                                                           |
-| **Render worker** | components, the retained graph, layout, input dispatch, hit-testing, rasterization, and the runtime services                                               |
+| Thread            | Owns                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Shell** (main)  | the `<canvas>`, input forwarding, the editing proxy for IME, `ResizeObserver`, and the APIs that exist only here — history and the address bar, `localStorage`, clipboard, IPC |
+| **App worker**    | api → storage → domain → view models. Plain RxJS                                                                                                                               |
+| **Render worker** | components, the retained graph, layout, input dispatch, hit-testing, rasterization, and the runtime services                                                                   |
 
 Application work has to cost something somewhere, and the arrangement decides what. State in the render worker costs dropped frames. State on the shell costs input latency. State in the app worker costs neither — which is what its thread buys.
 
@@ -191,6 +191,10 @@ The body runs once, like a class `render()`; the host keeps the cells fed when t
 
 Nodes carry `role`, `label`, `value` and `states`, or inherit them from the component that built them. The runtime diffs a semantics tree per frame and emits patches to the shell. An unknown `role` fails the build the way an unknown prop already does.
 
+### Routing
+
+Routes are declared with full paths and a `parent` pointer, so the params a screen receives are read off the path by the compiler: `route({ path: '/mail/:folder/:id', component: MessageScreen, parent: Folder })` makes `router.go(Message, { folder, id })` checkable, and a misspelled or missing param a compile error. One `RouterOutlet` renders the whole matched chain, each screen becoming the `outlet` prop of the one above it — so a layout is mounted once and stays mounted while its children change, and a navigation that changes only params re-emits nothing at all. Guards run outermost first, on urls the address bar produces as well as on navigations, and redirect by replacing rather than pushing. The only thing routing puts on the wire is a url: `pushState`, the fragment, or nothing at all, whichever the window calls for.
+
 ### Modifiers, animation, editing and find
 
 - **Modifiers** extend what an element _does_ — hover and press state, focus rings, tooltips, drag, measurement — without wrapping it in a component. The analogue is Compose's `Modifier.Node` or Svelte's `use:action`.
@@ -220,7 +224,7 @@ Pointer, wheel, keyboard, focus, gestures and hit-testing all run in the render 
 
 ### Runtime services
 
-Media, focus, animation, overlay, shell and find are plain classes with public methods and public cells, injected with `@Inject` or `ctx.inject` and registered with `useService`. They never cross a thread, and they hold non-transferable render-thread objects — an `ImageResolver`, decoded bitmaps, the focus manager, the animation driver — which is exactly why they are services and not channels.
+Media, focus, animation, overlay, shell, find and the router are plain classes with public methods and public cells, injected with `@Inject` or `ctx.inject` and registered with `useService`. They never cross a thread, and they hold non-transferable render-thread objects — an `ImageResolver`, decoded bitmaps, the focus manager, the animation driver — which is exactly why they are services and not channels.
 
 ## Proof, not promises
 
@@ -233,7 +237,7 @@ Media, focus, animation, overlay, shell and find are plain classes with public m
 | The patch stream bypasses main          | Measured in Chrome: with the shell busy-looped for 5000 ms, a channel fed from the app worker kept delivering patches throughout, and the render worker's frame gap was unchanged at 110 ms                                   | `#framework`                                             |
 | Application state outlives the renderer | Switching renderer replaces the render worker — the frame count restarts — while a channel keeps counting across the swap                                                                                                     | `#framework`, renderer toggle                            |
 | Data survives a reload                  | The notes example persists through `FileSystemSyncAccessHandle` in the app worker: typing a marker and reloading brings it back, and a first run with no file writes the seed                                                 | `#example-notes`                                         |
-| It's tested                             | **1,715 tests** across **130 spec files**, ~5 s                                                                                                                                                                               | `pnpm test:run`                                          |
+| It's tested                             | **1,798 tests** across **136 spec files**, ~6 s                                                                                                                                                                               | `pnpm test:run`                                          |
 
 Two things are deliberately **not** claimed. The notes example holds three notes, so nothing here stresses a long list while the app worker writes; and the cost of per-key diffing on the app thread at `DataTable` scale has not been measured. Both are recorded as unmeasured in [`0030-thread-model.md`](docs/decisions/0030-thread-model.md) §9 rather than papered over.
 
@@ -257,15 +261,16 @@ One shell, switched by hash:
 | `#webgpu`         | The WebGPU renderer drawing the real framework tree                                             |
 | `#compare`        | Canvas2D and WebGPU side by side with a live pixel diff                                         |
 | `#benchmark`      | WebGPU throughput                                                                               |
-| `#examples`       | Five small complete apps, below                                                                 |
+| `#examples`       | Six small complete apps, below                                                                  |
 
-| Example              | What it demonstrates                                                       |
-| -------------------- | -------------------------------------------------------------------------- |
-| `#example-signin`    | A passcode sign-in, written in JSX                                         |
-| `#example-notes`     | Text editing and IME over a channel, persisted to OPFS from the app worker |
-| `#example-theme`     | Theming through the environment                                            |
-| `#example-live`      | A live feed bound straight to the canvas                                   |
-| `#example-animation` | A board that moves, and an idle app that does not                          |
+| Example              | What it demonstrates                                                         |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `#example-signin`    | A passcode sign-in, written in JSX                                           |
+| `#example-notes`     | Text editing and IME over a channel, persisted to OPFS from the app worker   |
+| `#example-theme`     | Theming through the environment                                              |
+| `#example-live`      | A live feed bound straight to the canvas                                     |
+| `#example-router`    | Nested routes, typed params and a guard, walked by the browser's Back button |
+| `#example-animation` | A board that moves, and an idle app that does not                            |
 
 ## Architecture
 
