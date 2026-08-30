@@ -8,6 +8,7 @@ import type { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
 import { NodalRuntime, type FrameMetrics, type RendererChoice } from './NodalRuntime';
 import { EditingProxy, writeClipboard } from './EditingProxy';
+import { observeReducedMotion } from './reducedMotion';
 import { measure } from './worker/WorkerApp';
 import type { StoreReplica } from '../store/worker/StoreReplica';
 
@@ -54,6 +55,7 @@ export class NodalApp {
   private resizeObserver: ResizeObserver | null = null;
   private proxy: EditingProxy | null = null;
   private detachVisibility: (() => void) | null = null;
+  private detachReducedMotion: (() => void) | null = null;
 
   constructor(options: NodalAppOptions) {
     this.host = options.host;
@@ -171,6 +173,8 @@ export class NodalApp {
     this.proxy = null;
     this.detachVisibility?.();
     this.detachVisibility = null;
+    this.detachReducedMotion?.();
+    this.detachReducedMotion = null;
     this.adapter.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
@@ -217,6 +221,7 @@ export class NodalApp {
       document.addEventListener('visibilitychange', onVisibility);
       this.detachVisibility = () => document.removeEventListener('visibilitychange', onVisibility);
     }
+    this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
   }
 
   private observeResize(): void {

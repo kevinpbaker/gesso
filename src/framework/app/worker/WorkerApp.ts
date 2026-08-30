@@ -2,6 +2,7 @@ import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../Noda
 import type { RendererBackend } from '../../../ui/rendering';
 import { modifiersFrom, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
+import { observeReducedMotion } from '../reducedMotion';
 
 export interface WorkerAppOptions {
   /**
@@ -304,6 +305,11 @@ export class WorkerApp {
     const onVisibilityChange = (): void => {
       this.post({ type: 'visibility', visible: document.visibilityState !== 'hidden' });
     };
+    // Sent once here as well as on change: someone who already has the
+    // preference on must not watch the first screen animate.
+    const detachReducedMotion = observeReducedMotion(reduced => {
+      this.post({ type: 'reducedMotion', reduced });
+    });
     const onPointerMove = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
       this.post({ type: 'pointerMove', x, y, buttons: event.buttons, modifiers: modifiersFrom(event) });
@@ -341,6 +347,7 @@ export class WorkerApp {
     canvas.addEventListener('keyup', onKeyUp);
 
     return () => {
+      detachReducedMotion();
       canvas.removeEventListener('mousedown', onMouseDown);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       canvas.removeEventListener('pointerdown', onPointerDown);

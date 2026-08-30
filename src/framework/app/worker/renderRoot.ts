@@ -150,6 +150,9 @@ export class RenderWorkerApp {
       case 'blur':
         runtime.input.focus.blur();
         break;
+      case 'reducedMotion':
+        runtime.setReducedMotion(message.reduced);
+        break;
       case 'visibility':
         runtime.setVisible(message.visible);
         break;

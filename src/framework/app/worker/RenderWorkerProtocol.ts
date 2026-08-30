@@ -46,6 +46,17 @@ export type ShellToRuntimeMessage =
   | { type: 'blur' }
   /** The page was hidden or shown (document.visibilityState). */
   | { type: 'visibility'; visible: boolean }
+  /**
+   * The person's motion preference (`prefers-reduced-motion`), sent
+   * once at start-up and again whenever it changes.
+   *
+   * The first thing this protocol has ever carried that is a
+   * *preference* rather than an event or a size. It is inbound because
+   * the query needs a window and the animations are in here; see
+   * `NodalRuntime.setReducedMotion` for why it is not an environment
+   * key.
+   */
+  | { type: 'reducedMotion'; reduced: boolean }
   | { type: 'inspector'; enabled: boolean }
   | { type: 'dispose' };
 
