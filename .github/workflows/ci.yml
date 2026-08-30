@@ -1,0 +1,141 @@
+# Continuous integration (`docs/ROADMAP.md` F8).
+#
+# Before this file there was no CI in the repository at all: every gate
+# the earlier milestones claim — layout conformance, the performance
+# budgets, renderer parity — was a command someone remembered to type.
+#
+# The jobs are split by what they need. `checks` needs nothing but Node.
+# `install` and `parity` need a browser, and the runner images ship
+# Google Chrome. `screenshots` needs a browser *and* baselines captured
+# in the same environment, which is why it is the one job here that
+# cannot yet be authoritative; see decisions/0033-packaging.md.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The scripts run TypeScript directly through Node's type stripping.
+  NODE_VERSION: '24'
+
+jobs:
+  checks:
+    name: format, lint, types, tests, build, API report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Formatting
+        run: pnpm format:check
+      - name: Lint
+        run: pnpm lint
+      - name: Types
+        run: pnpm exec tsc --noEmit
+
+      # Layout conformance (L0) and the performance budgets (L7) are
+      # vitest specs with committed artifacts, so this one command is
+      # three of the gates the roadmap asks for.
+      - name: Tests, layout conformance and performance budgets
+        run: pnpm test:run
+
+      - name: Build the packages and the playground
+        run: pnpm build
+      - name: Public API report
+        run: pnpm api:check
+
+  install:
+    name: packed packages install and run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Packs the three packages, installs the tarballs into a fresh Vite
+      # project with npm, typechecks it against the published
+      # declarations, builds it and drives it in Chrome. Compares no
+      # pixels, so it is environment-independent.
+      - name: Install check
+        run: pnpm check:install
+        env:
+          CHROME_BIN: google-chrome
+
+  parity:
+    name: Canvas2D and WebGPU agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # WebGPU on a machine with no GPU is Dawn on Vulkan on SwiftShader,
+      # which needs the Vulkan loader present. The script fails rather
+      # than passes when no adapter turns up, so a missing library here
+      # is reported and not skipped.
+      - name: Vulkan loader for SwiftShader
+        run: sudo apt-get update && sudo apt-get install -y libvulkan1 mesa-vulkan-drivers
+
+      # Compares the compare route's two panes against each other in one
+      # run, so it needs no baseline and is environment-independent.
+      - name: Renderer parity
+        run: pnpm parity:webgpu
+        env:
+          CHROME_BIN: google-chrome
+
+  screenshots:
+    name: route screenshots (advisory until baselines are captured here)
+    runs-on: ubuntu-latest
+    # Not authoritative yet, and deliberately not pretending to be. The
+    # baselines committed in apps/playground/screenshots were captured on
+    # a developer machine, and canvas text is rasterised with the system's
+    # fonts, so they are not comparable with this runner's output — the
+    # script says so and fails rather than comparing anyway. To promote
+    # this job to a gate: run `pnpm screenshots:update` in this
+    # environment, commit the baselines and the manifest, and delete this
+    # line.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Vulkan loader for SwiftShader
+        run: sudo apt-get update && sudo apt-get install -y libvulkan1 mesa-vulkan-drivers
+
+      - name: Route screenshots
+        run: pnpm screenshots
+        env:
+          CHROME_BIN: google-chrome
+
+      # What a reviewer needs to see when a route's rendering changes.
+      - name: Upload the captures that differed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-screenshots
+          path: apps/playground/screenshots/*.actual.png
+          if-no-files-found: ignore
