@@ -99,6 +99,7 @@ describe('NodalRuntime frame pipeline', () => {
         'patches',
         'render',
         'semantics',
+        'ticks',
         'virtualize'
       ]);
     });

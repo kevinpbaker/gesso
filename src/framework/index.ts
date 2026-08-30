@@ -41,6 +41,14 @@ export {
 } from './app/NodalRuntime';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellStore, type ShellRequest } from './app/ShellStore';
+export {
+  AnimationStore,
+  type AnimateOptions,
+  type SpringOptions,
+  type UiDuration,
+  type UiEasingChoice
+} from './app/AnimationStore';
+export { observeReducedMotion } from './app/reducedMotion';
 export { FindStore } from './app/FindStore';
 export { FocusStore } from './app/FocusStore';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';

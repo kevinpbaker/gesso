@@ -6,6 +6,7 @@ import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventListener, UiEventListenerOptions } from '../input/UiInputDispatcher';
 import type { UiEventType } from '../input/UiInputEvent';
 import type { DecorationShape } from '../rendering/Decorations';
+import type { AnimatedCell, UiSpringOptions, UiTweenOptions } from '../animation';
 
 /** Anything a modifier can hand to `own` to have released on detach. */
 export type UiModifierTeardown = (() => void) | { unsubscribe(): void };
@@ -57,9 +58,24 @@ export interface UiModifierHost {
    */
   layoutBox(): LayoutBox | null;
   /**
+   * Where the node sits in the layout, before any scrolling above it.
+   *
+   * `layoutBox` answers where the node is *seen*, which is what turns
+   * a pointer position into a fraction of a track. This answers where
+   * it is in the flow, which is a different question and the one an
+   * animation asks: a node whose page scrolled has not moved, and a
+   * layout animation that thought it had would drag every row of every
+   * list behind the scroll.
+   */
+  flowBox(): LayoutBox | null;
+  /**
    * Called after any frame that moved the node's box — including a
    * scroll, which moves everything under the scroller. Removed on
    * detach.
+   *
+   * A scroll is a superset of what a listener may care about: read
+   * `flowBox()` inside the listener when what matters is the node's
+   * place in the layout rather than on the screen.
    */
   onLayout(listener: (box: LayoutBox) => void): void;
   /**
@@ -95,6 +111,19 @@ export interface UiModifierHost {
    * node's transform and its ancestors' clips, and not under its own.
    */
   decorate(shapes: readonly DecorationShape[] | null): void;
+  /**
+   * Drives a cell over a fixed time, and cancels it on detach.
+   *
+   * Here rather than through the `AnimationStore` because a modifier
+   * is `@nodal/core` and a store is the framework's: the same line
+   * `layoutBox` and `isFocused` are on. The detach half is the point —
+   * `decisions/0026` and `0028` both argue that a modifier's lifetime
+   * is exactly its node's, and an animation that outlives its node
+   * holds the node, its cell and everything the cell captured.
+   */
+  animate<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): Observable<T>;
+  /** The same, on a spring. See `UiSpring` for why springs take numbers only. */
+  spring(cell: AnimatedCell<number>, to: number, options: UiSpringOptions): Observable<number>;
   /** Asks for a repaint, for a modifier whose own state changed. */
   requestFrame(): void;
 }

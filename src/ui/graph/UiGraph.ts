@@ -501,6 +501,35 @@ export class UiGraph {
     value: T,
     dirtyFlags: DirtyFlags = DirtyFlags.Properties
   ): boolean {
+    // A declared transition turns this write into a target rather than
+    // a value. It sits here, above the cascade, for the reason the
+    // cascade sits here at all (decisions/0022): the builder's static
+    // writes and a binding's emissions both funnel through this one
+    // method, so it is the only place that catches both. One field
+    // read for every node that declares no transition.
+    if (node.transitions !== null && node.transitions.write(property, value, dirtyFlags)) {
+      return true;
+    }
+    return this.updateNodePropertyNow(node, property, value, dirtyFlags);
+  }
+
+  /**
+   * Writes a property without consulting the node's transitions.
+   *
+   * What a transition's own per-frame writes go through: they are
+   * already the animation towards the target, so re-entering the
+   * transition check would have each frame start an animation towards
+   * the value it had just produced. Everything below this — the
+   * override cascade, the equality check, the dirty marking — is
+   * unchanged, so an animated value is overridable by a modifier
+   * exactly as a bound one is.
+   */
+  public updateNodePropertyNow<T>(
+    node: UiNode,
+    property: string,
+    value: T,
+    dirtyFlags: DirtyFlags = DirtyFlags.Properties
+  ): boolean {
     if (node.overrides !== null) {
       // A modifier is writing over something on this node, so the
       // element's value goes into the cascade rather than onto the

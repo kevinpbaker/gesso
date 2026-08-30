@@ -1,4 +1,13 @@
-import { isObservable, type Observable, type Subscription } from 'rxjs';
+import { EMPTY, isObservable, type Observable, type Subscription } from 'rxjs';
+
+import {
+  AnimationDriver,
+  UiSpring,
+  createTween,
+  type AnimatedCell,
+  type UiSpringOptions,
+  type UiTweenOptions
+} from '../animation';
 
 import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
@@ -25,6 +34,8 @@ interface Attached {
 /** Where a modifier's layout access comes from; the runtime supplies it. */
 export interface UiModifierLayout {
   box(node: UiNode): LayoutBox | null;
+  /** The same node in pre-scroll layout coordinates; see `UiModifierHost.flowBox`. */
+  flowBox(node: UiNode): LayoutBox | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 
@@ -72,7 +83,8 @@ export class UiModifierSet {
     private readonly dispatcher?: UiInputDispatcher,
     private readonly layout?: UiModifierLayout,
     private readonly focus?: UiModifierFocus,
-    private readonly environment?: UiModifierEnvironment
+    private readonly environment?: UiModifierEnvironment,
+    private readonly animations?: AnimationDriver
   ) {}
 
   /** The merged decoration list, created on demand. */
@@ -147,7 +159,8 @@ export class UiModifierSet {
       dispatcher: this.dispatcher,
       layout: this.layout,
       focus: this.focus,
-      environment: this.environment
+      environment: this.environment,
+      animations: this.animations
     });
     const entry: Attached = { kind, slot, host, args };
     kind.attach(host, args);
@@ -189,6 +202,7 @@ interface HostServices {
   layout?: UiModifierLayout;
   focus?: UiModifierFocus;
   environment?: UiModifierEnvironment;
+  animations?: AnimationDriver;
 }
 
 class Host implements UiModifierHost {
@@ -198,6 +212,8 @@ class Host implements UiModifierHost {
   private readonly subscriptions = new Map<string, Subscription>();
   private order = 0;
   private decorated = false;
+  /** Cells this modifier is driving, stopped when it detaches. */
+  private readonly animated = new Set<AnimatedCell<unknown>>();
 
   constructor(
     readonly node: UiNode,
@@ -273,6 +289,10 @@ class Host implements UiModifierHost {
     return this.services.layout?.box(this.node) ?? null;
   }
 
+  flowBox(): LayoutBox | null {
+    return this.services.layout?.flowBox(this.node) ?? null;
+  }
+
   onLayout(listener: (box: LayoutBox) => void): void {
     const layout = this.services.layout;
     if (layout === undefined) {
@@ -328,6 +348,31 @@ class Host implements UiModifierHost {
     this.decorations().set(this.source, this.order, shapes);
   }
 
+  animate<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): Observable<T> {
+    const driver = this.services.animations;
+    const tween = driver === undefined ? undefined : createTween(cell, to, options);
+    if (driver === undefined || tween === undefined) {
+      if (driver === undefined) {
+        warnMissing(this.name, 'animate a value', 'animations');
+      }
+      cell.value = to;
+      return EMPTY as Observable<T>;
+    }
+    this.animated.add(cell as AnimatedCell<unknown>);
+    return driver.start(tween);
+  }
+
+  spring(cell: AnimatedCell<number>, to: number, options: UiSpringOptions): Observable<number> {
+    const driver = this.services.animations;
+    if (driver === undefined) {
+      warnMissing(this.name, 'animate a value', 'animations');
+      cell.value = to;
+      return EMPTY as Observable<number>;
+    }
+    this.animated.add(cell as AnimatedCell<unknown>);
+    return driver.start(new UiSpring(cell, to, options));
+  }
+
   own(teardown: UiModifierTeardown): void {
     this.teardowns.push(teardown);
   }
@@ -361,6 +406,10 @@ class Host implements UiModifierHost {
     if (this.decorated) {
       this.decorate(null);
     }
+    for (const cell of this.animated) {
+      this.services.animations?.stop(cell);
+    }
+    this.animated.clear();
     const teardowns = this.teardowns;
     this.teardowns = [];
     for (let index = teardowns.length - 1; index >= 0; index--) {

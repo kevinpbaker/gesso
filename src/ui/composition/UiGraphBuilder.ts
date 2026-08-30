@@ -31,6 +31,8 @@ import {
   type UiModifierFocus,
   type UiModifierLayout
 } from '../modifiers/UiModifierSet';
+import { assertTransitionMap, type AnimationDriver, type UiTransitionSpec } from '../animation';
+import { NodeTransitions } from '../graph/UiPropertyTransitions';
 
 /**
  * Property reserved for reconciliation identity.
@@ -50,6 +52,21 @@ const REF_PROP = 'ref';
  * with the node. See `src/ui/modifiers`.
  */
 const MODIFIERS_PROP = 'modifiers';
+/**
+ * `transition` says how a property gets from one value to the next.
+ *
+ * The fourth reserved name, beside `key`, `ref` and `modifiers`, and
+ * for the same reason those three are reserved rather than registered:
+ * every one of them is about the *element* — its identity, who holds
+ * its node, what is attached to it — rather than a value on the node.
+ * Nothing in layout, paint, input or the environment ever reads a
+ * `transition`; `propertyEffects('transition')` would have no meaning,
+ * and registering it would make it bindable and overridable, which is
+ * nonsense for a description of how other properties are written.
+ * `MODIFIERS_ROADMAP.md` §4's rule that the registry's closedness is
+ * load-bearing is exactly the argument for keeping it out.
+ */
+const TRANSITION_PROP = 'transition';
 
 export type { UiNodeRef } from './UiElementProps';
 
@@ -109,6 +126,17 @@ export interface UiGraphBuilderOptions {
    * `onEnvironment` warns once.
    */
   environment?: UiModifierEnvironment;
+
+  /**
+   * Drives the animations a `transition` prop asks for.
+   *
+   * Supplied by the runtime, which owns the driver and the `ticks`
+   * phase that advances it. Without one a `transition` is still
+   * validated — a typo in it throws whether or not anything animates —
+   * and every write lands directly, so a headless build renders the
+   * final values.
+   */
+  animations?: AnimationDriver;
 }
 
 /**
@@ -152,9 +180,12 @@ export class UiGraphBuilder {
   private readonly layout: UiModifierLayout | undefined;
   private readonly focus: UiModifierFocus | undefined;
   private readonly modifierEnvironment: UiModifierEnvironment | undefined;
+  private readonly animations: AnimationDriver | undefined;
 
   /** Ensures the missing-dispatcher warning is emitted at most once. */
   private warnedAboutDispatcher = false;
+  /** The same, for a `transition` with no driver behind it. */
+  private warnedAboutAnimations = false;
 
   constructor(
     private readonly graph: UiGraph,
@@ -165,6 +196,7 @@ export class UiGraphBuilder {
     this.layout = options.layout;
     this.focus = options.focus;
     this.modifierEnvironment = options.environment;
+    this.animations = options.animations;
   }
 
   /**
@@ -430,6 +462,12 @@ export class UiGraphBuilder {
         this.modifiers.delete(current);
         modifiers.detach();
       }
+      // An animation outliving its node is the same leak a modifier
+      // would be: the driver holds the cell, the cell holds the node.
+      if (current.transitions !== null) {
+        current.transitions.release();
+        current.transitions = null;
+      }
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
       }
@@ -529,6 +567,12 @@ export class UiGraphBuilder {
    * being reactive.
    */
   private reconcileProps(node: UiNode, props: UiProps, parent?: UiNode): void {
+    // Installed before this pass writes anything, so a re-render that
+    // both adds a transition and changes the value it covers animates
+    // rather than jumping once and animating from then on. The prop is
+    // read out of `props` directly because the loop below has not run
+    // yet; it is skipped there, like `key`, `ref` and `modifiers`.
+    this.reconcileTransitions(node, (props as Record<string, unknown>)[TRANSITION_PROP]);
     const present = new Set<string>();
     const presentEvents = new Set<string>();
     let declaredModifiers: unknown;
@@ -543,6 +587,9 @@ export class UiGraphBuilder {
       }
       if (property === MODIFIERS_PROP) {
         declaredModifiers = value;
+        continue;
+      }
+      if (property === TRANSITION_PROP) {
         continue;
       }
       if (isEventProp(property, value)) {
@@ -623,11 +670,61 @@ export class UiGraphBuilder {
     const list = assertModifierList(node, declared);
     const set =
       existing ??
-      new UiModifierSet(node, this.graph, this.dispatcher, this.layout, this.focus, this.modifierEnvironment);
+      new UiModifierSet(
+        node,
+        this.graph,
+        this.dispatcher,
+        this.layout,
+        this.focus,
+        this.modifierEnvironment,
+        this.animations
+      );
     if (existing === undefined) {
       this.modifiers.set(node, set);
     }
     set.reconcile(list);
+  }
+
+  /**
+   * Installs, updates or removes the node's transitions.
+   *
+   * An element that stops declaring `transition` loses it entirely,
+   * cancelling whatever was in flight — the same rule `modifiers`
+   * follows, and the same reason: what an element declares this render
+   * is the whole truth about it.
+   */
+  private reconcileTransitions(node: UiNode, declared: unknown): void {
+    if (declared === undefined) {
+      if (node.transitions !== null) {
+        node.transitions.release();
+        node.transitions = null;
+      }
+      return;
+    }
+    const specs = assertTransitionMap(node.id, declared, name => findPropertyDefinition(name) !== undefined);
+    const driver = this.animations;
+    if (driver === undefined) {
+      // Validated but not driven: a headless build writes final values.
+      this.warnMissingAnimations();
+      return;
+    }
+    let transitions = node.transitions;
+    if (transitions === null) {
+      transitions = new NodeTransitions(node, this.graph, driver);
+      node.transitions = transitions;
+    }
+    (transitions as NodeTransitions).setSpecs(specs as ReadonlyMap<string, UiTransitionSpec>);
+  }
+
+  private warnMissingAnimations(): void {
+    if (this.warnedAboutAnimations) {
+      return;
+    }
+    this.warnedAboutAnimations = true;
+    console.warn(
+      `An element declared a 'transition', but the UiGraphBuilder was constructed without an animation driver. ` +
+        `Values are written directly. Construct it with { animations }, as the runtime does.`
+    );
   }
 
   /** The modifiers attached to a node, for the inspector and for tests. */
@@ -657,7 +754,8 @@ export class UiGraphBuilder {
     throw new Error(
       `Unknown prop '${property}' on node '${node.id}'.` +
         (suggestion !== undefined ? ` Did you mean '${suggestion}'?` : '') +
-        ` Props must be registered UI properties (width, padding, backgroundColor, …), 'key', 'ref', or on* event handlers.`
+        ` Props must be registered UI properties (width, padding, backgroundColor, …), 'key', 'ref',` +
+        ` 'modifiers', 'transition', or on* event handlers.`
     );
   }
 

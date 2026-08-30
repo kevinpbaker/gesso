@@ -35,6 +35,8 @@ import { ShellStore, type ShellRequest } from './ShellStore';
 import { FindStore } from './FindStore';
 import { FocusStore } from './FocusStore';
 import { MediaStore } from './MediaStore';
+import { AnimationStore } from './AnimationStore';
+import { AnimationDriver } from '../../ui/animation';
 import type { ImageResolver } from '../../ui/rendering/ImageResolver';
 import type { IconRasterizer } from '../../ui/rendering/IconRasterizer';
 import { buildSemanticsTree, diffSemantics } from '../../ui/semantics';
@@ -65,18 +67,32 @@ import type { StoreReplica } from '../store/worker/StoreReplica';
 /**
  * The ordered work of one frame.
  *
- * Only four of the seven stages the design document imagined are real
+ * Only five of the seven stages the design document imagined are real
  * phases. Component reconciliation and input dispatch are driven by
  * events, not by the clock: an observable emission reconciles its
  * subtree immediately and a pointer event routes immediately, each
  * marking nodes dirty so the *effects* land in the next frame. Giving
  * them frame slots would add latency and describe the system falsely.
  *
- * `patches` and `environment` run before the dirty set is snapshotted,
- * because both produce dirt that this frame must see. `layout` and
- * `render` run against the snapshot.
+ * `ticks`, `patches` and `environment` run before the dirty set is
+ * snapshotted, because all three produce dirt that this frame must
+ * see. `layout` and `render` run against the snapshot.
+ *
+ * `ticks` is first because an animation's writes are inputs to
+ * everything after them: a tick that changed a width has to be the
+ * width this frame's virtualization measures against and this frame's
+ * layout places from, and a tick that ran after `patches` would draw
+ * one frame late for the whole life of the animation.
  */
-export const UI_FRAME_PHASES = ['patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'] as const;
+export const UI_FRAME_PHASES = [
+  'ticks',
+  'patches',
+  'environment',
+  'virtualize',
+  'layout',
+  'semantics',
+  'render'
+] as const;
 
 export type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
 
@@ -221,6 +237,13 @@ export class NodalRuntime {
   /** Reachable before `input` is assigned, for the same reason. */
   private readonly focusManager: UiFocusManager;
   private readonly layoutNotifier: LayoutNotifier;
+  /**
+   * The running animations. Built as a field rather than in the body
+   * of the constructor because the builder, the stores and `buildRoot`
+   * all need it, and `buildRoot` is where a component's first
+   * `animate()` can happen.
+   */
+  private readonly animations = new AnimationDriver();
   private readonly focusNotifier = new FocusNotifier();
   private readonly environmentNotifier = new EnvironmentNotifier();
   private semantics: UiSemanticsMap = new Map();
@@ -230,6 +253,8 @@ export class NodalRuntime {
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Pending wake-up for an animation that does not want every frame. */
+  private animationTimer: ReturnType<typeof setTimeout> | null = null;
   private replicas: readonly StoreReplica[] = [];
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
   private started = false;
@@ -320,8 +345,13 @@ export class NodalRuntime {
         // node is *seen*, which is the world box after every scroll and
         // sticky offset above it.
         box: node => (this.engine.recordFor(node) === undefined ? null : this.engine.visibleBox(node)),
+        // And the pre-scroll box, for a modifier asking where the node
+        // sits in the layout rather than where it is seen — a layout
+        // animation, which must not mistake a scroll for a move.
+        flowBox: node => (this.engine.recordFor(node) === undefined ? null : this.engine.worldBox(node)),
         onLayout: (node, listener) => this.layoutNotifier.add(node, listener)
-      }
+      },
+      animations: this.animations
     });
 
     for (const StoreClass of options.storeClasses ?? []) {
@@ -354,6 +384,14 @@ export class NodalRuntime {
     if (!this.stores.has(MediaStore)) {
       this.stores.register(MediaStore);
     }
+    // And animation, whose running set must be per runtime for the
+    // same reason the media caches are: the playground has several
+    // runtimes in one worker, and a shared driver would tick a
+    // disposed runtime's cells.
+    if (!this.stores.has(AnimationStore)) {
+      this.stores.register(AnimationStore);
+    }
+    this.stores.get(AnimationStore).setDriver(this.animations);
     if (options.media?.resolver !== undefined) {
       this.stores.get(MediaStore).setResolver(options.media.resolver);
     }
@@ -364,10 +402,15 @@ export class NodalRuntime {
     this.scheduler = new UiScheduler({
       clock: options.clock ?? (callback => new UiTimerFrameClock(callback)),
       dirty: this.graph.getDirtyNodes(),
-      beforeCollect: () => this.runPreCollectPhases(),
+      beforeCollect: time => this.runPreCollectPhases(time),
       onFrame: frame => this.handleFrame(frame)
     });
 
+    // An animation started between frames — from a click handler that
+    // changes nothing else — has to arm the frame that will run its
+    // first tick. Nothing in the graph is dirty at that moment, so
+    // nothing else would.
+    this.animations.setWakeListener(() => this.scheduler.wake());
     this.graph.setDirtyListener(() => this.scheduler.notifyDirty());
     this.graph.setNodeRemovedListener(node => {
       this.engine.detachNode(node);
@@ -594,6 +637,32 @@ export class NodalRuntime {
     this.input.editing.setVisible(visible);
   }
 
+  /**
+   * The person has asked for less motion, or stopped asking.
+   *
+   * `ShellRequest` is outbound only and nothing carried a preference
+   * inbound before this, so honouring reduced motion is plumbing that
+   * had to be built rather than a setting that had to be read: the
+   * shell has the media query, the runtime has the animations, and in
+   * a render worker there is a thread boundary between them. It
+   * arrives the way `visibility` does, and lands on the driver, which
+   * is the one place every animation passes through.
+   *
+   * Not an environment key. A theme is scoped because different parts
+   * of a screen legitimately look different; a motion preference
+   * belongs to the person, not to a region of the tree, and an
+   * animation drives a cell, which has no node to resolve a scoped
+   * value against.
+   */
+  setReducedMotion(reduced: boolean): void {
+    this.stores.get(AnimationStore).applyReducedMotion(reduced);
+  }
+
+  /** Whether the runtime is currently honouring a reduced-motion preference. */
+  get reducedMotion(): boolean {
+    return this.animations.isReducedMotion;
+  }
+
   /** `engine.explain` for any node, for tests and devtools. */
   explain(node: UiNode): LayoutExplanation {
     return this.engine.explain(node);
@@ -659,10 +728,19 @@ export class NodalRuntime {
       clearTimeout(this.inspectorTimer);
       this.inspectorTimer = null;
     }
+    if (this.animationTimer !== null) {
+      clearTimeout(this.animationTimer);
+      this.animationTimer = null;
+    }
     this.inspectListener = null;
     this.cursorListener = null;
     this.rendererErrorListener = null;
     this.scheduler.stop();
+    // An animation holds its cell, and a cell holds whatever the
+    // component that made it captured. A disposed runtime must not.
+    this.animations.stopAll();
+    this.animations.setWakeListener(null);
+    this.stores.get(AnimationStore).setDriver(null);
     this.stores.get(FindStore).setController(null);
     this.stores.get(FocusStore).setManager(null);
     // Decoded bitmaps hold pixels; garbage collection is not prompt
@@ -938,8 +1016,23 @@ export class NodalRuntime {
    * collection, the environment phase saw an already-drained set and
    * silently did nothing, so a theme change never reached descendants.
    */
-  private runPreCollectPhases(): void {
+  private runPreCollectPhases(time: number): void {
     this.phaseTimings = emptyPhaseTimings();
+
+    // Animation first: every phase after this one reads values a tick
+    // may have just written. `hasWork` is a set's size, so an app with
+    // nothing running reports 0 without so much as reading the clock —
+    // and, because `scheduleAnimationTick` arms nothing when the
+    // driver is empty, an idle app runs no frames for this to be
+    // reported on at all.
+    this.phaseTimings.ticks = this.timePhase(
+      () => this.animations.isRunning,
+      () => this.animations.advance(time)
+    );
+    // Asked after the tick, not before: an animation that finished
+    // just now must not arm a frame nothing will use, and one that
+    // started during it must.
+    this.scheduleAnimationTick(time);
 
     this.phaseTimings.patches = this.timePhase(
       () => this.replicas.some(replica => replica.hasPendingPatches),
@@ -1136,6 +1229,54 @@ export class NodalRuntime {
   }
 
   /**
+   * Keeps frames coming while something is animating.
+   *
+   * This is the one problem in F4 with no precedent to copy. The
+   * scheduler arms a frame only when a node is marked dirty, and an
+   * animation's dirt is made *inside* `beforeCollect` — so by the time
+   * a frame ends the set is empty again and nothing would arm the
+   * next. Every other "frames nothing asks for" in this class (the
+   * caret blink, the scrollbar fade, the heatmap) answers that with a
+   * timer, and so does this; what is new is only that the driver is
+   * asked how long to wait.
+   *
+   * Three answers, and each one matters:
+   *
+   * - **undefined** — nothing is running, so nothing is armed. An idle
+   *   app schedules no frames at all, which is the strong reading of
+   *   §F4's "`ticks 0.00` when idle": not frames that do nothing, but
+   *   no frames.
+   * - **now or earlier** — something wants every frame, so the next
+   *   one is armed directly on the scheduler. Under
+   *   `requestAnimationFrame` that is the display's cadence; a timer
+   *   clock gets its own interval, which is what a render worker has.
+   * - **later** — nobody wants a frame until then, so one timer waits.
+   *   This is what keeps `decisions/0028`'s promise about the
+   *   `Spinner`: eight positions means eight wake-ups a second, not
+   *   sixty frames drawing seven identical pictures.
+   */
+  private scheduleAnimationTick(now: number): void {
+    const next = this.animations.nextTickAt(now);
+    if (next === undefined) {
+      return;
+    }
+    if (next <= now) {
+      this.scheduler.wake();
+      return;
+    }
+    if (this.animationTimer !== null) {
+      return;
+    }
+    this.animationTimer = setTimeout(
+      () => {
+        this.animationTimer = null;
+        this.scheduler.wake();
+      },
+      Math.max(1, next - now)
+    );
+  }
+
+  /**
    * Overlay scrollbars fade after scrolling stops, which needs frames no
    * property change asks for. The engine says when the next change is
    * due; one pending timer marks a repaint for it.
@@ -1326,7 +1467,7 @@ function emptyGpuTimings(): GpuStageTimings {
 }
 
 function emptyPhaseTimings(): FramePhaseTimings {
-  return { patches: 0, environment: 0, virtualize: 0, layout: 0, semantics: 0, render: 0 };
+  return { ticks: 0, patches: 0, environment: 0, virtualize: 0, layout: 0, semantics: 0, render: 0 };
 }
 
 /**

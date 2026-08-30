@@ -1,0 +1,365 @@
+import { describe, expect, it, vi } from 'vitest';
+import { map } from 'rxjs';
+
+import { Box, Column, ScrollView } from '../../ui/composition/UiComponents';
+import type { UiNode } from '../../ui/graph/UiNode';
+import { linear, spring, tween } from '../../ui/animation';
+import { animateLayout } from '../../ui/modifiers';
+import { state } from '../State';
+import { AnimationStore } from './AnimationStore';
+import { mountRuntime } from './RuntimeTestUtils';
+
+/**
+ * F4's `ticks` phase, and the one claim a spec of an animation can
+ * usefully make.
+ *
+ * `decisions/0025` recorded the shape of the bug a spec cannot catch:
+ * one that synthesises the event a component asks for cannot tell you
+ * the component asks for the wrong event. The animation analogue is a
+ * spec that advances a clock by exactly the duration and asserts the
+ * end value — it proves the arithmetic, which `UiAnimation.spec.ts`
+ * already does, and says nothing about whether frames arrive at all.
+ *
+ * So what is asserted here is **arrival**: that a running animation
+ * keeps arming frames on an otherwise idle app, and that an idle one
+ * arms none. The manual clock makes that observable — `isPending` is
+ * literally "a frame has been asked for" — and it is the thing the
+ * scheduler's dirty-set contract does not give for free.
+ */
+describe('the ticks phase', () => {
+  it('keeps frames coming by itself while something is animating', () => {
+    const opacity = state(0);
+    const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20, opacity })));
+    // Drain whatever the first build asked for, so what follows is an
+    // app with nothing dirty and nothing pending.
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    expect(mounted.clock.isPending).toBe(false);
+
+    mounted.runtime.stores.get(AnimationStore).animate(opacity, 1, { duration: 200, easing: linear });
+
+    // Starting it armed a frame, with nothing marked dirty by anyone.
+    expect(mounted.clock.isPending).toBe(true);
+
+    let frames = 0;
+    while (mounted.clock.isPending && frames < 200) {
+      time += 16;
+      frames++;
+      mounted.clock.tick(time);
+    }
+
+    expect(opacity.value).toBe(1);
+    // Roughly 200 ms at 16 ms a frame, and then it stopped asking.
+    expect(frames).toBeGreaterThan(8);
+    expect(frames).toBeLessThan(20);
+    expect(mounted.clock.isPending).toBe(false);
+  });
+
+  it('reports 0 on a frame with nothing running, and arms nothing', () => {
+    const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20 })));
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    expect(mounted.frames.length).toBeGreaterThan(0);
+    for (const metrics of mounted.frames) {
+      expect(metrics.phases.ticks).toBe(0);
+    }
+    expect(mounted.clock.isPending).toBe(false);
+  });
+
+  it('waits out an animation that does not want every frame', () => {
+    vi.useFakeTimers();
+    try {
+      const step = state(0);
+      const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20, opacity: step })));
+      let time = 0;
+      while (mounted.clock.isPending) {
+        time += 16;
+        mounted.clock.tick(time);
+      }
+      mounted.runtime.stores
+        .get(AnimationStore)
+        .animate(step, 1, { duration: 800, easing: linear, stepMs: 100, repeat: true });
+      mounted.clock.tick((time += 16));
+
+      // The first tick has happened and the next is 100 ms away, so
+      // the runtime is on a timer rather than holding a frame open.
+      expect(mounted.clock.isPending).toBe(false);
+      vi.advanceTimersByTime(100);
+      expect(mounted.clock.isPending).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('a declared transition', () => {
+  function firstBox(root: UiNode | null): UiNode {
+    const child = root?.firstChild;
+    if (child == null) {
+      throw new Error('no child');
+    }
+    return child;
+  }
+
+  it('turns a write into a movement, and passes through the values between', () => {
+    const opacity = state(1);
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n) },
+        Box({ width: 20, height: 20, opacity, transition: { opacity: tween(200, { easing: linear }) } })
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    const box = firstBox(node);
+    expect(box.properties.get('opacity')).toBe(1);
+
+    opacity.value = 0;
+    // The write did not land; it became a target.
+    expect(box.properties.get('opacity')).toBe(1);
+
+    const seen: number[] = [];
+    while (mounted.clock.isPending && seen.length < 100) {
+      time += 16;
+      mounted.clock.tick(time);
+      seen.push(box.properties.get('opacity') as number);
+    }
+    expect(seen.at(-1)).toBe(0);
+    expect(seen.some(value => value > 0 && value < 1)).toBe(true);
+  });
+
+  it('a bare number is a duration in milliseconds', () => {
+    let node: UiNode | null = null;
+    const width = state(100);
+    const mounted = mountRuntime(
+      Column({ ref: (n: UiNode | null) => (node = n) }, Box({ width, height: 20, transition: { width: 100 } }))
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    width.value = 200;
+    expect(firstBox(node).properties.get('width')).toBe(100);
+    while (mounted.clock.isPending && time < 5000) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    expect(firstBox(node).properties.get('width')).toBe(200);
+  });
+
+  it("a node's first value is not a change, so nothing animates into view", () => {
+    let node: UiNode | null = null;
+    mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n) },
+        Box({ width: 20, height: 20, opacity: 0.5, transition: { opacity: 200 } })
+      )
+    );
+    expect(firstBox(node).properties.get('opacity')).toBe(0.5);
+  });
+
+  it('re-emitting the same target does not restart it', () => {
+    const opacity = state(1);
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n) },
+        Box({ width: 20, height: 20, opacity, transition: { opacity: spring('gentle') } })
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    opacity.value = 0;
+    for (let i = 0; i < 4; i++) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    const midway = firstBox(node).properties.get('opacity') as number;
+    // A spring told again where it is already going keeps its velocity
+    // rather than starting over from where it has got to.
+    opacity.value = 0;
+    time += 16;
+    mounted.clock.tick(time);
+    expect(firstBox(node).properties.get('opacity') as number).toBeLessThan(midway);
+  });
+
+  it('writes a value it cannot blend directly, and says so once', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const color = state<string>('surface');
+      let node: UiNode | null = null;
+      mountRuntime(
+        Column(
+          { ref: (n: UiNode | null) => (node = n) },
+          Box({ width: 20, height: 20, backgroundColor: color, transition: { backgroundColor: 200 } })
+        )
+      );
+      color.value = 'controlAccent';
+      expect(firstBox(node).properties.get('backgroundColor')).toBe('controlAccent');
+      expect(warn).toHaveBeenCalledOnce();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('rejects a transition naming something that is not a property', () => {
+    // The type system rejects it too — `transition` is keyed by the
+    // registry — so the cast is what an untyped caller would hit.
+    expect(() => mountRuntime(Column({}, Box({ width: 10, transition: { opacty: 200 } as never })))).toThrow(
+      /not a UI property/
+    );
+  });
+
+  it('cancels what is in flight when the node leaves the tree', () => {
+    const opacity = state(1);
+    const shown = state(true);
+    const mounted = mountRuntime(
+      Column(
+        {},
+        shown.pipe(
+          map(visible =>
+            visible
+              ? [Box({ width: 20, height: 20, opacity, transition: { opacity: tween(400, { easing: linear }) } })]
+              : []
+          )
+        )
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    opacity.value = 0;
+    time += 16;
+    mounted.clock.tick(time);
+
+    shown.value = false;
+    // The animation is gone with its node: nothing keeps asking for
+    // frames, which is the leak `decisions/0026` and `0028` name.
+    let frames = 0;
+    while (mounted.clock.isPending && frames < 10) {
+      time += 16;
+      frames++;
+      mounted.clock.tick(time);
+    }
+    expect(mounted.clock.isPending).toBe(false);
+  });
+});
+
+describe('animateLayout', () => {
+  it('offsets a node back to where it was and springs it home', () => {
+    const gap = state(0);
+    let first: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { width: 200, height: 200 },
+        Box({ width: 20, height: 20, marginTop: gap }),
+        Box({ ref: (n: UiNode | null) => (first = n), width: 20, height: 20, modifiers: [animateLayout(undefined)] })
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    expect(first!.properties.has('top')).toBe(false);
+
+    // Push the sibling down, which moves this node 40px in the flow.
+    gap.value = 40;
+    time += 16;
+    mounted.clock.tick(time);
+
+    // It is drawn back where it was, not where layout put it.
+    expect(first!.properties.get('top')).toBeCloseTo(-40, 3);
+    expect(first!.properties.get('position')).toBe('relative');
+
+    let frames = 0;
+    while (mounted.clock.isPending && frames < 300) {
+      time += 16;
+      frames++;
+      mounted.clock.tick(time);
+    }
+    // Home, and the override handed back rather than left at zero.
+    expect(first!.properties.has('top')).toBe(false);
+    expect(first!.properties.has('position')).toBe(false);
+    expect(frames).toBeGreaterThan(4);
+  });
+});
+
+describe('animateLayout and scrolling', () => {
+  it('does not mistake a scroll for a move', () => {
+    // The browser found this one. `onLayout` reports the *visible*
+    // box, which every node under a scroller shares the movement of,
+    // so a FLIP reading that box made every row of every list lag
+    // behind the page scroll and catch up. It reads `flowBox`.
+    const offset = state(0);
+    let row: UiNode | null = null;
+    const mounted = mountRuntime(
+      ScrollView(
+        { width: 200, height: 100, scrollY: offset },
+        Box({ width: 20, height: 400 }),
+        Box({ ref: (n: UiNode | null) => (row = n), width: 20, height: 20, modifiers: [animateLayout(undefined)] })
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    offset.value = 120;
+    time += 16;
+    mounted.clock.tick(time);
+
+    expect(row!.properties.has('top')).toBe(false);
+    expect(row!.properties.has('position')).toBe(false);
+  });
+});
+
+describe('reduced motion', () => {
+  it('makes an animation arrive at once, and schedules no frames for it', () => {
+    const opacity = state(0);
+    const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20, opacity })));
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    mounted.runtime.setReducedMotion(true);
+    expect(mounted.runtime.reducedMotion).toBe(true);
+
+    mounted.runtime.stores.get(AnimationStore).animate(opacity, 1, { duration: 400 });
+    expect(opacity.value).toBe(1);
+    // The value changed, so a frame is due for the paint — but no
+    // further frame is armed once it has run.
+    while (mounted.clock.isPending && time < 2000) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    expect(mounted.frames.every(metrics => metrics.phases.ticks === 0)).toBe(true);
+  });
+
+  it('is readable by a component through the store', () => {
+    const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20 })));
+    const animations = mounted.runtime.stores.get(AnimationStore);
+    const seen: boolean[] = [];
+    animations.reducedMotion.subscribe(value => seen.push(value));
+    mounted.runtime.setReducedMotion(true);
+    mounted.runtime.setReducedMotion(true);
+    expect(seen).toEqual([false, true]);
+  });
+});

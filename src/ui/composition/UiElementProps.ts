@@ -1,5 +1,6 @@
 import type { Observable } from 'rxjs';
 import type { UiModifier } from '../modifiers/UiModifier';
+import type { UiTransitionValue } from '../animation/UiTransition';
 
 import type { UiNode } from '../graph/UiNode';
 import type {
@@ -159,6 +160,20 @@ export type ModifierProps = {
   modifiers?: readonly UiModifier[];
 };
 
+/**
+ * How named properties get from one value to the next.
+ *
+ * A number is a duration in milliseconds; `tween()` and `spring()`
+ * build the longer forms. The key names a registered property, and an
+ * unknown one throws the way an unknown prop does — but `transition`
+ * itself is not a property: nothing in layout, paint, input or the
+ * environment reads it, and it is reserved beside `key`, `ref` and
+ * `modifiers` for exactly that reason. See `src/ui/animation`.
+ */
+export type TransitionProps = {
+  transition?: Partial<Record<UiPropertyName, UiTransitionValue>>;
+};
+
 /** Props every element accepts. */
 export type CommonProps = IdentityProps &
   UiEventProps &
@@ -171,6 +186,7 @@ export type CommonProps = IdentityProps &
   InteractionProps &
   SemanticsProps &
   ModifierProps &
+  TransitionProps &
   EnvironmentProps;
 
 /** Props of an element that has children. */

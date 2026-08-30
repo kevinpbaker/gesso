@@ -26,6 +26,21 @@ export interface UiPropertyOverrides {
   entries: UiPropertyOverride[];
 }
 
+/**
+ * The transitions an element declared, as the graph sees them.
+ *
+ * Structural rather than the class itself so that `UiNode` — which
+ * every part of the engine imports — does not pull in the animation
+ * module. `UiPropertyTransitions.ts` holds the implementation and the
+ * argument for where it sits.
+ */
+export interface UiNodeTransitions {
+  /** Takes over a write by animating towards it, or declines it. */
+  write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
+  /** Cancels everything, for a node leaving the tree. */
+  release(): void;
+}
+
 export class UiNode {
   constructor(
     public readonly id: NodeId,
@@ -81,6 +96,15 @@ export class UiNode {
    * for what a shape means and where it lands.
    */
   public decorations: readonly DecorationShape[] | null = null;
+
+  /**
+   * How this node's properties get from one value to the next.
+   *
+   * Null until the element declares a `transition`, so the cost to a
+   * tree without one is a field read on the property write path — the
+   * same shape, and the same argument, as `overrides` above.
+   */
+  public transitions: UiNodeTransitions | null = null;
 
   hasChildren(): boolean {
     return this.firstChild !== null;
