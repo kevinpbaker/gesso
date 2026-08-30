@@ -676,8 +676,11 @@ type UiEventListener = (event: UiInputEvent) => void;
 interface UiEventListenerOptions {
   capture?: boolean;
 }
+type UiListenerErrorReporter = (error: unknown, node: UiNode, type: string) => void;
 declare class UiInputDispatcher {
   private readonly stores;
+  private errorReporter;
+  onListenerError(reporter: UiListenerErrorReporter | null): void;
   private readonly typeCount;
   addEventListener(node: UiNode, type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   removeEventListener(node: UiNode, type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
@@ -3770,6 +3773,7 @@ export {
   UiKeyboardEvent,
   UiKeyModifiers,
   UiLength,
+  UiListenerErrorReporter,
   UiManualFrameClock,
   UiModifier,
   UiModifierEnvironment,
@@ -4379,6 +4383,7 @@ import {
   UiKeyboardEvent,
   UiKeyModifiers,
   UiLength,
+  UiListenerErrorReporter,
   UiManualFrameClock,
   UiModifier,
   UiModifierEnvironment,
@@ -4489,7 +4494,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-0gF9HJwQ.js";
+} from "./index-C_DvpXhl.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4943,6 +4948,7 @@ export {
   type UiInterpolator,
   type UiKeyModifiers,
   type UiLength,
+  type UiListenerErrorReporter,
   type UiModifier,
   type UiModifierEnvironment,
   type UiModifierFocus,
@@ -5123,7 +5129,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-0gF9HJwQ.js";
+} from "./index-C_DvpXhl.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

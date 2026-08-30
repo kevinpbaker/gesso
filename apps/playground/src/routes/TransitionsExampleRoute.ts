@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 
 /**
  * Runs the transitions example in a render worker behind the shared
@@ -14,6 +15,7 @@ import { mountShell } from '../shell/AppShell';
  */
 export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'example-transitions', metrics: true });
+  const errors = mountRouteErrors(shell);
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
@@ -39,10 +41,7 @@ export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
         { label: 'Frame', value: `${metrics.durationMs.toFixed(1)} ms` }
       ]);
     },
-    onError: (message, stack) => {
-      shell.setStatus(`Render worker error: ${message}`);
-      console.error('[gesso transitions example]', message, stack);
-    }
+    onError: errors.report
   });
   shell.setStatus('Source: apps/playground/src/examples/TransitionsExampleApp.tsx — click a card, then press Back.');
   shell.setDetail(
@@ -52,6 +51,7 @@ export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
 
   return () => {
     dispose();
+    errors.dispose();
     shell.dispose();
   };
 }
