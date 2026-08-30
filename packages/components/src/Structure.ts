@@ -191,7 +191,18 @@ export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
       props.tabs.pipe(map(tabs => tabs.map(tab => tabButton(tab, value.value, value.change))))
     ),
     Box(
-      { role: 'tabpanel', label: value.value.pipe(map(current => labelOf(props.tabs.value, current))) },
+      {
+        role: 'tabpanel',
+        label: value.value.pipe(map(current => labelOf(props.tabs.value, current))),
+        // A panel is as wide as the tabs above it, and so is what it
+        // holds. A Box is a Stack, whose children are aligned rather
+        // than stretched, so without this the panel's content shrinks
+        // to itself: a panel of tabs sat narrower than its own tab
+        // strip, and anything inside sized as a fraction of the panel
+        // — a `SplitPane`, a percentage width — had no definite width
+        // to be a fraction of, and quietly stopped responding.
+        x: 'stretch'
+      },
       props.children.value ?? Row()
     )
   );

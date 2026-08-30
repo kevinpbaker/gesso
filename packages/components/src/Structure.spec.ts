@@ -183,6 +183,36 @@ describe('SplitPane', () => {
     expect(dividerX()).toBeCloseTo(160, 5);
   });
 
+  it('still moves when it is inside a tab panel', () => {
+    const split = new BehaviorSubject(0.4);
+    const ui = mount(
+      createComponent(Tabs, {
+        tabs: [{ value: 'stories', label: 'Stories' }],
+        defaultValue: 'stories',
+        children: Box(
+          { height: 90, overflow: 'hidden' },
+          createComponent(SplitPane, {
+            split,
+            first: Box({ padding: 8 }, Text({ text: 'stories list', fontSize: 12 })),
+            second: Box({ padding: 8 }, Text({ text: 'Drag the divider · 40%', fontSize: 12 }))
+          })
+        )
+      })
+    );
+    ui.frame();
+    const dividerX = (): number => ui.getLayout(ui.getByRole('separator'))!.x;
+
+    // A Box is a Stack, so its children are aligned rather than
+    // stretched. While the tab panel did not stretch its content, the
+    // pane had no definite width for the split to be a fraction of:
+    // `valueNow` moved and the divider did not budge, which is exactly
+    // what a split pane looks like when it is broken.
+    const at40 = dividerX();
+    split.next(0.8);
+    ui.frame();
+    expect(dividerX()).toBeGreaterThan(at40);
+  });
+
   it('reports where the divider is, as a percentage', () => {
     const ui = mount(createComponent(SplitPane, { defaultSplit: 0.35, first: Box({}), second: Box({}) }));
     const record = ui.recordsFor('separator')[0];
