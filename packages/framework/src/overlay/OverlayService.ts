@@ -22,7 +22,8 @@ export type OverlayPlacement =
  * `ref` prop) by the layout engine, which flips them to the other side
  * when they would overflow and shifts them to stay on screen; they
  * follow the anchor when it scrolls. Unanchored entries use the edge
- * offsets, all relative to the viewport.
+ * offsets, all relative to the viewport, or `center` for the axes that
+ * should stay in the middle of it instead.
  */
 export interface OverlayEntry {
   /** Stable identity: opening an id that is already open replaces it. */
@@ -37,6 +38,19 @@ export interface OverlayEntry {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  /**
+   * Centre an unanchored entry in the viewport along an axis.
+   *
+   * The edges of that axis stop being a position and become the region
+   * to centre within — unset they are the whole viewport, so a dialog
+   * asking for `'x'` sits in the middle however wide the window is, and
+   * one asking for `'both'` sits in the middle of the screen. The other
+   * axis is untouched: `center: 'x'` with `bottom: 24` is a toast
+   * centred along the bottom edge.
+   *
+   * Ignored on an anchored entry, which is placed beside its anchor.
+   */
+  readonly center?: 'x' | 'y' | 'both';
   /**
    * Close the entry when the pointer goes down, or the wheel turns,
    * anywhere outside it. A backdrop takes those events, so nothing

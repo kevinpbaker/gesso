@@ -95,6 +95,21 @@ function entryBox(layer: UiNode): UiNode | undefined {
   return undefined;
 }
 
+/** The first node in the layer declaring `width`: an entry's content. */
+function findBox(layer: UiNode, width: number): UiNode | undefined {
+  const stack: UiNode[] = [layer];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (node.properties.get('width') === width) {
+      return node;
+    }
+    for (let child = node.lastChild; child !== null; child = child.previousSibling) {
+      stack.push(child);
+    }
+  }
+  return undefined;
+}
+
 function findText(root: UiNode, text: string): UiNode | undefined {
   const stack: UiNode[] = [root];
   while (stack.length > 0) {
@@ -208,6 +223,49 @@ describe('overlays', () => {
     frame();
     runtime.input.wheel.wheel(300, 250, 0, 40, noKeyModifiers());
     expect(overlays.isOpen('menu')).toBe(false);
+    runtime.dispose();
+  });
+
+  it('centres an unanchored entry in the viewport', () => {
+    const { runtime, layer, overlays, frame } = mount();
+    overlays.open({
+      id: 'dialog',
+      center: 'x',
+      top: 40,
+      content: Box({ width: 120, height: 60 })
+    });
+    frame();
+    // 400 wide, so a 120-wide dialog starts at 140 however the content
+    // is sized; `top` is untouched by centring on x alone.
+    const content = runtime.debugLayoutBox(findBox(layer, 120)!);
+    expect(content.x).toBe(140);
+    expect(content.y).toBe(40);
+
+    overlays.open({ id: 'dialog', center: 'both', content: Box({ width: 120, height: 60 }) });
+    frame();
+    // 'both' takes the other axis too: (300 - 60) / 2.
+    expect(runtime.debugLayoutBox(findBox(layer, 120)!)).toMatchObject({ x: 140, y: 120 });
+    runtime.dispose();
+  });
+
+  it('lets a press beside a centred entry reach the backdrop', () => {
+    pressed.length = 0;
+    const { runtime, overlays, frame } = mount();
+    overlays.open({
+      id: 'dialog',
+      center: 'x',
+      top: 40,
+      dismissOnOutsidePress: true,
+      content: Button({ width: 120, height: 60, text: 'Item', onPointerDown: () => pressed.push('menu-item') })
+    });
+    frame();
+
+    // The box holding a centred entry is stretched across the viewport,
+    // so this press is inside it but well beside the dialog: it has to
+    // fall through to the backdrop rather than being swallowed.
+    runtime.input.pointer.pointerDown(20, 60, 1, noKeyModifiers());
+    expect(overlays.isOpen('dialog')).toBe(false);
+    expect(pressed).toEqual([]);
     runtime.dispose();
   });
 
