@@ -4,6 +4,7 @@ import { getStoreMetadata } from '../StoreMetadata';
 import { diffProjection, type Patch } from '../StorePatch';
 import type { Store } from '../Store';
 import { isStoreClientMessage, type StoreHostMessage, type StorePort } from './StoreWorkerProtocol';
+import { servePorts, type PortHost } from '../../worker/WorkerPorts';
 
 /**
  * Publishes a store from the thread that owns it.
@@ -18,6 +19,52 @@ import { isStoreClientMessage, type StoreHostMessage, type StorePort } from './S
  */
 export function exposeStore(StoreClass: new () => Store, port: StorePort = self as unknown as StorePort): ExposedStore {
   return new ExposedStore(StoreClass, port);
+}
+
+/**
+ * Publishes several stores from one data worker.
+ *
+ * The worker's global channel carries only the port handshake (see
+ * `WorkerPorts`), so each store gets a private `MessagePort` and a
+ * worker can hold an application's whole state layer rather than one
+ * store. Call it synchronously at the top level of the worker module:
+ *
+ *   serveStores({ CatalogStore, CartStore });
+ *
+ * The property names are the keys the client asks for, which is why
+ * shorthand reads well here — `{ CatalogStore }` names it exactly as
+ * the default key does.
+ *
+ * Returns a function that stops serving and disposes what it exposed.
+ */
+export function serveStores(stores: Record<string, new () => Store>, host?: PortHost): () => void {
+  const exposed: ExposedStore[] = [];
+  const stop = servePorts((key, port) => {
+    const StoreClass = stores[key];
+    if (StoreClass === undefined) {
+      const names = Object.keys(stores).sort().join(', ');
+      // Answered on the port that asked rather than thrown. A throw
+      // here happens inside a data worker, where nothing is listening:
+      // the page sees no error and the client simply never receives a
+      // patch, which is the least debuggable failure this arrangement
+      // can produce. Sent back, it reaches `StoreReplica.onError` and
+      // from there the shell's console.
+      const message: StoreHostMessage = {
+        type: 'store:error',
+        message: `No store is served under '${key}'. Served stores: ${names.length > 0 ? names : '(none)'}.`
+      };
+      port.postMessage(message);
+      return;
+    }
+    exposed.push(exposeStore(StoreClass, port as unknown as StorePort));
+  }, host);
+  return () => {
+    stop();
+    for (const store of exposed) {
+      store.dispose();
+    }
+    exposed.length = 0;
+  };
 }
 
 export class ExposedStore {

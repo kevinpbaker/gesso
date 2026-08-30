@@ -3,6 +3,7 @@ import type { FrameworkChild } from '../ComponentElement';
 import type { ComponentType } from '../FunctionComponent';
 import type { Store } from '../store/Store';
 import { createStoreRegistry, type StoreRegistration } from '../store/worker/createStoreRegistry';
+import type { WorkerHandle } from '../worker/WorkerPorts';
 import { NodalApp } from './NodalApp';
 import type { FrameMetrics, RendererChoice } from './NodalRuntime';
 
@@ -26,8 +27,8 @@ export class NodalAppBuilder {
    * here: rendering stays on the main thread in this configuration,
    * so keeping heavy state work off it still buys smoother frames.
    */
-  useStore(StoreClass: new () => Store, options: { worker?: () => Worker } = {}): this {
-    this.registrations.push({ storeClass: StoreClass, worker: options.worker });
+  useStore(StoreClass: new () => Store, options: { worker?: WorkerHandle | (() => Worker); key?: string } = {}): this {
+    this.registrations.push({ storeClass: StoreClass, worker: options.worker, key: options.key });
     return this;
   }
 

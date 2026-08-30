@@ -6,7 +6,16 @@ export { State, Action, Projection } from './store/decorators';
 export { Store, type StoreProjections } from './store/Store';
 export { structurallyEqual } from './store/structuralEquals';
 export { diffProjection, applyPatch, applyPatches, type Patch, type PatchPath } from './store/StorePatch';
-export { exposeStore, ExposedStore } from './store/worker/exposeStore';
+export { exposeStore, serveStores, ExposedStore } from './store/worker/exposeStore';
+export {
+  workerHandle,
+  servePorts,
+  isPortHandshake,
+  type WorkerHandle,
+  type PortHost,
+  type PortHandshake,
+  type MessageEndpoint
+} from './worker/WorkerPorts';
 export { attachStore } from './store/worker/attachStore';
 export { StoreReplica } from './store/worker/StoreReplica';
 export { createStoreRegistry, type StoreRegistration, type RegistryHandle } from './store/worker/createStoreRegistry';

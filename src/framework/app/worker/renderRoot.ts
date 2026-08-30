@@ -7,6 +7,7 @@ import {
   type RegistryHandle,
   type StoreRegistration
 } from '../../store/worker/createStoreRegistry';
+import type { WorkerHandle } from '../../worker/WorkerPorts';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
 import { NodalRuntime, type RendererChoice } from '../NodalRuntime';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
@@ -66,11 +67,11 @@ export class RenderWorkerApp {
    *     worker: () => new Worker(new URL('./cart.worker.ts', import.meta.url), { type: 'module' })
    *   })
    */
-  useStore(StoreClass: new () => Store, options: { worker?: () => Worker } = {}): this {
+  useStore(StoreClass: new () => Store, options: { worker?: WorkerHandle | (() => Worker); key?: string } = {}): this {
     if (this.runtime !== undefined) {
       throw new Error(`Store '${StoreClass.name}' was registered after the runtime started.`);
     }
-    this.registrations.push({ storeClass: StoreClass, worker: options.worker });
+    this.registrations.push({ storeClass: StoreClass, worker: options.worker, key: options.key });
     return this;
   }
 
