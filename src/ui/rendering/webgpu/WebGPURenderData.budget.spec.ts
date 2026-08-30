@@ -4,7 +4,7 @@ import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import { Constraints } from '../../layout/LayoutTypes';
 import { RenderHarness } from '../RenderTestUtils';
-import { buildRenderList, CommandKind } from './WebGPURenderData';
+import { buildRenderList, createTextCache, glyphCount, CommandKind } from './WebGPURenderData';
 
 /**
  * Render-list budgets (WebGPU roadmap G7).
@@ -13,9 +13,17 @@ import { buildRenderList, CommandKind } from './WebGPURenderData';
  * it is the one CI pins. The tree is the L7 layout budget's: a page, a
  * scroller, 500 fixed-height rows of five text columns — 10,502 nodes
  * of which a 1200×800 viewport shows about twenty rows. The counts are
- * hard budgets: instances and text runs must follow the visible window,
- * not the tree, at every scroll offset. Timings are printed and capped
- * an order of magnitude above their measured value.
+ * hard budgets: instances, text runs and glyph instances must follow
+ * the visible window, not the tree, at every scroll offset. Timings are
+ * printed and capped well above their measured value.
+ *
+ * Two timings, because the glyph atlas made them different questions.
+ * A **cold** build meets lines it has never shaped: it measures each
+ * line's cluster positions once, and that is most of its cost. A
+ * **warm** rebuild — the same text again, which is every frame of a
+ * still or slowly scrolling screen — reuses the shaping and the atlas
+ * cells and only writes instances. The second is the frame cost; the
+ * first is what revealing a screenful of new text costs, once.
  */
 describe('buildRenderList budgets', () => {
   const ROWS = 500;
@@ -24,6 +32,8 @@ describe('buildRenderList budgets', () => {
   const VIEWPORT = Constraints.loose(1200, 800);
   const ROW_HEIGHT = 40;
   const VISIBLE_ROWS = Math.ceil(800 / ROW_HEIGHT) + 1;
+  /** Characters in the longest `Row 499 column 4 line 2`. */
+  const LONGEST_ROW_TEXT = 23;
 
   function node(h: RenderHarness, id: string, type: UiNodeType, props: Record<string, unknown> = {}): UiNode {
     const created = h.createNode(id, type);
@@ -78,17 +88,33 @@ describe('buildRenderList budgets', () => {
     for (const scrollY of [0, maxScroll / 2, maxScroll]) {
       list.setProperty('scrollY', scrollY);
       h.layout(root, VIEWPORT);
-      const { result, ms } = timed(`build at scrollY ${scrollY}`, () =>
-        buildRenderList(root, h.engine, h.measurer, 1200, 800, 1, Number.MAX_SAFE_INTEGER)
+      const cache = createTextCache();
+      const { result, ms } = timed(`cold build at scrollY ${scrollY}`, () =>
+        buildRenderList(root, h.engine, h.measurer, 1200, 800, 1, Number.MAX_SAFE_INTEGER, [], cache)
       );
-      const texts = result.commands.filter(c => c.kind === CommandKind.Text).length;
+      const texts = result.textRuns.length;
       // One fill per visible row, plus the rows' text runs.
       expect(result.instanceCount, `instances at ${scrollY}`).toBeLessThanOrEqual(VISIBLE_ROWS);
       expect(result.instanceCount, `instances at ${scrollY}`).toBeGreaterThanOrEqual(VISIBLE_ROWS - 2);
       expect(texts, `text runs at ${scrollY}`).toBeLessThanOrEqual(VISIBLE_ROWS * COLUMNS_PER_ROW * TEXTS_PER_COLUMN);
       expect(texts, `text runs at ${scrollY}`).toBeGreaterThan(0);
-      // Measured around 3 ms; an order of magnitude of headroom.
-      expect(ms, `build time at ${scrollY}`).toBeLessThan(40);
+      // Glyphs follow the window too: at most every character of every
+      // visible run, and never a character of a row that is not mounted.
+      const glyphs = glyphCount(result);
+      expect(glyphs, `glyphs at ${scrollY}`).toBeGreaterThan(0);
+      expect(glyphs, `glyphs at ${scrollY}`).toBeLessThanOrEqual(texts * LONGEST_ROW_TEXT);
+      // Measured around 12 ms cold on a loaded machine; the cap is well
+      // clear of it, because the cost here is shaping twenty rows of
+      // text no frame has seen before.
+      expect(ms, `cold build time at ${scrollY}`).toBeLessThan(120);
+
+      const warm = timed(`warm build at scrollY ${scrollY}`, () =>
+        buildRenderList(root, h.engine, h.measurer, 1200, 800, 1, Number.MAX_SAFE_INTEGER, [], cache)
+      );
+      expect(glyphCount(warm.result), `warm glyphs at ${scrollY}`).toBe(glyphs);
+      // Measured around 2.4 ms for 4,950 glyph instances: no shaping,
+      // no cell allocation, just the walk and the instance writes.
+      expect(warm.ms, `warm build time at ${scrollY}`).toBeLessThan(40);
     }
   });
 
@@ -99,7 +125,7 @@ describe('buildRenderList budgets', () => {
     h.layout(root, VIEWPORT);
     const result = buildRenderList(root, h.engine, h.measurer, 1200, 800, 1, Number.MAX_SAFE_INTEGER);
     for (const command of result.commands) {
-      if (command.kind === CommandKind.Text) {
+      if (command.kind === CommandKind.Glyphs) {
         expect(command.scissor).toEqual({ x: 0, y: 0, width: 1200, height: 800 });
       }
     }

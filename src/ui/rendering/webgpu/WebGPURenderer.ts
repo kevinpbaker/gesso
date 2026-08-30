@@ -14,17 +14,18 @@ import {
 } from './WebGPUPipeline';
 import {
   buildRenderList,
+  createTextCache,
   CLIP_STRIDE_BYTES,
   CommandKind,
   INSTANCE_STRIDE_BYTES,
   TEXTURED_STRIDE_BYTES,
   viewportScissor,
-  type RenderCommand,
-  type ScissorRect,
-  type TextCommand
+  type RenderTextCache,
+  type ScissorRect
 } from './WebGPURenderData';
 import { VIEW_UNIFORM_FLOATS } from './WebGPUShader';
 import { WebGPUTextureCache } from './WebGPUTextureCache';
+import { WebGPUGlyphPages } from './WebGPUGlyphPages';
 
 export interface WebGPURendererOptions {
   /** The WebGPU surface this renderer draws into. */
@@ -95,6 +96,9 @@ export class WebGPURenderer implements UiRenderer {
   private primitives: PrimitivePipeline | null = null;
   private textured: TexturedPipeline | null = null;
   private textures: WebGPUTextureCache | null = null;
+  private glyphPages: WebGPUGlyphPages | null = null;
+  /** The glyph atlas and line shaper, kept across frames. */
+  private readonly textCache: RenderTextCache = createTextCache();
   private instanceBuffer: GPUBuffer | null = null;
   private texturedBuffer: GPUBuffer | null = null;
   private clipBuffer: GPUBuffer | null = null;
@@ -152,6 +156,7 @@ export class WebGPURenderer implements UiRenderer {
     this.primitives = createPrimitivePipeline(init.device, init.format, this.clipLayout);
     this.textured = createTexturedPipeline(init.device, init.format, this.clipLayout);
     this.textures = new WebGPUTextureCache(init.device, this.textured);
+    this.glyphPages = new WebGPUGlyphPages(init.device, this.textured, this.textCache.atlas);
     this.lost = false;
   }
 
@@ -213,6 +218,7 @@ export class WebGPURenderer implements UiRenderer {
     // instead of an elapsed time, and looked identical to each other.
     const prepareStart =
       this.hooks.onPrepareStart !== undefined || this.hooks.onPrepareEnd !== undefined ? performance.now() : 0;
+    this.textCache.atlas.beginFrame();
     const list = buildRenderList(
       root,
       context.layout,
@@ -221,7 +227,8 @@ export class WebGPURenderer implements UiRenderer {
       this.surface.logicalHeight,
       this.surface.dpr,
       context.now,
-      context.overlay ?? []
+      context.overlay ?? [],
+      this.textCache
     );
     if (this.hooks.onPrepareEnd !== undefined) {
       this.hooks.onPrepareEnd(performance.now() - prepareStart);
@@ -231,7 +238,10 @@ export class WebGPURenderer implements UiRenderer {
     const primitives = this.primitives!;
     const textured = this.textured!;
     const textures = this.textures!;
-    textures.beginFrame();
+    const glyphPages = this.glyphPages!;
+    // The build allocated atlas cells; fill the new ones before the
+    // pass that samples them.
+    glyphPages.flush();
 
     const uploadStart =
       this.hooks.onUploadStart !== undefined || this.hooks.onUploadEnd !== undefined ? performance.now() : 0;
@@ -325,36 +335,37 @@ export class WebGPURenderer implements UiRenderer {
         continue;
       }
 
-      const bindGroup =
-        command.kind === CommandKind.Text
-          ? textures.textBindGroup(command.item)
-          : textures.imageBindGroup(command.image);
+      const glyphs = command.kind === CommandKind.Glyphs;
+      const bindGroup = glyphs ? glyphPages.bindGroup(command.page) : textures.imageBindGroup(command.image);
       if (bindGroup === null) {
         continue;
       }
-      if (currentKind !== CommandKind.Text) {
+      // Glyphs and images share one pipeline and one instance buffer;
+      // only the sampled texture and the UV rectangle differ.
+      if (currentKind !== CommandKind.Glyphs) {
         pass.setPipeline(textured.pipeline);
         pass.setVertexBuffer(0, textured.vertexBuffer);
         pass.setVertexBuffer(1, this.texturedBuffer!);
         pass.setIndexBuffer(textured.indexBuffer, 'uint16');
-        currentKind = CommandKind.Text;
+        currentKind = CommandKind.Glyphs;
       }
       currentScissor = setScissor(pass, currentScissor, scissor);
       pass.setBindGroup(0, bindGroup);
-      // Consecutive runs of the same text under the same scissor — a
-      // list of repeated labels — share a texture and draw as one call.
-      const count = command.kind === CommandKind.Text ? sameTextureRun(commands, i) : 1;
-      pass.drawIndexed(textured.indexCount, count, 0, 0, command.instance);
+      // The builder already merged every run of glyphs sharing a page
+      // and a scissor, so a screen of text in one font is one call.
+      const count = glyphs ? command.end - command.start : 1;
+      if (count <= 0) {
+        continue;
+      }
+      pass.drawIndexed(textured.indexCount, count, 0, 0, glyphs ? command.start : command.instance);
       this.lastDraws.texturedDraws++;
       this.lastDraws.texturedInstances += count;
-      i += count - 1;
     }
 
     pass.end();
     const capture = this.takeCapture(device, commandEncoder, texture);
     device.queue.submit([commandEncoder.finish()]);
     capture?.();
-    textures.endFrame();
     if (this.hooks.onEncodeEnd !== undefined) {
       this.hooks.onEncodeEnd(performance.now() - encodeStart);
     }
@@ -443,8 +454,12 @@ export class WebGPURenderer implements UiRenderer {
     this.disposed = true;
     this.removeLostListener();
     this.surface.unconfigure();
-    this.textures?.dispose();
     this.textures = null;
+    this.glyphPages?.dispose();
+    this.glyphPages = null;
+    // The atlas outlives the device: its slots are plain packing, and
+    // a re-initialized renderer re-uploads them into fresh textures.
+    this.textCache.atlas.reset();
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
     this.texturedBuffer?.destroy();
@@ -487,38 +502,6 @@ export class WebGPURenderer implements UiRenderer {
     const size = Math.max(Math.ceil((byteLength * 1.5) / stride) * stride, stride * 16);
     return this.device!.createBuffer({ size, usage: usage | copyDstBufferUsage });
   }
-}
-
-/**
- * How many commands from `start` are text runs with the same texture
- * key and scissor as the first, occupying consecutive instances.
- */
-function sameTextureRun(commands: readonly RenderCommand[], start: number): number {
-  const first = commands[start] as TextCommand;
-  let count = 1;
-  for (let j = start + 1; j < commands.length; j++) {
-    const next = commands[j];
-    if (
-      next.kind !== CommandKind.Text ||
-      next.item.key !== first.item.key ||
-      next.instance !== first.instance + count ||
-      !sameScissor(next.scissor, first.scissor)
-    ) {
-      break;
-    }
-    count++;
-  }
-  return count;
-}
-
-function sameScissor(a: ScissorRect | null, b: ScissorRect | null): boolean {
-  if (a === b) {
-    return true;
-  }
-  if (a === null || b === null) {
-    return false;
-  }
-  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
 function setScissor(pass: GPURenderPassEncoder, current: ScissorRect | null, next: ScissorRect): ScissorRect {

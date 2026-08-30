@@ -8,8 +8,11 @@ import type { TextMeasurer } from '../../layout/TextMeasurer';
 import { resolvePaintState, createPaintState, computeObjectFitRect } from '../PaintState';
 import type { UiImage } from '../PaintState';
 import { colorToCss } from '../PaintState';
-import { layoutTextLines, buildFontString } from '../TextRenderer';
+import { layoutTextLines, buildFontString, textMeasureRequest } from '../TextRenderer';
 import type { TextLinePlacement } from '../TextRenderer';
+import { WebGPUGlyphAtlas, phaseFor } from './WebGPUGlyphAtlas';
+import { GlyphShaper } from './WebGPUGlyphShaper';
+import type { MeasureRun } from './WebGPUGlyphShaper';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
@@ -39,16 +42,21 @@ export const INSTANCE_STRIDE_FLOATS = 20;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
 
 /**
- * Textured instance layout (text runs and images), in floats:
+ * Textured instance layout (glyphs and images), in floats:
  *
  *   0  pos.xy
  *   2  size.xy
  *   4  opacity
  *   5  clipIndex
  *   6  transform          3x2
- *   12 (end)
+ *   12 uvOrigin.xy        top-left of the sampled region, 0..1
+ *   14 uvSize.xy          its extent; (0,0)-(1,1) is the whole texture
+ *   16 (end)
+ *
+ * An image samples its whole texture; a glyph samples its cell in an
+ * atlas page, which is what the UV rectangle is here for.
  */
-export const TEXTURED_STRIDE_FLOATS = 12;
+export const TEXTURED_STRIDE_FLOATS = 16;
 export const TEXTURED_STRIDE_BYTES = TEXTURED_STRIDE_FLOATS * 4;
 
 /**
@@ -75,8 +83,8 @@ export const enum PrimitiveKind {
 export const enum CommandKind {
   /** A contiguous range of primitive instances under one scissor. */
   Primitives = 0,
-  /** One textured instance drawn with a rasterised text run. */
-  Text = 1,
+  /** A contiguous range of glyph instances sharing one atlas page. */
+  Glyphs = 1,
   /** One textured instance drawn with an image. */
   Image = 2
 }
@@ -100,12 +108,15 @@ export interface PrimitiveCommand {
   scissor: ScissorRect | null;
 }
 
-export interface TextCommand {
-  kind: CommandKind.Text;
-  /** Index in the textured instance buffer. */
-  instance: number;
+export interface GlyphCommand {
+  kind: CommandKind.Glyphs;
+  /** Inclusive start index in the textured instance buffer. */
+  start: number;
+  /** Exclusive end index. */
+  end: number;
+  /** Atlas page every instance in the range samples. */
+  page: number;
   scissor: ScissorRect | null;
-  item: TextRenderItem;
 }
 
 export interface ImageCommand {
@@ -115,29 +126,35 @@ export interface ImageCommand {
   image: UiImage;
 }
 
-export type RenderCommand = PrimitiveCommand | TextCommand | ImageCommand;
+export type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
 
 /**
- * A text run ready to rasterise.
+ * One line of text the frame drew, as a whole.
  *
- * Lines are already placed: the same `layoutTextLines` the Canvas2D
- * renderer draws from, relative to the run's own bounds, so the
- * texture depends on the text and its style but not on where the box
- * is or how tall it is. Scrolling a list therefore reuses every run.
+ * The GPU draws glyphs, not runs, so nothing in the pipeline reads
+ * this — it is the record of *what text went where*, kept because the
+ * question "did this frame draw the right words in the right boxes" is
+ * the one parity tests and the profiler ask, and per-glyph instances
+ * are a bad place to ask it. Building it is cheaper than the
+ * per-run `TextRenderItem` it replaces, which mapped every line.
  */
-export interface TextRenderItem {
-  /** Cache key: everything that changes the rasterised pixels. */
-  key: string;
+export interface TextRunDraw {
+  text: string;
   /** Canvas font shorthand. */
   font: string;
   /** CSS color string. */
   color: string;
-  /** Line placements relative to the texture's top-left corner. */
-  lines: readonly TextLinePlacement[];
-  /** Texture size in logical pixels; physical is this × dpr. */
+  /** Line start and alphabetic baseline in logical screen pixels. */
+  x: number;
+  y: number;
+  /** Measured line width and line-box height, logical pixels. */
   width: number;
   height: number;
-  dpr: number;
+  opacity: number;
+  /** Index of the run's first glyph instance. */
+  instance: number;
+  /** Glyph instances emitted for it; zero when every cluster is blank. */
+  glyphs: number;
 }
 
 export interface RenderList {
@@ -149,6 +166,8 @@ export interface RenderList {
   clipData: Float32Array;
   clipCount: number;
   commands: RenderCommand[];
+  /** The lines of text the frame drew, in paint order. */
+  textRuns: TextRunDraw[];
 }
 
 interface CullRect {
@@ -180,26 +199,98 @@ interface RenderState {
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 
-/**
- * Padding around a rasterised run, in em. Glyphs overhang their line
- * box — descenders under a tight lineHeight, italic swashes past the
- * measured advance — and Canvas2D draws them; the texture must too.
- */
-const TEXT_PADDING_EM = 0.5;
-
 const paintScratch = createPaintState();
 const contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
+ * A growable float buffer for instance data.
+ *
+ * The builder used to collect instances in a plain `number[]` and
+ * convert at the end. That is fine at a few hundred instances and it
+ * is not fine at a few thousand: the atlas emits one instance per
+ * letter on screen, and both the boxed pushes and the element-by-
+ * element conversion showed up as the largest cost in the frame. This
+ * writes floats where they are going to live, and the buffer is
+ * module-level scratch — like `paintScratch` above — because a build
+ * is not re-entrant and a per-frame allocation is the thing being
+ * avoided.
+ */
+class FloatBuffer {
+  data: Float32Array;
+  length = 0;
+
+  constructor(capacity: number) {
+    this.data = new Float32Array(capacity);
+  }
+
+  reset(): void {
+    this.length = 0;
+  }
+
+  /** Room for `count` more floats, doubling until there is. */
+  ensure(count: number): void {
+    const needed = this.length + count;
+    if (needed <= this.data.length) {
+      return;
+    }
+    let capacity = this.data.length * 2;
+    while (capacity < needed) {
+      capacity *= 2;
+    }
+    const grown = new Float32Array(capacity);
+    grown.set(this.data.subarray(0, this.length));
+    this.data = grown;
+  }
+
+  /** Appends four floats; the clip chain is written a vec4 at a time. */
+  push4(a: number, b: number, c: number, d: number): void {
+    this.ensure(4);
+    const at = this.length;
+    this.data[at] = a;
+    this.data[at + 1] = b;
+    this.data[at + 2] = c;
+    this.data[at + 3] = d;
+    this.length = at + 4;
+  }
+
+  /** A copy of what was written, for the frame to own. */
+  take(): Float32Array {
+    return this.data.slice(0, this.length);
+  }
+}
+
+const instanceScratch = new FloatBuffer(INSTANCE_STRIDE_FLOATS * 512);
+const texturedScratch = new FloatBuffer(TEXTURED_STRIDE_FLOATS * 2048);
+const clipScratch = new FloatBuffer(CLIP_STRIDE_FLOATS * 64);
+
+/**
+ * Everything the builder keeps between frames: the glyph atlas it
+ * allocates cells in and the shaper that positions clusters within a
+ * line. Both are caches, and both are the renderer's to own — a
+ * builder that made its own each frame would rasterise every glyph
+ * again on every frame.
+ */
+export interface RenderTextCache {
+  atlas: WebGPUGlyphAtlas;
+  shaper: GlyphShaper;
+}
+
+/** A cache for one-shot builds — tests, and the first frame. */
+export function createTextCache(): RenderTextCache {
+  return { atlas: new WebGPUGlyphAtlas(), shaper: new GlyphShaper() };
+}
+
+/**
  * Builds a CPU-side render list from the retained UI tree.
  *
- * One ordered command list holds fills, borders, text and images in
+ * One ordered command list holds fills, borders, glyphs and images in
  * paint order — background, image, border, decorations, children,
  * text, the decorations marked `after: 'children'`, then the node's
  * scrollbars — exactly as the Canvas2D renderer paints them.
  * Primitive instances are batched into one command until the scissor
- * changes; text and images are one command each because each binds
- * its own texture.
+ * changes, and glyph instances likewise until the scissor or the atlas
+ * page changes; an image is one command, because it binds its own
+ * texture.
  */
 export function buildRenderList(
   root: UiNode,
@@ -209,12 +300,18 @@ export function buildRenderList(
   logicalHeight: number,
   dpr: number,
   now: number = typeof performance !== 'undefined' ? performance.now() : Date.now(),
-  overlay: readonly OverlayShape[] = []
+  overlay: readonly OverlayShape[] = [],
+  textCache: RenderTextCache = createTextCache()
 ): RenderList {
-  const instanceData: number[] = [];
-  const texturedData: number[] = [];
-  const clipData: number[] = [];
+  const instanceData = instanceScratch;
+  const texturedData = texturedScratch;
+  const clipData = clipScratch;
+  instanceData.reset();
+  texturedData.reset();
+  clipData.reset();
   const commands: RenderCommand[] = [];
+  const textRuns: TextRunDraw[] = [];
+  const { atlas, shaper } = textCache;
 
   /** Primitive instances emitted since the last primitive command was closed. */
   let openStart = 0;
@@ -244,6 +341,105 @@ export function buildRenderList(
     if (!scissorsEqual(openScissor, scissor)) {
       closePrimitives();
       openScissor = scissor;
+    }
+  }
+
+  /**
+   * Emits one glyph instance per inked cluster of every line.
+   *
+   * The lines are the ones Canvas2D draws, in the coordinate space
+   * `originX`/`originY` translates into absolute layout coordinates.
+   * Each glyph is snapped so its cell lands on whole physical pixels —
+   * the horizontal remainder becomes the atlas's subpixel phase rather
+   * than being thrown away — and instances that share an atlas page
+   * and a scissor are merged into one command, so a screen of text in
+   * one font is one draw call.
+   */
+  function pushGlyphs(options: {
+    lines: readonly TextLinePlacement[];
+    font: string;
+    color: string;
+    fontSize: number;
+    measureRun: MeasureRun;
+    originX: number;
+    originY: number;
+    ctm: Affine;
+    opacity: number;
+    rounded: number;
+    scissor: ScissorRect | null;
+  }): void {
+    const { lines, font, color, fontSize, originX, originY, ctm, scissor } = options;
+    const opacity = options.opacity;
+    const rounded = options.rounded;
+    const style = atlas.styleFor(font, color, fontSize, dpr);
+    for (const line of lines) {
+      if (line.text.length === 0) {
+        continue;
+      }
+      const baseline = originY + line.baselineY;
+      const [runScreenX, runScreenY] = applyTransform(ctm, originX + line.x, baseline);
+      const run: TextRunDraw = {
+        text: line.text,
+        font,
+        color,
+        x: runScreenX,
+        y: runScreenY,
+        width: line.width,
+        height: line.height,
+        opacity: options.opacity,
+        instance: texturedData.length / TEXTURED_STRIDE_FLOATS,
+        glyphs: 0
+      };
+      textRuns.push(run);
+
+      const lineX = originX + line.x;
+      for (const cluster of shaper.shape(line.text, font, line.width, options.measureRun)) {
+        if (cluster.blank) {
+          continue;
+        }
+        const penX = lineX + cluster.x;
+        // Inlined rather than via applyTransform: this loop runs once
+        // per letter on screen, and a returned pair would be an
+        // allocation per letter per frame.
+        const screenX = penX * ctm[0] + baseline * ctm[2] + ctm[4];
+        const screenY = penX * ctm[1] + baseline * ctm[3] + ctm[5];
+        const physicalX = screenX * dpr;
+        const wholeX = Math.floor(physicalX);
+        const slot = atlas.slotFor(style, cluster.text, cluster.advance, phaseFor(physicalX - wholeX));
+        if (slot === null) {
+          continue;
+        }
+        closePrimitives();
+        // Shifting the translation rather than the rectangle keeps the
+        // instance in layout coordinates, as every other instance is,
+        // and lands the cell on whole physical pixels.
+        const instance = pushTextured(
+          texturedData,
+          penX + slot.offsetX,
+          baseline + slot.offsetY,
+          slot.width,
+          slot.height,
+          opacity,
+          ctm,
+          rounded,
+          slot,
+          wholeX / dpr - screenX,
+          Math.round(screenY * dpr) / dpr - screenY
+        );
+        const last = commands[commands.length - 1];
+        if (
+          last !== undefined &&
+          last.kind === CommandKind.Glyphs &&
+          last.page === slot.page &&
+          last.end === instance &&
+          scissorsEqual(last.scissor, scissor)
+        ) {
+          last.end = instance + 1;
+        } else {
+          commands.push({ kind: CommandKind.Glyphs, start: instance, end: instance + 1, page: slot.page, scissor });
+        }
+        run.glyphs++;
+      }
     }
   }
 
@@ -326,10 +522,10 @@ export function buildRenderList(
           // A new node in the chain whose parent is the enclosing rounded
           // clip, so descendants are tested against both.
           nextRounded = clipData.length / CLIP_STRIDE_FLOATS;
-          clipData.push(rec.x, rec.y, rec.width, rec.height);
-          clipData.push(uniformBorderRadius(paint.borderRadius), state.rounded, 0, 0);
-          clipData.push(inverse[0], inverse[1], inverse[2], inverse[3]);
-          clipData.push(inverse[4], inverse[5], 0, 0);
+          clipData.push4(rec.x, rec.y, rec.width, rec.height);
+          clipData.push4(uniformBorderRadius(paint.borderRadius), state.rounded, 0, 0);
+          clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
+          clipData.push4(inverse[4], inverse[5], 0, 0);
         }
       }
     }
@@ -387,10 +583,10 @@ export function buildRenderList(
           const inverse = invertTransform(nodeCtm);
           if (inverse !== null) {
             imageRounded = clipData.length / CLIP_STRIDE_FLOATS;
-            clipData.push(rec.x, rec.y, rec.width, rec.height);
-            clipData.push(uniformBorderRadius(paint.borderRadius), ownRounded, 0, 0);
-            clipData.push(inverse[0], inverse[1], inverse[2], inverse[3]);
-            clipData.push(inverse[4], inverse[5], 0, 0);
+            clipData.push4(rec.x, rec.y, rec.width, rec.height);
+            clipData.push4(uniformBorderRadius(paint.borderRadius), ownRounded, 0, 0);
+            clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
+            clipData.push4(inverse[4], inverse[5], 0, 0);
           }
         }
         closePrimitives();
@@ -402,7 +598,8 @@ export function buildRenderList(
           rect.height,
           effectiveOpacity,
           nodeCtm,
-          imageRounded
+          imageRounded,
+          FULL_TEXTURE
         );
         commands.push({ kind: CommandKind.Image, instance, scissor: imageScissor, image: paint.image });
       }
@@ -533,66 +730,28 @@ export function buildRenderList(
       const offsetX = rec.x + rec.paddingLeft - rec.scrollX;
       const offsetY = rec.y + rec.paddingTop - rec.scrollY;
 
-      /** One rasterised run of placed lines (content-box coordinates). */
-      const pushTextRun = (lines: readonly TextLinePlacement[], color: string, cacheText: string): void => {
-        const drawn = lines.filter(line => line.text.length > 0);
-        if (drawn.length === 0) {
-          return;
-        }
-        const pad = Math.ceil(text.fontSize * TEXT_PADDING_EM);
-        let minX = Infinity;
-        let maxX = -Infinity;
-        for (const line of drawn) {
-          minX = Math.min(minX, line.x);
-          maxX = Math.max(maxX, line.x + line.width);
-        }
-        const minY = drawn[0].y;
-        const maxY = drawn[drawn.length - 1].y + drawn[drawn.length - 1].height;
-        // The texture is relative to the run's own padded bounds, so its
-        // pixels do not depend on where the run sits; the instance's
-        // screen origin is snapped to a physical pixel below. Whole
-        // physical pixels in size, so the texture maps 1:1.
-        const originX = minX - pad;
-        const originY = minY - pad;
-        const width = Math.ceil((maxX - minX + 2 * pad) * dpr) / dpr;
-        const height = Math.ceil((maxY - minY + 2 * pad) * dpr) / dpr;
-        const relative: TextLinePlacement[] = drawn.map(line => ({
-          text: line.text,
-          start: line.start,
-          end: line.end,
-          x: line.x - originX,
-          y: line.y - originY,
-          baselineY: line.baselineY - originY,
-          width: line.width,
-          height: line.height
-        }));
-        const font = buildFontString(text);
-        const item: TextRenderItem = {
-          key: textCacheKey(cacheText, font, color, text.textAlign, contentBox.width, dpr),
+      const font = buildFontString(text);
+      // Prefix widths come from the measurer that produced the lines,
+      // so cluster positions and the line width agree exactly. The
+      // request's font is all `measureRunWidth` reads of it.
+      const measureRequest = textMeasureRequest(text.text ?? '', text, contentBox);
+      const measureRun: MeasureRun = run => (run.length === 0 ? 0 : measurer.measureRunWidth(run, measureRequest));
+
+      /** One run of placed lines, in content-box coordinates. */
+      const pushTextRun = (lines: readonly TextLinePlacement[], color: string): void => {
+        pushGlyphs({
+          lines,
           font,
           color,
-          lines: relative,
-          width,
-          height,
-          dpr
-        };
-        // Snap the run's screen origin to a physical pixel so glyphs
-        // rasterised on pixel boundaries land on them.
-        const runX = offsetX + originX;
-        const runY = offsetY + originY;
-        const snapped = snapTranslation(nodeCtm, runX, runY, dpr);
-        closePrimitives();
-        const instance = pushTextured(
-          texturedData,
-          runX,
-          runY,
-          width,
-          height,
-          effectiveOpacity,
-          snapped,
-          contentRounded
-        );
-        commands.push({ kind: CommandKind.Text, instance, scissor: contentScissor, item });
+          fontSize: text.fontSize,
+          measureRun,
+          originX: offsetX,
+          originY: offsetY,
+          ctm: nodeCtm,
+          opacity: effectiveOpacity,
+          rounded: contentRounded,
+          scissor: contentScissor
+        });
       };
 
       /** A plain rectangle in the content box, clipped like the text. */
@@ -628,9 +787,9 @@ export function buildRenderList(
           }
         }
         if (editable.placeholderLines.length > 0) {
-          pushTextRun(editable.placeholderLines, colorToCss(text.placeholderColor), ` ${text.placeholder}`);
+          pushTextRun(editable.placeholderLines, colorToCss(text.placeholderColor));
         } else {
-          pushTextRun(editable.lines, colorToCss(text.textColor), model.text);
+          pushTextRun(editable.lines, colorToCss(text.textColor));
         }
         if (model.composing) {
           const underline = parseColor(text.textColor);
@@ -673,7 +832,7 @@ export function buildRenderList(
             }
           }
         }
-        pushTextRun(lines, colorToCss(text.textColor), text.text!);
+        pushTextRun(lines, colorToCss(text.textColor));
       }
     }
 
@@ -739,19 +898,17 @@ export function buildRenderList(
         break;
       }
       case 'label': {
-        const lines = layoutTextLines(
-          { x: 0, y: 0, width: 0, height: shape.height },
-          {
-            ...createPaintState(),
-            text: shape.text,
-            fontSize: shape.fontSize,
-            fontFamily: shape.fontFamily,
-            lineHeight: shape.height,
-            textWrap: 'none',
-            verticalAlign: 'middle'
-          },
-          measurer
-        );
+        const labelBox = { x: 0, y: 0, width: 0, height: shape.height };
+        const labelState = {
+          ...createPaintState(),
+          text: shape.text,
+          fontSize: shape.fontSize,
+          fontFamily: shape.fontFamily,
+          lineHeight: shape.height,
+          textWrap: 'none' as const,
+          verticalAlign: 'middle' as const
+        };
+        const lines = layoutTextLines(labelBox, labelState, measurer);
         if (lines.length === 0) {
           break;
         }
@@ -775,29 +932,20 @@ export function buildRenderList(
             NO_CLIP_INDEX
           );
         }
-        const pad = Math.ceil(shape.fontSize * TEXT_PADDING_EM);
-        const line = lines[0];
-        const item: TextRenderItem = {
-          key: textCacheKey(shape.text, shape.font, shape.textColor, 'left', 0, dpr),
+        const labelRequest = textMeasureRequest(shape.text, labelState, labelBox);
+        pushGlyphs({
+          lines,
           font: shape.font,
           color: shape.textColor,
-          lines: [{ ...line, x: pad, y: pad, baselineY: line.baselineY - line.y + pad }],
-          width: Math.ceil((line.width + 2 * pad) * dpr) / dpr,
-          height: Math.ceil((line.height + 2 * pad) * dpr) / dpr,
-          dpr
-        };
-        closePrimitives();
-        const instance = pushTextured(
-          texturedData,
-          origin.x + LABEL_PADDING_X - pad,
-          origin.y + line.y - pad,
-          item.width,
-          item.height,
-          1,
-          snapTranslation(IDENTITY, origin.x + LABEL_PADDING_X - pad, origin.y + line.y - pad, dpr),
-          NO_CLIP_INDEX
-        );
-        commands.push({ kind: CommandKind.Text, instance, scissor: null, item });
+          fontSize: shape.fontSize,
+          measureRun: run => (run.length === 0 ? 0 : measurer.measureRunWidth(run, labelRequest)),
+          originX: origin.x + LABEL_PADDING_X,
+          originY: origin.y,
+          ctm: IDENTITY,
+          opacity: 1,
+          rounded: NO_CLIP_INDEX,
+          scissor: null
+        });
         break;
       }
     }
@@ -805,13 +953,14 @@ export function buildRenderList(
   closePrimitives();
 
   return {
-    instanceData: new Float32Array(instanceData),
+    instanceData: instanceData.take(),
     instanceCount: instanceData.length / INSTANCE_STRIDE_FLOATS,
-    texturedData: new Float32Array(texturedData),
+    texturedData: texturedData.take(),
     texturedCount: texturedData.length / TEXTURED_STRIDE_FLOATS,
-    clipData: new Float32Array(clipData),
+    clipData: clipData.take(),
     clipCount: clipData.length / CLIP_STRIDE_FLOATS,
-    commands
+    commands,
+    textRuns
   };
 }
 
@@ -821,31 +970,22 @@ function cssColor(css: string): RgbaColor | undefined {
 }
 
 /**
- * The text commands of a render list, in paint order. For tests and
+ * The lines of text a render list draws, in paint order. For tests and
  * the profiler; the renderer walks `commands` directly.
  */
-export function textItems(list: RenderList): TextRenderItem[] {
-  const items: TextRenderItem[] = [];
-  for (const command of list.commands) {
-    if (command.kind === CommandKind.Text) {
-      items.push(command.item);
-    }
-  }
-  return items;
+export function textRuns(list: RenderList): readonly TextRunDraw[] {
+  return list.textRuns;
 }
 
-function textCacheKey(
-  text: string,
-  font: string,
-  color: string,
-  align: string,
-  wrapWidth: number,
-  dpr: number
-): string {
-  // The wrap width decides the line breaks and the alignment decides
-  // the lines' relative offsets; the run's position, vertical alignment
-  // and box height move the whole run and are not part of the pixels.
-  return `${text}\0${font}\0${color}\0${align}\0${wrapWidth}\0${dpr}`;
+/** Glyph instances a render list draws, across every glyph command. */
+export function glyphCount(list: RenderList): number {
+  let count = 0;
+  for (const command of list.commands) {
+    if (command.kind === CommandKind.Glyphs) {
+      count += command.end - command.start;
+    }
+  }
+  return count;
 }
 
 /**
@@ -853,7 +993,7 @@ function textCacheKey(
  * Canvas2D renderer draws and the hit tester grabs.
  */
 function pushScrollbars(
-  out: number[],
+  out: FloatBuffer,
   rec: LayoutRecord,
   opacity: number,
   transform: Affine,
@@ -890,7 +1030,7 @@ function pushScrollbars(
 }
 
 function pushInstance(
-  out: number[],
+  out: FloatBuffer,
   x: number,
   y: number,
   width: number,
@@ -903,31 +1043,81 @@ function pushInstance(
   transform: Affine,
   clip: number
 ): void {
-  out.push(x, y);
-  out.push(width, height);
-  out.push(color.r, color.g, color.b, color.a);
-  out.push(radius, opacity, borderWidth);
-  out.push(kind);
-  out.push(transform[0], transform[1], transform[2], transform[3], transform[4], transform[5]);
-  out.push(clip, 0);
+  out.ensure(INSTANCE_STRIDE_FLOATS);
+  const data = out.data;
+  const at = out.length;
+  data[at] = x;
+  data[at + 1] = y;
+  data[at + 2] = width;
+  data[at + 3] = height;
+  data[at + 4] = color.r;
+  data[at + 5] = color.g;
+  data[at + 6] = color.b;
+  data[at + 7] = color.a;
+  data[at + 8] = radius;
+  data[at + 9] = opacity;
+  data[at + 10] = borderWidth;
+  data[at + 11] = kind;
+  data[at + 12] = transform[0];
+  data[at + 13] = transform[1];
+  data[at + 14] = transform[2];
+  data[at + 15] = transform[3];
+  data[at + 16] = transform[4];
+  data[at + 17] = transform[5];
+  data[at + 18] = clip;
+  data[at + 19] = 0;
+  out.length = at + INSTANCE_STRIDE_FLOATS;
 }
 
+/** The whole of a texture: what an image samples. */
+const FULL_TEXTURE: UvRect = { u: 0, v: 0, uw: 1, vh: 1 };
+
+interface UvRect {
+  u: number;
+  v: number;
+  uw: number;
+  vh: number;
+}
+
+/**
+ * `dx`/`dy` shift the transform's translation, which is how a glyph
+ * snaps its cell onto whole physical pixels without a transform array
+ * of its own — one allocation per letter per frame, otherwise.
+ */
 function pushTextured(
-  out: number[],
+  out: FloatBuffer,
   x: number,
   y: number,
   width: number,
   height: number,
   opacity: number,
   transform: Affine,
-  clip: number
+  clip: number,
+  uv: UvRect,
+  dx = 0,
+  dy = 0
 ): number {
-  const index = out.length / TEXTURED_STRIDE_FLOATS;
-  out.push(x, y);
-  out.push(width, height);
-  out.push(opacity, clip);
-  out.push(transform[0], transform[1], transform[2], transform[3], transform[4], transform[5]);
-  return index;
+  out.ensure(TEXTURED_STRIDE_FLOATS);
+  const data = out.data;
+  const at = out.length;
+  data[at] = x;
+  data[at + 1] = y;
+  data[at + 2] = width;
+  data[at + 3] = height;
+  data[at + 4] = opacity;
+  data[at + 5] = clip;
+  data[at + 6] = transform[0];
+  data[at + 7] = transform[1];
+  data[at + 8] = transform[2];
+  data[at + 9] = transform[3];
+  data[at + 10] = transform[4] + dx;
+  data[at + 11] = transform[5] + dy;
+  data[at + 12] = uv.u;
+  data[at + 13] = uv.v;
+  data[at + 14] = uv.uw;
+  data[at + 15] = uv.vh;
+  out.length = at + TEXTURED_STRIDE_FLOATS;
+  return at / TEXTURED_STRIDE_FLOATS;
 }
 
 function buildOwnTransform(
@@ -989,21 +1179,6 @@ export function invertTransform(t: Affine): Affine | null {
   const d = t[0] / det;
   // `+ 0` folds -0 into 0 so equal transforms compare equal.
   return [a + 0, b + 0, c + 0, d + 0, -(a * t[4] + c * t[5]) + 0, -(b * t[4] + d * t[5]) + 0];
-}
-
-/**
- * Adjusts a transform so that the point (x, y) lands on a physical
- * pixel boundary. Only the translation moves; under rotation or scale
- * the adjustment is still a pure screen-space shift.
- */
-function snapTranslation(transform: Affine, x: number, y: number, dpr: number): Affine {
-  const [sx, sy] = applyTransform(transform, x, y);
-  const dx = Math.round(sx * dpr) / dpr - sx;
-  const dy = Math.round(sy * dpr) / dpr - sy;
-  if (dx === 0 && dy === 0) {
-    return transform;
-  }
-  return [transform[0], transform[1], transform[2], transform[3], transform[4] + dx, transform[5] + dy];
 }
 
 /**

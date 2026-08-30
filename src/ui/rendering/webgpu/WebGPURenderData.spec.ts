@@ -6,7 +6,9 @@ import { Constraints } from '../../layout/LayoutTypes';
 import { RenderHarness } from '../RenderTestUtils';
 import {
   buildRenderList,
-  textItems,
+  createTextCache,
+  textRuns,
+  glyphCount,
   viewportScissor,
   CLIP_STRIDE_FLOATS,
   CommandKind,
@@ -15,7 +17,7 @@ import {
   PrimitiveKind,
   type ImageCommand,
   type PrimitiveCommand,
-  type TextCommand
+  type GlyphCommand
 } from './WebGPURenderData';
 import { WebGPUSurface, toPhysicalPixels } from './WebGPUSurface';
 
@@ -27,9 +29,19 @@ function box(h: RenderHarness, id: string, props: Record<string, unknown>): UiNo
   return node;
 }
 
-function layoutAndBuild(h: RenderHarness, root: UiNode) {
+function layoutAndBuild(h: RenderHarness, root: UiNode, cache = createTextCache()) {
   h.layout(root);
-  return buildRenderList(root, h.engine, h.measurer, h.surface.logicalWidth, h.surface.logicalHeight, h.surface.dpr);
+  return buildRenderList(
+    root,
+    h.engine,
+    h.measurer,
+    h.surface.logicalWidth,
+    h.surface.logicalHeight,
+    h.surface.dpr,
+    undefined,
+    undefined,
+    cache
+  );
 }
 
 function readInstance(list: ReturnType<typeof buildRenderList>, index: number) {
@@ -341,31 +353,48 @@ describe('buildRenderList text', () => {
     h.graph.appendChild(root, node);
     const list = layoutAndBuild(h, root);
     expect(list.instanceCount).toBe(0);
-    expect(list.texturedCount).toBe(1);
-    const items = textItems(list);
-    expect(items).toHaveLength(1);
-    expect(items[0].lines.map(line => line.text)).toEqual(['Hello']);
-    expect(items[0].font).toBe('normal 14px sans-serif');
-    expect(items[0].color).toBe('#123456');
+    // One textured instance per inked cluster, not one per run.
+    expect(list.texturedCount).toBe(5);
+    expect(glyphCount(list)).toBe(5);
+    const runs = textRuns(list);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].text).toBe('Hello');
+    expect(runs[0].glyphs).toBe(5);
+    expect(runs[0].font).toBe('normal 14px sans-serif');
+    expect(runs[0].color).toBe('#123456');
+    // The five glyphs share a page and a scissor, so they are one draw.
+    expect(list.commands).toHaveLength(1);
+    expect(list.commands[0]).toMatchObject({ kind: CommandKind.Glyphs, start: 0, end: 5, page: 0 });
   });
 
-  it('sizes the texture to the run, padded, not to the box', () => {
+  it('emits no instance for a blank cluster, but still records the run', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
-    // The run is far narrower than its 300-wide box; a texture the size
-    // of the box would waste pixels and, worse, cut off a run wider
-    // than its box.
+    const node = box(h, 'label', { width: 200, height: 30, text: 'a b', fontSize: 14, textWrap: 'none' });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    expect(glyphCount(list)).toBe(2);
+    expect(textRuns(list)[0]).toMatchObject({ text: 'a b', glyphs: 2 });
+  });
+
+  it('sizes each instance to its glyph cell, not to the run or the box', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    // A cell is one cluster's advance plus its side bearings, so every
+    // instance is far narrower than either the run or the 300-wide box.
     const node = box(h, 'label', { width: 300, height: 100, text: 'Hello', fontSize: 10, textWrap: 'none' });
     h.graph.appendChild(root, node);
     const list = layoutAndBuild(h, root);
-    const [item] = textItems(list);
-    const pad = 5;
-    const runWidth = item.lines[0].width;
-    expect(runWidth).toBeLessThan(100);
-    expect(item.width).toBe(runWidth + 2 * pad);
-    expect(item.height).toBe(Math.ceil(item.lines[0].height + 2 * pad));
-    expect(item.lines[0].x).toBe(pad);
-    expect(item.lines[0].y).toBe(pad);
+    const [run] = textRuns(list);
+    const advance = run.width / 'Hello'.length;
+    for (let i = 0; i < list.texturedCount; i++) {
+      const offset = i * TEXTURED_STRIDE_FLOATS;
+      expect(list.texturedData[offset + 2]).toBeGreaterThan(advance);
+      expect(list.texturedData[offset + 2]).toBeLessThan(run.width);
+      // The cell samples a sub-rectangle of its page, never all of it.
+      expect(list.texturedData[offset + 14]).toBeLessThan(1);
+      expect(list.texturedData[offset + 15]).toBeLessThan(1);
+    }
   });
 
   it('draws text that overflows a tight box, as Canvas2D does', () => {
@@ -374,11 +403,14 @@ describe('buildRenderList text', () => {
     const node = box(h, 'label', { width: 20, height: 12, text: 'Overflowing', fontSize: 10, textWrap: 'none' });
     h.graph.appendChild(root, node);
     const list = layoutAndBuild(h, root);
-    const [item] = textItems(list);
-    expect(item.width).toBeGreaterThan(20);
-    const command = list.commands.find((c): c is TextCommand => c.kind === CommandKind.Text)!;
-    // The instance covers the run; the box does not clip it.
-    expect(list.texturedData[command.instance * TEXTURED_STRIDE_FLOATS + 2]).toBe(item.width);
+    const [run] = textRuns(list);
+    expect(run.width).toBeGreaterThan(20);
+    const command = list.commands.find((c): c is GlyphCommand => c.kind === CommandKind.Glyphs)!;
+    expect(command.end - command.start).toBe('Overflowing'.length);
+    // The last glyph starts past the box's right edge; the box does not
+    // clip it, as Canvas2D does not either.
+    const last = (command.end - 1) * TEXTURED_STRIDE_FLOATS;
+    expect(list.texturedData[last]).toBeGreaterThan(20);
   });
 
   it('keeps the same texture key while the run moves', () => {
@@ -387,11 +419,19 @@ describe('buildRenderList text', () => {
     root.setProperty('padding', 0);
     const node = box(h, 'label', { width: 100, height: 30, text: 'Hello', fontSize: 14 });
     h.graph.appendChild(root, node);
-    const before = textItems(layoutAndBuild(h, root))[0].key;
+    const cache = createTextCache();
+    layoutAndBuild(h, root, cache);
+    const before = cache.atlas.glyphCount;
+    // At most one cell per cluster: 'Hello' has four distinct letters,
+    // and the two l's differ only if they fall on different phases.
+    expect(before).toBeLessThanOrEqual(5);
     root.setProperty('padding', 37);
     node.setProperty('verticalAlign', 'bottom');
-    const after = textItems(layoutAndBuild(h, root))[0].key;
-    expect(after).toBe(before);
+    layoutAndBuild(h, root, cache);
+    // Moving a run by a whole number of pixels re-uses every cell: a
+    // cell's pixels depend on the cluster, the font, the colour and the
+    // subpixel phase, and none of those moved.
+    expect(cache.atlas.glyphCount).toBe(before);
   });
 
   it('paints text above earlier siblings and below later ones', () => {
@@ -404,7 +444,7 @@ describe('buildRenderList text', () => {
     const list = layoutAndBuild(h, root);
     // Text is a command in the ordered list, not a pass after all fills:
     // the covering box's fill comes after it.
-    expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Text, CommandKind.Primitives]);
+    expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Glyphs, CommandKind.Primitives]);
   });
 });
 
@@ -850,9 +890,13 @@ describe('buildRenderList overlay', () => {
     const label = screenBox(list, 3);
     expect(label.y).toBe(4);
     expect(label.x).toBe(10);
-    const text = textItems(list);
+    const text = textRuns(list);
     expect(text).toHaveLength(1);
-    expect(text[0].lines[0].text).toBe("box 'a' 50×50");
-    expect(list.commands.map(c => c.kind)).toEqual([CommandKind.Primitives, CommandKind.Primitives, CommandKind.Text]);
+    expect(text[0].text).toBe("box 'a' 50×50");
+    expect(list.commands.map(c => c.kind)).toEqual([
+      CommandKind.Primitives,
+      CommandKind.Primitives,
+      CommandKind.Glyphs
+    ]);
   });
 });

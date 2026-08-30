@@ -10,7 +10,7 @@ import {
   CommandKind,
   INSTANCE_STRIDE_FLOATS,
   PrimitiveKind,
-  textItems
+  textRuns
 } from './webgpu/WebGPURenderData';
 
 /**
@@ -109,7 +109,7 @@ describe('WebGPU text selection render list', () => {
     setSelectionRange(label, 1, 3);
     const list = buildRenderList(root, h.engine, h.measurer, 800, 600, 1, 0);
 
-    expect(textItems(list).map(item => item.lines.map(line => line.text))).toEqual([['abcd']]);
+    expect(textRuns(list).map(run => run.text)).toEqual(['abcd']);
     const kinds = Array.from(
       { length: list.instanceCount },
       (_, i) => list.instanceData[i * INSTANCE_STRIDE_FLOATS + 11]
@@ -117,7 +117,7 @@ describe('WebGPU text selection render list', () => {
     expect(kinds.filter(kind => kind === PrimitiveKind.Fill)).toHaveLength(1);
     expect(list.instanceData[0]).toBeCloseTo(8.4, 5);
     expect(list.instanceData[2]).toBeCloseTo(16.8, 5);
-    expect(list.commands.map(command => command.kind)).toEqual([CommandKind.Primitives, CommandKind.Text]);
+    expect(list.commands.map(command => command.kind)).toEqual([CommandKind.Primitives, CommandKind.Glyphs]);
   });
 
   it('emits find matches under the selection, in the same order as Canvas2D', () => {
@@ -134,13 +134,13 @@ describe('WebGPU text selection render list', () => {
       (_, i) => list.instanceData[i * INSTANCE_STRIDE_FLOATS + 11]
     );
     expect(kinds.filter(kind => kind === PrimitiveKind.Fill)).toHaveLength(3);
-    expect(list.commands.map(command => command.kind)).toEqual([CommandKind.Primitives, CommandKind.Text]);
+    expect(list.commands.map(command => command.kind)).toEqual([CommandKind.Primitives, CommandKind.Glyphs]);
   });
 
   it('emits only the text run when nothing is selected', () => {
     const { h, root } = scene();
     const list = buildRenderList(root, h.engine, h.measurer, 800, 600, 1, 0);
     expect(list.instanceCount).toBe(0);
-    expect(list.commands.map(command => command.kind)).toEqual([CommandKind.Text]);
+    expect(list.commands.map(command => command.kind)).toEqual([CommandKind.Glyphs]);
   });
 });

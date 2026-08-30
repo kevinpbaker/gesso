@@ -44,7 +44,9 @@ export type { RgbaColor } from './webgpu/WebGPUColor';
 export { initializeWebGPU } from './webgpu/WebGPUDevice';
 export {
   buildRenderList,
-  textItems,
+  createTextCache,
+  textRuns,
+  glyphCount,
   INSTANCE_STRIDE_FLOATS,
   INSTANCE_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
@@ -59,10 +61,15 @@ export type {
   RenderList,
   RenderCommand,
   PrimitiveCommand,
-  TextCommand,
+  GlyphCommand,
   ImageCommand,
-  TextRenderItem,
+  TextRunDraw,
+  RenderTextCache,
   ScissorRect,
   Affine
 } from './webgpu/WebGPURenderData';
 export { WebGPUTextureCache } from './webgpu/WebGPUTextureCache';
+export { WebGPUGlyphAtlas, GLYPH_SUBPIXEL_PHASES } from './webgpu/WebGPUGlyphAtlas';
+export type { GlyphSlot, GlyphUpload } from './webgpu/WebGPUGlyphAtlas';
+export { GlyphShaper } from './webgpu/WebGPUGlyphShaper';
+export { WebGPUGlyphPages } from './webgpu/WebGPUGlyphPages';

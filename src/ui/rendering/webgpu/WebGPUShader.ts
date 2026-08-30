@@ -172,6 +172,8 @@ fn vs(
   @location(5) transformA: vec2f,
   @location(6) transformB: vec2f,
   @location(7) transformC: vec2f,
+  @location(8) uvOrigin: vec2f,
+  @location(9) uvSize: vec2f,
 ) -> VertexOutput {
   var out: VertexOutput;
   let world = instancePos + vertex * instanceSize;
@@ -180,7 +182,9 @@ fn vs(
     world.x * transformA.y + world.y * transformB.y + transformC.y
   );
   out.position = toClipSpace(transformed);
-  out.uv = vertex;
+  // A glyph samples its cell in an atlas page; an image passes the
+  // whole texture as (0,0)-(1,1) and this is the identity.
+  out.uv = uvOrigin + vertex * uvSize;
   out.opacity = instanceOpacity;
   out.clipIndex = clipIndex;
   return out;

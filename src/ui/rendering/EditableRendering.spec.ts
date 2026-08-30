@@ -9,7 +9,7 @@ import {
   CommandKind,
   INSTANCE_STRIDE_FLOATS,
   PrimitiveKind,
-  textItems
+  textRuns
 } from './webgpu/WebGPURenderData';
 
 /**
@@ -127,7 +127,7 @@ describe('WebGPU editable render list', () => {
     model.focused = true;
     model.select(1, 3);
     const selected = build(h, root, model.blinkOrigin);
-    expect(textItems(selected).map(item => item.lines.map(line => line.text))).toEqual([['abcd']]);
+    expect(textRuns(selected).map(run => run.text)).toEqual(['abcd']);
     const fills = Array.from(
       { length: selected.instanceCount },
       (_, i) => selected.instanceData[i * INSTANCE_STRIDE_FLOATS + 11]
@@ -136,14 +136,14 @@ describe('WebGPU editable render list', () => {
     expect(selected.instanceData[0]).toBeCloseTo(8.4, 5);
     expect(selected.instanceData[2]).toBeCloseTo(16.8, 5);
     // Selection before text, as Canvas2D paints them.
-    expect(selected.commands.map(command => command.kind)).toEqual([CommandKind.Primitives, CommandKind.Text]);
+    expect(selected.commands.map(command => command.kind)).toEqual([CommandKind.Primitives, CommandKind.Glyphs]);
 
     model.select(4);
     const caret = build(h, root, model.blinkOrigin);
     expect(caret.instanceCount).toBe(1);
     expect(caret.instanceData[0]).toBe(34);
     expect(caret.instanceData[2]).toBe(1);
-    expect(caret.commands.map(command => command.kind)).toEqual([CommandKind.Text, CommandKind.Primitives]);
+    expect(caret.commands.map(command => command.kind)).toEqual([CommandKind.Glyphs, CommandKind.Primitives]);
   });
 
   it('shifts a scrolled field by its own offset', () => {
@@ -152,7 +152,7 @@ describe('WebGPU editable render list', () => {
     model.focused = true;
     model.select(8);
     const list = build(h, root, model.blinkOrigin);
-    expect(textItems(list).map(item => item.lines.map(line => line.text))).toEqual([['abcdefgh']]);
+    expect(textRuns(list).map(run => run.text)).toEqual(['abcdefgh']);
     expect(list.instanceCount).toBe(1);
     expect(list.instanceData[0]).toBe(47);
   });
@@ -161,9 +161,9 @@ describe('WebGPU editable render list', () => {
     const h = new RenderHarness();
     const { root } = scene(h, { value: '', placeholder: 'Search', placeholderColor: '#12ab34' });
     const list = build(h, root, 0);
-    const items = textItems(list);
+    const items = textRuns(list);
     expect(items).toHaveLength(1);
-    expect(items[0].lines[0].text).toBe('Search');
+    expect(items[0].text).toBe('Search');
     expect(items[0].color).toBe('#12ab34');
     // An unfocused empty field draws nothing else.
     expect(list.instanceCount).toBe(0);

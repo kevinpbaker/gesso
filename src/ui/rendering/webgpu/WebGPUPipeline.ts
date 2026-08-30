@@ -29,7 +29,7 @@ export interface TexturedPipeline {
   indexCount: number;
   uniformBuffer: GPUBuffer;
   bindGroupLayout: GPUBindGroupLayout;
-  /** Nearest sampling: text is rasterised at its screen size. */
+  /** Nearest sampling: a glyph cell maps one-to-one onto pixels. */
   textSampler: GPUSampler;
   /** Linear sampling: images are scaled by objectFit. */
   imageSampler: GPUSampler;
@@ -212,7 +212,9 @@ function texturedInstanceLayout(): GPUVertexBufferLayout {
       { shaderLocation: 4, offset: 20, format: 'float32' }, // clip index
       { shaderLocation: 5, offset: 24, format: 'float32x2' }, // transform a
       { shaderLocation: 6, offset: 32, format: 'float32x2' }, // transform b
-      { shaderLocation: 7, offset: 40, format: 'float32x2' } // transform c
+      { shaderLocation: 7, offset: 40, format: 'float32x2' }, // transform c
+      { shaderLocation: 8, offset: 48, format: 'float32x2' }, // uv origin
+      { shaderLocation: 9, offset: 56, format: 'float32x2' } // uv size
     ]
   };
 }

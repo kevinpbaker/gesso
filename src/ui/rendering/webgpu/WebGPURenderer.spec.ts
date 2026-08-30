@@ -267,7 +267,7 @@ describe('WebGPURenderer text', () => {
 });
 
 describe('WebGPURenderer text batching', () => {
-  it('draws consecutive identical text runs under one scissor as a single instanced call', async () => {
+  it('draws a column of text as a single instanced call', async () => {
     const device = createMockDevice();
     const adapter = createMockAdapter(device);
     const originalNavigator = globalThis.navigator;
@@ -290,7 +290,16 @@ describe('WebGPURenderer text batching', () => {
         this.height = height;
       }
       getContext() {
-        return { scale: vi.fn(), fillText: vi.fn(), font: '', fillStyle: '', textAlign: '', textBaseline: '' };
+        return {
+          setTransform: vi.fn(),
+          clearRect: vi.fn(),
+          scale: vi.fn(),
+          fillText: vi.fn(),
+          font: '',
+          fillStyle: '',
+          textAlign: '',
+          textBaseline: ''
+        };
       }
     };
 
@@ -317,9 +326,11 @@ describe('WebGPURenderer text batching', () => {
       h.layout(root);
 
       renderer.render(root, { layout: h.engine, text: h.measurer });
-      // Five "one" runs share a texture and draw once; "different" draws once.
-      expect(renderer.lastDraws.texturedDraws).toBe(2);
-      expect(renderer.lastDraws.texturedInstances).toBe(6);
+      // Every glyph is a cell in the same atlas page under the same
+      // scissor, so the whole column — six runs, twenty-four letters —
+      // is one draw. With a texture per run it was two.
+      expect(renderer.lastDraws.texturedDraws).toBe(1);
+      expect(renderer.lastDraws.texturedInstances).toBe(5 * 'one'.length + 'different'.length);
       renderer.dispose();
     } finally {
       (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas = originalOffscreen;

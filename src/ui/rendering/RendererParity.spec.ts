@@ -18,7 +18,9 @@ import {
   PrimitiveKind,
   TEXTURED_STRIDE_FLOATS,
   type Affine,
-  type RenderList
+  type RenderList,
+  type ScissorRect,
+  type TextRunDraw
 } from './webgpu/WebGPURenderData';
 
 /**
@@ -273,7 +275,43 @@ function webgpuDraws(list: RenderList): Draw[] {
   const draws: Draw[] = [];
   const clipOf = (scissor: { x: number; y: number; width: number; height: number } | null): Clip | null =>
     scissor === null ? null : { x: scissor.x, y: scissor.y, width: scissor.width, height: scissor.height };
+  // Text is compared run by run, not glyph by glyph: what has to match
+  // Canvas2D is the words, their baselines and their colour, and the
+  // atlas cell a letter happens to land in is not part of that. Runs
+  // are emitted in instance order, so consuming them as their glyph
+  // commands come up keeps text interleaved with the fills around it.
+  const runClips = new Map<TextRunDraw, ScissorRect | null>();
   for (const command of list.commands) {
+    if (command.kind === CommandKind.Glyphs) {
+      for (const run of list.textRuns) {
+        if (run.instance >= command.start && run.instance < command.end) {
+          runClips.set(run, command.scissor);
+        }
+      }
+    }
+  }
+  let nextRun = 0;
+  const flushRuns = (limit: number): void => {
+    while (nextRun < list.textRuns.length && list.textRuns[nextRun].instance < limit) {
+      const run = list.textRuns[nextRun++];
+      draws.push({
+        kind: 'text',
+        text: run.text,
+        x: round(run.x),
+        y: round(run.y),
+        width: 0,
+        height: 0,
+        color: cssColorKey(run.color),
+        opacity: round(run.opacity),
+        clip: clipOf(runClips.get(run) ?? null)
+      });
+    }
+  };
+  for (const command of list.commands) {
+    if (command.kind === CommandKind.Glyphs) {
+      flushRuns(command.end);
+      continue;
+    }
     if (command.kind === CommandKind.Primitives) {
       for (let i = command.start; i < command.end; i++) {
         const o = i * INSTANCE_STRIDE_FLOATS;
@@ -295,30 +333,14 @@ function webgpuDraws(list: RenderList): Draw[] {
     const o = command.instance * TEXTURED_STRIDE_FLOATS;
     const d = list.texturedData;
     const t: Affine = [d[o + 6], d[o + 7], d[o + 8], d[o + 9], d[o + 10], d[o + 11]];
-    if (command.kind === CommandKind.Image) {
-      draws.push({
-        kind: 'image',
-        ...screenBox(t, d[o], d[o + 1], d[o + 2], d[o + 3]),
-        opacity: round(d[o + 4]),
-        clip: clipOf(command.scissor)
-      });
-      continue;
-    }
-    for (const line of command.item.lines) {
-      const [x, y] = apply(t, d[o] + line.x, d[o + 1] + line.baselineY);
-      draws.push({
-        kind: 'text',
-        text: line.text,
-        x: round(x),
-        y: round(y),
-        width: 0,
-        height: 0,
-        color: cssColorKey(command.item.color),
-        opacity: round(d[o + 4]),
-        clip: clipOf(command.scissor)
-      });
-    }
+    draws.push({
+      kind: 'image',
+      ...screenBox(t, d[o], d[o + 1], d[o + 2], d[o + 3]),
+      opacity: round(d[o + 4]),
+      clip: clipOf(command.scissor)
+    });
   }
+  flushRuns(Number.POSITIVE_INFINITY);
   return draws;
 }
 
