@@ -218,6 +218,7 @@ interface OverlayOptions {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;
   readonly zIndex?: number;
   readonly environment?: UiNode | null;

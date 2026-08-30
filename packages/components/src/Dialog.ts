@@ -124,7 +124,13 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
       // the previous opening's final state.
       enter.value = 0;
       overlay.show(body(), {
+        // Centred across the window and 80px down from the top, which
+        // is where a dialog belongs and where the entrance's pivot
+        // assumes it is growing from. Not vertically centred: a dialog
+        // that grows as its content arrives would walk up the screen,
+        // and a tall one would have nowhere to go.
         top: 80,
+        center: 'x',
         environment: placeholder,
         dismissOnOutsidePress: dismissible.value,
         onClose: () => {

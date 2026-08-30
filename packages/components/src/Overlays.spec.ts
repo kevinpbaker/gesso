@@ -68,6 +68,18 @@ describe('Dialog', () => {
     expect(record?.states).toEqual(['modal']);
   });
 
+  it('opens centred across the window, below the top', () => {
+    const open = new BehaviorSubject(true);
+    const ui = mount(app(open));
+    ui.frame();
+
+    // A dialog is centred horizontally and sits 80 from the top —
+    // vertically centring one would move it as its content arrived.
+    const entry = ui.entries()[0];
+    expect(entry.center).toBe('x');
+    expect(entry.top).toBe(80);
+  });
+
   it('Escape closes it', () => {
     const open = new BehaviorSubject(true);
     const ui = mount(app(open));
