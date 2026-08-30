@@ -191,6 +191,17 @@ The body runs once, like a class `render()`; the host keeps the cells fed when t
 
 Nodes carry `role`, `label`, `value` and `states`, or inherit them from the component that built them. The runtime diffs a semantics tree per frame and emits patches to the shell. An unknown `role` fails the build the way an unknown prop already does.
 
+### Seeing what went wrong
+
+A canvas application hides its failures twice over: nothing goes red, and the UI runs in a worker whose console you have to know to go and select — so a render worker that throws leaves its last good frame on screen, looking exactly like an application that works. `@gesso/devtools` draws the error over the app instead, with every frame mapped back through the source maps and the offending line quoted:
+
+```ts
+const overlay = mountErrorOverlay(host);
+createApp({ renderWorker, onError: overlay.report });
+```
+
+It says which of five things broke — a message handler, a frame, the renderer, a channel, or one event listener — because each costs the running application something different. Closing the three holes underneath it mattered more than the drawing: a component that threw during a frame used to reach nothing at all, and an `onClick` that threw was caught by the dispatcher and logged to a console the page cannot show.
+
 ### Testing a component without a browser
 
 `@gesso/testing` mounts a tree on a manual clock over a canvas double, with a measurer that is proportional to the font size instead of a flat lie, and queries it through the very same semantics tree the accessibility mirror hands to the platform. A control that is awkward to find in a test is a control that is awkward to find with a screen reader; there is no second definition for the two to drift apart.
@@ -253,8 +264,8 @@ Media, focus, animation, overlay, shell, find and the router are plain classes w
 | The patch stream bypasses main          | Measured in Chrome: with the shell busy-looped for 5000 ms, a channel fed from the app worker kept delivering patches throughout, and the render worker's frame gap was unchanged at 110 ms                                                                                | `#framework`                                             |
 | Application state outlives the renderer | Switching renderer replaces the render worker — the frame count restarts — while a channel keeps counting across the swap                                                                                                                                                  | `#framework`, renderer toggle                            |
 | Data survives a reload                  | The notes example persists through `FileSystemSyncAccessHandle` in the app worker: typing a marker and reloading brings it back, and a first run with no file writes the seed                                                                                              | `#example-notes`                                         |
-| It's tested                             | **1,839 tests** across **139 spec files**, ~7 s                                                                                                                                                                                                                            | `pnpm test:run`                                          |
-| The published packages work             | All four packages are packed to tarballs, installed with npm into a fresh Vite project, typechecked against the rolled-up declarations with `skipLibCheck: false`, built, clicked in Chrome — and a component mounted and asserted through the published `@gesso/testing`  | `pnpm check:install`                                     |
+| It's tested                             | **1,889 tests** across **143 spec files**, ~7 s                                                                                                                                                                                                                            | `pnpm test:run`                                          |
+| The published packages work             | All five packages are packed to tarballs, installed with npm into a fresh Vite project, typechecked against the rolled-up declarations with `skipLibCheck: false`, built, clicked in Chrome — and a component mounted and asserted through the published `@gesso/testing`  | `pnpm check:install`                                     |
 | A route cannot change silently          | Eight playground routes are captured in headless Chrome and diffed against committed baselines; 5 px of gap reads 1.718 % against a 0.1 % threshold. Six routes are uncovered, each with its reason in the script                                                          | `pnpm screenshots`                                       |
 | The public surface is reviewed          | Each package's exported declarations are committed as `packages/*/api/*.api.d.ts`; an added export fails the check as an added line                                                                                                                                        | `pnpm api:check`                                         |
 | A screen reader has something to read   | Chrome's own **computed accessibility tree** for two example routes: 31 and 41 nodes, a `switch` carrying `checked`, a `list` of `listitem`s, a `textbox` whose value is the note's text; a synthesised press reaches the app, and Tab leaves the right node focused there | `pnpm check:a11y`                                        |
@@ -326,7 +337,7 @@ One shell, switched by hash:
 
 ### Where things live
 
-Four workspace packages, three of them publishable:
+Six workspace packages, five of them publishable:
 
 | Package             | Directory             | What it is                                                                              |
 | ------------------- | --------------------- | --------------------------------------------------------------------------------------- |
@@ -334,6 +345,7 @@ Four workspace packages, three of them publishable:
 | `@gesso/framework`  | `packages/framework`  | Components, the frame runtime, the worker barrier.                                      |
 | `@gesso/components` | `packages/components` | The component library — five tiers, one contract.                                       |
 | `@gesso/testing`    | `packages/testing`    | `renderTest` — mount a component with no browser and query it as a screen reader would. |
+| `@gesso/devtools`   | `packages/devtools`   | What the runtime will not tell you by itself. So far: the error overlay.                |
 | `@gesso/playground` | `apps/playground`     | The demo harness — the routes and one shell. Private, and not the framework.            |
 
 `@gesso/core` and `@gesso/framework` each carry a second entry, `./testing`, holding the doubles and the mount harness their own suites use; nothing an application builds against reaches through it. `@gesso/testing` is the published one — its root entry imports no test runner at all, and the vitest matchers sit behind `@gesso/testing/matchers` because `expect.extend` is a side effect on a global. Cross-package imports go through a package's root entry, never a deep path, so `api/*.api.d.ts` reviews the whole surface rather than one file at a time.
@@ -375,7 +387,7 @@ And at the root, `scripts/` holds `gen-layout-fixtures.ts` (Chrome → `expected
 
 ```bash
 pnpm dev               # Vite dev server with the playground
-pnpm build             # tsdown for the three packages, then vite for the playground
+pnpm build             # tsdown for the five packages, then vite for the playground
 pnpm preview           # serve the production build
 pnpm test              # vitest, watch mode
 pnpm test:run          # vitest, once
