@@ -48,6 +48,7 @@ interface ControlLayoutProps {
   flexBasis?: UiLength;
   selfX?: UiSelfAlignment;
   selfY?: UiSelfAlignment;
+  rootModifiers?: readonly UiModifier[];
 }
 interface CheckboxProps extends ControlLayoutProps {
   ref?: UiNodeRef;
@@ -350,6 +351,16 @@ interface ImageProps extends ControlLayoutProps {
   placeholderColor?: never;
 }
 declare function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild;
+interface VideoProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  src: string;
+  alt?: string;
+  objectFit?: ObjectFit;
+  borderRadius?: number;
+  loop?: boolean;
+  autoplay?: boolean;
+}
+declare function Video(props: Inputs<VideoProps>, ctx: ComponentContext): UiChild;
 interface IconProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   path: string;
@@ -358,6 +369,7 @@ interface IconProps extends ControlLayoutProps {
   color?: UiColorValue;
   style?: 'fill' | 'stroke';
   strokeWidth?: number;
+  fillRule?: 'nonzero' | 'evenodd';
   label?: string;
 }
 declare function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild;
@@ -478,7 +490,9 @@ export {
   type TooltipProps,
   type TreeNode,
   type TreeProps,
+  type VideoProps,
   type VirtualList,
   useOverlay,
+  Video,
   virtualList
 };

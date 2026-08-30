@@ -76,6 +76,8 @@ declare function colorValuesEqual(a: unknown, b: unknown): boolean;
 interface UiTransform {
   readonly x: number;
   readonly y: number;
+  readonly translateX: number;
+  readonly translateY: number;
   readonly scaleX: number;
   readonly scaleY: number;
   readonly rotation: number;
@@ -84,6 +86,8 @@ declare const UiTransforms: {
   readonly identity: {
     readonly x: 0;
     readonly y: 0;
+    readonly translateX: 0;
+    readonly translateY: 0;
     readonly scaleX: 1;
     readonly scaleY: 1;
     readonly rotation: 0;
@@ -119,6 +123,7 @@ type UiReducedMotionPolicy = 'snap' | 'keep';
 interface UiAnimationOptions {
   stepMs?: number;
   reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
 }
 interface UiTweenOptions extends UiAnimationOptions {
   duration: number;
@@ -134,13 +139,14 @@ declare abstract class UiAnimation<T> {
   readonly cell: AnimatedCell<T>;
   private readonly stepMs;
   readonly reducedMotionPolicy: UiReducedMotionPolicy;
+  private readonly delayMs;
   protected startedAt: number;
   private begun;
   private readonly subject;
   private lastSampledAt;
   private lastWritten;
   private finished;
-  protected constructor(cell: AnimatedCell<T>, stepMs: number, reducedMotionPolicy: UiReducedMotionPolicy);
+  protected constructor(cell: AnimatedCell<T>, stepMs: number, reducedMotionPolicy: UiReducedMotionPolicy, delayMs?: number);
   get values(): Observable<T>;
   get isFinished(): boolean;
   dueAt(now: number): number;
@@ -280,55 +286,6 @@ declare class UiEnvironment {
   getOwn(name: string): unknown;
   providesOwn(name: string): boolean;
 }
-interface Size {
-  width: number;
-  height: number;
-}
-interface LayoutBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-interface TightenOptions {
-  width?: number;
-  height?: number;
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
-}
-declare class Constraints {
-  readonly minWidth: number;
-  readonly maxWidth: number;
-  readonly minHeight: number;
-  readonly maxHeight: number;
-  constructor(minWidth?: number, maxWidth?: number, minHeight?: number, maxHeight?: number);
-  static unbounded(): Constraints;
-  static tight(width: number, height: number): Constraints;
-  static loose(width: number, height: number): Constraints;
-  hasBoundedWidth(): boolean;
-  hasBoundedHeight(): boolean;
-}
-interface LayoutStats {
-  measured: number;
-  placed: number;
-  relayoutRoots: number;
-  fullLayout: boolean;
-  measuredNodes: UiNode[];
-}
-interface LayoutResult {
-  root: UiNode;
-  box: LayoutBox;
-  contentWidth: number;
-  contentHeight: number;
-  scrollX: number;
-  scrollY: number;
-  clip: LayoutBox;
-}
-declare function clampSize(constraints: Constraints, width: number, height: number): Size;
-declare function constraintsEqual(a: Constraints, b: Constraints): boolean;
-declare function tightenConstraints(constraints: Constraints, options: TightenOptions): Constraints;
 declare class LayoutRecord {
   readonly node: UiNode;
   constructor(node: UiNode);
@@ -525,6 +482,104 @@ declare class UiNode {
   getProperty<T>(property: NodeProperty): T | undefined;
   setProperty<T>(property: NodeProperty, value: T): void;
 }
+interface Size {
+  width: number;
+  height: number;
+}
+interface LayoutBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface TightenOptions {
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+}
+declare class Constraints {
+  readonly minWidth: number;
+  readonly maxWidth: number;
+  readonly minHeight: number;
+  readonly maxHeight: number;
+  constructor(minWidth?: number, maxWidth?: number, minHeight?: number, maxHeight?: number);
+  static unbounded(): Constraints;
+  static tight(width: number, height: number): Constraints;
+  static loose(width: number, height: number): Constraints;
+  hasBoundedWidth(): boolean;
+  hasBoundedHeight(): boolean;
+}
+interface LayoutStats {
+  measured: number;
+  placed: number;
+  relayoutRoots: number;
+  fullLayout: boolean;
+  measuredNodes: UiNode[];
+}
+interface LayoutResult {
+  root: UiNode;
+  box: LayoutBox;
+  contentWidth: number;
+  contentHeight: number;
+  scrollX: number;
+  scrollY: number;
+  clip: LayoutBox;
+}
+declare function clampSize(constraints: Constraints, width: number, height: number): Size;
+declare function constraintsEqual(a: Constraints, b: Constraints): boolean;
+declare function tightenConstraints(constraints: Constraints, options: TightenOptions): Constraints;
+interface SharedClaim {
+  readonly box: LayoutBox | null;
+  yieldPrevious(): void;
+}
+declare class UiSharedElements {
+  private readonly holders;
+  claim(name: string, node: UiNode, onYield: () => void): SharedClaim;
+  report(name: string, node: UiNode, box: LayoutBox): void;
+  release(name: string, node: UiNode): void;
+  get names(): readonly string[];
+  clear(): void;
+}
+interface MotionState {
+  readonly opacity?: number;
+  readonly x?: number;
+  readonly y?: number;
+  readonly scale?: number;
+  readonly scaleX?: number;
+  readonly scaleY?: number;
+  readonly rotate?: number;
+}
+type MotionStateInput = MotionState | readonly MotionState[];
+interface ResolvedMotionState {
+  readonly opacity: number;
+  readonly x: number;
+  readonly y: number;
+  readonly scaleX: number;
+  readonly scaleY: number;
+  readonly rotate: number;
+}
+declare const MOTION_REST: ResolvedMotionState;
+declare const MOTION_CHANNELS: readonly ['opacity', 'x', 'y', 'scaleX', 'scaleY', 'rotate'];
+type MotionChannel = (typeof MOTION_CHANNELS)[number];
+declare function resolveMotionState(input: MotionStateInput | null | undefined): ResolvedMotionState;
+declare function isMotionRest(state: ResolvedMotionState): boolean;
+interface MotionTiming {
+  readonly duration?: number | UiDurationToken;
+  readonly easing?: UiEasing | UiEasingToken;
+  readonly spring?: UiSpringToken | UiSpringSpec;
+  readonly delay?: number;
+  readonly reducedMotion?: UiReducedMotionPolicy;
+}
+declare const fade: MotionState;
+declare function slideUp(distance?: number): MotionState;
+declare function slideDown(distance?: number): MotionState;
+declare function slideFrom(edge: 'left' | 'right' | 'top' | 'bottom', distance?: number): MotionState;
+declare function scaleFrom(scale?: number): MotionState;
+declare function rotateFrom(radians: number): MotionState;
+declare function pop(scale?: number): MotionState;
 declare class DirtyNodeSet {
   private readonly nodes;
   mark(node: UiNode): boolean;
@@ -621,11 +676,8 @@ type UiEventListener = (event: UiInputEvent) => void;
 interface UiEventListenerOptions {
   capture?: boolean;
 }
-type UiListenerErrorReporter = (error: unknown, node: UiNode, type: string) => void;
 declare class UiInputDispatcher {
   private readonly stores;
-  private errorReporter;
-  onListenerError(reporter: UiListenerErrorReporter | null): void;
   private readonly typeCount;
   addEventListener(node: UiNode, type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   removeEventListener(node: UiNode, type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
@@ -669,6 +721,10 @@ interface UiModifierHost {
   own(teardown: UiModifierTeardown): void;
   layoutBox(): LayoutBox | null;
   flowBox(): LayoutBox | null;
+  scrollOffset(): {
+    x: number;
+    y: number;
+  } | null;
   onLayout(listener: (box: LayoutBox) => void): void;
   environment<T>(key: UiEnvironmentKey<T>): T;
   onEnvironment(listener: () => void): void;
@@ -678,6 +734,8 @@ interface UiModifierHost {
   decorate(shapes: readonly DecorationShape[] | null): void;
   animate<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): Observable<T>;
   spring(cell: AnimatedCell<number>, to: number, options: UiSpringOptions): Observable<number>;
+  stopAnimation<T>(cell: AnimatedCell<T>): void;
+  readonly shared: UiSharedElements | null;
   requestFrame(): void;
 }
 interface UiModifierKind<A> {
@@ -699,6 +757,10 @@ declare function isUiModifier(value: unknown): value is UiModifier;
 interface UiModifierLayout {
   box(node: UiNode): LayoutBox | null;
   flowBox(node: UiNode): LayoutBox | null;
+  scroll(node: UiNode): {
+    x: number;
+    y: number;
+  } | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 interface UiModifierFocus {
@@ -718,9 +780,10 @@ declare class UiModifierSet {
   private readonly focus?;
   private readonly environment?;
   private readonly animations?;
+  private readonly sharedElements?;
   private attached;
   private decorations;
-  constructor(node: UiNode, graph: UiGraph, dispatcher?: UiInputDispatcher | undefined, layout?: UiModifierLayout | undefined, focus?: UiModifierFocus | undefined, environment?: UiModifierEnvironment | undefined, animations?: AnimationDriver | undefined);
+  constructor(node: UiNode, graph: UiGraph, dispatcher?: UiInputDispatcher | undefined, layout?: UiModifierLayout | undefined, focus?: UiModifierFocus | undefined, environment?: UiModifierEnvironment | undefined, animations?: AnimationDriver | undefined, sharedElements?: UiSharedElements | undefined);
   private decorationsFor;
   get names(): string[];
   get size(): number;
@@ -870,6 +933,17 @@ interface UiTheme {
 declare const lightTheme: UiTheme;
 declare const darkTheme: UiTheme;
 declare function themesEqual(a: UiTheme, b: UiTheme): boolean;
+interface UiVideoSurface {
+  readonly frame: VideoFrame | ImageBitmap | null;
+  readonly version: number;
+  readonly width: number;
+  readonly height: number;
+}
+declare function isVideoSurface(value: unknown): value is UiVideoSurface;
+declare function videoFrameSize(surface: UiVideoSurface): {
+  width: number;
+  height: number;
+};
 type LazyAxis = 'column' | 'row';
 interface LazyListOptions {
   readonly count: Reactive<number>;
@@ -1118,6 +1192,7 @@ declare const UiProperties: {
   readonly transform: UiPropertyDefinition<Partial<UiTransform> | undefined>;
   readonly text: UiPropertyDefinition<string | undefined>;
   readonly image: UiPropertyDefinition<ImageBitmap | undefined>;
+  readonly video: UiPropertyDefinition<UiVideoSurface | undefined>;
   readonly objectFit: UiPropertyDefinition<UiObjectFit | undefined>;
   readonly scrollX: UiPropertyDefinition<number | undefined>;
   readonly scrollY: UiPropertyDefinition<number | undefined>;
@@ -1198,6 +1273,7 @@ interface UiGraphBuilderOptions {
   focus?: UiModifierFocus;
   environment?: UiModifierEnvironment;
   animations?: AnimationDriver;
+  sharedElements?: UiSharedElements;
 }
 declare class UiGraphBuilder {
   private readonly graph;
@@ -1211,6 +1287,7 @@ declare class UiGraphBuilder {
   private readonly focus;
   private readonly modifierEnvironment;
   private readonly animations;
+  private readonly sharedElements;
   private warnedAboutDispatcher;
   private warnedAboutAnimations;
   constructor(graph: UiGraph, options?: UiGraphBuilderOptions);
@@ -1487,6 +1564,7 @@ interface PaintState {
   opacity: number;
   backgroundColor: UiColor | undefined;
   image: UiImage | undefined;
+  video: UiVideoSurface | undefined;
   objectFit: ObjectFit;
   borderColor: UiColor | undefined;
   borderWidth: number;
@@ -1551,7 +1629,7 @@ interface Canvas2DContext {
   stroke(): void;
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
-  drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
   fillStyle: string | CanvasGradient | CanvasPattern;
   strokeStyle: string | CanvasGradient | CanvasPattern;
   lineWidth: number;
@@ -2356,13 +2434,18 @@ declare class LayoutEngine {
   private toNumber;
   private clamp;
 }
+interface NotifiedLayout {
+  readonly box: LayoutBox;
+  readonly scrollX: number;
+  readonly scrollY: number;
+}
 declare class LayoutNotifier {
   private readonly listeners;
   private readonly last;
   add(node: UiNode, listener: (box: LayoutBox) => void): () => void;
   get size(): number;
   isEmpty(): boolean;
-  notify(boxOf: (node: UiNode) => LayoutBox): void;
+  notify(read: (node: UiNode) => NotifiedLayout): void;
   handleNodeRemoved(node: UiNode): void;
 }
 declare const ELLIPSIS = "…";
@@ -2526,6 +2609,7 @@ interface IconSpec {
   readonly color: UiColor;
   readonly style: 'fill' | 'stroke';
   readonly strokeWidth: number;
+  readonly fillRule?: 'nonzero' | 'evenodd';
 }
 interface IconRasterizerOptions {
   scale?: number;
@@ -2543,7 +2627,7 @@ interface IconContext {
   lineWidth: number;
   lineCap: CanvasLineCap;
   lineJoin: CanvasLineJoin;
-  fill(path: Path2D): void;
+  fill(path: Path2D, fillRule?: 'nonzero' | 'evenodd'): void;
   stroke(path: Path2D): void;
 }
 declare function iconKey(spec: IconSpec): string;
@@ -2576,9 +2660,77 @@ interface IconSourceArgs {
   readonly color: UiColorValue;
   readonly style: 'fill' | 'stroke';
   readonly strokeWidth: number;
+  readonly fillRule?: 'nonzero' | 'evenodd';
 }
 declare const iconSource: ((args: IconSourceArgs, key?: string | number) => UiModifier<IconSourceArgs>) & {
   readonly kind: UiModifierKind<IconSourceArgs>;
+};
+interface MotionArgs extends MotionTiming {
+  readonly state?: MotionStateInput | Observable<MotionStateInput | null> | null;
+  readonly initial?: MotionStateInput;
+  readonly onSettled?: () => void;
+}
+declare const motion: ((args: MotionArgs, key?: string | number) => UiModifier<MotionArgs>) & {
+  readonly kind: UiModifierKind<MotionArgs>;
+};
+interface SharedElementArgs extends MotionTiming {
+  readonly name: string;
+  readonly morph?: 'transform' | 'geometry';
+  readonly fadeFrom?: number;
+}
+declare const sharedElement: ((args: SharedElementArgs, key?: string | number) => UiModifier<SharedElementArgs>) & {
+  readonly kind: UiModifierKind<SharedElementArgs>;
+};
+interface VideoPlayback {
+  readonly surface: UiVideoSurface;
+  readonly width: number;
+  readonly height: number;
+  readonly duration: number;
+  present(positionMs: number): boolean;
+  onError(listener: (error: unknown) => void): () => void;
+}
+interface VideoResolver {
+  resolve(source: string): Promise<VideoPlayback>;
+  release(source: string): void;
+  dispose(): void;
+}
+interface DefaultVideoResolverOptions {
+  capacity?: number;
+  fetch?: (source: string) => Promise<ArrayBuffer>;
+}
+declare function canDecodeVideo(): boolean;
+declare class DefaultVideoResolver implements VideoResolver {
+  private readonly entries;
+  private readonly evictable;
+  private readonly capacity;
+  private readonly fetchBuffer;
+  private disposed;
+  constructor(options?: DefaultVideoResolverOptions);
+  get size(): number;
+  resolve(source: string): Promise<VideoPlayback>;
+  release(source: string): void;
+  dispose(): void;
+  private open;
+}
+interface VideoSourceArgs {
+  readonly resolver: VideoResolver;
+  readonly source: string;
+  readonly loop?: boolean;
+  readonly autoplay?: boolean;
+  readonly onState?: (state: 'loading' | 'playing' | 'failed', error?: unknown) => void;
+}
+declare const videoSource: ((args: VideoSourceArgs, key?: string | number) => UiModifier<VideoSourceArgs>) & {
+  readonly kind: UiModifierKind<VideoSourceArgs>;
+};
+interface ScrollOffset {
+  readonly x: number;
+  readonly y: number;
+}
+interface ScrollPositionArgs {
+  readonly onChange: (offset: ScrollOffset) => void;
+}
+declare const scrollPosition: ((args: ScrollPositionArgs, key?: string | number) => UiModifier<ScrollPositionArgs>) & {
+  readonly kind: UiModifierKind<ScrollPositionArgs>;
 };
 declare function resolveProperty<T>(node: UiNode, definition: UiPropertyDefinition<T>): T;
 declare function resolvePropertyByName<T>(node: UiNode, name: string): T | undefined;
@@ -2827,6 +2979,28 @@ interface WebGPUDeviceInit {
   format: GPUTextureFormat;
 }
 declare function initializeWebGPU(): Promise<WebGPUDeviceInit>;
+interface TexturedPipeline {
+  pipeline: GPURenderPipeline;
+  vertexBuffer: GPUBuffer;
+  indexBuffer: GPUBuffer;
+  indexCount: number;
+  uniformBuffer: GPUBuffer;
+  bindGroupLayout: GPUBindGroupLayout;
+  textSampler: GPUSampler;
+  imageSampler: GPUSampler;
+}
+type TextureSource = UiImage | UiVideoSurface;
+declare class WebGPUTextureCache {
+  private readonly device;
+  private readonly pipeline;
+  private readonly images;
+  constructor(device: GPUDevice, pipeline: TexturedPipeline);
+  imageBindGroup(source: TextureSource): GPUBindGroup | null;
+  private stillBindGroup;
+  private videoBindGroup;
+  private upload;
+  private copyInto;
+}
 declare const GLYPH_SUBPIXEL_PHASES = 3;
 interface GlyphStyle {
   readonly font: string;
@@ -2939,7 +3113,7 @@ interface ImageCommand {
   kind: CommandKind.Image;
   instance: number;
   scissor: ScissorRect | null;
-  image: UiImage;
+  source: TextureSource;
 }
 type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
 interface TextRunDraw {
@@ -2974,23 +3148,6 @@ declare function buildRenderList(root: UiNode, layout: {
 }, measurer: TextMeasurer, logicalWidth: number, logicalHeight: number, dpr: number, now?: number, overlay?: readonly OverlayShape[], textCache?: RenderTextCache): RenderList;
 declare function textRuns(list: RenderList): readonly TextRunDraw[];
 declare function glyphCount(list: RenderList): number;
-interface TexturedPipeline {
-  pipeline: GPURenderPipeline;
-  vertexBuffer: GPUBuffer;
-  indexBuffer: GPUBuffer;
-  indexCount: number;
-  uniformBuffer: GPUBuffer;
-  bindGroupLayout: GPUBindGroupLayout;
-  textSampler: GPUSampler;
-  imageSampler: GPUSampler;
-}
-declare class WebGPUTextureCache {
-  private readonly device;
-  private readonly pipeline;
-  private readonly images;
-  constructor(device: GPUDevice, pipeline: TexturedPipeline);
-  imageBindGroup(image: UiImage): GPUBindGroup | null;
-}
 declare class WebGPUGlyphPages {
   private readonly device;
   private readonly pipeline;
@@ -3008,6 +3165,22 @@ declare class WebGPUGlyphPages {
   private upload;
   private scratchFor;
 }
+interface Mp4Sample {
+  readonly offset: number;
+  readonly size: number;
+  readonly timestampUs: number;
+  readonly durationUs: number;
+  readonly isKey: boolean;
+}
+interface Mp4VideoTrack {
+  readonly codec: string;
+  readonly codedWidth: number;
+  readonly codedHeight: number;
+  readonly description?: Uint8Array;
+  readonly samples: readonly Mp4Sample[];
+  readonly durationUs: number;
+}
+declare function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack;
 type UiFrameCallback = (frame: UiFrame) => void;
 interface UiSchedulerOptions {
   clock: UiFrameClockFactory;
@@ -3130,6 +3303,7 @@ export {
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
+  canDecodeVideo,
   Canvas2DContext,
   Canvas2DRenderer,
   Canvas2DRendererOptions,
@@ -3201,9 +3375,12 @@ export {
   defaultShapes,
   defaultTextStyle,
   defaultTypography,
+  DefaultVideoResolver,
+  DefaultVideoResolverOptions,
   defaultVisualState,
   defineModifier,
   defineProperty,
+  demuxMp4Video,
   describeLength,
   detectEditingPlatform,
   diffSemantics,
@@ -3230,6 +3407,7 @@ export {
   ELLIPSIS,
   EnvironmentNotifier,
   EnvironmentProps,
+  fade,
   findEnvironmentKey,
   FindHost,
   FindMatch,
@@ -3303,6 +3481,7 @@ export {
   isEditableNode,
   isFrLength,
   isMinMaxTrack,
+  isMotionRest,
   isMultiline,
   isNodeFocusable,
   isNodeHitTestable,
@@ -3318,6 +3497,7 @@ export {
   isUiModifier,
   isUiRole,
   isUiSemanticState,
+  isVideoSurface,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -3358,6 +3538,16 @@ export {
   measure,
   minmax,
   MinMaxTrack,
+  motion,
+  MOTION_CHANNELS,
+  MOTION_REST,
+  MotionArgs,
+  MotionChannel,
+  MotionState,
+  MotionStateInput,
+  MotionTiming,
+  Mp4Sample,
+  Mp4VideoTrack,
   nextCaretToggle,
   nextGraphemeEnd,
   nextWordEnd,
@@ -3401,6 +3591,7 @@ export {
   PlatformEventTarget,
   PlatformSurface,
   PointerControllerOptions,
+  pop,
   PositionProps,
   pressable,
   previousGraphemeStart,
@@ -3428,7 +3619,9 @@ export {
   resetTransitionWarnings,
   resolveBoolean,
   resolveCursor,
+  ResolvedMotionState,
   resolveLength,
+  resolveMotionState,
   resolveNumber,
   resolvePaintState,
   resolveProperty,
@@ -3436,9 +3629,12 @@ export {
   resolveString,
   rgb8,
   rgba,
+  rotateFrom,
   Row,
   RowProps,
+  Rs,
   RunMeasure,
+  scaleFrom,
   ScissorRect,
   ScrollAdjustment,
   SCROLLBAR_FADE_MS,
@@ -3453,6 +3649,9 @@ export {
   scrollbarThumbs,
   scrollbarZoneAt,
   ScrollContainerState,
+  ScrollOffset,
+  scrollPosition,
+  ScrollPositionArgs,
   ScrollSink,
   ScrollView,
   ScrollViewProps,
@@ -3467,9 +3666,15 @@ export {
   setSelectionRange,
   shadowsEqual,
   shapesEqual,
+  SharedClaim,
+  sharedElement,
+  SharedElementArgs,
   Size,
   SizeDecision,
   sizeGridTracks,
+  slideDown,
+  slideFrom,
+  slideUp,
   spring,
   Stack,
   StackProps,
@@ -3565,7 +3770,6 @@ export {
   UiKeyboardEvent,
   UiKeyModifiers,
   UiLength,
-  UiListenerErrorReporter,
   UiManualFrameClock,
   UiModifier,
   UiModifierEnvironment,
@@ -3615,6 +3819,7 @@ export {
   UiSemanticsUpdate,
   UiShadows,
   UiShapes,
+  UiSharedElements,
   UiSpring,
   UiSpringOptions,
   UiSpringSpec,
@@ -3639,6 +3844,7 @@ export {
   UiTweenOptions,
   UiTypography,
   UiVerticalAlign,
+  UiVideoSurface,
   UiVirtualWindow,
   UiVisualState,
   UiVisualStateSet,
@@ -3649,6 +3855,11 @@ export {
   validateStates,
   validateSubgrid,
   VerticalAlign,
+  videoFrameSize,
+  VideoPlayback,
+  VideoResolver,
+  videoSource,
+  VideoSourceArgs,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
@@ -3657,7 +3868,6 @@ export {
   VirtualViewport,
   visualState,
   visualStatesEqual,
-  vs,
   WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
@@ -3702,6 +3912,7 @@ import {
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
+  canDecodeVideo,
   Canvas2DContext,
   Canvas2DRenderer,
   Canvas2DRendererOptions,
@@ -3773,9 +3984,12 @@ import {
   defaultShapes,
   defaultTextStyle,
   defaultTypography,
+  DefaultVideoResolver,
+  DefaultVideoResolverOptions,
   defaultVisualState,
   defineModifier,
   defineProperty,
+  demuxMp4Video,
   describeLength,
   detectEditingPlatform,
   diffSemantics,
@@ -3802,6 +4016,7 @@ import {
   ELLIPSIS,
   EnvironmentNotifier,
   EnvironmentProps,
+  fade,
   findEnvironmentKey,
   FindHost,
   FindMatch,
@@ -3876,6 +4091,7 @@ import {
   isEditableNode,
   isFrLength,
   isMinMaxTrack,
+  isMotionRest,
   isMultiline,
   isNodeFocusable,
   isNodeHitTestable,
@@ -3891,6 +4107,7 @@ import {
   isUiModifier,
   isUiRole,
   isUiSemanticState,
+  isVideoSurface,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -3931,6 +4148,16 @@ import {
   measure,
   minmax,
   MinMaxTrack,
+  motion,
+  MOTION_CHANNELS,
+  MOTION_REST,
+  MotionArgs,
+  MotionChannel,
+  MotionState,
+  MotionStateInput,
+  MotionTiming,
+  Mp4Sample,
+  Mp4VideoTrack,
   nextCaretToggle,
   nextGraphemeEnd,
   nextWordEnd,
@@ -3974,6 +4201,7 @@ import {
   PlatformEventTarget,
   PlatformSurface,
   PointerControllerOptions,
+  pop,
   PositionProps,
   pressable,
   previousGraphemeStart,
@@ -4001,7 +4229,9 @@ import {
   resetTransitionWarnings,
   resolveBoolean,
   resolveCursor,
+  ResolvedMotionState,
   resolveLength,
+  resolveMotionState,
   resolveNumber,
   resolvePaintState,
   resolveProperty,
@@ -4009,9 +4239,11 @@ import {
   resolveString,
   rgb8,
   rgba,
+  rotateFrom,
   Row,
   RowProps,
   RunMeasure,
+  scaleFrom,
   ScissorRect,
   ScrollAdjustment,
   SCROLLBAR_FADE_MS,
@@ -4026,6 +4258,9 @@ import {
   scrollbarThumbs,
   scrollbarZoneAt,
   ScrollContainerState,
+  ScrollOffset,
+  scrollPosition,
+  ScrollPositionArgs,
   ScrollSink,
   ScrollView,
   ScrollViewProps,
@@ -4040,9 +4275,15 @@ import {
   setSelectionRange,
   shadowsEqual,
   shapesEqual,
+  SharedClaim,
+  sharedElement,
+  SharedElementArgs,
   Size,
   SizeDecision,
   sizeGridTracks,
+  slideDown,
+  slideFrom,
+  slideUp,
   spring,
   Stack,
   StackProps,
@@ -4138,7 +4379,6 @@ import {
   UiKeyboardEvent,
   UiKeyModifiers,
   UiLength,
-  UiListenerErrorReporter,
   UiManualFrameClock,
   UiModifier,
   UiModifierEnvironment,
@@ -4188,6 +4428,7 @@ import {
   UiSemanticsUpdate,
   UiShadows,
   UiShapes,
+  UiSharedElements,
   UiSpring,
   UiSpringOptions,
   UiSpringSpec,
@@ -4212,6 +4453,7 @@ import {
   UiTweenOptions,
   UiTypography,
   UiVerticalAlign,
+  UiVideoSurface,
   UiVirtualWindow,
   UiVisualState,
   UiVisualStateSet,
@@ -4222,6 +4464,11 @@ import {
   validateStates,
   validateSubgrid,
   VerticalAlign,
+  videoFrameSize,
+  VideoPlayback,
+  VideoResolver,
+  videoSource,
+  VideoSourceArgs,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
@@ -4242,7 +4489,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CZHunoom.js";
+} from "./index-0gF9HJwQ.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4264,6 +4511,7 @@ export {
   buildSemanticsTree,
   Button,
   BUTTON_INTERACTION,
+  canDecodeVideo,
   Canvas2DRenderer,
   CanvasPlatformSurface,
   CanvasSurface,
@@ -4318,9 +4566,11 @@ export {
   defaultShapes,
   defaultTextStyle,
   defaultTypography,
+  DefaultVideoResolver,
   defaultVisualState,
   defineModifier,
   defineProperty,
+  demuxMp4Video,
   describeLength,
   detectEditingPlatform,
   diffSemantics,
@@ -4337,6 +4587,7 @@ export {
   editorOf,
   ELLIPSIS,
   EnvironmentNotifier,
+  fade,
   findEnvironmentKey,
   findMatchesIn,
   findPropertyDefinition,
@@ -4376,6 +4627,7 @@ export {
   isEditableNode,
   isFrLength,
   isMinMaxTrack,
+  isMotionRest,
   isMultiline,
   isNodeFocusable,
   isNodeHitTestable,
@@ -4391,6 +4643,7 @@ export {
   isUiModifier,
   isUiRole,
   isUiSemanticState,
+  isVideoSurface,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
@@ -4416,6 +4669,9 @@ export {
   matchRangesOf,
   measure,
   minmax,
+  motion,
+  MOTION_CHANNELS,
+  MOTION_REST,
   nextCaretToggle,
   nextGraphemeEnd,
   nextWordEnd,
@@ -4445,6 +4701,7 @@ export {
   parseTransform,
   percent,
   placeGridItems,
+  pop,
   pressable,
   previousGraphemeStart,
   previousWordStart,
@@ -4462,6 +4719,7 @@ export {
   resolveBoolean,
   resolveCursor,
   resolveLength,
+  resolveMotionState,
   resolveNumber,
   resolvePaintState,
   resolveProperty,
@@ -4469,7 +4727,9 @@ export {
   resolveString,
   rgb8,
   rgba,
+  rotateFrom,
   Row,
+  scaleFrom,
   SCROLLBAR_FADE_MS,
   SCROLLBAR_HOVER_ZONE,
   SCROLLBAR_INSET,
@@ -4479,6 +4739,7 @@ export {
   scrollbarThumb,
   scrollbarThumbs,
   scrollbarZoneAt,
+  scrollPosition,
   ScrollView,
   selectableTextNodes,
   selectableTextOf,
@@ -4489,7 +4750,11 @@ export {
   setSelectionRange,
   shadowsEqual,
   shapesEqual,
+  sharedElement,
   sizeGridTracks,
+  slideDown,
+  slideFrom,
+  slideUp,
   spring,
   Stack,
   statesEqual,
@@ -4535,6 +4800,7 @@ export {
   type DecorationShape,
   type DecorationStroke,
   type DefaultImageResolverOptions,
+  type DefaultVideoResolverOptions,
   type DrawStats,
   type Edges,
   type EditableTextProps,
@@ -4595,6 +4861,13 @@ export {
   type LazyListProps,
   type LazySourceArgs,
   type MinMaxTrack,
+  type MotionArgs,
+  type MotionChannel,
+  type MotionState,
+  type MotionStateInput,
+  type MotionTiming,
+  type Mp4Sample,
+  type Mp4VideoTrack,
   type NodeId,
   type NodeProperty,
   type ObjectFit,
@@ -4620,6 +4893,7 @@ export {
   type RenderHooks,
   type RenderList,
   type RenderTextCache,
+  type ResolvedMotionState,
   type RowProps,
   type RunMeasure,
   type ScissorRect,
@@ -4627,10 +4901,14 @@ export {
   type ScrollbarAxis,
   type ScrollbarThumb,
   type ScrollContainerState,
+  type ScrollOffset,
+  type ScrollPositionArgs,
   type ScrollSink,
   type ScrollViewProps,
   type SelectionControllerOptions,
   type SelectionHost,
+  type SharedClaim,
+  type SharedElementArgs,
   type Size,
   type SizeDecision,
   type StackProps,
@@ -4665,7 +4943,6 @@ export {
   type UiInterpolator,
   type UiKeyModifiers,
   type UiLength,
-  type UiListenerErrorReporter,
   type UiModifier,
   type UiModifierEnvironment,
   type UiModifierFocus,
@@ -4695,7 +4972,11 @@ export {
   type UiTransitionSpec,
   type UiTransitionValue,
   type UiTweenOptions,
+  type UiVideoSurface,
   type VerticalAlign,
+  type VideoPlayback,
+  type VideoResolver,
+  type VideoSourceArgs,
   type VirtualItemMeasure,
   type VirtualUpdate,
   type VirtualViewport,
@@ -4771,6 +5052,7 @@ export {
   UiSemanticStates,
   UiShadows,
   UiShapes,
+  UiSharedElements,
   UiSpring,
   UiSpringSpec,
   UiSpringToken,
@@ -4798,6 +5080,8 @@ export {
   validateRole,
   validateStates,
   validateSubgrid,
+  videoFrameSize,
+  videoSource,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
@@ -4839,7 +5123,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-CZHunoom.js";
+} from "./index-0gF9HJwQ.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

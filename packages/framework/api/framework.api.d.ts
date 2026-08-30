@@ -200,6 +200,8 @@ import {
   ImageResolver,
   LayoutExplanation,
   LayoutInspector,
+  MotionStateInput,
+  MotionTiming,
   RendererBackend,
   TextMeasurer,
   UI_ROLES,
@@ -216,6 +218,7 @@ import {
   UiInputDispatcher,
   UiKeyboardController,
   UiKeyModifiers,
+  UiLength,
   UiMotion,
   UiNode,
   UiPlatformAdapter,
@@ -233,7 +236,8 @@ import {
   UiSemanticsUpdate,
   UiSpringSpec,
   UiSpringToken,
-  UiWheelController
+  UiWheelController,
+  VideoResolver
 } from "@gesso/core";
 declare class InternalState<T> extends BehaviorSubject<T> {
   constructor(initialValue: T);
@@ -653,6 +657,7 @@ declare class GessoRuntime {
   private readonly focusManager;
   private readonly layoutNotifier;
   private readonly animations;
+  private readonly sharedElements;
   private readonly focusNotifier;
   private readonly environmentNotifier;
   private semantics;
@@ -692,6 +697,7 @@ declare class GessoRuntime {
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
   get reducedMotion(): boolean;
+  get sharedElementNames(): readonly string[];
   explain(node: UiNode): LayoutExplanation;
   debugRoot(): UiNode;
   debugLayoutBox(node: UiNode): {
@@ -1022,10 +1028,28 @@ declare class GessoApp {
   private handleShellRequest;
   private observeResize;
 }
+interface RouteTransition {
+  enter?: MotionStateInput;
+  exit?: MotionStateInput;
+  mode?: 'together' | 'wait';
+  timing?: MotionTiming;
+}
 declare class RouterOutlet extends Component {
   router: RouterService;
+  transition: InputCell<RouteTransition | undefined>;
   render(): UiChild;
 }
+interface PresenceProps {
+  children?: UiChild | readonly UiChild[];
+  enter?: MotionStateInput;
+  exit?: MotionStateInput;
+  mode?: 'together' | 'wait';
+  timing?: MotionTiming;
+  width?: UiLength | number;
+  height?: UiLength | number;
+  exitTimeout?: number;
+}
+declare function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): UiChild;
 type UiDuration = UiDurationToken | number;
 type UiEasingChoice = UiEasingToken | UiEasing;
 interface AnimateOptions {
@@ -1034,6 +1058,7 @@ interface AnimateOptions {
   stepMs?: number;
   repeat?: boolean;
   reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
 }
 interface SpringOptions {
   spring?: UiSpringToken | UiSpringSpec;
@@ -1043,6 +1068,7 @@ interface SpringOptions {
   velocity?: number;
   restDelta?: number;
   reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
 }
 declare class AnimationService {
   readonly reducedMotion: InternalState<boolean>;
@@ -1080,10 +1106,14 @@ declare class FindService {
 declare class MediaService {
   private imageResolver;
   private iconRasterizer;
+  private videoResolver;
   private ownsResolver;
+  private ownsVideoResolver;
   get images(): ImageResolver;
   get icons(): IconRasterizer;
+  get videos(): VideoResolver;
   setResolver(resolver: ImageResolver): void;
+  setVideoResolver(resolver: VideoResolver): void;
   setRasterizer(rasterizer: IconRasterizer): void;
   dispose(): void;
 }
@@ -1258,6 +1288,7 @@ export {
   OverlayService,
   parseUrl,
   portHandle,
+  Presence,
   provide,
   ProvidedChannel,
   renderRoot,
@@ -1306,6 +1337,7 @@ export {
   type PatchPath,
   type PortHandshake,
   type PortHost,
+  type PresenceProps,
   type RendererChoice,
   type RouteContext,
   type RouteDefinition,
