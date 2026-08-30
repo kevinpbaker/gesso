@@ -25,7 +25,9 @@ import {
 } from '../components';
 import { FocusStore } from '../framework/app/FocusStore';
 import { darkTheme, lightTheme } from '../ui/environment/UiTheme';
-import { focusRing, interactive } from '../ui/modifiers';
+import { animateLayout, focusRing, interactive } from '../ui/modifiers';
+import { spring, tween } from '../ui/animation';
+import { AnimationStore } from '../framework/app/AnimationStore';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
 import { auto, fr, percent, repeat } from '../ui/layout';
@@ -1409,6 +1411,123 @@ export class LazyListDemo extends Component {
   }
 }
 
+/**
+ * Animation (roadmap F4): the three things §F4 says it is done when.
+ *
+ * A **reorder** whose rows animate to their new places — keyed
+ * children, so the nodes survive the shuffle, and `animateLayout` on
+ * each one, which reads the old box from B2's `LayoutNotifier` and
+ * springs the node home from it. A **declarative transition**, where
+ * nothing in the element knows it is animated: the props are the same
+ * bound values they would be without it, and `transition` says how
+ * they travel. And a **reduced-motion** switch, so the accessibility
+ * half is visible rather than asserted.
+ *
+ * The dialog that fades and scales is in the Overlays card above; it
+ * is the `Dialog` component's own entrance, so every dialog in the
+ * library has it.
+ */
+@Define('animation-demo')
+export class AnimationDemo extends Component {
+  @Inject(AnimationStore) animations!: AnimationStore;
+
+  @State() order = state([0, 1, 2, 3, 4]);
+  @State() expanded = state(false);
+
+  private shuffle(): void {
+    const next = [...this.order.value];
+    // One rotation plus a swap: every row moves, and two of them swap
+    // past each other, which is where a FLIP either looks right or
+    // very obviously does not.
+    next.push(next.shift()!);
+    [next[1], next[2]] = [next[2], next[1]];
+    this.order.value = next;
+  }
+
+  override render(): UiElement {
+    const rows = this.order.pipe(
+      map(order =>
+        order.map(id =>
+          Row(
+            {
+              key: id,
+              // The list is what animates; each row carries the
+              // modifier, so a row that is not in the list is not
+              // paying for it.
+              modifiers: [animateLayout(undefined)],
+              padding: 8,
+              gap: 10,
+              y: 'center',
+              backgroundColor: 'controlBackground',
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: 'border'
+            },
+            Box({ width: 10, height: 10, borderRadius: 5, backgroundColor: ROW_COLORS[id] }),
+            Text({ text: ROW_LABELS[id], color: 'controlForeground', fontSize: 13 })
+          )
+        )
+      )
+    );
+
+    return Column(
+      { width: 340, gap: 10, theme: darkTheme },
+      createComponent(Card, {
+        title: 'Animation (F4)',
+        children: Column(
+          { gap: 12 },
+          Text({
+            text: 'Reorder springs each row from where it was; the panel below is animated by a transition prop alone.',
+            color: 'textMuted',
+            fontSize: 12
+          }),
+          Column({ gap: 6 }, rows),
+          Row(
+            { gap: 8 },
+            labelButton('Shuffle', () => this.shuffle()),
+            labelButton('Toggle', () => (this.expanded.value = !this.expanded.value)),
+            // Stands in for the shell's `prefers-reduced-motion` query,
+            // which lands on exactly this call after crossing the
+            // worker boundary as a `reducedMotion` message.
+            labelButton('Motion', () => this.animations.applyReducedMotion(!this.animations.reducedMotion.value))
+          ),
+          Text({
+            text: this.animations.reducedMotion.pipe(map(on => (on ? 'Reduced motion: on' : 'Reduced motion: off'))),
+            color: 'textMuted',
+            fontSize: 11
+          }),
+          Box(
+            {
+              // Not one animation call anywhere: three bound values and
+              // a statement of how each one travels.
+              transition: {
+                opacity: 200,
+                height: spring('gentle'),
+                transform: tween(260)
+              },
+              width: percent(100),
+              height: this.expanded.pipe(map(on => (on ? 96 : 32))),
+              opacity: this.expanded.pipe(map(on => (on ? 1 : 0.35))),
+              transform: this.expanded.pipe(map(on => ({ x: 150, y: 16, scaleX: on ? 1 : 0.9, scaleY: 1 }))),
+              backgroundColor: 'controlAccent',
+              borderRadius: 6
+            },
+            Text({
+              text: 'transition: { opacity, height, transform }',
+              color: 'controlBackground',
+              fontSize: 11,
+              padding: 8
+            })
+          )
+        )
+      })
+    );
+  }
+}
+
+const ROW_COLORS = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'];
+const ROW_LABELS = ['Inbox', 'Drafts', 'Sent', 'Archive', 'Trash'];
+
 @Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoStore) demo!: DemoStore;
@@ -1461,6 +1580,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(StructureTierDemo),
       createComponent(DataTierDemo),
       createComponent(MediaTierDemo),
+      createComponent(AnimationDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),
@@ -1476,6 +1596,26 @@ export class FrameworkDemoRoot extends Component {
       Column({ gap: 6, x: 'start' }, this.recentTicks())
     );
   }
+}
+
+/**
+ * A button wide enough for a word, where `stepButton` is sized for a
+ * single glyph.
+ */
+function labelButton(label: string, onClick: () => void): UiElement {
+  return Button({
+    text: label,
+    onClick,
+    color: '#e5e7eb',
+    fontSize: 13,
+    height: 28,
+    paddingLeft: 12,
+    paddingRight: 12,
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    borderRadius: 4,
+    backgroundColor: '#374151'
+  });
 }
 
 function stepButton(label: string, onClick: () => void): UiElement {
