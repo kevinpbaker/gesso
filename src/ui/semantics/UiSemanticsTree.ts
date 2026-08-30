@@ -35,6 +35,8 @@ export interface UiSemanticsRecord {
   readonly valueText?: string;
   readonly posInSet?: number;
   readonly setSize?: number;
+  /** How deep a treeitem sits, 1 for a root. */
+  readonly level?: number;
 }
 
 /** Insertion-ordered: iterating the map walks the tree in document order. */
@@ -163,7 +165,8 @@ function describe(
     valueMax: node.properties.get('valueMax') as number | undefined,
     valueText: valueTextOf(node),
     posInSet: node.properties.get('posInSet') as number | undefined,
-    setSize: node.properties.get('setSize') as number | undefined
+    setSize: node.properties.get('setSize') as number | undefined,
+    level: node.properties.get('level') as number | undefined
   });
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BehaviorSubject } from 'rxjs';
 
 import { NodalRuntime } from './NodalRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
@@ -22,12 +23,12 @@ function countNodes(root: UiNode, type: UiNodeType): number {
  * virtualization doing its work before layout.
  */
 describe('NodalRuntime lazy lists', () => {
-  function mount(rows = 100000) {
+  function mount(rows: number | BehaviorSubject<number> = 100000, revision?: BehaviorSubject<unknown>) {
     let clock!: UiManualFrameClock;
     const renders: number[] = [];
     const runtime = new NodalRuntime({
       root: LazyColumn(
-        { height: 200, count: rows, estimatedExtent: 20, overscan: 2, initialViewportExtent: 200 },
+        { height: 200, count: rows, estimatedExtent: 20, overscan: 2, initialViewportExtent: 200, revision },
         index => {
           renders.push(index);
           return Row({ height: 20 }, Text({ text: `row ${index}` }));
@@ -82,6 +83,40 @@ describe('NodalRuntime lazy lists', () => {
     visit(list);
     expect(texts[0]).toBe('row 98');
     expect(texts[texts.length - 1]).toBe('row 112');
+    runtime.dispose();
+  });
+
+  it('follows an observable count, on the first frame and after it', () => {
+    const count = new BehaviorSubject(0);
+    const { runtime, frame, list } = mount(count);
+    // Nothing to show yet, and no wait for a second frame to say so.
+    expect(countNodes(list, UiNodeType.Text)).toBe(0);
+
+    count.next(1000);
+    frame();
+    expect(countNodes(list, UiNodeType.Text)).toBe(13);
+
+    // A shorter list drops what it cannot show, and the scroll offset
+    // the engine clamps comes back into range.
+    runtime.input.wheel.wheel(100, 100, 0, 10_000, noKeyModifiers());
+    frame();
+    count.next(5);
+    frame();
+    expect(countNodes(list, UiNodeType.Text)).toBe(5);
+    runtime.dispose();
+  });
+
+  it('re-renders the mounted rows when the revision says the data behind them moved', () => {
+    const revision = new BehaviorSubject<unknown>(0);
+    const { runtime, frame, renders } = mount(1000, revision);
+    expect(renders).toHaveLength(13);
+
+    revision.next(1);
+    frame();
+
+    // The same thirteen indices, rendered again: index 5 is a
+    // different row after a sort, and its cells are written in place.
+    expect(renders.slice(13)).toEqual(Array.from({ length: 13 }, (_, i) => i));
     runtime.dispose();
   });
 

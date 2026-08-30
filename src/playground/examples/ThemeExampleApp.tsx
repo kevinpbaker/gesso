@@ -299,7 +299,11 @@ export function buildTheme(spec: ThemeSpec): UiTheme {
     controlForeground: text,
     controlForegroundDisabled: hex(palette.textMuted),
     controlAccent: primary,
-    danger: hex(palette.negative)
+    danger: hex(palette.negative),
+    // A chosen row: the accent behind it, and text that stays legible
+    // on top of it whichever way the palette leans.
+    selectionBackground: mix(hex(palette.surface), primary, palette.dark ? 0.32 : 0.2),
+    selectionForeground: text
   };
   return {
     colors,

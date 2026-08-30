@@ -138,12 +138,14 @@ export class UiGraph {
       // First child.
       parent.firstChild = child;
       parent.lastChild = child;
+      this.inheritEnvironment(child);
       return;
     }
     const previous = parent.lastChild;
     previous.nextSibling = child;
     child.previousSibling = previous;
     parent.lastChild = child;
+    this.inheritEnvironment(child);
   }
 
   /**
@@ -175,6 +177,7 @@ export class UiGraph {
     if (parent.lastChild === reference) {
       parent.lastChild = child;
     }
+    this.inheritEnvironment(child);
   }
 
   public removeNode(node: UiNode): void {
@@ -627,6 +630,48 @@ export class UiGraph {
     }
     node.environment = environment;
     return true;
+  }
+
+  /**
+   * Gives a freshly attached subtree the environment of the tree it
+   * joined.
+   *
+   * Environments used to be built once, when the root was built, and
+   * afterwards only for a node whose own provider property changed. So
+   * every node mounted later — a keyed list's new row, and every row a
+   * lazy list mounts as it scrolls — kept `environment === null` and
+   * resolved its palette names against the *default* theme: a row
+   * chosen in a dark table came out in the light theme's blue, in a
+   * card that had provided a dark theme since the first frame.
+   *
+   * This runs at attach because the builder writes a node's props and
+   * builds its children before putting it in the tree, so by the time
+   * an edge is made both the subtree and its new parent's environment
+   * are final. The walk is bounded by the subtree being attached, which
+   * is what a mount costs anyway.
+   */
+  private inheritEnvironment(child: UiNode): void {
+    if (child.parent?.environment == null) {
+      return;
+    }
+    const visit = (node: UiNode): void => {
+      const previous = node.environment;
+      const next = this.buildNodeEnvironment(node);
+      if (previous === null || !this.environmentsEqual(previous, next)) {
+        node.environment = next;
+        // A node that already had an environment and now resolves a
+        // different one has to repaint. A node that had none is new,
+        // and its creation dirtied it already — marking it again would
+        // only widen the flags a freshly built node reports.
+        if (previous !== null) {
+          this.markDirty(node, inheritedPropertyFlags);
+        }
+      }
+      for (let current = node.firstChild; current !== null; current = current.nextSibling) {
+        visit(current);
+      }
+    };
+    visit(child);
   }
 
   /**

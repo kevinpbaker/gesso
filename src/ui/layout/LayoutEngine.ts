@@ -1054,28 +1054,35 @@ export class LayoutEngine {
     const rowGap = this.numberProp(node, 'rowGap') ?? gap;
     const gridX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Stretch;
 
-    const requests: GridItemRequest<UiNode>[] = [];
-    this.forEachLayoutChild(node, child => {
-      requests.push({
-        item: child,
-        column: this.lineProp(child, 'column'),
-        row: this.lineProp(child, 'row'),
-        columnSpan: Math.max(1, Math.floor(this.numberProp(child, 'columnSpan') ?? 1)),
-        rowSpan: Math.max(1, Math.floor(this.numberProp(child, 'rowSpan') ?? 1))
-      });
-    });
-    const placed = placeGridItems(requests, columnsProp.length, rowsProp.length, flow);
-    const columnSizes = this.fillTracks(columnsProp, placed.columnCount, autoColumns);
+    // A subgrid's own tracks come from its parent, so its own `columns`
+    // prop is not read here: the tracks it has are the span it was
+    // given, and its cells are placed into those.
+    const subgridded = this.subgridColumns(node);
+    const explicitColumns = subgridded?.tracks.length ?? columnsProp.length;
+    const requests = this.gridRequests(node, explicitColumns);
+    const placed = placeGridItems(requests, explicitColumns, rowsProp.length, flow);
+    const columnSizes = subgridded?.tracks ?? this.fillTracks(columnsProp, placed.columnCount, autoColumns);
     const rowSizes = this.fillTracks(rowsProp, placed.rowCount, autoRows);
+    const effectiveColumnGap = subgridded?.gap ?? columnGap;
 
     const savedBase = this.percentBase;
     this.percentBase = { width: availableWidth, height: availableHeight };
 
-    // Columns: from each item's min- and max-content width.
+    // Columns: from each item's min- and max-content width — except a
+    // subgrid item, whose own children contribute to the tracks it
+    // spans, one per column, so the parent sizes a column from the
+    // cells in it rather than from a row treated as one lump.
     const gridRec = this.record(node);
-    const columnItems = placed.placements.map(placement => {
+    const columnItems: Array<{ start: number; end: number; contribution: GridContribution }> = [];
+    for (const placement of placed.placements) {
       const cRec = this.record(placement.item);
       this.resolveLayoutProps(placement.item, cRec);
+      if (this.isSubgrid(placement.item)) {
+        cRec.contentMatters = true;
+        cRec.relayoutBoundary = false;
+        this.collectSubgridColumns(placement, columnItems);
+        continue;
+      }
       // Tracks are sized from the items' content unless both of an
       // item's sizes are lengths.
       const explicitBoth =
@@ -1090,20 +1097,28 @@ export class LayoutEngine {
         min: this.minContentContribution(placement.item, cRec) + marginH,
         max: cRec.measuredWidth + marginH
       };
-      return { start: placement.columnStart, end: placement.columnEnd, contribution };
-    });
+      columnItems.push({ start: placement.columnStart, end: placement.columnEnd, contribution });
+    }
     const columns = sizeGridTracks({
       sizes: columnSizes,
       available: availableWidth,
-      gap: columnGap,
+      gap: effectiveColumnGap,
       distribution: parseAlignContent(node.properties.get('justifyContent')),
       items: columnItems
     });
 
+    // Every subgrid row now knows the widths it must lay its cells out
+    // in, before it is measured for its own row's height below.
+    for (const placement of placed.placements) {
+      if (this.isSubgrid(placement.item)) {
+        this.publishSubgridTracks(placement, columns, effectiveColumnGap);
+      }
+    }
+
     // Rows: from each item's height at the width its column area gives it.
     const rowItems = placed.placements.map(placement => {
       const cRec = this.record(placement.item);
-      const areaWidth = this.spanExtent(columns, placement.columnStart, placement.columnEnd, columnGap);
+      const areaWidth = this.spanExtent(columns, placement.columnStart, placement.columnEnd, effectiveColumnGap);
       const alignX = this.stackAlignment(placement.item, 'selfX', 'width', gridX);
       const marginH = cRec.marginLeft + cRec.marginRight;
       const width = Math.max(0, areaWidth - marginH);
@@ -1125,6 +1140,120 @@ export class LayoutEngine {
     this.percentBase = savedBase;
     void content;
     return { columns, rows, placements: placed.placements };
+  }
+
+  /**
+   * A grid's items, fragments expanded, with their placement requests.
+   *
+   * A subgrid child that does not say how many columns it spans spans
+   * all of them: a table row shares the whole header, and requiring
+   * every row to repeat the column count would be a number to keep in
+   * step with the columns array.
+   */
+  private gridRequests(node: UiNode, explicitColumns: number): GridItemRequest<UiNode>[] {
+    const requests: GridItemRequest<UiNode>[] = [];
+    this.forEachLayoutChild(node, child => {
+      const declaredSpan = this.numberProp(child, 'columnSpan');
+      const span =
+        declaredSpan === undefined && this.isSubgrid(child)
+          ? Math.max(1, explicitColumns)
+          : Math.max(1, Math.floor(declaredSpan ?? 1));
+      requests.push({
+        item: child,
+        column: this.lineProp(child, 'column'),
+        row: this.lineProp(child, 'row'),
+        columnSpan: span,
+        rowSpan: Math.max(1, Math.floor(this.numberProp(child, 'rowSpan') ?? 1))
+      });
+    });
+    return requests;
+  }
+
+  /** A Grid that takes its column tracks from the grid it sits in. */
+  private isSubgrid(node: UiNode): boolean {
+    return node.type === UiNodeType.Grid && node.properties.get('subgrid') === 'columns';
+  }
+
+  /**
+   * The tracks a subgrid was handed by its parent, as fixed lengths, or
+   * undefined for an ordinary grid.
+   *
+   * A subgrid that is laid out with no parent tracks yet — measured on
+   * its own, or sitting in something that is not a Grid — falls back to
+   * its own `columns`, so it degrades to an ordinary grid rather than
+   * collapsing to nothing.
+   */
+  private subgridColumns(node: UiNode): { tracks: UiTrackSize[]; gap: number } | undefined {
+    if (!this.isSubgrid(node)) {
+      return undefined;
+    }
+    const rec = this.record(node);
+    if (rec.subgridColumns === undefined) {
+      return undefined;
+    }
+    return { tracks: [...rec.subgridColumns], gap: rec.subgridColumnGap };
+  }
+
+  /**
+   * Contributes a subgrid's cells to the parent's tracks, one entry per
+   * cell in the parent's column space.
+   *
+   * The cells are measured here rather than through the subgrid,
+   * because the subgrid cannot be measured until the tracks these
+   * contributions decide exist. A subgrid's own horizontal padding and
+   * margins are not distributed into the tracks (CSS subgrid does):
+   * a row that wants inset content puts the padding on its cells.
+   */
+  private collectSubgridColumns(
+    placement: GridPlacement<UiNode>,
+    out: Array<{ start: number; end: number; contribution: GridContribution }>
+  ): void {
+    const span = placement.columnEnd - placement.columnStart;
+    const inner = placeGridItems(this.gridRequests(placement.item, span), span, 0, 'row');
+    for (const cell of inner.placements) {
+      const cellRec = this.record(cell.item);
+      this.resolveLayoutProps(cell.item, cellRec);
+      cellRec.contentMatters = true;
+      this.measure(cell.item, new Constraints(0, Infinity, 0, Infinity));
+      cellRec.relayoutBoundary = false;
+      const marginH = cellRec.marginLeft + cellRec.marginRight;
+      out.push({
+        // A cell beyond the row's span is clamped into it: the parent
+        // has no track there, and a row is not allowed to add one.
+        start: placement.columnStart + Math.min(cell.columnStart, span - 1),
+        end: placement.columnStart + Math.min(cell.columnEnd, span),
+        contribution: {
+          min: this.minContentContribution(cell.item, cellRec) + marginH,
+          max: cellRec.measuredWidth + marginH
+        }
+      });
+    }
+  }
+
+  /**
+   * Writes the parent's resolved tracks onto a subgrid, and marks it
+   * for re-measurement when they moved — its constraints can be
+   * unchanged while the tracks inside them are not, and the measurement
+   * cache compares only constraints.
+   */
+  private publishSubgridTracks(placement: GridPlacement<UiNode>, columns: GridTrackSizingResult, gap: number): void {
+    const rec = this.record(placement.item);
+    const tracks: number[] = [];
+    for (let index = placement.columnStart; index < placement.columnEnd; index++) {
+      tracks.push(columns.tracks[Math.min(index, columns.tracks.length - 1)]?.size ?? 0);
+    }
+    const previous = rec.subgridColumns;
+    if (
+      previous === undefined ||
+      rec.subgridColumnGap !== gap ||
+      previous.length !== tracks.length ||
+      previous.some((size, index) => size !== tracks[index])
+    ) {
+      rec.subgridColumns = tracks;
+      rec.subgridColumnGap = gap;
+      rec.measureDirty = true;
+      rec.placeDirty = true;
+    }
   }
 
   private gridArea(

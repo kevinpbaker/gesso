@@ -135,6 +135,16 @@ export class LayoutRecord {
   scrollbarVisibleUntil = 0;
 
   /**
+   * `subgrid: 'columns'`: the parent grid's resolved track widths for
+   * the span this node occupies, and the parent's column gap, written
+   * by the parent before it measures the node. A subgrid lays itself
+   * out against these instead of its own `columns` prop, which is what
+   * makes a table row line up with its header.
+   */
+  subgridColumns: number[] | undefined = undefined;
+  subgridColumnGap = 0;
+
+  /**
    * Children (fragments expanded) in paint order when any of them has
    * a non-zero zIndex; null means tree order. Hit testing walks it in
    * reverse. Rebuilt whenever the node is placed.

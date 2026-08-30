@@ -51,6 +51,26 @@ export type UiDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse' | 
 
 export type UiGridAutoFlow = 'row' | 'column';
 
+/**
+ * Which axis a nested grid takes from its parent's tracks. Only the
+ * column axis exists: see the `subgrid` property.
+ */
+export type UiSubgridAxis = 'columns';
+
+export const UI_SUBGRID_AXES: readonly UiSubgridAxis[] = ['columns'];
+
+/** Validates the `subgrid` prop the way `role` and `states` are validated. */
+export function validateSubgrid(value: unknown): string | undefined {
+  if (value === undefined || value === 'columns') {
+    return undefined;
+  }
+  return (
+    `Unknown subgrid axis '${String(value)}'. ` +
+    `Only 'columns' is supported: a virtualized table's parent cannot see the rows that are not mounted, ` +
+    `so its row tracks are not something a row could share.`
+  );
+}
+
 export type UiPosition = 'static' | 'relative' | 'absolute' | 'sticky';
 
 export type UiOverflow = 'visible' | 'hidden' | 'scroll' | 'auto';

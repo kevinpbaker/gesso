@@ -143,6 +143,7 @@ export type SemanticsProps = PropsOf<
   | 'valueText'
   | 'posInSet'
   | 'setSize'
+  | 'level'
 >;
 
 /** Environment values an element provides to its subtree. */
@@ -225,6 +226,7 @@ export type ScrollViewProps = FlexContainerProps;
 export type GridProps = ContainerProps &
   PropsOf<
     | 'columns'
+    | 'subgrid'
     | 'rows'
     | 'autoColumns'
     | 'autoRows'

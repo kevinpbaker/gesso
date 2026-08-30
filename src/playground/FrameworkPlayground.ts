@@ -3,16 +3,21 @@ import {
   Accordion,
   Card,
   Checkbox,
+  DataTable,
   Dialog,
   Divider,
   FindBar,
+  LazyList,
   Menu,
   Select,
   SplitPane,
   Tabs,
   TextInput,
   Toast,
-  Toolbar
+  Toolbar,
+  Tree,
+  type DataTableSort,
+  type TreeNode
 } from '../components';
 import { FocusStore } from '../framework/app/FocusStore';
 import { darkTheme } from '../ui/environment/UiTheme';
@@ -477,6 +482,12 @@ export class MenuDemo extends Component {
  * compared by identity, as props are — rebuilt objects would re-attach
  * the modifier on every render. Toggling the plain box's modifier off
  * shows the override layer handing the declared colour back.
+ *
+ * The three buttons on the second row carry `focusRing()`: Tab through
+ * them and the ring follows, and the one inside the little scroller is
+ * clipped by it when it is only half in view — which is the whole
+ * argument for decorations being painted inside a node's own paint
+ * pass rather than over the finished frame.
  */
 const CARD_INTERACTION = interactive({
   hover: true,
@@ -540,7 +551,7 @@ export class ModifierDemo extends Component {
         stepButton('Attach / detach', () => {
           this.attached.value = !this.attached.value;
         })
-      )
+      ),
     );
   }
 }
@@ -865,6 +876,139 @@ function toolButton(label: string): UiElement {
   });
 }
 
+/**
+ * The Data tier (roadmap C6): a hundred thousand rows, sorted, with the
+ * header and every row sharing one set of column tracks.
+ *
+ * This is the card the tier's two engine deferrals were for. The rows
+ * are `subgrid: 'columns'` items of the grid the header sits in, so
+ * their columns are the header's; the table's `count` and `revision`
+ * are Observables, so a sort tells the window that index 5 means a
+ * different row now. The status bar's layout figure stays flat while it
+ * scrolls, because layout costs the visible window and not the data.
+ */
+@Define('data-tier-demo')
+export class DataTierDemo extends Component {
+  @State() sort = state<DataTableSort | null>({ column: 'name', direction: 'ascending' });
+  @State() selected = state(-1);
+  @State() open = state<readonly string[]>(['src']);
+  @State() file = state<string | null>('components');
+
+  private readonly people = buildPeople(100000);
+
+  override render(): UiElement {
+    return Column(
+      { width: 340, gap: 10, theme: darkTheme },
+      createComponent(Card, {
+        title: 'Data (C6)',
+        children: Column(
+          { gap: 10 },
+          Text({
+            text: `${this.people.length.toLocaleString()} rows — press a header to sort, arrows to walk them.`,
+            color: 'textMuted',
+            fontSize: 12
+          }),
+          createComponent(DataTable<Person>, {
+            label: 'People',
+            height: 220,
+            rowHeight: 26,
+            columns: PEOPLE_COLUMNS,
+            rows: this.people,
+            sort: this.sort,
+            onSortChange: (next: DataTableSort | null) => (this.sort.value = next),
+            selectedRow: this.selected,
+            onSelect: (index: number) => (this.selected.value = index)
+          }),
+          Row(
+            { gap: 10, y: 'start' },
+            createComponent(Tree, {
+              label: 'Files',
+              width: 150,
+              height: 130,
+              nodes: FILE_TREE,
+              expanded: this.open,
+              onExpandedChange: (next: readonly string[]) => (this.open.value = next),
+              selectedKey: this.file,
+              onSelect: (key: string | null) => (this.file.value = key)
+            }),
+            createComponent(LazyList, {
+              label: 'Log',
+              flexGrow: 1,
+              height: 130,
+              count: 50000,
+              estimatedItemExtent: 22,
+              defaultSelectedIndex: 0,
+              item: (index: number) =>
+                Row(
+                  { paddingLeft: 8, paddingRight: 8, paddingTop: 3, paddingBottom: 3 },
+                  Text({ text: `line ${index.toLocaleString()}`, fontSize: 12, selectable: false })
+                )
+            })
+          )
+        )
+      })
+    );
+  }
+}
+
+interface Person {
+  readonly name: string;
+  readonly team: string;
+  readonly score: number;
+}
+
+const TEAMS = ['Layout', 'Render', 'Input', 'Docs'];
+const NAMES = ['Ana', 'Ravi', 'Mikael', 'Jun', 'Noor', 'Elif', 'Tom', 'Sara'];
+
+function buildPeople(count: number): readonly Person[] {
+  const people: Person[] = [];
+  for (let index = 0; index < count; index++) {
+    people.push({
+      name: `${NAMES[index % NAMES.length]} ${index}`,
+      team: TEAMS[index % TEAMS.length],
+      score: (index * 37) % 1000
+    });
+  }
+  return people;
+}
+
+const PEOPLE_COLUMNS = [
+  {
+    key: 'name',
+    header: 'Name',
+    width: fr(1),
+    compare: (a: Person, b: Person) => a.name.localeCompare(b.name),
+    cell: (person: Person) => Text({ text: person.name, fontSize: 12, selectable: false })
+  },
+  {
+    key: 'team',
+    header: 'Team',
+    width: 70,
+    compare: (a: Person, b: Person) => a.team.localeCompare(b.team),
+    cell: (person: Person) => Text({ text: person.team, fontSize: 12, selectable: false })
+  },
+  {
+    key: 'score',
+    header: 'Score',
+    width: 66,
+    align: 'end' as const,
+    compare: (a: Person, b: Person) => a.score - b.score,
+    cell: (person: Person) => Text({ text: String(person.score), fontSize: 12, selectable: false })
+  }
+];
+
+const FILE_TREE: readonly TreeNode[] = [
+  {
+    key: 'src',
+    label: 'src',
+    children: [
+      { key: 'components', label: 'components', children: [{ key: 'DataTable', label: 'DataTable.ts' }] },
+      { key: 'ui', label: 'ui', children: [{ key: 'layout', label: 'layout' }] }
+    ]
+  },
+  { key: 'docs', label: 'docs', children: [{ key: 'decisions', label: 'decisions' }] }
+];
+
 @Define('scroll-demo')
 export class ScrollDemo extends Component {
   override render(): UiElement {
@@ -1176,6 +1320,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(SignInFormDemo),
       createComponent(OverlayTierDemo),
       createComponent(StructureTierDemo),
+      createComponent(DataTierDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),

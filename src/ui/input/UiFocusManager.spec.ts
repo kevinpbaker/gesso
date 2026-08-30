@@ -158,8 +158,27 @@ describe('UiFocusManager', () => {
     focusManager.focusOnPress(btn2);
     expect(focusManager.focusedNode).toBe(btn2);
     focusManager.blur();
+    // `box` has no focusable ancestor either, so nothing is focused:
+    // pressing the page background is not a request to blur.
     focusManager.focusOnPress(box);
     expect(focusManager.focusedNode).toBeNull();
+  });
+
+  it('focusOnPress walks up to the nearest focusable ancestor', () => {
+    const { h, focusableBox, focusManager } = setup();
+    // A container that is one tab stop — a tablist, a table — is
+    // pressed through the content inside it, which is not focusable
+    // itself. Without the walk the container never takes focus and its
+    // arrow keys are dead after a mouse press.
+    const inner = h.node('inner', UiNodeType.Box, { width: 100, height: 20 });
+    const text = h.node('text', UiNodeType.Text, { text: 'Props' });
+    h.add(focusableBox, inner);
+    h.add(inner, text);
+    h.layoutTree();
+
+    focusManager.focusOnPress(text);
+
+    expect(focusManager.focusedNode).toBe(focusableBox);
   });
 
   it('focuses via onPress after pointerdown, unless defaultPrevented', () => {

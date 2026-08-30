@@ -147,10 +147,26 @@ export class UiFocusManager {
     this.notify(null);
   }
 
-  /** Focus-on-press hook: focuses the node when it is focusable. */
+  /**
+   * Focus-on-press hook: focuses the nearest focusable node at or above
+   * the one that was pressed.
+   *
+   * The walk upward is what the DOM does, and what a container that is
+   * one tab stop needs: pressing a tab hits the Text inside it, a table
+   * cell hits a Box three levels below the table, and a component whose
+   * arrows move a selection is keyboard-dead after a mouse press if the
+   * press left focus where it was. Found in a browser, on `Tabs` —
+   * clicking a tab selected it and the arrows then did nothing.
+   *
+   * Nothing focusable above the press leaves focus untouched, as before:
+   * pressing the page background is not a request to blur.
+   */
   focusOnPress(node: UiNode): void {
-    if (isNodeFocusable(node)) {
-      this.focus(node);
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      if (isNodeFocusable(current)) {
+        this.focus(current);
+        return;
+      }
     }
   }
 

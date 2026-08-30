@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { UiGraph } from './UiGraph';
 import { UiNodeType } from './UiNodeType';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
-import { lightTheme } from '../environment/UiTheme';
+import { darkTheme, lightTheme } from '../environment/UiTheme';
 import { defaultTextStyle } from '../properties/UiTextStyle';
 import { UiColors } from '../properties/UiColor';
 import { DirtyFlags } from './DirtyFlags';
@@ -166,5 +166,46 @@ describe('UiGraph environment propagation', () => {
 
     expect(notifications).toBe(0);
     expect(child.isDirty()).toBe(true);
+  });
+
+  it('gives a subtree attached later the environment of the tree it joins', () => {
+    const graph = new UiGraph();
+    const provider = graph.createNode('provider', UiNodeType.Box);
+    provider.setProperty('theme', darkTheme);
+    graph.appendChild(graph.root, provider);
+    graph.propagateEnvironment(graph.root);
+
+    // A row a lazy list mounts as it scrolls, a keyed list's new item:
+    // built and attached long after the root's environment was built.
+    // Without inheriting at attach it kept `environment === null` and
+    // resolved its palette names against the *default* theme, so a
+    // chosen row in a dark table came out in the light theme's blue.
+    const row = graph.createNode('row', UiNodeType.Box);
+    const cell = graph.createNode('cell', UiNodeType.Text);
+    graph.appendChild(row, cell);
+    graph.appendChild(provider, row);
+
+    expect(row.environment!.get(UiEnvironmentKeys.theme)).toBe(darkTheme);
+    expect(cell.environment!.get(UiEnvironmentKeys.theme)).toBe(darkTheme);
+  });
+
+  it('re-resolves a node moved under a different provider', () => {
+    const graph = new UiGraph();
+    const light = graph.createNode('light', UiNodeType.Box);
+    const dark = graph.createNode('dark', UiNodeType.Box);
+    dark.setProperty('theme', darkTheme);
+    graph.appendChild(graph.root, light);
+    graph.appendChild(graph.root, dark);
+    const node = graph.createNode('node', UiNodeType.Box);
+    graph.appendChild(light, node);
+    graph.propagateEnvironment(graph.root);
+    graph.clearDirty(node);
+
+    graph.detachNode(node);
+    graph.appendChild(dark, node);
+
+    expect(node.environment!.get(UiEnvironmentKeys.theme)).toBe(darkTheme);
+    // It already existed and now paints differently, so it is dirty.
+    expect(node.isDirty()).toBe(true);
   });
 });

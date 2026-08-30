@@ -33,12 +33,14 @@ import type {
   UiPointerEvents,
   UiPosition,
   UiSelfAlignment,
+  UiSubgridAxis,
   UiTextAlign,
   UiTextDirection,
   UiTextOverflowValue,
   UiTextWrapValue,
   UiVerticalAlign
 } from './UiPropertyValues';
+import { validateSubgrid } from './UiPropertyValues';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 import type { UiRole, UiSemanticStates } from './UiSemantics';
 import { statesEqual, validateRole, validateStates } from './UiSemantics';
@@ -252,6 +254,22 @@ export const UiProperties = {
     defaultValue: undefined,
     inherited: false,
     affects: L
+  }),
+
+  /**
+   * A grid item that is itself a Grid takes its column tracks from the
+   * span it occupies in its parent, instead of declaring its own — so a
+   * table's rows line up with its header without either knowing the
+   * widths. Only the column axis: a virtualized table's parent cannot
+   * see the rows that are not mounted, so its row tracks are not
+   * something a row could share.
+   */
+  subgrid: defineProperty<UiSubgridAxis | undefined>({
+    name: 'subgrid',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L,
+    validate: validateSubgrid
   }),
 
   /** 'row' (default) fills rows left to right; 'column' fills columns top to bottom. */
@@ -901,6 +919,18 @@ export const UiProperties = {
     affects: S
   }),
 
+  /**
+   * How deep a treeitem sits, 1 for a root. A tree is rendered as a
+   * flat list of rows — it must be, to be virtualized — so the nesting
+   * exists nowhere else for a reader to find.
+   */
+  level: defineProperty<number | undefined>({
+    name: 'level',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
   // -------------------------------------------------------------------------
   // Transform
   // -------------------------------------------------------------------------
@@ -972,6 +1002,14 @@ export const UiProperties = {
   /** Set by LazyColumn/LazyRow on each mounted item wrapper: its index. */
   virtualIndex: defineProperty<number | undefined>({
     name: 'virtualIndex',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /** Set by LazyGrid on its header: the content above the first row. */
+  virtualLead: defineProperty<boolean | undefined>({
+    name: 'virtualLead',
     defaultValue: undefined,
     inherited: false,
     affects: DirtyFlags.Properties

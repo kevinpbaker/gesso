@@ -33,12 +33,16 @@ export type {
 export { createElement } from './UiFactory';
 export { Box, Stack, Text, EditableText, Button, Row, Column, ScrollView, Grid } from './UiComponents';
 export { UiGraphBuilder } from './UiGraphBuilder';
-export { LazyColumn, LazyRow, type LazyListProps } from './UiLazyList';
+export { LazyColumn, LazyGrid, LazyRow, type LazyGridProps, type LazyListProps } from './UiLazyList';
 export {
+  lazySource,
   UiVirtualWindow,
   VIRTUAL_INDEX_PROP,
+  VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
   type LazyAxis,
+  type LazyGridOptions,
+  type LazySourceArgs,
   type LazyListOptions,
   type LazyItemRenderer,
   type VirtualViewport,

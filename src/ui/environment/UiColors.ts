@@ -35,6 +35,12 @@ export interface UiColors {
   readonly controlAccent: UiColor;
   /** An invalid control's border, and the text explaining why. */
   readonly danger: UiColor;
+  // Selection tokens. A row of a list, a tree or a table is chosen
+  // rather than operated, so it is neither a control's accent nor its
+  // hover: one pair, so the three data components agree on what
+  // "chosen" looks like without any of them naming a colour.
+  readonly selectionBackground: UiColor;
+  readonly selectionForeground: UiColor;
 }
 
 export const lightColors: UiColors = {
@@ -54,7 +60,9 @@ export const lightColors: UiColors = {
   controlForeground: { r: 0.07, g: 0.09, b: 0.13, a: 1 },
   controlForegroundDisabled: { r: 0.6, g: 0.62, b: 0.65, a: 1 },
   controlAccent: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
-  danger: { r: 0.86, g: 0.15, b: 0.15, a: 1 }
+  danger: { r: 0.86, g: 0.15, b: 0.15, a: 1 },
+  selectionBackground: { r: 0.85, g: 0.92, b: 0.99, a: 1 },
+  selectionForeground: { r: 0.05, g: 0.24, b: 0.44, a: 1 }
 } as const;
 
 export const darkColors: UiColors = {
@@ -74,7 +82,9 @@ export const darkColors: UiColors = {
   controlForeground: { r: 0.9, g: 0.91, b: 0.94, a: 1 },
   controlForegroundDisabled: { r: 0.48, g: 0.5, b: 0.55, a: 1 },
   controlAccent: { r: 0.4, g: 0.76, b: 1, a: 1 },
-  danger: { r: 0.94, g: 0.42, b: 0.42, a: 1 }
+  danger: { r: 0.94, g: 0.42, b: 0.42, a: 1 },
+  selectionBackground: { r: 0.16, g: 0.29, b: 0.42, a: 1 },
+  selectionForeground: { r: 0.85, g: 0.93, b: 1, a: 1 }
 } as const;
 
 /**

@@ -45,6 +45,15 @@ function semantics(runtime: NodalRuntime, role: string): UiSemanticsRecord {
   return record;
 }
 
+/** The slider's track strip: the second child of the node that is the slider. */
+function trackOf(runtime: NodalRuntime): UiNode {
+  const strip = byRole(runtime, 'slider').firstChild?.nextSibling;
+  if (strip === null || strip === undefined) {
+    throw new Error('the slider has no track');
+  }
+  return strip;
+}
+
 function mount(root: Parameters<typeof mountRuntime>[0]) {
   const mounted = mountRuntime(root, { width: 400, height: 400 });
   mounted.frame(0);
@@ -282,6 +291,31 @@ describe('Slider', () => {
     expect(record.valueMin).toBe(0);
     expect(record.valueMax).toBe(10);
     expect(record.valueText).toBe('40%');
+  });
+
+  it('turns a pan into a value on the track it measured', () => {
+    const changes: number[] = [];
+    const { runtime, frame } = mount(
+      createComponent(Slider, {
+        label: 'Volume',
+        min: 0,
+        max: 100,
+        step: 1,
+        defaultValue: 0,
+        onChange: v => changes.push(v)
+      })
+    );
+    // The measure modifier reported the strip's box on the first frame.
+    frame();
+
+    // A press-and-move is a Pan; a Drag here is a long press then a
+    // move, which is not how a thumb is grabbed. The slider fills the
+    // 400px root, so three quarters along is 75.
+    const strip = trackOf(runtime);
+    runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanStart, 300, 30), strip);
+    runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanMove, 200, 30), strip);
+
+    expect(changes).toEqual([75, 50]);
   });
 });
 

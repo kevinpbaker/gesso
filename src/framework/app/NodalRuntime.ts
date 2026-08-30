@@ -8,6 +8,7 @@ import { scrollbarThumb } from '../../ui/layout/Scrollbars';
 import {
   UiVirtualWindow,
   VIRTUAL_INDEX_PROP,
+  VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
   type VirtualItemMeasure
 } from '../../ui/composition/UiVirtualWindow';
@@ -936,8 +937,8 @@ export class NodalRuntime {
       const scrollProp = node.properties.get(column ? 'scrollY' : 'scrollX');
       const scroll = typeof scrollProp === 'number' ? scrollProp : column ? rec.scrollY : rec.scrollX;
       const measures: VirtualItemMeasure[] = [];
-      this.collectVirtualMeasures(node, column, measures);
-      const result = window.update({ scroll, extent: column ? rec.height : rec.width }, measures);
+      const lead = this.collectVirtualMeasures(node, column, measures);
+      const result = window.update({ scroll, extent: column ? rec.height : rec.width, lead }, measures);
       if (result.scrollAdjust !== 0) {
         node.setProperty(column ? 'scrollY' : 'scrollX', scroll + result.scrollAdjust);
         this.graph.markDirty(node, DirtyFlags.Transform);
@@ -945,27 +946,47 @@ export class NodalRuntime {
     }
   }
 
-  private collectVirtualMeasures(parent: UiNode, column: boolean, out: VirtualItemMeasure[]): void {
+  /**
+   * Measures the mounted items, and returns the extent of the content
+   * above the first of them — a lazy grid's header.
+   *
+   * A lazy grid puts its rows inside one Grid, so that the header and
+   * every row share its tracks; the rows are that grid's children
+   * rather than the scroll container's, which is why the walk goes
+   * through a Grid as it goes through a Fragment.
+   */
+  private collectVirtualMeasures(parent: UiNode, column: boolean, out: VirtualItemMeasure[]): number {
+    let lead = 0;
     for (let child = parent.firstChild; child !== null; child = child.nextSibling) {
-      if (child.type === UiNodeType.Fragment) {
-        this.collectVirtualMeasures(child, column, out);
-        continue;
-      }
       const index = child.properties.get(VIRTUAL_INDEX_PROP);
       if (typeof index !== 'number') {
+        if (child.type === UiNodeType.Fragment || child.type === UiNodeType.Grid) {
+          lead += this.collectVirtualMeasures(child, column, out);
+          continue;
+        }
+        if (child.properties.get(VIRTUAL_LEAD_PROP) === true) {
+          lead += this.extentOf(child, column);
+        }
         continue;
       }
       const rec = this.engine.recordFor(child);
       if (rec === undefined) {
         continue;
       }
-      out.push({
-        index,
-        extent: column
-          ? rec.measuredHeight + rec.marginTop + rec.marginBottom
-          : rec.measuredWidth + rec.marginLeft + rec.marginRight
-      });
+      out.push({ index, extent: this.extentOf(child, column) });
     }
+    return lead;
+  }
+
+  /** A node's outer extent along the list's axis. */
+  private extentOf(node: UiNode, column: boolean): number {
+    const rec = this.engine.recordFor(node);
+    if (rec === undefined) {
+      return 0;
+    }
+    return column
+      ? rec.measuredHeight + rec.marginTop + rec.marginBottom
+      : rec.measuredWidth + rec.marginLeft + rec.marginRight;
   }
 
   private handleFrame(frame: UiFrame): void {

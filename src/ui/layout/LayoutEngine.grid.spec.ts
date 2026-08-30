@@ -163,6 +163,45 @@ describe('LayoutEngine grid', () => {
     expect(h.record(g).minContentWidth).toBe(80);
   });
 
+  it("sizes a subgrid row's cells in the tracks its parent resolved", () => {
+    const h = new LayoutHarness(new CharacterCountTextMeasurer({ glyphWidth: 1 }));
+    const root = grid(h, 'top', { width: 300, columns: [auto, fr(1), auto], gap: 8 });
+    const header = node(h, 'header', UiNodeType.Grid, { subgrid: 'columns' });
+    const headerCells = ['Id', 'Name', 'Status'].map((label, i) => text(h, `h${i}`, label));
+    h.append(header, ...headerCells);
+    const body = node(h, 'body', UiNodeType.Grid, { subgrid: 'columns' });
+    const bodyCells = ['1234', 'A', 'ok'].map((label, i) => text(h, `b${i}`, label));
+    h.append(body, ...bodyCells);
+    h.append(root, header, body);
+    layout(h, root);
+
+    // Neither row declared a span, so each takes the whole grid; the
+    // tracks are sized from the cells of both rows at once, so column 0
+    // is the wider of 'Id' and '1234' and both rows agree on it.
+    expect(h.box(header).width).toBe(300);
+    expect(h.box(headerCells[0]).width).toBe(40);
+    expect(h.box(bodyCells[0]).width).toBe(40);
+    // The 1fr column takes what the two auto columns leave, less gaps.
+    expect(h.box(headerCells[1])).toMatchObject({ x: 48, width: 184 });
+    expect(h.box(bodyCells[1])).toMatchObject({ x: 48, width: 184 });
+    // Column 2 is the wider of 'Status' and 'ok'.
+    expect(h.box(headerCells[2])).toMatchObject({ x: 240, width: 60 });
+    expect(h.box(bodyCells[2])).toMatchObject({ x: 240, width: 60 });
+  });
+
+  it('lays a subgrid out from its own columns when nothing gave it tracks', () => {
+    const h = new LayoutHarness(new CharacterCountTextMeasurer({ glyphWidth: 1 }));
+    // A row rendered on its own degrades to an ordinary grid rather
+    // than collapsing to nothing.
+    const root = grid(h, 'top', { width: 200, columns: [50, 50], subgrid: 'columns' });
+    const a = box(h, 'a', { height: 10 });
+    const b = box(h, 'b', { height: 10 });
+    h.append(root, a, b);
+    layout(h, root);
+    expect(h.box(a)).toMatchObject({ x: 0, width: 50 });
+    expect(h.box(b)).toMatchObject({ x: 50, width: 50 });
+  });
+
   it('rejects a track list that is not an array', () => {
     const h = new LayoutHarness();
     const root = grid(h, 'top', { columns: '1fr 1fr' });
