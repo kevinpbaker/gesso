@@ -25,12 +25,17 @@ export interface UiSchedulerOptions {
    * Runs immediately before the dirty set is snapshotted.
    *
    * For work that produces dirt of its own — applying store patches,
-   * propagating environment — so the nodes it dirties belong to the
-   * frame about to be collected rather than the one after it. Anything
-   * reading the dirty set after collection sees an empty one, so this
-   * hook is the only place such work can go.
+   * propagating environment, advancing animations — so the nodes it
+   * dirties belong to the frame about to be collected rather than the
+   * one after it. Anything reading the dirty set after collection sees
+   * an empty one, so this hook is the only place such work can go.
+   *
+   * It receives the frame's time, so a phase that advances with the
+   * clock advances on *this* clock: under a manual clock in a spec
+   * `performance.now()` is a different number entirely, and an
+   * animation reading it would not be reproducible.
    */
-  beforeCollect?: () => void;
+  beforeCollect?: (time: UiFrameTime) => void;
 }
 
 /**
@@ -48,7 +53,7 @@ export class UiScheduler {
   private readonly clock: UiFrameClock;
   private readonly dirty: DirtyNodeSet;
   private readonly onFrame: UiFrameCallback;
-  private readonly beforeCollect: (() => void) | undefined;
+  private readonly beforeCollect: ((time: UiFrameTime) => void) | undefined;
 
   private disposed = false;
   private active = true;
@@ -79,6 +84,22 @@ export class UiScheduler {
    * Arms a frame only when none is already pending.
    */
   notifyDirty(): void {
+    this.wake();
+  }
+
+  /**
+   * Arms a frame for work that is not in the dirty set.
+   *
+   * `notifyDirty` is the graph's call and means "a node changed"; this
+   * means "run a frame anyway", which is what an animation needs.
+   * Nothing an animation writes can be what arms its own frame: its
+   * writes happen in `beforeCollect`, inside a frame that has to exist
+   * already. Something outside the graph has to ask, and this is the
+   * asking. Safe to call from inside `beforeCollect` — `pending` is
+   * cleared before that hook runs, so it arms the next frame and not
+   * the one in progress.
+   */
+  wake(): void {
     if (this.disposed || !this.active || this.pending) {
       return;
     }
@@ -148,7 +169,7 @@ export class UiScheduler {
 
   private handleFrame(time: UiFrameTime): void {
     this.pending = false;
-    this.beforeCollect?.();
+    this.beforeCollect?.(time);
     const frame = this.collectFrame(time);
     if (frame.size > 0) {
       this.onFrame(frame);
