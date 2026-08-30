@@ -2,7 +2,6 @@
   "name": "@gesso/framework",
   "version": "0.1.0",
   "description": "Components, stores, the frame runtime and the worker barrier over @gesso/core.",
-  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "exports": {
