@@ -34,7 +34,7 @@ An application is three files across three threads, joined by one shared module 
 
 ```ts
 // notes.contract.ts — the only module both workers import
-import { channel } from './framework';
+import { channel } from '@gesso/framework';
 
 export interface NotesView {
   readonly rows: readonly NoteRow[];
@@ -53,7 +53,7 @@ export const Notes = channel<NotesView, NotesCommands>('notes', { rows: [], open
 
 ```ts
 // notes.app.worker.ts — your application. Plain classes, plain RxJS.
-import { serveChannels } from './framework';
+import { serveChannels } from '@gesso/framework';
 
 const repository = new OpfsNotesRepository(SEED_NOTES);
 const domain = new NotesDomain(repository);
@@ -78,7 +78,7 @@ Above `serveChannels` there is no framework import in that file's dependency gra
 
 ```tsx
 // notes.render.worker.ts — everything the user sees
-import { renderRoot, internalState } from './framework';
+import { renderRoot, internalState } from '@gesso/framework';
 
 function NotesApp(props, ctx) {
   const notes = ctx.channel(Notes);
@@ -177,7 +177,7 @@ The body runs once, like a class `render()`; the host keeps the cells fed when t
 
 ### A component library
 
-`src/components` is a library built on the runtime, in five tiers. Every control follows one contract: controlled by default with an optional `defaultX` that makes it self-managing, themed through `UiTheme`'s control tokens with no colour props of its own, keyboard operable from a keymap that is data, and emitting `role`, `label`, `value` and `states` from the day it was written.
+`packages/components/src` is a library built on the runtime, in five tiers. Every control follows one contract: controlled by default with an optional `defaultX` that makes it self-managing, themed through `UiTheme`'s control tokens with no colour props of its own, keyboard operable from a keymap that is data, and emitting `role`, `label`, `value` and `states` from the day it was written.
 
 | Tier          | Components                                                                           |
 | ------------- | ------------------------------------------------------------------------------------ |
@@ -302,31 +302,49 @@ One shell, switched by hash:
 
 ### Where things live
 
-| Path                    | What it is                                                                                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/ui/graph`          | Retained `UiNode` graph, dirty flags, dirty-node sets                                                                                             |
-| `src/ui/composition`    | `Row`, `Column`, `Stack`, `Grid`, `Text`, `Button`, `ScrollView`, `LazyColumn`/`LazyRow`; the `UiGraphBuilder` that turns elements into mutations |
-| `src/ui/bindings`       | RxJS → graph: property, children and event bindings                                                                                               |
-| `src/ui/layout`         | `LayoutEngine`, `ParagraphLayout`, `GridLayout`, `LayoutExplanation`, typed lengths, `conformance/` fixtures                                      |
-| `src/ui/scheduler`      | Frame clock, frame phases, scheduler                                                                                                              |
-| `src/ui/rendering`      | `UiRenderer` contract, `PaintState`, `TextRenderer`, `LayoutInspector`, `canvas2d/`, `webgpu/`                                                    |
-| `src/ui/input`          | Hit tester, pointer/wheel/keyboard controllers, focus manager, gesture recognizer, platform adapter                                               |
-| `src/ui/editing`        | The editable text buffer, caret and undo                                                                                                          |
-| `src/ui/selection`      | Selection across text runs                                                                                                                        |
-| `src/ui/animation`      | Tween and spring drivers, the tick phase, `UiMotion`                                                                                              |
-| `src/ui/modifiers`      | The modifier mechanism and the core modifiers                                                                                                     |
-| `src/ui/semantics`      | The semantics tree and its per-frame diff                                                                                                         |
-| `src/ui/find`           | Find controller over the retained graph                                                                                                           |
-| `src/ui/properties`     | The property registry — every layout/paint/input property with its dirty flags; unknown props throw                                               |
-| `src/ui/environment`    | Theme, typography, colors, shapes, shadows; scoped reactive environment keys                                                                      |
-| `src/framework`         | `Component`, decorators, `internalState`/`input`, `createApp`/`renderRoot`/`GessoRuntime`                                                         |
-| `src/framework/channel` | `channel()` tokens, `provide`, `serveChannels`, `ChannelReplica`, the structural differ and the patch protocol                                    |
-| `src/framework/service` | The service registry behind `useService` and `@Inject`                                                                                            |
-| `src/framework/worker`  | The port handshake and transport; one worker can host many channels                                                                               |
-| `src/components`        | The component library — five tiers, one contract                                                                                                  |
-| `src/playground`        | The demo harness — the routes and one shell. Not the framework.                                                                                   |
-| `scripts/`              | `gen-layout-fixtures.ts` (Chrome → `expected.json`), `check-webgpu-parity.ts` (Chrome pixel diff over the DevTools protocol)                      |
-| `docs/`                 | The design doc, the roadmaps, and the decision records                                                                                            |
+Four workspace packages, three of them publishable:
+
+| Package             | Directory             | What it is                                                                            |
+| ------------------- | --------------------- | ------------------------------------------------------------------------------------- |
+| `@gesso/core`       | `packages/core`       | The retained graph, layout, the two renderers, input. Knows nothing about components. |
+| `@gesso/framework`  | `packages/framework`  | Components, the frame runtime, the worker barrier.                                    |
+| `@gesso/components` | `packages/components` | The component library — five tiers, one contract.                                     |
+| `@gesso/playground` | `apps/playground`     | The demo harness — the routes and one shell. Private, and not the framework.          |
+
+`@gesso/core` and `@gesso/framework` each carry a second entry, `./testing`, holding the doubles and the mount harness the suites use; nothing an application builds against reaches through it. Cross-package imports go through a package's root entry, never a deep path, so `api/*.api.d.ts` reviews the whole surface rather than one file at a time.
+
+Inside `packages/core/src`:
+
+| Path          | What it is                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `graph`       | Retained `UiNode` graph, dirty flags, dirty-node sets                                                                                             |
+| `composition` | `Row`, `Column`, `Stack`, `Grid`, `Text`, `Button`, `ScrollView`, `LazyColumn`/`LazyRow`; the `UiGraphBuilder` that turns elements into mutations |
+| `bindings`    | RxJS → graph: property, children and event bindings                                                                                               |
+| `layout`      | `LayoutEngine`, `ParagraphLayout`, `GridLayout`, `LayoutExplanation`, typed lengths, `conformance/` fixtures                                      |
+| `scheduler`   | Frame clock, frame phases, scheduler                                                                                                              |
+| `rendering`   | `UiRenderer` contract, `PaintState`, `TextRenderer`, `LayoutInspector`, `canvas2d/`, `webgpu/`                                                    |
+| `input`       | Hit tester, pointer/wheel/keyboard controllers, focus manager, gesture recognizer, platform adapter                                               |
+| `editing`     | The editable text buffer, caret and undo                                                                                                          |
+| `selection`   | Selection across text runs                                                                                                                        |
+| `animation`   | Tween and spring drivers, the tick phase, `UiMotion`                                                                                              |
+| `modifiers`   | The modifier mechanism and the core modifiers                                                                                                     |
+| `semantics`   | The semantics tree and its per-frame diff                                                                                                         |
+| `find`        | Find controller over the retained graph                                                                                                           |
+| `properties`  | The property registry — every layout/paint/input property with its dirty flags; unknown props throw                                               |
+| `environment` | Theme, typography, colors, shapes, shadows; scoped reactive environment keys                                                                      |
+
+Inside `packages/framework/src`:
+
+| Path      | What it is                                                                                                     |
+| --------- | -------------------------------------------------------------------------------------------------------------- |
+| `.`       | `Component`, decorators, `internalState`/`input`, `createApp`/`renderRoot`/`GessoRuntime`                      |
+| `channel` | `channel()` tokens, `provide`, `serveChannels`, `ChannelReplica`, the structural differ and the patch protocol |
+| `service` | The service registry behind `useService` and `@Inject`                                                         |
+| `worker`  | The port handshake and transport; one worker can host many channels                                            |
+| `router`  | Typed routes, the one outlet, the shell history modes                                                          |
+| `jsx`     | The optional JSX surface over `createElement`                                                                  |
+
+And at the root, `scripts/` holds `gen-layout-fixtures.ts` (Chrome → `expected.json`) and `check-webgpu-parity.ts` (Chrome pixel diff over the DevTools protocol); `docs/` holds the design doc, the roadmaps and the decision records.
 
 ## Scripts
 
