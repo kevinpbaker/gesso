@@ -4,6 +4,8 @@ import { input } from '../framework/Input';
 import { state } from '../framework/State';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
 import { MediaStore } from '../framework/app/MediaStore';
+import { AnimationStore } from '../framework/app/AnimationStore';
+import { steps } from '../ui/animation';
 import { Box } from '../ui/composition/UiComponents';
 import type { UiChild, UiElement } from '../ui/composition/UiElement';
 import { percent } from '../ui/layout/UiLength';
@@ -160,16 +162,24 @@ const SPINNER_STEP_MS = 110;
 const SPINNER_BLADES = 8;
 
 /**
- * The library's first animation, and a placeholder for one.
+ * The library's first animation, now driven by F4's `ticks` phase.
  *
- * `ROADMAP.md` F4 owns animation; until there is a ticks phase, this
- * is what C7 allows — one cell driven from a timer. The shape is
- * chosen so that costs as little as possible: eight blades of fixed,
- * decreasing opacity sit in a container, and the **container's
- * rotation** is the only thing that changes. So a turn is one property
- * write eight times a second, not eight writes sixty times a second,
- * and the componentised F4 version replaces the interval with a
- * subscription and changes nothing else.
+ * Eight blades of fixed, decreasing opacity sit in a container, and
+ * the **container's rotation** is the only thing that changes — so a
+ * turn is one property write eight times a second, not eight writes
+ * sixty times a second. `decisions/0028` promised the F4 version would
+ * replace the interval with a subscription and change nothing else,
+ * and this is that: a repeating tween whose easing has eight steps and
+ * whose `stepMs` is one step long, so the runtime wakes eight times a
+ * second rather than sixty and writes the same eight values the timer
+ * wrote. What it gains over the timer is that it stops when the
+ * component leaves, that it is on the frame clock rather than beside
+ * it, and that it appears in the profiler as `ticks`.
+ *
+ * It **keeps turning under reduced motion.** A spinner that stands
+ * still is not a calmer spinner: it is one that says work has stopped.
+ * WCAG 2.3.3 is about motion triggered by interaction, and a busy
+ * indicator is not that; see `UiReducedMotionPolicy`.
  *
  * It is a `status` rather than a `progressbar`: a spinner says work is
  * happening and cannot say how much, and `busy` is the state for that.
@@ -180,10 +190,15 @@ export function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiC
   const color = props.color.value ?? 'controlAccent';
   const step = state(0);
 
-  const timer = setInterval(() => {
-    step.value = (step.value + 1) % SPINNER_BLADES;
-  }, SPINNER_STEP_MS);
-  ctx.onUnmount(() => clearInterval(timer));
+  const animations = ctx.inject(AnimationStore);
+  animations.animate(step, SPINNER_BLADES, {
+    duration: SPINNER_BLADES * SPINNER_STEP_MS,
+    easing: steps(SPINNER_BLADES),
+    stepMs: SPINNER_STEP_MS,
+    repeat: true,
+    reducedMotion: 'keep'
+  });
+  ctx.onUnmount(() => animations.stop(step));
 
   const blade = size * 0.22;
   const radius = size / 2 - blade / 2;
@@ -266,10 +281,21 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
   const step = state(0);
 
   if (indeterminate) {
-    const timer = setInterval(() => {
-      step.value = (step.value + 1) % PROGRESS_STEPS;
-    }, PROGRESS_STEP_MS);
-    ctx.onUnmount(() => clearInterval(timer));
+    // The same shape as `Spinner`: a stepped, repeating tween sampled
+    // once per step, so the sweep costs twenty-four writes a sweep and
+    // twenty-four wake-ups, not sixty a second. It keeps sweeping
+    // under reduced motion for the same reason a spinner keeps
+    // turning — a still indeterminate bar states that nothing is
+    // happening.
+    const animations = ctx.inject(AnimationStore);
+    animations.animate(step, PROGRESS_STEPS, {
+      duration: PROGRESS_STEPS * PROGRESS_STEP_MS,
+      easing: steps(PROGRESS_STEPS),
+      stepMs: PROGRESS_STEP_MS,
+      repeat: true,
+      reducedMotion: 'keep'
+    });
+    ctx.onUnmount(() => animations.stop(step));
   }
 
   const fraction: Observable<number> = indeterminate

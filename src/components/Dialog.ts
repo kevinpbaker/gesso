@@ -2,7 +2,9 @@ import { map } from 'rxjs';
 
 import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
+import { AnimationStore } from '../framework/app/AnimationStore';
 import { FocusStore } from '../framework/app/FocusStore';
+import { state } from '../framework/State';
 import { Box, Column, Row, Text } from '../ui/composition/UiComponents';
 import type { UiChild } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
@@ -40,9 +42,19 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
   const dismissible = input(props.dismissible, true);
   const width = input(props.width, 360);
   const focus = ctx.inject(FocusStore);
+  const animations = ctx.inject(AnimationStore);
   const overlay = useOverlay(ctx, 'dialog');
   let trapped = false;
   let placeholder: UiNode | null = null;
+  /**
+   * How far in the dialog is: 0 as it mounts, 1 when it has arrived.
+   *
+   * One cell for both halves of the entrance, so opacity and scale
+   * cannot disagree, and one animation rather than two. Both are paint
+   * properties, so a frame of the entrance costs a repaint and no
+   * layout at all.
+   */
+  const enter = state(0);
 
   const close = (): void => {
     if (overlay.isOpen()) {
@@ -73,6 +85,14 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
           }
         },
         width: width.value,
+        opacity: enter,
+        // `x` and `y` are the pivot, not a translation: half the width
+        // and nothing vertical grows it from the top centre, which is
+        // where a dialog anchored 80px from the top appears to come
+        // from. See `UiTransform`.
+        transform: enter.pipe(
+          map(t => ({ x: width.value / 2, y: 0, scaleX: 0.96 + 0.04 * t, scaleY: 0.96 + 0.04 * t }))
+        ),
         padding: 20,
         backgroundColor: 'surface',
         borderColor: 'border',
@@ -98,6 +118,10 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
   // by whoever owns the reason it is open.
   props.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
+      // Reset before the tree is built, so the first frame the dialog
+      // is on screen is the one it starts from rather than a frame of
+      // the previous opening's final state.
+      enter.value = 0;
       overlay.show(body(), {
         top: 80,
         environment: placeholder,
@@ -107,10 +131,19 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
           props.onClose.value?.();
         }
       });
+      // Started after `show`, so the node the binding writes exists.
+      // Under reduced motion this writes 1 here and completes, and the
+      // dialog is simply present — the end state is identical, which
+      // is the whole argument for snapping rather than skipping.
+      animations.animate(enter, 1, { duration: 'slow', easing: 'decelerate' });
     } else if (isOpen !== true && overlay.isOpen()) {
       overlay.hide();
     }
   });
+  // The cell outlives the overlay's nodes — the component owns it —
+  // so the animation has to be stopped with the component and not with
+  // the tree it was writing into.
+  ctx.onUnmount(() => animations.stop(enter));
 
   // The dialog itself lives in the overlay layer; nothing is rendered
   // where it was declared.

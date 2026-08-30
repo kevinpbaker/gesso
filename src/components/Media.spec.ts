@@ -278,18 +278,21 @@ describe('Icon', () => {
 });
 
 describe('Spinner and ProgressBar', () => {
-  it('a spinner is a busy status and turns from one cell', () => {
+  it('a spinner is a busy status and turns from one cell, on the ticks phase', () => {
     vi.useFakeTimers();
     try {
       let node: UiNode | null = null;
       const mounted = mountRuntime(Column({ ref: (n: UiNode | null) => (node = n) }, createComponent(Spinner, {})));
-      mounted.frame();
+      mounted.frame(0);
       const spinner = firstElement(node!);
       expect(semanticsOf(spinner)).toMatchObject({ role: 'status', label: 'Loading', states: ['busy'] });
       const first = spinner.properties.get('transform');
 
+      // The runtime waits out the spinner's step with a timer rather
+      // than taking a frame it would draw nothing on, so the fake
+      // timers have to run before a frame is even pending.
       vi.advanceTimersByTime(400);
-      mounted.frame();
+      mounted.frame(400);
 
       expect(spinner.properties.get('transform')).not.toEqual(first);
     } finally {
