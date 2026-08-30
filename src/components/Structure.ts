@@ -7,7 +7,7 @@ import type { UiChild, UiElement } from '../ui/composition/UiElement';
 import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
 
 /**
  * The pieces a screen is assembled from: a surface, a rule, a row of
@@ -170,6 +170,7 @@ export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
       {
         ref: focus.ref,
         focusable: true,
+        modifiers: [CONTROL_FOCUS_RING],
         gap: 4,
         role: 'tablist',
         label,
@@ -288,7 +289,7 @@ function panel(
     Row(
       {
         focusable: true,
-        modifiers: [CONTROL_INTERACTION],
+        modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
         y: 'center',
         gap: 8,
         padding: 8,

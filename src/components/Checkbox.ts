@@ -9,6 +9,7 @@ import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
+  CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
   borderToken,
   foregroundToken,
@@ -66,7 +67,7 @@ export function Checkbox(props: Inputs<CheckboxProps>, ctx: ComponentContext): U
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: [CONTROL_INTERACTION],
+      modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
       gap: 8,
       y: 'center',
       padding: 4,
@@ -83,7 +84,7 @@ export function Checkbox(props: Inputs<CheckboxProps>, ctx: ComponentContext): U
         height: 18,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: borderToken(focus.focused, invalid),
+        borderColor: borderToken(invalid),
         backgroundColor: fill(value.value, disabled),
         x: 'center',
         y: 'center',

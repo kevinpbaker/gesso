@@ -1,11 +1,11 @@
-import { combineLatest, map, type Observable } from 'rxjs';
+import { map, type Observable } from 'rxjs';
 
 import type { InputCell } from '../framework/Input';
 import type { Inputs } from '../framework/FunctionComponent';
 import type { UiKeyboardEvent } from '../ui/input/UiInputEvent';
 import type { UiLength } from '../ui/layout/UiLength';
 import type { UiSelfAlignment } from '../ui/properties/UiPropertyValues';
-import { interactive, type UiModifier } from '../ui/modifiers';
+import { focusRing, interactive, type UiModifier } from '../ui/modifiers';
 
 /**
  * What every control in this tier shares.
@@ -31,11 +31,34 @@ export const CONTROL_INTERACTION: UiModifier = interactive({
   pressed: { backgroundColor: 'controlBackgroundPressed' }
 });
 
-/** The border token a control shows: focused, invalid, or resting. */
-export function borderToken(focused: Observable<boolean>, invalid: Observable<boolean>): Observable<string> {
-  return combine(focused, invalid, (isFocused, isInvalid) =>
-    isInvalid ? 'danger' : isFocused ? 'controlBorderFocused' : 'controlBorder'
-  );
+/**
+ * Visible focus, for every control in the library.
+ *
+ * One shared value, for the same reason `CONTROL_INTERACTION` is one:
+ * a modifier's arguments are compared by identity, so a fresh one per
+ * render would detach and re-attach the ring on every frame.
+ *
+ * It goes on the element that *is* the control — the one that takes
+ * focus and carries the role — which for a container that is a single
+ * tab stop (a radio group, a tab list, a list of rows) is the
+ * container. That is the correct thing to mark: the ring says where
+ * the keyboard is, and which item inside is chosen is said by the
+ * item's own selection colour.
+ */
+export const CONTROL_FOCUS_RING: UiModifier = focusRing();
+
+/**
+ * The border token a control shows: invalid, or resting.
+ *
+ * It used to take focus too, because before `MODIFIERS_ROADMAP.md` B3
+ * a bound `borderColor` was the only way a control could show focus at
+ * all. Now `CONTROL_FOCUS_RING` does it, once, for controls that have
+ * no border to recolour as much as for the ones that do — and a
+ * control that both recoloured its border and grew a ring would be
+ * saying the same thing twice.
+ */
+export function borderToken(invalid: Observable<boolean>): Observable<string> {
+  return invalid.pipe(map(bad => (bad ? 'danger' : 'controlBorder')));
 }
 
 /** The foreground token for a control's own text. */
@@ -82,10 +105,6 @@ function precisionOf(step: number): number {
   const text = String(step);
   const dot = text.indexOf('.');
   return dot === -1 ? 0 : text.length - dot - 1;
-}
-
-function combine<A, B, R>(a: Observable<A>, b: Observable<B>, project: (a: A, b: B) => R): Observable<R> {
-  return combineLatest([a, b]).pipe(map(([first, second]) => project(first, second)));
 }
 
 /**

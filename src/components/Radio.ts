@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
+import { combineLatest, map, type Observable } from 'rxjs';
 import type { UiNodeRef } from '../ui/composition/UiElementProps';
 
 import { input } from '../framework/Input';
@@ -9,8 +9,8 @@ import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled, type ControlledValue } from './controlled';
 import { trackFocus } from './focus';
 import {
+  CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
-  borderToken,
   foregroundToken,
   keymap,
   layoutOf,
@@ -107,6 +107,7 @@ export function RadioGroup(props: Inputs<RadioGroupProps>, ctx: ComponentContext
     ref: focus.ref,
     focusable: true,
     disabled,
+    modifiers: [CONTROL_FOCUS_RING],
     gap: 4,
     role: 'radiogroup' as const,
     label,
@@ -157,7 +158,7 @@ function radio(
         height: 18,
         borderRadius: 9,
         borderWidth: 1,
-        borderColor: borderToken(active, NEVER),
+        borderColor: active.pipe(map(on => (on ? 'controlAccent' : 'controlBorder'))),
         backgroundColor: 'controlBackground',
         x: 'center',
         y: 'center',
@@ -173,8 +174,6 @@ function radio(
     Text({ text: option.label, color: foregroundToken(off), selectable: false })
   );
 }
-
-const NEVER: Observable<boolean> = new BehaviorSubject(false);
 
 function dot(selected: Observable<boolean>, disabled: Observable<boolean>): Observable<string> {
   return combineLatest([selected, disabled]).pipe(

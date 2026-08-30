@@ -12,8 +12,8 @@ import { measure } from '../ui/modifiers';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
+  CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
-  borderToken,
   foregroundToken,
   keymap,
   layoutOf,
@@ -102,6 +102,7 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
       ref: focus.ref,
       focusable: true,
       disabled,
+      modifiers: [CONTROL_FOCUS_RING],
       gap: 6,
       role: 'slider',
       label,
@@ -154,7 +155,7 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
           width: percent(100),
           borderRadius: 3,
           borderWidth: 1,
-          borderColor: borderToken(focus.focused, NEVER),
+          borderColor: 'controlBorder',
           backgroundColor: 'controlBackground',
           x: 'start',
           y: 'center'
@@ -169,8 +170,6 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
     )
   );
 }
-
-const NEVER: Observable<boolean> = new BehaviorSubject(false);
 
 function fill(disabled: Observable<boolean>): Observable<string> {
   return disabled.pipe(map(off => (off ? 'controlForegroundDisabled' : 'controlAccent')));

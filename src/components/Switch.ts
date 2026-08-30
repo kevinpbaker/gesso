@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
+import { combineLatest, map, type Observable } from 'rxjs';
 import type { UiNodeRef } from '../ui/composition/UiElementProps';
 
 import { input } from '../framework/Input';
@@ -9,8 +9,8 @@ import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
+  CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
-  borderToken,
   foregroundToken,
   keymap,
   layoutOf,
@@ -61,7 +61,7 @@ export function Switch(props: Inputs<SwitchProps>, ctx: ComponentContext): UiChi
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: [CONTROL_INTERACTION],
+      modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
       gap: 8,
       y: 'center',
       padding: 4,
@@ -81,7 +81,7 @@ export function Switch(props: Inputs<SwitchProps>, ctx: ComponentContext): UiChi
         padding: 2,
         borderRadius: 11,
         borderWidth: 1,
-        borderColor: borderToken(focus.focused, NEVER_INVALID),
+        borderColor: 'controlBorder',
         backgroundColor: track(value.value, disabled),
         x: value.value.pipe(map(on => (on ? 'end' : 'start'))),
         y: 'center',
@@ -94,7 +94,6 @@ export function Switch(props: Inputs<SwitchProps>, ctx: ComponentContext): UiChi
 }
 
 /** A switch cannot fail validation, so its border is only ever focused or not. */
-const NEVER_INVALID: Observable<boolean> = new BehaviorSubject(false);
 
 function track(checked: Observable<boolean>, disabled: Observable<boolean>): Observable<string> {
   return combineLatest([checked, disabled]).pipe(

@@ -9,7 +9,7 @@ import type { UiNodeRef } from '../ui/composition/UiElementProps';
 import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { keymap, layoutOf, type ControlLayoutProps } from './internals';
+import { CONTROL_FOCUS_RING, keymap, layoutOf, type ControlLayoutProps } from './internals';
 import { stepIndex, virtualList } from './virtual';
 
 /**
@@ -107,7 +107,7 @@ export function LazyList(props: Inputs<LazyListProps>, ctx: ComponentContext): U
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: [list.viewport],
+      modifiers: [list.viewport, CONTROL_FOCUS_RING],
       scrollY: list.scrollY,
       focusable: true,
       count: props.count,

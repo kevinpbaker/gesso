@@ -9,7 +9,14 @@ import type { UiKeyboardEvent, UiTextChangeEvent } from '../ui/input/UiInputEven
 import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { borderToken, foregroundToken, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import {
+  CONTROL_FOCUS_RING,
+  borderToken,
+  foregroundToken,
+  keymap,
+  layoutOf,
+  type ControlLayoutProps
+} from './internals';
 
 /**
  * A field the user types into: a label, the field, and the message
@@ -89,6 +96,7 @@ function textField(props: Inputs<TextInputProps>, ctx: ComponentContext, forceMu
     ),
     EditableText({
       ref: focus.ref,
+      modifiers: [CONTROL_FOCUS_RING],
       value: value.value,
       placeholder: props.placeholder,
       disabled,
@@ -99,7 +107,7 @@ function textField(props: Inputs<TextInputProps>, ctx: ComponentContext, forceMu
       backgroundColor: 'controlBackground',
       color: 'controlForeground',
       borderWidth: 1,
-      borderColor: borderToken(focus.focused, invalid),
+      borderColor: borderToken(invalid),
       borderRadius: 6,
       padding: 8,
       minHeight: multiline.pipe(map(on => (on ? 72 : 32))),

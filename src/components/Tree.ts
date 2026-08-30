@@ -9,7 +9,7 @@ import type { UiNodeRef } from '../ui/composition/UiElementProps';
 import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
 import { stepIndex, virtualList } from './virtual';
 
 /**
@@ -227,7 +227,7 @@ export function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: [list.viewport],
+      modifiers: [list.viewport, CONTROL_FOCUS_RING],
       scrollY: list.scrollY,
       focusable: true,
       count,

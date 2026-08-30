@@ -10,7 +10,7 @@ import { percent } from '../ui/layout/UiLength';
 import { measure } from '../ui/modifiers';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_INTERACTION, borderToken, keymap, layoutOf, type ControlLayoutProps } from './internals';
+import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, layoutOf, type ControlLayoutProps } from './internals';
 
 /**
  * Two panes and a divider the user can move.
@@ -74,11 +74,11 @@ export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext):
   const divider = Box({
     ref: focus.ref,
     focusable: true,
-    modifiers: [CONTROL_INTERACTION],
+    modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
     width: horizontal() ? 6 : undefined,
     height: horizontal() ? undefined : 6,
     backgroundColor: 'controlBackground',
-    borderColor: borderToken(focus.focused, NEVER),
+    borderColor: 'controlBorder',
     borderWidth: 1,
     cursor: horizontal() ? 'col-resize' : 'row-resize',
     role: 'separator',
@@ -125,5 +125,3 @@ export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext):
 
   return horizontal() ? Row(container, first, divider, second) : Column(container, first, divider, second);
 }
-
-const NEVER = new BehaviorSubject(false);

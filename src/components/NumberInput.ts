@@ -9,7 +9,15 @@ import type { UiTextChangeEvent } from '../ui/input/UiInputEvent';
 import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { borderToken, foregroundToken, keymap, layoutOf, quantize, type ControlLayoutProps } from './internals';
+import {
+  CONTROL_FOCUS_RING,
+  borderToken,
+  foregroundToken,
+  keymap,
+  layoutOf,
+  quantize,
+  type ControlLayoutProps
+} from './internals';
 
 /**
  * A number typed or stepped.
@@ -92,13 +100,14 @@ export function NumberInput(props: Inputs<NumberInputProps>, ctx: ComponentConte
       { gap: 4, y: 'center' },
       EditableText({
         ref: focus.ref,
+        modifiers: [CONTROL_FOCUS_RING],
         value: text,
         disabled,
         textWrap: 'none',
         backgroundColor: 'controlBackground',
         color: 'controlForeground',
         borderWidth: 1,
-        borderColor: borderToken(focus.focused, invalid),
+        borderColor: borderToken(invalid),
         borderRadius: 6,
         padding: 8,
         minWidth: 80,

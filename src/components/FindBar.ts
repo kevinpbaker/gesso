@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, map } from 'rxjs';
+import { combineLatest, map } from 'rxjs';
 
 import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
@@ -8,7 +8,7 @@ import type { UiChild } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
 import type { UiKeyboardEvent, UiTextChangeEvent } from '../ui/input/UiInputEvent';
 import { state } from '../framework/State';
-import { borderToken, keymap } from './internals';
+import { CONTROL_FOCUS_RING, keymap } from './internals';
 import { trackFocus } from './focus';
 
 /**
@@ -67,6 +67,7 @@ export function FindBar(props: Inputs<FindBarProps>, ctx: ComponentContext): UiC
         focus.ref(node);
         find.setField(node);
       },
+      modifiers: [CONTROL_FOCUS_RING],
       value: query,
       placeholder: placeholder.value,
       textWrap: 'none',
@@ -74,7 +75,7 @@ export function FindBar(props: Inputs<FindBarProps>, ctx: ComponentContext): UiC
       padding: 6,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: borderToken(focus.focused, NEVER),
+      borderColor: 'controlBorder',
       backgroundColor: 'controlBackground',
       color: 'controlForeground',
       role: 'searchbox',
@@ -111,6 +112,3 @@ function step(glyph: string, label: string, press: () => void) {
     onClick: press
   });
 }
-
-/** A find field cannot fail validation; its border is focused or not. */
-const NEVER = new BehaviorSubject(false);

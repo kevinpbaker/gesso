@@ -11,6 +11,7 @@ import type { UiSemanticState } from '../ui/properties/UiSemantics';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
+  CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
   borderToken,
   foregroundToken,
@@ -196,13 +197,13 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
         ref: focus.ref,
         focusable: true,
         disabled,
-        modifiers: [CONTROL_INTERACTION],
+        modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
         y: 'center',
         padding: 8,
         gap: 8,
         backgroundColor: 'controlBackground',
         borderWidth: 1,
-        borderColor: borderToken(focus.focused, invalid),
+        borderColor: borderToken(invalid),
         borderRadius: 6,
         role: 'combobox',
         label,
