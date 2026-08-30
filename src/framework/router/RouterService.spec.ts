@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from '../../ui/composition/UiComponents';
+import { createShellHistory } from '../app/shellHistory';
 import { route, to, type RouteDefinition } from './RouteDefinition';
 import { RouterService } from './RouterService';
 
@@ -151,13 +152,52 @@ describe('RouterService', () => {
 
   describe('guards', () => {
     it('redirects when the guard names somewhere else to be', () => {
-      const { router: service, sink } = router();
+      const { router: service } = router();
       service.navigate('/settings');
       expect(service.match.value!.route).toBe(SignIn);
       expect(service.url.value).toBe('/sign-in');
-      // Replaced, not pushed: Back must not land on the refused url.
+    });
+
+    it('pushes a redirect of a navigation from inside the app', () => {
+      const { router: service, sink } = router();
+      service.navigate('/settings');
+      // Pushed, not replaced. Nothing is written to the history until a
+      // navigation settles, so the refused url was never an entry —
+      // there is nothing to avoid leaving behind, and replacing would
+      // overwrite the entry the person is standing on.
+      expect(sink.push).toHaveBeenCalledWith('/sign-in');
+      expect(sink.replace).not.toHaveBeenCalled();
+    });
+
+    it('replaces a redirect of a url the shell already committed to', () => {
+      const { router: service, sink } = router();
+      service.applyUrl('/settings');
+      expect(service.match.value!.route).toBe(SignIn);
+      // The address bar was already on the refused url before the guard
+      // saw it, so it is corrected in place: Back must not land on a url
+      // that will only be refused again.
       expect(sink.replace).toHaveBeenCalledWith('/sign-in');
       expect(sink.push).not.toHaveBeenCalled();
+    });
+
+    it('leaves Back on the screen the person was on when a guard redirects', () => {
+      // The whole scenario, against a real history: the bug this pins
+      // sent Back out of the app, because the redirect had overwritten
+      // the entry Home was standing on.
+      const history = createShellHistory({ mode: 'memory', initialUrl: '/' });
+      const service = new RouterService();
+      service.setHistory(history);
+      history.onChange(url => service.applyUrl(url));
+      service.setRoutes({ routes: ROUTES, notFound: NotFound });
+      service.applyUrl(history.url);
+      expect(service.match.value!.route).toBe(Home);
+
+      service.go(Settings);
+      expect(service.match.value!.route).toBe(SignIn);
+
+      service.back();
+      expect(service.match.value!.route).toBe(Home);
+      expect(service.url.value).toBe('/');
     });
 
     it('lets the same url through once the guard is satisfied', () => {

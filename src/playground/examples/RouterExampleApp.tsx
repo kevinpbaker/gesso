@@ -360,8 +360,9 @@ function SignInScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
         Sign in
       </text>
       <text color="textMuted" fontSize={13}>
-        Settings is guarded. The guard read the session, found none, and redirected here — replacing the entry rather
-        than pushing it, so Back does not land on the url that was just refused.
+        Settings is guarded. The guard read the session, found none, and redirected here. Press Back: you land on the
+        screen you came from, because a redirect of a navigation from inside the app pushes — the refused url was never
+        a history entry. A redirect of a url the address bar had already committed to replaces instead.
       </text>
       <row gap={8}>
         <Action

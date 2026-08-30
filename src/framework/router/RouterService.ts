@@ -199,11 +199,14 @@ export class RouterService {
    * Resolves a url, runs the guards along the way, and publishes the
    * result.
    *
-   * One method for both directions of travel, because a guard's
-   * redirect has to be handled the same whether the navigation came
-   * from a component or from the back button.
+   * One method for both directions of travel, because a guard runs the
+   * same either way — but what a redirect does to the history depends
+   * on which direction it came from, and that is the whole of the
+   * `replace` bookkeeping below.
    */
   private resolveInto(url: string, options: { push: boolean; replace?: boolean }): void {
+    const push = options.push;
+    let replace = options.replace ?? false;
     let target = url;
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
       const match = this.resolve(target);
@@ -212,20 +215,30 @@ export class RouterService {
         // Refused with nowhere else to go: the current url stands. When
         // the refusal was of a url the shell already committed to, the
         // shell is put back where the app actually is.
-        if (!options.push) {
+        if (!push) {
           this.history?.replace(this.url.value);
         }
         return;
       }
       if (verdict === true) {
-        this.publish(target, match, options);
+        this.publish(target, match, { push, replace });
         return;
       }
       target = urlOf(verdict);
-      // A redirect never pushes: the refused url must not be a Back
-      // target, and the redirect itself was not something the person
-      // asked for.
-      options = { push: options.push, replace: true };
+      // Where a redirect leaves the history depends on whether the
+      // refused url was ever an entry.
+      //
+      // From inside the app it was not: nothing is written until a
+      // navigation settles, so the redirect pushes, and Back returns to
+      // the screen the person left. Replacing here was a bug — it
+      // overwrote the entry they were standing on, and Back walked out
+      // of the app entirely.
+      //
+      // From the shell it was: the address bar already committed to the
+      // refused url before the guard ever saw it, so the redirect
+      // replaces, and Back does not land back on a url that will only
+      // be refused again.
+      replace = push ? replace : true;
     }
     throw new Error(`Navigating to '${url}' redirected more than ${MAX_REDIRECTS} times.`);
   }
