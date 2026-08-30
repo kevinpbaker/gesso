@@ -1593,6 +1593,60 @@ const ROW_COLORS = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'];
 const ROW_LABELS = ['Inbox', 'Drafts', 'Sent', 'Archive', 'Trash'];
 
 @Define('framework-demo-root')
+/**
+ * A component that fails on purpose, so the error overlay has
+ * something to report.
+ *
+ * It reads a property off nothing, which is the shape of most real
+ * ones. It is built by the observable below rather than mounted with
+ * the page, so the throw happens while a frame is being built — the
+ * case that is otherwise invisible, because it never passes through a
+ * message handler and lands only in a worker's console.
+ */
+@Define('broken-child')
+export class BrokenChild extends Component {
+  override render(): UiElement {
+    const notes = undefined as unknown as { title: string }[];
+    return Text({ text: notes[0].title, color: '#e5e7eb' });
+  }
+}
+
+/**
+ * Two ways to break this app, for looking at what happens when one
+ * does (`@gesso/devtools`, ROADMAP F7).
+ *
+ * The two buttons are the two halves of `RuntimeErrorSource` a person
+ * can reach from here: a handler throws inside the message the shell
+ * sent, and the child below throws while a frame is being built. The
+ * first leaves the application running; the second leaves the frame
+ * half-applied, and the overlay says so.
+ */
+@Define('break-demo')
+export class BreakDemo extends Component {
+  readonly broken = internalState(false);
+
+  override render(): UiElement {
+    return Column(
+      { gap: 8, x: 'start' },
+      Text({ text: 'Errors', color: '#ffffff', fontSize: 16, fontWeight: 600 }),
+      Text({
+        text: 'A canvas app keeps its last good frame on screen when it fails. These break it on purpose.',
+        color: '#9ca3af'
+      }),
+      Row(
+        { gap: 8 },
+        labelButton('Throw in a handler', () => {
+          throw new Error('Thrown from a click handler.');
+        }),
+        labelButton('Throw in a render', () => {
+          this.broken.value = true;
+        })
+      ),
+      this.broken.pipe(map(broken => (broken ? [createComponent(BrokenChild)] : [])))
+    );
+  }
+}
+
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoCounter) demo!: DemoCounter;
 
@@ -1636,6 +1690,7 @@ export class FrameworkDemoRoot extends Component {
         color: '#9ca3af'
       }),
       createComponent(ChannelDemo),
+      createComponent(BreakDemo),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(ModifierDemo),
       createComponent(SignInFormDemo),

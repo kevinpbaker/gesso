@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 
 /**
  * Runs the routing example in a render worker behind the shared page
@@ -16,6 +17,7 @@ import { mountShell } from '../shell/AppShell';
  */
 export function mountRouterExampleRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'example-router', metrics: true });
+  const errors = mountRouteErrors(shell);
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
@@ -40,10 +42,7 @@ export function mountRouterExampleRoute(host: HTMLElement): () => void {
         { label: 'Frame', value: `${metrics.durationMs.toFixed(1)} ms` }
       ]);
     },
-    onError: (message, stack) => {
-      shell.setStatus(`Render worker error: ${message}`);
-      console.error('[gesso router example]', message, stack);
-    }
+    onError: errors.report
   });
   shell.setStatus(
     'Source: apps/playground/src/examples/RouterExampleApp.tsx — the browser’s Back button walks its routes.'
@@ -55,6 +54,7 @@ export function mountRouterExampleRoute(host: HTMLElement): () => void {
 
   return () => {
     dispose();
+    errors.dispose();
     shell.dispose();
   };
 }

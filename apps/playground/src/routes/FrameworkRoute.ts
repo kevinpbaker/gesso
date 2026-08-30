@@ -3,6 +3,7 @@ import { DemoCounter, FrameworkDemoRoot } from '../FrameworkPlayground';
 import { Heavy } from '../HeavyWork';
 import { Ticker } from '../TickerChannel';
 import { mountShell, type AppShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 import { addInspectAction, mountInspectorPanel } from '../shell/InspectorPanel';
 
 const BLOCK_MS = 2000;
@@ -42,6 +43,7 @@ interface FrameMetrics {
 export function mountFrameworkRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework', metrics: true });
   const inspectorPanel = mountInspectorPanel(shell.preview);
+  const errors = mountRouteErrors(shell);
   let inspecting = false;
   // Spawned once for the route, not once per mount. Switching renderer
   // below disposes the app and builds a new one; an application worker
@@ -63,10 +65,7 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
       // own cannot see a canvas anyway.
       interceptFind: true,
       onFrame: report,
-      onError: (message, stack) => {
-        shell.setStatus(`Render worker error: ${message}`);
-        console.error('[gesso render worker]', message, stack);
-      },
+      onError: errors.report,
       // The explanation is computed in the worker, where the layout
       // records are; only its text crosses to this thread.
       onInspect: text => inspectorPanel.set(text)
@@ -95,6 +94,7 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     // Ours to stop, since the route spawned it.
     applicationWorker.terminate();
     inspectorPanel.dispose();
+    errors.dispose();
     shell.dispose();
   };
 }
@@ -109,6 +109,10 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
 export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework-sync', metrics: true });
   const inspectorPanel = mountInspectorPanel(shell.preview);
+  // No `onError` to give: this configuration renders on this thread,
+  // so what a component throws is an ordinary main-thread exception —
+  // and the overlay's window capture is what catches it.
+  const errors = mountRouteErrors(shell);
   let inspecting = false;
 
   const start = (renderer: RendererChoice): { dispose: () => void; setInspector(enabled: boolean): void } => {
@@ -125,7 +129,13 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
       .useChannel(Ticker, { worker: dataWorker })
       .renderer(renderer)
       .onFrame(report)
-      .onInspect(text => inspectorPanel.set(text));
+      .onInspect(text => inspectorPanel.set(text))
+      // The two the runtime swallows on this thread as well: a
+      // renderer that cannot draw, and a listener that threw. An
+      // exception nothing catches needs no wiring here — it is an
+      // ordinary main-thread error, and the overlay is listening for
+      // those on the window.
+      .onError(errors.report);
     const dispose = builder.mountSync(shell.preview);
     if (inspecting) {
       builder.setInspector(true);
@@ -147,6 +157,7 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   return () => {
     app.dispose();
     inspectorPanel.dispose();
+    errors.dispose();
     shell.dispose();
   };
 }

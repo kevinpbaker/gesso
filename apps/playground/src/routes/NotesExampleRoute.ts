@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 
 /**
  * Runs the notes example in a render worker behind the shared page
@@ -7,6 +8,7 @@ import { mountShell } from '../shell/AppShell';
  */
 export function mountNotesExampleRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'example-notes', metrics: true });
+  const errors = mountRouteErrors(shell);
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
@@ -35,10 +37,7 @@ export function mountNotesExampleRoute(host: HTMLElement): () => void {
         { label: 'Frame', value: `${metrics.durationMs.toFixed(1)} ms` }
       ]);
     },
-    onError: (message, stack) => {
-      shell.setStatus(`Render worker error: ${message}`);
-      console.error('[gesso notes example]', message, stack);
-    }
+    onError: errors.report
   });
   shell.setStatus('Source: apps/playground/src/examples/NotesExampleApp.tsx — click into the text and type.');
   shell.setDetail('Text editing with caret, selection, IME composition and clipboard, in the render worker.');
@@ -46,6 +45,7 @@ export function mountNotesExampleRoute(host: HTMLElement): () => void {
 
   return () => {
     dispose();
+    errors.dispose();
     shell.dispose();
   };
 }

@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 
 /**
  * Runs the animation example in a render worker behind the shared page
@@ -15,6 +16,7 @@ import { mountShell } from '../shell/AppShell';
  */
 export function mountAnimationExampleRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'example-animation', metrics: true });
+  const errors = mountRouteErrors(shell);
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
@@ -42,10 +44,7 @@ export function mountAnimationExampleRoute(host: HTMLElement): () => void {
         { label: 'ticks', value: `${metrics.phases.ticks.toFixed(2)} ms` }
       ]);
     },
-    onError: (message, stack) => {
-      shell.setStatus(`Render worker error: ${message}`);
-      console.error('[gesso animation example]', message, stack);
-    }
+    onError: errors.report
   });
   shell.setStatus('Source: apps/playground/src/examples/AnimationExampleApp.tsx — move a card and watch `ticks`.');
   shell.setDetail(
@@ -57,6 +56,7 @@ export function mountAnimationExampleRoute(host: HTMLElement): () => void {
 
   return () => {
     dispose();
+    errors.dispose();
     shell.dispose();
   };
 }

@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 
 /** Placeholder shown for a reading no frame has supplied yet. */
 const PENDING = '—';
@@ -10,6 +11,7 @@ const PENDING = '—';
  */
 export function mountLiveExampleRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'example-live', metrics: true });
+  const errors = mountRouteErrors(shell);
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
@@ -48,10 +50,7 @@ export function mountLiveExampleRoute(host: HTMLElement): () => void {
       }
       showMetrics(String(metrics.nodes), String(metrics.measured), `${metrics.durationMs.toFixed(1)} ms`);
     },
-    onError: (message, stack) => {
-      shell.setStatus(`Render worker error: ${message}`);
-      console.error('[gesso live example]', message, stack);
-    }
+    onError: errors.report
   });
   shell.setStatus('Source: apps/playground/src/examples/LiveExampleApp.tsx — try the rate buttons and the spike.');
   shell.setDetail(
@@ -61,6 +60,7 @@ export function mountLiveExampleRoute(host: HTMLElement): () => void {
 
   return () => {
     dispose();
+    errors.dispose();
     shell.dispose();
   };
 }

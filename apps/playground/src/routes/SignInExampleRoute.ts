@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
+import { mountRouteErrors } from '../shell/errors';
 
 /**
  * Runs the sign-in example in a render worker behind the shared page
@@ -8,6 +9,7 @@ import { mountShell } from '../shell/AppShell';
  */
 export function mountSignInExampleRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'example-signin', metrics: true });
+  const errors = mountRouteErrors(shell);
   let frames = 0;
   let lastReport = performance.now();
   let framesAtLastReport = 0;
@@ -33,10 +35,7 @@ export function mountSignInExampleRoute(host: HTMLElement): () => void {
         { label: 'Frame', value: `${metrics.durationMs.toFixed(1)} ms` }
       ]);
     },
-    onError: (message, stack) => {
-      shell.setStatus(`Render worker error: ${message}`);
-      console.error('[gesso sign-in example]', message, stack);
-    }
+    onError: errors.report
   });
   shell.setStatus('Source: apps/playground/src/examples/SignInExampleApp.tsx — the passcode is 246813.');
   shell.setDetail('Functional components in JSX over one channel; the authentication runs on the application worker.');
@@ -44,6 +43,7 @@ export function mountSignInExampleRoute(host: HTMLElement): () => void {
 
   return () => {
     dispose();
+    errors.dispose();
     shell.dispose();
   };
 }
