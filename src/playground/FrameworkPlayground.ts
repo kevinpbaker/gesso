@@ -1,5 +1,19 @@
 import { map } from 'rxjs';
-import { Checkbox, Dialog, Menu, Select, TextInput, Toast } from '../components';
+import {
+  Accordion,
+  Card,
+  Checkbox,
+  Dialog,
+  Divider,
+  FindBar,
+  Menu,
+  Select,
+  SplitPane,
+  Tabs,
+  TextInput,
+  Toast,
+  Toolbar
+} from '../components';
 import { FocusStore } from '../framework/app/FocusStore';
 import { darkTheme } from '../ui/environment/UiTheme';
 import { interactive } from '../ui/modifiers';
@@ -18,7 +32,6 @@ import { input } from '../framework/Input';
 import { Store } from '../framework/store/Store';
 import { Action, Projection, State } from '../framework/store/decorators';
 import { HeavyStore } from './HeavyStore';
-import { FindStore } from '../framework/app/FindStore';
 
 /**
  * Demo store used by the framework playground.
@@ -746,6 +759,112 @@ export class OverlayTierDemo extends Component {
   }
 }
 
+/**
+ * The Structure tier (roadmap C5): the chrome a screen is made of.
+ *
+ * Tabs choose what the split pane shows, the toolbar groups its
+ * buttons under one name, and the divider between the panes is
+ * draggable because B2 let a modifier measure its own track.
+ */
+@Define('structure-tier-demo')
+export class StructureTierDemo extends Component {
+  @State() tab = state('stories');
+  @State() split = state(0.4);
+  @State() open = state<readonly string[]>(['what']);
+
+  override render(): UiElement {
+    return Column(
+      { width: 340, gap: 10, theme: darkTheme },
+      createComponent(Card, {
+        title: 'Structure (C5)',
+        children: Column(
+          { gap: 10 },
+          createComponent(Toolbar, {
+            label: 'Story actions',
+            children: Row(
+              { gap: 6 },
+              toolButton('Reload'),
+              toolButton('Copy'),
+              createComponent(Divider, { direction: 'column', height: 20 }),
+              toolButton('Share')
+            )
+          }),
+          createComponent(Tabs, {
+            tabs: [
+              { value: 'stories', label: 'Stories' },
+              { value: 'props', label: 'Props' },
+              { value: 'notes', label: 'Notes', disabled: true }
+            ],
+            value: this.tab,
+            onChange: (value: string) => (this.tab.value = value),
+            children: Box(
+              { height: 90, borderRadius: 6, borderWidth: 1, borderColor: 'border', overflow: 'hidden' },
+              createComponent(SplitPane, {
+                split: this.split,
+                min: 0.2,
+                max: 0.8,
+                onSplitChange: (value: number) => (this.split.value = value),
+                first: Box(
+                  { padding: 8, backgroundColor: 'controlBackground' },
+                  Text({ text: this.tab.pipe(map(name => `${name} list`)), color: 'controlForeground', fontSize: 12 })
+                ),
+                second: Box(
+                  { padding: 8 },
+                  Text({
+                    text: this.split.pipe(map(value => `Drag the divider · ${Math.round(value * 100)}%`)),
+                    color: 'textMuted',
+                    fontSize: 12,
+                    maxLines: 2
+                  })
+                )
+              })
+            )
+          }),
+          createComponent(Accordion, {
+            exclusive: true,
+            open: this.open,
+            onOpenChange: (next: readonly string[]) => (this.open.value = next),
+            sections: [
+              {
+                value: 'what',
+                label: 'What this tier is',
+                content: Text({
+                  text: 'Tabs, toolbar, split pane, accordion, card and divider — all themed, all keyboard operable.',
+                  color: 'textMuted',
+                  fontSize: 12
+                })
+              },
+              {
+                value: 'find',
+                label: 'Find bar',
+                content: Text({
+                  text: 'Ctrl/Cmd+F opens the library find bar; the playground no longer has its own.',
+                  color: 'textMuted',
+                  fontSize: 12
+                })
+              }
+            ]
+          })
+        )
+      })
+    );
+  }
+}
+
+function toolButton(label: string): UiElement {
+  return Button({
+    text: label,
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'controlBackground',
+    color: 'controlForeground',
+    borderWidth: 1,
+    borderColor: 'controlBorder',
+    fontSize: 12,
+    label
+  });
+}
+
 @Define('scroll-demo')
 export class ScrollDemo extends Component {
   override render(): UiElement {
@@ -1056,6 +1175,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(ModifierDemo),
       createComponent(SignInFormDemo),
       createComponent(OverlayTierDemo),
+      createComponent(StructureTierDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),
@@ -1069,82 +1189,6 @@ export class FrameworkDemoRoot extends Component {
       createComponent(GridDemo),
       Text({ text: 'Keyed components from an observable list (click Add):', color: '#9ca3af' }),
       Column({ gap: 6, x: 'start' }, this.recentTicks())
-    );
-  }
-}
-
-/**
- * Find (roadmap F2): the bar Ctrl/Cmd+F opens.
- *
- * The framework owns the search — `FindStore` is the reactive face of
- * `UiFindController` — and this is all an app has to write for it: a
- * field bound to `search`, a count, and two steps. The matches light up
- * on the page as you type and the active one scrolls into view, which
- * is the part a canvas cannot get from the browser.
- */
-@Define('find-bar')
-export class FindBar extends Component {
-  @Inject(FindStore) find!: FindStore;
-
-  private query = state('');
-
-  private search(value: string): void {
-    this.query.value = value;
-    this.find.search(value);
-  }
-
-  override render(): UiElement {
-    return Row(
-      {
-        visible: this.find.open,
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        gap: 8,
-        y: 'center',
-        padding: 8,
-        backgroundColor: '#1f2937',
-        borderColor: '#374151',
-        borderWidth: 1,
-        borderRadius: 8
-      },
-      EditableText({
-        ref: node => this.find.setField(node),
-        value: this.query,
-        placeholder: 'Find on page',
-        onInput: event => this.search(event.value),
-        // Enter is the app's in a single-line field, so it steps here.
-        onKeyDown: event => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            if (event.modifiers.shift) {
-              this.find.previous();
-            } else {
-              this.find.next();
-            }
-          }
-        },
-        width: 180,
-        textWrap: 'none',
-        color: '#ffffff',
-        fontSize: 13,
-        padding: 6,
-        borderRadius: 4,
-        backgroundColor: '#111827',
-        borderWidth: 1,
-        borderColor: '#374151'
-      }),
-      Text({
-        text: this.find.matchCount.pipe(
-          map(count => (count === 0 ? (this.query.value.length === 0 ? '' : 'no matches') : `of ${count}`))
-        ),
-        color: '#9ca3af',
-        fontSize: 12,
-        width: 70
-      }),
-      stepButton('‹', () => this.find.previous()),
-      stepButton('›', () => this.find.next()),
-      stepButton('✕', () => this.find.close())
     );
   }
 }
