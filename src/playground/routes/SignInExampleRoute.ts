@@ -15,6 +15,7 @@ export function mountSignInExampleRoute(host: HTMLElement): () => void {
   const app = createApp({
     // Written out literally so the bundler can see and split it.
     worker: () => new Worker(new URL('../examples/SignInExampleWorker.ts', import.meta.url), { type: 'module' }),
+    appWorker: () => new Worker(new URL('../examples/signin/SignInAppWorker.ts', import.meta.url), { type: 'module' }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();
@@ -37,7 +38,7 @@ export function mountSignInExampleRoute(host: HTMLElement): () => void {
     }
   });
   shell.setStatus('Source: src/playground/examples/SignInExampleApp.tsx — the passcode is 246813.');
-  shell.setDetail('Functional components in JSX over one store, running in the render worker.');
+  shell.setDetail('Functional components in JSX over one channel; the authentication runs on the application worker.');
   const dispose = app.mount(shell.preview);
 
   return () => {

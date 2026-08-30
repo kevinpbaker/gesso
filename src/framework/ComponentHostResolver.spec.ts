@@ -11,12 +11,11 @@ import { Column, Text } from '../ui/composition/UiComponents';
 import type { UiChild, UiElement } from '../ui/composition/UiElement';
 import { Component } from './Component';
 import { Define, Input } from './decorators';
-import { State } from './store/decorators';
 import { createComponent } from './createComponent';
 import { ComponentHostResolver } from './ComponentHostResolver';
 import { state } from './State';
 import { input } from './Input';
-import { StoreRegistry } from './store/StoreRegistry';
+import { ServiceRegistry } from './service/ServiceRegistry';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,7 +64,7 @@ function findByText(node: UiNode, text: string): UiNode | undefined {
 
 function createHarness() {
   const graph = new UiGraph();
-  const stores = new StoreRegistry();
+  const stores = new ServiceRegistry();
   const resolver = new ComponentHostResolver(stores);
   const builder = new UiGraphBuilder(graph, { components: resolver });
   return { graph, builder, resolver, stores };
@@ -93,19 +92,10 @@ class Greeting extends Component {
 
 @Define('counter')
 class Counter extends Component {
-  @State() count = state(0);
+  readonly count = state(0);
 
   override render() {
     return Text({ text: this.count.pipe(map(c => `Count: ${c}`)) });
-  }
-}
-
-@Define('bad')
-class BadState extends Component {
-  @State() count: number = undefined as unknown as number;
-
-  override render() {
-    return Text({ text: 'bad' });
   }
 }
 
@@ -362,14 +352,6 @@ describe('ComponentHostResolver', () => {
       const bindings = graph.getBindingsForNode(node);
       expect(bindings).toHaveLength(1);
       expect(bindings[0].property).toBe('text');
-    });
-
-    it('throws when a @State field is not initialized', () => {
-      const { builder } = createHarness();
-
-      expect(() => builder.build(createComponent(BadState))).toThrow(
-        "Component 'bad' declares @State() 'count' but it is not initialized"
-      );
     });
   });
 

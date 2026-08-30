@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHANNELS, LiveChannel, LiveStore, LogRing, RATES, type ChannelSpec } from './LiveExampleApp';
+import { CHANNELS, LiveChannel, LiveFeed, LogRing, RATES, type ChannelSpec } from './LiveExampleApp';
 
 const SPEC: ChannelSpec = CHANNELS[0];
 
-function createStore(): LiveStore {
-  const store = new LiveStore();
-  store.init();
-  return store;
+function createStore(): LiveFeed {
+  return new LiveFeed();
 }
 
 /** Drives the feed without letting its interval start. */
-function run(store: LiveStore, ticks: number): void {
+function run(store: LiveFeed, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
     store.tick();
   }
@@ -103,18 +101,18 @@ describe('live example', () => {
     expect(store.load$.value).toBeLessThanOrEqual(1);
   });
 
-  it('carries the controls through the projection and nothing else', () => {
+  it('carries the controls through the stream view and nothing else', () => {
     const store = createStore();
     const views: string[] = [];
-    store.projection.stream.subscribe(view => views.push(`${view.running}:${view.hz}`));
+    store.stream.subscribe(view => views.push(`${view.running}:${view.hz}`));
 
     expect(views).toEqual([`true:${RATES.live.hz}`]);
 
-    // Ticks are plain subjects, so the feed never disturbs the projection.
+    // Ticks are plain subjects, so the feed never disturbs the view.
     run(store, 30);
     expect(views.length).toBe(1);
 
-    store.dispatch('setRate', 'calm');
+    store.setRate('calm');
     store.stop();
     expect(views[1]).toBe(`true:${RATES.calm.hz}`);
   });
@@ -123,18 +121,18 @@ describe('live example', () => {
     const store = createStore();
     run(store, 3);
 
-    store.dispatch('toggle');
-    expect(store.stream.running).toBe(false);
+    store.toggle();
+    expect(store.running.value).toBe(false);
     expect(store.ticks$.value).toBe(3);
 
-    store.dispatch('toggle');
+    store.toggle();
     store.stop();
-    expect(store.stream.running).toBe(true);
+    expect(store.running.value).toBe(true);
   });
 
   it('files an incident when an injected spike pushes a channel over budget', () => {
     const store = createStore();
-    store.dispatch('spike');
+    store.spike();
     run(store, 30);
     store.stop();
 

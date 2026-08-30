@@ -15,7 +15,7 @@ import { ComponentHostResolver } from '../ComponentHostResolver';
 import { Define, Input } from '../decorators';
 import type { Inputs } from '../FunctionComponent';
 import { input } from '../Input';
-import { StoreRegistry } from '../store/StoreRegistry';
+import { ServiceRegistry } from '../service/ServiceRegistry';
 import { Fragment } from './jsx-runtime';
 
 @Define('greeting')
@@ -54,7 +54,7 @@ function texts(node: UiNode): unknown[] {
 
 function createHarness() {
   const graph = new UiGraph();
-  const resolver = new ComponentHostResolver(new StoreRegistry());
+  const resolver = new ComponentHostResolver(new ServiceRegistry());
   const builder = new UiGraphBuilder(graph, { components: resolver });
   return { graph, builder, resolver };
 }

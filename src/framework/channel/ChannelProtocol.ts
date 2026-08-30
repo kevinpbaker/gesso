@@ -1,4 +1,4 @@
-import type { Patch } from '../store/StorePatch';
+import type { Patch } from './StorePatch';
 
 /**
  * A two-way channel endpoint. `MessagePort` satisfies it, as does a

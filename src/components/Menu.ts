@@ -2,7 +2,7 @@ import { BehaviorSubject, map, type Observable } from 'rxjs';
 
 import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
-import { FocusStore } from '../framework/app/FocusStore';
+import { FocusService } from '../framework/app/FocusService';
 import { Column, Row, Text } from '../ui/composition/UiComponents';
 import type { UiChild, UiElement } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
@@ -40,7 +40,7 @@ export interface MenuProps {
 export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
   const label = input(props.label, 'Menu');
   const placement = input(props.placement, 'bottom-start');
-  const focus = ctx.inject(FocusStore);
+  const focus = ctx.inject(FocusService);
   const overlay = useOverlay(ctx, 'menu');
   const active = new BehaviorSubject(0);
   let trapped = false;

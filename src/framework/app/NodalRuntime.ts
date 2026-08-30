@@ -14,7 +14,7 @@ import {
 } from '../../ui/composition/UiVirtualWindow';
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
-import { OverlayStore } from '../overlay/OverlayStore';
+import { OverlayService } from '../overlay/OverlayService';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
 import { resolveCursor } from '../../ui/input/UiInteraction';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -31,11 +31,11 @@ import { UiKeyboardController } from '../../ui/input/UiKeyboardController';
 import { UiEditingController, type EditingState } from '../../ui/input/UiEditingController';
 import { UiSelectionController } from '../../ui/selection/UiSelectionController';
 import { UiFindController } from '../../ui/find/UiFindController';
-import { ShellStore, type ShellRequest } from './ShellStore';
-import { FindStore } from './FindStore';
-import { FocusStore } from './FocusStore';
-import { MediaStore } from './MediaStore';
-import { AnimationStore } from './AnimationStore';
+import { ShellService, type ShellRequest } from './ShellService';
+import { FindService } from './FindService';
+import { FocusService } from './FocusService';
+import { MediaService } from './MediaService';
+import { AnimationService } from './AnimationService';
 import { AnimationDriver } from '../../ui/animation';
 import type { ImageResolver } from '../../ui/rendering/ImageResolver';
 import type { IconRasterizer } from '../../ui/rendering/IconRasterizer';
@@ -60,10 +60,9 @@ import {
 } from '../../ui/rendering';
 import { InputLatencyTracker } from './InputLatency';
 import { ChannelRegistry } from '../channel/ChannelRegistry';
+import { ServiceRegistry } from '../service/ServiceRegistry';
 import { UiScheduler, UiTimerFrameClock } from '../../ui/scheduler';
 import type { UiFrame, UiFrameClockFactory } from '../../ui/scheduler';
-import { StoreRegistry } from '../store/StoreRegistry';
-import type { Store } from '../store/Store';
 
 /**
  * The ordered work of one frame.
@@ -149,9 +148,8 @@ export interface NodalRuntimeOptions {
    * to a 1×1 OffscreenCanvas; tests pass a double.
    */
   measureCanvas?: CanvasHost;
-  storeClasses?: (new () => Store)[];
   /**
-   * The image resolver and icon rasteriser the `MediaStore` should
+   * The image resolver and icon rasteriser the `MediaService` should
    * use.
    *
    * Supplied here rather than through the store afterwards because the
@@ -163,10 +161,13 @@ export interface NodalRuntimeOptions {
    */
   media?: { resolver?: ImageResolver; rasterizer?: IconRasterizer };
   /**
-   * A registry built elsewhere, when some stores live in data workers.
-   * Takes the place of storeClasses.
+   * The runtime services this runtime's components may reach.
+   *
+   * Supplied only by a test wanting to substitute one; a runtime
+   * registers the six it owns itself, because they are part of what a
+   * runtime *is* rather than something an application configures.
    */
-  stores?: StoreRegistry;
+  services?: ServiceRegistry;
   /**
    * The channels this runtime's components may reach.
    *
@@ -193,7 +194,7 @@ export interface NodalRuntimeOptions {
  * and renderRoot() in a render worker.
  */
 export class NodalRuntime {
-  readonly stores: StoreRegistry;
+  readonly services: ServiceRegistry;
   readonly channels: ChannelRegistry;
   readonly input: RuntimeInput;
   /**
@@ -249,7 +250,7 @@ export class NodalRuntime {
   private readonly layoutNotifier: LayoutNotifier;
   /**
    * The running animations. Built as a field rather than in the body
-   * of the constructor because the builder, the stores and `buildRoot`
+   * of the constructor because the builder, the services and `buildRoot`
    * all need it, and `buildRoot` is where a component's first
    * `animate()` can happen.
    */
@@ -270,7 +271,7 @@ export class NodalRuntime {
   private started = false;
 
   constructor(options: NodalRuntimeOptions) {
-    this.stores = options.stores ?? new StoreRegistry();
+    this.services = options.services ?? new ServiceRegistry();
     this.channels = options.channels ?? new ChannelRegistry();
     this.canvas = options.canvas;
     this.pixelRatio = options.dpr ?? 1;
@@ -325,7 +326,7 @@ export class NodalRuntime {
 
     this.engine = new LayoutEngine(this.textMeasurer);
     this.inspector = new LayoutInspector(this.engine);
-    this.resolver = new ComponentHostResolver(this.stores, this.channels);
+    this.resolver = new ComponentHostResolver(this.services, this.channels);
     this.layoutNotifier = new LayoutNotifier();
     // Built before the tree, not with the rest of the input stack in
     // `createInput`: modifiers attach while `buildRoot` runs, and a
@@ -365,49 +366,46 @@ export class NodalRuntime {
       animations: this.animations
     });
 
-    for (const StoreClass of options.storeClasses ?? []) {
-      this.stores.register(StoreClass);
-    }
-    // Every runtime has an overlay layer; the store behind it is local
-    // by necessity (its entries hold elements and nodes).
-    if (!this.stores.has(OverlayStore)) {
-      this.stores.register(OverlayStore);
+    // Every runtime has an overlay layer; its entries hold elements and
+    // nodes, so it could not leave this thread even if asked.
+    if (!this.services.has(OverlayService)) {
+      this.services.register(OverlayService);
     }
     // And the shell's services: clipboard and URLs, which only the host
     // thread can reach.
-    if (!this.stores.has(ShellStore)) {
-      this.stores.register(ShellStore);
+    if (!this.services.has(ShellService)) {
+      this.services.register(ShellService);
     }
-    this.stores.get(ShellStore).setHandler(request => this.shellListener?.(request));
+    this.services.get(ShellService).setHandler(request => this.shellListener?.(request));
     // And the find session, so a component can drive the search the
     // browser's own find bar cannot do over a canvas.
-    if (!this.stores.has(FindStore)) {
-      this.stores.register(FindStore);
+    if (!this.services.has(FindService)) {
+      this.services.register(FindService);
     }
     // And focus, which lives in the input stack and is therefore out
     // of a component's reach without a store in front of it.
-    if (!this.stores.has(FocusStore)) {
-      this.stores.register(FocusStore);
+    if (!this.services.has(FocusService)) {
+      this.services.register(FocusService);
     }
     // And the image resolver and icon rasteriser, whose caches must be
     // per runtime: two runtimes in one worker must not share a bitmap
     // one of them is about to close.
-    if (!this.stores.has(MediaStore)) {
-      this.stores.register(MediaStore);
+    if (!this.services.has(MediaService)) {
+      this.services.register(MediaService);
     }
     // And animation, whose running set must be per runtime for the
     // same reason the media caches are: the playground has several
     // runtimes in one worker, and a shared driver would tick a
     // disposed runtime's cells.
-    if (!this.stores.has(AnimationStore)) {
-      this.stores.register(AnimationStore);
+    if (!this.services.has(AnimationService)) {
+      this.services.register(AnimationService);
     }
-    this.stores.get(AnimationStore).setDriver(this.animations);
+    this.services.get(AnimationService).setDriver(this.animations);
     if (options.media?.resolver !== undefined) {
-      this.stores.get(MediaStore).setResolver(options.media.resolver);
+      this.services.get(MediaService).setResolver(options.media.resolver);
     }
     if (options.media?.rasterizer !== undefined) {
-      this.stores.get(MediaStore).setRasterizer(options.media.rasterizer);
+      this.services.get(MediaService).setRasterizer(options.media.rasterizer);
     }
 
     this.scheduler = new UiScheduler({
@@ -440,7 +438,7 @@ export class NodalRuntime {
 
     this.buildRoot(options.root);
     this.input = this.createInput();
-    this.stores.get(FocusStore).setManager(this.input.focus);
+    this.services.get(FocusService).setManager(this.input.focus);
     // Keyboard navigation must keep the focused control visible.
     this.input.focus.onFocusChange(node => {
       if (node !== null) {
@@ -454,7 +452,7 @@ export class NodalRuntime {
   }
 
   /**
-   * Aligns patch delivery from worker-owned stores to the frame.
+   * Aligns patch delivery from worker-owned channels to the frame.
    *
    * Without this a burst of patches rebuilds the bound subtree once per
    * patch, even though only the final state is ever drawn.
@@ -637,7 +635,7 @@ export class NodalRuntime {
   }
 
   /**
-   * Receives what components ask of the shell through `ShellStore`:
+   * Receives what components ask of the shell through `ShellService`:
    * clipboard writes and URLs to open. Without a listener they are
    * dropped.
    */
@@ -681,7 +679,7 @@ export class NodalRuntime {
    * value against.
    */
   setReducedMotion(reduced: boolean): void {
-    this.stores.get(AnimationStore).applyReducedMotion(reduced);
+    this.services.get(AnimationService).applyReducedMotion(reduced);
   }
 
   /** Whether the runtime is currently honouring a reduced-motion preference. */
@@ -766,12 +764,12 @@ export class NodalRuntime {
     // component that made it captured. A disposed runtime must not.
     this.animations.stopAll();
     this.animations.setWakeListener(null);
-    this.stores.get(AnimationStore).setDriver(null);
-    this.stores.get(FindStore).setController(null);
-    this.stores.get(FocusStore).setManager(null);
+    this.services.get(AnimationService).setDriver(null);
+    this.services.get(FindService).setController(null);
+    this.services.get(FocusService).setManager(null);
     // Decoded bitmaps hold pixels; garbage collection is not prompt
     // about them, so they are closed rather than dropped.
-    this.stores.get(MediaStore).dispose();
+    this.services.get(MediaService).dispose();
     this.graph.setEnvironmentChangedListener(null);
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
@@ -855,7 +853,7 @@ export class NodalRuntime {
     );
     // Text that is not an editable has no model of its own, so its
     // selection is the controller's; it reaches the clipboard through
-    // the same ShellStore request a component would use.
+    // the same ShellService request a component would use.
     const selection = new UiSelectionController(
       {
         recordFor: node => this.engine.recordFor(node),
@@ -863,7 +861,7 @@ export class NodalRuntime {
         measurer: this.textMeasurer,
         markDirty: (node, flags) => this.graph.markDirty(node, flags),
         root: () => this.layoutRoot(),
-        copy: text => this.stores.get(ShellStore).copyText(text),
+        copy: text => this.services.get(ShellService).copyText(text),
         blurEditable: () => {
           if (editing.focused !== null) {
             focus.blur();
@@ -898,7 +896,7 @@ export class NodalRuntime {
       selection
     );
     this.findController = find;
-    this.stores.get(FindStore).setController(find);
+    this.services.get(FindService).setController(find);
     return {
       dispatcher: this.dispatcher,
       focus,

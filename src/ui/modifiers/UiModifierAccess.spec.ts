@@ -8,7 +8,7 @@ import { darkTheme, lightTheme } from '../environment/UiTheme';
 import type { UiTheme } from '../environment/UiTheme';
 import type { UiNode } from '../graph/UiNode';
 import { mountRuntime } from '../../framework/app/RuntimeTestUtils';
-import { FocusStore } from '../../framework/app/FocusStore';
+import { FocusService } from '../../framework/app/FocusService';
 import { defineModifier } from './UiModifier';
 
 /**
@@ -102,7 +102,7 @@ describe("a modifier's focus access", () => {
       )
     );
     mounted.frame();
-    const store = mounted.runtime.stores.get(FocusStore);
+    const store = mounted.runtime.services.get(FocusService);
     expect(seen.focus).toEqual([false]);
 
     store.focus(target!);

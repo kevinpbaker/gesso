@@ -1,15 +1,13 @@
 import type { UiNode } from '../../ui/graph/UiNode';
 import type { UiFindController } from '../../ui/find/UiFindController';
 import { state } from '../State';
-import { Store } from '../store/Store';
-import { Action, State } from '../store/decorators';
 
 /**
  * The find session, as a store components can inject.
  *
  * `UiFindController` does the searching, but it lives in the runtime
  * and a component cannot reach it — components reach the world through
- * stores, as they do for the clipboard (`ShellStore`) and overlays.
+ * stores, as they do for the clipboard (`ShellService`) and overlays.
  * This is the reactive face of it: cells a find bar binds to, actions
  * it dispatches.
  *
@@ -17,14 +15,14 @@ import { Action, State } from '../store/decorators';
  * is open, which is what makes Ctrl/Cmd+F and Escape mean find; what a
  * find bar looks like is a component, and belongs to F3.
  */
-export class FindStore extends Store {
+export class FindService {
   /** Whether a find session is running; a bar shows itself for this. */
-  @State() open = state(false);
+  readonly open = state(false);
   /** The query the matches are for. */
-  @State() query = state('');
-  @State() matchCount = state(0);
+  readonly query = state('');
+  readonly matchCount = state(0);
   /** Which match is active, 1-based for display, or 0 when there is none. */
-  @State() activeMatch = state(0);
+  readonly activeMatch = state(0);
 
   private controller: UiFindController | null = null;
   private detach: (() => void) | null = null;
@@ -52,38 +50,32 @@ export class FindStore extends Store {
    * Registers the bar's query field, so opening a session puts the
    * caret in it. Pass it as the field's `ref`; null when it unmounts.
    */
-  @Action()
   setField(node: UiNode | null): void {
     this.field = node;
     this.controller?.setField(node);
   }
 
   /** Starts a session. The app shows its bar; the field takes the caret. */
-  @Action()
   openFind(): void {
     this.controller?.open();
   }
 
   /** Ends the session and drops the highlights. */
-  @Action()
   close(): void {
     this.controller?.close();
   }
 
   /** Searches for `query`, activating its first match. */
-  @Action()
   search(query: string, matchCase = false): void {
     this.controller?.search(query, { matchCase });
   }
 
   /** Moves to the next match, wrapping around. */
-  @Action()
   next(): void {
     this.controller?.next();
   }
 
   /** Moves to the previous match, wrapping around. */
-  @Action()
   previous(): void {
     this.controller?.previous();
   }
@@ -92,7 +84,6 @@ export class FindStore extends Store {
    * Re-runs the current query because the content changed under it.
    * An app that edits text while a find is open calls this.
    */
-  @Action()
   refresh(): void {
     this.controller?.refresh();
   }

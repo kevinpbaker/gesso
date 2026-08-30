@@ -4,12 +4,11 @@ import { map } from 'rxjs/operators';
 import { Component } from '../../Component';
 import { Define } from '../../decorators';
 import { state } from '../../State';
-import { State as ComponentState } from '../../store/decorators';
 import { createComponent } from '../../createComponent';
-import { Store } from '../../store/Store';
 import { Box, Column, Text } from '../../../ui/composition/UiComponents';
 import type { CanvasHost } from '../../../ui/rendering';
 import { RenderWorkerApp } from './renderRoot';
+import { channel } from '../../channel/ChannelToken';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 function createMockCanvas(width = 800, height = 600): CanvasHost {
@@ -72,7 +71,7 @@ const clicks: string[] = [];
 
 @Define('worker-root')
 class WorkerRoot extends Component {
-  @ComponentState() count = state(0);
+  readonly count = state(0);
 
   override render() {
     return Column(
@@ -205,8 +204,8 @@ describe('RenderWorkerApp', () => {
     const app = new RenderWorkerApp(createComponent(WorkerRoot), host);
     send(initMessage(createMockCanvas()));
 
-    class LateStore extends Store {}
-    expect(() => app.useStore(LateStore)).toThrow(/after the runtime started/);
+    const Late = channel<{ value: number }>('late', { value: 0 });
+    expect(() => app.useChannel(Late)).toThrow(/after the runtime started/);
   });
 });
 

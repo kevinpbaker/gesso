@@ -4,11 +4,9 @@ import { BehaviorSubject } from 'rxjs';
 import { Box, Button, Column, Row, Text } from '../../ui/composition/UiComponents';
 import type { UiCursor } from '../../ui/properties/UiPropertyValues';
 import { DirtyFlags } from '../../ui/graph/DirtyFlags';
-import { attachStore } from '../store/worker/attachStore';
-import type { StorePort } from '../store/worker/StoreWorkerProtocol';
-import { Store } from '../store/Store';
-import { state } from '../State';
-import { Projection, State } from '../store/decorators';
+import { ChannelReplica } from '../channel/ChannelReplica';
+import { channel } from '../channel/ChannelToken';
+import type { ChannelPort } from '../channel/ChannelProtocol';
 import { UiEnvironmentKeys } from '../../ui/environment/UiEnvironmentKeys';
 import { UiManualFrameClock } from '../../ui/scheduler';
 import { NodalRuntime } from './NodalRuntime';
@@ -106,30 +104,25 @@ describe('NodalRuntime frame pipeline', () => {
   });
 
   describe('frame-aligned patches', () => {
-    class CounterStore extends Store {
-      @State() count = state(0);
-      @Projection() get value(): { count: number } {
-        return { count: this.count.value };
-      }
-    }
+    const Counter = channel<{ value: { count: number } }>('counter', { value: { count: 0 } });
 
-    function createPort(): { port: StorePort; send: (data: unknown) => void } {
-      const port: StorePort = { postMessage: () => {}, onmessage: null };
+    function createPort(): { port: ChannelPort; send: (data: unknown) => void } {
+      const port: ChannelPort = { postMessage: () => {}, onmessage: null };
       return { port, send: data => port.onmessage?.({ data }) };
     }
 
     it('applies a burst of patches in one pass', () => {
       const { port, send } = createPort();
-      const replica = attachStore(CounterStore, port);
+      const replica = new ChannelReplica(Counter, port);
       const seen: unknown[] = [];
-      replica.projection.value.subscribe(v => seen.push(v));
+      replica.view.value.subscribe(v => seen.push(v));
       const baseline = seen.length;
 
       let scheduled = 0;
       replica.deferPatches(() => scheduled++);
 
       for (let i = 1; i <= 5; i++) {
-        send({ type: 'store:patch', patches: [{ op: 'set', projection: 'value', path: ['count'], value: i }] });
+        send({ type: 'channel:patch', patches: [{ op: 'set', projection: 'value', path: ['count'], value: i }] });
       }
 
       // Nothing has reached the bindings yet.
@@ -147,12 +140,12 @@ describe('NodalRuntime frame pipeline', () => {
 
     it('applies patches on arrival when not deferred', () => {
       const { port, send } = createPort();
-      const replica = attachStore(CounterStore, port);
+      const replica = new ChannelReplica(Counter, port);
       const seen: unknown[] = [];
-      replica.projection.value.subscribe(v => seen.push(v));
+      replica.view.value.subscribe(v => seen.push(v));
       const baseline = seen.length;
 
-      send({ type: 'store:patch', patches: [{ op: 'set', projection: 'value', path: ['count'], value: 1 }] });
+      send({ type: 'channel:patch', patches: [{ op: 'set', projection: 'value', path: ['count'], value: 1 }] });
 
       expect(seen.length - baseline).toBe(1);
     });

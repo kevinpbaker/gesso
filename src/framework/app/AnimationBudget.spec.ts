@@ -4,7 +4,7 @@ import { map } from 'rxjs';
 import { Box, Column, Row, Text } from '../../ui/composition/UiComponents';
 import { animateLayout } from '../../ui/modifiers';
 import { state } from '../State';
-import { AnimationStore } from './AnimationStore';
+import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
@@ -34,7 +34,7 @@ describe('what a frame of animation costs', () => {
       time += 16;
       mounted.clock.tick(time);
     }
-    const animations = mounted.runtime.stores.get(AnimationStore);
+    const animations = mounted.runtime.services.get(AnimationService);
     for (const cell of cells) {
       animations.animate(cell, 1, { duration: 4000 });
     }

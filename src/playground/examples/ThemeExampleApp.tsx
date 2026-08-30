@@ -3,8 +3,7 @@ import { map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
 import { state } from '../../framework/State';
-import { Store } from '../../framework/store/Store';
-import { Action, Projection, State } from '../../framework/store/decorators';
+import { AppearanceChannel, type AppearanceCommands } from './theme/ThemeContract';
 import type { UiChild } from '../../ui/composition';
 import type { UiColors } from '../../ui/environment/UiColors';
 import type { UiShadows } from '../../ui/environment/UiShadows';
@@ -327,59 +326,48 @@ export interface AppearanceView extends ThemeSpec {
   readonly dark: boolean;
 }
 
-function specOf(view: AppearanceView): ThemeSpec {
+export function specOf(view: AppearanceView): ThemeSpec {
   return { palette: view.palette, accent: view.accent, corners: view.corners, textSize: view.textSize };
 }
 
-export class ThemeStore extends Store {
-  @State() palette = state<PaletteName>('daylight');
-  @State() accent = state<AccentName>('blue');
-  @State() corners = state<CornerName>('soft');
-  @State() textSize = state<TextSizeName>('regular');
+/**
+ * The appearance application: four choices and four ways to change
+ * them.
+ *
+ * It publishes the *choices*, not the theme. `UiTheme` is a plain
+ * object and would cross happily, but it is derived from these four
+ * strings by a pure function, and rebuilding it on the render side
+ * costs one call where sending it costs a diff of every colour,
+ * radius, shadow and font size on every change. Only what cannot be
+ * recomputed should travel.
+ */
+export class AppearanceApp {
+  readonly palette = state<PaletteName>('daylight');
+  readonly accent = state<AccentName>('blue');
+  readonly corners = state<CornerName>('soft');
+  readonly textSize = state<TextSizeName>('regular');
 
-  @Projection()
-  get view(): AppearanceView {
-    return {
-      palette: this.palette.value,
-      accent: this.accent.value,
-      corners: this.corners.value,
-      textSize: this.textSize.value,
-      dark: isDark(this.palette.value)
-    };
-  }
+  readonly view: Observable<AppearanceView> = combineLatest([
+    this.palette,
+    this.accent,
+    this.corners,
+    this.textSize
+  ]).pipe(
+    map(([palette, accent, corners, textSize]) => ({ palette, accent, corners, textSize, dark: isDark(palette) }))
+  );
 
-  /** The theme the page provides at its root. */
-  @Projection()
-  get theme(): UiTheme {
-    return buildTheme(specOf(this.view));
-  }
-
-  /**
-   * The same choices in the opposite mode. Provided to one subtree of
-   * the preview, which is how a light card lives inside a dark page.
-   */
-  @Projection()
-  get contrastTheme(): UiTheme {
-    const view = this.view;
-    return buildTheme({ ...specOf(view), palette: view.dark ? 'daylight' : 'midnight' });
-  }
-
-  @Action()
   setPalette(palette: PaletteName): void {
     this.palette.value = palette;
   }
 
-  @Action()
   setAccent(accent: AccentName): void {
     this.accent.value = accent;
   }
 
-  @Action()
   setCorners(corners: CornerName): void {
     this.corners.value = corners;
   }
 
-  @Action()
   setTextSize(textSize: TextSizeName): void {
     this.textSize.value = textSize;
   }
@@ -394,7 +382,10 @@ export class ThemeStore extends Store {
 // ---------------------------------------------------------------------------
 
 interface Appearance {
-  readonly store: ThemeStore;
+  /** The four choices, as they crossed the barrier. */
+  readonly view: Observable<AppearanceView>;
+  /** The commands that change them. */
+  readonly send: AppearanceCommands;
   readonly theme: Observable<UiTheme>;
   readonly text: (name: keyof UiTypography) => Observable<UiTextStyle>;
   readonly size: (name: keyof UiTypography) => Observable<number>;
@@ -403,10 +394,14 @@ interface Appearance {
 }
 
 function appearance(ctx: ComponentContext): Appearance {
-  const store = ctx.inject(ThemeStore);
-  const theme = store.projection.theme;
+  const channel = ctx.channel(AppearanceChannel);
+  const view = channel.view.view;
+  // Built here, from the four choices that crossed. `buildTheme` is
+  // pure, so this is cheaper than shipping the result.
+  const theme = view.pipe(map(choices => buildTheme(specOf(choices))));
   return {
-    store,
+    view,
+    send: channel.send,
     theme,
     text: name => theme.pipe(map(value => value.typography[name])),
     size: name => theme.pipe(map(value => value.typography[name].fontSize)),
@@ -482,15 +477,14 @@ function Segmented(props: Inputs<{ options: readonly Option[]; selected: string;
  * path as the page.
  */
 function PaletteChip(props: Inputs<{ name: PaletteName }>, ctx: ComponentContext) {
-  const { store, radius } = appearance(ctx);
-  const view = store.projection.view;
+  const { view, send, radius } = appearance(ctx);
   const preview = combineLatest([props.name, view]).pipe(
     map(([name, current]) => buildTheme({ ...specOf(current), palette: name }))
   );
   const selected = combineLatest([props.name, view]).pipe(map(([name, current]) => name === current.palette));
   return (
     <column
-      onClick={() => store.dispatch('setPalette', props.name.value)}
+      onClick={() => send.setPalette(props.name.value)}
       flexGrow={1}
       gap={8}
       padding={8}
@@ -521,11 +515,11 @@ function PaletteChip(props: Inputs<{ name: PaletteName }>, ctx: ComponentContext
 }
 
 function AccentSwatch(props: Inputs<{ name: AccentName }>, ctx: ComponentContext) {
-  const store = ctx.inject(ThemeStore);
-  const selected = store.projection.view.pipe(map(view => view.accent === props.name.value));
+  const { view, send } = appearance(ctx);
+  const selected = view.pipe(map(choices => choices.accent === props.name.value));
   return (
     <box
-      onClick={() => store.dispatch('setAccent', props.name.value)}
+      onClick={() => send.setAccent(props.name.value)}
       width={36}
       height={36}
       x="center"
@@ -545,8 +539,7 @@ function AccentSwatch(props: Inputs<{ name: AccentName }>, ctx: ComponentContext
 }
 
 function SettingsPanel(_props: Inputs<{}>, ctx: ComponentContext) {
-  const { store, theme, text, radius } = appearance(ctx);
-  const view = store.projection.view;
+  const { view, send, theme, text, radius } = appearance(ctx);
   const label = text('label');
 
   const section = (title: string, body: UiChild): UiChild => (
@@ -604,7 +597,7 @@ function SettingsPanel(_props: Inputs<{}>, ctx: ComponentContext) {
         <Segmented
           options={cornerOptions}
           selected={view.pipe(map(current => current.corners))}
-          onSelect={value => store.dispatch('setCorners', value as CornerName)}
+          onSelect={value => send.setCorners(value as CornerName)}
         />
       )}
 
@@ -613,7 +606,7 @@ function SettingsPanel(_props: Inputs<{}>, ctx: ComponentContext) {
         <Segmented
           options={textOptions}
           selected={view.pipe(map(current => current.textSize))}
-          onSelect={value => store.dispatch('setTextSize', value as TextSizeName)}
+          onSelect={value => send.setTextSize(value as TextSizeName)}
         />
       )}
 
@@ -778,8 +771,12 @@ function SampleCard(_props: Inputs<{}>, ctx: ComponentContext) {
 }
 
 function Preview(_props: Inputs<{}>, ctx: ComponentContext) {
-  const { store, text, radius, shadow } = appearance(ctx);
-  const contrast = store.projection.contrastTheme;
+  const { view, text, radius, shadow } = appearance(ctx);
+  // The same choices in the opposite mode, so a light card can live
+  // inside a dark page. Derived here for the same reason the theme is.
+  const contrast = view.pipe(
+    map(choices => buildTheme({ ...specOf(choices), palette: choices.dark ? 'daylight' : 'midnight' }))
+  );
   const contrastBody = contrast.pipe(map(value => value.typography.body));
   // Written once, when this component's body runs. A theme change that
   // rebuilt the tree would reset it; it never does.

@@ -6,8 +6,8 @@ import { createComponent } from '../createComponent';
 import { Box, Button, Column } from '../../ui/composition/UiComponents';
 import type { UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
-import { OverlayStore } from '../overlay/OverlayStore';
-import { FocusStore } from './FocusStore';
+import { OverlayService } from '../overlay/OverlayService';
+import { FocusService } from './FocusService';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
@@ -16,7 +16,7 @@ import { mountRuntime } from './RuntimeTestUtils';
  * The dialog is the shape F3's `Dialog` will have: it traps focus in
  * its own subtree while it is open, and releasing hands the keyboard
  * back to the button that opened it. Everything here goes through
- * `FocusStore`, because that is all a component can reach.
+ * `FocusService`, because that is all a component can reach.
  */
 let host: FocusHostApp | null = null;
 
@@ -27,14 +27,14 @@ function register(instance: FocusHostApp): void {
 
 @Define('focus-host-app')
 class FocusHostApp extends Component {
-  @Inject(OverlayStore) overlays!: OverlayStore;
-  @Inject(FocusStore) focus!: FocusStore;
+  @Inject(OverlayService) overlays!: OverlayService;
+  @Inject(FocusService) focus!: FocusService;
 
   opener: UiNode | null = null;
   dialog: UiNode | null = null;
 
   openDialog(): void {
-    this.overlays.dispatch('open', {
+    this.overlays.open({
       id: 'dialog',
       top: 40,
       left: 40,
@@ -43,7 +43,7 @@ class FocusHostApp extends Component {
           ref: (node: UiNode | null) => {
             this.dialog = node;
             if (node !== null) {
-              this.focus.dispatch('trap', node);
+              this.focus.trap(node);
             }
           },
           width: 200,
@@ -56,7 +56,7 @@ class FocusHostApp extends Component {
   }
 
   closeDialog(): void {
-    this.overlays.dispatch('close', 'dialog');
+    this.overlays.close('dialog');
   }
 
   constructor() {
@@ -83,7 +83,7 @@ class FocusHostApp extends Component {
 /** A field that asks for focus from its own ref, during the first build. */
 @Define('autofocus-app')
 class AutoFocusApp extends Component {
-  @Inject(FocusStore) focus!: FocusStore;
+  @Inject(FocusService) focus!: FocusService;
 
   override render(): UiElement {
     return Column(
@@ -91,7 +91,7 @@ class AutoFocusApp extends Component {
       Button({
         ref: (node: UiNode | null) => {
           if (node !== null) {
-            this.focus.dispatch('focus', node);
+            this.focus.focus(node);
           }
         },
         width: 80,
@@ -106,7 +106,7 @@ function mount(App: new () => Component) {
   host = null;
   const mounted = mountRuntime(createComponent(App), { width: 400, height: 300 });
   mounted.frame(0);
-  return { ...mounted, store: mounted.runtime.stores.get(FocusStore) };
+  return { ...mounted, store: mounted.runtime.services.get(FocusService) };
 }
 
 /** The mounted `FocusHostApp`; only the tests that use one call this. */
@@ -121,7 +121,7 @@ function texts(nodes: readonly UiNode[]): string[] {
   return nodes.map(node => String(node.properties.get('text')));
 }
 
-describe('FocusStore', () => {
+describe('FocusService', () => {
   it('is registered by every runtime and follows the focused node', () => {
     const { runtime, store } = mount(FocusHostApp);
 

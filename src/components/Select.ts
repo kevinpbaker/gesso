@@ -2,7 +2,7 @@ import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
 
 import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
-import { FocusStore } from '../framework/app/FocusStore';
+import { FocusService } from '../framework/app/FocusService';
 import { Column, Row, Text } from '../ui/composition/UiComponents';
 import type { UiChild, UiElement } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
@@ -38,7 +38,7 @@ export interface SelectOption {
  * Up open it; a printed character jumps to the first option starting
  * with it. Open: the arrows walk, Home and End jump, Enter chooses,
  * Escape closes without choosing and puts focus back on the trigger —
- * which is `FocusStore.releaseTrap` doing what it was built for.
+ * which is `FocusService.releaseTrap` doing what it was built for.
  */
 export interface SelectProps extends ControlLayoutProps {
   value?: string;
@@ -59,7 +59,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
   const disabled = input(props.disabled, false);
   const invalid = input(props.invalid, false);
   const required = input(props.required, false);
-  const focusStore = ctx.inject(FocusStore);
+  const focusStore = ctx.inject(FocusService);
   const focus = trackFocus(ctx, props.ref);
   const overlay = useOverlay(ctx, 'select');
   const active = new BehaviorSubject(0);

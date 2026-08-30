@@ -41,7 +41,7 @@ export interface UiSpringSpec {
  * token on the theme would be a token nothing could resolve. That is
  * the mistake `decisions/0022` recorded about `visualState`: a value
  * shipped where nothing reads it. An application that wants a
- * different feel installs one with `AnimationStore.setMotion`, which
+ * different feel installs one with `AnimationService.setMotion`, which
  * is per runtime, as everything else in front of the graph is.
  */
 export interface UiMotion {

@@ -5,7 +5,7 @@ import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
 import { NodalRuntime } from '../app/NodalRuntime';
 import { mockCanvas } from '../app/RuntimeTestUtils';
-import { OverlayStore } from './OverlayStore';
+import { OverlayService } from './OverlayService';
 import { Box, Button, Column, Text } from '../../ui/composition/UiComponents';
 import type { UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -20,12 +20,12 @@ const pressed: string[] = [];
  */
 @Define('overlay-host-app')
 class OverlayHostApp extends Component {
-  @Inject(OverlayStore) overlays!: OverlayStore;
+  @Inject(OverlayService) overlays!: OverlayService;
 
   anchor: UiNode | null = null;
 
   openMenu(placement: 'bottom-start' | 'top-start' = 'bottom-start'): void {
-    this.overlays.dispatch('open', {
+    this.overlays.open({
       id: 'menu',
       anchor: this.anchor,
       placement,
@@ -70,7 +70,7 @@ function mount() {
     }
   };
   frame();
-  const overlays = runtime.stores.get(OverlayStore);
+  const overlays = runtime.services.get(OverlayService);
   const layer = runtime.layoutRoot().lastChild!;
   return { runtime, overlays, layer, frame };
 }
@@ -117,7 +117,7 @@ describe('overlays', () => {
     const { runtime, overlays, layer, frame } = mount();
     const open = findText(runtime.debugRoot(), 'Open')!;
     // Drive the component's action through the store the way a click would.
-    overlays.dispatch('open', {
+    overlays.open({
       id: 'menu',
       anchor: open,
       placement: 'bottom-start',
@@ -136,7 +136,7 @@ describe('overlays', () => {
   it('flips above the anchor when there is no room below', () => {
     const { runtime, overlays, layer, frame } = mount();
     const open = findText(runtime.debugRoot(), 'Open')!;
-    overlays.dispatch('open', {
+    overlays.open({
       id: 'menu',
       anchor: open,
       placement: 'bottom-start',
@@ -146,7 +146,7 @@ describe('overlays', () => {
     // 260 tall fits neither the 250 below the anchor nor the 20 above;
     // the side with more room wins, so it stays below.
     expect(runtime.debugLayoutBox(entryBox(layer)!).y).toBe(50);
-    overlays.dispatch('open', {
+    overlays.open({
       id: 'menu',
       anchor: open,
       placement: 'top-start',
@@ -162,7 +162,7 @@ describe('overlays', () => {
     pressed.length = 0;
     const { runtime, overlays, frame } = mount();
     const open = findText(runtime.debugRoot(), 'Open')!;
-    overlays.dispatch('open', {
+    overlays.open({
       id: 'menu',
       anchor: open,
       placement: 'bottom-start',
@@ -194,7 +194,7 @@ describe('overlays', () => {
   it('closes a dismissible entry when the wheel turns outside it', () => {
     const { runtime, overlays, frame } = mount();
     const open = findText(runtime.debugRoot(), 'Open')!;
-    overlays.dispatch('open', {
+    overlays.open({
       id: 'menu',
       anchor: open,
       dismissOnOutsidePress: true,
@@ -207,7 +207,7 @@ describe('overlays', () => {
   });
 
   it('replaces an entry with the same id and closes all', () => {
-    const store = new OverlayStore();
+    const store = new OverlayService();
     const closed: string[] = [];
     store.open({ id: 'a', content: Box(), onClose: () => closed.push('a') });
     store.open({ id: 'b', content: Box() });

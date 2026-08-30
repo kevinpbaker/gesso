@@ -2,7 +2,7 @@ import { combineLatest, map } from 'rxjs';
 
 import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
-import { FindStore } from '../framework/app/FindStore';
+import { FindService } from '../framework/app/FindService';
 import { Button, EditableText, Row, Text } from '../ui/composition/UiComponents';
 import type { UiChild } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
@@ -16,7 +16,7 @@ import { trackFocus } from './focus';
  *
  * F2 built the search and left the bar to this tier, and every app that
  * wanted find had to write the same forty lines. The framework knows a
- * session is open (`FindStore`); this is what it looks like.
+ * session is open (`FindService`); this is what it looks like.
  *
  * It positions itself over the app rather than in the flow, so opening
  * one does not reflow the page underneath it.
@@ -30,7 +30,7 @@ export interface FindBarProps {
 export function FindBar(props: Inputs<FindBarProps>, ctx: ComponentContext): UiChild {
   const inset = input(props.inset, 12);
   const placeholder = input(props.placeholder, 'Find on page');
-  const find = ctx.inject(FindStore);
+  const find = ctx.inject(FindService);
   const query = state('');
   const focus = trackFocus(ctx);
 

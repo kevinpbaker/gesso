@@ -1,33 +1,31 @@
 import type { UiNode } from '../../ui/graph/UiNode';
 import type { UiFocusManager } from '../../ui/input/UiFocusManager';
 import { state } from '../State';
-import { Store } from '../store/Store';
-import { Action, State } from '../store/decorators';
 
 /**
  * Keyboard focus, as a store components can inject.
  *
  * `UiFocusManager` lives in the runtime and a component cannot reach
  * it — components reach the world through stores, as they do for the
- * clipboard (`ShellStore`), overlays (`OverlayStore`) and find
- * (`FindStore`). Without this a component cannot autofocus a field,
+ * clipboard (`ShellService`), overlays (`OverlayService`) and find
+ * (`FindService`). Without this a component cannot autofocus a field,
  * trap the keyboard in a dialog, or put the caret in the input that
  * failed validation.
  *
  * Nodes come from a `ref` prop. A tree's refs fire before the runtime
  * installs the manager, so an action taken during the first build is
  * queued and replayed once there is one; that is the same problem
- * `FindStore` solves for its query field, and the reason `autoFocus`
+ * `FindService` solves for its query field, and the reason `autoFocus`
  * in a dialog works on the frame it mounts.
  *
  * It must stay on the render thread: its actions take `UiNode`s, which
  * never cross a worker boundary.
  */
-export class FocusStore extends Store {
+export class FocusService {
   /** The node holding focus, or null. A control binds its focus ring to this. */
-  @State() focused = state<UiNode | null>(null);
+  readonly focused = state<UiNode | null>(null);
   /** Whether focus is confined to a subtree by an open trap. */
-  @State() trapped = state(false);
+  readonly trapped = state(false);
 
   private manager: UiFocusManager | null = null;
   private detach: (() => void) | null = null;
@@ -62,25 +60,21 @@ export class FocusStore extends Store {
   }
 
   /** Gives the node keyboard focus. Non-focusable nodes are ignored. */
-  @Action()
   focus(node: UiNode): void {
     this.run(manager => manager.focus(node));
   }
 
   /** Drops focus without moving it anywhere. */
-  @Action()
   blur(): void {
     this.run(manager => manager.blur());
   }
 
   /** Moves focus to the next focusable node, wrapping around. */
-  @Action()
   focusNext(): void {
     this.run(manager => manager.focusNext());
   }
 
   /** Moves focus to the previous focusable node, wrapping around. */
-  @Action()
   focusPrevious(): void {
     this.run(manager => manager.focusPrevious());
   }
@@ -90,7 +84,6 @@ export class FocusStore extends Store {
    * it was elsewhere. Traps nest: a dialog opened over a dialog traps
    * again, and each release restores its own opener.
    */
-  @Action()
   trap(scope: UiNode): void {
     this.run(manager => manager.pushScope(scope));
   }
@@ -99,7 +92,6 @@ export class FocusStore extends Store {
    * Ends the innermost trap and returns focus to whatever held it when
    * the trap was taken — the button that opened the dialog.
    */
-  @Action()
   releaseTrap(): void {
     this.run(manager => manager.popScope());
   }

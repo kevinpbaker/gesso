@@ -14,6 +14,7 @@ export function mountThemeExampleRoute(host: HTMLElement): () => void {
   const app = createApp({
     // Written out literally so the bundler can see and split it.
     worker: () => new Worker(new URL('../examples/ThemeExampleWorker.ts', import.meta.url), { type: 'module' }),
+    appWorker: () => new Worker(new URL('../examples/theme/ThemeAppWorker.ts', import.meta.url), { type: 'module' }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();

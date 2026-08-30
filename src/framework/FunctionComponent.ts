@@ -4,7 +4,6 @@ import type { Reactive } from '../ui/composition/UiElementProps';
 import type { UiChild } from '../ui/composition/UiElement';
 import { Component } from './Component';
 import type { InputCell } from './Input';
-import type { Store } from './store/Store';
 import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken } from './channel/ChannelToken';
 
@@ -14,8 +13,14 @@ import type { ChannelToken } from './channel/ChannelToken';
  * `onUnmount()` give a class.
  */
 export interface ComponentContext {
-  /** The registered store (or replica) of this class. */
-  inject<S extends Store>(StoreClass: new () => S): S;
+  /**
+   * The runtime service of this class: overlays, focus, find, the
+   * clipboard, media, animation.
+   *
+   * Services stay on this thread and are simply called. Application
+   * state comes through `channel` instead.
+   */
+  inject<S extends object>(ServiceClass: new () => S): S;
 
   /**
    * The channel declared by `token`: `view` keys to read or bind, and

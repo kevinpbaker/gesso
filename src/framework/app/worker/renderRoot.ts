@@ -1,12 +1,6 @@
 import type { FrameworkChild } from '../../ComponentElement';
 import { createComponent } from '../../createComponent';
 import type { ComponentType } from '../../FunctionComponent';
-import type { Store } from '../../store/Store';
-import {
-  createStoreRegistry,
-  type RegistryHandle,
-  type StoreRegistration
-} from '../../store/worker/createStoreRegistry';
 import { APPLICATION_WORKER, portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import {
   createChannelRegistry,
@@ -17,6 +11,7 @@ import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
 import { NodalRuntime, type RendererChoice } from '../NodalRuntime';
+import { ServiceRegistry } from '../../service/ServiceRegistry';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
@@ -38,10 +33,10 @@ interface WorkerGlobal {
  *
  * Usage, in a module loaded as a worker:
  *
- *   renderRoot(AppRoot).useStore(DemoStore);
+ *   renderRoot(AppRoot).useChannel(Catalog);
  *
  * The message handler is installed synchronously, so chained
- * useStore() calls always land before the shell's init message is
+ * useChannel() calls always land before the shell's init message is
  * processed.
  */
 export function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerApp {
@@ -49,13 +44,12 @@ export function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerAp
 }
 
 export class RenderWorkerApp {
-  private readonly registrations: StoreRegistration[] = [];
   private readonly channelRegistrations: ChannelRegistration[] = [];
+  private readonly serviceRegistrations: (new () => object)[] = [];
   private readonly root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
   private runtime: NodalRuntime | undefined;
-  private registry: RegistryHandle | undefined;
   private channels: ChannelRegistryHandle | undefined;
   /** The shell's port to the application worker, if there is one. */
   private appWorker: WorkerHandle | undefined;
@@ -64,26 +58,6 @@ export class RenderWorkerApp {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
     this.host = host;
     this.host.onmessage = event => this.receive(event.data);
-  }
-
-  /**
-   * Registers a store.
-   *
-   * With no options the store lives here, in the render worker. Pass a
-   * worker factory to put it in a data worker instead, so its actions,
-   * business logic and projection computation stay off this thread and
-   * cannot delay a frame:
-   *
-   *   .useStore(CartStore, {
-   *     worker: () => new Worker(new URL('./cart.worker.ts', import.meta.url), { type: 'module' })
-   *   })
-   */
-  useStore(StoreClass: new () => Store, options: { worker?: WorkerHandle | (() => Worker); key?: string } = {}): this {
-    if (this.runtime !== undefined) {
-      throw new Error(`Store '${StoreClass.name}' was registered after the runtime started.`);
-    }
-    this.registrations.push({ storeClass: StoreClass, worker: options.worker, key: options.key });
-    return this;
   }
 
   /**
@@ -107,6 +81,22 @@ export class RenderWorkerApp {
       worker: options.worker,
       source: options.source as unknown as ChannelSource<never, never>
     });
+    return this;
+  }
+
+  /**
+   * Registers a runtime service: a plain class this thread constructs
+   * once and hands to whoever injects it.
+   *
+   * For things that belong to the render thread and could not leave it
+   * — something holding a `UiNode`, a decoded bitmap, or a generator
+   * feeding bound props at frame rate. Application state goes through
+   * `useChannel` instead, and the test is the usual one: if it
+   * survives a reload or another screen cares about it, it is not a
+   * service.
+   */
+  useService(ServiceClass: new () => object): this {
+    this.serviceRegistrations.push(ServiceClass);
     return this;
   }
 
@@ -201,9 +191,7 @@ export class RenderWorkerApp {
         break;
       case 'dispose':
         runtime.dispose();
-        this.registry?.dispose();
         this.channels?.dispose();
-        this.registry = undefined;
         this.channels = undefined;
         this.runtime = undefined;
         break;
@@ -240,14 +228,7 @@ export class RenderWorkerApp {
     renderer: RendererChoice | undefined
   ): void {
     this.runtime?.dispose();
-    this.registry?.dispose();
     this.channels?.dispose();
-    this.registry = createStoreRegistry(
-      this.registrations.map(registration => this.resolveWorker(registration)),
-      (storeName, message, stack) => {
-        this.host.postMessage({ type: 'error', message: `store ${storeName}: ${message}`, stack });
-      }
-    );
     this.channels = createChannelRegistry(
       // A channel registered with neither a worker nor a source is
       // served by whatever the shell spawned. Naming no worker is the
@@ -262,11 +243,15 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'error', message: `channel ${channelName}: ${message}`, stack });
       }
     );
+    const services = new ServiceRegistry();
+    for (const ServiceClass of this.serviceRegistrations) {
+      services.register(ServiceClass);
+    }
     this.runtime = new NodalRuntime({
       root: this.root,
+      services,
       canvas,
       renderer,
-      stores: this.registry.registry,
       channels: this.channels.registry,
       // A worker has no requestAnimationFrame tied to the compositor,
       // so frames are timer-paced. See FRAMEWORK_DESIGN section 13.
@@ -275,7 +260,7 @@ export class RenderWorkerApp {
       height,
       dpr
     });
-    this.runtime.deferPatchesFrom([...this.registry.replicas, ...this.channels.registry.all()]);
+    this.runtime.deferPatchesFrom(this.channels.registry.all());
     this.runtime.onInspect(text => {
       this.host.postMessage({ type: 'inspect', text });
     });

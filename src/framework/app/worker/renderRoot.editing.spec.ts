@@ -4,7 +4,7 @@ import { Component } from '../../Component';
 import { Define, Inject } from '../../decorators';
 import { Button, Column, EditableText } from '../../../ui/composition/UiComponents';
 import type { CanvasHost } from '../../../ui/rendering';
-import { ShellStore } from '../ShellStore';
+import { ShellService } from '../ShellService';
 import { RenderWorkerApp } from './renderRoot';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
@@ -64,7 +64,7 @@ const values: string[] = [];
 
 @Define('editing-worker-root')
 class EditingRoot extends Component {
-  @Inject(ShellStore) shell!: ShellStore;
+  @Inject(ShellService) shell!: ShellService;
 
   override render() {
     return Column(
@@ -74,8 +74,8 @@ class EditingRoot extends Component {
         width: 40,
         height: 20,
         onClick: () => {
-          this.shell.dispatch('copyText', 'copied!');
-          this.shell.dispatch('openUrl', 'https://example.test/');
+          this.shell.copyText('copied!');
+          this.shell.openUrl('https://example.test/');
         }
       })
     );
@@ -161,7 +161,7 @@ describe('RenderWorkerApp editing', () => {
     expect(values).toEqual(['abx']);
   });
 
-  it('forwards ShellStore requests as clipboard and openUrl messages', async () => {
+  it('forwards ShellService requests as clipboard and openUrl messages', async () => {
     const { sent, press } = start();
     await settle();
     // The button sits 10px below the 16.8px field.

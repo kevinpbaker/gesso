@@ -1,5 +1,6 @@
 import { renderRoot } from '../../framework/app/worker/renderRoot';
-import { BoardApp, BoardStore } from './AnimationExampleApp';
+import { Board } from './board/BoardContract';
+import { BoardApp } from './AnimationExampleApp';
 
 /**
  * Render worker for the animation example. Every animation on the
@@ -7,4 +8,4 @@ import { BoardApp, BoardStore } from './AnimationExampleApp';
  * thread forwards input and reports the frame timings the status bar
  * shows.
  */
-renderRoot(BoardApp).useStore(BoardStore);
+renderRoot(BoardApp).useChannel(Board);

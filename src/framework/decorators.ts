@@ -27,9 +27,10 @@ export function Input(): PropertyDecorator {
 }
 
 /**
- * Declares a property as an injected store.
+ * Declares a property as an injected runtime service.
  *
- * The store must be registered with createApp().useStore().
+ * The service must be registered with useService(), or be one of
+ * the six a runtime registers itself.
  */
 export function Inject<T extends Function>(StoreClass: T): PropertyDecorator {
   return (target, propertyKey) => {

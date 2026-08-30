@@ -4,14 +4,12 @@ import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
 import { NodalApp } from './NodalApp';
-import { Store } from '../store/Store';
+import { ServiceRegistry } from '../service/ServiceRegistry';
 import { state } from '../State';
-import { State as StateDecorator, Action } from '../store/decorators';
 import { Box, Column, Text } from '../../ui/composition/UiComponents';
 import { FakePlatformSurface } from '../../ui/input/UiInputTestUtils';
 import { state as cell } from '../State';
 import { input } from '../Input';
-import { State as ComponentState } from '../store/decorators';
 import type { UiChild, UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
@@ -71,15 +69,19 @@ function createMockHost(): HTMLElement {
   } as unknown as HTMLElement;
 }
 
-class CounterStore extends Store {
-  @StateDecorator() count = state(0);
+/**
+ * A service standing in for shared state a component reads.
+ *
+ * A plain class with a public cell and public methods: same thread,
+ * so nothing here needs a projection, a dispatch or a wire format.
+ */
+class CounterService {
+  readonly count = state(0);
 
-  @Action()
   increment() {
     this.count.value++;
   }
 
-  @Action()
   decrement() {
     this.count.value--;
   }
@@ -87,10 +89,10 @@ class CounterStore extends Store {
 
 @Define('counter-view')
 class CounterView extends Component {
-  @Inject(CounterStore) store!: CounterStore;
+  @Inject(CounterService) counter!: CounterService;
 
   override render() {
-    return Text({ text: `Count: ${this.store.select(s => s.count.value)}` });
+    return Text({ text: this.counter.count.pipe(map(count => `Count: ${count}`)) });
   }
 }
 
@@ -116,28 +118,26 @@ class ListItem extends Component {
 
 @Define('list-root')
 class ListRoot extends Component {
-  @Inject(CounterStore) store!: CounterStore;
+  @Inject(CounterService) counter!: CounterService;
 
   override render(): UiChild {
     return Column(
-      this.store
-        .select(s => s.count.value)
-        .pipe(
-          map(count => {
-            const labels: string[] = [];
-            for (let i = 1; i <= count; i++) {
-              labels.push(`item-${i}`);
-            }
-            return labels.map(label => createComponent(ListItem, { label }, label) as unknown as UiElement);
-          })
-        )
+      this.counter.count.pipe(
+        map(count => {
+          const labels: string[] = [];
+          for (let i = 1; i <= count; i++) {
+            labels.push(`item-${i}`);
+          }
+          return labels.map(label => createComponent(ListItem, { label }, label) as unknown as UiElement);
+        })
+      )
     );
   }
 }
 
 @Define('click-counter')
 class ClickCounter extends Component {
-  @ComponentState() count = cell(0);
+  readonly count = cell(0);
 
   override render() {
     return Column(
@@ -165,18 +165,20 @@ function collectText(node: UiNode, into: string[] = []): string[] {
 }
 
 describe('NodalApp', () => {
-  it('mounts a component and registers stores', () => {
+  it('mounts a component and resolves an injected service', () => {
     const host = createMockHost();
     const canvas = createMockCanvas();
+    const services = new ServiceRegistry();
+    services.register(CounterService);
     const app = new NodalApp({
       host,
       root: createComponent(CounterView),
-      storeClasses: [CounterStore],
+      services,
       canvas,
       clock: callback => new UiTimerFrameClock(callback)
     });
 
-    expect(app.stores.has(CounterStore)).toBe(true);
+    expect(services.has(CounterService)).toBe(true);
 
     app.mount();
 
@@ -186,26 +188,28 @@ describe('NodalApp', () => {
   it('mounts and unmounts components emitted by an observable list', () => {
     itemMounts.length = 0;
     itemUnmounts.length = 0;
+    const services = new ServiceRegistry();
+    services.register(CounterService);
 
     const app = new NodalApp({
       host: createMockHost(),
       canvas: createMockCanvas(),
       root: createComponent(ListRoot),
-      storeClasses: [CounterStore],
+      services,
       clock: callback => new UiTimerFrameClock(callback)
     });
 
-    const store = app.stores.get(CounterStore);
+    const counter = services.get(CounterService);
     const root = app.debugRoot();
 
     expect(collectText(root)).toEqual([]);
 
-    store.dispatch('increment');
-    store.dispatch('increment');
+    counter.increment();
+    counter.increment();
     expect(collectText(root)).toEqual(['item-1', 'item-2']);
     expect(itemMounts).toEqual(['item-1', 'item-2']);
 
-    store.dispatch('decrement');
+    counter.decrement();
     expect(collectText(root)).toEqual(['item-1']);
     expect(itemUnmounts).toEqual(['item-2']);
 

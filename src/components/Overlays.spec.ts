@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent } from '../framework/createComponent';
 import { mountRuntime } from '../framework/app/RuntimeTestUtils';
 import type { NodalRuntime } from '../framework/app/NodalRuntime';
-import { OverlayStore } from '../framework/overlay/OverlayStore';
+import { OverlayService } from '../framework/overlay/OverlayService';
 import { Button, Column, Row } from '../ui/composition/UiComponents';
 import type { UiNode } from '../ui/graph/UiNode';
 import { UiEventType, UiPointerEvent } from '../ui/input/UiInputEvent';
@@ -49,7 +49,7 @@ function mount(root: Parameters<typeof mountRuntime>[0]) {
     press: (key: string) => runtime.input.keyboard.keyDown(key),
     click: (node: UiNode) => runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.Click, 0, 0), node),
     focused: () => runtime.input.focus.focusedNode,
-    entries: () => runtime.stores.get(OverlayStore).entries.value
+    entries: () => runtime.services.get(OverlayService).entries.value
   };
 }
 

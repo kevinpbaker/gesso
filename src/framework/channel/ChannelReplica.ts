@@ -1,5 +1,5 @@
 import { InputCell } from '../Input';
-import { applyPatches, type Patch } from '../store/StorePatch';
+import { applyPatches, type Patch } from './StorePatch';
 import { isChannelHostMessage, type ChannelClientMessage, type ChannelPort } from './ChannelProtocol';
 import { viewKeys, type ChannelToken } from './ChannelToken';
 import { isPortErrorMessage } from '../worker/WorkerPorts';

@@ -1,11 +1,10 @@
-import { Store } from '../store/Store';
 import { DefaultImageResolver, type ImageResolver } from '../../ui/rendering/ImageResolver';
 import { IconRasterizer } from '../../ui/rendering/IconRasterizer';
 
 /**
  * Where an `Image` finds its bitmap and an `Icon` its raster.
  *
- * A store for the same reason `ShellStore` is one: a component reaches
+ * A store for the same reason `ShellService` is one: a component reaches
  * the world outside the graph through an injected store and never
  * through a module-level singleton. It matters more here than usual,
  * because the cache has to be per runtime — two runtimes in one worker
@@ -17,7 +16,7 @@ import { IconRasterizer } from '../../ui/rendering/IconRasterizer';
  * would put every thumbnail of a scrolling list into the patch stream
  * for no consumer.
  */
-export class MediaStore extends Store {
+export class MediaService {
   private imageResolver: ImageResolver = new DefaultImageResolver();
   private iconRasterizer = new IconRasterizer();
   /** Set when the caller supplied one, so the default is not disposed twice. */

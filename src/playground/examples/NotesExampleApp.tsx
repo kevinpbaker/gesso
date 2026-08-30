@@ -2,7 +2,7 @@ import { combineLatest } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
-import { ShellStore } from '../../framework/app/ShellStore';
+import { ShellService } from '../../framework/app/ShellService';
 import { state } from '../../framework/State';
 import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
 
@@ -112,7 +112,7 @@ function wordCount(text: string): number {
 
 function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
   const notes = ctx.channel(Notes);
-  const shell = ctx.inject(ShellStore);
+  const shell = ctx.inject(ShellService);
   const open = notes.view.open;
   const title = open.pipe(
     map(note => note?.title ?? ''),
@@ -160,7 +160,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
             onClick={() => {
               const selected = notes.view.open.value;
               if (selected !== null) {
-                shell.dispatch('copyText', `${selected.title}\n\n${selected.body}`);
+                shell.copyText(`${selected.title}\n\n${selected.body}`);
               }
             }}
             padding={8}

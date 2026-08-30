@@ -1,6 +1,3 @@
-import { Store } from '../store/Store';
-import { Action } from '../store/decorators';
-
 /**
  * Something only the shell — the thread with a window — can do.
  */
@@ -13,11 +10,11 @@ export type ShellRequest = { type: 'clipboard'; text: string } | { type: 'openUr
  * Dispatching an action here hands the request to the runtime, which
  * forwards it to whichever host it has: `WorkerApp` posts it to the
  * main thread, `NodalApp` performs it directly. Every runtime registers
- * one, like `OverlayStore`; being a store keeps the rule that
+ * one, like `OverlayService`; being a store keeps the rule that
  * components reach the outside world through actions only, and gives a
  * desktop shell (roadmap E1) one place to bind native equivalents.
  */
-export class ShellStore extends Store {
+export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
 
   /** Installed by the runtime; a request with no handler is dropped. */
@@ -26,13 +23,11 @@ export class ShellStore extends Store {
   }
 
   /** Puts text on the system clipboard. */
-  @Action()
   copyText(text: string): void {
     this.handler?.({ type: 'clipboard', text });
   }
 
   /** Opens a URL in the user's browser, in a new tab or window. */
-  @Action()
   openUrl(url: string): void {
     this.handler?.({ type: 'openUrl', url });
   }

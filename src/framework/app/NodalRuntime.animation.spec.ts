@@ -6,7 +6,7 @@ import type { UiNode } from '../../ui/graph/UiNode';
 import { linear, spring, tween } from '../../ui/animation';
 import { animateLayout } from '../../ui/modifiers';
 import { state } from '../State';
-import { AnimationStore } from './AnimationStore';
+import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
@@ -39,7 +39,7 @@ describe('the ticks phase', () => {
     }
     expect(mounted.clock.isPending).toBe(false);
 
-    mounted.runtime.stores.get(AnimationStore).animate(opacity, 1, { duration: 200, easing: linear });
+    mounted.runtime.services.get(AnimationService).animate(opacity, 1, { duration: 200, easing: linear });
 
     // Starting it armed a frame, with nothing marked dirty by anyone.
     expect(mounted.clock.isPending).toBe(true);
@@ -82,8 +82,8 @@ describe('the ticks phase', () => {
         time += 16;
         mounted.clock.tick(time);
       }
-      mounted.runtime.stores
-        .get(AnimationStore)
+      mounted.runtime.services
+        .get(AnimationService)
         .animate(step, 1, { duration: 800, easing: linear, stepMs: 100, repeat: true });
       mounted.clock.tick((time += 16));
 
@@ -394,7 +394,7 @@ describe('reduced motion', () => {
     mounted.runtime.setReducedMotion(true);
     expect(mounted.runtime.reducedMotion).toBe(true);
 
-    mounted.runtime.stores.get(AnimationStore).animate(opacity, 1, { duration: 400 });
+    mounted.runtime.services.get(AnimationService).animate(opacity, 1, { duration: 400 });
     expect(opacity.value).toBe(1);
     // The value changed, so a frame is due for the paint — but no
     // further frame is armed once it has run.
@@ -407,7 +407,7 @@ describe('reduced motion', () => {
 
   it('is readable by a component through the store', () => {
     const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20 })));
-    const animations = mounted.runtime.stores.get(AnimationStore);
+    const animations = mounted.runtime.services.get(AnimationService);
     const seen: boolean[] = [];
     animations.reducedMotion.subscribe(value => seen.push(value));
     mounted.runtime.setReducedMotion(true);

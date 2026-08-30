@@ -2,8 +2,8 @@ import type { ComponentResolver } from '../ui/composition/ComponentResolver';
 import type { ComponentLikeElement, UiChild } from '../ui/composition/UiElement';
 import type { ComponentElement } from './ComponentElement';
 import { ComponentHost } from './ComponentHost';
-import type { StoreRegistry } from './store/StoreRegistry';
 import { ChannelRegistry } from './channel/ChannelRegistry';
+import { ServiceRegistry } from './service/ServiceRegistry';
 
 /**
  * Mounts framework components on behalf of UiGraphBuilder.
@@ -22,7 +22,7 @@ export class ComponentHostResolver implements ComponentResolver {
   private pendingMounts: ComponentHost[] = [];
 
   constructor(
-    private readonly stores: StoreRegistry,
+    private readonly services: ServiceRegistry = new ServiceRegistry(),
     private readonly channels: ChannelRegistry = new ChannelRegistry()
   ) {}
 
@@ -38,7 +38,7 @@ export class ComponentHostResolver implements ComponentResolver {
     }
 
     if (host === undefined) {
-      host = new ComponentHost(element as ComponentElement, this.stores, this.channels);
+      host = new ComponentHost(element as ComponentElement, this.services, this.channels);
       this.hosts.set(anchorId, host);
       this.pendingMounts.push(host);
     } else {

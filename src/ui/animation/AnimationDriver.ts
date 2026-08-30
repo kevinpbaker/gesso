@@ -20,7 +20,7 @@ function erase<T>(animation: UiAnimation<T>): AnyAnimation {
  * cell — and it removes the whole question of what two animations
  * writing one value would mean.
  *
- * The driver is per runtime for the reason `MediaStore` is: the
+ * The driver is per runtime for the reason `MediaService` is: the
  * playground runs several runtimes in one worker, and a module-level
  * set of animations would tick a disposed runtime's cells.
  */

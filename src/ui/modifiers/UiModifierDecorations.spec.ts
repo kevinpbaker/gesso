@@ -12,7 +12,7 @@ import { darkTheme } from '../environment/UiTheme';
 import { decorationColor, decorationRect, type DecorationShape } from '../rendering/Decorations';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import { mountRuntime } from '../../framework/app/RuntimeTestUtils';
-import { FocusStore } from '../../framework/app/FocusStore';
+import { FocusService } from '../../framework/app/FocusService';
 import { decorated, focusRing } from './decoration';
 
 function build(root: UiChild) {
@@ -128,7 +128,7 @@ describe('focusRing', () => {
 
   it('draws nothing until the node is focused, and follows focus from node to node', () => {
     const { runtime, first, second } = form();
-    const store = runtime.stores.get(FocusStore);
+    const store = runtime.services.get(FocusService);
 
     expect(first.decorations).toBeNull();
     expect(second.decorations).toBeNull();
@@ -147,7 +147,7 @@ describe('focusRing', () => {
 
   it('is a stroke outside the node, so it never covers the control it marks', () => {
     const { runtime, first } = form();
-    runtime.stores.get(FocusStore).focus(first);
+    runtime.services.get(FocusService).focus(first);
 
     const shape = first.decorations![0];
     expect(shape.kind).toBe('stroke');
@@ -175,7 +175,7 @@ describe('focusRing', () => {
     const mounted = mountRuntime(Column({}, children));
     mounted.frame();
     const focused = target!;
-    mounted.runtime.stores.get(FocusStore).focus(focused);
+    mounted.runtime.services.get(FocusService).focus(focused);
     expect(focused.decorations).toBeNull();
 
     children.next(button(true));

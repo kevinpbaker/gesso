@@ -1,22 +1,18 @@
 import { renderRoot } from '../framework/app/worker/renderRoot';
-import { DemoStore, FrameworkDemoRoot } from './FrameworkPlayground';
-import { HeavyStore } from './HeavyStore';
+import { DemoCounter, FrameworkDemoRoot } from './FrameworkPlayground';
+import { Heavy } from './HeavyWork';
 import { Ticker } from './TickerChannel';
-import { APPLICATION_WORKER } from '../framework/worker/WorkerPorts';
 
 /**
  * Render worker for the framework playground.
  *
- * The entire UI lives here: components, the retained graph, layout,
- * input routing, and rasterization to an OffscreenCanvas.
+ * The entire UI lives here. It spawns nothing: the shell creates the
+ * application worker and hands this one a port to it, so both channels
+ * resolve over that port without this file knowing where it leads.
  *
- * It spawns nothing. The shell creates the application worker and
- * hands this one a port to it, so `HeavyStore` and `Ticker` are named
- * over that port without this file knowing where it leads — which is
- * what keeps the application alive when this worker is replaced on a
- * renderer switch.
+ * One service and two channels, which is the taxonomy in three lines.
+ * `DemoCounter` is shared state that never leaves this thread, so it is
+ * simply called. `Heavy` and `Ticker` are application state on another
+ * thread, reached through view keys and commands.
  */
-renderRoot(FrameworkDemoRoot)
-  .useStore(DemoStore)
-  .useStore(HeavyStore, { worker: APPLICATION_WORKER })
-  .useChannel(Ticker);
+renderRoot(FrameworkDemoRoot).useService(DemoCounter).useChannel(Heavy).useChannel(Ticker);

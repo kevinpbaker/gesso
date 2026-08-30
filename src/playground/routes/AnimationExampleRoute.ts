@@ -22,6 +22,7 @@ export function mountAnimationExampleRoute(host: HTMLElement): () => void {
   const app = createApp({
     // Written out literally so the bundler can see and split it.
     worker: () => new Worker(new URL('../examples/AnimationExampleWorker.ts', import.meta.url), { type: 'module' }),
+    appWorker: () => new Worker(new URL('../examples/board/BoardAppWorker.ts', import.meta.url), { type: 'module' }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();

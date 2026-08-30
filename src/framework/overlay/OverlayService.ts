@@ -1,7 +1,5 @@
 import type { UiChild } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
-import { Store } from '../store/Store';
-import { Action, State } from '../store/decorators';
 import { state } from '../State';
 
 export type OverlayPlacement =
@@ -75,16 +73,12 @@ export interface OverlayEntry {
  * It must stay on the render thread: entries hold UiElements and
  * UiNodes, which never cross a worker boundary.
  */
-export class OverlayStore extends Store {
-  @State() entries = state<readonly OverlayEntry[]>([]);
-
-  @Action()
+export class OverlayService {
+  readonly entries = state<readonly OverlayEntry[]>([]);
   open(entry: OverlayEntry): void {
     const others = this.entries.value.filter(existing => existing.id !== entry.id);
     this.entries.value = [...others, entry];
   }
-
-  @Action()
   close(id: string): void {
     const closing = this.entries.value.find(entry => entry.id === id);
     if (closing === undefined) {
@@ -93,8 +87,6 @@ export class OverlayStore extends Store {
     this.entries.value = this.entries.value.filter(entry => entry !== closing);
     closing.onClose?.();
   }
-
-  @Action()
   closeAll(): void {
     const closing = this.entries.value;
     if (closing.length === 0) {

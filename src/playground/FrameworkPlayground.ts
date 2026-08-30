@@ -23,16 +23,16 @@ import {
   type DataTableSort,
   type TreeNode
 } from '../components';
-import { FocusStore } from '../framework/app/FocusStore';
+import { FocusService } from '../framework/app/FocusService';
 import { darkTheme, lightTheme } from '../ui/environment/UiTheme';
 import { animateLayout, focusRing, interactive } from '../ui/modifiers';
 import { spring, tween } from '../ui/animation';
-import { AnimationStore } from '../framework/app/AnimationStore';
+import { AnimationService } from '../framework/app/AnimationService';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
 import { auto, fr, percent, repeat } from '../ui/layout';
 import type { UiNode } from '../ui/graph/UiNode';
-import { OverlayStore } from '../framework/overlay/OverlayStore';
+import { OverlayService } from '../framework/overlay/OverlayService';
 import type { UiElement } from '../ui/composition';
 import { Component } from '../framework/Component';
 import { createComponent } from '../framework/createComponent';
@@ -40,10 +40,9 @@ import { Channel, Define, Inject, Input } from '../framework/decorators';
 import { state } from '../framework/State';
 import { createDemoBitmap } from './demoBitmap';
 import { input } from '../framework/Input';
-import { Store } from '../framework/store/Store';
-import { Action, Projection, State } from '../framework/store/decorators';
-import { HeavyStore } from './HeavyStore';
+import { Heavy } from './HeavyWork';
 import { Ticker, type TickerCommands, type TickerView } from './TickerChannel';
+import type { HeavyCommands, HeavyStatus } from './HeavyWork';
 import type { ChannelReplica } from '../framework/channel/ChannelReplica';
 
 /**
@@ -52,30 +51,28 @@ import type { ChannelReplica } from '../framework/channel/ChannelReplica';
  * Owned by the single-thread app runtime and injected into components
  * with `@Inject()`. Actions are the only way to mutate store state.
  */
-export class DemoStore extends Store {
-  @State() clicks = state(0);
+/**
+ * Shared state that never leaves this thread, as a service.
+ *
+ * The counterpart to `Heavy` and `Ticker` below, which are channels.
+ * A service is a plain class the runtime hands out and a component
+ * simply calls; a channel is application state on another thread,
+ * reached through view keys and commands. The playground shows both,
+ * because knowing which of the two a thing is is the decision the
+ * thread model asks an application to make.
+ */
+export class DemoCounter {
+  readonly clicks = state(0);
 
-  /**
-   * Derived read model. Exposed to components as an Observable that
-   * emits only when the projected value actually changes, which is
-   * what a data worker will send over the wire in Phase E.
-   */
-  @Projection()
-  get summary(): { clicks: number; parity: string } {
-    return {
-      clicks: this.clicks.value,
-      parity: this.clicks.value % 2 === 0 ? 'even' : 'odd'
-    };
-  }
+  readonly summary = this.clicks.pipe(map(clicks => ({ clicks, parity: clicks % 2 === 0 ? 'even' : 'odd' })));
 
-  @Action()
   increment(): void {
     this.clicks.value++;
   }
 }
 
 /**
- * A component that demonstrates local `@State()` driven by a click.
+ * A component that demonstrates local state driven by a click.
  *
  * The button carries a declarative `onClick` prop, so the handler is
  * registered on the input dispatcher during reconciliation. Pressing
@@ -84,7 +81,7 @@ export class DemoStore extends Store {
  */
 @Define('local-counter')
 export class LocalCounter extends Component {
-  @State() count = state(0);
+  readonly count = state(0);
 
   increment(): void {
     this.count.value++;
@@ -121,18 +118,18 @@ export class LocalCounter extends Component {
  */
 @Define('store-counter')
 export class StoreCounter extends Component {
-  @Inject(DemoStore) demo!: DemoStore;
+  @Inject(DemoCounter) demo!: DemoCounter;
 
   override render(): UiElement {
     return Row(
       { gap: 12, y: 'center' },
       Text({
-        text: this.demo.projection.summary.pipe(map(s => `Store count: ${s.clicks} (${s.parity})`)),
+        text: this.demo.summary.pipe(map(s => `Store count: ${s.clicks} (${s.parity})`)),
         color: '#e5e7eb'
       }),
       Button(
         {
-          onClick: () => this.demo.dispatch('increment'),
+          onClick: () => this.demo.increment(),
           color: '#ffffff',
           backgroundColor: '#1f6feb',
           width: 80,
@@ -177,7 +174,7 @@ export class TickItem extends Component {
  */
 @Define('heartbeat')
 export class Heartbeat extends Component {
-  @State() ticks = state(0);
+  readonly ticks = state(0);
 
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -265,7 +262,7 @@ export class ChannelDemo extends Component {
  */
 @Define('heavy-panel')
 export class HeavyPanel extends Component {
-  @Inject(HeavyStore) heavy!: HeavyStore;
+  @Channel(Heavy) heavy!: ChannelReplica<{ status: HeavyStatus }, HeavyCommands>;
 
   override render(): UiElement {
     return Column(
@@ -273,7 +270,7 @@ export class HeavyPanel extends Component {
       Row(
         { gap: 12, y: 'center' },
         Text({
-          text: this.heavy.projection.status.pipe(
+          text: this.heavy.view.status.pipe(
             map(status =>
               status === undefined
                 ? 'Data worker: connecting…'
@@ -284,7 +281,7 @@ export class HeavyPanel extends Component {
         }),
         Button(
           {
-            onClick: () => this.heavy.dispatch('compute'),
+            onClick: () => this.heavy.send.compute(),
             color: '#ffffff',
             backgroundColor: '#a855f7',
             width: 150,
@@ -349,8 +346,8 @@ export class TextShowcase extends Component {
  */
 @Define('text-field-demo')
 export class TextFieldDemo extends Component {
-  @State() name = state('Ada');
-  @State() notes = state('Type here. Enter makes a new line; the field grows with it.');
+  readonly name = state('Ada');
+  readonly notes = state('Type here. Enter makes a new line; the field grows with it.');
 
   override render(): UiElement {
     return Column(
@@ -402,14 +399,14 @@ export class TextFieldDemo extends Component {
 
 /**
  * Overlays (roadmap L2): a menu anchored to a button through a `ref`,
- * opened through the OverlayStore. The button sits inside a short
+ * opened through the OverlayService. The button sits inside a short
  * scroll view near the bottom of the page, so the menu flips upward
  * when there is no room below and follows the button as the list
  * scrolls; a press anywhere else closes it.
  */
 @Define('menu-demo')
 export class MenuDemo extends Component {
-  @Inject(OverlayStore) overlays!: OverlayStore;
+  @Inject(OverlayService) overlays!: OverlayService;
 
   private anchor: UiNode | null = null;
   private noteAnchor: UiNode | null = null;
@@ -421,10 +418,10 @@ export class MenuDemo extends Component {
    */
   private toggleNote(): void {
     if (this.overlays.isOpen('menu-demo-note')) {
-      this.overlays.dispatch('close', 'menu-demo-note');
+      this.overlays.close('menu-demo-note');
       return;
     }
-    this.overlays.dispatch('open', {
+    this.overlays.open({
       id: 'menu-demo-note',
       anchor: this.noteAnchor,
       placement: 'right-start',
@@ -441,7 +438,7 @@ export class MenuDemo extends Component {
   }
 
   private open(): void {
-    this.overlays.dispatch('open', {
+    this.overlays.open({
       id: 'menu-demo',
       anchor: this.anchor,
       placement: 'bottom-start',
@@ -466,7 +463,7 @@ export class MenuDemo extends Component {
             borderRadius: 4,
             onClick: () => {
               this.choice.value = `Chose “${label}”`;
-              this.overlays.dispatch('close', 'menu-demo');
+              this.overlays.close('menu-demo');
             }
           })
         )
@@ -645,19 +642,19 @@ function ringButton(text: string, key?: string): UiElement {
  *
  * Every control is themed through the control tokens, carries its own
  * role, name and states, and is operable from the keyboard. Submitting
- * with an empty field puts the caret in it through `FocusStore`, which
+ * with an empty field puts the caret in it through `FocusService`, which
  * is the thing a component could not do before C0.
  */
 @Define('sign-in-form-demo')
 export class SignInFormDemo extends Component {
-  @Inject(FocusStore) focus!: FocusStore;
+  @Inject(FocusService) focus!: FocusService;
 
-  @State() email = state('');
-  @State() passcode = state('');
-  @State() remember = state(true);
-  @State() emailError = state('');
-  @State() passcodeError = state('');
-  @State() status = state('');
+  readonly email = state('');
+  readonly passcode = state('');
+  readonly remember = state(true);
+  readonly emailError = state('');
+  readonly passcodeError = state('');
+  readonly status = state('');
 
   private emailField: UiNode | null = null;
   private passcodeField: UiNode | null = null;
@@ -669,7 +666,7 @@ export class SignInFormDemo extends Component {
     this.passcodeError.value = missingPasscode ? 'Enter your passcode' : '';
     this.status.value = missingEmail || missingPasscode ? '' : `Signed in as ${this.email.value}`;
     // The caret goes to the first field that failed, which is what a
-    // form has to be able to do and what FocusStore exists for.
+    // form has to be able to do and what FocusService exists for.
     const offending = missingEmail ? this.emailField : missingPasscode ? this.passcodeField : null;
     if (offending !== null) {
       this.focus.focus(offending);
@@ -747,11 +744,11 @@ export class SignInFormDemo extends Component {
  */
 @Define('overlay-tier-demo')
 export class OverlayTierDemo extends Component {
-  @State() dialogOpen = state(false);
-  @State() menuOpen = state(false);
-  @State() payment = state('card');
-  @State() toastOpen = state(false);
-  @State() lastCommand = state('nothing yet');
+  readonly dialogOpen = state(false);
+  readonly menuOpen = state(false);
+  readonly payment = state('card');
+  readonly toastOpen = state(false);
+  readonly lastCommand = state('nothing yet');
 
   private menuAnchor: UiNode | null = null;
 
@@ -862,9 +859,9 @@ export class OverlayTierDemo extends Component {
  */
 @Define('structure-tier-demo')
 export class StructureTierDemo extends Component {
-  @State() tab = state('stories');
-  @State() split = state(0.4);
-  @State() open = state<readonly string[]>(['what']);
+  readonly tab = state('stories');
+  readonly split = state(0.4);
+  readonly open = state<readonly string[]>(['what']);
 
   override render(): UiElement {
     return Column(
@@ -972,10 +969,10 @@ function toolButton(label: string): UiElement {
  */
 @Define('data-tier-demo')
 export class DataTierDemo extends Component {
-  @State() sort = state<DataTableSort | null>({ column: 'name', direction: 'ascending' });
-  @State() selected = state(-1);
-  @State() open = state<readonly string[]>(['src']);
-  @State() file = state<string | null>('components');
+  readonly sort = state<DataTableSort | null>({ column: 'name', direction: 'ascending' });
+  readonly selected = state(-1);
+  readonly open = state<readonly string[]>(['src']);
+  readonly file = state<string | null>('components');
 
   private readonly people = buildPeople(100000);
 
@@ -1196,7 +1193,7 @@ export class ScrollDemo extends Component {
  * progress bars.
  *
  * The picture is fetched and decoded by the `ImageResolver` the
- * `MediaStore` holds — in the render worker, which is what "off the
+ * `MediaService` holds — in the render worker, which is what "off the
  * main thread" means for a Nodal app — and the icons are rasterised
  * from paths at whatever colour the card's theme resolves. Switching
  * the card between the light and dark themes redraws them, which is
@@ -1225,8 +1222,8 @@ const SWATCH_PNG = '/swatch.png';
 
 @Define('media-tier-demo')
 export class MediaTierDemo extends Component {
-  @State() progress = state(0.35);
-  @State() dark = state(true);
+  readonly progress = state(0.35);
+  readonly dark = state(true);
 
   override render(): UiElement {
     return Column(
@@ -1302,7 +1299,7 @@ export class MediaTierDemo extends Component {
  */
 @Define('image-demo')
 export class ImageDemo extends Component {
-  @State() image = state<ImageBitmap | undefined>(undefined);
+  readonly image = state<ImageBitmap | undefined>(undefined);
 
   onMount(): void {
     void createDemoBitmap().then(bitmap => {
@@ -1474,10 +1471,10 @@ export class LazyListDemo extends Component {
  */
 @Define('animation-demo')
 export class AnimationDemo extends Component {
-  @Inject(AnimationStore) animations!: AnimationStore;
+  @Inject(AnimationService) animations!: AnimationService;
 
-  @State() order = state([0, 1, 2, 3, 4]);
-  @State() expanded = state(false);
+  readonly order = state([0, 1, 2, 3, 4]);
+  readonly expanded = state(false);
 
   private shuffle(): void {
     const next = [...this.order.value];
@@ -1575,7 +1572,7 @@ const ROW_LABELS = ['Inbox', 'Drafts', 'Sent', 'Archive', 'Trash'];
 
 @Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
-  @Inject(DemoStore) demo!: DemoStore;
+  @Inject(DemoCounter) demo!: DemoCounter;
 
   /**
    * The four most recent ticks, newest first, keyed by tick number.
@@ -1585,17 +1582,15 @@ export class FrameworkDemoRoot extends Component {
    * list exercises keyed component identity, not just creation.
    */
   private recentTicks() {
-    return this.demo
-      .select(s => s.clicks.value)
-      .pipe(
-        map(count => {
-          const ticks: number[] = [];
-          for (let tick = count; tick > count - 4 && tick > 0; tick--) {
-            ticks.push(tick);
-          }
-          return ticks.map(tick => createComponent(TickItem, { label: `Tick #${tick}` }, tick));
-        })
-      );
+    return this.demo.clicks.pipe(
+      map(count => {
+        const ticks: number[] = [];
+        for (let tick = count; tick > count - 4 && tick > 0; tick--) {
+          ticks.push(tick);
+        }
+        return ticks.map(tick => createComponent(TickItem, { label: `Tick #${tick}` }, tick));
+      })
+    );
   }
 
   override render(): UiElement {

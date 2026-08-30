@@ -18,8 +18,6 @@ import {
   type UiSpringToken
 } from '../../ui/environment/UiMotion';
 import { state } from '../State';
-import { Store } from '../store/Store';
-import { State } from '../store/decorators';
 
 /** A duration named from the motion vocabulary, or milliseconds outright. */
 export type UiDuration = UiDurationToken | number;
@@ -55,21 +53,21 @@ export interface SpringOptions {
 /**
  * Animation, as a store components can inject.
  *
- * A store for the reason `MediaStore` is one, and it is the same
+ * A store for the reason `MediaService` is one, and it is the same
  * reason: the running set has to be **per runtime**. The playground
  * runs several runtimes in one worker, and a module-level driver would
  * tick a disposed runtime's cells — which is why `animate(cell, to)`
  * is a method here rather than the free function `ROADMAP.md` §F4
  * sketched. A free function has nowhere to find its driver, and the
  * framework's answer to "where does a component reach the world" has
- * been an injected store since `ShellStore`.
+ * been an injected store since `ShellService`.
  *
  * The driver itself lives in the runtime, beside the layout engine and
  * the focus manager, because the runtime is what advances it: the
  * `ticks` phase is the driver's only caller. This store is the handle
- * on it, exactly as `FocusStore` is the handle on `UiFocusManager`.
+ * on it, exactly as `FocusService` is the handle on `UiFocusManager`.
  */
-export class AnimationStore extends Store {
+export class AnimationService {
   /**
    * Whether the person using this app has asked for less motion.
    *
@@ -77,7 +75,7 @@ export class AnimationStore extends Store {
    * movement at all rather than running one that snaps. The runtime
    * sets it from the shell; see `NodalRuntime.setReducedMotion`.
    */
-  @State() reducedMotion = state(false);
+  readonly reducedMotion = state(false);
 
   private driver: AnimationDriver | null = null;
   private motionVocabulary: UiMotion = defaultMotion;

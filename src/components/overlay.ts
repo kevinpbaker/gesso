@@ -1,7 +1,7 @@
-import type { Observable } from 'rxjs';
+import { distinctUntilChanged, map, type Observable } from 'rxjs';
 
 import type { ComponentContext } from '../framework/FunctionComponent';
-import { OverlayStore, type OverlayEntry, type OverlayPlacement } from '../framework/overlay/OverlayStore';
+import { OverlayService, type OverlayEntry, type OverlayPlacement } from '../framework/overlay/OverlayService';
 import type { UiChild } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
 
@@ -40,18 +40,24 @@ export interface OverlayOptions {
 let counter = 0;
 
 export function useOverlay(ctx: ComponentContext, name: string): OverlayHandle {
-  const store = ctx.inject(OverlayStore);
+  const overlays = ctx.inject(OverlayService);
   const id = `${name}-${counter++}`;
-  ctx.onUnmount(() => store.close(id));
+  ctx.onUnmount(() => overlays.close(id));
   return {
     id,
-    open: store.select(state => state.entries.value.some(entry => entry.id === id)),
-    isOpen: () => store.isOpen(id),
+    // Piped off the service's own cell. `select` existed so a store
+    // could be read the same way whether it was local or remote; a
+    // service is only ever local, so there is nothing to abstract over.
+    open: overlays.entries.pipe(
+      map(entries => entries.some(entry => entry.id === id)),
+      distinctUntilChanged()
+    ),
+    isOpen: () => overlays.isOpen(id),
     show: (content, options = {}) => {
       const entry: OverlayEntry = { id, content, ...options };
-      store.dispatch('open', entry);
+      overlays.open(entry);
     },
-    hide: () => store.dispatch('close', id)
+    hide: () => overlays.close(id)
   };
 }
 

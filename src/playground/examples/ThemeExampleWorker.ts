@@ -1,8 +1,10 @@
 import { renderRoot } from '../../framework/app/worker/renderRoot';
-import { ThemeApp, ThemeStore } from './ThemeExampleApp';
+import { ThemeApp } from './ThemeExampleApp';
+import { AppearanceChannel } from './theme/ThemeContract';
 
 /**
- * Render worker for the theming example: the theme is built here, next
- * to the tree it themes. The main thread only forwards input.
+ * Render worker for the theme example. The screen lives here; the four
+ * appearance choices live on the application worker, and the theme
+ * itself is rebuilt from them on this side.
  */
-renderRoot(ThemeApp).useStore(ThemeStore);
+renderRoot(ThemeApp).useChannel(AppearanceChannel);

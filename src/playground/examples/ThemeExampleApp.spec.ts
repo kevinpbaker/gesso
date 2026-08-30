@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import { colorToHex } from '../../ui/properties/UiColor';
-import { buildTheme, isDark, ThemeStore, type ThemeSpec } from './ThemeExampleApp';
+import { AppearanceApp, buildTheme, isDark, specOf, type ThemeSpec } from './ThemeExampleApp';
 
 const BASE: ThemeSpec = { palette: 'daylight', accent: 'blue', corners: 'soft', textSize: 'regular' };
 
-function createStore(): ThemeStore {
-  const store = new ThemeStore();
-  store.init();
-  return store;
+/** The latest value of an observable, read synchronously. */
+function latest<T>(observable: { subscribe(next: (value: T) => void): { unsubscribe(): void } }): T {
+  let value!: T;
+  observable.subscribe(next => (value = next)).unsubscribe();
+  return value;
 }
 
 describe('theme example', () => {
@@ -46,28 +47,29 @@ describe('theme example', () => {
     expect(colorToHex(dark.typography.body.color)).not.toBe(colorToHex(light.typography.body.color));
   });
 
-  it('follows the selections through the theme projection', () => {
-    const store = createStore();
+  it('follows the selections through the published choices', () => {
+    // The theme is not published — it is rebuilt on the render side
+    // from these four strings, so this is what actually crosses.
+    const app = new AppearanceApp();
     const themes: string[] = [];
-    store.projection.theme.subscribe(theme => themes.push(colorToHex(theme.colors.primary)));
+    app.view.subscribe(view => themes.push(colorToHex(buildTheme(specOf(view)).colors.primary)));
 
-    store.dispatch('setAccent', 'emerald');
+    app.setAccent('emerald');
     expect(themes.length).toBe(2);
     expect(themes[1]).not.toBe(themes[0]);
     expect(themes[1]).toBe(colorToHex(buildTheme({ ...BASE, accent: 'emerald' }).colors.primary));
   });
 
   it('keeps every choice but the mode in the contrast theme', () => {
-    const store = createStore();
-    store.dispatch('setPalette', 'midnight');
-    store.dispatch('setCorners', 'round');
+    const app = new AppearanceApp();
+    app.setPalette('midnight');
+    app.setCorners('round');
 
-    const theme = store.view.dark;
-    expect(theme).toBe(true);
-    expect(isDark(store.palette.value)).toBe(true);
+    const view = latest(app.view);
+    expect(view.dark).toBe(true);
+    expect(isDark(app.palette.value)).toBe(true);
 
-    let contrast = buildTheme(BASE);
-    store.projection.contrastTheme.subscribe(value => (contrast = value));
+    const contrast = buildTheme({ ...specOf(view), palette: view.dark ? 'daylight' : 'midnight' });
     expect(contrast.shapes.medium).toBe(buildTheme({ ...BASE, corners: 'round' }).shapes.medium);
     expect(colorToHex(contrast.colors.background)).toBe(colorToHex(buildTheme(BASE).colors.background));
   });

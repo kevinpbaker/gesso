@@ -3,9 +3,9 @@
  *
  * A worker's global `onmessage` is a single channel, so a worker that
  * receives messages on it can host exactly one conversation. That is
- * why a store in a data worker meant a worker per store: `attachStore`
- * claimed the `Worker` object itself, and a second store had nowhere
- * to go.
+ * why a store in a data worker used to mean a worker per store: the
+ * client claimed the `Worker` object itself, and a second one had
+ * nowhere to go.
  *
  * A handshake fixes it. The client opens a `MessageChannel`, keeps one
  * end and transfers the other with a name; the worker serves that name
@@ -37,8 +37,8 @@ export function isPortHandshake(value: unknown): value is PortHandshake {
 /**
  * A worker spawned at most once, serving any number of named ports.
  *
- * Handed to several `useStore` calls, it is what lets one data worker
- * hold a whole application layer instead of one store. Spawning is
+ * Handed to several `useChannel` calls, it is what lets one worker
+ * hold a whole application layer instead of one channel. Spawning is
  * deferred to the first `open`, so a handle nobody uses costs nothing.
  */
 export interface WorkerHandle {
@@ -58,7 +58,7 @@ export interface WorkerHandle {
  *
  * A registration inside the render worker cannot name that worker: it
  * is created by the shell and its port only arrives with `init`, long
- * after `useStore` and `useChannel` have run. This sentinel is what a
+ * after `useChannel` and `useService` have run. This sentinel is what a
  * registration puts there instead, and the render worker swaps it for
  * the real handle once the port shows up.
  *

@@ -1,5 +1,6 @@
 import { Subscription } from 'rxjs';
 import { ChannelRegistry } from './channel/ChannelRegistry';
+import { ServiceRegistry } from './service/ServiceRegistry';
 import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
@@ -15,8 +16,6 @@ import {
   isClassComponent
 } from './FunctionComponent';
 import { getComponentMetadata } from './metadata';
-import type { Store } from './store/Store';
-import type { StoreRegistry } from './store/StoreRegistry';
 
 /**
  * Owns a single component instance and its lifecycle.
@@ -25,7 +24,7 @@ import type { StoreRegistry } from './store/StoreRegistry';
  *   - instantiating the component class, or preparing a function's
  *     input cells and context
  *   - feeding parent props into input cells
- *   - resolving injected stores
+ *   - resolving injected services
  *   - validating that @State fields are initialized
  *   - calling render() (or the function) exactly once and caching its output
  *   - invoking onMount / onUnmount hooks
@@ -74,7 +73,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
 
   constructor(
     element: ComponentElement<P>,
-    private readonly stores: StoreRegistry,
+    private readonly services: ServiceRegistry = new ServiceRegistry(),
     private readonly channels: ChannelRegistry = new ChannelRegistry()
   ) {
     this.element = element;
@@ -84,7 +83,6 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       this.wireInputs();
       this.wireInjects();
       this.wireChannels();
-      this.validateState();
     } else {
       this.instance = undefined;
     }
@@ -213,7 +211,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       }
     };
     return {
-      inject: <S extends Store>(StoreClass: new () => S): S => this.stores.get(StoreClass),
+      inject: <S extends object>(ServiceClass: new () => S): S => this.services.get(ServiceClass),
       channel: <V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C> =>
         this.channels.get(token),
       onMount: hook => {
@@ -308,22 +306,9 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
 
   private wireInjects(): void {
     const metadata = getComponentMetadata(this.element.component);
-    for (const [propertyName, StoreClass] of metadata.injects) {
-      const store = this.stores.get(StoreClass as unknown as new () => Store);
-      (this.instance as unknown as Record<string, unknown>)[propertyName] = store;
-    }
-  }
-
-  private validateState(): void {
-    const metadata = getComponentMetadata(this.element.component);
-    for (const stateName of metadata.states) {
-      const value = (this.instance as unknown as Record<string, unknown>)[stateName];
-      if (value === undefined) {
-        throw new Error(
-          `Component '${metadata.tag}' declares @State() '${stateName}' but it is not initialized. ` +
-            `Initialize it with state(initialValue).`
-        );
-      }
+    for (const [propertyName, ServiceClass] of metadata.injects) {
+      const service = this.services.get(ServiceClass as unknown as new () => object);
+      (this.instance as unknown as Record<string, unknown>)[propertyName] = service;
     }
   }
 }

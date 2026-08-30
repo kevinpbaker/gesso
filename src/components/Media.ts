@@ -3,8 +3,8 @@ import { map, type Observable } from 'rxjs';
 import { input } from '../framework/Input';
 import { state } from '../framework/State';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
-import { MediaStore } from '../framework/app/MediaStore';
-import { AnimationStore } from '../framework/app/AnimationStore';
+import { MediaService } from '../framework/app/MediaService';
+import { AnimationService } from '../framework/app/AnimationService';
 import { steps } from '../ui/animation';
 import { Box } from '../ui/composition/UiComponents';
 import type { UiChild, UiElement } from '../ui/composition/UiElement';
@@ -57,7 +57,7 @@ export interface ImageProps extends ControlLayoutProps {
  * image than for anything else in the library.
  */
 export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild {
-  const store = ctx.inject(MediaStore);
+  const store = ctx.inject(MediaService);
   const alt = input(props.alt, undefined);
   const objectFit = input(props.objectFit, 'cover' as ObjectFit);
   const radius = input(props.borderRadius, 0);
@@ -121,7 +121,7 @@ export interface IconProps extends ControlLayoutProps {
  * version costs, so the atlas has a number to beat.
  */
 export function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild {
-  const store = ctx.inject(MediaStore);
+  const store = ctx.inject(MediaService);
   const label = input(props.label, undefined);
   const size = props.size.value ?? 16;
 
@@ -190,7 +190,7 @@ export function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiC
   const color = props.color.value ?? 'controlAccent';
   const step = state(0);
 
-  const animations = ctx.inject(AnimationStore);
+  const animations = ctx.inject(AnimationService);
   animations.animate(step, SPINNER_BLADES, {
     duration: SPINNER_BLADES * SPINNER_STEP_MS,
     easing: steps(SPINNER_BLADES),
@@ -287,7 +287,7 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
     // under reduced motion for the same reason a spinner keeps
     // turning — a still indeterminate bar states that nothing is
     // happening.
-    const animations = ctx.inject(AnimationStore);
+    const animations = ctx.inject(AnimationService);
     animations.animate(step, PROGRESS_STEPS, {
       duration: PROGRESS_STEPS * PROGRESS_STEP_MS,
       easing: steps(PROGRESS_STEPS),

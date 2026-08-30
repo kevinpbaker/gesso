@@ -371,7 +371,7 @@ class Host implements UiModifierHost {
     }
     this.animated.add(cell as AnimatedCell<unknown>);
     // Retargeting a spring keeps the velocity it had, as
-    // `AnimationStore.spring` does: a spring that started again from
+    // `AnimationService.spring` does: a spring that started again from
     // rest every time it was re-aimed would crawl, which is exactly
     // what a modifier re-aimed once a frame does.
     const previous = driver.animationFor(cell);

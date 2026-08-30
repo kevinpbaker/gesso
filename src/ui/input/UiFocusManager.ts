@@ -38,7 +38,7 @@ interface FocusScope {
  * `focus()` refuses a node outside it — which is what makes a modal
  * dialog modal for the keyboard. `popScope()` restores focus to
  * whatever held it when the scope was pushed. Components reach both
- * through `FocusStore`, never directly.
+ * through `FocusService`, never directly.
  */
 export class UiFocusManager {
   private root: UiNode;

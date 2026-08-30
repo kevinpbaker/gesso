@@ -21,7 +21,8 @@ export const EXAMPLES: readonly ExampleMeta[] = [
     description:
       'A sign-in screen of the kind a banking or device app shows: a six-digit keypad, dots that fill as you type, ' +
       'a wrong-code state, a lockout with a countdown after three attempts, a remember-this-device switch, and the ' +
-      'account screen it unlocks. Written entirely in JSX as functional components over one store, rendering in ' +
+      'account screen it unlocks. Written entirely in JSX as functional components over one channel, whose ' +
+      'authentication runs on the application worker, rendering in ' +
       'the render worker. The passcode is 246813.',
     source: 'src/playground/examples/SignInExampleApp.tsx',
     tags: ['JSX', 'functional components', 'store', 'theme colors', 'render worker']
@@ -33,7 +34,7 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'A notes app you can type into: a list of notes, a single-line title and a multi-line body. Caret, selection, ' +
       'word and line navigation, undo, copy, cut and paste, and IME composition for CJK input all work, with the text ' +
       'edited in the render worker and only a hidden textarea on the main thread. Copy note uses the clipboard ' +
-      'through the ShellStore.',
+      'through the ShellService.',
     source: 'src/playground/examples/NotesExampleApp.tsx',
     tags: ['text editing', 'IME', 'clipboard', 'JSX', 'store', 'render worker']
   },

@@ -1,13 +1,11 @@
 export { Component } from './Component';
 export { State as StateCell, state } from './State';
+export { ServiceRegistry } from './service/ServiceRegistry';
 export { InputCell, input } from './Input';
 export { Define, Input, Inject, Channel } from './decorators';
 export * from './channel';
-export { State, Action, Projection } from './store/decorators';
-export { Store, type StoreProjections } from './store/Store';
-export { structurallyEqual } from './store/structuralEquals';
-export { diffProjection, applyPatch, applyPatches, type Patch, type PatchPath } from './store/StorePatch';
-export { exposeStore, serveStores, ExposedStore } from './store/worker/exposeStore';
+export { structurallyEqual } from './channel/structuralEquals';
+export { diffProjection, applyPatch, applyPatches, type Patch, type PatchPath } from './channel/StorePatch';
 export {
   workerHandle,
   portHandle,
@@ -20,11 +18,6 @@ export {
   type PortHandshake,
   type MessageEndpoint
 } from './worker/WorkerPorts';
-export { attachStore } from './store/worker/attachStore';
-export { StoreReplica } from './store/worker/StoreReplica';
-export { createStoreRegistry, type StoreRegistration, type RegistryHandle } from './store/worker/createStoreRegistry';
-export type { StorePort, StoreClientMessage, StoreHostMessage } from './store/worker/StoreWorkerProtocol';
-export { StoreRegistry } from './store/StoreRegistry';
 export { createComponent } from './createComponent';
 export {
   isClassComponent,
@@ -35,7 +28,7 @@ export {
   type Inputs,
   type ComponentProps
 } from './FunctionComponent';
-export { OverlayStore, type OverlayEntry, type OverlayPlacement } from './overlay/OverlayStore';
+export { OverlayService, type OverlayEntry, type OverlayPlacement } from './overlay/OverlayService';
 export { OverlayLayer } from './overlay/OverlayLayer';
 export { ComponentHostResolver } from './ComponentHostResolver';
 export { ComponentHost } from './ComponentHost';
@@ -53,17 +46,17 @@ export {
   type FramePhaseTimings
 } from './app/NodalRuntime';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
-export { ShellStore, type ShellRequest } from './app/ShellStore';
+export { ShellService, type ShellRequest } from './app/ShellService';
 export {
-  AnimationStore,
+  AnimationService,
   type AnimateOptions,
   type SpringOptions,
   type UiDuration,
   type UiEasingChoice
-} from './app/AnimationStore';
+} from './app/AnimationService';
 export { observeReducedMotion } from './app/reducedMotion';
-export { FindStore } from './app/FindStore';
-export { FocusStore } from './app/FocusStore';
+export { FindService } from './app/FindService';
+export { FocusService } from './app/FocusService';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export type { EditingState } from '../ui/input/UiEditingController';
 export type { UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from '../ui/semantics';

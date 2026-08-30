@@ -4,20 +4,18 @@ import type { UiNode } from '../../ui/graph/UiNode';
 import type { CanvasHost } from '../../ui/rendering';
 import { UiAnimationFrameClock } from '../../ui/scheduler';
 import type { UiFrameClockFactory } from '../../ui/scheduler';
-import type { StoreRegistry } from '../store/StoreRegistry';
-import type { Store } from '../store/Store';
 import { NodalRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './NodalRuntime';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { observeReducedMotion } from './reducedMotion';
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
+import type { ServiceRegistry } from '../service/ServiceRegistry';
 
 export interface NodalAppOptions {
   host: HTMLElement;
   root: FrameworkChild;
-  storeClasses?: (new () => Store)[];
   /** A registry built elsewhere, when some stores live in data workers. */
-  stores?: StoreRegistry;
+  services?: ServiceRegistry;
   channels?: ChannelRegistry;
   canvas?: CanvasHost;
   /** The rendering backend; see RendererChoice. Defaults to `canvas2d`. */
@@ -67,8 +65,7 @@ export class NodalApp {
       root: options.root,
       canvas: this.canvas,
       renderer: options.renderer,
-      storeClasses: options.storeClasses,
-      stores: options.stores,
+      services: options.services,
       channels: options.channels,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
       dpr: devicePixelRatio()
@@ -82,8 +79,9 @@ export class NodalApp {
     });
   }
 
-  get stores(): StoreRegistry {
-    return this.runtime.stores;
+  /** The runtime services a component in this app can inject. */
+  get services(): ServiceRegistry {
+    return this.runtime.services;
   }
 
   /**

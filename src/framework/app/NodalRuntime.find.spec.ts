@@ -8,7 +8,7 @@ import { selectionRangeOf } from '../../ui/selection/UiSelectable';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import { FindStore } from './FindStore';
+import { FindService } from './FindService';
 import { NodalRuntime } from './NodalRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 
@@ -47,7 +47,7 @@ function mount(root: UiElement) {
     tick,
     texts,
     find: runtime.input.find,
-    store: runtime.stores.get(FindStore),
+    store: runtime.services.get(FindService),
     key: (name: string, modifiers: UiKeyModifiers = noKeyModifiers()) => runtime.input.keyboard.keyDown(name, modifiers)
   };
 }

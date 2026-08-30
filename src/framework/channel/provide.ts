@@ -1,6 +1,6 @@
 import { Subscription, type Observable } from 'rxjs';
 
-import { diffProjection, type Patch } from '../store/StorePatch';
+import { diffProjection, type Patch } from './StorePatch';
 import { isChannelClientMessage, type ChannelHostMessage, type ChannelPort } from './ChannelProtocol';
 import { requirePlainData } from './plainData';
 import { viewKeys, type ChannelToken, type CommandMap } from './ChannelToken';

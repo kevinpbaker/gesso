@@ -105,9 +105,9 @@ export type RuntimeToShellMessage =
    * editing proxy to mirror; null when no editable has focus.
    */
   | { type: 'editing'; state: EditingState | null }
-  /** Put text on the clipboard (ShellStore.copyText). */
+  /** Put text on the clipboard (ShellService.copyText). */
   | { type: 'clipboard'; text: string }
-  /** Open a URL in a new tab (ShellStore.openUrl). */
+  /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string };
 
 /**

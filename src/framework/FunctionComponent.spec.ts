@@ -16,16 +16,14 @@ import { input } from './Input';
 import { Component } from './Component';
 import { Define } from './decorators';
 import { state } from './State';
-import { Store } from './store/Store';
-import { Action, State } from './store/decorators';
-import { StoreRegistry } from './store/StoreRegistry';
+import { ServiceRegistry } from './service/ServiceRegistry';
 
 function createHarness() {
   const graph = new UiGraph();
-  const stores = new StoreRegistry();
-  const resolver = new ComponentHostResolver(stores);
+  const services = new ServiceRegistry();
+  const resolver = new ComponentHostResolver(services);
   const builder = new UiGraphBuilder(graph, { components: resolver });
-  return { graph, builder, resolver, stores };
+  return { graph, builder, resolver, services };
 }
 
 function texts(node: UiNode): unknown[] {
@@ -43,12 +41,12 @@ function texts(node: UiNode): unknown[] {
   return result;
 }
 
-class ClickStore extends Store {
-  @State() clicks = state(0);
+/** A runtime service: a plain class, called directly. */
+class ClickService {
+  readonly count = state(0);
 
-  @Action()
   click(): void {
-    this.clicks.value++;
+    this.count.value++;
   }
 }
 
@@ -141,22 +139,22 @@ describe('functional components', () => {
     expect(texts(root)).toEqual(['count 7', 'step 5']);
   });
 
-  it('injects stores and runs lifecycle hooks through the context', () => {
+  it('injects services and runs lifecycle hooks through the context', () => {
     const mounted = vi.fn();
     const unmounted = vi.fn();
     function Clicks(_props: Inputs<{}>, ctx: ComponentContext) {
-      const store = ctx.inject(ClickStore);
+      const clicks = ctx.inject(ClickService);
       ctx.onMount(mounted);
       ctx.onUnmount(unmounted);
-      return Text({ text: store.select(s => s.clicks.value).pipe(map(n => `clicks ${n}`)) });
+      return Text({ text: clicks.count.pipe(map(n => `clicks ${n}`)) });
     }
-    const { builder, stores, resolver } = createHarness();
-    stores.register(ClickStore);
+    const { builder, services, resolver } = createHarness();
+    services.register(ClickService);
     const root = builder.build(Column(createComponent(Clicks)));
     expect(texts(root)).toEqual(['clicks 0']);
     expect(mounted).toHaveBeenCalledTimes(1);
 
-    stores.get(ClickStore).dispatch('click');
+    services.get(ClickService).click();
     expect(texts(root)).toEqual(['clicks 1']);
 
     builder.build(Column());

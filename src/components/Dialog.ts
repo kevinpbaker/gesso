@@ -2,8 +2,8 @@ import { map } from 'rxjs';
 
 import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
-import { AnimationStore } from '../framework/app/AnimationStore';
-import { FocusStore } from '../framework/app/FocusStore';
+import { AnimationService } from '../framework/app/AnimationService';
+import { FocusService } from '../framework/app/FocusService';
 import { state } from '../framework/State';
 import { Box, Column, Row, Text } from '../ui/composition/UiComponents';
 import type { UiChild } from '../ui/composition/UiElement';
@@ -15,7 +15,7 @@ import { useOverlay } from './overlay';
  * A window that takes over the keyboard.
  *
  * Modal in the only sense that matters: while it is open, focus cannot
- * leave it (`FocusStore.trap`), and closing hands the keyboard back to
+ * leave it (`FocusService.trap`), and closing hands the keyboard back to
  * whatever opened it. Both halves are the runtime's — C0 built them —
  * so this component is the shape and the lifecycle, not the mechanism.
  *
@@ -41,8 +41,8 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
   const description = input(props.description, '');
   const dismissible = input(props.dismissible, true);
   const width = input(props.width, 360);
-  const focus = ctx.inject(FocusStore);
-  const animations = ctx.inject(AnimationStore);
+  const focus = ctx.inject(FocusService);
+  const animations = ctx.inject(AnimationService);
   const overlay = useOverlay(ctx, 'dialog');
   let trapped = false;
   let placeholder: UiNode | null = null;

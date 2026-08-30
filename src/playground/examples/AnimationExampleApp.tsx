@@ -4,9 +4,8 @@ import { map } from 'rxjs/operators';
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
 import type { UiChild } from '../../ui/composition';
 import { state } from '../../framework/State';
-import { AnimationStore } from '../../framework/app/AnimationStore';
-import { Store } from '../../framework/store/Store';
-import { Action, Projection, State } from '../../framework/store/decorators';
+import { Board } from './board/BoardContract';
+import { AnimationService } from '../../framework/app/AnimationService';
 import { spring } from '../../ui/animation';
 import type { UiSpringToken } from '../../ui/environment/UiMotion';
 import { darkTheme } from '../../ui/environment/UiTheme';
@@ -192,24 +191,24 @@ export function place(order: LaneOrder, id: string, lane: Lane, index: number): 
   return next;
 }
 
-export class BoardStore extends Store {
-  @State() order = state<LaneOrder>(INITIAL_ORDER);
-  @State() selected = state<string | null>(null);
-  @State() undo = state<UndoEntry | null>(null);
-  @State() motion = state<MotionName>('snappy');
+/**
+ * The board application: lanes, what is picked, and one step of undo.
+ *
+ * Genuine application state — it outlives any one view and another
+ * screen could reasonably care — so it lives behind the barrier rather
+ * than beside the components that draw it.
+ */
+export class BoardModel {
+  readonly order = state<LaneOrder>(INITIAL_ORDER);
+  readonly selected = state<string | null>(null);
+  readonly undo = state<UndoEntry | null>(null);
+  readonly motion = state<MotionName>('snappy');
 
-  @Projection()
-  get board(): BoardView {
-    return {
-      order: this.order.value,
-      selected: this.selected.value,
-      undo: this.undo.value,
-      motion: this.motion.value
-    };
-  }
+  readonly board: Observable<BoardView> = combineLatest([this.order, this.selected, this.undo, this.motion]).pipe(
+    map(([order, selected, undo, motion]) => ({ order, selected, undo, motion }))
+  );
 
   /** Moves a card one lane left or right, keeping its row where it can. */
-  @Action()
   shift(payload: { id: string; delta: number }): void {
     const from = locate(this.order.value, payload.id);
     if (from === null) {
@@ -224,7 +223,6 @@ export class BoardStore extends Store {
   }
 
   /** Moves a card up or down within its own lane. */
-  @Action()
   reorder(payload: { id: string; delta: number }): void {
     const from = locate(this.order.value, payload.id);
     if (from === null) {
@@ -243,13 +241,11 @@ export class BoardStore extends Store {
    * detail. Named `toggleCard` rather than `select` because `select`
    * is `Store`'s own — it is how a component reads a slice.
    */
-  @Action()
   toggleCard(id: string): void {
     this.selected.value = this.selected.value === id ? null : id;
   }
 
   /** Deals every card into a lane at random. Every card moves at once. */
-  @Action()
   shuffle(): void {
     const ids = TASKS.map(task => task.id).sort(() => Math.random() - 0.5);
     let order: LaneOrder = { todo: [], doing: [], done: [] };
@@ -260,8 +256,6 @@ export class BoardStore extends Store {
     this.undo.value = null;
     this.order.value = order;
   }
-
-  @Action()
   undoMove(): void {
     const entry = this.undo.value;
     if (entry === null) {
@@ -272,12 +266,9 @@ export class BoardStore extends Store {
   }
 
   /** Called when the bar has finished sliding out, not when it is asked to. */
-  @Action()
   clearUndo(): void {
     this.undo.value = null;
   }
-
-  @Action()
   setMotion(motion: MotionName): void {
     this.motion.value = motion;
   }
@@ -367,8 +358,8 @@ function TaskCard(
   props: Inputs<{ task: Task; selected: boolean; motion: MotionName; lane: Lane }>,
   ctx: ComponentContext
 ) {
-  const board = ctx.inject(BoardStore);
-  const animations = ctx.inject(AnimationStore);
+  const board = ctx.channel(Board);
+  const animations = ctx.inject(AnimationService);
   const task = props.task.value;
   const laneIndex = LANES.indexOf(props.lane.value);
 
@@ -397,7 +388,7 @@ function TaskCard(
       borderWidth={1}
       borderRadius={8}
       cursor="pointer"
-      onClick={() => board.dispatch('toggleCard', task.id)}
+      onClick={() => board.send.toggleCard(task.id)}
       onPointerDown={() => springPress(0.96)}
       onPointerUp={() => springPress(1)}
       onPointerLeave={() => springPress(1)}>
@@ -420,10 +411,10 @@ function TaskCard(
       <box flexGrow={1} />
 
       <row gap={6} opacity={props.selected.pipe(map(on => (on ? 1 : 0)))} y="center">
-        <Chip label="◀" onPress={() => board.dispatch('shift', { id: task.id, delta: -1 })} />
-        <Chip label="▲" onPress={() => board.dispatch('reorder', { id: task.id, delta: -1 })} />
-        <Chip label="▼" onPress={() => board.dispatch('reorder', { id: task.id, delta: 1 })} />
-        <Chip label="▶" onPress={() => board.dispatch('shift', { id: task.id, delta: 1 })} />
+        <Chip label="◀" onPress={() => board.send.shift({ id: task.id, delta: -1 })} />
+        <Chip label="▲" onPress={() => board.send.reorder({ id: task.id, delta: -1 })} />
+        <Chip label="▼" onPress={() => board.send.reorder({ id: task.id, delta: 1 })} />
+        <Chip label="▶" onPress={() => board.send.shift({ id: task.id, delta: 1 })} />
         <text color="textMuted" fontSize={10} flexGrow={1} textAlign="right">
           {LANE_TITLES[LANES[laneIndex]]}
         </text>
@@ -434,9 +425,9 @@ function TaskCard(
 
 /** One lane, and the keyed cards in it. */
 function LaneColumn(props: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
-  const board = ctx.inject(BoardStore);
+  const board = ctx.channel(Board);
   const lane = props.lane.value;
-  const view = board.projection.board;
+  const view = board.view.board;
 
   // Keyed children, so a card that moves is the *same node* moved. A
   // FLIP has nothing to animate from if the node it animates was
@@ -488,14 +479,14 @@ function LaneColumn(props: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
  * app that wants an exit owns the node until the animation is done.
  */
 function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
-  const board = ctx.inject(BoardStore);
-  const animations = ctx.inject(AnimationStore);
+  const board = ctx.channel(Board);
+  const animations = ctx.inject(AnimationService);
   const slide = state(0);
   let shown = false;
 
   ctx.onUnmount(() => animations.stop(slide));
 
-  board.projection.board.subscribe(view => {
+  board.view.board.subscribe(view => {
     const wanted = view.undo !== null;
     if (wanted === shown) {
       return;
@@ -512,11 +503,11 @@ function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
     // Slide out first, and let the store forget only once it is gone.
     shown = false;
     animations.animate(slide, 0, { duration: 'fast', easing: 'accelerate' }).subscribe({
-      complete: () => board.dispatch('clearUndo')
+      complete: () => board.send.clearUndo()
     });
   };
 
-  const label = board.projection.board.pipe(map(view => view.undo?.label ?? ''));
+  const label = board.view.board.pipe(map(view => view.undo?.label ?? ''));
 
   return (
     <row
@@ -540,7 +531,7 @@ function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
         <text color="text" fontSize={12}>
           {label}
         </text>
-        <Chip label="Undo" wide onPress={() => board.dispatch('undoMove')} />
+        <Chip label="Undo" wide onPress={() => board.send.undoMove()} />
         <Chip label="Dismiss" wide onPress={dismiss} />
       </row>
     </row>
@@ -549,9 +540,9 @@ function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
 
 /** The picker: how the board moves, and whether it moves at all. */
 function MotionPanel(_props: Inputs<{}>, ctx: ComponentContext) {
-  const board = ctx.inject(BoardStore);
-  const animations = ctx.inject(AnimationStore);
-  const chosen = board.projection.board.pipe(map(view => view.motion));
+  const board = ctx.channel(Board);
+  const animations = ctx.inject(AnimationService);
+  const chosen = board.view.board.pipe(map(view => view.motion));
 
   return (
     <row gap={16} y="center" paddingLeft={4} paddingRight={4} flexWrap="wrap">
@@ -564,11 +555,11 @@ function MotionPanel(_props: Inputs<{}>, ctx: ComponentContext) {
           label={motion}
           wide
           on={chosen.pipe(map(current => current === motion))}
-          onPress={() => board.dispatch('setMotion', motion)}
+          onPress={() => board.send.setMotion(motion)}
         />
       ))}
       <box width={1} height={18} backgroundColor="border" />
-      <Chip label="Shuffle" wide onPress={() => board.dispatch('shuffle')} />
+      <Chip label="Shuffle" wide onPress={() => board.send.shuffle()} />
       <box flexGrow={1} />
       <Chip
         label="Reduced motion"
@@ -584,7 +575,7 @@ function MotionPanel(_props: Inputs<{}>, ctx: ComponentContext) {
 }
 
 export function BoardApp(_props: Inputs<{}>, ctx: ComponentContext) {
-  const animations = ctx.inject(AnimationStore);
+  const animations = ctx.inject(AnimationService);
   const hint = combineLatest([animations.reducedMotion]).pipe(
     map(([reduced]) =>
       reduced

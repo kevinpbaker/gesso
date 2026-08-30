@@ -26,7 +26,7 @@ export class State<T> extends BehaviorSubject<T> {
  *
  * Usage inside a component:
  *
- *   @State() count = state(0);
+ *   private readonly count = state(0);
  *
  *   increment() {
  *     this.count.value++;

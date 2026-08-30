@@ -1,9 +1,8 @@
 import { createComponent } from '../createComponent';
 import type { FrameworkChild } from '../ComponentElement';
 import type { ComponentType } from '../FunctionComponent';
-import type { Store } from '../store/Store';
-import { createStoreRegistry, type StoreRegistration } from '../store/worker/createStoreRegistry';
 import type { WorkerHandle } from '../worker/WorkerPorts';
+import { ServiceRegistry } from '../service/ServiceRegistry';
 import { createChannelRegistry, type ChannelRegistration } from '../channel/createChannelRegistry';
 import type { ChannelSource } from '../channel/provide';
 import type { ChannelToken } from '../channel/ChannelToken';
@@ -14,33 +13,14 @@ import type { FrameMetrics, RendererChoice } from './NodalRuntime';
  * Fluent builder for the single-thread configuration.
  */
 export class NodalAppBuilder {
-  private readonly registrations: StoreRegistration[] = [];
   private readonly channelRegistrations: ChannelRegistration[] = [];
+  private readonly serviceRegistrations: (new () => object)[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((text: string | null) => void) | undefined;
   private rendererChoice: RendererChoice | undefined;
   private app: NodalApp | undefined;
 
   constructor(private readonly root: FrameworkChild | ComponentType) {}
-
-  /**
-   * Registers a store.
-   *
-   * With no options the store lives on this thread. Pass a worker
-   * factory to move it into a data worker, which is worth doing even
-   * here: rendering stays on the main thread in this configuration,
-   * so keeping heavy state work off it still buys smoother frames.
-   */
-  useStore(StoreClass: new () => Store, options: { worker?: WorkerHandle | (() => Worker); key?: string } = {}): this {
-    this.registrations.push({ storeClass: StoreClass, worker: options.worker, key: options.key });
-    return this;
-  }
-
-  /**
-   * Chooses the rendering backend, mirroring WorkerAppOptions.renderer.
-   * Defaults to Canvas2D; `webgpu` and `auto` fall back to it when the
-   * browser has no WebGPU.
-   */
 
   /**
    * Registers a channel.
@@ -60,6 +40,22 @@ export class NodalAppBuilder {
       worker: options.worker,
       source: options.source as unknown as ChannelSource<never, never>
     });
+    return this;
+  }
+
+  /**
+   * Registers a runtime service: a plain class this thread constructs
+   * once and hands to whoever injects it.
+   *
+   * For things that belong to the render thread and could not leave it
+   * — something holding a `UiNode`, a decoded bitmap, or a generator
+   * feeding bound props at frame rate. Application state goes through
+   * `useChannel` instead, and the test is the usual one: if it
+   * survives a reload or another screen cares about it, it is not a
+   * service.
+   */
+  useService(ServiceClass: new () => object): this {
+    this.serviceRegistrations.push(ServiceClass);
     return this;
   }
 
@@ -106,16 +102,19 @@ export class NodalAppBuilder {
   mountSync(host: HTMLElement | string): () => void {
     const element = typeof host === 'string' ? requireElement(host) : host;
     const rootElement = typeof this.root === 'function' ? createComponent(this.root as ComponentType) : this.root;
-    const stores = createStoreRegistry(this.registrations);
     const channels = createChannelRegistry(this.channelRegistrations);
+    const services = new ServiceRegistry();
+    for (const ServiceClass of this.serviceRegistrations) {
+      services.register(ServiceClass);
+    }
     const app = new NodalApp({
       host: element,
       root: rootElement,
-      stores: stores.registry,
       channels: channels.registry,
+      services,
       renderer: this.rendererChoice
     });
-    app.deferPatchesFrom([...stores.replicas, ...channels.registry.all()]);
+    app.deferPatchesFrom(channels.registry.all());
     if (this.frameListener !== undefined) {
       app.onFrame(this.frameListener);
     }
@@ -128,7 +127,6 @@ export class NodalAppBuilder {
       this.app = undefined;
       app.dispose();
       channels.dispose();
-      stores.dispose();
     };
   }
 }

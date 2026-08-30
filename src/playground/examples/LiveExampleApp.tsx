@@ -3,8 +3,6 @@ import { map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
 import { state } from '../../framework/State';
-import { Store } from '../../framework/store/Store';
-import { Action, Projection, State } from '../../framework/store/decorators';
 
 /**
  * Live: an operations board fed by a stream that never stops.
@@ -427,9 +425,24 @@ export interface StreamView {
   readonly hz: number;
 }
 
-export class LiveStore extends Store {
-  @State() running = state(true);
-  @State() rate = state<RateName>('live');
+/**
+ * The live feed, as a render-thread service.
+ *
+ * Deliberately *not* behind a channel. It is a synthetic generator for
+ * a rendering stress test: it invents its own data, nothing else reads
+ * it, and it does not survive a reload — so by the rule in
+ * `decisions/0029-thread-model.md` §4.2 it is not application state.
+ * Putting it across the barrier would measure the patch stream at
+ * 60Hz, which is worth measuring but is not what this route exists to
+ * show; the route is here to stress bindings and the renderer.
+ *
+ * A real live-data application would put its feed on the application
+ * worker. What that costs at this update rate is an open question the
+ * decision record names and nothing has answered.
+ */
+export class LiveFeed {
+  readonly running = state(true);
+  readonly rate = state<RateName>('live');
 
   /**
    * The stream. Deliberately not `@State`: each of these is read by
@@ -457,7 +470,6 @@ export class LiveStore extends Store {
   private sinceRoutine = 0;
 
   constructor() {
-    super();
     // The log is eight rows whether or not it has anything to say, so
     // it starts with a plausible history rather than as an empty box.
     for (const text of ['collector attached to 3 channels', 'edge-3 rejoined the pool', 'retry budget replenished']) {
@@ -465,34 +477,27 @@ export class LiveStore extends Store {
     }
   }
 
-  @Projection()
-  get stream(): StreamView {
-    return { running: this.running.value, rate: this.rate.value, hz: RATES[this.rate.value].hz };
-  }
+  readonly stream: Observable<StreamView> = combineLatest([this.running, this.rate]).pipe(
+    map(([running, rate]) => ({ running, rate, hz: RATES[rate].hz }))
+  );
 
   /** Starts the feed. Called from the root component's onMount. */
-  @Action()
   start(): void {
     this.restart();
   }
 
   /** Stops the feed and its timer. Called from onUnmount. */
-  @Action()
   stop(): void {
     if (this.timer !== null) {
       clearInterval(this.timer);
       this.timer = null;
     }
   }
-
-  @Action()
   toggle(): void {
     this.running.value = !this.running.value;
     this.restart();
     this.record(this.running.value ? 'stream resumed' : 'stream paused', 'info');
   }
-
-  @Action()
   setRate(rate: RateName): void {
     if (rate === this.rate.value) {
       return;
@@ -501,8 +506,6 @@ export class LiveStore extends Store {
     this.restart();
     this.record(`sample rate set to ${RATES[rate].label}`, 'info');
   }
-
-  @Action()
   spike(): void {
     for (const channel of this.channels) {
       channel.spike();
@@ -651,12 +654,12 @@ function RailButton(props: Inputs<{ label: string; primary?: boolean; onPress: (
 
 function RateButton(props: Inputs<{ rate: RateName }>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
-  const selected = store.projection.stream.pipe(map(view => view.rate === props.rate.value));
+  const store = ctx.inject(LiveFeed);
+  const selected = store.stream.pipe(map(view => view.rate === props.rate.value));
   const hovered = state(false);
   return (
     <button
-      onClick={() => store.dispatch('setRate', props.rate.value)}
+      onClick={() => store.setRate(props.rate.value)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       flexGrow={1}
@@ -705,8 +708,8 @@ function Readout(props: Inputs<{ label: string; value: string; accent?: boolean 
 
 function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
-  const stream = store.projection.stream;
+  const store = ctx.inject(LiveFeed);
+  const stream = store.stream;
   // Written while this body runs, and never again. If the numbers
   // above it keep climbing while this stays put, nothing was rebuilt.
   const builtAt = clockText(Date.now());
@@ -749,7 +752,7 @@ function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
         <RailButton
           label={stream.pipe(map(view => (view.running ? 'Pause the feed' : 'Resume the feed')))}
           primary
-          onPress={() => store.dispatch('toggle')}
+          onPress={() => store.toggle()}
         />
         {RATE_ROWS.map((rates, index) => (
           <row key={index} gap={7} selfX="stretch">
@@ -758,7 +761,7 @@ function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
             ))}
           </row>
         ))}
-        <RailButton label="Inject a spike" onPress={() => store.dispatch('spike')} />
+        <RailButton label="Inject a spike" onPress={() => store.spike()} />
       </column>
 
       <column
@@ -875,7 +878,7 @@ function ChannelCard(props: Inputs<{ channel: LiveChannel }>) {
  */
 function Scanner(_props: Inputs<{}>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
+  const store = ctx.inject(LiveFeed);
   const travel = 132 - 34;
   const offset = store.sweep$.pipe(
     map(step => {
@@ -897,7 +900,7 @@ function Scanner(_props: Inputs<{}>, ctx: ComponentContext) {
  */
 function SaturationMeter(_props: Inputs<{}>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
+  const store = ctx.inject(LiveFeed);
   const load = store.load$;
   return (
     <column
@@ -945,7 +948,7 @@ function LogLine(props: Inputs<{ row: LogRowCells }>) {
 
 function EventLog(_props: Inputs<{}>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
+  const store = ctx.inject(LiveFeed);
   return (
     <column
       gap={4}
@@ -971,8 +974,8 @@ function EventLog(_props: Inputs<{}>, ctx: ComponentContext) {
 
 function Board(_props: Inputs<{}>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
-  const stream = store.projection.stream;
+  const store = ctx.inject(LiveFeed);
+  const stream = store.stream;
   const headline = combineLatest([stream, store.incidents$]).pipe(
     map(([view, incidents]) => {
       const paused = view.running ? '' : ' · paused';
@@ -1023,16 +1026,16 @@ function Board(_props: Inputs<{}>, ctx: ComponentContext) {
  */
 export function LiveApp(_props: Inputs<{}>, ctx: ComponentContext) {
   counted();
-  const store = ctx.inject(LiveStore);
+  const store = ctx.inject(LiveFeed);
   const bodies = state(0);
 
   ctx.onMount(() => {
     // Mount hooks are flushed once the whole tree exists, so this is
     // the total for the page rather than for the root alone.
     bodies.value = bodyRuns;
-    store.dispatch('start');
+    store.start();
   });
-  ctx.onUnmount(() => store.dispatch('stop'));
+  ctx.onUnmount(() => store.stop());
 
   return (
     <row backgroundColor={BG} y="stretch">

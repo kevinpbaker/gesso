@@ -17,12 +17,12 @@ import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
  *   createApp({ worker: new URL('./app.worker.ts', import.meta.url) }).mount('#app');
  *
  *   // app.worker.ts
- *   renderRoot(AppRoot).useStore(DemoStore);
+ *   renderRoot(AppRoot).useChannel(Catalog);
  *
  * Single-thread — for tests, headless rendering, and environments
  * without OffscreenCanvas:
  *
- *   createApp(AppRoot).useStore(DemoStore).mountSync('#app');
+ *   createApp(AppRoot).useChannel(Catalog, { source }).mountSync('#app');
  */
 export function createApp(options: WorkerAppOptions): WorkerApp;
 export function createApp(root: FrameworkChild | ComponentType): NodalAppBuilder;

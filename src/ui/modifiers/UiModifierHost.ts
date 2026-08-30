@@ -114,7 +114,7 @@ export interface UiModifierHost {
   /**
    * Drives a cell over a fixed time, and cancels it on detach.
    *
-   * Here rather than through the `AnimationStore` because a modifier
+   * Here rather than through the `AnimationService` because a modifier
    * is `@nodal/core` and a store is the framework's: the same line
    * `layoutBox` and `isFocused` are on. The detach half is the point —
    * `decisions/0026` and `0028` both argue that a modifier's lifetime

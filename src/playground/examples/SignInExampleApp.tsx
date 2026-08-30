@@ -1,10 +1,9 @@
-import { combineLatest } from 'rxjs';
+import { combineLatest, type Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
-import { Store } from '../../framework/store/Store';
-import { Action, Projection, State } from '../../framework/store/decorators';
 import { state } from '../../framework/State';
+import { SignIn } from './signin/SignInContract';
 
 /**
  * A passcode sign-in screen and the account screen behind it.
@@ -37,30 +36,49 @@ export interface AuthView {
   readonly signedInAt: number | null;
 }
 
-export class AuthStore extends Store {
-  @State() digits = state('');
-  @State() status = state<AuthStatus>('idle');
-  @State() attempts = state(0);
-  @State() lockSecondsLeft = state(0);
-  @State() rememberDevice = state(true);
-  @State() signedInAt = state<number | null>(null);
+/**
+ * The sign-in application: one plain class, no framework in sight.
+ *
+ * Where the notes example has a repository, rules and a view model as
+ * three layers, this has one — and that is the point. The framework
+ * asks only for observables of plain data; how many layers produce
+ * them is the application's business. A keypad needs none.
+ *
+ * A single `view` key rather than one per field: §3.2 of
+ * `decisions/0029-thread-model.md` says to split finely, and the
+ * reason is diff cost over large values. Six scalars are not that.
+ */
+export class AuthApp {
+  readonly digits = state('');
+  readonly status = state<AuthStatus>('idle');
+  readonly attempts = state(0);
+  readonly lockSecondsLeft = state(0);
+  readonly rememberDevice = state(true);
+  readonly signedInAt = state<number | null>(null);
 
   private lockTimer: ReturnType<typeof setInterval> | null = null;
 
-  @Projection()
-  get view(): AuthView {
-    return {
-      status: this.status.value,
-      entered: this.digits.value.length,
-      attemptsLeft: MAX_ATTEMPTS - this.attempts.value,
-      lockSecondsLeft: this.lockSecondsLeft.value,
-      rememberDevice: this.rememberDevice.value,
-      signedInAt: this.signedInAt.value
-    };
-  }
+  // Declared after the cells it reads: field initializers run in
+  // order, so the cells exist by the time this one runs.
+  readonly view: Observable<AuthView> = combineLatest([
+    this.status,
+    this.digits,
+    this.attempts,
+    this.lockSecondsLeft,
+    this.rememberDevice,
+    this.signedInAt
+  ]).pipe(
+    map(([status, digits, attempts, lockSecondsLeft, rememberDevice, signedInAt]) => ({
+      status,
+      entered: digits.length,
+      attemptsLeft: MAX_ATTEMPTS - attempts,
+      lockSecondsLeft,
+      rememberDevice,
+      signedInAt
+    }))
+  );
 
   /** A keypad press. Ignored while checking or locked; submits on the sixth digit. */
-  @Action()
   press(digit: string): void {
     const status = this.status.value;
     if (status === 'checking' || status === 'locked' || status === 'signedIn') {
@@ -80,8 +98,6 @@ export class AuthStore extends Store {
       setTimeout(() => this.verify(), CHECK_DELAY_MS);
     }
   }
-
-  @Action()
   backspace(): void {
     if (this.status.value === 'wrong') {
       this.status.value = 'idle';
@@ -92,13 +108,9 @@ export class AuthStore extends Store {
       this.digits.value = this.digits.value.slice(0, -1);
     }
   }
-
-  @Action()
   toggleRemember(): void {
     this.rememberDevice.value = !this.rememberDevice.value;
   }
-
-  @Action()
   signOut(): void {
     this.signedInAt.value = null;
     this.digits.value = '';
@@ -161,8 +173,8 @@ const SUCCESS = '#2ea88a';
 
 /** One of the six passcode dots; fills as digits are entered, turns red on a wrong code. */
 function Dot(props: Inputs<{ index: number }>, ctx: ComponentContext) {
-  const auth = ctx.inject(AuthStore);
-  const color = combineLatest([auth.projection.view, props.index]).pipe(
+  const auth = ctx.channel(SignIn);
+  const color = combineLatest([auth.view.view, props.index]).pipe(
     map(([view, index]) => {
       if (view.status === 'wrong') return DANGER;
       if (view.status === 'signedIn') return SUCCESS;
@@ -215,8 +227,8 @@ function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean }
 
 /** The line under the dots: a prompt, the checking state, an error, or the lockout countdown. */
 function StatusLine(_props: Inputs<{}>, ctx: ComponentContext) {
-  const auth = ctx.inject(AuthStore);
-  const view = auth.projection.view;
+  const auth = ctx.channel(SignIn);
+  const view = auth.view.view;
   const text = view.pipe(
     map(v => {
       switch (v.status) {
@@ -256,8 +268,8 @@ function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void
 }
 
 function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
-  const auth = ctx.inject(AuthStore);
-  const view = auth.projection.view;
+  const auth = ctx.channel(SignIn);
+  const view = auth.view.view;
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   return (
@@ -294,18 +306,18 @@ function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
 
       <grid columns={[84, 84, 84]} gap={10} justifyContent="center">
         {digits.map(digit => (
-          <Key key={digit} label={digit} onPress={() => auth.dispatch('press', digit)} />
+          <Key key={digit} label={digit} onPress={() => auth.send.press(digit)} />
         ))}
         <Key key="forgot" label="?" dim onPress={() => {}} />
-        <Key key="0" label="0" onPress={() => auth.dispatch('press', '0')} />
-        <Key key="back" label="⌫" dim onPress={() => auth.dispatch('backspace')} />
+        <Key key="0" label="0" onPress={() => auth.send.press('0')} />
+        <Key key="back" label="⌫" dim onPress={() => auth.send.backspace()} />
       </grid>
 
       <row x="space-between" y="center">
         <Switch
           label="Remember this device"
           on={view.pipe(map(v => v.rememberDevice))}
-          onToggle={() => auth.dispatch('toggleRemember')}
+          onToggle={() => auth.send.toggleRemember()}
         />
         <text color="primary" fontSize={13} cursor="pointer">
           Forgot passcode?
@@ -383,8 +395,8 @@ function MovementRow(props: Inputs<{ movement: Movement }>) {
 }
 
 function AccountScreen(_props: Inputs<{}>, ctx: ComponentContext) {
-  const auth = ctx.inject(AuthStore);
-  const signedInAt = auth.projection.view.pipe(
+  const auth = ctx.channel(SignIn);
+  const signedInAt = auth.view.view.pipe(
     map(v => (v.signedInAt === null ? '' : new Date(v.signedInAt).toLocaleTimeString()))
   );
   const balance = MOVEMENTS.reduce((sum, m) => sum + m.amount, 12480.55);
@@ -408,7 +420,7 @@ function AccountScreen(_props: Inputs<{}>, ctx: ComponentContext) {
           </text>
         </column>
         <button
-          onClick={() => auth.dispatch('signOut')}
+          onClick={() => auth.send.signOut()}
           padding={8}
           paddingLeft={14}
           paddingRight={14}
@@ -444,8 +456,8 @@ function AccountScreen(_props: Inputs<{}>, ctx: ComponentContext) {
 // ---------------------------------------------------------------------------
 
 export function SignInApp(_props: Inputs<{}>, ctx: ComponentContext) {
-  const auth = ctx.inject(AuthStore);
-  const screen = auth.projection.view.pipe(
+  const auth = ctx.channel(SignIn);
+  const screen = auth.view.view.pipe(
     map(v => v.status === 'signedIn'),
     distinctUntilChanged(),
     map(signedIn => (signedIn ? <AccountScreen key="account" /> : <SignInScreen key="signin" />))

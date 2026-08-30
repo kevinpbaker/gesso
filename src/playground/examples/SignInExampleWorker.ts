@@ -1,8 +1,9 @@
 import { renderRoot } from '../../framework/app/worker/renderRoot';
-import { AuthStore, SignInApp } from './SignInExampleApp';
+import { SignInApp } from './SignInExampleApp';
+import { SignIn } from './signin/SignInContract';
 
 /**
- * Render worker for the sign-in example: the whole UI, the store and
- * its timers live here. The main thread only forwards input.
+ * Render worker for the sign-in example. The keypad and the screen
+ * live here; the authentication lives on the application worker.
  */
-renderRoot(SignInApp).useStore(AuthStore);
+renderRoot(SignInApp).useChannel(SignIn);
