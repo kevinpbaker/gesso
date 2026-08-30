@@ -1,14 +1,22 @@
 /**
  * Renderer-independent 2D transform.
  *
- * The transform is applied around the node's origin. A separate
- * transform-origin property is not modeled here; the origin is
- * resolved by consumers (e.g. layout/paint) from the node's box.
+ * The transform is applied around a pivot, and `x` / `y` are where
+ * that pivot sits inside the node — not a translation. Both renderers
+ * compose `T(pivot) · R · S · T(-pivot)` (`Canvas2DRenderer.applyTransform`,
+ * `buildOwnTransform` in `WebGPURenderData`), so `{ x: 50, y: 50 }`
+ * alone moves nothing, which is what `UiHitTester.spec`'s "unaffected
+ * by an identity transform" asserts. A node that wants to rotate about
+ * its middle passes half its width and height.
+ *
+ * These two fields were documented as "additional translation" until
+ * the Media tier's `Spinner` was written against that description and
+ * swung around its own top-left corner in the browser.
  */
 export interface UiTransform {
-  /** Additional translation along the x-axis, in logical pixels. */
+  /** The pivot's offset from the node's left edge, in logical pixels. */
   readonly x: number;
-  /** Additional translation along the y-axis, in logical pixels. */
+  /** The pivot's offset from the node's top edge, in logical pixels. */
   readonly y: number;
   /** Scale along the x-axis. */
   readonly scaleX: number;
