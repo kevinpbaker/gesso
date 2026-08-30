@@ -1,5 +1,6 @@
 import './playground/shell/theme.css';
 
+import { mountAnimationExampleRoute } from './playground/routes/AnimationExampleRoute';
 import { mountBenchmarkRoute } from './playground/routes/BenchmarkRoute';
 import { mountCanvasRoute } from './playground/routes/CanvasRoute';
 import { mountCompareRoute } from './playground/routes/CompareRoute';
@@ -37,7 +38,8 @@ const MOUNTS: Record<string, Mount> = {
   'example-signin': mountSignInExampleRoute,
   'example-notes': mountNotesExampleRoute,
   'example-theme': mountThemeExampleRoute,
-  'example-live': mountLiveExampleRoute
+  'example-live': mountLiveExampleRoute,
+  'example-animation': mountAnimationExampleRoute
 };
 
 if (import.meta.env.DEV) {

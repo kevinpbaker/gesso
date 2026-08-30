@@ -60,5 +60,19 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'inject a spike and watch a threshold crossing repaint forty bars from one push.',
     source: 'src/playground/examples/LiveExampleApp.tsx',
     tags: ['bindings', 'observables', 'no rebuilds', 'streaming data', 'JSX', 'render worker']
+  },
+  {
+    route: 'example-animation',
+    title: 'A board that moves',
+    description:
+      'A sprint board where every movement is animated and nothing re-renders. Cards spring between lanes and ' +
+      'shove their neighbours aside, a card grows when you open it, pressing one springs it under your finger, ' +
+      'and an undo bar slides in and — the harder half — slides out before it is forgotten. The four ways to ask ' +
+      'for motion are all here: a `transition` prop on an element, an `animateLayout` modifier, a spring on a ' +
+      'cell, and a tween whose completion drives what happens next. The picker changes how the board moves; the ' +
+      '`ticks` reading in the bar is the animation phase itself, and it falls back to 0.00 ms whenever the board ' +
+      'is still, because an idle app schedules no frames at all. Reduced motion is honoured rather than ignored.',
+    source: 'src/playground/examples/AnimationExampleApp.tsx',
+    tags: ['animation', 'transitions', 'springs', 'layout animation', 'reduced motion', 'JSX', 'render worker']
   }
 ];

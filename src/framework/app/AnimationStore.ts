@@ -105,7 +105,17 @@ export class AnimationStore extends Store {
     return this.motionVocabulary;
   }
 
-  /** Called by the runtime when the shell reports the preference. */
+  /**
+   * Turns reduced motion on or off for this runtime.
+   *
+   * The runtime calls it when the shell reports the platform's
+   * `prefers-reduced-motion`, which is where the answer normally comes
+   * from. It is public because an application may legitimately offer
+   * its own motion setting — many do — and because a person who wants
+   * less motion in *this* app should not have to change an OS
+   * preference to get it. The last caller wins; there is no priority
+   * between the platform's answer and the app's.
+   */
   applyReducedMotion(reduced: boolean): void {
     if (this.reducedMotion.value === reduced) {
       return;

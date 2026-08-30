@@ -42,7 +42,18 @@ export const ROUTES: readonly RouteMeta[] = [
   { id: 'example-signin', label: 'Sign in', title: 'Example · passcode sign-in, written in JSX', parent: 'examples' },
   { id: 'example-notes', label: 'Notes', title: 'Example · notes with text editing and IME', parent: 'examples' },
   { id: 'example-theme', label: 'Theming', title: 'Example · theming through the environment', parent: 'examples' },
-  { id: 'example-live', label: 'Live', title: 'Example · a live feed bound straight to the canvas', parent: 'examples' }
+  {
+    id: 'example-live',
+    label: 'Live',
+    title: 'Example · a live feed bound straight to the canvas',
+    parent: 'examples'
+  },
+  {
+    id: 'example-animation',
+    label: 'Animation',
+    title: 'Example · a board that moves, and an idle app that does not',
+    parent: 'examples'
+  }
 ];
 
 export const DEFAULT_ROUTE_ID = 'debug';
