@@ -114,7 +114,7 @@ Single-thread mode exists too — `createApp(NotesApp).useChannel(Notes, { sourc
 | Thread            | Owns                                                                                                                                                       |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Shell** (main)  | the `<canvas>`, input forwarding, the editing proxy for IME, `ResizeObserver`, and the APIs that exist only here — History, `localStorage`, clipboard, IPC |
-| **App worker**    | api → storage → domain → view models. Plain RxJS. The fast OPFS path lives here because `FileSystemSyncAccessHandle` exists only in a dedicated worker     |
+| **App worker**    | api → storage → domain → view models. Plain RxJS                                                                                                           |
 | **Render worker** | components, the retained graph, layout, input dispatch, hit-testing, rasterization, and the runtime services                                               |
 
 Application work has to cost something somewhere, and the arrangement decides what. State in the render worker costs dropped frames. State on the shell costs input latency. State in the app worker costs neither — which is what its thread buys.
