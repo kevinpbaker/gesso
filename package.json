@@ -20,7 +20,9 @@
     "api:update": "node scripts/check-api.ts --update",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "check:install": "node scripts/check-install.ts"
+    "check:install": "node scripts/check-install.ts",
+    "screenshots": "node scripts/check-route-screenshots.ts",
+    "screenshots:update": "node scripts/check-route-screenshots.ts --update"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

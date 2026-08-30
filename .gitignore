@@ -26,3 +26,6 @@ dist-ssr
 # Claude Code: local worktree checkouts and personal settings; shared config (.claude/settings.json, agents, skills) is committed
 .claude/worktrees/
 .claude/settings.local.json
+
+# Screenshot gate: the capture written beside a baseline when a route fails
+apps/playground/screenshots/*.actual.png

@@ -80,18 +80,53 @@ export class DevTools {
     return new DevTools(socket);
   }
 
-  send(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  /**
+   * Sends one command and awaits its reply.
+   *
+   * The timeout is not belt-and-braces: a `Runtime.evaluate` whose
+   * execution context is torn down by a navigation mid-flight can go
+   * unanswered forever, and without this the caller's own `waitFor`
+   * never gets to time out either, because it is awaiting this promise.
+   */
+  send(method: string, params: Record<string, unknown> = {}, timeoutMs = 15_000): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, result => (result instanceof Error ? reject(result) : resolve(result)));
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`DevTools ${method} did not reply within ${timeoutMs} ms.`));
+      }, timeoutMs);
+      this.pending.set(id, result => {
+        clearTimeout(timer);
+        if (result instanceof Error) {
+          reject(result);
+        } else {
+          resolve(result);
+        }
+      });
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }
 
-  async evaluate<T>(expression: string): Promise<T> {
-    const reply = (await this.send('Runtime.evaluate', { expression, returnByValue: true })) as {
+  /**
+   * Evaluates an expression and returns its value.
+   *
+   * `awaitPromise` matters for an async expression: without it the reply
+   * carries the Promise itself and the value comes back undefined, which
+   * reads exactly like a successful evaluation of nothing.
+   */
+  async evaluate<T>(expression: string, awaitPromise = false): Promise<T> {
+    const reply = (await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise
+    })) as {
       result: { value: T };
+      exceptionDetails?: { text: string; exception?: { description?: string } };
     };
+    if (reply.exceptionDetails !== undefined) {
+      const detail = reply.exceptionDetails;
+      throw new Error(`Evaluation threw: ${detail.exception?.description ?? detail.text}`);
+    }
     return reply.result.value;
   }
 
