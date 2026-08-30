@@ -54,6 +54,6 @@ export interface NotesCommands {
  * in one object the differ would walk the entire list on every
  * keystroke; split, the row change is a single small patch and the
  * body is the only large value that moves. This is the granularity
- * rule of `decisions/0029-thread-model.md` §3.2 in practice.
+ * rule of `decisions/0030-thread-model.md` §3.2 in practice.
  */
 export const Notes = channel<NotesView, NotesCommands>('notes', { rows: [], open: null });

@@ -134,7 +134,7 @@ Two words for cells, split on the barrier axis rather than on what they hold:
 
 Granularity is the tuning knob. Declare keys finely — `rows` and `open` separately, not one `state` object — because a key holding a large array re-diffs that array on any change. In the notes example a keystroke in the body moves `open` wholesale while changing one row's preview; kept in one object, the differ would walk the whole list on every keystroke.
 
-The reasoning is in [`0029-thread-model.md`](docs/decisions/0029-thread-model.md).
+The reasoning is in [`0030-thread-model.md`](docs/decisions/0030-thread-model.md).
 
 ## What's inside
 
@@ -235,7 +235,7 @@ Media, focus, animation, overlay, shell and find are plain classes with public m
 | Data survives a reload                  | The notes example persists through `FileSystemSyncAccessHandle` in the app worker: typing a marker and reloading brings it back, and a first run with no file writes the seed                                                 | `#example-notes`                                         |
 | It's tested                             | **1,715 tests** across **130 spec files**, ~5 s                                                                                                                                                                               | `pnpm test:run`                                          |
 
-Two things are deliberately **not** claimed. The notes example holds three notes, so nothing here stresses a long list while the app worker writes; and the cost of per-key diffing on the app thread at `DataTable` scale has not been measured. Both are recorded as unmeasured in [`0029-thread-model.md`](docs/decisions/0029-thread-model.md) §9 rather than papered over.
+Two things are deliberately **not** claimed. The notes example holds three notes, so nothing here stresses a long list while the app worker writes; and the cost of per-key diffing on the app thread at `DataTable` scale has not been measured. Both are recorded as unmeasured in [`0030-thread-model.md`](docs/decisions/0030-thread-model.md) §9 rather than papered over.
 
 Every claim of doneness in this project has an exit criterion observable in a browser, not just a test runner — because WebGPU cannot run in vitest at all, and a passing suite is not evidence a route renders. The input-latency measurement is the cautionary tale: the first cut stamped the event where the shell forwards it, which reads ~0 ms however blocked the shell is, because the listener only runs once the thread is free. The vitest suite was perfectly happy with it. The browser check is what found it.
 
@@ -373,7 +373,7 @@ The decision records are the real documentation. Each one states the problem, th
 | [0027](docs/decisions/0027-decorations-and-focus-rings.md) | Decoration shapes, and the focus ring                                             |
 | [0028](docs/decisions/0028-media-tier.md)                  | The Media tier — an image resolver that cannot leave the render thread            |
 | [0029](docs/decisions/0029-animation.md)                   | Animation, and how an idle app stays idle                                         |
-| [0029](docs/decisions/0029-thread-model.md)                | Three threads and a declared barrier                                              |
+| [0030](docs/decisions/0030-thread-model.md)                | Three threads and a declared barrier                                              |
 
 Then [`FRAMEWORK_DESIGN.md`](docs/FRAMEWORK_DESIGN.md) for the component model and the thread architecture.
 

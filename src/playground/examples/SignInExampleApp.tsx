@@ -45,7 +45,7 @@ export interface AuthView {
  * them is the application's business. A keypad needs none.
  *
  * A single `view` key rather than one per field: §3.2 of
- * `decisions/0029-thread-model.md` says to split finely, and the
+ * `decisions/0030-thread-model.md` says to split finely, and the
  * reason is diff cost over large values. Six scalars are not that.
  */
 export class AuthApp {

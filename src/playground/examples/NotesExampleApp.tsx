@@ -11,7 +11,7 @@ import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
  * and body on the right, both typed into directly.
  *
  * This is the roadmap F2 exit screen, and since A4 it is also the
- * first screen built the way `decisions/0029-thread-model.md`
+ * first screen built the way `decisions/0030-thread-model.md`
  * describes. Nothing in this file holds application state or knows
  * where it comes from: it reads view keys off the `Notes` channel and
  * sends commands back. The notebook itself — a repository, the rules,

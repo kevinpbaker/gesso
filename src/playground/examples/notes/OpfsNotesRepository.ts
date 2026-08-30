@@ -15,7 +15,7 @@ import type { Note, NotesRepository } from './NotesRepository';
  * dedicated worker, and the write below is a synchronous file write
  * that would block whatever thread it happened on. On the shell it
  * would stall input; here it competes with nothing the person can see.
- * §2.1 of `decisions/0029-thread-model.md` predicted this; this is the
+ * §2.1 of `decisions/0030-thread-model.md` predicted this; this is the
  * first code that depends on it.
  */
 
