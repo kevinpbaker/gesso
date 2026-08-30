@@ -8,7 +8,7 @@ import { createDefinition } from '../PlaygroundDefinition';
 import { PlaygroundState } from '../PlaygroundState';
 import { scrollStatsText } from '../scrollStats';
 import { WebGPUPreview } from '../WebGPUPreview';
-import { createDemoBitmap } from '../demoBitmap';
+import { createDemoBitmap, createIconBitmap } from '../demoBitmap';
 import { createPreviewCanvas, observeSize } from '../shell/dom';
 
 /** Half the gap between the two panes, in CSS pixels. */
@@ -172,6 +172,7 @@ export function mountCompareRoute(host: HTMLElement): () => void {
   // Where the parity check reads its result; see scripts/check-webgpu-parity.ts.
   panel.preview.dataset.parityStatus = 'pending';
   void createDemoBitmap().then(bitmap => state.image$.next(bitmap));
+  void createIconBitmap().then(bitmap => state.icon$.next(bitmap));
 
   const playground = new LayoutPlayground({
     clock: callback => new UiAnimationFrameClock(callback),

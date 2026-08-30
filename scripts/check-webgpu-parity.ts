@@ -25,7 +25,26 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const VITE_PORT = 5187;
 const DEVTOOLS_PORT = 9337;
 const PAGE_URL = `http://localhost:${VITE_PORT}/#compare`;
-const MAX_PERCENT = Number(process.env.PARITY_MAX_PERCENT ?? '0.03');
+/**
+ * Differing pixels as a fraction of the compared ones.
+ *
+ * This number is a function of how many antialiased edges the compare
+ * route's tree has, not of how close the two backends are: a rounded
+ * stroke costs about a pixel per corner whichever backend is right,
+ * because one rasterises a path and the other evaluates an SDF. It was
+ * 0.03 when the fixture ended at the scrolled sticky list; the
+ * decorated card of `MODIFIERS_ROADMAP.md` B3 and the rasterised icon
+ * of `COMPONENTS_ROADMAP.md` C7 added about thirty antialiased corners
+ * between them and took the reading from 0.013% to 0.029%, which left
+ * a pixel of headroom and would have failed the next rounded box
+ * somebody added.
+ *
+ * Raised to 0.05 with that in mind, and with the gross allowance
+ * below — which stayed at 0.02 and reads 0.000% — left alone. Gross is
+ * the number that catches a backend actually being wrong; this one
+ * catches a fixture growing.
+ */
+const MAX_PERCENT = Number(process.env.PARITY_MAX_PERCENT ?? '0.05');
 /**
  * Pixels that differ grossly — covered on one backend, empty on the
  * other — as a fraction of the compared pixels. Anti-aliasing never

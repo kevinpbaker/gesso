@@ -7,9 +7,13 @@ import {
   Dialog,
   Divider,
   FindBar,
+  Icon,
+  Image,
   LazyList,
   Menu,
+  ProgressBar,
   Select,
+  Spinner,
   SplitPane,
   Tabs,
   TextInput,
@@ -20,7 +24,7 @@ import {
   type TreeNode
 } from '../components';
 import { FocusStore } from '../framework/app/FocusStore';
-import { darkTheme } from '../ui/environment/UiTheme';
+import { darkTheme, lightTheme } from '../ui/environment/UiTheme';
 import { focusRing, interactive } from '../ui/modifiers';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
@@ -1141,6 +1145,109 @@ export class ScrollDemo extends Component {
 }
 
 /**
+ * The Media tier (roadmap C7): a picture, icons, a spinner and two
+ * progress bars.
+ *
+ * The picture is fetched and decoded by the `ImageResolver` the
+ * `MediaStore` holds — in the render worker, which is what "off the
+ * main thread" means for a Nodal app — and the icons are rasterised
+ * from paths at whatever colour the card's theme resolves. Switching
+ * the card between the light and dark themes redraws them, which is
+ * the one thing in the library that cannot resolve a palette name at
+ * paint: a raster has its colour baked in.
+ */
+const ICONS: readonly { path: string; label: string }[] = [
+  // Stroked, on the 24-unit grid: a check, a plus, a search and a bell.
+  { path: 'M4 12.5 L9.5 18 L20 6', label: 'Done' },
+  { path: 'M12 5 L12 19 M5 12 L19 12', label: 'Add' },
+  { path: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14 M16 16 L21 21', label: 'Search' },
+  { path: 'M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6 M10 20a2 2 0 0 0 4 0', label: 'Alerts' }
+];
+
+/**
+ * The picture the card fetches, served by the dev server out of
+ * `public/`.
+ *
+ * A real URL rather than a data URL on purpose: an SVG data URL would
+ * have been smaller and self-contained, but `createImageBitmap` cannot
+ * decode SVG in Chrome ("The source image could not be decoded"), and
+ * a demo that quietly showed a placeholder would have hidden that from
+ * whoever writes the first `Image` in an application.
+ */
+const SWATCH_PNG = '/swatch.png';
+
+@Define('media-tier-demo')
+export class MediaTierDemo extends Component {
+  @State() progress = state(0.35);
+  @State() dark = state(true);
+
+  override render(): UiElement {
+    return Column(
+      { width: 340, gap: 10, theme: this.dark.pipe(map(on => (on ? darkTheme : lightTheme))) },
+      createComponent(Card, {
+        title: 'Media (C7)',
+        children: Column(
+          { gap: 12 },
+          Text({
+            text: 'A fetched picture, icons rasterised from paths, and the first two animations.',
+            color: 'textMuted',
+            fontSize: 12
+          }),
+          Row(
+            { gap: 12, y: 'center' },
+            createComponent(Image, {
+              src: SWATCH_PNG,
+              alt: 'A gradient swatch',
+              width: 120,
+              height: 68,
+              borderRadius: 8,
+              objectFit: 'cover'
+            }),
+            Column(
+              { gap: 10, flexGrow: 1 },
+              Row(
+                { gap: 10, y: 'center' },
+                ...ICONS.map(icon =>
+                  createComponent(Icon, {
+                    path: icon.path,
+                    label: icon.label,
+                    size: 20,
+                    style: 'stroke',
+                    strokeWidth: 2,
+                    color: 'controlAccent'
+                  })
+                )
+              ),
+              Row(
+                { gap: 10, y: 'center' },
+                createComponent(Spinner, { size: 20, label: 'Working' }),
+                Text({ text: 'Working…', color: 'controlForeground', fontSize: 12 })
+              )
+            )
+          ),
+          createComponent(ProgressBar, { value: this.progress, label: 'Upload', width: percent(100) }),
+          createComponent(ProgressBar, { label: 'Indexing', width: percent(100) }),
+          Row(
+            { gap: 8 },
+            stepButton('More', () => {
+              this.progress.value = Math.min(1, this.progress.value + 0.15);
+            }),
+            stepButton('Less', () => {
+              this.progress.value = Math.max(0, this.progress.value - 0.15);
+            }),
+            // The icons are rasters, so this is what proves they follow
+            // the theme rather than resolving a palette name at paint.
+            stepButton('Light / dark', () => {
+              this.dark.value = !this.dark.value;
+            })
+          )
+        )
+      })
+    );
+  }
+}
+
+/**
  * Images (WebGPU roadmap G5): a bitmap decoded on the rendering thread
  * — drawn here with OffscreenCanvas, in an application it would come
  * from `createImageBitmap(blob)` — shown under every `objectFit`
@@ -1353,6 +1460,7 @@ export class FrameworkDemoRoot extends Component {
       createComponent(OverlayTierDemo),
       createComponent(StructureTierDemo),
       createComponent(DataTierDemo),
+      createComponent(MediaTierDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),

@@ -10,6 +10,10 @@ export { drawOverlayShapes, labelOrigin, LABEL_PADDING_X } from './OverlayShapes
 export type { OverlayShape } from './OverlayShapes';
 export { decorationColor, decorationRect, hasDecorationPhase, paintsAfterChildren } from './Decorations';
 export type { DecorationShape, DecorationFill, DecorationStroke, DecorationRect } from './Decorations';
+export { DefaultImageResolver } from './ImageResolver';
+export type { ImageResolver, DefaultImageResolverOptions } from './ImageResolver';
+export { IconRasterizer, iconKey } from './IconRasterizer';
+export type { IconSpec, IconRasterizerOptions, IconCanvas, IconContext } from './IconRasterizer';
 export {
   createPaintState,
   resolvePaintState,

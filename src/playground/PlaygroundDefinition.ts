@@ -121,6 +121,13 @@ function paritySection(state: PlaygroundState): UiElement {
       image: state.image$,
       objectFit: 'cover'
     }),
+    // The Media tier (C7): a rasterised icon, drawn the way `Icon`
+    // draws one — through `image` and `objectFit`, which is why the
+    // tier needed no renderer work at all.
+    Box(
+      { width: 44, height: 80, y: 'center', x: 'center' },
+      Box({ width: 28, height: 28, image: state.icon$, objectFit: 'contain' })
+    ),
     Column(
       { gap: 6 },
       Box({

@@ -34,6 +34,9 @@ import { UiFindController } from '../../ui/find/UiFindController';
 import { ShellStore, type ShellRequest } from './ShellStore';
 import { FindStore } from './FindStore';
 import { FocusStore } from './FocusStore';
+import { MediaStore } from './MediaStore';
+import type { ImageResolver } from '../../ui/rendering/ImageResolver';
+import type { IconRasterizer } from '../../ui/rendering/IconRasterizer';
 import { buildSemanticsTree, diffSemantics } from '../../ui/semantics';
 import { LayoutNotifier } from '../../ui/layout/LayoutNotifier';
 import type { UiSemanticsMap, UiSemanticsPatch } from '../../ui/semantics';
@@ -130,6 +133,18 @@ export interface NodalRuntimeOptions {
    */
   measureCanvas?: CanvasHost;
   storeClasses?: (new () => Store)[];
+  /**
+   * The image resolver and icon rasteriser the `MediaStore` should
+   * use.
+   *
+   * Supplied here rather than through the store afterwards because the
+   * tree is built inside this constructor, and an `Image` in it asks
+   * for its bitmap at that moment: a resolver installed after the
+   * runtime exists would already have missed the first screen. An app
+   * that fetches through its own stack, or one that has measured a
+   * reason to decode in a worker of its own, passes it here.
+   */
+  media?: { resolver?: ImageResolver; rasterizer?: IconRasterizer };
   /**
    * A registry built elsewhere, when some stores live in data workers.
    * Takes the place of storeClasses.
@@ -332,6 +347,18 @@ export class NodalRuntime {
     // of a component's reach without a store in front of it.
     if (!this.stores.has(FocusStore)) {
       this.stores.register(FocusStore);
+    }
+    // And the image resolver and icon rasteriser, whose caches must be
+    // per runtime: two runtimes in one worker must not share a bitmap
+    // one of them is about to close.
+    if (!this.stores.has(MediaStore)) {
+      this.stores.register(MediaStore);
+    }
+    if (options.media?.resolver !== undefined) {
+      this.stores.get(MediaStore).setResolver(options.media.resolver);
+    }
+    if (options.media?.rasterizer !== undefined) {
+      this.stores.get(MediaStore).setRasterizer(options.media.rasterizer);
     }
 
     this.scheduler = new UiScheduler({
@@ -638,6 +665,9 @@ export class NodalRuntime {
     this.scheduler.stop();
     this.stores.get(FindStore).setController(null);
     this.stores.get(FocusStore).setManager(null);
+    // Decoded bitmaps hold pixels; garbage collection is not prompt
+    // about them, so they are closed rather than dropped.
+    this.stores.get(MediaStore).dispose();
     this.graph.setEnvironmentChangedListener(null);
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);

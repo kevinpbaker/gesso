@@ -37,6 +37,16 @@ export { Toast, type ToastProps } from './Toast';
 export { LazyList, type LazyListProps } from './LazyList';
 export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';
 export { Tree, type TreeNode, type TreeProps } from './Tree';
+export {
+  Image,
+  Icon,
+  Spinner,
+  ProgressBar,
+  type ImageProps,
+  type IconProps,
+  type SpinnerProps,
+  type ProgressBarProps
+} from './Media';
 export { useOverlay, type OverlayHandle, type OverlayOptions } from './overlay';
 export { virtualList, stepIndex, type VirtualList } from './virtual';
 export { controlled, type ControlledValue } from './controlled';

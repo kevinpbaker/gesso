@@ -62,4 +62,12 @@ export class PlaygroundState {
    * never set it (the boxes then show their backgrounds).
    */
   readonly image$ = new BehaviorSubject<ImageBitmap | undefined>(undefined);
+
+  /**
+   * The parity section's icon, rasterised from a path by the Media
+   * tier's own `IconRasterizer` rather than drawn by hand — so what the
+   * compare route diffs is the thing `Icon` produces, not a
+   * look-alike.
+   */
+  readonly icon$ = new BehaviorSubject<ImageBitmap | undefined>(undefined);
 }
