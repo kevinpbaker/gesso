@@ -157,6 +157,32 @@ describe('SplitPane', () => {
     expect(changes).toEqual([0.25]);
   });
 
+  it('puts the divider at the fraction even when a pane holds wider content', () => {
+    const split = new BehaviorSubject(0.4);
+    const ui = mount(
+      Box(
+        { width: 200, height: 90, overflow: 'hidden' },
+        createComponent(SplitPane, {
+          split,
+          first: Box({ padding: 8 }, Text({ text: 'stories list', fontSize: 12 })),
+          second: Box({ padding: 8 }, Text({ text: 'Drag the divider · 40%', fontSize: 12 }))
+        })
+      )
+    );
+    ui.frame();
+    const dividerX = (): number => ui.getLayout(ui.getByRole('separator'))!.x;
+
+    // A flex item's automatic minimum is its min-content size, so
+    // before both panes opted out of it the second pane's text refused
+    // to shrink and pinned the divider partway across — 0.4 and 0.8
+    // landed in the same place while `valueNow` happily reported the
+    // number it had been given.
+    expect(dividerX()).toBeCloseTo(80, 5);
+    split.next(0.8);
+    ui.frame();
+    expect(dividerX()).toBeCloseTo(160, 5);
+  });
+
   it('reports where the divider is, as a percentage', () => {
     const ui = mount(createComponent(SplitPane, { defaultSplit: 0.35, first: Box({}), second: Box({}) }));
     const record = ui.recordsFor('separator')[0];

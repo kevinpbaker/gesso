@@ -107,15 +107,28 @@ export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext):
     width: percent(100),
     height: percent(100)
   };
+  // Both panes opt out of the automatic minimum, and the first one out
+  // of shrinking as well.
+  //
+  // A flex item's automatic minimum is its content's min-content size,
+  // so a pane whose text is wider than the fraction it was given
+  // refuses to shrink and takes the space out of the other one. The
+  // divider then stops dead partway across — the split still reports
+  // the number it was asked for, and the panes ignore it. Both panes
+  // clip, so their content was never what should decide their size:
+  // the fraction is.
+  const shrinkable = { minWidth: 0, minHeight: 0, overflow: 'hidden' } as const;
   const first = Box(
     {
       width: horizontal() ? firstSize : percent(100),
       height: horizontal() ? percent(100) : firstSize,
-      overflow: 'hidden'
+      // The fraction is a size, not an opening bid.
+      flexShrink: 0,
+      ...shrinkable
     },
     props.first.value ?? Row()
   );
-  const second = Box({ flexGrow: 1, overflow: 'hidden' }, props.second.value ?? Row());
+  const second = Box({ flexGrow: 1, ...shrinkable }, props.second.value ?? Row());
 
   return horizontal() ? Row(container, first, divider, second) : Column(container, first, divider, second);
 }
