@@ -201,6 +201,7 @@ import {
   LayoutExplanation,
   LayoutInspector,
   RendererBackend,
+  TextMeasurer,
   UI_ROLES,
   UI_SEMANTIC_STATES,
   UiChild,
@@ -600,6 +601,7 @@ interface GessoRuntimeOptions {
   canvas: CanvasHost;
   renderer?: RendererChoice;
   measureCanvas?: CanvasHost;
+  textMeasurer?: TextMeasurer;
   media?: {
     resolver?: ImageResolver;
     rasterizer?: IconRasterizer;

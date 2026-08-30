@@ -50,6 +50,7 @@ import {
   Constraints,
   Canvas2DRenderer,
   CanvasTextMeasurer,
+  type TextMeasurer,
   createCanvasSurface,
   createWebGPUSurface,
   LayoutInspector,
@@ -162,6 +163,19 @@ export interface GessoRuntimeOptions {
    */
   measureCanvas?: CanvasHost;
   /**
+   * The measurer layout and the renderers share, when the caller wants
+   * one that does not come from a canvas.
+   *
+   * Only a test supplies it. A canvas measurer is the right answer
+   * everywhere a canvas is real, but a test double's `measureText`
+   * answers the same width for every font size, so text laid out
+   * against one is not text: a heading and its caption come out the
+   * same height. `@gesso/testing` passes `CharacterCountTextMeasurer`
+   * instead, which is proportional to the font size and identical on
+   * every machine.
+   */
+  textMeasurer?: TextMeasurer;
+  /**
    * The image resolver and icon rasteriser the `MediaService` should
    * use.
    *
@@ -235,7 +249,7 @@ export class GessoRuntime {
   private readonly scheduler: UiScheduler;
   private readonly inputLatency = new InputLatencyTracker();
   private readonly canvas: CanvasHost;
-  private readonly textMeasurer: CanvasTextMeasurer;
+  private readonly textMeasurer: TextMeasurer;
   /** The 2D surface when Canvas2D draws; the inspector paints on it. */
   private canvasSurface: CanvasSurface | null = null;
   private renderer: UiRenderer;
@@ -313,7 +327,7 @@ export class GessoRuntime {
     const choice = options.renderer ?? 'canvas2d';
     if (choice === 'canvas2d') {
       this.canvasSurface = createCanvasSurface(options.canvas);
-      this.textMeasurer = new CanvasTextMeasurer(this.canvasSurface.getContext2D());
+      this.textMeasurer = options.textMeasurer ?? new CanvasTextMeasurer(this.canvasSurface.getContext2D());
       this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
       this.rendererState = 'canvas2d';
       this.rendererReady = Promise.resolve('canvas2d');
@@ -322,7 +336,7 @@ export class GessoRuntime {
       // on a canvas of its own. One measurer still serves layout and the
       // renderer, which is what keeps line breaks identical.
       const measureSurface = createCanvasSurface(options.measureCanvas ?? createMeasureCanvas());
-      this.textMeasurer = new CanvasTextMeasurer(measureSurface.getContext2D());
+      this.textMeasurer = options.textMeasurer ?? new CanvasTextMeasurer(measureSurface.getContext2D());
       const webgpu = new WebGPURenderer({
         surface: createWebGPUSurface(options.canvas as unknown as WebGPUCanvasHost),
         onError: message => this.reportRendererError(message),
