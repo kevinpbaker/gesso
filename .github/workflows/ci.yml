@@ -103,6 +103,29 @@ jobs:
         env:
           CHROME_BIN: google-chrome
 
+  accessibility:
+    name: the accessibility mirror is readable and operable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Reads Chrome's own computed accessibility tree for two example
+      # routes and presses a control the way an assistive technology
+      # does. It compares no pixels and needs no baseline, so unlike the
+      # screenshot job it is authoritative here. What it cannot do is
+      # run VoiceOver or NVDA; decisions/0034-accessibility-mirror.md
+      # says exactly what that leaves unverified.
+      - name: Accessibility mirror
+        run: pnpm check:a11y
+        env:
+          CHROME_BIN: google-chrome
+
   screenshots:
     name: route screenshots (advisory until baselines are captured here)
     runs-on: ubuntu-latest

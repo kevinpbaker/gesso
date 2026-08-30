@@ -16,6 +16,7 @@
     "test:run": "vitest run",
     "fixtures:layout": "node scripts/gen-layout-fixtures.ts",
     "parity:webgpu": "node scripts/check-webgpu-parity.ts",
+    "check:a11y": "node scripts/check-a11y-tree.ts",
     "bench:graph": "vite-node scripts/bench-graph.ts",
     "api:check": "node scripts/check-api.ts",
     "api:update": "node scripts/check-api.ts --update",
