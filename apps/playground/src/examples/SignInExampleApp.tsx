@@ -1,6 +1,7 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
+import type { UiSemanticState } from '@gesso/core';
 import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
 import { SignIn } from './signin/SignInContract';
 
@@ -189,7 +190,7 @@ function Dot(props: Inputs<{ index: number }>, ctx: ComponentContext) {
  * runtime routes to the key: enter/leave for hover, down/up for the
  * press, with a leave while pressed ending both.
  */
-function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean }>) {
+function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean; name?: string }>) {
   const hovered = internalState(false);
   const pressed = internalState(false);
   const background = combineLatest([props.dim, hovered, pressed]).pipe(
@@ -202,6 +203,9 @@ function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean }
   const color = combineLatest([props.dim, hovered]).pipe(map(([dim, hover]) => (dim && !hover ? MUTED : KEY_TEXT)));
   return (
     <button
+      // A `button` announces itself; what it is *called* is its text,
+      // which is a word for the digits and a glyph for the other two.
+      label={props.name}
       onClick={() => props.onPress.value()}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => {
@@ -255,7 +259,14 @@ function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void
   const trackColor = props.on.pipe(map(on => (on ? 'primary' : DOT_EMPTY)));
   const knobX = props.on.pipe(map(on => (on ? 'end' : 'start')));
   return (
-    <row gap={10} y="center" onClick={() => props.onToggle.value()} cursor="pointer">
+    <row
+      gap={10}
+      y="center"
+      role="switch"
+      label={props.label}
+      states={props.on.pipe(map((on): UiSemanticState[] => (on ? ['checked'] : [])))}
+      onClick={() => props.onToggle.value()}
+      cursor="pointer">
       <box width={36} height={20} borderRadius={10} backgroundColor={trackColor} x={knobX} y="center" padding={2}>
         <box width={16} height={16} borderRadius={8} backgroundColor="#ffffff" />
       </box>
@@ -295,7 +306,10 @@ function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
       </column>
 
       <column gap={12} x="center" selfX="center">
-        <row gap={12}>
+        <row
+          gap={12}
+          role="group"
+          label={view.pipe(map(v => `Passcode, ${v.entered} of ${CODE_LENGTH} digits entered`))}>
           {Array.from({ length: CODE_LENGTH }, (_, index) => (
             <Dot key={index} index={index} />
           ))}
@@ -303,13 +317,13 @@ function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
         <StatusLine />
       </column>
 
-      <grid columns={[84, 84, 84]} gap={10} justifyContent="center">
+      <grid columns={[84, 84, 84]} gap={10} justifyContent="center" role="group" label="Passcode keypad">
         {digits.map(digit => (
           <Key key={digit} label={digit} onPress={() => auth.send.press(digit)} />
         ))}
-        <Key key="forgot" label="?" dim onPress={() => {}} />
+        <Key key="forgot" label="?" name="Forgot passcode" dim onPress={() => {}} />
         <Key key="0" label="0" onPress={() => auth.send.press('0')} />
-        <Key key="back" label="⌫" dim onPress={() => auth.send.backspace()} />
+        <Key key="back" label="⌫" name="Delete" dim onPress={() => auth.send.backspace()} />
       </grid>
 
       <row x="space-between" y="center">

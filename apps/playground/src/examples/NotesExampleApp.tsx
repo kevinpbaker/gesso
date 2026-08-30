@@ -54,6 +54,18 @@ function NoteRow(props: Inputs<{ note: NoteRowData }>, ctx: ComponentContext) {
       borderRadius={8}
       backgroundColor={background}
       cursor="pointer"
+      // A row is one item of the sidebar's list, named by its title:
+      // its preview is the second line on screen and would be a second
+      // sentence in a screen reader's ear for no gain.
+      //
+      // `list`/`listitem` rather than `listbox`/`option`, even though
+      // exactly one row is selected at a time: a listbox promises a
+      // keyboard interaction pattern this hand-written sidebar does
+      // not implement, and the `selected` state ARIA would carry with
+      // it is dropped by the platform on a `listitem` anyway. Which
+      // note is open is announced by the editor beside it.
+      role="listitem"
+      label={props.note.pipe(map(note => note.title))}
       onClick={() => notes.send.open(props.note.value.id)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}>
@@ -80,6 +92,7 @@ function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
           Notes
         </text>
         <button
+          label="New note"
           onClick={() => notes.send.create()}
           padding={6}
           paddingLeft={12}
@@ -92,7 +105,7 @@ function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
           </text>
         </button>
       </row>
-      <scrollview gap={4} flex={1}>
+      <scrollview gap={4} flex={1} role="list" label="Notes">
         {rows}
       </scrollview>
     </column>
@@ -143,6 +156,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
       <row x="space-between" y="center" gap={16}>
         <editabletext
           value={title}
+          label="Note title"
           placeholder="Untitled"
           onInput={event => notes.send.setTitle(event.value)}
           color={TEXT}
@@ -200,6 +214,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
       <scrollview flex={1} backgroundColor={CARD} borderColor={BORDER} borderWidth={1} borderRadius={12} padding={20}>
         <editabletext
           value={body}
+          label="Note body"
           multiline
           placeholder="Start writing…"
           onInput={event => notes.send.setBody(event.value)}
