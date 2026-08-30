@@ -772,7 +772,16 @@ export class OverlayTierDemo extends Component {
   readonly toastOpen = internalState(false);
   readonly lastCommand = internalState('nothing yet');
 
-  private menuAnchor: UiNode | null = null;
+  /**
+   * The button the menu hangs off, as a cell rather than a field.
+   *
+   * `render()` runs once and the `ref` below fires after it, so a plain
+   * field hands `Menu` the `null` it held at that moment and never
+   * corrects it — and an unanchored entry falls back to the edge
+   * offsets, which is why the menu used to open in the top-left corner
+   * of the screen. A cell is an Observable, so the prop follows the ref.
+   */
+  private readonly menuAnchor = internalState<UiNode | null>(null);
 
   override render(): UiElement {
     return Column(
@@ -808,7 +817,7 @@ export class OverlayTierDemo extends Component {
           onClick: () => (this.dialogOpen.value = true)
         }),
         Button({
-          ref: (node: UiNode | null) => (this.menuAnchor = node),
+          ref: (node: UiNode | null) => (this.menuAnchor.value = node),
           text: 'Actions',
           padding: 8,
           borderRadius: 6,
