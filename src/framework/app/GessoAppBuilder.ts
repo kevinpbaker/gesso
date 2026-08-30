@@ -7,6 +7,8 @@ import { createChannelRegistry, type ChannelRegistration } from '../channel/crea
 import type { ChannelSource } from '../channel/provide';
 import type { ChannelToken } from '../channel/ChannelToken';
 import { GessoApp } from './GessoApp';
+import type { RouterRoutes } from '../router/RouterService';
+import type { ShellHistoryOptions } from './shellHistory';
 import type { FrameMetrics, RendererChoice } from './GessoRuntime';
 
 /**
@@ -18,6 +20,8 @@ export class GessoAppBuilder {
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((text: string | null) => void) | undefined;
   private rendererChoice: RendererChoice | undefined;
+  private routes: RouterRoutes | undefined;
+  private historyOptions: ShellHistoryOptions | undefined;
   private app: GessoApp | undefined;
 
   constructor(private readonly root: FrameworkChild | ComponentType) {}
@@ -56,6 +60,25 @@ export class GessoAppBuilder {
    */
   useService(ServiceClass: new () => object): this {
     this.serviceRegistrations.push(ServiceClass);
+    return this;
+  }
+
+  /**
+   * Declares the app's routes, which is all it takes to make a
+   * `RouterOutlet` in the tree resolve them. Mirrors
+   * `renderRoot().useRoutes`.
+   */
+  useRoutes(routes: RouterRoutes): this {
+    this.routes = routes;
+    return this;
+  }
+
+  /**
+   * How the app's url is kept: `path` (pushState, the default in a
+   * browser), `hash`, or `memory`. See `shellHistory`.
+   */
+  useHistory(history: ShellHistoryOptions): this {
+    this.historyOptions = history;
     return this;
   }
 
@@ -112,6 +135,8 @@ export class GessoAppBuilder {
       root: rootElement,
       channels: channels.registry,
       services,
+      routes: this.routes,
+      history: this.historyOptions,
       renderer: this.rendererChoice
     });
     app.deferPatchesFrom(channels.registry.all());

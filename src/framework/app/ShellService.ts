@@ -1,7 +1,19 @@
 /**
  * Something only the shell — the thread with a window — can do.
+ *
+ * The `history` variant is the router's, not a component's: a
+ * component navigates through `RouterService`, which turns the
+ * navigation into one of these because the address bar is on the other
+ * thread. It is here rather than in a protocol of its own because it
+ * is the same kind of thing as the other two — a request the render
+ * thread cannot serve itself — and `GessoApp` and `WorkerApp` already
+ * have exactly one place that answers them.
  */
-export type ShellRequest = { type: 'clipboard'; text: string } | { type: 'openUrl'; url: string };
+export type ShellRequest =
+  | { type: 'clipboard'; text: string }
+  | { type: 'openUrl'; url: string }
+  | { type: 'history'; action: 'push' | 'replace'; url: string }
+  | { type: 'history'; action: 'back' | 'forward'; url?: undefined };
 
 /**
  * The shell's services, as a store components can inject.

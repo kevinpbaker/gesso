@@ -9,6 +9,7 @@ import {
 } from './RenderWorkerProtocol';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { observeReducedMotion } from '../reducedMotion';
+import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
 
 export interface WorkerAppOptions {
   /**
@@ -81,6 +82,16 @@ export interface WorkerAppOptions {
    * app's own KeyDown listener claimed.
    */
   interceptFind?: boolean;
+  /**
+   * How the app's url is kept, for an app with routes: `path`
+   * (pushState, the default), `hash`, or `memory`. See `shellHistory`.
+   *
+   * The shell's half of routing is this and nothing else. It holds no
+   * routes, resolves nothing, and could not — a route names a
+   * component class, which never leaves the worker. It reports the url
+   * the window is at and performs the pushes the worker asks for.
+   */
+  history?: ShellHistoryOptions;
 }
 
 /**
@@ -104,6 +115,7 @@ export class WorkerApp {
   private resizeObserver: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
   private proxy: EditingProxy | null = null;
+  private history: ShellHistory | null = null;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -182,6 +194,7 @@ export class WorkerApp {
     );
 
     this.observeResize(element);
+    this.attachHistory();
     this.detachInput = this.attachInput(canvas);
     // The hidden textarea that turns keystrokes into text for the
     // worker. It has DOM focus while the worker reports a focused
@@ -230,6 +243,8 @@ export class WorkerApp {
   dispose(): void {
     this.proxy?.dispose();
     this.proxy = null;
+    this.history?.dispose();
+    this.history = null;
     this.detachInput?.();
     this.detachInput = null;
     this.resizeObserver?.disconnect();
@@ -296,8 +311,44 @@ export class WorkerApp {
     }
     if (message.type === 'openUrl') {
       window.open(message.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (message.type === 'history') {
+      this.applyHistory(message.action, message.url);
     }
   };
+
+  /**
+   * Reports the window's address to the worker, and keeps reporting it.
+   *
+   * Sent once at start-up as well as on change, for the same reason
+   * `reducedMotion` is: an app opened directly at a url must start on
+   * the screen that url names, not on its root.
+   */
+  private attachHistory(): void {
+    const history = createShellHistory(this.options.history);
+    this.history = history;
+    history.onChange(url => this.post({ type: 'url', url }));
+    this.post({ type: 'url', url: history.url });
+  }
+
+  private applyHistory(action: 'push' | 'replace' | 'back' | 'forward', url?: string): void {
+    const history = this.history;
+    if (history === null) {
+      return;
+    }
+    if (action === 'back') {
+      history.back();
+    } else if (action === 'forward') {
+      history.forward();
+    } else if (url !== undefined) {
+      if (action === 'push') {
+        history.push(url);
+      } else {
+        history.replace(url);
+      }
+    }
+  }
 
   private post(message: ShellToRuntimeMessage): void {
     // A backstop only. An input forwarded from a DOM event carries the

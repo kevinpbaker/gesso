@@ -47,6 +47,25 @@ export {
 } from './app/GessoRuntime';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellService, type ShellRequest } from './app/ShellService';
+export { RouterService, type RouteMatch, type RouterHistorySink, type RouterRoutes } from './router/RouterService';
+export { RouterOutlet } from './router/RouterOutlet';
+export {
+  route,
+  to,
+  type OutletProps,
+  type RouteContext,
+  type RouteDefinition,
+  type RouteGuard,
+  type RouteOptions,
+  type RouteTarget
+} from './router/RouteDefinition';
+export { buildPath, formatUrl, parseUrl, type RouteParams } from './router/RoutePath';
+export {
+  createShellHistory,
+  type ShellHistory,
+  type ShellHistoryMode,
+  type ShellHistoryOptions
+} from './app/shellHistory';
 export {
   AnimationService,
   type AnimateOptions,

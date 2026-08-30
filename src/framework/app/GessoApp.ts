@@ -5,11 +5,14 @@ import type { CanvasHost } from '../../ui/rendering';
 import { UiAnimationFrameClock } from '../../ui/scheduler';
 import type { UiFrameClockFactory } from '../../ui/scheduler';
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
+import type { ShellRequest } from './ShellService';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { observeReducedMotion } from './reducedMotion';
+import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
+import type { RouterRoutes } from '../router/RouterService';
 
 export interface GessoAppOptions {
   host: HTMLElement;
@@ -17,6 +20,13 @@ export interface GessoAppOptions {
   /** A registry built elsewhere, when some stores live in data workers. */
   services?: ServiceRegistry;
   channels?: ChannelRegistry;
+  /** The routes a `RouterOutlet` in the tree resolves against. */
+  routes?: RouterRoutes;
+  /**
+   * How the app's url is kept: `path` (pushState, the default in a
+   * browser), `hash`, or `memory`. See `shellHistory`.
+   */
+  history?: ShellHistoryOptions;
   canvas?: CanvasHost;
   /** The rendering backend; see RendererChoice. Defaults to `canvas2d`. */
   renderer?: RendererChoice;
@@ -49,10 +59,12 @@ export class GessoApp {
   private readonly host: HTMLElement;
   private readonly inputEnabled: boolean;
   private readonly adapter: UiPlatformAdapter;
+  private readonly historyOptions: ShellHistoryOptions | undefined;
 
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
   private proxy: EditingProxy | null = null;
+  private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
   private detachReducedMotion: (() => void) | null = null;
 
@@ -60,6 +72,7 @@ export class GessoApp {
     this.host = options.host;
     this.canvas = options.canvas ?? createCanvasElement();
     this.inputEnabled = options.input ?? true;
+    this.historyOptions = options.history;
 
     this.runtime = new GessoRuntime({
       root: options.root,
@@ -67,6 +80,7 @@ export class GessoApp {
       renderer: options.renderer,
       services: options.services,
       channels: options.channels,
+      routes: options.routes,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
       dpr: devicePixelRatio()
     });
@@ -119,6 +133,7 @@ export class GessoApp {
     const box = isCanvasElement(this.canvas) ? measure(this.canvas, this.host) : undefined;
     this.resize(box?.width ?? this.canvas.width ?? 600, box?.height ?? this.canvas.height ?? 600);
     this.attachInput();
+    this.attachHistory();
     this.runtime.onCursor(cursor => {
       if (isCanvasElement(this.canvas)) {
         this.canvas.style.cursor = cursor ?? '';
@@ -175,6 +190,8 @@ export class GessoApp {
     this.detachVisibility = null;
     this.detachReducedMotion?.();
     this.detachReducedMotion = null;
+    this.history?.dispose();
+    this.history = null;
     this.adapter.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
@@ -209,19 +226,52 @@ export class GessoApp {
     });
     this.runtime.setTextInputSource('proxy');
     this.runtime.onEditingState(state => this.proxy?.update(state));
-    this.runtime.onShellRequest(request => {
-      if (request.type === 'clipboard') {
-        writeClipboard(request.text, canvas.ownerDocument);
-      } else {
-        canvas.ownerDocument.defaultView?.open(request.url, '_blank', 'noopener,noreferrer');
-      }
-    });
     if (typeof document !== 'undefined') {
       const onVisibility = (): void => this.runtime.setVisible(document.visibilityState !== 'hidden');
       document.addEventListener('visibilitychange', onVisibility);
       this.detachVisibility = () => document.removeEventListener('visibilitychange', onVisibility);
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
+  }
+
+  /**
+   * Connects the router to the window's address bar.
+   *
+   * Outside `attachInput` deliberately: an app mounted with
+   * `input: false` — a test, a headless render — still routes, and a
+   * router that silently stopped syncing in that configuration would
+   * be a difference between the two hosts that nothing declared.
+   */
+  private attachHistory(): void {
+    const history = createShellHistory(this.historyOptions);
+    this.history = history;
+    this.runtime.onShellRequest(request => this.handleShellRequest(request, history));
+    history.onChange(url => this.runtime.setUrl(url));
+    this.runtime.setUrl(history.url);
+  }
+
+  private handleShellRequest(request: ShellRequest, history: ShellHistory): void {
+    if (request.type === 'history') {
+      if (request.action === 'push') {
+        history.push(request.url);
+      } else if (request.action === 'replace') {
+        history.replace(request.url);
+      } else if (request.action === 'back') {
+        history.back();
+      } else {
+        history.forward();
+      }
+      return;
+    }
+    if (!isCanvasElement(this.canvas)) {
+      // No document to write a clipboard through or open a window from.
+      return;
+    }
+    if (request.type === 'clipboard') {
+      writeClipboard(request.text, this.canvas.ownerDocument);
+      return;
+    }
+    this.canvas.ownerDocument.defaultView?.open(request.url, '_blank', 'noopener,noreferrer');
   }
 
   private observeResize(): void {

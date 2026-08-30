@@ -70,6 +70,18 @@ export type ShellToRuntimeMessage =
    * key.
    */
   | { type: 'reducedMotion'; reduced: boolean }
+  /**
+   * Where the window's address is now: once at start-up, and again for
+   * every back, forward or typed address afterwards.
+   *
+   * The second preference-shaped message on this protocol, and for the
+   * same reason as `reducedMotion`: `location` and `history` are the
+   * shell's and the routes are in here. A url is the whole of what
+   * routing puts on the wire — patterns, params, guards and screens
+   * never leave the render thread, because a route holds a component
+   * class and a component class cannot be posted anywhere.
+   */
+  | { type: 'url'; url: string }
   | { type: 'inspector'; enabled: boolean }
   | { type: 'dispose' };
 
@@ -108,7 +120,9 @@ export type RuntimeToShellMessage =
   /** Put text on the clipboard (ShellService.copyText). */
   | { type: 'clipboard'; text: string }
   /** Open a URL in a new tab (ShellService.openUrl). */
-  | { type: 'openUrl'; url: string };
+  | { type: 'openUrl'; url: string }
+  /** The router navigated; the shell owns the address bar (RouterService). */
+  | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string };
 
 /**
  * The set of shell messages that carry a user input.

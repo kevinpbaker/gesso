@@ -32,6 +32,7 @@ import { UiEditingController, type EditingState } from '../../ui/input/UiEditing
 import { UiSelectionController } from '../../ui/selection/UiSelectionController';
 import { UiFindController } from '../../ui/find/UiFindController';
 import { ShellService, type ShellRequest } from './ShellService';
+import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
 import { FocusService } from './FocusService';
 import { MediaService } from './MediaService';
@@ -168,6 +169,17 @@ export interface GessoRuntimeOptions {
    * runtime *is* rather than something an application configures.
    */
   services?: ServiceRegistry;
+  /**
+   * The routes a `RouterOutlet` in this tree resolves against.
+   *
+   * Optional, like every other application-shaped thing here: a
+   * runtime with no routes still registers a `RouterService`, and it
+   * simply matches nothing. Given here rather than set afterwards for
+   * the same reason `media` is — the tree is built inside this
+   * constructor, and an outlet in it asks for the current match at
+   * that moment.
+   */
+  routes?: RouterRoutes;
   /**
    * The channels this runtime's components may reach.
    *
@@ -401,6 +413,23 @@ export class GessoRuntime {
       this.services.register(AnimationService);
     }
     this.services.get(AnimationService).setDriver(this.animations);
+    // And the router, whose matches hold route definitions, which hold
+    // component classes: it could not cross a worker boundary if it
+    // wanted to. The one thing it needs from the shell is the address
+    // bar, which it reaches the same way the clipboard does.
+    if (!this.services.has(RouterService)) {
+      this.services.register(RouterService);
+    }
+    const router = this.services.get(RouterService);
+    router.setHistory({
+      push: url => this.shellListener?.({ type: 'history', action: 'push', url }),
+      replace: url => this.shellListener?.({ type: 'history', action: 'replace', url }),
+      back: () => this.shellListener?.({ type: 'history', action: 'back' }),
+      forward: () => this.shellListener?.({ type: 'history', action: 'forward' })
+    });
+    if (options.routes !== undefined) {
+      router.setRoutes(options.routes);
+    }
     if (options.media?.resolver !== undefined) {
       this.services.get(MediaService).setResolver(options.media.resolver);
     }
@@ -682,6 +711,18 @@ export class GessoRuntime {
     this.services.get(AnimationService).applyReducedMotion(reduced);
   }
 
+  /**
+   * The window's address, as the shell reports it: once at start-up,
+   * and again for every back, forward or typed address.
+   *
+   * Guards run on it — a url the person typed is the navigation a
+   * guard exists for — so a refused url is corrected back through the
+   * history sink rather than shown.
+   */
+  setUrl(url: string): void {
+    this.services.get(RouterService).applyUrl(url);
+  }
+
   /** Whether the runtime is currently honouring a reduced-motion preference. */
   get reducedMotion(): boolean {
     return this.animations.isReducedMotion;
@@ -767,6 +808,7 @@ export class GessoRuntime {
     this.services.get(AnimationService).setDriver(null);
     this.services.get(FindService).setController(null);
     this.services.get(FocusService).setManager(null);
+    this.services.get(RouterService).setHistory(null);
     // Decoded bitmaps hold pixels; garbage collection is not prompt
     // about them, so they are closed rather than dropped.
     this.services.get(MediaService).dispose();

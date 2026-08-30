@@ -12,6 +12,7 @@ import type { ChannelToken } from '../../channel/ChannelToken';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
+import type { RouterRoutes } from '../../router/RouterService';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
@@ -46,6 +47,7 @@ export function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerAp
 export class RenderWorkerApp {
   private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly serviceRegistrations: (new () => object)[] = [];
+  private routes: RouterRoutes | undefined;
   private readonly root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
@@ -97,6 +99,24 @@ export class RenderWorkerApp {
    */
   useService(ServiceClass: new () => object): this {
     this.serviceRegistrations.push(ServiceClass);
+    return this;
+  }
+
+  /**
+   * Declares the app's routes, which is all it takes to make a
+   * `RouterOutlet` in the tree resolve them.
+   *
+   *   renderRoot(AppRoot).useRoutes({ routes: ROUTES, notFound: NotFound });
+   *
+   * They are declared here, in the render worker, because a route
+   * holds a component class. The shell never sees one; the only thing
+   * that crosses is the url.
+   */
+  useRoutes(routes: RouterRoutes): this {
+    if (this.runtime !== undefined) {
+      throw new Error('Routes were registered after the runtime started.');
+    }
+    this.routes = routes;
     return this;
   }
 
@@ -183,6 +203,9 @@ export class RenderWorkerApp {
       case 'reducedMotion':
         runtime.setReducedMotion(message.reduced);
         break;
+      case 'url':
+        runtime.setUrl(message.url);
+        break;
       case 'visibility':
         runtime.setVisible(message.visible);
         break;
@@ -250,6 +273,7 @@ export class RenderWorkerApp {
     this.runtime = new GessoRuntime({
       root: this.root,
       services,
+      routes: this.routes,
       canvas,
       renderer,
       channels: this.channels.registry,
@@ -271,9 +295,13 @@ export class RenderWorkerApp {
       this.host.postMessage({ type: 'editing', state });
     });
     this.runtime.onShellRequest(request => {
-      this.host.postMessage(
-        request.type === 'clipboard' ? { type: 'clipboard', text: request.text } : { type: 'openUrl', url: request.url }
-      );
+      if (request.type === 'clipboard') {
+        this.host.postMessage({ type: 'clipboard', text: request.text });
+      } else if (request.type === 'openUrl') {
+        this.host.postMessage({ type: 'openUrl', url: request.url });
+      } else {
+        this.host.postMessage({ type: 'history', action: request.action, url: request.url });
+      }
     });
     this.runtime.onRendererError(message => {
       this.host.postMessage({ type: 'error', message: `renderer: ${message}` });
