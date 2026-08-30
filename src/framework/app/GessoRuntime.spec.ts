@@ -9,10 +9,10 @@ import { channel } from '../channel/ChannelToken';
 import type { ChannelPort } from '../channel/ChannelProtocol';
 import { UiEnvironmentKeys } from '../../ui/environment/UiEnvironmentKeys';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import { NodalRuntime } from './NodalRuntime';
+import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas, mountRuntime } from './RuntimeTestUtils';
 
-describe('NodalRuntime frame pipeline', () => {
+describe('GessoRuntime frame pipeline', () => {
   it('propagates environment to descendants when a provider property changes', () => {
     // The environment phase has to run before the frame's dirty set is
     // collected. Run after, it saw an already-drained set, so a theme
@@ -20,7 +20,7 @@ describe('NodalRuntime frame pipeline', () => {
     const contentColor$ = new BehaviorSubject('#ff0000');
     let clock!: UiManualFrameClock;
 
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root: Column({ contentColor: contentColor$ }, Text({ text: 'hello' })),
       canvas: mockCanvas(800, 600),
       width: 800,
@@ -152,11 +152,11 @@ describe('NodalRuntime frame pipeline', () => {
   });
 });
 
-describe('NodalRuntime layout inspector', () => {
+describe('GessoRuntime layout inspector', () => {
   function mountInspectable() {
     let clock!: UiManualFrameClock;
     const canvas = mockCanvas(800, 600);
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root: Column({ padding: 10 }, Box({ width: 200, height: 100, padding: 4 }, Text({ text: 'inside' }))),
       canvas,
       width: 800,
@@ -210,11 +210,11 @@ describe('NodalRuntime layout inspector', () => {
   });
 });
 
-describe('NodalRuntime cursor', () => {
+describe('GessoRuntime cursor', () => {
   function mountWithCursor() {
     let clock!: UiManualFrameClock;
     const cursorProp = new BehaviorSubject<UiCursor | undefined>(undefined);
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       // A button that sets the cursor, with a label that inherits it, and a
       // plain box beside it that sets none.
       root: Row(

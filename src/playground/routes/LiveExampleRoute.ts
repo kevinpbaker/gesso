@@ -50,7 +50,7 @@ export function mountLiveExampleRoute(host: HTMLElement): () => void {
     },
     onError: (message, stack) => {
       shell.setStatus(`Render worker error: ${message}`);
-      console.error('[nodal live example]', message, stack);
+      console.error('[gesso live example]', message, stack);
     }
   });
   shell.setStatus('Source: src/playground/examples/LiveExampleApp.tsx — try the rate buttons and the spike.');

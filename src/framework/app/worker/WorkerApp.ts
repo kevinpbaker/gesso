@@ -1,4 +1,4 @@
-import type { FrameMetrics, RendererChoice } from '../NodalRuntime';
+import type { FrameMetrics, RendererChoice } from '../GessoRuntime';
 import {
   epochFromEvent,
   epochNow,
@@ -75,14 +75,14 @@ export interface WorkerAppOptions {
    *
    * A flag rather than something the runtime decides, because the
    * worker's answer cannot come back in time to cancel a default —
-   * unlike `NodalApp`, where the platform adapter cancels whatever the
+   * unlike `GessoApp`, where the platform adapter cancels whatever the
    * app's own KeyDown listener claimed.
    */
   interceptFind?: boolean;
 }
 
 /**
- * Main-thread half of a worker-hosted Nodal application.
+ * Main-thread half of a worker-hosted Gesso application.
  *
  * Owns nothing but the canvas element and the event plumbing. It
  * creates the canvas, hands its drawing surface to the worker as an
@@ -160,7 +160,7 @@ export class WorkerApp {
       // end afterwards, so it cannot be in the way of a patch even by
       // accident.
       const hub = new MessageChannel();
-      application.postMessage({ type: 'nodal:hub' }, [hub.port2]);
+      application.postMessage({ type: 'gesso:hub' }, [hub.port2]);
       appPort = hub.port1;
       transfer.push(hub.port1);
     }
@@ -268,7 +268,7 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'error') {
-      const report = this.options.onError ?? ((text, stack) => console.error(`[nodal render worker] ${text}`, stack));
+      const report = this.options.onError ?? ((text, stack) => console.error(`[gesso render worker] ${text}`, stack));
       report(message.message, message.stack);
       return;
     }

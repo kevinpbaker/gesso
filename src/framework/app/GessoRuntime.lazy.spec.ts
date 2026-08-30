@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { NodalRuntime } from './NodalRuntime';
+import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 import { LazyColumn, Row, Text } from '../../ui/composition';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -22,11 +22,11 @@ function countNodes(root: UiNode, type: UiNodeType): number {
  * nodes, scrolling changes which ones, and the phase profile shows
  * virtualization doing its work before layout.
  */
-describe('NodalRuntime lazy lists', () => {
+describe('GessoRuntime lazy lists', () => {
   function mount(rows: number | BehaviorSubject<number> = 100000, revision?: BehaviorSubject<unknown>) {
     let clock!: UiManualFrameClock;
     const renders: number[] = [];
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root: LazyColumn(
         { height: 200, count: rows, estimatedExtent: 20, overscan: 2, initialViewportExtent: 200, revision },
         index => {

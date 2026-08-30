@@ -1,7 +1,7 @@
 import { getComponentMetadata } from './metadata';
 
 /**
- * Declares a class as a Nodal component.
+ * Declares a class as a Gesso component.
  *
  * The tag is used for debugging and identity; it does not create
  * a DOM element.

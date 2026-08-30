@@ -15,7 +15,7 @@ import expectedJson from './expected.json?raw';
 
 /**
  * Chrome lays out in 1/64 px units and rounds when distributing
- * fractional free space; Nodal computes in floats. Anything under a
+ * fractional free space; Gesso computes in floats. Anything under a
  * tenth of a pixel is agreement.
  */
 const TOLERANCE = 0.1;
@@ -45,7 +45,7 @@ describe('LayoutEngine conformance with Chrome', () => {
       continue;
     }
     const run = () => {
-      const actual = layoutWithNodal(layoutCase);
+      const actual = layoutWithGesso(layoutCase);
       const mismatches = compare(actual, expected.boxes);
       if (mismatches.length > 0) {
         throw new Error(
@@ -65,7 +65,7 @@ describe('LayoutEngine conformance with Chrome', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Nodal side
+// Gesso side
 // ---------------------------------------------------------------------------
 
 const NODE_TYPES: Record<CaseNode['type'], UiNodeType> = {
@@ -86,7 +86,7 @@ function measurerFor(layoutCase: LayoutCase): CharacterCountTextMeasurer {
     : new CharacterCountTextMeasurer();
 }
 
-function layoutWithNodal(layoutCase: LayoutCase): MeasuredBox[] {
+function layoutWithGesso(layoutCase: LayoutCase): MeasuredBox[] {
   const harness = new LayoutHarness(measurerFor(layoutCase));
   const paths = new Map<UiNode, string>();
   const root = buildNode(harness, layoutCase.root, 'root', paths);
@@ -138,11 +138,11 @@ function compare(actual: readonly MeasuredBox[], expected: readonly MeasuredBox[
       key => Math.abs(box[key] - reference[key]) > TOLERANCE
     );
     if (differing.length > 0) {
-      lines.push(`  ${box.path}: nodal ${format(box)} vs chrome ${format(reference)}  (${differing.join(', ')})`);
+      lines.push(`  ${box.path}: gesso ${format(box)} vs chrome ${format(reference)}  (${differing.join(', ')})`);
     }
   }
   if (actual.length !== expected.length) {
-    lines.push(`  box count: nodal ${actual.length} vs chrome ${expected.length}`);
+    lines.push(`  box count: gesso ${actual.length} vs chrome ${expected.length}`);
   }
   return lines;
 }

@@ -12,7 +12,7 @@ import { SignIn } from './signin/SignInContract';
  * text field, a keypad, six dots, and unambiguous states — checking,
  * wrong code, locked out, signed in. It is written entirely in JSX as
  * functional components over one store, and runs in the render worker
- * like any other Nodal app. There is no text input yet (roadmap F2),
+ * like any other Gesso app. There is no text input yet (roadmap F2),
  * which is also why a passcode rather than a password: everything here
  * is pointer-operable today.
  *

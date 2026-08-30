@@ -62,7 +62,7 @@ export class OpfsNotesRepository implements NotesRepository {
    */
   constructor(
     private readonly seed: readonly Note[],
-    private readonly fileName = 'nodal-notes.json'
+    private readonly fileName = 'gesso-notes.json'
   ) {
     // Starts empty rather than seeded. Seeding here and then replacing
     // on load would show the person a notebook that is about to be

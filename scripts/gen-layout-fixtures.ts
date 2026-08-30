@@ -41,7 +41,7 @@ if (duplicate !== undefined) {
   throw new Error(`Two layout cases are named '${duplicate}'.`);
 }
 
-const workDir = mkdtempSync(join(tmpdir(), 'nodal-layout-fixtures-'));
+const workDir = mkdtempSync(join(tmpdir(), 'gesso-layout-fixtures-'));
 try {
   const pagePath = join(workDir, 'cases.html');
   writeFileSync(pagePath, casesToHtml(layoutCases, { ahemFontDataUri: `data:font/truetype;base64,${ahem}` }));

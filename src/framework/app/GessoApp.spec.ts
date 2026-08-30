@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
-import { NodalApp } from './NodalApp';
+import { GessoApp } from './GessoApp';
 import { ServiceRegistry } from '../service/ServiceRegistry';
 import { internalState } from '../InternalState';
 import { Box, Column, Text } from '../../ui/composition/UiComponents';
@@ -164,13 +164,13 @@ function collectText(node: UiNode, into: string[] = []): string[] {
   return into;
 }
 
-describe('NodalApp', () => {
+describe('GessoApp', () => {
   it('mounts a component and resolves an injected service', () => {
     const host = createMockHost();
     const canvas = createMockCanvas();
     const services = new ServiceRegistry();
     services.register(CounterService);
-    const app = new NodalApp({
+    const app = new GessoApp({
       host,
       root: createComponent(CounterView),
       services,
@@ -191,7 +191,7 @@ describe('NodalApp', () => {
     const services = new ServiceRegistry();
     services.register(CounterService);
 
-    const app = new NodalApp({
+    const app = new GessoApp({
       host: createMockHost(),
       canvas: createMockCanvas(),
       root: createComponent(ListRoot),
@@ -217,7 +217,7 @@ describe('NodalApp', () => {
   });
 
   it('routes a real click through hit-testing into a component handler', () => {
-    const app = new NodalApp({
+    const app = new GessoApp({
       host: createMockHost(),
       canvas: createMockCanvas(),
       root: createComponent(ClickCounter),
@@ -268,7 +268,7 @@ describe('NodalApp', () => {
     function mountWithManualClock() {
       let clock: UiManualFrameClock | undefined;
       const canvas = createMockCanvas();
-      const app = new NodalApp({
+      const app = new GessoApp({
         host: createMockHost(),
         canvas,
         root: createComponent(ClickCounter),

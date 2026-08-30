@@ -1,7 +1,7 @@
 /**
  * What a node means, as opposed to what it looks like.
  *
- * A canvas has no DOM, so nothing about a Nodal tree is visible to a
+ * A canvas has no DOM, so nothing about a Gesso tree is visible to a
  * screen reader unless the tree says what it is. These properties are
  * that statement: they are read by the semantics phase, diffed per
  * frame, and (roadmap F6b) mirrored into an off-screen DOM the

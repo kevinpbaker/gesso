@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from '../framework/createComponent';
 import { mountRuntime } from '../framework/app/RuntimeTestUtils';
-import type { NodalRuntime } from '../framework/app/NodalRuntime';
+import type { GessoRuntime } from '../framework/app/GessoRuntime';
 import { Box, Text } from '../ui/composition/UiComponents';
 import { UiEnvironmentKeys } from '../ui/environment/UiEnvironmentKeys';
 import { darkTheme } from '../ui/environment/UiTheme';
@@ -17,7 +17,7 @@ import { LazyList } from './LazyList';
 import { Tree, type TreeNode } from './Tree';
 
 /** Every node under the root, in document order. */
-function nodes(runtime: NodalRuntime): UiNode[] {
+function nodes(runtime: GessoRuntime): UiNode[] {
   const result: UiNode[] = [];
   const visit = (node: UiNode): void => {
     result.push(node);
@@ -29,11 +29,11 @@ function nodes(runtime: NodalRuntime): UiNode[] {
   return result;
 }
 
-function byRole(runtime: NodalRuntime, role: string): UiNode[] {
+function byRole(runtime: GessoRuntime, role: string): UiNode[] {
   return nodes(runtime).filter(candidate => candidate.properties.get('role') === role);
 }
 
-function records(runtime: NodalRuntime, role: string): UiSemanticsRecord[] {
+function records(runtime: GessoRuntime, role: string): UiSemanticsRecord[] {
   return [...runtime.semanticsTree().values()].filter(record => record.role === role);
 }
 

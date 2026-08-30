@@ -6,7 +6,7 @@ import { TEXT_GLYPH_WIDTH_FACTOR, TEXT_LINE_HEIGHT_FACTOR, DEFAULT_CASE_FONT_SIZ
  * can render, and whose script reports every box relative to its
  * case's viewport.
  *
- * The mapping is deliberately literal — Nodal borrowed CSS names, so
+ * The mapping is deliberately literal — Gesso borrowed CSS names, so
  * `flexGrow` is `flex-grow` and `gap` is `gap`, and since roadmap item
  * L3 the defaults match too: cross-axis `stretch`, automatic minimum
  * size. The one deliberate difference left is that a stack (grid here)
@@ -19,13 +19,13 @@ import { TEXT_GLYPH_WIDTH_FACTOR, TEXT_LINE_HEIGHT_FACTOR, DEFAULT_CASE_FONT_SIZ
  *             around text without depending on a font.
  *   'ahem'  — real text in the Ahem font, whose every glyph is a 1em
  *             square with ascent 0.8 and descent 0.2. Chrome wraps,
- *             clamps and baseline-aligns it for real; the Nodal side
+ *             clamps and baseline-aligns it for real; the Gesso side
  *             measures with `glyphWidth: 1`.
  *
- * Borders are never emitted: `borderWidth` is paint-only in Nodal.
+ * Borders are never emitted: `borderWidth` is paint-only in Gesso.
  */
 
-export const RESULT_START = '@@NODAL-LAYOUT-FIXTURES@@';
+export const RESULT_START = '@@GESSO-LAYOUT-FIXTURES@@';
 export const RESULT_END = '@@END@@';
 
 export interface MeasuredBox {
@@ -102,7 +102,7 @@ function reportScript(): string {
 (function () {
   function round(value) { return Math.round(value * 1000) / 1000; }
   function report() {
-    // Scroll containers the case scrolled: Chrome clamps like Nodal does.
+    // Scroll containers the case scrolled: Chrome clamps like Gesso does.
     var scrolled = document.querySelectorAll('[data-scroll-x],[data-scroll-y]');
     for (var s = 0; s < scrolled.length; s++) {
       var sx = scrolled[s].getAttribute('data-scroll-x');
@@ -189,7 +189,7 @@ function containerStyles(node: CaseNode): string[] {
         'flex-direction:column',
         `justify-content:${mainAlignment(props.y)}`,
         // Baseline alignment has no meaning along a column's cross axis;
-        // Nodal treats it as start, as CSS does.
+        // Gesso treats it as start, as CSS does.
         `align-items:${crossAlignment(props.x === 'baseline' ? 'start' : props.x)}`,
         ...gapStyles(node),
         ...flexContainerStyles(node)
@@ -200,7 +200,7 @@ function containerStyles(node: CaseNode): string[] {
       }
       // A stack: every child in the same cell, aligned by x / y. One fr
       // track fills a definite box and shrink-wraps an auto one, and
-      // grid honours margins and per-child self alignment like Nodal.
+      // grid honours margins and per-child self alignment like Gesso.
       return [
         'display:grid',
         'grid-template-columns:1fr',
@@ -272,7 +272,7 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   if (props.overflow !== undefined) {
     styles.push(`overflow:${props.overflow}`);
     if (props.overflow === 'scroll' || props.overflow === 'auto') {
-      // Nodal's scrollbars are overlays; classic ones would take layout space.
+      // Gesso's scrollbars are overlays; classic ones would take layout space.
       styles.push('scrollbar-width:none');
     }
   }
@@ -294,7 +294,7 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
     styles.push(`flex-shrink:${props.flexShrink}`);
   }
   // `flex` first: an explicit flexBasis wins over the shorthand's 0 in
-  // Nodal, and in CSS the later declaration wins.
+  // Gesso, and in CSS the later declaration wins.
   if (props.flex !== undefined) {
     styles.push(`flex:${props.flex}`);
   }
@@ -304,7 +304,7 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
   if (props.aspectRatio !== undefined) {
     styles.push(`aspect-ratio:${props.aspectRatio}`);
   }
-  // Nodal reads only the cross-axis self alignment: selfY under a row,
+  // Gesso reads only the cross-axis self alignment: selfY under a row,
   // selfX under a column. The main-axis one has no CSS equivalent.
   if (parent !== null) {
     const self = parent.type === 'row' ? props.selfY : parent.type === 'column' ? props.selfX : undefined;
@@ -323,7 +323,7 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
 
 /**
  * Explicit size, min/max, padding, and the text model. When `rootCase`
- * is given the node is the layout root and, like Nodal's
+ * is given the node is the layout root and, like Gesso's
  * computeRootBox, fills the viewport on any axis without an explicit
  * size.
  */
@@ -336,7 +336,7 @@ function sizeStyles(node: CaseNode, rootCase: LayoutCase | null, layoutCase: Lay
   }
 
   if (rootCase !== null && props.position === undefined) {
-    // Nodal's fallback containing block is the layout root; the case
+    // Gesso's fallback containing block is the layout root; the case
     // viewport would be CSS's. Make the root the block in both.
     styles.push('position:relative');
   }
@@ -385,7 +385,7 @@ function fixedTextSpanStyles(node: CaseNode): string[] {
 }
 
 /**
- * Real text for 'ahem' cases. Nodal's text props map onto the CSS
+ * Real text for 'ahem' cases. Gesso's text props map onto the CSS
  * that Chrome wraps, clamps and truncates with.
  */
 function ahemTextStyles(node: CaseNode): string[] {
@@ -484,7 +484,7 @@ function gridAlignment(value: Alignment | undefined): string {
   }
 }
 
-/** Cross alignment; the unset default is stretch, as in CSS and Nodal. */
+/** Cross alignment; the unset default is stretch, as in CSS and Gesso. */
 function crossAlignment(value: Alignment | undefined): string {
   switch (value) {
     case 'start':

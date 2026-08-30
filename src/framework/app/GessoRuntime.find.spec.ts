@@ -9,7 +9,7 @@ import type { UiNode } from '../../ui/graph/UiNode';
 import { UiNodeType } from '../../ui/graph/UiNodeType';
 import { UiManualFrameClock } from '../../ui/scheduler';
 import { FindService } from './FindService';
-import { NodalRuntime } from './NodalRuntime';
+import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 
 /** 7px per character, so an offset's x is 7 × offset in the default 14px font. */
@@ -18,7 +18,7 @@ const ctrl = (): UiKeyModifiers => ({ ...noKeyModifiers(), ctrl: true });
 
 function mount(root: UiElement) {
   let clock!: UiManualFrameClock;
-  const runtime = new NodalRuntime({
+  const runtime = new GessoRuntime({
     root,
     canvas: mockCanvas(800, 600),
     width: 800,
@@ -61,7 +61,7 @@ const page = (): UiElement =>
     Text({ text: 'nothing here' })
   );
 
-describe('NodalRuntime find', () => {
+describe('GessoRuntime find', () => {
   it('opens and closes a session on the platform shortcut', () => {
     const { find, store, key } = mount(page());
     expect(find.isOpen).toBe(false);

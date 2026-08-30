@@ -250,9 +250,9 @@ describe('ComponentHostResolver', () => {
     it('supplies input values to the component instance', () => {
       const { builder } = createHarness();
 
-      const anchor = builder.build(createComponent(Greeting, { name: 'Nodal' }));
+      const anchor = builder.build(createComponent(Greeting, { name: 'Gesso' }));
 
-      expect(getChildren(anchor)[0].getProperty('text')).toBe('Hello Nodal');
+      expect(getChildren(anchor)[0].getProperty('text')).toBe('Hello Gesso');
     });
 
     it('passes observable inputs through to node bindings', () => {

@@ -1,7 +1,7 @@
 /**
  * Layout conformance cases.
  *
- * Each case is a small tree written in Nodal's own vocabulary. The
+ * Each case is a small tree written in Gesso's own vocabulary. The
  * same definition is translated two ways:
  *
  *   - into HTML/CSS, rendered by headless Chrome to produce the
@@ -14,8 +14,8 @@
  * other non-erasable syntax from the rest of the runtime.
  *
  * Property names mirror CSS on purpose, so the translation table in
- * `toHtml.ts` is short. Where Nodal's *defaults* differ from CSS
- * (cross-axis `start`, minimum size 0) the translator encodes Nodal's
+ * `toHtml.ts` is short. Where Gesso's *defaults* differ from CSS
+ * (cross-axis `start`, minimum size 0) the translator encodes Gesso's
  * current behaviour explicitly; those deltas are listed there and are
  * what roadmap item L3 removes.
  */
@@ -72,7 +72,7 @@ export type TextOverflow = 'clip' | 'ellipsis';
  *             (0.6em per glyph, 1.2em per line). Tests box algebra.
  *   'ahem'  — real text in the Ahem font, whose glyphs are 1em squares
  *             (ascent 0.8, descent 0.2). Tests wrapping and baselines;
- *             the Nodal side measures with `glyphWidth: 1`.
+ *             the Gesso side measures with `glyphWidth: 1`.
  */
 export type CaseFont = 'fixed' | 'ahem';
 
@@ -154,7 +154,7 @@ export interface LayoutCase {
   /** Default 'fixed'. */
   readonly font?: CaseFont;
   /**
-   * Set when Nodal is known to disagree with Chrome. The spec then
+   * Set when Gesso is known to disagree with Chrome. The spec then
    * expects the comparison to fail, so fixing the engine surfaces as a
    * test that must have its divergence note removed.
    */
@@ -348,7 +348,7 @@ export const layoutCases: readonly LayoutCase[] = [
     column({ x: 'start' }, row({}, box({ height: 20, flexBasis: 90 }), box({ height: 20, flexBasis: 60 }))),
     {
       divergence:
-        "Nodal counts flex-basis toward a shrink-wrapped container's size; Chrome sizes the container from item content and ignores flex-basis (browsers disagree with each other here)."
+        "Gesso counts flex-basis toward a shrink-wrapped container's size; Chrome sizes the container from item content and ignores flex-basis (browsers disagree with each other here)."
     }
   ),
   testCase('basis/column', column({}, box({ width: 40, flexBasis: 70 }), leaf(40, 20))),

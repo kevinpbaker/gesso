@@ -1,5 +1,5 @@
 /**
- * `@nodal/components` — the component library.
+ * `@gesso/components` — the component library.
  *
  * Every control here follows one contract (`COMPONENTS_ROADMAP.md` §2):
  * controlled by default with an optional `defaultX` that makes it
@@ -8,7 +8,7 @@
  * data, and emitting `role`, `label`, `value` and `states` from the day
  * it was written.
  *
- * It may import `@nodal/core` (`src/ui`) and `@nodal/framework`
+ * It may import `@gesso/core` (`src/ui`) and `@gesso/framework`
  * (`src/framework`), never the playground.
  */
 export { Checkbox, type CheckboxProps } from './Checkbox';

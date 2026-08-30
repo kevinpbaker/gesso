@@ -1,5 +1,5 @@
 import { createApp } from '../../framework';
-import type { RendererChoice } from '../../framework/app/NodalRuntime';
+import type { RendererChoice } from '../../framework/app/GessoRuntime';
 import { DemoCounter, FrameworkDemoRoot } from '../FrameworkPlayground';
 import { Heavy } from '../HeavyWork';
 import { Ticker } from '../TickerChannel';
@@ -11,7 +11,7 @@ const BLOCK_MS = 2000;
 /** How often the reporter is allowed to touch the DOM. */
 const REPORT_INTERVAL_MS = 500;
 /** Where the chosen backend survives a reload. */
-const RENDERER_STORAGE_KEY = 'nodal.playground.renderer';
+const RENDERER_STORAGE_KEY = 'gesso.playground.renderer';
 
 interface FrameMetrics {
   durationMs: number;
@@ -67,7 +67,7 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
       onFrame: report,
       onError: (message, stack) => {
         shell.setStatus(`Render worker error: ${message}`);
-        console.error('[nodal render worker]', message, stack);
+        console.error('[gesso render worker]', message, stack);
       },
       // The explanation is computed in the worker, where the layout
       // records are; only its text crosses to this thread.

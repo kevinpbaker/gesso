@@ -101,7 +101,7 @@ export function createChannelRegistry(
       if (onError !== undefined) {
         onError(token.name, message, stack);
       } else {
-        console.error(`[nodal channel ${token.name}] ${message}`, stack);
+        console.error(`[gesso channel ${token.name}] ${message}`, stack);
       }
     });
   }

@@ -4,14 +4,14 @@ import type { UiNode } from '../../ui/graph/UiNode';
 import type { CanvasHost } from '../../ui/rendering';
 import { UiAnimationFrameClock } from '../../ui/scheduler';
 import type { UiFrameClockFactory } from '../../ui/scheduler';
-import { NodalRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './NodalRuntime';
+import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { observeReducedMotion } from './reducedMotion';
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
 
-export interface NodalAppOptions {
+export interface GessoAppOptions {
   host: HTMLElement;
   root: FrameworkChild;
   /** A registry built elsewhere, when some stores live in data workers. */
@@ -30,9 +30,9 @@ export interface NodalAppOptions {
 }
 
 /**
- * Single-thread Nodal application.
+ * Single-thread Gesso application.
  *
- * A thin DOM shell over NodalRuntime: it creates and sizes a canvas,
+ * A thin DOM shell over GessoRuntime: it creates and sizes a canvas,
  * observes the host element, and forwards browser events into the
  * runtime's input controllers. All UI work — components, graph,
  * layout, rendering — belongs to the runtime and never touches the
@@ -43,8 +43,8 @@ export interface NodalAppOptions {
  * puts UI work on the main thread and so is not the default for an
  * interactive app.
  */
-export class NodalApp {
-  private readonly runtime: NodalRuntime;
+export class GessoApp {
+  private readonly runtime: GessoRuntime;
   private readonly canvas: CanvasHost;
   private readonly host: HTMLElement;
   private readonly inputEnabled: boolean;
@@ -56,12 +56,12 @@ export class NodalApp {
   private detachVisibility: (() => void) | null = null;
   private detachReducedMotion: (() => void) | null = null;
 
-  constructor(options: NodalAppOptions) {
+  constructor(options: GessoAppOptions) {
     this.host = options.host;
     this.canvas = options.canvas ?? createCanvasElement();
     this.inputEnabled = options.input ?? true;
 
-    this.runtime = new NodalRuntime({
+    this.runtime = new GessoRuntime({
       root: options.root,
       canvas: this.canvas,
       renderer: options.renderer,
@@ -150,7 +150,7 @@ export class NodalApp {
     this.runtime.resize(width, height, devicePixelRatio());
   }
 
-  /** Turns the layout inspector on or off; see NodalRuntime.setInspectorEnabled. */
+  /** Turns the layout inspector on or off; see GessoRuntime.setInspectorEnabled. */
   setInspector(enabled: boolean): void {
     this.runtime.setInspectorEnabled(enabled);
   }

@@ -10,7 +10,7 @@ import { noKeyModifiers, type UiKeyModifiers, type UiTextChangeEvent } from '../
 import type { EditingState } from '../../ui/input/UiEditingController';
 import type { CanvasHost } from '../../ui/rendering';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import { NodalRuntime } from './NodalRuntime';
+import { GessoRuntime } from './GessoRuntime';
 
 /** 7px per character, so caret x is 7 × offset in the default 14px font. */
 function mockCanvas(): CanvasHost {
@@ -57,7 +57,7 @@ const mods = (partial: Partial<UiKeyModifiers>): UiKeyModifiers => ({ ...noKeyMo
 function mount(root: UiElement) {
   let clock!: UiManualFrameClock;
   const states: (EditingState | null)[] = [];
-  const runtime = new NodalRuntime({
+  const runtime = new GessoRuntime({
     root,
     canvas: mockCanvas(),
     width: 800,
@@ -108,7 +108,7 @@ function mount(root: UiElement) {
   return { runtime, clock, tick, states, field, model, type, key, press, find };
 }
 
-describe('NodalRuntime editing', () => {
+describe('GessoRuntime editing', () => {
   it('focuses an editable on press and places the caret at the nearest boundary', () => {
     const { runtime, field, model, press } = mount(Column(EditableText({ value: 'hello' })));
     press(7 * 2 + 3, 5);

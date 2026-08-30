@@ -3,16 +3,16 @@ import { vi } from 'vitest';
 import type { FrameworkChild } from '../ComponentElement';
 import type { CanvasHost } from '../../ui/rendering';
 import { UiManualFrameClock } from '../../ui/scheduler';
-import { NodalRuntime, type FrameMetrics, type NodalRuntimeOptions } from './NodalRuntime';
+import { GessoRuntime, type FrameMetrics, type GessoRuntimeOptions } from './GessoRuntime';
 
 /**
  * Shared harness for runtime specs.
  *
- * Every spec that drove a real `NodalRuntime` used to carry its own
+ * Every spec that drove a real `GessoRuntime` used to carry its own
  * canvas mock — eight near-identical copies of the same 7px-per-
  * character `measureText` — and its own mount helper. A component
  * library is another two dozen specs that would each need one, so the
- * harness lives here instead. `@nodal/testing` (roadmap F7) is this
+ * harness lives here instead. `@gesso/testing` (roadmap F7) is this
  * file's public successor: what is awkward to express here is the
  * feedback that shapes it.
  *
@@ -52,7 +52,7 @@ export function mockCanvas(width = 800, height = 600): MockCanvas {
 }
 
 export interface MountedRuntime {
-  readonly runtime: NodalRuntime;
+  readonly runtime: GessoRuntime;
   readonly clock: UiManualFrameClock;
   readonly canvas: MockCanvas;
   /** Frames the runtime reported, in order. */
@@ -65,9 +65,9 @@ export interface MountedRuntime {
   frame(time?: number): void;
 }
 
-export interface MountOptions extends Omit<Partial<NodalRuntimeOptions>, 'root' | 'canvas' | 'clock'> {
+export interface MountOptions extends Omit<Partial<GessoRuntimeOptions>, 'root' | 'canvas' | 'clock'> {
   /** Runs before `start()`, for listeners that must see the first frame. */
-  onCreate?: (runtime: NodalRuntime) => void;
+  onCreate?: (runtime: GessoRuntime) => void;
   /** Leave the runtime stopped; the spec calls `start()` itself. */
   start?: boolean;
 }
@@ -78,7 +78,7 @@ export function mountRuntime(root: FrameworkChild, options: MountOptions = {}): 
   const canvas = mockCanvas(rest.width ?? 800, rest.height ?? 600);
   const frames: FrameMetrics[] = [];
   let clock!: UiManualFrameClock;
-  const runtime = new NodalRuntime({
+  const runtime = new GessoRuntime({
     width: canvas.width,
     height: canvas.height,
     ...rest,

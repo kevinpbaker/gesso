@@ -18,7 +18,7 @@ export function mountExamplesRoute(host: HTMLElement): () => void {
     createElement('p', {
       className: 'pg-examples-lede',
       text:
-        'Small, complete apps that each show one way of building with Nodal. Every one runs in the render worker; ' +
+        'Small, complete apps that each show one way of building with Gesso. Every one runs in the render worker; ' +
         'the source file named on the card is the whole UI.'
     })
   );

@@ -1,10 +1,10 @@
 import type { FrameworkChild } from '../ComponentElement';
 import type { ComponentType } from '../FunctionComponent';
-import { NodalAppBuilder } from './NodalAppBuilder';
+import { GessoAppBuilder } from './GessoAppBuilder';
 import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
 
 /**
- * Creates a Nodal application.
+ * Creates a Gesso application.
  *
  * Two configurations, because a class reference cannot cross
  * postMessage: the root component has to already be inside the worker
@@ -25,12 +25,12 @@ import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
  *   createApp(AppRoot).useChannel(Catalog, { source }).mountSync('#app');
  */
 export function createApp(options: WorkerAppOptions): WorkerApp;
-export function createApp(root: FrameworkChild | ComponentType): NodalAppBuilder;
-export function createApp(arg: WorkerAppOptions | FrameworkChild | ComponentType): WorkerApp | NodalAppBuilder {
+export function createApp(root: FrameworkChild | ComponentType): GessoAppBuilder;
+export function createApp(arg: WorkerAppOptions | FrameworkChild | ComponentType): WorkerApp | GessoAppBuilder {
   if (isWorkerAppOptions(arg)) {
     return new WorkerApp(arg);
   }
-  return new NodalAppBuilder(arg);
+  return new GessoAppBuilder(arg);
 }
 
 function isWorkerAppOptions(value: unknown): value is WorkerAppOptions {

@@ -33,7 +33,7 @@ export function mountThemeExampleRoute(host: HTMLElement): () => void {
     },
     onError: (message, stack) => {
       shell.setStatus(`Render worker error: ${message}`);
-      console.error('[nodal theme example]', message, stack);
+      console.error('[gesso theme example]', message, stack);
     }
   });
   shell.setStatus('Source: src/playground/examples/ThemeExampleApp.tsx — change a setting on the left.');

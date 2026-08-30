@@ -133,7 +133,7 @@ function renderHeader(routeId: string, title: string): HTMLElement {
 
   const brand = createElement('div', { className: 'pg-brand' });
   brand.appendChild(renderBrandMark());
-  brand.appendChild(createElement('span', { className: 'pg-brand-name', text: 'Nodal' }));
+  brand.appendChild(createElement('span', { className: 'pg-brand-name', text: 'Gesso' }));
 
   const titleEl = createElement('div', { className: 'pg-title' });
   titleEl.appendChild(createElement('span', { className: 'pg-title-text', text: title }));

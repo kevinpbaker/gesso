@@ -117,7 +117,7 @@ export class ChannelReplica<View extends object, Commands extends object> {
 
   private report(message: string, stack?: string): void {
     const listener =
-      this.errorListener ?? ((text, trace) => console.error(`[nodal channel ${this.token.name}] ${text}`, trace));
+      this.errorListener ?? ((text, trace) => console.error(`[gesso channel ${this.token.name}] ${text}`, trace));
     listener(message, stack);
   }
 

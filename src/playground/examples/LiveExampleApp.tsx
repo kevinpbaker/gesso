@@ -7,7 +7,7 @@ import { internalState } from '../../framework/InternalState';
 /**
  * Live: an operations board fed by a stream that never stops.
  *
- * Every Nodal prop accepts an Observable as well as a value. When the
+ * Every Gesso prop accepts an Observable as well as a value. When the
  * Observable emits, that one property changes on that one node and the
  * next frame is drawn from it. The component that produced the node
  * does not run again, the tree is not diffed, and nothing is created,

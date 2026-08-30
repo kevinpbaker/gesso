@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NodalRuntime } from './NodalRuntime';
+import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 import { Button, Column } from '../../ui/composition/UiComponents';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -11,11 +11,11 @@ import { UiManualFrameClock } from '../../ui/scheduler';
  * Keyboard navigation keeps the focused control visible: focusing a
  * row below a scroll container's viewport scrolls it into view.
  */
-describe('NodalRuntime scrollIntoView', () => {
+describe('GessoRuntime scrollIntoView', () => {
   function mount() {
     let clock!: UiManualFrameClock;
     const rows = Array.from({ length: 10 }, (_, i) => Button({ height: 20, text: `row ${i}`, flexShrink: 0 }));
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root: Column({ height: 50, overflow: 'scroll' }, ...rows),
       canvas: mockCanvas(300, 200),
       width: 300,

@@ -42,7 +42,7 @@ export function mountAnimationExampleRoute(host: HTMLElement): () => void {
     },
     onError: (message, stack) => {
       shell.setStatus(`Render worker error: ${message}`);
-      console.error('[nodal animation example]', message, stack);
+      console.error('[gesso animation example]', message, stack);
     }
   });
   shell.setStatus('Source: src/playground/examples/AnimationExampleApp.tsx — move a card and watch `ticks`.');

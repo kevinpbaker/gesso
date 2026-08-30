@@ -171,7 +171,7 @@ describe('workerHandle', () => {
     );
 
     const hub = new MessageChannel();
-    host.onmessage?.({ data: { type: 'nodal:hub' }, ports: [hub.port2] });
+    host.onmessage?.({ data: { type: 'gesso:hub' }, ports: [hub.port2] });
 
     const client = portHandle(hub.port1 as unknown as { postMessage(m: unknown, t: Transferable[]): void }).open(
       'ticker'
@@ -191,7 +191,7 @@ describe('workerHandle', () => {
       () => [],
       host
     );
-    expect(() => host.onmessage?.({ data: { type: 'nodal:port', key: 'catalog' } })).toThrow(
+    expect(() => host.onmessage?.({ data: { type: 'gesso:port', key: 'catalog' } })).toThrow(
       /handshake for 'catalog' arrived with no port/
     );
   });
@@ -227,7 +227,7 @@ describe('workerHandle', () => {
     );
 
     const open = (key: string) =>
-      host.onmessage?.({ data: { type: 'nodal:port', key }, ports: [new MessageChannel().port2] });
+      host.onmessage?.({ data: { type: 'gesso:port', key }, ports: [new MessageChannel().port2] });
     open('channel');
     open('store');
 
@@ -252,7 +252,7 @@ describe('workerHandle', () => {
     const reply = new Promise<unknown>(resolve => {
       pair.port1.onmessage = event => resolve(event.data);
     });
-    host.onmessage?.({ data: { type: 'nodal:port', key: 'nope' }, ports: [pair.port2] });
+    host.onmessage?.({ data: { type: 'gesso:port', key: 'nope' }, ports: [pair.port2] });
 
     // A handshake that matched nothing would otherwise leave the
     // client waiting forever with nothing said.
@@ -263,8 +263,8 @@ describe('workerHandle', () => {
   });
 
   it('recognises only a well-formed handshake', () => {
-    expect(isPortHandshake({ type: 'nodal:port', key: 'a' })).toBe(true);
-    expect(isPortHandshake({ type: 'nodal:port' })).toBe(false);
+    expect(isPortHandshake({ type: 'gesso:port', key: 'a' })).toBe(true);
+    expect(isPortHandshake({ type: 'gesso:port' })).toBe(false);
     expect(isPortHandshake({ type: 'other', key: 'a' })).toBe(false);
     expect(isPortHandshake(null)).toBe(false);
   });

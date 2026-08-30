@@ -16,10 +16,10 @@
 
     /* JSX — optional surface over the factory API; see src/framework/jsx */
     "jsx": "react-jsx",
-    "jsxImportSource": "nodal",
+    "jsxImportSource": "gesso",
     "paths": {
-      "nodal/jsx-runtime": ["./src/framework/jsx/jsx-runtime.ts"],
-      "nodal/jsx-dev-runtime": ["./src/framework/jsx/jsx-dev-runtime.ts"]
+      "gesso/jsx-runtime": ["./src/framework/jsx/jsx-runtime.ts"],
+      "gesso/jsx-dev-runtime": ["./src/framework/jsx/jsx-dev-runtime.ts"]
     },
 
     /* Decorators */

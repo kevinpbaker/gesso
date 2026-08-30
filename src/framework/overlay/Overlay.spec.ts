@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
-import { NodalRuntime } from '../app/NodalRuntime';
+import { GessoRuntime } from '../app/GessoRuntime';
 import { mockCanvas } from '../app/RuntimeTestUtils';
 import { OverlayService } from './OverlayService';
 import { Box, Button, Column, Text } from '../../ui/composition/UiComponents';
@@ -56,7 +56,7 @@ class OverlayHostApp extends Component {
 
 function mount() {
   let clock!: UiManualFrameClock;
-  const runtime = new NodalRuntime({
+  const runtime = new GessoRuntime({
     root: createComponent(OverlayHostApp),
     canvas: mockCanvas(400, 300),
     width: 400,

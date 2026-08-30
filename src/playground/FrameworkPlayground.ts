@@ -638,7 +638,7 @@ function ringButton(text: string, key?: string): UiElement {
 
 /**
  * The Inputs tier (roadmap C3): a sign-in form built from
- * `@nodal/components` with no hand-rolled widget and no colour in it.
+ * `@gesso/components` with no hand-rolled widget and no colour in it.
  *
  * Every control is themed through the control tokens, carries its own
  * role, name and states, and is operable from the keyboard. Submitting
@@ -685,7 +685,7 @@ export class SignInFormDemo extends Component {
         borderWidth: 1,
         borderColor: 'border'
       },
-      Text({ text: 'Sign in (C3 · @nodal/components)', color: 'text', fontSize: 16, fontWeight: 600 }),
+      Text({ text: 'Sign in (C3 · @gesso/components)', color: 'text', fontSize: 16, fontWeight: 600 }),
       createComponent(TextInput, {
         label: 'Email',
         placeholder: 'you@example.com',
@@ -1194,7 +1194,7 @@ export class ScrollDemo extends Component {
  *
  * The picture is fetched and decoded by the `ImageResolver` the
  * `MediaService` holds — in the render worker, which is what "off the
- * main thread" means for a Nodal app — and the icons are rasterised
+ * main thread" means for a Gesso app — and the icons are rasterised
  * from paths at whatever colour the card's theme resolves. Switching
  * the card between the light and dark themes redraws them, which is
  * the one thing in the library that cannot resolve a palette name at

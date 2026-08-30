@@ -21,7 +21,7 @@ type Measure = (segment: string) => number;
  * tests all get their lines from here, so a line can never wrap in
  * one place and not another.
  *
- * Semantics follow CSS where Nodal borrows its names:
+ * Semantics follow CSS where Gesso borrows its names:
  *
  *   wrap 'word'  — `white-space: normal`: break at spaces; a word wider
  *                  than the available width overflows on its own line.

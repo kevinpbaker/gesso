@@ -3,14 +3,14 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from '../framework/createComponent';
 import { mountRuntime } from '../framework/app/RuntimeTestUtils';
-import type { NodalRuntime } from '../framework/app/NodalRuntime';
+import type { GessoRuntime } from '../framework/app/GessoRuntime';
 import { Box, Text } from '../ui/composition/UiComponents';
 import type { UiNode } from '../ui/graph/UiNode';
 import { UiEventType, UiPointerEvent } from '../ui/input/UiInputEvent';
 import { Accordion, Card, Divider, Tabs, Toolbar } from './Structure';
 import { SplitPane } from './SplitPane';
 
-function nodes(runtime: NodalRuntime): UiNode[] {
+function nodes(runtime: GessoRuntime): UiNode[] {
   const result: UiNode[] = [];
   const visit = (node: UiNode): void => {
     result.push(node);
@@ -22,7 +22,7 @@ function nodes(runtime: NodalRuntime): UiNode[] {
   return result;
 }
 
-function byRole(runtime: NodalRuntime, role: string): UiNode {
+function byRole(runtime: GessoRuntime, role: string): UiNode {
   const node = nodes(runtime).find(candidate => candidate.properties.get('role') === role);
   if (node === undefined) {
     throw new Error(`no node with role '${role}'`);
@@ -30,7 +30,7 @@ function byRole(runtime: NodalRuntime, role: string): UiNode {
   return node;
 }
 
-function records(runtime: NodalRuntime, role: string) {
+function records(runtime: GessoRuntime, role: string) {
   return [...runtime.semanticsTree().values()].filter(record => record.role === role);
 }
 

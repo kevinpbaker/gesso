@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Box, Column, Text } from '../../ui/composition/UiComponents';
 import type { CanvasHost } from '../../ui/rendering';
 import { UiManualFrameClock, type UiFrameClockFactory } from '../../ui/scheduler';
-import { NodalRuntime, type FrameMetrics } from './NodalRuntime';
+import { GessoRuntime, type FrameMetrics } from './GessoRuntime';
 
 /**
  * The renderer option (WebGPU roadmap G2): a runtime asked for WebGPU
@@ -131,12 +131,12 @@ function withMockWebGPU(device: GPUDevice): void {
   });
 }
 
-describe('NodalRuntime renderer option', () => {
+describe('GessoRuntime renderer option', () => {
   it('draws with Canvas2D by default and says so', () => {
     const canvas = mockCanvas();
     const clock = manualClock();
     const frames: FrameMetrics[] = [];
-    const runtime = new NodalRuntime({ root, canvas, clock: clock.factory, width: 200, height: 100 });
+    const runtime = new GessoRuntime({ root, canvas, clock: clock.factory, width: 200, height: 100 });
     runtime.onFrame(metrics => frames.push(metrics));
     runtime.start();
     clock.tick();
@@ -153,7 +153,7 @@ describe('NodalRuntime renderer option', () => {
     const clock = manualClock();
     const frames: FrameMetrics[] = [];
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root,
       canvas,
       renderer: 'webgpu',
@@ -189,7 +189,7 @@ describe('NodalRuntime renderer option', () => {
   it('is quiet about the fallback under `auto`', async () => {
     withoutWebGPU();
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root,
       canvas: mockCanvas(),
       renderer: 'auto',
@@ -210,7 +210,7 @@ describe('NodalRuntime renderer option', () => {
     const measure = mockCanvas();
     const clock = manualClock();
     const frames: FrameMetrics[] = [];
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       root,
       canvas,
       renderer: 'webgpu',

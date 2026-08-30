@@ -1,6 +1,6 @@
 import type { UiKeyModifiers } from '../../../ui/input/UiInputEvent';
 import type { EditingState } from '../../../ui/input/UiEditingController';
-import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../NodalRuntime';
+import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 import type { RendererBackend } from '../../../ui/rendering';
 
 /**
@@ -66,7 +66,7 @@ export type ShellToRuntimeMessage =
    * The first thing this protocol has ever carried that is a
    * *preference* rather than an event or a size. It is inbound because
    * the query needs a window and the animations are in here; see
-   * `NodalRuntime.setReducedMotion` for why it is not an environment
+   * `GessoRuntime.setReducedMotion` for why it is not an environment
    * key.
    */
   | { type: 'reducedMotion'; reduced: boolean }

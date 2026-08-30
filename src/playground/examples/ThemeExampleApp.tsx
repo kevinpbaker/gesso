@@ -17,7 +17,7 @@ import type { UiTextStyle } from '../../ui/properties/UiTextStyle';
 /**
  * Theming: a settings pane wired to the app it restyles.
  *
- * A theme in Nodal is one value in the environment. A node provides
+ * A theme in Gesso is one value in the environment. A node provides
  * it, every descendant resolves against it, and nothing in between
  * has to pass it along. This example puts that on screen: the four
  * controls on the left build a `UiTheme`, the root provides it, and
@@ -791,7 +791,7 @@ function Preview(_props: Inputs<{}>, ctx: ComponentContext) {
           </text>
         </box>
         <column flexGrow={1} gap={2}>
-          <text textStyle={text('title')}>Nodal · Releases</text>
+          <text textStyle={text('title')}>Gesso · Releases</text>
           <text textStyle={text('bodySmall')}>Three services, one canvas renderer</text>
         </column>
         <Pill label="Invite" />

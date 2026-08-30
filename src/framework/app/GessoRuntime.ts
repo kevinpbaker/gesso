@@ -135,7 +135,7 @@ export interface RuntimeInput {
  */
 export type RendererChoice = RendererBackend | 'auto';
 
-export interface NodalRuntimeOptions {
+export interface GessoRuntimeOptions {
   /** Root component or element. */
   root: FrameworkChild;
   /** Canvas to draw into: HTMLCanvasElement, OffscreenCanvas, or a test double. */
@@ -190,10 +190,10 @@ export interface NodalRuntimeOptions {
  * controllers, scheduler and renderer. Everything here runs happily
  * in a Worker: the only things it cannot do for itself are obtain a
  * canvas and learn about size and input, which is exactly the split
- * between this class and its two hosts — NodalApp on the main thread
+ * between this class and its two hosts — GessoApp on the main thread
  * and renderRoot() in a render worker.
  */
-export class NodalRuntime {
+export class GessoRuntime {
   readonly services: ServiceRegistry;
   readonly channels: ChannelRegistry;
   readonly input: RuntimeInput;
@@ -270,7 +270,7 @@ export class NodalRuntime {
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
   private started = false;
 
-  constructor(options: NodalRuntimeOptions) {
+  constructor(options: GessoRuntimeOptions) {
     this.services = options.services ?? new ServiceRegistry();
     this.channels = options.channels ?? new ChannelRegistry();
     this.canvas = options.canvas;
@@ -1465,7 +1465,7 @@ export interface FrameMetrics {
    * shell too busy to forward events costs the person a late response
    * while the render worker, with nothing new to draw, reports a
    * perfectly even frame gap. Null on a host that does not stamp its
-   * input — see `NodalRuntime.noteInput`.
+   * input — see `GessoRuntime.noteInput`.
    */
   inputLatencyMs: number | null;
 }
@@ -1515,7 +1515,7 @@ function createMeasureCanvas(): CanvasHost {
     canvas.height = 1;
     return canvas;
   }
-  throw new Error('NodalRuntime: no canvas is available for text measurement; pass `measureCanvas`.');
+  throw new Error('GessoRuntime: no canvas is available for text measurement; pass `measureCanvas`.');
 }
 
 /** Milliseconds per WebGPU stage of one frame. */

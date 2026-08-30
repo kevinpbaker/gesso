@@ -9,7 +9,7 @@ export type ShellRequest = { type: 'clipboard'; text: string } | { type: 'openUr
  * A component in the render worker has no clipboard and no window.
  * Dispatching an action here hands the request to the runtime, which
  * forwards it to whichever host it has: `WorkerApp` posts it to the
- * main thread, `NodalApp` performs it directly. Every runtime registers
+ * main thread, `GessoApp` performs it directly. Every runtime registers
  * one, like `OverlayService`; being a store keeps the rule that
  * components reach the outside world through actions only, and gives a
  * desktop shell (roadmap E1) one place to bind native equivalents.

@@ -10,7 +10,7 @@ import type { Note } from './NotesRepository';
 export const SEED_NOTES: readonly Note[] = [
   {
     id: 'n1',
-    title: 'Welcome to Nodal notes',
+    title: 'Welcome to Gesso notes',
     body:
       'Click anywhere in this text and start typing.\n\n' +
       'Everything you would expect from a text field works: arrow keys, Shift to select, double-click for a word, ' +

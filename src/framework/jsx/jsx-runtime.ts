@@ -30,9 +30,9 @@ import type { ClassComponent, ComponentContext, ComponentProps, ComponentType } 
  *
  * Enabled per project with
  *
- *   "jsx": "react-jsx", "jsxImportSource": "nodal"
+ *   "jsx": "react-jsx", "jsxImportSource": "gesso"
  *
- * in tsconfig (the repository maps `nodal/jsx-runtime` to this file).
+ * in tsconfig (the repository maps `gesso/jsx-runtime` to this file).
  *
  * Intrinsic tags are the element factories in lowercase: `text`,
  * `editabletext`, `button`, `box`, `stack`, `row`, `column`,

@@ -12,7 +12,7 @@ import type { UiImage } from '../properties/UiImage';
  *
  * An implementation is free to fetch and decode wherever it likes; the
  * default one below does it wherever it is constructed, which for a
- * Nodal app is the render worker.
+ * Gesso app is the render worker.
  */
 export interface ImageResolver {
   /**
@@ -65,7 +65,7 @@ const DEFAULT_CAPACITY = 32;
  * `COMPONENTS_ROADMAP.md` C7 asks for the decode to be in a worker
  * with the bitmap transferred back. This resolver does not spawn one,
  * for two reasons that are worth stating rather than discovering
- * later. A Nodal runtime normally *is* a worker — the render worker of
+ * later. A Gesso runtime normally *is* a worker — the render worker of
  * `WorkerApp` — so a resolver constructed by it already fetches and
  * decodes off the main thread, and the bitmap never crosses a thread
  * at all, which is strictly better than transferring one. And

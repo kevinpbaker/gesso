@@ -1,30 +1,30 @@
 <div align="center">
 
-# Nodal
+# Gesso
 
 **A retained-mode UI framework that draws your app on a canvas, lays it out like Chrome, and never lets the main thread touch it.**
 
 TypeScript · RxJS · Canvas2D & WebGPU · zero DOM layout · zero runtime dependencies beyond `rxjs`
 
-[Why](#why-nodal) · [Sixty seconds](#sixty-seconds) · [What's inside](#whats-inside) · [Proof](#proof-not-promises) · [Playground](#the-playground) · [Architecture](#architecture) · [Roadmap](#where-its-going)
+[Why](#why-gesso) · [Sixty seconds](#sixty-seconds) · [What's inside](#whats-inside) · [Proof](#proof-not-promises) · [Playground](#the-playground) · [Architecture](#architecture) · [Roadmap](#where-its-going)
 
 </div>
 
 ---
 
-## Why Nodal
+## Why Gesso
 
 Every web UI framework is, in the end, a clever way to ask the DOM to do layout. The DOM is a fine document renderer and a mediocre application runtime: layout is opaque, styling is a global namespace, and every millisecond of your business logic competes with paint for the one thread that matters.
 
-Nodal starts from the other end. It owns the whole stack — component model, retained scene graph, layout, input, rasterization — and treats the browser as a place to put a canvas and a source of raw pointer events. The consequences are the point:
+Gesso starts from the other end. It owns the whole stack — component model, retained scene graph, layout, input, rasterization — and treats the browser as a place to put a canvas and a source of raw pointer events. The consequences are the point:
 
 - **The UI thread does nothing but UI.** Components, layout, hit-testing and painting run in a render worker. Application state runs in data workers. The main thread forwards events and owns nothing. A 1.5 s CPU burn in a store does not cost the animation next to it a single frame — that's a demo route, not a slide.
-- **Layout you can trust, because Chrome checked it.** Nodal borrows CSS's vocabulary (`flexGrow`, `gap`, `padding`, `position: 'absolute'`, `fr(1)`), so it must borrow CSS's answers. 239 layout cases are rendered by headless Chrome, and the engine is asserted to match every box within 0.1 px.
+- **Layout you can trust, because Chrome checked it.** Gesso borrows CSS's vocabulary (`flexGrow`, `gap`, `padding`, `position: 'absolute'`, `fr(1)`), so it must borrow CSS's answers. 239 layout cases are rendered by headless Chrome, and the engine is asserted to match every box within 0.1 px.
 - **Layout you can interrogate.** `engine.explain(node)` tells you _why_ a box is the size it is — `flex`, `stretch`, `content`, `min`, `aspect-ratio` — in sentences, in the order the rules applied. A hover inspector paints margin/padding/content boxes and a heatmap of what the last frame actually re-measured. Misspell a prop and the graph builder throws instead of silently ignoring it.
 - **Cost follows the change, not the tree.** A text edit deep in a 10k-node page re-measures fewer than 20 nodes. A scroll frame re-measures zero. These are CI budgets, not aspirations.
 - **Two renderers, one truth.** Canvas2D and WebGPU consume the same `LayoutRecord`s through the same `UiRenderer` contract, are checked draw-for-draw in tests, and pixel-diffed against each other in headless Chrome.
 
-Nodal is an experiment, and an honest one: every design decision is written down in [`docs/decisions/`](docs/decisions/) with the problem it solved and the trade it made.
+Gesso is an experiment, and an honest one: every design decision is written down in [`docs/decisions/`](docs/decisions/) with the problem it solved and the trade it made.
 
 ## Sixty seconds
 
@@ -102,7 +102,7 @@ Projections become the wire format — diffed structurally, shipped as patches �
 
 ### A layout engine that finished the job
 
-Most canvas UI kits ship flexbox-ish. Nodal shipped the CSS you actually reach for, and had Chrome grade the homework.
+Most canvas UI kits ship flexbox-ish. Gesso shipped the CSS you actually reach for, and had Chrome grade the homework.
 
 | Capability                   | The short version                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -233,7 +233,7 @@ Single-thread mode exists too — `createApp(AppRoot).useStore(X).mountSync('#ap
 | `src/ui/input`       | Hit tester, pointer/wheel/keyboard controllers, focus manager, gesture recognizer, platform adapter                                                          |
 | `src/ui/properties`  | The property registry — every layout/paint/input property with its dirty flags; unknown props throw                                                          |
 | `src/ui/environment` | Theme, typography, colors, shapes, shadows; scoped reactive environment keys                                                                                 |
-| `src/framework`      | `Component`, decorators, `Store`, replication (`exposeStore`/`attachStore`/patches), `OverlayStore`, `createApp`/`renderRoot`/`NodalRuntime`                 |
+| `src/framework`      | `Component`, decorators, `Store`, replication (`exposeStore`/`attachStore`/patches), `OverlayStore`, `createApp`/`renderRoot`/`GessoRuntime`                 |
 | `src/playground`     | The demo harness — eight routes and one shell. Not the framework.                                                                                            |
 | `scripts/`           | `gen-layout-fixtures.ts` (Chrome → `expected.json`), `check-webgpu-parity.ts` (Chrome pixel diff over DevTools protocol)                                     |
 | `docs/`              | Design doc, roadmaps, and thirteen decision records                                                                                                          |
@@ -292,6 +292,6 @@ Layout (L0–L8) and WebGPU parity are done. What's honestly missing, in the ord
 
 ## Status & license
 
-Nodal is an active research project — a serious attempt at building a small, deterministic UI runtime from first principles and writing down every trade along the way. The runtime is functional and heavily tested; the API will move.
+Gesso is an active research project — a serious attempt at building a small, deterministic UI runtime from first principles and writing down every trade along the way. The runtime is functional and heavily tested; the API will move.
 
 Private and unlicensed.

@@ -169,7 +169,7 @@ describe('UiGraphBuilder', () => {
       expect(() => createBuilder().builder.build(createElement(UiNodeType.Row, { widht: 100 }))).toThrow(
         /Unknown prop 'widht' on node 'root:0'. Did you mean 'width'\?/
       );
-      // CSS names that Nodal spells differently are the common case.
+      // CSS names that Gesso spells differently are the common case.
       expect(() => createBuilder().builder.build(createElement(UiNodeType.Row, { alignItems: 'center' }))).toThrow(
         /Unknown prop 'alignItems'/
       );

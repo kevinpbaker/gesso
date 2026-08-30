@@ -699,7 +699,7 @@ export class LayoutEngine {
    * is inside its viewport, `padding` pixels from the nearest edge,
    * innermost first. Nothing is changed: the caller writes the offsets
    * (scrollX/scrollY properties) and marks the containers dirty, which
-   * is how NodalRuntime.scrollIntoView keeps a focused row on screen.
+   * is how GessoRuntime.scrollIntoView keeps a focused row on screen.
    *
    * `inner`, a box in the node's own coordinates, reveals that part of
    * the node instead of the whole — the caret of a tall editable.

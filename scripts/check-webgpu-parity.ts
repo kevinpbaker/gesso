@@ -143,7 +143,7 @@ class DevTools {
 
 async function main(): Promise<void> {
   const chrome = findChrome();
-  const profile = mkdtempSync(join(tmpdir(), 'nodal-parity-'));
+  const profile = mkdtempSync(join(tmpdir(), 'gesso-parity-'));
   let vite: ChildProcess | undefined;
   let browser: ChildProcess | undefined;
   let devtools: DevTools | undefined;

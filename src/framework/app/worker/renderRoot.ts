@@ -10,7 +10,7 @@ import {
 import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
-import { NodalRuntime, type RendererChoice } from '../NodalRuntime';
+import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
@@ -24,7 +24,7 @@ interface WorkerGlobal {
 }
 
 /**
- * Runs a Nodal application inside a render worker.
+ * Runs a Gesso application inside a render worker.
  *
  * Everything the user sees is built and drawn here: components,
  * the retained graph, layout, input routing, and rasterization to an
@@ -49,7 +49,7 @@ export class RenderWorkerApp {
   private readonly root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
-  private runtime: NodalRuntime | undefined;
+  private runtime: GessoRuntime | undefined;
   private channels: ChannelRegistryHandle | undefined;
   /** The shell's port to the application worker, if there is one. */
   private appWorker: WorkerHandle | undefined;
@@ -247,7 +247,7 @@ export class RenderWorkerApp {
     for (const ServiceClass of this.serviceRegistrations) {
       services.register(ServiceClass);
     }
-    this.runtime = new NodalRuntime({
+    this.runtime = new GessoRuntime({
       root: this.root,
       services,
       canvas,

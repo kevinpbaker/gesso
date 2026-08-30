@@ -2,7 +2,7 @@ import type { EditingState } from '../../ui/input/UiEditingController';
 
 /**
  * Where the proxy sends what it hears. `WorkerApp` posts each call to
- * the render worker; `NodalApp` calls the runtime's editing controller
+ * the render worker; `GessoApp` calls the runtime's editing controller
  * directly.
  */
 export interface EditingProxySink {

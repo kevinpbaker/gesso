@@ -36,7 +36,7 @@ export function mountNotesExampleRoute(host: HTMLElement): () => void {
     },
     onError: (message, stack) => {
       shell.setStatus(`Render worker error: ${message}`);
-      console.error('[nodal notes example]', message, stack);
+      console.error('[gesso notes example]', message, stack);
     }
   });
   shell.setStatus('Source: src/playground/examples/NotesExampleApp.tsx — click into the text and type.');

@@ -10,7 +10,7 @@ function labels(patches: readonly UiSemanticsPatch[]): (string | undefined)[] {
   return patches.map(patch => (patch.op === 'remove' ? undefined : patch.node.label));
 }
 
-describe('NodalRuntime semantics', () => {
+describe('GessoRuntime semantics', () => {
   it('emits the tree for a login form on the first frame', () => {
     const patches: UiSemanticsPatch[][] = [];
     const { frame } = mountRuntime(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NodalRuntime } from './NodalRuntime';
+import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 import { Box, Column } from '../../ui/composition/UiComponents';
 import { noKeyModifiers } from '../../ui/input/UiInputEvent';
@@ -12,14 +12,14 @@ import { UiManualFrameClock } from '../../ui/scheduler';
  * proportion, pressing the track pages, hovering the edge reveals the
  * bar, and none of it reaches the content beneath.
  */
-describe('NodalRuntime scrollbars', () => {
+describe('GessoRuntime scrollbars', () => {
   function mount() {
     let clock!: UiManualFrameClock;
     const pressed: number[] = [];
     const rows = Array.from({ length: 50 }, (_, i) =>
       Box({ height: 20, flexShrink: 0, onPointerDown: () => pressed.push(i) })
     );
-    const runtime = new NodalRuntime({
+    const runtime = new GessoRuntime({
       // 200 wide, 100 tall, 1000 of content: maxScroll 900.
       root: Column({ width: 200, height: 100, overflow: 'scroll' }, ...rows),
       canvas: mockCanvas(300, 300),

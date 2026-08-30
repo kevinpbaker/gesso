@@ -34,17 +34,17 @@ export { ComponentHostResolver } from './ComponentHostResolver';
 export { ComponentHost } from './ComponentHost';
 export { isComponentElement, type ComponentElement, type FrameworkChild } from './ComponentElement';
 export { createApp } from './app/createApp';
-export { NodalAppBuilder } from './app/NodalAppBuilder';
-export { NodalApp, type NodalAppOptions } from './app/NodalApp';
+export { GessoAppBuilder } from './app/GessoAppBuilder';
+export { GessoApp, type GessoAppOptions } from './app/GessoApp';
 export {
-  NodalRuntime,
+  GessoRuntime,
   UI_FRAME_PHASES,
-  type NodalRuntimeOptions,
+  type GessoRuntimeOptions,
   type RuntimeInput,
   type FrameMetrics,
   type UiFramePhase,
   type FramePhaseTimings
-} from './app/NodalRuntime';
+} from './app/GessoRuntime';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellService, type ShellRequest } from './app/ShellService';
 export {

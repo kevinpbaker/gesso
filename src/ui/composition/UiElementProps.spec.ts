@@ -48,7 +48,7 @@ describe('element prop types', () => {
   it('rejects a misspelled prop', () => {
     // @ts-expect-error 'widht' is not a prop
     Row({ widht: 100 });
-    // @ts-expect-error CSS's name; Nodal spells it `y`
+    // @ts-expect-error CSS's name; Gesso spells it `y`
     Column({ alignItems: 'center' });
     // @ts-expect-error a Text has no `columns`
     Text({ columns: [1] });

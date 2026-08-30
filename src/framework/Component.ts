@@ -1,7 +1,7 @@
 import type { UiChild } from '../ui/composition/UiElement';
 
 /**
- * Base class for all Nodal framework components.
+ * Base class for all Gesso framework components.
  *
  * Components are class-based. They declare reactive state with
  * an `internalState()` cell, inputs with `@Input()`, and return a UiElement tree

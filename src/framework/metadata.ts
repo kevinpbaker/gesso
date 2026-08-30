@@ -1,4 +1,4 @@
-export const COMPONENT_METADATA_KEY = Symbol('nodal:component:metadata');
+export const COMPONENT_METADATA_KEY = Symbol('gesso:component:metadata');
 
 export interface ComponentMetadata {
   tag: string;

@@ -79,8 +79,8 @@ describe('functional components', () => {
     const root = builder.build(Column(createComponent(Greeting, { name: name$ })));
     expect(texts(root)).toEqual(['Hello World']);
 
-    name$.next('Nodal');
-    expect(texts(root)).toEqual(['Hello Nodal']);
+    name$.next('Gesso');
+    expect(texts(root)).toEqual(['Hello Gesso']);
     expect(renders).toHaveBeenCalledTimes(1);
   });
 

@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from '../framework/createComponent';
 import { mountRuntime } from '../framework/app/RuntimeTestUtils';
-import type { NodalRuntime } from '../framework/app/NodalRuntime';
+import type { GessoRuntime } from '../framework/app/GessoRuntime';
 import { Column } from '../ui/composition/UiComponents';
 import type { UiNode } from '../ui/graph/UiNode';
 import { UiEventType, UiPointerEvent } from '../ui/input/UiInputEvent';
@@ -16,7 +16,7 @@ import { Switch } from './Switch';
 import { TextArea, TextInput } from './TextInput';
 
 /** Every node under the root, in document order. */
-function nodes(runtime: NodalRuntime): UiNode[] {
+function nodes(runtime: GessoRuntime): UiNode[] {
   const result: UiNode[] = [];
   const visit = (node: UiNode): void => {
     result.push(node);
@@ -28,7 +28,7 @@ function nodes(runtime: NodalRuntime): UiNode[] {
   return result;
 }
 
-function byRole(runtime: NodalRuntime, role: string): UiNode {
+function byRole(runtime: GessoRuntime, role: string): UiNode {
   const node = nodes(runtime).find(candidate => candidate.properties.get('role') === role);
   if (node === undefined) {
     throw new Error(`no node with role '${role}'`);
@@ -37,7 +37,7 @@ function byRole(runtime: NodalRuntime, role: string): UiNode {
 }
 
 /** The semantics record for a role, as the mirror would receive it. */
-function semantics(runtime: NodalRuntime, role: string): UiSemanticsRecord {
+function semantics(runtime: GessoRuntime, role: string): UiSemanticsRecord {
   const record = [...runtime.semanticsTree().values()].find(candidate => candidate.role === role);
   if (record === undefined) {
     throw new Error(`no semantics record with role '${role}'`);
@@ -46,7 +46,7 @@ function semantics(runtime: NodalRuntime, role: string): UiSemanticsRecord {
 }
 
 /** The slider's track strip: the second child of the node that is the slider. */
-function trackOf(runtime: NodalRuntime): UiNode {
+function trackOf(runtime: GessoRuntime): UiNode {
   const strip = byRole(runtime, 'slider').firstChild?.nextSibling;
   if (strip === null || strip === undefined) {
     throw new Error('the slider has no track');

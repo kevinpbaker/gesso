@@ -25,13 +25,13 @@ export interface MessageEndpoint {
 
 /** The one message the global channel carries. */
 export interface PortHandshake {
-  type: 'nodal:port';
+  type: 'gesso:port';
   key: string;
 }
 
 export function isPortHandshake(value: unknown): value is PortHandshake {
   const message = value as { type?: unknown; key?: unknown } | null;
-  return message?.type === 'nodal:port' && typeof message.key === 'string';
+  return message?.type === 'gesso:port' && typeof message.key === 'string';
 }
 
 /**
@@ -98,7 +98,7 @@ export function portHandle(endpoint: TransferTarget): WorkerHandle {
   return {
     open(key: string): MessagePort {
       const channel = new MessageChannel();
-      endpoint.postMessage({ type: 'nodal:port', key } satisfies PortHandshake, [channel.port2]);
+      endpoint.postMessage({ type: 'gesso:port', key } satisfies PortHandshake, [channel.port2]);
       return channel.port1;
     },
     get spawned(): boolean {
@@ -119,14 +119,14 @@ export function portHandle(endpoint: TransferTarget): WorkerHandle {
  * should have to know which route a channel came in on.
  */
 export interface HubMessage {
-  type: 'nodal:hub';
+  type: 'gesso:hub';
 }
 
 export function isHubMessage(value: unknown): value is HubMessage {
-  return (value as { type?: unknown } | null)?.type === 'nodal:hub';
+  return (value as { type?: unknown } | null)?.type === 'gesso:hub';
 }
 
-const BASE_INSTALLED = Symbol.for('nodal:port-base-installed');
+const BASE_INSTALLED = Symbol.for('gesso:port-base-installed');
 
 /**
  * The handler every `servePorts` chain sits on top of.
@@ -201,7 +201,7 @@ export function workerHandle(factory: () => Worker): WorkerHandle {
       // handshake is safe as long as `servePorts` is called
       // synchronously at the top level of the worker module — the same
       // guarantee `renderRoot` relies on.
-      worker.postMessage({ type: 'nodal:port', key } satisfies PortHandshake, [channel.port2]);
+      worker.postMessage({ type: 'gesso:port', key } satisfies PortHandshake, [channel.port2]);
       return channel.port1;
     },
     get spawned(): boolean {
@@ -240,7 +240,7 @@ export function isPortErrorMessage(value: unknown): value is PortErrorMessage {
 }
 
 /** Every name served on a host, across all `servePorts` calls on it. */
-const SERVED_NAMES = Symbol.for('nodal:served-port-names');
+const SERVED_NAMES = Symbol.for('gesso:served-port-names');
 
 interface HostWithNames extends PortHost {
   [SERVED_NAMES]?: Array<() => readonly string[]>;

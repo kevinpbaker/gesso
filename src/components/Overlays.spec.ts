@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from '../framework/createComponent';
 import { mountRuntime } from '../framework/app/RuntimeTestUtils';
-import type { NodalRuntime } from '../framework/app/NodalRuntime';
+import type { GessoRuntime } from '../framework/app/GessoRuntime';
 import { OverlayService } from '../framework/overlay/OverlayService';
 import { Button, Column, Row } from '../ui/composition/UiComponents';
 import type { UiNode } from '../ui/graph/UiNode';
@@ -12,7 +12,7 @@ import { Dialog } from './Dialog';
 import { Menu } from './Menu';
 import { Select } from './Select';
 
-function nodes(runtime: NodalRuntime): UiNode[] {
+function nodes(runtime: GessoRuntime): UiNode[] {
   const result: UiNode[] = [];
   const visit = (node: UiNode): void => {
     result.push(node);
@@ -24,7 +24,7 @@ function nodes(runtime: NodalRuntime): UiNode[] {
   return result;
 }
 
-function byRole(runtime: NodalRuntime, role: string): UiNode {
+function byRole(runtime: GessoRuntime, role: string): UiNode {
   const node = nodes(runtime).find(candidate => candidate.properties.get('role') === role);
   if (node === undefined) {
     throw new Error(`no node with role '${role}'`);
@@ -32,7 +32,7 @@ function byRole(runtime: NodalRuntime, role: string): UiNode {
   return node;
 }
 
-function byLabel(runtime: NodalRuntime, label: string): UiNode {
+function byLabel(runtime: GessoRuntime, label: string): UiNode {
   const node = nodes(runtime).find(candidate => candidate.properties.get('label') === label);
   if (node === undefined) {
     throw new Error(`no node labelled '${label}'`);

@@ -34,7 +34,7 @@ export function mountSignInExampleRoute(host: HTMLElement): () => void {
     },
     onError: (message, stack) => {
       shell.setStatus(`Render worker error: ${message}`);
-      console.error('[nodal sign-in example]', message, stack);
+      console.error('[gesso sign-in example]', message, stack);
     }
   });
   shell.setStatus('Source: src/playground/examples/SignInExampleApp.tsx — the passcode is 246813.');

@@ -41,7 +41,7 @@ const MATCH_REVEAL_PADDING = 8;
  * Finding text in the app's own content.
  *
  * The browser's find bar searches the DOM, and a canvas has none, so
- * Ctrl+F over a Nodal app has to be the app's.
+ * Ctrl+F over a Gesso app has to be the app's.
  *
  * The corpus is the node tree — every string `selectableTextNodes`
  * finds, in reading order. That is the same reach a DOM mirror would

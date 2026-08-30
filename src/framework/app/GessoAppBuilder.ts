@@ -6,19 +6,19 @@ import { ServiceRegistry } from '../service/ServiceRegistry';
 import { createChannelRegistry, type ChannelRegistration } from '../channel/createChannelRegistry';
 import type { ChannelSource } from '../channel/provide';
 import type { ChannelToken } from '../channel/ChannelToken';
-import { NodalApp } from './NodalApp';
-import type { FrameMetrics, RendererChoice } from './NodalRuntime';
+import { GessoApp } from './GessoApp';
+import type { FrameMetrics, RendererChoice } from './GessoRuntime';
 
 /**
  * Fluent builder for the single-thread configuration.
  */
-export class NodalAppBuilder {
+export class GessoAppBuilder {
   private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly serviceRegistrations: (new () => object)[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((text: string | null) => void) | undefined;
   private rendererChoice: RendererChoice | undefined;
-  private app: NodalApp | undefined;
+  private app: GessoApp | undefined;
 
   constructor(private readonly root: FrameworkChild | ComponentType) {}
 
@@ -107,7 +107,7 @@ export class NodalAppBuilder {
     for (const ServiceClass of this.serviceRegistrations) {
       services.register(ServiceClass);
     }
-    const app = new NodalApp({
+    const app = new GessoApp({
       host: element,
       root: rootElement,
       channels: channels.registry,

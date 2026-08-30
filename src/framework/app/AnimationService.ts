@@ -73,7 +73,7 @@ export class AnimationService {
    *
    * Bindable, so a component can decide not to render a decorative
    * movement at all rather than running one that snaps. The runtime
-   * sets it from the shell; see `NodalRuntime.setReducedMotion`.
+   * sets it from the shell; see `GessoRuntime.setReducedMotion`.
    */
   readonly reducedMotion = internalState(false);
 
