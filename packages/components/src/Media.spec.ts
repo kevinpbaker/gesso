@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from '@gesso/framework';
-import { mountRuntime } from '@gesso/framework/testing';
+import { renderTest } from '@gesso/testing';
 import {
   Box,
   Column,
@@ -46,11 +46,6 @@ function firstElement(node: UiNode): UiNode {
     throw new Error(`No element under '${node.id}'.`);
   }
   return child;
-}
-
-/** Lets the fetch → blob → decode → write chain settle. */
-function settle(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 function semanticsOf(node: UiNode): Record<string, unknown> {
@@ -190,8 +185,7 @@ function mountMedia(root: UiChild, options: { decode?: () => Promise<UiImage> } 
     fetch: () => Promise.resolve(new Blob()),
     decode: options.decode ?? (() => Promise.resolve(bitmap))
   });
-  const mounted = mountRuntime(root, { media: { resolver } });
-  mounted.frame();
+  const mounted = renderTest(root, { media: { resolver } });
   return { ...mounted, bitmap, resolver };
 }
 
@@ -212,8 +206,7 @@ describe('Image', () => {
     );
 
     expect(node!.properties.get('image')).toBeUndefined();
-    await settle();
-    mounted.frame();
+    await mounted.settle();
 
     expect(node!.properties.get('image')).toBe(mounted.bitmap);
     expect(semanticsOf(node!)).toMatchObject({ role: 'image', label: 'A photograph' });
@@ -236,9 +229,9 @@ describe('Image', () => {
     const children = new BehaviorSubject<UiChild>(
       Box({ key: 'shown' }, createComponent(Image, { src: 'photo.png', alt: 'One' }))
     );
-    const mounted = mountRuntime(Column({}, children), { media: { resolver } });
+    const mounted = renderTest(Column({}, children), { media: { resolver } });
     mounted.frame();
-    await settle();
+    await mounted.settle();
     expect(resolver.size).toBe(1);
 
     // The list drops the row; `host.own` releases inside removeSubtree,
@@ -263,17 +256,17 @@ describe('Icon', () => {
   it('resolves its colour against the theme it inherits, and redraws when that changes', async () => {
     const { rasterizer, fills } = recordingRasterizer();
     const theme = new BehaviorSubject<UiTheme>(lightTheme);
-    const mounted = mountRuntime(
+    const mounted = renderTest(
       Column({ theme }, createComponent(Icon, { path: 'M0 0h24v24H0z', color: 'controlAccent', size: 16 })),
       { media: { rasterizer } }
     );
     mounted.frame();
-    await settle();
+    await mounted.settle();
     expect(fills).toHaveLength(1);
 
     theme.next(darkTheme);
     mounted.frame();
-    await settle();
+    await mounted.settle();
 
     // Two rasters, in the two palettes' accents — a raster's colour is
     // baked in, so this is the one thing in the library that cannot
@@ -288,7 +281,7 @@ describe('Spinner and ProgressBar', () => {
     vi.useFakeTimers();
     try {
       let node: UiNode | null = null;
-      const mounted = mountRuntime(Column({ ref: (n: UiNode | null) => (node = n) }, createComponent(Spinner, {})));
+      const mounted = renderTest(Column({ ref: (n: UiNode | null) => (node = n) }, createComponent(Spinner, {})));
       mounted.frame(0);
       const spinner = firstElement(node!);
       expect(semanticsOf(spinner)).toMatchObject({ role: 'status', label: 'Loading', states: ['busy'] });
@@ -309,7 +302,7 @@ describe('Spinner and ProgressBar', () => {
   it('a determinate bar reports its value; an indeterminate one reports busy and no value', () => {
     let determinate: UiNode | null = null;
     let indeterminate: UiNode | null = null;
-    const mounted = mountRuntime(
+    const mounted = renderTest(
       Column(
         {},
         Column(

@@ -1,51 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent, type GessoRuntime, OverlayService } from '@gesso/framework';
-import { mountRuntime } from '@gesso/framework/testing';
-import { Button, Column, Row, type UiNode, UiEventType, UiPointerEvent } from '@gesso/core';
+import { createComponent, OverlayService } from '@gesso/framework';
+import { renderTest } from '@gesso/testing';
+import { Button, Column, Row, type UiRole, type UiSemanticsRecord } from '@gesso/core';
 import { Dialog } from './Dialog';
 import { Menu } from './Menu';
 import { Select } from './Select';
 
-function nodes(runtime: GessoRuntime): UiNode[] {
-  const result: UiNode[] = [];
-  const visit = (node: UiNode): void => {
-    result.push(node);
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      visit(child);
-    }
-  };
-  visit(runtime.layoutRoot());
-  return result;
-}
-
-function byRole(runtime: GessoRuntime, role: string): UiNode {
-  const node = nodes(runtime).find(candidate => candidate.properties.get('role') === role);
-  if (node === undefined) {
-    throw new Error(`no node with role '${role}'`);
-  }
-  return node;
-}
-
-function byLabel(runtime: GessoRuntime, label: string): UiNode {
-  const node = nodes(runtime).find(candidate => candidate.properties.get('label') === label);
-  if (node === undefined) {
-    throw new Error(`no node labelled '${label}'`);
-  }
-  return node;
-}
-
-function mount(root: Parameters<typeof mountRuntime>[0]) {
-  const mounted = mountRuntime(root, { width: 400, height: 400 });
-  mounted.frame(0);
-  const { runtime } = mounted;
+function mount(root: Parameters<typeof renderTest>[0]) {
+  const ui = renderTest(root, { width: 400, height: 400 });
   return {
-    ...mounted,
-    press: (key: string) => runtime.input.keyboard.keyDown(key),
-    click: (node: UiNode) => runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.Click, 0, 0), node),
-    focused: () => runtime.input.focus.focusedNode,
-    entries: () => runtime.services.get(OverlayService).entries.value
+    ...ui,
+    /** The overlay entries currently open, which is what a dialog or a select is. */
+    entries: () => ui.runtime.services.get(OverlayService).entries.value,
+    recordFor: (role: UiRole): UiSemanticsRecord | undefined =>
+      [...ui.semanticsTree().values()].find(record => record.role === role)
   };
 }
 
@@ -64,35 +34,35 @@ describe('Dialog', () => {
 
   it('traps the keyboard and restores it to the opener', () => {
     const open = new BehaviorSubject(false);
-    const { runtime, frame, press, focused } = mount(app(open));
-    const opener = byLabel(runtime, 'Open');
-    runtime.input.focus.focus(opener);
+    const ui = mount(app(open));
+    const opener = ui.getByLabel('Open');
+    ui.fireEvent.focus(opener);
 
     open.next(true);
-    frame();
+    ui.frame();
 
     // Focus moved into the dialog once its children existed.
-    expect(runtime.input.focus.trapped).toBe(true);
-    const inside = [focused()?.properties.get('label')];
-    press('Tab');
-    inside.push(focused()?.properties.get('label'));
-    press('Tab');
-    inside.push(focused()?.properties.get('label'));
+    expect(ui.runtime.input.focus.trapped).toBe(true);
+    const inside = [ui.runtime.input.focus.focusedNode?.properties.get('label')];
+    ui.fireEvent.keyDown('Tab');
+    inside.push(ui.runtime.input.focus.focusedNode?.properties.get('label'));
+    ui.fireEvent.keyDown('Tab');
+    inside.push(ui.runtime.input.focus.focusedNode?.properties.get('label'));
     expect(inside).toEqual(['Cancel', 'Delete', 'Cancel']);
 
     open.next(false);
-    frame();
+    ui.frame();
 
-    expect(runtime.input.focus.trapped).toBe(false);
-    expect(focused()).toBe(opener);
+    expect(ui.runtime.input.focus.trapped).toBe(false);
+    expect(ui.runtime.input.focus.focusedNode).toBe(opener);
   });
 
   it('says what it is, and that it is modal', () => {
     const open = new BehaviorSubject(true);
-    const { runtime, frame } = mount(app(open));
-    frame();
+    const ui = mount(app(open));
+    ui.frame();
 
-    const record = [...runtime.semanticsTree().values()].find(entry => entry.role === 'dialog');
+    const record = ui.recordFor('dialog');
     expect(record?.label).toBe('Delete note');
     expect(record?.description).toBe('This cannot be undone.');
     expect(record?.states).toEqual(['modal']);
@@ -100,21 +70,21 @@ describe('Dialog', () => {
 
   it('Escape closes it', () => {
     const open = new BehaviorSubject(true);
-    const { frame, press, entries } = mount(app(open));
-    frame();
-    expect(entries()).toHaveLength(1);
+    const ui = mount(app(open));
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
 
-    press('Escape');
-    frame();
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
 
-    expect(entries()).toHaveLength(0);
+    expect(ui.entries()).toHaveLength(0);
     expect(open.value).toBe(false);
   });
 
   it('Escape closes only the topmost, because focus is in it', () => {
     const outer = new BehaviorSubject(true);
     const inner = new BehaviorSubject(false);
-    const { frame, press, entries } = mount(
+    const ui = mount(
       Column(
         createComponent(Dialog, {
           open: outer,
@@ -130,17 +100,17 @@ describe('Dialog', () => {
         })
       )
     );
-    frame();
+    ui.frame();
     inner.next(true);
-    frame();
-    expect(entries()).toHaveLength(2);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(2);
 
-    press('Escape');
-    frame();
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
 
     expect(inner.value).toBe(false);
     expect(outer.value).toBe(true);
-    expect(entries()).toHaveLength(1);
+    expect(ui.entries()).toHaveLength(1);
   });
 });
 
@@ -162,71 +132,71 @@ describe('Select', () => {
 
   it('opens, walks and chooses from the keyboard alone', () => {
     const changes: string[] = [];
-    const { runtime, frame, press, entries } = mount(selectApp(changes));
-    runtime.input.focus.focus(byRole(runtime, 'combobox'));
+    const ui = mount(selectApp(changes));
+    ui.fireEvent.focus(ui.getByRole('combobox'));
 
-    press('Enter');
-    frame();
-    expect(entries()).toHaveLength(1);
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
 
-    press('ArrowDown');
-    press('Enter');
-    frame();
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
 
     expect(changes).toEqual(['bank']);
-    expect(entries()).toHaveLength(0);
+    expect(ui.entries()).toHaveLength(0);
   });
 
   it('Escape closes without choosing and gives the trigger back', () => {
     const changes: string[] = [];
-    const { runtime, frame, press, entries } = mount(selectApp(changes));
-    const trigger = byRole(runtime, 'combobox');
-    runtime.input.focus.focus(trigger);
+    const ui = mount(selectApp(changes));
+    const trigger = ui.getByRole('combobox');
+    ui.fireEvent.focus(trigger);
 
-    press('Enter');
-    frame();
-    press('ArrowDown');
-    press('Escape');
-    frame();
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
 
     expect(changes).toEqual([]);
-    expect(entries()).toHaveLength(0);
-    expect(runtime.input.focus.focusedNode).toBe(trigger);
+    expect(ui.entries()).toHaveLength(0);
+    expect(ui.runtime.input.focus.focusedNode).toBe(trigger);
   });
 
   it('jumps to an option by its first letter, closed and open', () => {
     const changes: string[] = [];
-    const { runtime, frame, press } = mount(selectApp(changes));
-    runtime.input.focus.focus(byRole(runtime, 'combobox'));
+    const ui = mount(selectApp(changes));
+    ui.fireEvent.focus(ui.getByRole('combobox'));
 
     // Closed: the letter chooses outright.
-    press('b');
+    ui.fireEvent.keyDown('b');
     expect(changes).toEqual(['bank']);
 
     // Open: it moves the highlight, and Enter takes it.
-    press('Enter');
-    frame();
-    press('c');
-    press('Enter');
-    frame();
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    ui.fireEvent.keyDown('c');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
     expect(changes).toEqual(['bank', 'card']);
   });
 
   it('reports what it is, what it holds and whether it is open', () => {
     const changes: string[] = [];
-    const { runtime, frame, press } = mount(selectApp(changes));
-    const record = () => [...runtime.semanticsTree().values()].find(entry => entry.role === 'combobox');
+    const ui = mount(selectApp(changes));
+    const record = () => ui.recordFor('combobox');
 
     expect(record()?.label).toBe('Payment');
     expect(record()?.valueText).toBe('Card');
     expect(record()?.states).toBeUndefined();
 
-    runtime.input.focus.focus(byRole(runtime, 'combobox'));
-    press('Enter');
-    frame();
+    ui.fireEvent.focus(ui.getByRole('combobox'));
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
 
     expect(record()?.states).toEqual(['expanded']);
-    const chosen = [...runtime.semanticsTree().values()].filter(entry => entry.role === 'option');
+    const chosen = ui.getAllByRole('option').map(node => ui.getSemantics(node));
     expect(chosen.map(entry => [entry.label, entry.states])).toEqual([
       ['Card', ['selected']],
       ['Bank transfer', undefined],
@@ -236,13 +206,13 @@ describe('Select', () => {
 
   it('sits beside its trigger, so the engine can flip it at the edge', () => {
     const changes: string[] = [];
-    const { runtime, frame, press, entries } = mount(selectApp(changes));
-    runtime.input.focus.focus(byRole(runtime, 'combobox'));
-    press('Enter');
-    frame();
+    const ui = mount(selectApp(changes));
+    ui.fireEvent.focus(ui.getByRole('combobox'));
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
 
-    const entry = entries()[0];
-    expect(entry.anchor).toBe(byRole(runtime, 'combobox'));
+    const entry = ui.entries()[0];
+    expect(entry.anchor).toBe(ui.getByRole('combobox'));
     expect(entry.placement).toBe('bottom-start');
   });
 });
@@ -251,7 +221,7 @@ describe('Menu', () => {
   it('walks its items and chooses one, then closes', () => {
     const open = new BehaviorSubject(false);
     const chosen: string[] = [];
-    const { frame, press, entries } = mount(
+    const ui = mount(
       createComponent(Menu, {
         open,
         items: [
@@ -265,15 +235,15 @@ describe('Menu', () => {
     );
 
     open.next(true);
-    frame();
-    expect(entries()).toHaveLength(1);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
 
-    press('ArrowDown');
-    press('Enter');
-    frame();
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
 
     expect(chosen).toEqual(['duplicate']);
-    expect(entries()).toHaveLength(0);
+    expect(ui.entries()).toHaveLength(0);
     expect(open.value).toBe(false);
   });
 });

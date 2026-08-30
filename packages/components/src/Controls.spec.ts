@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent, type GessoRuntime } from '@gesso/framework';
-import { mountRuntime } from '@gesso/framework/testing';
-import { Column, type UiNode, UiEventType, UiPointerEvent, type UiSemanticsRecord } from '@gesso/core';
+import { createComponent } from '@gesso/framework';
+import { renderTest, type Rendered } from '@gesso/testing';
+import '@gesso/testing/matchers';
+import { Column, type UiNode, type UiRole, type UiSemanticsRecord, UiEventType, UiPointerEvent } from '@gesso/core';
 import { Checkbox } from './Checkbox';
 import { NumberInput } from './NumberInput';
 import { RadioGroup } from './Radio';
@@ -11,129 +12,99 @@ import { Slider } from './Slider';
 import { Switch } from './Switch';
 import { TextArea, TextInput } from './TextInput';
 
-/** Every node under the root, in document order. */
-function nodes(runtime: GessoRuntime): UiNode[] {
-  const result: UiNode[] = [];
-  const visit = (node: UiNode): void => {
-    result.push(node);
-    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      visit(child);
-    }
-  };
-  visit(runtime.layoutRoot());
-  return result;
-}
-
-function byRole(runtime: GessoRuntime, role: string): UiNode {
-  const node = nodes(runtime).find(candidate => candidate.properties.get('role') === role);
-  if (node === undefined) {
-    throw new Error(`no node with role '${role}'`);
-  }
-  return node;
-}
-
-/** The semantics record for a role, as the mirror would receive it. */
-function semantics(runtime: GessoRuntime, role: string): UiSemanticsRecord {
-  const record = [...runtime.semanticsTree().values()].find(candidate => candidate.role === role);
-  if (record === undefined) {
-    throw new Error(`no semantics record with role '${role}'`);
-  }
-  return record;
-}
-
 /** The slider's track strip: the second child of the node that is the slider. */
-function trackOf(runtime: GessoRuntime): UiNode {
-  const strip = byRole(runtime, 'slider').firstChild?.nextSibling;
+function trackOf(ui: Pick<Rendered, 'getByRole'>): UiNode {
+  const strip = ui.getByRole('slider').firstChild?.nextSibling;
   if (strip === null || strip === undefined) {
     throw new Error('the slider has no track');
   }
   return strip;
 }
 
-function mount(root: Parameters<typeof mountRuntime>[0]) {
-  const mounted = mountRuntime(root, { width: 400, height: 400 });
-  mounted.frame(0);
-  const { runtime } = mounted;
-  const click = (node: UiNode): void => {
-    runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.Click, 0, 0), node);
+/**
+ * `renderTest` at this tier's size, plus the two moves every control
+ * test makes: focus the control, and read back what a screen reader
+ * would say about it.
+ *
+ * Both are one line of the library rather than a reimplementation of
+ * it, which is the difference between this and the forty-line preamble
+ * each spec in this package used to carry.
+ */
+function mount(root: Parameters<typeof renderTest>[0]) {
+  const ui = renderTest(root, { width: 400, height: 400 });
+  return {
+    ...ui,
+    focusRole: (role: UiRole): UiNode => {
+      const node = ui.getByRole(role);
+      ui.fireEvent.focus(node);
+      return node;
+    },
+    recordFor: (role: UiRole): UiSemanticsRecord => ui.getSemantics(ui.getByRole(role))
   };
-  const press = (key: string): void => {
-    runtime.input.keyboard.keyDown(key);
-  };
-  const focusRole = (role: string): UiNode => {
-    const node = byRole(runtime, role);
-    runtime.input.focus.focus(node);
-    return node;
-  };
-  return { ...mounted, click, press, focusRole };
 }
 
 describe('Checkbox', () => {
   it('manages its own value from defaultChecked', () => {
     const changes: boolean[] = [];
-    const { runtime, click, frame } = mount(
+    const ui = mount(
       createComponent(Checkbox, { label: 'Wrap lines', defaultChecked: false, onChange: v => changes.push(v) })
     );
 
-    click(byRole(runtime, 'checkbox'));
-    frame();
+    ui.fireEvent.click(ui.getByRole('checkbox'));
+    ui.frame();
 
     expect(changes).toEqual([true]);
-    expect(semantics(runtime, 'checkbox').states).toEqual(['checked']);
+    expect(ui.getByRole('checkbox')).toHaveSemantics({ states: ['checked'] });
   });
 
   it('does not move when the app owns the value and does not change it', () => {
     const changes: boolean[] = [];
-    const { runtime, click, frame } = mount(
-      createComponent(Checkbox, { label: 'Wrap', checked: false, onChange: v => changes.push(v) })
-    );
+    const ui = mount(createComponent(Checkbox, { label: 'Wrap', checked: false, onChange: v => changes.push(v) }));
 
-    click(byRole(runtime, 'checkbox'));
-    frame();
+    ui.fireEvent.click(ui.getByRole('checkbox'));
+    ui.frame();
 
     expect(changes).toEqual([true]);
     // The app said no, so the box is still unticked.
-    expect(semantics(runtime, 'checkbox').states).toBeUndefined();
+    expect(ui.getByRole('checkbox')).toHaveSemantics({ states: [] });
   });
 
   it('follows the app when the app does change it', () => {
     const checked$ = new BehaviorSubject(false);
-    const { runtime, frame } = mount(createComponent(Checkbox, { label: 'Wrap', checked: checked$ }));
+    const ui = mount(createComponent(Checkbox, { label: 'Wrap', checked: checked$ }));
 
     checked$.next(true);
-    frame();
+    ui.frame();
 
-    expect(semantics(runtime, 'checkbox').states).toEqual(['checked']);
+    expect(ui.recordFor('checkbox').states).toEqual(['checked']);
   });
 
   it('toggles from the keyboard', () => {
     const changes: boolean[] = [];
-    const { focusRole, press } = mount(
+    const ui = mount(
       createComponent(Checkbox, { label: 'Wrap', defaultChecked: false, onChange: v => changes.push(v) })
     );
 
-    focusRole('checkbox');
-    press(' ');
-    press('Enter');
+    ui.focusRole('checkbox');
+    ui.fireEvent.keyDown(' ');
+    ui.fireEvent.keyDown('Enter');
 
     expect(changes).toEqual([true, false]);
   });
 
   it('ignores input while disabled', () => {
     const changes: boolean[] = [];
-    const { runtime, click } = mount(
-      createComponent(Checkbox, { label: 'Wrap', disabled: true, onChange: v => changes.push(v) })
-    );
+    const ui = mount(createComponent(Checkbox, { label: 'Wrap', disabled: true, onChange: v => changes.push(v) }));
 
-    click(byRole(runtime, 'checkbox'));
+    ui.fireEvent.click(ui.getByRole('checkbox'));
 
     expect(changes).toEqual([]);
   });
 
   it('carries its name, and its validation states', () => {
-    const { runtime } = mount(createComponent(Checkbox, { label: 'Accept terms', required: true, invalid: true }));
+    const ui = mount(createComponent(Checkbox, { label: 'Accept terms', required: true, invalid: true }));
 
-    const record = semantics(runtime, 'checkbox');
+    const record = ui.recordFor('checkbox');
     expect(record.label).toBe('Accept terms');
     expect(record.states).toEqual(['invalid', 'required']);
   });
@@ -148,15 +119,13 @@ describe('Checkbox', () => {
 describe('Switch', () => {
   it('is a switch, not a checkbox, and toggles', () => {
     const changes: boolean[] = [];
-    const { runtime, click, frame } = mount(
-      createComponent(Switch, { label: 'Notifications', onChange: v => changes.push(v) })
-    );
+    const ui = mount(createComponent(Switch, { label: 'Notifications', onChange: v => changes.push(v) }));
 
-    click(byRole(runtime, 'switch'));
-    frame();
+    ui.fireEvent.click(ui.getByRole('switch'));
+    ui.frame();
 
     expect(changes).toEqual([true]);
-    expect(semantics(runtime, 'switch').label).toBe('Notifications');
+    expect(ui.getByRole('switch')).toHaveSemantics({ role: 'switch', name: 'Notifications' });
   });
 });
 
@@ -169,35 +138,35 @@ describe('RadioGroup', () => {
 
   it('is one tab stop whose arrows move the choice, skipping disabled options', () => {
     const changes: string[] = [];
-    const { focusRole, press } = mount(
+    const ui = mount(
       createComponent(RadioGroup, { label: 'Payment', options, defaultValue: 'card', onChange: v => changes.push(v) })
     );
 
-    focusRole('radiogroup');
-    press('ArrowDown');
-    press('ArrowDown');
+    ui.focusRole('radiogroup');
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('ArrowDown');
 
     // Cash is disabled, so the second step wraps back to Card.
     expect(changes).toEqual(['bank', 'card']);
   });
 
   it('reports each option and which one is chosen', () => {
-    const { runtime } = mount(createComponent(RadioGroup, { label: 'Payment', options, defaultValue: 'bank' }));
+    const ui = mount(createComponent(RadioGroup, { label: 'Payment', options, defaultValue: 'bank' }));
 
-    const radios = [...runtime.semanticsTree().values()].filter(record => record.role === 'radio');
+    const radios = ui.getAllByRole('radio').map(node => ui.getSemantics(node));
     expect(radios.map(record => record.label)).toEqual(['Card', 'Bank transfer', 'Cash']);
     expect(radios.map(record => record.states)).toEqual([undefined, ['checked'], undefined]);
   });
 
   it('Home and End jump to the ends', () => {
     const changes: string[] = [];
-    const { focusRole, press } = mount(
+    const ui = mount(
       createComponent(RadioGroup, { label: 'Payment', options, defaultValue: 'bank', onChange: v => changes.push(v) })
     );
 
-    focusRole('radiogroup');
-    press('End');
-    press('Home');
+    ui.focusRole('radiogroup');
+    ui.fireEvent.keyDown('End');
+    ui.fireEvent.keyDown('Home');
 
     // Cash is disabled, so the last selectable option is Bank.
     expect(changes).toEqual(['bank', 'card']);
@@ -207,7 +176,7 @@ describe('RadioGroup', () => {
 describe('TextInput', () => {
   it('reports what was typed and carries its name and message', () => {
     const changes: string[] = [];
-    const { runtime, frame } = mount(
+    const ui = mount(
       createComponent(TextInput, {
         label: 'Email',
         description: 'We only use it to sign you in.',
@@ -215,35 +184,35 @@ describe('TextInput', () => {
         onChange: v => changes.push(v)
       })
     );
-    const field = byRole(runtime, 'textbox');
+    const field = ui.getByRole('textbox');
 
-    runtime.input.focus.focus(field);
-    runtime.input.editing.beforeInput('insertText', 'ada@example.com');
-    frame();
+    ui.fireEvent.focus(field);
+    ui.fireEvent.type('ada@example.com');
+    ui.frame();
 
     expect(changes).toEqual(['ada@example.com']);
-    const record = semantics(runtime, 'textbox');
+    const record = ui.recordFor('textbox');
     expect(record.label).toBe('Email');
     expect(record.valueText).toBe('ada@example.com');
     expect(record.description).toBe('We only use it to sign you in.');
   });
 
   it('is invalid, and says so, when it has an error', () => {
-    const { runtime } = mount(createComponent(TextInput, { label: 'Email', error: 'Enter an email address' }));
+    const ui = mount(createComponent(TextInput, { label: 'Email', error: 'Enter an email address' }));
 
-    expect(semantics(runtime, 'textbox').states).toEqual(['invalid']);
+    expect(ui.recordFor('textbox').states).toEqual(['invalid']);
   });
 
   it('submits on Enter when it is a single line, and does not when it is not', () => {
     const submits = vi.fn();
     const single = mount(createComponent(TextInput, { label: 'Email', onSubmit: submits }));
-    single.runtime.input.focus.focus(byRole(single.runtime, 'textbox'));
-    single.press('Enter');
+    single.focusRole('textbox');
+    single.fireEvent.keyDown('Enter');
     expect(submits).toHaveBeenCalledTimes(1);
 
     const multi = mount(createComponent(TextArea, { label: 'Notes', onSubmit: submits }));
-    multi.runtime.input.focus.focus(byRole(multi.runtime, 'textbox'));
-    multi.press('Enter');
+    multi.focusRole('textbox');
+    multi.fireEvent.keyDown('Enter');
     expect(submits).toHaveBeenCalledTimes(1);
   });
 });
@@ -251,7 +220,7 @@ describe('TextInput', () => {
 describe('Slider', () => {
   it('steps with the arrows and clamps to its range', () => {
     const changes: number[] = [];
-    const { focusRole, press } = mount(
+    const ui = mount(
       createComponent(Slider, {
         label: 'Volume',
         min: 0,
@@ -262,17 +231,17 @@ describe('Slider', () => {
       })
     );
 
-    focusRole('slider');
-    press('ArrowRight');
-    press('ArrowRight');
-    press('Home');
-    press('ArrowLeft');
+    ui.focusRole('slider');
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.fireEvent.keyDown('Home');
+    ui.fireEvent.keyDown('ArrowLeft');
 
     expect(changes).toEqual([10, 10, 0, 0]);
   });
 
   it('reports its value, its range and how to say it', () => {
-    const { runtime } = mount(
+    const ui = mount(
       createComponent(Slider, {
         label: 'Volume',
         min: 0,
@@ -282,7 +251,7 @@ describe('Slider', () => {
       })
     );
 
-    const record = semantics(runtime, 'slider');
+    const record = ui.recordFor('slider');
     expect(record.valueNow).toBe(4);
     expect(record.valueMin).toBe(0);
     expect(record.valueMax).toBe(10);
@@ -291,7 +260,7 @@ describe('Slider', () => {
 
   it('turns a pan into a value on the track it measured', () => {
     const changes: number[] = [];
-    const { runtime, frame } = mount(
+    const ui = mount(
       createComponent(Slider, {
         label: 'Volume',
         min: 0,
@@ -302,14 +271,14 @@ describe('Slider', () => {
       })
     );
     // The measure modifier reported the strip's box on the first frame.
-    frame();
+    ui.frame();
 
     // A press-and-move is a Pan; a Drag here is a long press then a
     // move, which is not how a thumb is grabbed. The slider fills the
     // 400px root, so three quarters along is 75.
-    const strip = trackOf(runtime);
-    runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanStart, 300, 30), strip);
-    runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanMove, 200, 30), strip);
+    const strip = trackOf(ui);
+    ui.runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanStart, 300, 30), strip);
+    ui.runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanMove, 200, 30), strip);
 
     expect(changes).toEqual([75, 50]);
   });
@@ -318,14 +287,14 @@ describe('Slider', () => {
 describe('NumberInput', () => {
   it('steps with the arrows, bounded by its range', () => {
     const changes: number[] = [];
-    const { focusRole, press } = mount(
+    const ui = mount(
       createComponent(NumberInput, { label: 'Guests', min: 1, max: 3, defaultValue: 2, onChange: v => changes.push(v) })
     );
 
-    focusRole('spinbutton');
-    press('ArrowUp');
-    press('ArrowUp');
-    press('ArrowDown');
+    ui.focusRole('spinbutton');
+    ui.fireEvent.keyDown('ArrowUp');
+    ui.fireEvent.keyDown('ArrowUp');
+    ui.fireEvent.keyDown('ArrowDown');
 
     expect(changes).toEqual([3, 3, 2]);
   });
@@ -333,13 +302,13 @@ describe('NumberInput', () => {
   it('reports a number only when the text is one', () => {
     const type = (character: string): number[] => {
       const changes: number[] = [];
-      const { runtime, frame } = mount(
+      const ui = mount(
         createComponent(NumberInput, { label: 'Guests', defaultValue: 0, onChange: v => changes.push(v) })
       );
-      runtime.input.focus.focus(byRole(runtime, 'spinbutton'));
-      runtime.input.keyboard.keyDown('End');
-      runtime.input.editing.beforeInput('insertText', character);
-      frame();
+      ui.focusRole('spinbutton');
+      ui.fireEvent.keyDown('End');
+      ui.fireEvent.type(character);
+      ui.frame();
       return changes;
     };
 
@@ -352,7 +321,7 @@ describe('NumberInput', () => {
 
 describe('the tier as a whole', () => {
   it('emits a role, a name and states for every control on one form', () => {
-    const { runtime } = mount(
+    const ui = mount(
       Column(
         createComponent(TextInput, { label: 'Email' }),
         createComponent(Checkbox, { label: 'Remember me' }),
@@ -362,7 +331,7 @@ describe('the tier as a whole', () => {
       )
     );
 
-    const roles = [...runtime.semanticsTree().values()]
+    const roles = [...ui.semanticsTree().values()]
       .filter(record => record.role !== undefined && record.role !== 'button')
       .map(record => [record.role, record.label]);
     expect(roles).toEqual([
