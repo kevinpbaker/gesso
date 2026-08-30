@@ -24,7 +24,7 @@ import {
 } from './UiElement';
 import type { UiNodeRef } from './UiElementProps';
 import type { UiProps } from './UiProps';
-import { UiModifierSet, assertModifierList } from '../modifiers/UiModifierSet';
+import { UiModifierSet, assertModifierList, type UiModifierLayout } from '../modifiers/UiModifierSet';
 
 /**
  * Property reserved for reconciliation identity.
@@ -78,6 +78,15 @@ export interface UiGraphBuilderOptions {
    * renders working.
    */
   dispatcher?: UiInputDispatcher;
+
+  /**
+   * Lets a modifier read its node's box and follow it.
+   *
+   * Supplied by the runtime, which is where the layout engine lives.
+   * Without it `host.onLayout` warns once and does nothing, as event
+   * registration does without a dispatcher.
+   */
+  layout?: UiModifierLayout;
 }
 
 /**
@@ -118,6 +127,8 @@ export class UiGraphBuilder {
 
   private readonly dispatcher: UiInputDispatcher | undefined;
 
+  private readonly layout: UiModifierLayout | undefined;
+
   /** Ensures the missing-dispatcher warning is emitted at most once. */
   private warnedAboutDispatcher = false;
 
@@ -127,6 +138,8 @@ export class UiGraphBuilder {
   ) {
     this.components = options.components;
     this.dispatcher = options.dispatcher;
+    this.layout = options.layout;
+    this.layout = options.layout;
   }
 
   /**
@@ -570,7 +583,7 @@ export class UiGraphBuilder {
       return;
     }
     const list = assertModifierList(node, declared);
-    const set = existing ?? new UiModifierSet(node, this.graph, this.dispatcher);
+    const set = existing ?? new UiModifierSet(node, this.graph, this.dispatcher, this.layout);
     if (existing === undefined) {
       this.modifiers.set(node, set);
     }

@@ -1,6 +1,7 @@
 import type { Observable } from 'rxjs';
 
 import type { UiNode } from '../graph/UiNode';
+import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventListener, UiEventListenerOptions } from '../input/UiInputDispatcher';
 import type { UiEventType } from '../input/UiInputEvent';
 
@@ -17,7 +18,7 @@ export type UiModifierTeardown = (() => void) | { unsubscribe(): void };
  * add or remove children (a behaviour that needs children is a
  * component, and component identity is node identity).
  *
- * Layout, environment and focus arrive in B2.
+ * Environment and focus access arrive with the rest of B2.
  */
 export interface UiModifierHost {
   /** The node the modifier is attached to. */
@@ -50,6 +51,17 @@ export interface UiModifierHost {
    * Teardowns run in reverse order, as a stack unwinds.
    */
   own(teardown: UiModifierTeardown): void;
+  /**
+   * Where the node is now, in layout coordinates, or null before the
+   * first layout and for a node that has no record (a fragment).
+   */
+  layoutBox(): LayoutBox | null;
+  /**
+   * Called after any frame that moved the node's box — including a
+   * scroll, which moves everything under the scroller. Removed on
+   * detach.
+   */
+  onLayout(listener: (box: LayoutBox) => void): void;
   /** Asks for a repaint, for a modifier whose own state changed. */
   requestFrame(): void;
 }

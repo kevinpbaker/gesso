@@ -32,6 +32,7 @@ import { ShellStore, type ShellRequest } from './ShellStore';
 import { FindStore } from './FindStore';
 import { FocusStore } from './FocusStore';
 import { buildSemanticsTree, diffSemantics } from '../../ui/semantics';
+import { LayoutNotifier } from '../../ui/layout/LayoutNotifier';
 import type { UiSemanticsMap, UiSemanticsPatch } from '../../ui/semantics';
 import { LayoutEngine } from '../../ui/layout/LayoutEngine';
 import type { LayoutExplanation } from '../../ui/layout/LayoutExplanation';
@@ -201,6 +202,7 @@ export class NodalRuntime {
   private findController: UiFindController | null = null;
   /** Reachable before `input` is assigned, for the same reason. */
   private focusManager: UiFocusManager | null = null;
+  private readonly layoutNotifier: LayoutNotifier;
   private semantics: UiSemanticsMap = new Map();
   private semanticsListener: ((patches: readonly UiSemanticsPatch[]) => void) | null = null;
   private lastEditingState: EditingState | null = null;
@@ -268,7 +270,19 @@ export class NodalRuntime {
     this.engine = new LayoutEngine(this.textMeasurer);
     this.inspector = new LayoutInspector(this.engine);
     this.resolver = new ComponentHostResolver(this.stores);
-    this.builder = new UiGraphBuilder(this.graph, { components: this.resolver, dispatcher: this.dispatcher });
+    this.layoutNotifier = new LayoutNotifier();
+    this.builder = new UiGraphBuilder(this.graph, {
+      components: this.resolver,
+      dispatcher: this.dispatcher,
+      layout: {
+        // The visible box, not the world box: a modifier that turns a
+        // pointer position into a fraction of its node needs where the
+        // node is *seen*, which is the world box after every scroll and
+        // sticky offset above it.
+        box: node => (this.engine.recordFor(node) === undefined ? null : this.engine.visibleBox(node)),
+        onLayout: (node, listener) => this.layoutNotifier.add(node, listener)
+      }
+    });
 
     for (const StoreClass of options.storeClasses ?? []) {
       this.stores.register(StoreClass);
@@ -313,6 +327,7 @@ export class NodalRuntime {
       // Nor can focus: a closed dialog or a recycled row takes the
       // focused node with it.
       this.focusManager?.handleNodeRemoved(node);
+      this.layoutNotifier.handleNodeRemoved(node);
     });
 
     this.buildRoot(options.root);
@@ -973,6 +988,12 @@ export class NodalRuntime {
     );
     if (laidOut) {
       this.inspector.recordLayout(started);
+    }
+    // A modifier that follows its node's box hears about it here, after
+    // the boxes are final and before anything paints from them. Nothing
+    // listening means nothing walked.
+    if (!this.layoutNotifier.isEmpty()) {
+      this.layoutNotifier.notify(node => this.engine.visibleBox(node));
     }
 
     // What the tree *means* changes far less often than where it sits,

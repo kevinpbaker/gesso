@@ -1,4 +1,7 @@
+import type { Subject } from 'rxjs';
+
 import { UiEventType } from '../input/UiInputEvent';
+import type { LayoutBox } from '../layout/LayoutTypes';
 import { UiVisualState, type UiVisualStateSet } from '../properties/UiVisualState';
 import { defineModifier, type UiModifier } from './UiModifier';
 
@@ -136,3 +139,23 @@ function sameStates(a: UiVisualStateSet, b: ReadonlySet<UiVisualState>): boolean
   }
   return true;
 }
+
+/**
+ * Reports the node's box whenever it moves: the `ResizeObserver` a
+ * canvas does not have.
+ *
+ * The subject is the caller's, so a component can attach this to an
+ * element it renders and read the box back — which is how a split pane
+ * turns a pointer position into a fraction of its own track without
+ * reaching into the layout engine.
+ */
+export const measure = defineModifier<Subject<LayoutBox>>({
+  name: 'measure',
+  attach(host, target) {
+    const box = host.layoutBox();
+    if (box !== null) {
+      target.next(box);
+    }
+    host.onLayout(next => target.next(next));
+  }
+});

@@ -5,6 +5,7 @@ import type { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
 import { clearOverrideProperty, writeOverrideProperty } from '../graph/UiPropertyOverrides';
 import type { UiEventListener, UiEventListenerOptions, UiInputDispatcher } from '../input/UiInputDispatcher';
+import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventType } from '../input/UiInputEvent';
 import { findPropertyDefinition, propertyEffects } from '../properties/UiPropertyRegistry';
 import { resolveProperty } from '../properties/UiPropertyResolver';
@@ -32,13 +33,20 @@ interface Attached {
  * The set keeps list order, because order is semantic: B1's override
  * layer resolves a conflict in favour of whichever modifier is later.
  */
+/** Where a modifier's layout access comes from; the runtime supplies it. */
+export interface UiModifierLayout {
+  box(node: UiNode): LayoutBox | null;
+  onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
+}
+
 export class UiModifierSet {
   private attached: Attached[] = [];
 
   constructor(
     private readonly node: UiNode,
     private readonly graph: UiGraph,
-    private readonly dispatcher?: UiInputDispatcher
+    private readonly dispatcher?: UiInputDispatcher,
+    private readonly layout?: UiModifierLayout
   ) {}
 
   /** The names of what is attached, in order, for the inspector. */
@@ -98,7 +106,7 @@ export class UiModifierSet {
   }
 
   private attach(kind: UiModifierKind<unknown>, slot: string | number, args: unknown): Attached {
-    const host = new Host(this.node, this.graph, kind.name, this.dispatcher);
+    const host = new Host(this.node, this.graph, kind.name, this.dispatcher, this.layout);
     const entry: Attached = { kind, slot, host, args };
     kind.attach(host, args);
     return entry;
@@ -145,7 +153,8 @@ class Host implements UiModifierHost {
     readonly node: UiNode,
     private readonly graph: UiGraph,
     private readonly name: string,
-    private readonly dispatcher?: UiInputDispatcher
+    private readonly dispatcher?: UiInputDispatcher,
+    private readonly layout?: UiModifierLayout
   ) {
     this.source = Symbol(name);
   }
@@ -207,6 +216,18 @@ class Host implements UiModifierHost {
     this.own(() => dispatcher.removeEventListener(this.node, type, listener, options));
   }
 
+  layoutBox(): LayoutBox | null {
+    return this.layout?.box(this.node) ?? null;
+  }
+
+  onLayout(listener: (box: LayoutBox) => void): void {
+    if (this.layout === undefined) {
+      warnMissingLayout(this.name);
+      return;
+    }
+    this.own(this.layout.onLayout(this.node, listener));
+  }
+
   own(teardown: UiModifierTeardown): void {
     this.teardowns.push(teardown);
   }
@@ -248,6 +269,19 @@ class Host implements UiModifierHost {
       }
     }
   }
+}
+
+let warnedAboutLayout = false;
+
+function warnMissingLayout(name: string): void {
+  if (warnedAboutLayout) {
+    return;
+  }
+  warnedAboutLayout = true;
+  console.warn(
+    `Modifier '${name}' asked to follow its node's box, but the UiGraphBuilder was constructed without layout access. ` +
+      `Construct it with { layout } for onLayout to fire.`
+  );
 }
 
 let warnedAboutDispatcher = false;
