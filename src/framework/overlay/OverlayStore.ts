@@ -49,6 +49,17 @@ export interface OverlayEntry {
   readonly dismissOnOutsidePress?: boolean;
   /** Order among open entries; later entries paint on top by default. */
   readonly zIndex?: number;
+  /**
+   * A node whose environment the content should inherit.
+   *
+   * The layer is mounted above the app root, so an entry's content is
+   * nowhere near the tree that opened it and inherits none of its
+   * scoped values: a menu opened inside a dark-themed panel would come
+   * out light. Passing a node from that tree — a trigger, or the
+   * placeholder the component left where it was declared — carries the
+   * theme across.
+   */
+  readonly environment?: UiNode | null;
   readonly onClose?: () => void;
 }
 
