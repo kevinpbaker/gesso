@@ -1,12 +1,14 @@
 import { isObservable, type Observable, type Subscription } from 'rxjs';
 
 import { DirtyFlags } from '../graph/DirtyFlags';
+import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import type { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
 import { clearOverrideProperty, writeOverrideProperty } from '../graph/UiPropertyOverrides';
 import type { UiEventListener, UiEventListenerOptions, UiInputDispatcher } from '../input/UiInputDispatcher';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventType } from '../input/UiInputEvent';
+import type { DecorationShape } from '../rendering/Decorations';
 import { findPropertyDefinition, propertyEffects } from '../properties/UiPropertyRegistry';
 import { resolveProperty } from '../properties/UiPropertyResolver';
 import { isUiModifier, type UiModifier, type UiModifierKind } from './UiModifier';
@@ -18,6 +20,32 @@ interface Attached {
   readonly slot: string | number;
   readonly host: Host;
   args: unknown;
+}
+
+/** Where a modifier's layout access comes from; the runtime supplies it. */
+export interface UiModifierLayout {
+  box(node: UiNode): LayoutBox | null;
+  onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
+}
+
+/**
+ * Where a modifier's focus access comes from.
+ *
+ * Supplied by the runtime, which owns the focus manager. Kept behind
+ * an interface for the same reason layout is: `src/ui/composition`
+ * must not depend on the input stack, and a headless build has
+ * neither.
+ */
+export interface UiModifierFocus {
+  isFocused(node: UiNode): boolean;
+  focus(node: UiNode): void;
+  onFocusChange(node: UiNode, listener: (focused: boolean) => void): () => void;
+}
+
+/** Where a modifier's environment access comes from. */
+export interface UiModifierEnvironment {
+  read<T>(node: UiNode, key: UiEnvironmentKey<T>): T;
+  onChange(node: UiNode, listener: () => void): () => void;
 }
 
 /**
@@ -33,21 +61,27 @@ interface Attached {
  * The set keeps list order, because order is semantic: B1's override
  * layer resolves a conflict in favour of whichever modifier is later.
  */
-/** Where a modifier's layout access comes from; the runtime supplies it. */
-export interface UiModifierLayout {
-  box(node: UiNode): LayoutBox | null;
-  onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
-}
-
 export class UiModifierSet {
   private attached: Attached[] = [];
+  /** Built on the first `decorate`, so an undecorated node allocates nothing. */
+  private decorations: NodeDecorations | null = null;
 
   constructor(
     private readonly node: UiNode,
     private readonly graph: UiGraph,
     private readonly dispatcher?: UiInputDispatcher,
-    private readonly layout?: UiModifierLayout
+    private readonly layout?: UiModifierLayout,
+    private readonly focus?: UiModifierFocus,
+    private readonly environment?: UiModifierEnvironment
   ) {}
+
+  /** The merged decoration list, created on demand. */
+  private decorationsFor(): NodeDecorations {
+    if (this.decorations === null) {
+      this.decorations = new NodeDecorations(this.node, this.graph);
+    }
+    return this.decorations;
+  }
 
   /** The names of what is attached, in order, for the inspector. */
   get names(): string[] {
@@ -88,6 +122,9 @@ export class UiModifierSet {
     for (const [order, entry] of next.entries()) {
       entry.host.setOrder(order);
     }
+    // Order is semantic for decorations too: a node paints its
+    // modifiers' shapes in the order the element listed them.
+    this.decorations?.reorder();
 
     for (const entry of previous) {
       if (!taken.has(entry)) {
@@ -106,7 +143,12 @@ export class UiModifierSet {
   }
 
   private attach(kind: UiModifierKind<unknown>, slot: string | number, args: unknown): Attached {
-    const host = new Host(this.node, this.graph, kind.name, this.dispatcher, this.layout);
+    const host = new Host(this.node, this.graph, kind.name, () => this.decorationsFor(), {
+      dispatcher: this.dispatcher,
+      layout: this.layout,
+      focus: this.focus,
+      environment: this.environment
+    });
     const entry: Attached = { kind, slot, host, args };
     kind.attach(host, args);
     return entry;
@@ -142,19 +184,27 @@ export class UiModifierSet {
  * instances of one kind on a node write independently and each
  * restores only its own.
  */
+interface HostServices {
+  dispatcher?: UiInputDispatcher;
+  layout?: UiModifierLayout;
+  focus?: UiModifierFocus;
+  environment?: UiModifierEnvironment;
+}
+
 class Host implements UiModifierHost {
   private teardowns: UiModifierTeardown[] = [];
   private readonly source: symbol;
   private readonly written = new Set<string>();
   private readonly subscriptions = new Map<string, Subscription>();
   private order = 0;
+  private decorated = false;
 
   constructor(
     readonly node: UiNode,
     private readonly graph: UiGraph,
     private readonly name: string,
-    private readonly dispatcher?: UiInputDispatcher,
-    private readonly layout?: UiModifierLayout
+    private readonly decorations: () => NodeDecorations,
+    private readonly services: HostServices
   ) {
     this.source = Symbol(name);
   }
@@ -167,6 +217,9 @@ class Host implements UiModifierHost {
     this.order = order;
     for (const property of this.written) {
       this.write(property, this.node.properties.get(property));
+    }
+    if (this.decorated) {
+      this.decorations().setOrder(this.source, order);
     }
   }
 
@@ -207,25 +260,72 @@ class Host implements UiModifierHost {
   }
 
   on(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void {
-    if (this.dispatcher === undefined) {
+    const dispatcher = this.services.dispatcher;
+    if (dispatcher === undefined) {
       warnMissingDispatcher(this.name);
       return;
     }
-    const dispatcher = this.dispatcher;
     dispatcher.addEventListener(this.node, type, listener, options);
     this.own(() => dispatcher.removeEventListener(this.node, type, listener, options));
   }
 
   layoutBox(): LayoutBox | null {
-    return this.layout?.box(this.node) ?? null;
+    return this.services.layout?.box(this.node) ?? null;
   }
 
   onLayout(listener: (box: LayoutBox) => void): void {
-    if (this.layout === undefined) {
+    const layout = this.services.layout;
+    if (layout === undefined) {
       warnMissingLayout(this.name);
       return;
     }
-    this.own(this.layout.onLayout(this.node, listener));
+    this.own(layout.onLayout(this.node, listener));
+  }
+
+  environment<T>(key: UiEnvironmentKey<T>): T {
+    const environment = this.services.environment;
+    if (environment === undefined) {
+      // The default is what an unprovided key resolves to anyway, so a
+      // headless build reads the same value the tree would.
+      return key.defaultValue;
+    }
+    return environment.read(this.node, key);
+  }
+
+  onEnvironment(listener: () => void): void {
+    const environment = this.services.environment;
+    if (environment === undefined) {
+      warnMissing(this.name, 'follow its environment', 'environment');
+      return;
+    }
+    this.own(environment.onChange(this.node, listener));
+  }
+
+  focus(): void {
+    const focus = this.services.focus;
+    if (focus === undefined) {
+      warnMissing(this.name, 'move focus', 'focus');
+      return;
+    }
+    focus.focus(this.node);
+  }
+
+  isFocused(): boolean {
+    return this.services.focus?.isFocused(this.node) ?? false;
+  }
+
+  onFocusChange(listener: (focused: boolean) => void): void {
+    const focus = this.services.focus;
+    if (focus === undefined) {
+      warnMissing(this.name, 'follow focus', 'focus');
+      return;
+    }
+    this.own(focus.onFocusChange(this.node, listener));
+  }
+
+  decorate(shapes: readonly DecorationShape[] | null): void {
+    this.decorated = shapes !== null;
+    this.decorations().set(this.source, this.order, shapes);
   }
 
   own(teardown: UiModifierTeardown): void {
@@ -258,6 +358,9 @@ class Host implements UiModifierHost {
     for (const property of this.written) {
       this.clear(property);
     }
+    if (this.decorated) {
+      this.decorate(null);
+    }
     const teardowns = this.teardowns;
     this.teardowns = [];
     for (let index = teardowns.length - 1; index >= 0; index--) {
@@ -268,6 +371,68 @@ class Host implements UiModifierHost {
         teardown.unsubscribe();
       }
     }
+  }
+}
+
+/**
+ * The merged decorations of one node.
+ *
+ * Every modifier that decorates contributes its own list; the node
+ * paints the concatenation in modifier order, which is the same rule
+ * the override cascade uses and for the same reason — order in the
+ * element's list is the only thing that can settle a disagreement, and
+ * it is the one a reader can see.
+ *
+ * `node.decorations` goes back to null when the last contributor
+ * leaves, so a node that was decorated and is not any more costs
+ * exactly what it did before.
+ */
+class NodeDecorations {
+  private readonly bySource = new Map<symbol, { order: number; shapes: readonly DecorationShape[] }>();
+
+  constructor(
+    private readonly node: UiNode,
+    private readonly graph: UiGraph
+  ) {}
+
+  set(source: symbol, order: number, shapes: readonly DecorationShape[] | null): void {
+    if (shapes === null || shapes.length === 0) {
+      if (!this.bySource.delete(source)) {
+        return;
+      }
+    } else {
+      this.bySource.set(source, { order, shapes });
+    }
+    this.rebuild();
+  }
+
+  setOrder(source: symbol, order: number): void {
+    const entry = this.bySource.get(source);
+    if (entry === undefined || entry.order === order) {
+      return;
+    }
+    entry.order = order;
+    this.rebuild();
+  }
+
+  reorder(): void {
+    if (this.bySource.size > 1) {
+      this.rebuild();
+    }
+  }
+
+  private rebuild(): void {
+    if (this.bySource.size === 0) {
+      this.node.decorations = null;
+      this.graph.markDirty(this.node, DirtyFlags.Paint);
+      return;
+    }
+    const merged: DecorationShape[] = [];
+    for (const entry of [...this.bySource.values()].sort((a, b) => a.order - b.order)) {
+      merged.push(...entry.shapes);
+    }
+    this.node.decorations = merged;
+    this.graph.markDirty(this.node, DirtyFlags.Paint);
   }
 }
 
@@ -294,6 +459,20 @@ function warnMissingDispatcher(name: string): void {
   console.warn(
     `Modifier '${name}' asked to listen for input, but the UiGraphBuilder was constructed without a dispatcher. ` +
       `Construct it with { dispatcher } for modifiers to receive events.`
+  );
+}
+
+const warnedAbout = new Set<string>();
+
+/** One warning per missing service, as the two above do for theirs. */
+function warnMissing(name: string, what: string, option: string): void {
+  if (warnedAbout.has(option)) {
+    return;
+  }
+  warnedAbout.add(option);
+  console.warn(
+    `Modifier '${name}' asked to ${what}, but the UiGraphBuilder was constructed without ${option} access. ` +
+      `Construct it with { ${option} }, as the runtime does.`
   );
 }
 

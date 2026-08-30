@@ -17,6 +17,7 @@ import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import { drawOverlayShapes } from '../OverlayShapes';
+import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -43,8 +44,10 @@ export interface Canvas2DRendererOptions {
  *   1. background fill   (backgroundColor, rounded rect when radius > 0)
  *   2. background image  (image + objectFit)
  *   3. border            (borderWidth/borderColor)
- *   4. children          (tree order)
- *   5. foreground text   (text + text style)
+ *   4. decorations       (what the node's modifiers drew)
+ *   5. children          (tree order)
+ *   6. foreground text   (text + text style)
+ *   7. decorations       (those marked `after: 'children'`)
  *
  * All geometry is absolute layout-root coordinates. Scroll
  * containers clip to their viewport and translate by
@@ -164,6 +167,14 @@ export class Canvas2DRenderer implements UiRenderer {
     this.paintBackground(ctx, rec, paint);
     this.paintImage(ctx, rec, paint);
     this.paintBorder(ctx, rec, paint);
+    // Decorations sit beside the border, outside the node's own clip:
+    // a focus ring's every pixel lies outside the box that would clip
+    // it. Ancestors' clips and the node's transform do apply, which is
+    // what makes a ring disappear with a scrolled-away row.
+    const decorations = node.decorations;
+    if (decorations !== null && hasDecorationPhase(decorations, false)) {
+      this.paintDecorations(ctx, node, rec, paint, decorations, false);
+    }
 
     if (rec.clips) {
       // overflow hidden/scroll/auto and ScrollView: children and the
@@ -207,6 +218,9 @@ export class Canvas2DRenderer implements UiRenderer {
 
     if (rec.clips) {
       ctx.restore();
+    }
+    if (decorations !== null && hasDecorationPhase(decorations, true)) {
+      this.paintDecorations(ctx, node, rec, resolvePaintState(node, this.paint), decorations, true);
     }
     if (rec.scrollable) {
       this.paintScrollbars(ctx, rec, context.now ?? performance.now());
@@ -308,6 +322,66 @@ export class Canvas2DRenderer implements UiRenderer {
       ctx.stroke();
     } else {
       ctx.strokeRect(x, y, width, height);
+    }
+  }
+
+  /**
+   * The shapes the node's modifiers put on it, in modifier order.
+   *
+   * The geometry and the colour come from `Decorations.ts` rather than
+   * from here, because the WebGPU backend asks the same two questions
+   * and a second copy of either is a way for the two to drift.
+   */
+  private paintDecorations(
+    ctx: Canvas2DContext,
+    node: UiNode,
+    rec: LayoutRecord,
+    paint: PaintState,
+    shapes: readonly DecorationShape[],
+    after: boolean
+  ): void {
+    const nodeRadius = uniformBorderRadius(paint.borderRadius);
+    for (const shape of shapes) {
+      if ((shape.after === 'children') !== after) {
+        continue;
+      }
+      const color = decorationColor(node, shape);
+      if (color === undefined) {
+        continue;
+      }
+      const box = decorationRect(shape, rec, nodeRadius);
+      if (box.width <= 0 || box.height <= 0) {
+        continue;
+      }
+      if (shape.kind === 'fill') {
+        ctx.fillStyle = colorToCss(color);
+        if (box.radius > 0) {
+          traceRoundedRect(ctx, box.x, box.y, box.width, box.height, box.radius);
+          ctx.fill();
+        } else {
+          ctx.fillRect(box.x, box.y, box.width, box.height);
+        }
+        continue;
+      }
+      if (shape.lineWidth <= 0) {
+        continue;
+      }
+      // The band lies inside the shape's box, as a border does: the
+      // stroke is centred on a path inset by half its width.
+      const inset = shape.lineWidth / 2;
+      ctx.strokeStyle = colorToCss(color);
+      ctx.lineWidth = shape.lineWidth;
+      ctx.lineJoin = 'round';
+      const x = box.x + inset;
+      const y = box.y + inset;
+      const width = Math.max(0, box.width - shape.lineWidth);
+      const height = Math.max(0, box.height - shape.lineWidth);
+      if (box.radius > 0) {
+        traceRoundedRect(ctx, x, y, width, height, Math.max(0, box.radius - inset));
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(x, y, width, height);
+      }
     }
   }
 

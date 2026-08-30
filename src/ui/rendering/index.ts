@@ -8,6 +8,8 @@ export { LayoutInspector, INSPECTOR_HEAT_MS } from './LayoutInspector';
 export type { InspectorOverlay } from './LayoutInspector';
 export { drawOverlayShapes, labelOrigin, LABEL_PADDING_X } from './OverlayShapes';
 export type { OverlayShape } from './OverlayShapes';
+export { decorationColor, decorationRect, hasDecorationPhase, paintsAfterChildren } from './Decorations';
+export type { DecorationShape, DecorationFill, DecorationStroke, DecorationRect } from './Decorations';
 export {
   createPaintState,
   resolvePaintState,

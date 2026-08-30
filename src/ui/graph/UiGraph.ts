@@ -46,6 +46,7 @@ export class UiGraph {
    * with tree lifetime.
    */
   private nodeRemovedListener: ((node: UiNode) => void) | null = null;
+  private environmentChangedListener: ((node: UiNode) => void) | null = null;
 
   public readonly root: UiNode;
 
@@ -458,6 +459,20 @@ export class UiGraph {
   }
 
   /**
+   * Subscribes to environment reassignment.
+   *
+   * Invoked once per node whose inherited environment resolved to
+   * something different — at attach, and after a provider above it
+   * changed. An inherited *property* needs no such thing, because the
+   * node is marked dirty and re-resolves on the next frame; a modifier
+   * that read a value out of the environment holds it where no dirty
+   * flag reaches, which is what this exists for.
+   */
+  public setEnvironmentChangedListener(listener: ((node: UiNode) => void) | null): void {
+    this.environmentChangedListener = listener;
+  }
+
+  /**
    * The shared dirty set, for a scheduler to drain.
    */
   public getDirtyNodes(): DirtyNodeSet {
@@ -596,9 +611,12 @@ export class UiGraph {
   /**
    * Builds the environment a node should use given its parent and its
    * own provider properties.
+   *
+   * `parent` defaults to the node's own, and is passed explicitly for
+   * a node the builder has constructed but not yet put in the tree —
+   * which is every node at the moment its modifiers attach.
    */
-  public buildNodeEnvironment(node: UiNode): UiEnvironment {
-    const parent = node.parent;
+  public buildNodeEnvironment(node: UiNode, parent: UiNode | null = node.parent): UiEnvironment {
     const base = parent !== null ? parent.environment : null;
     let env = base ?? new UiEnvironment(null);
 
@@ -666,6 +684,7 @@ export class UiGraph {
         if (previous !== null) {
           this.markDirty(node, inheritedPropertyFlags);
         }
+        this.environmentChangedListener?.(node);
       }
       for (let current = node.firstChild; current !== null; current = current.nextSibling) {
         visit(current);
@@ -721,6 +740,7 @@ export class UiGraph {
     if (changed) {
       node.environment = next;
       this.markDirty(node, inheritedFlags);
+      this.environmentChangedListener?.(node);
     }
 
     let child = node.firstChild;

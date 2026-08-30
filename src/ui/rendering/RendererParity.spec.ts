@@ -7,6 +7,7 @@ import { auto, fr } from '../layout/UiLength';
 import { normalizeColor } from '../properties/UiColor';
 import { setSelectionRange } from '../selection/UiSelectable';
 import { setMatchRanges } from '../find/UiTextMatches';
+import type { DecorationShape } from './Decorations';
 import { RenderHarness } from './RenderTestUtils';
 import type { RecordedCall } from './RenderTestUtils';
 import { parseColor } from './webgpu/WebGPUColor';
@@ -476,6 +477,96 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     const draws = expectParity(h, root);
     expect(draws.map(d => d.kind)).toEqual(['fill', 'image', 'fill']);
     expect(draws[1].clip).toEqual({ x: 10, y: 10, width: 160, height: 90 });
+  });
+
+  /**
+   * Decorations (MODIFIERS_ROADMAP.md B3) are the only pixels a
+   * modifier may put on screen, and the reason they are a shared input
+   * rather than a canvas callback is exactly this: the two backends
+   * place them from one piece of arithmetic, under one set of clips.
+   *
+   * The tree puts a ring on a row inside a rounded, scrolled clip — so
+   * a decoration that is cut off has to be cut off the same way on
+   * both — and a second one on a zIndex-reordered child, so a
+   * decoration lands at its node's place in paint order and not at its
+   * place in the tree.
+   */
+  it('decorated nodes under a clip and under paintOrder', () => {
+    const h = new RenderHarness(400, 200);
+    const ring: readonly DecorationShape[] = [
+      { kind: 'stroke', color: '#22d3ee', lineWidth: 2, outset: 4 },
+      // Under the node's content, and inside its box rather than around
+      // it: the other half of the vocabulary.
+      { kind: 'fill', color: 'rgba(34,211,238,0.25)', x: 4, y: 4, width: 16, height: 16, radius: 3 }
+    ];
+    const over: readonly DecorationShape[] = [
+      { kind: 'stroke', color: '#f472b6', lineWidth: 3, outset: 0, after: 'children' }
+    ];
+
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 8);
+
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 200);
+    scroll.setProperty('height', 80);
+    scroll.setProperty('borderRadius', 10);
+    scroll.setProperty('scrollY', 30);
+    scroll.setProperty('backgroundColor', '#0f172a');
+    for (let i = 0; i < 5; i++) {
+      const row = box(h, `row${i}`, {
+        width: 200,
+        height: 40,
+        flexShrink: 0,
+        borderRadius: 6,
+        backgroundColor: '#1e293b'
+      });
+      // The half-scrolled row: its ring must be clipped with it.
+      if (i === 1) {
+        row.decorations = ring;
+      }
+      h.append(scroll, row);
+    }
+    h.append(root, scroll);
+
+    const stack = box(h, 'stack', { width: 200, height: 60 });
+    const behind = box(h, 'behind', { width: 60, height: 60, backgroundColor: '#334155', zIndex: 1 });
+    const front = box(h, 'front', { width: 60, height: 60, backgroundColor: '#64748b', zIndex: 3 });
+    front.decorations = over;
+    h.append(stack, front, behind);
+    h.append(root, stack);
+
+    const draws = expectParity(h, root);
+    // The reordered child's own fill comes after its lower sibling's,
+    // and its `after: 'children'` ring immediately after that.
+    expect(draws.map(d => d.kind)).toEqual([
+      'fill', // the scroller
+      'fill', // row 0, scrolled above the viewport
+      'fill', // row 1, the decorated one
+      'border', // its ring, first in the modifier's list
+      'fill', // and the fill behind its content, second
+      'fill', // row 2
+      'fill', // the lower sibling of the reordered pair
+      'fill', // the reordered child, painted after it
+      'border' // and its ring, after its children rather than before
+    ]);
+    // The ring is the row's box grown by the outset on all four sides,
+    // and cut off by the scroller's viewport — the whole point of a
+    // decoration being painted inside the node's pass.
+    const drawnRing = draws[3];
+    expect({
+      x: drawnRing.x,
+      y: drawnRing.y,
+      width: drawnRing.width,
+      height: drawnRing.height
+    }).toEqual({
+      x: 4,
+      y: 14,
+      width: 208,
+      height: 48
+    });
+    expect(drawnRing.clip).toEqual({ x: 8, y: 8, width: 200, height: 80 });
+    // The reordered child's own ring is not clipped by anything.
+    expect(draws[8].clip).toBeNull();
   });
 
   it('images under every objectFit', () => {

@@ -24,7 +24,13 @@ import {
 } from './UiElement';
 import type { UiNodeRef } from './UiElementProps';
 import type { UiProps } from './UiProps';
-import { UiModifierSet, assertModifierList, type UiModifierLayout } from '../modifiers/UiModifierSet';
+import {
+  UiModifierSet,
+  assertModifierList,
+  type UiModifierEnvironment,
+  type UiModifierFocus,
+  type UiModifierLayout
+} from '../modifiers/UiModifierSet';
 
 /**
  * Property reserved for reconciliation identity.
@@ -87,6 +93,22 @@ export interface UiGraphBuilderOptions {
    * registration does without a dispatcher.
    */
   layout?: UiModifierLayout;
+
+  /**
+   * Lets a modifier move focus, read whether its node has it, and
+   * follow it. Supplied by the runtime, which owns the focus manager.
+   * Without it those calls warn once and do nothing, as `onLayout`
+   * does without layout access.
+   */
+  focus?: UiModifierFocus;
+
+  /**
+   * Lets a modifier read the values its node inherits and follow them.
+   * Without it `host.environment` answers with the key's default —
+   * which is what an unprovided key resolves to anyway — and
+   * `onEnvironment` warns once.
+   */
+  environment?: UiModifierEnvironment;
 }
 
 /**
@@ -128,6 +150,8 @@ export class UiGraphBuilder {
   private readonly dispatcher: UiInputDispatcher | undefined;
 
   private readonly layout: UiModifierLayout | undefined;
+  private readonly focus: UiModifierFocus | undefined;
+  private readonly modifierEnvironment: UiModifierEnvironment | undefined;
 
   /** Ensures the missing-dispatcher warning is emitted at most once. */
   private warnedAboutDispatcher = false;
@@ -139,7 +163,8 @@ export class UiGraphBuilder {
     this.components = options.components;
     this.dispatcher = options.dispatcher;
     this.layout = options.layout;
-    this.layout = options.layout;
+    this.focus = options.focus;
+    this.modifierEnvironment = options.environment;
   }
 
   /**
@@ -474,7 +499,7 @@ export class UiGraphBuilder {
   private createNode(parent: UiNode, definition: UiElement, index: number): UiNode {
     const id = this.createNodeId(parent, definition, index);
     const node = this.graph.createNode(id, definition.type);
-    this.reconcileProps(node, definition.props);
+    this.reconcileProps(node, definition.props, parent);
     this.reconcileChildren(node, definition.children);
     return node;
   }
@@ -503,7 +528,7 @@ export class UiGraphBuilder {
    * instance is unchanged and torn down when a property stops
    * being reactive.
    */
-  private reconcileProps(node: UiNode, props: UiProps): void {
+  private reconcileProps(node: UiNode, props: UiProps, parent?: UiNode): void {
     const present = new Set<string>();
     const presentEvents = new Set<string>();
     let declaredModifiers: unknown;
@@ -562,6 +587,19 @@ export class UiGraphBuilder {
       }
     }
 
+    if (node.environment === null && parent?.environment != null) {
+      // A freshly built node is not in the tree yet — the builder
+      // writes its props and builds its children before making the
+      // edge — so what it inherits is not reachable from it. Seeding
+      // it here, after the node's own provider props are written and
+      // before its modifiers attach, is what makes `host.environment`
+      // answer with the theme the node will actually be under rather
+      // than with the default. `inheritEnvironment` recomputes at
+      // attach and keeps this instance when it agrees, so nothing is
+      // marked dirty twice.
+      node.environment = this.graph.buildNodeEnvironment(node, parent);
+    }
+
     this.reconcileModifiers(node, declaredModifiers);
   }
 
@@ -583,7 +621,9 @@ export class UiGraphBuilder {
       return;
     }
     const list = assertModifierList(node, declared);
-    const set = existing ?? new UiModifierSet(node, this.graph, this.dispatcher, this.layout);
+    const set =
+      existing ??
+      new UiModifierSet(node, this.graph, this.dispatcher, this.layout, this.focus, this.modifierEnvironment);
     if (existing === undefined) {
       this.modifiers.set(node, set);
     }

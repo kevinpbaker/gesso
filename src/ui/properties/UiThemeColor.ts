@@ -29,7 +29,18 @@ export function resolveColor<T extends UiColorValue | undefined>(
   node: UiNode,
   definition: UiPropertyDefinition<T>
 ): UiColor | undefined {
-  const value = resolveProperty(node, definition);
+  return resolveColorValue(node, resolveProperty(node, definition));
+}
+
+/**
+ * The same resolution for a colour that did not come from a property.
+ *
+ * A decoration shape carries its colour inline rather than through the
+ * registry, and must still honour a palette name — otherwise a focus
+ * ring would be the one thing in the library that names a literal
+ * colour.
+ */
+export function resolveColorValue(node: UiNode, value: UiColorValue | undefined): UiColor | undefined {
   if (typeof value === 'string') {
     const themed = themeColorFor(node, value);
     if (themed !== undefined) {

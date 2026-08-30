@@ -25,6 +25,8 @@ import { UiPointerController } from '../../ui/input/UiPointerController';
 import { UiWheelController } from '../../ui/input/UiWheelController';
 import type { ScrollContainerState, ScrollSink } from '../../ui/input/UiWheelController';
 import { UiFocusManager } from '../../ui/input/UiFocusManager';
+import { FocusNotifier } from '../../ui/input/FocusNotifier';
+import { EnvironmentNotifier } from '../../ui/environment/EnvironmentNotifier';
 import { UiKeyboardController } from '../../ui/input/UiKeyboardController';
 import { UiEditingController, type EditingState } from '../../ui/input/UiEditingController';
 import { UiSelectionController } from '../../ui/selection/UiSelectionController';
@@ -202,8 +204,10 @@ export class NodalRuntime {
   private selectionController: UiSelectionController | null = null;
   private findController: UiFindController | null = null;
   /** Reachable before `input` is assigned, for the same reason. */
-  private focusManager: UiFocusManager | null = null;
+  private readonly focusManager: UiFocusManager;
   private readonly layoutNotifier: LayoutNotifier;
+  private readonly focusNotifier = new FocusNotifier();
+  private readonly environmentNotifier = new EnvironmentNotifier();
   private semantics: UiSemanticsMap = new Map();
   private semanticsListener: ((patches: readonly UiSemanticsPatch[]) => void) | null = null;
   private lastEditingState: EditingState | null = null;
@@ -272,9 +276,29 @@ export class NodalRuntime {
     this.inspector = new LayoutInspector(this.engine);
     this.resolver = new ComponentHostResolver(this.stores);
     this.layoutNotifier = new LayoutNotifier();
+    // Built before the tree, not with the rest of the input stack in
+    // `createInput`: modifiers attach while `buildRoot` runs, and a
+    // `focusRing()` on the first control asks whether its node has
+    // focus at that moment. The traversal root arrives afterwards
+    // through `setRoot`, which is the only thing the manager needs the
+    // tree for.
+    this.focusManager = new UiFocusManager(this.graph.root, this.dispatcher);
+    this.focusManager.onFocusChange(node => this.focusNotifier.handleFocusChange(node));
+    this.graph.setEnvironmentChangedListener(node => this.environmentNotifier.handleEnvironmentChange(node));
     this.builder = new UiGraphBuilder(this.graph, {
       components: this.resolver,
       dispatcher: this.dispatcher,
+      focus: {
+        isFocused: node => this.focusNotifier.isFocused(node),
+        focus: node => {
+          this.focusManager.focus(node);
+        },
+        onFocusChange: (node, listener) => this.focusNotifier.add(node, listener)
+      },
+      environment: {
+        read: (node, key) => (node.environment ?? this.graph.buildNodeEnvironment(node)).get(key),
+        onChange: (node, listener) => this.environmentNotifier.add(node, listener)
+      },
       layout: {
         // The visible box, not the world box: a modifier that turns a
         // pointer position into a fraction of its node needs where the
@@ -327,8 +351,10 @@ export class NodalRuntime {
       this.findController?.handleNodeRemoved(node);
       // Nor can focus: a closed dialog or a recycled row takes the
       // focused node with it.
-      this.focusManager?.handleNodeRemoved(node);
+      this.focusManager.handleNodeRemoved(node);
       this.layoutNotifier.handleNodeRemoved(node);
+      this.focusNotifier.handleNodeRemoved(node);
+      this.environmentNotifier.handleNodeRemoved(node);
     });
 
     this.buildRoot(options.root);
@@ -612,6 +638,7 @@ export class NodalRuntime {
     this.scheduler.stop();
     this.stores.get(FindStore).setController(null);
     this.stores.get(FocusStore).setManager(null);
+    this.graph.setEnvironmentChangedListener(null);
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.frameListener = null;
@@ -673,8 +700,8 @@ export class NodalRuntime {
   private createInput(): RuntimeInput {
     const root = this.layoutRoot();
     const hitTester = new UiHitTester(this.engine, root);
-    const focus = new UiFocusManager(root, this.dispatcher);
-    this.focusManager = focus;
+    const focus = this.focusManager;
+    focus.setRoot(root);
     const scrollSink = this.createScrollSink();
     // Editing is a default behaviour of the pointer and keyboard
     // controllers for EditableText targets; the shell's text input
@@ -1000,7 +1027,7 @@ export class NodalRuntime {
     // `ref` — which fires before the node has children — enters its
     // subtree here, so a dialog opened this frame gets the caret in
     // it before the frame is laid out and revealed.
-    this.focusManager?.settleScope();
+    this.focusManager.settleScope();
 
     const laidOut = frameNeedsLayout(frame);
     this.phaseTimings.layout = this.timePhase(

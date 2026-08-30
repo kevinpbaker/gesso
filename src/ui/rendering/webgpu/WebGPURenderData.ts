@@ -15,6 +15,7 @@ import type { RgbaColor } from './WebGPUColor';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
+import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
 import { toPhysicalPixels } from './WebGPUSurface';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
@@ -193,8 +194,9 @@ const contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
  * Builds a CPU-side render list from the retained UI tree.
  *
  * One ordered command list holds fills, borders, text and images in
- * paint order — background, image, border, children, text, then the
- * node's scrollbars — exactly as the Canvas2D renderer paints them.
+ * paint order — background, image, border, decorations, children,
+ * text, the decorations marked `after: 'children'`, then the node's
+ * scrollbars — exactly as the Canvas2D renderer paints them.
  * Primitive instances are batched into one command until the scissor
  * changes; text and images are one command each because each binds
  * its own texture.
@@ -428,6 +430,57 @@ export function buildRenderList(
       }
     }
 
+    /**
+     * The node's modifier decorations, as fill and border instances at
+     * the node's own place in paint order.
+     *
+     * Under `ownScissor` / `ownRounded` — its ancestors' clips — and
+     * not under its own, exactly where the background and border go,
+     * because a ring with an outset lies entirely outside the box that
+     * would clip it. The rectangle and the colour come from
+     * `Decorations.ts`, which is the same arithmetic Canvas2D uses.
+     */
+    const pushDecorations = (shapes: readonly DecorationShape[], after: boolean): void => {
+      const nodeRadius = uniformBorderRadius(paint.borderRadius);
+      for (const shape of shapes) {
+        if ((shape.after === 'children') !== after) {
+          continue;
+        }
+        const resolved = decorationColor(node, shape);
+        const color = resolved === undefined ? undefined : parseColor(resolved);
+        if (color === undefined) {
+          continue;
+        }
+        const rect = decorationRect(shape, rec, nodeRadius);
+        if (rect.width <= 0 || rect.height <= 0) {
+          continue;
+        }
+        if (shape.kind === 'stroke' && shape.lineWidth <= 0) {
+          continue;
+        }
+        beginPrimitives(ownScissor);
+        pushInstance(
+          instanceData,
+          rect.x,
+          rect.y,
+          rect.width,
+          rect.height,
+          color,
+          rect.radius,
+          effectiveOpacity,
+          shape.kind === 'stroke' ? shape.lineWidth : 0,
+          shape.kind === 'stroke' ? PrimitiveKind.Border : PrimitiveKind.Fill,
+          nodeCtm,
+          ownRounded
+        );
+      }
+    };
+
+    const decorations = node.decorations;
+    if (decorations !== null && hasDecorationPhase(decorations, false)) {
+      pushDecorations(decorations, false);
+    }
+
     // Captured before children reuse the shared scratch below. An
     // editable always has foreground work: its caret and placeholder.
     const hasText = paint.editor !== undefined || (paint.text !== undefined && paint.text.length > 0);
@@ -622,6 +675,13 @@ export function buildRenderList(
         }
         pushTextRun(lines, colorToCss(text.textColor), text.text!);
       }
+    }
+
+    if (decorations !== null && hasDecorationPhase(decorations, true)) {
+      // Children reused the paint scratch; the node's own radius and
+      // opacity are read from it, so re-resolve before the second pass.
+      resolvePaintState(node, paintScratch);
+      pushDecorations(decorations, true);
     }
 
     if (rec.scrollable) {

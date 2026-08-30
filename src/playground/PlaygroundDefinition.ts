@@ -1,5 +1,7 @@
 import { Box, Button, Column, Row, ScrollView, Text } from '../ui/composition';
 import type { UiElement, UiProps } from '../ui/composition';
+import { decorated } from '../ui/modifiers';
+import type { DecorationShape } from '../ui/rendering';
 import type { PlaygroundState } from './PlaygroundState';
 
 const SCROLL_ITEM_COUNT = 100;
@@ -52,8 +54,32 @@ function stressSubtree(count: number): UiElement | undefined {
  * pixel by pixel — a rounded clipped card with rotated children and
  * text, an image under `objectFit: cover` in a rounded box, bordered
  * boxes with and without radii, and a scrolled list with a sticky
- * header.
+ * header, and a decorated card — the modifier decorations of
+ * `MODIFIERS_ROADMAP.md` B3, which are the one thing a modifier may
+ * put on screen and therefore the one thing that has to be identical
+ * on both backends.
  */
+
+/**
+ * A ring outside a card and a bar inside it, hoisted so the modifier's
+ * arguments keep their identity across rebuilds.
+ *
+ * Both phases of the node's paint pass: the ring goes on before the
+ * node's children, the pink outline after them.
+ */
+const CARD_DECORATION: readonly DecorationShape[] = [
+  { kind: 'stroke', color: '#38bdf8', lineWidth: 2, outset: 4 },
+  { kind: 'fill', color: 'rgba(56,189,248,0.35)', x: 8, y: 8, width: 40, height: 6, radius: 3 },
+  { kind: 'stroke', color: '#f472b6', lineWidth: 2, outset: -6, radius: 4, after: 'children' }
+];
+
+/**
+ * A ring on a row inside the scrolled, rounded list. It is cut off by
+ * the scroller, which is what an overlay shape could not do and the
+ * reason a decoration is painted inside the node's own paint pass.
+ */
+const ROW_DECORATION: readonly DecorationShape[] = [{ kind: 'stroke', color: '#facc15', lineWidth: 2, outset: 3 }];
+
 function paritySection(state: PlaygroundState): UiElement {
   return Row(
     { gap: 10, y: 'start' },
@@ -103,7 +129,8 @@ function paritySection(state: PlaygroundState): UiElement {
         borderWidth: 2,
         borderColor: '#10b981',
         borderRadius: 8,
-        backgroundColor: 'rgba(16,185,129,0.15)'
+        backgroundColor: 'rgba(16,185,129,0.15)',
+        modifiers: [decorated(CARD_DECORATION)]
       }),
       Box({ width: 90, height: 34, borderWidth: 3, borderColor: '#f43f5e' })
     ),
@@ -114,7 +141,14 @@ function paritySection(state: PlaygroundState): UiElement {
         Text({ text: 'Sticky', color: '#e2e8f0', fontSize: 11 })
       ),
       ...Array.from({ length: 8 }, (_, i) =>
-        Text({ text: `Line ${i + 1}`, color: '#cbd5e1', fontSize: 11, padding: 4, flexShrink: 0 })
+        Text({
+          text: `Line ${i + 1}`,
+          color: '#cbd5e1',
+          fontSize: 11,
+          padding: 4,
+          flexShrink: 0,
+          modifiers: i === 1 ? [decorated(ROW_DECORATION)] : undefined
+        })
       )
     )
   );

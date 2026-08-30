@@ -1,6 +1,7 @@
 import { DirtyFlags } from './DirtyFlags';
 import { type UiNodeType } from './UiNodeType';
 import type { UiEnvironment } from '../environment/UiEnvironment';
+import type { DecorationShape } from '../rendering/Decorations';
 
 export type NodeId = string;
 export type NodeProperty = string;
@@ -68,6 +69,18 @@ export class UiNode {
    * ancestor provides environment values.
    */
   public environment: UiEnvironment | null = null;
+
+  /**
+   * Shapes the node's modifiers put in its own paint pass, merged in
+   * modifier order.
+   *
+   * Null until a modifier decorates, so the cost to an undecorated
+   * node is the one null check each renderer already makes per node,
+   * and a tree of ten thousand plain boxes pays nothing. Written only
+   * through `UiModifierHost.decorate`; see `rendering/Decorations.ts`
+   * for what a shape means and where it lands.
+   */
+  public decorations: readonly DecorationShape[] | null = null;
 
   hasChildren(): boolean {
     return this.firstChild !== null;

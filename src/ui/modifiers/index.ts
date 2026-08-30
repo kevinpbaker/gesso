@@ -2,4 +2,5 @@ export { defineModifier, isUiModifier, type UiModifier, type UiModifierKind } fr
 export type { UiModifierHost, UiModifierTeardown } from './UiModifierHost';
 export { UiModifierSet, assertModifierList } from './UiModifierSet';
 export { interactive, hoverable, pressable, measure, BUTTON_INTERACTION, type InteractiveOptions } from './interaction';
-export type { UiModifierLayout } from './UiModifierSet';
+export { decorated, focusRing, type FocusRingOptions } from './decoration';
+export type { UiModifierEnvironment, UiModifierFocus, UiModifierLayout } from './UiModifierSet';

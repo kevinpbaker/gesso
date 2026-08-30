@@ -21,7 +21,7 @@ import {
 } from '../components';
 import { FocusStore } from '../framework/app/FocusStore';
 import { darkTheme } from '../ui/environment/UiTheme';
-import { interactive } from '../ui/modifiers';
+import { focusRing, interactive } from '../ui/modifiers';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
 import { auto, fr, percent, repeat } from '../ui/layout';
@@ -476,7 +476,8 @@ export class MenuDemo extends Component {
  * focus through rows that scroll themselves into view.
  */
 /**
- * Modifiers (roadmap B1): behaviour attached to an element.
+ * Modifiers (roadmap B1 and B3): behaviour attached to an element, and
+ * the one thing a modifier may put on screen.
  *
  * The options are module constants because a modifier's arguments are
  * compared by identity, as props are — rebuilt objects would re-attach
@@ -552,8 +553,39 @@ export class ModifierDemo extends Component {
           this.attached.value = !this.attached.value;
         })
       ),
+      Text({
+        text: 'Focus rings (B3): Tab through these. The ring is a decoration, so the one in the scroller is cut off with its row.',
+        color: '#9ca3af',
+        fontSize: 12,
+        maxLines: 2
+      }),
+      Row(
+        { gap: 12, y: 'start' },
+        ringButton('First'),
+        ringButton('Second'),
+        Column(
+          { width: 150, height: 64, overflow: 'scroll', borderRadius: 8, backgroundColor: '#0b1220', padding: 6 },
+          ...Array.from({ length: 5 }, (_, i) => ringButton(`Row ${i + 1}`, 'row'))
+        )
+      )
     );
   }
+}
+
+/** A button that shows the focus ring and nothing else. */
+function ringButton(text: string, key?: string): UiElement {
+  return Button({
+    key: key === undefined ? undefined : `${key}-${text}`,
+    text,
+    modifiers: [focusRing()],
+    padding: 8,
+    marginBottom: 4,
+    flexShrink: 0,
+    backgroundColor: '#1f2937',
+    borderRadius: 6,
+    color: '#e5e7eb',
+    fontSize: 12
+  });
 }
 
 /**
