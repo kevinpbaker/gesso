@@ -3,6 +3,7 @@ import type { ComponentLikeElement, UiChild } from '../ui/composition/UiElement'
 import type { ComponentElement } from './ComponentElement';
 import { ComponentHost } from './ComponentHost';
 import type { StoreRegistry } from './store/StoreRegistry';
+import { ChannelRegistry } from './channel/ChannelRegistry';
 
 /**
  * Mounts framework components on behalf of UiGraphBuilder.
@@ -20,7 +21,10 @@ export class ComponentHostResolver implements ComponentResolver {
   private readonly hosts = new Map<string, ComponentHost>();
   private pendingMounts: ComponentHost[] = [];
 
-  constructor(private readonly stores: StoreRegistry) {}
+  constructor(
+    private readonly stores: StoreRegistry,
+    private readonly channels: ChannelRegistry = new ChannelRegistry()
+  ) {}
 
   resolve(element: ComponentLikeElement, anchorId: string): UiChild {
     let host = this.hosts.get(anchorId);
@@ -34,7 +38,7 @@ export class ComponentHostResolver implements ComponentResolver {
     }
 
     if (host === undefined) {
-      host = new ComponentHost(element as ComponentElement, this.stores);
+      host = new ComponentHost(element as ComponentElement, this.stores, this.channels);
       this.hosts.set(anchorId, host);
       this.pendingMounts.push(host);
     } else {

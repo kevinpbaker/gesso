@@ -8,6 +8,13 @@ import {
   type StoreRegistration
 } from '../../store/worker/createStoreRegistry';
 import type { WorkerHandle } from '../../worker/WorkerPorts';
+import {
+  createChannelRegistry,
+  type ChannelRegistration,
+  type ChannelRegistryHandle
+} from '../../channel/createChannelRegistry';
+import type { ChannelSource } from '../../channel/provide';
+import type { ChannelToken } from '../../channel/ChannelToken';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
 import { NodalRuntime, type RendererChoice } from '../NodalRuntime';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
@@ -43,11 +50,13 @@ export function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerAp
 
 export class RenderWorkerApp {
   private readonly registrations: StoreRegistration[] = [];
+  private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
   private runtime: NodalRuntime | undefined;
   private registry: RegistryHandle | undefined;
+  private channels: ChannelRegistryHandle | undefined;
 
   constructor(root: FrameworkChild | ComponentType, host: WorkerGlobal = self as unknown as WorkerGlobal) {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
@@ -72,6 +81,30 @@ export class RenderWorkerApp {
       throw new Error(`Store '${StoreClass.name}' was registered after the runtime started.`);
     }
     this.registrations.push({ storeClass: StoreClass, worker: options.worker, key: options.key });
+    return this;
+  }
+
+  /**
+   * Registers a channel.
+   *
+   * With `worker`, the channel's data lives there — api, store, domain
+   * and view models, all plain code the framework never sees. With
+   * `source`, it is fed from this thread; either way the same patches
+   * cross the same kind of port, so a channel can be moved into a
+   * worker later without a view noticing.
+   */
+  useChannel<V extends object, C extends object>(
+    token: ChannelToken<V, C>,
+    options: { worker?: WorkerHandle | (() => Worker); source?: ChannelSource<V, C> }
+  ): this {
+    if (this.runtime !== undefined) {
+      throw new Error(`Channel '${token.name}' was registered after the runtime started.`);
+    }
+    this.channelRegistrations.push({
+      token: token as unknown as ChannelToken<never, never>,
+      worker: options.worker,
+      source: options.source as unknown as ChannelSource<never, never>
+    });
     return this;
   }
 
@@ -163,7 +196,9 @@ export class RenderWorkerApp {
       case 'dispose':
         runtime.dispose();
         this.registry?.dispose();
+        this.channels?.dispose();
         this.registry = undefined;
+        this.channels = undefined;
         this.runtime = undefined;
         break;
     }
@@ -186,14 +221,19 @@ export class RenderWorkerApp {
   ): void {
     this.runtime?.dispose();
     this.registry?.dispose();
+    this.channels?.dispose();
     this.registry = createStoreRegistry(this.registrations, (storeName, message, stack) => {
       this.host.postMessage({ type: 'error', message: `store ${storeName}: ${message}`, stack });
+    });
+    this.channels = createChannelRegistry(this.channelRegistrations, (channelName, message, stack) => {
+      this.host.postMessage({ type: 'error', message: `channel ${channelName}: ${message}`, stack });
     });
     this.runtime = new NodalRuntime({
       root: this.root,
       canvas,
       renderer,
       stores: this.registry.registry,
+      channels: this.channels.registry,
       // A worker has no requestAnimationFrame tied to the compositor,
       // so frames are timer-paced. See FRAMEWORK_DESIGN section 13.
       clock: callback => new UiTimerFrameClock(callback),
@@ -201,7 +241,7 @@ export class RenderWorkerApp {
       height,
       dpr
     });
-    this.runtime.deferPatchesFrom(this.registry.replicas);
+    this.runtime.deferPatchesFrom([...this.registry.replicas, ...this.channels.registry.all()]);
     this.runtime.onInspect(text => {
       this.host.postMessage({ type: 'inspect', text });
     });

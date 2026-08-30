@@ -1,4 +1,7 @@
 import { Subscription } from 'rxjs';
+import { ChannelRegistry } from './channel/ChannelRegistry';
+import type { ChannelReplica } from './channel/ChannelReplica';
+import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
 import { isObservable, type UiChild } from '../ui/composition/UiElement';
 import { InputCell } from './Input';
@@ -71,7 +74,8 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
 
   constructor(
     element: ComponentElement<P>,
-    private readonly stores: StoreRegistry
+    private readonly stores: StoreRegistry,
+    private readonly channels: ChannelRegistry = new ChannelRegistry()
   ) {
     this.element = element;
     if (isClassComponent(element.component)) {
@@ -79,6 +83,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       this.validateInputs();
       this.wireInputs();
       this.wireInjects();
+      this.wireChannels();
       this.validateState();
     } else {
       this.instance = undefined;
@@ -209,6 +214,8 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     };
     return {
       inject: <S extends Store>(StoreClass: new () => S): S => this.stores.get(StoreClass),
+      channel: <V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C> =>
+        this.channels.get(token),
       onMount: hook => {
         requireRendering('onMount');
         this.mountHooks.push(hook);
@@ -280,6 +287,22 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
             `Initialize it with input(defaultValue).`
         );
       }
+    }
+  }
+
+  /**
+   * Resolves `@Channel(token)` properties to their replicas.
+   *
+   * Alongside `wireInjects` rather than inside it: a store is a class
+   * this thread owns, a channel is a name the other side answers to,
+   * and only one of the two survives the barrier design.
+   */
+  private wireChannels(): void {
+    const metadata = getComponentMetadata(this.element.component);
+    for (const [propertyName, token] of metadata.channels) {
+      (this.instance as unknown as Record<string, unknown>)[propertyName] = this.channels.get(
+        token as ChannelToken<object, CommandMap>
+      );
     }
   }
 

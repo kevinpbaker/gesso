@@ -2,6 +2,8 @@ import { createApp } from '../../framework';
 import type { RendererChoice } from '../../framework/app/NodalRuntime';
 import { DemoStore, FrameworkDemoRoot } from '../FrameworkPlayground';
 import { HeavyStore } from '../HeavyStore';
+import { Ticker } from '../TickerChannel';
+import { workerHandle } from '../../framework/worker/WorkerPorts';
 import { mountShell, type AppShell } from '../shell/AppShell';
 import { addInspectAction, mountInspectorPanel } from '../shell/InspectorPanel';
 
@@ -103,11 +105,15 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   const start = (renderer: RendererChoice): { dispose: () => void; setInspector(enabled: boolean): void } => {
     const report = createFrameReporter(shell, 'Main thread', renderer);
     shell.setStatus(`Starting the single-threaded app on ${describeRenderer(renderer)}…`);
+    // One data worker for the whole application layer: the store on
+    // the old path, the channel on the new one, two named ports.
+    const dataWorker = workerHandle(
+      () => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })
+    );
     const builder = createApp(FrameworkDemoRoot)
       .useStore(DemoStore)
-      .useStore(HeavyStore, {
-        worker: () => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })
-      })
+      .useStore(HeavyStore, { worker: dataWorker })
+      .useChannel(Ticker, { worker: dataWorker })
       .renderer(renderer)
       .onFrame(report)
       .onInspect(text => inspectorPanel.set(text));

@@ -5,6 +5,8 @@ import type { UiChild } from '../ui/composition/UiElement';
 import { Component } from './Component';
 import type { InputCell } from './Input';
 import type { Store } from './store/Store';
+import type { ChannelReplica } from './channel/ChannelReplica';
+import type { ChannelToken } from './channel/ChannelToken';
 
 /**
  * What a functional component can ask of the framework while its body
@@ -14,6 +16,12 @@ import type { Store } from './store/Store';
 export interface ComponentContext {
   /** The registered store (or replica) of this class. */
   inject<S extends Store>(StoreClass: new () => S): S;
+
+  /**
+   * The channel declared by `token`: `view` keys to read or bind, and
+   * `send` to issue a command.
+   */
+  channel<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
 
   /**
    * Runs once after the component's nodes exist and its bindings are

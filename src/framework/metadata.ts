@@ -5,6 +5,8 @@ export interface ComponentMetadata {
   inputs: Set<string>;
   states: Set<string>;
   injects: Map<string, Function>;
+  /** Property name → the channel token it resolves to (`@Channel`). */
+  channels: Map<string, { name: string }>;
 }
 
 const metadataStore = new WeakMap<Function, ComponentMetadata>();
@@ -12,7 +14,7 @@ const metadataStore = new WeakMap<Function, ComponentMetadata>();
 export function getComponentMetadata(constructor: Function): ComponentMetadata {
   let metadata = metadataStore.get(constructor);
   if (metadata === undefined) {
-    metadata = { tag: constructor.name, inputs: new Set(), states: new Set(), injects: new Map() };
+    metadata = { tag: constructor.name, inputs: new Set(), states: new Set(), injects: new Map(), channels: new Map() };
     metadataStore.set(constructor, metadata);
   }
   return metadata;

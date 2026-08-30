@@ -4,6 +4,7 @@ import { getStoreMetadata } from '../StoreMetadata';
 import { applyPatches, type Patch } from '../StorePatch';
 import type { Store, StoreProjections } from '../Store';
 import { isStoreHostMessage, type StoreClientMessage, type StorePort } from './StoreWorkerProtocol';
+import { isPortErrorMessage } from '../../worker/WorkerPorts';
 
 /**
  * Stand-in for a store that lives in another thread.
@@ -82,12 +83,18 @@ export class StoreReplica<T extends Store = Store> {
   }
 
   private receive(data: unknown): void {
+    if (isPortErrorMessage(data)) {
+      // The transport could not find anything serving this store's
+      // name. Reported like any other store error, because from here
+      // it is one: no patch will ever arrive.
+      this.report(data.message);
+      return;
+    }
     if (!isStoreHostMessage(data)) {
       return;
     }
     if (data.type === 'store:error') {
-      const report = this.errorListener ?? ((message, stack) => console.error(`[nodal store] ${message}`, stack));
-      report(data.message, data.stack);
+      this.report(data.message, data.stack);
       return;
     }
     this.receivePatches(data.patches);
@@ -123,6 +130,11 @@ export class StoreReplica<T extends Store = Store> {
     const batch = this.pending;
     this.pending = [];
     this.applyPatches(batch);
+  }
+
+  private report(message: string, stack?: string): void {
+    const listener = this.errorListener ?? ((text, trace) => console.error(`[nodal store] ${text}`, trace));
+    listener(message, stack);
   }
 
   private receivePatches(patches: readonly Patch[]): void {

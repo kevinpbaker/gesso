@@ -59,11 +59,11 @@ import {
   type WebGPUCanvasHost
 } from '../../ui/rendering';
 import { InputLatencyTracker } from './InputLatency';
+import { ChannelRegistry } from '../channel/ChannelRegistry';
 import { UiScheduler, UiTimerFrameClock } from '../../ui/scheduler';
 import type { UiFrame, UiFrameClockFactory } from '../../ui/scheduler';
 import { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
-import type { StoreReplica } from '../store/worker/StoreReplica';
 
 /**
  * The ordered work of one frame.
@@ -167,6 +167,13 @@ export interface NodalRuntimeOptions {
    * Takes the place of storeClasses.
    */
   stores?: StoreRegistry;
+  /**
+   * The channels this runtime's components may reach.
+   *
+   * Attached elsewhere and handed in, because where a channel's data
+   * lives is the application's decision, not the runtime's.
+   */
+  channels?: ChannelRegistry;
   /** Defaults to a timer clock, which is the only option inside a worker. */
   clock?: UiFrameClockFactory;
   /** Initial logical size. Callers normally follow with resize(). */
@@ -187,6 +194,7 @@ export interface NodalRuntimeOptions {
  */
 export class NodalRuntime {
   readonly stores: StoreRegistry;
+  readonly channels: ChannelRegistry;
   readonly input: RuntimeInput;
   /**
    * The layout inspector: hover boxes, a heatmap of measured nodes and
@@ -257,12 +265,13 @@ export class NodalRuntime {
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
   /** Pending wake-up for an animation that does not want every frame. */
   private animationTimer: ReturnType<typeof setTimeout> | null = null;
-  private replicas: readonly StoreReplica[] = [];
+  private replicas: readonly PatchSource[] = [];
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
   private started = false;
 
   constructor(options: NodalRuntimeOptions) {
     this.stores = options.stores ?? new StoreRegistry();
+    this.channels = options.channels ?? new ChannelRegistry();
     this.canvas = options.canvas;
     this.pixelRatio = options.dpr ?? 1;
     this.width = options.width ?? 600;
@@ -316,7 +325,7 @@ export class NodalRuntime {
 
     this.engine = new LayoutEngine(this.textMeasurer);
     this.inspector = new LayoutInspector(this.engine);
-    this.resolver = new ComponentHostResolver(this.stores);
+    this.resolver = new ComponentHostResolver(this.stores, this.channels);
     this.layoutNotifier = new LayoutNotifier();
     // Built before the tree, not with the rest of the input stack in
     // `createInput`: modifiers attach while `buildRoot` runs, and a
@@ -450,10 +459,10 @@ export class NodalRuntime {
    * Without this a burst of patches rebuilds the bound subtree once per
    * patch, even though only the final state is ever drawn.
    */
-  deferPatchesFrom(replicas: readonly StoreReplica[]): void {
-    this.replicas = replicas;
-    for (const replica of replicas) {
-      replica.deferPatches(() => this.scheduler.notifyDirty());
+  deferPatchesFrom(sources: readonly PatchSource[]): void {
+    this.replicas = sources;
+    for (const source of sources) {
+      source.deferPatches(() => this.scheduler.notifyDirty());
     }
   }
 
@@ -1408,6 +1417,19 @@ export class NodalRuntime {
   get lastFrameDurationMs(): number {
     return this.lastFrameMs;
   }
+}
+
+/**
+ * Anything that queues incoming state and applies it on a frame.
+ *
+ * Structural rather than a base class: a store replica and a channel
+ * replica have nothing else in common, and the frame's first phase
+ * only ever needs these three members.
+ */
+export interface PatchSource {
+  readonly hasPendingPatches: boolean;
+  flush(): void;
+  deferPatches(scheduleFlush: () => void): void;
 }
 
 export interface FrameMetrics {

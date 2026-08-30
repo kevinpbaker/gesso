@@ -4,6 +4,9 @@ import type { ComponentType } from '../FunctionComponent';
 import type { Store } from '../store/Store';
 import { createStoreRegistry, type StoreRegistration } from '../store/worker/createStoreRegistry';
 import type { WorkerHandle } from '../worker/WorkerPorts';
+import { createChannelRegistry, type ChannelRegistration } from '../channel/createChannelRegistry';
+import type { ChannelSource } from '../channel/provide';
+import type { ChannelToken } from '../channel/ChannelToken';
 import { NodalApp } from './NodalApp';
 import type { FrameMetrics, RendererChoice } from './NodalRuntime';
 
@@ -12,6 +15,7 @@ import type { FrameMetrics, RendererChoice } from './NodalRuntime';
  */
 export class NodalAppBuilder {
   private readonly registrations: StoreRegistration[] = [];
+  private readonly channelRegistrations: ChannelRegistration[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((text: string | null) => void) | undefined;
   private rendererChoice: RendererChoice | undefined;
@@ -37,6 +41,28 @@ export class NodalAppBuilder {
    * Defaults to Canvas2D; `webgpu` and `auto` fall back to it when the
    * browser has no WebGPU.
    */
+
+  /**
+   * Registers a channel.
+   *
+   * With `worker`, the channel's data lives there — api, store, domain
+   * and view models, all plain code the framework never sees. With
+   * `source`, it is fed from this thread; either way the same patches
+   * cross the same kind of port, so a channel can be moved into a
+   * worker later without a view noticing.
+   */
+  useChannel<V extends object, C extends object>(
+    token: ChannelToken<V, C>,
+    options: { worker?: WorkerHandle | (() => Worker); source?: ChannelSource<V, C> }
+  ): this {
+    this.channelRegistrations.push({
+      token: token as unknown as ChannelToken<never, never>,
+      worker: options.worker,
+      source: options.source as unknown as ChannelSource<never, never>
+    });
+    return this;
+  }
+
   renderer(choice: RendererChoice): this {
     this.rendererChoice = choice;
     return this;
@@ -81,13 +107,15 @@ export class NodalAppBuilder {
     const element = typeof host === 'string' ? requireElement(host) : host;
     const rootElement = typeof this.root === 'function' ? createComponent(this.root as ComponentType) : this.root;
     const stores = createStoreRegistry(this.registrations);
+    const channels = createChannelRegistry(this.channelRegistrations);
     const app = new NodalApp({
       host: element,
       root: rootElement,
       stores: stores.registry,
+      channels: channels.registry,
       renderer: this.rendererChoice
     });
-    app.deferPatchesFrom(stores.replicas);
+    app.deferPatchesFrom([...stores.replicas, ...channels.registry.all()]);
     if (this.frameListener !== undefined) {
       app.onFrame(this.frameListener);
     }
@@ -99,6 +127,7 @@ export class NodalAppBuilder {
     return () => {
       this.app = undefined;
       app.dispose();
+      channels.dispose();
       stores.dispose();
     };
   }

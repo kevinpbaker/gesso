@@ -39,25 +39,22 @@ export function exposeStore(StoreClass: new () => Store, port: StorePort = self 
  */
 export function serveStores(stores: Record<string, new () => Store>, host?: PortHost): () => void {
   const exposed: ExposedStore[] = [];
-  const stop = servePorts((key, port) => {
-    const StoreClass = stores[key];
-    if (StoreClass === undefined) {
-      const names = Object.keys(stores).sort().join(', ');
-      // Answered on the port that asked rather than thrown. A throw
-      // here happens inside a data worker, where nothing is listening:
-      // the page sees no error and the client simply never receives a
-      // patch, which is the least debuggable failure this arrangement
-      // can produce. Sent back, it reaches `StoreReplica.onError` and
-      // from there the shell's console.
-      const message: StoreHostMessage = {
-        type: 'store:error',
-        message: `No store is served under '${key}'. Served stores: ${names.length > 0 ? names : '(none)'}.`
-      };
-      port.postMessage(message);
-      return;
-    }
-    exposed.push(exposeStore(StoreClass, port as unknown as StorePort));
-  }, host);
+  const stop = servePorts(
+    (key, port) => {
+      const StoreClass = stores[key];
+      if (StoreClass === undefined) {
+        // Declined, not answered: another `servePorts` on this worker
+        // may serve the name, and if nobody does, `servePorts` itself
+        // reports it on the port — naming everything the worker
+        // serves, which is more than this call can see.
+        return false;
+      }
+      exposed.push(exposeStore(StoreClass, port as unknown as StorePort));
+      return true;
+    },
+    () => Object.keys(stores),
+    host
+  );
   return () => {
     stop();
     for (const store of exposed) {

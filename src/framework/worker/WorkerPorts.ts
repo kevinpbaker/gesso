@@ -97,19 +97,56 @@ export interface PortHost {
 }
 
 /**
+ * What a port is answered with when no handler claimed its name.
+ *
+ * Its own message type rather than a store's or a channel's, because
+ * the transport does not know which of them the client is: both
+ * recognise it, so a mismatched name is loud either way.
+ */
+export interface PortErrorMessage {
+  type: 'port:error';
+  message: string;
+}
+
+export function isPortErrorMessage(value: unknown): value is PortErrorMessage {
+  const message = value as { type?: unknown; message?: unknown } | null;
+  return message?.type === 'port:error' && typeof message.message === 'string';
+}
+
+/** Every name served on a host, across all `servePorts` calls on it. */
+const SERVED_NAMES = Symbol.for('nodal:served-port-names');
+
+interface HostWithNames extends PortHost {
+  [SERVED_NAMES]?: Array<() => readonly string[]>;
+}
+
+/**
  * Serves named ports inside a worker.
  *
  * Call it synchronously at the top level of the worker module, before
- * any await, so no handshake is missed. `onPort` is handed the name
- * the client asked for and the port to answer on; an unknown name is
- * `onPort`'s problem to report, not this function's.
+ * any await, so no handshake is missed.
+ *
+ * `onPort` returns whether it took the port. Returning false passes
+ * the handshake to whatever was serving before, which is what lets two
+ * kinds of thing — stores and channels, during the migration — share
+ * one worker: each answers for its own names and declines the rest.
+ * When nobody accepts, the port is answered with an error naming
+ * everything the worker does serve, because a handshake that silently
+ * matched nothing leaves the client waiting forever with nothing said.
+ *
+ * `names` is only read to build that message.
  *
  * Returns a function that stops serving.
  */
 export function servePorts(
-  onPort: (key: string, port: MessagePort) => void,
+  onPort: (key: string, port: MessagePort) => boolean,
+  names: () => readonly string[],
   host: PortHost = self as unknown as PortHost
 ): () => void {
+  const withNames = host as HostWithNames;
+  const registered = (withNames[SERVED_NAMES] ??= []);
+  registered.push(names);
+
   const previous = host.onmessage;
   host.onmessage = event => {
     if (!isPortHandshake(event.data)) {
@@ -122,9 +159,27 @@ export function servePorts(
     if (port === undefined) {
       throw new Error(`Port handshake for '${event.data.key}' arrived with no port attached.`);
     }
-    onPort(event.data.key, port);
+    if (onPort(event.data.key, port)) {
+      return;
+    }
+    if (previous !== null) {
+      previous(event);
+      return;
+    }
+    const served = registered.flatMap(get => [...get()]).sort();
+    const error: PortErrorMessage = {
+      type: 'port:error',
+      message: `Nothing is served under '${event.data.key}'. This worker serves: ${
+        served.length > 0 ? served.join(', ') : '(nothing)'
+      }.`
+    };
+    port.postMessage(error);
   };
   return () => {
     host.onmessage = previous;
+    const index = registered.indexOf(names);
+    if (index >= 0) {
+      registered.splice(index, 1);
+    }
   };
 }

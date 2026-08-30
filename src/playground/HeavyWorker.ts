@@ -1,15 +1,33 @@
+import { serveChannels } from '../framework/channel/serveChannels';
 import { serveStores } from '../framework/store/worker/exposeStore';
 import { HeavyStore } from './HeavyStore';
+import { Ticker } from './TickerChannel';
+import { TickerViewModel } from './TickerViewModel';
 
 /**
- * Data worker owning HeavyStore.
+ * The playground's data worker.
  *
- * Receives actions, runs them here, and publishes the store's
- * projections as patches. Nothing else about the store crosses.
+ * It holds two things at once, which is what the named-port transport
+ * bought: a `HeavyStore` on the old path, and the `Ticker` channel on
+ * the new one. Each answers for its own names on the worker's single
+ * global channel and declines the rest.
  *
- * `serveStores` rather than `exposeStore(HeavyStore)`: the worker's
- * global channel now carries only the port handshake, so a second
- * store added here would get a private port instead of needing a
- * second worker.
+ * Above `serveChannels` there is no framework: `TickerViewModel` is a
+ * plain class over plain subjects, and only plain data crosses.
  */
 serveStores({ HeavyStore });
+
+const ticker = new TickerViewModel();
+serveChannels([
+  {
+    token: Ticker,
+    source: {
+      view: { ticks: ticker.ticks, label: ticker.label, status: ticker.status },
+      commands: {
+        reset: () => ticker.reset(),
+        step: (by: number) => ticker.step(by)
+      }
+    }
+  }
+]);
+ticker.start();

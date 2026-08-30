@@ -36,13 +36,15 @@ import { OverlayStore } from '../framework/overlay/OverlayStore';
 import type { UiElement } from '../ui/composition';
 import { Component } from '../framework/Component';
 import { createComponent } from '../framework/createComponent';
-import { Define, Inject, Input } from '../framework/decorators';
+import { Channel, Define, Inject, Input } from '../framework/decorators';
 import { state } from '../framework/State';
 import { createDemoBitmap } from './demoBitmap';
 import { input } from '../framework/Input';
 import { Store } from '../framework/store/Store';
 import { Action, Projection, State } from '../framework/store/decorators';
 import { HeavyStore } from './HeavyStore';
+import { Ticker, type TickerCommands, type TickerView } from './TickerChannel';
+import type { ChannelReplica } from '../framework/channel/ChannelReplica';
 
 /**
  * Demo store used by the framework playground.
@@ -207,6 +209,49 @@ export class Heartbeat extends Component {
         backgroundColor: '#38bdf8',
         borderRadius: 6
       })
+    );
+  }
+}
+
+/**
+ * The barrier contract, live (roadmap A2).
+ *
+ * Nothing here knows where the data comes from: `Ticker` is a name and
+ * a shape, and its view keys arrive as input cells exactly as props
+ * do. The application behind it — a plain view model over a plain
+ * subject — lives in the data worker and shares nothing with this file
+ * but the token.
+ */
+@Define('channel-demo')
+export class ChannelDemo extends Component {
+  @Channel(Ticker) ticker!: ChannelReplica<TickerView, TickerCommands>;
+
+  override render(): UiElement {
+    return Row(
+      { gap: 12, y: 'center' },
+      Text({ text: this.ticker.view.label, color: '#9ca3af' }),
+      Button(
+        {
+          onClick: () => this.ticker.send.step(10),
+          color: '#ffffff',
+          backgroundColor: '#0ea5e9',
+          width: 90,
+          height: 26,
+          borderRadius: 4
+        },
+        Text({ text: '+10', color: '#ffffff' })
+      ),
+      Button(
+        {
+          onClick: () => this.ticker.send.reset(),
+          color: '#ffffff',
+          backgroundColor: '#64748b',
+          width: 90,
+          height: 26,
+          borderRadius: 4
+        },
+        Text({ text: 'Reset', color: '#ffffff' })
+      )
     );
   }
 }
@@ -1573,6 +1618,7 @@ export class FrameworkDemoRoot extends Component {
         text: 'Click the buttons: input, components, stores and Canvas2D are wired end to end.',
         color: '#9ca3af'
       }),
+      createComponent(ChannelDemo),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(ModifierDemo),
       createComponent(SignInFormDemo),

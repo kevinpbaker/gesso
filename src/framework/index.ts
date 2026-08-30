@@ -1,7 +1,8 @@
 export { Component } from './Component';
 export { State as StateCell, state } from './State';
 export { InputCell, input } from './Input';
-export { Define, Input, Inject } from './decorators';
+export { Define, Input, Inject, Channel } from './decorators';
+export * from './channel';
 export { State, Action, Projection } from './store/decorators';
 export { Store, type StoreProjections } from './store/Store';
 export { structurallyEqual } from './store/structuralEquals';

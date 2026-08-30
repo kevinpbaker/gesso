@@ -52,7 +52,14 @@ describe('workerHandle', () => {
       return worker;
     });
     const served: string[] = [];
-    servePorts(key => served.push(key), host);
+    servePorts(
+      key => {
+        served.push(key);
+        return true;
+      },
+      () => ['catalog', 'cart'],
+      host
+    );
 
     expect(handle.spawned).toBe(false);
     handle.open('catalog');
@@ -66,9 +73,14 @@ describe('workerHandle', () => {
   it('carries messages both ways over one opened port', async () => {
     const { worker, host } = createFakeWorker();
     const handle = workerHandle(() => worker);
-    servePorts((_key, port) => {
-      port.onmessage = event => port.postMessage(`echo:${String(event.data)}`);
-    }, host);
+    servePorts(
+      (_key, port) => {
+        port.onmessage = event => port.postMessage(`echo:${String(event.data)}`);
+        return true;
+      },
+      () => ['demo'],
+      host
+    );
 
     const client = handle.open('demo');
     const replies = collect([client], 1);
@@ -80,9 +92,14 @@ describe('workerHandle', () => {
   it('keeps two ports on one worker independent', async () => {
     const { worker, host } = createFakeWorker();
     const handle = workerHandle(() => worker);
-    servePorts((key, port) => {
-      port.onmessage = event => port.postMessage(`${key}:${String(event.data)}`);
-    }, host);
+    servePorts(
+      (key, port) => {
+        port.onmessage = event => port.postMessage(`${key}:${String(event.data)}`);
+        return true;
+      },
+      () => ['alpha', 'beta'],
+      host
+    );
 
     const a = handle.open('alpha');
     const b = handle.open('beta');
@@ -110,7 +127,11 @@ describe('workerHandle', () => {
     const host: PortHost = { onmessage: null };
     const other = vi.fn();
     host.onmessage = other;
-    servePorts(() => expect.unreachable('a plain message is not a handshake'), host);
+    servePorts(
+      () => expect.unreachable('a plain message is not a handshake'),
+      () => [],
+      host
+    );
 
     host.onmessage?.({ data: { type: 'something:else' } });
     expect(other).toHaveBeenCalledTimes(1);
@@ -120,17 +141,91 @@ describe('workerHandle', () => {
     const host: PortHost = { onmessage: null };
     const original = vi.fn();
     host.onmessage = original;
-    const stop = servePorts(() => {}, host);
+    const stop = servePorts(
+      () => true,
+      () => [],
+      host
+    );
     stop();
     expect(host.onmessage).toBe(original);
   });
 
   it('rejects a handshake with no port attached', () => {
     const host: PortHost = { onmessage: null };
-    servePorts(() => {}, host);
+    servePorts(
+      () => true,
+      () => [],
+      host
+    );
     expect(() => host.onmessage?.({ data: { type: 'nodal:port', key: 'catalog' } })).toThrow(
       /handshake for 'catalog' arrived with no port/
     );
+  });
+
+  it('passes a name it does not serve to the handler installed before it', () => {
+    // Two kinds of thing served from one worker — stores and channels
+    // during the migration. Each answers for its own names and
+    // declines the rest.
+    const host: PortHost = { onmessage: null };
+    const first: string[] = [];
+    const second: string[] = [];
+    servePorts(
+      key => {
+        if (key !== 'store') {
+          return false;
+        }
+        first.push(key);
+        return true;
+      },
+      () => ['store'],
+      host
+    );
+    servePorts(
+      key => {
+        if (key !== 'channel') {
+          return false;
+        }
+        second.push(key);
+        return true;
+      },
+      () => ['channel'],
+      host
+    );
+
+    const open = (key: string) =>
+      host.onmessage?.({ data: { type: 'nodal:port', key }, ports: [new MessageChannel().port2] });
+    open('channel');
+    open('store');
+
+    expect(first).toEqual(['store']);
+    expect(second).toEqual(['channel']);
+  });
+
+  it('answers a name nothing serves, naming what the worker does serve', async () => {
+    const host: PortHost = { onmessage: null };
+    servePorts(
+      () => false,
+      () => ['store'],
+      host
+    );
+    servePorts(
+      () => false,
+      () => ['channel'],
+      host
+    );
+
+    const pair = new MessageChannel();
+    const reply = new Promise<unknown>(resolve => {
+      pair.port1.onmessage = event => resolve(event.data);
+    });
+    host.onmessage?.({ data: { type: 'nodal:port', key: 'nope' }, ports: [pair.port2] });
+
+    // A handshake that matched nothing would otherwise leave the
+    // client waiting forever with nothing said.
+    expect(await reply).toEqual({
+      type: 'port:error',
+      message: "Nothing is served under 'nope'. This worker serves: channel, store."
+    });
   });
 
   it('recognises only a well-formed handshake', () => {

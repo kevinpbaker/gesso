@@ -125,8 +125,10 @@ describe('a data worker shared by several stores', () => {
 
   it('reports an unknown key back over the port instead of throwing into the void', async () => {
     // A throw inside a data worker is invisible to the page, and the
-    // client would just never receive a patch. Sent back, it surfaces
-    // through the replica's onError.
+    // client would just never receive a patch. Answered on the port, it
+    // surfaces through the replica's onError. The message comes from
+    // the transport rather than from serveStores, because only the
+    // transport can see everything the worker serves.
     const host: PortHost = { onmessage: null };
     serveStores({ CatalogStore, CartStore }, host);
     const channel = new MessageChannel();
@@ -139,8 +141,8 @@ describe('a data worker shared by several stores', () => {
     ).not.toThrow();
 
     expect(await reply).toEqual({
-      type: 'store:error',
-      message: "No store is served under 'NoSuchStore'. Served stores: CartStore, CatalogStore."
+      type: 'port:error',
+      message: "Nothing is served under 'NoSuchStore'. This worker serves: CartStore, CatalogStore."
     });
   });
 
@@ -164,7 +166,7 @@ describe('a data worker shared by several stores', () => {
     );
 
     await waitFor(() => errors.length > 0, 'the error to reach the registry');
-    expect(errors[0]).toMatch(/No store is served under 'CartStore'/);
+    expect(errors[0]).toMatch(/Nothing is served under 'CartStore'/);
     registry.dispose();
   });
 });

@@ -6,11 +6,11 @@ import { UiAnimationFrameClock } from '../../ui/scheduler';
 import type { UiFrameClockFactory } from '../../ui/scheduler';
 import type { StoreRegistry } from '../store/StoreRegistry';
 import type { Store } from '../store/Store';
-import { NodalRuntime, type FrameMetrics, type RendererChoice } from './NodalRuntime';
+import { NodalRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './NodalRuntime';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { observeReducedMotion } from './reducedMotion';
 import { measure } from './worker/WorkerApp';
-import type { StoreReplica } from '../store/worker/StoreReplica';
+import type { ChannelRegistry } from '../channel/ChannelRegistry';
 
 export interface NodalAppOptions {
   host: HTMLElement;
@@ -18,6 +18,7 @@ export interface NodalAppOptions {
   storeClasses?: (new () => Store)[];
   /** A registry built elsewhere, when some stores live in data workers. */
   stores?: StoreRegistry;
+  channels?: ChannelRegistry;
   canvas?: CanvasHost;
   /** The rendering backend; see RendererChoice. Defaults to `canvas2d`. */
   renderer?: RendererChoice;
@@ -68,6 +69,7 @@ export class NodalApp {
       renderer: options.renderer,
       storeClasses: options.storeClasses,
       stores: options.stores,
+      channels: options.channels,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
       dpr: devicePixelRatio()
     });
@@ -128,8 +130,8 @@ export class NodalApp {
   }
 
   /** Aligns patch delivery from worker-owned stores to the frame. */
-  deferPatchesFrom(replicas: readonly StoreReplica[]): void {
-    this.runtime.deferPatchesFrom(replicas);
+  deferPatchesFrom(sources: readonly PatchSource[]): void {
+    this.runtime.deferPatchesFrom(sources);
   }
 
   /**
