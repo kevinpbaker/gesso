@@ -27,21 +27,21 @@ export type ShellToRuntimeMessage =
       textInput?: 'proxy' | 'keys';
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
-  | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers }
-  | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers }
-  | { type: 'pointerUp'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers }
-  | { type: 'pointerCancel' }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiKeyModifiers }
-  | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers }
-  | { type: 'keyUp'; key: string; modifiers: UiKeyModifiers }
+  | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
+  | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
+  | { type: 'pointerUp'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
+  | { type: 'pointerCancel'; at?: number }
+  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiKeyModifiers; at?: number }
+  | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers; at?: number }
+  | { type: 'keyUp'; key: string; modifiers: UiKeyModifiers; at?: number }
   /** A `beforeinput` from the editing proxy, in the DOM's inputType vocabulary. */
-  | { type: 'beforeInput'; inputType: string; data: string | null }
-  | { type: 'compositionStart' }
+  | { type: 'beforeInput'; inputType: string; data: string | null; at?: number }
+  | { type: 'compositionStart'; at?: number }
   /** The composition text so far and the caret offset within it. */
-  | { type: 'compositionUpdate'; text: string; caret: number }
+  | { type: 'compositionUpdate'; text: string; caret: number; at?: number }
   /** The committed text; empty when the composition was cancelled. */
-  | { type: 'compositionEnd'; text: string }
-  | { type: 'paste'; text: string }
+  | { type: 'compositionEnd'; text: string; at?: number }
+  | { type: 'paste'; text: string; at?: number }
   /** The editing proxy lost focus to something outside the app. */
   | { type: 'blur' }
   /** The page was hidden or shown (document.visibilityState). */
@@ -77,6 +77,7 @@ export type RuntimeToShellMessage =
       measured: number;
       relayoutRoots: number;
       at: number;
+      inputLatencyMs: number | null;
       phases: FramePhaseTimings;
       renderer: RendererBackend | 'pending';
       gpu: GpuStageTimings | null;
@@ -95,6 +96,70 @@ export type RuntimeToShellMessage =
   | { type: 'clipboard'; text: string }
   /** Open a URL in a new tab (ShellStore.openUrl). */
   | { type: 'openUrl'; url: string };
+
+/**
+ * The set of shell messages that carry a user input.
+ *
+ * The shell stamps these with `at` and the runtime measures against
+ * them; everything else in the protocol is a size, a preference or a
+ * lifecycle signal and has no latency to speak of.
+ */
+const INPUT_MESSAGE_TYPES: ReadonlySet<string> = new Set([
+  'pointerDown',
+  'pointerMove',
+  'pointerUp',
+  'pointerCancel',
+  'wheel',
+  'keyDown',
+  'keyUp',
+  'beforeInput',
+  'compositionStart',
+  'compositionUpdate',
+  'compositionEnd',
+  'paste'
+]);
+
+export function isInputMessage(message: ShellToRuntimeMessage): message is ShellToRuntimeMessage & { at?: number } {
+  return INPUT_MESSAGE_TYPES.has(message.type);
+}
+
+/**
+ * Milliseconds since the Unix epoch, at `performance.now()`'s
+ * resolution.
+ *
+ * Input latency is the one measurement in this protocol that spans two
+ * threads, and `performance.now()` cannot span them: a worker's time
+ * origin is its own creation, not the document's, so the shell's
+ * reading and the worker's reading are counted from different
+ * moments. Adding `timeOrigin` puts both on one clock.
+ *
+ * `FrameMetrics.at` deliberately does *not* use this — it is only ever
+ * subtracted from another reading taken on the same thread, and its
+ * docblock explains why that is the honest measure of a stall.
+ */
+export function epochNow(): number {
+  if (typeof performance === 'undefined') {
+    return Date.now();
+  }
+  return performance.timeOrigin + performance.now();
+}
+
+/**
+ * When a DOM event actually happened, on the same epoch clock.
+ *
+ * `event.timeStamp` is set by the browser when it creates the event,
+ * not when a listener runs, and that difference is the whole point of
+ * this measurement: a shell busy for two seconds runs its listener two
+ * seconds late, and stamping inside the listener would record the
+ * delay as zero. Reading the event's own clock is what makes a blocked
+ * shell visible.
+ */
+export function epochFromEvent(event: { timeStamp: number }): number {
+  if (typeof performance === 'undefined') {
+    return Date.now();
+  }
+  return performance.timeOrigin + event.timeStamp;
+}
 
 export function modifiersFrom(event: {
   shiftKey: boolean;

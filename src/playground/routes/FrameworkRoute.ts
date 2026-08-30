@@ -16,6 +16,7 @@ interface FrameMetrics {
   measured: number;
   relayoutRoots: number;
   at: number;
+  inputLatencyMs: number | null;
   phases: Record<string, number>;
   renderer: string;
   gpu: { prepare: number; upload: number; encode: number } | null;
@@ -184,6 +185,12 @@ function createFrameReporter(
   let framesAtLastReport = 0;
   let previousFrameAt: number | null = null;
   let worstGap = 0;
+  // The pair that makes the thread model visible. Frame gap is measured
+  // on the rendering thread and is blind to a shell too busy to forward
+  // an event; input latency starts where the event arrived. Blocking
+  // the main thread moves one of these and not the other.
+  let worstInput = 0;
+  let inputSamples = 0;
   // Peak rather than latest: patches and environment run on a small
   // minority of frames, so sampling the current frame would almost
   // always show them as idle even when they are doing the work.
@@ -203,6 +210,10 @@ function createFrameReporter(
       worstGap = Math.max(worstGap, metrics.at - previousFrameAt);
     }
     previousFrameAt = metrics.at;
+    if (metrics.inputLatencyMs !== null) {
+      worstInput = Math.max(worstInput, metrics.inputLatencyMs);
+      inputSamples++;
+    }
     for (const [name, ms] of Object.entries(metrics.phases)) {
       worstPhase[name] = Math.max(worstPhase[name] ?? 0, ms);
     }
@@ -246,8 +257,11 @@ function createFrameReporter(
       metrics.gpu !== null && renderCount > 0
         ? ` (prepare ${(gpuSum.prepare / renderCount).toFixed(2)} · upload ${(gpuSum.upload / renderCount).toFixed(2)} · encode ${(gpuSum.encode / renderCount).toFixed(2)})`
         : '';
+    // Leading, because the status line clips to one line and this is
+    // the number the route exists to show.
+    const inputText = inputSamples === 0 ? 'Input —' : `Input ${worstInput.toFixed(0)}ms worst`;
     shell.setStatus(
-      `Render ${meanRender.toFixed(2)}ms mean${gpuText} · worst · ` +
+      `${inputText} · Render ${meanRender.toFixed(2)}ms mean${gpuText} · worst · ` +
         Object.entries(worstPhase)
           .map(([name, ms]) => `${name} ${ms.toFixed(2)}ms`)
           .join(' · ')

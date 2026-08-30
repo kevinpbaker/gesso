@@ -58,6 +58,7 @@ import {
   type UiRenderer,
   type WebGPUCanvasHost
 } from '../../ui/rendering';
+import { InputLatencyTracker } from './InputLatency';
 import { UiScheduler, UiTimerFrameClock } from '../../ui/scheduler';
 import type { UiFrame, UiFrameClockFactory } from '../../ui/scheduler';
 import { StoreRegistry } from '../store/StoreRegistry';
@@ -199,6 +200,7 @@ export class NodalRuntime {
   private readonly engine: LayoutEngine;
   private readonly builder: UiGraphBuilder;
   private readonly scheduler: UiScheduler;
+  private readonly inputLatency = new InputLatencyTracker();
   private readonly canvas: CanvasHost;
   private readonly textMeasurer: CanvasTextMeasurer;
   /** The 2D surface when Canvas2D draws; the inspector paints on it. */
@@ -548,6 +550,21 @@ export class NodalRuntime {
    */
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void {
     this.frameListener = listener;
+  }
+
+  /**
+   * Reports when the shell received the input just routed, so the
+   * frame answering it can say how long it waited.
+   *
+   * Called by the host *after* handing the event to the input
+   * controllers, because whether a frame is now pending is the test
+   * for whether the input caused any work at all. A host that does not
+   * call this leaves `FrameMetrics.inputLatencyMs` null, which is why
+   * it is a separate call rather than a parameter on every input
+   * method: measurement must not be a condition of routing an event.
+   */
+  noteInput(at: number | undefined): void {
+    this.inputLatency.mark(at, this.scheduler.framePending);
   }
 
   /**
@@ -1222,6 +1239,7 @@ export class NodalRuntime {
       measured: this.engine.stats.measured,
       relayoutRoots: this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
       at: finished,
+      inputLatencyMs: this.inputLatency.take(epochAt(finished)),
       phases: this.phaseTimings,
       renderer: this.rendererState,
       gpu: this.gpuTimings
@@ -1418,10 +1436,35 @@ export interface FrameMetrics {
    * times say nothing about when the work happened.
    */
   at: number;
+  /**
+   * How long the input this frame answers waited, from the moment the
+   * shell received it to the moment this frame finished, or null when
+   * the frame was not drawn for an input.
+   *
+   * The companion to `at`, and the measurement `at` cannot make: a
+   * shell too busy to forward events costs the person a late response
+   * while the render worker, with nothing new to draw, reports a
+   * perfectly even frame gap. Null on a host that does not stamp its
+   * input — see `NodalRuntime.noteInput`.
+   */
+  inputLatencyMs: number | null;
 }
 
 function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+/**
+ * Converts a `now()` reading to the cross-thread epoch clock.
+ *
+ * `performance.now()` counts from this thread's time origin, which in
+ * a worker is the worker's own creation; the shell's stamps are
+ * epoch-based so that the two can be subtracted. When there is no
+ * `performance`, `now()` already returned `Date.now()` and the reading
+ * is an epoch already.
+ */
+function epochAt(reading: number): number {
+  return typeof performance !== 'undefined' ? performance.timeOrigin + reading : reading;
 }
 
 function editingStatesEqual(a: EditingState | null, b: EditingState | null): boolean {

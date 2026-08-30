@@ -1,6 +1,12 @@
-import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../NodalRuntime';
-import type { RendererBackend } from '../../../ui/rendering';
-import { modifiersFrom, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
+import type { FrameMetrics, RendererChoice } from '../NodalRuntime';
+import {
+  epochFromEvent,
+  epochNow,
+  isInputMessage,
+  modifiersFrom,
+  type RuntimeToShellMessage,
+  type ShellToRuntimeMessage
+} from './RenderWorkerProtocol';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { observeReducedMotion } from '../reducedMotion';
 
@@ -25,18 +31,13 @@ export interface WorkerAppOptions {
    * in workers, and the frame metrics say which one is drawing.
    */
   renderer?: RendererChoice;
-  /** Receives frame timings reported by the render worker. */
-  onFrame?: (metrics: {
-    frame: number;
-    durationMs: number;
-    nodes: number;
-    measured: number;
-    relayoutRoots: number;
-    at: number;
-    phases: FramePhaseTimings;
-    renderer: RendererBackend | 'pending';
-    gpu: GpuStageTimings | null;
-  }) => void;
+  /**
+   * Receives frame timings reported by the render worker.
+   *
+   * `FrameMetrics` itself rather than a structural copy of it: the
+   * copy had already fallen a field behind the real thing once.
+   */
+  onFrame?: (metrics: FrameMetrics) => void;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
   /**
@@ -167,11 +168,11 @@ export class WorkerApp {
       // its own text.
       event.preventDefault();
     }
-    this.post({ type: 'keyDown', key: event.key, modifiers: modifiersFrom(event) });
+    this.post({ type: 'keyDown', key: event.key, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
   }
 
   private forwardKeyUp(event: KeyboardEvent): void {
-    this.post({ type: 'keyUp', key: event.key, modifiers: modifiersFrom(event) });
+    this.post({ type: 'keyUp', key: event.key, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
   }
 
   /**
@@ -212,6 +213,7 @@ export class WorkerApp {
         measured: message.measured,
         relayoutRoots: message.relayoutRoots,
         at: message.at,
+        inputLatencyMs: message.inputLatencyMs,
         phases: message.phases,
         renderer: message.renderer,
         gpu: message.gpu
@@ -249,6 +251,14 @@ export class WorkerApp {
   };
 
   private post(message: ShellToRuntimeMessage): void {
+    // A backstop only. An input forwarded from a DOM event carries the
+    // event's own timestamp (see `epochFromEvent`); this covers the
+    // few that have no event behind them, and costs a listener that
+    // forgot to stamp a reading that is late by however long the shell
+    // took to get here.
+    if (isInputMessage(message) && message.at === undefined) {
+      (message as { at?: number }).at = epochNow();
+    }
     this.worker?.postMessage(message);
   }
 
@@ -293,7 +303,14 @@ export class WorkerApp {
       if (!(this.proxy?.active ?? false)) {
         canvas.focus();
       }
-      this.post({ type: 'pointerDown', x, y, buttons: event.buttons, modifiers: modifiersFrom(event) });
+      this.post({
+        type: 'pointerDown',
+        x,
+        y,
+        buttons: event.buttons,
+        modifiers: modifiersFrom(event),
+        at: epochFromEvent(event)
+      });
     };
     const onMouseDown = (event: MouseEvent): void => {
       if (this.proxy?.active ?? false) {
@@ -312,11 +329,25 @@ export class WorkerApp {
     });
     const onPointerMove = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
-      this.post({ type: 'pointerMove', x, y, buttons: event.buttons, modifiers: modifiersFrom(event) });
+      this.post({
+        type: 'pointerMove',
+        x,
+        y,
+        buttons: event.buttons,
+        modifiers: modifiersFrom(event),
+        at: epochFromEvent(event)
+      });
     };
     const onPointerUp = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
-      this.post({ type: 'pointerUp', x, y, buttons: event.buttons, modifiers: modifiersFrom(event) });
+      this.post({
+        type: 'pointerUp',
+        x,
+        y,
+        buttons: event.buttons,
+        modifiers: modifiersFrom(event),
+        at: epochFromEvent(event)
+      });
     };
     const onPointerCancel = (): void => {
       this.post({ type: 'pointerCancel' });
@@ -330,7 +361,8 @@ export class WorkerApp {
         y,
         deltaX: event.deltaX,
         deltaY: event.deltaY,
-        modifiers: modifiersFrom(event)
+        modifiers: modifiersFrom(event),
+        at: epochFromEvent(event)
       });
     };
     const onKeyDown = (event: KeyboardEvent): void => this.forwardKeyDown(event);

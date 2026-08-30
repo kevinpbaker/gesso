@@ -9,7 +9,7 @@ import {
 } from '../../store/worker/createStoreRegistry';
 import { UiTimerFrameClock } from '../../../ui/scheduler';
 import { NodalRuntime, type RendererChoice } from '../NodalRuntime';
-import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
+import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
  * Minimal view of the worker global, so this module type-checks
@@ -166,6 +166,14 @@ export class RenderWorkerApp {
         this.runtime = undefined;
         break;
     }
+
+    // After routing, not before: whether a frame is now pending is how
+    // the runtime tells an input that caused work from one that hit
+    // nothing. `dispose` cannot reach here with a live runtime, and no
+    // lifecycle message is an input, so the guard is enough.
+    if (this.runtime !== undefined && isInputMessage(message)) {
+      this.runtime.noteInput(message.at);
+    }
   }
 
   private initialize(
@@ -219,6 +227,7 @@ export class RenderWorkerApp {
         measured: metrics.measured,
         relayoutRoots: metrics.relayoutRoots,
         at: metrics.at,
+        inputLatencyMs: metrics.inputLatencyMs,
         phases: metrics.phases,
         renderer: metrics.renderer,
         gpu: metrics.gpu
