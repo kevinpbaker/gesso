@@ -1,4 +1,7 @@
 import { map } from 'rxjs';
+import { Checkbox, TextInput } from '../components';
+import { FocusStore } from '../framework/app/FocusStore';
+import { darkTheme } from '../ui/environment/UiTheme';
 import { interactive } from '../ui/modifiers';
 
 import { Box, Button, Column, EditableText, Grid, LazyColumn, Row, ScrollView, Text } from '../ui/composition';
@@ -529,6 +532,105 @@ export class ModifierDemo extends Component {
   }
 }
 
+/**
+ * The Inputs tier (roadmap C3): a sign-in form built from
+ * `@nodal/components` with no hand-rolled widget and no colour in it.
+ *
+ * Every control is themed through the control tokens, carries its own
+ * role, name and states, and is operable from the keyboard. Submitting
+ * with an empty field puts the caret in it through `FocusStore`, which
+ * is the thing a component could not do before C0.
+ */
+@Define('sign-in-form-demo')
+export class SignInFormDemo extends Component {
+  @Inject(FocusStore) focus!: FocusStore;
+
+  @State() email = state('');
+  @State() passcode = state('');
+  @State() remember = state(true);
+  @State() emailError = state('');
+  @State() passcodeError = state('');
+  @State() status = state('');
+
+  private emailField: UiNode | null = null;
+  private passcodeField: UiNode | null = null;
+
+  private submit(): void {
+    const missingEmail = this.email.value.trim().length === 0;
+    const missingPasscode = this.passcode.value.trim().length === 0;
+    this.emailError.value = missingEmail ? 'Enter your email address' : '';
+    this.passcodeError.value = missingPasscode ? 'Enter your passcode' : '';
+    this.status.value = missingEmail || missingPasscode ? '' : `Signed in as ${this.email.value}`;
+    // The caret goes to the first field that failed, which is what a
+    // form has to be able to do and what FocusStore exists for.
+    const offending = missingEmail ? this.emailField : missingPasscode ? this.passcodeField : null;
+    if (offending !== null) {
+      this.focus.focus(offending);
+    }
+  }
+
+  override render(): UiElement {
+    return Column(
+      {
+        width: 340,
+        padding: 16,
+        gap: 10,
+        theme: darkTheme,
+        backgroundColor: 'surface',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'border'
+      },
+      Text({ text: 'Sign in (C3 · @nodal/components)', color: 'text', fontSize: 16, fontWeight: 600 }),
+      createComponent(TextInput, {
+        label: 'Email',
+        placeholder: 'you@example.com',
+        ref: this.setEmailField,
+        value: this.email,
+        error: this.emailError,
+        required: true,
+        onChange: (value: string) => (this.email.value = value),
+        onSubmit: () => this.submit()
+      }),
+      createComponent(TextInput, {
+        label: 'Passcode',
+        placeholder: 'six digits',
+        ref: this.setPasscodeField,
+        value: this.passcode,
+        error: this.passcodeError,
+        required: true,
+        onChange: (value: string) => (this.passcode.value = value),
+        onSubmit: () => this.submit()
+      }),
+      createComponent(Checkbox, {
+        label: 'Remember this device',
+        checked: this.remember,
+        onChange: (value: boolean) => (this.remember.value = value)
+      }),
+      Row(
+        { gap: 8, y: 'center' },
+        Button({
+          text: 'Sign in',
+          padding: 10,
+          borderRadius: 6,
+          backgroundColor: 'controlAccent',
+          color: 'controlBackground',
+          onClick: () => this.submit()
+        }),
+        Text({ text: this.status, color: 'textMuted', fontSize: 12 })
+      )
+    );
+  }
+
+  /** Refs, so a failed submit knows which node to focus. */
+  setEmailField = (node: UiNode | null): void => {
+    this.emailField = node;
+  };
+  setPasscodeField = (node: UiNode | null): void => {
+    this.passcodeField = node;
+  };
+}
+
 @Define('scroll-demo')
 export class ScrollDemo extends Component {
   override render(): UiElement {
@@ -837,6 +939,7 @@ export class FrameworkDemoRoot extends Component {
       }),
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(ModifierDemo),
+      createComponent(SignInFormDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),
