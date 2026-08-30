@@ -2,7 +2,7 @@ import type { UiColors } from './UiColors';
 import type { UiTypography } from './UiTypography';
 import type { UiShapes } from './UiShapes';
 import type { UiShadows } from './UiShadows';
-import { colorsEqualPalette } from './UiColors';
+import { colorsEqualPalette, darkColors, lightColors } from './UiColors';
 import { typographyEqual } from './UiTypography';
 import { shapesEqual } from './UiShapes';
 import { shadowsEqual } from './UiShadows';
@@ -23,16 +23,7 @@ export interface UiTheme {
 }
 
 export const lightTheme: UiTheme = {
-  colors: {
-    background: { r: 1, g: 1, b: 1, a: 1 },
-    surface: { r: 0.98, g: 0.98, b: 0.98, a: 1 },
-    primary: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
-    secondary: { r: 0.61, g: 0.15, b: 0.69, a: 1 },
-    text: { r: 0, g: 0, b: 0, a: 1 },
-    textMuted: { r: 0.4, g: 0.4, b: 0.4, a: 1 },
-    border: { r: 0.85, g: 0.85, b: 0.85, a: 1 },
-    shadow: { r: 0, g: 0, b: 0, a: 0.2 }
-  },
+  colors: lightColors,
   typography: {
     body: {
       fontFamily: 'sans-serif',
@@ -125,16 +116,7 @@ export const lightTheme: UiTheme = {
 
 export const darkTheme: UiTheme = {
   ...lightTheme,
-  colors: {
-    background: { r: 0.12, g: 0.12, b: 0.12, a: 1 },
-    surface: { r: 0.18, g: 0.18, b: 0.18, a: 1 },
-    primary: { r: 0.4, g: 0.76, b: 1, a: 1 },
-    secondary: { r: 0.88, g: 0.6, b: 0.94, a: 1 },
-    text: { r: 1, g: 1, b: 1, a: 1 },
-    textMuted: { r: 0.6, g: 0.6, b: 0.6, a: 1 },
-    border: { r: 0.3, g: 0.3, b: 0.3, a: 1 },
-    shadow: { r: 0, g: 0, b: 0, a: 0.5 }
-  },
+  colors: darkColors,
   typography: {
     body: { ...lightTheme.typography.body, color: { r: 1, g: 1, b: 1, a: 1 } },
     bodyLarge: { ...lightTheme.typography.bodyLarge, color: { r: 1, g: 1, b: 1, a: 1 } },

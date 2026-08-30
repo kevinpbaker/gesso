@@ -287,7 +287,19 @@ export function buildTheme(spec: ThemeSpec): UiTheme {
     border: hex(palette.border),
     positive: hex(palette.positive),
     negative: hex(palette.negative),
-    shadow: withAlpha(hex('#000000'), palette.shadowAlpha)
+    shadow: withAlpha(hex('#000000'), palette.shadowAlpha),
+    // The control tokens the component library reads, derived from the
+    // same four choices, so a checkbox in this preview follows the
+    // palette without naming a colour of its own.
+    controlBackground: hex(palette.surface),
+    controlBackgroundHovered: mix(hex(palette.surface), text, palette.dark ? 0.12 : 0.06),
+    controlBackgroundPressed: mix(hex(palette.surface), text, palette.dark ? 0.2 : 0.12),
+    controlBorder: hex(palette.border),
+    controlBorderFocused: primary,
+    controlForeground: text,
+    controlForegroundDisabled: hex(palette.textMuted),
+    controlAccent: primary,
+    danger: hex(palette.negative)
   };
   return {
     colors,
