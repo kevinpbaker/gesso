@@ -51,8 +51,8 @@ export class RenderWorkerApp {
 
   private runtime: GessoRuntime | undefined;
   private channels: ChannelRegistryHandle | undefined;
-  /** The shell's port to the application worker, if there is one. */
-  private appWorker: WorkerHandle | undefined;
+  /** The shell's port to the application-logic worker, if there is one. */
+  private appLogicWorker: WorkerHandle | undefined;
 
   constructor(root: FrameworkChild | ComponentType, host: WorkerGlobal = self as unknown as WorkerGlobal) {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
@@ -121,10 +121,10 @@ export class RenderWorkerApp {
 
   private dispatch(message: ShellToRuntimeMessage): void {
     if (message.type === 'init') {
-      // The shell's channel to the application worker, when it spawned
+      // The shell's channel to the application-logic worker, when it spawned
       // one. Held before initialize, because the channels registered
       // without a worker of their own are opened over it there.
-      this.appWorker = message.appPort === undefined ? undefined : portHandle(message.appPort);
+      this.appLogicWorker = message.appPort === undefined ? undefined : portHandle(message.appPort);
       this.initialize(message.canvas, message.width, message.height, message.dpr, message.renderer);
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
@@ -217,7 +217,7 @@ export class RenderWorkerApp {
     if (registration.worker !== APPLICATION_WORKER) {
       return registration;
     }
-    return { ...registration, worker: this.appWorker };
+    return { ...registration, worker: this.appLogicWorker };
   }
 
   private initialize(
@@ -232,11 +232,11 @@ export class RenderWorkerApp {
     this.channels = createChannelRegistry(
       // A channel registered with neither a worker nor a source is
       // served by whatever the shell spawned. Naming no worker is the
-      // common case: an application has one application worker, and
+      // common case: an application has one application-logic worker, and
       // repeating that at every registration says nothing.
       this.channelRegistrations.map(registration =>
         registration.worker === undefined && registration.source === undefined
-          ? { ...registration, worker: this.appWorker }
+          ? { ...registration, worker: this.appLogicWorker }
           : this.resolveWorker(registration)
       ),
       (channelName, message, stack) => {

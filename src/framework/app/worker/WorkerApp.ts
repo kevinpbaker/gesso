@@ -12,19 +12,20 @@ import { observeReducedMotion } from '../reducedMotion';
 
 export interface WorkerAppOptions {
   /**
-   * The worker that calls renderRoot().
+   * Spawns the render worker: the one that calls renderRoot(), and so
+   * owns components, layout and drawing.
    *
    * Prefer the factory form. Bundlers only code-split a worker when
    * they can see `new Worker(new URL('./x.ts', import.meta.url))`
    * written out literally, and that cannot happen inside this file —
    * it has to appear in the calling module:
    *
-   *   worker: () => new Worker(new URL('./app.worker.ts', import.meta.url), { type: 'module' })
+   *   renderWorker: () => new Worker(new URL('./app.render.worker.ts', import.meta.url), { type: 'module' })
    *
    * A URL is accepted for environments that resolve modules at
    * runtime, but a bundled build will not emit a chunk for it.
    */
-  worker: (() => Worker) | URL | string;
+  renderWorker: (() => Worker) | URL | string;
   /**
    * The rendering backend the worker draws with. Defaults to Canvas2D;
    * `webgpu` and `auto` fall back to it when the browser has no WebGPU
@@ -39,8 +40,8 @@ export interface WorkerAppOptions {
    */
   onFrame?: (metrics: FrameMetrics) => void;
   /**
-   * Spawns the application worker: api, persistence, domain and view
-   * models, published as channels.
+   * Spawns the application-logic worker: api, persistence, domain and
+   * view models, published as channels.
    *
    * The shell creates it, hands the render worker a port to it, and
    * then has nothing more to do with it — no patch ever crosses this
@@ -49,7 +50,8 @@ export interface WorkerAppOptions {
    * the render worker being replaced, and nothing depends on a worker
    * being able to spawn a worker.
    *
-   * A factory rather than a URL, for the same reason `worker` is one.
+   * A factory rather than a URL, for the same reason `renderWorker` is
+   * one.
    *
    * Pass an already-running `Worker` to keep it across a remount. The
    * app is disposed and rebuilt whenever the *rendering* changes — the
@@ -59,7 +61,7 @@ export interface WorkerAppOptions {
    * application. What this class spawned, it terminates; what it was
    * handed, it leaves alone.
    */
-  appWorker?: Worker | (() => Worker) | URL | string;
+  appLogicWorker?: Worker | (() => Worker) | URL | string;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
   /**
@@ -93,10 +95,10 @@ export interface WorkerAppOptions {
 export class WorkerApp {
   private readonly options: WorkerAppOptions;
 
-  private worker: Worker | undefined;
-  private applicationWorker: Worker | undefined;
-  /** True only when this class spawned the application worker. */
-  private ownsApplicationWorker = false;
+  private renderWorker: Worker | undefined;
+  private appLogicWorker: Worker | undefined;
+  /** True only when this class spawned the application-logic worker. */
+  private ownsAppLogicWorker = false;
   private canvas: HTMLCanvasElement | undefined;
   private host: HTMLElement | undefined;
   private resizeObserver: ResizeObserver | null = null;
@@ -133,9 +135,9 @@ export class WorkerApp {
     }
 
     const offscreen = canvas.transferControlToOffscreen();
-    const spec = this.options.worker;
+    const spec = this.options.renderWorker;
     const worker = typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
-    this.worker = worker;
+    this.renderWorker = worker;
     worker.addEventListener('message', this.handleWorkerMessage);
 
     // The canvas's own box, not the host's. `clientWidth`/`clientHeight`
@@ -150,12 +152,12 @@ export class WorkerApp {
     const { width, height } = measure(canvas, element);
     const transfer: Transferable[] = [offscreen];
     let appPort: MessagePort | undefined;
-    if (this.options.appWorker !== undefined) {
-      const spec = this.options.appWorker;
+    if (this.options.appLogicWorker !== undefined) {
+      const spec = this.options.appLogicWorker;
       const given = typeof spec === 'object' && spec instanceof Worker;
       const application = given ? spec : typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
-      this.applicationWorker = application;
-      this.ownsApplicationWorker = !given;
+      this.appLogicWorker = application;
+      this.ownsAppLogicWorker = !given;
       // One channel between the two workers. The shell holds neither
       // end afterwards, so it cannot be in the way of a patch even by
       // accident.
@@ -232,17 +234,17 @@ export class WorkerApp {
     this.detachInput = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
-    if (this.worker !== undefined) {
-      this.worker.postMessage({ type: 'dispose' } as ShellToRuntimeMessage);
-      this.worker.removeEventListener('message', this.handleWorkerMessage);
-      this.worker.terminate();
-      this.worker = undefined;
+    if (this.renderWorker !== undefined) {
+      this.renderWorker.postMessage({ type: 'dispose' } as ShellToRuntimeMessage);
+      this.renderWorker.removeEventListener('message', this.handleWorkerMessage);
+      this.renderWorker.terminate();
+      this.renderWorker = undefined;
     }
-    if (this.ownsApplicationWorker) {
-      this.applicationWorker?.terminate();
+    if (this.ownsAppLogicWorker) {
+      this.appLogicWorker?.terminate();
     }
-    this.applicationWorker = undefined;
-    this.ownsApplicationWorker = false;
+    this.appLogicWorker = undefined;
+    this.ownsAppLogicWorker = false;
     if (this.canvas !== undefined && this.canvas.parentElement === this.host) {
       this.host?.removeChild(this.canvas);
     }
@@ -306,7 +308,7 @@ export class WorkerApp {
     if (isInputMessage(message) && message.at === undefined) {
       (message as { at?: number }).at = epochNow();
     }
-    this.worker?.postMessage(message);
+    this.renderWorker?.postMessage(message);
   }
 
   private observeResize(element: HTMLElement): void {

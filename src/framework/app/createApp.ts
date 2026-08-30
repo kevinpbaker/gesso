@@ -14,9 +14,12 @@ import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
  * happens off the main thread:
  *
  *   // main.ts
- *   createApp({ worker: new URL('./app.worker.ts', import.meta.url) }).mount('#app');
+ *   createApp({
+ *     renderWorker: () => new Worker(new URL('./app.render.worker.ts', import.meta.url), { type: 'module' }),
+ *     appLogicWorker: () => new Worker(new URL('./app.logic.worker.ts', import.meta.url), { type: 'module' })
+ *   }).mount('#app');
  *
- *   // app.worker.ts
+ *   // app.render.worker.ts
  *   renderRoot(AppRoot).useChannel(Catalog);
  *
  * Single-thread — for tests, headless rendering, and environments
@@ -37,6 +40,6 @@ function isWorkerAppOptions(value: unknown): value is WorkerAppOptions {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const worker = (value as Partial<WorkerAppOptions>).worker;
+  const worker = (value as Partial<WorkerAppOptions>).renderWorker;
   return typeof worker === 'function' || typeof worker === 'string' || worker instanceof URL;
 }

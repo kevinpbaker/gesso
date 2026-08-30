@@ -56,10 +56,10 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     const report = createFrameReporter(shell, 'Render worker', renderer);
     const app = createApp({
       // Written out literally so the bundler can see and split it.
-      worker: () => new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module' }),
+      renderWorker: () => new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module' }),
       // Handed over rather than spawned here, so it survives the
       // renderer switch: what WorkerApp is given, it leaves alone.
-      appWorker: applicationWorker,
+      appLogicWorker: applicationWorker,
       renderer,
       // The app has a find bar, so it takes Ctrl/Cmd+F; the browser's
       // own cannot see a canvas anyway.

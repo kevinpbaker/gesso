@@ -98,8 +98,8 @@ renderRoot(NotesApp).useChannel(Notes);
 ```ts
 // main.ts — the main thread's entire job
 createApp({
-  worker: () => new Worker(new URL('./notes.render.worker.ts', import.meta.url), { type: 'module' }),
-  appWorker: () => new Worker(new URL('./notes.app.worker.ts', import.meta.url), { type: 'module' })
+  renderWorker: () => new Worker(new URL('./notes.render.worker.ts', import.meta.url), { type: 'module' }),
+  appLogicWorker: () => new Worker(new URL('./notes.app.worker.ts', import.meta.url), { type: 'module' })
 }).mount('#app');
 ```
 
