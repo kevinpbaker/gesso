@@ -59,6 +59,12 @@ export const ROUTES: readonly RouteMeta[] = [
     label: 'Animation',
     title: 'Example · a board that moves, and an idle app that does not',
     parent: 'examples'
+  },
+  {
+    id: 'example-transitions',
+    label: 'Transitions',
+    title: 'Example · shared elements across a route change, and a video that keeps playing',
+    parent: 'examples'
   }
 ];
 

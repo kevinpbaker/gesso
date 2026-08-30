@@ -112,7 +112,9 @@ const CANNOT_SETTLE: Record<string, string> = {
   'example-notes':
     "paints the note's edited time (NotesViewModel: `new Date(note.updatedAt).toLocaleString()`), whose width changes with the clock and reflows the line around it",
   'example-theme':
-    'paints the time the tree was built (ThemeExampleApp: `new Date().toLocaleTimeString()`), which re-wraps the paragraph it sits in when its width changes'
+    'paints the time the tree was built (ThemeExampleApp: `new Date().toLocaleTimeString()`), which re-wraps the paragraph it sits in when its width changes',
+  'example-transitions':
+    'plays a video: the second card decodes an MP4 continuously, so the frame on screen depends on when the shot was taken and the route never reaches a still frame'
 };
 
 /*

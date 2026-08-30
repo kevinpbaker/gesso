@@ -87,5 +87,20 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'an idle app schedules no frames at all.',
     source: 'apps/playground/src/examples/AnimationExampleApp.tsx',
     tags: ['animation', 'transitions', 'springs', 'layout animation', 'reduced motion', 'JSX', 'render worker']
+  },
+  {
+    route: 'example-transitions',
+    title: 'Playlists, and the transition between them',
+    description:
+      'A replica of the View Transitions demo everyone has seen — three playlist cards, each expanding into a full ' +
+      'screen — built without snapshots. Twelve elements are declared shared by name, and each one springs from ' +
+      'where the element it replaces was standing: the card background morphs by geometry so its corners square ' +
+      'off rather than stretch, and everything else translates and scales, which never touches layout. Click a ' +
+      'card and press Back before it lands to see that the morph is interruptible, which a cross-fade of two ' +
+      'rasters cannot be. The second playlist plays a video, decoded from an MP4 by WebCodecs in the render ' +
+      'worker, and it keeps playing across the navigation because playback is reference-counted by source rather ' +
+      'than owned by a node.',
+    source: 'apps/playground/src/examples/TransitionsExampleApp.tsx',
+    tags: ['shared elements', 'route transitions', 'presence', 'video', 'WebCodecs', 'JSX', 'render worker']
   }
 ];

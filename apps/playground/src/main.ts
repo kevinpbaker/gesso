@@ -12,6 +12,7 @@ import { mountLayoutRoute } from './routes/LayoutRoute';
 import { mountLiveExampleRoute } from './routes/LiveExampleRoute';
 import { mountRouterExampleRoute } from './routes/RouterExampleRoute';
 import { mountThemeExampleRoute } from './routes/ThemeExampleRoute';
+import { mountTransitionsExampleRoute } from './routes/TransitionsExampleRoute';
 import { mountWebGPURoute } from './routes/WebGPURoute';
 import { DEFAULT_ROUTE_ID, findRoute, routeIdFromHash, ROUTES } from './shell/routes';
 
@@ -41,7 +42,8 @@ const MOUNTS: Record<string, Mount> = {
   'example-theme': mountThemeExampleRoute,
   'example-live': mountLiveExampleRoute,
   'example-router': mountRouterExampleRoute,
-  'example-animation': mountAnimationExampleRoute
+  'example-animation': mountAnimationExampleRoute,
+  'example-transitions': mountTransitionsExampleRoute
 };
 
 if (import.meta.env.DEV) {
