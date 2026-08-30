@@ -26,6 +26,7 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@gesso/testing": "workspace:^",
     "rxjs": "^7.8.2"
   },
   "scripts": {

@@ -1,0 +1,48 @@
+{
+  "name": "@gesso/testing",
+  "version": "0.1.0",
+  "description": "Mount a component without a browser, query it the way a screen reader would, and read back why a box is the size it is.",
+  "type": "module",
+  "sideEffects": [
+    "./src/matchers.ts",
+    "./dist/matchers.js"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./matchers": "./src/matchers.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./matchers": {
+        "types": "./dist/matchers.d.ts",
+        "default": "./dist/matchers.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@gesso/core": "workspace:^",
+    "@gesso/framework": "workspace:^"
+  },
+  "peerDependencies": {
+    "rxjs": "^7.8.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "rxjs": "^7.8.2"
+  },
+  "scripts": {
+    "build": "tsdown"
+  }
+}

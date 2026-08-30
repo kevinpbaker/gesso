@@ -7,8 +7,9 @@
  * every consumer's public surface and in the API report, where a change
  * to a test double would read as a change to the framework.
  *
- * This is the seam `@gesso/testing` (`ROADMAP.md` F7) will build its
- * `renderTest()` on; until then it is what the suites here already use.
+ * This is the seam `@gesso/testing` builds `renderTest()` on: the
+ * recording context and the canvas host it mounts over come from here,
+ * which is why neither of them may ever import a test runner.
  */
 export { InputTestHarness, FakeEventTarget, FakePlatformSurface } from './input/UiInputTestUtils';
 export {

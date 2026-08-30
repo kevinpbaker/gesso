@@ -67,6 +67,9 @@ importers:
         specifier: workspace:^
         version: link:../framework
     devDependencies:
+      '@gesso/testing':
+        specifier: workspace:^
+        version: link:../testing
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
@@ -86,6 +89,22 @@ importers:
       '@gesso/core':
         specifier: workspace:^
         version: link:../core
+    devDependencies:
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+
+  packages/testing:
+    dependencies:
+      '@gesso/core':
+        specifier: workspace:^
+        version: link:../core
+      '@gesso/framework':
+        specifier: workspace:^
+        version: link:../framework
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(vite@8.2.1(yaml@2.9.0))
     devDependencies:
       rxjs:
         specifier: ^7.8.2
