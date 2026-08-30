@@ -52,6 +52,19 @@ export class UiNode {
   public firstChild: UiNode | null = null;
   public lastChild: UiNode | null = null;
 
+  /**
+   * Bumped whenever this node's children are inserted, moved or
+   * removed — never when a child merely changes size.
+   *
+   * It is the difference between "this node reordered" and "the node
+   * above it grew", which look identical to anything watching boxes
+   * and want opposite behaviour from a layout animation. Every change
+   * to the child list goes through `appendChild`, `insertBefore` or
+   * `detachNode`, so one counter here is exact and costs a comparison
+   * rather than a walk of the sibling list.
+   */
+  public childOrderVersion = 0;
+
   public previousSibling: UiNode | null = null;
   public nextSibling: UiNode | null = null;
 

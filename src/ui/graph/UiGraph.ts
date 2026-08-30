@@ -135,6 +135,7 @@ export class UiGraph {
       throw new Error(`Node '${child.id}' already has a parent.`);
     }
     child.parent = parent;
+    parent.childOrderVersion++;
     if (parent.lastChild === null) {
       // First child.
       parent.firstChild = child;
@@ -165,6 +166,7 @@ export class UiGraph {
       this.appendChild(parent, child);
       return;
     }
+    parent.childOrderVersion++;
     const previous = reference.previousSibling;
     if (previous !== null) {
       previous.nextSibling = child;
@@ -218,6 +220,7 @@ export class UiGraph {
     if (!parent) {
       return;
     }
+    parent.childOrderVersion++;
     const previous = node.previousSibling;
     const next = node.nextSibling;
     if (previous) {

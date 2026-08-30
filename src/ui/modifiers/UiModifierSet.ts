@@ -370,7 +370,13 @@ class Host implements UiModifierHost {
       return EMPTY as Observable<number>;
     }
     this.animated.add(cell as AnimatedCell<unknown>);
-    return driver.start(new UiSpring(cell, to, options));
+    // Retargeting a spring keeps the velocity it had, as
+    // `AnimationStore.spring` does: a spring that started again from
+    // rest every time it was re-aimed would crawl, which is exactly
+    // what a modifier re-aimed once a frame does.
+    const previous = driver.animationFor(cell);
+    const velocity = options.velocity ?? (previous instanceof UiSpring ? previous.currentVelocity : 0);
+    return driver.start(new UiSpring(cell, to, { ...options, velocity }));
   }
 
   own(teardown: UiModifierTeardown): void {

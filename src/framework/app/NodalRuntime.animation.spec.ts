@@ -262,14 +262,35 @@ describe('a declared transition', () => {
 });
 
 describe('animateLayout', () => {
-  it('offsets a node back to where it was and springs it home', () => {
-    const gap = state(0);
-    let first: UiNode | null = null;
+  /** Stable per-id ref callbacks, so each one fires once. */
+  function refs(into: Map<number, UiNode>): (id: number) => (node: UiNode | null) => void {
+    const made = new Map<number, (node: UiNode | null) => void>();
+    return id => {
+      let fn = made.get(id);
+      if (fn === undefined) {
+        fn = (node: UiNode | null) => {
+          if (node !== null) {
+            into.set(id, node);
+          }
+        };
+        made.set(id, fn);
+      }
+      return fn;
+    };
+  }
+
+  it('offsets a reordered node back to where it was and springs it home', () => {
+    const seen = new Map<number, UiNode>();
+    const ref = refs(seen);
+    const order = state([0, 1, 2]);
     const mounted = mountRuntime(
       Column(
-        { width: 200, height: 200 },
-        Box({ width: 20, height: 20, marginTop: gap }),
-        Box({ ref: (n: UiNode | null) => (first = n), width: 20, height: 20, modifiers: [animateLayout(undefined)] })
+        { width: 200, height: 300 },
+        order.pipe(
+          map(ids =>
+            ids.map(id => Box({ key: id, ref: ref(id), width: 20, height: 40, modifiers: [animateLayout(undefined)] }))
+          )
+        )
       )
     );
     let time = 0;
@@ -277,16 +298,16 @@ describe('animateLayout', () => {
       time += 16;
       mounted.clock.tick(time);
     }
-    expect(first!.properties.has('top')).toBe(false);
+    expect(seen.get(2)!.properties.has('top')).toBe(false);
 
-    // Push the sibling down, which moves this node 40px in the flow.
-    gap.value = 40;
+    order.value = [2, 0, 1];
     time += 16;
     mounted.clock.tick(time);
 
-    // It is drawn back where it was, not where layout put it.
-    expect(first!.properties.get('top')).toBeCloseTo(-40, 3);
-    expect(first!.properties.get('position')).toBe('relative');
+    // Both are drawn where they were, not where layout has put them.
+    expect(seen.get(2)!.properties.get('top')).toBeCloseTo(80, 3);
+    expect(seen.get(0)!.properties.get('top')).toBeCloseTo(-40, 3);
+    expect(seen.get(2)!.properties.get('position')).toBe('relative');
 
     let frames = 0;
     while (mounted.clock.isPending && frames < 300) {
@@ -294,10 +315,41 @@ describe('animateLayout', () => {
       frames++;
       mounted.clock.tick(time);
     }
-    // Home, and the override handed back rather than left at zero.
-    expect(first!.properties.has('top')).toBe(false);
-    expect(first!.properties.has('position')).toBe(false);
+    // Home, and the overrides handed back rather than left at zero.
+    expect(seen.get(2)!.properties.has('top')).toBe(false);
+    expect(seen.get(2)!.properties.has('position')).toBe(false);
     expect(frames).toBeGreaterThan(4);
+  });
+
+  it('follows a neighbour that grows instead of being held still', () => {
+    // The bug the browser found on the example's first click: the card
+    // above expands, and the card below — pinned by its own FLIP while
+    // the layout moved under it every frame — was grown straight over.
+    // Nothing changed places here, so nothing should be animated.
+    const height = state(40);
+    let below: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { width: 200, height: 300 },
+        Box({ width: 20, height }),
+        Box({ ref: (n: UiNode | null) => (below = n), width: 20, height: 40, modifiers: [animateLayout(undefined)] })
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+
+    for (const next of [50, 60, 70, 80]) {
+      height.value = next;
+      time += 16;
+      mounted.clock.tick(time);
+      expect(below!.properties.has('top')).toBe(false);
+      expect(below!.properties.has('position')).toBe(false);
+    }
+    // And no frames are being asked for on its behalf.
+    expect(mounted.clock.isPending).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { defaultMotion, type UiSpringSpec, type UiSpringToken } from '../environment/UiMotion';
 import type { AnimatedCell, UiEasing } from '../animation';
+import type { UiNode } from '../graph/UiNode';
 import { defineModifier } from './UiModifier';
 import type { UiModifierHost } from './UiModifierHost';
 
@@ -40,13 +41,25 @@ export interface AnimateLayoutOptions {
  * animating subtree is re-placed each frame from its relayout
  * boundary; `decisions/0029` has the measurement.
  *
- * The listener has to tell its own movement apart from the layout's,
- * because writing an offset moves the box the notifier reports. It
- * does that by subtracting the offset it wrote: what it watches is the
- * node's place in the *flow*, and only a change there starts a new
- * animation. An interruption therefore springs from wherever the node
- * had got to, which is what a list reordered twice in quick succession
- * should look like.
+ * **It animates a reorder, and follows everything else.** The two look
+ * identical to anything watching boxes and want opposite behaviour: a
+ * node that changed places should be drawn back where it was and
+ * released, while a node that moved because its neighbour grew should
+ * simply move with it. Holding it still would be the neighbour growing
+ * *through* it, which is what the first version of this did — the
+ * example's expanding card was drawn over the card below it, in the
+ * browser, on the first click. So the modifier absorbs a move only
+ * when its parent's `childOrderVersion` has changed, which is exactly
+ * "something was inserted, moved or removed here" and is one integer
+ * comparison. A window resize is followed rather than animated for the
+ * same reason.
+ *
+ * The listener also has to tell its own movement apart from the
+ * layout's, because writing an offset moves the box the notifier
+ * reports. It does that by subtracting the offset it wrote: what it
+ * watches is the node's place in the *flow*. An interruption springs
+ * from wherever the node had got to, which is what a list reordered
+ * twice in quick succession should look like.
  */
 export const animateLayout = defineModifier<AnimateLayoutOptions | undefined>({
   name: 'animateLayout',
@@ -60,6 +73,9 @@ class LayoutAnimation {
   private flowX = 0;
   private flowY = 0;
   private seen = false;
+  /** The parent and its child-order version when we last heard. */
+  private parent: UiNode | null = null;
+  private childOrder = -1;
   /** What we are currently offsetting by, and therefore what to subtract. */
   private offsetX = 0;
   private offsetY = 0;
@@ -163,6 +179,11 @@ class LayoutAnimation {
     }
     const flowX = box.x - this.offsetX;
     const flowY = box.y - this.offsetY;
+    const parent = this.host.node.parent;
+    const childOrder = parent === null ? -1 : parent.childOrderVersion;
+    const reordered = parent !== this.parent || childOrder !== this.childOrder;
+    this.parent = parent;
+    this.childOrder = childOrder;
     if (!this.seen) {
       this.seen = true;
       this.flowX = flowX;
@@ -173,6 +194,14 @@ class LayoutAnimation {
     const dy = this.flowY - flowY;
     this.flowX = flowX;
     this.flowY = flowY;
+    if (!reordered) {
+      // Nothing changed places, so this is the layout itself moving —
+      // a neighbour resizing, a window resizing, a container growing.
+      // The node follows it, and whatever spring is already running
+      // keeps decaying the offset it has. Absorbing this would hold
+      // the node still while its neighbour grew into it.
+      return;
+    }
     const threshold = this.options.threshold ?? 0.5;
     if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) {
       // Either nothing moved, or the only thing that moved was us.
