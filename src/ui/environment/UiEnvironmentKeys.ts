@@ -4,7 +4,7 @@ import type { UiTextStyle } from '../properties/UiTextStyle';
 import type { UiColor } from '../properties/UiColor';
 import { lightTheme, themesEqual } from './UiTheme';
 import { defaultTextStyle, textStylesEqual } from '../properties/UiTextStyle';
-import { UiColors, colorsEqual } from '../properties/UiColor';
+import { UiBasicColors, colorsEqual } from '../properties/UiColor';
 
 /**
  * Built-in environment keys.
@@ -28,7 +28,7 @@ export const UiEnvironmentKeys = {
 
   contentColor: createEnvironmentKey<UiColor>({
     name: 'contentColor',
-    defaultValue: UiColors.black,
+    defaultValue: UiBasicColors.black,
     compare: colorsEqual
   })
 } as const;

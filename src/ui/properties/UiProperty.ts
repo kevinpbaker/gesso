@@ -2,7 +2,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinition';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
-import { UiColors, colorValuesEqual } from './UiColor';
+import { UiBasicColors, colorValuesEqual } from './UiColor';
 import type { UiBorderRadius } from './UiBorderRadius';
 import { UiBorderRadiuses, borderRadiusEqual, normalizeBorderRadius } from './UiBorderRadius';
 import type { UiBoxShadow } from './UiBoxShadow';
@@ -532,7 +532,7 @@ export const UiProperties = {
 
   color: defineProperty<UiColorValue>({
     name: 'color',
-    defaultValue: UiColors.black,
+    defaultValue: UiBasicColors.black,
     inherited: true,
     affects: P,
     environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,

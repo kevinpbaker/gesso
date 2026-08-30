@@ -4,7 +4,7 @@ import type { TextOverflow, TextWrap } from '../layout/TextMeasurer';
 import { resolveProperty, resolveNumber, resolveString, resolveBoolean } from '../properties/UiPropertyResolver';
 import { UiProperties } from '../properties/UiProperty';
 import type { UiColor } from '../properties/UiColor';
-import { UiColors, colorToHex, colorToRgba } from '../properties/UiColor';
+import { UiBasicColors, colorToHex, colorToRgba } from '../properties/UiColor';
 import type { UiBorderRadius } from '../properties/UiBorderRadius';
 import { normalizeBorderRadius } from '../properties/UiBorderRadius';
 import type { UiBoxShadow } from '../properties/UiBoxShadow';
@@ -86,7 +86,7 @@ export interface PaintState {
 export const DEFAULT_FONT_SIZE = 14;
 export const DEFAULT_FONT_FAMILY = 'sans-serif';
 export const DEFAULT_FONT_WEIGHT = 'normal';
-export const DEFAULT_TEXT_COLOR = UiColors.black;
+export const DEFAULT_TEXT_COLOR = UiBasicColors.black;
 export { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 
 export function normalizeTextAlign(value: unknown): TextAlign {
@@ -165,7 +165,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
       resolveColor(node, UiProperties.placeholderColor) ?? themeColor(node, 'textMuted') ?? DEFAULT_PLACEHOLDER_COLOR;
     out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
     out.caretColor =
-      resolveColor(node, UiProperties.caretColor) ?? resolveColor(node, UiProperties.color) ?? UiColors.black;
+      resolveColor(node, UiProperties.caretColor) ?? resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
     out.textSelection = undefined;
     out.textMatches = undefined;
   } else {
@@ -192,7 +192,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.fontFamily = font.fontFamily;
   out.fontWeight = font.fontWeight;
   out.lineHeight = font.lineHeight;
-  out.textColor = resolveColor(node, UiProperties.color) ?? UiColors.black;
+  out.textColor = resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
   out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
   out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
   out.textWrap = normalizeTextWrap(resolveString(node, 'textWrap'));

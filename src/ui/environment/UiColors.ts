@@ -1,5 +1,5 @@
 import type { UiColor } from '../properties/UiColor';
-import { colorsEqual, UiColors } from '../properties/UiColor';
+import { colorsEqual, UiBasicColors } from '../properties/UiColor';
 
 /**
  * A renderer-independent color palette.
@@ -52,15 +52,15 @@ export interface UiColors {
 }
 
 export const lightColors: UiColors = {
-  background: UiColors.white,
+  background: UiBasicColors.white,
   surface: { r: 0.98, g: 0.98, b: 0.98, a: 1 },
   primary: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
   secondary: { r: 0.61, g: 0.15, b: 0.69, a: 1 },
-  text: UiColors.black,
+  text: UiBasicColors.black,
   textMuted: { r: 0.4, g: 0.4, b: 0.4, a: 1 },
   border: { r: 0.85, g: 0.85, b: 0.85, a: 1 },
   shadow: { r: 0, g: 0, b: 0, a: 0.2 },
-  controlBackground: UiColors.white,
+  controlBackground: UiBasicColors.white,
   controlBackgroundHovered: { r: 0.95, g: 0.95, b: 0.96, a: 1 },
   controlBackgroundPressed: { r: 0.9, g: 0.9, b: 0.92, a: 1 },
   controlBorder: { r: 0.76, g: 0.77, b: 0.79, a: 1 },
@@ -79,7 +79,7 @@ export const darkColors: UiColors = {
   surface: { r: 0.18, g: 0.18, b: 0.18, a: 1 },
   primary: { r: 0.4, g: 0.76, b: 1, a: 1 },
   secondary: { r: 0.88, g: 0.6, b: 0.94, a: 1 },
-  text: UiColors.white,
+  text: UiBasicColors.white,
   textMuted: { r: 0.6, g: 0.6, b: 0.6, a: 1 },
   border: { r: 0.3, g: 0.3, b: 0.3, a: 1 },
   shadow: { r: 0, g: 0, b: 0, a: 0.5 },

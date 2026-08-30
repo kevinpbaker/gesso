@@ -13,7 +13,7 @@ export interface UiColor {
   readonly a: number;
 }
 
-export const UiColors = {
+export const UiBasicColors = {
   transparent: { r: 0, g: 0, b: 0, a: 0 },
   black: { r: 0, g: 0, b: 0, a: 1 },
   white: { r: 1, g: 1, b: 1, a: 1 },

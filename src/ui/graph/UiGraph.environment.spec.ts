@@ -5,7 +5,7 @@ import { UiNodeType } from './UiNodeType';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { darkTheme, lightTheme } from '../environment/UiTheme';
 import { defaultTextStyle } from '../properties/UiTextStyle';
-import { UiColors } from '../properties/UiColor';
+import { UiBasicColors } from '../properties/UiColor';
 import { DirtyFlags } from './DirtyFlags';
 
 describe('UiGraph environment propagation', () => {
@@ -14,7 +14,7 @@ describe('UiGraph environment propagation', () => {
     expect(graph.root.environment).not.toBeNull();
     expect(graph.root.environment!.get(UiEnvironmentKeys.theme)).toBe(lightTheme);
     expect(graph.root.environment!.get(UiEnvironmentKeys.textStyle)).toBe(defaultTextStyle);
-    expect(graph.root.environment!.get(UiEnvironmentKeys.contentColor)).toEqual(UiColors.black);
+    expect(graph.root.environment!.get(UiEnvironmentKeys.contentColor)).toEqual(UiBasicColors.black);
   });
 
   it('builds a child environment that inherits from the parent', () => {
@@ -40,7 +40,7 @@ describe('UiGraph environment propagation', () => {
     graph.appendChild(graph.root, node);
     const envA = graph.buildNodeEnvironment(node);
     node.environment = envA;
-    const envB = envA.set(UiEnvironmentKeys.contentColor, UiColors.red);
+    const envB = envA.set(UiEnvironmentKeys.contentColor, UiBasicColors.red);
     expect(graph.setNodeEnvironment(node, envB)).toBe(true);
     expect(graph.setNodeEnvironment(node, envB)).toBe(false);
   });
