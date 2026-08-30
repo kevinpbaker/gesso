@@ -15,7 +15,7 @@ import { isClassComponent } from './FunctionComponent';
 import { input } from './Input';
 import { Component } from './Component';
 import { Define } from './decorators';
-import { state } from './State';
+import { internalState } from './InternalState';
 import { ServiceRegistry } from './service/ServiceRegistry';
 
 function createHarness() {
@@ -43,7 +43,7 @@ function texts(node: UiNode): unknown[] {
 
 /** A runtime service: a plain class, called directly. */
 class ClickService {
-  readonly count = state(0);
+  readonly count = internalState(0);
 
   click(): void {
     this.count.value++;
@@ -115,10 +115,10 @@ describe('functional components', () => {
     expect(texts(root)).toEqual(['Untitled']);
   });
 
-  it('keeps local state() cells across parent reconciles', () => {
+  it('keeps local internalState() cells across parent reconciles', () => {
     function Counter(props: Inputs<{ step?: number }>) {
       const step = input(props.step, 1);
-      const count = state(0);
+      const count = internalState(0);
       return Row(
         Text({ text: count.pipe(map(c => `count ${c}`)) }),
         Text({

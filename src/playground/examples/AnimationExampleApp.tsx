@@ -3,7 +3,7 @@ import { map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
 import type { UiChild } from '../../ui/composition';
-import { state } from '../../framework/State';
+import { internalState } from '../../framework/InternalState';
 import { Board } from './board/BoardContract';
 import { AnimationService } from '../../framework/app/AnimationService';
 import { spring } from '../../ui/animation';
@@ -199,10 +199,10 @@ export function place(order: LaneOrder, id: string, lane: Lane, index: number): 
  * than beside the components that draw it.
  */
 export class BoardModel {
-  readonly order = state<LaneOrder>(INITIAL_ORDER);
-  readonly selected = state<string | null>(null);
-  readonly undo = state<UndoEntry | null>(null);
-  readonly motion = state<MotionName>('snappy');
+  readonly order = internalState<LaneOrder>(INITIAL_ORDER);
+  readonly selected = internalState<string | null>(null);
+  readonly undo = internalState<UndoEntry | null>(null);
+  readonly motion = internalState<MotionName>('snappy');
 
   readonly board: Observable<BoardView> = combineLatest([this.order, this.selected, this.undo, this.motion]).pipe(
     map(([order, selected, undo, motion]) => ({ order, selected, undo, motion }))
@@ -364,7 +364,7 @@ function TaskCard(
   const laneIndex = LANES.indexOf(props.lane.value);
 
   /** 1 at rest, 0.96 while held. A number, because a spring integrates one. */
-  const press = state(1);
+  const press = internalState(1);
   const springPress = (to: number): void => {
     animations.spring(press, to, { spring: 'stiff' });
   };
@@ -481,7 +481,7 @@ function LaneColumn(props: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
 function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
   const board = ctx.channel(Board);
   const animations = ctx.inject(AnimationService);
-  const slide = state(0);
+  const slide = internalState(0);
   let shown = false;
 
   ctx.onUnmount(() => animations.stop(slide));

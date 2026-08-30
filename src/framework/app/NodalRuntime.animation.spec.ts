@@ -5,7 +5,7 @@ import { Box, Column, ScrollView } from '../../ui/composition/UiComponents';
 import type { UiNode } from '../../ui/graph/UiNode';
 import { linear, spring, tween } from '../../ui/animation';
 import { animateLayout } from '../../ui/modifiers';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';
 
@@ -28,7 +28,7 @@ import { mountRuntime } from './RuntimeTestUtils';
  */
 describe('the ticks phase', () => {
   it('keeps frames coming by itself while something is animating', () => {
-    const opacity = state(0);
+    const opacity = internalState(0);
     const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20, opacity })));
     // Drain whatever the first build asked for, so what follows is an
     // app with nothing dirty and nothing pending.
@@ -75,7 +75,7 @@ describe('the ticks phase', () => {
   it('waits out an animation that does not want every frame', () => {
     vi.useFakeTimers();
     try {
-      const step = state(0);
+      const step = internalState(0);
       const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20, opacity: step })));
       let time = 0;
       while (mounted.clock.isPending) {
@@ -108,7 +108,7 @@ describe('a declared transition', () => {
   }
 
   it('turns a write into a movement, and passes through the values between', () => {
-    const opacity = state(1);
+    const opacity = internalState(1);
     let node: UiNode | null = null;
     const mounted = mountRuntime(
       Column(
@@ -140,7 +140,7 @@ describe('a declared transition', () => {
 
   it('a bare number is a duration in milliseconds', () => {
     let node: UiNode | null = null;
-    const width = state(100);
+    const width = internalState(100);
     const mounted = mountRuntime(
       Column({ ref: (n: UiNode | null) => (node = n) }, Box({ width, height: 20, transition: { width: 100 } }))
     );
@@ -170,7 +170,7 @@ describe('a declared transition', () => {
   });
 
   it('re-emitting the same target does not restart it', () => {
-    const opacity = state(1);
+    const opacity = internalState(1);
     let node: UiNode | null = null;
     const mounted = mountRuntime(
       Column(
@@ -200,7 +200,7 @@ describe('a declared transition', () => {
   it('writes a value it cannot blend directly, and says so once', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const color = state<string>('surface');
+      const color = internalState<string>('surface');
       let node: UiNode | null = null;
       mountRuntime(
         Column(
@@ -225,8 +225,8 @@ describe('a declared transition', () => {
   });
 
   it('cancels what is in flight when the node leaves the tree', () => {
-    const opacity = state(1);
-    const shown = state(true);
+    const opacity = internalState(1);
+    const shown = internalState(true);
     const mounted = mountRuntime(
       Column(
         {},
@@ -282,7 +282,7 @@ describe('animateLayout', () => {
   it('offsets a reordered node back to where it was and springs it home', () => {
     const seen = new Map<number, UiNode>();
     const ref = refs(seen);
-    const order = state([0, 1, 2]);
+    const order = internalState([0, 1, 2]);
     const mounted = mountRuntime(
       Column(
         { width: 200, height: 300 },
@@ -326,7 +326,7 @@ describe('animateLayout', () => {
     // above expands, and the card below — pinned by its own FLIP while
     // the layout moved under it every frame — was grown straight over.
     // Nothing changed places here, so nothing should be animated.
-    const height = state(40);
+    const height = internalState(40);
     let below: UiNode | null = null;
     const mounted = mountRuntime(
       Column(
@@ -359,7 +359,7 @@ describe('animateLayout and scrolling', () => {
     // box, which every node under a scroller shares the movement of,
     // so a FLIP reading that box made every row of every list lag
     // behind the page scroll and catch up. It reads `flowBox`.
-    const offset = state(0);
+    const offset = internalState(0);
     let row: UiNode | null = null;
     const mounted = mountRuntime(
       ScrollView(
@@ -384,7 +384,7 @@ describe('animateLayout and scrolling', () => {
 
 describe('reduced motion', () => {
   it('makes an animation arrive at once, and schedules no frames for it', () => {
-    const opacity = state(0);
+    const opacity = internalState(0);
     const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20, opacity })));
     let time = 0;
     while (mounted.clock.isPending) {

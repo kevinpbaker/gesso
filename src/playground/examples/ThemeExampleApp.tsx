@@ -2,7 +2,7 @@ import { combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
-import { state } from '../../framework/State';
+import { internalState } from '../../framework/InternalState';
 import { AppearanceChannel, type AppearanceCommands } from './theme/ThemeContract';
 import type { UiChild } from '../../ui/composition';
 import type { UiColors } from '../../ui/environment/UiColors';
@@ -342,10 +342,10 @@ export function specOf(view: AppearanceView): ThemeSpec {
  * recomputed should travel.
  */
 export class AppearanceApp {
-  readonly palette = state<PaletteName>('daylight');
-  readonly accent = state<AccentName>('blue');
-  readonly corners = state<CornerName>('soft');
-  readonly textSize = state<TextSizeName>('regular');
+  readonly palette = internalState<PaletteName>('daylight');
+  readonly accent = internalState<AccentName>('blue');
+  readonly corners = internalState<CornerName>('soft');
+  readonly textSize = internalState<TextSizeName>('regular');
 
   readonly view: Observable<AppearanceView> = combineLatest([
     this.palette,
@@ -424,7 +424,7 @@ function SegmentButton(
   ctx: ComponentContext
 ) {
   const { radius } = appearance(ctx);
-  const hovered = state(false);
+  const hovered = internalState(false);
   const background = combineLatest([props.selected, hovered]).pipe(
     map(([selected, hover]) => (selected ? 'primary' : hover ? 'surfaceAlt' : 'transparent'))
   );
@@ -624,7 +624,7 @@ function SettingsPanel(_props: Inputs<{}>, ctx: ComponentContext) {
 
 function Pill(props: Inputs<{ label: string; primary?: boolean }>, ctx: ComponentContext) {
   const { radius, size } = appearance(ctx);
-  const hovered = state(false);
+  const hovered = internalState(false);
   const background = combineLatest([props.primary, hovered]).pipe(
     map(([primary, hover]) => (primary === true ? 'primary' : hover ? 'surfaceAlt' : 'transparent'))
   );

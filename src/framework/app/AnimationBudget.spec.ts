@@ -3,7 +3,7 @@ import { map } from 'rxjs';
 
 import { Box, Column, Row, Text } from '../../ui/composition/UiComponents';
 import { animateLayout } from '../../ui/modifiers';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';
 
@@ -27,7 +27,7 @@ describe('what a frame of animation costs', () => {
   }
 
   it('a hundred running animations cost less than a millisecond a frame', () => {
-    const cells = Array.from({ length: 100 }, () => state(0));
+    const cells = Array.from({ length: 100 }, () => internalState(0));
     const mounted = mountRuntime(Column({}, ...cells.map(cell => Box({ width: 20, height: 20, opacity: cell }))));
     let time = 0;
     while (mounted.clock.isPending) {
@@ -55,7 +55,7 @@ describe('what a frame of animation costs', () => {
   });
 
   it('a reorder of fifty rows re-places them each frame, and says what that costs', () => {
-    const order = state(Array.from({ length: ROWS }, (_, index) => index));
+    const order = internalState(Array.from({ length: ROWS }, (_, index) => index));
     const mounted = mountRuntime(
       Column(
         { width: 400, height: 2400 },

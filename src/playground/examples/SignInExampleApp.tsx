@@ -2,7 +2,7 @@ import { combineLatest, type Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
-import { state } from '../../framework/State';
+import { internalState } from '../../framework/InternalState';
 import { SignIn } from './signin/SignInContract';
 
 /**
@@ -49,12 +49,12 @@ export interface AuthView {
  * reason is diff cost over large values. Six scalars are not that.
  */
 export class AuthApp {
-  readonly digits = state('');
-  readonly status = state<AuthStatus>('idle');
-  readonly attempts = state(0);
-  readonly lockSecondsLeft = state(0);
-  readonly rememberDevice = state(true);
-  readonly signedInAt = state<number | null>(null);
+  readonly digits = internalState('');
+  readonly status = internalState<AuthStatus>('idle');
+  readonly attempts = internalState(0);
+  readonly lockSecondsLeft = internalState(0);
+  readonly rememberDevice = internalState(true);
+  readonly signedInAt = internalState<number | null>(null);
 
   private lockTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -191,8 +191,8 @@ function Dot(props: Inputs<{ index: number }>, ctx: ComponentContext) {
  * press, with a leave while pressed ending both.
  */
 function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean }>) {
-  const hovered = state(false);
-  const pressed = state(false);
+  const hovered = internalState(false);
+  const pressed = internalState(false);
   const background = combineLatest([props.dim, hovered, pressed]).pipe(
     map(([dim, hover, press]) => {
       if (press) return dim ? KEY : KEY_PRESSED;

@@ -13,7 +13,7 @@ import { Component } from './Component';
 import { Define, Input } from './decorators';
 import { createComponent } from './createComponent';
 import { ComponentHostResolver } from './ComponentHostResolver';
-import { state } from './State';
+import { internalState } from './InternalState';
 import { input } from './Input';
 import { ServiceRegistry } from './service/ServiceRegistry';
 
@@ -92,7 +92,7 @@ class Greeting extends Component {
 
 @Define('counter')
 class Counter extends Component {
-  readonly count = state(0);
+  readonly count = internalState(0);
 
   override render() {
     return Text({ text: this.count.pipe(map(c => `Count: ${c}`)) });

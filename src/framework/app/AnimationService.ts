@@ -17,7 +17,7 @@ import {
   type UiSpringSpec,
   type UiSpringToken
 } from '../../ui/environment/UiMotion';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 
 /** A duration named from the motion vocabulary, or milliseconds outright. */
 export type UiDuration = UiDurationToken | number;
@@ -75,7 +75,7 @@ export class AnimationService {
    * movement at all rather than running one that snaps. The runtime
    * sets it from the shell; see `NodalRuntime.setReducedMotion`.
    */
-  readonly reducedMotion = state(false);
+  readonly reducedMotion = internalState(false);
 
   private driver: AnimationDriver | null = null;
   private motionVocabulary: UiMotion = defaultMotion;

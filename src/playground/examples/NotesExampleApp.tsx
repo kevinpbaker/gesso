@@ -3,7 +3,7 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
 import { ShellService } from '../../framework/app/ShellService';
-import { state } from '../../framework/State';
+import { internalState } from '../../framework/InternalState';
 import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
 
 /**
@@ -45,7 +45,7 @@ const FAINT = '#5d6a7b';
 
 function NoteRow(props: Inputs<{ note: NoteRowData }>, ctx: ComponentContext) {
   const notes = ctx.channel(Notes);
-  const hovered = state(false);
+  const hovered = internalState(false);
   const background = combineLatest([props.note, hovered]).pipe(
     map(([note, hover]) => (note.selected ? ROW_SELECTED : hover ? ROW_HOVER : 'transparent'))
   );

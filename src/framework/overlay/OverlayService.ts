@@ -1,6 +1,6 @@
 import type { UiChild } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 
 export type OverlayPlacement =
   | 'top'
@@ -74,7 +74,7 @@ export interface OverlayEntry {
  * UiNodes, which never cross a worker boundary.
  */
 export class OverlayService {
-  readonly entries = state<readonly OverlayEntry[]>([]);
+  readonly entries = internalState<readonly OverlayEntry[]>([]);
   open(entry: OverlayEntry): void {
     const others = this.entries.value.filter(existing => existing.id !== entry.id);
     this.entries.value = [...others, entry];

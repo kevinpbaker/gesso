@@ -68,7 +68,7 @@ export type Inputs<P> = {
  *
  * The body is the component's `render()`: it runs once per instance,
  * and everything dynamic in the returned tree is an Observable. Local
- * state is `state()` cells created in the body.
+ * state is `internalState()` cells created in the body.
  */
 export type FunctionComponent<P = {}> = (props: Inputs<P>, context: ComponentContext) => UiChild;
 

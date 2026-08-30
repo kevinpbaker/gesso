@@ -5,10 +5,10 @@ import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
 import { NodalApp } from './NodalApp';
 import { ServiceRegistry } from '../service/ServiceRegistry';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 import { Box, Column, Text } from '../../ui/composition/UiComponents';
 import { FakePlatformSurface } from '../../ui/input/UiInputTestUtils';
-import { state as cell } from '../State';
+import { internalState as cell } from '../InternalState';
 import { input } from '../Input';
 import type { UiChild, UiElement } from '../../ui/composition/UiElement';
 import type { UiNode } from '../../ui/graph/UiNode';
@@ -76,7 +76,7 @@ function createMockHost(): HTMLElement {
  * so nothing here needs a projection, a dispatch or a wire format.
  */
 class CounterService {
-  readonly count = state(0);
+  readonly count = internalState(0);
 
   increment() {
     this.count.value++;

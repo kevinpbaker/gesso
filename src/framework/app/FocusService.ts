@@ -1,6 +1,6 @@
 import type { UiNode } from '../../ui/graph/UiNode';
 import type { UiFocusManager } from '../../ui/input/UiFocusManager';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 
 /**
  * Keyboard focus, as a store components can inject.
@@ -23,9 +23,9 @@ import { state } from '../State';
  */
 export class FocusService {
   /** The node holding focus, or null. A control binds its focus ring to this. */
-  readonly focused = state<UiNode | null>(null);
+  readonly focused = internalState<UiNode | null>(null);
   /** Whether focus is confined to a subtree by an open trap. */
-  readonly trapped = state(false);
+  readonly trapped = internalState(false);
 
   private manager: UiFocusManager | null = null;
   private detach: (() => void) | null = null;

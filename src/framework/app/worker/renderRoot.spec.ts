@@ -3,7 +3,7 @@ import { map } from 'rxjs/operators';
 
 import { Component } from '../../Component';
 import { Define } from '../../decorators';
-import { state } from '../../State';
+import { internalState } from '../../InternalState';
 import { createComponent } from '../../createComponent';
 import { Box, Column, Text } from '../../../ui/composition/UiComponents';
 import type { CanvasHost } from '../../../ui/rendering';
@@ -71,7 +71,7 @@ const clicks: string[] = [];
 
 @Define('worker-root')
 class WorkerRoot extends Component {
-  readonly count = state(0);
+  readonly count = internalState(0);
 
   override render() {
     return Column(

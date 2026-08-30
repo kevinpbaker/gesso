@@ -1,6 +1,6 @@
 import type { UiNode } from '../../ui/graph/UiNode';
 import type { UiFindController } from '../../ui/find/UiFindController';
-import { state } from '../State';
+import { internalState } from '../InternalState';
 
 /**
  * The find session, as a store components can inject.
@@ -17,12 +17,12 @@ import { state } from '../State';
  */
 export class FindService {
   /** Whether a find session is running; a bar shows itself for this. */
-  readonly open = state(false);
+  readonly open = internalState(false);
   /** The query the matches are for. */
-  readonly query = state('');
-  readonly matchCount = state(0);
+  readonly query = internalState('');
+  readonly matchCount = internalState(0);
   /** Which match is active, 1-based for display, or 0 when there is none. */
-  readonly activeMatch = state(0);
+  readonly activeMatch = internalState(0);
 
   private controller: UiFindController | null = null;
   private detach: (() => void) | null = null;

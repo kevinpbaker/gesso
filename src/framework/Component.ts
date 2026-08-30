@@ -4,7 +4,7 @@ import type { UiChild } from '../ui/composition/UiElement';
  * Base class for all Nodal framework components.
  *
  * Components are class-based. They declare reactive state with
- * a `state()` cell, inputs with `@Input()`, and return a UiElement tree
+ * an `internalState()` cell, inputs with `@Input()`, and return a UiElement tree
  * from `render()`. The framework calls `render()` once per mount;
  * after that, observable emissions in the returned tree drive updates.
  */

@@ -18,7 +18,7 @@ import type { UiPropertyName, UiPropertyValues } from '../properties/UiProperty'
  *
  * Every element prop is `Reactive`: a plain value is written to the
  * node, an Observable becomes a binding that writes each emission.
- * Cells (`state()`, `input()`) are Observables, so they drop straight
+ * Cells (`internalState()`, `input()`) are Observables, so they drop straight
  * in.
  */
 export type Reactive<T> = T | Observable<T>;

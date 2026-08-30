@@ -2,7 +2,7 @@ import type { Observable } from 'rxjs';
 import { map } from 'rxjs';
 
 import type { InputCell } from '../framework/Input';
-import { state, type State } from '../framework/State';
+import { internalState, type InternalState } from '../framework/InternalState';
 
 /**
  * A control's value, whoever owns it.
@@ -64,7 +64,7 @@ export function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>
       change: next => onChange.value?.(next)
     };
   }
-  const own: State<T> = state(initial.value === undefined ? fallback : initial.value);
+  const own: InternalState<T> = internalState(initial.value === undefined ? fallback : initial.value);
   return {
     value: own,
     current: () => own.value,

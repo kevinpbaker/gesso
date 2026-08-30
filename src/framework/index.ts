@@ -1,5 +1,5 @@
 export { Component } from './Component';
-export { State as StateCell, state } from './State';
+export { InternalState, internalState } from './InternalState';
 export { ServiceRegistry } from './service/ServiceRegistry';
 export { InputCell, input } from './Input';
 export { Define, Input, Inject, Channel } from './decorators';

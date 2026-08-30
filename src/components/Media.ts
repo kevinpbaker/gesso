@@ -1,7 +1,7 @@
 import { map, type Observable } from 'rxjs';
 
 import { input } from '../framework/Input';
-import { state } from '../framework/State';
+import { internalState } from '../framework/InternalState';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
 import { MediaService } from '../framework/app/MediaService';
 import { AnimationService } from '../framework/app/AnimationService';
@@ -61,7 +61,7 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
   const alt = input(props.alt, undefined);
   const objectFit = input(props.objectFit, 'cover' as ObjectFit);
   const radius = input(props.borderRadius, 0);
-  const status = state<'loading' | 'loaded' | 'failed'>('loading');
+  const status = internalState<'loading' | 'loaded' | 'failed'>('loading');
 
   // Built once, in the body, so its identity is stable across renders
   // and the modifier is never re-attached. The source is read once for
@@ -188,7 +188,7 @@ export function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiC
   const size = props.size.value ?? 20;
   const label = input(props.label, 'Loading');
   const color = props.color.value ?? 'controlAccent';
-  const step = state(0);
+  const step = internalState(0);
 
   const animations = ctx.inject(AnimationService);
   animations.animate(step, SPINNER_BLADES, {
@@ -278,7 +278,7 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
   const max = input(props.max, 1);
   const thickness = props.thickness.value ?? 6;
   const indeterminate = props.value.value === undefined;
-  const step = state(0);
+  const step = internalState(0);
 
   if (indeterminate) {
     // The same shape as `Spinner`: a stepped, repeating tween sampled

@@ -1,7 +1,7 @@
 import { combineLatest, map, type Observable } from 'rxjs';
 
 import { channel } from '../framework/channel/ChannelToken';
-import { state } from '../framework/State';
+import { internalState } from '../framework/InternalState';
 
 const SPIN_MS = 1500;
 
@@ -29,9 +29,9 @@ export const Heavy = channel<{ status: HeavyStatus }, HeavyCommands>('heavy', {
  * of the thread model, in a form you can press a button on.
  */
 export class HeavyWork {
-  readonly runs = state(0);
-  readonly checksum = state(0);
-  readonly lastDurationMs = state(0);
+  readonly runs = internalState(0);
+  readonly checksum = internalState(0);
+  readonly lastDurationMs = internalState(0);
 
   readonly status: Observable<HeavyStatus> = combineLatest([this.runs, this.checksum, this.lastDurationMs]).pipe(
     map(([runs, checksum, lastDurationMs]) => ({ runs, checksum, lastDurationMs: Math.round(lastDurationMs) }))

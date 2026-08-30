@@ -4,7 +4,7 @@ import { input } from '../framework/Input';
 import type { ComponentContext, Inputs } from '../framework/FunctionComponent';
 import { AnimationService } from '../framework/app/AnimationService';
 import { FocusService } from '../framework/app/FocusService';
-import { state } from '../framework/State';
+import { internalState } from '../framework/InternalState';
 import { Box, Column, Row, Text } from '../ui/composition/UiComponents';
 import type { UiChild } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
@@ -54,7 +54,7 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
    * properties, so a frame of the entrance costs a repaint and no
    * layout at all.
    */
-  const enter = state(0);
+  const enter = internalState(0);
 
   const close = (): void => {
     if (overlay.isOpen()) {

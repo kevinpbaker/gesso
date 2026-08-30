@@ -37,7 +37,7 @@ import type { UiElement } from '../ui/composition';
 import { Component } from '../framework/Component';
 import { createComponent } from '../framework/createComponent';
 import { Channel, Define, Inject, Input } from '../framework/decorators';
-import { state } from '../framework/State';
+import { internalState } from '../framework/InternalState';
 import { createDemoBitmap } from './demoBitmap';
 import { input } from '../framework/Input';
 import { Heavy } from './HeavyWork';
@@ -62,7 +62,7 @@ import type { ChannelReplica } from '../framework/channel/ChannelReplica';
  * thread model asks an application to make.
  */
 export class DemoCounter {
-  readonly clicks = state(0);
+  readonly clicks = internalState(0);
 
   readonly summary = this.clicks.pipe(map(clicks => ({ clicks, parity: clicks % 2 === 0 ? 'even' : 'odd' })));
 
@@ -81,7 +81,7 @@ export class DemoCounter {
  */
 @Define('local-counter')
 export class LocalCounter extends Component {
-  readonly count = state(0);
+  readonly count = internalState(0);
 
   increment(): void {
     this.count.value++;
@@ -174,7 +174,7 @@ export class TickItem extends Component {
  */
 @Define('heartbeat')
 export class Heartbeat extends Component {
-  readonly ticks = state(0);
+  readonly ticks = internalState(0);
 
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -346,8 +346,8 @@ export class TextShowcase extends Component {
  */
 @Define('text-field-demo')
 export class TextFieldDemo extends Component {
-  readonly name = state('Ada');
-  readonly notes = state('Type here. Enter makes a new line; the field grows with it.');
+  readonly name = internalState('Ada');
+  readonly notes = internalState('Type here. Enter makes a new line; the field grows with it.');
 
   override render(): UiElement {
     return Column(
@@ -410,7 +410,7 @@ export class MenuDemo extends Component {
 
   private anchor: UiNode | null = null;
   private noteAnchor: UiNode | null = null;
-  private choice = state('Nothing chosen yet');
+  private choice = internalState('Nothing chosen yet');
 
   /**
    * A popover with no backdrop: it stays open while the page and the
@@ -554,7 +554,7 @@ const BUTTON_STYLES = interactive({
 
 @Define('modifier-demo')
 export class ModifierDemo extends Component {
-  private attached = state(true);
+  private attached = internalState(true);
 
   private card(attached: boolean): UiElement {
     return Box(
@@ -649,12 +649,12 @@ function ringButton(text: string, key?: string): UiElement {
 export class SignInFormDemo extends Component {
   @Inject(FocusService) focus!: FocusService;
 
-  readonly email = state('');
-  readonly passcode = state('');
-  readonly remember = state(true);
-  readonly emailError = state('');
-  readonly passcodeError = state('');
-  readonly status = state('');
+  readonly email = internalState('');
+  readonly passcode = internalState('');
+  readonly remember = internalState(true);
+  readonly emailError = internalState('');
+  readonly passcodeError = internalState('');
+  readonly status = internalState('');
 
   private emailField: UiNode | null = null;
   private passcodeField: UiNode | null = null;
@@ -744,11 +744,11 @@ export class SignInFormDemo extends Component {
  */
 @Define('overlay-tier-demo')
 export class OverlayTierDemo extends Component {
-  readonly dialogOpen = state(false);
-  readonly menuOpen = state(false);
-  readonly payment = state('card');
-  readonly toastOpen = state(false);
-  readonly lastCommand = state('nothing yet');
+  readonly dialogOpen = internalState(false);
+  readonly menuOpen = internalState(false);
+  readonly payment = internalState('card');
+  readonly toastOpen = internalState(false);
+  readonly lastCommand = internalState('nothing yet');
 
   private menuAnchor: UiNode | null = null;
 
@@ -859,9 +859,9 @@ export class OverlayTierDemo extends Component {
  */
 @Define('structure-tier-demo')
 export class StructureTierDemo extends Component {
-  readonly tab = state('stories');
-  readonly split = state(0.4);
-  readonly open = state<readonly string[]>(['what']);
+  readonly tab = internalState('stories');
+  readonly split = internalState(0.4);
+  readonly open = internalState<readonly string[]>(['what']);
 
   override render(): UiElement {
     return Column(
@@ -969,10 +969,10 @@ function toolButton(label: string): UiElement {
  */
 @Define('data-tier-demo')
 export class DataTierDemo extends Component {
-  readonly sort = state<DataTableSort | null>({ column: 'name', direction: 'ascending' });
-  readonly selected = state(-1);
-  readonly open = state<readonly string[]>(['src']);
-  readonly file = state<string | null>('components');
+  readonly sort = internalState<DataTableSort | null>({ column: 'name', direction: 'ascending' });
+  readonly selected = internalState(-1);
+  readonly open = internalState<readonly string[]>(['src']);
+  readonly file = internalState<string | null>('components');
 
   private readonly people = buildPeople(100000);
 
@@ -1222,8 +1222,8 @@ const SWATCH_PNG = '/swatch.png';
 
 @Define('media-tier-demo')
 export class MediaTierDemo extends Component {
-  readonly progress = state(0.35);
-  readonly dark = state(true);
+  readonly progress = internalState(0.35);
+  readonly dark = internalState(true);
 
   override render(): UiElement {
     return Column(
@@ -1299,7 +1299,7 @@ export class MediaTierDemo extends Component {
  */
 @Define('image-demo')
 export class ImageDemo extends Component {
-  readonly image = state<ImageBitmap | undefined>(undefined);
+  readonly image = internalState<ImageBitmap | undefined>(undefined);
 
   onMount(): void {
     void createDemoBitmap().then(bitmap => {
@@ -1473,8 +1473,8 @@ export class LazyListDemo extends Component {
 export class AnimationDemo extends Component {
   @Inject(AnimationService) animations!: AnimationService;
 
-  readonly order = state([0, 1, 2, 3, 4]);
-  readonly expanded = state(false);
+  readonly order = internalState([0, 1, 2, 3, 4]);
+  readonly expanded = internalState(false);
 
   private shuffle(): void {
     const next = [...this.order.value];

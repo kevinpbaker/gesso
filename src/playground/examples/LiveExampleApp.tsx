@@ -2,7 +2,7 @@ import { BehaviorSubject, combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
-import { state } from '../../framework/State';
+import { internalState } from '../../framework/InternalState';
 
 /**
  * Live: an operations board fed by a stream that never stops.
@@ -441,8 +441,8 @@ export interface StreamView {
  * decision record names and nothing has answered.
  */
 export class LiveFeed {
-  readonly running = state(true);
-  readonly rate = state<RateName>('live');
+  readonly running = internalState(true);
+  readonly rate = internalState<RateName>('live');
 
   /**
    * The stream. Deliberately not `@State`: each of these is read by
@@ -624,7 +624,7 @@ function counted(): void {
 
 function RailButton(props: Inputs<{ label: string; primary?: boolean; onPress: () => void }>) {
   counted();
-  const hovered = state(false);
+  const hovered = internalState(false);
   const background = combineLatest([props.primary, hovered]).pipe(
     map(([primary, hover]) => (primary === true ? (hover ? '#4d97ff' : ACCENT) : hover ? '#1a2740' : 'transparent'))
   );
@@ -656,7 +656,7 @@ function RateButton(props: Inputs<{ rate: RateName }>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   const selected = store.stream.pipe(map(view => view.rate === props.rate.value));
-  const hovered = state(false);
+  const hovered = internalState(false);
   return (
     <button
       onClick={() => store.setRate(props.rate.value)}
@@ -1027,7 +1027,7 @@ function Board(_props: Inputs<{}>, ctx: ComponentContext) {
 export function LiveApp(_props: Inputs<{}>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
-  const bodies = state(0);
+  const bodies = internalState(0);
 
   ctx.onMount(() => {
     // Mount hooks are flushed once the whole tree exists, so this is

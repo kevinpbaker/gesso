@@ -7,7 +7,7 @@ import { Button, EditableText, Row, Text } from '../ui/composition/UiComponents'
 import type { UiChild } from '../ui/composition/UiElement';
 import type { UiNode } from '../ui/graph/UiNode';
 import type { UiKeyboardEvent, UiTextChangeEvent } from '../ui/input/UiInputEvent';
-import { state } from '../framework/State';
+import { internalState } from '../framework/InternalState';
 import { CONTROL_FOCUS_RING, keymap } from './internals';
 import { trackFocus } from './focus';
 
@@ -31,7 +31,7 @@ export function FindBar(props: Inputs<FindBarProps>, ctx: ComponentContext): UiC
   const inset = input(props.inset, 12);
   const placeholder = input(props.placeholder, 'Find on page');
   const find = ctx.inject(FindService);
-  const query = state('');
+  const query = internalState('');
   const focus = trackFocus(ctx);
 
   const search = (value: string): void => {
