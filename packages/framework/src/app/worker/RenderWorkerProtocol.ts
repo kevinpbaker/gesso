@@ -1,4 +1,4 @@
-import type { UiKeyModifiers, EditingState, RendererBackend } from '@gesso/core';
+import type { UiKeyModifiers, EditingState, RendererBackend, UiSemanticsAction, UiSemanticsUpdate } from '@gesso/core';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
 /**
@@ -36,6 +36,12 @@ export type ShellToRuntimeMessage =
        * across the webviews this project targets.
        */
       appPort?: MessagePort;
+      /**
+       * Whether the shell has an accessibility mirror to feed. False
+       * stops the runtime computing the geometry it would need, which
+       * is the only per-frame cost the mirror has in here.
+       */
+      accessibility?: boolean;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
   | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
@@ -81,6 +87,18 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'url'; url: string }
   | { type: 'inspector'; enabled: boolean }
+  /**
+   * What an assistive technology did to the accessibility mirror: a
+   * press, a focus move, or a value set.
+   *
+   * The third preference-shaped asymmetry on this protocol, and the
+   * only *input* on it that no device produced. It arrives by id
+   * rather than by coordinate because that is what the mirror has: an
+   * element standing for a node, with no idea where the person's
+   * pointer is or whether there is one. `GessoRuntime.applySemanticsAction`
+   * turns it back into the events a pointer and a keyboard produce.
+   */
+  | { type: 'semanticsAction'; action: UiSemanticsAction }
   | { type: 'dispose' };
 
 /**
@@ -120,7 +138,18 @@ export type RuntimeToShellMessage =
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
   /** The router navigated; the shell owns the address bar (RouterService). */
-  | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string };
+  | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string }
+  /**
+   * What the accessibility mirror needs to keep up with this frame:
+   * the semantics patches, the boxes that moved, and the focused node
+   * when focus moved.
+   *
+   * Sent only while the shell has a mirror attached — a `SemanticsMirror`
+   * subscribes by existing, and a runtime nobody is mirroring computes
+   * no geometry at all. Records and boxes travel at different cadences
+   * and are one message anyway; `UiSemanticsUpdate` says why.
+   */
+  | { type: 'semantics'; update: UiSemanticsUpdate };
 
 /**
  * The set of shell messages that carry a user input.

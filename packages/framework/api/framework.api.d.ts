@@ -222,12 +222,14 @@ import {
   UiReducedMotionPolicy,
   UiRole,
   UiSelectionController,
+  UiSemanticsAction,
   UiSemanticsMap,
   UiSemanticsMap as UiSemanticsMap$1,
   UiSemanticsPatch,
-  UiSemanticsPatch as UiSemanticsPatch$1,
   UiSemanticsRecord,
+  UiSemanticsRecord as UiSemanticsRecord$1,
   UiSemanticState,
+  UiSemanticsUpdate,
   UiSpringSpec,
   UiSpringToken,
   UiWheelController
@@ -652,6 +654,8 @@ declare class GessoRuntime {
   private readonly environmentNotifier;
   private semantics;
   private semanticsListener;
+  private semanticsBoxes;
+  private lastFocusedId;
   private lastEditingState;
   private shellListener;
   private caretTimer;
@@ -698,9 +702,11 @@ declare class GessoRuntime {
   private buildRoot;
   private resolveRootElement;
   private createInput;
-  onSemantics(listener: ((patches: readonly UiSemanticsPatch$1[]) => void) | null): void;
+  onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
   semanticsTree(): UiSemanticsMap$1;
+  applySemanticsAction(action: UiSemanticsAction): void;
   private updateSemantics;
+  private collectSemanticsBoxes;
   private revealBox;
   private handleHoverChange;
   private createScrollSink;
@@ -774,6 +780,7 @@ interface WorkerAppOptions {
   onError?: (message: string, stack?: string) => void;
   onInspect?: (text: string | null) => void;
   interceptFind?: boolean;
+  accessibility?: boolean;
   history?: ShellHistoryOptions;
 }
 declare class WorkerApp {
@@ -786,6 +793,7 @@ declare class WorkerApp {
   private resizeObserver;
   private detachInput;
   private proxy;
+  private mirror;
   private history;
   constructor(options: WorkerAppOptions);
   mount(host: HTMLElement | string): () => void;
@@ -813,17 +821,20 @@ interface GessoAppOptions {
   renderer?: RendererChoice;
   clock?: UiFrameClockFactory;
   input?: boolean;
+  accessibility?: boolean;
 }
 declare class GessoApp {
   private readonly runtime;
   private readonly canvas;
   private readonly host;
   private readonly inputEnabled;
+  private readonly accessibilityEnabled;
   private readonly adapter;
   private readonly historyOptions;
   private running;
   private resizeObserver;
   private proxy;
+  private mirror;
   private history;
   private detachVisibility;
   private detachReducedMotion;
@@ -840,6 +851,7 @@ declare class GessoApp {
   debugRoot(): UiNode;
   dispose(): void;
   private attachInput;
+  private attachSemanticsMirror;
   private attachHistory;
   private handleShellRequest;
   private observeResize;
@@ -949,12 +961,53 @@ declare class EditingProxy {
   get active(): boolean;
   get element(): HTMLTextAreaElement;
   update(state: EditingState$1 | null): void;
+  focus(): void;
+  describe(record: UiSemanticsRecord$1 | null): void;
   dispose(): void;
   private position;
   private mirror;
   private listen;
 }
 declare function writeClipboard(text: string, doc?: Document): void;
+interface SemanticsMirrorSink {
+  action(action: UiSemanticsAction): void;
+  keyDown?(event: KeyboardEvent): void;
+  keyUp?(event: KeyboardEvent): void;
+}
+interface EditingMirrorTarget {
+  readonly active: boolean;
+  describe(record: UiSemanticsRecord$1 | null): void;
+  focus(): void;
+}
+declare class SemanticsMirror {
+  private readonly canvas;
+  private readonly sink;
+  private readonly editing;
+  private readonly container;
+  private readonly doc;
+  private readonly entries;
+  private readonly ids;
+  private readonly detach;
+  private resizeObserver;
+  private stopTracking;
+  private applying;
+  private focusedId;
+  private disposed;
+  constructor(canvas: HTMLCanvasElement, sink: SemanticsMirrorSink, editing?: EditingMirrorTarget | null);
+  get element(): HTMLElement;
+  elementFor(id: string): HTMLElement | undefined;
+  apply(update: UiSemanticsUpdate): void;
+  dispose(): void;
+  private upsert;
+  private createElement;
+  private describe;
+  private place;
+  private remove;
+  private applyFocus;
+  private listen;
+  private idOf;
+  private trackCanvas;
+}
 type ShellToRuntimeMessage = {
   type: 'init';
   canvas: OffscreenCanvas;
@@ -964,6 +1017,7 @@ type ShellToRuntimeMessage = {
   renderer?: RendererChoice;
   textInput?: 'proxy' | 'keys';
   appPort?: MessagePort;
+  accessibility?: boolean;
 } | {
   type: 'resize';
   width: number;
@@ -1053,6 +1107,10 @@ type ShellToRuntimeMessage = {
 } | {
   type: 'inspector';
   enabled: boolean;
+} |
+{
+  type: 'semanticsAction';
+  action: UiSemanticsAction;
 } | {
   type: 'dispose';
 };
@@ -1099,6 +1157,10 @@ type RuntimeToShellMessage = {
   type: 'history';
   action: 'push' | 'replace' | 'back' | 'forward';
   url?: string;
+} |
+{
+  type: 'semantics';
+  update: UiSemanticsUpdate;
 };
 interface WorkerGlobal {
   onmessage: ((event: MessageEvent<ShellToRuntimeMessage>) => void) | null;
@@ -1179,6 +1241,7 @@ export {
   route,
   RouterOutlet,
   RouterService,
+  SemanticsMirror,
   serveChannels,
   servePorts,
   ServiceRegistry,
@@ -1200,6 +1263,7 @@ export {
   type ComponentElement,
   type ComponentProps,
   type ComponentType,
+  type EditingMirrorTarget,
   type EditingProxySink,
   type EditingState,
   type FrameMetrics,
@@ -1229,6 +1293,7 @@ export {
   type RouteTarget,
   type RuntimeInput,
   type RuntimeToShellMessage,
+  type SemanticsMirrorSink,
   type ServedChannel,
   type ShellHistory,
   type ShellHistoryMode,

@@ -31,6 +31,10 @@ class FakeElement {
     this.attributes.set(name, value);
   }
 
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+
   addEventListener(type: string, listener: (event: FakeEvent) => void): void {
     let set = this.listeners.get(type);
     if (set === undefined) {
@@ -316,6 +320,48 @@ describe('EditingProxy', () => {
     doc.focused = true;
     textarea.dispatch('blur', { relatedTarget: doc.createElement('input') });
     expect(sink.calls).toEqual([['blur']]);
+  });
+
+  it("carries the focused editable's semantics for the accessibility mirror", () => {
+    const { proxy, textarea, state } = setup();
+    proxy.update(state());
+    // Hidden from assistive technology by default: an unlabelled text
+    // box floating over an application is noise.
+    expect(textarea.attributes.get('aria-hidden')).toBe('true');
+
+    proxy.describe({
+      id: 'n1',
+      parent: null,
+      index: 0,
+      role: 'textbox',
+      label: 'Email',
+      states: ['required']
+    });
+
+    expect(textarea.attributes.has('aria-hidden')).toBe(false);
+    expect(textarea.attributes.get('role')).toBe('textbox');
+    expect(textarea.attributes.get('aria-label')).toBe('Email');
+    expect(textarea.attributes.get('aria-required')).toBe('true');
+
+    proxy.describe(null);
+    expect(textarea.attributes.get('aria-hidden')).toBe('true');
+    expect(textarea.attributes.has('aria-label')).toBe(false);
+  });
+
+  it('takes focus back from whatever the mirror had focused', () => {
+    const { doc, proxy, textarea, state } = setup();
+    const mirrored = doc.createElement('div');
+    doc.body.appendChild(mirrored);
+    mirrored.focus();
+    proxy.update(state());
+    // `update` leaves focus alone when it is somewhere it does not
+    // recognise; the mirror is the one that knows this element is the
+    // app's own, and says so by calling focus().
+    expect(doc.activeElement).toBe(mirrored);
+
+    proxy.focus();
+
+    expect(doc.activeElement).toBe(textarea);
   });
 
   it('removes the element and listeners on dispose', () => {

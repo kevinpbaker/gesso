@@ -8,6 +8,7 @@ import {
   type ShellToRuntimeMessage
 } from './RenderWorkerProtocol';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
+import { SemanticsMirror } from '../SemanticsMirror';
 import { observeReducedMotion } from '../reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
 
@@ -83,6 +84,17 @@ export interface WorkerAppOptions {
    */
   interceptFind?: boolean;
   /**
+   * Set false to drop the off-screen DOM an assistive technology reads
+   * (`SemanticsMirror`).
+   *
+   * On by default: an application that is accessible only when its
+   * author remembered a flag is an application that is not accessible.
+   * Turning it off also stops the render worker computing the geometry
+   * the mirror needs, which is what makes the opt-out worth having for
+   * a measurement.
+   */
+  accessibility?: boolean;
+  /**
    * How the app's url is kept, for an app with routes: `path`
    * (pushState, the default), `hash`, or `memory`. See `shellHistory`.
    *
@@ -115,6 +127,7 @@ export class WorkerApp {
   private resizeObserver: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
   private proxy: EditingProxy | null = null;
+  private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
 
   constructor(options: WorkerAppOptions) {
@@ -188,6 +201,7 @@ export class WorkerApp {
         renderer: this.options.renderer,
         // Text comes through the editing proxy below, IME and all.
         textInput: 'proxy',
+        accessibility: this.options.accessibility !== false,
         appPort
       } as ShellToRuntimeMessage,
       transfer
@@ -209,6 +223,21 @@ export class WorkerApp {
       keyDown: event => this.forwardKeyDown(event),
       keyUp: event => this.forwardKeyUp(event)
     });
+    if (this.options.accessibility !== false) {
+      // The off-screen DOM an assistive technology reads. Keys are
+      // forwarded from it for the same reason they are forwarded from
+      // the proxy: while the app has focus, the element holding it is
+      // one of these and not the canvas.
+      this.mirror = new SemanticsMirror(
+        canvas,
+        {
+          action: action => this.post({ type: 'semanticsAction', action }),
+          keyDown: event => this.forwardKeyDown(event),
+          keyUp: event => this.forwardKeyUp(event)
+        },
+        this.proxy
+      );
+    }
 
     return () => this.dispose();
   }
@@ -243,6 +272,8 @@ export class WorkerApp {
   dispose(): void {
     this.proxy?.dispose();
     this.proxy = null;
+    this.mirror?.dispose();
+    this.mirror = null;
     this.history?.dispose();
     this.history = null;
     this.detachInput?.();
@@ -311,6 +342,10 @@ export class WorkerApp {
     }
     if (message.type === 'openUrl') {
       window.open(message.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (message.type === 'semantics') {
+      this.mirror?.apply(message.update);
       return;
     }
     if (message.type === 'history') {

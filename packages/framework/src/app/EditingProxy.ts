@@ -1,4 +1,4 @@
-import type { EditingState } from '@gesso/core';
+import type { EditingState, UiSemanticsRecord } from '@gesso/core';
 
 /**
  * Where the proxy sends what it hears. `WorkerApp` posts each call to
@@ -157,6 +157,67 @@ export class EditingProxy {
         this.textarea.focus({ preventScroll: true });
       }
     }
+  }
+
+  /**
+   * Takes DOM focus for the focused editable, unconditionally.
+   *
+   * `update()` is careful about where it takes focus from — page
+   * chrome outside the app must keep it — but the accessibility
+   * mirror calls this only when the runtime has just said an editable
+   * holds focus, and the element it is taking focus from is the
+   * mirror's own. Without it, moving focus from a button to a field
+   * would leave DOM focus on the button's mirrored element and the
+   * IME with nothing to compose into.
+   */
+  focus(): void {
+    if (this.disposed || this.state === null || this.doc.activeElement === this.textarea) {
+      return;
+    }
+    this.textarea.focus({ preventScroll: true });
+  }
+
+  /**
+   * Describes the focused editable on this element, for the
+   * accessibility mirror (`SemanticsMirror`).
+   *
+   * The textarea is `aria-hidden` by default because an unlabelled
+   * text box floating over an application is noise; when the mirror
+   * hands it a record it stops being unlabelled, and becomes the one
+   * element that is both what the assistive technology reads and what
+   * the person is really typing into. That the two cannot disagree is
+   * the reason the field's semantics live here rather than on a second
+   * element beside it.
+   */
+  describe(record: UiSemanticsRecord | null): void {
+    if (this.disposed) {
+      return;
+    }
+    const textarea = this.textarea;
+    if (record === null) {
+      textarea.setAttribute('aria-hidden', 'true');
+      for (const attribute of [
+        'role',
+        'aria-label',
+        'aria-description',
+        'aria-required',
+        'aria-invalid',
+        'aria-readonly',
+        'aria-disabled'
+      ]) {
+        textarea.removeAttribute(attribute);
+      }
+      return;
+    }
+    textarea.removeAttribute('aria-hidden');
+    setOrClear(textarea, 'role', record.role);
+    setOrClear(textarea, 'aria-label', record.label);
+    setOrClear(textarea, 'aria-description', record.description);
+    const states = new Set(record.states ?? []);
+    setOrClear(textarea, 'aria-required', states.has('required') ? 'true' : undefined);
+    setOrClear(textarea, 'aria-invalid', states.has('invalid') ? 'true' : undefined);
+    setOrClear(textarea, 'aria-readonly', states.has('readonly') ? 'true' : undefined);
+    setOrClear(textarea, 'aria-disabled', record.disabled === true ? 'true' : undefined);
   }
 
   dispose(): void {
@@ -357,5 +418,13 @@ function copyWithExecCommand(text: string, doc: Document): void {
   } finally {
     scratch.remove();
     previous?.focus?.({ preventScroll: true });
+  }
+}
+
+function setOrClear(element: HTMLElement, attribute: string, value: string | undefined): void {
+  if (value === undefined) {
+    element.removeAttribute(attribute);
+  } else {
+    element.setAttribute(attribute, value);
   }
 }

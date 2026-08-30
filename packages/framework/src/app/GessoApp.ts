@@ -10,6 +10,7 @@ import {
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import type { ShellRequest } from './ShellService';
 import { EditingProxy, writeClipboard } from './EditingProxy';
+import { SemanticsMirror } from './SemanticsMirror';
 import { observeReducedMotion } from './reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
 import { measure } from './worker/WorkerApp';
@@ -40,6 +41,16 @@ export interface GessoAppOptions {
    * can be driven directly through `app.input`.
    */
   input?: boolean;
+  /**
+   * Set false to drop the off-screen DOM an assistive technology reads
+   * (`SemanticsMirror`).
+   *
+   * On by default, because an application that is accessible only when
+   * its author remembered a flag is an application that is not
+   * accessible. The opt-out is for a host that mirrors the tree itself,
+   * and for measuring what the mirror costs.
+   */
+  accessibility?: boolean;
 }
 
 /**
@@ -61,12 +72,14 @@ export class GessoApp {
   private readonly canvas: CanvasHost;
   private readonly host: HTMLElement;
   private readonly inputEnabled: boolean;
+  private readonly accessibilityEnabled: boolean;
   private readonly adapter: UiPlatformAdapter;
   private readonly historyOptions: ShellHistoryOptions | undefined;
 
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
   private proxy: EditingProxy | null = null;
+  private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
   private detachReducedMotion: (() => void) | null = null;
@@ -75,6 +88,7 @@ export class GessoApp {
     this.host = options.host;
     this.canvas = options.canvas ?? createCanvasElement();
     this.inputEnabled = options.input ?? true;
+    this.accessibilityEnabled = options.accessibility ?? true;
     this.historyOptions = options.history;
 
     this.runtime = new GessoRuntime({
@@ -189,6 +203,8 @@ export class GessoApp {
     this.running = false;
     this.proxy?.dispose();
     this.proxy = null;
+    this.mirror?.dispose();
+    this.mirror = null;
     this.detachVisibility?.();
     this.detachVisibility = null;
     this.detachReducedMotion?.();
@@ -229,12 +245,35 @@ export class GessoApp {
     });
     this.runtime.setTextInputSource('proxy');
     this.runtime.onEditingState(state => this.proxy?.update(state));
+    this.attachSemanticsMirror(canvas);
     if (typeof document !== 'undefined') {
       const onVisibility = (): void => this.runtime.setVisible(document.visibilityState !== 'hidden');
       document.addEventListener('visibilitychange', onVisibility);
       this.detachVisibility = () => document.removeEventListener('visibilitychange', onVisibility);
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
+  }
+
+  /**
+   * Mounts the off-screen DOM an assistive technology reads.
+   *
+   * The same class the worker configuration uses, driven directly
+   * instead of over the protocol — which is the point of it being a
+   * DOM class that knows nothing about where its updates come from.
+   * Keys are not forwarded from it: `CanvasPlatformSurface` listens on
+   * `window` and already sees them, exactly as for the editing proxy.
+   */
+  private attachSemanticsMirror(canvas: HTMLCanvasElement): void {
+    if (!this.accessibilityEnabled) {
+      return;
+    }
+    const mirror = new SemanticsMirror(
+      canvas,
+      { action: action => this.runtime.applySemanticsAction(action) },
+      this.proxy
+    );
+    this.mirror = mirror;
+    this.runtime.onSemantics(update => mirror.apply(update));
   }
 
   /**

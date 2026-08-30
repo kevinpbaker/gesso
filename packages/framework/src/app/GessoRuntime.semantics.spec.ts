@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
 
-import { Box, Button, Column, EditableText, Text, type UiSemanticsPatch } from '@gesso/core';
+import {
+  Box,
+  Button,
+  Column,
+  EditableText,
+  Row,
+  Text,
+  type UiSemanticsPatch,
+  type UiSemanticsUpdate
+} from '@gesso/core';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /** The records a run of patches leaves behind, by label. */
@@ -21,7 +30,7 @@ describe('GessoRuntime semantics', () => {
           Button({ text: 'Continue' })
         )
       ),
-      { onCreate: runtime => runtime.onSemantics(next => patches.push([...next])) }
+      { onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches])) }
     );
     frame(0);
 
@@ -41,7 +50,7 @@ describe('GessoRuntime semantics', () => {
     const patches: UiSemanticsPatch[][] = [];
     const { frame } = mountRuntime(
       Column(Box({ role: 'checkbox', label: 'Wrap lines', states: states$ }), Text({ text: 'Editor' })),
-      { onCreate: runtime => runtime.onSemantics(next => patches.push([...next])) }
+      { onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches])) }
     );
     frame(0);
     expect(patches).toHaveLength(1);
@@ -64,7 +73,7 @@ describe('GessoRuntime semantics', () => {
         { role: 'list', label: 'Notes' },
         rows$.pipe(map(rows => rows.map(row => Box({ key: String(row), role: 'listitem', label: `Row ${row}` }))))
       ),
-      { onCreate: runtime => runtime.onSemantics(next => patches.push([...next])) }
+      { onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches])) }
     );
     frame(0);
     expect(labels(patches[0])).toEqual(['Notes', 'Row 0', 'Row 1', 'Row 2']);
@@ -103,9 +112,113 @@ describe('GessoRuntime semantics', () => {
     frame(0);
 
     const seen: UiSemanticsPatch[] = [];
-    runtime.onSemantics(patches => seen.push(...patches));
+    runtime.onSemantics(update => seen.push(...update.patches));
 
     expect(labels(seen)).toEqual(['Save']);
+  });
+
+  describe('the accessibility mirror (F6b)', () => {
+    it('sends every mirrored node a box, and afterwards only the ones that moved', () => {
+      const gap$ = new BehaviorSubject(0);
+      const updates: UiSemanticsUpdate[] = [];
+      const { frame } = mountRuntime(
+        Column(
+          { gap: gap$ },
+          Button({ text: 'Save', width: 80, height: 30 }),
+          Button({ text: 'Cancel', width: 80, height: 30 })
+        ),
+        { onCreate: runtime => runtime.onSemantics(update => updates.push(update)) }
+      );
+      frame(0);
+
+      expect(updates).toHaveLength(1);
+      expect(updates[0].boxes.map(entry => entry.box.y)).toEqual([0, 30]);
+
+      // A gap pushes the second button down and leaves the first alone,
+      // so only one box is worth sending.
+      gap$.next(12);
+      frame();
+
+      const moved = updates.at(-1)!;
+      expect(moved.patches).toHaveLength(0);
+      expect(moved.boxes).toHaveLength(1);
+      expect(moved.boxes[0].box.y).toBe(42);
+    });
+
+    it('reports the focused node when focus moves, and not when it has not', () => {
+      const updates: UiSemanticsUpdate[] = [];
+      const { runtime, frame } = mountRuntime(
+        Column(Button({ text: 'Save', focusable: true }), Button({ text: 'Cancel', focusable: true })),
+        { onCreate: run => run.onSemantics(update => updates.push(update)) }
+      );
+      frame(0);
+      // Nothing has focus and nothing had it before, so the first
+      // update says nothing about focus rather than saying "null".
+      expect(updates[0].focused).toBeUndefined();
+
+      runtime.input.keyboard.keyDown('Tab', { ctrl: false, shift: false, alt: false, meta: false });
+      frame();
+
+      const focusUpdate = updates.at(-1)!;
+      const first = runtime.semanticsTree().values().next().value!;
+      expect(focusUpdate.focused).toBe(first.id);
+
+      // A frame that moved nothing and focused nothing says nothing.
+      const count = updates.length;
+      frame();
+      expect(updates).toHaveLength(count);
+    });
+
+    it('routes a press from an assistive technology to the node an ordinary click reaches', () => {
+      const presses: string[] = [];
+      const { runtime, frame } = mountRuntime(Column(Button({ text: 'Save', onClick: () => presses.push('save') })));
+      frame(0);
+      const button = [...runtime.semanticsTree().values()].find(node => node.role === 'button')!;
+
+      runtime.applySemanticsAction({ id: button.id, action: 'click' });
+
+      expect(presses).toEqual(['save']);
+    });
+
+    it('moves focus for a focus action, and refuses an id that has left the tree', () => {
+      const { runtime, frame } = mountRuntime(
+        Column(Button({ text: 'Save', focusable: true }), Button({ text: 'Cancel', focusable: true }))
+      );
+      frame(0);
+      const buttons = [...runtime.semanticsTree().values()];
+
+      runtime.applySemanticsAction({ id: buttons[1].id, action: 'focus' });
+      expect(runtime.input.focus.focusedNode?.id).toBe(buttons[1].id);
+
+      runtime.applySemanticsAction({ id: 'no-such-node', action: 'focus' });
+      expect(runtime.input.focus.focusedNode?.id).toBe(buttons[1].id);
+    });
+
+    it("sets an editable's value for a setValue action, as an edit the app can see", () => {
+      const inputs: string[] = [];
+      const { runtime, frame } = mountRuntime(
+        Row(EditableText({ value: 'ada', label: 'Name', onInput: event => inputs.push(event.value) }))
+      );
+      frame(0);
+      const field = [...runtime.semanticsTree().values()].find(node => node.role === 'textbox')!;
+
+      runtime.applySemanticsAction({ id: field.id, action: 'setValue', value: 'grace' });
+
+      expect(inputs).toEqual(['grace']);
+    });
+
+    it('costs nothing while nothing is mirroring it', () => {
+      const gap$ = new BehaviorSubject(0);
+      const { frame, frames } = mountRuntime(Column({ gap: gap$ }, Button({ text: 'Save' })));
+      frame(0);
+
+      gap$.next(8);
+      frame();
+
+      // A frame that laid out but changed no semantics: without a
+      // listener there is no geometry to gather and the phase is idle.
+      expect(frames.at(-1)?.phases.semantics).toBe(0);
+    });
   });
 
   it('rejects an unknown role at build time, with the nearest name', () => {

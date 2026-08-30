@@ -145,7 +145,14 @@ export class RenderWorkerApp {
       // one. Held before initialize, because the channels registered
       // without a worker of their own are opened over it there.
       this.appLogicWorker = message.appPort === undefined ? undefined : portHandle(message.appPort);
-      this.initialize(message.canvas, message.width, message.height, message.dpr, message.renderer);
+      this.initialize(
+        message.canvas,
+        message.width,
+        message.height,
+        message.dpr,
+        message.renderer,
+        message.accessibility !== false
+      );
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
     }
@@ -212,6 +219,9 @@ export class RenderWorkerApp {
       case 'inspector':
         runtime.setInspectorEnabled(message.enabled);
         break;
+      case 'semanticsAction':
+        runtime.applySemanticsAction(message.action);
+        break;
       case 'dispose':
         runtime.dispose();
         this.channels?.dispose();
@@ -248,7 +258,8 @@ export class RenderWorkerApp {
     width: number,
     height: number,
     dpr: number,
-    renderer: RendererChoice | undefined
+    renderer: RendererChoice | undefined,
+    accessibility: boolean
   ): void {
     this.runtime?.dispose();
     this.channels?.dispose();
@@ -294,6 +305,13 @@ export class RenderWorkerApp {
     this.runtime.onEditingState(state => {
       this.host.postMessage({ type: 'editing', state });
     });
+    if (accessibility) {
+      // Subscribing is what turns the geometry sweep on in the
+      // runtime, so a shell without a mirror pays nothing for one.
+      this.runtime.onSemantics(update => {
+        this.host.postMessage({ type: 'semantics', update });
+      });
+    }
     this.runtime.onShellRequest(request => {
       if (request.type === 'clipboard') {
         this.host.postMessage({ type: 'clipboard', text: request.text });

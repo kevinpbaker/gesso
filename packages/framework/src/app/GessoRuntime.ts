@@ -18,6 +18,8 @@ import {
   type UiNode,
   UiNodeType,
   UiInputDispatcher,
+  UiPointerEvent,
+  UiEventType,
   UiHitTester,
   UiPointerController,
   UiWheelController,
@@ -37,8 +39,12 @@ import {
   buildSemanticsTree,
   diffSemantics,
   LayoutNotifier,
+  type UiSemanticsAction,
+  type UiSemanticsBox,
   type UiSemanticsMap,
   type UiSemanticsPatch,
+  type UiSemanticsUpdate,
+  type LayoutBox,
   LayoutEngine,
   type LayoutExplanation,
   Constraints,
@@ -276,7 +282,14 @@ export class GessoRuntime {
   private readonly focusNotifier = new FocusNotifier();
   private readonly environmentNotifier = new EnvironmentNotifier();
   private semantics: UiSemanticsMap = new Map();
-  private semanticsListener: ((patches: readonly UiSemanticsPatch[]) => void) | null = null;
+  private semanticsListener: ((update: UiSemanticsUpdate) => void) | null = null;
+  /**
+   * The box last reported for each mirrored node, so a frame that
+   * moved three rows of a list sends three boxes rather than all of
+   * them. Only populated while a listener is attached.
+   */
+  private semanticsBoxes = new Map<string, LayoutBox>();
+  private lastFocusedId: string | null = null;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
@@ -353,7 +366,17 @@ export class GessoRuntime {
     // through `setRoot`, which is the only thing the manager needs the
     // tree for.
     this.focusManager = new UiFocusManager(this.graph.root, this.dispatcher);
-    this.focusManager.onFocusChange(node => this.focusNotifier.handleFocusChange(node));
+    this.focusManager.onFocusChange(node => {
+      this.focusNotifier.handleFocusChange(node);
+      if (this.semanticsListener !== null) {
+        // A mirror has to move DOM focus with the app's, and the frame
+        // where it hears about it is the frame this arms. Most focus
+        // changes dirty something anyway — a focus ring is a property
+        // write — but a node with no visible focus state would
+        // otherwise change nothing and schedule nothing.
+        this.requestRepaint();
+      }
+    });
     this.graph.setEnvironmentChangedListener(node => this.environmentNotifier.handleEnvironmentChange(node));
     this.builder = new UiGraphBuilder(this.graph, {
       components: this.resolver,
@@ -968,23 +991,32 @@ export class GessoRuntime {
   }
 
   /**
-   * Receives what changed in the semantics tree, after any frame that
-   * changed it.
+   * Receives what an accessibility mirror needs after any frame that
+   * changed it: the semantics patches, the boxes that moved, and the
+   * focused node when focus moved.
    *
-   * Nothing consumes this yet: the off-screen DOM mirror an assistive
-   * technology reads is roadmap F6b, and it owns the wire format, so
-   * there is deliberately no protocol message here. What exists now is
-   * the tree, the diff, and the guarantee that every component written
-   * from today emits semantics — which is the half that cannot be
-   * retrofitted later.
+   * The consumer is `SemanticsMirror` — an off-screen DOM tree over the
+   * canvas that the platform's assistive technology reads (roadmap
+   * F6b). Attaching one is what turns the geometry sweep on; without a
+   * listener the runtime keeps the tree and diffs it, and looks at no
+   * boxes at all.
    */
-  onSemantics(listener: ((patches: readonly UiSemanticsPatch[]) => void) | null): void {
+  onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void {
     this.semanticsListener = listener;
-    if (listener !== null && this.semantics.size > 0) {
-      // A listener attached after the first frame still needs the tree
-      // that already exists, as one patch per record.
-      listener([...this.semantics.values()].map(node => ({ op: 'add', node }) as const));
+    this.semanticsBoxes.clear();
+    if (listener === null || this.semantics.size === 0) {
+      // Nothing to catch up on: a listener attached before the first
+      // frame hears about the tree when the frame builds it.
+      return;
     }
+    // A listener attached after the first frame needs the tree that
+    // already exists, as one patch per record, with the geometry and
+    // the focus that go with it.
+    listener({
+      patches: [...this.semantics.values()].map(node => ({ op: 'add', node }) as const),
+      boxes: this.collectSemanticsBoxes(),
+      focused: this.focusManager.focusedNode?.id ?? null
+    });
   }
 
   /** The semantics tree as of the last frame that changed it. */
@@ -992,13 +1024,106 @@ export class GessoRuntime {
     return this.semantics;
   }
 
-  private updateSemantics(): void {
-    const next = buildSemanticsTree(this.layoutRoot());
-    const patches = diffSemantics(this.semantics, next);
-    this.semantics = next;
-    if (patches.length > 0) {
-      this.semanticsListener?.(patches);
+  /**
+   * Something an assistive technology did to a mirrored element,
+   * turned back into ordinary input.
+   *
+   * Deliberately routed through the same controllers a pointer and a
+   * keyboard use rather than into components directly: an AT press on
+   * a `Checkbox` has to reach the `onClick` the mouse reaches, or the
+   * two paths drift and only one of them is tested. `focus` goes
+   * through the focus manager, which means an AT cannot escape an open
+   * focus trap any more than Tab can.
+   */
+  applySemanticsAction(action: UiSemanticsAction): void {
+    const node = this.graph.getNode(action.id);
+    if (node === undefined || !this.semantics.has(action.id)) {
+      // A stale id: the mirror acted on a node this frame removed.
+      return;
     }
+    if (action.action === 'focus') {
+      this.focusManager.focus(node);
+      return;
+    }
+    if (action.action === 'setValue') {
+      // The editing controller edits whatever holds focus, so focus is
+      // part of the action rather than a precondition the caller has
+      // to arrange.
+      this.focusManager.focus(node);
+      this.input.editing.replaceText(action.value ?? '');
+      return;
+    }
+    this.focusManager.focus(node);
+    const box = this.engine.visibleBox(node);
+    this.dispatcher.dispatch(
+      new UiPointerEvent(UiEventType.Click, box.x + box.width / 2, box.y + box.height / 2, 1),
+      node
+    );
+  }
+
+  /**
+   * Rebuilds the semantics tree, and gathers what moved.
+   *
+   * The two halves have different triggers — meaning changes when a
+   * semantics property or the shape of the tree does, position changes
+   * whenever anything is laid out or scrolled — so each is asked for
+   * separately and an update is sent only if one of them has something
+   * to say. `UiSemanticsUpdate` explains why they travel together
+   * anyway.
+   */
+  private updateSemantics(rebuild: boolean, moved: boolean): void {
+    let patches: readonly UiSemanticsPatch[] = EMPTY_PATCHES;
+    if (rebuild) {
+      const next = buildSemanticsTree(this.layoutRoot());
+      patches = diffSemantics(this.semantics, next);
+      this.semantics = next;
+    }
+    const listener = this.semanticsListener;
+    if (listener === null) {
+      return;
+    }
+    const boxes = moved || patches.length > 0 ? this.collectSemanticsBoxes() : EMPTY_BOXES;
+    const focused = this.focusManager.focusedNode?.id ?? null;
+    const focusMoved = focused !== this.lastFocusedId;
+    this.lastFocusedId = focused;
+    if (patches.length === 0 && boxes.length === 0 && !focusMoved) {
+      return;
+    }
+    listener(focusMoved ? { patches, boxes, focused } : { patches, boxes });
+  }
+
+  /**
+   * The mirrored nodes whose box differs from the one last sent.
+   *
+   * Bounded by the semantics tree, which is bounded by the *mounted*
+   * nodes — so a 100k-row list costs the fifteen rows it has mounted,
+   * the same bound `decisions/0021` gives for the tree walk itself.
+   * Ids that have left the tree are dropped here rather than tracked,
+   * since a removal patch has already told the mirror about them.
+   */
+  private collectSemanticsBoxes(): UiSemanticsBox[] {
+    const changed: UiSemanticsBox[] = [];
+    for (const id of this.semantics.keys()) {
+      const node = this.graph.getNode(id);
+      if (node === undefined || this.engine.recordFor(node) === undefined) {
+        continue;
+      }
+      const box = this.engine.visibleBox(node);
+      const last = this.semanticsBoxes.get(id);
+      if (last !== undefined && boxesEqual(last, box)) {
+        continue;
+      }
+      this.semanticsBoxes.set(id, box);
+      changed.push({ id, box });
+    }
+    if (this.semanticsBoxes.size > this.semantics.size) {
+      for (const id of this.semanticsBoxes.keys()) {
+        if (!this.semantics.has(id)) {
+          this.semanticsBoxes.delete(id);
+        }
+      }
+    }
+    return changed;
   }
 
   /** Scrolls every scroll container above `node` so a node-local box is visible. */
@@ -1239,12 +1364,27 @@ export class GessoRuntime {
       this.layoutNotifier.notify(node => this.engine.visibleBox(node));
     }
 
+    // Before the semantics phase, not after the frame: the mirror
+    // decides whether to move DOM focus from what the editing proxy
+    // reports, and a field that gains focus this frame must have been
+    // reported by the time it does. Layout has run, so the caret box
+    // it carries is this frame's.
+    this.sendEditingState();
+
     // What the tree *means* changes far less often than where it sits,
-    // so this phase reads 0 on a scrolled or animated frame and only
-    // walks when a semantics property or the shape of the tree moved.
+    // so the tree is rebuilt only when a semantics property or the
+    // shape of the tree moved. With an accessibility mirror attached
+    // the phase also sweeps the mirrored boxes on any frame that laid
+    // out, because an off-screen element that is not over its node
+    // gives a screen reader's cursor the wrong rectangle — so this
+    // reads 0.00 on an app with no mirror, and on a mirrored app only
+    // on a frame that neither moved nor re-meant anything.
+    const rebuildSemantics = frameNeedsSemantics(frame);
     this.phaseTimings.semantics = this.timePhase(
-      () => frameNeedsSemantics(frame),
-      () => this.updateSemantics()
+      () =>
+        rebuildSemantics ||
+        (this.semanticsListener !== null && (laidOut || this.focusManager.focusedNode?.id !== this.lastFocusedId)),
+      () => this.updateSemantics(rebuildSemantics, laidOut)
     );
 
     // Render is unconditional once the backend is ready: both backends
@@ -1285,8 +1425,6 @@ export class GessoRuntime {
     // A frame can change the cursor without the pointer moving: the
     // hovered node's `cursor` prop, or the node itself, may have changed.
     this.sendCursor();
-    // Layout has run, so the caret box the shell mirrors is current.
-    this.sendEditingState();
     this.frameListener?.({
       frame: frame.id,
       durationMs: elapsed,
@@ -1598,6 +1736,14 @@ function frameNeedsLayout(frame: UiFrame): boolean {
  * tree — a removed node marks its parent Children-dirty, which is how
  * a closed dialog leaves the tree.
  */
+/** Shared empties, so a frame that changed nothing allocates nothing. */
+const EMPTY_PATCHES: readonly UiSemanticsPatch[] = [];
+const EMPTY_BOXES: readonly UiSemanticsBox[] = [];
+
+function boxesEqual(a: LayoutBox, b: LayoutBox): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
 function frameNeedsSemantics(frame: UiFrame): boolean {
   const flags = DirtyFlags.Semantics | DirtyFlags.Children;
   return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & flags) !== 0);
