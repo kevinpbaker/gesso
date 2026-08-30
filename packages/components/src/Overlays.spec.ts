@@ -68,16 +68,18 @@ describe('Dialog', () => {
     expect(record?.states).toEqual(['modal']);
   });
 
-  it('opens centred across the window, below the top', () => {
+  it('opens centred in the canvas', () => {
     const open = new BehaviorSubject(true);
     const ui = mount(app(open));
     ui.frame();
 
-    // A dialog is centred horizontally and sits 80 from the top —
-    // vertically centring one would move it as its content arrived.
+    // Centred on both axes and pinned to no edge, so the box the layer
+    // gives it spans the whole canvas and the dialog sits in the middle
+    // of it however tall the content turns out to be.
     const entry = ui.entries()[0];
-    expect(entry.center).toBe('x');
-    expect(entry.top).toBe(80);
+    expect(entry.center).toBe('both');
+    expect(entry.top).toBeUndefined();
+    expect(entry.left).toBeUndefined();
   });
 
   it('Escape closes it', () => {

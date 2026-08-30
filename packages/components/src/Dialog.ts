@@ -87,10 +87,17 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
         },
         width: width.value,
         opacity: enter,
-        // `x` and `y` are the pivot, not a translation: half the width
-        // and nothing vertical grows it from the top centre, which is
-        // where a dialog anchored 80px from the top appears to come
-        // from. See `UiTransform`.
+        // `x` and `y` are the pivot, not a translation (see
+        // `UiTransform`). Half the width puts it on the dialog's
+        // vertical axis, which is what a centred dialog wants.
+        //
+        // `y` stays 0 — the top edge — because the pivot is in logical
+        // pixels and a dialog's height is its content's, not known
+        // where the transform is declared. The entrance scales 0.96 to
+        // 1, so the difference between growing from the top edge and
+        // from the middle is 2% of the height: two or three pixels,
+        // over the whole entrance. Reading the measured box back to
+        // close that gap would cost a layout round trip per frame.
         transform: enter.pipe(
           map(t => ({ x: width.value / 2, y: 0, scaleX: 0.96 + 0.04 * t, scaleY: 0.96 + 0.04 * t }))
         ),
@@ -124,13 +131,14 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
       // the previous opening's final state.
       enter.value = 0;
       overlay.show(body(), {
-        // Centred across the window and 80px down from the top, which
-        // is where a dialog belongs and where the entrance's pivot
-        // assumes it is growing from. Not vertically centred: a dialog
-        // that grows as its content arrives would walk up the screen,
-        // and a tall one would have nowhere to go.
-        top: 80,
-        center: 'x',
+        // Centred in the canvas on both axes.
+        //
+        // A dialog that grows after it opens moves on the axis it is
+        // centred on, and one taller than the canvas overflows both
+        // ends rather than just the bottom — so the edges of a centred
+        // dialog are the caller's problem to keep modest. That is the
+        // trade for the position a modal is expected in.
+        center: 'both',
         environment: placeholder,
         dismissOnOutsidePress: dismissible.value,
         onClose: () => {
