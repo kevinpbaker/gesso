@@ -156,7 +156,7 @@ function describe(
     role,
     label: name,
     description: node.properties.get('description') as string | undefined,
-    states: states === undefined ? undefined : normalizeStates(states),
+    states: states === undefined || states.length === 0 ? undefined : normalizeStates(states),
     disabled: disabled ? true : undefined,
     valueNow: node.properties.get('valueNow') as number | undefined,
     valueMin: node.properties.get('valueMin') as number | undefined,

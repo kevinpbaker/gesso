@@ -688,7 +688,9 @@ export const UiProperties = {
     name: 'value',
     defaultValue: undefined,
     inherited: false,
-    affects: C | L
+    // Semantics too: an editable's value is what a screen reader reads
+    // it as, so the semantics tree has to follow the text.
+    affects: C | L | S
   }),
 
   /** Shown, muted, while an editable is empty. */
