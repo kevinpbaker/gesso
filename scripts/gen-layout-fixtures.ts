@@ -1,5 +1,5 @@
 /**
- * Regenerates `src/ui/layout/conformance/expected.json` from Chrome.
+ * Regenerates `packages/core/src/layout/conformance/expected.json` from Chrome.
  *
  *   pnpm fixtures:layout
  *
@@ -19,14 +19,14 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { caseFingerprint, layoutCases } from '../src/ui/layout/conformance/cases.ts';
-import { casesToHtml, parseResults } from '../src/ui/layout/conformance/toHtml.ts';
-import type { ExpectedFixtures } from '../src/ui/layout/conformance/expectedFixtures.ts';
+import { caseFingerprint, layoutCases } from '../packages/core/src/layout/conformance/cases.ts';
+import { casesToHtml, parseResults } from '../packages/core/src/layout/conformance/toHtml.ts';
+import type { ExpectedFixtures } from '../packages/core/src/layout/conformance/expectedFixtures.ts';
 
 const CHROME_CANDIDATES = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser', 'chrome'];
 
 const here = dirname(fileURLToPath(import.meta.url));
-const conformanceDir = join(here, '..', 'src', 'ui', 'layout', 'conformance');
+const conformanceDir = join(here, '..', 'packages', 'core', 'src', 'layout', 'conformance');
 const outputPath = join(conformanceDir, 'expected.json');
 // Ahem (public domain, from web-platform-tests): every glyph is a 1em
 // square, so real text has knowable widths. Embedded as a data URI so

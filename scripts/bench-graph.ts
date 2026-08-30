@@ -1,5 +1,5 @@
 /**
- * Microbenchmarks for the retained UI graph (src/ui/graph).
+ * Microbenchmarks for the retained UI graph (packages/core/src/graph).
  *
  * Three shapes, matching how the graph is actually driven:
  *
@@ -21,13 +21,13 @@
  * they compare a change against its own baseline, not against another
  * machine's.
  */
-import { DirtyFlags } from '../src/ui/graph/DirtyFlags.ts';
-import { UiGraph } from '../src/ui/graph/UiGraph.ts';
-import { UiNodeType } from '../src/ui/graph/UiNodeType.ts';
-import { UiScheduler } from '../src/ui/scheduler/UiScheduler.ts';
-import { lightTheme } from '../src/ui/environment/UiTheme.ts';
-import type { UiNode } from '../src/ui/graph/UiNode.ts';
-import type { UiFrameClock, UiFrameTime } from '../src/ui/scheduler/UiFrameClock.ts';
+import { DirtyFlags } from '../packages/core/src/graph/DirtyFlags.ts';
+import { UiGraph } from '../packages/core/src/graph/UiGraph.ts';
+import { UiNodeType } from '../packages/core/src/graph/UiNodeType.ts';
+import { UiScheduler } from '../packages/core/src/scheduler/UiScheduler.ts';
+import { lightTheme } from '../packages/core/src/environment/UiTheme.ts';
+import type { UiNode } from '../packages/core/src/graph/UiNode.ts';
+import type { UiFrameClock, UiFrameTime } from '../packages/core/src/scheduler/UiFrameClock.ts';
 
 const NODES = Number(process.env.BENCH_NODES ?? '10000');
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS ?? '30');

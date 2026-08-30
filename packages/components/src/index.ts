@@ -1,0 +1,54 @@
+/**
+ * `@gesso/components` — the component library.
+ *
+ * Every control here follows one contract (`COMPONENTS_ROADMAP.md` §2):
+ * controlled by default with an optional `defaultX` that makes it
+ * self-managing, themed through `UiTheme`'s control tokens with no
+ * colour props of its own, keyboard operable from a keymap that is
+ * data, and emitting `role`, `label`, `value` and `states` from the day
+ * it was written.
+ *
+ * It may import `@gesso/core` and `@gesso/framework`, never the
+ * playground.
+ */
+export { Checkbox, type CheckboxProps } from './Checkbox';
+export { Switch, type SwitchProps } from './Switch';
+export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';
+export { TextInput, TextArea, type TextInputProps, type TextAreaProps } from './TextInput';
+export { Slider, type SliderProps } from './Slider';
+export { NumberInput, type NumberInputProps } from './NumberInput';
+export { Card, Divider, Toolbar, Tabs, Accordion } from './Structure';
+export type {
+  CardProps,
+  DividerProps,
+  ToolbarProps,
+  TabsProps,
+  TabDefinition,
+  AccordionProps,
+  AccordionSection
+} from './Structure';
+export { SplitPane, type SplitPaneProps } from './SplitPane';
+export { FindBar, type FindBarProps } from './FindBar';
+export { Dialog, type DialogProps } from './Dialog';
+export { Menu, type MenuProps, type MenuItem } from './Menu';
+export { Select, type SelectProps, type SelectOption } from './Select';
+export { Tooltip, type TooltipProps } from './Tooltip';
+export { Toast, type ToastProps } from './Toast';
+export { LazyList, type LazyListProps } from './LazyList';
+export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';
+export { Tree, type TreeNode, type TreeProps } from './Tree';
+export {
+  Image,
+  Icon,
+  Spinner,
+  ProgressBar,
+  type ImageProps,
+  type IconProps,
+  type SpinnerProps,
+  type ProgressBarProps
+} from './Media';
+export { useOverlay, type OverlayHandle, type OverlayOptions } from './overlay';
+export { virtualList, stepIndex, type VirtualList } from './virtual';
+export { controlled, type ControlledValue } from './controlled';
+export { trackFocus, type ControlFocus } from './focus';
+export { keymap, quantize, type ControlLayoutProps, type Keymap } from './internals';

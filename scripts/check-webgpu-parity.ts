@@ -148,7 +148,10 @@ async function main(): Promise<void> {
   let browser: ChildProcess | undefined;
   let devtools: DevTools | undefined;
   try {
-    vite = spawn('npx', ['vite', '--port', String(VITE_PORT), '--strictPort'], { stdio: 'ignore' });
+    // The playground is its own package now, so Vite is given its root.
+    vite = spawn('npx', ['vite', 'apps/playground', '--port', String(VITE_PORT), '--strictPort'], {
+      stdio: 'ignore'
+    });
     await waitFor('Vite', async () => ((await fetch(`http://localhost:${VITE_PORT}/`)).ok ? true : undefined), 30_000);
 
     browser = spawn(

@@ -1,0 +1,32 @@
+{
+  "name": "@gesso/components",
+  "version": "0.1.0",
+  "description": "The component library — five tiers, one contract.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@gesso/core": "workspace:^",
+    "@gesso/framework": "workspace:^"
+  },
+  "peerDependencies": {
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "rxjs": "^7.8.2"
+  }
+}

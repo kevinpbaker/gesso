@@ -1,36 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "es2023",
-    "module": "esnext",
-    "lib": ["ES2023", "DOM"],
-    "types": ["vite/client", "@webgpu/types"],
-    "allowArbitraryExtensions": true,
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* JSX — optional surface over the factory API; see src/framework/jsx */
-    "jsx": "react-jsx",
-    "jsxImportSource": "gesso",
-    "paths": {
-      "gesso/jsx-runtime": ["./src/framework/jsx/jsx-runtime.ts"],
-      "gesso/jsx-dev-runtime": ["./src/framework/jsx/jsx-dev-runtime.ts"]
-    },
-
-    /* Decorators */
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": false,
-
-    /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": false,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src"]
+  "extends": "./tsconfig.base.json",
+  "include": ["packages/*/src", "apps/*/src"]
 }
