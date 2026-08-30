@@ -350,12 +350,14 @@ And at the root, `scripts/` holds `gen-layout-fixtures.ts` (Chrome → `expected
 
 ```bash
 pnpm dev               # Vite dev server with the playground
-pnpm build             # tsc + vite build
+pnpm build             # tsdown for the three packages, then vite for the playground
 pnpm preview           # serve the production build
 pnpm test              # vitest, watch mode
 pnpm test:run          # vitest, once
 pnpm lint              # oxlint
 pnpm format            # oxfmt
+pnpm api:check         # each package's public surface against its committed report
+pnpm api:update        # rewrite those reports after an intended change
 pnpm fixtures:layout   # re-render conformance cases in headless Chrome → expected.json
 pnpm parity:webgpu     # Canvas2D vs WebGPU pixel diff in headless Chrome (needs a WebGPU adapter)
 ```
