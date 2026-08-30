@@ -49,6 +49,12 @@ export const ROUTES: readonly RouteMeta[] = [
     parent: 'examples'
   },
   {
+    id: 'example-router',
+    label: 'Routing',
+    title: 'Example · nested routes, guards, and the browser’s Back button',
+    parent: 'examples'
+  },
+  {
     id: 'example-animation',
     label: 'Animation',
     title: 'Example · a board that moves, and an idle app that does not',
@@ -57,6 +63,19 @@ export const ROUTES: readonly RouteMeta[] = [
 ];
 
 export const DEFAULT_ROUTE_ID = 'debug';
+
+/**
+ * The route a location hash names, ignoring anything after it.
+ *
+ * A route may own the rest of the fragment: the routing example runs a
+ * Gesso app whose own url lives at `#example-router/mail/inbox/2`, so
+ * the id is the first segment and the remainder belongs to the page.
+ * Splitting here is what lets the shell leave a mounted route alone
+ * while the app inside it navigates.
+ */
+export function routeIdFromHash(hash: string): string {
+  return hash.replace(/^#/, '').split('/')[0] ?? '';
+}
 
 export function findRoute(id: string): RouteMeta | undefined {
   return ROUTES.find(route => route.id === id);

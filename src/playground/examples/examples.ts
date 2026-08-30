@@ -63,6 +63,19 @@ export const EXAMPLES: readonly ExampleMeta[] = [
     tags: ['bindings', 'observables', 'no rebuilds', 'streaming data', 'JSX', 'render worker']
   },
   {
+    route: 'example-router',
+    title: 'Routing',
+    description:
+      'A mail app in three nested levels — a folder rail, a message list, a message — where every screen is a route ' +
+      'and every route is a full path whose params the compiler checks. The layout is mounted once and stays mounted ' +
+      'while folders and messages change under it, and walking from one message to the next rebuilds nothing at all: ' +
+      'the same screen follows the param. Settings is behind a guard that redirects to a sign-in and replaces the ' +
+      'entry rather than pushing it. The address bar follows every navigation and the browser’s own Back and Forward ' +
+      'walk them, because the only thing routing puts on the wire is a url.',
+    source: 'src/playground/examples/RouterExampleApp.tsx',
+    tags: ['routing', 'nested outlets', 'typed params', 'guards', 'history', 'render worker']
+  },
+  {
     route: 'example-animation',
     title: 'A board that moves',
     description:
