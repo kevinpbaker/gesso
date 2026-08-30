@@ -8,19 +8,21 @@
  * the threshold, or when the headless browser has no WebGPU adapter —
  * a machine that cannot run the check must say so rather than pass it.
  *
- * Chrome is driven over its DevTools protocol with Node's built-in
- * WebSocket, because `--dump-dom` serialises the page under a virtual
- * time budget that the GPU process's adapter request does not honour.
- * No browser-automation dependency, as with gen-layout-fixtures.ts.
+ * Chrome is driven over its DevTools protocol from `lib/devtools.ts`,
+ * which carries the reason: `--dump-dom` serialises the page under a
+ * virtual time budget that the GPU process's adapter request does not
+ * honour. No browser-automation dependency, as with
+ * gen-layout-fixtures.ts.
  *
  *   pnpm parity:webgpu                   # thresholds PARITY_MAX_PERCENT (0.03) and PARITY_MAX_GROSS_PERCENT (0.02)
  *   CHROME_BIN=/path/to/chrome pnpm parity:webgpu
  */
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setTimeout as sleep } from 'node:timers/promises';
+
+import { DevTools, findChrome, openPage, waitFor, WEBGPU_FLAGS } from './lib/devtools.ts';
 
 const VITE_PORT = 5187;
 const DEVTOOLS_PORT = 9337;
@@ -53,7 +55,6 @@ const MAX_PERCENT = Number(process.env.PARITY_MAX_PERCENT ?? '0.05');
  */
 const MAX_GROSS_PERCENT = Number(process.env.PARITY_MAX_GROSS_PERCENT ?? '0.02');
 const READY_TIMEOUT_MS = 45_000;
-const CHROME_CANDIDATES = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser', 'chrome'];
 
 interface Parity {
   status: string;
@@ -63,82 +64,6 @@ interface Parity {
   histogram?: string;
   leftPainted: number;
   rightPainted: number;
-}
-
-function findChrome(): string {
-  const candidates = process.env.CHROME_BIN ? [process.env.CHROME_BIN] : CHROME_CANDIDATES;
-  for (const candidate of candidates) {
-    try {
-      execFileSync(candidate, ['--version'], { stdio: 'ignore' });
-      return candidate;
-    } catch {
-      // try the next name
-    }
-  }
-  throw new Error(`No Chrome binary found. Tried: ${candidates.join(', ')}. Set CHROME_BIN.`);
-}
-
-async function waitFor<T>(what: string, probe: () => Promise<T | undefined>, timeoutMs: number): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const result = await probe();
-      if (result !== undefined) {
-        return result;
-      }
-    } catch {
-      // not yet
-    }
-    await sleep(250);
-  }
-  throw new Error(`Timed out after ${timeoutMs} ms waiting for ${what}.`);
-}
-
-/** A minimal DevTools client: send a command, await its reply. */
-class DevTools {
-  private nextId = 1;
-  private readonly pending = new Map<number, (result: unknown) => void>();
-  private readonly socket: WebSocket;
-
-  constructor(socket: WebSocket) {
-    this.socket = socket;
-    socket.addEventListener('message', event => {
-      const message = JSON.parse(String(event.data)) as { id?: number; result?: unknown; error?: { message: string } };
-      if (message.id !== undefined) {
-        const resolve = this.pending.get(message.id);
-        this.pending.delete(message.id);
-        resolve?.(message.error !== undefined ? new Error(message.error.message) : message.result);
-      }
-    });
-  }
-
-  static async connect(url: string): Promise<DevTools> {
-    const socket = new WebSocket(url);
-    await new Promise<void>((resolve, reject) => {
-      socket.addEventListener('open', () => resolve(), { once: true });
-      socket.addEventListener('error', () => reject(new Error(`Could not connect to ${url}`)), { once: true });
-    });
-    return new DevTools(socket);
-  }
-
-  send(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, result => (result instanceof Error ? reject(result) : resolve(result)));
-      this.socket.send(JSON.stringify({ id, method, params }));
-    });
-  }
-
-  async evaluate<T>(expression: string): Promise<T> {
-    const reply = (await this.send('Runtime.evaluate', { expression, returnByValue: true })) as {
-      result: { value: T };
-    };
-    return reply.result.value;
-  }
-
-  close(): void {
-    this.socket.close();
-  }
 }
 
 async function main(): Promise<void> {
@@ -154,41 +79,14 @@ async function main(): Promise<void> {
     });
     await waitFor('Vite', async () => ((await fetch(`http://localhost:${VITE_PORT}/`)).ok ? true : undefined), 30_000);
 
-    browser = spawn(
-      chrome,
-      [
-        '--headless=new',
-        '--no-first-run',
-        '--no-default-browser-check',
-        '--hide-scrollbars',
-        '--force-device-scale-factor=1',
-        '--window-size=1400,900',
-        `--user-data-dir=${profile}`,
-        `--remote-debugging-port=${DEVTOOLS_PORT}`,
-        // WebGPU without a display: Dawn on Vulkan on SwiftShader.
-        '--enable-unsafe-webgpu',
-        '--enable-features=Vulkan',
-        '--use-angle=vulkan',
-        '--use-vulkan=swiftshader',
-        '--ignore-gpu-blocklist',
-        PAGE_URL
-      ],
-      { stdio: 'ignore' }
-    );
-
-    const target = await waitFor(
-      'the DevTools endpoint',
-      async () => {
-        const targets = (await (await fetch(`http://localhost:${DEVTOOLS_PORT}/json`)).json()) as {
-          type: string;
-          url: string;
-          webSocketDebuggerUrl: string;
-        }[];
-        return targets.find(t => t.type === 'page' && t.url.startsWith(`http://localhost:${VITE_PORT}`));
-      },
-      15_000
-    );
-    devtools = await DevTools.connect(target.webSocketDebuggerUrl);
+    ({ browser, devtools } = await openPage(chrome, {
+      url: PAGE_URL,
+      devtoolsPort: DEVTOOLS_PORT,
+      windowSize: [1400, 900],
+      // WebGPU without a display: Dawn on Vulkan on SwiftShader.
+      flags: WEBGPU_FLAGS,
+      profileDir: profile
+    }));
 
     const parity = await waitFor(
       'the compare route to report parity',
