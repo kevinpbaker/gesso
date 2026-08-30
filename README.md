@@ -4,6 +4,8 @@
 
 **A retained-mode UI framework that draws your app on a canvas, lays it out like Chrome, and never lets the main thread touch it.**
 
+_gesso_ (**JESS**-oh) — the primer coat that makes a raw canvas take paint.
+
 TypeScript · RxJS · Canvas2D & WebGPU · zero DOM layout · zero runtime dependencies beyond `rxjs`
 
 [Why](#why-gesso) · [Sixty seconds](#sixty-seconds) · [What's inside](#whats-inside) · [Proof](#proof-not-promises) · [Playground](#the-playground) · [Architecture](#architecture) · [Roadmap](#where-its-going)
