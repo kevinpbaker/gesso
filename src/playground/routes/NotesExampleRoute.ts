@@ -14,6 +14,10 @@ export function mountNotesExampleRoute(host: HTMLElement): () => void {
   const app = createApp({
     // Written out literally so the bundler can see and split it.
     worker: () => new Worker(new URL('../examples/NotesExampleWorker.ts', import.meta.url), { type: 'module' }),
+    // The notebook itself: repository, rules and shaping, on their own
+    // thread. The shell wires the two workers together and then has
+    // nothing more to do with either.
+    appWorker: () => new Worker(new URL('../examples/notes/NotesAppWorker.ts', import.meta.url), { type: 'module' }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();

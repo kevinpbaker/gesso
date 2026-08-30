@@ -3,135 +3,27 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 
 import type { ComponentContext, Inputs } from '../../framework/FunctionComponent';
 import { ShellStore } from '../../framework/app/ShellStore';
-import { Store } from '../../framework/store/Store';
-import { Action, Projection, State } from '../../framework/store/decorators';
 import { state } from '../../framework/State';
+import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
 
 /**
  * A notes app: a list of notes on the left, the selected note's title
  * and body on the right, both typed into directly.
  *
- * This is the roadmap F2 exit screen. The title is a single-line
- * `editabletext`; the body is a multi-line one inside a scroll view.
- * Everything a text field needs happens here: the caret and selection
- * are drawn by the renderer, keys and IME composition arrive through
- * the shell's editing proxy, copy and paste use the real clipboard,
- * and the store is the source of truth — each edit dispatches an
- * action and the field follows the projection back, so switching notes
- * swaps the text under the same field. It runs in the render worker.
+ * This is the roadmap F2 exit screen, and since A4 it is also the
+ * first screen built the way `decisions/0029-thread-model.md`
+ * describes. Nothing in this file holds application state or knows
+ * where it comes from: it reads view keys off the `Notes` channel and
+ * sends commands back. The notebook itself — a repository, the rules,
+ * the shaping — is plain code in `notes/`, running on the application
+ * worker, and shares nothing with this file but the token.
+ *
+ * Everything a text field needs still happens here: the caret and
+ * selection are drawn by the renderer, keys and IME composition arrive
+ * through the shell's editing proxy, copy and paste use the real
+ * clipboard, and each edit sends a command whose effect returns as a
+ * patch, so switching notes swaps the text under the same field.
  */
-
-export interface Note {
-  readonly id: string;
-  readonly title: string;
-  readonly body: string;
-  readonly updatedAt: number;
-}
-
-export interface NoteSummary {
-  readonly id: string;
-  readonly title: string;
-  readonly preview: string;
-  readonly selected: boolean;
-}
-
-export interface NotesView {
-  readonly notes: readonly NoteSummary[];
-  readonly selected: Note | null;
-}
-
-const SEED: readonly Note[] = [
-  {
-    id: 'n1',
-    title: 'Welcome to Nodal notes',
-    body:
-      'Click anywhere in this text and start typing.\n\n' +
-      'Everything you would expect from a text field works: arrow keys, Shift to select, double-click for a word, ' +
-      'Home and End, Ctrl/Cmd+A, undo and redo, copy, cut and paste.\n\n' +
-      'Switch your keyboard to Japanese, Chinese or Korean and type: the IME candidate window opens at the caret, ' +
-      'and the composition is underlined until you commit it. Dead keys (´ + e → é) go through the same path.\n\n' +
-      'The whole UI, this text included, is drawn on a canvas by a render worker. The only DOM involved is a hidden ' +
-      'textarea on the main thread that turns your keystrokes into text.',
-    updatedAt: Date.now() - 3 * 60 * 60 * 1000
-  },
-  {
-    id: 'n2',
-    title: 'Groceries',
-    body: 'Oat milk\nCoffee beans\nSourdough\nApples — the crisp kind\nParmesan',
-    updatedAt: Date.now() - 26 * 60 * 60 * 1000
-  },
-  {
-    id: 'n3',
-    title: 'Talk outline',
-    body: '1. Why a canvas UI\n2. One identity system\n3. Layout that follows the change\n4. Threads: shell, render, data\n5. What is next',
-    updatedAt: Date.now() - 4 * 24 * 60 * 60 * 1000
-  }
-];
-
-export class NotesStore extends Store {
-  @State() notes = state<readonly Note[]>(SEED);
-  @State() selectedId = state<string | null>(SEED[0].id);
-
-  private nextId = SEED.length + 1;
-
-  @Projection()
-  get view(): NotesView {
-    const selectedId = this.selectedId.value;
-    const sorted = [...this.notes.value].sort((a, b) => b.updatedAt - a.updatedAt);
-    return {
-      notes: sorted.map(note => ({
-        id: note.id,
-        title: note.title.trim().length > 0 ? note.title : 'Untitled',
-        preview:
-          note.body
-            .split('\n')
-            .find(line => line.trim().length > 0)
-            ?.slice(0, 60) ?? 'No additional text',
-        selected: note.id === selectedId
-      })),
-      selected: this.notes.value.find(note => note.id === selectedId) ?? null
-    };
-  }
-
-  @Action()
-  open(id: string): void {
-    this.selectedId.value = id;
-  }
-
-  @Action()
-  create(): void {
-    const id = `n${this.nextId++}`;
-    this.notes.value = [...this.notes.value, { id, title: '', body: '', updatedAt: Date.now() }];
-    this.selectedId.value = id;
-  }
-
-  @Action()
-  remove(id: string): void {
-    const remaining = this.notes.value.filter(note => note.id !== id);
-    this.notes.value = remaining;
-    if (this.selectedId.value === id) {
-      const next = [...remaining].sort((a, b) => b.updatedAt - a.updatedAt)[0];
-      this.selectedId.value = next?.id ?? null;
-    }
-  }
-
-  @Action()
-  setTitle(title: string): void {
-    this.update(note => ({ ...note, title }));
-  }
-
-  @Action()
-  setBody(body: string): void {
-    this.update(note => ({ ...note, body }));
-  }
-
-  private update(change: (note: Note) => Note): void {
-    const id = this.selectedId.value;
-    this.notes.value = this.notes.value.map(note =>
-      note.id === id ? { ...change(note), updatedAt: Date.now() } : note
-    );
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -151,8 +43,8 @@ const FAINT = '#5d6a7b';
 // Sidebar
 // ---------------------------------------------------------------------------
 
-function NoteRow(props: Inputs<{ note: NoteSummary }>, ctx: ComponentContext) {
-  const notes = ctx.inject(NotesStore);
+function NoteRow(props: Inputs<{ note: NoteRowData }>, ctx: ComponentContext) {
+  const notes = ctx.channel(Notes);
   const hovered = state(false);
   const background = combineLatest([props.note, hovered]).pipe(
     map(([note, hover]) => (note.selected ? ROW_SELECTED : hover ? ROW_HOVER : 'transparent'))
@@ -164,7 +56,7 @@ function NoteRow(props: Inputs<{ note: NoteSummary }>, ctx: ComponentContext) {
       borderRadius={8}
       backgroundColor={background}
       cursor="pointer"
-      onClick={() => notes.dispatch('open', props.note.value.id)}
+      onClick={() => notes.send.open(props.note.value.id)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}>
       <text color={TEXT} fontSize={14} fontWeight={600} maxLines={1} textOverflow="ellipsis">
@@ -178,8 +70,11 @@ function NoteRow(props: Inputs<{ note: NoteSummary }>, ctx: ComponentContext) {
 }
 
 function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
-  const notes = ctx.inject(NotesStore);
-  const rows = notes.projection.view.pipe(map(view => view.notes.map(note => <NoteRow key={note.id} note={note} />)));
+  const notes = ctx.channel(Notes);
+  // Bound straight off the view key. No projection, no store, no
+  // `undefined` before the first patch — the token's initial value is
+  // an empty list, so this renders an empty sidebar and then fills it.
+  const rows = notes.view.rows.pipe(map(list => list.map(note => <NoteRow key={note.id} note={note} />)));
   return (
     <column width={280} backgroundColor={SIDEBAR} borderColor={BORDER} borderWidth={1} padding={12} gap={12}>
       <row x="space-between" y="center" paddingLeft={4}>
@@ -187,7 +82,7 @@ function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
           Notes
         </text>
         <button
-          onClick={() => notes.dispatch('create')}
+          onClick={() => notes.send.create()}
           padding={6}
           paddingLeft={12}
           paddingRight={12}
@@ -216,25 +111,27 @@ function wordCount(text: string): number {
 }
 
 function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
-  const notes = ctx.inject(NotesStore);
+  const notes = ctx.channel(Notes);
   const shell = ctx.inject(ShellStore);
-  const view = notes.projection.view;
-  const title = view.pipe(
-    map(v => v.selected?.title ?? ''),
+  const open = notes.view.open;
+  const title = open.pipe(
+    map(note => note?.title ?? ''),
     distinctUntilChanged()
   );
-  const body = view.pipe(
-    map(v => v.selected?.body ?? ''),
+  const body = open.pipe(
+    map(note => note?.body ?? ''),
     distinctUntilChanged()
   );
-  const meta = view.pipe(
-    map(v => {
-      if (v.selected === null) {
+  const meta = open.pipe(
+    map(note => {
+      if (note === null) {
         return '';
       }
-      const when = new Date(v.selected.updatedAt).toLocaleString();
-      const words = wordCount(v.selected.body);
-      return `Edited ${when} · ${words} word${words === 1 ? '' : 's'} · ${v.selected.body.length} characters`;
+      // `editedAt` arrives formatted; the counts are derived from a
+      // body this thread already holds, so neither costs the wire
+      // anything.
+      const words = wordCount(note.body);
+      return `Edited ${note.editedAt} · ${words} word${words === 1 ? '' : 's'} · ${note.body.length} characters`;
     })
   );
   // `flex={1}` rather than `flexGrow={1}` here and on the title, as in
@@ -249,7 +146,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
         <editabletext
           value={title}
           placeholder="Untitled"
-          onInput={event => notes.dispatch('setTitle', event.value)}
+          onInput={event => notes.send.setTitle(event.value)}
           color={TEXT}
           fontSize={24}
           fontWeight={600}
@@ -261,7 +158,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
         <row gap={8}>
           <button
             onClick={() => {
-              const selected = notes.view.selected;
+              const selected = notes.view.open.value;
               if (selected !== null) {
                 shell.dispatch('copyText', `${selected.title}\n\n${selected.body}`);
               }
@@ -280,9 +177,9 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
           </button>
           <button
             onClick={() => {
-              const selected = notes.view.selected;
+              const selected = notes.view.open.value;
               if (selected !== null) {
-                notes.dispatch('remove', selected.id);
+                notes.send.remove(selected.id);
               }
             }}
             padding={8}
@@ -307,7 +204,7 @@ function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
           value={body}
           multiline
           placeholder="Start writing…"
-          onInput={event => notes.dispatch('setBody', event.value)}
+          onInput={event => notes.send.setBody(event.value)}
           color={TEXT}
           fontSize={15}
           lineHeight={24}
@@ -334,9 +231,9 @@ function EmptyState() {
 
 /** The editor while a note is selected, else the empty state; the sidebar stays. */
 export function NotesApp(_props: Inputs<{}>, ctx: ComponentContext) {
-  const notes = ctx.inject(NotesStore);
-  const main = notes.projection.view.pipe(
-    map(v => v.selected !== null),
+  const notes = ctx.channel(Notes);
+  const main = notes.view.open.pipe(
+    map(note => note !== null),
     distinctUntilChanged(),
     map(hasNote => (hasNote ? <Editor key="editor" /> : <EmptyState key="empty" />))
   );

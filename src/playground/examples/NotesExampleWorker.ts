@@ -1,9 +1,13 @@
 import { renderRoot } from '../../framework/app/worker/renderRoot';
-import { NotesApp, NotesStore } from './NotesExampleApp';
+import { NotesApp } from './NotesExampleApp';
+import { Notes } from './notes/NotesContract';
 
 /**
- * Render worker for the notes example: the UI, the text editing and
- * the store all live here. The main thread forwards input and hosts
- * the editing proxy.
+ * Render worker for the notes example.
+ *
+ * The UI and the text editing live here; the notebook does not. The
+ * channel is registered with no worker of its own, so it resolves to
+ * whichever application worker the shell spawned — this file does not
+ * need to know which, or where.
  */
-renderRoot(NotesApp).useStore(NotesStore);
+renderRoot(NotesApp).useChannel(Notes);

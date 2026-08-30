@@ -1,0 +1,36 @@
+import { serveChannels } from '../../../framework/channel/serveChannels';
+import { Notes } from './NotesContract';
+import { NotesDomain } from './NotesDomain';
+import { InMemoryNotesRepository } from './NotesRepository';
+import { SEED_NOTES } from './NotesSeed';
+import { NotesViewModel } from './NotesViewModel';
+
+/**
+ * The notes application, on its own thread.
+ *
+ * Four lines of wiring over three plain classes, and one call that
+ * publishes the result. Above `serveChannels` there is no framework
+ * import in this file's dependency graph at all — no `Store`, no
+ * decorator, no runtime — so every layer under it is testable with
+ * bare vitest, and swapping the repository for an OPFS one later
+ * touches nothing else.
+ */
+const repository = new InMemoryNotesRepository(SEED_NOTES);
+const domain = new NotesDomain(repository);
+const view = new NotesViewModel(domain);
+
+serveChannels([
+  {
+    token: Notes,
+    source: {
+      view: { rows: view.rows, open: view.open },
+      commands: {
+        open: (id: string) => domain.select(id),
+        create: () => domain.create(),
+        remove: (id: string) => domain.remove(id),
+        setTitle: (title: string) => domain.setTitle(title),
+        setBody: (body: string) => domain.setBody(body)
+      }
+    }
+  }
+]);
