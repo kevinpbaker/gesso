@@ -19,6 +19,9 @@ export class GessoAppBuilder {
   private readonly serviceRegistrations: (new () => object)[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((text: string | null) => void) | undefined;
+  private errorListener:
+    | ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void)
+    | undefined;
   private rendererChoice: RendererChoice | undefined;
   private routes: RouterRoutes | undefined;
   private historyOptions: ShellHistoryOptions | undefined;
@@ -106,6 +109,15 @@ export class GessoAppBuilder {
   }
 
   /**
+   * Receives errors the runtime would otherwise only log, mirroring
+   * WorkerAppOptions.onError. See `GessoApp.onError`.
+   */
+  onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this {
+    this.errorListener = listener;
+    return this;
+  }
+
+  /**
    * Turns the layout inspector on or off on the mounted app, mirroring
    * WorkerApp.setInspector. A no-op before mountSync.
    */
@@ -145,6 +157,9 @@ export class GessoAppBuilder {
     }
     if (this.inspectListener !== undefined) {
       app.onInspect(this.inspectListener);
+    }
+    if (this.errorListener !== undefined) {
+      app.onError(this.errorListener);
     }
     this.app = app;
     app.mount();

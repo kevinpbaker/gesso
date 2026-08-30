@@ -4,6 +4,7 @@ import {
   epochNow,
   isInputMessage,
   modifiersFrom,
+  type RuntimeErrorSource,
   type RuntimeToShellMessage,
   type ShellToRuntimeMessage
 } from './RenderWorkerProtocol';
@@ -64,8 +65,17 @@ export interface WorkerAppOptions {
    * handed, it leaves alone.
    */
   appLogicWorker?: Worker | (() => Worker) | URL | string;
-  /** Receives errors thrown inside the render worker. Defaults to console.error. */
-  onError?: (message: string, stack?: string) => void;
+  /**
+   * Receives errors thrown inside the render worker: while handling a
+   * message, uncaught during a frame, from the renderer, or from a
+   * channel — `source` says which, and `RuntimeErrorSource` says what
+   * each one costs the running application.
+   *
+   * Defaults to `console.error`, which is a developer reading the
+   * right thread in devtools at the right moment. `@gesso/devtools`'s
+   * error overlay is the same callback, drawn where the app is.
+   */
+  onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   /**
    * Receives the hovered node's layout explanation while the inspector
    * is on (see `setInspector`), and null when nothing is hovered.
@@ -129,6 +139,8 @@ export class WorkerApp {
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
+  /** True once the render worker has answered `ready` at least once. */
+  private ready = false;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -164,6 +176,7 @@ export class WorkerApp {
     const worker = typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
     this.renderWorker = worker;
     worker.addEventListener('message', this.handleWorkerMessage);
+    worker.addEventListener('error', this.handleWorkerFailure);
 
     // The canvas's own box, not the host's. `clientWidth`/`clientHeight`
     // include the host's padding, while the canvas is sized to its
@@ -242,6 +255,37 @@ export class WorkerApp {
     return () => this.dispose();
   }
 
+  /**
+   * An error the browser raised *at the worker object*, which is not
+   * the same thing as the worker reporting one.
+   *
+   * The worker reports its own exceptions over the protocol, with a
+   * stack and a source; this event carries neither. Left uncancelled,
+   * the browser reports it a second time at this window — the same
+   * failure with less information, which is what the error overlay
+   * showed as a duplicate — so it is cancelled here.
+   *
+   * It is passed on in exactly one case: the worker never got as far
+   * as saying `ready`, so its own handlers were never installed and
+   * nothing else will ever report this. A module that fails to load,
+   * or fails to parse, arrives this way and no other.
+   */
+  private handleWorkerFailure = (event: ErrorEvent): void => {
+    event.preventDefault();
+    if (this.ready) {
+      return;
+    }
+    const where = event.filename === undefined || event.filename === '' ? '' : ` (${event.filename})`;
+    this.report(`the render worker failed to start: ${event.message}${where}`, undefined, 'uncaught');
+  };
+
+  /** Reports an error, to `onError` or to the console it defaults to. */
+  private report(message: string, stack: string | undefined, source: RuntimeErrorSource): void {
+    const report =
+      this.options.onError ?? ((text, trace, from) => console.error(`[gesso render worker: ${from}] ${text}`, trace));
+    report(message, stack, source);
+  }
+
   private forwardKeyDown(event: KeyboardEvent): void {
     if (this.options.interceptFind === true && isFind(event)) {
       event.preventDefault();
@@ -270,6 +314,7 @@ export class WorkerApp {
   }
 
   dispose(): void {
+    this.ready = false;
     this.proxy?.dispose();
     this.proxy = null;
     this.mirror?.dispose();
@@ -283,6 +328,7 @@ export class WorkerApp {
     if (this.renderWorker !== undefined) {
       this.renderWorker.postMessage({ type: 'dispose' } as ShellToRuntimeMessage);
       this.renderWorker.removeEventListener('message', this.handleWorkerMessage);
+      this.renderWorker.removeEventListener('error', this.handleWorkerFailure);
       this.renderWorker.terminate();
       this.renderWorker = undefined;
     }
@@ -316,8 +362,11 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'error') {
-      const report = this.options.onError ?? ((text, stack) => console.error(`[gesso render worker] ${text}`, stack));
-      report(message.message, message.stack);
+      this.report(message.message, message.stack, message.source);
+      return;
+    }
+    if (message.type === 'ready') {
+      this.ready = true;
       return;
     }
     if (message.type === 'inspect') {

@@ -49,9 +49,15 @@ function createMockCanvas(width = 800, height = 600): CanvasHost {
 
 function createFakeWorkerGlobal() {
   const sent: RuntimeToShellMessage[] = [];
+  const listeners = new Map<string, (event: unknown) => void>();
   const host = {
     onmessage: null as ((event: MessageEvent<ShellToRuntimeMessage>) => void) | null,
-    postMessage: (message: RuntimeToShellMessage) => sent.push(message)
+    postMessage: (message: RuntimeToShellMessage) => sent.push(message),
+    // What the worker installs to catch what no message handler can
+    // see; a test fires one by calling the recorded listener.
+    addEventListener: (type: string, listener: (event: never) => void) => {
+      listeners.set(type, listener as (event: unknown) => void);
+    }
   };
   const send = (message: ShellToRuntimeMessage): void => {
     host.onmessage?.({ data: message } as MessageEvent<ShellToRuntimeMessage>);

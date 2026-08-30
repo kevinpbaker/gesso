@@ -83,4 +83,8 @@ export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } f
 export type { EditingState, UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from '@gesso/core';
 export { UI_ROLES, UI_SEMANTIC_STATES, type UiRole, type UiSemanticState } from '@gesso/core';
 export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';
-export type { ShellToRuntimeMessage, RuntimeToShellMessage } from './app/worker/RenderWorkerProtocol';
+export type {
+  ShellToRuntimeMessage,
+  RuntimeToShellMessage,
+  RuntimeErrorSource
+} from './app/worker/RenderWorkerProtocol';

@@ -192,6 +192,23 @@ export class GessoApp {
     this.runtime.onInspect(listener);
   }
 
+  /**
+   * Receives the errors this configuration would otherwise only log:
+   * a renderer that could not draw, and an application listener that
+   * threw and was caught so the dispatch could continue.
+   *
+   * Mirrors `WorkerAppOptions.onError`, minus the two sources that
+   * cannot arise here — nothing crosses a message boundary, and an
+   * exception nothing catches is an ordinary main-thread error that
+   * reaches `window` on its own.
+   */
+  onError(
+    listener: ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void) | null
+  ): void {
+    this.runtime.onRendererError(listener === null ? null : message => listener(message, undefined, 'renderer'));
+    this.runtime.onListenerError(listener === null ? null : (message, stack) => listener(message, stack, 'listener'));
+  }
+
   debugRoot(): UiNode {
     return this.runtime.debugRoot();
   }

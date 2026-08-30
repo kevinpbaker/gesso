@@ -672,6 +672,7 @@ declare class GessoRuntime {
   start(): void;
   get rendererBackend(): RendererBackend | 'pending';
   onRendererError(listener: ((message: string) => void) | null): void;
+  onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
   private reportRendererError;
   private fallBackToCanvas2D;
   private requestRepaint;
@@ -756,6 +757,7 @@ declare class GessoAppBuilder {
   private readonly serviceRegistrations;
   private frameListener;
   private inspectListener;
+  private errorListener;
   private rendererChoice;
   private routes;
   private historyOptions;
@@ -771,15 +773,172 @@ declare class GessoAppBuilder {
   renderer(choice: RendererChoice): this;
   onFrame(listener: (metrics: FrameMetrics) => void): this;
   onInspect(listener: (text: string | null) => void): this;
+  onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
   setInspector(enabled: boolean): void;
   mountSync(host: HTMLElement | string): () => void;
 }
+type ShellToRuntimeMessage = {
+  type: 'init';
+  canvas: OffscreenCanvas;
+  width: number;
+  height: number;
+  dpr: number;
+  renderer?: RendererChoice;
+  textInput?: 'proxy' | 'keys';
+  appPort?: MessagePort;
+  accessibility?: boolean;
+} | {
+  type: 'resize';
+  width: number;
+  height: number;
+  dpr: number;
+} | {
+  type: 'pointerDown';
+  x: number;
+  y: number;
+  buttons: number;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} | {
+  type: 'pointerMove';
+  x: number;
+  y: number;
+  buttons: number;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} | {
+  type: 'pointerUp';
+  x: number;
+  y: number;
+  buttons: number;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} | {
+  type: 'pointerCancel';
+  at?: number;
+} | {
+  type: 'wheel';
+  x: number;
+  y: number;
+  deltaX: number;
+  deltaY: number;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} | {
+  type: 'keyDown';
+  key: string;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} | {
+  type: 'keyUp';
+  key: string;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} |
+{
+  type: 'beforeInput';
+  inputType: string;
+  data: string | null;
+  at?: number;
+} | {
+  type: 'compositionStart';
+  at?: number;
+} |
+{
+  type: 'compositionUpdate';
+  text: string;
+  caret: number;
+  at?: number;
+} |
+{
+  type: 'compositionEnd';
+  text: string;
+  at?: number;
+} | {
+  type: 'paste';
+  text: string;
+  at?: number;
+} |
+{
+  type: 'blur';
+} |
+{
+  type: 'visibility';
+  visible: boolean;
+} |
+{
+  type: 'reducedMotion';
+  reduced: boolean;
+} |
+{
+  type: 'url';
+  url: string;
+} | {
+  type: 'inspector';
+  enabled: boolean;
+} |
+{
+  type: 'semanticsAction';
+  action: UiSemanticsAction;
+} | {
+  type: 'dispose';
+};
+type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener';
+type RuntimeToShellMessage = {
+  type: 'ready';
+} | {
+  type: 'frame';
+  frame: number;
+  durationMs: number;
+  nodes: number;
+  measured: number;
+  relayoutRoots: number;
+  at: number;
+  inputLatencyMs: number | null;
+  phases: FramePhaseTimings;
+  renderer: RendererBackend | 'pending';
+  gpu: GpuStageTimings | null;
+} | {
+  type: 'error';
+  message: string;
+  stack?: string;
+  source: RuntimeErrorSource;
+} |
+{
+  type: 'inspect';
+  text: string | null;
+} |
+{
+  type: 'cursor';
+  cursor: string | null;
+} |
+{
+  type: 'editing';
+  state: EditingState$1 | null;
+} |
+{
+  type: 'clipboard';
+  text: string;
+} |
+{
+  type: 'openUrl';
+  url: string;
+} |
+{
+  type: 'history';
+  action: 'push' | 'replace' | 'back' | 'forward';
+  url?: string;
+} |
+{
+  type: 'semantics';
+  update: UiSemanticsUpdate;
+};
 interface WorkerAppOptions {
   renderWorker: (() => Worker) | URL | string;
   renderer?: RendererChoice;
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | (() => Worker) | URL | string;
-  onError?: (message: string, stack?: string) => void;
+  onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (text: string | null) => void;
   interceptFind?: boolean;
   accessibility?: boolean;
@@ -797,8 +956,11 @@ declare class WorkerApp {
   private proxy;
   private mirror;
   private history;
+  private ready;
   constructor(options: WorkerAppOptions);
   mount(host: HTMLElement | string): () => void;
+  private handleWorkerFailure;
+  private report;
   private forwardKeyDown;
   private forwardKeyUp;
   setInspector(enabled: boolean): void;
@@ -850,6 +1012,7 @@ declare class GessoApp {
   resize(width: number, height: number): void;
   setInspector(enabled: boolean): void;
   onInspect(listener: ((text: string | null) => void) | null): void;
+  onError(listener: ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void) | null): void;
   debugRoot(): UiNode;
   dispose(): void;
   private attachInput;
@@ -1010,163 +1173,21 @@ declare class SemanticsMirror {
   private idOf;
   private trackCanvas;
 }
-type ShellToRuntimeMessage = {
-  type: 'init';
-  canvas: OffscreenCanvas;
-  width: number;
-  height: number;
-  dpr: number;
-  renderer?: RendererChoice;
-  textInput?: 'proxy' | 'keys';
-  appPort?: MessagePort;
-  accessibility?: boolean;
-} | {
-  type: 'resize';
-  width: number;
-  height: number;
-  dpr: number;
-} | {
-  type: 'pointerDown';
-  x: number;
-  y: number;
-  buttons: number;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} | {
-  type: 'pointerMove';
-  x: number;
-  y: number;
-  buttons: number;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} | {
-  type: 'pointerUp';
-  x: number;
-  y: number;
-  buttons: number;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} | {
-  type: 'pointerCancel';
-  at?: number;
-} | {
-  type: 'wheel';
-  x: number;
-  y: number;
-  deltaX: number;
-  deltaY: number;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} | {
-  type: 'keyDown';
-  key: string;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} | {
-  type: 'keyUp';
-  key: string;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} |
-{
-  type: 'beforeInput';
-  inputType: string;
-  data: string | null;
-  at?: number;
-} | {
-  type: 'compositionStart';
-  at?: number;
-} |
-{
-  type: 'compositionUpdate';
-  text: string;
-  caret: number;
-  at?: number;
-} |
-{
-  type: 'compositionEnd';
-  text: string;
-  at?: number;
-} | {
-  type: 'paste';
-  text: string;
-  at?: number;
-} |
-{
-  type: 'blur';
-} |
-{
-  type: 'visibility';
-  visible: boolean;
-} |
-{
-  type: 'reducedMotion';
-  reduced: boolean;
-} |
-{
-  type: 'url';
-  url: string;
-} | {
-  type: 'inspector';
-  enabled: boolean;
-} |
-{
-  type: 'semanticsAction';
-  action: UiSemanticsAction;
-} | {
-  type: 'dispose';
-};
-type RuntimeToShellMessage = {
-  type: 'ready';
-} | {
-  type: 'frame';
-  frame: number;
-  durationMs: number;
-  nodes: number;
-  measured: number;
-  relayoutRoots: number;
-  at: number;
-  inputLatencyMs: number | null;
-  phases: FramePhaseTimings;
-  renderer: RendererBackend | 'pending';
-  gpu: GpuStageTimings | null;
-} | {
-  type: 'error';
-  message: string;
-  stack?: string;
-} |
-{
-  type: 'inspect';
-  text: string | null;
-} |
-{
-  type: 'cursor';
-  cursor: string | null;
-} |
-{
-  type: 'editing';
-  state: EditingState$1 | null;
-} |
-{
-  type: 'clipboard';
-  text: string;
-} |
-{
-  type: 'openUrl';
-  url: string;
-} |
-{
-  type: 'history';
-  action: 'push' | 'replace' | 'back' | 'forward';
-  url?: string;
-} |
-{
-  type: 'semantics';
-  update: UiSemanticsUpdate;
-};
+interface WorkerErrorEvent {
+  message?: string;
+  error?: unknown;
+  filename?: string;
+  lineno?: number;
+  colno?: number;
+}
+interface WorkerRejectionEvent {
+  reason?: unknown;
+}
 interface WorkerGlobal {
   onmessage: ((event: MessageEvent<ShellToRuntimeMessage>) => void) | null;
   postMessage(message: RuntimeToShellMessage): void;
+  addEventListener(type: 'error', listener: (event: WorkerErrorEvent) => void): void;
+  addEventListener(type: 'unhandledrejection', listener: (event: WorkerRejectionEvent) => void): void;
 }
 declare function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerApp;
 declare class RenderWorkerApp {
@@ -1179,6 +1200,7 @@ declare class RenderWorkerApp {
   private channels;
   private appLogicWorker;
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
+  private reportUncaught;
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options?: {
     worker?: WorkerHandle | (() => Worker);
     source?: ChannelSource<V, C>;
@@ -1293,6 +1315,7 @@ export {
   type RouterHistorySink,
   type RouterRoutes,
   type RouteTarget,
+  type RuntimeErrorSource,
   type RuntimeInput,
   type RuntimeToShellMessage,
   type SemanticsMirrorSink,

@@ -102,6 +102,31 @@ export type ShellToRuntimeMessage =
   | { type: 'dispose' };
 
 /**
+ * Where an error the worker reports came from.
+ *
+ * The shell cannot see a worker's exceptions, so this is the only
+ * thing that tells a developer *what* is broken rather than only what
+ * threw — and the four cases have genuinely different consequences:
+ *
+ *   - `message`   — thrown while handling a message from the shell.
+ *     Input or a resize was dropped; the app is otherwise intact.
+ *   - `uncaught`  — an exception or a rejected promise nothing caught,
+ *     which is almost always a frame. The scheduler had already
+ *     drained the dirty set for that frame, so the work it held is
+ *     gone and the surface can be stale until something dirties those
+ *     nodes again. The most serious of the four.
+ *   - `renderer`  — the backend refused to draw (a lost GPU device, a
+ *     surface it could not configure). Layout and state are fine.
+ *   - `channel`   — a channel's worker or its patch stream threw. The
+ *     view is intact; the data behind it stopped.
+ *   - `listener`  — one of the application's own event listeners threw.
+ *     The dispatcher caught it so the event still reached the rest of
+ *     the tree, so this is the one source that costs the running
+ *     application nothing but whatever the handler was supposed to do.
+ */
+export type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener';
+
+/**
  * Messages the render worker sends back.
  *
  * The shell owns no UI state, so this carries only observability:
@@ -123,7 +148,7 @@ export type RuntimeToShellMessage =
       renderer: RendererBackend | 'pending';
       gpu: GpuStageTimings | null;
     }
-  | { type: 'error'; message: string; stack?: string }
+  | { type: 'error'; message: string; stack?: string; source: RuntimeErrorSource }
   /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */
   | { type: 'inspect'; text: string | null }
   /** The CSS cursor the hovered node asks for; null for the default arrow. */

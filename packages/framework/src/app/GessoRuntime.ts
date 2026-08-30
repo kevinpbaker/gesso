@@ -556,6 +556,27 @@ export class GessoRuntime {
     this.rendererErrorListener = listener;
   }
 
+  /**
+   * Receives exceptions thrown by the application's own event
+   * listeners — an `onClick` that throws.
+   *
+   * The dispatcher catches those so that one broken listener cannot
+   * stop an event reaching the rest of the tree, which means nothing
+   * outside it can see them. Without this hook they are logged to the
+   * console of whichever thread dispatched, and in the worker
+   * configuration that console is not the page's.
+   */
+  onListenerError(listener: ((message: string, stack?: string) => void) | null): void {
+    this.dispatcher.onListenerError(
+      listener === null
+        ? null
+        : (error, node, type) => {
+            const message = error instanceof Error ? error.message : String(error);
+            listener(`${message} (listener: ${type} on ${node.id})`, error instanceof Error ? error.stack : undefined);
+          }
+    );
+  }
+
   private reportRendererError(message: string): void {
     if (this.rendererErrorListener !== null) {
       this.rendererErrorListener(message);

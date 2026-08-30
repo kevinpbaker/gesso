@@ -16,12 +16,36 @@ import type { RouterRoutes } from '../../router/RouterService';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
+ * An `error` event as this module needs it: the thrown value when the
+ * engine kept it, and the location when it did not.
+ */
+interface WorkerErrorEvent {
+  message?: string;
+  error?: unknown;
+  filename?: string;
+  lineno?: number;
+  colno?: number;
+}
+
+/** An `unhandledrejection` event, reduced to the value that was rejected. */
+interface WorkerRejectionEvent {
+  reason?: unknown;
+}
+
+/**
  * Minimal view of the worker global, so this module type-checks
  * against the DOM lib without pulling in the WebWorker lib.
+ *
+ * `addEventListener` is required rather than optional, because a host
+ * without it is a host whose uncaught exceptions vanish, and that is
+ * the failure this whole file exists to prevent. A test double states
+ * how it wants to be told instead of quietly not being told.
  */
 interface WorkerGlobal {
   onmessage: ((event: MessageEvent<ShellToRuntimeMessage>) => void) | null;
   postMessage(message: RuntimeToShellMessage): void;
+  addEventListener(type: 'error', listener: (event: WorkerErrorEvent) => void): void;
+  addEventListener(type: 'unhandledrejection', listener: (event: WorkerRejectionEvent) => void): void;
 }
 
 /**
@@ -60,6 +84,46 @@ export class RenderWorkerApp {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
     this.host = host;
     this.host.onmessage = event => this.receive(event.data);
+    // Everything `receive` cannot see. A frame runs from a timer, not
+    // from a message, so a component that throws while rendering,
+    // laying out or painting throws into the task that armed the
+    // frame — where the only witness is the worker's own console,
+    // which a page cannot read and a person only finds by opening the
+    // right thread in devtools. These two listeners are what make a
+    // render worker's failures reach the shell at all.
+    this.host.addEventListener('error', event => {
+      // The location only when the engine kept no Error: with one, the
+      // stack says where it was in more detail and the event's
+      // `filename` is whichever bundle chunk the frame landed in,
+      // which is not where anybody wrote anything.
+      const error = event.error;
+      this.reportUncaught(
+        error ?? event.message ?? 'Unknown error',
+        error === undefined ? locationOf(event) : undefined
+      );
+    });
+    this.host.addEventListener('unhandledrejection', event => {
+      this.reportUncaught(event.reason ?? 'Unhandled rejection');
+    });
+  }
+
+  /**
+   * Reports a value nothing caught.
+   *
+   * `where` is the fallback location the `error` event carries when
+   * the engine did not keep the thrown object — a cross-origin script,
+   * or a value thrown that was never an Error. Without it the report
+   * would be a bare sentence with nothing to look up.
+   */
+  private reportUncaught(value: unknown, where?: string): void {
+    const error = value instanceof Error ? value : undefined;
+    const message = error !== undefined ? error.message : String(value);
+    this.host.postMessage({
+      type: 'error',
+      message: where === undefined ? message : `${message} (${where})`,
+      stack: error?.stack,
+      source: 'uncaught'
+    });
   }
 
   /**
@@ -134,7 +198,8 @@ export class RenderWorkerApp {
       this.host.postMessage({
         type: 'error',
         message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
+        source: 'message'
       });
     }
   }
@@ -274,7 +339,12 @@ export class RenderWorkerApp {
           : this.resolveWorker(registration)
       ),
       (channelName, message, stack) => {
-        this.host.postMessage({ type: 'error', message: `channel ${channelName}: ${message}`, stack });
+        this.host.postMessage({
+          type: 'error',
+          message: `channel ${channelName}: ${message}`,
+          stack,
+          source: 'channel'
+        });
       }
     );
     const services = new ServiceRegistry();
@@ -322,7 +392,10 @@ export class RenderWorkerApp {
       }
     });
     this.runtime.onRendererError(message => {
-      this.host.postMessage({ type: 'error', message: `renderer: ${message}` });
+      this.host.postMessage({ type: 'error', message, source: 'renderer' });
+    });
+    this.runtime.onListenerError((message, stack) => {
+      this.host.postMessage({ type: 'error', message, stack, source: 'listener' });
     });
     this.runtime.onFrame(metrics => {
       this.host.postMessage({
@@ -342,4 +415,14 @@ export class RenderWorkerApp {
     this.runtime.start();
     this.host.postMessage({ type: 'ready' });
   }
+}
+
+/** `file:line:column` from an error event that carried no Error. */
+function locationOf(event: WorkerErrorEvent): string | undefined {
+  if (event.filename === undefined || event.filename === '') {
+    return undefined;
+  }
+  const line = event.lineno ?? 0;
+  const column = event.colno ?? 0;
+  return `${event.filename}:${line}:${column}`;
 }

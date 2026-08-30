@@ -56,14 +56,28 @@ function createMockCanvas(width = 800, height = 600): CanvasHost {
  */
 function createFakeWorkerGlobal() {
   const sent: RuntimeToShellMessage[] = [];
+  const listeners = new Map<string, (event: unknown) => void>();
   const host = {
     onmessage: null as ((event: MessageEvent<ShellToRuntimeMessage>) => void) | null,
-    postMessage: (message: RuntimeToShellMessage) => sent.push(message)
+    postMessage: (message: RuntimeToShellMessage) => sent.push(message),
+    // What the worker installs to catch what no message handler can
+    // see; a test fires one by calling the recorded listener.
+    addEventListener: (type: string, listener: (event: never) => void) => {
+      listeners.set(type, listener as (event: unknown) => void);
+    }
   };
   const send = (message: ShellToRuntimeMessage): void => {
     host.onmessage?.({ data: message } as MessageEvent<ShellToRuntimeMessage>);
   };
-  return { host, sent, send };
+  /** Fires one of the listeners the worker installed on its global. */
+  const emit = (type: 'error' | 'unhandledrejection', event: unknown): void => {
+    const listener = listeners.get(type);
+    if (listener === undefined) {
+      throw new Error(`No '${type}' listener was installed on the worker global.`);
+    }
+    listener(event);
+  };
+  return { host, sent, send, emit };
 }
 
 const clicks: string[] = [];
@@ -85,6 +99,19 @@ class WorkerRoot extends Component {
         }
       })
     );
+  }
+}
+
+@Define('broken-listener-root')
+class BrokenListenerRoot extends Component {
+  override render() {
+    return Box({
+      width: 200,
+      height: 100,
+      onClick: () => {
+        throw new Error('handler exploded');
+      }
+    });
   }
 }
 
@@ -171,6 +198,63 @@ describe('RenderWorkerApp', () => {
     const error = sent.find(m => m.type === 'error');
     expect(error).toBeDefined();
     expect(error && 'message' in error && error.message).toBe('render exploded');
+    // Thrown while handling init, so the app is broken but nothing was
+    // half-applied — which is a different sentence from `uncaught`.
+    expect(error && 'source' in error && error.source).toBe('message');
+  });
+
+  it('reports what threw outside a message, which is where a frame throws', () => {
+    const { host, sent, emit } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+
+    // A component that throws while rendering throws into the timer
+    // task that armed the frame, never into `receive`. Without this
+    // listener the page hears nothing at all.
+    emit('error', { error: new Error('frame exploded'), message: 'Uncaught Error: frame exploded' });
+
+    const error = sent.find(m => m.type === 'error');
+    expect(error && 'message' in error && error.message).toBe('frame exploded');
+    expect(error && 'source' in error && error.source).toBe('uncaught');
+    expect(error && 'stack' in error && typeof error.stack).toBe('string');
+  });
+
+  it('keeps the location when the engine did not keep the error', () => {
+    const { host, sent, emit } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+
+    emit('error', { message: 'Script error.', filename: 'http://host/worker.js', lineno: 12, colno: 5 });
+
+    const error = sent.find(m => m.type === 'error');
+    expect(error && 'message' in error && error.message).toBe('Script error. (http://host/worker.js:12:5)');
+  });
+
+  it('reports a listener that threw, which the dispatcher swallows', () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(BrokenListenerRoot), host);
+    send(initMessage(createMockCanvas()));
+
+    send({ type: 'pointerDown', x: 40, y: 40, buttons: 1, modifiers: noKeyModifiers });
+    send({ type: 'pointerUp', x: 40, y: 40, buttons: 0, modifiers: noKeyModifiers });
+
+    // The dispatch has to continue past a broken listener, so nothing
+    // rethrows and neither `receive` nor the global handler ever sees
+    // this one. Before it was reported, an `onClick` that threw inside
+    // a render worker was invisible to the page entirely.
+    const error = sent.find(m => m.type === 'error');
+    expect(error && 'message' in error && error.message).toContain('handler exploded');
+    expect(error && 'source' in error && error.source).toBe('listener');
+    expect(error && 'stack' in error && typeof error.stack).toBe('string');
+  });
+
+  it('reports a rejected promise nobody handled', () => {
+    const { host, sent, emit } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+
+    emit('unhandledrejection', { reason: new Error('load failed') });
+
+    const error = sent.find(m => m.type === 'error');
+    expect(error && 'message' in error && error.message).toBe('load failed');
+    expect(error && 'source' in error && error.source).toBe('uncaught');
   });
 
   it('ignores input that arrives before init', () => {
