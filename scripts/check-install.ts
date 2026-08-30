@@ -37,7 +37,7 @@ import { join } from 'node:path';
 
 import { DevTools, findChrome, openPage, waitFor } from './lib/devtools.ts';
 
-const PACKAGES = ['core', 'framework', 'components', 'testing'];
+const PACKAGES = ['core', 'framework', 'components', 'testing', 'devtools'];
 const PREVIEW_PORT = 5188;
 const DEVTOOLS_PORT = 9338;
 const root = join(import.meta.dirname, '..');

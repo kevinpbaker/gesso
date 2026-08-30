@@ -41,7 +41,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join, relative } from 'node:path';
 
 /** The publishable packages, in the order the report should read. */
-const PACKAGES = ['core', 'framework', 'components', 'testing'];
+const PACKAGES = ['core', 'framework', 'components', 'testing', 'devtools'];
 
 const root = join(import.meta.dirname, '..');
 const update = process.argv.includes('--update');
