@@ -3,10 +3,11 @@
  *
  * "`npm install @gesso/framework` in a fresh Vite project runs the
  * counter example." This script is that sentence, executed: it packs the
- * three publishable packages into tarballs, installs them into a copy of
+ * publishable packages into tarballs, installs them into a copy of
  * `examples/counter` with npm, typechecks that project against the
- * published declarations, builds it with Vite, serves the build, and
- * drives it in headless Chrome until the counter counts.
+ * published declarations, runs its vitest suite, builds it with Vite,
+ * serves the build, and drives it in headless Chrome until the counter
+ * counts.
  *
  * What each step is actually for:
  *
@@ -20,6 +21,11 @@
  *     screenshots: the count is painted, so there is no DOM to assert on,
  *     and a checksum over the pixels is the honest way to say "this
  *     repainted after a key".
+ *   - `vitest run` in the example is F7's half of the same idea: the
+ *     point of `@gesso/testing` is that somebody outside this workspace
+ *     can test a component with it, and only an install proves that.
+ *     Nothing else here resolves it any way but through a workspace
+ *     link.
  *
  *   node scripts/check-install.ts           # pack, install, build, run
  *   node scripts/check-install.ts --keep    # leave the temp project behind
@@ -31,7 +37,7 @@ import { join } from 'node:path';
 
 import { DevTools, findChrome, openPage, waitFor } from './lib/devtools.ts';
 
-const PACKAGES = ['core', 'framework', 'components'];
+const PACKAGES = ['core', 'framework', 'components', 'testing'];
 const PREVIEW_PORT = 5188;
 const DEVTOOLS_PORT = 9338;
 const root = join(import.meta.dirname, '..');
@@ -144,10 +150,15 @@ async function main(): Promise<void> {
     const manifestPath = join(app, 'package.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
       dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
     };
-    for (const [name, tarball] of tarballs) {
-      if (manifest.dependencies[name] !== undefined) {
-        manifest.dependencies[name] = `file:${tarball}`;
+    // Both lists: `@gesso/testing` is a dev dependency of a consumer, as
+    // it is of anyone who tests components rather than shipping them.
+    for (const list of [manifest.dependencies, manifest.devDependencies]) {
+      for (const [name, tarball] of tarballs) {
+        if (list[name] !== undefined) {
+          list[name] = `file:${tarball}`;
+        }
       }
     }
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -157,6 +168,9 @@ async function main(): Promise<void> {
 
     console.log('typechecking the example against the published types…');
     run('npx', ['tsc', '--noEmit'], app);
+
+    console.log("running the example's component tests through @gesso/testing…");
+    run('npx', ['vitest', 'run'], app);
 
     console.log('building the example…');
     run('npx', ['vite', 'build', '--logLevel', 'warn'], app);

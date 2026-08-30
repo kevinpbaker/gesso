@@ -12,7 +12,11 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
-    // Sibling git worktrees under .claude/ carry their own copies of the suite.
-    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**']
+    // Sibling git worktrees under .claude/ carry their own copies of the
+    // suite. `examples/` is excluded for a different reason: it is not a
+    // workspace package, so its imports of `@gesso/*` resolve to nothing
+    // here — they are meant to resolve to installed tarballs, which is
+    // exactly what `pnpm check:install` sets up and runs them in.
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', 'examples/**']
   }
 });
