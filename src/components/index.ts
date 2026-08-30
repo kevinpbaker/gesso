@@ -17,6 +17,18 @@ export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';
 export { TextInput, TextArea, type TextInputProps, type TextAreaProps } from './TextInput';
 export { Slider, type SliderProps } from './Slider';
 export { NumberInput, type NumberInputProps } from './NumberInput';
+export { Card, Divider, Toolbar, Tabs, Accordion } from './Structure';
+export type {
+  CardProps,
+  DividerProps,
+  ToolbarProps,
+  TabsProps,
+  TabDefinition,
+  AccordionProps,
+  AccordionSection
+} from './Structure';
+export { SplitPane, type SplitPaneProps } from './SplitPane';
+export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
 export { Select, type SelectProps, type SelectOption } from './Select';
