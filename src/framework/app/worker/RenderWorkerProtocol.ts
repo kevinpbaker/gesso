@@ -25,6 +25,19 @@ export type ShellToRuntimeMessage =
        * presses are all there is.
        */
       textInput?: 'proxy' | 'keys';
+      /**
+       * One end of a channel to the application worker, when the shell
+       * spawned one.
+       *
+       * The shell creates both workers and wires them together once,
+       * then stays out of the way — it never sees a patch. Owning the
+       * spawn rather than letting the render worker nest a worker
+       * inside itself keeps the application alive across a render
+       * worker being replaced (a renderer switch), and avoids
+       * depending on nested worker support, which is not uniform
+       * across the webviews this project targets.
+       */
+      appPort?: MessagePort;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
   | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }

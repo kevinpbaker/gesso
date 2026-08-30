@@ -45,12 +45,21 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework', metrics: true });
   const inspectorPanel = mountInspectorPanel(shell.preview);
   let inspecting = false;
+  // Spawned once for the route, not once per mount. Switching renderer
+  // below disposes the app and builds a new one; an application worker
+  // owned by that lifetime would restart for a reason that has nothing
+  // to do with the application. Written out literally so the bundler
+  // emits a chunk for it.
+  const applicationWorker = new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' });
 
   const start = (renderer: RendererChoice): { dispose: () => void; setInspector(enabled: boolean): void } => {
     const report = createFrameReporter(shell, 'Render worker', renderer);
     const app = createApp({
       // Written out literally so the bundler can see and split it.
       worker: () => new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module' }),
+      // Handed over rather than spawned here, so it survives the
+      // renderer switch: what WorkerApp is given, it leaves alone.
+      appWorker: applicationWorker,
       renderer,
       // The app has a find bar, so it takes Ctrl/Cmd+F; the browser's
       // own cannot see a canvas anyway.
@@ -85,6 +94,8 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
 
   return () => {
     app.dispose();
+    // Ours to stop, since the route spawned it.
+    applicationWorker.terminate();
     inspectorPanel.dispose();
     shell.dispose();
   };

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { isPortHandshake, servePorts, workerHandle, type PortHost } from './WorkerPorts';
+import { isPortHandshake, portHandle, servePorts, workerHandle, type PortHost } from './WorkerPorts';
 
 /**
  * A Worker stand-in that delivers what it is posted to a PortHost,
@@ -137,7 +137,10 @@ describe('workerHandle', () => {
     expect(other).toHaveBeenCalledTimes(1);
   });
 
-  it('restores the previous handler when it stops serving', () => {
+  it('stops serving without cutting off the handler it wrapped', () => {
+    // Identity is not restored — a base handler sits underneath every
+    // chain, owning hub routing and the unserved-name answer — so the
+    // guarantee is behavioural: whatever was listening still hears.
     const host: PortHost = { onmessage: null };
     const original = vi.fn();
     host.onmessage = original;
@@ -147,7 +150,38 @@ describe('workerHandle', () => {
       host
     );
     stop();
-    expect(host.onmessage).toBe(original);
+    host.onmessage?.({ data: { type: 'not-a-handshake' } });
+    expect(original).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes handshakes arriving on a hub port through the whole chain', async () => {
+    // The shell owns the application worker and hands the render
+    // worker a port to it, so handshakes reach a worker two ways.
+    const host: PortHost = { onmessage: null };
+    servePorts(
+      (key, port) => {
+        if (key !== 'ticker') {
+          return false;
+        }
+        port.onmessage = event => port.postMessage(`ticker:${String(event.data)}`);
+        return true;
+      },
+      () => ['ticker'],
+      host
+    );
+
+    const hub = new MessageChannel();
+    host.onmessage?.({ data: { type: 'nodal:hub' }, ports: [hub.port2] });
+
+    const client = portHandle(hub.port1 as unknown as { postMessage(m: unknown, t: Transferable[]): void }).open(
+      'ticker'
+    );
+    const reply = new Promise<unknown>(resolve => {
+      client.onmessage = event => resolve(event.data);
+    });
+    client.postMessage('hello');
+
+    expect(await reply).toBe('ticker:hello');
   });
 
   it('rejects a handshake with no port attached', () => {

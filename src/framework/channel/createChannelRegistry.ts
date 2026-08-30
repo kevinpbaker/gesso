@@ -79,8 +79,10 @@ export function createChannelRegistry(
     } else {
       if (registration.source === undefined) {
         throw new Error(
-          `Channel '${token.name}' was registered with neither a worker nor a source. ` +
-            `Pass source to feed it from this thread, or worker to attach one that owns its data.`
+          `Channel '${token.name}' was registered with neither a worker nor a source, ` +
+            `and no application worker was supplied to serve it. Pass appWorker to createApp ` +
+            `to spawn one, source to feed the channel from this thread, or worker to name a ` +
+            `worker of its own.`
         );
       }
       const pair = new MessageChannel();

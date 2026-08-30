@@ -10,7 +10,10 @@ export { diffProjection, applyPatch, applyPatches, type Patch, type PatchPath } 
 export { exposeStore, serveStores, ExposedStore } from './store/worker/exposeStore';
 export {
   workerHandle,
+  portHandle,
   servePorts,
+  APPLICATION_WORKER,
+  isPortErrorMessage,
   isPortHandshake,
   type WorkerHandle,
   type PortHost,

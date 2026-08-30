@@ -7,7 +7,7 @@ import {
   type RegistryHandle,
   type StoreRegistration
 } from '../../store/worker/createStoreRegistry';
-import type { WorkerHandle } from '../../worker/WorkerPorts';
+import { APPLICATION_WORKER, portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import {
   createChannelRegistry,
   type ChannelRegistration,
@@ -57,6 +57,8 @@ export class RenderWorkerApp {
   private runtime: NodalRuntime | undefined;
   private registry: RegistryHandle | undefined;
   private channels: ChannelRegistryHandle | undefined;
+  /** The shell's port to the application worker, if there is one. */
+  private appWorker: WorkerHandle | undefined;
 
   constructor(root: FrameworkChild | ComponentType, host: WorkerGlobal = self as unknown as WorkerGlobal) {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
@@ -95,7 +97,7 @@ export class RenderWorkerApp {
    */
   useChannel<V extends object, C extends object>(
     token: ChannelToken<V, C>,
-    options: { worker?: WorkerHandle | (() => Worker); source?: ChannelSource<V, C> }
+    options: { worker?: WorkerHandle | (() => Worker); source?: ChannelSource<V, C> } = {}
   ): this {
     if (this.runtime !== undefined) {
       throw new Error(`Channel '${token.name}' was registered after the runtime started.`);
@@ -129,6 +131,10 @@ export class RenderWorkerApp {
 
   private dispatch(message: ShellToRuntimeMessage): void {
     if (message.type === 'init') {
+      // The shell's channel to the application worker, when it spawned
+      // one. Held before initialize, because the channels registered
+      // without a worker of their own are opened over it there.
+      this.appWorker = message.appPort === undefined ? undefined : portHandle(message.appPort);
       this.initialize(message.canvas, message.width, message.height, message.dpr, message.renderer);
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
@@ -212,6 +218,20 @@ export class RenderWorkerApp {
     }
   }
 
+  /**
+   * Swaps the `APPLICATION_WORKER` placeholder for the shell's port.
+   *
+   * Registrations run before `init`, so a registration naming the
+   * application worker can only name a stand-in; this is where it
+   * becomes real. Anything else is left exactly as registered.
+   */
+  private resolveWorker<T extends { worker?: WorkerHandle | (() => Worker) }>(registration: T): T {
+    if (registration.worker !== APPLICATION_WORKER) {
+      return registration;
+    }
+    return { ...registration, worker: this.appWorker };
+  }
+
   private initialize(
     canvas: OffscreenCanvas,
     width: number,
@@ -222,12 +242,26 @@ export class RenderWorkerApp {
     this.runtime?.dispose();
     this.registry?.dispose();
     this.channels?.dispose();
-    this.registry = createStoreRegistry(this.registrations, (storeName, message, stack) => {
-      this.host.postMessage({ type: 'error', message: `store ${storeName}: ${message}`, stack });
-    });
-    this.channels = createChannelRegistry(this.channelRegistrations, (channelName, message, stack) => {
-      this.host.postMessage({ type: 'error', message: `channel ${channelName}: ${message}`, stack });
-    });
+    this.registry = createStoreRegistry(
+      this.registrations.map(registration => this.resolveWorker(registration)),
+      (storeName, message, stack) => {
+        this.host.postMessage({ type: 'error', message: `store ${storeName}: ${message}`, stack });
+      }
+    );
+    this.channels = createChannelRegistry(
+      // A channel registered with neither a worker nor a source is
+      // served by whatever the shell spawned. Naming no worker is the
+      // common case: an application has one application worker, and
+      // repeating that at every registration says nothing.
+      this.channelRegistrations.map(registration =>
+        registration.worker === undefined && registration.source === undefined
+          ? { ...registration, worker: this.appWorker }
+          : this.resolveWorker(registration)
+      ),
+      (channelName, message, stack) => {
+        this.host.postMessage({ type: 'error', message: `channel ${channelName}: ${message}`, stack });
+      }
+    );
     this.runtime = new NodalRuntime({
       root: this.root,
       canvas,

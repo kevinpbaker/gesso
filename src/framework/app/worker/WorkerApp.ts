@@ -38,6 +38,28 @@ export interface WorkerAppOptions {
    * copy had already fallen a field behind the real thing once.
    */
   onFrame?: (metrics: FrameMetrics) => void;
+  /**
+   * Spawns the application worker: api, persistence, domain and view
+   * models, published as channels.
+   *
+   * The shell creates it, hands the render worker a port to it, and
+   * then has nothing more to do with it — no patch ever crosses this
+   * thread. Owning the spawn is bootstrap wiring, not a running
+   * responsibility, and it buys two things: the application survives
+   * the render worker being replaced, and nothing depends on a worker
+   * being able to spawn a worker.
+   *
+   * A factory rather than a URL, for the same reason `worker` is one.
+   *
+   * Pass an already-running `Worker` to keep it across a remount. The
+   * app is disposed and rebuilt whenever the *rendering* changes — the
+   * playground's Canvas2D/WebGPU switch does exactly that — and an
+   * application worker spawned here would go with it, discarding
+   * application state for a reason that had nothing to do with the
+   * application. What this class spawned, it terminates; what it was
+   * handed, it leaves alone.
+   */
+  appWorker?: Worker | (() => Worker) | URL | string;
   /** Receives errors thrown inside the render worker. Defaults to console.error. */
   onError?: (message: string, stack?: string) => void;
   /**
@@ -72,6 +94,9 @@ export class WorkerApp {
   private readonly options: WorkerAppOptions;
 
   private worker: Worker | undefined;
+  private applicationWorker: Worker | undefined;
+  /** True only when this class spawned the application worker. */
+  private ownsApplicationWorker = false;
   private canvas: HTMLCanvasElement | undefined;
   private host: HTMLElement | undefined;
   private resizeObserver: ResizeObserver | null = null;
@@ -123,6 +148,22 @@ export class WorkerApp {
     // `contentRect` and so already agreed with this measurement; the
     // first frame was the only one that did not.
     const { width, height } = measure(canvas, element);
+    const transfer: Transferable[] = [offscreen];
+    let appPort: MessagePort | undefined;
+    if (this.options.appWorker !== undefined) {
+      const spec = this.options.appWorker;
+      const given = typeof spec === 'object' && spec instanceof Worker;
+      const application = given ? spec : typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
+      this.applicationWorker = application;
+      this.ownsApplicationWorker = !given;
+      // One channel between the two workers. The shell holds neither
+      // end afterwards, so it cannot be in the way of a patch even by
+      // accident.
+      const hub = new MessageChannel();
+      application.postMessage({ type: 'nodal:hub' }, [hub.port2]);
+      appPort = hub.port1;
+      transfer.push(hub.port1);
+    }
     worker.postMessage(
       {
         type: 'init',
@@ -132,9 +173,10 @@ export class WorkerApp {
         dpr: window.devicePixelRatio || 1,
         renderer: this.options.renderer,
         // Text comes through the editing proxy below, IME and all.
-        textInput: 'proxy'
+        textInput: 'proxy',
+        appPort
       } as ShellToRuntimeMessage,
-      [offscreen]
+      transfer
     );
 
     this.observeResize(element);
@@ -196,6 +238,11 @@ export class WorkerApp {
       this.worker.terminate();
       this.worker = undefined;
     }
+    if (this.ownsApplicationWorker) {
+      this.applicationWorker?.terminate();
+    }
+    this.applicationWorker = undefined;
+    this.ownsApplicationWorker = false;
     if (this.canvas !== undefined && this.canvas.parentElement === this.host) {
       this.host?.removeChild(this.canvas);
     }

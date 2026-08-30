@@ -54,6 +54,132 @@ export interface WorkerHandle {
 }
 
 /**
+ * Stands for "whichever worker the shell spawned for the application".
+ *
+ * A registration inside the render worker cannot name that worker: it
+ * is created by the shell and its port only arrives with `init`, long
+ * after `useStore` and `useChannel` have run. This sentinel is what a
+ * registration puts there instead, and the render worker swaps it for
+ * the real handle once the port shows up.
+ *
+ * Opening a port on it before then is a bug rather than a race, so it
+ * says so.
+ */
+export const APPLICATION_WORKER: WorkerHandle = {
+  open(): MessagePort {
+    throw new Error(
+      'APPLICATION_WORKER was used directly. It is a placeholder the render worker ' +
+        "replaces with the shell's port; reaching it means no application worker was supplied — " +
+        'pass appWorker to createApp.'
+    );
+  },
+  spawned: false,
+  terminate(): void {}
+};
+
+/**
+ * Anything a handshake can be posted to with a port attached.
+ * `Worker` and `MessagePort` both satisfy it.
+ */
+export interface TransferTarget {
+  postMessage(message: unknown, transfer: Transferable[]): void;
+}
+
+/**
+ * A handle over an endpoint someone else owns.
+ *
+ * The shell spawns the application worker and hands the render worker
+ * one end of a channel to it; this is what the render worker opens
+ * named ports over. `terminate` is a no-op — the lifetime belongs to
+ * whoever created the endpoint, and a handle that could kill a worker
+ * it did not spawn would be a surprising thing to hand out.
+ */
+export function portHandle(endpoint: TransferTarget): WorkerHandle {
+  return {
+    open(key: string): MessagePort {
+      const channel = new MessageChannel();
+      endpoint.postMessage({ type: 'nodal:port', key } satisfies PortHandshake, [channel.port2]);
+      return channel.port1;
+    },
+    get spawned(): boolean {
+      return true;
+    },
+    terminate(): void {}
+  };
+}
+
+/**
+ * Routes handshakes arriving on a transferred port through the same
+ * handlers as the worker's own global channel.
+ *
+ * The shell owns the application worker and gives the render worker a
+ * port to it, so handshakes reach this worker two ways: on its global
+ * channel (whoever spawned it) and on that port (whoever was given
+ * it). Both should be served by the same handlers, and neither end
+ * should have to know which route a channel came in on.
+ */
+export interface HubMessage {
+  type: 'nodal:hub';
+}
+
+export function isHubMessage(value: unknown): value is HubMessage {
+  return (value as { type?: unknown } | null)?.type === 'nodal:hub';
+}
+
+const BASE_INSTALLED = Symbol.for('nodal:port-base-installed');
+
+/**
+ * The handler every `servePorts` chain sits on top of.
+ *
+ * It owns the two things no individual server can: routing a hub port
+ * through the whole chain, and answering a handshake that nobody
+ * accepted. Both have to be innermost — the first because the chain is
+ * only complete once every server has wrapped `onmessage`, the second
+ * because "nobody accepted" is only known after every server has
+ * declined.
+ */
+function installBase(host: PortHost & { [BASE_INSTALLED]?: boolean }): void {
+  if (host[BASE_INSTALLED] === true) {
+    return;
+  }
+  host[BASE_INSTALLED] = true;
+  const previous = host.onmessage;
+  const registered = (host as HostWithNames)[SERVED_NAMES] ?? [];
+
+  host.onmessage = event => {
+    if (isHubMessage(event.data)) {
+      const port = event.ports?.[0];
+      if (port === undefined) {
+        throw new Error('A hub message arrived with no port attached.');
+      }
+      // The whole chain, not just this handler: by now every
+      // `servePorts` on this host has wrapped `onmessage`, and a
+      // handshake arriving on the port should reach all of them.
+      port.onmessage = host.onmessage;
+      return;
+    }
+    if (!isPortHandshake(event.data)) {
+      previous?.(event);
+      return;
+    }
+    const port = event.ports?.[0];
+    if (port === undefined) {
+      throw new Error(`Port handshake for '${event.data.key}' arrived with no port attached.`);
+    }
+    // Reaching here means every server declined. Silence would leave
+    // the client waiting forever with nothing said.
+    const served = registered.flatMap(get => [...get()]).sort();
+    const error: PortErrorMessage = {
+      type: 'port:error',
+      message: `Nothing is served under '${event.data.key}'. This worker serves: ${
+        served.length > 0 ? served.join(', ') : '(nothing)'
+      }.`
+    };
+    port.postMessage(error);
+  };
+}
+
+/**
  * Wraps a worker factory so the worker is created once and shared.
  *
  * A factory rather than a URL for the same reason the render worker
@@ -146,6 +272,10 @@ export function servePorts(
   const withNames = host as HostWithNames;
   const registered = (withNames[SERVED_NAMES] ??= []);
   registered.push(names);
+  // Before this handler wraps `onmessage`, so the base ends up
+  // innermost: it answers a handshake only once every server above it
+  // has declined.
+  installBase(host);
 
   const previous = host.onmessage;
   host.onmessage = event => {
@@ -162,18 +292,9 @@ export function servePorts(
     if (onPort(event.data.key, port)) {
       return;
     }
-    if (previous !== null) {
-      previous(event);
-      return;
-    }
-    const served = registered.flatMap(get => [...get()]).sort();
-    const error: PortErrorMessage = {
-      type: 'port:error',
-      message: `Nothing is served under '${event.data.key}'. This worker serves: ${
-        served.length > 0 ? served.join(', ') : '(nothing)'
-      }.`
-    };
-    port.postMessage(error);
+    // Declined. Another server may take it; the base answers if none
+    // does.
+    previous?.(event);
   };
   return () => {
     host.onmessage = previous;
