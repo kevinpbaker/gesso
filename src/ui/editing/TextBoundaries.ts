@@ -9,10 +9,16 @@
  * treats letters, digits and underscore as word characters.
  */
 
+interface Segment {
+  index: number;
+  segment: string;
+  isWordLike?: boolean;
+}
+
 interface Segmenter {
   segment(text: string): {
-    containing(index: number): { index: number; segment: string; isWordLike?: boolean } | undefined;
-  };
+    containing(index: number): Segment | undefined;
+  } & Iterable<Segment>;
 }
 
 const graphemes: Segmenter | null = createSegmenter('grapheme');
@@ -68,9 +74,24 @@ export function previousGraphemeStart(text: string, index: number): number {
   return index - 1;
 }
 
-/** Every caret position in `text`: 0, each grapheme boundary, `text.length`. */
+/**
+ * Every caret position in `text`: 0, each grapheme boundary,
+ * `text.length`.
+ *
+ * One pass over the segmenter rather than a `nextGraphemeEnd` per
+ * grapheme: each of those re-segments the whole string and then scans
+ * it for the offset, which makes the walk quadratic. That did not
+ * matter while only a caret move used it; the WebGPU text path asks
+ * for the boundaries of every line it draws.
+ */
 export function graphemeBoundaries(text: string): number[] {
   const boundaries = [0];
+  if (graphemes !== null) {
+    for (const segment of graphemes.segment(text)) {
+      boundaries.push(segment.index + segment.segment.length);
+    }
+    return boundaries;
+  }
   let index = 0;
   while (index < text.length) {
     index = nextGraphemeEnd(text, index);
