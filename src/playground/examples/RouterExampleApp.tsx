@@ -6,6 +6,7 @@ import { route, to, type OutletProps } from '../../framework/router/RouteDefinit
 import { RouterOutlet } from '../../framework/router/RouterOutlet';
 import { RouterService } from '../../framework/router/RouterService';
 import type { UiChild } from '../../ui/composition';
+import { darkTheme } from '../../ui/environment/UiTheme';
 
 /**
  * A routed app: three levels of nested screens, typed params, a guard,
@@ -163,11 +164,17 @@ function Action(props: Inputs<{ label: string; onPress: () => void }>) {
  * scattered through the tree, so a screen that is a parent renders its
  * child through `props.outlet` and nothing has to agree about nesting
  * twice.
+ *
+ * The dark theme is provided here and nowhere else. Every colour below
+ * this line is a palette *name* resolved against whatever theme the
+ * node inherits, so one `theme` prop on the root repaints all six
+ * screens — including the ones the outlet has not mounted yet, which
+ * inherit it when they arrive.
  */
 export function RouterExampleApp(_props: Inputs<{}>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
-    <column backgroundColor="background" x="stretch" y="stretch">
+    <column theme={darkTheme} backgroundColor="background" x="stretch" y="stretch">
       <row gap={8} y="center" padding={12} backgroundColor="surface">
         <text color="text" fontSize={14} fontWeight={600} paddingRight={8}>
           Routes
