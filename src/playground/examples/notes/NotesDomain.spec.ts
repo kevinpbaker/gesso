@@ -73,6 +73,36 @@ describe('NotesDomain', () => {
     expect(notes.find(note => note.id === 'n1')).toMatchObject({ title: 'First', updatedAt: 300 });
   });
 
+  it('opens the newest note as soon as an empty repository fills', () => {
+    // A repository that loads from disk starts empty, so there is
+    // nothing to open when the domain is constructed.
+    const repository = new InMemoryNotesRepository([]);
+    const domain = new NotesDomain(repository, () => 1000);
+    expect(latest(domain.open)).toBeNull();
+
+    repository.write(SEED);
+    expect(latest(domain.open)?.id).toBe('n1');
+  });
+
+  it('leaves a chosen note alone when the repository reloads', () => {
+    const repository = new InMemoryNotesRepository(SEED);
+    const domain = new NotesDomain(repository, () => 1000);
+    domain.select('n3');
+
+    repository.write([...SEED]);
+    expect(latest(domain.open)?.id).toBe('n3');
+  });
+
+  it('takes the next id from what exists, not from how many there are', () => {
+    // A notebook read back from disk can have gaps: delete n2 of three
+    // and reload. A counter seeded from the length would hand out an id
+    // that is already taken.
+    const repository = new InMemoryNotesRepository([SEED[0]!, SEED[2]!]);
+    const domain = new NotesDomain(repository, () => 1000);
+
+    expect(domain.create()).toBe('n4');
+  });
+
   it('ignores an edit when nothing is open', () => {
     const { domain, repository } = build([SEED[0]!]);
     domain.remove('n1');
