@@ -47,6 +47,9 @@ importers:
       '@gesso/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@gesso/devtools':
+        specifier: workspace:^
+        version: link:../../packages/devtools
       '@gesso/framework':
         specifier: workspace:^
         version: link:../../packages/framework
@@ -83,6 +86,12 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+
+  packages/devtools:
+    dependencies:
+      '@gesso/framework':
+        specifier: workspace:^
+        version: link:../framework
 
   packages/framework:
     dependencies:
