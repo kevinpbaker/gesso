@@ -72,11 +72,6 @@ export function isNodeFocusable(node: UiNode): boolean {
   return node.type === UiNodeType.Button || node.type === UiNodeType.EditableText;
 }
 
-/** Whether the node is text the user can type into. */
-export function isEditableNode(node: UiNode): boolean {
-  return node.type === UiNodeType.EditableText;
-}
-
 /**
  * Whether the user may select this node's text with the pointer.
  *
