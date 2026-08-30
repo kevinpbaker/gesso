@@ -1,5 +1,5 @@
 export { UiInputDispatcher } from './UiInputDispatcher';
-export type { UiEventListener, UiEventListenerOptions } from './UiInputDispatcher';
+export type { UiEventListener, UiEventListenerOptions, UiListenerErrorReporter } from './UiInputDispatcher';
 export {
   noKeyModifiers,
   UiBeforeInputEvent,

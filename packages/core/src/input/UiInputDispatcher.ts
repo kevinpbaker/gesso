@@ -58,8 +58,32 @@ type ListenerStore = Map<string, ListenerEntry[]>;
  * A throwing listener is reported and does not stop the rest of the
  * dispatch, matching how bindings isolate errors in UiGraph.
  */
+/**
+ * What to do with an exception a listener threw.
+ *
+ * `node` and `type` are what a report needs to be actionable, and the
+ * error keeps its stack.
+ */
+export type UiListenerErrorReporter = (error: unknown, node: UiNode, type: string) => void;
+
 export class UiInputDispatcher {
   private readonly stores = new WeakMap<UiNode, ListenerStore>();
+
+  /**
+   * Where a throwing listener is reported.
+   *
+   * The dispatch has to continue — one broken `onClick` must not stop
+   * the event reaching the rest of the tree, or stop the other
+   * listeners on the same node — so the exception is caught here and
+   * nowhere else can see it. Left unset it goes to the console, which
+   * inside a render worker is a console almost nobody opens; a runtime
+   * sets this so the failure can reach the shell instead.
+   */
+  private errorReporter: UiListenerErrorReporter | null = null;
+
+  onListenerError(reporter: UiListenerErrorReporter | null): void {
+    this.errorReporter = reporter;
+  }
 
   /**
    * Number of registered listeners per event type.
@@ -208,7 +232,11 @@ export class UiInputDispatcher {
       try {
         entry.listener(event);
       } catch (error) {
-        console.error(`UI event listener failed (${node.id}.${event.type})`, error);
+        if (this.errorReporter !== null) {
+          this.errorReporter(error, node, event.type);
+        } else {
+          console.error(`UI event listener failed (${node.id}.${event.type})`, error);
+        }
       }
     }
   }

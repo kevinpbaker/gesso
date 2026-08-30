@@ -166,6 +166,24 @@ describe('UiInputDispatcher', () => {
     boom.mockRestore();
   });
 
+  it('reports a throwing listener where a runtime can see it', () => {
+    // Caught here and nowhere else, so without this hook the failure
+    // exists only in the console of whichever thread dispatched — and
+    // in the worker configuration that is not the page's.
+    const { h, c } = setupChain();
+    const reported: string[] = [];
+    h.dispatcher.onListenerError((error, node, type) => {
+      reported.push(`${node.id}.${type}: ${(error as Error).message}`);
+    });
+    h.dispatcher.addEventListener(c, UiEventType.Click, () => {
+      throw new Error('listener exploded');
+    });
+
+    h.dispatcher.dispatch(new UiInputEvent(UiEventType.Click), c);
+
+    expect(reported).toEqual([`${c.id}.${UiEventType.Click}: listener exploded`]);
+  });
+
   it('removeEventListener stops future invocation and must match capture', () => {
     const { h, c } = setupChain();
     const listener = vi.fn();
