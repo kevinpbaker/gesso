@@ -191,6 +191,22 @@ The body runs once, like a class `render()`; the host keeps the cells fed when t
 
 Nodes carry `role`, `label`, `value` and `states`, or inherit them from the component that built them. The runtime diffs a semantics tree per frame and emits patches to the shell. An unknown `role` fails the build the way an unknown prop already does.
 
+### Testing a component without a browser
+
+`@gesso/testing` mounts a tree on a manual clock over a canvas double, with a measurer that is proportional to the font size instead of a flat lie, and queries it through the very same semantics tree the accessibility mirror hands to the platform. A control that is awkward to find in a test is a control that is awkward to find with a screen reader; there is no second definition for the two to drift apart.
+
+```ts
+const ui = renderTest(createComponent(Checkbox, { label: 'Wrap lines' }));
+
+ui.fireEvent.click(ui.getByRole('checkbox'));
+ui.frame();
+
+expect(ui.getByRole('checkbox')).toHaveSemantics({ states: ['checked'] });
+expect(ui.getByLabel('Wrap lines')).toHaveBox({ height: 24 });
+```
+
+A `toHaveBox` that misses prints `engine.explain`'s answer under it — which axis was decided by which rule, and which ancestor a change is laid out from — and a query that misses prints the semantics tree beside the node tree. Frames are yours: `ui.frame()` runs one, `ui.settle()` runs them until the tree is quiet, and `findByRole`/`findByText` drive the clock until a match appears.
+
 ### Routing
 
 Routes are declared with full paths and a `parent` pointer, so the params a screen receives are read off the path by the compiler: `route({ path: '/mail/:folder/:id', component: MessageScreen, parent: Folder })` makes `router.go(Message, { folder, id })` checkable, and a misspelled or missing param a compile error. One `RouterOutlet` renders the whole matched chain, each screen becoming the `outlet` prop of the one above it — so a layout is mounted once and stays mounted while its children change, and a navigation that changes only params re-emits nothing at all. Guards run outermost first, on urls the address bar produces as well as on navigations; a redirect pushes when the navigation came from inside the app, so Back returns to the screen you left, and replaces when the address bar had already committed to the refused url. The only thing routing puts on the wire is a url: `pushState`, the fragment, or nothing at all, whichever the window calls for.
@@ -237,8 +253,8 @@ Media, focus, animation, overlay, shell, find and the router are plain classes w
 | The patch stream bypasses main          | Measured in Chrome: with the shell busy-looped for 5000 ms, a channel fed from the app worker kept delivering patches throughout, and the render worker's frame gap was unchanged at 110 ms                                                                                | `#framework`                                             |
 | Application state outlives the renderer | Switching renderer replaces the render worker — the frame count restarts — while a channel keeps counting across the swap                                                                                                                                                  | `#framework`, renderer toggle                            |
 | Data survives a reload                  | The notes example persists through `FileSystemSyncAccessHandle` in the app worker: typing a marker and reloading brings it back, and a first run with no file writes the seed                                                                                              | `#example-notes`                                         |
-| It's tested                             | **1,822 tests** across **137 spec files**, ~6 s                                                                                                                                                                                                                            | `pnpm test:run`                                          |
-| The published packages work             | `@gesso/core`, `@gesso/framework` and `@gesso/components` are packed to tarballs, installed with npm into a fresh Vite project, typechecked against the rolled-up declarations with `skipLibCheck: false`, built, and clicked                                              | `pnpm check:install`                                     |
+| It's tested                             | **1,839 tests** across **139 spec files**, ~7 s                                                                                                                                                                                                                            | `pnpm test:run`                                          |
+| The published packages work             | All four packages are packed to tarballs, installed with npm into a fresh Vite project, typechecked against the rolled-up declarations with `skipLibCheck: false`, built, clicked in Chrome — and a component mounted and asserted through the published `@gesso/testing`  | `pnpm check:install`                                     |
 | A route cannot change silently          | Eight playground routes are captured in headless Chrome and diffed against committed baselines; 5 px of gap reads 1.718 % against a 0.1 % threshold. Six routes are uncovered, each with its reason in the script                                                          | `pnpm screenshots`                                       |
 | The public surface is reviewed          | Each package's exported declarations are committed as `packages/*/api/*.api.d.ts`; an added export fails the check as an added line                                                                                                                                        | `pnpm api:check`                                         |
 | A screen reader has something to read   | Chrome's own **computed accessibility tree** for two example routes: 31 and 41 nodes, a `switch` carrying `checked`, a `list` of `listitem`s, a `textbox` whose value is the note's text; a synthesised press reaches the app, and Tab leaves the right node focused there | `pnpm check:a11y`                                        |
@@ -312,14 +328,15 @@ One shell, switched by hash:
 
 Four workspace packages, three of them publishable:
 
-| Package             | Directory             | What it is                                                                            |
-| ------------------- | --------------------- | ------------------------------------------------------------------------------------- |
-| `@gesso/core`       | `packages/core`       | The retained graph, layout, the two renderers, input. Knows nothing about components. |
-| `@gesso/framework`  | `packages/framework`  | Components, the frame runtime, the worker barrier.                                    |
-| `@gesso/components` | `packages/components` | The component library — five tiers, one contract.                                     |
-| `@gesso/playground` | `apps/playground`     | The demo harness — the routes and one shell. Private, and not the framework.          |
+| Package             | Directory             | What it is                                                                              |
+| ------------------- | --------------------- | --------------------------------------------------------------------------------------- |
+| `@gesso/core`       | `packages/core`       | The retained graph, layout, the two renderers, input. Knows nothing about components.   |
+| `@gesso/framework`  | `packages/framework`  | Components, the frame runtime, the worker barrier.                                      |
+| `@gesso/components` | `packages/components` | The component library — five tiers, one contract.                                       |
+| `@gesso/testing`    | `packages/testing`    | `renderTest` — mount a component with no browser and query it as a screen reader would. |
+| `@gesso/playground` | `apps/playground`     | The demo harness — the routes and one shell. Private, and not the framework.            |
 
-`@gesso/core` and `@gesso/framework` each carry a second entry, `./testing`, holding the doubles and the mount harness the suites use; nothing an application builds against reaches through it. Cross-package imports go through a package's root entry, never a deep path, so `api/*.api.d.ts` reviews the whole surface rather than one file at a time.
+`@gesso/core` and `@gesso/framework` each carry a second entry, `./testing`, holding the doubles and the mount harness their own suites use; nothing an application builds against reaches through it. `@gesso/testing` is the published one — its root entry imports no test runner at all, and the vitest matchers sit behind `@gesso/testing/matchers` because `expect.extend` is a side effect on a global. Cross-package imports go through a package's root entry, never a deep path, so `api/*.api.d.ts` reviews the whole surface rather than one file at a time.
 
 Inside `packages/core/src`:
 
