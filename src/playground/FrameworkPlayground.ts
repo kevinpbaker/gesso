@@ -1,5 +1,5 @@
 import { map } from 'rxjs';
-import { Checkbox, TextInput } from '../components';
+import { Checkbox, Dialog, Menu, Select, TextInput, Toast } from '../components';
 import { FocusStore } from '../framework/app/FocusStore';
 import { darkTheme } from '../ui/environment/UiTheme';
 import { interactive } from '../ui/modifiers';
@@ -631,6 +631,121 @@ export class SignInFormDemo extends Component {
   };
 }
 
+/**
+ * The Overlays tier (roadmap C4): everything that floats.
+ *
+ * A dialog that traps the keyboard and hands it back, a select
+ * operable without a pointer, and a menu — all placed by L2's engine,
+ * so each one flips and shifts at the edge of the viewport on its own.
+ */
+@Define('overlay-tier-demo')
+export class OverlayTierDemo extends Component {
+  @State() dialogOpen = state(false);
+  @State() menuOpen = state(false);
+  @State() payment = state('card');
+  @State() toastOpen = state(false);
+  @State() lastCommand = state('nothing yet');
+
+  private menuAnchor: UiNode | null = null;
+
+  override render(): UiElement {
+    return Column(
+      {
+        width: 340,
+        padding: 16,
+        gap: 10,
+        theme: darkTheme,
+        backgroundColor: 'surface',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'border'
+      },
+      Text({ text: 'Overlays (C4)', color: 'text', fontSize: 16, fontWeight: 600 }),
+      createComponent(Select, {
+        label: 'Payment',
+        value: this.payment,
+        onChange: (value: string) => (this.payment.value = value),
+        options: [
+          { value: 'card', label: 'Card' },
+          { value: 'bank', label: 'Bank transfer' },
+          { value: 'cash', label: 'Cash', disabled: true }
+        ]
+      }),
+      Row(
+        { gap: 8, y: 'center' },
+        Button({
+          text: 'Open dialog',
+          padding: 8,
+          borderRadius: 6,
+          backgroundColor: 'controlAccent',
+          color: 'controlBackground',
+          onClick: () => (this.dialogOpen.value = true)
+        }),
+        Button({
+          ref: (node: UiNode | null) => (this.menuAnchor = node),
+          text: 'Actions',
+          padding: 8,
+          borderRadius: 6,
+          backgroundColor: 'controlBackground',
+          color: 'controlForeground',
+          borderWidth: 1,
+          borderColor: 'controlBorder',
+          onClick: () => (this.menuOpen.value = !this.menuOpen.value)
+        })
+      ),
+      Text({ text: this.lastCommand.pipe(map(text => `Last: ${text}`)), color: 'textMuted', fontSize: 12 }),
+      createComponent(Dialog, {
+        open: this.dialogOpen,
+        title: 'Delete this note?',
+        description: 'Tab stays inside; Escape closes and the button that opened it takes the caret back.',
+        onClose: () => (this.dialogOpen.value = false),
+        content: Row(
+          { gap: 8 },
+          Button({
+            text: 'Cancel',
+            padding: 8,
+            borderRadius: 6,
+            backgroundColor: 'controlBackground',
+            color: 'controlForeground',
+            borderWidth: 1,
+            borderColor: 'controlBorder',
+            onClick: () => (this.dialogOpen.value = false)
+          }),
+          Button({
+            text: 'Delete',
+            padding: 8,
+            borderRadius: 6,
+            backgroundColor: 'danger',
+            color: 'controlBackground',
+            onClick: () => {
+              this.lastCommand.value = 'deleted';
+              this.dialogOpen.value = false;
+              this.toastOpen.value = true;
+            }
+          })
+        )
+      }),
+      createComponent(Menu, {
+        open: this.menuOpen,
+        anchor: this.menuAnchor,
+        label: 'Actions',
+        items: [
+          { value: 'rename', label: 'Rename' },
+          { value: 'duplicate', label: 'Duplicate' },
+          { value: 'archive', label: 'Archive', disabled: true }
+        ],
+        onSelect: (value: string) => (this.lastCommand.value = value),
+        onOpenChange: (open: boolean) => (this.menuOpen.value = open)
+      }),
+      createComponent(Toast, {
+        open: this.toastOpen,
+        message: 'Note deleted',
+        onClose: () => (this.toastOpen.value = false)
+      })
+    );
+  }
+}
+
 @Define('scroll-demo')
 export class ScrollDemo extends Component {
   override render(): UiElement {
@@ -940,6 +1055,7 @@ export class FrameworkDemoRoot extends Component {
       Box({ width: 120, height: 120, backgroundColor: '#f59e0b', borderRadius: 8 }),
       createComponent(ModifierDemo),
       createComponent(SignInFormDemo),
+      createComponent(OverlayTierDemo),
       createComponent(TextShowcase),
       createComponent(TextFieldDemo),
       createComponent(LocalCounter),
