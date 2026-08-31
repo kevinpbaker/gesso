@@ -149,6 +149,7 @@ declare abstract class UiAnimation<T> {
   protected constructor(cell: AnimatedCell<T>, stepMs: number, reducedMotionPolicy: UiReducedMotionPolicy, delayMs?: number);
   get values(): Observable<T>;
   get isFinished(): boolean;
+  get dueSlackMs(): number;
   dueAt(now: number): number;
   protected abstract sample(now: number, elapsedMs: number): {
     value: T;
@@ -1919,6 +1920,7 @@ declare class NodeTransitions implements UiNodeTransitions {
   private startAnimation;
 }
 declare function resetTransitionWarnings(): void;
+type FocusSource = 'pointer' | 'keyboard' | 'program';
 declare class UiFocusManager {
   private readonly dispatcher;
   private root;
@@ -1932,8 +1934,8 @@ declare class UiFocusManager {
   hasFocus(): boolean;
   get scopeRoot(): UiNode;
   get trapped(): boolean;
-  focus(node: UiNode): boolean;
-  onFocusChange(listener: (node: UiNode | null) => void): () => void;
+  focus(node: UiNode, source?: FocusSource): boolean;
+  onFocusChange(listener: (node: UiNode | null, source: FocusSource) => void): () => void;
   onScopeChange(listener: () => void): () => void;
   private notify;
   private notifyScope;
@@ -2221,6 +2223,10 @@ interface UiTimerFrameClockOptions {
   intervalMs?: number;
   now?: () => UiFrameTime;
 }
+interface UiHostFrameClockOptions {
+  fallbackMs?: number;
+  now?: () => UiFrameTime;
+}
 declare class UiTimerFrameClock implements UiFrameClock {
   private readonly onFrame;
   private readonly intervalMs;
@@ -2229,6 +2235,25 @@ declare class UiTimerFrameClock implements UiFrameClock {
   constructor(onFrame: (time: UiFrameTime) => void, options?: UiTimerFrameClockOptions);
   requestFrame(): void;
   cancelFrame(): void;
+}
+declare class UiHostFrameClock implements UiFrameClock {
+  private readonly onFrame;
+  private readonly onActive;
+  private pending;
+  private active;
+  private hosted;
+  private idleTicks;
+  private handle;
+  private readonly fallbackMs;
+  private readonly now;
+  constructor(onFrame: (time: UiFrameTime) => void,
+  onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
+  requestFrame(): void;
+  cancelFrame(): void;
+  private clearFallback;
+  private deliver;
+  tick(time: UiFrameTime): void;
+  private setActive;
 }
 declare class UiManualFrameClock implements UiFrameClock {
   private onFrame;
@@ -2680,6 +2705,7 @@ interface SharedElementArgs extends MotionTiming {
   readonly name: string;
   readonly morph?: 'transform' | 'geometry';
   readonly fadeFrom?: number;
+  readonly onMorph?: (morphing: boolean) => void;
 }
 declare const sharedElement: ((args: SharedElementArgs, key?: string | number) => UiModifier<SharedElementArgs>) & {
   readonly kind: UiModifierKind<SharedElementArgs>;
@@ -2689,6 +2715,7 @@ interface VideoPlayback {
   readonly width: number;
   readonly height: number;
   readonly duration: number;
+  readonly frameDurationMs: number;
   present(positionMs: number): boolean;
   onError(listener: (error: unknown) => void): () => void;
 }
@@ -3182,6 +3209,7 @@ interface Mp4VideoTrack {
   readonly description?: Uint8Array;
   readonly samples: readonly Mp4Sample[];
   readonly durationUs: number;
+  readonly frameDurationUs: number;
 }
 declare function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack;
 type UiFrameCallback = (frame: UiFrame) => void;
@@ -3199,6 +3227,7 @@ declare class UiScheduler {
   private disposed;
   private active;
   private pending;
+  private collecting;
   private frames;
   private readonly drained;
   constructor(options: UiSchedulerOptions);
@@ -3424,6 +3453,7 @@ export {
   FocusNotifier,
   focusRing,
   FocusRingOptions,
+  FocusSource,
   FontMetrics,
   formatConstraints,
   formatExplanation,
@@ -3635,7 +3665,6 @@ export {
   rotateFrom,
   Row,
   RowProps,
-  Rs,
   RunMeasure,
   scaleFrom,
   ScissorRect,
@@ -3765,6 +3794,8 @@ export {
   UiGraphBuilder,
   UiGridAutoFlow,
   UiHitTester,
+  UiHostFrameClock,
+  UiHostFrameClockOptions,
   UiImage,
   UiInputDispatcher,
   UiInputEvent,
@@ -3872,6 +3903,7 @@ export {
   VirtualViewport,
   visualState,
   visualStatesEqual,
+  Vs,
   WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
@@ -4034,6 +4066,7 @@ import {
   FocusNotifier,
   focusRing,
   FocusRingOptions,
+  FocusSource,
   FontMetrics,
   formatConstraints,
   formatExplanation,
@@ -4375,6 +4408,8 @@ import {
   UiGraphBuilder,
   UiGridAutoFlow,
   UiHitTester,
+  UiHostFrameClock,
+  UiHostFrameClockOptions,
   UiImage,
   UiInputDispatcher,
   UiInputEvent,
@@ -4494,7 +4529,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-C_DvpXhl.js";
+} from "./index-DLs3j-tU.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4823,6 +4858,7 @@ export {
   type FlexContainerProps,
   type FlexItemProps,
   type FocusRingOptions,
+  type FocusSource,
   type FontMetrics,
   type FrLength,
   type GestureInput,
@@ -4944,6 +4980,7 @@ export {
   type UiFrameClock,
   type UiFrameClockFactory,
   type UiFrameTime,
+  type UiHostFrameClockOptions,
   type UiImage,
   type UiInterpolator,
   type UiKeyModifiers,
@@ -5028,6 +5065,7 @@ export {
   UiGraphBuilder,
   UiGridAutoFlow,
   UiHitTester,
+  UiHostFrameClock,
   UiInputDispatcher,
   UiInputEvent,
   UiKeyboardController,
@@ -5129,7 +5167,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-C_DvpXhl.js";
+} from "./index-DLs3j-tU.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

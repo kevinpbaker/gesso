@@ -887,6 +887,10 @@ type ShellToRuntimeMessage = {
 {
   type: 'semanticsAction';
   action: UiSemanticsAction;
+} |
+{
+  type: 'tick';
+  time: number;
 } | {
   type: 'dispose';
 };
@@ -937,6 +941,9 @@ type RuntimeToShellMessage = {
   url?: string;
 } |
 {
+  type: 'frameLoop';
+  running: boolean;
+} | {
   type: 'semantics';
   update: UiSemanticsUpdate;
 };
@@ -964,6 +971,7 @@ declare class WorkerApp {
   private mirror;
   private history;
   private ready;
+  private frameHandle;
   constructor(options: WorkerAppOptions);
   mount(host: HTMLElement | string): () => void;
   private handleWorkerFailure;
@@ -971,6 +979,7 @@ declare class WorkerApp {
   private forwardKeyDown;
   private forwardKeyUp;
   setInspector(enabled: boolean): void;
+  private setFrameLoop;
   dispose(): void;
   private readonly handleWorkerMessage;
   private attachHistory;
@@ -1228,6 +1237,7 @@ declare class RenderWorkerApp {
   private readonly root;
   private readonly host;
   private runtime;
+  private clock;
   private channels;
   private appLogicWorker;
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
