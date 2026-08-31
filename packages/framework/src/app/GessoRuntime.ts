@@ -77,6 +77,7 @@ import { FocusService } from './FocusService';
 import { MediaService } from './MediaService';
 import { AnimationService } from './AnimationService';
 import { InputLatencyTracker } from './InputLatency';
+import { SmoothScroller } from './SmoothScroller';
 import { ChannelRegistry } from '../channel/ChannelRegistry';
 import { ServiceRegistry } from '../service/ServiceRegistry';
 
@@ -288,6 +289,8 @@ export class GessoRuntime {
   /** Reachable before `input` is assigned, for the same reason. */
   private readonly focusManager: UiFocusManager;
   private readonly layoutNotifier: LayoutNotifier;
+  /** Animates a wheel scroll; see `SmoothScroller`. */
+  private readonly smoothScroller: SmoothScroller;
   /**
    * The running animations. Built as a field rather than in the body
    * of the constructor because the builder, the services and `buildRoot`
@@ -475,6 +478,21 @@ export class GessoRuntime {
       this.services.register(AnimationService);
     }
     this.services.get(AnimationService).setDriver(this.animations);
+    this.smoothScroller = new SmoothScroller(
+      this.graph,
+      this.services.get(AnimationService),
+      // Read fresh on every notch rather than captured: content grows,
+      // and a target clamped against yesterday's limit stops short.
+      (node, axis) => {
+        const record = this.engine.recordFor(node);
+        if (record === undefined) {
+          return 0;
+        }
+        return axis === 'scrollY'
+          ? Math.max(0, record.contentHeight - record.height)
+          : Math.max(0, record.contentWidth - record.width);
+      }
+    );
     // And the router, whose matches hold route definitions, which hold
     // component classes: it could not cross a worker boundary if it
     // wanted to. The one thing it needs from the shell is the address
@@ -523,6 +541,7 @@ export class GessoRuntime {
       // focused node with it.
       this.focusManager.handleNodeRemoved(node);
       this.layoutNotifier.handleNodeRemoved(node);
+      this.smoothScroller.handleNodeRemoved(node);
       this.focusNotifier.handleNodeRemoved(node);
       this.environmentNotifier.handleNodeRemoved(node);
     });
@@ -865,6 +884,9 @@ export class GessoRuntime {
    */
   scrollIntoView(node: UiNode, padding = 8): void {
     for (const adjustment of this.engine.revealAdjustments(node, padding)) {
+      // A reveal knows exactly where the container has to be, and a
+      // spring still running would overwrite that on its next tick.
+      this.smoothScroller.stop(adjustment.container);
       adjustment.container.setProperty('scrollX', adjustment.scrollX);
       adjustment.container.setProperty('scrollY', adjustment.scrollY);
       this.graph.markDirty(adjustment.container, DirtyFlags.Transform);
@@ -1201,6 +1223,9 @@ export class GessoRuntime {
   /** Scrolls every scroll container above `node` so a node-local box is visible. */
   private revealBox(node: UiNode, box: { x: number; y: number; width: number; height: number }): void {
     for (const adjustment of this.engine.revealAdjustments(node, 0, box)) {
+      // On every keystroke, so it must land at once: a spring here
+      // would leave the caret trailing the text being typed.
+      this.smoothScroller.stop(adjustment.container);
       adjustment.container.setProperty('scrollX', adjustment.scrollX);
       adjustment.container.setProperty('scrollY', adjustment.scrollY);
       this.graph.markDirty(adjustment.container, DirtyFlags.Transform);
@@ -1245,11 +1270,26 @@ export class GessoRuntime {
           viewportHeight: record.height
         };
       },
-      scrollBy: (node, dx, dy): void => {
+      scrollBy: (node, dx, dy, behavior): void => {
         const record = this.engine.recordFor(node);
         if (record === undefined) {
           return;
         }
+        if (behavior === 'smooth') {
+          // The smooth path adds to where the container is *going*, so
+          // it needs the effective offset only as a starting point.
+          if (dx !== 0) {
+            this.smoothScroller.scrollBy(node, 'scrollX', dx, record.scrollX);
+          }
+          if (dy !== 0) {
+            this.smoothScroller.scrollBy(node, 'scrollY', dy, record.scrollY);
+          }
+          return;
+        }
+        // An instant scroll wins over one in flight rather than racing
+        // it: a thumb drag reads the offset back on every pointer move
+        // and would chase a moving value.
+        this.smoothScroller.stop(node);
         if (dx !== 0) {
           node.setProperty('scrollX', record.scrollX + dx);
         }
@@ -1361,8 +1401,17 @@ export class GessoRuntime {
       const lead = this.collectVirtualMeasures(node, column, measures);
       const result = window.update({ scroll, extent: column ? rec.height : rec.width, lead }, measures);
       if (result.scrollAdjust !== 0) {
-        node.setProperty(column ? 'scrollY' : 'scrollX', scroll + result.scrollAdjust);
+        const axis = column ? 'scrollY' : 'scrollX';
+        node.setProperty(axis, scroll + result.scrollAdjust);
         this.graph.markDirty(node, DirtyFlags.Transform);
+        // This is a coordinate correction, not a scroll: the content
+        // above moved, so the viewport moves with it to keep the same
+        // row under the eye. A running scroll therefore has to have
+        // *both* ends shifted — the write above would otherwise be
+        // overwritten by the animation's next tick and the list would
+        // slip by this much every frame, which is the jitter anchoring
+        // exists to prevent.
+        this.smoothScroller.adjust(node, axis, result.scrollAdjust);
       }
     }
   }

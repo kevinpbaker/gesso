@@ -6,6 +6,7 @@ import {
   createTween,
   easings,
   type AnimatedCell,
+  type UiAnimation,
   type UiEasing,
   type UiReducedMotionPolicy,
   defaultMotion,
@@ -192,6 +193,19 @@ export class AnimationService {
   /** Stops whatever is driving a cell, leaving it where it stands. */
   stop<T>(cell: AnimatedCell<T>): boolean {
     return this.driver?.stop(cell) ?? false;
+  }
+
+  /**
+   * What is driving a cell, if anything.
+   *
+   * For a caller that needs to know where a movement is *going* rather
+   * than where it is — a scroll adding a wheel notch has to add it to
+   * the destination, or every notch after the first travels less than
+   * it asked for. `spring` uses the same lookup internally to carry
+   * velocity across a retarget.
+   */
+  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined {
+    return this.driver?.animationFor(cell);
   }
 
   private resolveDuration(duration: UiDuration): number {
