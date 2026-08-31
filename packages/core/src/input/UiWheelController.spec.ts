@@ -3,7 +3,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { noKeyModifiers, UiEventType, UiWheelDeltaMode, type UiKeyModifiers } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
-import type { UiWheelController } from './UiWheelController';
+import { isNotchedWheel, type UiWheelController } from './UiWheelController';
 
 /**
  * A 400x400 app root holding a 300x200 ScrollView at (0,0). The
@@ -98,6 +98,31 @@ describe('UiWheelController', () => {
     controller.wheel(50, 50, 0, 1, noKeyModifiers(), UiWheelDeltaMode.Page);
 
     expect(scrollY(h, scroll)).toBe(200);
+  });
+
+  it('counts a detent that a display scaled off a round number', () => {
+    // Real hardware, and the reason an equality test was wrong: the
+    // same mouse reports -120 on one monitor and -119 on another, with
+    // a `deltaY` of 119.99999642372141 rather than a round number,
+    // because Chrome scales a wheel delta per display and the scaled
+    // value is truncated into the legacy field. Demanding an exact
+    // multiple classified every notch on that display as a precision
+    // device, and scrolling never smoothed at all.
+    expect(isNotchedWheel(UiWheelDeltaMode.Pixel, -119)).toBe(true);
+    expect(isNotchedWheel(UiWheelDeltaMode.Pixel, -120)).toBe(true);
+    expect(isNotchedWheel(UiWheelDeltaMode.Pixel, -241)).toBe(true);
+  });
+
+  it('does not count what a precision device sends', () => {
+    // A trackpad's deltas are small and arbitrary. The half-detent
+    // floor is what keeps them out: without it, anything near zero
+    // reads as a whole number of detents.
+    for (const delta of [7, -7, 40, 60, 100, -100]) {
+      expect(isNotchedWheel(UiWheelDeltaMode.Pixel, delta)).toBe(false);
+    }
+    expect(isNotchedWheel(UiWheelDeltaMode.Pixel, undefined)).toBe(false);
+    // A delta that is not in pixels is never a precision device.
+    expect(isNotchedWheel(UiWheelDeltaMode.Line, undefined)).toBe(true);
   });
 
   it('carries the mode on the event, as the DOM does', () => {

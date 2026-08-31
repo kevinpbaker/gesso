@@ -94,11 +94,37 @@ export function isNotchedWheel(deltaMode: UiWheelDeltaMode, wheelDeltaY: number 
   if (deltaMode !== UiWheelDeltaMode.Pixel) {
     return true;
   }
-  return wheelDeltaY !== undefined && wheelDeltaY !== 0 && wheelDeltaY % NOTCH_WHEEL_DELTA === 0;
+  if (wheelDeltaY === undefined) {
+    return false;
+  }
+  const magnitude = Math.abs(wheelDeltaY);
+  // Half a detent is not one. This is what keeps a trackpad's small
+  // deltas out, since the test below would otherwise read anything
+  // near zero as a whole number of detents.
+  if (magnitude < NOTCH_WHEEL_DELTA / 2) {
+    return false;
+  }
+  const remainder = magnitude % NOTCH_WHEEL_DELTA;
+  return remainder <= NOTCH_TOLERANCE || NOTCH_WHEEL_DELTA - remainder <= NOTCH_TOLERANCE;
 }
 
 /** What a detent is worth in the legacy `wheelDelta` field. */
 const NOTCH_WHEEL_DELTA = 120;
+/**
+ * How far off a whole detent still counts as one.
+ *
+ * An exact multiple is too much to ask, and real hardware said so: the
+ * same mouse reports `wheelDeltaY` of exactly -120 on one monitor and
+ * **-119** on another, with a `deltaY` of 119.99999642372141 rather
+ * than a round number. Chrome scales a wheel delta per display, and
+ * the scaled value is truncated on its way into the legacy field. An
+ * equality test therefore classified every notch on that display as a
+ * precision device and scrolling never smoothed at all.
+ *
+ * Five percent of a detent, which is far tighter than the gap to
+ * anything a trackpad sends and loose enough for that scaling.
+ */
+const NOTCH_TOLERANCE = 6;
 
 /**
  * Routes wheel input. Dispatches a bubbling Wheel event to the node
