@@ -1,4 +1,13 @@
+import { linear } from '../animation/UiEasing';
+import type { AnimatedCell } from '../animation/UiAnimation';
 import { defineModifier } from './UiModifier';
+
+/**
+ * How long the offset has to hold still before a scroll counts as
+ * over. Long enough to bridge a gap between two wheel notches, short
+ * enough that a value persisted afterwards is not noticeably late.
+ */
+const SETTLE_MS = 120;
 
 /** How far a scroll container has been scrolled, in logical pixels. */
 export interface ScrollOffset {
@@ -9,9 +18,31 @@ export interface ScrollOffset {
 export interface ScrollPositionArgs {
   /**
    * Told whenever this container's scroll offset changes, and only
-   * then — not on every frame, and not when the container merely moved.
+   * then — not when the container merely moved.
+   *
+   * "Not on every frame" used to be part of this promise, and a
+   * smoothed wheel ended it: an animated scroll changes the offset on
+   * every frame it runs, so one notch is now ten or twenty calls
+   * rather than one. That is the honest report of what happened, and
+   * it is what a scroll-linked header or a position indicator wants.
+   * A consumer that only cares where the scrolling *stopped* wants
+   * `onSettled` instead.
    */
-  readonly onChange: (offset: ScrollOffset) => void;
+  readonly onChange?: (offset: ScrollOffset) => void;
+  /**
+   * Told once when the offset stops changing.
+   *
+   * What persisting a position wants — a route remembering where its
+   * list was — since writing that on every frame of every notch is a
+   * great deal of writing for one answer nobody reads until later.
+   *
+   * "Stops" is measured by a frame passing with the offset unchanged,
+   * because this modifier is built on layout notifications and has no
+   * view of whether an animation is running. That makes it a frame
+   * late by construction, which for a value read after the fact is
+   * free.
+   */
+  readonly onSettled?: (offset: ScrollOffset) => void;
 }
 
 /**
@@ -61,13 +92,49 @@ export const scrollPosition = defineModifier<ScrollPositionArgs>({
   name: 'scrollPosition',
   attach(host, args) {
     let last: ScrollOffset | null = null;
+    /**
+     * The settle detector: a short animation restarted on every
+     * change, whose completion means nothing changed while it ran.
+     *
+     * A frame that reports nothing cannot be observed here —
+     * `onLayout` fires on *change*, which is the whole point of it —
+     * and the last frame of a scroll is a frame where the offset
+     * changed, with nothing armed after it. So the end of a scroll has
+     * to be waited for rather than noticed, and this waits on the
+     * framework's own clock rather than a timer: it is cancelled with
+     * the node, it stops when the runtime does, and a reduced-motion
+     * app snaps it, which reports the settle immediately and is
+     * exactly right.
+     */
+    let settling = 0;
+    const settleCell: AnimatedCell<number> = {
+      get value(): number {
+        return settling;
+      },
+      set value(next: number) {
+        settling = next;
+      }
+    };
+    const armSettle = (offset: ScrollOffset): void => {
+      settling = 0;
+      host.animate(settleCell, 1, { duration: SETTLE_MS, easing: linear }).subscribe({
+        complete: () => {
+          if (settling === 1) {
+            args.onSettled?.(offset);
+          }
+        }
+      });
+    };
     host.onLayout(() => {
       const offset = host.scrollOffset();
       if (offset === null || (last !== null && last.x === offset.x && last.y === offset.y)) {
         return;
       }
       last = offset;
-      args.onChange(offset);
+      args.onChange?.(offset);
+      if (args.onSettled !== undefined) {
+        armSettle(offset);
+      }
     });
   }
 });

@@ -113,6 +113,44 @@ describe('scrollPosition', () => {
     expect(seen.map(at => at.y)).toEqual([190]);
   });
 
+  it('reports the end of a scroll once, however many frames it took', () => {
+    // What persisting a position wants. A smoothed wheel changes the
+    // offset on every frame it animates, so a route remembering where
+    // its list was would otherwise write that value ten or twenty
+    // times per notch to answer one question nobody reads until later.
+    const offset = internalState(0);
+    const changes: number[] = [];
+    const settled: number[] = [];
+    const mounted = mountRuntime(
+      ScrollView(
+        {
+          width: 200,
+          height: 100,
+          scrollY: offset,
+          modifiers: [
+            scrollPosition({
+              onChange: at => changes.push(at.y),
+              onSettled: at => settled.push(at.y)
+            })
+          ]
+        },
+        Column({ width: 200 }, Box({ width: 200, height: 600 }))
+      )
+    );
+    drain(mounted);
+    changes.length = 0;
+    settled.length = 0;
+
+    offset.value = 120;
+    drain(mounted);
+    offset.value = 260;
+    drain(mounted);
+
+    expect(changes).toEqual([120, 260]);
+    // Once per stretch of movement, not once per change.
+    expect(settled).toEqual([120, 260]);
+  });
+
   it('says nothing on a frame that only moved the container', () => {
     const height = internalState(300);
     const offset = internalState(40);
