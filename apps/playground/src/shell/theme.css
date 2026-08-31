@@ -567,6 +567,29 @@ body {
   background-position: -1px -1px;
 }
 
+/*
+ * A route that replaces the shell instead of mounting inside it.
+ *
+ * `.pg-preview` gives a route a padded, dark, grid-backed pane, which
+ * is right for a renderer demo and wrong for an application: the point
+ * of `#transitions-app` is that nothing of the playground is around
+ * it. So this is the host's full box and one colour — chalk, the
+ * ground `TransitionsExampleApp` paints, so the moment between the
+ * canvas being attached and the first frame arriving is the app's own
+ * background rather than the shell's ink.
+ *
+ * `position: relative` is load-bearing: the devtools error overlay
+ * positions itself against its host, and with a static host it would
+ * escape to the viewport.
+ */
+.pg-standalone {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--chalk);
+}
+
 .pg-preview-split {
   display: grid;
   grid-template-columns: 1fr 1fr;

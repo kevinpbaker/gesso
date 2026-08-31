@@ -114,7 +114,8 @@ const CANNOT_SETTLE: Record<string, string> = {
   'example-theme':
     'paints the time the tree was built (ThemeExampleApp: `new Date().toLocaleTimeString()`), which re-wraps the paragraph it sits in when its width changes',
   'example-transitions':
-    'plays a video: the second card decodes an MP4 continuously, so the frame on screen depends on when the shot was taken and the route never reaches a still frame'
+    'plays a video: the second card decodes an MP4 continuously, so the frame on screen depends on when the shot was taken and the route never reaches a still frame',
+  'transitions-app': 'the same example as `example-transitions`, and the same video, with the shell taken away'
 };
 
 /*

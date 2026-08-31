@@ -28,6 +28,20 @@ export interface RouteMeta {
    * mounted.
    */
   readonly parent?: string;
+  /**
+   * Reachable only by typing its hash: absent from the nav, and
+   * pointed at by nothing else.
+   *
+   * Different from `parent`, which describes a page reached from
+   * another page and still highlights the nav item it belongs to.
+   * A hidden route belongs under nothing. It exists for a view that
+   * would confuse a visitor to be offered — `transitions-app` renders
+   * the same example as `example-transitions`, so listing both would
+   * pose a question the nav cannot answer — while staying a real
+   * route the router resolves, rather than a branch on a query
+   * parameter or a build flag.
+   */
+  readonly hidden?: boolean;
 }
 
 export const ROUTES: readonly RouteMeta[] = [
@@ -65,6 +79,12 @@ export const ROUTES: readonly RouteMeta[] = [
     label: 'Transitions',
     title: 'Example · shared elements across a route change, and a video that keeps playing',
     parent: 'examples'
+  },
+  {
+    id: 'transitions-app',
+    label: 'Transitions (standalone)',
+    title: 'Transitions, with no playground around it',
+    hidden: true
   }
 ];
 

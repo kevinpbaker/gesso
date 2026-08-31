@@ -143,7 +143,9 @@ function renderHeader(routeId: string, title: string): HTMLElement {
   const current = findRoute(routeId);
   const currentNavId = current?.parent ?? routeId;
   for (const route of ROUTES) {
-    if (route.parent !== undefined) {
+    // A child route is represented by its parent's item; a hidden one
+    // is represented by nothing at all.
+    if (route.parent !== undefined || route.hidden === true) {
       continue;
     }
     const link = createElement('a', {
