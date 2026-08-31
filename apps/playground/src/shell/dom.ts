@@ -8,6 +8,8 @@
  * document when the incoming one looks up its own elements.
  */
 
+import { prepareInputSurface } from '@gesso/core';
+
 /**
  * Finds a required descendant, throwing a located error if it is
  * missing rather than returning null for a caller to trip over later.
@@ -46,17 +48,17 @@ export function createElement<K extends keyof HTMLElementTagNameMap>(
  * Creates the canvas the renderer routes draw into.
  *
  * Every one of them needs the same three non-obvious settings:
- * `tabIndex` so the canvas can hold keyboard focus, `touch-action:
- * none` so the browser does not steal pointer gestures for scrolling,
- * and the `pg-canvas` class for sizing. Getting one wrong produces a
- * subtly dead input surface, so they live in one place.
+ * `tabIndex` so the canvas can hold keyboard focus, the surface styles
+ * that stop the browser treating it as a document (`prepareInputSurface`
+ * says which and why), and the `pg-canvas` class for sizing. Getting one
+ * wrong produces a subtly dead input surface, so they live in one place.
  */
 export function createPreviewCanvas(parent: HTMLElement, options: { focusable?: boolean } = {}): HTMLCanvasElement {
   const canvas = createElement('canvas', { className: 'pg-canvas' });
   if (options.focusable !== false) {
     canvas.tabIndex = 0;
   }
-  canvas.style.touchAction = 'none';
+  prepareInputSurface(canvas);
   parent.appendChild(canvas);
   return canvas;
 }

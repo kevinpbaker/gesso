@@ -79,6 +79,8 @@ export class EditingProxy {
   private state: EditingState | null = null;
   private composing = false;
   private disposed = false;
+  /** Set while `raiseKeyboard` drops focus on purpose; see there. */
+  private refocusing = false;
   private readonly detach: () => void;
 
   constructor(
@@ -149,6 +151,10 @@ export class EditingProxy {
     }
     this.position(state);
     this.mirror(state);
+    // What the phone's Return key should say. A single-line field has
+    // nothing to insert a newline into, and a keyboard offering one is
+    // offering a key that does nothing.
+    this.textarea.setAttribute('enterkeyhint', state.multiline ? 'enter' : 'done');
     if (!wasActive || this.doc.activeElement !== this.textarea) {
       const active = this.doc.activeElement;
       // Take focus only from the canvas or from nothing: an editable
@@ -175,6 +181,52 @@ export class EditingProxy {
       return;
     }
     this.textarea.focus({ preventScroll: true });
+  }
+
+  /**
+   * Re-takes DOM focus from inside a user gesture, so a phone opens its
+   * keyboard.
+   *
+   * A phone raises the keyboard for a focus that a person's gesture
+   * caused, and for no other. In the worker configuration the runtime's
+   * answer to a press — *this* node is editable, it has focus now —
+   * arrives as a message a frame later, and `update()` focuses the
+   * element from inside that message handler. The task the gesture
+   * belonged to is over by then, so iOS moves focus and leaves the
+   * keyboard down: a field the person is demonstrably typing into, with
+   * nothing to type on.
+   *
+   * The shell calls this from the `pointerup` of the press that opened
+   * the editable, which is a gesture task, and only for a press that
+   * turned editing on — re-asserting focus while the keyboard is
+   * already up is what makes it flicker.
+   *
+   * Focus has to be dropped and retaken rather than simply retaken:
+   * focusing an element that is already focused does nothing at all,
+   * and it already is focused — that is the whole problem. The blur is
+   * ours, so the listener that would report it to the runtime as the
+   * person leaving the field is suppressed for its duration.
+   *
+   * Nothing calls it in the single-threaded configuration and nothing
+   * should: there, `update()` runs inside the pointerdown's own call
+   * stack and the browser sees the focus as the gesture's.
+   */
+  raiseKeyboard(): void {
+    if (this.disposed || this.state === null) {
+      return;
+    }
+    const textarea = this.textarea;
+    if (this.doc.activeElement !== textarea) {
+      textarea.focus({ preventScroll: true });
+      return;
+    }
+    this.refocusing = true;
+    try {
+      textarea.blur();
+      textarea.focus({ preventScroll: true });
+    } finally {
+      this.refocusing = false;
+    }
   }
 
   /**
@@ -346,6 +398,11 @@ export class EditingProxy {
     };
 
     const onBlur = (event: Event): void => {
+      if (this.refocusing) {
+        // Our own blur, half of retaking focus inside a gesture. The
+        // person has not left anything.
+        return;
+      }
       // Focus moved within the page (not the window losing focus, which
       // also blurs) to something other than the canvas: the app's
       // editable should stop showing a caret.

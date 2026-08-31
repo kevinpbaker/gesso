@@ -31,6 +31,12 @@ export type { TouchScrollerOptions } from './UiTouchScroller';
 export type { GestureInput, GestureRecognizerOptions } from './UiGestureRecognizer';
 export { UiEditingController } from './UiEditingController';
 export type { EditingControllerOptions, EditingHost, EditingState } from './UiEditingController';
-export { CanvasPlatformSurface, capturePointer, pointerDeviceOf, UiPlatformAdapter } from './UiPlatformAdapter';
+export {
+  CanvasPlatformSurface,
+  capturePointer,
+  pointerDeviceOf,
+  prepareInputSurface,
+  UiPlatformAdapter
+} from './UiPlatformAdapter';
 export type { PlatformAdapterOptions, PlatformEventTarget, PlatformSurface } from './UiPlatformAdapter';
 export { isNodeFocusable, isNodeHitTestable, isNodeInert, isNodeSelectable, resolveCursor } from './UiInteraction';

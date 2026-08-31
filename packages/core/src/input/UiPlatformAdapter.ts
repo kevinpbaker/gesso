@@ -235,6 +235,41 @@ function modifiersFromEvent(event: {
 }
 
 /**
+ * Makes an element usable as an input surface.
+ *
+ * Five settings, all of them the same instruction in different words:
+ * this element is an application, not a document. Every one of them is
+ * invisible until a finger arrives, and getting one wrong produces a
+ * subtly dead or subtly wrong surface rather than an error.
+ *
+ *   touch-action              the browser does not take gestures for
+ *                             page scrolling and double-tap zoom. The
+ *                             framework scrolls its own containers.
+ *   user-select               a press-and-drag does not start selecting
+ *                             the page around the canvas. The framework
+ *                             has its own text selection, over text the
+ *                             DOM cannot see.
+ *   -webkit-touch-callout     a long press does not raise the iOS
+ *                             callout menu over the app, which would
+ *                             land on the LongPress gesture the app is
+ *                             about to receive.
+ *   -webkit-tap-highlight     a tap does not flash a grey box over
+ *                             whatever the browser guessed was hit.
+ *
+ * Vendor-prefixed properties are set through the style map rather than
+ * as fields, since TypeScript's CSSStyleDeclaration has only some of
+ * them and the missing ones are exactly the ones iOS needs.
+ */
+export function prepareInputSurface(element: HTMLElement): void {
+  const style = element.style;
+  style.touchAction = 'none';
+  style.userSelect = 'none';
+  style.setProperty('-webkit-user-select', 'none');
+  style.setProperty('-webkit-touch-callout', 'none');
+  style.setProperty('-webkit-tap-highlight-color', 'transparent');
+}
+
+/**
  * Surface implementation backed by a real HTML element. Pointer and
  * wheel events come from the element; keyboard events come from
  * `window` by default so Tab/keys work even when the canvas is not

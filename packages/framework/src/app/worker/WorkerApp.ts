@@ -8,7 +8,7 @@ import {
   type RuntimeToShellMessage,
   type ShellToRuntimeMessage
 } from './RenderWorkerProtocol';
-import { capturePointer, pointerDeviceOf, wheelDeltaYOf } from '@gesso/core';
+import { capturePointer, pointerDeviceOf, prepareInputSurface, wheelDeltaYOf } from '@gesso/core';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { observeReducedMotion } from '../reducedMotion';
@@ -162,7 +162,7 @@ export class WorkerApp {
     canvas.style.display = 'block';
     canvas.style.width = '100%';
     canvas.style.height = '100%';
-    canvas.style.touchAction = 'none';
+    prepareInputSurface(canvas);
     canvas.tabIndex = 0;
     element.appendChild(canvas);
     this.canvas = canvas;
@@ -524,8 +524,14 @@ export class WorkerApp {
       return { x: clientX - rect.left, y: clientY - rect.top };
     };
 
+    // Whether an editable already had focus when the press began. A
+    // press that *starts* editing is the one that has to raise the
+    // keyboard; one that lands on a field already being typed into must
+    // not, since the keyboard is up and re-taking focus makes it blink.
+    let editingAtPress = false;
     const onPointerDown = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
+      editingAtPress = this.proxy?.active ?? false;
       // While an editable has focus the proxy's textarea holds DOM
       // focus; the worker decides whether this press keeps it there.
       if (!(this.proxy?.active ?? false)) {
@@ -591,6 +597,14 @@ export class WorkerApp {
         pointer: pointerDeviceOf(event),
         at: epochFromEvent(event)
       });
+      // The worker's answer to the press has arrived by now — a round
+      // trip is a frame and a tap is not — so the proxy already holds
+      // DOM focus, taken from a message rather than from a gesture. A
+      // phone ignores that one. This is the last gesture task of the
+      // press, and the only chance to ask again.
+      if (!editingAtPress && (this.proxy?.active ?? false)) {
+        this.proxy?.raiseKeyboard();
+      }
     };
     const onPointerCancel = (event: PointerEvent): void => {
       this.post({ type: 'pointerCancel', pointer: pointerDeviceOf(event) });

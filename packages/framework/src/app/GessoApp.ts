@@ -1,6 +1,7 @@
 import type { FrameworkChild } from '../ComponentElement';
 import {
   CanvasPlatformSurface,
+  prepareInputSurface,
   UiPlatformAdapter,
   type UiNode,
   type CanvasHost,
@@ -243,7 +244,7 @@ export class GessoApp {
       return;
     }
     this.canvas.tabIndex = 0;
-    this.canvas.style.touchAction = 'none';
+    prepareInputSurface(this.canvas);
     this.adapter.attach(new CanvasPlatformSurface(this.canvas));
 
     // Text editing goes through a hidden textarea, exactly as in the

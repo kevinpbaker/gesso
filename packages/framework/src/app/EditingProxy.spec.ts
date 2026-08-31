@@ -364,6 +364,52 @@ describe('EditingProxy', () => {
     expect(doc.activeElement).toBe(textarea);
   });
 
+  it('tells the phone keyboard what its Return key is for', () => {
+    const { proxy, textarea, state } = setup();
+
+    proxy.update(state());
+    expect(textarea.attributes.get('enterkeyhint')).toBe('done');
+
+    proxy.update(state({ multiline: true }));
+    expect(textarea.attributes.get('enterkeyhint')).toBe('enter');
+  });
+
+  describe('raiseKeyboard', () => {
+    it('retakes focus it already holds, without reporting a blur', () => {
+      const { doc, proxy, textarea, state, sink } = setup();
+      proxy.update(state());
+      expect(doc.activeElement).toBe(textarea);
+      sink.calls.length = 0;
+
+      proxy.raiseKeyboard();
+
+      // A phone raises its keyboard for a focus a gesture caused, and
+      // an element that is already focused cannot be focused again —
+      // so the focus has to be dropped first.
+      expect(doc.activeElement).toBe(textarea);
+      expect(sink.calls.map(call => call[0])).not.toContain('blur');
+    });
+
+    it('takes focus when something else has it', () => {
+      const { doc, proxy, textarea, canvas, state } = setup();
+      proxy.update(state());
+      canvas.focus();
+      expect(doc.activeElement).toBe(canvas);
+
+      proxy.raiseKeyboard();
+
+      expect(doc.activeElement).toBe(textarea);
+    });
+
+    it('does nothing when no editable has focus', () => {
+      const { doc, proxy, canvas } = setup();
+
+      proxy.raiseKeyboard();
+
+      expect(doc.activeElement).toBe(canvas);
+    });
+  });
+
   it('removes the element and listeners on dispose', () => {
     const { doc, proxy, textarea, state } = setup();
     proxy.update(state());
