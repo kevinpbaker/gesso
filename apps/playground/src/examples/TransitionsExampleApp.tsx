@@ -135,7 +135,11 @@ export const ROUTES = { routes: [Home, Detail] };
 function Stats(props: Inputs<{ playlist: Playlist }>): UiChild {
   const playlist = props.playlist.value;
   return (
-    <row gap={8} x="center" y="center" modifiers={[sharedElement({ name: `playlist-stats-${playlist.id}` })]}>
+    <row
+      gap={8}
+      x="center"
+      y="center"
+      modifiers={[sharedElement({ name: `playlist-stats-${playlist.id}`, scale: 'uniform' })]}>
       <row gap={4} y="center">
         <Icon path={ICONS.bars} size={14} color={playlist.secondaryText} />
         <text color={playlist.secondaryText} fontSize={13} selectable={false}>
@@ -357,14 +361,14 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
               fontSize={14}
               fontWeight={700}
               selectable={false}
-              modifiers={[sharedElement({ name: `playlist-user-${playlist.id}` })]}>
+              modifiers={[sharedElement({ name: `playlist-user-${playlist.id}`, scale: 'uniform' })]}>
               {playlist.user.name.toUpperCase()}
             </text>
             <text
               color={playlist.secondaryText}
               fontSize={13}
               selectable={false}
-              modifiers={[sharedElement({ name: `playlist-date-${playlist.id}` })]}>
+              modifiers={[sharedElement({ name: `playlist-date-${playlist.id}`, scale: 'uniform' })]}>
               {playlist.user.date}
             </text>
           </column>
@@ -385,7 +389,7 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
           fontWeight={700}
           textAlign="center"
           selectable={false}
-          modifiers={[sharedElement({ name: `playlist-title-${playlist.id}` })]}>
+          modifiers={[sharedElement({ name: `playlist-title-${playlist.id}`, scale: 'uniform' })]}>
           {playlist.title}
         </text>
         <box height={10} />
@@ -558,14 +562,14 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
                 fontSize={14}
                 fontWeight={700}
                 selectable={false}
-                modifiers={[sharedElement({ name: `playlist-user-${playlist.id}` })]}>
+                modifiers={[sharedElement({ name: `playlist-user-${playlist.id}`, scale: 'uniform' })]}>
                 {playlist.user.name.toUpperCase()}
               </text>
               <text
                 color={playlist.secondaryText}
                 fontSize={13}
                 selectable={false}
-                modifiers={[sharedElement({ name: `playlist-date-${playlist.id}` })]}>
+                modifiers={[sharedElement({ name: `playlist-date-${playlist.id}`, scale: 'uniform' })]}>
                 {playlist.user.date}
               </text>
             </column>
@@ -575,7 +579,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
               fontWeight={700}
               textAlign="center"
               selectable={false}
-              modifiers={[sharedElement({ name: `playlist-title-${playlist.id}` })]}>
+              modifiers={[sharedElement({ name: `playlist-title-${playlist.id}`, scale: 'uniform' })]}>
               {playlist.title}
             </text>
             <box height={14} />
