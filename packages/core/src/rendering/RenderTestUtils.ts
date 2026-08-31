@@ -32,6 +32,12 @@ export class RecordingCanvasContext implements Canvas2DContext {
   private _font = '';
   private _textAlign: CanvasTextAlign = 'start';
   private _textBaseline: CanvasTextBaseline = 'alphabetic';
+  /**
+   * Tracking, which is a context property rather than part of the font
+   * shorthand — and sticky, so a spec can check it was cleared as well
+   * as that it was set.
+   */
+  letterSpacing = '0px';
 
   get fillStyle(): string | CanvasGradient | CanvasPattern {
     return this._fillStyle;

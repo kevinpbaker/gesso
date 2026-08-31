@@ -113,20 +113,35 @@ export function buildFontString(state: Pick<PaintState, 'fontWeight' | 'fontSize
  * would.
  */
 export function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState, measurer: TextMeasurer): void {
-  drawTextLines(ctx, layoutTextLines(box, state, measurer), buildFontString(state), colorToCss(state.textColor));
+  drawTextLines(
+    ctx,
+    layoutTextLines(box, state, measurer),
+    buildFontString(state),
+    colorToCss(state.textColor),
+    state.letterSpacing
+  );
 }
 
-/** Draws already-placed lines in one font and colour. */
+/**
+ * Draws already-placed lines in one font and colour.
+ *
+ * `letterSpacing` is passed separately because it is not part of the
+ * font shorthand, and it is set on every call rather than only when
+ * non-zero because the context keeps it: a label with tracking would
+ * otherwise leave every run drawn after it spaced out too.
+ */
 export function drawTextLines(
   ctx: Canvas2DContext,
   placements: readonly TextLinePlacement[],
   font: string,
-  color: string
+  color: string,
+  letterSpacing = 0
 ): void {
   if (placements.length === 0) {
     return;
   }
   ctx.font = font;
+  ctx.letterSpacing = `${letterSpacing}px`;
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';

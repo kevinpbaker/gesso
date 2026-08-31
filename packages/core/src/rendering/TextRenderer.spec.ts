@@ -146,6 +146,21 @@ describe('drawText', () => {
     expect(draws[0].args).toEqual(['Hi', 10 + (100 - 12) / 2, 29]);
   });
 
+  it('applies the tracking the style asked for, and clears it otherwise', () => {
+    // `letterSpacing` was resolved onto the text font and passed into
+    // the measure request, and then consumed by nothing: the `label`
+    // style asks for 0.5px of tracking and drew with none. It is set on
+    // every call rather than only when non-zero because the context
+    // keeps it — a label would otherwise space out every run drawn
+    // after it.
+    const ctx = new RecordingCanvasContext();
+    drawText(ctx, { x: 0, y: 0, width: 100, height: 40 }, state({ text: 'Hi', letterSpacing: 0.5 }), measurer);
+    expect(ctx.letterSpacing).toBe('0.5px');
+
+    drawText(ctx, { x: 0, y: 0, width: 100, height: 40 }, state({ text: 'Hi' }), measurer);
+    expect(ctx.letterSpacing).toBe('0px');
+  });
+
   it('draws nothing for empty text', () => {
     const ctx = new RecordingCanvasContext();
     drawText(ctx, { x: 0, y: 0, width: 100, height: 20 }, state({ text: undefined }), measurer);

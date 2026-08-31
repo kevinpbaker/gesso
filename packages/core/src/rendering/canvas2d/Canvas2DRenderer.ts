@@ -442,7 +442,7 @@ export class Canvas2DRenderer implements UiRenderer {
         ctx.fillRect(box.x, box.y, box.width, box.height);
       }
     }
-    drawTextLines(ctx, lines, buildFontString(paint), colorToCss(paint.textColor));
+    drawTextLines(ctx, lines, buildFontString(paint), colorToCss(paint.textColor), paint.letterSpacing);
   }
 
   /**
@@ -462,9 +462,15 @@ export class Canvas2DRenderer implements UiRenderer {
       }
     }
     if (layout.placeholderLines.length > 0) {
-      drawTextLines(ctx, layout.placeholderLines, buildFontString(paint), colorToCss(paint.placeholderColor));
+      drawTextLines(
+        ctx,
+        layout.placeholderLines,
+        buildFontString(paint),
+        colorToCss(paint.placeholderColor),
+        paint.letterSpacing
+      );
     } else {
-      drawTextLines(ctx, layout.lines, buildFontString(paint), colorToCss(paint.textColor));
+      drawTextLines(ctx, layout.lines, buildFontString(paint), colorToCss(paint.textColor), paint.letterSpacing);
     }
     if (model.composing) {
       ctx.fillStyle = colorToCss(paint.textColor);

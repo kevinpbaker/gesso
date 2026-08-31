@@ -60,6 +60,8 @@ export interface PaintState {
   fontFamily: string;
   fontWeight: string | number;
   lineHeight: number;
+  /** Extra space after each character, as CSS `letter-spacing`. */
+  letterSpacing: number;
   textColor: UiColor;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
@@ -204,6 +206,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.fontFamily = font.fontFamily;
   out.fontWeight = font.fontWeight;
   out.lineHeight = font.lineHeight;
+  out.letterSpacing = font.letterSpacing;
   out.textColor = resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
   out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
   out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
@@ -295,6 +298,7 @@ export function createPaintState(): PaintState {
     fontFamily: DEFAULT_FONT_FAMILY,
     fontWeight: DEFAULT_FONT_WEIGHT,
     lineHeight: 0,
+    letterSpacing: 0,
     textColor: DEFAULT_TEXT_COLOR,
     textAlign: 'left',
     verticalAlign: 'top',

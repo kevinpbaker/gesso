@@ -13,6 +13,16 @@ export interface Canvas2DContext {
   scale(x: number, y: number): void;
   rotate(angle: number): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  /**
+   * CSS `letter-spacing`, as a length string.
+   *
+   * A context property rather than part of the font shorthand, and
+   * sticky, so a run that wants none has to say `'0px'` rather than
+   * leave it. Optional because a stub context has no reason to carry
+   * it; where it is missing, measuring and drawing both do without and
+   * still agree with each other.
+   */
+  letterSpacing?: string;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
   strokeRect(x: number, y: number, width: number, height: number): void;
