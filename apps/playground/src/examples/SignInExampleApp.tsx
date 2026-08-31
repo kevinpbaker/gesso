@@ -4,6 +4,21 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 import type { UiSemanticState } from '@gesso/core';
 import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
 import { SignIn } from './signin/SignInContract';
+import {
+  BORDER,
+  BORDER_STRONG,
+  CHALK,
+  DANGER as BRAND_DANGER,
+  GROUND,
+  gessoTheme,
+  POSITIVE,
+  SURFACE,
+  SURFACE_OVERLAY,
+  SURFACE_RAISED,
+  TEXT,
+  TEXT_FAINT,
+  TEXT_MUTED
+} from './brand';
 
 /**
  * A passcode sign-in screen and the account screen behind it.
@@ -154,18 +169,18 @@ export class AuthApp {
 // the literals are this screen's own.
 // ---------------------------------------------------------------------------
 
-const BG = '#0b1220';
-const CARD = '#111a2b';
-const CARD_BORDER = '#1f2a3d';
-const KEY = '#182338';
-const KEY_HOVER = '#22304a';
-const KEY_PRESSED = '#2b3d5e';
-const KEY_TEXT = '#e6edf3';
-const MUTED = '#8b98a9';
-const FAINT = '#5d6a7b';
-const DOT_EMPTY = '#2a3441';
-const DANGER = '#e5534b';
-const SUCCESS = '#2ea88a';
+const BG = GROUND;
+const CARD = SURFACE;
+const CARD_BORDER = BORDER;
+const KEY = SURFACE_RAISED;
+const KEY_HOVER = SURFACE_OVERLAY;
+const KEY_PRESSED = BORDER_STRONG;
+const KEY_TEXT = TEXT;
+const MUTED = TEXT_MUTED;
+const FAINT = TEXT_FAINT;
+const DOT_EMPTY = BORDER_STRONG;
+const DANGER = BRAND_DANGER;
+const SUCCESS = POSITIVE;
 
 // ---------------------------------------------------------------------------
 // Sign-in screen
@@ -268,7 +283,7 @@ function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void
       onClick={() => props.onToggle.value()}
       cursor="pointer">
       <box width={36} height={20} borderRadius={10} backgroundColor={trackColor} x={knobX} y="center" padding={2}>
-        <box width={16} height={16} borderRadius={8} backgroundColor="#ffffff" />
+        <box width={16} height={16} borderRadius={8} backgroundColor={CHALK} />
       </box>
       <text color={MUTED} fontSize={13}>
         {props.label}
@@ -293,7 +308,7 @@ function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
       borderRadius={16}>
       <column gap={6} x="center" selfX="center">
         <box width={44} height={44} borderRadius={12} backgroundColor="primary" x="center" y="center">
-          <text color="#ffffff" fontSize={20} fontWeight={600}>
+          <text color={CHALK} fontSize={20} fontWeight={600}>
             N
           </text>
         </box>
@@ -385,7 +400,7 @@ function MovementRow(props: Inputs<{ movement: Movement }>) {
         width={36}
         height={36}
         borderRadius={18}
-        backgroundColor={movement.pipe(map(m => (m.amount < 0 ? DOT_EMPTY : 'rgba(46, 168, 138, 0.18)')))}
+        backgroundColor={movement.pipe(map(m => (m.amount < 0 ? DOT_EMPTY : 'rgba(79, 160, 126, 0.2)')))}
         x="center"
         y="center">
         <text color={movement.pipe(map(m => (m.amount < 0 ? MUTED : SUCCESS)))} fontSize={14} fontWeight={600}>
@@ -476,7 +491,7 @@ export function SignInApp(_props: Inputs<{}>, ctx: ComponentContext) {
     map(signedIn => (signedIn ? <AccountScreen key="account" /> : <SignInScreen key="signin" />))
   );
   return (
-    <scrollview backgroundColor={BG} x="center" y="center" padding={32}>
+    <scrollview theme={gessoTheme} backgroundColor={BG} x="center" y="center" padding={32}>
       {screen}
     </scrollview>
   );

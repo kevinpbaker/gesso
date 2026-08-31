@@ -2,6 +2,24 @@ import { BehaviorSubject, combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
+import {
+  ACCENT as BRAND_ACCENT,
+  BORDER as BRAND_BORDER,
+  BORDER_SOFT,
+  CHALK,
+  DANGER,
+  GROUND,
+  LINEN,
+  MONO,
+  POSITIVE,
+  SURFACE,
+  SURFACE_OVERLAY,
+  SURFACE_RAISED,
+  TEXT as BRAND_TEXT,
+  TEXT_FAINT,
+  TEXT_MUTED,
+  WARNING
+} from './brand';
 
 /**
  * Live: an operations board fed by a stream that never stops.
@@ -66,25 +84,29 @@ import { type ComponentContext, type Inputs, internalState } from '@gesso/framew
  */
 
 // ---------------------------------------------------------------------------
-// Palette. This board sets its own colours rather than naming theme
-// entries; #example-theme is the example about themes.
+// Palette. This board names no theme entries — every colour is a
+// literal, because a dashboard's series and thresholds are its own
+// vocabulary and not a theme's; #example-theme is the example about
+// themes. The literals come from the shared Gesso ramp all the same,
+// so the board sits in the same product as the chrome around it.
 // ---------------------------------------------------------------------------
 
-const BG = '#080d16';
-const PANEL = '#0e1626';
-const CARD = '#111b2c';
-const CARD_ALT = '#0c1524';
-const BORDER = '#1d2a41';
-const BORDER_SOFT = '#172234';
-const TRACK = '#18233a';
-const TEXT = '#e6edf3';
-const MUTED = '#8b98a9';
-const FAINT = '#5c6a7d';
-const ACCENT = '#3d8bfd';
-const GOOD = '#2ea88a';
-const WARN = '#e3a008';
-const BAD = '#e5534b';
-const MONO = 'ui-monospace, monospace';
+const BG = GROUND;
+const PANEL = SURFACE;
+const CARD = SURFACE_RAISED;
+/** A sunken well inside a panel, rather than a card raised off it. */
+const CARD_ALT = GROUND;
+const BORDER = BRAND_BORDER;
+const TRACK = SURFACE_OVERLAY;
+const TEXT = BRAND_TEXT;
+const MUTED = TEXT_MUTED;
+const FAINT = TEXT_FAINT;
+const ACCENT = BRAND_ACCENT;
+/** Ultramarine lifted once more, for the hover on an accented button. */
+const ACCENT_HOVER = '#8b9ce4';
+const GOOD = POSITIVE;
+const WARN = WARNING;
+const BAD = DANGER;
 
 // ---------------------------------------------------------------------------
 // The feed
@@ -157,7 +179,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'throughput',
     name: 'Throughput',
     unit: 'req/s',
-    colour: '#3d8bfd',
+    colour: BRAND_ACCENT,
     base: 2400,
     swing: 260,
     warnAbove: 3400,
@@ -168,7 +190,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'latency',
     name: 'p95 latency',
     unit: 'ms',
-    colour: '#a78bfa',
+    colour: '#a98cd0',
     base: 74,
     swing: 11,
     warnAbove: 104,
@@ -179,7 +201,7 @@ export const CHANNELS: readonly ChannelSpec[] = [
     id: 'errors',
     name: 'Error rate',
     unit: '%',
-    colour: '#38bdf8',
+    colour: LINEN,
     base: 0.62,
     swing: 0.16,
     warnAbove: 1.25,
@@ -625,7 +647,9 @@ function RailButton(props: Inputs<{ label: string; primary?: boolean; onPress: (
   counted();
   const hovered = internalState(false);
   const background = combineLatest([props.primary, hovered]).pipe(
-    map(([primary, hover]) => (primary === true ? (hover ? '#4d97ff' : ACCENT) : hover ? '#1a2740' : 'transparent'))
+    map(([primary, hover]) =>
+      primary === true ? (hover ? ACCENT_HOVER : ACCENT) : hover ? SURFACE_OVERLAY : 'transparent'
+    )
   );
   return (
     <button
@@ -642,7 +666,7 @@ function RailButton(props: Inputs<{ label: string; primary?: boolean; onPress: (
       backgroundColor={background}
       cursor="pointer">
       <text
-        color={props.primary.pipe(map(primary => (primary === true ? '#ffffff' : TEXT)))}
+        color={props.primary.pipe(map(primary => (primary === true ? CHALK : TEXT)))}
         fontSize={13}
         fontWeight={600}>
         {props.label}
@@ -669,7 +693,7 @@ function RateButton(props: Inputs<{ rate: RateName }>, ctx: ComponentContext) {
       borderWidth={1}
       borderColor={selected.pipe(map(on => (on ? ACCENT : BORDER)))}
       backgroundColor={combineLatest([selected, hovered]).pipe(
-        map(([on, hover]) => (on ? 'rgba(61,139,253,0.18)' : hover ? '#1a2740' : 'transparent'))
+        map(([on, hover]) => (on ? 'rgba(110, 130, 216, 0.2)' : hover ? SURFACE_OVERLAY : 'transparent'))
       )}
       cursor="pointer">
       <text color={selected.pipe(map(on => (on ? ACCENT : MUTED)))} fontSize={12.5} fontWeight={600}>

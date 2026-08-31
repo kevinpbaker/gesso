@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { colorToHex } from '@gesso/core';
 import { AppearanceApp, buildTheme, isDark, specOf, type ThemeSpec } from './ThemeExampleApp';
 
-const BASE: ThemeSpec = { palette: 'daylight', accent: 'blue', corners: 'soft', textSize: 'regular' };
+const BASE: ThemeSpec = { palette: 'daylight', accent: 'ultramarine', corners: 'soft', textSize: 'regular' };
 
 /** The latest value of an observable, read synchronously. */
 function latest<T>(observable: { subscribe(next: (value: T) => void): { unsubscribe(): void } }): T {
@@ -15,7 +15,7 @@ function latest<T>(observable: { subscribe(next: (value: T) => void): { unsubscr
 describe('theme example', () => {
   it('paints the accent as the palette primary', () => {
     expect(colorToHex(buildTheme(BASE).colors.primary)).toBe(
-      colorToHex(buildTheme({ ...BASE, palette: 'midnight' }).colors.primary)
+      colorToHex(buildTheme({ ...BASE, palette: 'gesso' }).colors.primary)
     );
     expect(colorToHex(buildTheme({ ...BASE, accent: 'rose' }).colors.primary)).not.toBe(
       colorToHex(buildTheme(BASE).colors.primary)
@@ -41,7 +41,7 @@ describe('theme example', () => {
 
   it('carries the palette text colors in the type scale', () => {
     const light = buildTheme(BASE);
-    const dark = buildTheme({ ...BASE, palette: 'midnight' });
+    const dark = buildTheme({ ...BASE, palette: 'gesso' });
     expect(colorToHex(light.typography.body.color)).toBe(colorToHex(light.colors.text));
     expect(colorToHex(light.typography.label.color)).toBe(colorToHex(light.colors.textMuted));
     expect(colorToHex(dark.typography.body.color)).not.toBe(colorToHex(light.typography.body.color));
@@ -62,14 +62,14 @@ describe('theme example', () => {
 
   it('keeps every choice but the mode in the contrast theme', () => {
     const app = new AppearanceApp();
-    app.setPalette('midnight');
+    app.setPalette('gesso');
     app.setCorners('round');
 
     const view = latest(app.view);
     expect(view.dark).toBe(true);
     expect(isDark(app.palette.value)).toBe(true);
 
-    const contrast = buildTheme({ ...specOf(view), palette: view.dark ? 'daylight' : 'midnight' });
+    const contrast = buildTheme({ ...specOf(view), palette: view.dark ? 'daylight' : 'gesso' });
     expect(contrast.shapes.medium).toBe(buildTheme({ ...BASE, corners: 'round' }).shapes.medium);
     expect(colorToHex(contrast.colors.background)).toBe(colorToHex(buildTheme(BASE).colors.background));
   });

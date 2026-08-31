@@ -52,8 +52,8 @@ import {
 // The four choices, and the theme they build
 // ---------------------------------------------------------------------------
 
-export type PaletteName = 'daylight' | 'sepia' | 'midnight' | 'contrast';
-export type AccentName = 'blue' | 'violet' | 'emerald' | 'amber' | 'rose';
+export type PaletteName = 'gesso' | 'daylight' | 'sepia' | 'contrast';
+export type AccentName = 'ultramarine' | 'violet' | 'emerald' | 'amber' | 'rose';
 export type CornerName = 'sharp' | 'soft' | 'round';
 export type TextSizeName = 'small' | 'regular' | 'large';
 
@@ -91,6 +91,27 @@ interface PaletteSpec {
 }
 
 const PALETTES: Record<PaletteName, PaletteSpec> = {
+  /*
+   * The house palette, and the one the example opens in: ink pulled
+   * apart into three surfaces, chalk into two weights of text. It sits
+   * where a generic `Midnight` used to; the other three are here to be
+   * switched to, which is the point of the example, and each leans a
+   * different way — light, warm, maximum contrast — rather than being a
+   * second dark blue.
+   */
+  gesso: {
+    label: 'Gesso',
+    dark: true,
+    background: '#101216',
+    surface: '#16181d',
+    surfaceAlt: '#1d2027',
+    text: '#f7f3ea',
+    textMuted: '#a9a296',
+    border: '#363a45',
+    positive: '#4fa07e',
+    negative: '#db5a4e',
+    shadowAlpha: 0.55
+  },
   daylight: {
     label: 'Daylight',
     dark: false,
@@ -117,19 +138,6 @@ const PALETTES: Record<PaletteName, PaletteSpec> = {
     negative: '#a8442a',
     shadowAlpha: 0.18
   },
-  midnight: {
-    label: 'Midnight',
-    dark: true,
-    background: '#0b1220',
-    surface: '#121a2b',
-    surfaceAlt: '#1b2540',
-    text: '#e6edf3',
-    textMuted: '#8b98a9',
-    border: '#22304a',
-    positive: '#3fbf94',
-    negative: '#e5695f',
-    shadowAlpha: 0.55
-  },
   contrast: {
     label: 'Contrast',
     dark: true,
@@ -146,7 +154,12 @@ const PALETTES: Record<PaletteName, PaletteSpec> = {
 };
 
 const ACCENTS: Record<AccentName, { readonly label: string; readonly color: string; readonly onPrimary: string }> = {
-  blue: { label: 'Blue', color: '#2f6fed', onPrimary: '#ffffff' },
+  // One accent has to read on the chalk palettes and the ink ones
+  // alike, so this is ultramarine at a mid tone rather than either the
+  // printed #2a3e8c, which disappears into ink, or the lifted #6e82d8
+  // the chrome uses, which is washed out on Daylight. It replaced a
+  // generic `Blue` that it was within a few degrees of hue of.
+  ultramarine: { label: 'Ultramarine', color: '#5068d8', onPrimary: '#f7f3ea' },
   violet: { label: 'Violet', color: '#7c5cf0', onPrimary: '#ffffff' },
   emerald: { label: 'Emerald', color: '#11a37f', onPrimary: '#ffffff' },
   amber: { label: 'Amber', color: '#e0900c', onPrimary: '#231800' },
@@ -166,8 +179,8 @@ const TEXT_SIZES: Record<TextSizeName, { readonly label: string; readonly scale:
   large: { label: 'Large', scale: 1.15 }
 };
 
-export const PALETTE_ORDER: readonly PaletteName[] = ['daylight', 'sepia', 'midnight', 'contrast'];
-export const ACCENT_ORDER: readonly AccentName[] = ['blue', 'violet', 'emerald', 'amber', 'rose'];
+export const PALETTE_ORDER: readonly PaletteName[] = ['gesso', 'daylight', 'sepia', 'contrast'];
+export const ACCENT_ORDER: readonly AccentName[] = ['ultramarine', 'violet', 'emerald', 'amber', 'rose'];
 
 function hex(value: string): UiColor {
   const color = parseColor(value);
@@ -346,8 +359,8 @@ export function specOf(view: AppearanceView): ThemeSpec {
  * recomputed should travel.
  */
 export class AppearanceApp {
-  readonly palette = internalState<PaletteName>('daylight');
-  readonly accent = internalState<AccentName>('blue');
+  readonly palette = internalState<PaletteName>('gesso');
+  readonly accent = internalState<AccentName>('ultramarine');
   readonly corners = internalState<CornerName>('soft');
   readonly textSize = internalState<TextSizeName>('regular');
 
@@ -779,7 +792,7 @@ function Preview(_props: Inputs<{}>, ctx: ComponentContext) {
   // The same choices in the opposite mode, so a light card can live
   // inside a dark page. Derived here for the same reason the theme is.
   const contrast = view.pipe(
-    map(choices => buildTheme({ ...specOf(choices), palette: choices.dark ? 'daylight' : 'midnight' }))
+    map(choices => buildTheme({ ...specOf(choices), palette: choices.dark ? 'daylight' : 'gesso' }))
   );
   const contrastBody = contrast.pipe(map(value => value.typography.body));
   // Written once, when this component's body runs. A theme change that

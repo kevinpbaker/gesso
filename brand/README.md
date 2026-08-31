@@ -11,8 +11,17 @@ brush stroke that has been through a renderer.
 | `gesso-mark.svg`      | Full colour. Chalk stroke on raw linen.                                                                                  |
 | `gesso-mark-mono.svg` | One colour. The square takes `currentColor`; the stroke is knocked out, so whatever is behind the mark shows through it. |
 
-`apps/playground/public/favicon.svg` is a copy of `gesso-mark.svg` and is the only place the
-mark is wired into the build, from `apps/playground/index.html`.
+The playground draws the mark in three places, each taking only what it needs:
+
+| Where                                | How                                                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `apps/playground/public/favicon.svg` | A copy of `gesso-mark.svg`, linked from `apps/playground/index.html`.                                                    |
+| The shell header                     | `renderBrandMark` in `src/shell/AppShell.ts` redraws the geometry as SVG elements, so the header never uses `innerHTML`. |
+| The transitions example              | The stroke alone, as a path in `ICONS.gessoStroke`, rasterised by `Icon` over a linen square.                            |
+
+There is no shared module: an SVG asset, a DOM builder and a rasterised path string have no
+representation in common, so each carries the two colours and the path itself. If the
+geometry changes, all three change.
 
 ## Geometry
 

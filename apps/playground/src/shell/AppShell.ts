@@ -186,38 +186,57 @@ function renderStatusBar(withMetrics: boolean): HTMLElement {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/** Raw linen: the canvas the mark is a square of. `brand/README.md`. */
+const LINEN = '#be9a6e';
+/** Chalk ground: the one coat of primer brushed across it. */
+const CHALK = '#f7f3ea';
+
 /**
- * Three connected nodes: the retained graph the whole runtime is
- * built around. Built as elements rather than parsed from a string so
- * the header never touches innerHTML.
+ * The Gesso mark: one broad diagonal coat of chalk ground pulled
+ * across a square of raw linen.
+ *
+ * The geometry is `brand/gesso-mark.svg`, redrawn here as elements
+ * rather than parsed from a string, so the header never touches
+ * innerHTML. Its 64x64 viewBox is a 16x16 grid scaled by four, so at
+ * the 16px the header draws it every coordinate lands on a whole
+ * device pixel and no small-size drawing is needed.
+ *
+ * The stroke is knocked out with a clip path rather than inset,
+ * because the coat runs corner to corner and would otherwise spill
+ * past the square's rounded corners.
  */
 function renderBrandMark(): SVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('width', '16');
   svg.setAttribute('height', '16');
-  svg.setAttribute('viewBox', '0 0 16 16');
-  svg.setAttribute('fill', 'none');
+  svg.setAttribute('viewBox', '0 0 64 64');
   svg.setAttribute('aria-hidden', 'true');
 
-  const edges = document.createElementNS(SVG_NS, 'path');
-  edges.setAttribute('d', 'M4 4.5 L12 3 M4 4.5 L9 12.5 M12 3 L9 12.5');
-  edges.setAttribute('stroke', 'currentColor');
-  edges.setAttribute('stroke-width', '1.2');
-  edges.setAttribute('opacity', '0.45');
-  svg.appendChild(edges);
+  const clip = document.createElementNS(SVG_NS, 'clipPath');
+  clip.setAttribute('id', 'pg-brand-canvas');
+  clip.appendChild(brandSquare());
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  defs.appendChild(clip);
+  svg.appendChild(defs);
 
-  for (const [cx, cy, r, opacity] of [
-    [4, 4.5, 2.1, 1],
-    [12, 3, 1.5, 0.75],
-    [9, 12.5, 1.5, 0.75]
-  ]) {
-    const node = document.createElementNS(SVG_NS, 'circle');
-    node.setAttribute('cx', String(cx));
-    node.setAttribute('cy', String(cy));
-    node.setAttribute('r', String(r));
-    node.setAttribute('fill', 'currentColor');
-    node.setAttribute('opacity', String(opacity));
-    svg.appendChild(node);
-  }
+  const canvas = brandSquare();
+  canvas.setAttribute('fill', LINEN);
+  svg.appendChild(canvas);
+
+  const stroke = document.createElementNS(SVG_NS, 'path');
+  stroke.setAttribute('d', 'M0 40H16V28H32V16H48V4H64V24H48V36H32V48H16V60H0Z');
+  stroke.setAttribute('clip-path', 'url(#pg-brand-canvas)');
+  stroke.setAttribute('fill', CHALK);
+  svg.appendChild(stroke);
+
   return svg;
+}
+
+/** The full-bleed rounded square, drawn twice: as fill and as clip. */
+function brandSquare(): SVGElement {
+  const rect = document.createElementNS(SVG_NS, 'rect');
+  rect.setAttribute('width', '64');
+  rect.setAttribute('height', '64');
+  rect.setAttribute('rx', '12');
+  return rect;
 }

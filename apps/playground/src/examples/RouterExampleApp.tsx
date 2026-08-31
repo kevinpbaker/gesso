@@ -10,7 +10,8 @@ import {
   RouterOutlet,
   RouterService
 } from '@gesso/framework';
-import { type UiChild, darkTheme } from '@gesso/core';
+import type { UiChild } from '@gesso/core';
+import { gessoTheme } from './brand';
 
 /**
  * A routed app: three levels of nested screens, typed params, a guard,
@@ -178,7 +179,7 @@ function Action(props: Inputs<{ label: string; onPress: () => void }>) {
 export function RouterExampleApp(_props: Inputs<{}>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
-    <column theme={darkTheme} backgroundColor="background" x="stretch" y="stretch">
+    <column theme={gessoTheme} backgroundColor="background" x="stretch" y="stretch">
       <row gap={8} y="center" padding={12} backgroundColor="surface">
         <text color="text" fontSize={14} fontWeight={600} paddingRight={8}>
           Routes

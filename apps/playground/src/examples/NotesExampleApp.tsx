@@ -3,6 +3,20 @@ import { distinctUntilChanged, map } from 'rxjs/operators';
 
 import { type ComponentContext, type Inputs, ShellService, internalState } from '@gesso/framework';
 import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
+import {
+  ACCENT_WASH,
+  BORDER,
+  BORDER_STRONG,
+  CHALK,
+  GROUND,
+  gessoTheme,
+  SURFACE,
+  SURFACE_OVERLAY,
+  SURFACE_RAISED,
+  TEXT,
+  TEXT_FAINT,
+  TEXT_MUTED
+} from './brand';
 
 /**
  * A notes app: a list of notes on the left, the selected note's title
@@ -27,15 +41,18 @@ import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
 // Palette
 // ---------------------------------------------------------------------------
 
-const BG = '#0b1220';
-const SIDEBAR = '#0f1729';
-const CARD = '#111a2b';
-const BORDER = '#1f2a3d';
-const ROW_HOVER = '#182338';
-const ROW_SELECTED = '#1e2b45';
-const TEXT = '#e6edf3';
-const MUTED = '#8b98a9';
-const FAINT = '#5d6a7b';
+/*
+ * Roles, taken from the shared Gesso ramp in `brand.ts`. Only the two
+ * row states are named locally, because "the row under the pointer"
+ * and "the row you are reading" are this screen's own vocabulary.
+ */
+const BG = GROUND;
+const SIDEBAR = SURFACE;
+const CARD = SURFACE_RAISED;
+const ROW_HOVER = SURFACE_OVERLAY;
+const ROW_SELECTED = ACCENT_WASH;
+const MUTED = TEXT_MUTED;
+const FAINT = TEXT_FAINT;
 
 // ---------------------------------------------------------------------------
 // Sidebar
@@ -86,7 +103,7 @@ function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
   // an empty list, so this renders an empty sidebar and then fills it.
   const rows = notes.view.rows.pipe(map(list => list.map(note => <NoteRow key={note.id} note={note} />)));
   return (
-    <column width={280} backgroundColor={SIDEBAR} borderColor={BORDER} borderWidth={1} padding={12} gap={12}>
+    <column width={280} backgroundColor={SIDEBAR} borderColor={BORDER_STRONG} borderWidth={1} padding={12} gap={12}>
       <row x="space-between" y="center" paddingLeft={4}>
         <text color={TEXT} fontSize={16} fontWeight={600}>
           Notes
@@ -100,7 +117,7 @@ function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
           borderRadius={8}
           backgroundColor="primary"
           cursor="pointer">
-          <text color="#ffffff" fontSize={13} fontWeight={600}>
+          <text color={CHALK} fontSize={13} fontWeight={600}>
             New
           </text>
         </button>
@@ -251,7 +268,7 @@ export function NotesApp(_props: Inputs<{}>, ctx: ComponentContext) {
     map(hasNote => (hasNote ? <Editor key="editor" /> : <EmptyState key="empty" />))
   );
   return (
-    <row backgroundColor={BG} y="stretch">
+    <row theme={gessoTheme} backgroundColor={BG} y="stretch">
       <Sidebar />
       {main}
     </row>

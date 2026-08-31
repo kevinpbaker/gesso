@@ -16,5 +16,5 @@ export interface AppearanceCommands {
 }
 
 export const AppearanceChannel = channel<{ view: AppearanceView }, AppearanceCommands>('appearance', {
-  view: { palette: 'daylight', accent: 'blue', corners: 'soft', textSize: 'regular', dark: false }
+  view: { palette: 'gesso', accent: 'ultramarine', corners: 'soft', textSize: 'regular', dark: true }
 });

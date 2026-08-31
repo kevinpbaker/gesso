@@ -6,7 +6,6 @@ import {
   type UiChild,
   spring,
   type UiSpringToken,
-  darkTheme,
   type UiTheme,
   type UiColors,
   type UiColor,
@@ -14,6 +13,7 @@ import {
   animateLayout
 } from '@gesso/core';
 import { Board } from './board/BoardContract';
+import { BORDER, gessoColors, gessoTheme, LINEN, POSITIVE, SURFACE, SURFACE_RAISED } from './brand';
 
 /**
  * A sprint board that moves.
@@ -290,22 +290,24 @@ interface BoardColors extends UiColors {
   readonly surfaceRaised: UiColor;
 }
 
+/*
+ * The shared Gesso ramp, plus one colour per tag. The board's surfaces
+ * are raised a step above the shared background so a card reads as a
+ * card; the tag colours are the two warm and green brand-adjacent
+ * hues plus one drifted off ultramarine, so three tags stay apart
+ * without any of them going neon.
+ */
 const boardColors: BoardColors = {
-  ...darkTheme.colors,
-  background: parseColor('#0b1017')!,
-  surface: parseColor('#131b26')!,
-  surfaceRaised: parseColor('#1b2532')!,
-  border: parseColor('#243141')!,
-  text: parseColor('#e7eef7')!,
-  textMuted: parseColor('#8b9bb0')!,
-  primary: parseColor('#5b9dff')!,
-  controlAccent: parseColor('#5b9dff')!,
-  layout: parseColor('#f2b544')!,
-  render: parseColor('#57cc99')!,
-  input: parseColor('#c48bff')!
+  ...gessoColors,
+  surface: parseColor(SURFACE)!,
+  surfaceRaised: parseColor(SURFACE_RAISED)!,
+  border: parseColor(BORDER)!,
+  layout: parseColor(LINEN)!,
+  render: parseColor(POSITIVE)!,
+  input: parseColor('#a98cd0')!
 };
 
-const boardTheme: UiTheme = { ...darkTheme, colors: boardColors };
+const boardTheme: UiTheme = { ...gessoTheme, colors: boardColors };
 
 // ---------------------------------------------------------------------------
 // Pieces
