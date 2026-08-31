@@ -523,6 +523,32 @@ export interface SharedElementArgs extends MotionTiming {
   readonly morph?: 'transform' | 'geometry';
   /** Fade the arriving element up from this opacity as it morphs. */
   readonly fadeFrom?: number;
+  /**
+   * Told `true` when this element starts morphing and `false` when it
+   * has arrived — or when it leaves mid-flight, so nothing is left
+   * holding a state that will never be cleared.
+   *
+   * It exists for one thing, and stacking is the reason. A morphing
+   * element is bigger than its resting self for most of the way, so it
+   * overlaps whatever sits beside it, and it has to be drawn *over*
+   * that rather than under it. Raising the element itself is rarely the
+   * answer: what usually has to rise is an ancestor — the card the
+   * morphing background belongs to, not the background — and a modifier
+   * cannot reach an ancestor, nor should it, because which ancestor and
+   * how far are questions about a layout that only the layout knows.
+   *
+   *   const morphing = internalState(false);
+   *   <button zIndex={morphing.pipe(map(m => (m ? 1 : 0)))}>
+   *     <box modifiers={[sharedElement({ name, onMorph: at => (morphing.value = at) })]} />
+   *
+   * A browser has no equivalent because it does not need one: its
+   * named elements are lifted out of the page into a layer above
+   * everything, so nothing they might overlap is even in the picture.
+   * Gesso morphs the real node, which stays exactly where it is in the
+   * tree — the same trade that makes the morph interruptible and free
+   * of a raster.
+   */
+  readonly onMorph?: (morphing: boolean) => void;
 }
 
 /**
@@ -562,6 +588,8 @@ class SharedElementController {
    */
   private yieldPrevious: (() => void) | null = null;
   private yielded = false;
+  /** Whether a morph is running, so `onMorph` is never told twice. */
+  private morphing = false;
   /** Set for the one frame a geometry morph spends being measured. */
   private geometryTarget: LayoutBox | null = null;
 
@@ -589,10 +617,29 @@ class SharedElementController {
 
   detach(): void {
     // Whatever this element was replacing must not be left hidden
-    // because this one went away before it ever took its place.
+    // because this one went away before it ever took its place — and
+    // whatever was raised for this morph must not be left raised
+    // because the morph never finished.
+    this.endMorph();
     this.takeOver();
     this.host.shared?.release(this.args.name, this.host.node);
     this.layer.release();
+  }
+
+  private beginMorph(): void {
+    if (this.morphing) {
+      return;
+    }
+    this.morphing = true;
+    this.args.onMorph?.(true);
+  }
+
+  private endMorph(): void {
+    if (!this.morphing) {
+      return;
+    }
+    this.morphing = false;
+    this.args.onMorph?.(false);
   }
 
   /**
@@ -674,6 +721,7 @@ class SharedElementController {
     // are final and before anything paints from them — so the element is
     // drawn over the departing one straight away and that one can step
     // aside with nothing in between.
+    this.beginMorph();
     this.layer.snapTo(flip);
     this.takeOver();
     if (this.args.morph === 'geometry') {
@@ -688,15 +736,38 @@ class SharedElementController {
       this.morphGeometry(from, box, timing);
       return;
     }
-    this.layer.animateTo(MOTION_REST, timing);
+    this.layer.animateTo(MOTION_REST, timing, () => this.endMorph());
   }
 
-  /** A spring by default: a morph is a movement, not a duration. */
+  /**
+   * A duration by default, not a spring — which is the opposite of what
+   * this started as, and a measurement is why.
+   *
+   * A spring's shape does not change with distance: it covers the same
+   * *proportion* of the move in the same time whatever the move is. A
+   * `snappy` morph over 676px was measured stepping 14, 44, 62, 69, 71,
+   * 68 pixels a frame — half the distance in about 165ms, then the last
+   * third at a crawl. A card near the middle of a list has a hundred
+   * pixels to travel and that reads as a gentle expansion; the same
+   * card near the edge of the screen has six hundred, and the identical
+   * curve reads as a jump to the middle followed by a slow settle.
+   *
+   * A fixed duration spends the same time on the move however far it
+   * goes, so the whole path is visible and the eye can follow it. It is
+   * also what the browser's own View Transitions do, and why a morph
+   * there looks like travel rather than a cut.
+   *
+   * A spring is still right for a movement that follows a gesture,
+   * where the distance is whatever the finger did and there is a real
+   * velocity to carry — so `spring` remains available per call site,
+   * and naming one still turns the duration off.
+   */
   private timing(): MotionTiming {
+    const timed = this.args.spring === undefined;
     return {
-      spring: this.args.spring ?? (this.args.duration === undefined ? 'snappy' : undefined),
-      duration: this.args.duration,
-      easing: this.args.easing,
+      spring: this.args.spring,
+      duration: timed ? (this.args.duration ?? 'slow') : this.args.duration,
+      easing: timed ? (this.args.easing ?? 'standard') : this.args.easing,
       delay: this.args.delay,
       reducedMotion: this.args.reducedMotion
     };
@@ -735,6 +806,7 @@ class SharedElementController {
       warnGeometryNeedsPositioning(this.args.name, position, 'position');
       this.layer.snapTo(MOTION_REST);
       this.takeOver();
+      this.endMorph();
       return;
     }
     const baseLeft = numberOrZero(this.host.get<unknown>('left'));
@@ -743,6 +815,7 @@ class SharedElementController {
       warnGeometryNeedsPositioning(this.args.name, position, 'offsets');
       this.layer.snapTo(MOTION_REST);
       this.takeOver();
+      this.endMorph();
       return;
     }
     this.geometryTarget = to;
@@ -763,6 +836,7 @@ class SharedElementController {
         // on being laid out by what it declared. Leaving them behind
         // would freeze a card at the size the window happened to be.
         geometry.release();
+        this.endMorph();
       }
     };
     for (const field of GEOMETRY_FIELDS) {

@@ -282,6 +282,230 @@ describe('sharedElement()', () => {
     expect(motionOf(seen.get('below')!).written).toBe(false);
   });
 
+  it('says when it is morphing, so a layout can stack it over its neighbours', () => {
+    // A morphing element is bigger than its resting self for most of the
+    // way, so it overlaps whatever sits beside it. What has to rise is
+    // usually an ancestor rather than the element itself, and a modifier
+    // cannot reach one — so it reports, and the layout decides.
+    const showSecond = internalState(false);
+    const reported: boolean[] = [];
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 400 },
+        showSecond.pipe(
+          map(second =>
+            second
+              ? Box({
+                  key: 'b',
+                  width: 200,
+                  height: 100,
+                  marginTop: 100,
+                  modifiers: [
+                    sharedElement({
+                      name: 'hero',
+                      duration: 200,
+                      easing: linear,
+                      onMorph: active => reported.push(active)
+                    })
+                  ]
+                })
+              : Box({
+                  key: 'a',
+                  width: 100,
+                  height: 50,
+                  modifiers: [
+                    sharedElement({
+                      name: 'hero',
+                      duration: 200,
+                      easing: linear,
+                      onMorph: active => reported.push(active)
+                    })
+                  ]
+                })
+          )
+        )
+      )
+    );
+    drain(mounted);
+    // Nothing shared the name with the first one, so it never morphed.
+    expect(reported).toEqual([]);
+
+    showSecond.value = true;
+    mounted.frame();
+    expect(reported).toEqual([true]);
+
+    drain(mounted);
+    expect(reported).toEqual([true, false]);
+  });
+
+  it('lets a raised ancestor put the morphing element over its neighbours', () => {
+    // The reason `onMorph` exists, end to end. A shrinking element is
+    // bigger than its resting self for the whole morph, so it covers
+    // the sibling below it — and paint order is tree order among
+    // siblings, so without a raise the sibling below is drawn on top.
+    //
+    // Asserted on the draw order, because that is the thing the viewer
+    // sees. Each box is given a size nothing else shares so a fill can
+    // be told from the others.
+    const detail = internalState(false);
+    const morphing = internalState(false);
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 600 },
+        detail.pipe(
+          map(open =>
+            open
+              ? Box({
+                  key: 'detail',
+                  width: 400,
+                  height: 600,
+                  backgroundColor: '#000000',
+                  modifiers: [sharedElement({ name: 'hero', duration: 400, easing: linear })]
+                })
+              : Column(
+                  { width: 400 },
+                  // The card, raised only while what is inside it morphs.
+                  Box(
+                    {
+                      key: 'card',
+                      width: 200,
+                      height: 100,
+                      zIndex: morphing.pipe(map(active => (active ? 1 : 0)))
+                    },
+                    Box({
+                      width: 190,
+                      height: 90,
+                      backgroundColor: '#000000',
+                      modifiers: [
+                        sharedElement({
+                          name: 'hero',
+                          duration: 400,
+                          easing: linear,
+                          onMorph: active => (morphing.value = active)
+                        })
+                      ]
+                    })
+                  ),
+                  // The neighbour, later in tree order.
+                  Box({ key: 'b', width: 180, height: 80, backgroundColor: '#ffffff' })
+                )
+          )
+        )
+      )
+    );
+    const fills = mounted.canvas.ctx.fillRect;
+    /** Which of the two was filled last on the frame that just ran. */
+    const onTop = (): string | null => {
+      let top: string | null = null;
+      for (const [, , width] of fills.mock.calls as [number, number, number][]) {
+        if (width === 190) {
+          top = 'card';
+        } else if (width === 180) {
+          top = 'neighbour';
+        }
+      }
+      return top;
+    };
+
+    drain(mounted);
+    expect(onTop()).toBe('neighbour');
+
+    detail.value = true;
+    drain(mounted);
+
+    // Coming back, the card's inner box morphs down from 400x600, so
+    // for the length of the morph it covers the neighbour's row.
+    detail.value = false;
+    mounted.frame();
+    mounted.frame();
+    expect(morphing.value).toBe(true);
+    fills.mockClear();
+    mounted.frame();
+    expect(onTop()).toBe('card');
+
+    // And gives the row back once it has arrived: `onTop` reads the
+    // last frame that drew, which is the settled one.
+    fills.mockClear();
+    drain(mounted);
+    expect(morphing.value).toBe(false);
+    expect(onTop()).toBe('neighbour');
+  });
+
+  /**
+   * Where a morph spends its time: the fraction of the journey elapsed
+   * by the moment it has covered half the distance, plus how long the
+   * whole thing takes.
+   */
+  function pacing(spring: 'snappy' | undefined): { halfwayAt: number; frames: number } {
+    const showSecond = internalState(false);
+    let node: UiNode | null = null;
+    const shared = (): ReturnType<typeof sharedElement> =>
+      sharedElement(spring === undefined ? { name: 'hero' } : { name: 'hero', spring });
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 900 },
+        showSecond.pipe(
+          map(second =>
+            second
+              ? Box({
+                  key: 'b',
+                  ref: (n: UiNode | null) => (node = n),
+                  width: 200,
+                  height: 100,
+                  modifiers: [shared()]
+                })
+              : Box({ key: 'a', width: 200, height: 100, marginTop: 700, modifiers: [shared()] })
+          )
+        )
+      )
+    );
+    drain(mounted);
+
+    showSecond.value = true;
+    mounted.frame();
+    const start = Math.abs(motionOf(node!).y);
+    expect(start).toBeGreaterThan(600);
+
+    const path: number[] = [];
+    while (mounted.clock.isPending) {
+      mounted.frame();
+      path.push(Math.abs(motionOf(node!).y));
+    }
+    expect(path[path.length - 1]).toBe(0);
+    const halfway = path.findIndex(left => left <= start / 2);
+    return { halfwayAt: (halfway + 1) / path.length, frames: path.length };
+  }
+
+  it('spends a long morph evenly, rather than most of it at once', () => {
+    // The defect this replaced, stated as a number. A spring's curve is
+    // the same proportion of the move whatever the move is, so the
+    // measured `snappy` morph over 676px was half done in about 165ms
+    // and then took the best part of a second to arrive: nearly all of
+    // the movement in the first tenth of the time, which the eye reads
+    // as a jump to the middle and a slow settle. A card near the middle
+    // of a list travels a hundred pixels and the same curve looks like
+    // a gentle expansion — which is why this only showed up on a card
+    // near the edge of the screen.
+    const timed = pacing(undefined);
+    expect(timed.halfwayAt).toBeGreaterThan(0.2);
+    expect(timed.frames).toBeLessThan(30);
+
+    // The same journey on the old default, for the comparison to be
+    // real rather than asserted: half the distance gone in a small
+    // fraction of a much longer settle.
+    const sprung = pacing('snappy');
+    expect(sprung.halfwayAt).toBeLessThan(timed.halfwayAt);
+    expect(sprung.frames).toBeGreaterThan(timed.frames);
+  });
+
+  it('still takes a spring when one is asked for', () => {
+    // The principle a spring exists for has not gone: a movement that
+    // follows a gesture has a real velocity and no natural duration.
+    // Naming one turns the default duration off rather than fighting
+    // it, which is the bug a `{spring, duration}` pair would be.
+    expect(pacing('snappy').frames).toBeGreaterThan(30);
+  });
+
   it('does nothing at all for an element that nothing shared a name with', () => {
     let node: UiNode | null = null;
     const mounted = mountRuntime(
