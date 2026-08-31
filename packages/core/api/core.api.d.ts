@@ -183,6 +183,7 @@ declare class UiTween<T> extends UiAnimation<T> {
 }
 declare class UiSpring extends UiAnimation<number> {
   private position;
+  private previousPosition;
   private velocity;
   private readonly to;
   private readonly spec;
@@ -1592,6 +1593,7 @@ interface PaintState {
   fontFamily: string;
   fontWeight: string | number;
   lineHeight: number;
+  letterSpacing: number;
   textColor: UiColor;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
@@ -1630,6 +1632,7 @@ interface Canvas2DContext {
   scale(x: number, y: number): void;
   rotate(angle: number): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  letterSpacing?: string;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
   strokeRect(x: number, y: number, width: number, height: number): void;
@@ -4552,7 +4555,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-BE9IPw65.js";
+} from "./index-DSWooLvR.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5193,7 +5196,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-BE9IPw65.js";
+} from "./index-DSWooLvR.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -5258,6 +5261,7 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   private _font;
   private _textAlign;
   private _textBaseline;
+  letterSpacing: string;
   get fillStyle(): string | CanvasGradient | CanvasPattern;
   set fillStyle(value: string | CanvasGradient | CanvasPattern);
   get strokeStyle(): string | CanvasGradient | CanvasPattern;
