@@ -320,6 +320,8 @@ const SPRING_MAX_FRAME_MS = 64;
  */
 export class UiSpring extends UiAnimation<number> {
   private position: number;
+  /** The position one sub-step back, for the interpolation below. */
+  private previousPosition: number;
   private velocity: number;
   private readonly to: number;
   private readonly spec: UiSpringSpec;
@@ -329,6 +331,7 @@ export class UiSpring extends UiAnimation<number> {
   constructor(cell: AnimatedCell<number>, to: number, options: UiSpringOptions) {
     super(cell, options.stepMs ?? 0, options.reducedMotion ?? 'snap', options.delay ?? 0);
     this.position = cell.value;
+    this.previousPosition = this.position;
     this.velocity = options.velocity ?? 0;
     this.to = to;
     this.spec = options.spring;
@@ -364,6 +367,7 @@ export class UiSpring extends UiAnimation<number> {
     // one thing this integrator exists to avoid — the spec asserts
     // that 60 Hz and 30 Hz agree to six places.
     while (this.simulatedTo + SPRING_STEP_MS <= until) {
+      this.previousPosition = this.position;
       const acceleration = (-stiffness * (this.position - this.to) - damping * this.velocity) / mass;
       this.velocity += acceleration * seconds;
       this.position += this.velocity * seconds;
@@ -373,10 +377,31 @@ export class UiSpring extends UiAnimation<number> {
     // through its target at speed is not finished.
     if (Math.abs(this.position - this.to) < this.restDelta && Math.abs(this.velocity) < this.restDelta * 10) {
       this.position = this.to;
+      this.previousPosition = this.to;
       this.velocity = 0;
       return { value: this.to, done: true };
     }
-    return { value: this.position, done: false };
+    // Reported between the last two sub-steps, by however much of one
+    // is left over.
+    //
+    // The simulation runs on whole steps and must: a partial step would
+    // make the *trajectory* depend on the cadence, which is what this
+    // integrator exists to avoid. But reporting the whole-step position
+    // makes the value it hands out depend on the cadence in a different
+    // and more visible way. A sub-step is 1/240s, so a 60Hz frame is
+    // exactly four of them and every frame advances the same amount —
+    // while a 165Hz frame is 1.4545 of them, so the loop above runs one
+    // step, then one, then two, and the element moves by twice as much
+    // on every third frame. That reads as judder on exactly the
+    // displays fast enough to show it, which is the opposite of what a
+    // high refresh rate is for.
+    //
+    // Interpolating the *output* keeps both: the simulation is
+    // untouched and still agrees to six places across cadences, and the
+    // value handed out advances by an equal amount every frame. It
+    // trails the simulation by up to one sub-step, which is 4ms.
+    const alpha = (until - this.simulatedTo) / SPRING_STEP_MS;
+    return { value: this.previousPosition + (this.position - this.previousPosition) * alpha, done: false };
   }
 }
 

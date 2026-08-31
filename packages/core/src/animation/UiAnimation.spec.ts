@@ -229,6 +229,67 @@ describe('the driver', () => {
     expect(target.value).toBeCloseTo(25, 6);
   });
 
+  it('advances by an even amount per frame at a rate the sub-step does not divide', () => {
+    // The integrator runs on whole 1/240s sub-steps, and a 60Hz frame
+    // is exactly four of them — so every frame advanced the same
+    // amount and the motion was even. A 165Hz frame is 1.4545 of them,
+    // so the loop ran one step, then one, then two, and the value
+    // jumped by twice as much on every third frame. Judder on exactly
+    // the displays fast enough to show it.
+    /**
+     * How much each frame's movement differs from the mean of the two
+     * around it.
+     *
+     * Pure alternation shows up here and smooth acceleration does not,
+     * which is what makes it the right measure: a spring leaving rest
+     * legitimately moves further every frame, and a metric that only
+     * compared consecutive frames could not tell that from judder.
+     */
+    const alternation = (hz: number): number => {
+      const target = cell(0);
+      const spring = new UiSpring(target, 500, { spring: { stiffness: 220, damping: 24, mass: 1 } });
+      const values: number[] = [];
+      // From zero, because the first `advance` is what starts the clock.
+      for (let i = 0; i <= Math.round(hz / 4); i++) {
+        spring.advance((i * 1000) / hz);
+        values.push(target.value);
+      }
+      const moves = values.slice(1).map((value, i) => value - values[i]);
+      let worst = 0;
+      for (let i = 1; i < moves.length - 1; i++) {
+        const neighbours = (moves[i - 1] + moves[i + 1]) / 2;
+        if (neighbours > 0.01) {
+          worst = Math.max(worst, Math.abs(moves[i] - neighbours) / neighbours);
+        }
+      }
+      return worst;
+    };
+
+    // Measured before the output was interpolated: 106% at 165Hz and
+    // 100% at 144Hz — each frame moving about twice its neighbours,
+    // because the loop above ran one sub-step, then one, then two.
+    // 60Hz was 25%, since its frame is exactly four sub-steps.
+    expect(alternation(165)).toBeLessThan(0.15);
+    expect(alternation(144)).toBeLessThan(0.15);
+  });
+
+  it('still agrees across cadences, because only the report is interpolated', () => {
+    // The simulation is untouched: the interpolation is of the value
+    // handed out, not of the state. Two cadences that both land on a
+    // whole sub-step therefore still agree exactly.
+    const at60 = cell(0);
+    const spring60 = new UiSpring(at60, 500, { spring: defaultMotion.springs.gentle });
+    for (let t = 0; t <= 320; t += 16) {
+      spring60.advance(t);
+    }
+    const at30 = cell(0);
+    const spring30 = new UiSpring(at30, 500, { spring: defaultMotion.springs.gentle });
+    for (let t = 0; t <= 320; t += 32) {
+      spring30.advance(t);
+    }
+    expect(at60.value).toBeCloseTo(at30.value, 6);
+  });
+
   it('reports nothing to do when it is empty, which is what makes ticks 0 honest', () => {
     const driver = new AnimationDriver();
     expect(driver.isRunning).toBe(false);
