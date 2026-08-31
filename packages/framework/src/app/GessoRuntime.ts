@@ -292,6 +292,13 @@ export class GessoRuntime {
   /** Animates a wheel scroll; see `SmoothScroller`. */
   private readonly smoothScroller: SmoothScroller;
   /**
+   * Whether the document showing this runtime is on screen.
+   *
+   * Assumed true until the shell says otherwise, because a runtime with
+   * no shell — a spec, a headless graph — is never told and must draw.
+   */
+  private visible = true;
+  /**
    * The running animations. Built as a field rather than in the body
    * of the constructor because the builder, the services and `buildRoot`
    * all need it, and `buildRoot` is where a component's first
@@ -583,7 +590,9 @@ export class GessoRuntime {
   /** Starts the frame scheduler. */
   start(): void {
     this.started = true;
-    this.scheduler.start();
+    if (this.visible) {
+      this.scheduler.start();
+    }
   }
 
   /** The backend drawing frames, or `pending` while WebGPU initialises. */
@@ -796,6 +805,31 @@ export class GessoRuntime {
    */
   setVisible(visible: boolean): void {
     this.input.editing.setVisible(visible);
+    if (visible === this.visible) {
+      return;
+    }
+    this.visible = visible;
+    if (!visible) {
+      // Nothing to draw for, so nothing is drawn. A browser stops
+      // `requestAnimationFrame` for a hidden document and this is the
+      // same rule, applied where the runtime can act on it: without it
+      // a hidden tab keeps laying out and painting a canvas nobody can
+      // see. `UiHostFrameClock` cannot decide this for itself — a host
+      // that has stopped forwarding refreshes looks exactly like a host
+      // that never forwarded any, and the second must fall back to a
+      // timer rather than freeze.
+      this.scheduler.stop();
+      return;
+    }
+    if (!this.started) {
+      return;
+    }
+    this.scheduler.start();
+    // One frame on the way back, whether or not anything is dirty: an
+    // animation that was running when the tab went away is still in the
+    // driver, and `scheduleAnimationTick` only re-arms from inside a
+    // frame.
+    this.scheduler.wake();
   }
 
   /**

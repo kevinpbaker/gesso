@@ -550,6 +550,13 @@ export class WorkerApp {
     const onVisibilityChange = (): void => {
       this.post({ type: 'visibility', visible: document.visibilityState !== 'hidden' });
     };
+    // Sent once here as well as on change, for the reason the reduced
+    // motion listener below gives for itself: a tab that is *already*
+    // hidden when it starts never fires `visibilitychange`, so without
+    // this the runtime assumes it is on screen and lays out and paints
+    // a canvas nobody can see. That is not hypothetical — a page opened
+    // in a background tab, or behind another window, is exactly this.
+    onVisibilityChange();
     // Sent once here as well as on change: someone who already has the
     // preference on must not watch the first screen animate.
     const detachReducedMotion = observeReducedMotion(reduced => {
