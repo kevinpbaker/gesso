@@ -98,7 +98,7 @@ export class UiPlatformAdapter {
     this.wheelHandler = e => {
       const w = e as WheelEvent;
       const local = surface.clientToLocal(w.clientX, w.clientY);
-      const event = this.wheel.wheel(local.x, local.y, w.deltaX, w.deltaY, modifiersFromEvent(w));
+      const event = this.wheel.wheel(local.x, local.y, w.deltaX, w.deltaY, modifiersFromEvent(w), w.deltaMode);
       if (event.defaultPrevented) {
         w.preventDefault();
       }

@@ -9,6 +9,7 @@ export {
   UiKeyboardEvent,
   UiPointerEvent,
   UiTextChangeEvent,
+  UiWheelDeltaMode,
   UiWheelEvent
 } from './UiInputEvent';
 export type { UiKeyModifiers } from './UiInputEvent';

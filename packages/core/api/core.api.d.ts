@@ -665,13 +665,20 @@ declare class UiTextChangeEvent extends UiInputEvent {
   readonly selectionEnd: number;
   constructor(value: string, selectionStart: number, selectionEnd: number);
 }
+declare enum UiWheelDeltaMode {
+  Pixel = 0,
+  Line = 1,
+  Page = 2
+}
 declare class UiWheelEvent extends UiInputEvent {
   readonly x: number;
   readonly y: number;
   readonly deltaX: number;
   readonly deltaY: number;
   readonly modifiers: UiKeyModifiers;
-  constructor(type: UiEventType.Wheel, x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers);
+  readonly deltaMode: UiWheelDeltaMode;
+  constructor(type: UiEventType.Wheel, x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers,
+  deltaMode?: UiWheelDeltaMode);
 }
 type UiEventListener = (event: UiInputEvent) => void;
 interface UiEventListenerOptions {
@@ -1998,6 +2005,8 @@ interface ScrollContainerState {
   maxScrollX: number;
   maxScrollY: number;
   horizontal: boolean;
+  viewportWidth?: number;
+  viewportHeight?: number;
 }
 interface ScrollSink {
   containerState(node: UiNode): ScrollContainerState | undefined;
@@ -2010,9 +2019,10 @@ declare class UiWheelController {
   private readonly dispatcher;
   private readonly scrollSink;
   constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, scrollSink: ScrollSink);
-  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers): UiWheelEvent;
+  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode): UiWheelEvent;
   private nearestScrollable;
   private applyDelta;
+  private toPixels;
 }
 declare function isScrollContainer(node: UiNode): boolean;
 interface PointerControllerOptions {
@@ -3885,6 +3895,7 @@ export {
   UiVisualState,
   UiVisualStateSet,
   UiWheelController,
+  UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
   validateRole,
@@ -4499,6 +4510,7 @@ import {
   UiVisualState,
   UiVisualStateSet,
   UiWheelController,
+  UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
   validateRole,
@@ -4530,7 +4542,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CiDH1_3A.js";
+} from "./index-BgmFFQmJ.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5120,6 +5132,7 @@ export {
   UiVisualState,
   UiVisualStateSet,
   UiWheelController,
+  UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
   validateRole,
@@ -5168,7 +5181,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-CiDH1_3A.js";
+} from "./index-BgmFFQmJ.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

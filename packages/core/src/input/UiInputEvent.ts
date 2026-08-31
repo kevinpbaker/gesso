@@ -217,6 +217,18 @@ export class UiTextChangeEvent extends UiInputEvent {
  * there). preventDefault() on a Wheel cancels the automatic scroll
  * consumption of the nearest scroll container.
  */
+/**
+ * The unit a wheel's deltas are in, matching the DOM's `deltaMode`.
+ *
+ * The numbers are the DOM's own, so a shell can forward
+ * `event.deltaMode` unchanged and nothing has to translate.
+ */
+export enum UiWheelDeltaMode {
+  Pixel = 0,
+  Line = 1,
+  Page = 2
+}
+
 export class UiWheelEvent extends UiInputEvent {
   constructor(
     type: UiEventType.Wheel,
@@ -224,7 +236,20 @@ export class UiWheelEvent extends UiInputEvent {
     readonly y: number,
     readonly deltaX: number,
     readonly deltaY: number,
-    readonly modifiers: UiKeyModifiers = noKeyModifiers()
+    readonly modifiers: UiKeyModifiers = noKeyModifiers(),
+    /**
+     * What the deltas are measured in.
+     *
+     * Mirrors the DOM, deliberately: `deltaX`/`deltaY` are a distance
+     * in pixels only when this is `Pixel`, and a handler that reads
+     * them without checking is the bug this field was added to fix.
+     * Chrome reports pixels and Firefox reports lines, so a delta
+     * taken at face value moves the view three pixels per notch there.
+     * The wheel controller converts before it scrolls anything; an
+     * application handler that consumes the delta itself has to do the
+     * same.
+     */
+    readonly deltaMode: UiWheelDeltaMode = UiWheelDeltaMode.Pixel
   ) {
     super(type);
   }

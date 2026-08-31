@@ -588,6 +588,9 @@ export class WorkerApp {
         y,
         deltaX: event.deltaX,
         deltaY: event.deltaY,
+        // Forwarded, not converted: what a line is worth is a policy
+        // question and policy lives in the runtime.
+        deltaMode: event.deltaMode,
         modifiers: modifiersFrom(event),
         at: epochFromEvent(event)
       });

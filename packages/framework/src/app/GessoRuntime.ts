@@ -1240,7 +1240,9 @@ export class GessoRuntime {
           scrollY: record.scrollY,
           maxScrollX: Math.max(0, record.contentWidth - record.width),
           maxScrollY: Math.max(0, record.contentHeight - record.height),
-          horizontal: node.getProperty('direction') === 'row' || node.type === UiNodeType.Row
+          horizontal: node.getProperty('direction') === 'row' || node.type === UiNodeType.Row,
+          viewportWidth: record.width,
+          viewportHeight: record.height
         };
       },
       scrollBy: (node, dx, dy): void => {

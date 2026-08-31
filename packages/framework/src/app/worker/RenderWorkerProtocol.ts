@@ -48,7 +48,22 @@ export type ShellToRuntimeMessage =
   | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
   | { type: 'pointerUp'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
   | { type: 'pointerCancel'; at?: number }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: UiKeyModifiers; at?: number }
+  /**
+   * `deltaMode` is the DOM's own value, forwarded rather than
+   * translated: a wheel delta is a distance in pixels only when it is
+   * 0, and Firefox reports lines. Optional, so a shell that predates
+   * it is read as pixels — which is what it was assumed to be.
+   */
+  | {
+      type: 'wheel';
+      x: number;
+      y: number;
+      deltaX: number;
+      deltaY: number;
+      modifiers: UiKeyModifiers;
+      deltaMode?: number;
+      at?: number;
+    }
   | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers; at?: number }
   | { type: 'keyUp'; key: string; modifiers: UiKeyModifiers; at?: number }
   /** A `beforeinput` from the editing proxy, in the DOM's inputType vocabulary. */

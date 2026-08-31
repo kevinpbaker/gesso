@@ -823,13 +823,15 @@ type ShellToRuntimeMessage = {
 } | {
   type: 'pointerCancel';
   at?: number;
-} | {
+} |
+{
   type: 'wheel';
   x: number;
   y: number;
   deltaX: number;
   deltaY: number;
   modifiers: UiKeyModifiers;
+  deltaMode?: number;
   at?: number;
 } | {
   type: 'keyDown';

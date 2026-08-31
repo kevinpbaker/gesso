@@ -1,6 +1,6 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { noKeyModifiers, UiEventType, UiWheelEvent, type UiKeyModifiers } from './UiInputEvent';
+import { noKeyModifiers, UiEventType, UiWheelDeltaMode, UiWheelEvent, type UiKeyModifiers } from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
 import type { ScrollbarThumb } from '../layout/Scrollbars';
 import type { UiInputDispatcher } from './UiInputDispatcher';
@@ -17,7 +17,28 @@ export interface ScrollContainerState {
   maxScrollY: number;
   /** True when the container scrolls horizontally (row layout). */
   horizontal: boolean;
+  /**
+   * The visible extent, which is what a page-mode wheel delta means.
+   *
+   * Optional because a wheel that reports its deltas in pixels — every
+   * wheel on Chrome, and every trackpad everywhere — never needs it,
+   * and a sink written before page mode existed should not have to
+   * grow a field to keep compiling. A page delta with no extent falls
+   * back to a screenful of lines.
+   */
+  viewportWidth?: number;
+  viewportHeight?: number;
 }
+
+/**
+ * A line, in pixels, for a wheel that measures its deltas in lines.
+ *
+ * There is no API that says what a line is, so this is a choice: one
+ * line of default body text, near enough. Firefox reports three of
+ * them per notch, which lands close to the distance a notch moves a
+ * document there.
+ */
+const LINE_HEIGHT_PX = 16;
 
 /**
  * Bridges wheel scroll consumption to the layout system. The app
@@ -52,10 +73,11 @@ export class UiWheelController {
     y: number,
     deltaX: number,
     deltaY: number,
-    modifiers: UiKeyModifiers = noKeyModifiers()
+    modifiers: UiKeyModifiers = noKeyModifiers(),
+    deltaMode: UiWheelDeltaMode = UiWheelDeltaMode.Pixel
   ): UiWheelEvent {
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
-    const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers);
+    const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers, deltaMode);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
     }
@@ -64,7 +86,7 @@ export class UiWheelController {
       if (container !== null) {
         const state = this.scrollSink.containerState(container);
         if (state !== undefined) {
-          this.applyDelta(container, state, deltaX, deltaY);
+          this.applyDelta(container, state, deltaX, deltaY, deltaMode);
         }
       }
     }
@@ -80,12 +102,39 @@ export class UiWheelController {
     return null;
   }
 
-  private applyDelta(container: UiNode, state: ScrollContainerState, deltaX: number, deltaY: number): void {
+  private applyDelta(
+    container: UiNode,
+    state: ScrollContainerState,
+    deltaX: number,
+    deltaY: number,
+    deltaMode: UiWheelDeltaMode
+  ): void {
     if (state.horizontal) {
-      this.scrollSink.scrollBy(container, deltaX, 0);
+      this.scrollSink.scrollBy(container, this.toPixels(deltaX, deltaMode, state.viewportWidth), 0);
     } else {
-      this.scrollSink.scrollBy(container, 0, deltaY);
+      this.scrollSink.scrollBy(container, 0, this.toPixels(deltaY, deltaMode, state.viewportHeight));
     }
+  }
+
+  /**
+   * A wheel delta in whatever unit it arrived in, as pixels.
+   *
+   * A `WheelEvent`'s delta is only a distance when `deltaMode` is
+   * `Pixel`. Chrome reports pixels; Firefox reports **lines**, three
+   * per notch, so a delta taken at face value there moves the view
+   * three pixels — a scroll that looks broken rather than fast or
+   * slow. Page mode exists too, and means a screenful.
+   */
+  private toPixels(delta: number, mode: UiWheelDeltaMode, extent: number | undefined): number {
+    if (mode === UiWheelDeltaMode.Line) {
+      return delta * LINE_HEIGHT_PX;
+    }
+    if (mode === UiWheelDeltaMode.Page) {
+      // A screenful, less nothing: this matches paging the scrollbar
+      // track, which already moves by exactly one viewport.
+      return delta * (extent ?? LINE_HEIGHT_PX * 25);
+    }
+    return delta;
   }
 }
 

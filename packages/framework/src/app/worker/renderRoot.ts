@@ -248,7 +248,14 @@ export class RenderWorkerApp {
         runtime.input.pointer.pointerCancel();
         break;
       case 'wheel':
-        runtime.input.wheel.wheel(message.x, message.y, message.deltaX, message.deltaY, message.modifiers);
+        runtime.input.wheel.wheel(
+          message.x,
+          message.y,
+          message.deltaX,
+          message.deltaY,
+          message.modifiers,
+          message.deltaMode
+        );
         break;
       case 'keyDown':
         runtime.input.keyboard.keyDown(message.key, message.modifiers);

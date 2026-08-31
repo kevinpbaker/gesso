@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType, type UiKeyModifiers } from './UiInputEvent';
+import { noKeyModifiers, UiEventType, UiWheelDeltaMode, type UiKeyModifiers } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import type { UiWheelController } from './UiWheelController';
 
@@ -76,6 +76,39 @@ describe('UiWheelController', () => {
     expect(event.deltaY).toBe(100);
     expect(target).toHaveBeenCalledTimes(1);
     expect(ancestor).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a line delta as lines, not as pixels', () => {
+    // A `WheelEvent`'s delta is a distance only in pixel mode. Firefox
+    // reports lines — three per notch — so taken at face value a notch
+    // moved the view three pixels, which reads as a scroll that is
+    // broken rather than one that is slow.
+    const { h, scroll, controller } = setupVertical();
+
+    controller.wheel(50, 50, 0, 3, noKeyModifiers(), UiWheelDeltaMode.Line);
+
+    expect(scrollY(h, scroll)).toBe(48);
+  });
+
+  it('reads a page delta as one screenful of the container it is over', () => {
+    // The 200-tall viewport, which is what paging the scrollbar track
+    // already moves by.
+    const { h, scroll, controller } = setupVertical();
+
+    controller.wheel(50, 50, 0, 1, noKeyModifiers(), UiWheelDeltaMode.Page);
+
+    expect(scrollY(h, scroll)).toBe(200);
+  });
+
+  it('carries the mode on the event, as the DOM does', () => {
+    // The deltas stay in the unit they arrived in. A handler reading
+    // them without checking the mode is the bug this exists to name.
+    const { controller } = setupVertical();
+
+    const event = controller.wheel(50, 50, 0, 3, noKeyModifiers(), UiWheelDeltaMode.Line);
+
+    expect(event.deltaY).toBe(3);
+    expect(event.deltaMode).toBe(UiWheelDeltaMode.Line);
   });
 
   it('scrolls the nearest scroll container by deltaY', () => {

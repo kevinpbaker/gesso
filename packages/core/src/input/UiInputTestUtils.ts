@@ -150,7 +150,9 @@ class HarnessScrollSink implements ScrollSink {
       scrollY: record.scrollY,
       maxScrollX: Math.max(0, record.contentWidth - record.width),
       maxScrollY: Math.max(0, record.contentHeight - record.height),
-      horizontal
+      horizontal,
+      viewportWidth: record.width,
+      viewportHeight: record.height
     };
   }
 
