@@ -153,7 +153,15 @@ export class AnimationDriver {
   nextTickAt(now: number): number | undefined {
     let earliest: number | undefined;
     for (const animation of this.running.values()) {
-      const due = animation.dueAt(now);
+      // Minus its slack, because this is the earliest moment a frame
+      // would be *useful*, not the exact moment it is owed. Frames
+      // arrive on the display's refreshes: a caller that waits for the
+      // exact due time asks after the refresh that could have served
+      // it and waits for the next one, which is how 59.94fps video on
+      // a 60Hz display ends up playing at thirty. Asking a slack early
+      // means the refresh at or just before due is the one that
+      // serves it, and `advance` accepts it for the same reason.
+      const due = animation.dueAt(now) - animation.dueSlackMs;
       if (earliest === undefined || due < earliest) {
         earliest = due;
       }
@@ -173,7 +181,10 @@ export class AnimationDriver {
    */
   advance(now: number): void {
     for (const [cell, animation] of this.running) {
-      if (animation.dueAt(now) > now) {
+      // Early by less than its own slack counts as on time — the same
+      // allowance `nextTickAt` asks the scheduler for, and for the
+      // same reason. See `UiAnimation.dueSlackMs`.
+      if (animation.dueAt(now) - animation.dueSlackMs > now) {
         continue;
       }
       animation.advance(now);

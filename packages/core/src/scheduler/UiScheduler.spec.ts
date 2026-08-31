@@ -36,6 +36,89 @@ describe('UiScheduler', () => {
       expect(clock.isPending).toBe(true);
     });
 
+    it('arms nothing for a node dirtied by the frame about to collect it', () => {
+      // `beforeCollect` is where animations run, and one that writes
+      // through the graph marks a node dirty from inside the frame
+      // that is going to draw it. The dirty set is taken afterwards,
+      // so the work lands either way; arming a frame here only adds a
+      // second one with nothing left to do. Against a fixed 16ms timer
+      // that spare frame was simply the next scheduled one and cost
+      // nothing — against a display-paced clock it doubled the rate of
+      // every page with a video playing on it.
+      const clock = new UiManualFrameClock(() => {});
+      const dirty = new DirtyNodeSet();
+      const onFrame = vi.fn<(frame: UiFrame) => void>();
+      const node = createNode('a');
+      const scheduler = new UiScheduler({
+        clock: callback => {
+          clock.setCallback(callback);
+          return clock;
+        },
+        dirty,
+        onFrame,
+        beforeCollect: () => {
+          dirty.mark(node);
+          scheduler.notifyDirty();
+        }
+      });
+      scheduler.start();
+      dirty.mark(node);
+      scheduler.notifyDirty();
+      clock.tick(0);
+
+      expect(onFrame).toHaveBeenCalledTimes(1);
+      // The node the hook dirtied was collected by this frame.
+      expect(onFrame.mock.calls[0]![0].size).toBe(1);
+      // And no frame was armed to collect it again.
+      expect(clock.isPending).toBe(false);
+    });
+
+    it('still arms one for a change made outside a frame', () => {
+      // The distinction being drawn is *when*, not who: the same call
+      // from an event handler has no frame to ride on and must arm one.
+      const { scheduler, clock, dirty } = createScheduler();
+      scheduler.start();
+      dirty.mark(createNode('a'));
+      scheduler.notifyDirty();
+      clock.tick(0);
+      expect(clock.isPending).toBe(false);
+
+      dirty.mark(createNode('b'));
+      scheduler.notifyDirty();
+      expect(clock.isPending).toBe(true);
+    });
+
+    it('lets an animation arm the next frame from inside this one', () => {
+      // `wake` is the other half of the distinction: an animation has
+      // nothing in the dirty set to ride on — its whole job is to keep
+      // frames coming — so it asks directly and is not turned away.
+      const clock = new UiManualFrameClock(() => {});
+      const dirty = new DirtyNodeSet();
+      let frames = 0;
+      const scheduler = new UiScheduler({
+        clock: callback => {
+          clock.setCallback(callback);
+          return clock;
+        },
+        dirty,
+        onFrame: () => {},
+        beforeCollect: () => {
+          frames++;
+          if (frames < 3) {
+            scheduler.wake();
+          }
+        }
+      });
+      scheduler.start();
+      scheduler.wake();
+      clock.tick(0);
+      expect(clock.isPending).toBe(true);
+      clock.tick(16);
+      expect(clock.isPending).toBe(true);
+      clock.tick(32);
+      expect(clock.isPending).toBe(false);
+    });
+
     it('does not process synchronously', () => {
       const { scheduler, dirty, onFrame } = createScheduler();
       dirty.mark(createNode('a'));

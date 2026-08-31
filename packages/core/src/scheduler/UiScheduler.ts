@@ -58,6 +58,8 @@ export class UiScheduler {
   private disposed = false;
   private active = true;
   private pending = false;
+  /** True between a frame starting and its dirty set being taken. */
+  private collecting = false;
   private frames = 0;
 
   /**
@@ -81,9 +83,26 @@ export class UiScheduler {
   /**
    * Called whenever a node becomes dirty.
    *
-   * Arms a frame only when none is already pending.
+   * Arms a frame only when none is already pending — and not at all
+   * while a frame is between starting and collecting its dirty set,
+   * because that frame is about to collect this very node. The work
+   * happens either way; what a frame armed here would add is a second
+   * frame with nothing left to do.
+   *
+   * This is the difference between `notifyDirty` and `wake`, and it
+   * only became visible when frames started following the display.
+   * `beforeCollect` is where animations run, and an animation that
+   * writes through the graph — `videoSource` presenting the frame due
+   * at its position is the one that found this — marked a node dirty
+   * from inside the frame that was going to draw it, and armed
+   * another. Against a fixed 16ms timer the spare frame was simply the
+   * next scheduled one and cost nothing; against a 165Hz display it
+   * doubled the rate of everything a video was playing behind.
    */
   notifyDirty(): void {
+    if (this.collecting) {
+      return;
+    }
     this.wake();
   }
 
@@ -169,8 +188,14 @@ export class UiScheduler {
 
   private handleFrame(time: UiFrameTime): void {
     this.pending = false;
-    this.beforeCollect?.(time);
-    const frame = this.collectFrame(time);
+    this.collecting = true;
+    let frame: UiFrame;
+    try {
+      this.beforeCollect?.(time);
+      frame = this.collectFrame(time);
+    } finally {
+      this.collecting = false;
+    }
     if (frame.size > 0) {
       this.onFrame(frame);
     }

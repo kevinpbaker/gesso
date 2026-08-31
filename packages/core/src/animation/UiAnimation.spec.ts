@@ -256,10 +256,50 @@ describe('the driver', () => {
       )
     );
     driver.advance(1000);
-    // Eight wake-ups a second, not sixty.
-    expect(driver.nextTickAt(1000)).toBe(1110);
+    // Eight wake-ups a second, not sixty — asked for a slack early,
+    // because a frame lands on a refresh rather than on demand and
+    // waiting for the exact moment means catching the one after it.
+    expect(driver.nextTickAt(1000)).toBe(1110 - 4);
     driver.advance(1050);
     expect(target.written).toEqual([0]);
+  });
+
+  it('runs at the fastest thing on the page, and falls back when it ends', () => {
+    // The whole point of a min across everything running. A video
+    // paces itself at its own frame rate; an animation beside it wants
+    // every frame; while both are live the page runs at the animation's
+    // cadence, and when the animation finishes it drops back to the
+    // video's rather than staying awake at sixty for a picture that
+    // changes thirty times a second.
+    const driver = new AnimationDriver();
+    const video = cell(0);
+    driver.start(
+      new UiTween(
+        video,
+        1000,
+        { duration: 1000, easing: linear, stepMs: 1000 / 30, repeat: true },
+        (a, b, t) => a + (b - a) * t
+      )
+    );
+    driver.advance(1000);
+    // On its own: the next frame it has any use for is a thirtieth of
+    // a second away, not the next refresh — less the slack it is
+    // willing to be early by, so the refresh nearest its due time is
+    // the one that serves it.
+    expect(driver.nextTickAt(1000)).toBeCloseTo(1000 + 1000 / 30 - 4, 6);
+
+    const moving = cell(0);
+    driver.start(new UiTween(moving, 1, { duration: 200, easing: linear }, (a, b, t) => a + (b - a) * t));
+    driver.advance(1000);
+    // Now something wants every frame, so the page does too.
+    expect(driver.nextTickAt(1000)).toBe(1000);
+
+    // The animation ends; the video is still playing.
+    driver.advance(1200);
+    expect(driver.isRunning).toBe(true);
+    const next = driver.nextTickAt(1200);
+    expect(next).toBeGreaterThan(1200);
+    expect(next! - 1200).toBeCloseTo(1000 / 30 - 4, 6);
   });
 
   it('drops a finished animation, so an app goes quiet by itself', () => {

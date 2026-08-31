@@ -87,6 +87,9 @@ export interface UiSpringOptions extends UiAnimationOptions {
  * that has not changed — is the same for a tween and for a spring, and
  * is the part the driver depends on.
  */
+/** The most a sample may be taken early, in milliseconds. */
+const MAX_DUE_SLACK_MS = 4;
+
 export abstract class UiAnimation<T> {
   /** When the first tick reached it, on the frame clock. */
   protected startedAt = 0;
@@ -118,6 +121,25 @@ export abstract class UiAnimation<T> {
   }
 
   /** When this animation next wants a frame. */
+  /**
+   * How early a sample may be taken and still count as on time.
+   *
+   * Frames arrive on the display's refreshes, not on demand, so a
+   * cadence that does not divide the refresh interval can only ever be
+   * served early or late. Insisting on "not before due" makes that a
+   * catastrophe rather than a rounding error: 59.94fps video has a
+   * 16.683ms frame and a 60Hz display refreshes every 16.667ms, so
+   * every due time falls 0.016ms after a refresh, every refresh is
+   * turned away, and the video plays at half rate.
+   *
+   * Half a step, capped, because being early by a fraction of your own
+   * interval is imperceptible while being early by a whole one would
+   * be a dropped frame's worth of drift.
+   */
+  get dueSlackMs(): number {
+    return Math.min(this.stepMs / 2, MAX_DUE_SLACK_MS);
+  }
+
   dueAt(now: number): number {
     // Still waiting out its delay: the next frame it has any use for is
     // the one the delay ends on, so the scheduler can sleep until then
