@@ -141,6 +141,8 @@ export class WorkerApp {
   private history: ShellHistory | null = null;
   /** True once the render worker has answered `ready` at least once. */
   private ready = false;
+  /** The running `requestAnimationFrame` handle, when ticks are wanted. */
+  private frameHandle: number | null = null;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -313,8 +315,45 @@ export class WorkerApp {
     this.post({ type: 'inspector', enabled });
   }
 
+  /**
+   * Runs the display's refresh loop on the runtime's behalf.
+   *
+   * The one piece of per-frame work the shell genuinely has to do:
+   * `requestAnimationFrame` is tied to the compositor and does not
+   * exist in a worker, so without this the render worker can only
+   * guess at a cadence with a timer — a fixed sixty on a 165Hz
+   * display, aligned to none of its refreshes.
+   *
+   * The loop is free-running while the worker wants frames rather than
+   * armed per frame, because a request-per-frame costs a round trip
+   * inside every frame and halves the rate whenever the request misses
+   * that vsync's callback. Each tick is a bare timestamp, and the loop
+   * stops the moment the worker says it is idle — so an app doing
+   * nothing costs nothing here.
+   */
+  private setFrameLoop(running: boolean): void {
+    if (!running) {
+      if (this.frameHandle !== null) {
+        cancelAnimationFrame(this.frameHandle);
+        this.frameHandle = null;
+      }
+      return;
+    }
+    if (this.frameHandle !== null) {
+      return;
+    }
+    const step = (time: number): void => {
+      // Re-armed before posting, so a worker that keeps wanting frames
+      // never waits a refresh for the shell to come back round.
+      this.frameHandle = requestAnimationFrame(step);
+      this.post({ type: 'tick', time });
+    };
+    this.frameHandle = requestAnimationFrame(step);
+  }
+
   dispose(): void {
     this.ready = false;
+    this.setFrameLoop(false);
     this.proxy?.dispose();
     this.proxy = null;
     this.mirror?.dispose();
@@ -367,6 +406,10 @@ export class WorkerApp {
     }
     if (message.type === 'ready') {
       this.ready = true;
+      return;
+    }
+    if (message.type === 'frameLoop') {
+      this.setFrameLoop(message.running);
       return;
     }
     if (message.type === 'inspect') {

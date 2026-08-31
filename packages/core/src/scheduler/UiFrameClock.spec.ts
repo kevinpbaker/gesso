@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { UiAnimationFrameClock, UiManualFrameClock, UiTimerFrameClock } from './UiFrameClock';
+import { UiAnimationFrameClock, UiHostFrameClock, UiManualFrameClock, UiTimerFrameClock } from './UiFrameClock';
 
 describe('UiAnimationFrameClock', () => {
   let frameCallback: ((time: number) => void) | null = null;
@@ -171,5 +171,156 @@ describe('UiManualFrameClock', () => {
     clock.requestFrame();
     clock.tick(1);
     expect(onFrame).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('UiHostFrameClock', () => {
+  /** A clock whose fallback timer is long enough never to fire by accident. */
+  function hosted(): {
+    clock: UiHostFrameClock;
+    frames: number[];
+    active: boolean[];
+  } {
+    const frames: number[] = [];
+    const active: boolean[] = [];
+    const clock = new UiHostFrameClock(
+      time => frames.push(time),
+      running => active.push(running),
+      { fallbackMs: 100000 }
+    );
+    return { clock, frames, active };
+  }
+
+  it('delivers the host tick, on the host clock', () => {
+    // The timestamp matters as much as the beat: a forwarded rAF time
+    // keeps the runtime's frame times on the same clock the display
+    // is on, which is what makes a frame budget comparable to a
+    // refresh interval.
+    const { clock, frames } = hosted();
+    clock.requestFrame();
+    clock.tick(1234.5);
+    expect(frames).toEqual([1234.5]);
+  });
+
+  it('asks the host to keep ticking, and to stop when nobody wants one', () => {
+    // Free-running while frames are wanted, rather than one tick per
+    // request: a request that reaches the host after that refresh's
+    // callback has run would wait for the next one, halving the rate.
+    const { clock, active } = hosted();
+    clock.requestFrame();
+    expect(active).toEqual([true]);
+
+    // A second request while one is pending is not a second start.
+    clock.requestFrame();
+    expect(active).toEqual([true]);
+
+    // Not stopped the instant the frame ends: something animating
+    // slower than the display asks again a moment later, and the loop
+    // waits a few refreshes rather than being torn down and rebuilt.
+    clock.tick(0);
+    expect(active).toEqual([true]);
+    for (let i = 0; i < 4; i++) {
+      clock.tick(i);
+    }
+    expect(active).toEqual([true, false]);
+  });
+
+  it('keeps the loop running when the frame armed the next one', () => {
+    // The animating case: `onFrame` runs the frame and anything still
+    // moving arms the next from inside it, so whether the loop goes on
+    // can only be answered after the frame, not before.
+    const frames: number[] = [];
+    const active: boolean[] = [];
+    let clock!: UiHostFrameClock;
+    clock = new UiHostFrameClock(
+      time => {
+        frames.push(time);
+        if (frames.length < 3) {
+          clock.requestFrame();
+        }
+      },
+      running => active.push(running),
+      { fallbackMs: 100000 }
+    );
+    clock.requestFrame();
+    clock.tick(0);
+    clock.tick(6);
+    clock.tick(12);
+    expect(frames).toEqual([0, 6, 12]);
+    // Started once and never renegotiated: the whole point of a
+    // free-running loop is that a continuously animating app exchanges
+    // one message about pacing, not one per frame.
+    expect(active).toEqual([true]);
+  });
+
+  it('drops a tick nobody asked for, and stops the loop', () => {
+    const { clock, frames, active } = hosted();
+    clock.tick(0);
+    expect(frames).toEqual([]);
+    expect(active).toEqual([]);
+
+    clock.requestFrame();
+    clock.tick(1);
+    clock.tick(2);
+    expect(frames).toEqual([1]);
+    // Still running: one unwanted refresh is patience, not idleness.
+    expect(active).toEqual([true]);
+    for (let i = 0; i < 4; i++) {
+      clock.tick(i);
+    }
+    expect(active).toEqual([true, false]);
+
+    // And a request during the patient stretch never speaks to the
+    // host at all, which is what removes the churn.
+    clock.requestFrame();
+    clock.tick(20);
+    expect(frames).toEqual([1, 20]);
+    expect(active).toEqual([true, false, true]);
+  });
+
+  it('paces itself until a real tick proves the host forwards them', () => {
+    // The capability is never negotiated — the first tick is the only
+    // evidence it exists. A host that forwards nothing must therefore
+    // be no worse than the timer this replaced, not a frozen app.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16, now: () => 99 }
+      );
+      clock.requestFrame();
+      vi.advanceTimersByTime(16);
+      expect(frames).toEqual([99]);
+
+      // Once a tick has arrived the fallback stops being armed, so a
+      // display-paced app is not also running a timer per frame.
+      clock.requestFrame();
+      clock.tick(500);
+      clock.requestFrame();
+      vi.advanceTimersByTime(10000);
+      expect(frames).toEqual([99, 500]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels a pending frame and its fallback', () => {
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16 }
+      );
+      clock.requestFrame();
+      clock.cancelFrame();
+      vi.advanceTimersByTime(10000);
+      expect(frames).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -9,7 +9,7 @@ import {
 } from '../../channel/createChannelRegistry';
 import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
-import { UiTimerFrameClock } from '@gesso/core';
+import { UiHostFrameClock } from '@gesso/core';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { RouterRoutes } from '../../router/RouterService';
@@ -76,6 +76,8 @@ export class RenderWorkerApp {
   private readonly host: WorkerGlobal;
 
   private runtime: GessoRuntime | undefined;
+  /** Held so forwarded display refreshes can be handed to it. */
+  private clock: UiHostFrameClock | undefined;
   private channels: ChannelRegistryHandle | undefined;
   /** The shell's port to the application-logic worker, if there is one. */
   private appLogicWorker: WorkerHandle | undefined;
@@ -278,6 +280,9 @@ export class RenderWorkerApp {
       case 'url':
         runtime.setUrl(message.url);
         break;
+      case 'tick':
+        this.clock?.tick(message.time);
+        break;
       case 'visibility':
         runtime.setVisible(message.visible);
         break;
@@ -359,8 +364,15 @@ export class RenderWorkerApp {
       renderer,
       channels: this.channels.registry,
       // A worker has no requestAnimationFrame tied to the compositor,
-      // so frames are timer-paced. See FRAMEWORK_DESIGN section 13.
-      clock: callback => new UiTimerFrameClock(callback),
+      // so the shell forwards the display's own refresh and this clock
+      // just delivers it. See FRAMEWORK_DESIGN section 13.
+      clock: callback => {
+        const clock = new UiHostFrameClock(callback, running => {
+          this.host.postMessage({ type: 'frameLoop', running });
+        });
+        this.clock = clock;
+        return clock;
+      },
       width,
       height,
       dpr

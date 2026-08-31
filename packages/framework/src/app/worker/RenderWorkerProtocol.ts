@@ -99,6 +99,21 @@ export type ShellToRuntimeMessage =
    * turns it back into the events a pointer and a keyboard produce.
    */
   | { type: 'semanticsAction'; action: UiSemanticsAction }
+  /**
+   * One display refresh, forwarded from the shell's
+   * `requestAnimationFrame`.
+   *
+   * The render worker's frames were paced by a fixed 16ms timer,
+   * because `requestAnimationFrame` is tied to the compositor and does
+   * not exist off the main thread. That capped every display at
+   * roughly sixty and aligned to none of them. The shell runs the loop
+   * and forwards the beat; `time` is the rAF timestamp, so the
+   * runtime's frame times stay on the same clock the display is on.
+   *
+   * Sent only between `frameLoop` starting and stopping, so an idle
+   * app exchanges nothing.
+   */
+  | { type: 'tick'; time: number }
   | { type: 'dispose' };
 
 /**
@@ -174,6 +189,17 @@ export type RuntimeToShellMessage =
    * no geometry at all. Records and boxes travel at different cadences
    * and are one message anyway; `UiSemanticsUpdate` says why.
    */
+  /**
+   * Whether the runtime currently wants display refreshes.
+   *
+   * The shell answers by running or stopping a `requestAnimationFrame`
+   * loop that sends `tick`. It is a state rather than a per-frame
+   * request because a request-per-frame costs a round trip inside
+   * every frame: a request that reaches the shell after that vsync's
+   * callback has run waits for the next one, and the frame rate
+   * halves.
+   */
+  | { type: 'frameLoop'; running: boolean }
   | { type: 'semantics'; update: UiSemanticsUpdate };
 
 /**

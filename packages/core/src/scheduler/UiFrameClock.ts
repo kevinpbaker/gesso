@@ -80,6 +80,23 @@ export interface UiTimerFrameClockOptions {
 }
 
 /**
+ * Refreshes to keep asking for after the last frame anybody wanted.
+ *
+ * Four is about a fortieth of a second at sixty and a fortieth at one
+ * hundred and sixty-five, which covers the gap anything animating
+ * leaves between frames without keeping an idle application awake for
+ * a noticeable moment.
+ */
+const IDLE_TICKS_BEFORE_STOP = 4;
+
+export interface UiHostFrameClockOptions {
+  /** How long to wait for a host tick before pacing a frame anyway. */
+  fallbackMs?: number;
+  /** Time source for a fallback tick; host ticks carry their own. */
+  now?: () => UiFrameTime;
+}
+
+/**
  * Timer-backed clock that works in the browser main thread,
  * in a Worker, and in Node.
  */
@@ -112,6 +129,129 @@ export class UiTimerFrameClock implements UiFrameClock {
     }
     clearTimeout(this.handle);
     this.handle = null;
+  }
+}
+
+/**
+ * A clock whose frames arrive from somewhere else.
+ *
+ * The one thing a worker cannot do for itself. `requestAnimationFrame`
+ * is tied to the compositor and exists only on the main thread, so a
+ * render worker's frames were paced by `UiTimerFrameClock` at a fixed
+ * 16ms — roughly sixty a second on any display, aligned to none of
+ * them. On a 165Hz monitor that is not merely slower than it could be:
+ * an unaligned timer lands two frames inside one refresh, or none, so
+ * the pacing is uneven as well as capped.
+ *
+ * This clock does no timing at all. It reports when it wants frames
+ * and delivers whatever ticks it is handed, which lets the shell —
+ * the one thread with a `requestAnimationFrame` — supply the display's
+ * own cadence. That is the narrow exception to keeping the shell
+ * uninvolved: not work moved back onto the main thread for
+ * convenience, but the single fact a worker has no way to observe.
+ *
+ * **Ticks are free-running while frames are wanted, not requested one
+ * at a time.** A tick per request would cost a round trip inside every
+ * frame: if the request reaches the shell after that vsync's callback
+ * has run, the tick waits for the next one and the rate halves. So
+ * `onActive(true)` means "keep ticking" and `onActive(false)` means
+ * "stop"; a tick arriving with nothing pending is dropped, which costs
+ * one comparison and makes the timing robust to whichever side is
+ * late.
+ */
+export class UiHostFrameClock implements UiFrameClock {
+  private pending = false;
+  private active = false;
+  /** Set by the first real tick; until then the fallback timer paces. */
+  private hosted = false;
+  /** Refreshes arrived with nothing pending, before the loop stops. */
+  private idleTicks = 0;
+  private handle: ReturnType<typeof setTimeout> | null = null;
+  private readonly fallbackMs: number;
+  private readonly now: () => UiFrameTime;
+
+  constructor(
+    private readonly onFrame: (time: UiFrameTime) => void,
+    /** Told when this starts and stops wanting ticks. */
+    private readonly onActive: (active: boolean) => void,
+    options: UiHostFrameClockOptions = {}
+  ) {
+    this.fallbackMs = options.fallbackMs ?? 16;
+    this.now = options.now ?? (() => performance.now());
+  }
+
+  requestFrame(): void {
+    this.pending = true;
+    this.setActive(true);
+    // Until a tick has actually arrived, this paces itself. A host
+    // that does not forward refreshes is then merely no better than
+    // the timer it replaced, rather than a frozen application — which
+    // matters because the capability is not negotiated: the first real
+    // tick is the only evidence that it exists, and waiting for it
+    // while rendering nothing would be a worse trade than a timer.
+    if (!this.hosted && this.handle === null) {
+      this.handle = setTimeout(() => {
+        this.handle = null;
+        if (this.pending && !this.hosted) {
+          this.deliver(this.now());
+        }
+      }, this.fallbackMs);
+    }
+  }
+
+  cancelFrame(): void {
+    this.pending = false;
+    this.clearFallback();
+    this.setActive(false);
+  }
+
+  private clearFallback(): void {
+    if (this.handle !== null) {
+      clearTimeout(this.handle);
+      this.handle = null;
+    }
+  }
+
+  private deliver(time: UiFrameTime): void {
+    this.pending = false;
+    this.onFrame(time);
+  }
+
+  /**
+   * Delivers a tick from the host. Ignored when no frame is pending,
+   * which is what lets the host keep a loop running a beat longer than
+   * it is needed rather than negotiating every frame.
+   */
+  tick(time: UiFrameTime): void {
+    this.hosted = true;
+    this.clearFallback();
+    if (!this.pending) {
+      // Not wanted *yet* is not the same as not wanted. Something
+      // animating slower than the display asks for its next frame a
+      // moment after finishing this one, so stopping the loop the
+      // instant a frame ends and restarting it milliseconds later
+      // trades one message per frame for three and a cancelled
+      // `requestAnimationFrame` in between. A few idle refreshes of
+      // patience costs a dropped tick each and removes all of it.
+      this.idleTicks++;
+      if (this.idleTicks >= IDLE_TICKS_BEFORE_STOP) {
+        this.setActive(false);
+      }
+      return;
+    }
+    this.idleTicks = 0;
+    this.deliver(time);
+  }
+
+  private setActive(active: boolean): void {
+    if (active) {
+      this.idleTicks = 0;
+    }
+    if (this.active === active) {
+      return;
+    }
+    this.active = active;
+    this.onActive(active);
   }
 }
 
