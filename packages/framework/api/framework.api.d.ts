@@ -224,6 +224,7 @@ import {
   UiNode,
   UiPlatformAdapter,
   UiPointerController,
+  UiPointerDevice,
   UiReducedMotionPolicy,
   UiRole,
   UiSelectionController,
@@ -802,12 +803,14 @@ type ShellToRuntimeMessage = {
   width: number;
   height: number;
   dpr: number;
-} | {
+} |
+{
   type: 'pointerDown';
   x: number;
   y: number;
   buttons: number;
   modifiers: UiKeyModifiers;
+  pointer?: UiPointerDevice;
   at?: number;
 } | {
   type: 'pointerMove';
@@ -815,6 +818,7 @@ type ShellToRuntimeMessage = {
   y: number;
   buttons: number;
   modifiers: UiKeyModifiers;
+  pointer?: UiPointerDevice;
   at?: number;
 } | {
   type: 'pointerUp';
@@ -822,9 +826,11 @@ type ShellToRuntimeMessage = {
   y: number;
   buttons: number;
   modifiers: UiKeyModifiers;
+  pointer?: UiPointerDevice;
   at?: number;
 } | {
   type: 'pointerCancel';
+  pointer?: UiPointerDevice;
   at?: number;
 } |
 {

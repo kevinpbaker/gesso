@@ -623,6 +623,12 @@ interface UiKeyModifiers {
   meta: boolean;
 }
 declare function noKeyModifiers(): UiKeyModifiers;
+type UiPointerKind = 'mouse' | 'pen' | 'touch';
+interface UiPointerDevice {
+  readonly id: number;
+  readonly kind: UiPointerKind;
+}
+declare const MOUSE_POINTER: UiPointerDevice;
 declare class UiInputEvent {
   readonly type: UiEventType;
   target: UiNode | null;
@@ -648,7 +654,9 @@ declare class UiPointerEvent extends UiInputEvent {
   readonly y: number;
   readonly buttons: number;
   readonly modifiers: UiKeyModifiers;
-  constructor(type: UiEventType, x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers);
+  readonly pointer: UiPointerDevice;
+  constructor(type: UiEventType, x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers,
+  pointer?: UiPointerDevice);
 }
 declare class UiKeyboardEvent extends UiInputEvent {
   readonly key: string;
@@ -1978,6 +1986,7 @@ declare class FocusNotifier {
 }
 interface GestureRecognizerOptions {
   slop?: number;
+  touchSlop?: number;
   longPressDelay?: number;
 }
 interface GestureInput {
@@ -1990,10 +1999,12 @@ interface GestureInput {
 declare class UiGestureRecognizer implements GestureInput {
   private readonly dispatcher;
   private readonly slop;
+  private readonly touchSlop;
   private readonly longPressDelay;
   private state;
   private startX;
   private startY;
+  private startKind;
   private claimedPress;
   private timer;
   constructor(dispatcher: UiInputDispatcher, options?: GestureRecognizerOptions);
@@ -2004,6 +2015,7 @@ declare class UiGestureRecognizer implements GestureInput {
   claimed(): boolean;
   private armLongPress;
   private clearTimer;
+  private pressSlop;
   private dispatch;
 }
 interface ScrollContainerState {
@@ -2035,6 +2047,7 @@ declare class UiWheelController {
 declare function isScrollContainer(node: UiNode): boolean;
 interface PointerControllerOptions {
   slop?: number;
+  touchSlop?: number;
   gestures?: GestureInput;
   onPress?: (node: UiNode) => void;
   scrollSink?: ScrollSink;
@@ -2056,6 +2069,7 @@ declare class UiPointerController {
   private readonly hitTester;
   private readonly dispatcher;
   private readonly slop;
+  private readonly touchSlop;
   private readonly gestures;
   private readonly onPress;
   private readonly scrollSink;
@@ -2067,21 +2081,24 @@ declare class UiPointerController {
   private downX;
   private downY;
   private downDefaultPrevented;
+  private activePointer;
   private scrollbarDrag;
   constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, options?: PointerControllerOptions);
   get hoveredNode(): UiNode | null;
   get pressedNode(): UiNode | null;
   get draggingScrollbarOf(): UiNode | null;
-  pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers): UiPointerEvent;
-  pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers): UiPointerEvent | null;
-  pointerUp(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers): UiPointerEvent | null;
-  pointerCancel(): void;
+  pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent;
+  pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
+  pointerUp(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
+  pointerCancel(pointer?: UiPointerDevice): void;
+  private ownsPress;
   private pressScrollbar;
   private recordOrigin;
   private dragScrollbar;
   private updateHover;
   private chain;
   private dispatchBoundary;
+  private releaseHover;
 }
 interface KeyboardControllerOptions {
   tabNavigation?: boolean;
@@ -2206,6 +2223,8 @@ declare class UiPlatformAdapter {
   attach(surface: PlatformSurface): void;
   detach(): void;
 }
+declare function pointerDeviceOf(event: PointerEvent): UiPointerDevice;
+declare function capturePointer(target: EventTarget | null, pointerId: number): void;
 declare class CanvasPlatformSurface implements PlatformSurface {
   private readonly element;
   private readonly keyboardRoot;
@@ -3365,6 +3384,7 @@ export {
   CanvasSurface,
   CanvasTextMeasurer,
   CapturedFrame,
+  capturePointer,
   CARET_BLINK_MS,
   CARET_WIDTH,
   CaretRect,
@@ -3503,7 +3523,6 @@ export {
   HitTestLayoutReader,
   HitTestResult,
   hoverable,
-  Hs,
   IconCanvas,
   IconContext,
   iconKey,
@@ -3601,6 +3620,7 @@ export {
   MotionState,
   MotionStateInput,
   MotionTiming,
+  MOUSE_POINTER,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -3646,6 +3666,7 @@ export {
   PlatformEventTarget,
   PlatformSurface,
   PointerControllerOptions,
+  pointerDeviceOf,
   pop,
   PositionProps,
   pressable,
@@ -3847,8 +3868,10 @@ export {
   UiPlatformAdapter,
   UiPoint,
   UiPointerController,
+  UiPointerDevice,
   UiPointerEvent,
   UiPointerEvents,
+  UiPointerKind,
   UiPosition,
   UiProperties,
   UiPropertyDefinition,
@@ -3939,7 +3962,8 @@ export {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty
+  writeOverrideProperty,
+  Ws
 };
 // ==== index.d.ts ====
 import {
@@ -3981,6 +4005,7 @@ import {
   CanvasSurface,
   CanvasTextMeasurer,
   CapturedFrame,
+  capturePointer,
   CARET_BLINK_MS,
   CARET_WIDTH,
   CaretRect,
@@ -4217,6 +4242,7 @@ import {
   MotionState,
   MotionStateInput,
   MotionTiming,
+  MOUSE_POINTER,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -4262,6 +4288,7 @@ import {
   PlatformEventTarget,
   PlatformSurface,
   PointerControllerOptions,
+  pointerDeviceOf,
   pop,
   PositionProps,
   pressable,
@@ -4463,8 +4490,10 @@ import {
   UiPlatformAdapter,
   UiPoint,
   UiPointerController,
+  UiPointerDevice,
   UiPointerEvent,
   UiPointerEvents,
+  UiPointerKind,
   UiPosition,
   UiProperties,
   UiPropertyDefinition,
@@ -4556,7 +4585,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CGSYSrHT.js";
+} from "./index-C1el1i3i.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4583,6 +4612,7 @@ export {
   CanvasPlatformSurface,
   CanvasSurface,
   CanvasTextMeasurer,
+  capturePointer,
   CARET_BLINK_MS,
   CARET_WIDTH,
   caretRectFor,
@@ -4739,6 +4769,7 @@ export {
   motion,
   MOTION_CHANNELS,
   MOTION_REST,
+  MOUSE_POINTER,
   nextCaretToggle,
   nextGraphemeEnd,
   nextWordEnd,
@@ -4768,6 +4799,7 @@ export {
   parseTransform,
   percent,
   placeGridItems,
+  pointerDeviceOf,
   pop,
   pressable,
   previousGraphemeStart,
@@ -5023,6 +5055,8 @@ export {
   type UiNodeRef,
   type UiNodeTransitions,
   type UiPoint,
+  type UiPointerDevice,
+  type UiPointerKind,
   type UiPropertyOverride,
   type UiPropertyOverrides,
   type UiProps,
@@ -5197,7 +5231,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-CGSYSrHT.js";
+} from "./index-C1el1i3i.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
