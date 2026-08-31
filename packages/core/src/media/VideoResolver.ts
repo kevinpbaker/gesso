@@ -27,6 +27,17 @@ export interface VideoPlayback {
    */
   readonly frameDurationMs: number;
   /**
+   * How far into the video this playback has got, in milliseconds.
+   *
+   * What an arriving element needs in order to pick up where a
+   * departing one left off. The reference counting keeps the decoder
+   * alive across a navigation, but the *position* belongs to whoever
+   * is driving, and a node that has just been built has no idea where
+   * that is — so without this it starts at zero, which on a shared
+   * playback is a seek backwards and a decoder reset.
+   */
+  readonly positionMs: number;
+  /**
    * Shows the frame due at `positionMs` into the video, and says
    * whether that changed the picture.
    *
@@ -283,6 +294,10 @@ class Mp4Playback implements VideoPlayback {
     return this.track.frameDurationUs / 1000;
   }
 
+  get positionMs(): number {
+    return this.positionUs / 1000;
+  }
+
   async start(): Promise<void> {
     const config: VideoDecoderConfig = {
       codec: this.track.codec,
@@ -322,6 +337,14 @@ class Mp4Playback implements VideoPlayback {
       return false;
     }
     const wanted = Math.max(0, positionMs * 1000);
+    if (wanted === this.positionUs) {
+      // Two elements can share one playback — a card and the page it
+      // opens into, both on screen while a transition runs — and each
+      // presents on its own tick. The second one to arrive on a given
+      // position has nothing to do, and doing it anyway means a second
+      // `fill()` and a second walk of the frame queue per frame.
+      return false;
+    }
     if (wanted + SEEK_BACK_TOLERANCE_US < this.positionUs) {
       // Backwards: a loop wrapping, or a deliberate seek. Either way
       // every frame in flight belongs to where we no longer are.

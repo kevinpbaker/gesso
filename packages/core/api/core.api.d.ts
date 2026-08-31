@@ -2716,6 +2716,7 @@ interface VideoPlayback {
   readonly height: number;
   readonly duration: number;
   readonly frameDurationMs: number;
+  readonly positionMs: number;
   present(positionMs: number): boolean;
   onError(listener: (error: unknown) => void): () => void;
 }
@@ -4529,7 +4530,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DLs3j-tU.js";
+} from "./index-CiDH1_3A.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5167,7 +5168,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-DLs3j-tU.js";
+} from "./index-CiDH1_3A.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
