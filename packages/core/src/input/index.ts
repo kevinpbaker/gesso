@@ -26,6 +26,8 @@ export type { KeyboardControllerOptions } from './UiKeyboardController';
 export { isScrollContainer, UiWheelController } from './UiWheelController';
 export type { ScrollContainerState, ScrollSink, UiScrollBehavior } from './UiWheelController';
 export { UiGestureRecognizer } from './UiGestureRecognizer';
+export { UiTouchScroller } from './UiTouchScroller';
+export type { TouchScrollerOptions } from './UiTouchScroller';
 export type { GestureInput, GestureRecognizerOptions } from './UiGestureRecognizer';
 export { UiEditingController } from './UiEditingController';
 export type { EditingControllerOptions, EditingHost, EditingState } from './UiEditingController';

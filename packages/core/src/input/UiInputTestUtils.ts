@@ -4,8 +4,9 @@ import { Constraints } from '../layout/LayoutTypes';
 import { LayoutHarness } from '../layout/LayoutTestUtils';
 import { UiHitTester } from './UiHitTester';
 import { UiInputDispatcher } from './UiInputDispatcher';
-import { UiPointerController } from './UiPointerController';
+import { UiPointerController, type PointerControllerOptions } from './UiPointerController';
 import { UiGestureRecognizer } from './UiGestureRecognizer';
+import { UiTouchScroller, type TouchScrollerOptions } from './UiTouchScroller';
 import { UiFocusManager } from './UiFocusManager';
 import { UiKeyboardController } from './UiKeyboardController';
 import { UiWheelController, type ScrollContainerState, type ScrollSink } from './UiWheelController';
@@ -23,6 +24,8 @@ export class InputTestHarness {
   readonly layout: LayoutHarness;
   readonly root: UiNode;
   readonly dispatcher = new UiInputDispatcher();
+  /** Shared, so a spec can read back what a controller scrolled. */
+  readonly scrollSink = new HarnessScrollSink(this);
 
   /** A measurer is needed only by specs whose trees contain real text. */
   constructor(width = 400, height = 400, textMeasurer?: TextMeasurer) {
@@ -69,7 +72,23 @@ export class InputTestHarness {
   }
 
   createWheelController(): UiWheelController {
-    return new UiWheelController(this.createHitTester(), this.dispatcher, new HarnessScrollSink(this));
+    return new UiWheelController(this.createHitTester(), this.dispatcher, this.scrollSink);
+  }
+
+  /**
+   * A pointer controller with a gesture recognizer behind it, for the
+   * specs that need a real Pan rather than a hand-made one.
+   */
+  createGesturePointerController(options: PointerControllerOptions = {}): UiPointerController {
+    return new UiPointerController(this.createHitTester(), this.dispatcher, {
+      gestures: new UiGestureRecognizer(this.dispatcher),
+      scrollSink: this.scrollSink,
+      ...options
+    });
+  }
+
+  createTouchScroller(options: TouchScrollerOptions = {}): UiTouchScroller {
+    return new UiTouchScroller(this.dispatcher, this.root, this.scrollSink, options);
   }
 
   createPlatformAdapter(): UiPlatformAdapter {
@@ -136,7 +155,12 @@ export class FakePlatformSurface implements PlatformSurface {
  * engine re-reads and clamps the offset, mirroring how the app layer
  * drives scroll through node properties.
  */
-class HarnessScrollSink implements ScrollSink {
+export class HarnessScrollSink implements ScrollSink {
+  /** Every scroll asked for, in order, so a spec can read the behaviour hint. */
+  readonly calls: { node: UiNode; dx: number; dy: number; behavior: string }[] = [];
+  /** Containers whose scrollbars were revealed. */
+  readonly revealed: UiNode[] = [];
+
   constructor(private readonly harness: InputTestHarness) {}
 
   containerState(node: UiNode): ScrollContainerState | undefined {
@@ -156,7 +180,8 @@ class HarnessScrollSink implements ScrollSink {
     };
   }
 
-  scrollBy(node: UiNode, dx: number, dy: number): void {
+  scrollBy(node: UiNode, dx: number, dy: number, behavior: string = 'instant'): void {
+    this.calls.push({ node, dx, dy, behavior });
     const record = this.harness.layout.engine.recordFor(node);
     if (record === undefined) {
       return;
@@ -166,6 +191,10 @@ class HarnessScrollSink implements ScrollSink {
     node.setProperty('scrollX', clamp(record.scrollX + dx, 0, maxX));
     node.setProperty('scrollY', clamp(record.scrollY + dy, 0, maxY));
     this.harness.layoutTree();
+  }
+
+  revealScrollbars(node: UiNode): void {
+    this.revealed.push(node);
   }
 }
 

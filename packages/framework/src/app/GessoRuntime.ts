@@ -23,6 +23,7 @@ import {
   UiGestureRecognizer,
   UiHitTester,
   UiPointerController,
+  UiTouchScroller,
   UiWheelController,
   type ScrollContainerState,
   type ScrollSink,
@@ -140,6 +141,8 @@ export interface RuntimeInput {
   readonly selection: UiSelectionController;
   /** Finding text in the app's own content; the find bar's engine. */
   readonly find: UiFindController;
+  /** Dragging a scroll container's contents with a finger. */
+  readonly touchScroll: UiTouchScroller;
 }
 
 /**
@@ -954,6 +957,9 @@ export class GessoRuntime {
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);
     this.frameListener = null;
+    // Its listeners are on the root node, which the dispatcher holds by
+    // reference; a disposed runtime must not keep either alive.
+    this.input.touchScroll.dispose();
     this.resolver.dispose();
     this.renderer.dispose();
   }
@@ -1101,7 +1107,11 @@ export class GessoRuntime {
         selection
       }),
       wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
-      keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing, selection, find })
+      keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing, selection, find }),
+      // Listens at the root, so a pan reaches it only when nothing
+      // between the pressed node and here claimed the gesture. That is
+      // the opt-out a `Slider` or a `SplitPane` already relies on.
+      touchScroll: new UiTouchScroller(this.dispatcher, root, scrollSink)
     };
   }
 
