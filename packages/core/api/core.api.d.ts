@@ -670,6 +670,7 @@ declare enum UiWheelDeltaMode {
   Line = 1,
   Page = 2
 }
+declare function wheelDeltaYOf(event: object): number | undefined;
 declare class UiWheelEvent extends UiInputEvent {
   readonly x: number;
   readonly y: number;
@@ -677,8 +678,10 @@ declare class UiWheelEvent extends UiInputEvent {
   readonly deltaY: number;
   readonly modifiers: UiKeyModifiers;
   readonly deltaMode: UiWheelDeltaMode;
+  readonly wheelDeltaY?: number | undefined;
   constructor(type: UiEventType.Wheel, x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers,
-  deltaMode?: UiWheelDeltaMode);
+  deltaMode?: UiWheelDeltaMode,
+  wheelDeltaY?: number | undefined);
 }
 type UiEventListener = (event: UiInputEvent) => void;
 interface UiEventListenerOptions {
@@ -1206,6 +1209,7 @@ declare const UiProperties: {
   readonly video: UiPropertyDefinition<UiVideoSurface | undefined>;
   readonly objectFit: UiPropertyDefinition<UiObjectFit | undefined>;
   readonly scrollX: UiPropertyDefinition<number | undefined>;
+  readonly scrollBehavior: UiPropertyDefinition<"instant" | "smooth" | undefined>;
   readonly scrollY: UiPropertyDefinition<number | undefined>;
   readonly hitTestable: UiPropertyDefinition<boolean | undefined>;
   readonly virtualIndex: UiPropertyDefinition<number | undefined>;
@@ -1265,7 +1269,7 @@ type TransitionProps = {
   transition?: Partial<Record<UiPropertyName, UiTransitionValue>>;
 };
 type CommonProps = IdentityProps & UiEventProps & BoxModelProps & FlexItemProps & GridItemProps & PositionProps & PaintProps & TypographyProps & InteractionProps & SemanticsProps & ModifierProps & TransitionProps & EnvironmentProps;
-type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY'>;
+type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior'>;
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
@@ -2010,16 +2014,17 @@ interface ScrollContainerState {
 }
 interface ScrollSink {
   containerState(node: UiNode): ScrollContainerState | undefined;
-  scrollBy(node: UiNode, dx: number, dy: number): void;
+  scrollBy(node: UiNode, dx: number, dy: number, behavior?: UiScrollBehavior): void;
   revealScrollbars?(node: UiNode): void;
   scrollbar?(node: UiNode, axis: 'x' | 'y'): ScrollbarThumb | null;
 }
+type UiScrollBehavior = 'instant' | 'smooth';
 declare class UiWheelController {
   private readonly hitTester;
   private readonly dispatcher;
   private readonly scrollSink;
   constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, scrollSink: ScrollSink);
-  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode): UiWheelEvent;
+  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number): UiWheelEvent;
   private nearestScrollable;
   private applyDelta;
   private toPixels;
@@ -2768,7 +2773,8 @@ interface ScrollOffset {
   readonly y: number;
 }
 interface ScrollPositionArgs {
-  readonly onChange: (offset: ScrollOffset) => void;
+  readonly onChange?: (offset: ScrollOffset) => void;
+  readonly onSettled?: (offset: ScrollOffset) => void;
 }
 declare const scrollPosition: ((args: ScrollPositionArgs, key?: string | number) => UiModifier<ScrollPositionArgs>) & {
   readonly kind: UiModifierKind<ScrollPositionArgs>;
@@ -3493,6 +3499,7 @@ export {
   HitTestLayoutReader,
   HitTestResult,
   hoverable,
+  Hs,
   IconCanvas,
   IconContext,
   iconKey,
@@ -3853,6 +3860,7 @@ export {
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
+  UiScrollBehavior,
   UiSelectionController,
   UiSelfAlignment,
   UiSemanticsAction,
@@ -3915,7 +3923,6 @@ export {
   VirtualViewport,
   visualState,
   visualStatesEqual,
-  Vs,
   WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
@@ -3924,6 +3931,7 @@ export {
   WebGPURendererOptions,
   WebGPUSurface,
   WebGPUTextureCache,
+  wheelDeltaYOf,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
@@ -4468,6 +4476,7 @@ import {
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
+  UiScrollBehavior,
   UiSelectionController,
   UiSelfAlignment,
   UiSemanticsAction,
@@ -4538,11 +4547,12 @@ import {
   WebGPURendererOptions,
   WebGPUSurface,
   WebGPUTextureCache,
+  wheelDeltaYOf,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-BgmFFQmJ.js";
+} from "./index-BE9IPw65.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5016,6 +5026,7 @@ export {
   type UiReducedMotionPolicy,
   type UiRenderer,
   type UiSchedulerOptions,
+  type UiScrollBehavior,
   type UiSemanticsAction,
   type UiSemanticsBox,
   type UiSemanticsMap,
@@ -5151,6 +5162,7 @@ export {
   WebGPURenderer,
   WebGPUSurface,
   WebGPUTextureCache,
+  wheelDeltaYOf,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
@@ -5181,7 +5193,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-BgmFFQmJ.js";
+} from "./index-BE9IPw65.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

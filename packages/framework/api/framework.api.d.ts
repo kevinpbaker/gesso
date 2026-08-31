@@ -206,6 +206,7 @@ import {
   TextMeasurer,
   UI_ROLES,
   UI_SEMANTIC_STATES,
+  UiAnimation,
   UiChild,
   UiDurationToken,
   UiEasing,
@@ -656,6 +657,7 @@ declare class GessoRuntime {
   private findController;
   private readonly focusManager;
   private readonly layoutNotifier;
+  private readonly smoothScroller;
   private readonly animations;
   private readonly sharedElements;
   private readonly focusNotifier;
@@ -832,6 +834,7 @@ type ShellToRuntimeMessage = {
   deltaY: number;
   modifiers: UiKeyModifiers;
   deltaMode?: number;
+  wheelDeltaY?: number;
   at?: number;
 } | {
   type: 'keyDown';
@@ -1092,6 +1095,7 @@ declare class AnimationService {
   animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
   spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
   stop<T>(cell: AnimatedCell<T>): boolean;
+  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
   private resolveDuration;
   private resolveEasing;
 }
