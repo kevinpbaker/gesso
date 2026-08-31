@@ -298,10 +298,6 @@ export class GessoRuntime {
    * no shell — a spec, a headless graph — is never told and must draw.
    */
   private visible = true;
-  /** Whether a frame has ever been drawn, so the first paint is never skipped. */
-  private hasDrawn = false;
-  /** Set when a hidden runtime is waiting to draw its one first frame. */
-  private stopAfterFirstFrame = false;
   /**
    * The running animations. Built as a field rather than in the body
    * of the constructor because the builder, the services and `buildRoot`
@@ -594,9 +590,7 @@ export class GessoRuntime {
   /** Starts the frame scheduler. */
   start(): void {
     this.started = true;
-    if (this.visible) {
-      this.scheduler.start();
-    }
+    this.scheduler.start();
   }
 
   /** The backend drawing frames, or `pending` while WebGPU initialises. */
@@ -814,36 +808,14 @@ export class GessoRuntime {
     }
     this.visible = visible;
     if (!visible) {
-      // Nothing to draw for, so nothing is drawn. A browser stops
-      // `requestAnimationFrame` for a hidden document and this is the
-      // same rule, applied where the runtime can act on it: without it
-      // a hidden tab keeps laying out and painting a canvas nobody can
-      // see. `UiHostFrameClock` cannot decide this for itself — a host
-      // that has stopped forwarding refreshes looks exactly like a host
-      // that never forwarded any, and the second must fall back to a
-      // timer rather than freeze.
-      //
-      // Except the *first* frame, which is drawn even hidden. A canvas
-      // keeps what was last painted on it, so stopping before anything
-      // has been is the difference between a tab that is simply idle
-      // and one that shows nothing until a frame lands after it is
-      // looked at. Costs one layout and one paint, once.
-      if (this.hasDrawn) {
-        this.scheduler.stop();
-      } else {
-        this.stopAfterFirstFrame = true;
-      }
       return;
     }
-    this.stopAfterFirstFrame = false;
     if (!this.started) {
       return;
     }
-    this.scheduler.start();
     // One frame on the way back, whether or not anything is dirty: an
-    // animation that was running when the tab went away is still in the
-    // driver, and `scheduleAnimationTick` only re-arms from inside a
-    // frame.
+    // animation that was frozen while hidden is still in the driver,
+    // and `scheduleAnimationTick` only re-arms from inside a frame.
     this.scheduler.wake();
   }
 
@@ -1386,7 +1358,7 @@ export class GessoRuntime {
     // driver is empty, an idle app runs no frames for this to be
     // reported on at all.
     this.phaseTimings.ticks = this.timePhase(
-      () => this.animations.isRunning,
+      () => this.visible && this.animations.isRunning,
       () => this.animations.advance(time)
     );
     // Asked after the tick, not before: an animation that finished
@@ -1512,18 +1484,6 @@ export class GessoRuntime {
     const root = this.root;
     if (root === undefined) {
       return;
-    }
-    this.hasDrawn = true;
-    if (this.stopAfterFirstFrame) {
-      // The one frame a hidden runtime is allowed, so the canvas holds
-      // a picture rather than nothing. Stopped after it rather than
-      // before, so this frame completes.
-      this.stopAfterFirstFrame = false;
-      queueMicrotask(() => {
-        if (!this.visible) {
-          this.scheduler.stop();
-        }
-      });
     }
     const started = now();
 
@@ -1658,6 +1618,22 @@ export class GessoRuntime {
    *   sixty frames drawing seven identical pictures.
    */
   private scheduleAnimationTick(now: number): void {
+    if (!this.visible) {
+      // A hidden document arms nothing on its own account. This is the
+      // whole of "do not draw for nobody", and it is deliberately
+      // narrower than stopping the scheduler: a change that genuinely
+      // happened — an image finishing its decode, a patch arriving from
+      // the application thread — still marks a node dirty and still
+      // gets a frame, so the canvas holds a correct picture rather than
+      // whatever was on it when the tab went away.
+      //
+      // Stopping outright was tried first and was wrong in a way worth
+      // recording: the first frame is not the first *useful* paint.
+      // A route loaded hidden drew once, before its images had decoded,
+      // and then stopped — so it held a picture with every photograph
+      // missing until something woke it.
+      return;
+    }
     const next = this.animations.nextTickAt(now);
     if (next === undefined) {
       return;
