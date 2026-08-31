@@ -14,7 +14,7 @@ export {
 export type { UiKeyModifiers } from './UiInputEvent';
 export { UiHitTester } from './UiHitTester';
 export type { HitTester, HitTestLayoutReader, HitTestResult, UiPoint } from './UiHitTester';
-export { UiFocusManager } from './UiFocusManager';
+export { UiFocusManager, type FocusSource } from './UiFocusManager';
 export { FocusNotifier } from './FocusNotifier';
 export { UiPointerController } from './UiPointerController';
 export type { PointerControllerOptions } from './UiPointerController';

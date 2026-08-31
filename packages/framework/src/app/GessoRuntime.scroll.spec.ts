@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, ScrollView, scrollPosition, type ScrollOffset } from '@gesso/core';
+import { Box, Button, Column, ScrollView, noKeyModifiers, scrollPosition, type ScrollOffset } from '@gesso/core';
 import { internalState } from '../InternalState';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 
@@ -71,6 +71,46 @@ describe('scrollPosition', () => {
     offset.value = 9000;
     drain(mounted);
     expect(seen.map(at => at.y)).toEqual([500]);
+  });
+
+  it('does not scroll a control into view because it was clicked', () => {
+    // Focus reveals its target, which keyboard navigation needs. A
+    // press does not: the person can see what they pressed — it is
+    // under their cursor — and revealing it scrolls the page out from
+    // under a pointer that is still resting there. A tall control
+    // that is only partly visible moves most of the screen, which
+    // looks like the thing they clicked jumping away from them.
+    const seen: ScrollOffset[] = [];
+    const mounted = mountRuntime(
+      ScrollView(
+        {
+          width: 200,
+          height: 100,
+          modifiers: [scrollPosition({ onChange: at => seen.push(at) })]
+        },
+        Column(
+          { width: 200 },
+          Box({ width: 200, height: 90 }),
+          // Taller than the viewport and mostly below it, so a reveal
+          // would be a large scroll rather than a nudge.
+          Button({ label: 'open', width: 200, height: 200 })
+        )
+      )
+    );
+    drain(mounted);
+    seen.length = 0;
+
+    mounted.runtime.input.pointer.pointerDown(100, 95, 1, noKeyModifiers());
+    mounted.runtime.input.pointer.pointerUp(100, 95, 0, noKeyModifiers());
+    drain(mounted);
+    expect(seen).toEqual([]);
+
+    // The keyboard still reveals, which is the case the behaviour
+    // exists for.
+    mounted.runtime.input.focus.blur();
+    mounted.runtime.input.focus.focusNext();
+    drain(mounted);
+    expect(seen.map(at => at.y)).toEqual([190]);
   });
 
   it('says nothing on a frame that only moved the container', () => {

@@ -164,6 +164,32 @@ describe('UiFocusManager', () => {
     expect(focusManager.focusedNode).toBeNull();
   });
 
+  it('says what moved focus, so only a keyboard reveals its target', () => {
+    // The runtime scrolls the focused node into view, which keyboard
+    // navigation cannot do without — a control the person cannot see is
+    // a control they cannot use. A press is the opposite case: they can
+    // already see what they pressed, it is under their cursor, and
+    // revealing it scrolls the page out from under a pointer that is
+    // still resting there. A half-visible 562px card scrolled 511px on
+    // the press, which read as the card jumping up the screen.
+    const { btn1, btn2, focusManager } = setup();
+    const sources: string[] = [];
+    focusManager.onFocusChange((_node, source) => sources.push(source));
+
+    focusManager.focusOnPress(btn1);
+    expect(sources).toEqual(['pointer']);
+
+    // Everything else keeps the reveal: tab navigation, and a
+    // component calling `focus()` itself, which is what `element.focus()`
+    // does in a browser too.
+    focusManager.focusNext();
+    expect(focusManager.focusedNode).toBe(btn2);
+    expect(sources).toEqual(['pointer', 'program']);
+
+    focusManager.focus(btn1);
+    expect(sources).toEqual(['pointer', 'program', 'program']);
+  });
+
   it('focusOnPress walks up to the nearest focusable ancestor', () => {
     const { h, focusableBox, focusManager } = setup();
     // A container that is one tab stop — a tablist, a table — is

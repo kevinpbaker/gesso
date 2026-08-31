@@ -530,9 +530,15 @@ export class GessoRuntime {
     this.buildRoot(options.root);
     this.input = this.createInput();
     this.services.get(FocusService).setManager(this.input.focus);
-    // Keyboard navigation must keep the focused control visible.
-    this.input.focus.onFocusChange(node => {
-      if (node !== null) {
+    // Keyboard navigation must keep the focused control visible — but
+    // only keyboard navigation. A click has already shown the person
+    // where they are, and revealing what they just pressed scrolls the
+    // page out from under a pointer that is still resting on it: a
+    // half-visible 562px card jumped 511px up the screen on the press,
+    // before the transition it started had drawn a frame. A browser
+    // draws the same line, and for the same reason.
+    this.input.focus.onFocusChange((node, source) => {
+      if (node !== null && source !== 'pointer') {
         this.scrollIntoView(node);
       }
     });

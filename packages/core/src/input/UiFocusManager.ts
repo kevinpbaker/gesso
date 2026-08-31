@@ -11,6 +11,20 @@ import type { UiInputDispatcher } from './UiInputDispatcher';
  * nest: a confirmation dialog over a dialog pushes a second one, and
  * each pop restores its own opener.
  */
+/**
+ * What moved focus, which decides whether the focused node is scrolled
+ * into view.
+ *
+ * A browser draws the same distinction and it is the reason it exists:
+ * keyboard focus must reveal its target, because a control the person
+ * cannot see is a control they cannot use, while a *click* has already
+ * shown them where they are — the thing they pressed is under their
+ * cursor. Scrolling after a click moves the page out from under a
+ * pointer that is still there, and on a tall element that is a jump of
+ * most of the screen.
+ */
+export type FocusSource = 'pointer' | 'keyboard' | 'program';
+
 interface FocusScope {
   readonly root: UiNode;
   readonly restore: UiNode | null;
@@ -43,7 +57,7 @@ interface FocusScope {
 export class UiFocusManager {
   private root: UiNode;
   private focused: UiNode | null = null;
-  private readonly listeners = new Set<(node: UiNode | null) => void>();
+  private readonly listeners = new Set<(node: UiNode | null, source: FocusSource) => void>();
   private readonly scopeListeners = new Set<() => void>();
   private readonly scopes: FocusScope[] = [];
 
@@ -88,7 +102,7 @@ export class UiFocusManager {
    * otherwise, including when the node already held focus (a no-op
    * that emits nothing).
    */
-  focus(node: UiNode): boolean {
+  focus(node: UiNode, source: FocusSource = 'program'): boolean {
     if (!isNodeFocusable(node) || !this.withinScope(node)) {
       return false;
     }
@@ -101,7 +115,7 @@ export class UiFocusManager {
       this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Blur, node), previous);
     }
     this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Focus, previous), node);
-    this.notify(node);
+    this.notify(node, source);
     return true;
   }
 
@@ -109,7 +123,7 @@ export class UiFocusManager {
    * Called after focus moves or clears, with the new focused node. The
    * runtime uses it to scroll the focused node into view.
    */
-  onFocusChange(listener: (node: UiNode | null) => void): () => void {
+  onFocusChange(listener: (node: UiNode | null, source: FocusSource) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
@@ -124,9 +138,9 @@ export class UiFocusManager {
     };
   }
 
-  private notify(node: UiNode | null): void {
+  private notify(node: UiNode | null, source: FocusSource): void {
     for (const listener of this.listeners) {
-      listener(node);
+      listener(node, source);
     }
   }
 
@@ -144,7 +158,7 @@ export class UiFocusManager {
     const previous = this.focused;
     this.focused = null;
     this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Blur, null), previous);
-    this.notify(null);
+    this.notify(null, 'program');
   }
 
   /**
@@ -164,7 +178,7 @@ export class UiFocusManager {
   focusOnPress(node: UiNode): void {
     for (let current: UiNode | null = node; current !== null; current = current.parent) {
       if (isNodeFocusable(current)) {
-        this.focus(current);
+        this.focus(current, 'pointer');
         return;
       }
     }
@@ -259,7 +273,7 @@ export class UiFocusManager {
       this.popScope();
     }
     if (hadFocus && this.focused === null) {
-      this.notify(null);
+      this.notify(null, 'program');
     }
   }
 
