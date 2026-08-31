@@ -445,12 +445,21 @@ export const UiProperties = {
   /**
    * Paint and hit-test order among siblings; higher paints later and
    * is hit first. Ties keep tree order.
+   *
+   * Layout rather than Paint, which it was until a bound zIndex was
+   * found to change nothing. The order is not decided at paint time:
+   * `LayoutEngine.updatePaintOrder` sorts a parent's children into
+   * `LayoutRecord.paintOrder` during layout, from the same record
+   * field `position` writes — so a zIndex that only marked Paint was
+   * read back from a record nothing had recomputed, and took effect
+   * only if something else happened to relayout. Its partner in that
+   * sort key, `position`, has always been Layout.
    */
   zIndex: defineProperty<number | undefined>({
     name: 'zIndex',
     defaultValue: undefined,
     inherited: false,
-    affects: P
+    affects: L
   }),
 
   /**

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { DirtyFlags } from '../graph/DirtyFlags';
+import { propertyEffects } from '../properties/UiPropertyRegistry';
 import { UiFrame } from '../scheduler/UiFrame';
 import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
@@ -203,6 +204,17 @@ describe('LayoutEngine positioning', () => {
       a.setProperty('zIndex', 5);
       h.layout(root, Constraints.unbounded());
       expect(h.record(root).paintOrder).toEqual([b, a]);
+    });
+
+    it('asks for a layout when it changes, because that is when it is read', () => {
+      // The order lives in the layout record and is written by
+      // `updatePaintOrder` during layout, so a zIndex that only marked
+      // Paint was read back from a record nothing had recomputed:
+      // a bound zIndex changed the property and moved nothing until
+      // some unrelated change happened to relayout. `position`, its
+      // partner in the same sort key, has always been Layout.
+      expect(propertyEffects('zIndex') & DirtyFlags.Layout).toBe(DirtyFlags.Layout);
+      expect(propertyEffects('position') & DirtyFlags.Layout).toBe(DirtyFlags.Layout);
     });
 
     it('sorts stably and includes absolute children', () => {
