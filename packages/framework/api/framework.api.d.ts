@@ -238,6 +238,7 @@ import {
   UiSemanticsUpdate,
   UiSpringSpec,
   UiSpringToken,
+  UiTouchScroller,
   UiWheelController,
   VideoResolver
 } from "@gesso/core";
@@ -601,6 +602,7 @@ interface RuntimeInput {
   readonly editing: UiEditingController;
   readonly selection: UiSelectionController;
   readonly find: UiFindController;
+  readonly touchScroll: UiTouchScroller;
 }
 type RendererChoice = RendererBackend | 'auto';
 interface GessoRuntimeOptions {
@@ -1174,12 +1176,14 @@ declare class EditingProxy {
   private state;
   private composing;
   private disposed;
+  private refocusing;
   private readonly detach;
   constructor(canvas: HTMLCanvasElement, sink: EditingProxySink);
   get active(): boolean;
   get element(): HTMLTextAreaElement;
   update(state: EditingState$1 | null): void;
   focus(): void;
+  raiseKeyboard(): void;
   describe(record: UiSemanticsRecord$1 | null): void;
   dispose(): void;
   private position;

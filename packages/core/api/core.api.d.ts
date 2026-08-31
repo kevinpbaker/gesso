@@ -2124,6 +2124,33 @@ declare class UiKeyboardController {
   keyDown(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
 }
+interface TouchScrollerOptions {
+  momentum?: number;
+  flingVelocity?: number;
+  velocityWindow?: number;
+  now?: () => number;
+}
+declare class UiTouchScroller {
+  private readonly scrollSink;
+  private readonly momentum;
+  private readonly flingVelocity;
+  private readonly velocityWindow;
+  private readonly now;
+  private container;
+  private lastX;
+  private lastY;
+  private samples;
+  private readonly detach;
+  constructor(dispatcher: UiInputDispatcher, root: UiNode, scrollSink: ScrollSink, options?: TouchScrollerOptions);
+  get scrollingNode(): UiNode | null;
+  dispose(): void;
+  private panStart;
+  private panMove;
+  private panEnd;
+  private sample;
+  private releaseVelocity;
+  private resolve;
+}
 interface EditingHost {
   recordFor(node: UiNode): LayoutRecord | undefined;
   visibleBox(node: UiNode): LayoutBox;
@@ -2225,6 +2252,7 @@ declare class UiPlatformAdapter {
 }
 declare function pointerDeviceOf(event: PointerEvent): UiPointerDevice;
 declare function capturePointer(target: EventTarget | null, pointerId: number): void;
+declare function prepareInputSurface(element: HTMLElement): void;
 declare class CanvasPlatformSurface implements PlatformSurface {
   private readonly element;
   private readonly keyboardRoot;
@@ -3669,6 +3697,7 @@ export {
   pointerDeviceOf,
   pop,
   PositionProps,
+  prepareInputSurface,
   pressable,
   previousGraphemeStart,
   previousWordStart,
@@ -3681,6 +3710,7 @@ export {
   proportionalFontMetrics,
   PropsOf,
   provideEnvironment,
+  qs,
   Reactive,
   recordsEqual,
   RelayoutExplanation,
@@ -3778,6 +3808,7 @@ export {
   themesEqual,
   tightenConstraints,
   TightenOptions,
+  TouchScrollerOptions,
   traceRoundedRect,
   transform,
   Transform,
@@ -3916,6 +3947,7 @@ export {
   UiThemeColorName,
   UiTimerFrameClock,
   UiTimerFrameClockOptions,
+  UiTouchScroller,
   UiTrackSize,
   UiTransform,
   UiTransforms,
@@ -3962,8 +3994,7 @@ export {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty,
-  Ws
+  writeOverrideProperty
 };
 // ==== index.d.ts ====
 import {
@@ -4291,6 +4322,7 @@ import {
   pointerDeviceOf,
   pop,
   PositionProps,
+  prepareInputSurface,
   pressable,
   previousGraphemeStart,
   previousWordStart,
@@ -4400,6 +4432,7 @@ import {
   themesEqual,
   tightenConstraints,
   TightenOptions,
+  TouchScrollerOptions,
   traceRoundedRect,
   transform,
   Transform,
@@ -4538,6 +4571,7 @@ import {
   UiThemeColorName,
   UiTimerFrameClock,
   UiTimerFrameClockOptions,
+  UiTouchScroller,
   UiTrackSize,
   UiTransform,
   UiTransforms,
@@ -4585,7 +4619,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-C1el1i3i.js";
+} from "./index-C3BFHg47.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4801,6 +4835,7 @@ export {
   placeGridItems,
   pointerDeviceOf,
   pop,
+  prepareInputSurface,
   pressable,
   previousGraphemeStart,
   previousWordStart,
@@ -5025,6 +5060,7 @@ export {
   type TextRunMeasurer,
   type TextWrap,
   type TightenOptions,
+  type TouchScrollerOptions,
   type Transform,
   type TypographyProps,
   type UiAnimationOptions,
@@ -5172,6 +5208,7 @@ export {
   UiTheme,
   UiThemeColorName,
   UiTimerFrameClock,
+  UiTouchScroller,
   UiTransform,
   UiTransforms,
   UiTween,
@@ -5219,7 +5256,11 @@ import {
   LayoutResult,
   PlatformEventTarget,
   PlatformSurface,
+  PointerControllerOptions,
+  ScrollContainerState,
+  ScrollSink,
   TextMeasurer,
+  TouchScrollerOptions,
   UiFocusManager,
   UiGestureRecognizer,
   UiGraph,
@@ -5230,8 +5271,9 @@ import {
   UiNodeType,
   UiPlatformAdapter,
   UiPointerController,
+  UiTouchScroller,
   UiWheelController
-} from "./index-C1el1i3i.js";
+} from "./index-C3BFHg47.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -5248,6 +5290,7 @@ declare class InputTestHarness {
   readonly layout: LayoutHarness;
   readonly root: UiNode;
   readonly dispatcher: UiInputDispatcher;
+  readonly scrollSink: HarnessScrollSink;
   constructor(width?: number, height?: number, textMeasurer?: TextMeasurer);
   node(id: string, type: UiNodeType, props?: Record<string, unknown>): UiNode;
   add(parent: UiNode, ...children: UiNode[]): void;
@@ -5258,6 +5301,8 @@ declare class InputTestHarness {
   createFocusManager(): UiFocusManager;
   createKeyboardController(): UiKeyboardController;
   createWheelController(): UiWheelController;
+  createGesturePointerController(options?: PointerControllerOptions): UiPointerController;
+  createTouchScroller(options?: TouchScrollerOptions): UiTouchScroller;
   createPlatformAdapter(): UiPlatformAdapter;
   box(node: UiNode): {
     x: number;
@@ -5281,6 +5326,20 @@ declare class FakePlatformSurface implements PlatformSurface {
     x: number;
     y: number;
   };
+}
+declare class HarnessScrollSink implements ScrollSink {
+  private readonly harness;
+  readonly calls: {
+    node: UiNode;
+    dx: number;
+    dy: number;
+    behavior: string;
+  }[];
+  readonly revealed: UiNode[];
+  constructor(harness: InputTestHarness);
+  containerState(node: UiNode): ScrollContainerState | undefined;
+  scrollBy(node: UiNode, dx: number, dy: number, behavior?: string): void;
+  revealScrollbars(node: UiNode): void;
 }
 interface RecordedCall {
   name: string;
