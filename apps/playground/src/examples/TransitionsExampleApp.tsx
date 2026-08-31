@@ -24,6 +24,7 @@ import {
 } from '@gesso/core';
 
 import { ICONS, playlistById, PLAYLISTS, TRACKS, type Playlist } from './transitions/playlists';
+import { CHALK, INK, LINEN } from './brand';
 
 /**
  * A replica of Maxi Ferreira's `view-transitions-live` demo — three
@@ -76,16 +77,30 @@ import { ICONS, playlistById, PLAYLISTS, TRACKS, type Playlist } from './transit
 const COLUMN_WIDTH = 600;
 /** The card's own size, as the original draws it. */
 const CARD_WIDTH = 552;
+/**
+ * Space kept either side of a card once the window is too narrow to
+ * give it its full width, so it never runs into the edge.
+ */
+const GUTTER = 20;
 const CARD_HEIGHT = 562;
 const CARD_RADIUS = 32;
 /** How tall the artwork is on a card and on a playlist page. */
 const CARD_MEDIA_HEIGHT = 360;
 const PAGE_MEDIA_HEIGHT = 480;
 const HEADER_HEIGHT = 74;
-const PAGE_BACKGROUND = '#f6f6f6';
-/** The brand mark's two colours, and its geometry. See `brand/README.md`. */
-const LINEN = '#BE9A6E';
-const CHALK = '#F7F3EA';
+/*
+ * This screen is the light half of the brand: chalk ground for the
+ * page, plain white for the cards and sheets that carry artwork, and
+ * ink for text. The two greys are the brand's neutrals rather than
+ * true greys — chalk and ink mixed — so nothing on the page goes cold
+ * next to the linen mark. See `brand/README.md`.
+ */
+const PAGE_BACKGROUND = CHALK;
+/** A card or a sheet lifted off the chalk ground. */
+const CARD = '#ffffff';
+/** Secondary and tertiary text, and the icons that behave like it. */
+const MUTED = '#6f675c';
+const FAINT = '#a09789';
 const MARK_VIEWBOX = 64;
 const MARK_RADIUS = 12;
 
@@ -149,13 +164,13 @@ function Control(props: Inputs<{ path: string; big?: boolean; stroke?: boolean }
       width={size}
       height={size}
       borderRadius={size / 2}
-      backgroundColor={big.value ? '#ffffff' : 'rgba(0, 0, 0, 0.8)'}
+      backgroundColor={big.value ? CARD : 'rgba(0, 0, 0, 0.8)'}
       x="center"
       y="center">
       <Icon
         path={props.path.value}
         size={big.value ? 26 : 20}
-        color={big.value ? '#000000' : '#ffffff'}
+        color={big.value ? INK : CHALK}
         style={props.stroke.value === true ? 'stroke' : 'fill'}
         strokeWidth={2}
         fillRule="evenodd"
@@ -200,7 +215,7 @@ function PlayerControls(props: Inputs<{ playlist: Playlist; full?: boolean }>): 
  * transition — the shared name, the fit, the rounded corner — is the
  * same for both, which is the point of `Video` having `Image`'s shape.
  */
-function Artwork(props: Inputs<{ playlist: Playlist; height: number; fullWidth: number }>): UiChild {
+function Artwork(props: Inputs<{ playlist: Playlist; height: number }>): UiChild {
   const playlist = props.playlist.value;
   const height = props.height.value;
   const media = playlist.media;
@@ -216,7 +231,7 @@ function Artwork(props: Inputs<{ playlist: Playlist; height: number; fullWidth: 
       <Video
         src={media.url}
         alt={playlist.title}
-        width={props.fullWidth.value}
+        width={percent(100)}
         height={height}
         objectFit="cover"
         borderRadius={CARD_RADIUS}
@@ -270,7 +285,8 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
   const morphing = internalState(false);
   return (
     <button
-      width={CARD_WIDTH}
+      width={percent(100)}
+      maxWidth={CARD_WIDTH}
       height={CARD_HEIGHT}
       position="relative"
       zIndex={morphing.pipe(map(active => (active ? 1 : 0)))}
@@ -356,11 +372,11 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
             width={40}
             height={40}
             borderRadius={20}
-            backgroundColor="#ffffff"
+            backgroundColor={CARD}
             x="center"
             y="center"
             modifiers={[sharedElement({ name: `playlist-add-${playlist.id}` })]}>
-            <Icon path={ICONS.plus} size={20} color="#000000" style="stroke" strokeWidth={3} />
+            <Icon path={ICONS.plus} size={20} color={INK} style="stroke" strokeWidth={3} />
           </box>
         </row>
         <text
@@ -378,7 +394,7 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
             of the card whatever the title wrapped to. */}
         <box flexGrow={1} minHeight={20} />
         <box position="relative" width={percent(100)} x="center">
-          <Artwork playlist={playlist} height={CARD_MEDIA_HEIGHT} fullWidth={CARD_WIDTH} />
+          <Artwork playlist={playlist} height={CARD_MEDIA_HEIGHT} />
           <PlayerControls playlist={playlist} />
         </box>
       </column>
@@ -402,17 +418,24 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
       modifiers={[scrollPosition({ onChange: at => (listScroll.value = at.y) })]}
       width={percent(100)}
       height={percent(100)}>
-      <column width={percent(100)} paddingTop={HEADER_HEIGHT + 20} paddingBottom={40} gap={20} x="center">
+      <column
+        width={percent(100)}
+        paddingTop={HEADER_HEIGHT + 20}
+        paddingBottom={40}
+        paddingLeft={GUTTER}
+        paddingRight={GUTTER}
+        gap={20}
+        x="center">
         {PLAYLISTS.map(playlist => (
           <Card key={playlist.id} playlist={playlist} onOpen={open} />
         ))}
-        <column width={CARD_WIDTH} gap={10} paddingTop={20} x="center">
-          <text color="#6b6b6b" fontSize={13} textAlign="center" textWrap="word" maxWidth={480}>
+        <column width={percent(100)} maxWidth={CARD_WIDTH} gap={10} paddingTop={20} x="center">
+          <text color={MUTED} fontSize={13} textAlign="center" textWrap="word" maxWidth={480}>
             A replica of Maxi Ferreira’s View Transitions demo, built on Gesso’s motion layer: shared elements are FLIP
             over the live scene graph rather than snapshots, and the video decodes in the render worker through
             WebCodecs.
           </text>
-          <text color="#9c9c9c" fontSize={12} textAlign="center" textWrap="word" maxWidth={480}>
+          <text color={FAINT} fontSize={12} textAlign="center" textWrap="word" maxWidth={480}>
             Original concept by Ehsan Rahimi. Photographs by Atikh Bana and Te NGuyen; video by Anna Shvets.
           </text>
         </column>
@@ -431,16 +454,16 @@ function TrackRow(props: Inputs<{ index: number }>): UiChild {
     <row width={percent(100)} gap={20} paddingLeft={20} paddingRight={20} paddingTop={10} paddingBottom={10} y="center">
       <Image src={track.art} alt={track.title} width={60} height={60} borderRadius={6} objectFit="cover" />
       <column flex={1} gap={4}>
-        <text color="#111111" fontSize={14} fontWeight={700} selectable={false}>
+        <text color={INK} fontSize={14} fontWeight={700} selectable={false}>
           {track.title}
         </text>
-        <text color="#6b6b6b" fontSize={13} selectable={false}>
+        <text color={MUTED} fontSize={13} selectable={false}>
           {track.artist}
         </text>
       </column>
       <row gap={8} y="center">
-        <Icon path={ICONS.heart} size={22} color="#9c9c9c" />
-        <Icon path={ICONS.ellipsis} size={22} color="#9c9c9c" fillRule="evenodd" />
+        <Icon path={ICONS.heart} size={22} color={FAINT} />
+        <Icon path={ICONS.ellipsis} size={22} color={FAINT} fillRule="evenodd" />
       </row>
     </row>
   );
@@ -522,11 +545,11 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
                 width={24}
                 height={24}
                 borderRadius={12}
-                backgroundColor="#ffffff"
+                backgroundColor={CARD}
                 x="center"
                 y="center"
                 modifiers={[sharedElement({ name: `playlist-add-${playlist.id}` })]}>
-                <Icon path={ICONS.plus} size={14} color="#000000" style="stroke" strokeWidth={3} />
+                <Icon path={ICONS.plus} size={14} color={INK} style="stroke" strokeWidth={3} />
               </box>
             </box>
             <column gap={3} x="center">
@@ -572,7 +595,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
             </text>
             <box height={20} />
             <box position="relative" width={percent(100)} x="center">
-              <Artwork playlist={playlist} height={PAGE_MEDIA_HEIGHT} fullWidth={COLUMN_WIDTH} />
+              <Artwork playlist={playlist} height={PAGE_MEDIA_HEIGHT} />
               <PlayerControls playlist={playlist} full />
             </box>
           </column>
@@ -642,7 +665,7 @@ function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
       top={0}
       right={0}
       height={HEADER_HEIGHT}
-      backgroundColor="#ffffff"
+      backgroundColor={CARD}
       modifiers={[
         motion({
           state: props.hidden.pipe(map(hide => (hide ? slideDown(HEADER_HEIGHT + 6) : null))),
@@ -652,7 +675,7 @@ function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
       ]}>
       <row width={percent(100)} height={percent(100)} maxWidth={COLUMN_WIDTH} gap={16} x="center" y="center">
         <BrandMark size={26} />
-        <text color="#17191e" fontSize={22} fontWeight={700} selectable={false}>
+        <text color={INK} fontSize={22} fontWeight={700} selectable={false}>
           Playlists
         </text>
       </row>
