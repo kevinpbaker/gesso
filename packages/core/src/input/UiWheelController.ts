@@ -48,12 +48,57 @@ const LINE_HEIGHT_PX = 16;
  */
 export interface ScrollSink {
   containerState(node: UiNode): ScrollContainerState | undefined;
-  scrollBy(node: UiNode, dx: number, dy: number): void;
+  /**
+   * Moves the container, either at once or over time.
+   *
+   * `behavior` is a hint and defaults to `'instant'`, which is what
+   * every caller but the wheel wants and what a sink that does not
+   * animate should do with `'smooth'` as well. Animating belongs to
+   * the sink rather than to a caller stepping this in a loop: a
+   * playground harness sink echoes every write to another thread, and
+   * a scrollbar thumb drag reads the offset back on each pointer move,
+   * so a caller-driven animation would drive both of those too.
+   */
+  scrollBy(node: UiNode, dx: number, dy: number, behavior?: UiScrollBehavior): void;
   /** Show the container's scrollbars, as hovering near them or dragging one does. */
   revealScrollbars?(node: UiNode): void;
   /** Geometry of one scrollbar, for dragging its thumb. */
   scrollbar?(node: UiNode, axis: 'x' | 'y'): ScrollbarThumb | null;
 }
+
+/** Whether a scroll lands at once or is animated to its destination. */
+export type UiScrollBehavior = 'instant' | 'smooth';
+
+/**
+ * Whether this wheel event came from something with detents.
+ *
+ * Only a notched wheel is worth animating. It delivers one large jump
+ * per detent and nothing in between, which is the whole of the problem
+ * smooth scrolling solves. A trackpad already delivers a fine-grained
+ * inertial stream from the operating system, and animating that would
+ * integrate an inertia curve on top of one — a rubbery lag laid over
+ * scrolling that was already smooth, which is worse than the jumps.
+ *
+ * There is no honest way to *ask* what a device is, so this reads the
+ * evidence a `WheelEvent` carries and **only smooths on a positive
+ * answer**:
+ *
+ *   - A delta measured in lines or pages is never a precision device.
+ *   - `wheelDeltaY` is the legacy field, and a detented wheel reports
+ *     it in multiples of 120. A precision device does not.
+ *
+ * Anything else is treated as precise, so the failure direction is the
+ * behaviour that shipped before this existed.
+ */
+export function isNotchedWheel(deltaMode: UiWheelDeltaMode, wheelDeltaY: number | undefined): boolean {
+  if (deltaMode !== UiWheelDeltaMode.Pixel) {
+    return true;
+  }
+  return wheelDeltaY !== undefined && wheelDeltaY !== 0 && wheelDeltaY % NOTCH_WHEEL_DELTA === 0;
+}
+
+/** What a detent is worth in the legacy `wheelDelta` field. */
+const NOTCH_WHEEL_DELTA = 120;
 
 /**
  * Routes wheel input. Dispatches a bubbling Wheel event to the node
@@ -74,10 +119,11 @@ export class UiWheelController {
     deltaX: number,
     deltaY: number,
     modifiers: UiKeyModifiers = noKeyModifiers(),
-    deltaMode: UiWheelDeltaMode = UiWheelDeltaMode.Pixel
+    deltaMode: UiWheelDeltaMode = UiWheelDeltaMode.Pixel,
+    wheelDeltaY?: number
   ): UiWheelEvent {
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
-    const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers, deltaMode);
+    const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers, deltaMode, wheelDeltaY);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
     }
@@ -86,7 +132,7 @@ export class UiWheelController {
       if (container !== null) {
         const state = this.scrollSink.containerState(container);
         if (state !== undefined) {
-          this.applyDelta(container, state, deltaX, deltaY, deltaMode);
+          this.applyDelta(container, state, deltaX, deltaY, deltaMode, behaviorFor(container, deltaMode, wheelDeltaY));
         }
       }
     }
@@ -107,12 +153,13 @@ export class UiWheelController {
     state: ScrollContainerState,
     deltaX: number,
     deltaY: number,
-    deltaMode: UiWheelDeltaMode
+    deltaMode: UiWheelDeltaMode,
+    behavior: UiScrollBehavior
   ): void {
     if (state.horizontal) {
-      this.scrollSink.scrollBy(container, this.toPixels(deltaX, deltaMode, state.viewportWidth), 0);
+      this.scrollSink.scrollBy(container, this.toPixels(deltaX, deltaMode, state.viewportWidth), 0, behavior);
     } else {
-      this.scrollSink.scrollBy(container, 0, this.toPixels(deltaY, deltaMode, state.viewportHeight));
+      this.scrollSink.scrollBy(container, 0, this.toPixels(deltaY, deltaMode, state.viewportHeight), behavior);
     }
   }
 
@@ -136,6 +183,24 @@ export class UiWheelController {
     }
     return delta;
   }
+}
+
+/**
+ * Whether this wheel should animate the container it is over.
+ *
+ * Both halves have to agree: the device has to be one that jumps, and
+ * the container has not to have opted out with
+ * `scrollBehavior="instant"`.
+ */
+function behaviorFor(
+  container: UiNode,
+  deltaMode: UiWheelDeltaMode,
+  wheelDeltaY: number | undefined
+): UiScrollBehavior {
+  if (container.getProperty('scrollBehavior') === 'instant') {
+    return 'instant';
+  }
+  return isNotchedWheel(deltaMode, wheelDeltaY) ? 'smooth' : 'instant';
 }
 
 /** A ScrollView, or any node with overflow 'scroll' or 'auto'. */

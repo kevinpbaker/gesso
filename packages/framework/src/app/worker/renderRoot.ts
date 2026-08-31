@@ -254,7 +254,8 @@ export class RenderWorkerApp {
           message.deltaX,
           message.deltaY,
           message.modifiers,
-          message.deltaMode
+          message.deltaMode,
+          message.wheelDeltaY
         );
         break;
       case 'keyDown':

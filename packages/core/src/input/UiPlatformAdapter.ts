@@ -1,4 +1,4 @@
-import { type UiKeyModifiers } from './UiInputEvent';
+import { wheelDeltaYOf, type UiKeyModifiers } from './UiInputEvent';
 import type { UiKeyboardController } from './UiKeyboardController';
 import type { UiPointerController } from './UiPointerController';
 import type { UiWheelController } from './UiWheelController';
@@ -98,7 +98,15 @@ export class UiPlatformAdapter {
     this.wheelHandler = e => {
       const w = e as WheelEvent;
       const local = surface.clientToLocal(w.clientX, w.clientY);
-      const event = this.wheel.wheel(local.x, local.y, w.deltaX, w.deltaY, modifiersFromEvent(w), w.deltaMode);
+      const event = this.wheel.wheel(
+        local.x,
+        local.y,
+        w.deltaX,
+        w.deltaY,
+        modifiersFromEvent(w),
+        w.deltaMode,
+        wheelDeltaYOf(w)
+      );
       if (event.defaultPrevented) {
         w.preventDefault();
       }

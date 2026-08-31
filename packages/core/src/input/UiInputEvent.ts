@@ -229,6 +229,20 @@ export enum UiWheelDeltaMode {
   Page = 2
 }
 
+/**
+ * Reads the legacy `wheelDeltaY` off a DOM wheel event.
+ *
+ * Not on `WheelEvent` in TypeScript's lib, because it was never
+ * standardised — but every engine still reports it, and it is the only
+ * field that distinguishes a detented wheel (multiples of 120) from a
+ * precision device. Read defensively rather than cast, so an engine
+ * that has genuinely dropped it reports nothing instead of `NaN`.
+ */
+export function wheelDeltaYOf(event: object): number | undefined {
+  const value = (event as { wheelDeltaY?: unknown }).wheelDeltaY;
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 export class UiWheelEvent extends UiInputEvent {
   constructor(
     type: UiEventType.Wheel,
@@ -249,7 +263,14 @@ export class UiWheelEvent extends UiInputEvent {
      * application handler that consumes the delta itself has to do the
      * same.
      */
-    readonly deltaMode: UiWheelDeltaMode = UiWheelDeltaMode.Pixel
+    readonly deltaMode: UiWheelDeltaMode = UiWheelDeltaMode.Pixel,
+    /**
+     * The legacy `wheelDeltaY`, forwarded for one reason: a detented
+     * wheel reports it in multiples of 120 and a precision device does
+     * not, and there is no other evidence in a `WheelEvent` that tells
+     * the two apart. See `isNotchedWheel`.
+     */
+    readonly wheelDeltaY?: number
   ) {
     super(type);
   }

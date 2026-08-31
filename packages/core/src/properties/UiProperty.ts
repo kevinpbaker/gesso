@@ -1005,6 +1005,25 @@ export const UiProperties = {
     affects: T
   }),
 
+  /**
+   * Whether a wheel moves this container at once or animates it.
+   *
+   * `'instant'` opts out of the smoothing a notched wheel gets by
+   * default. Only the wheel consults it — a scrollbar thumb drag, a
+   * focus reveal and a caret reveal are always instant, because each
+   * of them is already tracking something the person is doing.
+   *
+   * It affects nothing that is laid out or painted; it is a policy the
+   * input layer reads, and it is registered rather than read loosely
+   * so that a misspelling is an error instead of silence.
+   */
+  scrollBehavior: defineProperty<'instant' | 'smooth' | undefined>({
+    name: 'scrollBehavior',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.None
+  }),
+
   scrollY: defineProperty<number | undefined>({
     name: 'scrollY',
     defaultValue: undefined,

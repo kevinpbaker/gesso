@@ -8,6 +8,7 @@ import {
   type RuntimeToShellMessage,
   type ShellToRuntimeMessage
 } from './RenderWorkerProtocol';
+import { wheelDeltaYOf } from '@gesso/core';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { observeReducedMotion } from '../reducedMotion';
@@ -591,6 +592,7 @@ export class WorkerApp {
         // Forwarded, not converted: what a line is worth is a policy
         // question and policy lives in the runtime.
         deltaMode: event.deltaMode,
+        wheelDeltaY: wheelDeltaYOf(event),
         modifiers: modifiersFrom(event),
         at: epochFromEvent(event)
       });

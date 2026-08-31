@@ -62,6 +62,12 @@ export type ShellToRuntimeMessage =
       deltaY: number;
       modifiers: UiKeyModifiers;
       deltaMode?: number;
+      /**
+       * The legacy `wheelDeltaY`. Forwarded because a detented wheel
+       * reports it in multiples of 120 and a precision device does
+       * not, and only a detented wheel is worth animating.
+       */
+      wheelDeltaY?: number;
       at?: number;
     }
   | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers; at?: number }

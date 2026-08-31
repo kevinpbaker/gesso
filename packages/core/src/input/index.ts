@@ -10,7 +10,8 @@ export {
   UiPointerEvent,
   UiTextChangeEvent,
   UiWheelDeltaMode,
-  UiWheelEvent
+  UiWheelEvent,
+  wheelDeltaYOf
 } from './UiInputEvent';
 export type { UiKeyModifiers } from './UiInputEvent';
 export { UiHitTester } from './UiHitTester';
@@ -22,7 +23,7 @@ export type { PointerControllerOptions } from './UiPointerController';
 export { UiKeyboardController } from './UiKeyboardController';
 export type { KeyboardControllerOptions } from './UiKeyboardController';
 export { isScrollContainer, UiWheelController } from './UiWheelController';
-export type { ScrollContainerState, ScrollSink } from './UiWheelController';
+export type { ScrollContainerState, ScrollSink, UiScrollBehavior } from './UiWheelController';
 export { UiGestureRecognizer } from './UiGestureRecognizer';
 export type { GestureInput, GestureRecognizerOptions } from './UiGestureRecognizer';
 export { UiEditingController } from './UiEditingController';
