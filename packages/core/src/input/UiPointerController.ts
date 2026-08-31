@@ -328,10 +328,17 @@ export class UiPointerController {
     const thumbStartLocal =
       axis === 'y' ? bar.thumb.y - this.recordOrigin(node, 'y') : bar.thumb.x - this.recordOrigin(node, 'x');
     const delta = (pointer < thumbStartLocal ? -1 : 1) * bar.viewport;
+    // Animated, for the reason a wheel notch is: pressing the track
+    // moves a whole screenful at once, and a screenful arriving
+    // instantly gives no sense of which way the content went. A thumb
+    // *drag* stays instant and must — it recomputes an absolute target
+    // from pointer travel on every move and reads the current offset
+    // back, so an animation in flight would have it chasing a position
+    // the container is only passing through.
     if (axis === 'y') {
-      sink.scrollBy(node, 0, delta);
+      sink.scrollBy(node, 0, delta, 'smooth');
     } else {
-      sink.scrollBy(node, delta, 0);
+      sink.scrollBy(node, delta, 0, 'smooth');
     }
   }
 

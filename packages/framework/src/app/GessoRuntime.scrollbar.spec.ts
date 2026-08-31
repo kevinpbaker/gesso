@@ -25,14 +25,22 @@ describe('GessoRuntime scrollbars', () => {
       clock: callback => (clock = new UiManualFrameClock(callback))
     });
     runtime.start();
+    // Time advances, because paging the track is animated now and a
+    // spring integrates against it.
+    let now = 0;
     const frame = () => {
       if (clock.isPending) {
-        clock.tick(0);
+        clock.tick((now += 16));
+      }
+    };
+    const settle = (limit = 400) => {
+      for (let i = 0; i < limit && clock.isPending; i++) {
+        clock.tick((now += 16));
       }
     };
     frame();
     const list = runtime.debugRoot();
-    return { runtime, frame, list, pressed, record: () => runtime['engine'].recordFor(list)! };
+    return { runtime, frame, settle, list, pressed, record: () => runtime['engine'].recordFor(list)! };
   }
 
   it('drags the thumb and scrolls in proportion to the track', () => {
@@ -58,14 +66,18 @@ describe('GessoRuntime scrollbars', () => {
   });
 
   it('pages one viewport when the visible track is pressed beside the thumb', () => {
-    const { runtime, frame, list, record } = mount();
+    const { runtime, frame, settle, list, record } = mount();
     // Reveal the bar (a wheel would too), then press below the thumb.
     runtime.input.wheel.wheel(50, 50, 0, 20, noKeyModifiers());
     frame();
     const bar = scrollbarThumb(record(), 'y')!;
     runtime.input.pointer.pointerDown(bar.thumb.x + 2, bar.thumb.y + bar.thumb.height + 20, 1, noKeyModifiers());
     runtime.input.pointer.pointerUp(bar.thumb.x + 2, bar.thumb.y + bar.thumb.height + 20, 0, noKeyModifiers());
+    // Paging is animated: a screenful arriving instantly gives no sense
+    // of which way the content went. So it takes frames to get there.
     frame();
+    expect(list.getProperty('scrollY')).toBeLessThan(120);
+    settle();
     // 20 from the wheel plus one viewport of 100.
     expect(list.getProperty('scrollY')).toBeCloseTo(120, 5);
     runtime.dispose();

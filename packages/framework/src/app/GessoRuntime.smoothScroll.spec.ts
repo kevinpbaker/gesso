@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, DirtyFlags, UiManualFrameClock, UiWheelDeltaMode, noKeyModifiers } from '@gesso/core';
+import {
+  Box,
+  Column,
+  DirtyFlags,
+  UiManualFrameClock,
+  UiWheelDeltaMode,
+  noKeyModifiers,
+  scrollbarThumb
+} from '@gesso/core';
 import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 
@@ -136,6 +144,24 @@ describe('GessoRuntime smooth scrolling', () => {
     runtime['graph'].updateNodeProperty(list, 'scrollY', 20, DirtyFlags.Transform);
     drain();
     expect(offset()).toBe(20);
+  });
+
+  it('leaves a scrollbar thumb drag instant, because it reads the offset back', () => {
+    // A drag recomputes an absolute target from pointer travel on every
+    // move and expresses it as a delta from the current offset. With an
+    // animation in flight that current value is a position the
+    // container is only passing through, so the drag would chase
+    // itself — this one has to land at once, and not merely for feel.
+    const { runtime, frame, offset, list } = mount();
+    const bar = scrollbarThumb(runtime['engine'].recordFor(list)!, 'y')!;
+    runtime.input.pointer.pointerDown(bar.thumb.x + 2, bar.thumb.y + 2, 1, noKeyModifiers());
+    runtime.input.pointer.pointerMove(bar.thumb.x + 2, bar.thumb.y + 12, 1, noKeyModifiers());
+    frame();
+    const dragged = offset();
+    expect(dragged).toBeGreaterThan(0);
+    // Already there: no frames were needed to arrive.
+    runtime.input.pointer.pointerUp(bar.thumb.x + 2, bar.thumb.y + 12, 0, noKeyModifiers());
+    expect(offset()).toBe(dragged);
   });
 
   it('arms no frames under reduced motion, and lands at once', () => {
