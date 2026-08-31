@@ -110,7 +110,19 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
         duration: durationMs,
         easing: linear,
         repeat: args.loop !== false,
-        reducedMotion: 'keep'
+        reducedMotion: 'keep',
+        // The video's own rate, which is what keeps a playing video
+        // from pinning the whole application to the frame clock. A
+        // tween with no `stepMs` asks to be sampled every frame; that
+        // was survivable while frames were a fixed sixty and is not
+        // once they follow the display, where a 30fps clip would wake
+        // a 165Hz app 165 times a second to present the same picture
+        // five times running. Declaring the rate instead lets
+        // `AnimationDriver.nextTickAt` do what it is for: the earliest
+        // moment *anybody* wants a frame, so an animation starting
+        // beside this video raises the rate for as long as it runs and
+        // the page falls back to the video's cadence when it settles.
+        stepMs: Math.max(1, resolved.frameDurationMs)
       });
     })
     .catch((error: unknown) => {

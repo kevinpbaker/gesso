@@ -15,6 +15,18 @@ export interface VideoPlayback {
   /** Seconds. Zero until the container has been read. */
   readonly duration: number;
   /**
+   * How often the picture can change, in milliseconds.
+   *
+   * Playback is driven by whoever owns time, and this is what that
+   * driver needs to pace itself: sampling this often never misses a
+   * frame, and sampling faster only discovers that nothing changed.
+   * Without it a playing video has to ask for *every* frame the clock
+   * will give — which on a display-paced runtime means a 30fps clip
+   * waking a 165Hz app 165 times a second to present the same picture
+   * five times running.
+   */
+  readonly frameDurationMs: number;
+  /**
    * Shows the frame due at `positionMs` into the video, and says
    * whether that changed the picture.
    *
@@ -265,6 +277,10 @@ class Mp4Playback implements VideoPlayback {
 
   get duration(): number {
     return this.track.durationUs / 1_000_000;
+  }
+
+  get frameDurationMs(): number {
+    return this.track.frameDurationUs / 1000;
   }
 
   async start(): Promise<void> {

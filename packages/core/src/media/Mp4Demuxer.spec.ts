@@ -218,6 +218,28 @@ describe('demuxMp4Video', () => {
     expect(track.durationUs).toBe(400_000);
   });
 
+  it('reports the shortest frame interval, which is what paces playback', () => {
+    const { data } = withMdatOffsets(BASE);
+    // 100 ticks at 1000 per second: a tenth of a second, so 10fps.
+    expect(demuxMp4Video(data).frameDurationUs).toBe(100_000);
+  });
+
+  it('takes the shortest interval of a variable-rate track, not the average', () => {
+    // Sampling too often costs a wake-up that finds nothing changed;
+    // sampling too rarely drops a picture. So the fastest the track
+    // ever moves is the safe number to pace by.
+    const spec: TrackSpec = {
+      ...BASE,
+      deltas: [
+        { count: 2, delta: 100 },
+        { count: 2, delta: 25 }
+      ]
+    };
+    const { data } = withMdatOffsets(spec);
+    const track = demuxMp4Video(data);
+    expect(track.frameDurationUs).toBe(25_000);
+  });
+
   it('walks several chunks with different sample counts', () => {
     const spec: TrackSpec = {
       ...BASE,

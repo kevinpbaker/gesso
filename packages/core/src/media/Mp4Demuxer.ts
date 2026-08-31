@@ -54,6 +54,18 @@ export interface Mp4VideoTrack {
   readonly samples: readonly Mp4Sample[];
   /** The whole track, in microseconds; where a loop wraps. */
   readonly durationUs: number;
+  /**
+   * The shortest frame interval in the track, in microseconds — the
+   * fastest the picture ever changes.
+   *
+   * What paces playback: a caller that samples this often never misses
+   * a frame, and one that samples faster only discovers that nothing
+   * changed. For constant-rate video, which is nearly all of it, this
+   * is simply the frame interval. For variable-rate video the shortest
+   * is the safe choice over the average, because sampling too often
+   * costs a wake-up and sampling too rarely drops a picture.
+   */
+  readonly frameDurationUs: number;
 }
 
 class Reader {
@@ -249,8 +261,12 @@ export function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack {
   // B-frames those are different samples, and this is where a loop
   // wraps.
   let durationUs = 0;
+  let frameDurationUs = Infinity;
   for (const sample of samples) {
     durationUs = Math.max(durationUs, sample.timestampUs + sample.durationUs);
+    if (sample.durationUs > 0 && sample.durationUs < frameDurationUs) {
+      frameDurationUs = sample.durationUs;
+    }
   }
   return {
     codec: table.codec,
@@ -258,7 +274,10 @@ export function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack {
     codedHeight: table.codedHeight,
     description: table.description,
     samples,
-    durationUs
+    durationUs,
+    // A track whose every sample claims zero duration says nothing
+    // about its rate, so it is paced as sixty rather than as infinity.
+    frameDurationUs: Number.isFinite(frameDurationUs) ? frameDurationUs : Math.round(1_000_000 / 60)
   };
 }
 
