@@ -54,6 +54,42 @@ export function noKeyModifiers(): UiKeyModifiers {
 }
 
 /**
+ * What is touching the surface, mirroring the DOM's `pointerType`.
+ *
+ * The runtime needs this because a finger is not a small mouse. It
+ * has no hover to leave behind, it covers the point it is aiming at,
+ * and it cannot land on a six-pixel scrollbar. Every one of those is
+ * a behaviour decision the framework has to take on its own, and
+ * `'touch'` is the only evidence it gets.
+ */
+export type UiPointerKind = 'mouse' | 'pen' | 'touch';
+
+/**
+ * The device behind a pointer event.
+ *
+ * `id` is the DOM's `pointerId`: it separates simultaneous contacts,
+ * so a second finger landing mid-press can be told from the first one
+ * moving. The pointer controller is single-press and uses it to
+ * *ignore* the second finger; a pinch recognizer would use it to
+ * follow both.
+ */
+export interface UiPointerDevice {
+  readonly id: number;
+  readonly kind: UiPointerKind;
+}
+
+/**
+ * The device assumed when a caller names none.
+ *
+ * A mouse, deliberately: every touch-specific behaviour is opt-in on
+ * `kind === 'touch'`, so a shell, a test or an app that predates this
+ * field keeps exactly the behaviour it had. The id matches what
+ * browsers give a mouse, and the object is frozen because it is
+ * shared by every event that does not name a device.
+ */
+export const MOUSE_POINTER: UiPointerDevice = Object.freeze({ id: 1, kind: 'mouse' as const });
+
+/**
  * Base class for every framework input event.
  *
  * Instances are small, flat and reused across the whole runtime.
@@ -142,9 +178,10 @@ export class UiFocusEvent extends UiInputEvent {
  * Pointer input event.
  *
  * Carries the canvas-space position (`x`/`y`), the pressed-button
- * bitmask and the keyboard modifiers present when the event was
- * produced. Used for every raw Pointer* event and for the Click
- * gesture, so listeners never need a browser-specific event shape.
+ * bitmask, the keyboard modifiers present when the event was produced
+ * and the device that produced it. Used for every raw Pointer* event
+ * and for the Click gesture, so listeners never need a
+ * browser-specific event shape.
  */
 export class UiPointerEvent extends UiInputEvent {
   constructor(
@@ -152,7 +189,13 @@ export class UiPointerEvent extends UiInputEvent {
     readonly x: number,
     readonly y: number,
     readonly buttons: number = 0,
-    readonly modifiers: UiKeyModifiers = noKeyModifiers()
+    readonly modifiers: UiKeyModifiers = noKeyModifiers(),
+    /**
+     * The device that produced the event, for a listener that has to
+     * treat a finger differently — sizing its own hit target, or
+     * skipping a hover affordance nothing will ever hover.
+     */
+    readonly pointer: UiPointerDevice = MOUSE_POINTER
   ) {
     super(type);
   }

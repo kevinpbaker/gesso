@@ -1,4 +1,10 @@
-import { wheelDeltaYOf, type UiKeyModifiers } from './UiInputEvent';
+import {
+  MOUSE_POINTER,
+  wheelDeltaYOf,
+  type UiKeyModifiers,
+  type UiPointerDevice,
+  type UiPointerKind
+} from './UiInputEvent';
 import type { UiKeyboardController } from './UiKeyboardController';
 import type { UiPointerController } from './UiPointerController';
 import type { UiWheelController } from './UiWheelController';
@@ -77,7 +83,12 @@ export class UiPlatformAdapter {
     this.pointerDownHandler = e => {
       const p = e as PointerEvent;
       const local = surface.clientToLocal(p.clientX, p.clientY);
-      const event = this.pointer.pointerDown(local.x, local.y, p.buttons, modifiersFromEvent(p));
+      // The element keeps every later event of this contact even once
+      // the finger leaves its box. Touch captures implicitly and a
+      // mouse does not, so without this a drag that runs off the
+      // canvas stops being delivered on one device and not the other.
+      capturePointer(e.target, p.pointerId);
+      const event = this.pointer.pointerDown(local.x, local.y, p.buttons, modifiersFromEvent(p), pointerDeviceOf(p));
       if (event.defaultPrevented) {
         p.preventDefault();
       }
@@ -85,15 +96,15 @@ export class UiPlatformAdapter {
     this.pointerMoveHandler = e => {
       const p = e as PointerEvent;
       const local = surface.clientToLocal(p.clientX, p.clientY);
-      this.pointer.pointerMove(local.x, local.y, p.buttons, modifiersFromEvent(p));
+      this.pointer.pointerMove(local.x, local.y, p.buttons, modifiersFromEvent(p), pointerDeviceOf(p));
     };
     this.pointerUpHandler = e => {
       const p = e as PointerEvent;
       const local = surface.clientToLocal(p.clientX, p.clientY);
-      this.pointer.pointerUp(local.x, local.y, p.buttons, modifiersFromEvent(p));
+      this.pointer.pointerUp(local.x, local.y, p.buttons, modifiersFromEvent(p), pointerDeviceOf(p));
     };
-    this.pointerCancelHandler = () => {
-      this.pointer.pointerCancel();
+    this.pointerCancelHandler = e => {
+      this.pointer.pointerCancel(pointerDeviceOf(e as PointerEvent));
     };
     this.wheelHandler = e => {
       const w = e as WheelEvent;
@@ -167,6 +178,45 @@ export class UiPlatformAdapter {
     this.wheelHandler = null;
     this.keyDownHandler = null;
     this.keyUpHandler = null;
+  }
+}
+
+/**
+ * The device behind a DOM pointer event.
+ *
+ * Anything the browser reports that is not one of the three known
+ * kinds is read as a mouse: `pointerType` is an open string, and an
+ * unrecognised device behaving like the default is better than one
+ * whose events are dropped.
+ *
+ * Exported because the worker shell does the same conversion on its
+ * way to the protocol, and the two must not answer differently.
+ */
+export function pointerDeviceOf(event: PointerEvent): UiPointerDevice {
+  const kind = event.pointerType;
+  if (kind !== 'touch' && kind !== 'pen' && kind !== 'mouse') {
+    return MOUSE_POINTER;
+  }
+  return { id: event.pointerId, kind: kind as UiPointerKind };
+}
+
+/**
+ * Asks the element to keep this contact, ignoring the failure.
+ *
+ * `setPointerCapture` throws for a pointer that is no longer active —
+ * a contact already released between the event and this call — and
+ * that is not a reason to lose the press. A target that has no such
+ * method (a test double, a non-element event target) is left alone.
+ */
+export function capturePointer(target: EventTarget | null, pointerId: number): void {
+  const element = target as { setPointerCapture?: (id: number) => void } | null;
+  if (typeof element?.setPointerCapture !== 'function') {
+    return;
+  }
+  try {
+    element.setPointerCapture(pointerId);
+  } catch {
+    // The contact ended first; the press will end with it.
   }
 }
 

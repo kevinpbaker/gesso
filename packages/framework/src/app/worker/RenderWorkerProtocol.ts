@@ -1,4 +1,11 @@
-import type { UiKeyModifiers, EditingState, RendererBackend, UiSemanticsAction, UiSemanticsUpdate } from '@gesso/core';
+import type {
+  UiKeyModifiers,
+  EditingState,
+  RendererBackend,
+  UiPointerDevice,
+  UiSemanticsAction,
+  UiSemanticsUpdate
+} from '@gesso/core';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
 /**
@@ -44,10 +51,40 @@ export type ShellToRuntimeMessage =
       accessibility?: boolean;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
-  | { type: 'pointerDown'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
-  | { type: 'pointerMove'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
-  | { type: 'pointerUp'; x: number; y: number; buttons: number; modifiers: UiKeyModifiers; at?: number }
-  | { type: 'pointerCancel'; at?: number }
+  /**
+   * `pointer` is the contact: which device, and which of its
+   * simultaneous contacts. Optional, so a shell written before touch
+   * existed is read as the mouse it was — every touch behaviour in the
+   * runtime is opt-in on this field saying `touch`.
+   */
+  | {
+      type: 'pointerDown';
+      x: number;
+      y: number;
+      buttons: number;
+      modifiers: UiKeyModifiers;
+      pointer?: UiPointerDevice;
+      at?: number;
+    }
+  | {
+      type: 'pointerMove';
+      x: number;
+      y: number;
+      buttons: number;
+      modifiers: UiKeyModifiers;
+      pointer?: UiPointerDevice;
+      at?: number;
+    }
+  | {
+      type: 'pointerUp';
+      x: number;
+      y: number;
+      buttons: number;
+      modifiers: UiKeyModifiers;
+      pointer?: UiPointerDevice;
+      at?: number;
+    }
+  | { type: 'pointerCancel'; pointer?: UiPointerDevice; at?: number }
   /**
    * `deltaMode` is the DOM's own value, forwarded rather than
    * translated: a wheel delta is a distance in pixels only when it is

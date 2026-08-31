@@ -1,5 +1,12 @@
 import type { UiNode } from '../graph/UiNode';
-import { noKeyModifiers, UiEventType, UiPointerEvent, type UiKeyModifiers } from './UiInputEvent';
+import {
+  MOUSE_POINTER,
+  noKeyModifiers,
+  UiEventType,
+  UiPointerEvent,
+  type UiKeyModifiers,
+  type UiPointerDevice
+} from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
 import { UiInputDispatcher } from './UiInputDispatcher';
 import type { GestureInput } from './UiGestureRecognizer';
@@ -12,6 +19,17 @@ export interface PointerControllerOptions {
    * pointerup and still count as a Click.
    */
   slop?: number;
+  /**
+   * The same allowance for a finger.
+   *
+   * A tap is not a click held still. The contact point moves as the
+   * finger flattens and lifts, and four pixels of travel — the mouse
+   * allowance — is routinely exceeded by a tap the person considers
+   * perfectly stationary. At that threshold a touchscreen loses
+   * roughly every other tap, silently: the PointerUp fires and no
+   * Click follows it.
+   */
+  touchSlop?: number;
   /**
    * Optional gesture recognizer fed the press sequence. When a
    * gesture is claimed, Click synthesis is suppressed.
@@ -94,9 +112,16 @@ interface ScrollbarDrag {
  *     when the pointer leaves its box. This keeps drags and releases
  *     owned by the pressed widget.
  *   - Click: synthesized on pointerup when the press stayed within
- *     `slop` px, pointerdown did not call preventDefault(), and no
+ *     `slop` px (`touchSlop` for a finger, which never holds as still
+ *     as a mouse), pointerdown did not call preventDefault(), and no
  *     gesture recognizer claimed the press.
  *   - pointercancel aborts the press and never produces a Click.
+ *   - Contacts: a press is owned by the contact that started it, and
+ *     the moves and releases of any other contact are ignored until it
+ *     ends. A second finger therefore cannot drag a widget the first
+ *     one is holding.
+ *   - Touch hover: a finger's hover is dropped when it lifts, because
+ *     the finger is no longer anywhere. A mouse keeps its hover.
  *   - Scrollbars: a press on a scroll container's thumb starts a drag
  *     that moves the content with the pointer; a press on the track
  *     beside a visible thumb pages one viewport toward the pointer.
@@ -111,6 +136,7 @@ interface ScrollbarDrag {
  */
 export class UiPointerController {
   private readonly slop: number;
+  private readonly touchSlop: number;
   private readonly gestures: GestureInput | null;
   private readonly onPress: ((node: UiNode) => void) | null;
   private readonly scrollSink: ScrollSink | null;
@@ -124,6 +150,15 @@ export class UiPointerController {
   private downX = 0;
   private downY = 0;
   private downDefaultPrevented = false;
+  /**
+   * The contact that owns the press in progress, or null when idle.
+   *
+   * Everything from the pointerdown to the release is routed by this
+   * id. Without it a second finger landing on the canvas mid-drag
+   * feeds its own moves to the node the *first* finger pressed, and
+   * the drag jumps between the two contacts.
+   */
+  private activePointer: UiPointerDevice | null = null;
 
   private scrollbarDrag: ScrollbarDrag | null = null;
 
@@ -133,6 +168,7 @@ export class UiPointerController {
     options: PointerControllerOptions = {}
   ) {
     this.slop = options.slop ?? 4;
+    this.touchSlop = options.touchSlop ?? 10;
     this.gestures = options.gestures ?? null;
     this.onPress = options.onPress ?? null;
     this.scrollSink = options.scrollSink ?? null;
@@ -161,18 +197,25 @@ export class UiPointerController {
    * dispatches PointerDown to the pressed node. Subsequent moves and
    * the up are routed to that node until release.
    */
-  pointerDown(x: number, y: number, buttons = 1, modifiers: UiKeyModifiers = noKeyModifiers()): UiPointerEvent {
-    const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers);
+  pointerDown(
+    x: number,
+    y: number,
+    buttons = 1,
+    modifiers: UiKeyModifiers = noKeyModifiers(),
+    pointer: UiPointerDevice = MOUSE_POINTER
+  ): UiPointerEvent {
+    const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers, pointer);
     if (this.downTarget !== null || this.scrollbarDrag !== null) {
       return event;
     }
     const hit = this.hitTester.hitTest(x, y);
     if (hit?.scrollbar !== undefined && this.scrollSink !== null) {
+      this.activePointer = pointer;
       this.pressScrollbar(hit.node, hit.scrollbar.axis, hit.scrollbar.onThumb, x, y);
       return event;
     }
     const target = hit?.node ?? null;
-    this.updateHover(target, x, y, buttons, modifiers);
+    this.updateHover(target, x, y, buttons, modifiers, pointer);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
       this.gestures?.pointerDown(event, target);
@@ -193,6 +236,7 @@ export class UiPointerController {
     this.downX = x;
     this.downY = y;
     this.downDefaultPrevented = event.defaultPrevented;
+    this.activePointer = pointer;
     return event;
   }
 
@@ -202,13 +246,22 @@ export class UiPointerController {
    * hover enter/leave, and dispatches PointerMove to the hovered
    * node. Returns null when the move lands on empty space.
    */
-  pointerMove(x: number, y: number, buttons = 0, modifiers: UiKeyModifiers = noKeyModifiers()): UiPointerEvent | null {
+  pointerMove(
+    x: number,
+    y: number,
+    buttons = 0,
+    modifiers: UiKeyModifiers = noKeyModifiers(),
+    pointer: UiPointerDevice = MOUSE_POINTER
+  ): UiPointerEvent | null {
+    if (!this.ownsPress(pointer)) {
+      return null;
+    }
     if (this.scrollbarDrag !== null) {
       this.dragScrollbar(x, y);
       return null;
     }
     if (this.downTarget !== null) {
-      const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers);
+      const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers, pointer);
       this.dispatcher.dispatch(event, this.downTarget);
       this.gestures?.pointerMove(event, this.downTarget);
       if (!event.defaultPrevented) {
@@ -230,11 +283,11 @@ export class UiPointerController {
       }
     }
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
-    this.updateHover(target, x, y, buttons, modifiers);
+    this.updateHover(target, x, y, buttons, modifiers, pointer);
     if (target === null) {
       return null;
     }
-    const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers);
+    const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers, pointer);
     this.dispatcher.dispatch(event, target);
     return event;
   }
@@ -245,10 +298,20 @@ export class UiPointerController {
    * cancelled via preventDefault on the down, synthesizes a Click on
    * the same node. Returns null when nothing was pressed.
    */
-  pointerUp(x: number, y: number, buttons = 0, modifiers: UiKeyModifiers = noKeyModifiers()): UiPointerEvent | null {
+  pointerUp(
+    x: number,
+    y: number,
+    buttons = 0,
+    modifiers: UiKeyModifiers = noKeyModifiers(),
+    pointer: UiPointerDevice = MOUSE_POINTER
+  ): UiPointerEvent | null {
+    if (!this.ownsPress(pointer)) {
+      return null;
+    }
     if (this.scrollbarDrag !== null) {
       this.dragScrollbar(x, y);
       this.scrollbarDrag = null;
+      this.activePointer = null;
       return null;
     }
     const target = this.downTarget;
@@ -256,10 +319,11 @@ export class UiPointerController {
       return null;
     }
     this.downTarget = null;
+    this.activePointer = null;
     this.editing?.pointerUp();
     this.selection?.pointerUp();
 
-    const event = new UiPointerEvent(UiEventType.PointerUp, x, y, buttons, modifiers);
+    const event = new UiPointerEvent(UiEventType.PointerUp, x, y, buttons, modifiers, pointer);
     this.dispatcher.dispatch(event, target);
     this.gestures?.pointerUp(event, target);
 
@@ -267,11 +331,13 @@ export class UiPointerController {
     if (!this.downDefaultPrevented && !gestureClaimed) {
       const dx = Math.abs(x - this.downX);
       const dy = Math.abs(y - this.downY);
-      if (dx <= this.slop && dy <= this.slop) {
-        const click = new UiPointerEvent(UiEventType.Click, x, y, buttons, modifiers);
+      const slop = pointer.kind === 'touch' ? this.touchSlop : this.slop;
+      if (dx <= slop && dy <= slop) {
+        const click = new UiPointerEvent(UiEventType.Click, x, y, buttons, modifiers, pointer);
         this.dispatcher.dispatch(click, target);
       }
     }
+    this.releaseHover(x, y, modifiers, pointer);
     return event;
   }
 
@@ -279,17 +345,35 @@ export class UiPointerController {
    * Aborts the active press: dispatches PointerCancel to the pressed
    * node and clears press state so no Click is synthesized.
    */
-  pointerCancel(): void {
+  pointerCancel(pointer: UiPointerDevice = MOUSE_POINTER): void {
+    if (!this.ownsPress(pointer)) {
+      return;
+    }
     this.scrollbarDrag = null;
     this.editing?.pointerUp();
     this.selection?.pointerUp();
-    if (this.downTarget === null) {
+    const target = this.downTarget;
+    this.downTarget = null;
+    this.activePointer = null;
+    if (target === null) {
       return;
     }
-    const event = new UiPointerEvent(UiEventType.PointerCancel, this.downX, this.downY, 0, noKeyModifiers());
-    this.dispatcher.dispatch(event, this.downTarget);
+    const event = new UiPointerEvent(UiEventType.PointerCancel, this.downX, this.downY, 0, noKeyModifiers(), pointer);
+    this.dispatcher.dispatch(event, target);
     this.gestures?.pointerCancel();
-    this.downTarget = null;
+    this.releaseHover(this.downX, this.downY, noKeyModifiers(), pointer);
+  }
+
+  /**
+   * Whether an event from this contact should be acted on.
+   *
+   * While a press is in flight only the contact that started it is
+   * heard; a second finger's moves and releases are dropped. When
+   * nothing is pressed every contact is heard, so hover still follows
+   * a mouse that never pressed anything.
+   */
+  private ownsPress(pointer: UiPointerDevice): boolean {
+    return this.activePointer === null || this.activePointer.id === pointer.id;
   }
 
   // -------------------------------------------------------------------------
@@ -387,7 +471,14 @@ export class UiPointerController {
    * between the two hovered nodes (the lowest common ancestor is
    * shared and never fires), matching mouseenter/mouseleave.
    */
-  private updateHover(next: UiNode | null, x: number, y: number, buttons: number, modifiers: UiKeyModifiers): void {
+  private updateHover(
+    next: UiNode | null,
+    x: number,
+    y: number,
+    buttons: number,
+    modifiers: UiKeyModifiers,
+    pointer: UiPointerDevice
+  ): void {
     if (next === this.hoverNode) {
       return;
     }
@@ -400,7 +491,7 @@ export class UiPointerController {
         if (nextChain.has(node)) {
           break;
         }
-        this.dispatchBoundary(UiEventType.PointerLeave, node, x, y, buttons, modifiers);
+        this.dispatchBoundary(UiEventType.PointerLeave, node, x, y, buttons, modifiers, pointer);
       }
     }
     if (next !== null) {
@@ -409,7 +500,7 @@ export class UiPointerController {
         if (previousChain.has(node)) {
           break;
         }
-        this.dispatchBoundary(UiEventType.PointerEnter, node, x, y, buttons, modifiers);
+        this.dispatchBoundary(UiEventType.PointerEnter, node, x, y, buttons, modifiers, pointer);
       }
     }
     this.onHoverChange?.(next);
@@ -430,9 +521,30 @@ export class UiPointerController {
     x: number,
     y: number,
     buttons: number,
-    modifiers: UiKeyModifiers
+    modifiers: UiKeyModifiers,
+    pointer: UiPointerDevice
   ): void {
-    const event = new UiPointerEvent(type, x, y, buttons, modifiers);
+    const event = new UiPointerEvent(type, x, y, buttons, modifiers, pointer);
     this.dispatcher.dispatch(event, node);
+  }
+
+  /**
+   * Drops hover when the contact that had it has left the surface.
+   *
+   * A finger stops existing when it lifts. A mouse does not, so its
+   * hover survives the release and the node it was released over stays
+   * hovered — which is what a mouse user sees and expects.
+   *
+   * Without this a tap leaves the tapped node hovered for good: every
+   * hover affordance in the app stays lit under the last thing touched,
+   * and the next tap somewhere else moves the stuck highlight rather
+   * than clearing it. It is the most visible thing that goes wrong when
+   * a canvas UI meets a touchscreen.
+   */
+  private releaseHover(x: number, y: number, modifiers: UiKeyModifiers, pointer: UiPointerDevice): void {
+    if (pointer.kind !== 'touch') {
+      return;
+    }
+    this.updateHover(null, x, y, 0, modifiers, pointer);
   }
 }

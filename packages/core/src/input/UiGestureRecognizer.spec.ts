@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType } from './UiInputEvent';
+import { UiEventType, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import { UiGestureRecognizer } from './UiGestureRecognizer';
 import { UiPointerController } from './UiPointerController';
@@ -250,5 +250,56 @@ describe('UiGestureRecognizer', () => {
     controller.pointerUp(50, 50);
     expect(panStart).toHaveBeenCalledTimes(1);
     expect(controller.pressedNode).toBeNull();
+  });
+
+  describe('touch', () => {
+    const finger = { id: 7, kind: 'touch' as const };
+    const noMods = { ctrl: false, shift: false, alt: false, meta: false };
+
+    it('holds a long press through the wander a mouse would have panned on', () => {
+      vi.useFakeTimers();
+      const { h, box, controller } = setup();
+      const longPress = vi.fn();
+      const panStart = vi.fn();
+      h.dispatcher.addEventListener(box, UiEventType.LongPress, longPress);
+      h.dispatcher.addEventListener(box, UiEventType.PanStart, panStart);
+
+      controller.pointerDown(50, 50, 1, noMods, finger);
+      // 10px: past the 8px mouse slop, inside the 12px touch slop.
+      controller.pointerMove(60, 50, 1, noMods, finger);
+      vi.advanceTimersByTime(500);
+
+      expect(panStart).not.toHaveBeenCalled();
+      expect(longPress).toHaveBeenCalledTimes(1);
+
+      controller.pointerUp(60, 50, 0, noMods, finger);
+    });
+
+    it('still pans a finger that travels past the touch slop', () => {
+      vi.useFakeTimers();
+      const { h, box, controller } = setup();
+      const panStart = vi.fn();
+      h.dispatcher.addEventListener(box, UiEventType.PanStart, panStart);
+
+      controller.pointerDown(50, 50, 1, noMods, finger);
+      controller.pointerMove(70, 50, 1, noMods, finger);
+
+      expect(panStart).toHaveBeenCalledTimes(1);
+      controller.pointerUp(70, 50, 0, noMods, finger);
+    });
+
+    it('carries the device onto the synthesized gesture events', () => {
+      const { h, box, controller } = setup();
+      const kinds: string[] = [];
+      h.dispatcher.addEventListener(box, UiEventType.PanStart, event =>
+        kinds.push((event as UiPointerEvent).pointer.kind)
+      );
+
+      controller.pointerDown(50, 50, 1, noMods, finger);
+      controller.pointerMove(90, 50, 1, noMods, finger);
+
+      expect(kinds).toEqual(['touch']);
+      controller.pointerUp(90, 50, 0, noMods, finger);
+    });
   });
 });

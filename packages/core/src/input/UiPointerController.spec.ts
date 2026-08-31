@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType, type UiPointerEvent } from './UiInputEvent';
+import { UiEventType, type UiPointerDevice, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import type { UiPointerController } from './UiPointerController';
 
@@ -249,5 +249,108 @@ describe('UiPointerController', () => {
     expect(down).not.toHaveBeenCalled();
     expect(controller.pressedNode).toBeNull();
     expect(controller.pointerUp(500, 50)).toBeNull();
+  });
+
+  describe('touch', () => {
+    const finger = (id = 10): UiPointerDevice => ({ id, kind: 'touch' });
+    const noMods = { ctrl: false, shift: false, alt: false, meta: false };
+
+    it('carries the device onto every dispatched event', () => {
+      const { h, a, controller } = setupRow();
+      const kinds: string[] = [];
+      for (const type of [UiEventType.PointerDown, UiEventType.PointerUp, UiEventType.Click]) {
+        h.dispatcher.addEventListener(a, type, event => kinds.push((event as UiPointerEvent).pointer.kind));
+      }
+
+      controller.pointerDown(50, 50, 1, noMods, finger());
+      controller.pointerUp(50, 50, 0, noMods, finger());
+
+      expect(kinds).toEqual(['touch', 'touch', 'touch']);
+    });
+
+    it('defaults to a mouse when no device is named', () => {
+      const { h, a, controller } = setupRow();
+      const kinds: string[] = [];
+      h.dispatcher.addEventListener(a, UiEventType.PointerDown, event =>
+        kinds.push((event as UiPointerEvent).pointer.kind)
+      );
+
+      controller.pointerDown(50, 50);
+
+      expect(kinds).toEqual(['mouse']);
+    });
+
+    it('drops hover when the finger lifts, and keeps it when a mouse does', () => {
+      const { h, a, controller } = setupRow();
+      const leave = vi.fn();
+      h.dispatcher.addEventListener(a, UiEventType.PointerLeave, leave);
+
+      controller.pointerDown(50, 50, 1, noMods, finger());
+      expect(controller.hoveredNode).toBe(a);
+      controller.pointerUp(50, 50, 0, noMods, finger());
+
+      expect(controller.hoveredNode).toBeNull();
+      expect(leave).toHaveBeenCalledTimes(1);
+
+      controller.pointerDown(50, 50);
+      controller.pointerUp(50, 50);
+      expect(controller.hoveredNode).toBe(a);
+    });
+
+    it('drops hover when a touch press is cancelled', () => {
+      const { controller } = setupRow();
+
+      controller.pointerDown(50, 50, 1, noMods, finger());
+      controller.pointerCancel(finger());
+
+      expect(controller.hoveredNode).toBeNull();
+    });
+
+    it('clicks a tap that wandered further than a mouse would be allowed', () => {
+      const { h, a, controller } = setupRow();
+      const click = vi.fn();
+      h.dispatcher.addEventListener(a, UiEventType.Click, click);
+
+      controller.pointerDown(50, 50, 1, noMods, finger());
+      controller.pointerMove(56, 57, 1, noMods, finger());
+      controller.pointerUp(56, 57, 0, noMods, finger());
+
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    it('still refuses a click for a tap that travelled beyond the touch slop', () => {
+      const { h, a, controller } = setupRow();
+      const click = vi.fn();
+      h.dispatcher.addEventListener(a, UiEventType.Click, click);
+
+      controller.pointerDown(50, 50, 1, noMods, finger());
+      controller.pointerUp(75, 50, 0, noMods, finger());
+
+      expect(click).not.toHaveBeenCalled();
+    });
+
+    it('ignores a second contact while the first one holds the press', () => {
+      const { h, a, b, controller } = setupRow();
+      const moveOnA = vi.fn();
+      const upOnA = vi.fn();
+      h.dispatcher.addEventListener(a, UiEventType.PointerMove, moveOnA);
+      h.dispatcher.addEventListener(a, UiEventType.PointerUp, upOnA);
+      const downOnB = vi.fn();
+      h.dispatcher.addEventListener(b, UiEventType.PointerDown, downOnB);
+
+      controller.pointerDown(50, 50, 1, noMods, finger(1));
+      // A second finger lands on the other box and drags away.
+      controller.pointerDown(150, 50, 1, noMods, finger(2));
+      controller.pointerMove(160, 60, 1, noMods, finger(2));
+      controller.pointerUp(160, 60, 0, noMods, finger(2));
+
+      expect(downOnB).not.toHaveBeenCalled();
+      expect(moveOnA).not.toHaveBeenCalled();
+      expect(upOnA).not.toHaveBeenCalled();
+      expect(controller.pressedNode).toBe(a);
+
+      controller.pointerMove(55, 55, 1, noMods, finger(1));
+      expect(moveOnA).toHaveBeenCalledTimes(1);
+    });
   });
 });

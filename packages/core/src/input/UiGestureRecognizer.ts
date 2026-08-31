@@ -1,5 +1,5 @@
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType, UiPointerEvent } from './UiInputEvent';
+import { UiEventType, UiPointerEvent, type UiPointerKind } from './UiInputEvent';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 
 export interface GestureRecognizerOptions {
@@ -8,6 +8,16 @@ export interface GestureRecognizerOptions {
    * is claimed as a Pan.
    */
   slop?: number;
+  /**
+   * The same threshold for a finger.
+   *
+   * Larger, because a finger is not a cursor: it rolls as it presses
+   * and the reported point wanders several pixels without the person
+   * intending to move at all. At the mouse threshold a deliberate
+   * long press on a touchscreen is claimed as a pan before the hold
+   * time is up, so the gesture becomes unreachable.
+   */
+  touchSlop?: number;
   /** Hold time (ms) before a still press becomes a LongPress. */
   longPressDelay?: number;
 }
@@ -53,11 +63,13 @@ type GestureState = 'idle' | 'pressing' | 'longPressed' | 'panning' | 'dragging'
  */
 export class UiGestureRecognizer implements GestureInput {
   private readonly slop: number;
+  private readonly touchSlop: number;
   private readonly longPressDelay: number;
 
   private state: GestureState = 'idle';
   private startX = 0;
   private startY = 0;
+  private startKind: UiPointerKind = 'mouse';
   private claimedPress = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -66,6 +78,7 @@ export class UiGestureRecognizer implements GestureInput {
     options: GestureRecognizerOptions = {}
   ) {
     this.slop = options.slop ?? 8;
+    this.touchSlop = options.touchSlop ?? 12;
     this.longPressDelay = options.longPressDelay ?? 500;
   }
 
@@ -77,6 +90,9 @@ export class UiGestureRecognizer implements GestureInput {
     this.claimedPress = false;
     this.startX = event.x;
     this.startY = event.y;
+    // Read once at the press: the threshold must not change under a
+    // gesture already being measured against it.
+    this.startKind = event.pointer.kind;
     this.armLongPress(target, event);
   }
 
@@ -85,7 +101,7 @@ export class UiGestureRecognizer implements GestureInput {
       return;
     }
     if (this.state === 'pressing') {
-      if (Math.hypot(event.x - this.startX, event.y - this.startY) > this.slop) {
+      if (Math.hypot(event.x - this.startX, event.y - this.startY) > this.pressSlop()) {
         this.clearTimer();
         this.state = 'panning';
         this.claimedPress = true;
@@ -153,8 +169,16 @@ export class UiGestureRecognizer implements GestureInput {
     }
   }
 
+  /** The movement threshold for the device that started the press. */
+  private pressSlop(): number {
+    return this.startKind === 'touch' ? this.touchSlop : this.slop;
+  }
+
   private dispatch(type: UiEventType, target: UiNode, x: number, y: number, source: UiPointerEvent): void {
-    const event = new UiPointerEvent(type, x, y, source.buttons, source.modifiers);
+    // The device is carried onto the synthesized event: a listener
+    // that has to size a drag handle for a finger learns it from the
+    // DragStart, not from the raw press it never saw.
+    const event = new UiPointerEvent(type, x, y, source.buttons, source.modifiers, source.pointer);
     this.dispatcher.dispatch(event, target);
   }
 }

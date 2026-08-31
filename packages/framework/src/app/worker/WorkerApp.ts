@@ -8,7 +8,7 @@ import {
   type RuntimeToShellMessage,
   type ShellToRuntimeMessage
 } from './RenderWorkerProtocol';
-import { wheelDeltaYOf } from '@gesso/core';
+import { capturePointer, pointerDeviceOf, wheelDeltaYOf } from '@gesso/core';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { observeReducedMotion } from '../reducedMotion';
@@ -531,12 +531,18 @@ export class WorkerApp {
       if (!(this.proxy?.active ?? false)) {
         canvas.focus();
       }
+      // The canvas keeps this contact even once it leaves the element,
+      // so a drag that runs off the edge is still delivered. A finger
+      // is captured implicitly and a mouse is not; capturing both
+      // makes the two behave the same.
+      capturePointer(canvas, event.pointerId);
       this.post({
         type: 'pointerDown',
         x,
         y,
         buttons: event.buttons,
         modifiers: modifiersFrom(event),
+        pointer: pointerDeviceOf(event),
         at: epochFromEvent(event)
       });
     };
@@ -570,6 +576,7 @@ export class WorkerApp {
         y,
         buttons: event.buttons,
         modifiers: modifiersFrom(event),
+        pointer: pointerDeviceOf(event),
         at: epochFromEvent(event)
       });
     };
@@ -581,11 +588,12 @@ export class WorkerApp {
         y,
         buttons: event.buttons,
         modifiers: modifiersFrom(event),
+        pointer: pointerDeviceOf(event),
         at: epochFromEvent(event)
       });
     };
-    const onPointerCancel = (): void => {
-      this.post({ type: 'pointerCancel' });
+    const onPointerCancel = (event: PointerEvent): void => {
+      this.post({ type: 'pointerCancel', pointer: pointerDeviceOf(event) });
     };
     const onWheel = (event: WheelEvent): void => {
       event.preventDefault();

@@ -236,16 +236,16 @@ export class RenderWorkerApp {
         runtime.resize(message.width, message.height, message.dpr);
         break;
       case 'pointerDown':
-        runtime.input.pointer.pointerDown(message.x, message.y, message.buttons, message.modifiers);
+        runtime.input.pointer.pointerDown(message.x, message.y, message.buttons, message.modifiers, message.pointer);
         break;
       case 'pointerMove':
-        runtime.input.pointer.pointerMove(message.x, message.y, message.buttons, message.modifiers);
+        runtime.input.pointer.pointerMove(message.x, message.y, message.buttons, message.modifiers, message.pointer);
         break;
       case 'pointerUp':
-        runtime.input.pointer.pointerUp(message.x, message.y, message.buttons, message.modifiers);
+        runtime.input.pointer.pointerUp(message.x, message.y, message.buttons, message.modifiers, message.pointer);
         break;
       case 'pointerCancel':
-        runtime.input.pointer.pointerCancel();
+        runtime.input.pointer.pointerCancel(message.pointer);
         break;
       case 'wheel':
         runtime.input.wheel.wheel(

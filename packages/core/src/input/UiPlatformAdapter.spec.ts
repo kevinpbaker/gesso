@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
-import { UiEventType } from './UiInputEvent';
+import { UiEventType, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness, FakePlatformSurface } from './UiInputTestUtils';
 
 function pointerEvent(props: {
@@ -13,6 +13,9 @@ function pointerEvent(props: {
   ctrlKey?: boolean;
   altKey?: boolean;
   metaKey?: boolean;
+  pointerType?: string;
+  pointerId?: number;
+  target?: unknown;
   preventDefault?: () => void;
 }): Event {
   return {
@@ -25,6 +28,9 @@ function pointerEvent(props: {
     ctrlKey: props.ctrlKey ?? false,
     altKey: props.altKey ?? false,
     metaKey: props.metaKey ?? false,
+    pointerType: props.pointerType ?? 'mouse',
+    pointerId: props.pointerId ?? 1,
+    target: props.target ?? null,
     preventDefault: props.preventDefault ?? (() => {}),
     defaultPrevented: false
   } as unknown as Event;
@@ -193,5 +199,75 @@ describe('UiPlatformAdapter', () => {
 
     expect(listener).not.toHaveBeenCalled();
     expect(adapter.attached).toBe(false);
+  });
+
+  it('forwards the pointer device from the DOM event', () => {
+    const h = new InputTestHarness();
+    const box = h.node('box', UiNodeType.Box, { width: 100, height: 100 });
+    h.add(h.root, box);
+    h.layoutTree();
+    const surface = new FakePlatformSurface();
+    const adapter = h.createPlatformAdapter();
+    adapter.attach(surface);
+    const seen: { kind: string; id: number }[] = [];
+    h.dispatcher.addEventListener(box, UiEventType.PointerDown, event => {
+      const pointerEvent = event as UiPointerEvent;
+      seen.push({ kind: pointerEvent.pointer.kind, id: pointerEvent.pointer.id });
+    });
+
+    surface.localX = 50;
+    surface.localY = 50;
+    surface.pointerTarget.emit('pointerdown', pointerEvent({ pointerType: 'touch', pointerId: 42 }));
+
+    expect(seen).toEqual([{ kind: 'touch', id: 42 }]);
+  });
+
+  it('reads an unrecognised pointerType as a mouse', () => {
+    const h = new InputTestHarness();
+    const box = h.node('box', UiNodeType.Box, { width: 100, height: 100 });
+    h.add(h.root, box);
+    h.layoutTree();
+    const surface = new FakePlatformSurface();
+    const adapter = h.createPlatformAdapter();
+    adapter.attach(surface);
+    const kinds: string[] = [];
+    h.dispatcher.addEventListener(box, UiEventType.PointerDown, event =>
+      kinds.push((event as UiPointerEvent).pointer.kind)
+    );
+
+    surface.localX = 50;
+    surface.localY = 50;
+    surface.pointerTarget.emit('pointerdown', pointerEvent({ pointerType: 'gamepad' }));
+
+    expect(kinds).toEqual(['mouse']);
+  });
+
+  it('captures the contact on the element the press landed on', () => {
+    const h = new InputTestHarness();
+    const box = h.node('box', UiNodeType.Box, { width: 100, height: 100 });
+    h.add(h.root, box);
+    h.layoutTree();
+    const surface = new FakePlatformSurface();
+    const adapter = h.createPlatformAdapter();
+    adapter.attach(surface);
+    const setPointerCapture = vi.fn();
+
+    surface.pointerTarget.emit('pointerdown', pointerEvent({ pointerId: 42, target: { setPointerCapture } }));
+
+    expect(setPointerCapture).toHaveBeenCalledWith(42);
+  });
+
+  it('survives an element that refuses the capture', () => {
+    const h = new InputTestHarness();
+    const surface = new FakePlatformSurface();
+    const adapter = h.createPlatformAdapter();
+    adapter.attach(surface);
+    const setPointerCapture = vi.fn(() => {
+      throw new Error('pointer is no longer active');
+    });
+
+    expect(() =>
+      surface.pointerTarget.emit('pointerdown', pointerEvent({ target: { setPointerCapture } }))
+    ).not.toThrow();
   });
 });

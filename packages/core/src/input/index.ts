@@ -1,6 +1,7 @@
 export { UiInputDispatcher } from './UiInputDispatcher';
 export type { UiEventListener, UiEventListenerOptions, UiListenerErrorReporter } from './UiInputDispatcher';
 export {
+  MOUSE_POINTER,
   noKeyModifiers,
   UiBeforeInputEvent,
   UiEventType,
@@ -13,7 +14,7 @@ export {
   UiWheelEvent,
   wheelDeltaYOf
 } from './UiInputEvent';
-export type { UiKeyModifiers } from './UiInputEvent';
+export type { UiKeyModifiers, UiPointerDevice, UiPointerKind } from './UiInputEvent';
 export { UiHitTester } from './UiHitTester';
 export type { HitTester, HitTestLayoutReader, HitTestResult, UiPoint } from './UiHitTester';
 export { UiFocusManager, type FocusSource } from './UiFocusManager';
@@ -28,6 +29,6 @@ export { UiGestureRecognizer } from './UiGestureRecognizer';
 export type { GestureInput, GestureRecognizerOptions } from './UiGestureRecognizer';
 export { UiEditingController } from './UiEditingController';
 export type { EditingControllerOptions, EditingHost, EditingState } from './UiEditingController';
-export { CanvasPlatformSurface, UiPlatformAdapter } from './UiPlatformAdapter';
+export { CanvasPlatformSurface, capturePointer, pointerDeviceOf, UiPlatformAdapter } from './UiPlatformAdapter';
 export type { PlatformAdapterOptions, PlatformEventTarget, PlatformSurface } from './UiPlatformAdapter';
 export { isNodeFocusable, isNodeHitTestable, isNodeInert, isNodeSelectable, resolveCursor } from './UiInteraction';
