@@ -298,6 +298,10 @@ export class GessoRuntime {
    * no shell — a spec, a headless graph — is never told and must draw.
    */
   private visible = true;
+  /** Whether a frame has ever been drawn, so the first paint is never skipped. */
+  private hasDrawn = false;
+  /** Set when a hidden runtime is waiting to draw its one first frame. */
+  private stopAfterFirstFrame = false;
   /**
    * The running animations. Built as a field rather than in the body
    * of the constructor because the builder, the services and `buildRoot`
@@ -818,9 +822,20 @@ export class GessoRuntime {
       // that has stopped forwarding refreshes looks exactly like a host
       // that never forwarded any, and the second must fall back to a
       // timer rather than freeze.
-      this.scheduler.stop();
+      //
+      // Except the *first* frame, which is drawn even hidden. A canvas
+      // keeps what was last painted on it, so stopping before anything
+      // has been is the difference between a tab that is simply idle
+      // and one that shows nothing until a frame lands after it is
+      // looked at. Costs one layout and one paint, once.
+      if (this.hasDrawn) {
+        this.scheduler.stop();
+      } else {
+        this.stopAfterFirstFrame = true;
+      }
       return;
     }
+    this.stopAfterFirstFrame = false;
     if (!this.started) {
       return;
     }
@@ -1497,6 +1512,18 @@ export class GessoRuntime {
     const root = this.root;
     if (root === undefined) {
       return;
+    }
+    this.hasDrawn = true;
+    if (this.stopAfterFirstFrame) {
+      // The one frame a hidden runtime is allowed, so the canvas holds
+      // a picture rather than nothing. Stopped after it rather than
+      // before, so this frame completes.
+      this.stopAfterFirstFrame = false;
+      queueMicrotask(() => {
+        if (!this.visible) {
+          this.scheduler.stop();
+        }
+      });
     }
     const started = now();
 

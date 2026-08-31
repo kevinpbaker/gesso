@@ -37,6 +37,28 @@ describe('visibility', () => {
     expect(mounted.frames.length).toBeGreaterThan(drawn);
   });
 
+  it('still draws its first frame when it starts out hidden', async () => {
+    // A canvas keeps whatever was last painted on it, so stopping
+    // before anything has been is the difference between a tab that is
+    // idle and one that shows nothing until a frame lands after it is
+    // looked at. A page opened in a background tab is exactly this: it
+    // never fires `visibilitychange`, so the shell reports hidden at
+    // attach and the runtime is told before it has drawn.
+    const mounted = mountRuntime(Column({ width: 200, height: 200 }, Box({ width: 10, height: 10 })), {
+      start: false
+    });
+    mounted.runtime.setVisible(false);
+    mounted.runtime.start();
+    while (mounted.clock.isPending) {
+      mounted.frame();
+    }
+    expect(mounted.frames.length).toBe(1);
+
+    // And then it stops, rather than going on drawing for nobody.
+    await Promise.resolve();
+    expect(mounted.clock.isPending).toBe(false);
+  });
+
   it('draws when nothing ever told it, which is every spec and headless graph', () => {
     const mounted = mountRuntime(Column({ width: 200, height: 200 }, Box({ width: 10, height: 10 })));
     while (mounted.clock.isPending) {
