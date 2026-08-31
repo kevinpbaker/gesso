@@ -246,11 +246,29 @@ function Artwork(props: Inputs<{ playlist: Playlist; height: number; fullWidth: 
 function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }>): UiChild {
   const playlist = props.playlist.value;
   const hovered = internalState(false);
+  /**
+   * Whether this card's background is morphing, which is the only time
+   * the card is bigger than itself.
+   *
+   * Coming back from a playlist the background shrinks from the whole
+   * page down to the card, so for those few hundred milliseconds it
+   * covers the cards below — and has to be drawn over them. Paint order
+   * is tree order among siblings, so without this the card below simply
+   * paints on top and the page appears to shrink *behind* it.
+   *
+   * The framework reports the morph and the card decides what it means,
+   * because what has to rise is the card and not the background inside
+   * it: raising the background would lift it over the card's own title
+   * and avatar, which is worse than the problem. See
+   * `SharedElementArgs.onMorph`.
+   */
+  const morphing = internalState(false);
   return (
     <button
       width={CARD_WIDTH}
       height={CARD_HEIGHT}
       position="relative"
+      zIndex={morphing.pipe(map(active => (active ? 1 : 0)))}
       x="center"
       cursor="pointer"
       label={playlist.title}
@@ -280,7 +298,13 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
         height={percent(100)}
         borderRadius={CARD_RADIUS}
         backgroundColor={playlist.background}
-        modifiers={[sharedElement({ name: `playlist-background-${playlist.id}`, morph: 'geometry' })]}
+        modifiers={[
+          sharedElement({
+            name: `playlist-background-${playlist.id}`,
+            morph: 'geometry',
+            onMorph: active => (morphing.value = active)
+          })
+        ]}
       />
       {/* Positioned, so it paints above the absolutely positioned
           background: a positioned element sits in the positioned layer,
@@ -298,7 +322,15 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
             objectFit="cover"
             rootModifiers={[sharedElement({ name: `playlist-avatar-${playlist.id}` })]}
           />
-          <column flex={1} gap={2} y="center">
+          {/* `x="start"` so each line hugs its text rather than
+              stretching to the column: a shared element morphs by the
+              ratio of the two boxes, and a name whose glyphs are 14px
+              in both places but whose *box* is 378 wide here and 133
+              on the page would be scaled 2.8x wide and shrunk back. It
+              is the box that has to match, not just the type. The
+              detail screen's column hugs for the same reason, by
+              centring. */}
+          <column flex={1} gap={2} y="center" x="start">
             <text
               color={playlist.text}
               fontSize={14}
