@@ -83,6 +83,11 @@ const CARD_MEDIA_HEIGHT = 360;
 const PAGE_MEDIA_HEIGHT = 480;
 const HEADER_HEIGHT = 74;
 const PAGE_BACKGROUND = '#f6f6f6';
+/** The brand mark's two colours, and its geometry. See `brand/README.md`. */
+const LINEN = '#BE9A6E';
+const CHALK = '#F7F3EA';
+const MARK_VIEWBOX = 64;
+const MARK_RADIUS = 12;
 
 /**
  * Where the list was left, so Back returns to it.
@@ -594,6 +599,33 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
 // ---------------------------------------------------------------------------
 
 /**
+ * The Gesso mark, drawn as `brand/gesso-mark.svg` draws it: one broad
+ * coat of chalk pulled across a square of raw linen.
+ *
+ * Two nodes rather than one `Icon`, because the mark is two colours and
+ * an `Icon` rasterises a single path in a single colour. The linen
+ * square is this box's own background, and the stroke is the icon over
+ * it. `overflow` does what the SVG's clip path does: the stroke runs
+ * full bleed to both edges, so its ends have to be cut where the
+ * rounded corners take the square away. The radius is 12 of the mark's
+ * 64, so it stays proportional at whatever size the mark is asked for.
+ */
+function BrandMark(props: Inputs<{ size: number }>): UiChild {
+  const size = props.size.value;
+  return (
+    <box
+      width={size}
+      height={size}
+      borderRadius={(size * MARK_RADIUS) / MARK_VIEWBOX}
+      backgroundColor={LINEN}
+      overflow="hidden"
+      flexShrink={0}>
+      <Icon path={ICONS.gessoStroke} viewBox={MARK_VIEWBOX} size={size} color={CHALK} label="Gesso" />
+    </box>
+  );
+}
+
+/**
  * The bar across the top, which exists on the list and not on a
  * playlist.
  *
@@ -619,7 +651,7 @@ function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
         })
       ]}>
       <row width={percent(100)} height={percent(100)} maxWidth={COLUMN_WIDTH} gap={16} x="center" y="center">
-        <Icon path={ICONS.astro} viewBox={80} size={26} color="#17191e" />
+        <BrandMark size={26} />
         <text color="#17191e" fontSize={22} fontWeight={700} selectable={false}>
           Playlists
         </text>
