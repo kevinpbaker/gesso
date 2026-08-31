@@ -506,6 +506,51 @@ describe('sharedElement()', () => {
     expect(pacing('snappy').frames).toBeGreaterThan(30);
   });
 
+  it('scales text by one ratio, so a different line count cannot squash it', () => {
+    // A FLIP derives a scale per axis from two boxes, which is right
+    // for a picture and wrong for a line of text: the box shape follows
+    // the line breaks, while the type inside only ever grows by its
+    // font size. Measured in the transitions example at 390x844, where
+    // the page title wraps to two lines and the card's stays on one:
+    // 0.79 across against 0.34 down, and the letters visibly squashed.
+    let node: UiNode | null = null;
+    const showSecond = internalState(false);
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 400 },
+        showSecond.pipe(
+          map(second =>
+            second
+              ? // Same width, three times the height: a wrapped line.
+                Box({
+                  key: 'b',
+                  ref: (n: UiNode | null) => (node = n),
+                  width: 200,
+                  height: 90,
+                  modifiers: [sharedElement({ name: 'hero', scale: 'uniform', duration: 200, easing: linear })]
+                })
+              : Box({
+                  key: 'a',
+                  width: 100,
+                  height: 30,
+                  modifiers: [sharedElement({ name: 'hero', scale: 'uniform', duration: 200, easing: linear })]
+                })
+          )
+        )
+      )
+    );
+    drain(mounted);
+
+    showSecond.value = true;
+    mounted.frame();
+    const at = motionOf(node!);
+    // The width ratio, on both axes: 100/200. Free, the height would
+    // have contributed 30/90 and the box would have been squashed to a
+    // third of its height while only halving its width.
+    expect(at.scaleX).toBeCloseTo(0.5, 6);
+    expect(at.scaleY).toBeCloseTo(0.5, 6);
+  });
+
   it('does nothing at all for an element that nothing shared a name with', () => {
     let node: UiNode | null = null;
     const mounted = mountRuntime(

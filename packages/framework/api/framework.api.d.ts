@@ -659,8 +659,6 @@ declare class GessoRuntime {
   private readonly layoutNotifier;
   private readonly smoothScroller;
   private visible;
-  private hasDrawn;
-  private stopAfterFirstFrame;
   private readonly animations;
   private readonly sharedElements;
   private readonly focusNotifier;

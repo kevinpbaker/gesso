@@ -524,6 +524,28 @@ export interface SharedElementArgs extends MotionTiming {
   /** Fade the arriving element up from this opacity as it morphs. */
   readonly fadeFrom?: number;
   /**
+   * How the two boxes' sizes become a scale.
+   *
+   * `'free'`, the default, takes each axis from its own ratio, which is
+   * what a picture wants: a 4:3 thumbnail opening into a 16:9 banner
+   * genuinely changes shape, and the morph should show that.
+   *
+   * `'uniform'` takes one scale for both axes, and is what **text**
+   * wants. A line of text has no shape of its own to preserve — its box
+   * is whatever the line breaks made it — while the type inside only
+   * ever grows by its font size. Left free, a title that fits on one
+   * line in a card and wraps to two on the page it opens into is scaled
+   * 0.73 across and 0.34 down, and the letters are visibly squashed on
+   * the way up. Measured exactly that, at a window width where the page
+   * title wrapped and the card's did not.
+   *
+   * The width ratio is the one kept, because for a line of text it
+   * tracks the font size closely — 0.73 against the 0.68 the font sizes
+   * actually imply, in that same measurement — while the height ratio
+   * is a count of lines and can be out by a whole multiple.
+   */
+  readonly scale?: 'free' | 'uniform';
+  /**
    * Told `true` when this element starts morphing and `false` when it
    * has arrived — or when it leaves mid-flight, so nothing is left
    * holding a state that will never be cleared.
@@ -709,12 +731,15 @@ class SharedElementController {
     // FLIP, with the pivot at the node's own centre — which is why the
     // offset is between centres and the scale is a plain ratio of
     // sizes, with nothing else to correct for.
+    const scaleX = from.width / box.width;
+    const scaleY = from.height / box.height;
+    const uniform = this.args.scale === 'uniform';
     const flip: ResolvedMotionState = {
       opacity: this.args.fadeFrom ?? MOTION_REST.opacity,
       x: from.x + from.width / 2 - (box.x + box.width / 2),
       y: from.y + from.height / 2 - (box.y + box.height / 2),
-      scaleX: from.width / box.width,
-      scaleY: from.height / box.height,
+      scaleX,
+      scaleY: uniform ? scaleX : scaleY,
       rotate: 0
     };
     // The transform lands *this* frame — `onLayout` runs after the boxes

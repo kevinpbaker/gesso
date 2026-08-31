@@ -2723,6 +2723,7 @@ interface SharedElementArgs extends MotionTiming {
   readonly name: string;
   readonly morph?: 'transform' | 'geometry';
   readonly fadeFrom?: number;
+  readonly scale?: 'free' | 'uniform';
   readonly onMorph?: (morphing: boolean) => void;
 }
 declare const sharedElement: ((args: SharedElementArgs, key?: string | number) => UiModifier<SharedElementArgs>) & {
@@ -4555,7 +4556,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DSWooLvR.js";
+} from "./index-CGSYSrHT.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5196,7 +5197,7 @@ import {
   UiPlatformAdapter,
   UiPointerController,
   UiWheelController
-} from "./index-DSWooLvR.js";
+} from "./index-CGSYSrHT.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
