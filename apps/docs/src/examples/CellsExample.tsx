@@ -3,6 +3,7 @@ import { map } from 'rxjs/operators';
 
 import { percent } from '@gesso/core';
 import { input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 
 const PRICE_USD = 12.5;
 const RATES = { USD: 1, EUR: 0.92 } as const;
@@ -55,7 +56,9 @@ function Step(props: Inputs<{ label: string; glyph: string; onPress: () => void 
       borderRadius={6}
       borderWidth={1}
       borderColor="border"
-      backgroundColor="background">
+      backgroundColor="background"
+      cursor="pointer"
+      modifiers={[HOVER_CONTROL]}>
       <text text={props.glyph} fontSize={14} color="text" />
     </button>
   );
@@ -76,7 +79,9 @@ export function Cells(_props: Inputs<{}>, _ctx: ComponentContext) {
         onClick={() => (currency.value = currency.value === 'USD' ? 'EUR' : 'USD')}
         padding={8}
         borderRadius={6}
-        backgroundColor="primary">
+        backgroundColor="primary"
+        cursor="pointer"
+        modifiers={[HOVER_ACCENT]}>
         <text text={currency.pipe(map(unit => `Showing ${unit} — switch`))} fontSize={13} color="background" />
       </button>
     </column>

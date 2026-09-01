@@ -2,6 +2,7 @@ import { map } from 'rxjs/operators';
 
 import { percent } from '@gesso/core';
 import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { HOVER_ACCENT } from './interaction';
 
 /**
  * How many component bodies this module has run.
@@ -54,7 +55,9 @@ export function RunsOnce(_props: Inputs<{}>, _ctx: ComponentContext) {
           onClick={() => tick.value++}
           padding={8}
           borderRadius={6}
-          backgroundColor="primary">
+          backgroundColor="primary"
+          cursor="pointer"
+          modifiers={[HOVER_ACCENT]}>
           <text text="Update readings" fontSize={13} color="background" />
         </button>
         <column gap={2}>

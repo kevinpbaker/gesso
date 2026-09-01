@@ -2,6 +2,7 @@ import { map } from 'rxjs/operators';
 
 import { percent } from '@gesso/core';
 import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { HOVER_CONTROL } from './interaction';
 
 const WIDTHS = [420, 320, 240] as const;
 
@@ -63,7 +64,9 @@ export function TextLayout(_props: Inputs<{}>, _ctx: ComponentContext) {
         borderRadius={6}
         borderWidth={1}
         borderColor="border"
-        backgroundColor="background">
+        backgroundColor="background"
+        cursor="pointer"
+        modifiers={[HOVER_CONTROL]}>
         <text text={width.pipe(map(value => `${value} px — narrower`))} fontSize={12} color="text" />
       </button>
     </column>

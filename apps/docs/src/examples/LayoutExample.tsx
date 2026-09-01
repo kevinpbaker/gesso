@@ -2,6 +2,7 @@ import { map } from 'rxjs/operators';
 
 import { percent, type UiAlignment } from '@gesso/core';
 import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { HOVER_CONTROL } from './interaction';
 
 const MAIN: readonly UiAlignment[] = ['start', 'center', 'end', 'space-between'];
 const CROSS: readonly UiAlignment[] = ['stretch', 'start', 'center', 'end'];
@@ -81,7 +82,9 @@ function Choice(props: Inputs<{ label: string; value: UiAlignment; onPress: () =
       borderRadius={6}
       borderWidth={1}
       borderColor="border"
-      backgroundColor="background">
+      backgroundColor="background"
+      cursor="pointer"
+      modifiers={[HOVER_CONTROL]}>
       <row gap={8} y="center">
         <text text={props.label} fontSize={12} color="textMuted" />
         <text text={props.value.pipe(map(String))} fontSize={13} color="text" width={92} />
