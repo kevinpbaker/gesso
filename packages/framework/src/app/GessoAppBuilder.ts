@@ -30,7 +30,7 @@ export class GessoAppBuilder {
   private app: GessoApp | undefined;
   private colorSchemePreference: ColorSchemePreference = 'auto';
 
-  constructor(private readonly root: FrameworkChild | ComponentType) {}
+  constructor(private root: FrameworkChild | ComponentType) {}
 
   /**
    * Registers a channel.
@@ -126,6 +126,19 @@ export class GessoAppBuilder {
    */
   setInspector(enabled: boolean): void {
     this.app?.setInspector(enabled);
+  }
+
+  /**
+   * Replaces the root and rebuilds the tree, for hot module
+   * replacement, mirroring `RenderWorkerApp.reload`.
+   *
+   * Before `mountSync` it changes which root will be built, so an
+   * entry that accepts a replacement during startup is not a race.
+   */
+  reload(root: FrameworkChild | ComponentType, services: readonly (new () => object)[] = []): this {
+    this.root = root;
+    this.app?.reload(typeof root === 'function' ? createComponent(root as ComponentType) : root, services);
+    return this;
   }
 
   /**

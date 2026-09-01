@@ -1108,6 +1108,65 @@ export class GessoRuntime {
     }
   }
 
+  /**
+   * Rebuilds the application's tree from a new root definition,
+   * keeping the runtime and everything that is not the tree
+   * (`ROADMAP.md` F7's HMR item).
+   *
+   * **Why a rebuild is the only story.** A Gesso component's `render`
+   * runs once; there is no re-render pass to push new code through, so
+   * replacing a module cannot be made to update a mounted component in
+   * place. What can be done is to throw the tree away and build a new
+   * one, and that is only useful if the things worth keeping do not
+   * live in the tree. In this framework they do not: application state
+   * is in a data worker behind a channel, and a replica's cells are
+   * held by the runtime rather than by any component, so a freshly
+   * built tree binds to values that are already there.
+   *
+   * That is why the roadmap's "snapshot projections as patches, replay
+   * after mount" is not here. It describes rebuilding a replica from
+   * scratch, and nothing rebuilds one: the replica, the services, the
+   * renderer, the canvas, the focus manager and the scheduler all
+   * survive, because only the tree is replaced.
+   *
+   * **What is kept and what is lost.** The layout root node is the
+   * same object, so input routing, the focus scope stack and every
+   * listener registered on the root stay valid. Below it, the builder
+   * reconciles rather than recreating, so a component whose class is
+   * the same object as before keeps its host and its `internalState`;
+   * one whose module was replaced is a different class, and its host
+   * is disposed and mounted again. Scroll offsets on containers that
+   * survive are kept, because the node is kept. Component state in a
+   * replaced module is lost, which is the honest cost and the reason
+   * this is a development tool.
+   *
+   * **Services from the replaced module have to be handed over.** A
+   * registry is keyed by the class object, so a service defined beside
+   * the root in a module that was replaced is a new class that the
+   * registry has never seen, even though the old one is still in it.
+   * Pass the replacements as `services` and the registry adopts them,
+   * keeping their instances and therefore their state. One that is
+   * genuinely new is registered instead.
+   */
+  reload(rootDefinition: FrameworkChild, services: readonly (new () => object)[] = []): void {
+    if (this.root === undefined) {
+      throw new Error('App root has not been built.');
+    }
+    // Before the tree is rebuilt, because the components in it inject
+    // these on the way up and would otherwise ask for a class the
+    // registry has never seen.
+    for (const ServiceClass of services) {
+      if (!this.services.adopt(ServiceClass)) {
+        this.services.register(ServiceClass);
+      }
+    }
+    // The hovered node may be about to be removed, and the inspector
+    // would go on explaining it until the pointer next moved.
+    this.inspector.setHovered(null);
+    this.buildRoot(rootDefinition);
+    this.graph.markDirty(this.root, DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Paint);
+  }
+
   dispose(): void {
     if (this.scrollbarTimer !== null) {
       clearTimeout(this.scrollbarTimer);

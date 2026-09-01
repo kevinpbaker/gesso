@@ -197,6 +197,14 @@ export class GessoApp {
   }
 
   /** Turns the layout inspector on or off; see GessoRuntime.setInspectorEnabled. */
+  /**
+   * Replaces the root and rebuilds the tree, for hot module
+   * replacement. See `GessoRuntime.reload` for what survives.
+   */
+  reload(root: FrameworkChild, services: readonly (new () => object)[] = []): void {
+    this.runtime.reload(root, services);
+  }
+
   setInspector(enabled: boolean): void {
     this.runtime.setInspectorEnabled(enabled);
   }

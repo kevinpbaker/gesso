@@ -72,7 +72,7 @@ export class RenderWorkerApp {
   private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly serviceRegistrations: (new () => object)[] = [];
   private routes: RouterRoutes | undefined;
-  private readonly root: FrameworkChild;
+  private root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
   private runtime: GessoRuntime | undefined;
@@ -126,6 +126,44 @@ export class RenderWorkerApp {
       stack: error?.stack,
       source: 'uncaught'
     });
+  }
+
+  /**
+   * Replaces the application's root and rebuilds its tree, for hot
+   * module replacement (`ROADMAP.md` F7).
+   *
+   * The framework knows nothing about any bundler. An entry module
+   * that wants this asks its own HMR client for the new module and
+   * hands the root over:
+   *
+   *   const app = renderRoot(AppRoot).useService(Counter);
+   *   import.meta.hot?.accept('./AppRoot', module => {
+   *     app.reload(module.AppRoot, [module.Counter]);
+   *   });
+   *
+   * The services are the ones the replaced module defines. They have
+   * to be named because a registry is keyed by the class object and a
+   * replaced module produces a new one; the registry adopts them,
+   * keeping their instances. Omit a service that lives in a module the
+   * replacement did not touch.
+   *
+   * Everything that is not the tree survives, including the channels:
+   * see `GessoRuntime.reload`. Called before the shell's `init`
+   * message it simply changes which root will be built.
+   */
+  reload(root: FrameworkChild | ComponentType, services: readonly (new () => object)[] = []): void {
+    this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
+    for (const ServiceClass of services) {
+      // Kept for a later reload too: a second replacement is matched
+      // against what the first one left, not against the original.
+      const previous = this.serviceRegistrations.findIndex(existing => existing.name === ServiceClass.name);
+      if (previous === -1) {
+        this.serviceRegistrations.push(ServiceClass);
+      } else {
+        this.serviceRegistrations[previous] = ServiceClass;
+      }
+    }
+    this.runtime?.reload(this.root, services);
   }
 
   /**
