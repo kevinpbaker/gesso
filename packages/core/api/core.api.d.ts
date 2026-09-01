@@ -745,6 +745,7 @@ interface UiModifierHost {
   set(property: string, value: unknown | Observable<unknown>): void;
   clear(property: string): void;
   on(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
+  onRoot(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   own(teardown: UiModifierTeardown): void;
   layoutBox(): LayoutBox | null;
   flowBox(): LayoutBox | null;
@@ -781,6 +782,7 @@ declare function defineModifier<A>(kind: Omit<UiModifierKind<A>, 'key'>): ((args
   readonly kind: UiModifierKind<A>;
 };
 declare function isUiModifier(value: unknown): value is UiModifier;
+declare class UiUnknownModifierPropertyError extends Error {}
 interface UiModifierLayout {
   box(node: UiNode): LayoutBox | null;
   flowBox(node: UiNode): LayoutBox | null;
@@ -866,32 +868,6 @@ interface UiBoxShadow {
 declare function boxShadow(offsetX: number, offsetY: number, blurRadius: number, spreadRadius: number, color: UiColor, inset?: boolean): UiBoxShadow;
 declare function boxShadowsEqual(a: UiBoxShadow, b: UiBoxShadow): boolean;
 declare function boxShadowArraysEqual(a: readonly UiBoxShadow[], b: readonly UiBoxShadow[]): boolean;
-interface UiTextStyle {
-  readonly fontFamily: string;
-  readonly fontSize: number;
-  readonly fontWeight: UiFontWeight;
-  readonly lineHeight: number;
-  readonly letterSpacing: number;
-  readonly color: UiColor;
-  readonly textAlign: UiTextAlign;
-  readonly textDirection: UiTextDirection;
-}
-declare const defaultTextStyle: UiTextStyle;
-declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
-declare enum UiVisualState {
-  Normal = "normal",
-  Hovered = "hovered",
-  Pressed = "pressed",
-  Focused = "focused",
-  Disabled = "disabled",
-  Selected = "selected",
-  Dragged = "dragged"
-}
-type UiVisualStateSet = ReadonlySet<UiVisualState>;
-declare function visualState(...states: UiVisualState[]): UiVisualStateSet;
-declare const defaultVisualState: UiVisualStateSet;
-declare function hasVisualState(states: UiVisualStateSet, state: UiVisualState): boolean;
-declare function visualStatesEqual(a: UiVisualStateSet, b: UiVisualStateSet): boolean;
 interface PercentLength {
   readonly unit: 'percent';
   readonly value: number;
@@ -920,6 +896,83 @@ declare const auto: AutoLength;
 declare function isAutoLength(value: unknown): value is AutoLength | 'auto';
 declare function isPercentLength(value: unknown): value is PercentLength;
 declare function resolveLength(value: unknown, base: number | undefined, property: string, keepAuto?: boolean): number | undefined | 'auto';
+type UiGradientOffset = number | PercentLength;
+interface UiGradientStop {
+  readonly offset?: UiGradientOffset;
+  readonly color: UiColorValue;
+}
+interface UiLinearGradient {
+  readonly kind: 'linear';
+  readonly angle: number;
+  readonly stops: readonly UiGradientStop[];
+}
+interface UiRadialGradient {
+  readonly kind: 'radial';
+  readonly centerX?: UiGradientOffset;
+  readonly centerY?: UiGradientOffset;
+  readonly radius?: UiGradientOffset;
+  readonly stops: readonly UiGradientStop[];
+}
+type UiGradient = UiLinearGradient | UiRadialGradient;
+declare const MAX_GRADIENT_STOPS = 8;
+declare function linearGradient(angle: number, stops: readonly UiGradientStop[]): UiLinearGradient;
+declare function radialGradient(stops: readonly UiGradientStop[], options?: Omit<UiRadialGradient, 'kind' | 'stops'>): UiRadialGradient;
+declare function validateGradient(value: unknown): string | undefined;
+declare function gradientsEqual(a: UiGradient | undefined, b: UiGradient | undefined): boolean;
+interface ResolvedGradientStop {
+  readonly offset: UiGradientOffset | undefined;
+  readonly color: UiColor;
+}
+type ResolvedGradient = {
+  readonly kind: 'linear';
+  readonly angle: number;
+  readonly stops: readonly ResolvedGradientStop[];
+} | {
+  readonly kind: 'radial';
+  readonly centerX: UiGradientOffset | undefined;
+  readonly centerY: UiGradientOffset | undefined;
+  readonly radius: UiGradientOffset | undefined;
+  readonly stops: readonly ResolvedGradientStop[];
+};
+interface GradientPaint {
+  readonly kind: 'linear' | 'radial';
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+  readonly radius: number;
+  readonly stops: readonly {
+    readonly offset: number;
+    readonly color: UiColor;
+  }[];
+}
+declare function gradientPaint(gradient: ResolvedGradient, width: number, height: number): GradientPaint;
+interface UiTextStyle {
+  readonly fontFamily: string;
+  readonly fontSize: number;
+  readonly fontWeight: UiFontWeight;
+  readonly lineHeight: number;
+  readonly letterSpacing: number;
+  readonly color: UiColor;
+  readonly textAlign: UiTextAlign;
+  readonly textDirection: UiTextDirection;
+}
+declare const defaultTextStyle: UiTextStyle;
+declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
+declare enum UiVisualState {
+  Normal = "normal",
+  Hovered = "hovered",
+  Pressed = "pressed",
+  Focused = "focused",
+  Disabled = "disabled",
+  Selected = "selected",
+  Dragged = "dragged"
+}
+type UiVisualStateSet = ReadonlySet<UiVisualState>;
+declare function visualState(...states: UiVisualState[]): UiVisualStateSet;
+declare const defaultVisualState: UiVisualStateSet;
+declare function hasVisualState(states: UiVisualStateSet, state: UiVisualState): boolean;
+declare function visualStatesEqual(a: UiVisualStateSet, b: UiVisualStateSet): boolean;
 interface UiTypography {
   readonly body: UiTextStyle;
   readonly bodyLarge: UiTextStyle;
@@ -1173,6 +1226,7 @@ declare const UiProperties: {
   readonly overflow: UiPropertyDefinition<UiOverflow | undefined>;
   readonly inset: UiPropertyDefinition<UiLength | undefined>;
   readonly backgroundColor: UiPropertyDefinition<UiColorValue | undefined>;
+  readonly backgroundGradient: UiPropertyDefinition<UiGradient | undefined>;
   readonly color: UiPropertyDefinition<UiColorValue>;
   readonly borderColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly borderWidth: UiPropertyDefinition<number | undefined>;
@@ -1271,7 +1325,7 @@ type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'min
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'anchor' | 'placement' | 'anchorOffset'>;
-type PaintProps = PropsOf<'backgroundColor' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
+type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
@@ -1401,6 +1455,7 @@ declare class UiGraph {
   unbind(binding: UiBinding<unknown>): void;
   unbindNode(node: UiNode): void;
   handleBindingError(binding: UiBinding<unknown>, error: unknown): void;
+  handleModifierError(name: string, node: UiNode, phase: 'attach' | 'update' | 'detach', error: unknown): void;
   getBindingsForNode(node: UiNode): UiBinding<unknown>[];
   getChildrenBindingForNode(node: UiNode): UiChildrenBinding | undefined;
   bindChildren(fragmentNode: UiNode, binding: UiChildrenBinding): void;
@@ -1592,6 +1647,7 @@ interface PaintState {
   visible: boolean;
   opacity: number;
   backgroundColor: UiColor | undefined;
+  backgroundGradient: ResolvedGradient | undefined;
   image: UiImage | undefined;
   video: UiVideoSurface | undefined;
   objectFit: ObjectFit;
@@ -1638,6 +1694,9 @@ declare function resolvePaintState(node: UiNode, out: PaintState): PaintState;
 declare function computeObjectFitRect(fit: ObjectFit, imageWidth: number, imageHeight: number, box: LayoutBox): LayoutBox;
 declare function createPaintState(): PaintState;
 declare function colorToCss(color: UiColor): string;
+interface Canvas2DGradient {
+  addColorStop(offset: number, color: string): void;
+}
 interface Canvas2DContext {
   save(): void;
   restore(): void;
@@ -1661,8 +1720,10 @@ interface Canvas2DContext {
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
   drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
-  fillStyle: string | CanvasGradient | CanvasPattern;
-  strokeStyle: string | CanvasGradient | CanvasPattern;
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
+  fillStyle: string | Canvas2DGradient | CanvasPattern;
+  strokeStyle: string | Canvas2DGradient | CanvasPattern;
   lineWidth: number;
   lineJoin: CanvasLineJoin;
   globalAlpha: number;
@@ -2313,6 +2374,7 @@ interface UiTimerFrameClockOptions {
 interface UiHostFrameClockOptions {
   fallbackMs?: number;
   stallMs?: number;
+  minStallMs?: number;
   now?: () => UiFrameTime;
 }
 declare class UiTimerFrameClock implements UiFrameClock {
@@ -2332,18 +2394,27 @@ declare class UiHostFrameClock implements UiFrameClock {
   private hosted;
   private stalled;
   private idleTicks;
+  private lastTickTime;
+  private hostOffset;
+  private readonly intervals;
   private handle;
   private readonly fallbackMs;
   private readonly stallMs;
+  private readonly minStallMs;
   private readonly now;
   constructor(onFrame: (time: UiFrameTime) => void,
   onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
   requestFrame(): void;
   private armTimer;
+  private watchMs;
+  private hostTime;
+  private cadenceMs;
+  private selfPaceMs;
   cancelFrame(): void;
   private clearFallback;
   private deliver;
   tick(time: UiFrameTime): void;
+  private recordCadence;
   private setActive;
 }
 declare class UiManualFrameClock implements UiFrameClock {
@@ -2388,7 +2459,9 @@ interface LayoutExplanation {
     contentWidth: number;
     contentHeight: number;
   };
+  readonly sources?: OverrideSources;
 }
+type OverrideSources = Readonly<Record<string, string>>;
 interface Edges {
   readonly top: number;
   readonly right: number;
@@ -2420,6 +2493,8 @@ interface LayoutStateExplanation {
 }
 declare function describeLength(raw: unknown): string;
 declare function formatConstraints(constraints: Constraints): string;
+declare function describeOverrides(node: UiNode): OverrideSources | undefined;
+declare function withOverrideSource(axis: AxisExplanation, source: string | undefined): AxisExplanation;
 declare function labelNode(node: UiNode): string;
 declare function formatExplanation(explanation: LayoutExplanation): string;
 declare const SCROLLBAR_LINGER_MS = 1200;
@@ -2689,6 +2764,27 @@ interface FocusRingOptions {
   readonly after?: 'children';
 }
 declare function focusRing(options?: FocusRingOptions): UiModifier<FocusRingOptions>;
+declare function autoFocus(): UiModifier<void>;
+interface ClickOutsideOptions {
+  readonly onOutside: (event: UiInputEvent) => void;
+  readonly except?: () => readonly (UiNode | null | undefined)[];
+  readonly wheel?: boolean;
+}
+declare function clickOutside(options: ClickOutsideOptions): UiModifier<ClickOutsideOptions>;
+interface DragOffset {
+  readonly x: number;
+  readonly y: number;
+}
+interface DraggableOptions {
+  readonly axis?: 'x' | 'y' | 'both';
+  readonly start?: 'press' | 'longPress';
+  readonly offset?: Subject<DragOffset>;
+  readonly onStart?: () => void;
+  readonly onEnd?: (offset: DragOffset) => void;
+  readonly dragging?: Readonly<Record<string, unknown>>;
+  readonly keepOffset?: boolean;
+}
+declare function draggable(options?: DraggableOptions): UiModifier<DraggableOptions>;
 interface AnimateLayoutOptions {
   spring?: UiSpringToken | UiSpringSpec;
   duration?: number;
@@ -2960,6 +3056,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private renderNode;
   private renderChildren;
   private paintBackground;
+  private fillBox;
   private paintImage;
   private paintBorder;
   private paintDecorations;
@@ -2986,12 +3083,16 @@ interface InspectorOverlay {
   shapes: OverlayShape[];
   nextChange: number | undefined;
 }
+interface LayoutInspectorOptions {
+  readonly modifierNames?: (node: UiNode) => readonly string[];
+}
 declare class LayoutInspector {
   private readonly engine;
+  private readonly options;
   private enabled;
   private hovered;
   private readonly heat;
-  constructor(engine: LayoutEngine);
+  constructor(engine: LayoutEngine, options?: LayoutInspectorOptions);
   get isEnabled(): boolean;
   get hoveredNode(): UiNode | null;
   setEnabled(enabled: boolean): void;
@@ -3069,8 +3170,9 @@ declare class WebGPURenderer implements UiRenderer {
   private instanceBuffer;
   private texturedBuffer;
   private clipBuffer;
-  private clipLayout;
-  private clipBindGroup;
+  private gradientBuffer;
+  private frameLayout;
+  private frameBindGroup;
   private cachedInstanceData;
   readonly lastDraws: DrawStats;
   private pendingCapture;
@@ -3259,6 +3361,8 @@ interface RenderList {
   texturedCount: number;
   clipData: Float32Array;
   clipCount: number;
+  gradientData: Float32Array;
+  gradientCount: number;
   commands: RenderCommand[];
   textRuns: TextRunDraw[];
 }
@@ -3410,6 +3514,7 @@ export {
   assertModifierList,
   assertTransitionMap,
   auto,
+  autoFocus,
   AutoLength,
   AxisExplanation,
   BindingId,
@@ -3431,6 +3536,7 @@ export {
   ButtonProps,
   canDecodeVideo,
   Canvas2DContext,
+  Canvas2DGradient,
   Canvas2DRenderer,
   Canvas2DRendererOptions,
   CanvasHost,
@@ -3450,6 +3556,8 @@ export {
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
+  clickOutside,
+  ClickOutsideOptions,
   CLIP_STRIDE_BYTES,
   CLIP_STRIDE_FLOATS,
   closestPropertyName,
@@ -3509,10 +3617,14 @@ export {
   defineProperty,
   demuxMp4Video,
   describeLength,
+  describeOverrides,
   detectEditingPlatform,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
+  draggable,
+  DraggableOptions,
+  DragOffset,
   drawOverlayShapes,
   DrawStats,
   drawText,
@@ -3562,6 +3674,9 @@ export {
   GlyphShaper,
   GlyphSlot,
   GlyphUpload,
+  gradientPaint,
+  GradientPaint,
+  gradientsEqual,
   graphemeBoundaries,
   Grid,
   GridContribution,
@@ -3626,6 +3741,7 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  kc,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -3634,6 +3750,7 @@ export {
   LayoutEngine,
   LayoutExplanation,
   LayoutInspector,
+  LayoutInspectorOptions,
   LayoutNotifier,
   layoutParagraph,
   LayoutReader,
@@ -3656,6 +3773,7 @@ export {
   lightColors,
   lightTheme,
   linear,
+  linearGradient,
   lineEndAt,
   lineIndexAtY,
   lineIndexForOffset,
@@ -3663,6 +3781,7 @@ export {
   lineStartAt,
   MainAxisAlignment,
   matchRangesOf,
+  MAX_GRADIENT_STOPS,
   measure,
   minmax,
   MinMaxTrack,
@@ -3698,6 +3817,7 @@ export {
   offsetForVerticalMove,
   OverlayShape,
   overrideSources,
+  OverrideSources,
   PaintProps,
   paintsAfterChildren,
   PaintState,
@@ -3736,6 +3856,7 @@ export {
   proportionalFontMetrics,
   PropsOf,
   provideEnvironment,
+  radialGradient,
   Reactive,
   recordsEqual,
   RelayoutExplanation,
@@ -3750,6 +3871,8 @@ export {
   resetTransitionWarnings,
   resolveBoolean,
   resolveCursor,
+  ResolvedGradient,
+  ResolvedGradientStop,
   ResolvedMotionState,
   resolveLength,
   resolveMotionState,
@@ -3890,6 +4013,9 @@ export {
   UiFrameClockFactory,
   UiFrameTime,
   UiGestureRecognizer,
+  UiGradient,
+  UiGradientOffset,
+  UiGradientStop,
   UiGraph,
   UiGraphBuilder,
   UiGridAutoFlow,
@@ -3904,6 +4030,7 @@ export {
   UiKeyboardEvent,
   UiKeyModifiers,
   UiLength,
+  UiLinearGradient,
   UiListenerErrorReporter,
   UiManualFrameClock,
   UiModifier,
@@ -3939,6 +4066,7 @@ export {
   UiPropertyValues,
   UiProps,
   UiPropValue,
+  UiRadialGradient,
   UiReducedMotionPolicy,
   UiRenderer,
   UiRole,
@@ -3983,6 +4111,7 @@ export {
   UiTween,
   UiTweenOptions,
   UiTypography,
+  UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
   UiVirtualWindow,
@@ -3992,6 +4121,7 @@ export {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  validateGradient,
   validateRole,
   validateStates,
   validateSubgrid,
@@ -4018,11 +4148,11 @@ export {
   WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
+  withOverrideSource,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty,
-  Ys
+  writeOverrideProperty
 };
 // ==== index.d.ts ====
 import {
@@ -4036,6 +4166,7 @@ import {
   assertModifierList,
   assertTransitionMap,
   auto,
+  autoFocus,
   AutoLength,
   AxisExplanation,
   BindingId,
@@ -4076,6 +4207,8 @@ import {
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
+  clickOutside,
+  ClickOutsideOptions,
   CLIP_STRIDE_BYTES,
   CLIP_STRIDE_FLOATS,
   closestPropertyName,
@@ -4135,10 +4268,14 @@ import {
   defineProperty,
   demuxMp4Video,
   describeLength,
+  describeOverrides,
   detectEditingPlatform,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
+  draggable,
+  DraggableOptions,
+  DragOffset,
   drawOverlayShapes,
   DrawStats,
   drawText,
@@ -4189,6 +4326,9 @@ import {
   GlyphShaper,
   GlyphSlot,
   GlyphUpload,
+  gradientPaint,
+  GradientPaint,
+  gradientsEqual,
   graphemeBoundaries,
   Grid,
   GridContribution,
@@ -4261,6 +4401,7 @@ import {
   LayoutEngine,
   LayoutExplanation,
   LayoutInspector,
+  LayoutInspectorOptions,
   LayoutNotifier,
   layoutParagraph,
   LayoutReader,
@@ -4283,6 +4424,7 @@ import {
   lightColors,
   lightTheme,
   linear,
+  linearGradient,
   lineEndAt,
   lineIndexAtY,
   lineIndexForOffset,
@@ -4290,6 +4432,7 @@ import {
   lineStartAt,
   MainAxisAlignment,
   matchRangesOf,
+  MAX_GRADIENT_STOPS,
   measure,
   minmax,
   MinMaxTrack,
@@ -4325,6 +4468,7 @@ import {
   offsetForVerticalMove,
   OverlayShape,
   overrideSources,
+  OverrideSources,
   PaintProps,
   paintsAfterChildren,
   PaintState,
@@ -4363,6 +4507,7 @@ import {
   proportionalFontMetrics,
   PropsOf,
   provideEnvironment,
+  radialGradient,
   Reactive,
   recordsEqual,
   RelayoutExplanation,
@@ -4377,6 +4522,8 @@ import {
   resetTransitionWarnings,
   resolveBoolean,
   resolveCursor,
+  ResolvedGradient,
+  ResolvedGradientStop,
   ResolvedMotionState,
   resolveLength,
   resolveMotionState,
@@ -4517,6 +4664,9 @@ import {
   UiFrameClockFactory,
   UiFrameTime,
   UiGestureRecognizer,
+  UiGradient,
+  UiGradientOffset,
+  UiGradientStop,
   UiGraph,
   UiGraphBuilder,
   UiGridAutoFlow,
@@ -4531,6 +4681,7 @@ import {
   UiKeyboardEvent,
   UiKeyModifiers,
   UiLength,
+  UiLinearGradient,
   UiListenerErrorReporter,
   UiManualFrameClock,
   UiModifier,
@@ -4566,6 +4717,7 @@ import {
   UiPropertyValues,
   UiProps,
   UiPropValue,
+  UiRadialGradient,
   UiReducedMotionPolicy,
   UiRenderer,
   UiRole,
@@ -4610,6 +4762,7 @@ import {
   UiTween,
   UiTweenOptions,
   UiTypography,
+  UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
   UiVirtualWindow,
@@ -4619,6 +4772,7 @@ import {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  validateGradient,
   validateRole,
   validateStates,
   validateSubgrid,
@@ -4645,11 +4799,12 @@ import {
   WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
+  withOverrideSource,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-Cbdqdmj9.js";
+} from "./index-D5LqhdwF.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4658,6 +4813,7 @@ export {
   assertModifierList,
   assertTransitionMap,
   auto,
+  autoFocus,
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
@@ -4686,6 +4842,7 @@ export {
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
+  clickOutside,
   CLIP_STRIDE_BYTES,
   CLIP_STRIDE_FLOATS,
   closestPropertyName,
@@ -4733,10 +4890,12 @@ export {
   defineProperty,
   demuxMp4Video,
   describeLength,
+  describeOverrides,
   detectEditingPlatform,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
+  draggable,
   drawOverlayShapes,
   drawText,
   easings,
@@ -4762,6 +4921,9 @@ export {
   GLYPH_SUBPIXEL_PHASES,
   glyphCount,
   GlyphShaper,
+  gradientPaint,
+  GradientPaint,
+  gradientsEqual,
   graphemeBoundaries,
   Grid,
   hasDecorationPhase,
@@ -4821,6 +4983,7 @@ export {
   lightColors,
   lightTheme,
   linear,
+  linearGradient,
   lineEndAt,
   lineIndexAtY,
   lineIndexForOffset,
@@ -4828,6 +4991,7 @@ export {
   lineStartAt,
   MainAxisAlignment,
   matchRangesOf,
+  MAX_GRADIENT_STOPS,
   measure,
   minmax,
   motion,
@@ -4876,12 +5040,15 @@ export {
   propertyValuesEqualByName,
   proportionalFontMetrics,
   provideEnvironment,
+  radialGradient,
   recordsEqual,
   repeat,
   resetOverrideWarnings,
   resetTransitionWarnings,
   resolveBoolean,
   resolveCursor,
+  ResolvedGradient,
+  ResolvedGradientStop,
   resolveLength,
   resolveMotionState,
   resolveNumber,
@@ -4954,6 +5121,7 @@ export {
   type CapturedFrame,
   type CaretRect,
   type ChildrenBindingId,
+  type ClickOutsideOptions,
   type ColumnProps,
   type CommonProps,
   type ComponentLikeElement,
@@ -4966,6 +5134,8 @@ export {
   type DecorationStroke,
   type DefaultImageResolverOptions,
   type DefaultVideoResolverOptions,
+  type DraggableOptions,
+  type DragOffset,
   type DrawStats,
   type Edges,
   type EditableTextProps,
@@ -5015,6 +5185,7 @@ export {
   type KeyboardControllerOptions,
   type LayoutBox,
   type LayoutExplanation,
+  type LayoutInspectorOptions,
   type LayoutReader,
   type LayoutResult,
   type LayoutStateExplanation,
@@ -5038,6 +5209,7 @@ export {
   type NodeProperty,
   type ObjectFit,
   type OverlayShape,
+  type OverrideSources,
   type PaintProps,
   type PaintState,
   type ParagraphGeometry,
@@ -5191,6 +5363,9 @@ export {
   UiFontWeight,
   UiFrame,
   UiGestureRecognizer,
+  UiGradient,
+  UiGradientOffset,
+  UiGradientStop,
   UiGraph,
   UiGraphBuilder,
   UiGridAutoFlow,
@@ -5200,6 +5375,7 @@ export {
   UiInputEvent,
   UiKeyboardController,
   UiKeyboardEvent,
+  UiLinearGradient,
   UiManualFrameClock,
   UiModifierSet,
   UiMotion,
@@ -5218,6 +5394,7 @@ export {
   UiPropertyName,
   UiPropertyValueOf,
   UiPropertyValues,
+  UiRadialGradient,
   UiRole,
   UiScheduler,
   UiSelectionController,
@@ -5245,6 +5422,7 @@ export {
   UiTransforms,
   UiTween,
   UiTypography,
+  UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVirtualWindow,
   UiVisualState,
@@ -5253,6 +5431,7 @@ export {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  validateGradient,
   validateRole,
   validateStates,
   validateSubgrid,
@@ -5270,6 +5449,7 @@ export {
   WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
+  withOverrideSource,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
@@ -5278,6 +5458,7 @@ export {
 // ==== testing.d.ts ====
 import {
   Canvas2DContext,
+  Canvas2DGradient,
   Canvas2DRenderer,
   CanvasHost,
   CanvasSurface,
@@ -5305,7 +5486,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Cbdqdmj9.js";
+} from "./index-D5LqhdwF.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -5380,6 +5561,16 @@ interface RecordedCall {
   name: string;
   args: unknown[];
 }
+declare class RecordedGradient implements Canvas2DGradient {
+  readonly kind: 'linear' | 'radial';
+  readonly args: readonly number[];
+  readonly stops: {
+    offset: number;
+    color: string;
+  }[];
+  constructor(kind: 'linear' | 'radial', args: readonly number[]);
+  addColorStop(offset: number, color: string): void;
+}
 declare class RecordingCanvasContext implements Canvas2DContext {
   readonly calls: RecordedCall[];
   private _fillStyle;
@@ -5391,10 +5582,10 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   private _textAlign;
   private _textBaseline;
   letterSpacing: string;
-  get fillStyle(): string | CanvasGradient | CanvasPattern;
-  set fillStyle(value: string | CanvasGradient | CanvasPattern);
-  get strokeStyle(): string | CanvasGradient | CanvasPattern;
-  set strokeStyle(value: string | CanvasGradient | CanvasPattern);
+  get fillStyle(): string | Canvas2DGradient | CanvasPattern;
+  set fillStyle(value: string | Canvas2DGradient | CanvasPattern);
+  get strokeStyle(): string | Canvas2DGradient | CanvasPattern;
+  set strokeStyle(value: string | Canvas2DGradient | CanvasPattern);
   get lineWidth(): number;
   set lineWidth(value: number);
   get lineJoin(): CanvasLineJoin;
@@ -5428,6 +5619,8 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
   drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): RecordedGradient;
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): RecordedGradient;
   private record;
 }
 declare function callNames(context: RecordingCanvasContext): string[];

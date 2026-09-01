@@ -394,18 +394,6 @@ declare class OverlayLayer extends Component {
   render(): UiElement;
   private renderEntries;
 }
-declare class ComponentHostResolver implements ComponentResolver {
-  private readonly services;
-  private readonly channels;
-  private readonly hosts;
-  private pendingMounts;
-  constructor(services?: ServiceRegistry, channels?: ChannelRegistry);
-  resolve(element: ComponentLikeElement, anchorId: string): UiChild;
-  release(anchorId: string): void;
-  flushMounts(): void;
-  dispose(): void;
-  get size(): number;
-}
 declare class ComponentHost<P extends Record<string, unknown> = Record<string, unknown>> {
   private readonly services;
   private readonly channels;
@@ -434,6 +422,19 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private validateInputs;
   private wireChannels;
   private wireInjects;
+}
+declare class ComponentHostResolver implements ComponentResolver {
+  private readonly services;
+  private readonly channels;
+  private readonly hosts;
+  private pendingMounts;
+  constructor(services?: ServiceRegistry, channels?: ChannelRegistry);
+  resolve(element: ComponentLikeElement, anchorId: string): UiChild;
+  release(anchorId: string): void;
+  flushMounts(): void;
+  dispose(): void;
+  get size(): number;
+  hostFor(anchorId: string): ComponentHost | undefined;
 }
 type ColorScheme = 'light' | 'dark';
 type ColorSchemePreference = ColorScheme | 'auto';
@@ -573,6 +574,46 @@ interface HistoryWindow {
   removeEventListener(type: string, listener: () => void): void;
 }
 declare function createShellHistory(options?: ShellHistoryOptions, host?: HistoryWindow | undefined): ShellHistory;
+interface UiNodeReport {
+  readonly id: string;
+  readonly type: string;
+  readonly box: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly owners: readonly UiOwnerReport[];
+  readonly props: readonly UiPropReport[];
+  readonly environment: readonly UiEnvironmentReport[];
+  readonly modifiers: readonly string[];
+  readonly semantics?: UiSemanticsReport;
+  readonly explanation: string;
+}
+interface UiOwnerReport {
+  readonly name: string;
+  readonly anchorId: string;
+}
+type UiPropOrigin = 'element' | 'binding' | 'modifier';
+interface UiPropReport {
+  readonly name: string;
+  readonly value: string;
+  readonly origin: UiPropOrigin;
+  readonly source?: string;
+}
+interface UiEnvironmentReport {
+  readonly key: string;
+  readonly value: string;
+  readonly provided: boolean;
+}
+interface UiSemanticsReport {
+  readonly role?: string;
+  readonly label?: string;
+  readonly value?: string;
+  readonly states?: readonly string[];
+}
+declare function printPropValue(value: unknown): string;
+declare function formatNodeReport(report: UiNodeReport): string;
 type ShellRequest = {
   type: 'clipboard';
   text: string;
@@ -703,7 +744,7 @@ declare class GessoRuntime {
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
   noteInput(at: number | undefined): void;
   setInspectorEnabled(enabled: boolean): void;
-  onInspect(listener: ((text: string | null) => void) | null): void;
+  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
   onCursor(listener: ((cursor: string | null) => void) | null): void;
   get cursor(): string | null;
   onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
@@ -720,6 +761,11 @@ declare class GessoRuntime {
   get colorScheme(): ColorScheme;
   get sharedElementNames(): readonly string[];
   explain(node: UiNode): LayoutExplanation;
+  inspectNode(node: UiNode): UiNodeReport;
+  private ownersOf;
+  private propsOf;
+  private environmentOf;
+  private semanticsOf;
   debugRoot(): UiNode;
   debugLayoutBox(node: UiNode): {
     x: number;
@@ -755,6 +801,7 @@ declare class GessoRuntime {
   private sendCursor;
   private sendScrollability;
   private sendInspection;
+  private hoveredReport;
   private timePhase;
   get lastFrameDurationMs(): number;
 }
@@ -802,7 +849,7 @@ declare class GessoAppBuilder {
   useHistory(history: ShellHistoryOptions): this;
   renderer(choice: RendererChoice): this;
   onFrame(listener: (metrics: FrameMetrics) => void): this;
-  onInspect(listener: (text: string | null) => void): this;
+  onInspect(listener: (report: UiNodeReport | null) => void): this;
   onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
   setInspector(enabled: boolean): void;
   setColorScheme(preference: ColorSchemePreference): this;
@@ -953,7 +1000,7 @@ type RuntimeToShellMessage = {
 } |
 {
   type: 'inspect';
-  text: string | null;
+  report: UiNodeReport | null;
 } |
 {
   type: 'cursor';
@@ -994,7 +1041,7 @@ interface WorkerAppOptions {
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | (() => Worker) | URL | string;
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
-  onInspect?: (text: string | null) => void;
+  onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;
   colorScheme?: ColorSchemePreference;
   accessibility?: boolean;
@@ -1078,7 +1125,7 @@ declare class GessoApp {
   resize(width: number, height: number): void;
   setInspector(enabled: boolean): void;
   setColorScheme(preference: ColorSchemePreference): void;
-  onInspect(listener: ((text: string | null) => void) | null): void;
+  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
   onError(listener: ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void) | null): void;
   debugRoot(): UiNode;
   dispose(): void;
@@ -1331,6 +1378,7 @@ export {
   FindService,
   findUnplainPath,
   FocusService,
+  formatNodeReport,
   formatUrl,
   GessoApp,
   GessoAppBuilder,
@@ -1356,6 +1404,7 @@ export {
   parseUrl,
   portHandle,
   Presence,
+  printPropValue,
   provide,
   ProvidedChannel,
   renderRoot,
@@ -1430,11 +1479,17 @@ export {
   type SpringOptions,
   type UiDuration,
   type UiEasingChoice,
+  type UiEnvironmentReport,
   type UiFramePhase,
+  type UiNodeReport,
+  type UiOwnerReport,
+  type UiPropOrigin,
+  type UiPropReport,
   type UiRole,
   type UiSemanticsMap,
   type UiSemanticsPatch,
   type UiSemanticsRecord,
+  type UiSemanticsReport,
   type UiSemanticState,
   type WorkerAppOptions,
   type WorkerHandle,

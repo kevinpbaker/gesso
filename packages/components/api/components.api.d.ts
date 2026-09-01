@@ -263,6 +263,7 @@ interface SelectProps extends ControlLayoutProps {
   ref?: (node: UiNode | null) => void;
 }
 declare function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
+declare function tooltipContent(text: string): UiChild;
 interface TooltipProps {
   text?: string;
   placement?: OverlayPlacement;
@@ -270,6 +271,15 @@ interface TooltipProps {
   children?: UiChild;
 }
 declare function Tooltip(props: Inputs<TooltipProps>, ctx: ComponentContext): UiChild;
+interface TooltipModifierOptions {
+  text: string;
+  placement?: OverlayPlacement;
+  delay?: number;
+}
+declare function tooltip(ctx: ComponentContext, options: TooltipModifierOptions): UiModifier<TooltipArgs>;
+interface TooltipArgs extends TooltipModifierOptions {
+  readonly overlay: OverlayHandle;
+}
 interface ToastProps {
   open?: boolean;
   onClose?: () => void;
@@ -447,7 +457,9 @@ export {
   TextInput,
   Toast,
   Toolbar,
+  tooltip,
   Tooltip,
+  tooltipContent,
   trackFocus,
   Tree,
   type AccordionProps,
@@ -487,6 +499,8 @@ export {
   type TextInputProps,
   type ToastProps,
   type ToolbarProps,
+  type TooltipArgs,
+  type TooltipModifierOptions,
   type TooltipProps,
   type TreeNode,
   type TreeProps,

@@ -6,7 +6,10 @@
 
 // ==== index.d.ts ====
 import {
-  RuntimeErrorSource
+  FrameMetrics,
+  RuntimeErrorSource,
+  UiFramePhase,
+  UiNodeReport
 } from "@gesso/framework";
 interface SourceMapV3 {
   version: number;
@@ -78,6 +81,41 @@ declare class ErrorOverlay {
   private copy;
 }
 declare function mountErrorOverlay(host: HTMLElement, options?: ErrorOverlayOptions): ErrorOverlay;
+interface NodeInspector {
+  set(report: UiNodeReport | null): void;
+  dispose(): void;
+}
+interface NodeInspectorOptions {
+  readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+}
+declare function mountNodeInspector(host: HTMLElement, options?: NodeInspectorOptions): NodeInspector;
+interface FrameProfiler {
+  report(metrics: FrameMetrics): void;
+  setVisible(visible: boolean): void;
+  readonly visible: boolean;
+  dispose(): void;
+}
+interface FrameProfilerOptions {
+  readonly history?: number;
+  readonly redrawMs?: number;
+  readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+}
+interface FrameSample {
+  readonly phases: Readonly<Record<UiFramePhase, number>>;
+  readonly total: number;
+  readonly gap: number;
+  readonly input: number | null;
+}
+declare function mountFrameProfiler(host: HTMLElement, options?: FrameProfilerOptions): FrameProfiler;
+interface FrameSummary {
+  readonly fps: number;
+  readonly meanTotal: number;
+  readonly worstTotal: number;
+  readonly worstGap: number;
+  readonly worstInput: number | null;
+  readonly worstPhase: Record<UiFramePhase, number>;
+}
+declare function summarize(samples: readonly FrameSample[]): FrameSummary;
 interface CodeFrameLine {
   number: number;
   text: string;
@@ -111,16 +149,25 @@ export {
   formatFrame,
   mapStack,
   mountErrorOverlay,
+  mountFrameProfiler,
+  mountNodeInspector,
   parseSourceMappingUrl,
   parseStack,
   primaryFrame,
   shortenPath,
   SourceMapConsumer,
   SourceMapStore,
+  summarize,
   type CodeFrame,
   type CodeFrameLine,
   type ErrorOrigin,
   type ErrorOverlayOptions,
+  type FrameProfiler,
+  type FrameProfilerOptions,
+  type FrameSample,
+  type FrameSummary,
+  type NodeInspector,
+  type NodeInspectorOptions,
   type OriginalPosition,
   type SourceMapV3,
   type StackFrame,
