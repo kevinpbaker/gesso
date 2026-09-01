@@ -22,7 +22,13 @@ export default defineConfig({
   description: 'A canvas UI framework that keeps the whole interface off the main thread.',
   cleanUrls: true,
   themeConfig: {
-    nav: [{ text: 'Guide', link: '/guide/what-is-gesso' }],
+    nav: [
+      { text: 'Guide', link: '/guide/what-is-gesso' },
+      { text: 'Layout', link: '/layout/flex' },
+      { text: 'Interaction', link: '/interaction/pointer-and-keyboard' },
+      { text: 'Appearance', link: '/appearance/themes-and-the-environment' },
+      { text: 'Components', link: '/components/' }
+    ],
     sidebar: [
       {
         text: 'Guide',
@@ -36,6 +42,49 @@ export default defineConfig({
           { text: 'Text', link: '/guide/text' },
           { text: 'Using components', link: '/guide/using-components' },
           { text: 'Light and dark', link: '/guide/appearance' }
+        ]
+      },
+      {
+        text: 'Layout',
+        items: [
+          { text: 'Flex in full', link: '/layout/flex' },
+          { text: 'Grid', link: '/layout/grid' },
+          { text: 'Overflow and scrolling', link: '/layout/overflow-and-scrolling' },
+          { text: 'Sticky positioning', link: '/layout/sticky' }
+        ]
+      },
+      {
+        text: 'Interaction',
+        items: [
+          { text: 'Pointer and keyboard', link: '/interaction/pointer-and-keyboard' },
+          { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' }
+        ]
+      },
+      {
+        text: 'Appearance',
+        items: [
+          { text: 'Themes and the environment', link: '/appearance/themes-and-the-environment' },
+          { text: 'The type scale', link: '/appearance/typography' }
+        ]
+      },
+      {
+        text: 'Components',
+        items: [
+          { text: 'Overview', link: '/components/' },
+          { text: 'Checkbox', link: '/components/checkbox' },
+          { text: 'Switch', link: '/components/switch' },
+          { text: 'RadioGroup', link: '/components/radio-group' },
+          { text: 'TextInput and TextArea', link: '/components/text-input' },
+          { text: 'Slider', link: '/components/slider' },
+          { text: 'NumberInput', link: '/components/number-input' },
+          { text: 'DataTable', link: '/components/data-table' },
+          { text: 'Tree', link: '/components/tree' },
+          { text: 'LazyList', link: '/components/lazy-list' },
+          { text: 'Tabs', link: '/components/tabs' },
+          { text: 'Accordion', link: '/components/accordion' },
+          { text: 'Card', link: '/components/card' },
+          { text: 'Divider', link: '/components/divider' },
+          { text: 'Toolbar', link: '/components/toolbar' }
         ]
       }
     ]
