@@ -16,6 +16,34 @@ bound into those nodes. The engine lays the nodes out with a CSS-shaped
 model — flex, grid, typed lengths, real text wrapping — and paints them
 through Canvas2D or WebGPU.
 
+## What it is for
+
+**Applications that compute as hard as they draw.** A web page runs
+everything on one thread of execution: your parsing, your diffing, your
+simulation, your layout and your paint all take turns on the same one.
+Nothing there is slow by itself. They simply cannot happen at once, so
+whichever one is running is the reason the other is late — and what a
+person sees is lag. The pointer sticks, a list stutters mid-scroll, a
+keystroke lands a beat after it was typed.
+
+The usual answers are to make the heavy work smaller, or to slice it
+into pieces short enough to fit between frames. Both work, both cost
+you the shape of your code, and neither survives the work getting
+genuinely large.
+
+Gesso moves the interface instead. Layout, paint, input and text run in
+a render worker; your application logic runs in another worker of its
+own; the main thread is left holding a canvas and an event listener.
+Heavy work and drawing are then on different threads and stop taking
+turns, which is why the numbers below say what they say — a busy loop
+on one thread does not move the frame times on another.
+
+That is the trade to weigh. If a screen is mostly static content with
+occasional interaction, the single-threaded page was never the problem
+and the DOM is a better tool. If it is an editor, a simulation, a
+console over a live feed, a canvas of its own, or anything where work
+and frames compete, the thread boundary is the entire point.
+
 ## Three things follow
 
 **The main thread is free.** Not "mostly free": the shell creates the
@@ -26,6 +54,14 @@ that measurement was 105 ms against a 106 ms idle baseline, because the
 frames were never on that thread to be blocked. In the single-thread
 configuration the same two-second stall takes the worst frame gap to
 2098 ms.
+
+The same holds for your own work. A 1,500 ms burn inside an application
+worker left the render thread's worst frame gap at 106 ms — the
+computation and the frames were never in each other's way, so there was
+nothing to drop. What a blocked thread still costs is the latency of
+anything that has to cross it: a click delivered while the shell was
+busy-looped for five seconds took 2,818 ms to arrive, on a screen that
+never stopped animating at 60 fps.
 
 **There is one identity system.** A component instance owns its nodes,
 so component identity is node identity. There is no second reconciler
