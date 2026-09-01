@@ -32,9 +32,8 @@ being blocked.
 On this machine the render worker comes through a three-second block
 reporting a longest frame of **41 ms** against its own 40 ms step: it
 does not skip a beat. The copy on the main thread reports **3,010 ms**,
-which is the block itself. Neither reading falls again — the worst thing
-that happened to a screen is a fact about it, not something it should be
-allowed to quietly recover from.
+which is the block itself. Both readings hold once they are set, so you
+can press the button and then look.
 
 ## What writing it looks like
 
