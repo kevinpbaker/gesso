@@ -227,6 +227,7 @@ import {
   UiPointerDevice,
   UiReducedMotionPolicy,
   UiRole,
+  UiScrollability,
   UiSelectionController,
   UiSemanticsAction,
   UiSemanticsMap,
@@ -662,6 +663,9 @@ declare class GessoRuntime {
   private lastInspection;
   private cursorListener;
   private lastCursor;
+  private scrollabilityListener;
+  private lastScrollability;
+  private lastScrollsAnything;
   private editingListener;
   private selectionController;
   private findController;
@@ -702,6 +706,8 @@ declare class GessoRuntime {
   onInspect(listener: ((text: string | null) => void) | null): void;
   onCursor(listener: ((cursor: string | null) => void) | null): void;
   get cursor(): string | null;
+  onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
+  get scrollability(): UiScrollability;
   onEditingState(listener: ((state: EditingState$1 | null) => void) | null): void;
   get editingState(): EditingState$1 | null;
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
@@ -747,6 +753,7 @@ declare class GessoRuntime {
   private sendEditingState;
   private scheduleInspectorRepaint;
   private sendCursor;
+  private sendScrollability;
   private sendInspection;
   private timePhase;
   get lastFrameDurationMs(): number;
@@ -953,6 +960,11 @@ type RuntimeToShellMessage = {
   cursor: string | null;
 } |
 {
+  type: 'scrollability';
+  scrollability: UiScrollability;
+  scrollsAnything: boolean;
+} |
+{
   type: 'editing';
   state: EditingState$1 | null;
 } |
@@ -999,6 +1011,7 @@ declare class WorkerApp {
   private detachInput;
   private proxy;
   private mirror;
+  private scrollability;
   private history;
   private ready;
   private frameHandle;
@@ -1019,6 +1032,7 @@ declare class WorkerApp {
   private applyHistory;
   private post;
   private observeResize;
+  private wouldConsumeWheel;
   private attachInput;
 }
 declare function createApp(options: WorkerAppOptions): WorkerApp;

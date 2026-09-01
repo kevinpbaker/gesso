@@ -688,9 +688,13 @@ declare class UiWheelEvent extends UiInputEvent {
   readonly modifiers: UiKeyModifiers;
   readonly deltaMode: UiWheelDeltaMode;
   readonly wheelDeltaY?: number | undefined;
+  private consumedFlag;
   constructor(type: UiEventType.Wheel, x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers,
   deltaMode?: UiWheelDeltaMode,
   wheelDeltaY?: number | undefined);
+  markConsumed(): void;
+  get consumed(): boolean;
+  reset(): void;
 }
 type UiEventListener = (event: UiInputEvent) => void;
 interface UiEventListenerOptions {
@@ -1220,6 +1224,7 @@ declare const UiProperties: {
   readonly scrollX: UiPropertyDefinition<number | undefined>;
   readonly scrollBehavior: UiPropertyDefinition<"instant" | "smooth" | undefined>;
   readonly scrollY: UiPropertyDefinition<number | undefined>;
+  readonly overscrollBehavior: UiPropertyDefinition<"auto" | "contain" | undefined>;
   readonly hitTestable: UiPropertyDefinition<boolean | undefined>;
   readonly virtualIndex: UiPropertyDefinition<number | undefined>;
   readonly virtualLead: UiPropertyDefinition<boolean | undefined>;
@@ -1278,7 +1283,7 @@ type TransitionProps = {
   transition?: Partial<Record<UiPropertyName, UiTransitionValue>>;
 };
 type CommonProps = IdentityProps & UiEventProps & BoxModelProps & FlexItemProps & GridItemProps & PositionProps & PaintProps & TypographyProps & InteractionProps & SemanticsProps & ModifierProps & TransitionProps & EnvironmentProps;
-type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior'>;
+type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior'>;
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
@@ -2030,17 +2035,30 @@ interface ScrollContainerState {
 interface ScrollSink {
   containerState(node: UiNode): ScrollContainerState | undefined;
   scrollBy(node: UiNode, dx: number, dy: number, behavior?: UiScrollBehavior): void;
+  scrollContainers?(): Iterable<UiNode>;
   revealScrollbars?(node: UiNode): void;
   scrollbar?(node: UiNode, axis: 'x' | 'y'): ScrollbarThumb | null;
 }
 type UiScrollBehavior = 'instant' | 'smooth';
+interface UiScrollability {
+  up: boolean;
+  down: boolean;
+  left: boolean;
+  right: boolean;
+}
 declare class UiWheelController {
   private readonly hitTester;
   private readonly dispatcher;
   private readonly scrollSink;
-  constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, scrollSink: ScrollSink);
+  private readonly rootNode;
+  constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, scrollSink: ScrollSink,
+  rootNode?: (() => UiNode | null) | null);
+  lastWheelTarget: UiNode | null;
   wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number): UiWheelEvent;
-  private nearestScrollable;
+  scrollabilityAt(x: number, y: number): UiScrollability;
+  scrollabilityOf(target: UiNode | null): UiScrollability;
+  scrollsAnything(): boolean;
+  private scrollChain;
   private applyDelta;
   private toPixels;
 }
@@ -2227,6 +2245,7 @@ interface PlatformSurface {
     x: number;
     y: number;
   };
+  setTouchAction?(value: string): void;
 }
 interface PlatformAdapterOptions {
   pointerController: UiPointerController;
@@ -2248,6 +2267,7 @@ declare class UiPlatformAdapter {
   constructor(options: PlatformAdapterOptions);
   get attached(): boolean;
   attach(surface: PlatformSurface): void;
+  syncTouchAction(): void;
   detach(): void;
 }
 declare function pointerDeviceOf(event: PointerEvent): UiPointerDevice;
@@ -2263,7 +2283,9 @@ declare class CanvasPlatformSurface implements PlatformSurface {
     x: number;
     y: number;
   };
+  setTouchAction(value: string): void;
 }
+declare function touchActionFor(scrollsAnything: boolean): string;
 declare function isNodeInert(node: UiNode): boolean;
 declare function isNodeHitTestable(node: UiNode): boolean;
 declare function isNodeFocusable(node: UiNode): boolean;
@@ -2290,6 +2312,7 @@ interface UiTimerFrameClockOptions {
 }
 interface UiHostFrameClockOptions {
   fallbackMs?: number;
+  stallMs?: number;
   now?: () => UiFrameTime;
 }
 declare class UiTimerFrameClock implements UiFrameClock {
@@ -2307,13 +2330,16 @@ declare class UiHostFrameClock implements UiFrameClock {
   private pending;
   private active;
   private hosted;
+  private stalled;
   private idleTicks;
   private handle;
   private readonly fallbackMs;
+  private readonly stallMs;
   private readonly now;
   constructor(onFrame: (time: UiFrameTime) => void,
   onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
   requestFrame(): void;
+  private armTimer;
   cancelFrame(): void;
   private clearFallback;
   private deliver;
@@ -3710,7 +3736,6 @@ export {
   proportionalFontMetrics,
   PropsOf,
   provideEnvironment,
-  qs,
   Reactive,
   recordsEqual,
   RelayoutExplanation,
@@ -3808,6 +3833,7 @@ export {
   themesEqual,
   tightenConstraints,
   TightenOptions,
+  touchActionFor,
   TouchScrollerOptions,
   traceRoundedRect,
   transform,
@@ -3918,6 +3944,7 @@ export {
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
+  UiScrollability,
   UiScrollBehavior,
   UiSelectionController,
   UiSelfAlignment,
@@ -3994,7 +4021,8 @@ export {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty
+  writeOverrideProperty,
+  Ys
 };
 // ==== index.d.ts ====
 import {
@@ -4432,6 +4460,7 @@ import {
   themesEqual,
   tightenConstraints,
   TightenOptions,
+  touchActionFor,
   TouchScrollerOptions,
   traceRoundedRect,
   transform,
@@ -4542,6 +4571,7 @@ import {
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
+  UiScrollability,
   UiScrollBehavior,
   UiSelectionController,
   UiSelfAlignment,
@@ -4619,7 +4649,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-C3BFHg47.js";
+} from "./index-Cbdqdmj9.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4903,6 +4933,7 @@ export {
   TEXTURED_STRIDE_FLOATS,
   themesEqual,
   tightenConstraints,
+  touchActionFor,
   traceRoundedRect,
   transform,
   transformIsIdentity,
@@ -5100,6 +5131,7 @@ export {
   type UiReducedMotionPolicy,
   type UiRenderer,
   type UiSchedulerOptions,
+  type UiScrollability,
   type UiScrollBehavior,
   type UiSemanticsAction,
   type UiSemanticsBox,
@@ -5273,7 +5305,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-C3BFHg47.js";
+} from "./index-Cbdqdmj9.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -5322,10 +5354,12 @@ declare class FakePlatformSurface implements PlatformSurface {
   readonly keyboardTarget: FakeEventTarget;
   localX: number;
   localY: number;
+  touchAction: string;
   clientToLocal(_clientX: number, _clientY: number): {
     x: number;
     y: number;
   };
+  setTouchAction(value: string): void;
 }
 declare class HarnessScrollSink implements ScrollSink {
   private readonly harness;
@@ -5339,6 +5373,7 @@ declare class HarnessScrollSink implements ScrollSink {
   constructor(harness: InputTestHarness);
   containerState(node: UiNode): ScrollContainerState | undefined;
   scrollBy(node: UiNode, dx: number, dy: number, behavior?: string): void;
+  scrollContainers(): Iterable<UiNode>;
   revealScrollbars(node: UiNode): void;
 }
 interface RecordedCall {
