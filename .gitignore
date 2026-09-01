@@ -29,3 +29,6 @@ dist-ssr
 
 # Screenshot gate: the capture written beside a baseline when a route fails
 apps/playground/screenshots/*.actual.png
+
+# Docs site: VitePress's transform cache (its build output is covered by `dist`)
+apps/docs/.vitepress/cache
