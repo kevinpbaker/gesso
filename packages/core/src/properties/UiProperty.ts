@@ -1031,6 +1031,34 @@ export const UiProperties = {
     affects: T
   }),
 
+  /**
+   * What happens to a wheel delta this node cannot use.
+   *
+   * Named after the CSS property it means the same thing as.
+   * `'auto'`, the default, chains the leftover to the nearest
+   * ancestor that can scroll — and when nothing in the runtime can,
+   * lets it out to whatever the canvas is embedded in, so a page
+   * around the canvas keeps scrolling. `'contain'` keeps it: the
+   * chain stops at this node and the shell prevents the browser's
+   * default.
+   *
+   * The distinction only matters at the point where scrolling runs
+   * out, which is exactly where getting it wrong is most visible. An
+   * app that fills the viewport wants `'contain'` on its root and
+   * nothing outside it moves; a live example embedded in an article
+   * wants the default, or the article stops scrolling whenever the
+   * cursor crosses the canvas.
+   *
+   * Like `scrollBehavior`, this is read by the input layer and
+   * affects nothing laid out or painted.
+   */
+  overscrollBehavior: defineProperty<'auto' | 'contain' | undefined>({
+    name: 'overscrollBehavior',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.None
+  }),
+
   // -------------------------------------------------------------------------
   // Interaction and internal markers
   // -------------------------------------------------------------------------

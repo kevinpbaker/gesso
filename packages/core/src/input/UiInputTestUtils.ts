@@ -72,7 +72,7 @@ export class InputTestHarness {
   }
 
   createWheelController(): UiWheelController {
-    return new UiWheelController(this.createHitTester(), this.dispatcher, this.scrollSink);
+    return new UiWheelController(this.createHitTester(), this.dispatcher, this.scrollSink, () => this.root);
   }
 
   /**
@@ -143,9 +143,15 @@ export class FakePlatformSurface implements PlatformSurface {
   readonly keyboardTarget = new FakeEventTarget();
   localX = 0;
   localY = 0;
+  /** The last `touch-action` the adapter asked for; '' before any. */
+  touchAction = '';
 
   clientToLocal(_clientX: number, _clientY: number): { x: number; y: number } {
     return { x: this.localX, y: this.localY };
+  }
+
+  setTouchAction(value: string): void {
+    this.touchAction = value;
   }
 }
 
@@ -191,6 +197,10 @@ export class HarnessScrollSink implements ScrollSink {
     node.setProperty('scrollX', clamp(record.scrollX + dx, 0, maxX));
     node.setProperty('scrollY', clamp(record.scrollY + dy, 0, maxY));
     this.harness.layoutTree();
+  }
+
+  scrollContainers(): Iterable<UiNode> {
+    return this.harness.layout.engine.scrollContainers();
   }
 
   revealScrollbars(node: UiNode): void {

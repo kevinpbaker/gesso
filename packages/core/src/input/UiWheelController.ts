@@ -60,6 +60,17 @@ export interface ScrollSink {
    * so a caller-driven animation would drive both of those too.
    */
   scrollBy(node: UiNode, dx: number, dy: number, behavior?: UiScrollBehavior): void;
+  /**
+   * Every scroll container currently laid out, in no order.
+   *
+   * Only the tree-level question needs this — "does this runtime
+   * scroll at all", which is what a touchscreen's `touch-action` has
+   * to be set from, since that is latched before the finger lands and
+   * there is no position to ask about yet. Optional, so a sink
+   * written before this existed still compiles; a sink that omits it
+   * is read as scrolling nothing.
+   */
+  scrollContainers?(): Iterable<UiNode>;
   /** Show the container's scrollbars, as hovering near them or dragging one does. */
   revealScrollbars?(node: UiNode): void;
   /** Geometry of one scrollbar, for dragging its thumb. */
@@ -68,6 +79,69 @@ export interface ScrollSink {
 
 /** Whether a scroll lands at once or is animated to its destination. */
 export type UiScrollBehavior = 'instant' | 'smooth';
+
+/**
+ * Which way a wheel at some point would move something in the
+ * runtime.
+ *
+ * Four directions rather than one flag because the interesting case
+ * is a container at an edge: a list scrolled to its top has to keep
+ * upward wheels away from itself and hand them to the page, and
+ * answering "is anything scrollable here" with a single boolean gets
+ * that exactly backwards.
+ */
+export interface UiScrollability {
+  up: boolean;
+  down: boolean;
+  left: boolean;
+  right: boolean;
+}
+
+/** Nothing under the pointer takes a wheel in any direction. */
+const NOTHING_SCROLLABLE: UiScrollability = Object.freeze({
+  up: false,
+  down: false,
+  left: false,
+  right: false
+});
+
+/** Every direction is kept, which is what containing overscroll means. */
+const EVERYTHING_SCROLLABLE: UiScrollability = Object.freeze({
+  up: true,
+  down: true,
+  left: true,
+  right: true
+});
+
+/**
+ * How much remaining range still counts as room to scroll.
+ *
+ * Offsets are floats — a fractional device pixel ratio and a clamped
+ * scroll both produce them — so an exact comparison against the
+ * maximum leaves a container permanently a hair off its own edge,
+ * claiming room it cannot use. Half a pixel is below anything a
+ * person can see move and well above that noise.
+ */
+const SCROLL_EPSILON = 0.5;
+
+/** Whether an offset can still move in the direction `delta` points. */
+function hasRoom(offset: number, max: number, delta: number): boolean {
+  return delta > 0 ? offset < max - SCROLL_EPSILON : offset > SCROLL_EPSILON;
+}
+
+/** Whether this node keeps overscroll rather than chaining it outwards. */
+function containsOverscroll(node: UiNode | null): boolean {
+  return node !== null && node.getProperty('overscrollBehavior') === 'contain';
+}
+
+/** The topmost ancestor of a node — the app root, in a mounted tree. */
+function rootOf(node: UiNode): UiNode {
+  let current = node;
+  while (current.parent !== null) {
+    current = current.parent;
+  }
+  return current;
+}
 
 /**
  * Whether this wheel event came from something with detents.
@@ -129,15 +203,43 @@ const NOTCH_TOLERANCE = 6;
 /**
  * Routes wheel input. Dispatches a bubbling Wheel event to the node
  * under the pointer, then, unless the event was defaultPrevented,
- * scrolls the nearest scroll container by the delta. preventDefault()
- * on Wheel therefore opts out of automatic scroll consumption.
+ * walks the scroll chain from that node outwards and gives the delta
+ * to the first container with room for it. preventDefault() on Wheel
+ * therefore opts out of automatic scroll consumption.
+ *
+ * The returned event says whether anything took the delta, via
+ * `consumed`. A shell needs that answer to decide whether to prevent
+ * the browser's default: a canvas that prevents unconditionally is a
+ * scroll trap on the page around it, and one that never prevents lets
+ * a scroll happen twice.
  */
 export class UiWheelController {
   constructor(
     private readonly hitTester: HitTester,
     private readonly dispatcher: UiInputDispatcher,
-    private readonly scrollSink: ScrollSink
+    private readonly scrollSink: ScrollSink,
+    /**
+     * The tree's root, when the host knows it.
+     *
+     * Only `scrollsAnything()` needs it, and only to honour an
+     * `overscrollBehavior="contain"` root in a tree that has no scroll
+     * container to walk up from. Optional so every existing caller
+     * still constructs; without it such a root is read as the default.
+     */
+    private readonly rootNode: (() => UiNode | null) | null = null
   ) {}
+
+  /**
+   * The node the last wheel landed on, or null before any.
+   *
+   * A wheel is evidence of where the pointer is, and sometimes the
+   * only evidence there is: scrolling a page slides a canvas under a
+   * cursor that never moved, so no pointer event ever told the
+   * runtime it was hovered. A host reporting scrollability falls back
+   * to this when nothing is hovered, which is what makes the second
+   * wheel of a burst land correctly even though the first could not.
+   */
+  lastWheelTarget: UiNode | null = null;
 
   wheel(
     x: number,
@@ -149,29 +251,156 @@ export class UiWheelController {
     wheelDeltaY?: number
   ): UiWheelEvent {
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
+    this.lastWheelTarget = target;
     const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers, deltaMode, wheelDeltaY);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
     }
     if (!event.defaultPrevented && target !== null) {
-      const container = this.nearestScrollable(target);
-      if (container !== null) {
-        const state = this.scrollSink.containerState(container);
-        if (state !== undefined) {
-          this.applyDelta(container, state, deltaX, deltaY, deltaMode, behaviorFor(container, deltaMode, wheelDeltaY));
-        }
-      }
+      this.scrollChain(target, event, deltaX, deltaY, deltaMode, wheelDeltaY);
     }
     return event;
   }
 
-  private nearestScrollable(node: UiNode): UiNode | null {
-    for (let current: UiNode | null = node; current !== null; current = current.parent) {
-      if (isScrollContainer(current)) {
-        return current;
+  /**
+   * Whether a wheel at this point would move anything, without moving
+   * it.
+   *
+   * The same walk `wheel()` does, stopping short of scrolling. It
+   * exists for a shell that has to answer *before* the delta arrives:
+   * one driving the runtime across a worker boundary cannot ask
+   * synchronously inside a DOM wheel handler, and a touchscreen's
+   * `touch-action` has to be set in CSS before the finger lands. Both
+   * read this after a pointer move and cache the answer.
+   *
+   * Application listeners are not consulted — they are not run for a
+   * question — so a handler that would call `preventDefault()` on the
+   * real event is invisible here. That is a deliberate limit and the
+   * safe direction: it can only under-report a trap, never invent one.
+   */
+  scrollabilityAt(x: number, y: number): UiScrollability {
+    return this.scrollabilityOf(this.hitTester.hitTest(x, y)?.node ?? null);
+  }
+
+  /**
+   * `scrollabilityAt` for a node already in hand.
+   *
+   * The runtime answers from the hovered node rather than a point,
+   * since it has one and re-running a hit test to rediscover it would
+   * be the same walk twice. A null node — the pointer over empty
+   * space, or never yet moved — scrolls nothing.
+   */
+  scrollabilityOf(target: UiNode | null): UiScrollability {
+    if (target === null) {
+      // A root that contains its overscroll says nothing leaves the
+      // canvas, and that has to hold before anything has been
+      // hovered — otherwise a full-viewport app leaks its first wheel
+      // to the page it is mounted in.
+      return containsOverscroll(this.rootNode?.() ?? null) ? EVERYTHING_SCROLLABLE : NOTHING_SCROLLABLE;
+    }
+    let up = false;
+    let down = false;
+    let left = false;
+    let right = false;
+    for (let node: UiNode | null = target; node !== null; node = node.parent) {
+      if (!isScrollContainer(node)) {
+        continue;
+      }
+      const state = this.scrollSink.containerState(node);
+      if (state === undefined) {
+        continue;
+      }
+      if (state.horizontal) {
+        left ||= hasRoom(state.scrollX, state.maxScrollX, -1);
+        right ||= hasRoom(state.scrollX, state.maxScrollX, 1);
+      } else {
+        up ||= hasRoom(state.scrollY, state.maxScrollY, -1);
+        down ||= hasRoom(state.scrollY, state.maxScrollY, 1);
+      }
+      if (containsOverscroll(node)) {
+        // Nothing past here can be reached by chaining, so nothing
+        // past here is worth reporting — and the contained node keeps
+        // every direction whether or not it has room left.
+        return EVERYTHING_SCROLLABLE;
       }
     }
-    return null;
+    if (containsOverscroll(rootOf(target))) {
+      return EVERYTHING_SCROLLABLE;
+    }
+    return { up, down, left, right };
+  }
+
+  /**
+   * Whether anything in the tree scrolls at all.
+   *
+   * The coarse, position-free form of `scrollabilityAt`, and the only
+   * one a touchscreen can use: `touch-action` is latched when the
+   * finger lands, so there is no hover position to have asked about
+   * and no later moment at which changing it would still count. A
+   * runtime with nothing scrollable can hand every gesture to the
+   * page; one with a scrollable container anywhere has to keep them,
+   * because it cannot know yet where the finger will land.
+   */
+  scrollsAnything(): boolean {
+    if (containsOverscroll(this.rootNode?.() ?? null)) {
+      return true;
+    }
+    for (const node of this.scrollSink.scrollContainers?.() ?? []) {
+      const state = this.scrollSink.containerState(node);
+      if (state === undefined) {
+        continue;
+      }
+      if (state.horizontal ? state.maxScrollX > SCROLL_EPSILON : state.maxScrollY > SCROLL_EPSILON) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Gives the delta to the first container along the chain with room
+   * for it, marking the event consumed when one takes it.
+   *
+   * "Room" means room in the direction of travel, not room for the
+   * whole delta: a container part-way down its range takes a wheel
+   * that would overshoot and clamps, which is what a browser does and
+   * what keeps a fast flick from jumping out to the page.
+   */
+  private scrollChain(
+    target: UiNode,
+    event: UiWheelEvent,
+    deltaX: number,
+    deltaY: number,
+    deltaMode: UiWheelDeltaMode,
+    wheelDeltaY: number | undefined
+  ): void {
+    for (let node: UiNode | null = target; node !== null; node = node.parent) {
+      if (!isScrollContainer(node)) {
+        continue;
+      }
+      const state = this.scrollSink.containerState(node);
+      if (state === undefined) {
+        continue;
+      }
+      const delta = state.horizontal ? deltaX : deltaY;
+      const offset = state.horizontal ? state.scrollX : state.scrollY;
+      const max = state.horizontal ? state.maxScrollX : state.maxScrollY;
+      if (delta !== 0 && hasRoom(offset, max, delta)) {
+        this.applyDelta(node, state, deltaX, deltaY, deltaMode, behaviorFor(node, deltaMode, wheelDeltaY));
+        event.markConsumed();
+        return;
+      }
+      if (containsOverscroll(node)) {
+        event.markConsumed();
+        return;
+      }
+    }
+    // Nothing had room. The root has the last word on whether the
+    // leftover leaves the canvas: by default it does, so a page
+    // around an embedded runtime goes on scrolling.
+    if (containsOverscroll(rootOf(target))) {
+      event.markConsumed();
+    }
   }
 
   private applyDelta(

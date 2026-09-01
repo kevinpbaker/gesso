@@ -24,7 +24,7 @@ export type { PointerControllerOptions } from './UiPointerController';
 export { UiKeyboardController } from './UiKeyboardController';
 export type { KeyboardControllerOptions } from './UiKeyboardController';
 export { isScrollContainer, UiWheelController } from './UiWheelController';
-export type { ScrollContainerState, ScrollSink, UiScrollBehavior } from './UiWheelController';
+export type { ScrollContainerState, ScrollSink, UiScrollability, UiScrollBehavior } from './UiWheelController';
 export { UiGestureRecognizer } from './UiGestureRecognizer';
 export { UiTouchScroller } from './UiTouchScroller';
 export type { TouchScrollerOptions } from './UiTouchScroller';
@@ -36,6 +36,7 @@ export {
   capturePointer,
   pointerDeviceOf,
   prepareInputSurface,
+  touchActionFor,
   UiPlatformAdapter
 } from './UiPlatformAdapter';
 export type { PlatformAdapterOptions, PlatformEventTarget, PlatformSurface } from './UiPlatformAdapter';

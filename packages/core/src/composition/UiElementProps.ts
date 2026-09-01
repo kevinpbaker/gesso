@@ -190,7 +190,8 @@ export type CommonProps = IdentityProps &
   EnvironmentProps;
 
 /** Props of an element that has children. */
-export type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior'>;
+export type ContainerProps = CommonProps &
+  PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior'>;
 
 /** Props of a flex container: Row, Column, ScrollView. */
 export type FlexContainerProps = ContainerProps &

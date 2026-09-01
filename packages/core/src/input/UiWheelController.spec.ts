@@ -188,6 +188,147 @@ describe('UiWheelController', () => {
     expect(() => controller.wheel(350, 350, 0, 100)).not.toThrow();
   });
 
+  it('marks the event consumed when a container took the delta', () => {
+    // The only fact a shell can act on. A canvas that prevents the
+    // browser default unconditionally is a scroll trap in the page
+    // around it; one that never prevents lets a single wheel scroll
+    // both the container and the page.
+    const { controller } = setupVertical();
+
+    expect(controller.wheel(50, 50, 0, 100).consumed).toBe(true);
+  });
+
+  it('leaves a wheel unconsumed at the edge it is already against', () => {
+    // The scroll view starts at the top, so an upward wheel has
+    // nowhere to go. The page around the canvas gets it instead —
+    // which is the whole of the scroll-trap fix.
+    const { controller } = setupVertical();
+
+    expect(controller.wheel(50, 50, 0, -100).consumed).toBe(false);
+  });
+
+  it('consumes a wheel it cannot use when the container contains overscroll', () => {
+    // `overscrollBehavior="contain"` is how a full-viewport app says
+    // nothing leaves the canvas, and it has to hold at the edge —
+    // the edge is the only place the question is ever asked.
+    const { scroll, controller } = setupVertical();
+    scroll.setProperty('overscrollBehavior', 'contain');
+
+    expect(controller.wheel(50, 50, 0, -100).consumed).toBe(true);
+  });
+
+  it('consumes a wheel nothing could use when the root contains overscroll', () => {
+    const { h, controller } = setupVertical();
+    h.root.setProperty('overscrollBehavior', 'contain');
+
+    // Over empty root area, where there is no scroll container at all.
+    expect(controller.wheel(350, 350, 0, 100).consumed).toBe(true);
+  });
+
+  it('takes a wheel that overshoots rather than handing it to the page', () => {
+    // Part-way down its range with room in the direction of travel,
+    // so the container takes the whole delta and clamps. A browser
+    // does the same, and it is what stops a fast flick jumping out of
+    // a list and scrolling the page behind it.
+    const { h, scroll, controller } = setupVertical();
+    controller.wheel(50, 50, 0, 100);
+
+    const event = controller.wheel(50, 50, 0, 10000);
+
+    expect(event.consumed).toBe(true);
+    expect(scrollY(h, scroll)).toBe(400);
+  });
+
+  it('chains past a container with no room to one that has some', () => {
+    // An inner list scrolled to its end sits inside an outer one that
+    // is not. The delta belongs to the outer, exactly as it would in
+    // a document.
+    const h = new InputTestHarness();
+    const outer = h.node('outer', UiNodeType.ScrollView, { width: 300, height: 200 });
+    const inner = h.node('inner', UiNodeType.ScrollView, { width: 300, height: 100 });
+    const content = h.node('content', UiNodeType.Box, { width: 300, height: 100 });
+    const filler = h.node('filler', UiNodeType.Box, { width: 300, height: 600 });
+    h.add(h.root, outer);
+    h.add(outer, inner);
+    h.add(inner, content);
+    h.add(outer, filler);
+    h.layoutTree();
+    const controller = h.createWheelController();
+
+    // The inner view is 100 tall around 100 of content: nothing to
+    // scroll, so the wheel goes to the outer one.
+    const event = controller.wheel(50, 50, 0, 100);
+
+    expect(event.consumed).toBe(true);
+    expect(scrollY(h, inner)).toBe(0);
+    expect(scrollY(h, outer)).toBe(100);
+  });
+
+  it('reports which way it could scroll, without scrolling', () => {
+    const { h, scroll, controller } = setupVertical();
+
+    expect(controller.scrollabilityAt(50, 50)).toEqual({ up: false, down: true, left: false, right: false });
+    expect(scrollY(h, scroll)).toBe(0);
+
+    controller.wheel(50, 50, 0, 100);
+    expect(controller.scrollabilityAt(50, 50)).toEqual({ up: true, down: true, left: false, right: false });
+
+    controller.wheel(50, 50, 0, 1000);
+    expect(controller.scrollabilityAt(50, 50)).toEqual({ up: true, down: false, left: false, right: false });
+  });
+
+  it('reports nothing scrollable over empty space', () => {
+    const { controller } = setupVertical();
+
+    expect(controller.scrollabilityAt(350, 350)).toEqual({ up: false, down: false, left: false, right: false });
+  });
+
+  it('answers the tree-level question a touchscreen has to ask', () => {
+    // `touch-action` is latched when the finger lands, so there is no
+    // hover position it could have been derived from.
+    expect(setupVertical().controller.scrollsAnything()).toBe(true);
+
+    const bare = new InputTestHarness();
+    bare.add(bare.root, bare.node('box', UiNodeType.Box, { width: 100, height: 100 }));
+    bare.layoutTree();
+    expect(bare.createWheelController().scrollsAnything()).toBe(false);
+
+    bare.root.setProperty('overscrollBehavior', 'contain');
+    expect(bare.createWheelController().scrollsAnything()).toBe(true);
+  });
+
+  it('remembers where the last wheel landed, for a host with no hover', () => {
+    // Scrolling a page slides a canvas under a cursor that never
+    // moved, so no pointer event ever tells the runtime it is
+    // hovered. The wheel itself is then the only evidence of where
+    // the pointer is, and a host reporting scrollability across a
+    // worker boundary has nothing else to fall back to.
+    const { scroll, controller } = setupVertical();
+
+    expect(controller.lastWheelTarget).toBeNull();
+    controller.wheel(50, 50, 0, 100);
+
+    expect(controller.scrollabilityOf(controller.lastWheelTarget)).toEqual({
+      up: true,
+      down: true,
+      left: false,
+      right: false
+    });
+    expect(controller.lastWheelTarget?.parent).toBe(scroll);
+  });
+
+  it('reports every direction kept for a contained root with nothing hovered', () => {
+    // The first wheel of a burst, before anything has been hovered.
+    // A full-viewport app that asked to contain its overscroll must
+    // not leak that one to the page it is mounted in.
+    const { h, controller } = setupVertical();
+    expect(controller.scrollabilityOf(null)).toEqual({ up: false, down: false, left: false, right: false });
+
+    h.root.setProperty('overscrollBehavior', 'contain');
+
+    expect(controller.scrollabilityOf(null)).toEqual({ up: true, down: true, left: true, right: true });
+  });
+
   it('carries the modifiers on the event', () => {
     const { h, controller } = setupVertical();
     const received: UiKeyModifiers[] = [];

@@ -287,6 +287,8 @@ export function wheelDeltaYOf(event: object): number | undefined {
 }
 
 export class UiWheelEvent extends UiInputEvent {
+  private consumedFlag = false;
+
   constructor(
     type: UiEventType.Wheel,
     readonly x: number,
@@ -316,5 +318,41 @@ export class UiWheelEvent extends UiInputEvent {
     readonly wheelDeltaY?: number
   ) {
     super(type);
+  }
+
+  /**
+   * Records that the runtime moved something with this delta.
+   *
+   * Called by the wheel controller, not by application code — an app
+   * handler that takes a wheel for itself says so with
+   * `preventDefault()`, and a shell treats the two the same.
+   */
+  markConsumed(): void {
+    this.consumedFlag = true;
+  }
+
+  /**
+   * Whether the runtime actually scrolled something.
+   *
+   * This is the answer a shell needs and the DOM cannot work out for
+   * itself: whether to call `preventDefault()` on the browser's wheel
+   * event. Preventing unconditionally makes the canvas a scroll trap
+   * on a page it is embedded in — the wheel dies over a canvas with
+   * nothing to scroll — and never preventing lets a scroll the
+   * runtime already consumed move the page as well. Neither is
+   * knowable without asking whether a container took the delta, which
+   * is what this reports.
+   *
+   * False at the end of a chain that found no room, unless something
+   * along it asked to keep the overscroll with
+   * `overscrollBehavior="contain"`.
+   */
+  get consumed(): boolean {
+    return this.consumedFlag;
+  }
+
+  override reset(): void {
+    super.reset();
+    this.consumedFlag = false;
   }
 }
