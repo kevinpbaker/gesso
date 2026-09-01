@@ -22,12 +22,15 @@ export default defineConfig({
   description: 'A canvas UI framework that keeps the whole interface off the main thread.',
   cleanUrls: true,
   themeConfig: {
-    nav: [{ text: 'Guide', link: '/guide/counter' }],
+    nav: [{ text: 'Guide', link: '/guide/installation' }],
     sidebar: [
       {
         text: 'Guide',
         items: [
+          { text: 'Installation', link: '/guide/installation' },
           { text: 'Your first component', link: '/guide/counter' },
+          { text: 'Components run once', link: '/guide/components-run-once' },
+          { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
           { text: 'Light and dark', link: '/guide/appearance' }
         ]
       }
