@@ -7,8 +7,6 @@ import { input, internalState, type ComponentContext, type Inputs } from '@gesso
 
 const BARS = 28;
 const STEP_MS = 40;
-/** How long a worst-gap reading stands before it is allowed to fall again. */
-const WINDOW_MS = 4000;
 
 /**
  * A screen that is always moving, and that times itself.
@@ -39,20 +37,17 @@ export function Pulse(props: Inputs<{ label?: string; caption?: string }>, ctx: 
   const worstMs = internalState(0);
 
   let previous: number | null = null;
-  let worstAt = 0;
   let ticking: Subscription | undefined;
 
   ctx.onMount(() => {
     ticking = interval(STEP_MS).subscribe(() => {
       const now = performance.now();
       if (previous !== null) {
-        const gap = now - previous;
-        // A reading stands for a few seconds and then gives way, so a
-        // second press reports that press rather than the first.
-        if (gap >= worstMs.value || now - worstAt > WINDOW_MS) {
-          worstMs.value = gap;
-          worstAt = now;
-        }
+        // A high-water mark, never walked back: the worst thing that
+        // happened to this screen is a fact about it, and a reading
+        // that quietly recovered would be one a reader had to catch in
+        // the act to believe.
+        worstMs.value = Math.max(worstMs.value, now - previous);
       }
       previous = now;
       sweep.value = (sweep.value + 1) % BARS;

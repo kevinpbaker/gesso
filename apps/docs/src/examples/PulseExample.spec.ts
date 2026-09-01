@@ -59,4 +59,22 @@ describe('the home page pulse', () => {
 
     expect(ui.getByText('In a render worker')).toBeDefined();
   });
+
+  it('never walks the longest frame back down', () => {
+    const ui = renderTest(createComponent(Pulse, { label: 'Render worker' }), { width: 460, height: 220 });
+
+    // A long gap, then a run of short ones. Real time passes here
+    // rather than fake, because the reading is taken from the clock the
+    // component is drawing on.
+    vi.advanceTimersByTime(400);
+    ui.frame(400);
+    const after = String(ui.getByText(/longest frame/).getProperty('text'));
+
+    for (let step = 0; step < 6; step++) {
+      vi.advanceTimersByTime(40);
+      ui.frame();
+    }
+
+    expect(String(ui.getByText(/longest frame/).getProperty('text'))).toBe(after);
+  });
 });

@@ -30,9 +30,11 @@ the main thread could not be trusted while the main thread is the thing
 being blocked.
 
 On this machine the render worker comes through a three-second block
-reporting a **42 ms** worst gap against its own 40 ms step: it does not
-skip a beat. The copy on the main thread reports **3,017 ms**, which is
-the block itself.
+reporting a longest frame of **41 ms** against its own 40 ms step: it
+does not skip a beat. The copy on the main thread reports **3,010 ms**,
+which is the block itself. Neither reading falls again — the worst thing
+that happened to a screen is a fact about it, not something it should be
+allowed to quietly recover from.
 
 It is not a trick of the demo. The same shape shows up in the
 repository's own measurements:
