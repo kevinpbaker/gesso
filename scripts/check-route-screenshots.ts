@@ -175,6 +175,28 @@ const PREVIEW_BOX = `(() => {
   return box.width > 0 && box.height > 0 ? box : null;
 })()`;
 
+/**
+ * Whether the error overlay is up, and what it says.
+ *
+ * A route that failed to render is perfectly still, so the quiesce loop
+ * settles on it happily and `--update` writes a picture of the error
+ * overlay as the baseline. That has happened: a route whose whole page
+ * threw was baselined and the gate went green on it forever after.
+ *
+ * The overlay is `@gesso/devtools`', in a shadow root under the element
+ * the app was mounted in, so this looks for that rather than for
+ * anything the application draws.
+ */
+const ERROR_OVERLAY = `(() => {
+  const root = document.querySelector('.pg-preview') ?? document.querySelector('#app');
+  if (!root) return null;
+  for (const child of root.children) {
+    const panel = child.shadowRoot && child.shadowRoot.querySelector('.panel[role="alert"]');
+    if (panel) return (panel.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 200);
+  }
+  return null;
+})()`;
+
 interface Diff {
   readonly pixels: number;
   readonly diff: number;
@@ -364,6 +386,14 @@ async function main(): Promise<void> {
         continue;
       }
       const { shot, box } = settled;
+
+      // Before anything is written or compared: a still frame is not
+      // the same thing as a rendered one.
+      const overlay = await devtools.evaluate<string | null>(ERROR_OVERLAY);
+      if (overlay !== null && overlay !== '') {
+        failures.push(`${name}: the error overlay is up, so this route did not render. It says: ${overlay}`);
+        continue;
+      }
 
       if (update) {
         writeFileSync(file, shot);
