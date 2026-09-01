@@ -434,6 +434,9 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private wireChannels;
   private wireInjects;
 }
+type ColorScheme = 'light' | 'dark';
+type ColorSchemePreference = ColorScheme | 'auto';
+declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
 type PatternSegment = {
   readonly kind: 'static';
   readonly text: string;
@@ -586,7 +589,11 @@ type ShellRequest = {
 };
 declare class ShellService {
   private handler;
+  private readonly scheme;
+  readonly colorScheme: Observable<ColorScheme>;
+  get currentColorScheme(): ColorScheme;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
+  applyColorScheme(scheme: ColorScheme): void;
   copyText(text: string): void;
   openUrl(url: string): void;
 }
@@ -702,7 +709,9 @@ declare class GessoRuntime {
   setVisible(visible: boolean): void;
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
+  setColorScheme(scheme: ColorScheme): void;
   get reducedMotion(): boolean;
+  get colorScheme(): ColorScheme;
   get sharedElementNames(): readonly string[];
   explain(node: UiNode): LayoutExplanation;
   debugRoot(): UiNode;
@@ -775,6 +784,7 @@ declare class GessoAppBuilder {
   private routes;
   private historyOptions;
   private app;
+  private colorSchemePreference;
   constructor(root: FrameworkChild | ComponentType);
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options: {
     worker?: WorkerHandle | (() => Worker);
@@ -788,6 +798,7 @@ declare class GessoAppBuilder {
   onInspect(listener: (text: string | null) => void): this;
   onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
   setInspector(enabled: boolean): void;
+  setColorScheme(preference: ColorSchemePreference): this;
   mountSync(host: HTMLElement | string): () => void;
 }
 type ShellToRuntimeMessage = {
@@ -892,6 +903,10 @@ type ShellToRuntimeMessage = {
   reduced: boolean;
 } |
 {
+  type: 'colorScheme';
+  scheme: ColorScheme;
+} |
+{
   type: 'url';
   url: string;
 } | {
@@ -969,6 +984,7 @@ interface WorkerAppOptions {
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (text: string | null) => void;
   interceptFind?: boolean;
+  colorScheme?: ColorSchemePreference;
   accessibility?: boolean;
   history?: ShellHistoryOptions;
 }
@@ -986,6 +1002,8 @@ declare class WorkerApp {
   private history;
   private ready;
   private frameHandle;
+  private detachColorScheme;
+  private colorSchemePreference;
   constructor(options: WorkerAppOptions);
   mount(host: HTMLElement | string): () => void;
   private handleWorkerFailure;
@@ -993,6 +1011,7 @@ declare class WorkerApp {
   private forwardKeyDown;
   private forwardKeyUp;
   setInspector(enabled: boolean): void;
+  setColorScheme(preference: ColorSchemePreference): void;
   private setFrameLoop;
   dispose(): void;
   private readonly handleWorkerMessage;
@@ -1016,6 +1035,7 @@ interface GessoAppOptions {
   clock?: UiFrameClockFactory;
   input?: boolean;
   accessibility?: boolean;
+  colorScheme?: ColorSchemePreference;
 }
 declare class GessoApp {
   private readonly runtime;
@@ -1032,6 +1052,8 @@ declare class GessoApp {
   private history;
   private detachVisibility;
   private detachReducedMotion;
+  private detachColorScheme;
+  private colorSchemePreference;
   constructor(options: GessoAppOptions);
   get services(): ServiceRegistry;
   get input(): UiPlatformAdapter;
@@ -1041,6 +1063,7 @@ declare class GessoApp {
   get rendererReady(): Promise<'canvas2d' | 'webgpu'>;
   resize(width: number, height: number): void;
   setInspector(enabled: boolean): void;
+  setColorScheme(preference: ColorSchemePreference): void;
   onInspect(listener: ((text: string | null) => void) | null): void;
   onError(listener: ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void) | null): void;
   debugRoot(): UiNode;
@@ -1109,6 +1132,7 @@ declare class AnimationService {
   private resolveEasing;
 }
 declare function observeReducedMotion(onChange: (reduced: boolean) => void): () => void;
+declare function observeMediaQuery(query: string, onChange: (matches: boolean) => void): () => void;
 declare class FindService {
   readonly open: InternalState<boolean>;
   readonly query: InternalState<string>;
@@ -1310,6 +1334,8 @@ export {
   isPortErrorMessage,
   isPortHandshake,
   MediaService,
+  observeColorScheme,
+  observeMediaQuery,
   observeReducedMotion,
   OverlayLayer,
   OverlayService,
@@ -1340,6 +1366,8 @@ export {
   type ChannelSource,
   type ChannelToken,
   type ClassComponent,
+  type ColorScheme,
+  type ColorSchemePreference,
   type Command,
   type CommandMap,
   type ComponentContext,
