@@ -22,10 +22,11 @@ which is the only honest measure across a thread boundary.
 
 <ThreadDemo />
 
-On this machine that press reads **136 ms** on the left and **2,034 ms**
-on the right. The worker hiccups once, when it notices the refreshes
-have stopped arriving and goes back to pacing itself; the main-thread
-copy is simply gone for two seconds.
+On this machine that press reads about **70 ms** on the left and
+**2,034 ms** on the right. The worker hiccups once — it cannot know the
+refreshes have stopped until one fails to arrive, so it waits about two
+of them and then goes back to pacing itself — while the main-thread copy
+is simply gone for two seconds.
 
 It is not a trick of the demo. The same shape shows up in the
 repository's own measurements:

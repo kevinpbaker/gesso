@@ -356,6 +356,77 @@ describe('UiHostFrameClock', () => {
     }
   });
 
+  it('watches at twice the display it has been shown, not at a fixed ceiling', () => {
+    // The ceiling is what it waits before it knows the cadence. Once
+    // refreshes have been arriving, a stall costs about a frame rather
+    // than a tenth of a second — which on a 60Hz panel is the
+    // difference between one dropped frame and six.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      let now = 0;
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16, stallMs: 100, minStallMs: 12, now: () => now }
+      );
+
+      // Four refreshes at 16 ms: a 60Hz host, plainly stated.
+      for (let i = 0; i < 5; i++) {
+        clock.requestFrame();
+        clock.tick(i * 16);
+      }
+      clock.requestFrame();
+
+      // Nothing at 30 ms — inside twice the interval, so still watching.
+      now = 100;
+      vi.advanceTimersByTime(30);
+      expect(frames).toHaveLength(5);
+
+      // And drawn shortly after, rather than at the 100 ms ceiling.
+      vi.advanceTimersByTime(6);
+      expect(frames).toHaveLength(6);
+      expect(frames.at(-1)).toBe(100);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not learn a cadence from the gap a stall left behind', () => {
+    // The tick that ends a stall is a second apart from the one before
+    // it. Treating that as the display's interval would set the watch a
+    // second wide and make the next stall invisible.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      let now = 0;
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16, stallMs: 100, minStallMs: 12, now: () => now }
+      );
+
+      clock.requestFrame();
+      clock.tick(0);
+      clock.requestFrame();
+      clock.tick(16);
+      // A second of silence, then the host returns.
+      clock.requestFrame();
+      clock.tick(1016);
+      clock.requestFrame();
+
+      // Back to the ceiling, because the only intervals it now has are
+      // none: the outlier cleared them rather than being averaged in.
+      now = 1116;
+      vi.advanceTimersByTime(99);
+      expect(frames).toHaveLength(3);
+      vi.advanceTimersByTime(2);
+      expect(frames).toHaveLength(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('cancels a pending frame and its fallback', () => {
     vi.useFakeTimers();
     try {

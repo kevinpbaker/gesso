@@ -87,22 +87,33 @@ export interface UiTimerFrameClockOptions {
  * leaves between frames without keeping an idle application awake for
  * a noticeable moment.
  */
+/** How many refresh intervals the watch is measured over. */
+const CADENCE_SAMPLES = 4;
+
 const IDLE_TICKS_BEFORE_STOP = 4;
 
 export interface UiHostFrameClockOptions {
   /** How long to wait for a host tick before pacing a frame anyway. */
   fallbackMs?: number;
   /**
-   * How long a hosted clock waits for a tick that does not come before
-   * deciding the host has stopped answering and pacing itself.
+   * The longest a hosted clock will wait for a tick before deciding the
+   * host has stopped answering and pacing itself again.
    *
-   * Well beyond any display's frame time — a tenth of a second without
-   * a refresh is a stalled host on a 30Hz panel as much as on a 165Hz
-   * one — because a tick clears this timer, so a value close to the
-   * refresh interval would race the host and draw frames it did not
-   * ask for.
+   * A ceiling rather than the usual figure: once ticks have been
+   * arriving the clock knows the display's own interval and watches at
+   * twice that, so this value only applies before it has seen enough
+   * refreshes to say. Waiting a tenth of a second on every stall would
+   * be six dropped frames on a 60Hz panel, which is visible.
    */
   stallMs?: number;
+  /**
+   * The shortest that watch can be, whatever the measured cadence.
+   *
+   * A floor exists because the estimate is taken from timestamps that
+   * jitter: watching at exactly one refresh would fire on any tick that
+   * arrived a moment late and draw a frame nobody asked for.
+   */
+  minStallMs?: number;
   /** Time source for a fallback tick; host ticks carry their own. */
   now?: () => UiFrameTime;
 }
@@ -182,9 +193,20 @@ export class UiHostFrameClock implements UiFrameClock {
   private stalled = false;
   /** Refreshes arrived with nothing pending, before the loop stops. */
   private idleTicks = 0;
+  /** The time the last tick carried, for measuring the display's interval. */
+  private lastTickTime: UiFrameTime | null = null;
+  /**
+   * The last few intervals between ticks, in arrival order.
+   *
+   * The watch is set from the largest of them rather than the mean: a
+   * display that drops the occasional refresh is still a live host, and
+   * a mean would put the watch inside the gap that dropped frame leaves.
+   */
+  private readonly intervals: number[] = [];
   private handle: ReturnType<typeof setTimeout> | null = null;
   private readonly fallbackMs: number;
   private readonly stallMs: number;
+  private readonly minStallMs: number;
   private readonly now: () => UiFrameTime;
 
   constructor(
@@ -195,6 +217,7 @@ export class UiHostFrameClock implements UiFrameClock {
   ) {
     this.fallbackMs = options.fallbackMs ?? 16;
     this.stallMs = options.stallMs ?? 100;
+    this.minStallMs = options.minStallMs ?? 12;
     this.now = options.now ?? (() => performance.now());
   }
 
@@ -239,8 +262,34 @@ export class UiHostFrameClock implements UiFrameClock {
         this.stalled = this.hosted;
         this.deliver(this.now());
       },
-      watching ? this.stallMs : this.fallbackMs
+      watching ? this.watchMs() : this.selfPaceMs()
     );
+  }
+
+  /**
+   * How long to wait for a tick before concluding none is coming.
+   *
+   * Twice the widest gap seen recently between refreshes: a live host
+   * always beats that, and a blocked one is noticed a frame or so
+   * after it stops rather than a fixed tenth of a second later. The
+   * ceiling applies until enough ticks have arrived to say — which is
+   * three, because two timestamps make one interval and one interval
+   * is not evidence of a cadence.
+   */
+  private watchMs(): number {
+    if (this.intervals.length < 2) {
+      return this.stallMs;
+    }
+    const widest = Math.max(...this.intervals);
+    return Math.min(this.stallMs, Math.max(this.minStallMs, widest * 2));
+  }
+
+  /** The interval to pace at while the host is absent: the display's, if it is known. */
+  private selfPaceMs(): number {
+    if (this.intervals.length < 2) {
+      return this.fallbackMs;
+    }
+    return Math.max(1, Math.min(this.fallbackMs, Math.max(...this.intervals)));
   }
 
   cancelFrame(): void {
@@ -269,6 +318,7 @@ export class UiHostFrameClock implements UiFrameClock {
   tick(time: UiFrameTime): void {
     this.hosted = true;
     this.stalled = false;
+    this.recordCadence(time);
     this.clearFallback();
     if (!this.pending) {
       // Not wanted *yet* is not the same as not wanted. Something
@@ -286,6 +336,31 @@ export class UiHostFrameClock implements UiFrameClock {
     }
     this.idleTicks = 0;
     this.deliver(time);
+  }
+
+  /**
+   * Keeps the last few gaps between ticks, which is where the watch
+   * interval comes from.
+   *
+   * A gap wider than the ceiling is not a cadence — it is the host
+   * coming back from a stall, or a tab that was hidden — so it is left
+   * out rather than teaching the clock to wait that long next time.
+   */
+  private recordCadence(time: UiFrameTime): void {
+    const previous = this.lastTickTime;
+    this.lastTickTime = time;
+    if (previous === null) {
+      return;
+    }
+    const interval = time - previous;
+    if (interval <= 0 || interval > this.stallMs) {
+      this.intervals.length = 0;
+      return;
+    }
+    this.intervals.push(interval);
+    if (this.intervals.length > CADENCE_SAMPLES) {
+      this.intervals.shift();
+    }
   }
 
   private setActive(active: boolean): void {
