@@ -17,5 +17,9 @@ export default {
       'LiveExample',
       defineClientComponent(() => import('./LiveExample.vue'))
     );
+    app.component(
+      'ThreadDemo',
+      defineClientComponent(() => import('./ThreadDemo.vue'))
+    );
   }
 } satisfies Theme;
