@@ -8,7 +8,7 @@ import { Pulse } from '../../src/examples/PulseExample';
 import PulseWorker from '../../src/examples/PulseExampleWorker?worker';
 
 /**
- * The same application, twice, on two different threads — and a button
+ * The same application, twice, on two different threads, with a button
  * that blocks the one the page is on.
  *
  * The left canvas is a render worker. The right one is the identical

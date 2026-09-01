@@ -4,7 +4,7 @@ description: A UI framework that runs your whole interface off the main thread, 
 
 # Interfaces that don't stutter
 
-Your application has real work to do — parsing a file, diffing a
+Your application has real work to do: parsing a file, diffing a
 document, simulating a system, sorting a hundred thousand rows. On the
 web that work and your interface share one thread of execution, so they
 take turns, and the person using it watches them take turns. The pointer
@@ -13,7 +13,7 @@ sticks. The list stutters mid-scroll. The keystroke lands a beat late.
 Gesso moves the entire interface somewhere else. Components, layout,
 paint, text and input run in a render worker. Your application logic runs
 in another. The main thread is left holding a canvas and forwarding
-events — so nothing you compute can drop a frame.
+events, so nothing you compute can drop a frame.
 
 **Try it.** Two copies of the same component, one in a render worker and
 one on the main thread. Block the main thread for three seconds and see
@@ -23,8 +23,8 @@ which one cares.
 
 The worker's longest frame across the block: **41 ms**, against its own
 40 ms step. It doesn't miss one. The copy on the main thread reports
-**3,010 ms** — the block itself. Both readings hold, so press it and
-then look.
+**3,010 ms**, which is the block itself. Both readings hold, so press
+it and then look.
 
 ## Declarative, with nothing to re-run
 
@@ -35,7 +35,7 @@ differs is what happens when the state changes.
 | Framework   | On a state change                                                                |
 | ----------- | -------------------------------------------------------------------------------- |
 | **SwiftUI** | `body` is recomputed and the result is diffed against the last one               |
-| **Compose** | the composable is invoked again — recomposition, with unchanged subtrees skipped |
+| **Compose** | the composable is invoked again (recomposition), with unchanged subtrees skipped |
 | **Gesso**   | nothing is invoked again; one property on one node is written                    |
 
 That difference is the one you feel while writing. There is no re-run to
@@ -52,10 +52,10 @@ A counter, as a function component in JSX:
 <<< @/src/examples/CounterExample.tsx
 
 `input(props.label, 'Count')` is a prop with a default. `internalState(0)`
-is the value this component owns — `@State`, `mutableStateOf`. And the
-caption is a derived value that lives nowhere: one expression over the
-other two, subscribed to by the node that shows it, so it cannot be
-stale and there is nothing to invalidate.
+is the value this component owns, the equivalent of `@State` or
+`mutableStateOf`. And the caption is a derived value that lives nowhere:
+one expression over the other two, subscribed to by the node that shows
+it, so it cannot be stale and there is nothing to invalidate.
 
 JSX is optional. It compiles onto the element factories, which are the
 same tree in a different spelling:
@@ -81,11 +81,11 @@ and dark toggle without being told either exists.
 ## What you get
 
 - **A real layout engine.** Flex and grid with CSS's own semantics,
-  typed lengths, and text that wraps, clamps and sits on a baseline —
+  typed lengths, and text that wraps, clamps and sits on a baseline, all
   checked against Chrome, so a box is the size you expect.
-- **Twenty-seven components.** Inputs, overlays, tables, trees, media —
-  themed, keyboard operable, and announced to assistive technology
-  without you doing anything.
+- **Twenty-seven components.** Inputs, overlays, tables, trees and
+  media, every one of them themed, keyboard operable, and announced to
+  assistive technology without you doing anything.
 - **Tests without a browser.** `renderTest` queries the same tree a
   screen reader reads, so a test finds a control by asking for a
   control.
@@ -96,7 +96,7 @@ and dark toggle without being told either exists.
 ## Where it doesn't belong
 
 Documents. Articles, marketing pages, anything whose value is being
-indexed and linked — a canvas has nothing for a crawler to read. Native
+indexed and linked: a canvas has nothing for a crawler to read. Native
 form controls also bring autofill, password managers and mobile
 keyboards that a canvas cannot match.
 

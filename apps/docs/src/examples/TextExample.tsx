@@ -7,7 +7,7 @@ import { HOVER_CONTROL } from './interaction';
 const WIDTHS = [420, 320, 240] as const;
 
 const BODY =
-  'A paragraph is laid out by the same measurer the engine uses, so a line breaks in exactly one place — the renderer never gets to disagree with layout about where a word went.';
+  'A paragraph is laid out by the same measurer the engine uses, so a line breaks in exactly one place, and the renderer never gets to disagree with layout about where a word went.';
 
 // #region card
 /**
@@ -67,7 +67,7 @@ export function TextLayout(_props: Inputs<{}>, _ctx: ComponentContext) {
         backgroundColor="background"
         cursor="pointer"
         modifiers={[HOVER_CONTROL]}>
-        <text text={width.pipe(map(value => `${value} px — narrower`))} fontSize={12} color="text" />
+        <text text={width.pipe(map(value => `${value} px, narrower`))} fontSize={12} color="text" />
       </button>
     </column>
   );

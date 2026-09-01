@@ -11,7 +11,8 @@ import { interactive, type UiModifier } from '@gesso/core';
  *
  * A `<button>` already publishes `hovered` and `pressed` as
  * `visualState`, but nothing paints a colour from that state on its
- * own — what a hovered control looks like is the application's. These
+ * own, because what a hovered control looks like is the application's.
+ * These
  * two say what it looks like here.
  *
  * Colours are theme tokens, resolved at paint against whatever theme
@@ -28,9 +29,9 @@ export const HOVER_CONTROL: UiModifier = interactive({
 /**
  * The same, for a filled accent button.
  *
- * The palette has hover and press tokens for a *control* — a field, a
- * checkbox, a menu row — and none for a button already painted in the
- * accent, because there is no darker accent to name. Dimming it is the
+ * The palette has hover and press tokens for a *control*, meaning a
+ * field, a checkbox or a menu row, and none for a button already
+ * painted in the accent, because there is no darker accent to name. Dimming it is the
  * honest answer: it reads as a press on both appearances and needs no
  * token that does not exist.
  */

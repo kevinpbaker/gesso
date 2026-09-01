@@ -10,7 +10,7 @@ import { Pulse } from './PulseExample';
  * The home page's argument rests on this thing stepping on its own
  * thread's timer, and saying what it measured itself.
  *
- * Fake timers, because the sweep is an interval — time has to pass
+ * Fake timers, because the sweep is an interval: time has to pass
  * before there is anything for a frame to draw.
  *
  * The counters are read off the nodes' own `text` properties rather

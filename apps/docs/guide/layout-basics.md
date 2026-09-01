@@ -5,8 +5,8 @@ description: Rows, columns and boxes; the two alignment props; typed lengths; an
 # Layout basics
 
 Gesso's layout borrows CSS's model and most of CSS's names, so a box
-that would be 240 px wide in a browser is 240 px wide here — the engine
-is checked against Chrome on a few hundred generated fixtures. What is
+that would be 240 px wide in a browser is 240 px wide here, and the
+engine is checked against Chrome on a few hundred generated fixtures. What is
 different is that the names are typed, and there is no cascade: a
 property is set on an element, and that is where it comes from.
 
@@ -18,17 +18,17 @@ property is set on an element, and that is where it comes from.
 | `<column>` | Along the vertical axis                              |
 | `<box>`    | Stacked on top of each other, aligned within the box |
 
-`<box>` is also the plain rectangle — a background, a border, a size —
-and it is exported as `Stack` when what you mean is layering.
+`<box>` is also the plain rectangle, meaning a background, a border and
+a size, and it is exported as `Stack` when what you mean is layering.
 
 ## `x` and `y` place everything
 
 Two props do the work of `justify-content`, `align-items` and their
 per-child overrides:
 
-- **`x`** — how children are placed horizontally.
-- **`y`** — how children are placed vertically.
-- **`selfX` / `selfY`** — one child overriding its parent on that axis.
+- **`x`** places children horizontally.
+- **`y`** places children vertically.
+- **`selfX` / `selfY`** let one child override its parent on that axis.
 
 They are named for the screen rather than for the axis, so they mean the
 same thing on a row as on a column. On a `row`, `x` distributes along
@@ -36,7 +36,7 @@ the main axis (`start`, `center`, `end`, `space-between`, and the rest)
 and `y` places across it. On a `column` they swap roles without swapping
 names.
 
-Press either button — `x` walks the distributions, `y` walks the
+Press either button. `x` walks the distributions, `y` walks the
 cross-axis values:
 
 <LiveExample id="layout" height="260" />
@@ -70,7 +70,7 @@ parent's definite content box, and behave as `auto` when it has none.
 ## Space
 
 `gap` between children, `padding` inside a container, `margin` outside a
-child — all in pixels, each with a per-side property beside it:
+child, all in pixels, each with a per-side property beside it:
 
 ```tsx
 <column gap={12} padding={16} paddingLeft={24} paddingRight={24}>
@@ -88,9 +88,9 @@ Sizing follows flexbox, including the parts people forget:
   back a share of the overflow; `flex={1}` is the usual shorthand for
   both.
 - **A flex item never shrinks below its content.** An item's automatic
-  minimum is the smaller of its declared size and its min-content size —
-  the longest word, the widest summed row — which is what stops a
-  column of cards being crushed to nothing by a tall sibling. Set
+  minimum is the smaller of its declared size and its min-content size,
+  which is the longest word or the widest summed row. That is what stops
+  a column of cards being crushed to nothing by a tall sibling. Set
   `minWidth`/`minHeight` explicitly to overrule it; scroll containers
   and clipped text have no automatic minimum by design.
 - Space a clamped item cannot take is redistributed to the others,
@@ -99,8 +99,8 @@ Sizing follows flexbox, including the parts people forget:
 ## When a box is the wrong size
 
 Ask the engine rather than guessing. Every runtime can explain any
-node's size — the rule that fixed each axis, the constraints it was
-given, and the ancestor a change would be laid out from:
+node's size: the rule that fixed each axis, the constraints it was
+given, and the ancestor a change would be laid out from.
 
 ```ts
 formatExplanation(runtime.explain(node));

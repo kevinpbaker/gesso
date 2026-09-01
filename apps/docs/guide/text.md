@@ -5,7 +5,7 @@ description: Wrapping, clamping and ellipsis; how a paragraph sizes its box; and
 # Text
 
 Text is the input to most layout decisions. A `<text>` element is not a
-rectangle with a string in it — it is measured, broken into lines, and
+rectangle with a string in it. It is measured, broken into lines, and
 sized by what it says, and the box around it is decided by that.
 
 The card below is 420 px wide. Press the button to narrow it and watch
@@ -16,7 +16,7 @@ which parts answer:
 <<< @/src/examples/TextExample.tsx#card
 
 The body re-wraps and gets taller. The title, clamped to two lines, does
-not — it drops what will not fit and ends in an ellipsis. Both are the
+not: it drops what will not fit and ends in an ellipsis. Both are the
 same element with different props.
 
 ## Styling
@@ -36,7 +36,7 @@ same element with different props.
 
 `color` takes a theme token as readily as a value, which is why nothing
 in these examples names a hex code. Text that sets neither size nor
-colour inherits both from the type scale in the environment — see
+colour inherits both from the type scale in the environment. See
 [light and dark](/guide/appearance) for what provides that.
 
 ## Wrapping, clamping, ellipsis
@@ -60,8 +60,8 @@ they explain most surprises:
 - **A tight bound is authoritative.** Told exactly how wide to be, text
   wraps to that width.
 - **A loose bound is available space, not a clamp.** Told "up to this
-  much", text takes what it needs — and content that does not fit
-  overflows, exactly as it would in a browser.
+  much", text takes what it needs, and content that does not fit
+  overflows exactly as it would in a browser.
 
 Flex sizing then runs twice around this: items are measured at their
 max-content width to resolve the main axis, and any item whose width
@@ -95,13 +95,13 @@ another for paint, and a caret cannot land between two characters that
 the renderer drew somewhere else.
 
 The consequence for you is that text costs measurement. It is memoised
-per node and per constraint — an unchanged paragraph is not measured
-again on a later frame — but a screen that re-wraps a thousand
+per node and per constraint, so an unchanged paragraph is not measured
+again on a later frame, but a screen that re-wraps a thousand
 paragraphs on every keystroke is doing real work, and the frame profiler
 will say so.
 
-Text you can _edit_ — a caret, a selection, composition from an IME — is
-a different subject from text you lay out, and lives in
+Text you can _edit_, with a caret, a selection and composition from an
+IME, is a different subject from text you lay out, and lives in
 `EditableText` and the `TextInput` component rather than in these props.
 
 ## Next

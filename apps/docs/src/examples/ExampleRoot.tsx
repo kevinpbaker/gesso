@@ -9,19 +9,18 @@ import { createComponent, ShellService, type ComponentContext, type Inputs } fro
  *
  * A canvas inherits nothing from the page: no stylesheet reaches it, so
  * an example that sets no colours would paint the default theme's black
- * text whatever appearance the page is in — invisible against a dark
- * one. This is the eight lines that fix that for every example at once,
+ * text whatever appearance the page is in, which is invisible against a
+ * dark one. This is the eight lines that fix that for every example at once,
  * and it is also the shape an application uses.
  *
  * `theme` is an environment value: provided here, inherited by
- * everything below, and — because it is an ordinary prop that accepts
- * an Observable — rebound rather than rebuilt when the appearance
- * changes. `lightTheme` and `darkTheme` ship with `@gesso/core`; an
+ * everything below, and, because it is an ordinary prop that accepts an
+ * Observable, rebound rather than rebuilt when the appearance changes. `lightTheme` and `darkTheme` ship with `@gesso/core`; an
  * application with its own palette maps the same signal onto that
  * instead.
  *
  * `textStyle` has to go with it. A theme's palette answers a colour
- * *token* — `backgroundColor="surface"` — but text that names no colour
+ * *token*, as in `backgroundColor="surface"`, but text that names no colour
  * at all takes it from the type scale in the environment, not from the
  * theme, so a root that provides only `theme` leaves every unstyled
  * line painting the default black.

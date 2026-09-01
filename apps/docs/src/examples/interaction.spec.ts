@@ -11,7 +11,7 @@ import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
  * says so, on a surface where the browser says nothing.
  *
  * Worth a spec of its own rather than one per example, because it is
- * the property most easily lost — a control keeps working perfectly
+ * the property most easily lost: a control keeps working perfectly
  * while looking like a label, so nothing else fails when it goes.
  */
 describe('the shared interaction modifiers', () => {

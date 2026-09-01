@@ -1,5 +1,5 @@
 ---
-description: Building a form from @gesso/components — what each control brings with it, and what stays your job.
+description: Building a form from @gesso/components, what each control brings with it, and what stays your job.
 ---
 
 # Using components
@@ -9,7 +9,7 @@ overlays, structure, data and media, twenty-seven components in all.
 Every one of them is themed, keyboard operable, and announces itself to
 an assistive technology from the day it was written.
 
-The form below is four of them and one plain button. Tab through it —
+The form below is four of them and one plain button. Tab through it:
 the fields take focus in order, Space toggles the checkbox, and the
 select opens and chooses from the keyboard alone.
 
@@ -58,8 +58,8 @@ shows what you give it; hand it `defaultValue` and it keeps its own:
 ```
 
 A controlled input given no `onChange` does not move, which is the same
-thing `readOnly` does and for the same reason — nothing wrote the value
-back.
+thing `readOnly` does and for the same reason, which is that nothing
+wrote the value back.
 
 ## The five tiers
 
@@ -72,7 +72,7 @@ back.
 | **Media**     | `Image`, `Icon`, `Spinner`, `ProgressBar`, `Video`                                   |
 
 Overlays flip and shift at the edge of the viewport, follow their anchor
-through a scroll, and trap focus where they should — a `Dialog` returns
+through a scroll, and trap focus where they should. A `Dialog` returns
 focus to whatever opened it. `DataTable` shares grid tracks across
 virtualized rows, which is what lets a hundred thousand of them scroll.
 
@@ -80,21 +80,21 @@ virtualized rows, which is what lets a hundred thousand of them scroll.
 
 Components take their colours from the theme rather than from props, on
 purpose: a `backgroundColor` prop on every control would fork the theme
-at every call site. What they do take is layout —
+at every call site. What they do take is layout:
 
 ```tsx
 <TextInput label="Email" width={percent(100)} flexGrow={1} marginTop={8} />
 ```
 
-— and `rootModifiers`, which attaches behaviour to the component's own
-root rather than to a box wrapped around it. That is what a modifier
+They also take `rootModifiers`, which attaches behaviour to the
+component's own root rather than to a box wrapped around it. That is what a modifier
 needs in order to see the control's real geometry: a `measure` on a
 wrapper reports the wrapper.
 
-Pass a modifier value that keeps its identity — declared once at module
-scope, not constructed in the call — because a modifier's arguments are
-compared by identity and a fresh one detaches and re-attaches every
-frame.
+Pass a modifier value that keeps its identity, declared once at module
+scope rather than constructed in the call, because a modifier's
+arguments are compared by identity and a fresh one detaches and
+re-attaches every frame.
 
 If a control needs to look different from the rest of the application,
 the answer is a different theme in the environment for that subtree, not

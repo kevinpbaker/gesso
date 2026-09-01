@@ -16,7 +16,7 @@ type Currency = keyof typeof RATES;
  *
  *  - `currency` comes from the parent. `input()` reads the prop cell
  *    and gives it a default, so the line follows a parent that changes
- *    its mind — without this body running a second time.
+ *    its mind, without this body running a second time.
  *  - `quantity` is the line's own. `internalState` is for what
  *    originates here and dies with the component.
  *  - `total` is derived, and is therefore **not** a cell. It is one
@@ -82,7 +82,7 @@ export function Cells(_props: Inputs<{}>, _ctx: ComponentContext) {
         backgroundColor="primary"
         cursor="pointer"
         modifiers={[HOVER_ACCENT]}>
-        <text text={currency.pipe(map(unit => `Showing ${unit} — switch`))} fontSize={13} color="background" />
+        <text text={currency.pipe(map(unit => `Showing ${unit}, switch`))} fontSize={13} color="background" />
       </button>
     </column>
   );

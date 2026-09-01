@@ -6,8 +6,8 @@ import { ShellService, type ComponentContext, type Inputs } from '@gesso/framewo
 /**
  * A screen that says which appearance it is in.
  *
- * Every colour here is a theme token — `text`, `textMuted`, `surface`,
- * `border`, `primary` — resolved against whatever theme is in the
+ * Every colour here is a theme token (`text`, `textMuted`, `surface`,
+ * `border`, `primary`) resolved against whatever theme is in the
  * environment. `ExampleRoot` puts one there and follows the page, so
  * this component sets no colour at all and still changes with the
  * toggle.

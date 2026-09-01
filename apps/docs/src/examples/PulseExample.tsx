@@ -11,14 +11,14 @@ const STEP_MS = 40;
 /**
  * A screen that is always moving, and that times itself.
  *
- * The home page mounts this twice — once in a render worker, once on
- * the main thread — and then blocks the main thread. Whichever copy
+ * The home page mounts this twice, once in a render worker and once on
+ * the main thread, and then blocks the main thread. Whichever copy
  * keeps sweeping is the argument.
  *
  * **Everything here belongs to the thread it runs on**: the timer that
  * advances the sweep, the clock the gap is measured on, the counter,
  * and the caption underneath. Nothing is reported to the page and
- * nothing is read from it, which is the point — a number that had to
+ * nothing is read from it, which is the point: a number that had to
  * cross to the main thread could not be trusted while the main thread
  * is the thing being blocked, and neither could a caption the page had
  * to redraw.

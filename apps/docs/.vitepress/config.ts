@@ -5,7 +5,7 @@ import { defineConfig } from 'vitepress';
  *
  * Prose is HTML, not canvas. A Gesso page is drawn into a canvas, which
  * means the browser's own find, text selection, and indexing have
- * nothing to read — F2 and F6b give a Gesso *application* its own
+ * nothing to read. F2 and F6b give a Gesso *application* its own
  * answers to those, but a docs site should not need them. So the site
  * is ordinary markdown, and Gesso appears in it the way it appears in
  * anybody's application: as a canvas with a render worker behind it,

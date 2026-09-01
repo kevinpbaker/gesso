@@ -5,7 +5,7 @@ description: Set up a project against the Gesso packages, and choose between the
 # Installation
 
 Gesso is four packages and a bundler that understands workers. There is
-no CLI, no plugin and no build step of its own — a Gesso project is an
+no CLI, no plugin and no build step of its own. A Gesso project is an
 ordinary Vite project that happens to draw its interface into a canvas.
 
 ## The packages
@@ -14,7 +14,7 @@ ordinary Vite project that happens to draw its interface into a canvas.
 | ------------------- | ---------------------------------------------------------------------------- |
 | `@gesso/core`       | The engine: elements, layout, the two renderers, input, text, theming        |
 | `@gesso/framework`  | Components, cells, the runtime, the shells, channels, routing                |
-| `@gesso/components` | The component library — inputs, overlays, structure, data, media             |
+| `@gesso/components` | The component library: inputs, overlays, structure, data, media              |
 | `@gesso/testing`    | `renderTest` and its queries, for testing a component with no browser at all |
 
 `@gesso/core` and `@gesso/framework` are what an application always
@@ -23,8 +23,8 @@ your dependency as much as theirs.
 
 ::: warning Not on a registry yet
 These packages are not published. A project consumes them today from
-tarballs — `pnpm pack` in each package directory, then install the
-files — which is exactly what this repository's own `pnpm check:install`
+tarballs. Run `pnpm pack` in each package directory and install the
+files, which is exactly what this repository's own `pnpm check:install`
 does before it runs a component test against the result.
 :::
 
@@ -83,7 +83,7 @@ whole of the difference:
 Row({ gap: 8, y: 'center' }, Text({ text: 'Ready' }));
 ```
 
-Drop the `jsx` lines and the second form still works — nothing in the
+Drop the `jsx` lines and the second form still works. Nothing in the
 framework requires JSX, and there is no runtime cost either way. The
 documentation uses markup because nested layout reads better as markup.
 
@@ -126,7 +126,7 @@ canvas, forwards events and does nothing else, so main-thread work
 cannot delay a frame.
 
 ```ts
-// main.ts — the main thread's entire job
+// main.ts: the main thread's entire job
 import { createApp } from '@gesso/framework';
 
 createApp({
@@ -137,7 +137,7 @@ createApp({
 ```
 
 ```ts
-// app.render.worker.ts — everything the person sees
+// app.render.worker.ts: everything the person sees
 import { renderRoot } from '@gesso/framework';
 import { App } from './App';
 

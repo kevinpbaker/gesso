@@ -7,7 +7,7 @@ import { HOVER_CONTROL } from './interaction';
 const MAIN: readonly UiAlignment[] = ['start', 'center', 'end', 'space-between'];
 const CROSS: readonly UiAlignment[] = ['stretch', 'start', 'center', 'end'];
 
-/** Steps through a list of values, wrapping — one control, four states. */
+/** Steps through a list of values, wrapping: one control, four states. */
 function cycle<T>(values: readonly T[], current: T): T {
   return values[(values.indexOf(current) + 1) % values.length]!;
 }
@@ -18,7 +18,7 @@ function cycle<T>(values: readonly T[], current: T): T {
  *
  * `x` distributes the children along the row's main axis; `y` sizes and
  * places them across it. They are the same two props on a `column`,
- * where the axes swap — which is why they are named for the screen
+ * where the axes swap, which is why they are named for the screen
  * rather than for the axis.
  *
  * None of the boxes sets a height, which is what lets `y: 'stretch'`

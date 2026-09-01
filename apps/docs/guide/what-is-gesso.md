@@ -5,7 +5,7 @@ description: What Gesso is, the three things that follow from drawing to a canva
 # What Gesso is
 
 Gesso draws application interfaces into a canvas, with everything above
-that canvas — components, layout, paint, input, text, accessibility —
+that canvas (components, layout, paint, input, text, accessibility)
 running in a worker. The page keeps one `<canvas>` element and forwards
 events to it. There is no DOM below that element, no stylesheet, and no
 virtual DOM.
@@ -13,8 +13,8 @@ virtual DOM.
 An application is a tree of components. Each component function runs
 once and returns nodes that stay; values that change are Observables
 bound into those nodes. The engine lays the nodes out with a CSS-shaped
-model — flex, grid, typed lengths, real text wrapping — and paints them
-through Canvas2D or WebGPU.
+model of flex, grid, typed lengths and real text wrapping, then paints
+them through Canvas2D or WebGPU.
 
 ## What it is for
 
@@ -22,7 +22,7 @@ through Canvas2D or WebGPU.
 everything on one thread of execution: your parsing, your diffing, your
 simulation, your layout and your paint all take turns on the same one.
 Nothing there is slow by itself. They simply cannot happen at once, so
-whichever one is running is the reason the other is late — and what a
+whichever one is running is the reason the other is late, and what a
 person sees is lag. The pointer sticks, a list stutters mid-scroll, a
 keystroke lands a beat after it was typed.
 
@@ -48,9 +48,9 @@ and frames compete, the thread boundary is the entire point.
 **The main thread is free.** Not "mostly free": the shell creates the
 canvas, forwards pointer and key events, and runs the display's refresh
 loop. Everything else is somewhere else. Whatever your application is
-busy with — a long parse, a big sort, a step of a simulation — it is
-busy on a thread the interface is not on, so the interface carries on
-drawing.
+busy with, whether that is a long parse, a big sort or a step of a
+simulation, it is busy on a thread the interface is not on, so the
+interface carries on drawing.
 
 Which means an interface that locks up because the program is working
 stops being a thing that can happen to you. There is no long task to
@@ -98,7 +98,7 @@ site is HTML with Gesso embedded in it rather than a Gesso application.
   requirement on a browser extension reading its contents.
 
 Gesso is for the other kind of screen: an application whose interface is
-its own — an editor, a console, a dashboard, a tool with a lot of state
+its own. An editor, a console, a dashboard, a tool with a lot of state
 and a lot of frames.
 
 ## Before you build on it
@@ -113,9 +113,9 @@ Gesso is young, and this is what that means where it would touch you.
   where it does not, so nothing depends on having it.
 - **No screen reader has been sat in front of it.** What your components
   emit does reach the platform's accessibility layer as real elements
-  with roles, states and actions — but whether VoiceOver and NVDA
-  announce a screen _well_ is a question only a person with one can
-  answer, and nobody has.
+  with roles, states and actions. Whether VoiceOver and NVDA announce a
+  screen _well_ is a question only a person with one can answer, and
+  nobody has.
 - **The desktop webviews are the destination, not the history.** Running
   this on macOS, Windows and Linux means WKWebView, WebView2 and
   WebKitGTK: three IME implementations, three font stacks, three ideas

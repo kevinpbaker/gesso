@@ -9,7 +9,7 @@ import { Form } from './FormExample';
 /**
  * The page's claim is that the library's controls arrive operable and
  * announced, so the spec reaches them the way an assistive technology
- * does — by role and name — rather than by walking the tree.
+ * does, by role and name, rather than by walking the tree.
  */
 describe('the docs form example', () => {
   it('announces every control by role and name', () => {

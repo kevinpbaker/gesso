@@ -12,8 +12,8 @@ import { exampleRoot } from './ExampleRoot';
  * The regression this file exists for.
  *
  * The counter sets no colour, so its caption takes the theme's. A root
- * that provided `theme` but not `textStyle` looked right — the canvas
- * painted the dark background — while every line of text stayed the
+ * that provided `theme` but not `textStyle` looked right, since the
+ * canvas painted the dark background, while every line of text stayed the
  * default black, which on that background is invisible. Nothing failed;
  * it was only visible in a screenshot. So the assertion is on the
  * *resolved* colour of the text node, which is where the two roots

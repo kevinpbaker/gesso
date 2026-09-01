@@ -34,6 +34,6 @@ describe('the docs cells example', () => {
     ui.frame();
 
     expect(ui.getAllByText('€11.50')).toHaveLength(2);
-    expect(ui.getByText('Showing EUR — switch')).toBeDefined();
+    expect(ui.getByText('Showing EUR, switch')).toBeDefined();
   });
 });

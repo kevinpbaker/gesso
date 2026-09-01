@@ -18,14 +18,14 @@ import { createApp, type WorkerApp } from '@gesso/framework';
  *     bundler has already split, addressable here by name.
  *  2. **The site is a single-page app.** A reader who walks five pages
  *     would leave five render workers running, so the app is disposed
- *     on unmount — `dispose()` terminates the worker the same way
+ *     on unmount: `dispose()` terminates the worker the same way
  *     leaving a playground route does.
  *
  * The appearance is handed over rather than left to the platform. A
  * Gesso shell follows `prefers-color-scheme` on its own, but this
- * site's toggle *overrides* the OS — a reader on a light system can be
- * reading in dark — so `colorScheme` is set from VitePress's `isDark`
- * and kept in step with it. Passing it at construction rather than
+ * site's toggle *overrides* the OS, since a reader on a light system
+ * can be reading in dark, so `colorScheme` is set from VitePress's
+ * `isDark` and kept in step with it. Passing it at construction rather than
  * after mounting is what stops the first frame painting in the
  * appearance the reader did not choose.
  */

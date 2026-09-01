@@ -15,7 +15,7 @@ count of component bodies does not move.
 
 <LiveExample id="runsonce" height="300" />
 
-Four bodies ran — the panel and its three rows — and they ran while the
+Four bodies ran, the panel and its three rows, and they ran while the
 screen was being built. After that, a press writes three numbers into
 three nodes that already exist.
 
@@ -31,7 +31,7 @@ that exist to survive re-rendering:
 | `useMemo` around an expensive derived value        | The body runs once, so the expression runs once. There is nothing to memoise against.                            |
 | `useCallback` for a stable handler                 | The closure is created once and attached to a node once. It is already stable.                                   |
 | A dependency array                                 | A binding subscribes to exactly the Observables it reads. Nothing is compared, so nothing can be under-declared. |
-| `key` to preserve identity across a render         | Component identity **is** node identity. A key matters only for a list whose contents are rebuilt — see below.   |
+| `key` to preserve identity across a render         | Component identity **is** node identity. A key matters only for a list whose contents are rebuilt; see below.    |
 | Splitting a component to avoid re-rendering a peer | A peer is never re-rendered. Components are split for readability alone.                                         |
 
 The last row is the one that changes how a screen is written. In a
@@ -44,13 +44,13 @@ touches that node.
 Running once is not the same as being free. What costs is the work a
 change actually causes:
 
-- **A content binding** — `text`, `image` — writes a property and
+- **A content binding** (`text`, `image`) writes a property and
   repaints.
-- **A layout binding** — `width`, `flexGrow`, `gap` — writes a property
+- **A layout binding** (`width`, `flexGrow`, `gap`) writes a property
   and runs layout again from the nearest node that can absorb it.
-- **A paint binding** — `backgroundColor`, `opacity` — writes a property
+- **A paint binding** (`backgroundColor`, `opacity`) writes a property
   and repaints without touching layout.
-- **A children binding** — an Observable of a list — mounts and unmounts
+- **A children binding** (an Observable of a list) mounts and unmounts
   components, which is the one case where bodies run again, for the
   items that are new.
 
@@ -69,8 +69,8 @@ only time. Three things mount a component:
 3. A route change, or any other place a component appears in a tree
    that was not there before.
 
-Everything else — every value, every colour, every size — is a write
-into a node that already exists.
+Everything else, every value and colour and size, is a write into a
+node that already exists.
 
 ```ts
 // Runs once, when the row is mounted.
@@ -80,7 +80,7 @@ const format = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 });
 return Text({ text: reading.pipe(map(value => format.format(value))) });
 ```
 
-That distinction — outside the binding, once; inside it, per emission —
+That distinction, outside the binding once and inside it per emission,
 is the whole performance model, and it is visible in the source rather
 than in a profiler.
 

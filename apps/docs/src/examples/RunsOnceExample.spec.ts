@@ -7,8 +7,8 @@ import '@gesso/testing/matchers';
 import { resetBodyCount, RunsOnce } from './RunsOnceExample';
 
 /**
- * The page claims a number — four component bodies, however many times
- * the readings change — so the spec asserts that number rather than
+ * The page claims a number: four component bodies, however many times
+ * the readings change. So the spec asserts that number rather than
  * something adjacent to it.
  */
 describe('the docs runs-once example', () => {

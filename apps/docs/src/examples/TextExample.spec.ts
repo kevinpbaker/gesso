@@ -28,7 +28,7 @@ describe('the docs text example', () => {
     // Same nodes, re-wrapped: the paragraph needed more lines.
     expect(narrow.body).toBeGreaterThan(wide.body);
     // The title is clamped, so it cannot answer a narrower card by
-    // growing — which is the whole point of `maxLines`.
+    // growing, which is the whole point of `maxLines`.
     expect(narrow.title).toBe(wide.title);
   });
 

@@ -7,8 +7,8 @@ import type { Theme } from 'vitepress';
  *
  * VitePress prerenders every page to HTML at build time, in Node, where
  * there is no `Worker`, no `document` and no `OffscreenCanvas`.
- * `defineClientComponent` defers the import so the module — and the
- * Gesso packages it pulls in — is never loaded during that render.
+ * `defineClientComponent` defers the import so the module, and the
+ * Gesso packages it pulls in, is never loaded during that render.
  */
 export default {
   extends: DefaultTheme,
