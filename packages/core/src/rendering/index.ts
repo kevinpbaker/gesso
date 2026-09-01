@@ -5,7 +5,7 @@ export { CanvasSurface, createCanvasSurface } from './canvas2d/CanvasSurface';
 export type { CanvasHost } from './canvas2d/CanvasSurface';
 export { CanvasTextMeasurer } from './canvas2d/CanvasTextMeasurer';
 export { LayoutInspector, INSPECTOR_HEAT_MS } from './LayoutInspector';
-export type { InspectorOverlay } from './LayoutInspector';
+export type { InspectorOverlay, LayoutInspectorOptions } from './LayoutInspector';
 export { drawOverlayShapes, labelOrigin, LABEL_PADDING_X } from './OverlayShapes';
 export type { OverlayShape } from './OverlayShapes';
 export { decorationColor, decorationRect, hasDecorationPhase, paintsAfterChildren } from './Decorations';

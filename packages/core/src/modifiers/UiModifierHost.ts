@@ -48,6 +48,22 @@ export interface UiModifierHost {
    */
   on(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   /**
+   * Listens to input anywhere in the tree, unregistered on detach.
+   *
+   * The listener is registered on the graph's root, in the capture
+   * phase by default, so it runs before the node the event is going to
+   * and sees events that never reach this modifier's own node at all.
+   * That last part is the whole reason it exists: "the person pressed
+   * somewhere else" is not observable from a listener on the node the
+   * press missed.
+   *
+   * Use it only for that. A modifier that listens at the root for
+   * something it could hear at its own node makes every event in the
+   * application walk one more listener, and there is one of these per
+   * attached instance.
+   */
+  onRoot(type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
+  /**
    * Registers something to release when the modifier detaches.
    * Teardowns run in reverse order, as a stack unwinds.
    */

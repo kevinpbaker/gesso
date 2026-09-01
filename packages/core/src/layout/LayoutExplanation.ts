@@ -37,7 +37,22 @@ export interface LayoutExplanation {
   readonly state: LayoutStateExplanation;
   /** Scroll facts, for a scroll container or a field that scrolls its text. */
   readonly scroll?: { scrollX: number; scrollY: number; contentWidth: number; contentHeight: number };
+  /**
+   * For each property a modifier is writing, who is writing it and what
+   * the element declared. Undefined when no modifier writes anything.
+   *
+   * L8 made layout explain itself and B1 then let a modifier change the
+   * numbers it explains, which without this makes the explanation lie
+   * by omission: `width 240 (explicit)` is true of the node and says
+   * nothing about the element saying 200. Every property is listed,
+   * not only the two the axes are about, because "why is it that
+   * colour" has the same answer and no other tool gives it.
+   */
+  readonly sources?: OverrideSources;
 }
+
+/** Property name to a sentence naming the modifiers that write it. */
+export type OverrideSources = Readonly<Record<string, string>>;
 
 export interface Edges {
   readonly top: number;
@@ -410,6 +425,44 @@ function formatEdges(edges: Edges): string {
 }
 
 /** A node named the way the explanation names every node: type and id. */
+/**
+ * Who is writing over what the element declared, per property.
+ *
+ * Reads `node.overrides`, which the cascade already keeps: every entry
+ * carries the name of the modifier kind that wrote it, in the order
+ * the element listed them, and the last one is the value in force.
+ * Nothing is computed that the write did not already record.
+ */
+export function describeOverrides(node: UiNode): OverrideSources | undefined {
+  if (node.overrides === null || node.overrides.size === 0) {
+    return undefined;
+  }
+  const out: Record<string, string> = {};
+  for (const [property, overrides] of node.overrides) {
+    if (overrides.entries.length === 0) {
+      continue;
+    }
+    const names = overrides.entries.map(entry => entry.name);
+    // The last one wins, so it is named last, and the rest are named as
+    // what it won against: "set by hoverable, then draggable" reads in
+    // the order the element listed them.
+    const who = names.length === 1 ? `set by ${names[0]}` : `set by ${names.join(', then ')}`;
+    // `describeLength` prints a length in every form the engine has and
+    // JSON-quotes anything that is not one, so it serves a colour or a
+    // set of visual states as well as it serves a width.
+    const declared = overrides.declared.present
+      ? `declared ${describeLength(overrides.declared.value)}`
+      : 'the element declared none';
+    out[property] = `${who} (${declared})`;
+  }
+  return Object.keys(out).length === 0 ? undefined : out;
+}
+
+/** The axis explanation with its override source as a last reason. */
+export function withOverrideSource(axis: AxisExplanation, source: string | undefined): AxisExplanation {
+  return source === undefined ? axis : { ...axis, reasons: [...axis.reasons, source] };
+}
+
 export function labelNode(node: UiNode): string {
   return `${node.type} '${node.id}'`;
 }
@@ -468,6 +521,14 @@ export function formatExplanation(explanation: LayoutExplanation): string {
       relayout.contentMatters ? 'matters to the parent' : 'stays inside'
     } · a change here is laid out from ${rootLabel}`
   );
+  // The two axes already carry theirs, on the line that explains the
+  // number they changed.
+  const others = Object.entries(explanation.sources ?? {}).filter(
+    ([property]) => property !== 'width' && property !== 'height'
+  );
+  if (others.length > 0) {
+    lines.push(`overrides: ${others.map(([property, source]) => `${property} ${source}`).join(' · ')}`);
+  }
   const measuredNote =
     state.measuredLastPass === undefined
       ? ''

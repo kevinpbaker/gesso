@@ -21,6 +21,7 @@ const CONTENT_FILL = 'rgba(76, 141, 255, 0.18)';
 const PADDING_FILL = 'rgba(46, 168, 138, 0.35)';
 const MARGIN_FILL = 'rgba(217, 155, 58, 0.3)';
 const RELAYOUT_STROKE = 'rgba(168, 85, 247, 0.9)';
+const DECORATION_STROKE = 'rgba(46, 168, 138, 0.95)';
 const LABEL_FILL = 'rgba(13, 17, 23, 0.92)';
 const LABEL_TEXT = '#e6edf3';
 const LABEL_FONT_SIZE = 10;
@@ -71,13 +72,32 @@ export interface InspectorOverlay {
  * so a heatmap row that scrolled out of its list is not drawn over the
  * content below it.
  */
+export interface LayoutInspectorOptions {
+  /**
+   * The modifiers attached to a node, in list order, so the label can
+   * name them.
+   *
+   * Supplied rather than read, because a node has no backpointer to
+   * its modifiers: the set lives in the builder, keyed by node, and
+   * `packages/core/src/rendering` must not depend on the builder to
+   * paint a debugging label. The runtime passes
+   * `node => builder.modifiersFor(node)?.names ?? []`; a caller that
+   * does not pass it gets an inspector that says nothing about
+   * modifiers, which is what it said before B5.
+   */
+  readonly modifierNames?: (node: UiNode) => readonly string[];
+}
+
 export class LayoutInspector {
   private enabled = false;
   private hovered: UiNode | null = null;
   /** When each node was last measured, for the heatmap. */
   private readonly heat = new Map<UiNode, number>();
 
-  constructor(private readonly engine: LayoutEngine) {}
+  constructor(
+    private readonly engine: LayoutEngine,
+    private readonly options: LayoutInspectorOptions = {}
+  ) {}
 
   get isEnabled(): boolean {
     return this.enabled;
@@ -232,11 +252,29 @@ export class LayoutInspector {
     );
     // Border box outline, drawn even for a zero-sized node so it can be found.
     out.push({ kind: 'stroke', ...box, color: HOVER_STROKE, lineWidth: 1 });
+    // Decorations in their own colour, because the whole point of one
+    // is that it is not the box: a focus ring sits outside the border
+    // box and would otherwise read as the node being bigger than it is.
+    for (const shape of node.decorations ?? []) {
+      const outset = shape.outset ?? 0;
+      out.push({
+        kind: 'stroke',
+        x: box.x + (shape.x ?? 0) - outset,
+        y: box.y + (shape.y ?? 0) - outset,
+        width: (shape.width ?? box.width) + outset * 2,
+        height: (shape.height ?? box.height) + outset * 2,
+        color: DECORATION_STROKE,
+        lineWidth: 1
+      });
+    }
 
+    const modifiers = this.options.modifierNames?.(node) ?? [];
     out.push({
       kind: 'label',
       box,
-      text: `${labelNode(node)} ${formatNumber(box.width)}×${formatNumber(box.height)}`,
+      text: `${labelNode(node)} ${formatNumber(box.width)}×${formatNumber(box.height)}${
+        modifiers.length === 0 ? '' : ` · ${modifiers.join(', ')}`
+      }`,
       font: LABEL_FONT,
       fontSize: LABEL_FONT_SIZE,
       fontFamily: LABEL_FONT_FAMILY,

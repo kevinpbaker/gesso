@@ -32,7 +32,14 @@ export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
 export { Select, type SelectProps, type SelectOption } from './Select';
-export { Tooltip, type TooltipProps } from './Tooltip';
+export {
+  Tooltip,
+  tooltip,
+  tooltipContent,
+  type TooltipArgs,
+  type TooltipModifierOptions,
+  type TooltipProps
+} from './Tooltip';
 export { Toast, type ToastProps } from './Toast';
 export { LazyList, type LazyListProps } from './LazyList';
 export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';

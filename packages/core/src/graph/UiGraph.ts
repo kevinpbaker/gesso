@@ -318,6 +318,24 @@ export class UiGraph {
     this.unbind(binding);
   }
 
+  /**
+   * A modifier threw in `attach`, `update` or `detach`.
+   *
+   * Reported here rather than allowed to propagate for the reason a
+   * binding error is: the throw happens inside the builder, halfway
+   * through reconciling a subtree, and letting it out leaves the tree
+   * partly built with no way back. The caller detaches the modifier,
+   * so the node keeps whatever the element declared and the rest of
+   * the frame goes on.
+   *
+   * Like `handleBindingError`, this reaches the console and not the
+   * error overlay. Both should, and neither does; that is one channel
+   * to add, not two.
+   */
+  public handleModifierError(name: string, node: UiNode, phase: 'attach' | 'update' | 'detach', error: unknown): void {
+    console.error(`UI modifier '${name}' threw in ${phase} on node '${node.id}'`, error);
+  }
+
   public getBindingsForNode(node: UiNode): UiBinding<unknown>[] {
     const byProperty = this.nodeBindings.get(node);
     return byProperty === undefined ? [] : [...byProperty.values()];

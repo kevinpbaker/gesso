@@ -24,7 +24,7 @@ import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
 import { accumulatedOffsetTo } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
-import { buildAxisExplanation, labelNode } from './LayoutExplanation';
+import { buildAxisExplanation, describeOverrides, labelNode, withOverrideSource } from './LayoutExplanation';
 import type { AxisFacts, FlexFacts, LayoutExplanation } from './LayoutExplanation';
 
 /** How long overlay scrollbars stay after the last scroll change. */
@@ -272,8 +272,9 @@ export class LayoutEngine {
         childCount
       };
     };
-    const width = buildAxisExplanation(facts('width'));
-    const height = buildAxisExplanation(facts('height'));
+    const sources = describeOverrides(node);
+    const width = withOverrideSource(buildAxisExplanation(facts('width')), sources?.width);
+    const height = withOverrideSource(buildAxisExplanation(facts('height')), sources?.height);
     this.percentBase = savedBase;
 
     const position = rec.absolute ? 'absolute' : rec.sticky ? 'sticky' : rec.positioned ? 'relative' : 'static';
@@ -308,7 +309,8 @@ export class LayoutEngine {
               contentWidth: rec.contentWidth,
               contentHeight: rec.contentHeight
             }
-          : undefined
+          : undefined,
+      sources
     };
   }
 

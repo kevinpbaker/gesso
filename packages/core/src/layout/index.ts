@@ -12,10 +12,18 @@ export {
 } from './Scrollbars';
 export { LayoutRecord } from './LayoutRecord';
 export { LayoutNotifier } from './LayoutNotifier';
-export { formatExplanation, formatConstraints, describeLength, labelNode } from './LayoutExplanation';
+export {
+  formatExplanation,
+  formatConstraints,
+  describeLength,
+  describeOverrides,
+  labelNode,
+  withOverrideSource
+} from './LayoutExplanation';
 export type {
   LayoutExplanation,
   AxisExplanation,
+  OverrideSources,
   SizeDecision,
   RelayoutExplanation,
   LayoutStateExplanation,

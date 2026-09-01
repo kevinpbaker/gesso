@@ -24,6 +24,18 @@ import { resolveProperty } from '../properties/UiPropertyResolver';
 import { isUiModifier, type UiModifier, type UiModifierKind } from './UiModifier';
 import type { UiModifierHost, UiModifierTeardown } from './UiModifierHost';
 
+/**
+ * A modifier named a property that is not in the registry.
+ *
+ * Its own class because it is the one failure a modifier can raise
+ * that must **not** be contained: an unknown property name is a typo,
+ * caught the moment the modifier runs, and the registry's closedness
+ * is what makes that a hard error rather than a silently ignored
+ * write. Everything else a modifier throws is contained, reported and
+ * detached; this is rethrown.
+ */
+export class UiUnknownModifierPropertyError extends Error {}
+
 /** One attached instance: its slot, its current arguments, its host. */
 interface Attached {
   readonly kind: UiModifierKind<unknown>;
@@ -128,11 +140,17 @@ export class UiModifierSet {
       const slot = modifier.key ?? ordinal;
       const match = previous.find(entry => entry.kind.key === kind.key && entry.slot === slot && !taken.has(entry));
       if (match === undefined) {
-        next.push(this.attach(kind, slot, modifier.args));
+        const attached = this.attach(kind, slot, modifier.args);
+        if (attached !== null) {
+          next.push(attached);
+        }
         continue;
       }
       taken.add(match);
-      next.push(this.update(match, modifier.args));
+      const updated = this.update(match, modifier.args);
+      if (updated !== null) {
+        next.push(updated);
+      }
     }
 
     for (const [order, entry] of next.entries()) {
@@ -158,7 +176,16 @@ export class UiModifierSet {
     this.attached = [];
   }
 
-  private attach(kind: UiModifierKind<unknown>, slot: string | number, args: unknown): Attached {
+  /**
+   * Attaches one modifier, or reports it and returns null.
+   *
+   * A modifier that throws while attaching had already been able to
+   * write properties, register listeners and own teardowns, so the
+   * half-attached host is released rather than dropped: without that,
+   * the overrides it wrote would stay on the node with nothing left to
+   * take them off again.
+   */
+  private attach(kind: UiModifierKind<unknown>, slot: string | number, args: unknown): Attached | null {
     const host = new Host(this.node, this.graph, kind.name, () => this.decorationsFor(), {
       dispatcher: this.dispatcher,
       layout: this.layout,
@@ -168,11 +195,20 @@ export class UiModifierSet {
       sharedElements: this.sharedElements
     });
     const entry: Attached = { kind, slot, host, args };
-    kind.attach(host, args);
+    try {
+      kind.attach(host, args);
+    } catch (error) {
+      host.release();
+      if (error instanceof UiUnknownModifierPropertyError) {
+        throw error;
+      }
+      this.graph.handleModifierError(kind.name, this.node, 'attach', error);
+      return null;
+    }
     return entry;
   }
 
-  private update(entry: Attached, args: unknown): Attached {
+  private update(entry: Attached, args: unknown): Attached | null {
     if (Object.is(entry.args, args)) {
       return entry;
     }
@@ -185,12 +221,32 @@ export class UiModifierSet {
     }
     const previous = entry.args;
     entry.args = args;
-    entry.kind.update(entry.host, args, previous);
+    try {
+      entry.kind.update(entry.host, args, previous);
+    } catch (error) {
+      this.detachOne(entry);
+      if (error instanceof UiUnknownModifierPropertyError) {
+        throw error;
+      }
+      this.graph.handleModifierError(entry.kind.name, this.node, 'update', error);
+      return null;
+    }
     return entry;
   }
 
   private detachOne(entry: Attached): void {
-    entry.kind.detach?.(entry.host);
+    try {
+      entry.kind.detach?.(entry.host);
+    } catch (error) {
+      if (error instanceof UiUnknownModifierPropertyError) {
+        entry.host.release();
+        throw error;
+      }
+      this.graph.handleModifierError(entry.kind.name, this.node, 'detach', error);
+    }
+    // Outside the catch: the host's own release is the framework's, and
+    // it is what restores the node. A modifier's `detach` failing must
+    // not leave an override behind.
     entry.host.release();
   }
 }
@@ -248,14 +304,18 @@ class Host implements UiModifierHost {
   get<T>(property: string): T {
     const definition = findPropertyDefinition<T>(property);
     if (definition === undefined) {
-      throw new Error(`Modifier '${this.name}' read unknown property '${property}' on node '${this.node.id}'.`);
+      throw new UiUnknownModifierPropertyError(
+        `Modifier '${this.name}' read unknown property '${property}' on node '${this.node.id}'.`
+      );
     }
     return resolveProperty(this.node, definition);
   }
 
   set(property: string, value: unknown): void {
     if (findPropertyDefinition(property) === undefined) {
-      throw new Error(`Modifier '${this.name}' wrote unknown property '${property}' on node '${this.node.id}'.`);
+      throw new UiUnknownModifierPropertyError(
+        `Modifier '${this.name}' wrote unknown property '${property}' on node '${this.node.id}'.`
+      );
     }
     this.subscriptions.get(property)?.unsubscribe();
     this.subscriptions.delete(property);
@@ -289,6 +349,22 @@ class Host implements UiModifierHost {
     }
     dispatcher.addEventListener(this.node, type, listener, options);
     this.own(() => dispatcher.removeEventListener(this.node, type, listener, options));
+  }
+
+  onRoot(type: UiEventType, listener: UiEventListener, options: UiEventListenerOptions = { capture: true }): void {
+    const dispatcher = this.services.dispatcher;
+    if (dispatcher === undefined) {
+      warnMissingDispatcher(this.name);
+      return;
+    }
+    // The graph's root, which is above the layout root and therefore
+    // above both the application's tree and the overlay layer beside
+    // it. A press on a menu opened over the page is dispatched into
+    // the overlay layer, and a modifier on the page still has to hear
+    // about it.
+    const root = this.graph.root;
+    dispatcher.addEventListener(root, type, listener, options);
+    this.own(() => dispatcher.removeEventListener(root, type, listener, options));
   }
 
   layoutBox(): LayoutBox | null {
