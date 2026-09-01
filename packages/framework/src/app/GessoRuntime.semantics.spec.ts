@@ -117,6 +117,74 @@ describe('GessoRuntime semantics', () => {
     expect(labels(seen)).toEqual(['Save']);
   });
 
+  describe('a bound string', () => {
+    it('updates the record a screen reader reads, not only the pixels', () => {
+      // The defect this exists for: `text` marked the node dirty for
+      // content and layout but not for semantics, so a counter
+      // repainted and the mirror went on reading the number it first
+      // saw. Nothing caught it, because what a press changes in the
+      // other specs is a role or a state rather than prose.
+      const count = new BehaviorSubject(0);
+      const patches: UiSemanticsPatch[][] = [];
+      const { frame } = mountRuntime(Column(Text({ text: count.pipe(map(value => `Clicks: ${value}`)) })), {
+        onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches]))
+      });
+      frame(0);
+      expect(labels(patches[0])).toEqual(['Clicks: 0']);
+
+      count.next(1);
+      frame();
+
+      expect(patches).toHaveLength(2);
+      expect(labels(patches[1])).toEqual(['Clicks: 1']);
+    });
+
+    it('updates the name a parent takes from its child', () => {
+      // A container's accessible name is built from its children's
+      // text, so a change below it has to reach the record above it.
+      const label = new BehaviorSubject('Save');
+      const patches: UiSemanticsPatch[][] = [];
+      const { frame } = mountRuntime(Column(Button({}, Text({ text: label }))), {
+        onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches]))
+      });
+      frame(0);
+
+      label.next('Saving');
+      frame();
+
+      const names = patches.flat().map(patch => (patch.op === 'remove' ? undefined : patch.node.label));
+      expect(names).toContain('Saving');
+    });
+
+    it('costs nothing while no mirror is listening, and is current when one asks', () => {
+      // The other half of the fix: `text` now marks semantics dirty on
+      // every bound label, so a runtime with no mirror must not walk
+      // the tree once a frame for nobody.
+      const count = new BehaviorSubject(0);
+      const mounted = mountRuntime(Column(Text({ text: count.pipe(map(value => `Clicks: ${value}`)) })));
+      mounted.frame(0);
+      count.next(7);
+      mounted.frame();
+
+      // Built on demand rather than per frame, and current when built.
+      const tree = [...mounted.runtime.semanticsTree().values()];
+      expect(tree.map(record => record.label)).toEqual(['Clicks: 7']);
+    });
+
+    it('hands a mirror attached later the tree as it is now', () => {
+      const count = new BehaviorSubject(0);
+      const patches: UiSemanticsPatch[][] = [];
+      const mounted = mountRuntime(Column(Text({ text: count.pipe(map(value => `Clicks: ${value}`)) })));
+      mounted.frame(0);
+      count.next(3);
+      mounted.frame();
+
+      mounted.runtime.onSemantics(update => patches.push([...update.patches]));
+
+      expect(labels(patches[0])).toEqual(['Clicks: 3']);
+    });
+  });
+
   describe('the accessibility mirror (F6b)', () => {
     it('sends every mirrored node a box, and afterwards only the ones that moved', () => {
       const gap$ = new BehaviorSubject(0);

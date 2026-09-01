@@ -108,7 +108,7 @@ describe('UiGraph with UiScheduler', () => {
       expect(onFrame).toHaveBeenCalledTimes(1);
       const frame = onFrame.mock.calls[0][0];
       expect(frame.nodes).toContain(node);
-      expect(frame.dirtyFlagsFor(node)).toBe(DirtyFlags.Content | DirtyFlags.Layout);
+      expect(frame.dirtyFlagsFor(node)).toBe(DirtyFlags.Content | DirtyFlags.Layout | DirtyFlags.Semantics);
     });
 
     it('does not schedule a frame for an unchanged rebuild', () => {

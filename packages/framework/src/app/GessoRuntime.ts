@@ -354,6 +354,8 @@ export class GessoRuntime {
    */
   private semanticsBoxes = new Map<string, LayoutBox>();
   private lastFocusedId: string | null = null;
+  /** A frame changed semantics while nothing was listening; see `semanticsTree`. */
+  private semanticsStale = false;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1047,7 +1049,7 @@ export class GessoRuntime {
   }
 
   private semanticsOf(node: UiNode): UiSemanticsReport | undefined {
-    const record = this.semantics.get(node.id);
+    const record = this.semanticsTree().get(node.id);
     if (record === undefined) {
       return undefined;
     }
@@ -1319,6 +1321,11 @@ export class GessoRuntime {
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void {
     this.semanticsListener = listener;
     this.semanticsBoxes.clear();
+    if (listener !== null) {
+      // Frames that ran while nothing was listening left it stale, and
+      // a mirror must not be handed a tree from before them.
+      this.semanticsTree();
+    }
     if (listener === null || this.semantics.size === 0) {
       // Nothing to catch up on: a listener attached before the first
       // frame hears about the tree when the frame builds it.
@@ -1334,8 +1341,18 @@ export class GessoRuntime {
     });
   }
 
-  /** The semantics tree as of the last frame that changed it. */
+  /**
+   * The semantics tree as of the last frame that changed it.
+   *
+   * Rebuilt here when no mirror was listening and a frame marked it
+   * stale, so a test or a devtools panel sees the current tree without
+   * every frame having paid to keep one nothing was reading.
+   */
   semanticsTree(): UiSemanticsMap {
+    if (this.semanticsStale) {
+      this.semantics = buildSemanticsTree(this.layoutRoot());
+      this.semanticsStale = false;
+    }
     return this.semantics;
   }
 
@@ -1388,12 +1405,21 @@ export class GessoRuntime {
    */
   private updateSemantics(rebuild: boolean, moved: boolean): void {
     let patches: readonly UiSemanticsPatch[] = EMPTY_PATCHES;
-    if (rebuild) {
-      const next = buildSemanticsTree(this.layoutRoot());
-      patches = diffSemantics(this.semantics, next);
-      this.semantics = next;
-    }
     const listener = this.semanticsListener;
+    if (rebuild) {
+      if (listener === null) {
+        // Nobody is reading it. Building and diffing the tree would be
+        // a walk of every node for no one, on frames that are now far
+        // more common than they were: `text` marks semantics dirty, so
+        // any bound label does this. The work moves to whoever asks.
+        this.semanticsStale = true;
+      } else {
+        const next = buildSemanticsTree(this.layoutRoot());
+        patches = diffSemantics(this.semantics, next);
+        this.semantics = next;
+        this.semanticsStale = false;
+      }
+    }
     if (listener === null) {
       return;
     }

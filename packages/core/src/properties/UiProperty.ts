@@ -982,7 +982,12 @@ export const UiProperties = {
     name: 'text',
     defaultValue: undefined,
     inherited: false,
-    affects: C | L
+    // Semantics too, for the reason `value` carries it: a node's
+    // accessible name is its `label` if it has one and its text
+    // otherwise, and a name that never changes is worse than no name.
+    // Without this a bound counter repainted and a screen reader went
+    // on reading the number it first saw, forever.
+    affects: C | L | S
   }),
 
   image: defineProperty<UiImage | undefined>({
