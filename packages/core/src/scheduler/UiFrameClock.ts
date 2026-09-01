@@ -93,6 +93,12 @@ const CADENCE_SAMPLES = 5;
 /** Above this, a gap between ticks is a hiccup rather than a display's rate. */
 const MAX_CADENCE_MS = 50;
 
+/**
+ * How many refresh intervals the watchdog waits before calling a host
+ * stalled. See `watchMs` for why one is not enough.
+ */
+const WATCH_REFRESHES = 2;
+
 const IDLE_TICKS_BEFORE_STOP = 4;
 
 export interface UiHostFrameClockOptions {
@@ -199,6 +205,11 @@ export class UiHostFrameClock implements UiFrameClock {
   /** The time the last tick carried, for measuring the display's interval. */
   private lastTickTime: UiFrameTime | null = null;
   /**
+   * The host's clock minus this thread's, or null before a tick has
+   * shown what it is. See `hostTime`.
+   */
+  private hostOffset: number | null = null;
+  /**
    * The last few intervals between ticks, in arrival order.
    *
    * The watch is set from the *median* of them. The largest was the
@@ -267,7 +278,7 @@ export class UiHostFrameClock implements UiFrameClock {
         // A tick would have cleared this timer, so its firing is the
         // evidence that none came.
         this.stalled = this.hosted;
-        this.deliver(this.now());
+        this.deliver(this.hostTime());
       },
       watching ? this.watchMs() : this.selfPaceMs()
     );
@@ -276,27 +287,67 @@ export class UiHostFrameClock implements UiFrameClock {
   /**
    * How long to wait for a tick before concluding none is coming.
    *
-   * Twice the widest gap seen recently between refreshes: a live host
-   * always beats that, and a blocked one is noticed a frame or so
-   * after it stops rather than a fixed tenth of a second later. The
-   * ceiling applies until enough ticks have arrived to say — which is
-   * three, because two timestamps make one interval and one interval
-   * is not evidence of a cadence.
+   * Two refreshes: a live host always beats that, and a blocked one is
+   * noticed a frame or two after it stops rather than a fixed tenth of
+   * a second later. The ceiling applies until enough ticks have
+   * arrived to say, which is three, because two timestamps make one
+   * interval and one interval is not evidence of a cadence.
+   *
+   * One refresh was tried first and is the bug this constant exists to
+   * record. The reasoning was that the timer is armed after the frame
+   * the tick delivered has done its work, so the next tick is already
+   * due by the deadline and wins the race whenever the host is alive.
+   * It is not: `requestFrame` is called from the runtime's
+   * `beforeCollect`, at the *start* of the frame, so the deadline
+   * falls a few microseconds after the next tick is due rather than a
+   * whole frame's work after it. The race is then decided by the
+   * jitter on one `postMessage`, and the watchdog fires on a large
+   * share of ordinary frames.
+   *
+   * It went unseen because the floor hides it on a fast display: at
+   * 165Hz a 6ms cadence is raised to `minStallMs`, which is already
+   * two refreshes, while at 60Hz a 16.7ms cadence is passed through
+   * untouched. Scrolling was smooth on the one panel and ran at a
+   * third of the rate on the other, which is exactly the asymmetry
+   * this arithmetic produces.
    */
   private watchMs(): number {
     const cadence = this.cadenceMs();
     if (cadence === null) {
       return this.stallMs;
     }
-    // One refresh, and no more. The timer is armed when a frame
-    // *finishes*, which is already after that frame's tick arrived, so
-    // the next tick is due before this deadline and wins the race
-    // whenever the host is alive — `setTimeout` is late by a
-    // millisecond or so on top. A host that has stopped is therefore
-    // noticed a single refresh after it stops, which is the least that
-    // is knowable: nothing in a worker can see a refresh that did not
-    // happen any sooner than the moment it was due.
-    return Math.min(this.stallMs, Math.max(this.minStallMs, cadence));
+    return Math.min(this.stallMs, Math.max(this.minStallMs, cadence * WATCH_REFRESHES));
+  }
+
+  /**
+   * This thread's own clock, expressed on the host's.
+   *
+   * A tick carries the host's `requestAnimationFrame` timestamp, and a
+   * self-paced frame has only `performance.now()` to offer. In a
+   * worker those are not the same clock: `performance.now()` counts
+   * from the worker's own creation, so it trails the shell's by the
+   * page's age at the moment the worker was spawned, which is hundreds
+   * of milliseconds in practice.
+   *
+   * Handing that raw reading to `onFrame` puts a timestamp from a
+   * different origin into a stream of host ones, and everything
+   * downstream reads the pair as a jump backwards through time. The
+   * runtime's animation phase declines to sample, because every
+   * running animation is due later than a `now` that far in the past,
+   * and then arms its next wake-up for `next - now`, which is the
+   * whole offset. One self-paced frame therefore silences the
+   * animation clock for as long as the worker is young. A scroll
+   * spring stops being advanced by the frame loop and only moves when
+   * something else dirties the graph.
+   *
+   * So the offset is learned from every tick and added back here.
+   * Before the first tick there is nothing to learn from and no host
+   * timestamp has been delivered either, so the local reading is the
+   * base and the first tick shifts it forward once.
+   */
+  private hostTime(): number {
+    const local = this.now();
+    return this.hostOffset === null ? local : local + this.hostOffset;
   }
 
   /** The median recent interval, or null before there are enough to say. */
@@ -340,6 +391,11 @@ export class UiHostFrameClock implements UiFrameClock {
   tick(time: UiFrameTime): void {
     this.hosted = true;
     this.stalled = false;
+    // Every tick, not just the first: the two clocks drift, and a tab
+    // that was suspended resumes with a different offset entirely.
+    // Reading it here costs one subtraction and keeps a self-paced
+    // frame on the same timeline as the ticks around it.
+    this.hostOffset = time - this.now();
     this.recordCadence(time);
     this.clearFallback();
     if (!this.pending) {

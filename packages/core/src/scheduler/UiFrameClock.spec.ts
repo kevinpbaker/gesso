@@ -373,20 +373,23 @@ describe('UiHostFrameClock', () => {
 
       // Four refreshes at 16 ms: a 60Hz host, plainly stated.
       for (let i = 0; i < 5; i++) {
+        now = i * 16;
         clock.requestFrame();
         clock.tick(i * 16);
       }
       clock.requestFrame();
 
-      // Nothing at 12 ms — inside the refresh, so still watching.
-      now = 100;
-      vi.advanceTimersByTime(12);
+      // Nothing at 30 ms, which is inside the two refreshes a live
+      // host is allowed, so still watching.
+      now = 64 + 30;
+      vi.advanceTimersByTime(30);
       expect(frames).toHaveLength(5);
 
-      // And drawn a refresh after the last tick, not at the ceiling.
-      vi.advanceTimersByTime(6);
+      // And drawn two refreshes after the last tick, not at the ceiling.
+      now = 64 + 33;
+      vi.advanceTimersByTime(3);
       expect(frames).toHaveLength(6);
-      expect(frames.at(-1)).toBe(100);
+      expect(frames.at(-1)).toBe(97);
     } finally {
       vi.useRealTimers();
     }
@@ -445,15 +448,102 @@ describe('UiHostFrameClock', () => {
       // Five refreshes at 16 ms with one 45 ms hitch in the middle.
       const times = [0, 16, 32, 77, 93, 109];
       for (const time of times) {
+        now = time;
         clock.requestFrame();
         clock.tick(time);
       }
       clock.requestFrame();
 
-      // The median is still 16, so the watch is ~16 and not ~90.
-      now = 200;
-      vi.advanceTimersByTime(30);
+      // The median is still 16, so the watch is ~32 and not ~90.
+      now = 109 + 25;
+      vi.advanceTimersByTime(25);
+      expect(frames).toHaveLength(times.length);
+      now = 109 + 40;
+      vi.advanceTimersByTime(15);
       expect(frames).toHaveLength(times.length + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not call a live 60Hz host stalled when its ticks jitter', () => {
+    // The bug this guards. The watchdog was one refresh wide, and the
+    // runtime asks for its next frame from inside the frame the tick
+    // delivered, not after that frame's work — so the deadline fell
+    // microseconds after the next tick was due and the race was
+    // decided by the jitter on one `postMessage`. On a 60Hz panel it
+    // fired on a large share of frames; on a 165Hz one the `minStall`
+    // floor already bought two refreshes and hid it, which is why
+    // scrolling was smooth on one monitor and ran at a third of the
+    // rate on the other.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      let now = 0;
+      let request = (): void => {};
+      const clock = new UiHostFrameClock(
+        time => {
+          frames.push(time);
+          // Where the runtime asks: inside the frame, before its work.
+          request();
+        },
+        () => {},
+        { fallbackMs: 16, stallMs: 100, minStallMs: 12, now: () => now }
+      );
+      request = () => clock.requestFrame();
+      clock.requestFrame();
+
+      // A 60Hz display forwarded across a port that adds a little to
+      // each arrival, which is every real render worker.
+      const jitter = [0, 1.5, 0.4, 2.1, 0.8, 1.2, 0.3, 1.9, 0.6, 1.1];
+      const ticks = jitter.map((_, i) => i * 16.7);
+      for (const [i, tick] of ticks.entries()) {
+        const arrival = tick + jitter[i]!;
+        vi.advanceTimersByTime(arrival - now);
+        now = arrival;
+        clock.tick(tick);
+      }
+
+      // Every frame came from a tick and none from the timer.
+      expect(frames).toEqual(ticks);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('paces a stalled host on the host clock rather than its own', () => {
+    // A worker's `performance.now()` counts from the worker's own
+    // creation, so it trails the shell's timestamps by the page's age
+    // at that moment. A raw local reading delivered in among host ones
+    // reads downstream as a jump backwards through time, and the
+    // runtime answers that by arming its next animation wake-up the
+    // whole offset away: one self-paced frame stops a scroll spring
+    // being advanced for as long as the worker is young.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      // This thread's clock, five seconds behind the host's.
+      let now = 0;
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16, stallMs: 100, minStallMs: 12, now: () => now }
+      );
+
+      for (let i = 0; i < 5; i++) {
+        now = i * 16;
+        clock.requestFrame();
+        clock.tick(5000 + i * 16);
+      }
+      clock.requestFrame();
+
+      // The host goes quiet and the watchdog draws two refreshes later.
+      now = 64 + 33;
+      vi.advanceTimersByTime(33);
+      expect(frames).toHaveLength(6);
+      // On the host's timeline, so the frame after the last tick is
+      // later than it rather than five seconds earlier.
+      expect(frames.at(-1)).toBe(5097);
     } finally {
       vi.useRealTimers();
     }
