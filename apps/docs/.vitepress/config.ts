@@ -34,6 +34,7 @@ export default defineConfig({
           { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
           { text: 'Layout basics', link: '/guide/layout-basics' },
           { text: 'Text', link: '/guide/text' },
+          { text: 'Using components', link: '/guide/using-components' },
           { text: 'Light and dark', link: '/guide/appearance' }
         ]
       }
