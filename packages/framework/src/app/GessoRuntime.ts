@@ -1,9 +1,21 @@
 import type { FrameworkChild } from '../ComponentElement';
 import { ComponentHostResolver } from '../ComponentHostResolver';
+import { getComponentMetadata } from '../metadata';
+import {
+  printPropValue,
+  type UiEnvironmentReport,
+  type UiNodeReport,
+  type UiOwnerReport,
+  type UiPropReport,
+  type UiSemanticsReport
+} from './NodeReport';
 import {
   UiGraph,
   UiGraphBuilder,
+  describeOverrides,
+  formatExplanation,
   isComponentLikeElement,
+  type UiEnvironment,
   isObservable,
   type UiElement,
   Stack,
@@ -279,7 +291,8 @@ export class GessoRuntime {
   private rendererErrorListener: ((message: string) => void) | null = null;
   /** WebGPU stage timings of the frame being rendered; null on Canvas2D. */
   private gpuTimings: GpuStageTimings | null = null;
-  private inspectListener: ((text: string | null) => void) | null = null;
+  private inspectListener: ((report: UiNodeReport | null) => void) | null = null;
+  /** The last report's explanation text, which is what tells two reports apart. */
   private lastInspection: string | null = null;
   private cursorListener: ((cursor: string | null) => void) | null = null;
   private lastCursor: string | null = null;
@@ -407,7 +420,12 @@ export class GessoRuntime {
     }
 
     this.engine = new LayoutEngine(this.textMeasurer);
-    this.inspector = new LayoutInspector(this.engine);
+    this.inspector = new LayoutInspector(this.engine, {
+      // Read through `this.builder`, which is assigned below: the
+      // closure runs when a node is hovered, long after the
+      // constructor.
+      modifierNames: node => this.builder.modifiersFor(node)?.names ?? []
+    });
     this.resolver = new ComponentHostResolver(this.services, this.channels);
     this.layoutNotifier = new LayoutNotifier();
     // Built before the tree, not with the rest of the input stack in
@@ -748,21 +766,26 @@ export class GessoRuntime {
     if (enabled) {
       this.inspector.setHovered(this.input.pointer.hoveredNode);
     }
-    // Always sent, so a listener learns the toggle even when the text
-    // happens to match (null before and after).
-    this.lastInspection = this.inspector.explainHoveredText();
-    this.inspectListener?.(this.lastInspection);
+    // Always sent, so a listener learns the toggle even when the
+    // report happens to match (null before and after).
+    const report = this.hoveredReport();
+    this.lastInspection = report?.explanation ?? null;
+    this.inspectListener?.(report);
     if (this.root !== undefined) {
       this.graph.markDirty(this.root, DirtyFlags.Paint);
     }
   }
 
   /**
-   * Receives the hovered node's layout explanation as text whenever it
-   * changes while the inspector is on, and null when nothing is hovered
-   * or the inspector is turned off.
+   * Receives a report on the hovered node whenever it changes while the
+   * inspector is on, and null when nothing is hovered or the inspector
+   * is turned off.
+   *
+   * The report carries `explanation`, which is what this used to send
+   * on its own. It is plain data so that the worker configuration can
+   * post it to a shell that has no access to the tree.
    */
-  onInspect(listener: ((text: string | null) => void) | null): void {
+  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void {
     this.inspectListener = listener;
   }
 
@@ -922,6 +945,118 @@ export class GessoRuntime {
   /** `engine.explain` for any node, for tests and devtools. */
   explain(node: UiNode): LayoutExplanation {
     return this.engine.explain(node);
+  }
+
+  /**
+   * Everything the inspector shows about one node, as plain data
+   * (`ROADMAP.md` F7).
+   *
+   * Built here rather than in `@gesso/devtools` because every source
+   * it reads is private to the render thread and most of it cannot
+   * cross a thread boundary at all: the graph's bindings, the
+   * builder's modifier sets, the resolver's component hosts. The
+   * report is strings, so it can.
+   */
+  inspectNode(node: UiNode): UiNodeReport {
+    const box = this.engine.visibleBox(node);
+    return {
+      id: node.id,
+      type: node.type,
+      box: { x: box.x, y: box.y, width: box.width, height: box.height },
+      owners: this.ownersOf(node),
+      props: this.propsOf(node),
+      environment: this.environmentOf(node),
+      modifiers: this.builder.modifiersFor(node)?.names ?? [],
+      semantics: this.semanticsOf(node),
+      explanation: formatExplanation(this.engine.explain(node))
+    };
+  }
+
+  /** The components that rendered a node, nearest first. */
+  private ownersOf(node: UiNode): UiOwnerReport[] {
+    const owners: UiOwnerReport[] = [];
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      // Asking the resolver rather than matching the id against
+      // `:component:`: it holds a host for exactly the anchors that are
+      // components, and a key with a colon in it would defeat the
+      // string test.
+      const host = this.resolver.hostFor(current.id);
+      if (host !== undefined) {
+        owners.push({ name: getComponentMetadata(host.component).tag, anchorId: current.id });
+      }
+    }
+    return owners;
+  }
+
+  private propsOf(node: UiNode): UiPropReport[] {
+    const sources = describeOverrides(node);
+    const out: UiPropReport[] = [];
+    for (const [name, value] of node.properties) {
+      const source = sources?.[name];
+      if (source !== undefined) {
+        out.push({ name, value: printPropValue(value), origin: 'modifier', source });
+        continue;
+      }
+      const binding = this.graph.getBindingForProperty(node, name);
+      if (binding !== undefined) {
+        out.push({ name, value: printPropValue(value), origin: 'binding', source: `bound (${binding.id})` });
+        continue;
+      }
+      out.push({ name, value: printPropValue(value), origin: 'element' });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }
+
+  /**
+   * Every environment value in force at the node, and whether the node
+   * is the one providing it.
+   *
+   * Walks the chain rather than reading the node's own map, because
+   * the question the inspector answers is "what does this node see",
+   * and most of what it sees was provided by an ancestor.
+   */
+  private environmentOf(node: UiNode): UiEnvironmentReport[] {
+    const environment = node.environment;
+    if (environment === null) {
+      return [];
+    }
+    // A node that provides nothing shares its parent's environment
+    // object rather than getting one of its own, so "does my
+    // environment provide this" is true of every node under a
+    // provider. The question the inspector is asking is narrower:
+    // whether this node is the one that provided it.
+    const own = environment === (node.parent?.environment ?? null) ? null : environment;
+    const seen = new Set<string>();
+    const out: UiEnvironmentReport[] = [];
+    for (let current: UiEnvironment | null = environment; current !== null; current = current.parent) {
+      for (const name of current.providedKeys()) {
+        if (seen.has(name)) {
+          continue;
+        }
+        seen.add(name);
+        out.push({
+          key: name,
+          value: printPropValue(current.getOwn(name)),
+          provided: current === own && own.providesOwn(name)
+        });
+      }
+    }
+    out.sort((a, b) => a.key.localeCompare(b.key));
+    return out;
+  }
+
+  private semanticsOf(node: UiNode): UiSemanticsReport | undefined {
+    const record = this.semantics.get(node.id);
+    if (record === undefined) {
+      return undefined;
+    }
+    return {
+      role: record.role,
+      label: record.label,
+      value: record.valueText ?? (record.valueNow === undefined ? undefined : String(record.valueNow)),
+      states: record.states
+    };
   }
 
   /**
@@ -1835,14 +1970,24 @@ export class GessoRuntime {
     this.scrollabilityListener?.(next, anything);
   }
 
-  /** Hands the listener the hovered node's explanation, when it changed. */
+  /** Hands the listener a report on the hovered node, when it changed. */
   private sendInspection(): void {
+    // Compared on the explanation rather than on the whole report,
+    // because the explanation already changes whenever anything about
+    // the node's geometry does and a deep compare of the report would
+    // cost more than building it.
     const text = this.inspector.explainHoveredText();
     if (text === this.lastInspection) {
       return;
     }
     this.lastInspection = text;
-    this.inspectListener?.(text);
+    this.inspectListener?.(this.hoveredReport());
+  }
+
+  /** A report on whatever the inspector says is hovered, or null. */
+  private hoveredReport(): UiNodeReport | null {
+    const node = this.inspector.hoveredNode;
+    return node === null ? null : this.inspectNode(node);
   }
 
   /**

@@ -11,6 +11,7 @@ import { GessoApp } from './GessoApp';
 import type { RouterRoutes } from '../router/RouterService';
 import type { ShellHistoryOptions } from './shellHistory';
 import type { FrameMetrics, RendererChoice } from './GessoRuntime';
+import type { UiNodeReport } from './NodeReport';
 
 /**
  * Fluent builder for the single-thread configuration.
@@ -19,7 +20,7 @@ export class GessoAppBuilder {
   private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly serviceRegistrations: (new () => object)[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
-  private inspectListener: ((text: string | null) => void) | undefined;
+  private inspectListener: ((report: UiNodeReport | null) => void) | undefined;
   private errorListener:
     | ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void)
     | undefined;
@@ -105,7 +106,7 @@ export class GessoAppBuilder {
    * Receives the hovered node's layout explanation while the inspector
    * is on, mirroring WorkerAppOptions.onInspect.
    */
-  onInspect(listener: (text: string | null) => void): this {
+  onInspect(listener: (report: UiNodeReport | null) => void): this {
     this.inspectListener = listener;
     return this;
   }

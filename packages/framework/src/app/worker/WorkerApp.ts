@@ -1,3 +1,4 @@
+import type { UiNodeReport } from '../NodeReport';
 import type { FrameMetrics, RendererChoice } from '../GessoRuntime';
 import {
   epochFromEvent,
@@ -86,10 +87,14 @@ export interface WorkerAppOptions {
    */
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   /**
-   * Receives the hovered node's layout explanation while the inspector
-   * is on (see `setInspector`), and null when nothing is hovered.
+   * Receives a report on the hovered node while the inspector is on
+   * (see `setInspector`), and null when nothing is hovered.
+   *
+   * The report is built in the worker, where the tree is, and crosses
+   * as plain data; `report.explanation` is the layout explanation this
+   * used to carry on its own.
    */
-  onInspect?: (text: string | null) => void;
+  onInspect?: (report: UiNodeReport | null) => void;
   /**
    * Cancel the browser's Ctrl/Cmd+F on the canvas, so the app's own
    * find bar takes it. Off by default: the browser's find bar cannot
@@ -480,7 +485,7 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'inspect') {
-      this.options.onInspect?.(message.text);
+      this.options.onInspect?.(message.report);
       return;
     }
     if (message.type === 'cursor') {

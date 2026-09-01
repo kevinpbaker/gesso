@@ -295,7 +295,7 @@ describe('RenderWorkerApp', () => {
 });
 
 describe('RenderWorkerApp inspector', () => {
-  it('turns the inspector on from a shell message and reports the hovered explanation', async () => {
+  it('turns the inspector on from a shell message and reports the hovered node', async () => {
     const { host, sent, send } = createFakeWorkerGlobal();
     new RenderWorkerApp(createComponent(WorkerRoot), host);
     send(initMessage(createMockCanvas()));
@@ -303,16 +303,20 @@ describe('RenderWorkerApp inspector', () => {
 
     send({ type: 'inspector', enabled: true });
     // Nothing hovered yet: the shell is told so, and can clear its panel.
-    expect(sent.filter(m => m.type === 'inspect').at(-1)).toEqual({ type: 'inspect', text: null });
+    expect(sent.filter(m => m.type === 'inspect').at(-1)).toEqual({ type: 'inspect', report: null });
 
     // Hover the 200×100 box below the text line.
     send({ type: 'pointerMove', x: 40, y: 40, buttons: 0, modifiers: noKeyModifiers });
     const inspect = sent.filter(m => m.type === 'inspect').at(-1);
-    expect(inspect && 'text' in inspect && inspect.text).toMatch(/^box '.*' — 200 × 100 at/);
-    expect(inspect && 'text' in inspect && inspect.text).toMatch(/width {2}200 {5}width: 200 \(explicit\)/);
+    const report = inspect && 'report' in inspect ? inspect.report : null;
+    expect(report?.type).toBe('box');
+    expect(report?.box).toMatchObject({ width: 200, height: 100 });
+    expect(report?.explanation).toMatch(/width {2}200 {5}width: 200 \(explicit\)/);
+    // The report is what crosses the wire, so it has to be cloneable.
+    expect(structuredClone(report)).toEqual(report);
 
     send({ type: 'inspector', enabled: false });
-    expect(sent.filter(m => m.type === 'inspect').at(-1)).toEqual({ type: 'inspect', text: null });
+    expect(sent.filter(m => m.type === 'inspect').at(-1)).toEqual({ type: 'inspect', report: null });
   });
 });
 

@@ -9,6 +9,7 @@ import {
   type UiFrameClockFactory
 } from '@gesso/core';
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
+import type { UiNodeReport } from './NodeReport';
 import type { ShellRequest } from './ShellService';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
@@ -219,8 +220,8 @@ export class GessoApp {
     this.runtime.setColorScheme(preference);
   }
 
-  /** Receives the hovered node's explanation while the inspector is on. */
-  onInspect(listener: ((text: string | null) => void) | null): void {
+  /** Receives a report on the hovered node while the inspector is on. */
+  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void {
     this.runtime.onInspect(listener);
   }
 

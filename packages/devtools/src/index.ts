@@ -12,6 +12,7 @@
  * action log.
  */
 export { ErrorOverlay, mountErrorOverlay, type ErrorOrigin, type ErrorOverlayOptions } from './ErrorOverlay';
+export { mountNodeInspector, type NodeInspector, type NodeInspectorOptions } from './NodeInspector';
 export {
   mountFrameProfiler,
   summarize,

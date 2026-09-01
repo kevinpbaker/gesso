@@ -389,8 +389,8 @@ export class RenderWorkerApp {
       dpr
     });
     this.runtime.deferPatchesFrom(this.channels.registry.all());
-    this.runtime.onInspect(text => {
-      this.host.postMessage({ type: 'inspect', text });
+    this.runtime.onInspect(report => {
+      this.host.postMessage({ type: 'inspect', report });
     });
     this.runtime.onCursor(cursor => {
       this.host.postMessage({ type: 'cursor', cursor });

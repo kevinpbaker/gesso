@@ -46,6 +46,16 @@ export {
   type UiFramePhase,
   type FramePhaseTimings
 } from './app/GessoRuntime';
+export {
+  formatNodeReport,
+  printPropValue,
+  type UiEnvironmentReport,
+  type UiNodeReport,
+  type UiOwnerReport,
+  type UiPropOrigin,
+  type UiPropReport,
+  type UiSemanticsReport
+} from './app/NodeReport';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellService, type ShellRequest } from './app/ShellService';
 export { RouterService, type RouteMatch, type RouterHistorySink, type RouterRoutes } from './router/RouterService';

@@ -36,20 +36,39 @@ export function mountInspectorPanel(preview: HTMLElement): InspectorPanel {
   };
 }
 
+/** Anything with an action bar; structural, so it needs no import. */
+interface ActionHost {
+  addAction(label: string, onClick: () => void): HTMLButtonElement;
+}
+
 /**
- * Adds the "Inspect layout" toggle to a shell's action bar and keeps its
- * label truthful. `apply` receives the new state.
+ * A two-state button in the action bar whose label says what pressing
+ * it will do, and whose `aria-pressed` says what state it is in.
  */
-export function addInspectAction(
-  shell: { addAction(label: string, onClick: () => void): HTMLButtonElement },
+export function addToggleAction(
+  shell: ActionHost,
+  labels: { readonly off: string; readonly on: string },
   apply: (enabled: boolean) => void
 ): void {
   let enabled = false;
-  const button = shell.addAction('Inspect layout', () => {
+  const button = shell.addAction(labels.off, () => {
     enabled = !enabled;
-    button.textContent = enabled ? 'Stop inspecting' : 'Inspect layout';
+    button.textContent = enabled ? labels.on : labels.off;
     button.setAttribute('aria-pressed', String(enabled));
     apply(enabled);
   });
   button.setAttribute('aria-pressed', 'false');
+}
+
+/**
+ * Adds the "Inspect layout" toggle to a shell's action bar and keeps its
+ * label truthful. `apply` receives the new state.
+ */
+export function addInspectAction(shell: ActionHost, apply: (enabled: boolean) => void): void {
+  addToggleAction(shell, { off: 'Inspect layout', on: 'Stop inspecting' }, apply);
+}
+
+/** Adds the "Profile frames" toggle. */
+export function addProfileAction(shell: ActionHost, apply: (enabled: boolean) => void): void {
+  addToggleAction(shell, { off: 'Profile frames', on: 'Stop profiling' }, apply);
 }

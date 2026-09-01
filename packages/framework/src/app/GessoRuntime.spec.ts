@@ -170,7 +170,7 @@ describe('GessoRuntime layout inspector', () => {
       clock: cb => (clock = new UiManualFrameClock(cb))
     });
     const explanations: (string | null)[] = [];
-    runtime.onInspect(text => explanations.push(text));
+    runtime.onInspect(report => explanations.push(report?.explanation ?? null));
     runtime.start();
     if (clock.isPending) clock.tick(0);
     const ctx = canvas.getContext('2d') as unknown as Record<string, ReturnType<typeof vi.fn>>;

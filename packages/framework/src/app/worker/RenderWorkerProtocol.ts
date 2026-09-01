@@ -1,3 +1,4 @@
+import type { UiNodeReport } from '../NodeReport';
 import type {
   UiKeyModifiers,
   EditingState,
@@ -240,8 +241,8 @@ export type RuntimeToShellMessage =
       gpu: GpuStageTimings | null;
     }
   | { type: 'error'; message: string; stack?: string; source: RuntimeErrorSource }
-  /** The hovered node's layout explanation while the inspector is on; null when nothing is hovered. */
-  | { type: 'inspect'; text: string | null }
+  /** A report on the hovered node while the inspector is on; null when nothing is hovered. */
+  | { type: 'inspect'; report: UiNodeReport | null }
   /** The CSS cursor the hovered node asks for; null for the default arrow. */
   | { type: 'cursor'; cursor: string | null }
   /**

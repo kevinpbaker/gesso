@@ -93,4 +93,16 @@ export class ComponentHostResolver implements ComponentResolver {
   get size(): number {
     return this.hosts.size;
   }
+
+  /**
+   * The component mounted at an anchor id, for the inspector.
+   *
+   * The anchor is the component's identity (`UiGraphBuilder` gives
+   * every component slot one), so this is the whole of the link
+   * between a node and the component that rendered it. Nothing else
+   * holds it, which is why the inspector has to ask here.
+   */
+  hostFor(anchorId: string): ComponentHost | undefined {
+    return this.hosts.get(anchorId);
+  }
 }
