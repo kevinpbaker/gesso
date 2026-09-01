@@ -294,13 +294,63 @@ describe('UiHostFrameClock', () => {
       vi.advanceTimersByTime(16);
       expect(frames).toEqual([99]);
 
-      // Once a tick has arrived the fallback stops being armed, so a
-      // display-paced app is not also running a timer per frame.
+      // Once a tick has arrived the timer stops *pacing* and becomes a
+      // watchdog: a display-paced app is not running a timer per frame,
+      // because every tick clears it before it can fire.
       clock.requestFrame();
       clock.tick(500);
       clock.requestFrame();
-      vi.advanceTimersByTime(10000);
-      expect(frames).toEqual([99, 500]);
+      vi.advanceTimersByTime(50);
+      clock.tick(516);
+      vi.advanceTimersByTime(50);
+      expect(frames).toEqual([99, 500, 516]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('goes back to pacing itself when a host that was ticking goes quiet', () => {
+    // The case the whole architecture exists for: the shell's thread is
+    // busy, so no forwarded refresh arrives. Frames stopping then would
+    // mean a render worker frozen by main-thread work, which is exactly
+    // what it is supposed to be immune to.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      let now = 0;
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16, stallMs: 100, now: () => now }
+      );
+
+      // A live host: ticks arrive and the watchdog never fires.
+      clock.requestFrame();
+      clock.tick(0);
+      clock.requestFrame();
+      vi.advanceTimersByTime(90);
+      expect(frames).toEqual([0]);
+
+      // Now it stops answering. One watchdog interval later this clock
+      // draws the frame the host did not ask for.
+      now = 100;
+      vi.advanceTimersByTime(20);
+      expect(frames).toEqual([0, 100]);
+
+      // And keeps pacing at the fallback interval while the quiet
+      // lasts, rather than waiting a whole watchdog per frame.
+      clock.requestFrame();
+      now = 116;
+      vi.advanceTimersByTime(16);
+      expect(frames).toEqual([0, 100, 116]);
+
+      // The host comes back; its cadence takes over again and the timer
+      // returns to watching.
+      clock.requestFrame();
+      clock.tick(132);
+      clock.requestFrame();
+      vi.advanceTimersByTime(90);
+      expect(frames).toEqual([0, 100, 116, 132]);
     } finally {
       vi.useRealTimers();
     }

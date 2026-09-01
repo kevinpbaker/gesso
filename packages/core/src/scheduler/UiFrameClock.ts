@@ -92,6 +92,17 @@ const IDLE_TICKS_BEFORE_STOP = 4;
 export interface UiHostFrameClockOptions {
   /** How long to wait for a host tick before pacing a frame anyway. */
   fallbackMs?: number;
+  /**
+   * How long a hosted clock waits for a tick that does not come before
+   * deciding the host has stopped answering and pacing itself.
+   *
+   * Well beyond any display's frame time — a tenth of a second without
+   * a refresh is a stalled host on a 30Hz panel as much as on a 165Hz
+   * one — because a tick clears this timer, so a value close to the
+   * refresh interval would race the host and draw frames it did not
+   * ask for.
+   */
+  stallMs?: number;
   /** Time source for a fallback tick; host ticks carry their own. */
   now?: () => UiFrameTime;
 }
@@ -164,10 +175,16 @@ export class UiHostFrameClock implements UiFrameClock {
   private active = false;
   /** Set by the first real tick; until then the fallback timer paces. */
   private hosted = false;
+  /**
+   * True while a host that was ticking has gone quiet, and this clock
+   * is pacing itself again until it comes back.
+   */
+  private stalled = false;
   /** Refreshes arrived with nothing pending, before the loop stops. */
   private idleTicks = 0;
   private handle: ReturnType<typeof setTimeout> | null = null;
   private readonly fallbackMs: number;
+  private readonly stallMs: number;
   private readonly now: () => UiFrameTime;
 
   constructor(
@@ -177,26 +194,53 @@ export class UiHostFrameClock implements UiFrameClock {
     options: UiHostFrameClockOptions = {}
   ) {
     this.fallbackMs = options.fallbackMs ?? 16;
+    this.stallMs = options.stallMs ?? 100;
     this.now = options.now ?? (() => performance.now());
   }
 
   requestFrame(): void {
     this.pending = true;
     this.setActive(true);
-    // Until a tick has actually arrived, this paces itself. A host
-    // that does not forward refreshes is then merely no better than
-    // the timer it replaced, rather than a frozen application — which
-    // matters because the capability is not negotiated: the first real
-    // tick is the only evidence that it exists, and waiting for it
-    // while rendering nothing would be a worse trade than a timer.
-    if (!this.hosted && this.handle === null) {
-      this.handle = setTimeout(() => {
-        this.handle = null;
-        if (this.pending && !this.hosted) {
-          this.deliver(this.now());
-        }
-      }, this.fallbackMs);
+    this.armTimer();
+  }
+
+  /**
+   * Arms the timer that draws a frame the host did not ask for.
+   *
+   * It plays two roles with one mechanism. Before any tick has arrived
+   * it *paces*: a host that does not forward refreshes is then merely
+   * no better than the timer this clock replaced, rather than a frozen
+   * application — which matters because the capability is not
+   * negotiated, and the first real tick is the only evidence it exists.
+   *
+   * Once ticks are arriving it *watches*: set far beyond a refresh
+   * interval, cleared by every tick, and therefore never fired while
+   * the host is answering. When it does fire, the host has stopped —
+   * a blocked main thread is the case that matters — and this clock
+   * goes back to pacing itself until a tick says otherwise.
+   *
+   * Without that second role the render worker's frames stop dead
+   * whenever the shell's thread is busy, which is the one thing the
+   * whole architecture exists to prevent.
+   */
+  private armTimer(): void {
+    if (this.handle !== null) {
+      return;
     }
+    const watching = this.hosted && !this.stalled;
+    this.handle = setTimeout(
+      () => {
+        this.handle = null;
+        if (!this.pending) {
+          return;
+        }
+        // A tick would have cleared this timer, so its firing is the
+        // evidence that none came.
+        this.stalled = this.hosted;
+        this.deliver(this.now());
+      },
+      watching ? this.stallMs : this.fallbackMs
+    );
   }
 
   cancelFrame(): void {
@@ -224,6 +268,7 @@ export class UiHostFrameClock implements UiFrameClock {
    */
   tick(time: UiFrameTime): void {
     this.hosted = true;
+    this.stalled = false;
     this.clearFallback();
     if (!this.pending) {
       // Not wanted *yet* is not the same as not wanted. Something
