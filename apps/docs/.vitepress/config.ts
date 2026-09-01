@@ -22,15 +22,18 @@ export default defineConfig({
   description: 'A canvas UI framework that keeps the whole interface off the main thread.',
   cleanUrls: true,
   themeConfig: {
-    nav: [{ text: 'Guide', link: '/guide/installation' }],
+    nav: [{ text: 'Guide', link: '/guide/what-is-gesso' }],
     sidebar: [
       {
         text: 'Guide',
         items: [
+          { text: 'What Gesso is', link: '/guide/what-is-gesso' },
           { text: 'Installation', link: '/guide/installation' },
           { text: 'Your first component', link: '/guide/counter' },
           { text: 'Components run once', link: '/guide/components-run-once' },
           { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
+          { text: 'Layout basics', link: '/guide/layout-basics' },
+          { text: 'Text', link: '/guide/text' },
           { text: 'Light and dark', link: '/guide/appearance' }
         ]
       }
