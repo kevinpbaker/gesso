@@ -611,7 +611,9 @@ export const UiProperties = {
     name: 'visible',
     defaultValue: true,
     inherited: false,
-    affects: P
+    // An invisible subtree is not in the semantics tree at all, so
+    // hiding a node removes its record and showing it adds one back.
+    affects: P | S
   }),
 
   // -------------------------------------------------------------------------

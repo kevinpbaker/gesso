@@ -89,6 +89,30 @@ describe('GessoRuntime semantics', () => {
     expect(update?.op === 'update' && update.node.index).toBe(1);
   });
 
+  it('removes the record of a node that was hidden, and brings it back', () => {
+    // An invisible subtree is left out of the tree entirely, so
+    // `visible` has to mark the node dirty for semantics the way
+    // leaving the tree does. Without it the mirror keeps an element
+    // for a node that is no longer drawn.
+    const visible$ = new BehaviorSubject(true);
+    const patches: UiSemanticsPatch[][] = [];
+    const { frame } = mountRuntime(Row(Box({ role: 'alert', label: 'Saved', visible: visible$ })), {
+      onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches]))
+    });
+    frame(0);
+    expect(labels(patches[0])).toEqual(['Saved']);
+
+    visible$.next(false);
+    frame();
+    expect(patches).toHaveLength(2);
+    expect(patches[1].map(patch => patch.op)).toEqual(['remove']);
+
+    visible$.next(true);
+    frame();
+    expect(patches).toHaveLength(3);
+    expect(labels(patches[2])).toEqual(['Saved']);
+  });
+
   it('costs nothing on a frame that changed no semantics', () => {
     const color$ = new BehaviorSubject('#111111');
     const { runtime, frame, frames } = mountRuntime(

@@ -53,9 +53,15 @@ describe('propertyEffects', () => {
   });
 
   it('classifies paint-only properties as paint', () => {
-    for (const property of ['color', 'backgroundColor', 'opacity', 'visible']) {
+    for (const property of ['color', 'backgroundColor', 'opacity']) {
       expect(propertyEffects(property)).toBe(DirtyFlags.Paint);
     }
+  });
+
+  it('classifies visibility as paint and semantics', () => {
+    // A hidden subtree is not in the semantics tree at all, so showing
+    // and hiding a node adds and removes its record.
+    expect(propertyEffects('visible')).toBe(DirtyFlags.Paint | DirtyFlags.Semantics);
   });
 
   it('classifies environment provider properties as environment dirty', () => {
