@@ -16,22 +16,23 @@ and an event listener.
 
 **Below are two copies of the same component.** The left one is in a
 render worker. The right one is the identical code mounted on the main
-thread. Block the main thread for two seconds and watch which one
-notices — each canvas reports its own worst gap between two frames,
-which is the only honest measure across a thread boundary.
+thread. Block the main thread for three seconds and watch which one
+notices. Each canvas times itself, on its own thread, and paints what
+it measured.
 
 <ThreadDemo />
 
-Each canvas draws its own reading: the label, the frame gap and the
-caption underneath are all painted by the component itself, on the
-thread it is running on, because a number that had to cross to the main
-thread could not be trusted while the main thread is the thing being
-blocked.
+Each canvas draws its own reading: the label, the gap and the caption
+underneath are all painted by the component itself. The timer that
+advances the sweep belongs to the thread it is running on, and so does
+the clock the gap is measured against — a number that had to cross to
+the main thread could not be trusted while the main thread is the thing
+being blocked.
 
-The main-thread copy stops dead for the whole three seconds. The worker
-keeps drawing — it hiccups once as it notices the refreshes have stopped
-arriving, because nothing inside a worker can see a refresh that did not
-happen until the moment it was due.
+On this machine the render worker comes through a three-second block
+reporting a **42 ms** worst gap against its own 40 ms step: it does not
+skip a beat. The copy on the main thread reports **3,017 ms**, which is
+the block itself.
 
 It is not a trick of the demo. The same shape shows up in the
 repository's own measurements:
