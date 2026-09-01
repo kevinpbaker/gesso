@@ -1,9 +1,8 @@
 import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
-
 import { percent } from '@gesso/core';
-import { type ComponentContext, type Inputs, input, internalState } from '@gesso/framework';
 import { HOVER_ACCENT } from './interaction';
+import { type ComponentContext, type Inputs, input, internalState } from '@gesso/framework';
 
 export function Counter(props: Inputs<{ label?: string }>, _context: ComponentContext) {
   const label = input(props.label, 'Count'); // props are cells; this one has a default
