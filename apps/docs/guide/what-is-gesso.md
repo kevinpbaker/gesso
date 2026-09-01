@@ -101,22 +101,25 @@ Gesso is for the other kind of screen: an application whose interface is
 its own — an editor, a console, a dashboard, a tool with a lot of state
 and a lot of frames.
 
-## What is proven, and where
+## Before you build on it
 
-Everything in these pages was built and checked in Chrome. That is a
-real limit rather than a formality: the three webviews a desktop build
-would ship on (WKWebView, WebView2, WebKitGTK) have three IME
-implementations, three font stacks and three ideas about device pixel
-ratio, and none of them has run this code.
+Gesso is young, and this is what that means where it would touch you.
 
-Two more, stated where you would otherwise find them the hard way:
-
-- **WebGPU is progressive.** Canvas2D is the default and is the portable
-  path; WebGPU is dependable only where the engine ships it.
-- **No screen reader has been run against the accessibility mirror.**
-  Chrome's computed accessibility tree is checked in CI, which proves
-  the platform sees the right elements, states and actions — not that
-  VoiceOver announces them well.
+- **It has run in Chrome.** Chrome and other Chromium browsers are the
+  honest extent of the evidence. Anywhere else is untested rather than
+  unsupported, which is a different thing but not a comfortable one.
+- **Canvas2D is the default**, and it works wherever a canvas does.
+  WebGPU is an enhancement taken where the engine offers it and skipped
+  where it does not, so nothing depends on having it.
+- **No screen reader has been sat in front of it.** What your components
+  emit does reach the platform's accessibility layer as real elements
+  with roles, states and actions — but whether VoiceOver and NVDA
+  announce a screen _well_ is a question only a person with one can
+  answer, and nobody has.
+- **The desktop webviews are the destination, not the history.** Running
+  this on macOS, Windows and Linux means WKWebView, WebView2 and
+  WebKitGTK: three IME implementations, three font stacks, three ideas
+  about device pixel ratio. None of them has run this code.
 
 ## Next
 
