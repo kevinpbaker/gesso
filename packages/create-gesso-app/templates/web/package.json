@@ -1,0 +1,22 @@
+{
+  "name": "gesso-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gesso/components": "^0.1.0",
+    "@gesso/core": "^0.1.0",
+    "@gesso/framework": "^0.1.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "typescript": "~7.0.2",
+    "vite": "^8.2.0"
+  }
+}

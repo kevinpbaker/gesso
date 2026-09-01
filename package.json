@@ -26,6 +26,8 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "check:install": "node scripts/check-install.ts",
+    "check:scaffold": "node scripts/check-scaffold.ts",
+    "create:app": "node packages/create-gesso-app/bin/create-gesso-app.ts",
     "screenshots": "node scripts/check-route-screenshots.ts",
     "screenshots:update": "node scripts/check-route-screenshots.ts --update"
   },
