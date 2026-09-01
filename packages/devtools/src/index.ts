@@ -8,10 +8,21 @@
  * therefore the error overlay — the worker's exceptions, source-mapped,
  * drawn over the application that was running when they were thrown.
  *
- * See `docs/ROADMAP.md` F7 for what else belongs here: the store
- * action log.
+ * Four tools now: the overlay, the node inspector, the frame profiler
+ * and the store action log.
  */
 export { ErrorOverlay, mountErrorOverlay, type ErrorOrigin, type ErrorOverlayOptions } from './ErrorOverlay';
+export {
+  createActionLog,
+  type ActionEntry,
+  type ActionLog,
+  type ActionLogOptions,
+  type ActionLogToken,
+  type ChannelErrorEntry,
+  type CommandEntry,
+  type PatchEntry
+} from './ActionLog';
+export { mountActionLogPanel, type ActionLogPanel, type ActionLogPanelOptions } from './ActionLogPanel';
 export { mountNodeInspector, type NodeInspector, type NodeInspectorOptions } from './NodeInspector';
 export {
   mountFrameProfiler,

@@ -4,8 +4,8 @@ import { Heavy } from '../HeavyWork';
 import { Ticker } from '../TickerChannel';
 import { mountShell, type AppShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
-import { mountFrameProfiler, mountNodeInspector } from '@gesso/devtools';
-import { addInspectAction, addProfileAction } from '../shell/InspectorPanel';
+import { createActionLog, mountActionLogPanel, mountFrameProfiler, mountNodeInspector } from '@gesso/devtools';
+import { addInspectAction, addProfileAction, addToggleAction } from '../shell/InspectorPanel';
 
 const BLOCK_MS = 2000;
 /** How often the reporter is allowed to touch the DOM. */
@@ -40,6 +40,14 @@ interface FrameMetrics {
  *
  * Compare with #framework-sync, which runs the same app on the main
  * thread and visibly stalls.
+ *
+ * No action log here, and the reason is the thread model rather than an
+ * omission. A channel's ports are made where the replicas are, which in
+ * this configuration is the render worker; the shell holds neither end
+ * and never sees a patch, deliberately. Tapping one from here would
+ * mean routing every patch through the shell to watch it go past, which
+ * is the opposite of what this route exists to demonstrate. See
+ * `decisions/0047-store-action-log.md`.
  */
 export function mountFrameworkRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework', metrics: true });
@@ -125,15 +133,32 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   // and the overlay's window capture is what catches it.
   const errors = mountRouteErrors(shell);
   let inspecting = false;
+  // Kept across a renderer switch the way `inspecting` is, so a toggle
+  // that is on stays on when the app underneath it is rebuilt.
+  let logging = false;
 
-  const start = (renderer: RendererChoice): { dispose: () => void; setInspector(enabled: boolean): void } => {
+  const start = (
+    renderer: RendererChoice
+  ): { dispose: () => void; setInspector(enabled: boolean): void; setActionLog(enabled: boolean): void } => {
     const report = createFrameReporter(shell, 'Main thread', renderer);
     shell.setStatus(`Starting the single-threaded app on ${describeRenderer(renderer)}…`);
     // One application worker for the whole layer: two channels over
     // two named ports on the same thread.
-    const dataWorker = workerHandle(
-      () => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })
+    //
+    // Tapped on the way past, which is what the action log records: the
+    // recorder sits on the ports the replicas were going to use anyway,
+    // so nothing gains a thread hop and nothing above it can tell. Both
+    // the log and its panel belong to this mount rather than to the
+    // route, because a renderer switch rebuilds the replicas and a
+    // timeline that outlived them would offer to rewind ports that are
+    // gone.
+    const actions = createActionLog();
+    const dataWorker = actions.tap(
+      workerHandle(() => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })),
+      [Ticker, Heavy]
     );
+    const actionPanel = mountActionLogPanel(shell.preview, actions);
+    actionPanel.setVisible(logging);
     const builder = createApp(FrameworkDemoRoot)
       .useService(DemoCounter)
       .useChannel(Heavy, { worker: dataWorker })
@@ -154,7 +179,15 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     if (inspecting) {
       builder.setInspector(true);
     }
-    return { dispose, setInspector: enabled => builder.setInspector(enabled) };
+    return {
+      dispose: () => {
+        dispose();
+        actionPanel.dispose();
+        actions.dispose();
+      },
+      setInspector: enabled => builder.setInspector(enabled),
+      setActionLog: enabled => actionPanel.setVisible(enabled)
+    };
   };
 
   let app = start(loadRendererChoice());
@@ -163,6 +196,10 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     app.setInspector(enabled);
   });
   addProfileAction(shell, enabled => profiler.setVisible(enabled));
+  addToggleAction(shell, { off: 'Action log', on: 'Hide action log' }, enabled => {
+    logging = enabled;
+    app.setActionLog(enabled);
+  });
   addRendererAction(shell, choice => {
     app.dispose();
     app = start(choice);
