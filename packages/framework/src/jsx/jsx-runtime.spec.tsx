@@ -4,8 +4,11 @@ import { map } from 'rxjs/operators';
 import { describe, expect, it } from 'vitest';
 
 import {
+  Button,
   Row,
   Text,
+  focusRing,
+  interactive,
   type UiChild,
   type UiElement,
   UiGraphBuilder,
@@ -29,6 +32,16 @@ class Greeting extends Component {
   override render() {
     return <text color="primary">{this.name.pipe(map(n => `Hello ${n}`))}</text>;
   }
+}
+
+/** A component that takes its content as a prop, the way `Card` does. */
+function Panel(props: Inputs<{ title: string; children?: UiChild }>) {
+  return (
+    <column gap={2}>
+      <text>{props.title}</text>
+      {props.children.value ?? Row()}
+    </column>
+  );
 }
 
 function Badge(props: Inputs<{ count: number; tone?: string }>) {
@@ -134,13 +147,80 @@ describe('jsx runtime', () => {
     expect(texts(root)).toEqual(['Hello again', '2', 'neutral', '5', 'warm']);
   });
 
-  it('refuses children on a component tag', () => {
+  it('hands a component tag its child as the children prop', () => {
+    const { builder } = createHarness();
+
+    const root = builder.build(
+      <column>
+        <Panel title="Details">
+          <text>inside</text>
+        </Panel>
+      </column>
+    );
+
+    expect(texts(root)).toEqual(['Details', 'inside']);
+  });
+
+  it('takes `children` written as an ordinary attribute the same way', () => {
+    const { builder } = createHarness();
+
+    const root = builder.build(
+      <column>
+        <Panel title="Details" children={<text>inside</text>} />
+      </column>
+    );
+
+    expect(texts(root)).toEqual(['Details', 'inside']);
+  });
+
+  it('refuses several children on a component tag, and says what to do', () => {
     expect(() => (
-      // @ts-expect-error components take inputs, not children
+      // @ts-expect-error a component's children prop is one child
+      <Panel title="Details">
+        <text>one</text>
+        <text>two</text>
+      </Panel>
+    )).toThrow(/takes one child/);
+  });
+
+  it('is a compile error to give children to a component that takes none', () => {
+    const typeChecks = () => (
+      // @ts-expect-error Badge declares no children prop
       <Badge count={1}>
         <text>child</text>
       </Badge>
-    )).toThrow(/received JSX children/);
+    );
+    expect(typeof typeChecks).toBe('function');
+  });
+
+  it('builds a button the factory way, interaction and all', () => {
+    // `Button()` injects BUTTON_INTERACTION so every button shows hover
+    // and press. A tag that went straight to `createElement` did not,
+    // and the two surfaces are supposed to be one.
+    const tag = (<button label="Save">Save</button>) as UiElement;
+    const factory = Button({ label: 'Save', text: 'Save' });
+
+    expect(tag.props.modifiers).toEqual(factory.props.modifiers);
+    expect((tag.props.modifiers as readonly { kind: { name: string } }[])[0]?.kind.name).toBe('interactive');
+  });
+
+  it('does not give a button a second interaction when the caller brought one', () => {
+    const tag = (<button label="Save" modifiers={[interactive({ hover: true, press: false })]}>Save</button>) as UiElement;
+
+    // Two `interactive` modifiers both write `visualState`, so the
+    // later set drops the earlier state.
+    expect((tag.props.modifiers as readonly { kind: { name: string } }[]).map(m => m.kind.name)).toEqual([
+      'interactive'
+    ]);
+  });
+
+  it('keeps a button its own modifiers as well as the interaction', () => {
+    const tag = (<button label="Save" modifiers={[focusRing()]}>Save</button>) as UiElement;
+
+    expect((tag.props.modifiers as readonly { kind: { name: string } }[]).map(m => m.kind.name)).toEqual([
+      'interactive',
+      'focusRing'
+    ]);
   });
 
   it('is type-checked like the factories', () => {

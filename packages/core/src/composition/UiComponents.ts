@@ -46,10 +46,24 @@ export function EditableText(props: EditableTextProps = {}): UiElement {
  * it without the app keeping a boolean per widget. A button that
  * declares its own modifiers keeps them, with the interaction one
  * first, so a caller's write of the same property wins.
+ *
+ * **Unless the caller brought their own interaction.** Two `interactive`
+ * modifiers on one node is the conflict `modifiers/interaction.ts`
+ * exists to avoid: both write `visualState`, so the later one's set
+ * drops the earlier one's state and the two disagree about what the
+ * pointer is doing. A caller who passes `interactive(...)` is asking
+ * for their configuration rather than a second copy of the default,
+ * so the default steps aside. This was found with the inspector, which
+ * showed a playground button carrying `interactive, interactive`.
  */
 export function Button(props: ButtonProps = {}, ...children: UiChild[]): UiElement {
   const declared = props.modifiers;
-  const modifiers = declared === undefined ? DEFAULT_BUTTON_MODIFIERS : [BUTTON_INTERACTION, ...declared];
+  const modifiers =
+    declared === undefined
+      ? DEFAULT_BUTTON_MODIFIERS
+      : declared.some(modifier => modifier.kind === BUTTON_INTERACTION.kind)
+        ? declared
+        : [BUTTON_INTERACTION, ...declared];
   return createElement(UiNodeType.Button, { ...props, modifiers }, children);
 }
 

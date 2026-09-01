@@ -13,8 +13,16 @@ import {
   type ComponentLikeElement,
   type UiChild,
   type UiElement,
-  createElement,
   type UiProps,
+  Box,
+  Button,
+  Column,
+  EditableText,
+  Grid,
+  Row,
+  ScrollView,
+  Stack,
+  Text,
   UiNodeType
 } from '@gesso/core';
 import type { Component } from '../Component';
@@ -135,13 +143,60 @@ export function jsx(type: JSX.ElementType, props: JsxProps | null, key?: string 
   if (typeof type !== 'function') {
     throw new Error(`JSX tag must be an intrinsic name or a component, got ${describe(type)}.`);
   }
-  if (children !== undefined) {
+  return createComponent(
+    type as ClassComponent,
+    componentProps(type, rest, children) as ComponentProps<ClassComponent>,
+    key
+  );
+}
+
+/**
+ * A component's props, with any JSX children folded in as `children`.
+ *
+ * This used to throw: components took inputs, not children, and the
+ * message said to pass them as a prop instead. The advice did not
+ * work. `<Card children={x} />` and `<Card>{x}</Card>` compile to the
+ * same `jsx(Card, { children: x })`, so the runtime cannot tell them
+ * apart and rejected both, which left every component in the library
+ * that takes its content as `children` (`Card`, `Tabs`, `Toolbar`,
+ * `Accordion`) unusable as a JSX tag. Since the documentation and the
+ * examples are JSX, that is most of the component library.
+ *
+ * It is also inconsistent: no other prop is checked here. A misspelled
+ * or wrongly typed prop is a compile error, and `children` already is
+ * one too, because `JSX.ElementChildrenAttribute` maps nested children
+ * onto the `children` prop and `LibraryManagedAttributes` types it
+ * from the component. A component that does not declare `children`
+ * therefore cannot be given any.
+ *
+ * The one rule left is arity. A component's `children` is a `UiChild`,
+ * which is one child and not a list, so several children have to be
+ * wrapped in a container tag. That is said here rather than left to
+ * become a confusing type error at the call site.
+ */
+function componentProps(
+  type: JSX.ElementType,
+  props: Record<string, unknown>,
+  children: JsxChildren
+): Record<string, unknown> {
+  if (children === undefined) {
+    return props;
+  }
+  const list = flattenChildren(children);
+  if (list.length === 0) {
+    return props;
+  }
+  if (list.length > 1) {
     throw new Error(
-      `Component '${(type as { name?: string }).name ?? 'anonymous'}' received JSX children. ` +
-        `Components take inputs, not children; pass them as a prop.`
+      `Component '${componentName(type)}' was given ${list.length} children. ` +
+        `A component takes one child, so wrap them in a container tag: <${componentName(type)}><column>…</column></${componentName(type)}>.`
     );
   }
-  return createComponent(type as ClassComponent, rest as ComponentProps<ClassComponent>, key);
+  return { ...props, children: list[0] };
+}
+
+function componentName(type: JSX.ElementType): string {
+  return typeof type === 'function' ? ((type as { name?: string }).name ?? 'anonymous') : String(type);
 }
 
 /** The compiler's variant for static child lists; identical here. */
@@ -164,6 +219,31 @@ export function Fragment(_props: { children?: JsxChildren }): never {
   throw new Error('JSX fragments are not supported: return a list of elements, or wrap them in a container tag.');
 }
 
+/**
+ * The element factories, by tag.
+ *
+ * JSX calls these rather than `createElement`, so an intrinsic tag and
+ * the factory of the same name are the same code path and cannot
+ * diverge. They already had: `Button()` injects `BUTTON_INTERACTION`,
+ * so every button made with the factory shows hover and press, and a
+ * `<button>` made here went straight to `createElement` and showed
+ * neither. Nothing caught it, because nothing reads `visualState` yet.
+ */
+const INTRINSIC_FACTORIES = {
+  text: Text,
+  editabletext: EditableText,
+  button: Button,
+  box: Box,
+  stack: Stack,
+  row: Row,
+  column: Column,
+  scrollview: ScrollView,
+  grid: Grid
+} as const satisfies Record<IntrinsicTag, unknown>;
+
+/** Every factory, seen as the one shape this file calls them with. */
+type ElementFactory = (props: UiProps, ...children: UiChild[]) => UiElement;
+
 function intrinsic(
   tag: string,
   props: Record<string, unknown>,
@@ -171,7 +251,8 @@ function intrinsic(
   key?: string | number
 ): UiElement {
   const type = (INTRINSIC_TYPES as Record<string, UiNodeType | undefined>)[tag];
-  if (type === undefined) {
+  const factory = (INTRINSIC_FACTORIES as Record<string, ElementFactory | undefined>)[tag];
+  if (type === undefined || factory === undefined) {
     throw new Error(
       `Unknown JSX tag '${tag}'. Intrinsic tags are ${Object.keys(INTRINSIC_TYPES)
         .map(name => `'${name}'`)
@@ -183,13 +264,9 @@ function intrinsic(
     if (elementProps.text !== undefined) {
       throw new Error(`<${tag}> has both a text prop and a text child; use one.`);
     }
-    return createElement(
-      type,
-      { ...elementProps, text: typeof children === 'number' ? String(children) : children },
-      []
-    );
+    return factory({ ...elementProps, text: typeof children === 'number' ? String(children) : children });
   }
-  return createElement(type, elementProps, flattenChildren(children));
+  return factory(elementProps, ...flattenChildren(children));
 }
 
 /**
