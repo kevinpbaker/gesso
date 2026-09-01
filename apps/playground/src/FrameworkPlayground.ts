@@ -1601,7 +1601,6 @@ export class AnimationDemo extends Component {
 const ROW_COLORS = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'];
 const ROW_LABELS = ['Inbox', 'Drafts', 'Sent', 'Archive', 'Trash'];
 
-@Define('framework-demo-root')
 /**
  * A component that fails on purpose, so the error overlay has
  * something to report.
@@ -1656,6 +1655,7 @@ export class BreakDemo extends Component {
   }
 }
 
+@Define('framework-demo-root')
 export class FrameworkDemoRoot extends Component {
   @Inject(DemoCounter) demo!: DemoCounter;
 
