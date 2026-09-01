@@ -36,20 +36,6 @@ which is the block itself. Neither reading falls again — the worst thing
 that happened to a screen is a fact about it, not something it should be
 allowed to quietly recover from.
 
-It is not a trick of the demo. The same shape shows up in the
-repository's own measurements:
-
-| What was blocked, and for how long       | Worst frame gap in the render worker        |
-| ---------------------------------------- | ------------------------------------------- |
-| The main thread, 2,000 ms                | **101 ms**                                  |
-| The main thread, 5,000 ms                | **105 ms** (against a 106 ms idle baseline) |
-| An application worker, 1,500 ms          | **106 ms**                                  |
-| _The same app single-threaded, 2,000 ms_ | _2,098 ms_                                  |
-
-What a blocked thread still costs is the latency of anything that has to
-cross it: a click delivered during that five-second block took 2,818 ms
-to arrive, on a screen that never stopped animating.
-
 ## What writing it looks like
 
 If you have written SwiftUI or Jetpack Compose, the shape is familiar: a
