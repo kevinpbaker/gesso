@@ -22,8 +22,11 @@ const STEP_MS = 40;
  * single-thread copy it is the blocked thread's own, and it stops with
  * everything else.
  *
- * `frames` counts what the sweep wrote, which is a frame count in
- * everything but name: a thread that cannot run cannot write one.
+ * The counter is `updates`, and it is deliberately not called frames:
+ * it counts what the interval wrote, which is evidence the *thread* is
+ * alive and none at all that anything was drawn. The frame gap the page
+ * reports beside each canvas is the honest measure, and the difference
+ * between the two is a mistake this example used to make.
  */
 export function Pulse(props: Inputs<{ label?: string }>, ctx: ComponentContext) {
   const sweep = internalState(0);
@@ -42,7 +45,7 @@ export function Pulse(props: Inputs<{ label?: string }>, ctx: ComponentContext) 
     <column gap={12} padding={16} width={percent(100)} height={percent(100)} y="center">
       <row gap={8} y="center">
         <text text={props.label} fontSize={12} fontWeight={600} color="text" />
-        <text text={frames.pipe(map(count => `frames drawn: ${count}`))} fontSize={11} color="textMuted" />
+        <text text={frames.pipe(map(count => `updates: ${count}`))} fontSize={11} color="textMuted" />
       </row>
 
       <row gap={3} y="end" height={64}>

@@ -32,7 +32,7 @@ describe('the home page pulse', () => {
     ui.frame(0);
 
     expect(ui.getByText('Render worker')).toBeDefined();
-    const counter = ui.getByText('frames drawn: 0');
+    const counter = ui.getByText('updates: 0');
 
     let time = 0;
     for (let step = 0; step < 4; step++) {
@@ -41,6 +41,6 @@ describe('the home page pulse', () => {
     }
 
     // 200 ms of time, a 40 ms interval: five writes.
-    expect(counter.getProperty('text')).toBe('frames drawn: 5');
+    expect(counter.getProperty('text')).toBe('updates: 5');
   });
 });

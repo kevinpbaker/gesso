@@ -28,6 +28,39 @@ const workerHost = ref<HTMLElement | null>(null);
 const syncHost = ref<HTMLElement | null>(null);
 const blocking = ref(false);
 const failure = ref<string | null>(null);
+const workerGap = ref<number | null>(null);
+const syncGap = ref<number | null>(null);
+
+/**
+ * The worst gap between two consecutive frames on each side.
+ *
+ * `FrameMetrics.at` is stamped on the clock of the thread that drew the
+ * frame, which is the only honest measure across a worker boundary:
+ * the messages themselves queue behind a blocked main thread and all
+ * arrive at once, so their arrival times would say nothing.
+ */
+function gapTracker(sink: { value: number | null }) {
+  let last: number | null = null;
+  return {
+    /**
+     * Forgets the worst gap so far but *not* the last frame's time: the
+     * gap that matters spans the press, and clearing `last` would throw
+     * away the one measurement the demonstration is about.
+     */
+    reset() {
+      sink.value = null;
+    },
+    record(at: number) {
+      if (last !== null) {
+        sink.value = Math.max(sink.value ?? 0, at - last);
+      }
+      last = at;
+    }
+  };
+}
+
+const workerGaps = gapTracker(workerGap);
+const syncGaps = gapTracker(syncGap);
 
 let worker: WorkerApp | undefined;
 let disposeWorker: (() => void) | undefined;
@@ -46,6 +79,7 @@ onMounted(() => {
     worker = createApp({
       renderWorker: () => new PulseWorker(),
       colorScheme: scheme,
+      onFrame: metrics => workerGaps.record(metrics.at),
       onError: message => {
         failure.value = message;
       }
@@ -54,6 +88,7 @@ onMounted(() => {
 
     const builder = createApp(exampleRoot(createComponent(Pulse, { label: 'Main thread' })));
     builder.setColorScheme(scheme);
+    builder.onFrame(metrics => syncGaps.record(metrics.at));
     syncApp = builder;
     disposeSync = builder.mountSync(syncHost.value!);
   } catch (error) {
@@ -70,6 +105,8 @@ onUnmounted(() => {
 
 function blockMainThread(): void {
   blocking.value = true;
+  workerGaps.reset();
+  syncGaps.reset();
   // Let the class change paint before the thread stops answering.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -90,11 +127,17 @@ function blockMainThread(): void {
     <div v-else class="thread-demo-panes">
       <figure>
         <div ref="workerHost" class="thread-demo-canvas" />
-        <figcaption>In a render worker</figcaption>
+        <figcaption>
+          In a render worker
+          <strong v-if="workerGap !== null" data-gap="worker">worst frame gap {{ Math.round(workerGap) }} ms</strong>
+        </figcaption>
       </figure>
       <figure>
         <div ref="syncHost" class="thread-demo-canvas" />
-        <figcaption>On the main thread</figcaption>
+        <figcaption>
+          On the main thread
+          <strong v-if="syncGap !== null" data-gap="sync">worst frame gap {{ Math.round(syncGap) }} ms</strong>
+        </figcaption>
       </figure>
     </div>
     <div class="thread-demo-controls">
@@ -130,10 +173,19 @@ function blockMainThread(): void {
 }
 
 .thread-demo-panes figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px;
   font-size: 12px;
   color: var(--vp-c-text-2);
   border-top: 1px solid var(--vp-c-divider);
+}
+
+.thread-demo-panes figcaption strong {
+  font-weight: 600;
+  color: var(--vp-c-text-1);
 }
 
 .thread-demo-controls {

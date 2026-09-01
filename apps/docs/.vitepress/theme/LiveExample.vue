@@ -29,7 +29,9 @@ import { createApp, type WorkerApp } from '@gesso/framework';
  * after mounting is what stops the first frame painting in the
  * appearance the reader did not choose.
  */
-const props = withDefaults(defineProps<{ id: string; height?: number }>(), { height: 240 });
+// `height` arrives as a string from markdown (`height="240"`), so the
+// prop takes either and the style interpolates whichever it got.
+const props = withDefaults(defineProps<{ id: string; height?: number | string }>(), { height: 240 });
 
 type WorkerModule = { default: new () => Worker };
 

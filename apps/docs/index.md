@@ -17,11 +17,18 @@ and an event listener.
 **Below are two copies of the same component.** The left one is in a
 render worker. The right one is the identical code mounted on the main
 thread. Block the main thread for two seconds and watch which one
-notices.
+notices — each canvas reports its own worst gap between two frames,
+which is the only honest measure across a thread boundary.
 
 <ThreadDemo />
 
-That is not a trick of the demo — it is the measured behaviour:
+On this machine that press reads **136 ms** on the left and **2,034 ms**
+on the right. The worker hiccups once, when it notices the refreshes
+have stopped arriving and goes back to pacing itself; the main-thread
+copy is simply gone for two seconds.
+
+It is not a trick of the demo. The same shape shows up in the
+repository's own measurements:
 
 | What was blocked, and for how long       | Worst frame gap in the render worker        |
 | ---------------------------------------- | ------------------------------------------- |
