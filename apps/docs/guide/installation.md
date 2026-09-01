@@ -46,8 +46,10 @@ does before it runs a component test against the result.
 
 ## TypeScript
 
-Nothing exotic; `moduleResolution: "bundler"` is the only line that has
-to be right, because the packages ship `exports` maps.
+Nothing exotic. `moduleResolution: "bundler"` is the line that has to be
+right, because the packages ship `exports` maps; the two `jsx` lines are
+what let you write elements as markup, which is how this site's examples
+and the framework's own are written.
 
 ```json
 {
@@ -58,25 +60,32 @@ to be right, because the packages ship `exports` maps.
     "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+
+    "jsx": "react-jsx",
+    "jsxImportSource": "@gesso/framework"
   },
   "include": ["src"]
 }
 ```
 
-Two more lines buy the optional JSX surface, which is what the examples
-on this site are written in:
+JSX here is a spelling, not a runtime. It compiles onto the element
+factories and produces the identical tree, so these two lines are the
+whole of the difference:
 
-```json
-{
-  "jsx": "react-jsx",
-  "jsxImportSource": "@gesso/framework"
-}
+```tsx
+<row gap={8} y="center">
+  <text text="Ready" />
+</row>
 ```
 
-JSX compiles straight onto the same factory calls — `<row gap={8}>` and
-`Row({ gap: 8 })` produce the same element — so it is a preference, not
-a fork. Nothing in the framework requires it.
+```ts
+Row({ gap: 8, y: 'center' }, Text({ text: 'Ready' }));
+```
+
+Drop the `jsx` lines and the second form still works — nothing in the
+framework requires JSX, and there is no runtime cost either way. The
+documentation uses markup because nested layout reads better as markup.
 
 ## A host to draw into
 
@@ -160,12 +169,17 @@ one runs unchanged on the other.
 
 Draw something with no state in it at all:
 
-```ts
-// App.ts
-import { Column, Text } from '@gesso/core';
-
-export const App = Column({ gap: 8, padding: 24 }, Text({ text: 'Hello from a worker' }));
+```tsx
+// App.tsx
+export const App = (
+  <column gap={8} padding={24}>
+    <text text="Hello from a worker" />
+  </column>
+);
 ```
+
+There is no import: the elements are intrinsic, resolved by
+`jsxImportSource`, the same way `<div>` needs no import in React.
 
 `npm run dev`, and the text is on a canvas. [Your first
 component](/guide/counter) is the next ten minutes.
