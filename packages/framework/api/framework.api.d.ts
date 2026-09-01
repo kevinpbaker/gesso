@@ -252,6 +252,7 @@ declare function internalState<T>(initialValue: T): InternalState<T>;
 declare class ServiceRegistry {
   private readonly services;
   register<T extends object>(ServiceClass: new () => T): T;
+  adopt(ServiceClass: new () => object): boolean;
   get<T extends object>(ServiceClass: new () => T): T;
   has(ServiceClass: Function): boolean;
 }
@@ -722,6 +723,7 @@ declare class GessoRuntime {
   private semanticsListener;
   private semanticsBoxes;
   private lastFocusedId;
+  private semanticsStale;
   private lastEditingState;
   private shellListener;
   private caretTimer;
@@ -775,6 +777,7 @@ declare class GessoRuntime {
   };
   layoutRoot(): UiNode;
   scrollIntoView(node: UiNode, padding?: number): void;
+  reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
   dispose(): void;
   private buildRoot;
   private resolveRootElement;
@@ -828,7 +831,7 @@ interface GpuStageTimings {
   encode: number;
 }
 declare class GessoAppBuilder {
-  private readonly root;
+  private root;
   private readonly channelRegistrations;
   private readonly serviceRegistrations;
   private frameListener;
@@ -852,6 +855,7 @@ declare class GessoAppBuilder {
   onInspect(listener: (report: UiNodeReport | null) => void): this;
   onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
   setInspector(enabled: boolean): void;
+  reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): this;
   setColorScheme(preference: ColorSchemePreference): this;
   mountSync(host: HTMLElement | string): () => void;
 }
@@ -1123,6 +1127,7 @@ declare class GessoApp {
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
   get rendererReady(): Promise<'canvas2d' | 'webgpu'>;
   resize(width: number, height: number): void;
+  reload(root: FrameworkChild, services?: readonly (new () => object)[]): void;
   setInspector(enabled: boolean): void;
   setColorScheme(preference: ColorSchemePreference): void;
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
@@ -1336,7 +1341,7 @@ declare class RenderWorkerApp {
   private readonly channelRegistrations;
   private readonly serviceRegistrations;
   private routes;
-  private readonly root;
+  private root;
   private readonly host;
   private runtime;
   private clock;
@@ -1344,6 +1349,7 @@ declare class RenderWorkerApp {
   private appLogicWorker;
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
   private reportUncaught;
+  reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options?: {
     worker?: WorkerHandle | (() => Worker);
     source?: ChannelSource<V, C>;

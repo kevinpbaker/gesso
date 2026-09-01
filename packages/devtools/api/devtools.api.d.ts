@@ -6,10 +6,13 @@
 
 // ==== index.d.ts ====
 import {
+  ChannelPort,
   FrameMetrics,
+  Patch,
   RuntimeErrorSource,
   UiFramePhase,
-  UiNodeReport
+  UiNodeReport,
+  WorkerHandle
 } from "@gesso/framework";
 interface SourceMapV3 {
   version: number;
@@ -81,6 +84,54 @@ declare class ErrorOverlay {
   private copy;
 }
 declare function mountErrorOverlay(host: HTMLElement, options?: ErrorOverlayOptions): ErrorOverlay;
+interface ActionLog {
+  tap(handle: WorkerHandle, tokens: readonly ActionLogToken[]): WorkerHandle;
+  tapPort(port: ChannelPort, token: ActionLogToken): ChannelPort;
+  readonly entries: readonly ActionEntry[];
+  readonly channels: readonly string[];
+  readonly pinnedTo: number | null;
+  jumpTo(seq: number | null): void;
+  clear(): void;
+  subscribe(listener: () => void): () => void;
+  dispose(): void;
+}
+interface ActionLogToken {
+  readonly name: string;
+  readonly initial: object;
+}
+interface ActionLogOptions {
+  readonly limit?: number;
+}
+interface EntryBase {
+  readonly seq: number;
+  readonly at: number;
+  readonly channel: string;
+}
+interface CommandEntry extends EntryBase {
+  readonly kind: 'command';
+  readonly command: string;
+  readonly payload: unknown;
+}
+interface PatchEntry extends EntryBase {
+  readonly kind: 'patch';
+  readonly patches: readonly Patch[];
+  readonly keys: readonly string[];
+}
+interface ChannelErrorEntry extends EntryBase {
+  readonly kind: 'error';
+  readonly message: string;
+}
+type ActionEntry = CommandEntry | PatchEntry | ChannelErrorEntry;
+declare function createActionLog(options?: ActionLogOptions): ActionLog;
+interface ActionLogPanel {
+  setVisible(visible: boolean): void;
+  readonly visible: boolean;
+  dispose(): void;
+}
+interface ActionLogPanelOptions {
+  readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+}
+declare function mountActionLogPanel(host: HTMLElement, log: ActionLog, options?: ActionLogPanelOptions): ActionLogPanel;
 interface NodeInspector {
   set(report: UiNodeReport | null): void;
   dispose(): void;
@@ -144,10 +195,12 @@ declare function shortenPath(url: string, origin?: string): string;
 declare function formatFrame(frame: StackFrame, origin?: string): string;
 export {
   codeFrame,
+  createActionLog,
   decodeMappings,
   ErrorOverlay,
   formatFrame,
   mapStack,
+  mountActionLogPanel,
   mountErrorOverlay,
   mountFrameProfiler,
   mountNodeInspector,
@@ -158,8 +211,16 @@ export {
   SourceMapConsumer,
   SourceMapStore,
   summarize,
+  type ActionEntry,
+  type ActionLog,
+  type ActionLogOptions,
+  type ActionLogPanel,
+  type ActionLogPanelOptions,
+  type ActionLogToken,
+  type ChannelErrorEntry,
   type CodeFrame,
   type CodeFrameLine,
+  type CommandEntry,
   type ErrorOrigin,
   type ErrorOverlayOptions,
   type FrameProfiler,
@@ -169,6 +230,7 @@ export {
   type NodeInspector,
   type NodeInspectorOptions,
   type OriginalPosition,
+  type PatchEntry,
   type SourceMapV3,
   type StackFrame,
   type StackLocation
