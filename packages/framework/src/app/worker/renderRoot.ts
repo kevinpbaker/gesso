@@ -395,6 +395,9 @@ export class RenderWorkerApp {
     this.runtime.onCursor(cursor => {
       this.host.postMessage({ type: 'cursor', cursor });
     });
+    this.runtime.onScrollability((scrollability, scrollsAnything) => {
+      this.host.postMessage({ type: 'scrollability', scrollability, scrollsAnything });
+    });
     this.runtime.onEditingState(state => {
       this.host.postMessage({ type: 'editing', state });
     });

@@ -8,7 +8,14 @@ import {
   type RuntimeToShellMessage,
   type ShellToRuntimeMessage
 } from './RenderWorkerProtocol';
-import { capturePointer, pointerDeviceOf, prepareInputSurface, wheelDeltaYOf } from '@gesso/core';
+import {
+  capturePointer,
+  pointerDeviceOf,
+  prepareInputSurface,
+  touchActionFor,
+  wheelDeltaYOf,
+  type UiScrollability
+} from '@gesso/core';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
@@ -150,6 +157,17 @@ export class WorkerApp {
   private detachInput: (() => void) | null = null;
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
+  /**
+   * Which way the runtime could scroll under the pointer, as of the
+   * last frame the worker reported.
+   *
+   * Starts out all false, which is the safe unknown: before the
+   * worker has said anything the shell lets wheels through to the
+   * page rather than swallowing them, so a canvas that fails to start
+   * degrades to an inert picture instead of a hole that eats
+   * scrolling.
+   */
+  private scrollability: UiScrollability = { up: false, down: false, left: false, right: false };
   private history: ShellHistory | null = null;
   /** True once the render worker has answered `ready` at least once. */
   private ready = false;
@@ -473,6 +491,16 @@ export class WorkerApp {
       }
       return;
     }
+    if (message.type === 'scrollability') {
+      // Cached, not acted on: the wheel handler reads it synchronously
+      // when an event arrives, which is the whole reason the worker
+      // pushes it ahead of time.
+      this.scrollability = message.scrollability;
+      if (this.canvas !== undefined) {
+        this.canvas.style.touchAction = touchActionFor(message.scrollsAnything);
+      }
+      return;
+    }
     if (message.type === 'editing') {
       this.proxy?.update(message.state);
       return;
@@ -560,12 +588,39 @@ export class WorkerApp {
    *
    * UiPlatformAdapter is deliberately not reused here. It decides
    * whether to call preventDefault() from the returned event's
-   * defaultPrevented flag, and that answer lives in the worker and
-   * cannot come back synchronously. The shell instead prevents the
-   * defaults that matter — page scroll on wheel, focus stealing on
-   * Tab, and the page's own select-all — and lets the worker route
-   * everything else.
+   * flags, and that answer lives in the worker and cannot come back
+   * synchronously. The shell instead prevents the defaults that
+   * matter — focus stealing on Tab, and the page's own select-all —
+   * and lets the worker route everything else.
+   *
+   * The wheel is the one place where "prevent it and be done" is
+   * wrong in both directions, so it reads a cached answer the worker
+   * pushed ahead of the event. See `wouldConsumeWheel`.
    */
+  /**
+   * Whether the runtime will take this wheel, decided from the cached
+   * scrollability rather than by asking.
+   *
+   * `preventDefault()` has to be called synchronously, inside the DOM
+   * handler, and the runtime is a `postMessage` away — so the honest
+   * answer arrives a frame late or not at all. The shell therefore
+   * answers from what the worker last reported about the pointer's
+   * scroll chain, which is the same bet a browser makes when it
+   * scrolls on the compositor thread.
+   *
+   * Both mistakes it can make are bounded and recoverable. One frame
+   * after a container reaches its edge, one wheel notch may still be
+   * swallowed; one frame after it leaves its edge, one may leak to
+   * the page. Neither is the failure this replaced, which was every
+   * wheel over the canvas dying whether or not there was anything to
+   * scroll.
+   *
+   * See `wheelConsumedBy` for the rule itself.
+   */
+  private wouldConsumeWheel(event: WheelEvent): boolean {
+    return wheelConsumedBy(this.scrollability, event.deltaX, event.deltaY);
+  }
+
   private attachInput(canvas: HTMLCanvasElement): () => void {
     const toLocal = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
@@ -658,7 +713,9 @@ export class WorkerApp {
       this.post({ type: 'pointerCancel', pointer: pointerDeviceOf(event) });
     };
     const onWheel = (event: WheelEvent): void => {
-      event.preventDefault();
+      if (this.wouldConsumeWheel(event)) {
+        event.preventDefault();
+      }
       const { x, y } = toLocal(event.clientX, event.clientY);
       this.post({
         type: 'wheel',
@@ -721,6 +778,36 @@ function isSelectAll(event: KeyboardEvent): boolean {
 /** Ctrl+F, or Cmd+F on a Mac: open the app's find bar. */
 function isFind(event: KeyboardEvent): boolean {
   return (event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'f' || event.key === 'F');
+}
+
+/**
+ * Whether the runtime will take a wheel with these deltas, given what
+ * it last said about the pointer's scroll chain.
+ *
+ * The shell has to answer this synchronously, inside the DOM handler,
+ * and the runtime is a `postMessage` away — so it answers from the
+ * last frame's report. That is the same bet a browser makes when it
+ * scrolls on the compositor thread, and both mistakes it allows are
+ * one frame long: a notch swallowed just after a container reached
+ * its edge, or one leaked to the page just after it left it. Neither
+ * is the failure this replaced, which was every wheel over the canvas
+ * dying whether or not there was anything to scroll.
+ *
+ * The dominant axis decides, matching the runtime's own rule that a
+ * container scrolls on one axis at a time. A wheel with no delta in
+ * that axis is never consumed.
+ */
+export function wheelConsumedBy(scrollability: UiScrollability, deltaX: number, deltaY: number): boolean {
+  if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+    if (deltaY > 0) {
+      return scrollability.down;
+    }
+    return deltaY < 0 ? scrollability.up : false;
+  }
+  if (deltaX > 0) {
+    return scrollability.right;
+  }
+  return deltaX < 0 ? scrollability.left : false;
 }
 
 /**

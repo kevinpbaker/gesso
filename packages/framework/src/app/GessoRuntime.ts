@@ -27,6 +27,7 @@ import {
   UiWheelController,
   type ScrollContainerState,
   type ScrollSink,
+  type UiScrollability,
   UiFocusManager,
   FocusNotifier,
   EnvironmentNotifier,
@@ -282,6 +283,18 @@ export class GessoRuntime {
   private lastInspection: string | null = null;
   private cursorListener: ((cursor: string | null) => void) | null = null;
   private lastCursor: string | null = null;
+  private scrollabilityListener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null = null;
+  private lastScrollability: UiScrollability = { up: false, down: false, left: false, right: false };
+  /**
+   * Undefined until the first report, so that one is always sent.
+   *
+   * The values it takes are ordinary booleans; the third state exists
+   * only to make "nothing has been said yet" different from "nothing
+   * scrolls", which matters because those two need opposite
+   * `touch-action` on the shell's canvas and an app with no scroll
+   * container at all would otherwise never send either.
+   */
+  private lastScrollsAnything: boolean | undefined = undefined;
   private editingListener: ((state: EditingState | null) => void) | null = null;
   /**
    * The selection controller, reachable before `input` is assigned:
@@ -769,6 +782,28 @@ export class GessoRuntime {
   }
 
   /**
+   * Receives which way the runtime could scroll under the pointer,
+   * whenever that changes.
+   *
+   * This exists because `preventDefault()` is a synchronous decision
+   * and this runtime may be a worker message away from the DOM event
+   * that needs it. A shell that swallows every wheel makes the canvas
+   * a scroll trap in the page around it; one that swallows none lets
+   * a scroll happen twice. Neither is a guess it can make locally, so
+   * the answer is pushed ahead of the event and read from a cache
+   * when one arrives — at worst one frame stale, which is the same
+   * trade a browser makes to scroll off the main thread.
+   */
+  onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void {
+    this.scrollabilityListener = listener;
+  }
+
+  /** Which way the pointer's scroll chain can currently move. */
+  get scrollability(): UiScrollability {
+    return this.lastScrollability;
+  }
+
+  /**
    * Receives the focused editable's text, selection and caret box after
    * any frame that changed them, and null when no editable has focus.
    * The shell's editing proxy mirrors it; see `EditingProxy`.
@@ -958,6 +993,7 @@ export class GessoRuntime {
     }
     this.inspectListener = null;
     this.cursorListener = null;
+    this.scrollabilityListener = null;
     this.rendererErrorListener = null;
     this.scheduler.stop();
     // An animation holds its cell, and a cell holds whatever the
@@ -1125,7 +1161,7 @@ export class GessoRuntime {
         editing,
         selection
       }),
-      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink),
+      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink, () => root),
       keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing, selection, find }),
       // Listens at the root, so a pan reaches it only when nothing
       // between the pressed node and here claimed the gesture. That is
@@ -1288,6 +1324,7 @@ export class GessoRuntime {
    */
   private handleHoverChange(node: UiNode | null): void {
     this.sendCursor();
+    this.sendScrollability();
     if (!this.inspector.isEnabled || !this.inspector.setHovered(node)) {
       return;
     }
@@ -1348,6 +1385,7 @@ export class GessoRuntime {
         }
         this.graph.markDirty(node, DirtyFlags.Transform);
       },
+      scrollContainers: () => this.engine.scrollContainers(),
       revealScrollbars: (node): void => {
         this.engine.revealScrollbars(node);
         this.graph.markDirty(node, DirtyFlags.Paint);
@@ -1605,6 +1643,9 @@ export class GessoRuntime {
     // A frame can change the cursor without the pointer moving: the
     // hovered node's `cursor` prop, or the node itself, may have changed.
     this.sendCursor();
+    // The same is true of the scroll chain — a container that reached
+    // its end, or content that grew under a still cursor.
+    this.sendScrollability();
     this.frameListener?.({
       frame: frame.id,
       durationMs: elapsed,
@@ -1765,6 +1806,33 @@ export class GessoRuntime {
     }
     this.lastCursor = cursor;
     this.cursorListener?.(cursor);
+  }
+
+  /**
+   * Hands the listener the pointer's scroll chain, when it changed.
+   *
+   * Sent from the same two places as the cursor and for the same
+   * reason: a hover change moves the chain, and a frame can change it
+   * without the pointer moving — a list that reached its end, or
+   * content that grew under a still cursor.
+   */
+  private sendScrollability(): void {
+    // Hover first, and the last wheel's own target when nothing is
+    // hovered. Scrolling a page slides a canvas under a cursor that
+    // never moved, so on that path a wheel is the only evidence the
+    // runtime gets that the pointer is over it at all.
+    const target = this.input.pointer.hoveredNode ?? this.input.wheel.lastWheelTarget;
+    const next = this.input.wheel.scrollabilityOf(target);
+    const anything = this.input.wheel.scrollsAnything();
+    const last = this.lastScrollability;
+    const unchanged =
+      next.up === last.up && next.down === last.down && next.left === last.left && next.right === last.right;
+    if (unchanged && anything === this.lastScrollsAnything) {
+      return;
+    }
+    this.lastScrollability = next;
+    this.lastScrollsAnything = anything;
+    this.scrollabilityListener?.(next, anything);
   }
 
   /** Hands the listener the hovered node's explanation, when it changed. */

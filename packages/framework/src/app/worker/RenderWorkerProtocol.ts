@@ -4,6 +4,7 @@ import type {
   RendererBackend,
   UiPointerDevice,
   UiSemanticsAction,
+  UiScrollability,
   UiSemanticsUpdate
 } from '@gesso/core';
 import type { ColorScheme } from '../colorScheme';
@@ -243,6 +244,21 @@ export type RuntimeToShellMessage =
   | { type: 'inspect'; text: string | null }
   /** The CSS cursor the hovered node asks for; null for the default arrow. */
   | { type: 'cursor'; cursor: string | null }
+  /**
+   * Which way the runtime could scroll under the pointer, and whether
+   * it has anything scrollable at all.
+   *
+   * Pushed ahead of the wheel it answers for, because the shell has
+   * to decide `preventDefault()` synchronously and the runtime is a
+   * message away. Without it the shell must either swallow every
+   * wheel — making the canvas a scroll trap in the page around it —
+   * or swallow none, and let one wheel scroll twice.
+   *
+   * `scrollsAnything` is the coarser tree-level answer, and drives
+   * the canvas's `touch-action`: that is latched when a finger lands,
+   * so there is no hover position it could have been derived from.
+   */
+  | { type: 'scrollability'; scrollability: UiScrollability; scrollsAnything: boolean }
   /**
    * The focused editable's text, selection and caret box for the
    * editing proxy to mirror; null when no editable has focus.
