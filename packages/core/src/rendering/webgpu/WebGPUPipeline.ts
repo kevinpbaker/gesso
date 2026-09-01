@@ -13,12 +13,22 @@ export interface PrimitivePipeline {
 }
 
 /**
- * The bind group layout for the clip chain (group 1), shared by both
- * pipelines so one bind group serves the whole pass.
+ * The bind group layout for what the whole frame shares (group 1): the
+ * clip chain and the frame's gradients, one bind group for the pass.
+ *
+ * Both are read-only storage rather than uniforms because both are
+ * variable-length per frame, and both live in group 1 rather than in a
+ * group of their own because a second bind group would be a second
+ * `setBindGroup` per pipeline switch for data neither pipeline changes.
+ * The textured pipeline never samples the gradients; a bind group
+ * layout may declare more than a shader uses.
  */
-export function createClipBindGroupLayout(device: GPUDevice): GPUBindGroupLayout {
+export function createFrameBindGroupLayout(device: GPUDevice): GPUBindGroupLayout {
   return device.createBindGroupLayout({
-    entries: [{ binding: 0, visibility: fragmentStage(), buffer: { type: 'read-only-storage' } }]
+    entries: [
+      { binding: 0, visibility: fragmentStage(), buffer: { type: 'read-only-storage' } },
+      { binding: 1, visibility: fragmentStage(), buffer: { type: 'read-only-storage' } }
+    ]
   });
 }
 
@@ -68,7 +78,7 @@ const STRAIGHT_ALPHA_BLEND: GPUBlendState = {
 export function createPrimitivePipeline(
   device: GPUDevice,
   format: GPUTextureFormat,
-  clipLayout: GPUBindGroupLayout
+  frameLayout: GPUBindGroupLayout
 ): PrimitivePipeline {
   const module = device.createShaderModule({ code: PRIMITIVE_SHADER });
 
@@ -77,7 +87,7 @@ export function createPrimitivePipeline(
   });
 
   const pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({ bindGroupLayouts: [uniformLayout, clipLayout] }),
+    layout: device.createPipelineLayout({ bindGroupLayouts: [uniformLayout, frameLayout] }),
     vertex: { module, entryPoint: 'vs', buffers: [quadVertexLayout(), primitiveInstanceLayout()] },
     fragment: { module, entryPoint: 'fs', targets: [{ format, blend: STRAIGHT_ALPHA_BLEND }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }
@@ -114,7 +124,7 @@ export function createPrimitivePipeline(
 export function createTexturedPipeline(
   device: GPUDevice,
   format: GPUTextureFormat,
-  clipLayout: GPUBindGroupLayout
+  frameLayout: GPUBindGroupLayout
 ): TexturedPipeline {
   const module = device.createShaderModule({ code: TEXTURED_SHADER });
 
@@ -127,7 +137,7 @@ export function createTexturedPipeline(
   });
 
   const pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, clipLayout] }),
+    layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, frameLayout] }),
     vertex: { module, entryPoint: 'vs', buffers: [quadVertexLayout(), texturedInstanceLayout()] },
     fragment: { module, entryPoint: 'fs', targets: [{ format, blend: STRAIGHT_ALPHA_BLEND }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }
@@ -195,7 +205,8 @@ function primitiveInstanceLayout(): GPUVertexBufferLayout {
       { shaderLocation: 6, offset: 48, format: 'float32x2' }, // transform a
       { shaderLocation: 7, offset: 56, format: 'float32x2' }, // transform b
       { shaderLocation: 8, offset: 64, format: 'float32x2' }, // transform c
-      { shaderLocation: 9, offset: 72, format: 'float32' } // clip index
+      { shaderLocation: 9, offset: 72, format: 'float32' }, // clip index
+      { shaderLocation: 10, offset: 76, format: 'float32' } // gradient index
     ]
   };
 }

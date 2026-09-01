@@ -17,6 +17,7 @@ import type { MeasureRun } from './WebGPUGlyphShaper';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
+import { gradientPaint, MAX_GRADIENT_STOPS, type ResolvedGradient } from '../../properties/UiGradient';
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
@@ -36,7 +37,7 @@ import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSel
  *   11 kind               (u32: PrimitiveKind)
  *   12 transform          3x2 affine, absolute layout → logical screen
  *   18 clipIndex          index into the clip chain, -1 for none
- *   19 pad
+ *   19 gradientIndex      index into the frame's gradients, -1 for none
  *   20 (end)
  */
 export const INSTANCE_STRIDE_FLOATS = 20;
@@ -75,6 +76,32 @@ export const TEXTURED_STRIDE_BYTES = TEXTURED_STRIDE_FLOATS * 4;
 export const CLIP_STRIDE_FLOATS = 16;
 export const CLIP_STRIDE_BYTES = CLIP_STRIDE_FLOATS * 4;
 export const NO_CLIP_INDEX = -1;
+
+/**
+ * Gradient record layout, in floats (twelve vec4s):
+ *
+ *   0  kind (0 linear, 1 radial), stopCount, pad, pad
+ *   4  linear: the gradient line x0, y0, x1, y1
+ *      radial: centre x, centre y, radius, pad
+ *   8  up to MAX_GRADIENT_STOPS colours, rgba each
+ *   40 their offsets along the gradient, four to a vec4
+ *   48 (end)
+ *
+ * Geometry is in the instance's own coordinates, with the origin at
+ * the rectangle's top-left, which is exactly the `localPos` the
+ * fragment shader already has. A fill instance names the gradient it
+ * is painted with; the record is fixed-size so one buffer holds them
+ * all and a stop is a lookup rather than a second indirection. That is
+ * what the stop cap buys, and why exceeding it is an error rather than
+ * a truncation: see `MAX_GRADIENT_STOPS`.
+ */
+export const GRADIENT_STRIDE_FLOATS = 48;
+export const GRADIENT_STRIDE_BYTES = GRADIENT_STRIDE_FLOATS * 4;
+/** Float offset of the first stop colour within a record. */
+export const GRADIENT_COLORS_OFFSET = 8;
+/** Float offset of the first stop position within a record. */
+export const GRADIENT_OFFSETS_OFFSET = 40;
+export const NO_GRADIENT_INDEX = -1;
 
 export const enum PrimitiveKind {
   Fill = 0,
@@ -167,6 +194,9 @@ export interface RenderList {
   /** The frame's rounded clips, CLIP_STRIDE_FLOATS each; see the layout above. */
   clipData: Float32Array;
   clipCount: number;
+  /** The frame's gradients, GRADIENT_STRIDE_FLOATS each. */
+  gradientData: Float32Array;
+  gradientCount: number;
   commands: RenderCommand[];
   /** The lines of text the frame drew, in paint order. */
   textRuns: TextRunDraw[];
@@ -264,6 +294,7 @@ class FloatBuffer {
 const instanceScratch = new FloatBuffer(INSTANCE_STRIDE_FLOATS * 512);
 const texturedScratch = new FloatBuffer(TEXTURED_STRIDE_FLOATS * 2048);
 const clipScratch = new FloatBuffer(CLIP_STRIDE_FLOATS * 64);
+const gradientScratch = new FloatBuffer(GRADIENT_STRIDE_FLOATS * 16);
 
 /**
  * Everything the builder keeps between frames: the glyph atlas it
@@ -308,9 +339,11 @@ export function buildRenderList(
   const instanceData = instanceScratch;
   const texturedData = texturedScratch;
   const clipData = clipScratch;
+  const gradientData = gradientScratch;
   instanceData.reset();
   texturedData.reset();
   clipData.reset();
+  gradientData.reset();
   const commands: RenderCommand[] = [];
   const textRuns: TextRunDraw[] = [];
   const { atlas, shaper } = textCache;
@@ -553,6 +586,37 @@ export function buildRenderList(
           PrimitiveKind.Fill,
           nodeCtm,
           ownRounded
+        );
+      }
+    }
+
+    // Background gradient, over the colour and under the image, where
+    // CSS paints a `background-image`. It is an ordinary fill instance
+    // naming a record in the frame's gradient buffer; the fragment
+    // shader evaluates the ramp at each pixel's place in the box, so
+    // the same instance carries the same rounded corners and the same
+    // clip chain as a flat one.
+    if (paint.backgroundGradient !== undefined) {
+      const index = pushGradient(gradientData, paint.backgroundGradient, rec.width, rec.height);
+      if (index !== NO_GRADIENT_INDEX) {
+        beginPrimitives(ownScissor);
+        // The instance's colour is unread when it names a gradient; the
+        // first stop makes a dumped instance buffer legible.
+        const first = paint.backgroundGradient.stops[0].color;
+        pushInstance(
+          instanceData,
+          rec.x,
+          rec.y,
+          rec.width,
+          rec.height,
+          first,
+          uniformBorderRadius(paint.borderRadius),
+          effectiveOpacity,
+          0,
+          PrimitiveKind.Fill,
+          nodeCtm,
+          ownRounded,
+          index
         );
       }
     }
@@ -969,6 +1033,8 @@ export function buildRenderList(
     texturedCount: texturedData.length / TEXTURED_STRIDE_FLOATS,
     clipData: clipData.take(),
     clipCount: clipData.length / CLIP_STRIDE_FLOATS,
+    gradientData: gradientData.take(),
+    gradientCount: gradientData.length / GRADIENT_STRIDE_FLOATS,
     commands,
     textRuns
   };
@@ -1051,7 +1117,8 @@ function pushInstance(
   borderWidth: number,
   kind: PrimitiveKind,
   transform: Affine,
-  clip: number
+  clip: number,
+  gradient: number = NO_GRADIENT_INDEX
 ): void {
   out.ensure(INSTANCE_STRIDE_FLOATS);
   const data = out.data;
@@ -1075,8 +1142,55 @@ function pushInstance(
   data[at + 16] = transform[4];
   data[at + 17] = transform[5];
   data[at + 18] = clip;
-  data[at + 19] = 0;
+  data[at + 19] = gradient;
   out.length = at + INSTANCE_STRIDE_FLOATS;
+}
+
+/**
+ * Writes one gradient record for a rectangle of the given size and
+ * returns its index, or NO_GRADIENT_INDEX when it would paint nothing.
+ *
+ * `gradientPaint` is the shared placement the Canvas2D renderer calls
+ * too, so the gradient line and the stop positions are one piece of
+ * arithmetic rather than two that have to agree.
+ */
+function pushGradient(out: FloatBuffer, gradient: ResolvedGradient, width: number, height: number): number {
+  const placed = gradientPaint(gradient, width, height);
+  if (placed.kind === 'radial' && !(placed.radius > 0)) {
+    return NO_GRADIENT_INDEX;
+  }
+  if (placed.stops.length > MAX_GRADIENT_STOPS) {
+    // `resolveGradient` already rejected this; the guard is here so a
+    // future caller cannot quietly write past the end of a record.
+    throw new Error(`A gradient may carry at most ${MAX_GRADIENT_STOPS} stops, got ${placed.stops.length}.`);
+  }
+  out.ensure(GRADIENT_STRIDE_FLOATS);
+  const data = out.data;
+  const at = out.length;
+  // The scratch is reused between frames, so the unwritten stop slots
+  // hold whatever the last frame put there.
+  data.fill(0, at, at + GRADIENT_STRIDE_FLOATS);
+  data[at] = placed.kind === 'linear' ? 0 : 1;
+  data[at + 1] = placed.stops.length;
+  data[at + 4] = placed.x0;
+  data[at + 5] = placed.y0;
+  if (placed.kind === 'linear') {
+    data[at + 6] = placed.x1;
+    data[at + 7] = placed.y1;
+  } else {
+    data[at + 6] = placed.radius;
+  }
+  for (let i = 0; i < placed.stops.length; i++) {
+    const stop = placed.stops[i];
+    const color = at + GRADIENT_COLORS_OFFSET + i * 4;
+    data[color] = stop.color.r;
+    data[color + 1] = stop.color.g;
+    data[color + 2] = stop.color.b;
+    data[color + 3] = stop.color.a;
+    data[at + GRADIENT_OFFSETS_OFFSET + i] = stop.offset;
+  }
+  out.length = at + GRADIENT_STRIDE_FLOATS;
+  return at / GRADIENT_STRIDE_FLOATS;
 }
 
 /** The whole of a texture: what an image samples. */

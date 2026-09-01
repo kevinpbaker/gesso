@@ -8,13 +8,19 @@ import { normalizeColor } from '../properties/UiColor';
 import { setSelectionRange } from '../selection/UiSelectable';
 import { setMatchRanges } from '../find/UiTextMatches';
 import type { DecorationShape } from './Decorations';
-import { RenderHarness } from './RenderTestUtils';
+import { linearGradient, radialGradient } from '../properties/UiGradient';
+import { percent } from '../layout/UiLength';
+import { RenderHarness, RecordedGradient } from './RenderTestUtils';
 import type { RecordedCall } from './RenderTestUtils';
 import { parseColor } from './webgpu/WebGPUColor';
 import {
   buildRenderList,
   CommandKind,
+  GRADIENT_COLORS_OFFSET,
+  GRADIENT_OFFSETS_OFFSET,
+  GRADIENT_STRIDE_FLOATS,
   INSTANCE_STRIDE_FLOATS,
+  NO_GRADIENT_INDEX,
   PrimitiveKind,
   TEXTURED_STRIDE_FLOATS,
   type Affine,
@@ -78,6 +84,60 @@ function cssColorKey(css: unknown): string {
   const color = normalizeColor(css);
   const rgba = color === undefined ? undefined : parseColor(color);
   return rgba === undefined ? String(css) : colorKey(rgba.r, rgba.g, rgba.b, rgba.a);
+}
+
+/**
+ * A gradient as a comparable string: kind, geometry in the filled box's
+ * own coordinates, then each stop.
+ *
+ * The two backends state a gradient in different shapes: Canvas2D gets
+ * absolute endpoints and `addColorStop` calls, and WebGPU gets a record
+ * in a storage buffer, so neither can be compared to the other
+ * directly. Both are reduced to this, which is what the fragment shader and
+ * `createLinearGradient` are each given: where the ramp starts, where it
+ * ends, and what is at each point along it.
+ */
+function gradientKey(
+  kind: string,
+  geometry: readonly number[],
+  stops: readonly { offset: number; color: string }[]
+): string {
+  const places = geometry.map(round).join(',');
+  const ramp = stops.map(stop => `${round(stop.offset)}:${stop.color}`).join(' ');
+  return `${kind}(${places})[${ramp}]`;
+}
+
+/**
+ * The Canvas2D gradient, relative to the box being filled. Radial
+ * gradients are asked for as two concentric circles with the inner one
+ * at zero radius, so only the outer radius carries information.
+ */
+function canvasGradientKey(gradient: RecordedGradient, boxX: number, boxY: number): string {
+  const stops = gradient.stops.map(stop => ({ offset: stop.offset, color: cssColorKey(stop.color) }));
+  if (gradient.kind === 'linear') {
+    const [x0, y0, x1, y1] = gradient.args;
+    return gradientKey('linear', [x0 - boxX, y0 - boxY, x1 - boxX, y1 - boxY], stops);
+  }
+  const [x0, y0, , , , r1] = gradient.args;
+  return gradientKey('radial', [x0 - boxX, y0 - boxY, r1], stops);
+}
+
+/** The same gradient read back out of the frame's gradient buffer. */
+function webgpuGradientKey(data: Float32Array, index: number): string {
+  const at = index * GRADIENT_STRIDE_FLOATS;
+  const count = data[at + 1];
+  const stops: { offset: number; color: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const color = at + GRADIENT_COLORS_OFFSET + i * 4;
+    stops.push({
+      offset: data[at + GRADIENT_OFFSETS_OFFSET + i],
+      color: colorKey(data[color], data[color + 1], data[color + 2], data[color + 3])
+    });
+  }
+  if (data[at] === 0) {
+    return gradientKey('linear', [data[at + 4], data[at + 5], data[at + 6], data[at + 7]], stops);
+  }
+  return gradientKey('radial', [data[at + 4], data[at + 5], data[at + 6]], stops);
 }
 
 function apply(t: Affine, x: number, y: number): [number, number] {
@@ -264,7 +324,7 @@ function fillDraw(
     kind: 'fill',
     ...screenBox(ctm, x, y, width, height),
     radius,
-    color: cssColorKey(style),
+    color: style instanceof RecordedGradient ? canvasGradientKey(style, x, y) : cssColorKey(style),
     opacity: round(alpha),
     clip
   };
@@ -318,11 +378,15 @@ function webgpuDraws(list: RenderList): Draw[] {
         const d = list.instanceData;
         const t: Affine = [d[o + 12], d[o + 13], d[o + 14], d[o + 15], d[o + 16], d[o + 17]];
         const kind = d[o + 11] === PrimitiveKind.Border ? 'border' : 'fill';
+        const gradient = d[o + 19];
         draws.push({
           kind,
           ...screenBox(t, d[o], d[o + 1], d[o + 2], d[o + 3]),
           radius: d[o + 8],
-          color: colorKey(d[o + 4], d[o + 5], d[o + 6], d[o + 7]),
+          color:
+            gradient === NO_GRADIENT_INDEX
+              ? colorKey(d[o + 4], d[o + 5], d[o + 6], d[o + 7])
+              : webgpuGradientKey(list.gradientData, gradient),
           opacity: round(d[o + 9]),
           ...(kind === 'border' ? { borderWidth: d[o + 10] } : {}),
           clip: clipOf(command.scissor)
@@ -589,6 +653,88 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     expect(drawnRing.clip).toEqual({ x: 8, y: 8, width: 200, height: 80 });
     // The reordered child's own ring is not clipped by anything.
     expect(draws[8].clip).toBeNull();
+  });
+
+  /**
+   * Gradients (`ROADMAP.md` F9). The two backends could not be further
+   * apart in how they hold one: Canvas2D asks the platform for a
+   * `CanvasGradient` and WebGPU evaluates a ramp per pixel out of a
+   * storage buffer. So what is compared is the gradient itself: its
+   * line in the box's own coordinates, and the colour at each point
+   * along it. The tree covers what the two could disagree about: the
+   * axis a linear gradient runs along, a diagonal whose line has to be
+   * lengthened, a gradient over a colour and under an image, one on a
+   * rounded box inside a rounded clip, offsets in pixels and in
+   * percentages against three stops, and a radial gradient off centre.
+   */
+  it('linear and radial gradients on boxes, clips and colours', () => {
+    const h = new RenderHarness(600, 400);
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 8);
+    root.setProperty('gap', 6);
+
+    h.append(
+      root,
+      box(h, 'down', {
+        width: 120,
+        height: 40,
+        backgroundGradient: linearGradient(Math.PI, [{ color: '#0ea5e9' }, { color: '#1e293b' }])
+      })
+    );
+    h.append(
+      root,
+      box(h, 'across', {
+        width: 120,
+        height: 40,
+        borderRadius: 8,
+        backgroundGradient: linearGradient(Math.PI / 2, [{ color: '#f43f5e' }, { color: '#facc15' }])
+      })
+    );
+    h.append(
+      root,
+      box(h, 'diagonal', {
+        width: 90,
+        height: 90,
+        // A gradient over a solid colour and under an image, which is
+        // the order CSS paints a background in.
+        backgroundColor: '#111827',
+        image: { width: 40, height: 20 } as ImageBitmap,
+        objectFit: 'contain',
+        backgroundGradient: linearGradient(Math.PI / 4, [
+          { offset: 0, color: '#22d3ee' },
+          { offset: 30, color: '#a855f7' },
+          { offset: percent(100), color: '#f97316' }
+        ])
+      })
+    );
+
+    const card = box(h, 'card', { width: 140, height: 70, overflow: 'hidden', borderRadius: 12 });
+    h.append(
+      card,
+      box(h, 'inner', {
+        width: 200,
+        height: 200,
+        flexShrink: 0,
+        borderRadius: 6,
+        backgroundGradient: radialGradient(
+          [
+            { offset: percent(0), color: '#ffffff' },
+            { offset: percent(70), color: '#38bdf8' },
+            { offset: percent(100), color: '#0f172a' }
+          ],
+          { centerX: percent(25), centerY: 10, radius: 60 }
+        )
+      })
+    );
+    h.append(root, card);
+
+    const draws = expectParity(h, root, Constraints.tight(600, 400));
+    expect(draws.map(d => d.kind)).toEqual(['fill', 'fill', 'fill', 'fill', 'image', 'fill']);
+    // The vertical gradient's line runs the height of the box, top to
+    // bottom, and its stops are the ends of it.
+    expect(draws[0].color).toBe('linear(60,0,60,40)[0:0.055,0.647,0.914,1 1:0.118,0.161,0.231,1]');
+    // The radial one keeps the centre and radius it was given.
+    expect(draws[5].color).toMatch(/^radial\(50,10,60\)\[0:1,1,1,1 0\.7:/);
   });
 
   it('images under every objectFit', () => {

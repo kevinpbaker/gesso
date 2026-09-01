@@ -8,7 +8,7 @@ import { Constraints } from '../layout/LayoutTypes';
 import type { LayoutBox, LayoutResult } from '../layout/LayoutTypes';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import { Canvas2DRenderer } from './canvas2d/Canvas2DRenderer';
-import type { Canvas2DContext } from './canvas2d/Canvas2DContext';
+import type { Canvas2DContext, Canvas2DGradient } from './canvas2d/Canvas2DContext';
 import { CanvasSurface } from './canvas2d/CanvasSurface';
 import type { CanvasHost } from './canvas2d/CanvasSurface';
 
@@ -18,14 +18,33 @@ export interface RecordedCall {
 }
 
 /**
+ * The gradient a recording context hands back, carrying what it was
+ * asked for so a test can read the whole paint rather than a `[object
+ * CanvasGradient]`. A real one is opaque, which is exactly what makes
+ * a gradient hard to assert on without this.
+ */
+export class RecordedGradient implements Canvas2DGradient {
+  readonly stops: { offset: number; color: string }[] = [];
+
+  constructor(
+    readonly kind: 'linear' | 'radial',
+    readonly args: readonly number[]
+  ) {}
+
+  addColorStop(offset: number, color: string): void {
+    this.stops.push({ offset, color });
+  }
+}
+
+/**
  * Deterministic Canvas2D spy: records every call and style
  * assignment so tests can assert the exact draw sequence.
  */
 export class RecordingCanvasContext implements Canvas2DContext {
   readonly calls: RecordedCall[] = [];
 
-  private _fillStyle: string | CanvasGradient | CanvasPattern = '#000';
-  private _strokeStyle: string | CanvasGradient | CanvasPattern = '#000';
+  private _fillStyle: string | Canvas2DGradient | CanvasPattern = '#000';
+  private _strokeStyle: string | Canvas2DGradient | CanvasPattern = '#000';
   private _lineWidth = 1;
   private _lineJoin: CanvasLineJoin = 'miter';
   private _globalAlpha = 1;
@@ -39,20 +58,20 @@ export class RecordingCanvasContext implements Canvas2DContext {
    */
   letterSpacing = '0px';
 
-  get fillStyle(): string | CanvasGradient | CanvasPattern {
+  get fillStyle(): string | Canvas2DGradient | CanvasPattern {
     return this._fillStyle;
   }
 
-  set fillStyle(value: string | CanvasGradient | CanvasPattern) {
+  set fillStyle(value: string | Canvas2DGradient | CanvasPattern) {
     this._fillStyle = value;
     this.record('set:fillStyle', [value]);
   }
 
-  get strokeStyle(): string | CanvasGradient | CanvasPattern {
+  get strokeStyle(): string | Canvas2DGradient | CanvasPattern {
     return this._strokeStyle;
   }
 
-  set strokeStyle(value: string | CanvasGradient | CanvasPattern) {
+  set strokeStyle(value: string | Canvas2DGradient | CanvasPattern) {
     this._strokeStyle = value;
     this.record('set:strokeStyle', [value]);
   }
@@ -195,6 +214,18 @@ export class RecordingCanvasContext implements Canvas2DContext {
 
   drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void {
     this.record('drawImage', [image, dx, dy, dw, dh]);
+  }
+
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): RecordedGradient {
+    const gradient = new RecordedGradient('linear', [x0, y0, x1, y1]);
+    this.record('createLinearGradient', [x0, y0, x1, y1]);
+    return gradient;
+  }
+
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): RecordedGradient {
+    const gradient = new RecordedGradient('radial', [x0, y0, r0, x1, y1, r1]);
+    this.record('createRadialGradient', [x0, y0, r0, x1, y1, r1]);
+    return gradient;
   }
 
   private record(name: string, args: unknown[]): void {

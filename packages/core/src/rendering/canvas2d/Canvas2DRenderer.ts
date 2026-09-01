@@ -1,8 +1,10 @@
 import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
-import type { Canvas2DContext } from './Canvas2DContext';
+import type { Canvas2DContext, Canvas2DGradient } from './Canvas2DContext';
 import type { CanvasSurface } from './CanvasSurface';
+import type { ResolvedGradient } from '../../properties/UiGradient';
+import { gradientPaint } from '../../properties/UiGradient';
 import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
 import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
@@ -259,10 +261,24 @@ export class Canvas2DRenderer implements UiRenderer {
   // -------------------------------------------------------------------------
 
   private paintBackground(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
-    if (paint.backgroundColor === undefined) {
-      return;
+    if (paint.backgroundColor !== undefined) {
+      ctx.fillStyle = colorToCss(paint.backgroundColor);
+      this.fillBox(ctx, rec, paint);
     }
-    ctx.fillStyle = colorToCss(paint.backgroundColor);
+    // The gradient goes over the colour and under the image, which is
+    // where CSS puts a `background-image`. Both are the node's own box,
+    // so a node with both pays for two fills, as it would in a browser.
+    if (paint.backgroundGradient !== undefined) {
+      const style = canvasGradient(ctx, paint.backgroundGradient, rec);
+      if (style !== undefined) {
+        ctx.fillStyle = style;
+        this.fillBox(ctx, rec, paint);
+      }
+    }
+  }
+
+  /** The node's box, following its corner radius. */
+  private fillBox(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
     if (!borderRadiusIsZero(paint.borderRadius)) {
       traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
       ctx.fill();
@@ -571,6 +587,40 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullY = this.cullStack.pop() ?? 0;
     this.cullX = this.cullStack.pop() ?? 0;
   }
+}
+
+/**
+ * A `CanvasGradient` for the node's box, or undefined when the gradient
+ * covers nothing (a zero radius, or a box with no area).
+ *
+ * `gradientPaint` places the gradient in the box's own coordinates and
+ * the box's origin is added here, so the arithmetic that decides where
+ * a gradient line runs is the one the WebGPU builder uses too.
+ */
+function canvasGradient(
+  ctx: Canvas2DContext,
+  gradient: ResolvedGradient,
+  rec: LayoutRecord
+): Canvas2DGradient | undefined {
+  const placed = gradientPaint(gradient, rec.width, rec.height);
+  if (placed.kind === 'radial' && !(placed.radius > 0)) {
+    return undefined;
+  }
+  const style =
+    placed.kind === 'linear'
+      ? ctx.createLinearGradient(rec.x + placed.x0, rec.y + placed.y0, rec.x + placed.x1, rec.y + placed.y1)
+      : ctx.createRadialGradient(
+          rec.x + placed.x0,
+          rec.y + placed.y0,
+          0,
+          rec.x + placed.x0,
+          rec.y + placed.y0,
+          placed.radius
+        );
+  for (const stop of placed.stops) {
+    style.addColorStop(stop.offset, colorToCss(stop.color));
+  }
+  return style;
 }
 
 /**

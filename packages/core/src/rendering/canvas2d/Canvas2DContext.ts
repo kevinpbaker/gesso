@@ -6,6 +6,17 @@
  * platform boundary (see CanvasSurface). Keeping this list explicit
  * means the renderer core never names a DOM type.
  */
+/**
+ * The part of `CanvasGradient` the renderer uses.
+ *
+ * Named separately so a recording context can satisfy it without
+ * fabricating a DOM object, which is the same reason `Canvas2DContext`
+ * exists. A real `CanvasGradient` satisfies it structurally.
+ */
+export interface Canvas2DGradient {
+  addColorStop(offset: number, color: string): void;
+}
+
 export interface Canvas2DContext {
   save(): void;
   restore(): void;
@@ -45,8 +56,11 @@ export interface Canvas2DContext {
    */
   drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
 
-  fillStyle: string | CanvasGradient | CanvasPattern;
-  strokeStyle: string | CanvasGradient | CanvasPattern;
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
+
+  fillStyle: string | Canvas2DGradient | CanvasPattern;
+  strokeStyle: string | Canvas2DGradient | CanvasPattern;
   lineWidth: number;
   lineJoin: CanvasLineJoin;
   globalAlpha: number;

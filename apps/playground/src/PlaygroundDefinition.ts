@@ -8,6 +8,9 @@ import {
   type UiElement,
   type UiProps,
   decorated,
+  linearGradient,
+  percent,
+  radialGradient,
   type DecorationShape
 } from '@gesso/core';
 import type { PlaygroundState } from './PlaygroundState';
@@ -98,6 +101,16 @@ function paritySection(state: PlaygroundState): UiElement {
         overflow: 'hidden',
         borderRadius: 14,
         backgroundColor: '#1e293b',
+        // The gradient of `ROADMAP.md` F9, on a box that already has a
+        // radius and a clip, so the pixel gate sees a gradient follow a
+        // rounded corner without a single new antialiased edge to
+        // account for. It paints over the colour, as CSS paints a
+        // `background-image` over `background-color`.
+        backgroundGradient: linearGradient(Math.PI / 3, [
+          { offset: percent(0), color: '#1e293b' },
+          { offset: percent(60), color: '#0f766e' },
+          { offset: percent(100), color: '#134e4a' }
+        ]),
         position: 'relative'
       },
       Box({
@@ -136,6 +149,21 @@ function paritySection(state: PlaygroundState): UiElement {
       { width: 44, height: 80, y: 'center', x: 'center' },
       Box({ width: 28, height: 28, image: state.icon$, objectFit: 'contain' })
     ),
+    // A radial gradient with a centre off the middle, in a square box:
+    // the other half of F9, and square so it adds no rounded corners to
+    // the pixel gate's budget.
+    Box({
+      width: 44,
+      height: 80,
+      backgroundGradient: radialGradient(
+        [
+          { offset: percent(0), color: '#fbbf24' },
+          { offset: percent(55), color: '#b45309' },
+          { offset: percent(100), color: '#1e293b' }
+        ],
+        { centerX: percent(30), centerY: percent(25) }
+      )
+    }),
     Column(
       { gap: 6 },
       Box({

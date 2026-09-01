@@ -11,7 +11,8 @@ import type { UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
 import type { UiImage } from '../properties/UiImage';
 import { isVideoSurface, type UiVideoSurface } from '../properties/UiVideo';
-import { resolveColor, themeColor } from '../properties/UiThemeColor';
+import { resolveColor, resolveGradient, themeColor } from '../properties/UiThemeColor';
+import type { ResolvedGradient } from '../properties/UiGradient';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import { editorFor, isEditableNode } from '../editing/UiEditable';
 import { selectionRangeOf, type TextRange } from '../selection/UiSelectable';
@@ -38,6 +39,13 @@ export interface PaintState {
   visible: boolean;
   opacity: number;
   backgroundColor: UiColor | undefined;
+  /**
+   * A gradient filling the box, painted over `backgroundColor` and
+   * under `image`, with its stops' palette names already resolved
+   * against the node's theme. Its geometry is still relative: the
+   * renderer places it once it has the node's box.
+   */
+  backgroundGradient: ResolvedGradient | undefined;
   image: UiImage | undefined;
   /**
    * A moving picture, drawn where `image` would be and under the same
@@ -150,6 +158,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.opacity = opacity === undefined ? 1 : Math.min(Math.max(opacity, 0), 1);
 
   out.backgroundColor = resolveColor(node, UiProperties.backgroundColor);
+  out.backgroundGradient = resolveGradient(node, resolveProperty(node, UiProperties.backgroundGradient));
   out.borderColor = resolveColor(node, UiProperties.borderColor);
   out.borderWidth = resolveNumber(node, 'borderWidth') ?? 0;
   out.borderRadius = normalizeBorderRadius(resolveProperty(node, UiProperties.borderRadius));
@@ -284,6 +293,7 @@ export function createPaintState(): PaintState {
     visible: true,
     opacity: 1,
     backgroundColor: undefined,
+    backgroundGradient: undefined,
     image: undefined,
     video: undefined,
     objectFit: 'fill',

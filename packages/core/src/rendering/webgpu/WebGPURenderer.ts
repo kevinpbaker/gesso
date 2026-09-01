@@ -6,7 +6,7 @@ import type { WebGPUSurface } from './WebGPUSurface';
 import { initializeWebGPU, onDeviceLost } from './WebGPUDevice';
 import { WebGPUError } from './WebGPUError';
 import {
-  createClipBindGroupLayout,
+  createFrameBindGroupLayout,
   createPrimitivePipeline,
   createTexturedPipeline,
   type PrimitivePipeline,
@@ -17,6 +17,7 @@ import {
   createTextCache,
   CLIP_STRIDE_BYTES,
   CommandKind,
+  GRADIENT_STRIDE_BYTES,
   INSTANCE_STRIDE_BYTES,
   TEXTURED_STRIDE_BYTES,
   viewportScissor,
@@ -102,8 +103,9 @@ export class WebGPURenderer implements UiRenderer {
   private instanceBuffer: GPUBuffer | null = null;
   private texturedBuffer: GPUBuffer | null = null;
   private clipBuffer: GPUBuffer | null = null;
-  private clipLayout: GPUBindGroupLayout | null = null;
-  private clipBindGroup: GPUBindGroup | null = null;
+  private gradientBuffer: GPUBuffer | null = null;
+  private frameLayout: GPUBindGroupLayout | null = null;
+  private frameBindGroup: GPUBindGroup | null = null;
   private cachedInstanceData: Float32Array | null = null;
   /** Draw calls of the most recent frame. */
   readonly lastDraws: DrawStats = { primitiveDraws: 0, texturedDraws: 0, texturedInstances: 0 };
@@ -152,9 +154,9 @@ export class WebGPURenderer implements UiRenderer {
       this.onError(`WebGPU error: ${event.error.message}`);
     };
     this.surface.configure(init.device, init.format);
-    this.clipLayout = createClipBindGroupLayout(init.device);
-    this.primitives = createPrimitivePipeline(init.device, init.format, this.clipLayout);
-    this.textured = createTexturedPipeline(init.device, init.format, this.clipLayout);
+    this.frameLayout = createFrameBindGroupLayout(init.device);
+    this.primitives = createPrimitivePipeline(init.device, init.format, this.frameLayout);
+    this.textured = createTexturedPipeline(init.device, init.format, this.frameLayout);
     this.textures = new WebGPUTextureCache(init.device, this.textured);
     this.glyphPages = new WebGPUGlyphPages(init.device, this.textured, this.textCache.atlas);
     this.lost = false;
@@ -258,23 +260,37 @@ export class WebGPURenderer implements UiRenderer {
       this.texturedBuffer = this.ensureBuffer(this.texturedBuffer, list.texturedData.byteLength, TEXTURED_STRIDE_BYTES);
       device.queue.writeBuffer(this.texturedBuffer, 0, list.texturedData.buffer, 0, list.texturedData.byteLength);
     }
-    // The clip chain is bound even when empty: the shader declares it and
-    // every instance names -1. The bind group follows the buffer.
+    // The clip chain and the gradients are bound even when empty: the
+    // shaders declare them and every instance names -1. The bind group
+    // follows the buffers.
     const clipBuffer = this.ensureBuffer(
       this.clipBuffer,
       list.clipData.byteLength,
       CLIP_STRIDE_BYTES,
       storageBufferUsage
     );
-    if (clipBuffer !== this.clipBuffer || this.clipBindGroup === null) {
+    const gradientBuffer = this.ensureBuffer(
+      this.gradientBuffer,
+      list.gradientData.byteLength,
+      GRADIENT_STRIDE_BYTES,
+      storageBufferUsage
+    );
+    if (clipBuffer !== this.clipBuffer || gradientBuffer !== this.gradientBuffer || this.frameBindGroup === null) {
       this.clipBuffer = clipBuffer;
-      this.clipBindGroup = device.createBindGroup({
-        layout: this.clipLayout!,
-        entries: [{ binding: 0, resource: { buffer: clipBuffer } }]
+      this.gradientBuffer = gradientBuffer;
+      this.frameBindGroup = device.createBindGroup({
+        layout: this.frameLayout!,
+        entries: [
+          { binding: 0, resource: { buffer: clipBuffer } },
+          { binding: 1, resource: { buffer: gradientBuffer } }
+        ]
       });
     }
     if (list.clipCount > 0) {
       device.queue.writeBuffer(clipBuffer, 0, list.clipData.buffer, 0, list.clipData.byteLength);
+    }
+    if (list.gradientCount > 0) {
+      device.queue.writeBuffer(gradientBuffer, 0, list.gradientData.buffer, 0, list.gradientData.byteLength);
     }
     const view = new Float32Array(VIEW_UNIFORM_FLOATS);
     view[0] = this.surface.logicalWidth || 1;
@@ -303,7 +319,7 @@ export class WebGPURenderer implements UiRenderer {
     const viewport = viewportScissor(this.surface.logicalWidth, this.surface.logicalHeight, this.surface.dpr);
     let currentScissor: ScissorRect | null = null;
     let currentKind: CommandKind | null = null;
-    pass.setBindGroup(1, this.clipBindGroup!);
+    pass.setBindGroup(1, this.frameBindGroup!);
     this.lastDraws.primitiveDraws = 0;
     this.lastDraws.texturedDraws = 0;
     this.lastDraws.texturedInstances = 0;
@@ -466,8 +482,10 @@ export class WebGPURenderer implements UiRenderer {
     this.texturedBuffer = null;
     this.clipBuffer?.destroy();
     this.clipBuffer = null;
-    this.clipBindGroup = null;
-    this.clipLayout = null;
+    this.gradientBuffer?.destroy();
+    this.gradientBuffer = null;
+    this.frameBindGroup = null;
+    this.frameLayout = null;
     this.primitives = null;
     this.textured = null;
     // The device is owned by the WebGPU initialization layer; the

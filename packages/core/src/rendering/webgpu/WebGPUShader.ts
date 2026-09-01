@@ -35,6 +35,11 @@ const SHARED = /* wgsl */ `
 // The frame's clip chain, four vec4s per node; see CLIP_STRIDE_FLOATS.
 @group(1) @binding(0) var<storage, read> uClips: array<vec4f>;
 
+// The frame's gradients, twelve vec4s each; see GRADIENT_STRIDE_FLOATS.
+// Declared in both pipelines so group 1 reads the same either way; only
+// the primitive pipeline samples it.
+@group(1) @binding(1) var<storage, read> uGradients: array<vec4f>;
+
 // Signed distance from a point to a rounded rectangle, negative inside.
 fn roundedRectDistance(point: vec2f, origin: vec2f, size: vec2f, radius: f32) -> f32 {
   let half = size * 0.5;
@@ -84,6 +89,90 @@ fn toClipSpace(transformed: vec2f) -> vec4f {
 export const PRIMITIVE_SHADER = /* wgsl */ `
 ${SHARED}
 
+// Twelve vec4s per gradient; colours start at 2 and offsets at 10.
+const GRADIENT_STRIDE = 12u;
+const GRADIENT_COLORS = 2u;
+const GRADIENT_OFFSETS = 10u;
+
+// One stop's position. The lane is picked with comparisons rather than
+// by indexing the vec4 with a runtime value, which is legal WGSL but
+// not worth depending on for four branches the compiler folds anyway.
+fn gradientStopOffset(base: u32, index: u32) -> f32 {
+  let row = uGradients[base + GRADIENT_OFFSETS + (index >> 2u)];
+  let lane = index & 3u;
+  if (lane == 0u) {
+    return row.x;
+  }
+  if (lane == 1u) {
+    return row.y;
+  }
+  if (lane == 2u) {
+    return row.z;
+  }
+  return row.w;
+}
+
+fn premultiply(color: vec4f) -> vec4f {
+  return vec4f(color.rgb * color.a, color.a);
+}
+
+fn unpremultiply(color: vec4f) -> vec4f {
+  if (color.a <= 0.0) {
+    return vec4f(0.0, 0.0, 0.0, 0.0);
+  }
+  return vec4f(color.rgb / color.a, color.a);
+}
+
+// The gradient's colour at a point in the instance's own coordinates.
+//
+// Stops are interpolated with premultiplied alpha, which is what the
+// canvas specification says a CanvasGradient does; for the opaque
+// stops most gradients have it is the same answer either way, and for
+// a stop that fades out it is the difference between a ramp that goes
+// through grey and one that does not.
+fn gradientColor(index: u32, local: vec2f) -> vec4f {
+  let base = index * GRADIENT_STRIDE;
+  let header = uGradients[base];
+  let geometry = uGradients[base + 1u];
+  var t = 0.0;
+  if (header.x < 0.5) {
+    // Linear: how far along the gradient line the point projects.
+    let line = geometry.zw - geometry.xy;
+    let lengthSquared = dot(line, line);
+    if (lengthSquared > 0.0) {
+      t = dot(local - geometry.xy, line) / lengthSquared;
+    }
+  } else {
+    // Radial: distance from the centre over the radius.
+    if (geometry.z > 0.0) {
+      t = length(local - geometry.xy) / geometry.z;
+    }
+  }
+  t = clamp(t, 0.0, 1.0);
+
+  let count = u32(header.y);
+  var previousOffset = gradientStopOffset(base, 0u);
+  var previousColor = premultiply(uGradients[base + GRADIENT_COLORS]);
+  if (t <= previousOffset) {
+    return unpremultiply(previousColor);
+  }
+  for (var i = 1u; i < count; i = i + 1u) {
+    let offset = gradientStopOffset(base, i);
+    let color = premultiply(uGradients[base + GRADIENT_COLORS + i]);
+    if (t <= offset) {
+      let span = offset - previousOffset;
+      var f = 0.0;
+      if (span > 0.0) {
+        f = (t - previousOffset) / span;
+      }
+      return unpremultiply(mix(previousColor, color, f));
+    }
+    previousOffset = offset;
+    previousColor = color;
+  }
+  return unpremultiply(previousColor);
+}
+
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) localPos: vec2f,
@@ -92,6 +181,7 @@ struct VertexOutput {
   @location(3) radiusOpacityBorder: vec3f,
   @location(4) @interpolate(flat) kind: u32,
   @location(5) @interpolate(flat) clipIndex: f32,
+  @location(6) @interpolate(flat) gradientIndex: f32,
 };
 
 @vertex
@@ -106,6 +196,7 @@ fn vs(
   @location(7) transformB: vec2f,
   @location(8) transformC: vec2f,
   @location(9) clipIndex: f32,
+  @location(10) gradientIndex: f32,
 ) -> VertexOutput {
   var out: VertexOutput;
   // The quad is inflated by one physical pixel on every side so the
@@ -126,6 +217,7 @@ fn vs(
   out.radiusOpacityBorder = radiusOpacityBorder;
   out.kind = instanceKind;
   out.clipIndex = clipIndex;
+  out.gradientIndex = gradientIndex;
   return out;
 }
 
@@ -145,7 +237,11 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
   if (alpha <= 0.0) {
     discard;
   }
-  return vec4f(in.color.rgb, in.color.a * in.radiusOpacityBorder.y * alpha);
+  var base = in.color;
+  if (in.gradientIndex >= 0.0) {
+    base = gradientColor(u32(in.gradientIndex), in.localPos);
+  }
+  return vec4f(base.rgb, base.a * in.radiusOpacityBorder.y * alpha);
 }
 `;
 

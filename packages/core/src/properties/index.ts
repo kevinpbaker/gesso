@@ -1,6 +1,7 @@
 export * from './UiBorderRadius';
 export * from './UiBoxShadow';
 export * from './UiColor';
+export * from './UiGradient';
 export * from './UiProperty';
 export * from './UiPropertyDefinition';
 export * from './UiPropertyRegistry';

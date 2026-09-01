@@ -107,6 +107,7 @@ export type PositionProps = PropsOf<
 
 export type PaintProps = PropsOf<
   | 'backgroundColor'
+  | 'backgroundGradient'
   | 'borderColor'
   | 'borderWidth'
   | 'borderRadius'

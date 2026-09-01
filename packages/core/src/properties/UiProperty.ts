@@ -7,6 +7,8 @@ import type { UiBorderRadius } from './UiBorderRadius';
 import { UiBorderRadiuses, borderRadiusEqual, normalizeBorderRadius } from './UiBorderRadius';
 import type { UiBoxShadow } from './UiBoxShadow';
 import { boxShadowArraysEqual } from './UiBoxShadow';
+import type { UiGradient } from './UiGradient';
+import { gradientsEqual, validateGradient } from './UiGradient';
 import type { UiTransform } from './UiTransform';
 import { transform, transformsEqual } from './UiTransform';
 import type { UiTextStyle } from './UiTextStyle';
@@ -538,6 +540,20 @@ export const UiProperties = {
     inherited: false,
     affects: P,
     compare: colorValuesEqual
+  }),
+
+  /**
+   * A gradient filling the box, painted over `backgroundColor` and
+   * under `image`, which is where CSS paints a `background-image`.
+   * Build it with `linearGradient()` or `radialGradient()`.
+   */
+  backgroundGradient: defineProperty<UiGradient | undefined>({
+    name: 'backgroundGradient',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P,
+    compare: gradientsEqual,
+    validate: validateGradient
   }),
 
   color: defineProperty<UiColorValue>({
