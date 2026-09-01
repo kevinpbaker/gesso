@@ -27,7 +27,8 @@ export default defineConfig({
       { text: 'Layout', link: '/layout/flex' },
       { text: 'Interaction', link: '/interaction/pointer-and-keyboard' },
       { text: 'Appearance', link: '/appearance/themes-and-the-environment' },
-      { text: 'Components', link: '/components/' }
+      { text: 'Components', link: '/components/' },
+      { text: 'Tooling', link: '/tooling/devtools' }
     ],
     sidebar: [
       {
@@ -65,6 +66,17 @@ export default defineConfig({
         items: [
           { text: 'Themes and the environment', link: '/appearance/themes-and-the-environment' },
           { text: 'The type scale', link: '/appearance/typography' }
+        ]
+      },
+      {
+        text: 'Tooling',
+        items: [
+          { text: 'Devtools', link: '/tooling/devtools' },
+          { text: 'Inspecting a node', link: '/tooling/inspecting-a-node' },
+          { text: 'Frames and phases', link: '/tooling/frames-and-phases' },
+          { text: 'The action log', link: '/tooling/the-action-log' },
+          { text: 'Hot module replacement', link: '/tooling/hot-module-replacement' },
+          { text: 'create-gesso-app', link: '/tooling/create-gesso-app' }
         ]
       },
       {
