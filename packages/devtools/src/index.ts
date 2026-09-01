@@ -8,10 +8,18 @@
  * therefore the error overlay — the worker's exceptions, source-mapped,
  * drawn over the application that was running when they were thrown.
  *
- * See `docs/ROADMAP.md` F7 for what else belongs here: the node
- * inspector, the store action log, and the frame profiler.
+ * See `docs/ROADMAP.md` F7 for what else belongs here: the store
+ * action log.
  */
 export { ErrorOverlay, mountErrorOverlay, type ErrorOrigin, type ErrorOverlayOptions } from './ErrorOverlay';
+export {
+  mountFrameProfiler,
+  summarize,
+  type FrameProfiler,
+  type FrameProfilerOptions,
+  type FrameSample,
+  type FrameSummary
+} from './FrameProfiler';
 export { codeFrame, type CodeFrame, type CodeFrameLine } from './codeFrame';
 export {
   formatFrame,
