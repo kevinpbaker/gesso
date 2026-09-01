@@ -22,11 +22,16 @@ which is the only honest measure across a thread boundary.
 
 <ThreadDemo />
 
-On this machine that press reads about **70 ms** on the left and
-**2,034 ms** on the right. The worker hiccups once — it cannot know the
-refreshes have stopped until one fails to arrive, so it waits about two
-of them and then goes back to pacing itself — while the main-thread copy
-is simply gone for two seconds.
+Each canvas draws its own reading: the label, the frame gap and the
+caption underneath are all painted by the component itself, on the
+thread it is running on, because a number that had to cross to the main
+thread could not be trusted while the main thread is the thing being
+blocked.
+
+The main-thread copy stops dead for the whole three seconds. The worker
+keeps drawing — it hiccups once as it notices the refreshes have stopped
+arriving, because nothing inside a worker can see a refresh that did not
+happen until the moment it was due.
 
 It is not a trick of the demo. The same shape shows up in the
 repository's own measurements:

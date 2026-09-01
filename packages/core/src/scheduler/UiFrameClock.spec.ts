@@ -356,7 +356,7 @@ describe('UiHostFrameClock', () => {
     }
   });
 
-  it('watches at twice the display it has been shown, not at a fixed ceiling', () => {
+  it('watches at the display it has been shown, not at a fixed ceiling', () => {
     // The ceiling is what it waits before it knows the cadence. Once
     // refreshes have been arriving, a stall costs about a frame rather
     // than a tenth of a second — which on a 60Hz panel is the
@@ -378,12 +378,12 @@ describe('UiHostFrameClock', () => {
       }
       clock.requestFrame();
 
-      // Nothing at 30 ms — inside twice the interval, so still watching.
+      // Nothing at 12 ms — inside the refresh, so still watching.
       now = 100;
-      vi.advanceTimersByTime(30);
+      vi.advanceTimersByTime(12);
       expect(frames).toHaveLength(5);
 
-      // And drawn shortly after, rather than at the 100 ms ceiling.
+      // And drawn a refresh after the last tick, not at the ceiling.
       vi.advanceTimersByTime(6);
       expect(frames).toHaveLength(6);
       expect(frames.at(-1)).toBe(100);
@@ -422,6 +422,38 @@ describe('UiHostFrameClock', () => {
       expect(frames).toHaveLength(3);
       vi.advanceTimersByTime(2);
       expect(frames).toHaveLength(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is not widened by one late refresh', () => {
+    // The case that made this a median rather than a maximum: a page
+    // doing something expensive in its own rAF delays one tick, and
+    // taking the widest gap would then wait twice *that* before
+    // noticing the next stall — a quarter of a second, measured.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      let now = 0;
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        () => {},
+        { fallbackMs: 16, stallMs: 100, minStallMs: 12, now: () => now }
+      );
+
+      // Five refreshes at 16 ms with one 45 ms hitch in the middle.
+      const times = [0, 16, 32, 77, 93, 109];
+      for (const time of times) {
+        clock.requestFrame();
+        clock.tick(time);
+      }
+      clock.requestFrame();
+
+      // The median is still 16, so the watch is ~16 and not ~90.
+      now = 200;
+      vi.advanceTimersByTime(30);
+      expect(frames).toHaveLength(times.length + 1);
     } finally {
       vi.useRealTimers();
     }

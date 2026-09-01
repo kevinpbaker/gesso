@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { createComponent } from '@gesso/framework';
 import { renderTest } from '@gesso/testing';
@@ -7,40 +7,35 @@ import '@gesso/testing/matchers';
 import { Pulse } from './PulseExample';
 
 /**
- * The home page's argument rests on this thing never stopping, so the
- * spec checks that it does not: given time and frames, the sweep moves
- * and the counter climbs.
+ * The home page's argument rests on this thing drawing a frame whenever
+ * the runtime gives it one, and saying so itself.
  *
- * Fake timers, because the sweep is an interval — time has to pass
- * before there is anything for a frame to draw.
- *
- * The counter is read off the node's own `text` property rather than
+ * The counters are read off the nodes' own `text` properties rather than
  * out of `debug()`, which prints the accessible name: they are the same
- * string here, and only one of them is what the screen paints.
+ * strings here, and only one of them is what the screen paints.
  */
 describe('the home page pulse', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
+  it('counts one frame per frame, from the runtime rather than a timer', () => {
+    const ui = renderTest(createComponent(Pulse, { label: 'Render worker' }), { width: 460, height: 200 });
+    const counter = ui.getByText(/^\d+ frames$/);
+    const started = Number(String(counter.getProperty('text')).split(' ')[0]);
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('keeps drawing for as long as it is given time', () => {
-    const ui = renderTest(createComponent(Pulse, { label: 'Render worker' }), { width: 420, height: 200 });
-    ui.frame(0);
-
-    expect(ui.getByText('Render worker')).toBeDefined();
-    const counter = ui.getByText('updates: 0');
-
-    let time = 0;
-    for (let step = 0; step < 4; step++) {
-      vi.advanceTimersByTime(50);
-      ui.frame((time += 50));
+    for (let frame = 0; frame < 5; frame++) {
+      ui.frame();
     }
 
-    // 200 ms of time, a 40 ms interval: five writes.
-    expect(counter.getProperty('text')).toBe('updates: 5');
+    // No timers advanced and no time passed: the only thing that
+    // happened is frames, which is the whole claim.
+    expect(counter.getProperty('text')).toBe(`${started + 5} frames`);
+  });
+
+  it('times itself, on the clock of the thread it is drawing on', () => {
+    const ui = renderTest(createComponent(Pulse, { label: 'Render worker' }), { width: 460, height: 200 });
+
+    ui.frame();
+    ui.frame();
+
+    const gap = ui.getByText(/worst frame gap/);
+    expect(String(gap.getProperty('text'))).toMatch(/^worst frame gap \d+ ms$/);
   });
 });

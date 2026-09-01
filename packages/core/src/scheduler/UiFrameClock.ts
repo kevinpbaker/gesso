@@ -88,7 +88,10 @@ export interface UiTimerFrameClockOptions {
  * a noticeable moment.
  */
 /** How many refresh intervals the watch is measured over. */
-const CADENCE_SAMPLES = 4;
+const CADENCE_SAMPLES = 5;
+
+/** Above this, a gap between ticks is a hiccup rather than a display's rate. */
+const MAX_CADENCE_MS = 50;
 
 const IDLE_TICKS_BEFORE_STOP = 4;
 
@@ -198,9 +201,13 @@ export class UiHostFrameClock implements UiFrameClock {
   /**
    * The last few intervals between ticks, in arrival order.
    *
-   * The watch is set from the largest of them rather than the mean: a
-   * display that drops the occasional refresh is still a live host, and
-   * a mean would put the watch inside the gap that dropped frame leaves.
+   * The watch is set from the *median* of them. The largest was the
+   * first attempt and it is too generous: one late refresh — a page
+   * doing something expensive in its own rAF, which is exactly what
+   * happens the moment before a demonstration blocks the thread —
+   * widened the watch to twice that late gap and made the next stall
+   * take a quarter of a second to notice. A median ignores one
+   * outlier in four and still describes the display.
    */
   private readonly intervals: number[] = [];
   private handle: ReturnType<typeof setTimeout> | null = null;
@@ -277,19 +284,34 @@ export class UiHostFrameClock implements UiFrameClock {
    * is not evidence of a cadence.
    */
   private watchMs(): number {
-    if (this.intervals.length < 2) {
+    const cadence = this.cadenceMs();
+    if (cadence === null) {
       return this.stallMs;
     }
-    const widest = Math.max(...this.intervals);
-    return Math.min(this.stallMs, Math.max(this.minStallMs, widest * 2));
+    // One refresh, and no more. The timer is armed when a frame
+    // *finishes*, which is already after that frame's tick arrived, so
+    // the next tick is due before this deadline and wins the race
+    // whenever the host is alive — `setTimeout` is late by a
+    // millisecond or so on top. A host that has stopped is therefore
+    // noticed a single refresh after it stops, which is the least that
+    // is knowable: nothing in a worker can see a refresh that did not
+    // happen any sooner than the moment it was due.
+    return Math.min(this.stallMs, Math.max(this.minStallMs, cadence));
+  }
+
+  /** The median recent interval, or null before there are enough to say. */
+  private cadenceMs(): number | null {
+    if (this.intervals.length < 3) {
+      return null;
+    }
+    const sorted = [...this.intervals].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)]!;
   }
 
   /** The interval to pace at while the host is absent: the display's, if it is known. */
   private selfPaceMs(): number {
-    if (this.intervals.length < 2) {
-      return this.fallbackMs;
-    }
-    return Math.max(1, Math.min(this.fallbackMs, Math.max(...this.intervals)));
+    const cadence = this.cadenceMs();
+    return cadence === null ? this.fallbackMs : Math.max(1, Math.min(this.fallbackMs, cadence));
   }
 
   cancelFrame(): void {
@@ -342,9 +364,11 @@ export class UiHostFrameClock implements UiFrameClock {
    * Keeps the last few gaps between ticks, which is where the watch
    * interval comes from.
    *
-   * A gap wider than the ceiling is not a cadence — it is the host
-   * coming back from a stall, or a tab that was hidden — so it is left
-   * out rather than teaching the clock to wait that long next time.
+   * A gap wider than `MAX_CADENCE_MS` is not a refresh interval — no
+   * display runs that slowly — so it is a hiccup, a stall ending, or a
+   * tab coming back, and it is dropped rather than taught to the clock.
+   * Only a gap wider than the ceiling clears what was learned, because
+   * that is long enough that whatever cadence preceded it is stale.
    */
   private recordCadence(time: UiFrameTime): void {
     const previous = this.lastTickTime;
@@ -353,8 +377,11 @@ export class UiHostFrameClock implements UiFrameClock {
       return;
     }
     const interval = time - previous;
-    if (interval <= 0 || interval > this.stallMs) {
+    if (interval > this.stallMs) {
       this.intervals.length = 0;
+      return;
+    }
+    if (interval <= 0 || interval > MAX_CADENCE_MS) {
       return;
     }
     this.intervals.push(interval);

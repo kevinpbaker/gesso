@@ -21,6 +21,11 @@ import PulseWorker from '../../src/examples/PulseExampleWorker?worker';
  * The block is a busy loop rather than a `sleep`, because that is what
  * real work is: `await` yields and a long synchronous computation does
  * not.
+ *
+ * Neither canvas reports anything to this component. Each one times
+ * itself and paints its own worst frame gap, because a reading that had
+ * to cross to the main thread could not be trusted while the main
+ * thread is the thing being blocked.
  */
 const { isDark } = useData();
 
@@ -28,39 +33,6 @@ const workerHost = ref<HTMLElement | null>(null);
 const syncHost = ref<HTMLElement | null>(null);
 const blocking = ref(false);
 const failure = ref<string | null>(null);
-const workerGap = ref<number | null>(null);
-const syncGap = ref<number | null>(null);
-
-/**
- * The worst gap between two consecutive frames on each side.
- *
- * `FrameMetrics.at` is stamped on the clock of the thread that drew the
- * frame, which is the only honest measure across a worker boundary:
- * the messages themselves queue behind a blocked main thread and all
- * arrive at once, so their arrival times would say nothing.
- */
-function gapTracker(sink: { value: number | null }) {
-  let last: number | null = null;
-  return {
-    /**
-     * Forgets the worst gap so far but *not* the last frame's time: the
-     * gap that matters spans the press, and clearing `last` would throw
-     * away the one measurement the demonstration is about.
-     */
-    reset() {
-      sink.value = null;
-    },
-    record(at: number) {
-      if (last !== null) {
-        sink.value = Math.max(sink.value ?? 0, at - last);
-      }
-      last = at;
-    }
-  };
-}
-
-const workerGaps = gapTracker(workerGap);
-const syncGaps = gapTracker(syncGap);
 
 let worker: WorkerApp | undefined;
 let disposeWorker: (() => void) | undefined;
@@ -79,16 +51,16 @@ onMounted(() => {
     worker = createApp({
       renderWorker: () => new PulseWorker(),
       colorScheme: scheme,
-      onFrame: metrics => workerGaps.record(metrics.at),
       onError: message => {
         failure.value = message;
       }
     });
     disposeWorker = worker.mount(workerHost.value!);
 
-    const builder = createApp(exampleRoot(createComponent(Pulse, { label: 'Main thread' })));
+    const builder = createApp(
+      exampleRoot(createComponent(Pulse, { label: 'Main thread', caption: 'On the main thread' }))
+    );
     builder.setColorScheme(scheme);
-    builder.onFrame(metrics => syncGaps.record(metrics.at));
     syncApp = builder;
     disposeSync = builder.mountSync(syncHost.value!);
   } catch (error) {
@@ -105,12 +77,10 @@ onUnmounted(() => {
 
 function blockMainThread(): void {
   blocking.value = true;
-  workerGaps.reset();
-  syncGaps.reset();
   // Let the class change paint before the thread stops answering.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      const until = performance.now() + 2000;
+      const until = performance.now() + 3000;
       while (performance.now() < until) {
         // Deliberately nothing: this is what a long computation looks
         // like from the outside.
@@ -125,24 +95,12 @@ function blockMainThread(): void {
   <div class="thread-demo">
     <p v-if="failure" class="thread-demo-failure">{{ failure }}</p>
     <div v-else class="thread-demo-panes">
-      <figure>
-        <div ref="workerHost" class="thread-demo-canvas" />
-        <figcaption>
-          In a render worker
-          <strong v-if="workerGap !== null" data-gap="worker">worst frame gap {{ Math.round(workerGap) }} ms</strong>
-        </figcaption>
-      </figure>
-      <figure>
-        <div ref="syncHost" class="thread-demo-canvas" />
-        <figcaption>
-          On the main thread
-          <strong v-if="syncGap !== null" data-gap="sync">worst frame gap {{ Math.round(syncGap) }} ms</strong>
-        </figcaption>
-      </figure>
+      <div ref="workerHost" class="thread-demo-canvas" />
+      <div ref="syncHost" class="thread-demo-canvas" />
     </div>
     <div class="thread-demo-controls">
       <button type="button" :disabled="blocking" @click="blockMainThread">
-        {{ blocking ? 'Main thread blocked…' : 'Block the main thread for 2 seconds' }}
+        {{ blocking ? 'Main thread blocked…' : 'Block the main thread for 3 seconds' }}
       </button>
       <span>Both canvases run the same component. Only one of them survives.</span>
     </div>
@@ -160,32 +118,11 @@ function blockMainThread(): void {
   gap: 16px;
 }
 
-.thread-demo-panes figure {
-  margin: 0;
+.thread-demo-canvas {
+  height: 186px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   overflow: hidden;
-}
-
-.thread-demo-canvas {
-  height: 150px;
-  background: var(--vp-c-bg-soft);
-}
-
-.thread-demo-panes figcaption {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 12px;
-  color: var(--vp-c-text-2);
-  border-top: 1px solid var(--vp-c-divider);
-}
-
-.thread-demo-panes figcaption strong {
-  font-weight: 600;
-  color: var(--vp-c-text-1);
 }
 
 .thread-demo-controls {
