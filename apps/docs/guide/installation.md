@@ -5,8 +5,10 @@ description: Set up a project against the Gesso packages, and choose between the
 # Installation
 
 Gesso is four packages and a bundler that understands workers. There is
-no CLI, no plugin and no build step of its own. A Gesso project is an
-ordinary Vite project that happens to draw its interface into a canvas.
+no plugin and no build step of its own: a Gesso project is an ordinary
+Vite project that happens to draw its interface into a canvas. There is
+a scaffolding CLI, `create-gesso-app`, and what it writes is exactly
+that ordinary project, so nothing below depends on having used it.
 
 ## The packages
 

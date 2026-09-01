@@ -205,7 +205,11 @@ describe('jsx runtime', () => {
   });
 
   it('does not give a button a second interaction when the caller brought one', () => {
-    const tag = (<button label="Save" modifiers={[interactive({ hover: true, press: false })]}>Save</button>) as UiElement;
+    const tag = (
+      <button label="Save" modifiers={[interactive({ hover: true, press: false })]}>
+        Save
+      </button>
+    ) as UiElement;
 
     // Two `interactive` modifiers both write `visualState`, so the
     // later set drops the earlier state.
@@ -215,7 +219,11 @@ describe('jsx runtime', () => {
   });
 
   it('keeps a button its own modifiers as well as the interaction', () => {
-    const tag = (<button label="Save" modifiers={[focusRing()]}>Save</button>) as UiElement;
+    const tag = (
+      <button label="Save" modifiers={[focusRing()]}>
+        Save
+      </button>
+    ) as UiElement;
 
     expect((tag.props.modifiers as readonly { kind: { name: string } }[]).map(m => m.kind.name)).toEqual([
       'interactive',
