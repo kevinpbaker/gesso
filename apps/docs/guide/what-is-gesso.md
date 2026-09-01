@@ -35,8 +35,7 @@ Gesso moves the interface instead. Layout, paint, input and text run in
 a render worker; your application logic runs in another worker of its
 own; the main thread is left holding a canvas and an event listener.
 Heavy work and drawing are then on different threads and stop taking
-turns, which is why the numbers below say what they say — a busy loop
-on one thread does not move the frame times on another.
+turns.
 
 That is the trade to weigh. If a screen is mostly static content with
 occasional interaction, the single-threaded page was never the problem
@@ -48,20 +47,16 @@ and frames compete, the thread boundary is the entire point.
 
 **The main thread is free.** Not "mostly free": the shell creates the
 canvas, forwards pointer and key events, and runs the display's refresh
-loop. Everything else is in a worker. Blocking the shell for five
-seconds costs input latency and nothing else — the worst frame gap in
-that measurement was 105 ms against a 106 ms idle baseline, because the
-frames were never on that thread to be blocked. In the single-thread
-configuration the same two-second stall takes the worst frame gap to
-2098 ms.
+loop. Everything else is somewhere else. Whatever your application is
+busy with — a long parse, a big sort, a step of a simulation — it is
+busy on a thread the interface is not on, so the interface carries on
+drawing.
 
-The same holds for your own work. A 1,500 ms burn inside an application
-worker left the render thread's worst frame gap at 106 ms — the
-computation and the frames were never in each other's way, so there was
-nothing to drop. What a blocked thread still costs is the latency of
-anything that has to cross it: a click delivered while the shell was
-busy-looped for five seconds took 2,818 ms to arrive, on a screen that
-never stopped animating at 60 fps.
+Which means an interface that locks up because the program is working
+stops being a thing that can happen to you. There is no long task to
+break into slices, no yielding to the event loop between chunks, no
+choosing between doing the work and staying responsive. The work runs
+where it runs, and the screen keeps its own time.
 
 **There is one identity system.** A component instance owns its nodes,
 so component identity is node identity. There is no second reconciler
