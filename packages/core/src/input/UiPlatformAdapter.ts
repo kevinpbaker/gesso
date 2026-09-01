@@ -34,6 +34,17 @@ export interface PlatformSurface {
   readonly pointerTarget: PlatformEventTarget;
   readonly keyboardTarget: PlatformEventTarget;
   clientToLocal(clientX: number, clientY: number): { x: number; y: number };
+  /**
+   * Sets the surface's `touch-action`, when the surface is something
+   * that has one.
+   *
+   * The adapter drives this rather than leaving it fixed at the value
+   * `prepareInputSurface` set, because the right value is not a
+   * property of the canvas — it is a property of what is currently
+   * inside it. Optional: a test fake, or a surface that is not a DOM
+   * element, has nothing to set.
+   */
+  setTouchAction?(value: string): void;
 }
 
 export interface PlatformAdapterOptions {
@@ -97,6 +108,7 @@ export class UiPlatformAdapter {
       const p = e as PointerEvent;
       const local = surface.clientToLocal(p.clientX, p.clientY);
       this.pointer.pointerMove(local.x, local.y, p.buttons, modifiersFromEvent(p), pointerDeviceOf(p));
+      this.syncTouchAction();
     };
     this.pointerUpHandler = e => {
       const p = e as PointerEvent;
@@ -118,9 +130,17 @@ export class UiPlatformAdapter {
         w.deltaMode,
         wheelDeltaYOf(w)
       );
-      if (event.defaultPrevented) {
+      // Both halves matter, and each was a bug on its own. `consumed`
+      // says a container took the delta, and without it the page
+      // behind the canvas scrolled too — one wheel, two scrolls.
+      // `defaultPrevented` says an application handler took it
+      // instead. Anything else is a wheel the runtime had no use for,
+      // and it has to reach the page, or a canvas embedded in a
+      // document becomes a scroll trap.
+      if (event.consumed || event.defaultPrevented) {
         w.preventDefault();
       }
+      this.syncTouchAction();
     };
     this.keyDownHandler = e => {
       const k = e as KeyboardEvent;
@@ -141,6 +161,21 @@ export class UiPlatformAdapter {
     surface.pointerTarget.addEventListener('wheel', this.wheelHandler, { passive: false });
     surface.keyboardTarget.addEventListener('keydown', this.keyDownHandler);
     surface.keyboardTarget.addEventListener('keyup', this.keyUpHandler);
+    this.syncTouchAction();
+  }
+
+  /**
+   * Puts the surface's `touch-action` in step with what the runtime
+   * currently has to scroll.
+   *
+   * Called after input that could have changed the answer, and public
+   * so a host that changes the tree without any input — a list that
+   * grew, a route that swapped — can say so. Cheap and idempotent:
+   * it walks the scroll containers, which are few, and writes to the
+   * DOM only on a change.
+   */
+  syncTouchAction(): void {
+    this.surface?.setTouchAction?.(touchActionFor(this.wheel.scrollsAnything()));
   }
 
   /** Remove all listeners from the attached surface. */
@@ -245,6 +280,13 @@ function modifiersFromEvent(event: {
  *   touch-action              the browser does not take gestures for
  *                             page scrolling and double-tap zoom. The
  *                             framework scrolls its own containers.
+ *                             This is the starting value only: once
+ *                             an adapter is attached it owns this
+ *                             property and relaxes it to `auto`
+ *                             whenever the runtime has nothing of its
+ *                             own to scroll, so a finger over an
+ *                             embedded canvas still scrolls the page
+ *                             around it. See `syncTouchAction`.
  *   user-select               a press-and-drag does not start selecting
  *                             the page around the canvas. The framework
  *                             has its own text selection, over text the
@@ -294,4 +336,30 @@ export class CanvasPlatformSurface implements PlatformSurface {
     const rect = this.element.getBoundingClientRect();
     return { x: clientX - rect.left, y: clientY - rect.top };
   }
+
+  setTouchAction(value: string): void {
+    if (this.element.style.touchAction !== value) {
+      this.element.style.touchAction = value;
+    }
+  }
+}
+
+/**
+ * The `touch-action` a runtime in this state should have.
+ *
+ * `'none'` means the framework takes every gesture, which is right
+ * whenever it has something of its own to scroll — its touch scroller
+ * handles the finger and the page must not fight it. `'auto'` hands
+ * gestures back, which is what an embedded canvas with nothing to
+ * scroll has to do, or a finger over it cannot scroll the article it
+ * sits in.
+ *
+ * There is no middle value worth using. `pan-y` would let the page
+ * scroll vertically while the runtime kept horizontal drags, but
+ * touch-action is latched when the finger lands and cannot be
+ * narrowed afterwards, so a runtime that guessed wrong has lost the
+ * gesture either way. The coarse answer is the one it can defend.
+ */
+export function touchActionFor(scrollsAnything: boolean): string {
+  return scrollsAnything ? 'none' : 'auto';
 }

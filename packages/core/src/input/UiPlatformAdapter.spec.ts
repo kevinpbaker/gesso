@@ -141,6 +141,65 @@ describe('UiPlatformAdapter', () => {
     expect(wheel.mock.calls[0]![0].deltaY).toBe(100);
   });
 
+  it('prevents the browser default only for a wheel the runtime used', () => {
+    // Both directions were bugs. Preventing unconditionally makes the
+    // canvas a scroll trap in the page around it; never preventing
+    // lets one wheel scroll the container and the page behind it.
+    const h = new InputTestHarness();
+    const scroll = h.node('scroll', UiNodeType.ScrollView, { width: 100, height: 100 });
+    h.add(h.root, scroll);
+    h.add(scroll, h.node('content', UiNodeType.Box, { width: 100, height: 400 }));
+    h.layoutTree();
+    const adapter = h.createPlatformAdapter();
+    const surface = new FakePlatformSurface();
+    surface.localX = 50;
+    surface.localY = 50;
+    adapter.attach(surface);
+
+    const down = vi.fn();
+    surface.pointerTarget.emit('wheel', wheelEvent({ deltaY: 100, preventDefault: down }));
+    expect(down).toHaveBeenCalledTimes(1);
+
+    // Now at the top edge for an upward wheel: the page gets it.
+    const up = vi.fn();
+    surface.pointerTarget.emit('wheel', wheelEvent({ deltaY: -1000, preventDefault: up }));
+    surface.pointerTarget.emit('wheel', wheelEvent({ deltaY: -100, preventDefault: up }));
+    expect(up).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents the browser default when an application handler took the wheel', () => {
+    const { h, surface } = setup();
+    h.dispatcher.addEventListener(h.root, UiEventType.Wheel, event => {
+      event.preventDefault();
+    });
+    const prevented = vi.fn();
+
+    surface.pointerTarget.emit('wheel', wheelEvent({ deltaY: 100, preventDefault: prevented }));
+
+    expect(prevented).toHaveBeenCalledTimes(1);
+  });
+
+  it('relaxes touch-action when the runtime has nothing of its own to scroll', () => {
+    // On a touchscreen this is the whole fix: `touch-action` is
+    // latched when the finger lands, so a canvas left at `none`
+    // swallows the gesture before any handler could hand it back.
+    const { surface } = setup();
+
+    expect(surface.touchAction).toBe('auto');
+  });
+
+  it('keeps touch-action at none when the runtime does scroll', () => {
+    const h = new InputTestHarness();
+    const scroll = h.node('scroll', UiNodeType.ScrollView, { width: 100, height: 100 });
+    h.add(h.root, scroll);
+    h.add(scroll, h.node('content', UiNodeType.Box, { width: 100, height: 400 }));
+    h.layoutTree();
+    const surface = new FakePlatformSurface();
+    h.createPlatformAdapter().attach(surface);
+
+    expect(surface.touchAction).toBe('none');
+  });
+
   it('routes keydown and keyup through the keyboard controller', () => {
     const { h, surface } = setup();
     const down = vi.fn();
