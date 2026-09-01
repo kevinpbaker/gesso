@@ -11,6 +11,7 @@ import {
 import { capturePointer, pointerDeviceOf, prepareInputSurface, wheelDeltaYOf } from '@gesso/core';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
+import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeReducedMotion } from '../reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
 
@@ -95,6 +96,16 @@ export interface WorkerAppOptions {
    */
   interceptFind?: boolean;
   /**
+   * The appearance the application is told about: `auto` (the default)
+   * follows `prefers-color-scheme`, `light` and `dark` override it.
+   *
+   * An option as well as a setter because a host with its own control
+   * — a documentation site whose reader has already chosen dark —
+   * otherwise starts on the platform's answer and corrects it a frame
+   * later, which is a visible flash of the wrong appearance.
+   */
+  colorScheme?: ColorSchemePreference;
+  /**
    * Set false to drop the off-screen DOM an assistive technology reads
    * (`SemanticsMirror`).
    *
@@ -144,9 +155,14 @@ export class WorkerApp {
   private ready = false;
   /** The running `requestAnimationFrame` handle, when ticks are wanted. */
   private frameHandle: number | null = null;
+  /** Stops watching `prefers-color-scheme`; null while overridden. */
+  private detachColorScheme: (() => void) | null = null;
+  /** The appearance this shell reports, remembered across a remount. */
+  private colorSchemePreference: ColorSchemePreference = 'auto';
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
+    this.colorSchemePreference = options.colorScheme ?? 'auto';
   }
 
   /**
@@ -226,6 +242,7 @@ export class WorkerApp {
     this.observeResize(element);
     this.attachHistory();
     this.detachInput = this.attachInput(canvas);
+    this.setColorScheme(this.colorSchemePreference);
     // The hidden textarea that turns keystrokes into text for the
     // worker. It has DOM focus while the worker reports a focused
     // editable, so its key events are forwarded like the canvas's.
@@ -317,6 +334,35 @@ export class WorkerApp {
   }
 
   /**
+   * Chooses what the application is told about the appearance.
+   *
+   * `auto` watches `prefers-color-scheme` and reports what it says;
+   * `light` and `dark` stop watching and report themselves, for a host
+   * with its own control — the reader of a documentation site who has
+   * picked dark against a light system, or a desktop window with an
+   * appearance setting of its own.
+   *
+   * Safe to call before `mount`: the preference is remembered and sent
+   * when the worker starts.
+   */
+  setColorScheme(preference: ColorSchemePreference): void {
+    this.detachColorScheme?.();
+    this.detachColorScheme = null;
+    this.colorSchemePreference = preference;
+    if (this.renderWorker === undefined) {
+      return;
+    }
+    if (preference === 'auto') {
+      // Reports once immediately as well as on change, for the reason
+      // reduced motion does: nobody fires a `change` event at an app
+      // that started in the appearance it is already in.
+      this.detachColorScheme = observeColorScheme(scheme => this.post({ type: 'colorScheme', scheme }));
+      return;
+    }
+    this.post({ type: 'colorScheme', scheme: preference });
+  }
+
+  /**
    * Runs the display's refresh loop on the runtime's behalf.
    *
    * The one piece of per-frame work the shell genuinely has to do:
@@ -355,6 +401,8 @@ export class WorkerApp {
   dispose(): void {
     this.ready = false;
     this.setFrameLoop(false);
+    this.detachColorScheme?.();
+    this.detachColorScheme = null;
     this.proxy?.dispose();
     this.proxy = null;
     this.mirror?.dispose();

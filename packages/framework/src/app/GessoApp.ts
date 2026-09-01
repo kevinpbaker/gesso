@@ -12,6 +12,7 @@ import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice 
 import type { ShellRequest } from './ShellService';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
+import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
 import { measure } from './worker/WorkerApp';
@@ -52,6 +53,12 @@ export interface GessoAppOptions {
    * and for measuring what the mirror costs.
    */
   accessibility?: boolean;
+  /**
+   * The appearance the application is told about: `auto` (the default)
+   * follows `prefers-color-scheme`, `light` and `dark` override it.
+   * See `WorkerApp` for why this is an option and not only a setter.
+   */
+  colorScheme?: ColorSchemePreference;
 }
 
 /**
@@ -84,6 +91,10 @@ export class GessoApp {
   private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
   private detachReducedMotion: (() => void) | null = null;
+  /** Stops watching `prefers-color-scheme`; null while overridden. */
+  private detachColorScheme: (() => void) | null = null;
+  /** The appearance this shell reports; watched or overridden. */
+  private colorSchemePreference: ColorSchemePreference = 'auto';
 
   constructor(options: GessoAppOptions) {
     this.host = options.host;
@@ -91,6 +102,7 @@ export class GessoApp {
     this.inputEnabled = options.input ?? true;
     this.accessibilityEnabled = options.accessibility ?? true;
     this.historyOptions = options.history;
+    this.colorSchemePreference = options.colorScheme ?? 'auto';
 
     this.runtime = new GessoRuntime({
       root: options.root,
@@ -188,6 +200,25 @@ export class GessoApp {
     this.runtime.setInspectorEnabled(enabled);
   }
 
+  /**
+   * Chooses what the application is told about the appearance: `auto`
+   * follows `prefers-color-scheme`, `light` and `dark` override it.
+   *
+   * The same method `WorkerApp` has, doing the same thing without the
+   * protocol in the middle — which is the point of the two shells
+   * having one surface.
+   */
+  setColorScheme(preference: ColorSchemePreference): void {
+    this.detachColorScheme?.();
+    this.detachColorScheme = null;
+    this.colorSchemePreference = preference;
+    if (preference === 'auto') {
+      this.detachColorScheme = observeColorScheme(scheme => this.runtime.setColorScheme(scheme));
+      return;
+    }
+    this.runtime.setColorScheme(preference);
+  }
+
   /** Receives the hovered node's explanation while the inspector is on. */
   onInspect(listener: ((text: string | null) => void) | null): void {
     this.runtime.onInspect(listener);
@@ -227,6 +258,8 @@ export class GessoApp {
     this.detachVisibility = null;
     this.detachReducedMotion?.();
     this.detachReducedMotion = null;
+    this.detachColorScheme?.();
+    this.detachColorScheme = null;
     this.history?.dispose();
     this.history = null;
     this.adapter.detach();
@@ -270,6 +303,7 @@ export class GessoApp {
       this.detachVisibility = () => document.removeEventListener('visibilitychange', onVisibility);
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
+    this.setColorScheme(this.colorSchemePreference);
   }
 
   /**

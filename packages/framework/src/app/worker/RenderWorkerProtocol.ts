@@ -6,6 +6,7 @@ import type {
   UiSemanticsAction,
   UiSemanticsUpdate
 } from '@gesso/core';
+import type { ColorScheme } from '../colorScheme';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
 /**
@@ -133,10 +134,26 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'reducedMotion'; reduced: boolean }
   /**
+   * The appearance the shell is asking for
+   * (`prefers-color-scheme`, or an override the host set), sent once at
+   * start-up and again whenever it changes.
+   *
+   * The second preference-shaped message here, and inbound for the same
+   * reason as the first — the query needs a window. It differs in who
+   * consumes it: reduced motion reaches the animation driver, while
+   * nothing in the framework reads this one. It is carried to `ShellService` and no further,
+   * because what dark *looks* like is the application's, and a
+   * framework that shipped an answer would be shipping a palette.
+   *
+   * Always resolved to one of the two appearances. `auto` is a thing a
+   * host tells a shell, not a thing that crosses.
+   */
+  | { type: 'colorScheme'; scheme: ColorScheme }
+  /**
    * Where the window's address is now: once at start-up, and again for
    * every back, forward or typed address afterwards.
    *
-   * The second preference-shaped message on this protocol, and for the
+   * The third preference-shaped message on this protocol, and for the
    * same reason as `reducedMotion`: `location` and `history` are the
    * shell's and the routes are in here. A url is the whole of what
    * routing puts on the wire — patterns, params, guards and screens
@@ -149,7 +166,7 @@ export type ShellToRuntimeMessage =
    * What an assistive technology did to the accessibility mirror: a
    * press, a focus move, or a value set.
    *
-   * The third preference-shaped asymmetry on this protocol, and the
+   * The fourth preference-shaped asymmetry on this protocol, and the
    * only *input* on it that no device produced. It arrives by id
    * rather than by coordinate because that is what the mirror has: an
    * element standing for a node, with no idea where the person's

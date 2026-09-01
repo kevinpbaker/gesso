@@ -71,6 +71,7 @@ import {
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayService } from '../overlay/OverlayService';
+import type { ColorScheme } from './colorScheme';
 import { ShellService, type ShellRequest } from './ShellService';
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
@@ -855,9 +856,27 @@ export class GessoRuntime {
     this.services.get(RouterService).applyUrl(url);
   }
 
+  /**
+   * The appearance the shell reports: once at start-up, and again
+   * whenever the platform's answer or the host's override changes.
+   *
+   * Passed straight through to `ShellService`, where an application
+   * reads it. Nothing here acts on it — unlike `reducedMotion`, which
+   * the animation driver consumes, no part of the framework knows what
+   * dark should look like.
+   */
+  setColorScheme(scheme: ColorScheme): void {
+    this.services.get(ShellService).applyColorScheme(scheme);
+  }
+
   /** Whether the runtime is currently honouring a reduced-motion preference. */
   get reducedMotion(): boolean {
     return this.animations.isReducedMotion;
+  }
+
+  /** The appearance the shell last reported; `light` until it says otherwise. */
+  get colorScheme(): ColorScheme {
+    return this.services.get(ShellService).currentColorScheme;
   }
 
   /** Which shared-element names are currently held, for specs and devtools. */

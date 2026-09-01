@@ -285,6 +285,9 @@ export class RenderWorkerApp {
       case 'reducedMotion':
         runtime.setReducedMotion(message.reduced);
         break;
+      case 'colorScheme':
+        runtime.setColorScheme(message.scheme);
+        break;
       case 'url':
         runtime.setUrl(message.url);
         break;

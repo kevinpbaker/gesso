@@ -6,6 +6,7 @@ import { ServiceRegistry } from '../service/ServiceRegistry';
 import { createChannelRegistry, type ChannelRegistration } from '../channel/createChannelRegistry';
 import type { ChannelSource } from '../channel/provide';
 import type { ChannelToken } from '../channel/ChannelToken';
+import type { ColorSchemePreference } from './colorScheme';
 import { GessoApp } from './GessoApp';
 import type { RouterRoutes } from '../router/RouterService';
 import type { ShellHistoryOptions } from './shellHistory';
@@ -26,6 +27,7 @@ export class GessoAppBuilder {
   private routes: RouterRoutes | undefined;
   private historyOptions: ShellHistoryOptions | undefined;
   private app: GessoApp | undefined;
+  private colorSchemePreference: ColorSchemePreference = 'auto';
 
   constructor(private readonly root: FrameworkChild | ComponentType) {}
 
@@ -126,6 +128,21 @@ export class GessoAppBuilder {
   }
 
   /**
+   * Chooses what the application is told about the appearance,
+   * mirroring `WorkerApp.setColorScheme`.
+   *
+   * Unlike `setInspector`, this is remembered when it is called before
+   * `mountSync`: the appearance decides what the first frame looks
+   * like, so a host that already knows the reader's choice must be
+   * able to say so before there is an app to tell.
+   */
+  setColorScheme(preference: ColorSchemePreference): this {
+    this.colorSchemePreference = preference;
+    this.app?.setColorScheme(preference);
+    return this;
+  }
+
+  /**
    * Mounts the app on the calling thread.
    *
    * Named for what it costs: everything — components, layout and
@@ -149,7 +166,8 @@ export class GessoAppBuilder {
       services,
       routes: this.routes,
       history: this.historyOptions,
-      renderer: this.rendererChoice
+      renderer: this.rendererChoice,
+      colorScheme: this.colorSchemePreference
     });
     app.deferPatchesFrom(channels.registry.all());
     if (this.frameListener !== undefined) {

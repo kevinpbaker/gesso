@@ -8,6 +8,8 @@ import { createComponent } from '../../createComponent';
 import { Box, Column, Text, type CanvasHost } from '@gesso/core';
 import { RenderWorkerApp } from './renderRoot';
 import { channel } from '../../channel/ChannelToken';
+import type { ComponentContext, Inputs } from '../../FunctionComponent';
+import { ShellService } from '../ShellService';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 function createMockCanvas(width = 800, height = 600): CanvasHost {
@@ -328,5 +330,29 @@ describe('RenderWorkerApp cursor', () => {
     // Off it: the shell restores the default.
     send({ type: 'pointerMove', x: 700, y: 500, buttons: 0, modifiers: noKeyModifiers });
     expect(sent.filter(m => m.type === 'cursor').at(-1)).toEqual({ type: 'cursor', cursor: null });
+  });
+});
+
+describe('RenderWorkerApp colour scheme', () => {
+  it('carries the appearance the shell reports through to a component', async () => {
+    const seen: string[] = [];
+
+    function Appearance(_props: Inputs<{}>, ctx: ComponentContext) {
+      const shell = ctx.inject(ShellService);
+      shell.colorScheme.subscribe(scheme => seen.push(scheme));
+      return Text({ text: 'appearance' });
+    }
+
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(Appearance), host);
+    send(initMessage(createMockCanvas()));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+
+    // Light until the shell says otherwise, which is what a shell too
+    // old to send this message leaves the application with.
+    expect(seen).toEqual(['light']);
+
+    send({ type: 'colorScheme', scheme: 'dark' });
+    expect(seen).toEqual(['light', 'dark']);
   });
 });

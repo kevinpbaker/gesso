@@ -76,6 +76,8 @@ export {
   type UiEasingChoice
 } from './app/AnimationService';
 export { observeReducedMotion } from './app/reducedMotion';
+export { observeColorScheme, type ColorScheme, type ColorSchemePreference } from './app/colorScheme';
+export { observeMediaQuery } from './app/mediaQuery';
 export { FindService } from './app/FindService';
 export { MediaService } from './app/MediaService';
 export { FocusService } from './app/FocusService';
