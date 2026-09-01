@@ -67,7 +67,6 @@ export function Pulse(props: Inputs<{ label?: string; caption?: string }>, ctx: 
       <column gap={12} padding={16} flexGrow={1} y="center">
         <row gap={10} y="center">
           <text text={label} fontSize={12} fontWeight={600} color="text" />
-          <text text={worstMs.pipe(map(ms => `worst gap ${Math.round(ms)} ms`))} fontSize={11} color="textMuted" />
           <text text={ticks.pipe(map(count => `${count} steps`))} fontSize={11} color="textMuted" />
         </row>
 
@@ -87,8 +86,14 @@ export function Pulse(props: Inputs<{ label?: string; caption?: string }>, ctx: 
 
       {/* The caption the page used to draw in HTML, drawn here instead. */}
       <box height={1} width={percent(100)} backgroundColor="border" />
-      <row padding={10} paddingLeft={16} paddingRight={16} y="center">
+      <row padding={10} paddingLeft={16} paddingRight={16} y="center" x="space-between">
         <text text={caption} fontSize={12} color="textMuted" />
+        <text
+          text={worstMs.pipe(map(ms => `longest frame ${Math.round(ms)} ms`))}
+          fontSize={12}
+          fontWeight={600}
+          color="text"
+        />
       </row>
     </column>
   );

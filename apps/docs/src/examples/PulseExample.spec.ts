@@ -41,14 +41,14 @@ describe('the home page pulse', () => {
     expect(steps.getProperty('text')).toBe('5 steps');
   });
 
-  it('reports a gap it measured itself', () => {
+  it('reports the longest frame it measured itself', () => {
     const ui = renderTest(createComponent(Pulse, { label: 'Render worker' }), { width: 460, height: 220 });
 
     vi.advanceTimersByTime(120);
     ui.frame(120);
 
-    const gap = ui.getByText(/worst gap/);
-    expect(String(gap.getProperty('text'))).toMatch(/^worst gap \d+ ms$/);
+    const gap = ui.getByText(/longest frame/);
+    expect(String(gap.getProperty('text'))).toMatch(/^longest frame \d+ ms$/);
   });
 
   it('paints the caption it was given, rather than the page drawing one', () => {
