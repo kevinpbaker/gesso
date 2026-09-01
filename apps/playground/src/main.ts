@@ -10,6 +10,7 @@ import { mountSignInExampleRoute } from './routes/SignInExampleRoute';
 import { mountNotesExampleRoute } from './routes/NotesExampleRoute';
 import { mountLayoutRoute } from './routes/LayoutRoute';
 import { mountLiveExampleRoute } from './routes/LiveExampleRoute';
+import { mountModifiersRoute } from './routes/ModifiersRoute';
 import { mountRouterExampleRoute } from './routes/RouterExampleRoute';
 import { mountThemeExampleRoute } from './routes/ThemeExampleRoute';
 import { mountTransitionsExampleRoute } from './routes/TransitionsExampleRoute';
@@ -34,6 +35,7 @@ const MOUNTS: Record<string, Mount> = {
   canvas: mountCanvasRoute,
   framework: mountFrameworkRoute,
   'framework-sync': mountFrameworkSyncRoute,
+  modifiers: mountModifiersRoute,
   webgpu: mountWebGPURoute,
   compare: mountCompareRoute,
   benchmark: mountBenchmarkRoute,

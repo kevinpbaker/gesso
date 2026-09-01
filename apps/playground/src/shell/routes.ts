@@ -49,6 +49,7 @@ export const ROUTES: readonly RouteMeta[] = [
   { id: 'canvas', label: 'Canvas', title: 'Canvas2D renderer · three threads' },
   { id: 'framework', label: 'Framework', title: 'Component runtime · render worker' },
   { id: 'framework-sync', label: 'Single thread', title: 'Component runtime · main thread' },
+  { id: 'modifiers', label: 'Modifiers', title: 'Modifiers · behaviour attached to an element' },
   { id: 'webgpu', label: 'WebGPU', title: 'WebGPU renderer' },
   { id: 'compare', label: 'Compare', title: 'Canvas2D and WebGPU, side by side' },
   { id: 'benchmark', label: 'Benchmark', title: 'WebGPU renderer benchmark' },
