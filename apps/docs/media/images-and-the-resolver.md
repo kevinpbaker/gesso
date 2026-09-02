@@ -179,10 +179,12 @@ does, leave the `alt` off.
   an `Image` pointed at an `.svg` fails where the same file in an `<img>`
   would work. A vector glyph belongs in [`Icon`](/media/icons), which
   draws a path instead of decoding a document.
-- **A different `src` is a different image.** The source is read once,
-  in a body that runs once, so binding an Observable to `src` does not
-  swap the picture. Give the `Image` a `key` that changes with the
-  source, and a new node resolves the new file.
+- **A bound `src` is followed.** An `Image` whose `src` is an Observable
+  shows each url it emits: the new file resolves, the old bitmap is
+  released, and a load that was superseded before it arrived is dropped
+  rather than drawn. The same url again is not a reload. A `key` is
+  still the right tool when the _shape_ changes, an `Image` that becomes
+  a placeholder box when there is nothing to show.
 - **No `srcset`.** Nothing selects a variant per device pixel ratio,
   because the component cannot see one. Choose the file yourself.
 - **A failed load is a tinted box.** While the bitmap is decoding, and

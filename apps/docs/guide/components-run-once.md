@@ -84,6 +84,50 @@ That distinction, outside the binding once and inside it per emission,
 is the whole performance model, and it is visible in the source rather
 than in a profiler.
 
+## What is live, and what is read once
+
+Every prop reaches a component as a cell. Reading `props.label.value`
+inside the body gives the value at that moment and nothing afterwards;
+binding `props.label`, or a `pipe` of it, into a node's prop gives every
+value it will ever have. The body runs once, so a `.value` read in it is
+a snapshot, and a snapshot of something that changes is a bug that
+fails silently: the screen simply stays as it was.
+
+Two things make that bug visible. If a body reads a prop with `.value`
+and that prop later changes with nothing following it, the framework
+warns once, naming the component, the prop and, for an object, the
+field that moved. And the library's own components follow their props:
+an `Image` bound to a `src` that changes shows the new picture and
+releases the old, an `Icon` bound to a `path` or `color` redraws in
+place. Neither needs a `key` to change what it shows.
+
+A `key` is for identity, not for change. Give one to each item of a
+list bound to an Observable, so a reordered list moves nodes rather than
+rebuilding them; give one to a child whose _shape_ changes, an `Image`
+that becomes a lettered box when there is no picture, so the reconciler
+replaces the node rather than handing new props to a body that has
+already run.
+
+A few rules that follow from the same model and are worth knowing before
+they are met:
+
+- Inside `<text>` and `<button>` a lone Observable child is the text.
+  `<button>{icon$}</button>` binds an element to the button's label and
+  draws nothing; the framework warns once when a text turns out not to
+  be text. Put such a child in an array, `{[icon$]}`, or in a `<box>`.
+- A `button` stacks its children at its origin, as a `box` does. To lay
+  out an icon beside a label, put a `<row>` inside it.
+- A modifier written inline, `modifiers={[interactive({ hovered: ... })]}`,
+  is compared by what it holds, so it is the same modifier across a
+  rebuild. A modifier whose arguments include a fresh callback each time
+  is a new one; hoist the callback, or the whole modifier.
+- `Presence` fills whatever holds it. Placed in an app's root it sits over
+  every screen and takes their clicks; hold it in a box the size of what
+  it animates.
+- Paint and hit order among siblings is tree order, then `zIndex`. An
+  absolutely positioned control followed by a positioned column is
+  painted under the column and cannot be clicked; give it a `zIndex`.
+
 ## Where state goes instead
 
 If the body does not re-run, a `useState` equivalent would have nowhere
