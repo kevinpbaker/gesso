@@ -181,15 +181,15 @@ createApp({ renderWorker: () => new Worker(/* … */), history: { mode: 'hash', 
 ```
 
 `router.back()` and `router.forward()` ask the shell to walk its
-history, and the url that comes back is resolved like any other. The
-example on this page is a guest on a documentation page whose address
-bar belongs to VitePress, so it is handed an in-memory history instead
-of the shell's, and its Back button drives that:
+history, and the url that comes back is resolved like any other.
 
-<<< @/src/examples/RoutingExample.tsx#history
-
-An application does not write this. It is worth reading only because it
-is the shell's whole contribution, in three lines.
+Which mode an app runs in is the shell's decision, made once where the
+app is created, and the example on this page is a case of it. A live
+example is a guest on a documentation page whose address bar belongs to
+VitePress, so this site starts every embedded app in `memory` mode. The
+example's Back button walks a history of its own, and the example's own
+code says nothing about any of that: it declares routes and navigates,
+exactly as an application would.
 
 ## Screen transitions and shared elements
 
@@ -223,10 +223,9 @@ screens swap under them.
 ## Limits
 
 - **Nothing in this repository navigates in `path` mode.** The
-  playground runs in `hash` mode, and the example on this page is
-  handed a memory history of its own, so pushState navigation is
-  covered by `shellHistory`'s own spec against a fake window and by
-  nothing else.
+  playground runs in `hash` mode and this site's live examples run in
+  `memory`, so pushState navigation is covered by `shellHistory`'s own
+  spec against a fake window and by nothing else.
 - **Only Chrome.** `pushState`, `popstate` and `hashchange` behave the
   same on WKWebView and WebView2 by specification, but nothing here has
   run on either.

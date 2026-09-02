@@ -2,16 +2,13 @@ import { map } from 'rxjs/operators';
 
 import { percent, type UiChild } from '@gesso/core';
 import {
-  createShellHistory,
   internalState,
   route,
-  to,
   RouterOutlet,
   RouterService,
   type ComponentContext,
   type Inputs,
-  type OutletProps,
-  type RouteDefinition
+  type OutletProps
 } from '@gesso/framework';
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 
@@ -39,20 +36,7 @@ const NOTES = [
  * will not compile with the param missing or misspelled. Nesting is
  * the `parent` pointer, not the shape of this list.
  */
-export const Home: RouteDefinition<'/'> = route({
-  path: '/',
-  component: HomeScreen,
-  /**
-   * Any address this app does not describe settles here. Two halves,
-   * and they answer different questions: `notFound` below decides
-   * what is shown, and this guard decides what the address becomes.
-   *
-   * It is not decoration on this page. A live example is handed the
-   * address of the documentation page it is embedded in, and none of
-   * these routes describe that.
-   */
-  guard: context => (context.url === '/' ? true : to(Home))
-});
+export const Home = route({ path: '/', component: HomeScreen });
 
 /** The layout. It draws a rail and places `props.outlet` beside it. */
 export const Notes = route({ path: '/notes', component: NotesLayout });
@@ -60,34 +44,13 @@ export const Notes = route({ path: '/notes', component: NotesLayout });
 /** The leaf, nested by pointing at the route it renders inside. */
 export const Note = route({ path: '/notes/:id', component: NoteScreen, parent: Notes });
 
+/** An address none of the three describe shows the home screen. */
 export const EXAMPLE_ROUTES = { routes: [Home, Notes, Note], notFound: Home };
 // #endregion routes
-
-// #region history
-/**
- * Gives this example a history of its own.
- *
- * In a browser the shell hands the router one, and that is the whole
- * of what makes the browser's Back and Forward walk an application's
- * routes: the shell reports the address the window is at, and the
- * router asks it to push. A documentation page owns its address bar,
- * so this example is given the same in-memory history a desktop
- * window and a test get, and the Back button drives that instead.
- *
- * An application writes none of this. It is here because the example
- * is a guest on someone else's page.
- */
-function attachMemoryHistory(router: RouterService): void {
-  const history = createShellHistory({ mode: 'memory' });
-  history.onChange(url => router.applyUrl(url));
-  router.setHistory(history);
-}
-// #endregion history
 
 /** The app: chrome of its own, the current url, and one outlet. */
 export function RoutingExample(_props: Inputs<{}>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
-  attachMemoryHistory(router);
 
   return (
     <column width={percent(100)} height={percent(100)} backgroundColor="background">

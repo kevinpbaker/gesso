@@ -1,13 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent, RouterService } from '@gesso/framework';
+import { createComponent, createShellHistory, RouterService } from '@gesso/framework';
 import { renderTest, type Rendered } from '@gesso/testing';
 import '@gesso/testing/matchers';
 
 import { EXAMPLE_ROUTES, RoutingExample } from './RoutingExample';
 
 function mount(): Rendered {
-  return renderTest(createComponent(RoutingExample, {}), { width: 640, height: 360, routes: EXAMPLE_ROUTES });
+  const ui = renderTest(createComponent(RoutingExample, {}), { width: 640, height: 360, routes: EXAMPLE_ROUTES });
+
+  // The shell's half of routing, which the test plays itself: there is
+  // no window here, so the history the Back button walks is a memory
+  // one. It is the same history the documentation site hands the
+  // running example, and the example writes neither.
+  const router = ui.runtime.services.get(RouterService);
+  const history = createShellHistory({ mode: 'memory' });
+  router.setHistory(history);
+  history.onChange(url => router.applyUrl(url));
+
+  return ui;
 }
 
 /** The url the router settled on, which is what the example draws. */
@@ -79,7 +90,7 @@ describe('the docs routing example', () => {
     expect(ui.getByText('Summaries off')).toBeDefined();
   });
 
-  it('walks back through the history the example is given', () => {
+  it('walks back through the history the shell holds', () => {
     const ui = mount();
     press(ui, 'Notes');
     press(ui, 'Baselines');
@@ -88,23 +99,22 @@ describe('the docs routing example', () => {
 
     press(ui, 'Back');
 
-    // Back is the shell's half of routing, here served by the memory
-    // history the example installs: it reports a url, and the router
-    // resolves it like any other.
+    // Back is the shell's half of routing: it reports a url, and the
+    // router resolves it like any other.
     expect(url(ui)).toBe('/notes/baselines');
     expect(ui.getByText(/puts a large number and a small label/)).toBeDefined();
   });
 
-  it('sends an address it does not describe to the home screen', () => {
+  it('shows the home screen for an address it does not describe', () => {
     const ui = mount();
     const router = ui.runtime.services.get(RouterService);
 
-    // What the shell does to a live example on this site: it reports
-    // the address of the page around it.
-    router.applyUrl('/structure/routing');
+    router.applyUrl('/nowhere');
     ui.frame();
 
-    expect(url(ui)).toBe('/');
+    // `notFound` decides what is shown, not what the address becomes:
+    // the url stands, so a reload lands in the same place.
+    expect(url(ui)).toBe('/nowhere');
     expect(ui.getByText(/Press Notes/)).toBeDefined();
   });
 });

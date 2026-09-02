@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
 import { createApp, type WorkerApp } from '@gesso/framework';
+import { embeddedAppOptions } from './embeddedApp';
 
 /**
  * A running Gesso application, embedded in a documentation page.
@@ -20,6 +21,10 @@ import { createApp, type WorkerApp } from '@gesso/framework';
  *     would leave five render workers running, so the app is disposed
  *     on unmount: `dispose()` terminates the worker the same way
  *     leaving a playground route does.
+ *  3. **An example is a guest on this page.** The options it starts
+ *     with come from `embeddedAppOptions`, which is where the memory
+ *     history lives: an example with routes navigates a history of
+ *     its own and never the site's address bar.
  *
  * The appearance is handed over rather than left to the platform. A
  * Gesso shell follows `prefers-color-scheme` on its own, but this
@@ -74,13 +79,15 @@ onMounted(async () => {
   }
 
   try {
-    app = createApp({
-      renderWorker: () => new ExampleWorker(),
-      colorScheme: isDark.value ? 'dark' : 'light',
-      onError: error => {
-        failure.value = error.message;
-      }
-    });
+    app = createApp(
+      embeddedAppOptions({
+        renderWorker: () => new ExampleWorker(),
+        colorScheme: isDark.value ? 'dark' : 'light',
+        onError: message => {
+          failure.value = message;
+        }
+      })
+    );
     dispose = app.mount(host.value);
   } catch (error) {
     failure.value = error instanceof Error ? error.message : String(error);
