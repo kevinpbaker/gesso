@@ -1,3 +1,5 @@
+import { map } from 'rxjs/operators';
+
 import { percent, scrollPosition, type UiNode } from '@gesso/core';
 import { useOverlay } from '@gesso/components';
 import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
@@ -18,6 +20,10 @@ const ANCHOR_ROW = 8;
 const ANCHOR_HIGH = 220;
 const ANCHOR_LOW = 120;
 
+/** The notice at the top of the list, collapsed and expanded. */
+const NOTICE_SMALL = 28;
+const NOTICE_LARGE = 96;
+
 // #region anchored
 /**
  * A panel anchored to a button, and a button the reader can send to
@@ -34,6 +40,11 @@ const ANCHOR_LOW = 120;
  *    it stays inside the viewport rather than hanging off the right
  *    edge.
  *
+ * The button can be moved two ways, and the panel follows both: the
+ * list scrolls under it, or the notice above it grows and pushes it
+ * down the list. Nothing in the component re-places the panel; the
+ * engine does it on the frame the button's box changed.
+ *
  * The anchor is a `UiNode`, taken from the button's `ref` and read
  * inside `show()` rather than captured earlier: a ref fires after the
  * component's body has run, so anything reading it sooner reads null.
@@ -44,6 +55,7 @@ const ANCHOR_LOW = 120;
 export function Anchored(_props: Inputs<{}>, ctx: ComponentContext) {
   const panel = useOverlay(ctx, 'docs-position');
   const at = internalState(ANCHOR_HIGH);
+  const notice = internalState(NOTICE_SMALL);
   let anchor: UiNode | null = null;
 
   const show = (): void => {
@@ -80,6 +92,10 @@ export function Anchored(_props: Inputs<{}>, ctx: ComponentContext) {
       <row height={32} gap={8} y="center">
         <Step label="Move the button down" onPress={() => (at.value = ANCHOR_LOW)} />
         <Step label="Move the button up" onPress={() => (at.value = ANCHOR_HIGH)} />
+        <Step
+          label={notice.pipe(map(height => (height === NOTICE_SMALL ? 'Expand the notice' : 'Collapse the notice')))}
+          onPress={() => (notice.value = notice.value === NOTICE_SMALL ? NOTICE_LARGE : NOTICE_SMALL)}
+        />
       </row>
       <scrollview
         flex={1}
@@ -92,6 +108,17 @@ export function Anchored(_props: Inputs<{}>, ctx: ComponentContext) {
         borderColor="border"
         borderRadius={8}
         backgroundColor="surface">
+        <column
+          key="notice"
+          width={percent(100)}
+          height={notice}
+          padding={6}
+          borderRadius={6}
+          borderWidth={1}
+          borderColor="border"
+          backgroundColor="background">
+          <text text="A notice that expands" fontSize={12} color="textMuted" />
+        </column>
         {Array.from({ length: ROWS }, (_unused, index) =>
           index === ANCHOR_ROW ? (
             <row key="anchor" height={32} x="end" y="center">

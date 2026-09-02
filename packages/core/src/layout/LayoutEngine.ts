@@ -31,6 +31,13 @@ import type { AxisFacts, FlexFacts, LayoutExplanation } from './LayoutExplanatio
 export const SCROLLBAR_LINGER_MS = 1200;
 /** Portion of the linger during which the scrollbar fades out. */
 export const SCROLLBAR_FADE_MS = 350;
+/**
+ * How many times a pass re-places anchored nodes that moved because
+ * something they are anchored to moved. One pass settles an overlay on
+ * a box; a further pass settles an overlay anchored to that overlay.
+ * The limit is what stops a cycle of anchors from spinning.
+ */
+const ANCHOR_CHAIN_LIMIT = 4;
 
 export interface ScrollAdjustment {
   container: UiNode;
@@ -134,6 +141,17 @@ export class LayoutEngine {
   private readonly textScrollNodes = new Set<UiNode>();
   /** Absolutely positioned nodes placed against an anchor node. */
   private readonly anchoredNodes = new Set<UiNode>();
+  /** The anchor each of those nodes was last placed against. */
+  private readonly anchorOf = new Map<UiNode, UiNode>();
+  /**
+   * The reverse index: which anchored nodes each anchor carries. A box
+   * that moves consults it, so an anchor that moved for any reason
+   * takes its overlays with it without every frame paying for the
+   * question.
+   */
+  private readonly anchorDependents = new Map<UiNode, Set<UiNode>>();
+  /** Anchored nodes whose anchor moved this frame, re-placed once it settles. */
+  private readonly movedAnchored = new Set<UiNode>();
   /** position: 'sticky' nodes, re-offset whenever anything scrolls. */
   private readonly stickyNodes = new Set<UiNode>();
   private readonly textMeasurer: TextMeasurer;
@@ -432,10 +450,17 @@ export class LayoutEngine {
     this.records.clear();
     this.scrollNodes.clear();
     this.textScrollNodes.clear();
+    this.anchorOf.clear();
+    this.anchorDependents.clear();
+    this.movedAnchored.clear();
     this.resetStats();
     this.fullLayout(constraints);
     const rec = this.record(node);
     this.applyScroll();
+    // Placement is one top-down walk, so an overlay placed before its
+    // anchor saw a box the anchor has since been given. Every box is
+    // final here, so the queue this pass filled settles them.
+    this.replaceMovedAnchored();
     const isScroll = node.type === UiNodeType.ScrollView;
     return {
       root: node,
@@ -481,24 +506,22 @@ export class LayoutEngine {
         this.record(node).transformDirty = true;
         (node.type === UiNodeType.EditableText ? this.textScrollNodes : this.scrollNodes).add(node);
         // An anchored node sits next to something that may just have
-        // scrolled; it is re-placed, cheaply, on the same frame.
-        if (this.anchoredNodes.size > 0) {
-          this.applyScroll();
-          for (const anchored of this.anchoredNodes) {
-            this.markLayoutDirty(anchored);
-          }
-          anyLayout = true;
+        // scrolled; it is re-placed, cheaply, once the frame settles.
+        for (const anchored of this.anchoredNodes) {
+          this.movedAnchored.add(anchored);
         }
       }
     }
 
     if (!anyLayout) {
       this.applyScroll();
+      this.replaceMovedAnchored();
       return;
     }
 
     this.relayout(constraints);
     this.applyScroll();
+    this.replaceMovedAnchored();
   }
 
   /**
@@ -870,6 +893,8 @@ export class LayoutEngine {
       this.scrollNodes.delete(current);
       this.textScrollNodes.delete(current);
       this.anchoredNodes.delete(current);
+      this.movedAnchored.delete(current);
+      this.forgetAnchoring(current);
       this.stickyNodes.delete(current);
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
@@ -2178,6 +2203,7 @@ export class LayoutEngine {
       const anchor = child.properties.get('anchor');
       if (anchor !== undefined && anchor !== null) {
         this.anchoredNodes.add(child);
+        this.trackAnchor(child, anchor as UiNode);
         const anchorRec = this.records.get(anchor as UiNode);
         if (anchorRec !== undefined) {
           this.placeAnchored(child, cRec, anchorRec, anchor as UiNode, block);
@@ -2185,6 +2211,7 @@ export class LayoutEngine {
         }
       } else {
         this.anchoredNodes.delete(child);
+        this.trackAnchor(child, null);
       }
 
       const marginH = cRec.marginLeft + cRec.marginRight;
@@ -2295,6 +2322,90 @@ export class LayoutEngine {
       y = this.clamp(y, block.y, Math.max(block.y, block.y + block.height - height));
     }
     this.assignBox(child, x, y, width, height);
+  }
+
+  /**
+   * Records which anchor an anchored node is placed against, in both
+   * directions, so a moved anchor can name its dependents. Passing
+   * `null` forgets the node, which is what a child that lost its
+   * `anchor` property does.
+   */
+  private trackAnchor(child: UiNode, anchor: UiNode | null): void {
+    const previous = this.anchorOf.get(child);
+    if (previous === (anchor ?? undefined)) {
+      return;
+    }
+    if (previous !== undefined) {
+      const siblings = this.anchorDependents.get(previous);
+      siblings?.delete(child);
+      if (siblings !== undefined && siblings.size === 0) {
+        this.anchorDependents.delete(previous);
+      }
+    }
+    if (anchor === null) {
+      this.anchorOf.delete(child);
+      return;
+    }
+    this.anchorOf.set(child, anchor);
+    let dependents = this.anchorDependents.get(anchor);
+    if (dependents === undefined) {
+      dependents = new Set<UiNode>();
+      this.anchorDependents.set(anchor, dependents);
+    }
+    dependents.add(child);
+  }
+
+  /** Drops a removed node from the anchor index, on both sides of it. */
+  private forgetAnchoring(node: UiNode): void {
+    this.trackAnchor(node, null);
+    const dependents = this.anchorDependents.get(node);
+    if (dependents === undefined) {
+      return;
+    }
+    for (const dependent of dependents) {
+      this.anchorOf.delete(dependent);
+    }
+    this.anchorDependents.delete(node);
+  }
+
+  /**
+   * Re-places the anchored nodes whose anchor moved during this pass.
+   * Placement is a single top-down walk, so an overlay may be reached
+   * before the anchor it follows; this runs once every box is final,
+   * and only over the overlays an actually moved box named. Placing one
+   * can move another that is anchored to it, so the queue is drained
+   * until it stays empty, up to a depth that stops a cycle.
+   */
+  private replaceMovedAnchored(): void {
+    for (let pass = 0; this.movedAnchored.size > 0 && pass < ANCHOR_CHAIN_LIMIT; pass++) {
+      const pending = [...this.movedAnchored];
+      this.movedAnchored.clear();
+      for (const child of pending) {
+        this.replaceAnchored(child);
+      }
+    }
+    this.movedAnchored.clear();
+  }
+
+  /** Places one anchored node against the box its anchor now has. */
+  private replaceAnchored(child: UiNode): void {
+    const cRec = this.records.get(child);
+    const anchor = this.anchorOf.get(child);
+    const anchorRec = anchor === undefined ? undefined : this.records.get(anchor);
+    if (cRec === undefined || anchor === undefined || anchorRec === undefined) {
+      return;
+    }
+    const savedBase = this.percentBase;
+    const block = this.containingBlockOf(child);
+    this.percentBase = { width: block.width, height: block.height };
+    this.resolveLayoutProps(child, cRec);
+    this.placeAnchored(child, cRec, anchorRec, anchor, block);
+    this.percentBase = savedBase;
+    // Only a node that came out somewhere new has anything to re-place
+    // inside it; assignBox left the flag set if it did.
+    if (cRec.placeDirty) {
+      this.place(child);
+    }
   }
 
   private parsePlacement(value: unknown): {
@@ -3072,6 +3183,18 @@ export class LayoutEngine {
       rec.width = width;
       rec.height = height;
       rec.placeDirty = true;
+      // Anything anchored to this node was placed against the box it
+      // had a moment ago and has to be placed again. A box that did not
+      // move asks nothing, and a tree with no anchored node at all does
+      // not even look.
+      if (this.anchorDependents.size > 0) {
+        const dependents = this.anchorDependents.get(node);
+        if (dependents !== undefined) {
+          for (const dependent of dependents) {
+            this.movedAnchored.add(dependent);
+          }
+        }
+      }
     }
   }
 

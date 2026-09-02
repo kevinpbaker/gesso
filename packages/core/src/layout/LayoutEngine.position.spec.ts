@@ -296,6 +296,80 @@ describe('LayoutEngine positioning', () => {
       const frame = new UiFrame(1, 0, new Map([[scroller, DirtyFlags.Transform]]));
       h.engine.layoutForFrame(frame, Constraints.loose(300, 400));
       expect(h.box(popup).y).toBe(180);
+      // A scroll re-places the popup and measures nothing.
+      expect(h.engine.stats.measured).toBe(0);
+      expect(h.engine.stats.placed).toBe(1);
+      expect(h.engine.stats.fullLayout).toBe(false);
+    });
+
+    /**
+     * A scene where the anchor can be moved by layout rather than by
+     * scrolling: a spacer above it in the flow, and an overlay layer
+     * that is a sibling of the whole app column, so nothing the anchor
+     * dirties reaches the popup on its own.
+     */
+    function movableScene(anchorProps: Record<string, unknown> = {}) {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const app = column(h, 'app', { padding: 20 });
+      const spacer = box(h, 'spacer', { width: 60, height: 30 });
+      const anchor = box(h, 'anchor', { width: 60, height: 20, ...anchorProps });
+      h.append(app, spacer, anchor);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor,
+        width: 100,
+        height: 50,
+        placement: 'bottom-start'
+      });
+      h.append(layer, popup);
+      h.append(root, app, layer);
+      h.layout(root, Constraints.loose(300, 200));
+      return { h, root, app, spacer, anchor, popup };
+    }
+
+    it('follows an anchor pushed down by a sibling that grew', () => {
+      const { h, spacer, anchor, popup } = movableScene();
+      expect(h.box(anchor).y).toBe(50);
+      expect(h.box(popup)).toEqual({ x: 20, y: 70, width: 100, height: 50 });
+
+      spacer.setProperty('height', 60);
+      h.engine.layoutForFrame(new UiFrame(1, 0, new Map([[spacer, DirtyFlags.Layout]])), Constraints.loose(300, 200));
+      expect(h.box(anchor).y).toBe(80);
+      expect(h.box(popup)).toEqual({ x: 20, y: 100, width: 100, height: 50 });
+      // The root, the app column, the spacer and the anchor would be
+      // placed by this frame anyway; following the anchor adds the
+      // popup's own placement and nothing else.
+      expect(h.engine.stats.placed).toBe(5);
+    });
+
+    it('follows an anchor moved by its own offsets', () => {
+      const { h, anchor, popup } = movableScene({ position: 'absolute', top: 40, left: 30 });
+      expect(h.box(anchor)).toEqual({ x: 30, y: 40, width: 60, height: 20 });
+      expect(h.box(popup)).toEqual({ x: 30, y: 60, width: 100, height: 50 });
+
+      anchor.setProperty('top', 90);
+      anchor.setProperty('left', 55);
+      h.engine.layoutForFrame(new UiFrame(1, 0, new Map([[anchor, DirtyFlags.Layout]])), Constraints.loose(300, 200));
+      expect(h.box(anchor)).toEqual({ x: 55, y: 90, width: 60, height: 20 });
+      expect(h.box(popup)).toEqual({ x: 55, y: 110, width: 100, height: 50 });
+    });
+
+    it('re-places nothing when a layout frame moves no box', () => {
+      const { h, spacer, popup } = movableScene();
+      const before = h.box(popup);
+
+      // The property is written with the value it already has, so the
+      // frame is dirty but every box comes out where it was. An engine
+      // that re-placed anchored nodes on any layout frame would place
+      // the popup here; the cost has to stay proportional to change.
+      spacer.setProperty('height', 30);
+      h.engine.layoutForFrame(new UiFrame(2, 0, new Map([[spacer, DirtyFlags.Layout]])), Constraints.loose(300, 200));
+      expect(h.box(popup)).toEqual(before);
+      // The dirty path only: the root, the app column and the spacer.
+      // The popup is not among them, and neither is the layer it sits in.
+      expect(h.engine.stats.placed).toBe(3);
     });
   });
 });

@@ -52,6 +52,15 @@ function panelBox(ui: Rendered): LayoutBox {
   return ui.getLayout(ui.getByRole('group', { name: 'Panel' }));
 }
 
+/**
+ * The gap between the panel and the anchor, on whichever side the panel
+ * took. The side it is on decides which of the two differences is the
+ * real distance; the other one spans both boxes and is negative.
+ */
+function gapToAnchor(panel: LayoutBox, anchor: LayoutBox): number {
+  return Math.max(panel.y - (anchor.y + anchor.height), anchor.y - (panel.y + panel.height));
+}
+
 function press(ui: Rendered, name: string): void {
   ui.fireEvent.click(ui.getByRole('button', { name }));
   ui.frame();
@@ -108,6 +117,25 @@ describe('the docs positioning example', () => {
     // The anchor really moved, and the panel is beside it again.
     expect(anchor.y).toBeLessThan(low);
     expect(panelBox(ui).y).toBeCloseTo(anchor.y + anchor.height + OFFSET, 3);
+  });
+
+  it('follows the anchor when the notice above it pushes it down the list', () => {
+    const ui = example();
+    const before = anchorSeen(ui).y;
+
+    // Nothing scrolls here: the notice above the button grows, the flow
+    // carries the button down with it, and the panel is placed again on
+    // whichever side of the button now has the room.
+    press(ui, 'Expand the notice');
+    const anchor = anchorSeen(ui);
+
+    expect(anchor.y).toBeGreaterThan(before);
+    expect(gapToAnchor(panelBox(ui), anchor)).toBeCloseTo(OFFSET, 3);
+
+    press(ui, 'Collapse the notice');
+    const back = anchorSeen(ui);
+    expect(back.y).toBeCloseTo(before, 3);
+    expect(panelBox(ui).y).toBeCloseTo(back.y + back.height + OFFSET, 3);
   });
 
   it('closes and reopens the panel from its anchor', () => {

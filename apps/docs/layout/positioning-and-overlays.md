@@ -10,7 +10,9 @@ to escape the box that opened them and be placed against something
 else. That is what `position` and the overlay layer are for.
 
 The panel below is anchored to the button in the list. Move the button
-towards the bottom edge and watch which side the panel takes:
+towards the bottom edge and watch which side the panel takes; expand
+the notice at the top of the list and watch the panel follow a button
+that nothing scrolled:
 
 <LiveExample id="position" height="360" />
 
@@ -119,18 +121,25 @@ the DOM:
   against the right of a list that reaches the canvas edge.
 
 Both are decided in the layout engine rather than in a pass afterwards,
-which is what makes them frame-exact. The anchor's record is final by
-the time the overlay is placed, since the layer is the last child of
-the root, so there is never a frame in which the panel is beside where
-the button used to be.
+which is what makes them frame-exact. There is never a frame in which
+the panel is beside where the button used to be.
+
+**An anchor that moves takes its overlays with it, whatever moved it.**
+The engine keeps an index of which anchored nodes each anchor carries.
+A box that comes out somewhere new names its overlays, and they are
+placed again at the end of the frame, once every box in the pass is
+final: it does not matter whether the anchor moved because the list
+scrolled, because its own offsets changed, or because something above
+it in the flow grew. A frame in which no box moved asks the index
+nothing, so an idle overlay costs nothing to keep open.
 
 **The anchor and the overlay may be under different scroll
 containers.** Layout boxes are pre-scroll, so before comparing the two
 the engine sums the scroll offsets of each node's scroll ancestors and
-brings both into the same visible space. The engine also keeps the set
-of anchored nodes and marks them dirty on a scroll-only frame, which is
-the one case where a transform change runs layout, and it is what makes
-the panel in the example follow its button as the list moves.
+brings both into the same visible space. Scrolling is the one change
+that moves an anchor without changing any box, so a scroll frame hands
+the anchored nodes their fresh placement directly and still measures
+nothing.
 
 If the anchored panel in your own screen stops following its anchor,
 the usual cause is that the anchor never reached the prop. A `ref`
@@ -223,11 +232,16 @@ one case that wraps real text between two edges.
 
 Anchored placement has no CSS equivalent that Chrome ships unflagged,
 so it is covered by engine specs instead: the side, the alignment, the
-offset, a flip on each axis, a shift, and following a scroll. The spec
-beside the example above asserts what this page claims about it, that
-the panel starts under its button, is shifted back inside the canvas,
-flips above the button when the scroll leaves no room below, and
-returns underneath when the button moves back.
+offset, a flip on each axis, a shift, following a scroll, following an
+anchor pushed down by a sibling that grew, and following an anchor
+whose own offsets changed. Two of those specs count the placements the
+frame made: following an anchor costs the overlay's own placement and
+nothing else, and a layout frame that leaves every box where it was
+places no overlay at all. The spec beside the example above asserts
+what this page claims about it, that the panel starts under its button,
+is shifted back inside the canvas, flips above the button when the
+scroll leaves no room below, returns underneath when the button moves
+back, and stays against the button when the notice above it grows.
 
 Layout does not change with the renderer: boxes are computed once and
 both Canvas2D and WebGPU read the result. Chrome is the only browser
