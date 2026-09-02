@@ -1,4 +1,4 @@
-import { combineLatest, distinctUntilChanged, map, type Observable, Subscription } from 'rxjs';
+import { BehaviorSubject, combineLatest, distinctUntilChanged, map, type Observable, Subscription } from 'rxjs';
 
 import {
   AnimationService,
@@ -8,6 +8,7 @@ import {
   internalState,
   input,
   type OutletProps,
+  Presence,
   route,
   RouterOutlet,
   RouterService,
@@ -26,6 +27,8 @@ import {
   focusRing,
   interactive,
   linear,
+  measure,
+  type LayoutBox,
   type UiChild,
   type UiKeyboardEvent,
   type UiModifier,
@@ -35,6 +38,7 @@ import {
 
 import { CARDS, cardById, ICONS, type CardDesign } from './transitions/playlists';
 import { Catalogue, Queue, type PlaylistView, type TrackView } from './transitions/TransitionsContract';
+import { formatClock } from './transitions/time';
 import { SNAPSHOT } from './transitions/snapshot';
 import { CHALK, INK, LINEN } from './brand';
 
@@ -109,6 +113,10 @@ const CARD_RADIUS = 32;
 const CARD_MEDIA_HEIGHT = 360;
 const PAGE_MEDIA_HEIGHT = 480;
 const HEADER_HEIGHT = 74;
+/** The now-playing bar across the bottom, once something plays. */
+const BAR_HEIGHT = 88;
+/** The coloured strip along the bar's top edge. */
+const BAR_ACCENT = 3;
 /*
  * This screen is the light half of the brand: chalk ground for the
  * page, plain white for the cards and sheets that carry artwork, and
@@ -169,6 +177,13 @@ const SHEET_CONTROL_INTERACTION = interactive({
   press: true,
   hovered: { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
   pressed: { backgroundColor: 'rgba(0, 0, 0, 0.1)' }
+});
+/** A control on the white bar: ink glyph, a wash of ink behind it on hover. */
+const BAR_CONTROL_INTERACTION = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
+  pressed: { backgroundColor: 'rgba(0, 0, 0, 0.12)' }
 });
 /** A track row, which plays on press. */
 const ROW_INTERACTION = interactive({
@@ -842,7 +857,7 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
       <column
         width={percent(100)}
         paddingTop={HEADER_HEIGHT + 20}
-        paddingBottom={40}
+        paddingBottom={bottomPadding(ctx, 40)}
         paddingLeft={GUTTER}
         paddingRight={GUTTER}
         gap={20}
@@ -1216,13 +1231,253 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
           width={percent(100)}
           maxWidth={COLUMN_WIDTH}
           paddingTop={20}
-          paddingBottom={40}
+          paddingBottom={bottomPadding(ctx, 40)}
           x="center"
           modifiers={[motion({ initial: [fade, slideUp(24)], duration: 'slow' })]}>
           {rows}
         </column>
       </column>
     </scrollview>
+  );
+}
+
+/**
+ * Room at the bottom of a scroll view for the bar, while there is one,
+ * so the last row is never hidden behind it.
+ */
+function bottomPadding(ctx: ComponentContext, base: number): Observable<number> {
+  return ctx.channel(Queue).view.current.pipe(
+    map(current => (current === null ? base : base + BAR_HEIGHT)),
+    distinctUntilChanged()
+  );
+}
+
+/** A control on the now-playing bar. */
+function BarControl(
+  props: Inputs<{ path: string; label: string; onClick: () => void; big?: boolean; stroke?: boolean }>
+): UiChild {
+  const big = input(props.big, false).value;
+  const size = big ? 48 : 38;
+  const icon = combineLatest([props.path, input(props.stroke, false)]).pipe(
+    map(([path, stroke]) => (
+      <Icon
+        key={`${path}|${stroke ? 'stroke' : 'fill'}`}
+        path={path}
+        size={big ? 22 : 18}
+        color={INK}
+        style={stroke ? 'stroke' : 'fill'}
+        strokeWidth={2}
+        fillRule="evenodd"
+      />
+    ))
+  );
+  return (
+    <button
+      width={size}
+      height={size}
+      borderRadius={size / 2}
+      backgroundColor={big ? '#f1ece3' : CARD}
+      x="center"
+      y="center"
+      cursor="pointer"
+      label={props.label}
+      onClick={() => props.onClick.value()}
+      modifiers={[BAR_CONTROL_INTERACTION, RING]}>
+      {[icon]}
+    </button>
+  );
+}
+
+/**
+ * The seek bar: a strip that reports where along it the pointer landed,
+ * and a fill that is a fraction of its width.
+ *
+ * Not the library's `Slider`, which prints its label and value above
+ * its track as a form control should; a player wants the bare track
+ * with the times either side of it. The strip measures itself through
+ * `measure`, so a pointer position means something without anything
+ * reaching into the engine, and it follows a pan from its first pixel,
+ * the way the `Slider` does. The arrows nudge by five seconds.
+ */
+function SeekBar(
+  props: Inputs<{ position: number; duration: number; accent: string; onSeek: (seconds: number) => void }>
+): UiChild {
+  const strip = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
+  const fraction = combineLatest([props.position, props.duration]).pipe(
+    map(([at, total]) => (total <= 0 ? 0 : Math.min(1, Math.max(0, at / total))))
+  );
+  const toSeconds = (event: UiPointerEvent): number => {
+    const box = strip.value;
+    const total = props.duration.value;
+    if (box.width <= 0 || total <= 0) {
+      return props.position.value;
+    }
+    return Math.min(1, Math.max(0, (event.x - box.x) / box.width)) * total;
+  };
+  const seek = (event: UiPointerEvent): void => {
+    event.stopPropagation();
+    props.onSeek.value(toSeconds(event));
+  };
+  const nudge = (by: number): void => {
+    const total = props.duration.value;
+    props.onSeek.value(Math.min(total > 0 ? total : Infinity, Math.max(0, props.position.value + by)));
+  };
+  return (
+    <box
+      flex={1}
+      height={20}
+      y="center"
+      focusable
+      cursor="pointer"
+      role="slider"
+      label="Seek"
+      valueNow={props.position}
+      valueMin={0}
+      valueMax={props.duration}
+      valueText={props.position.pipe(map(at => formatClock(at)))}
+      onPanStart={seek}
+      onPanMove={seek}
+      onPointerDown={seek}
+      onKeyDown={(event: UiKeyboardEvent) => {
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          event.preventDefault();
+          nudge(event.key === 'ArrowRight' ? 5 : -5);
+        }
+      }}
+      modifiers={[measure(strip), RING]}>
+      <box width={percent(100)} height={4} borderRadius={2} backgroundColor="rgba(0, 0, 0, 0.1)" x="start" y="center">
+        <box
+          height={4}
+          borderRadius={2}
+          width={fraction.pipe(map(part => percent(part * 100)))}
+          backgroundColor={props.accent}
+        />
+      </box>
+    </box>
+  );
+}
+
+/**
+ * The bar across the bottom while something plays: the track, three
+ * controls, and a seek bar whose head moves between the shell's samples
+ * because `AudioService` drives the position on the animation driver.
+ *
+ * It sits above both screens, so it stays put through every navigation,
+ * and takes its accent strip from the playing playlist's card so the
+ * two read as one thing. `Presence` around it, in the app, is what
+ * slides it in the first time a track starts and out when the queue
+ * finishes.
+ */
+function NowPlayingBar(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
+  const queue = ctx.channel(Queue);
+  const audio = ctx.inject(AudioService);
+  const track = queue.view.current;
+  const accent = queue.view.playlistId.pipe(map(id => (id === null ? INK : cardById(id).background)));
+  const playing = audio.state.pipe(
+    map(state => state.status === 'playing' || state.status === 'loading'),
+    distinctUntilChanged()
+  );
+  const duration = audio.state.pipe(
+    map(state => (Number.isFinite(state.duration) && state.duration > 0 ? state.duration : 0)),
+    distinctUntilChanged()
+  );
+  const position = audio.state.pipe(map(state => state.position));
+  const remaining = combineLatest([position, duration]).pipe(
+    map(([at, total]) => (total === 0 ? '' : `-${formatClock(Math.max(0, total - at))}`))
+  );
+  const togglePlay = (): void => {
+    const status = audio.current.status;
+    if (status === 'playing' || status === 'loading') {
+      audio.pause();
+    } else if (status === 'ended') {
+      queue.send.next();
+    } else {
+      audio.play();
+    }
+  };
+  const previous = (): void => {
+    if (audio.current.position > 3) {
+      audio.seek(0);
+    } else {
+      queue.send.previous();
+    }
+  };
+  // The artwork is an `Image`, which reads its source once: a new
+  // track is a new keyed node, and the same track is left alone.
+  const art = track.pipe(
+    map(current => current?.art ?? ''),
+    distinctUntilChanged(),
+    map(src =>
+      src === '' ? (
+        <box key="none" width={52} height={52} borderRadius={6} backgroundColor={ART_PLACEHOLDER} />
+      ) : (
+        <Image
+          key={src}
+          src={src}
+          alt=""
+          width={52}
+          height={52}
+          borderRadius={6}
+          objectFit="cover"
+          placeholderColor={ART_PLACEHOLDER}
+        />
+      )
+    )
+  );
+  return (
+    <column
+      position="absolute"
+      left={0}
+      right={0}
+      bottom={0}
+      height={BAR_HEIGHT}
+      backgroundColor={CARD}
+      role="region"
+      label="Now playing">
+      <box width={percent(100)} height={BAR_ACCENT} backgroundColor={accent} />
+      <row
+        width={percent(100)}
+        maxWidth={COLUMN_WIDTH + 120}
+        flex={1}
+        gap={16}
+        paddingLeft={GUTTER}
+        paddingRight={GUTTER}
+        y="center"
+        selfX="center">
+        <box width={52} height={52} flexShrink={0}>
+          {art}
+        </box>
+        <column flex={1} gap={6}>
+          <row gap={8} y="baseline">
+            <text color={INK} fontSize={14} fontWeight={700} selectable={false} maxLines={1} textOverflow="ellipsis">
+              {track.pipe(map(current => current?.title ?? ''))}
+            </text>
+            <text color={MUTED} fontSize={13} selectable={false} maxLines={1} textOverflow="ellipsis">
+              {track.pipe(map(current => current?.artist ?? ''))}
+            </text>
+          </row>
+          <row gap={10} y="center">
+            <text color={FAINT} fontSize={12} selectable={false} minWidth={34}>
+              {position.pipe(map(at => formatClock(at)))}
+            </text>
+            <SeekBar position={position} duration={duration} accent={accent} onSeek={(at: number) => audio.seek(at)} />
+            <text color={FAINT} fontSize={12} selectable={false} minWidth={40} textAlign="right">
+              {remaining}
+            </text>
+          </row>
+        </column>
+        <row gap={6} y="center" flexShrink={0}>
+          <BarControl path={ICONS.previous} label="Previous track" onClick={previous} />
+          <BarControl
+            path={playing.pipe(map(on => (on ? ICONS.pause : ICONS.play)))}
+            label={playing.pipe(map(on => (on ? 'Pause' : 'Play')))}
+            big
+            onClick={togglePlay}
+          />
+          <BarControl path={ICONS.next} label="Next track" onClick={() => queue.send.next()} />
+        </row>
+      </row>
+    </column>
   );
 }
 
@@ -1298,6 +1553,14 @@ export function TransitionsExampleApp(_props: Inputs<Record<string, never>>, ctx
   // The player lives for the life of the app, above both screens, so a
   // track keeps playing across every navigation.
   attachPlayer(ctx);
+  const queue = ctx.channel(Queue);
+  // The bar exists while something is queued. Keyed once, so a change of
+  // track updates it in place rather than sliding a new bar in.
+  const barShown = queue.view.current.pipe(
+    map(current => current !== null),
+    distinctUntilChanged()
+  );
+  const bar = barShown.pipe(map(shown => (shown ? [<NowPlayingBar key="now-playing" />] : [])));
   // Escape is Back. Keys go to the focused node and bubble; with nothing
   // focused they go to the app root, which is this box, so this one
   // handler covers a person who tabbed to a heart and one who never
@@ -1333,6 +1596,22 @@ export function TransitionsExampleApp(_props: Inputs<Record<string, never>>, ctx
         }}
       />
       <AppHeader hidden={onDetail} />
+      {/* `Presence` fills whatever holds it, so it is held to the strip
+          the bar occupies rather than the whole screen, where it would
+          sit over both screens and take their clicks and wheels. While
+          there is no bar the strip lets the pointer through to the
+          rows beneath it. */}
+      <box
+        position="absolute"
+        left={0}
+        right={0}
+        bottom={0}
+        height={BAR_HEIGHT}
+        pointerEvents={barShown.pipe(map(shown => (shown ? 'auto' : 'none')))}>
+        <Presence enter={[fade, slideUp(BAR_HEIGHT)]} exit={[fade, slideUp(BAR_HEIGHT)]} timing={{ duration: 320 }}>
+          {bar}
+        </Presence>
+      </box>
     </box>
   );
 }

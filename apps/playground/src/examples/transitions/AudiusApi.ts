@@ -1,4 +1,7 @@
+import { formatClock } from './time';
 import type { PlaylistView, TrackView } from './TransitionsContract';
+
+export { formatClock };
 
 /**
  * The slice of the Audius API the playlists app uses, and the shaping
@@ -174,14 +177,6 @@ export function mapPlaylist(playlist: AudiusPlaylist, cardId: string, tracks: re
     trackCount: tracks.length,
     url: `${AUDIUS_SITE}${playlist.permalink}`
   };
-}
-
-/** "4:07", the way a track list writes a length. */
-export function formatClock(seconds: number): string {
-  const whole = Math.max(0, Math.round(seconds));
-  const minutes = Math.floor(whole / 60);
-  const rest = whole % 60;
-  return `${minutes}:${rest < 10 ? '0' : ''}${rest}`;
 }
 
 /** "1h 50m" or "48m", the way a playlist header writes a total. */
