@@ -2968,6 +2968,7 @@ interface ScrollPositionArgs {
 declare const scrollPosition: ((args: ScrollPositionArgs, key?: string | number) => UiModifier<ScrollPositionArgs>) & {
   readonly kind: UiModifierKind<ScrollPositionArgs>;
 };
+declare function sameArgs(a: unknown, b: unknown, depth?: number): boolean;
 declare function resolveProperty<T>(node: UiNode, definition: UiPropertyDefinition<T>): T;
 declare function resolvePropertyByName<T>(node: UiNode, name: string): T | undefined;
 declare function resolveNumber(node: UiNode, name: string): number | undefined;
@@ -3520,6 +3521,7 @@ interface UiSemanticsAction {
   readonly value?: string;
 }
 export {
+  Ac,
   accumulatedOffsetTo,
   Affine,
   AlignContent,
@@ -3757,7 +3759,6 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
-  kc,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -3903,6 +3904,7 @@ export {
   Row,
   RowProps,
   RunMeasure,
+  sameArgs,
   scaleFrom,
   ScissorRect,
   ScrollAdjustment,
@@ -4554,6 +4556,7 @@ import {
   Row,
   RowProps,
   RunMeasure,
+  sameArgs,
   scaleFrom,
   ScissorRect,
   ScrollAdjustment,
@@ -4820,7 +4823,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-BtnZUlBA.js";
+} from "./index-BSyjX2F0.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5076,6 +5079,7 @@ export {
   rgba,
   rotateFrom,
   Row,
+  sameArgs,
   scaleFrom,
   SCROLLBAR_FADE_MS,
   SCROLLBAR_HOVER_ZONE,
@@ -5502,7 +5506,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BtnZUlBA.js";
+} from "./index-BSyjX2F0.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

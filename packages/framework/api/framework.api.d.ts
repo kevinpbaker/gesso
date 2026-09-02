@@ -359,6 +359,8 @@ interface ServedChannel {
   };
 }
 declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
+declare function pick<T, K extends keyof T>(source: Observable<T>, key: K): Observable<T[K]>;
+declare function pickKeys<T extends object, K extends keyof T>(source: Observable<T>, keys: readonly K[]): { readonly [P in K]: Observable<T[P]>; };
 declare function structurallyEqual<T>(a: T, b: T): boolean;
 interface ComponentElement<P = Record<string, unknown>> {
   readonly kind: 'component';
@@ -1563,6 +1565,8 @@ export {
   OverlayLayer,
   OverlayService,
   parseUrl,
+  pick,
+  pickKeys,
   portHandle,
   Presence,
   printPropValue,
