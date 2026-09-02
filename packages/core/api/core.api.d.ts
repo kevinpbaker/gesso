@@ -758,6 +758,7 @@ interface UiModifierHost {
   onEnvironment(listener: () => void): void;
   focus(): void;
   isFocused(): boolean;
+  isFocusVisible(): boolean;
   onFocusChange(listener: (focused: boolean) => void): void;
   decorate(shapes: readonly DecorationShape[] | null): void;
   animate<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): Observable<T>;
@@ -794,6 +795,7 @@ interface UiModifierLayout {
 }
 interface UiModifierFocus {
   isFocused(node: UiNode): boolean;
+  isFocusVisible(node: UiNode): boolean;
   focus(node: UiNode): void;
   onFocusChange(node: UiNode, listener: (focused: boolean) => void): () => void;
 }
@@ -2009,10 +2011,12 @@ declare class NodeTransitions implements UiNodeTransitions {
 }
 declare function resetTransitionWarnings(): void;
 type FocusSource = 'pointer' | 'keyboard' | 'program';
+type FocusModality = 'pointer' | 'keyboard';
 declare class UiFocusManager {
   private readonly dispatcher;
   private root;
   private focused;
+  private modality;
   private readonly listeners;
   private readonly scopeListeners;
   private readonly scopes;
@@ -2020,6 +2024,9 @@ declare class UiFocusManager {
   setRoot(root: UiNode): void;
   get focusedNode(): UiNode | null;
   hasFocus(): boolean;
+  get focusModality(): FocusModality;
+  get focusVisible(): boolean;
+  noteInput(modality: FocusModality): void;
   get scopeRoot(): UiNode;
   get trapped(): boolean;
   focus(node: UiNode, source?: FocusSource): boolean;
@@ -2044,9 +2051,11 @@ declare class UiFocusManager {
 declare class FocusNotifier {
   private readonly listeners;
   private focused;
+  private visible;
   add(node: UiNode, listener: (focused: boolean) => void): () => void;
   isFocused(node: UiNode): boolean;
-  handleFocusChange(node: UiNode | null): void;
+  isFocusVisible(node: UiNode): boolean;
+  handleFocusChange(node: UiNode | null, visible?: boolean): void;
   handleNodeRemoved(node: UiNode): void;
   private notify;
 }
@@ -4811,7 +4820,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-C0g8-pP4.js";
+} from "./index-CZzlmdux.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5493,7 +5502,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-C0g8-pP4.js";
+} from "./index-CZzlmdux.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
