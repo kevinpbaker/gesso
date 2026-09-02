@@ -175,8 +175,10 @@ nodes are built in the render worker and stay there.
 key for something that changes rarely. View state the whole render
 thread shares is a runtime service, registered with `useService`.
 Anything that survives a reload, or that another screen cares about, is
-a channel and lives in the application worker. The rule to hold onto is
-that a hover highlight must never round-trip to another thread.
+a channel and lives in the application worker. [State and
+services](/guide/state-and-services) walks that ladder rung by rung. The
+rule to hold onto is that a hover highlight must never round-trip to
+another thread.
 
 **Fonts are the page's, not the worker's.** A family is a string handed
 to the renderer, and nothing in these packages loads a font. The
