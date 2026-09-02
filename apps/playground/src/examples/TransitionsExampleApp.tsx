@@ -917,15 +917,19 @@ function PlayingBars(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
  */
 function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: ComponentContext): UiChild {
   const card = props.card.value;
-  const track = props.track.value;
+  // Bound, not read: the row keeps its key when the live catalogue
+  // replaces the snapshot's copy of the track, so a body that had read
+  // `props.track.value` would show the old copy for good. Handlers read
+  // the current value at the moment they run, which is fine.
+  const track = props.track;
   const queue = ctx.channel(Queue);
   const shell = ctx.inject(ShellService);
-  const liked = queue.view.likedTracks.pipe(
-    map(ids => ids.includes(track.id)),
+  const liked = combineLatest([queue.view.likedTracks, track]).pipe(
+    map(([ids, entry]) => ids.includes(entry.id)),
     distinctUntilChanged()
   );
-  const current = queue.view.current.pipe(
-    map(playing => playing?.id === track.id),
+  const current = combineLatest([queue.view.current, track]).pipe(
+    map(([playing, entry]) => playing?.id === entry.id),
     distinctUntilChanged()
   );
   const menuOpen = internalState(false);
@@ -936,14 +940,37 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
     { value: 'copy', label: 'Copy link' }
   ];
   const onMenu = (value: string): void => {
+    const entry = track.value;
     if (value === 'next') {
-      queue.send.playNext(track.id);
+      queue.send.playNext(entry.id);
     } else if (value === 'open') {
-      shell.openUrl(track.url);
+      shell.openUrl(entry.url);
     } else {
-      shell.copyText(track.url);
+      shell.copyText(entry.url);
     }
   };
+  // Two shapes for the artwork, so an Observable picks one; the
+  // `Image` inside follows its `src` on its own.
+  const art = track.pipe(
+    map(entry => entry.art !== ''),
+    distinctUntilChanged(),
+    map(has =>
+      has ? (
+        <Image
+          key="art"
+          src={track.pipe(map(entry => entry.art))}
+          alt={track.pipe(map(entry => entry.title))}
+          width={60}
+          height={60}
+          borderRadius={6}
+          objectFit="cover"
+          placeholderColor={ART_PLACEHOLDER}
+        />
+      ) : (
+        <box key="none" width={60} height={60} borderRadius={6} backgroundColor={ART_PLACEHOLDER} />
+      )
+    )
+  );
   return (
     <button
       width={percent(100)}
@@ -953,26 +980,14 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
       paddingBottom={10}
       borderRadius={10}
       cursor="pointer"
-      label={`${track.title} by ${track.artist}`}
+      label={track.pipe(map(entry => `${entry.title} by ${entry.artist}`))}
       states={current.pipe(map(on => (on ? ['selected'] : [])))}
-      onClick={() => queue.send.play({ playlistId: card.id, trackId: track.id })}
+      onClick={() => queue.send.play({ playlistId: card.id, trackId: track.value.id })}
       modifiers={[ROW_INTERACTION, RING]}>
       {/* A button stacks its children; the row is what lays them out. */}
       <row width={percent(100)} gap={20} y="center">
         <box position="relative" width={60} height={60} flexShrink={0}>
-          {track.art !== '' ? (
-            <Image
-              src={track.art}
-              alt={track.title}
-              width={60}
-              height={60}
-              borderRadius={6}
-              objectFit="cover"
-              placeholderColor={ART_PLACEHOLDER}
-            />
-          ) : (
-            <box width={60} height={60} borderRadius={6} backgroundColor={ART_PLACEHOLDER} />
-          )}
+          {art}
           {current.pipe(map(on => (on ? [<PlayingBars key="bars" />] : [])))}
         </box>
         <column flex={1} gap={4}>
@@ -983,14 +998,14 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
             selectable={false}
             maxLines={1}
             textOverflow="ellipsis">
-            {track.title}
+            {track.pipe(map(entry => entry.title))}
           </text>
           <text color={MUTED} fontSize={13} selectable={false} maxLines={1} textOverflow="ellipsis">
-            {track.artist}
+            {track.pipe(map(entry => entry.artist))}
           </text>
         </column>
         <text color={FAINT} fontSize={13} selectable={false}>
-          {track.duration}
+          {track.pipe(map(entry => entry.duration))}
         </text>
         <button
           width={36}
@@ -999,11 +1014,13 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
           x="center"
           y="center"
           cursor="pointer"
-          label={liked.pipe(map(on => (on ? `Unlike ${track.title}` : `Like ${track.title}`)))}
+          label={combineLatest([liked, track]).pipe(
+            map(([on, entry]) => (on ? `Unlike ${entry.title}` : `Like ${entry.title}`))
+          )}
           states={liked.pipe(map(on => (on ? ['pressed'] : [])))}
           onClick={(event: UiPointerEvent) => {
             event.stopPropagation();
-            queue.send.toggleLikeTrack(track.id);
+            queue.send.toggleLikeTrack(track.value.id);
           }}
           modifiers={[SHEET_CONTROL_INTERACTION, RING]}>
           <Icon
@@ -1022,7 +1039,7 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
           x="center"
           y="center"
           cursor="pointer"
-          label={`More for ${track.title}`}
+          label={track.pipe(map(entry => `More for ${entry.title}`))}
           onClick={(event: UiPointerEvent) => {
             event.stopPropagation();
             menuOpen.value = true;
@@ -1035,7 +1052,7 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
           anchor={menuAnchor}
           items={MENU_ITEMS}
           placement="bottom-end"
-          label={`Options for ${track.title}`}
+          label={track.pipe(map(entry => `Options for ${entry.title}`))}
           onOpenChange={(next: boolean) => (menuOpen.value = next)}
           onSelect={onMenu}
         />
