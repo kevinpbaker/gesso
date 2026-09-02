@@ -19,8 +19,13 @@ import { SNAPSHOT } from './snapshot';
 /** Who made the playlist, as the card header shows them. */
 export interface CuratorView {
   readonly name: string;
-  /** A square picture at about 150px, or '' when the curator has none. */
-  readonly avatar: string;
+  /**
+   * The curator's picture at about 150px, as urls on every mirror Audius
+   * lists for it, best first; empty when the curator has none. Several
+   * because the network's nodes are not all up at once, and an `Image`
+   * given the list tries them in order.
+   */
+  readonly avatar: readonly string[];
 }
 
 /**
@@ -53,8 +58,8 @@ export interface TrackView {
   /** "4:11" */
   readonly duration: string;
   readonly seconds: number;
-  /** Square artwork at 150px, or '' when the track has none. */
-  readonly art: string;
+  /** Square artwork at 150px, on every mirror Audius lists, best first; empty when the track has none. */
+  readonly art: readonly string[];
   /** The track's page on audius.co. */
   readonly url: string;
   /** The mp3, behind a redirect the browser follows on its own. */

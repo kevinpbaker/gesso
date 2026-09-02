@@ -17,7 +17,7 @@ function result(cardId: string, title: string, trackCount = 1): AudiusPlaylistRe
     artist: 'A',
     duration: '1:00',
     seconds: 60,
-    art: '',
+    art: [],
     url: '',
     stream: ''
   }));
@@ -25,7 +25,7 @@ function result(cardId: string, title: string, trackCount = 1): AudiusPlaylistRe
     id: cardId,
     title,
     description: '',
-    curator: { name: 'C', avatar: '' },
+    curator: { name: 'C', avatar: [] },
     date: 'May 2026',
     plays: '1',
     time: '1m',

@@ -4,8 +4,8 @@ import { AudiusApi, formatClock, formatCount, formatMonth, formatSpan, mapPlayli
 
 const HOST = 'https://api.example.test';
 
-function user(name: string, avatar?: string) {
-  return { name, profile_picture: avatar === undefined ? null : { '150x150': avatar } };
+function user(name: string, avatar?: string, mirrors?: string[]) {
+  return { name, profile_picture: avatar === undefined ? null : { '150x150': avatar, mirrors } };
 }
 
 function track(id: string, title: string, seconds: number, extra: Record<string, unknown> = {}) {
@@ -71,7 +71,7 @@ describe('AudiusApi', () => {
       id: '1',
       title: 'Deep House',
       description: 'Vibes',
-      curator: { name: 'DreamEater', avatar: 'https://cdn.example.test/dj.jpg' },
+      curator: { name: 'DreamEater', avatar: ['https://cdn.example.test/dj.jpg'] },
       date: 'July 2025',
       plays: '96,690',
       time: '8m',
@@ -85,7 +85,7 @@ describe('AudiusApi', () => {
       artist: 'Artist',
       duration: '4:30',
       seconds: 270,
-      art: 'https://cdn.example.test/t1.jpg',
+      art: ['https://cdn.example.test/t1.jpg'],
       url: 'https://audius.co/artist/t1',
       stream: `${HOST}/v1/tracks/t1/stream?app_name=gesso-playground`
     });
@@ -140,15 +140,48 @@ describe('formatting', () => {
     expect(formatMonth('not a date')).toBe('');
   });
 
-  it('maps a track without artwork or a curator without a picture to empty strings', () => {
+  it('lists a picture on every mirror Audius names, the answering node first', () => {
+    const mapped = mapTrack(
+      {
+        ...track('t', 'T', 10),
+        artwork: {
+          '150x150': 'https://node-a.example/content/Qm123/150x150.jpg',
+          mirrors: ['https://node-b.example/', 'https://node-c.example', 'https://node-a.example']
+        }
+      },
+      HOST
+    );
+    expect(mapped.art).toEqual([
+      'https://node-a.example/content/Qm123/150x150.jpg',
+      'https://node-b.example/content/Qm123/150x150.jpg',
+      'https://node-c.example/content/Qm123/150x150.jpg'
+    ]);
+    const playlist = mapPlaylist(
+      {
+        id: 'p',
+        playlist_name: 'P',
+        permalink: '/p',
+        created_at: '2024-02-01T00:00:00Z',
+        user: user('U', 'https://node-a.example/content/QmAv/150x150.jpg', ['https://node-d.example'])
+      },
+      '3',
+      []
+    );
+    expect(playlist.curator.avatar).toEqual([
+      'https://node-a.example/content/QmAv/150x150.jpg',
+      'https://node-d.example/content/QmAv/150x150.jpg'
+    ]);
+  });
+
+  it('maps a track without artwork or a curator without a picture to empty lists', () => {
     const mapped = mapTrack({ ...track('t', 'T', 10), artwork: null }, HOST);
-    expect(mapped.art).toBe('');
+    expect(mapped.art).toEqual([]);
     const playlist = mapPlaylist(
       { id: 'p', playlist_name: 'P', permalink: '/p', created_at: '2024-02-01T00:00:00Z', user: user('U') },
       '3',
       []
     );
-    expect(playlist.curator.avatar).toBe('');
+    expect(playlist.curator.avatar).toEqual([]);
     expect(playlist.description).toBe('');
     expect(playlist.plays).toBe('0');
     expect(playlist.date).toBe('February 2024');

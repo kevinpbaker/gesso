@@ -10,7 +10,7 @@ function track(id: string): TrackView {
     artist: 'A',
     duration: '1:00',
     seconds: 60,
-    art: '',
+    art: [],
     url: '',
     stream: `${id}.mp3`
   };

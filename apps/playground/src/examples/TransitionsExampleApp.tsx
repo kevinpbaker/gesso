@@ -287,7 +287,7 @@ function attachPlayer(ctx: ComponentContext): void {
       audio.setMetadata({
         title: track.title,
         artist: track.artist,
-        ...(track.art === '' ? {} : { artwork: track.art })
+        ...(track.art.length === 0 ? {} : { artwork: track.art[0]! })
       });
     })
   );
@@ -362,7 +362,8 @@ function Stats(props: Inputs<{ card: CardDesign; playlist: PlaylistView }>): UiC
  * fetched again from a slower mirror, and the slot sat empty while it
  * loaded. Compared by content instead, the same picture stays put.
  */
-function artworkKey(url: string): string {
+function artworkKey(urls: readonly string[]): string {
+  const url = urls[0] ?? '';
   const at = url.indexOf('/content/');
   return at === -1 ? url : url.slice(at);
 }
@@ -384,7 +385,7 @@ function Avatar(props: Inputs<{ card: CardDesign; playlist: PlaylistView; size: 
     map(playlist => playlist.curator),
     distinctUntilChanged((a, b) => artworkKey(a.avatar) === artworkKey(b.avatar) && a.name === b.name),
     map(curator =>
-      curator.avatar !== '' ? (
+      curator.avatar.length > 0 ? (
         <Image
           key="picture"
           src={curator.avatar}
@@ -945,7 +946,7 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
   // Two shapes for the artwork, so an Observable picks one; the
   // `Image` inside follows its `src` on its own.
   const art = track.pipe(
-    map(entry => entry.art !== ''),
+    map(entry => entry.art.length > 0),
     distinctUntilChanged(),
     map(has =>
       has ? (
@@ -1383,14 +1384,14 @@ function NowPlayingBar(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
   // The artwork is an `Image`, which reads its source once: a new
   // track is a new keyed node, and the same track is left alone.
   const art = track.pipe(
-    map(current => current?.art ?? ''),
-    distinctUntilChanged(),
+    map(current => current?.art ?? []),
+    distinctUntilChanged((a, b) => artworkKey(a) === artworkKey(b)),
     map(src =>
-      src === '' ? (
+      src.length === 0 ? (
         <box key="none" width={52} height={52} borderRadius={6} backgroundColor={ART_PLACEHOLDER} />
       ) : (
         <Image
-          key={src}
+          key="art"
           src={src}
           alt=""
           width={52}

@@ -24,10 +24,21 @@ export const AUDIUS_APP_NAME = 'gesso-playground';
 export const AUDIUS_DISCOVERY = 'https://api.audius.co';
 export const AUDIUS_SITE = 'https://audius.co';
 
+/**
+ * Artwork as Audius describes it: a url per size on the node that
+ * answered, and the origins of the other nodes holding the same file.
+ */
+interface AudiusArtwork {
+  readonly '150x150'?: string;
+  readonly '480x480'?: string;
+  readonly '1000x1000'?: string;
+  readonly mirrors?: readonly string[];
+}
+
 /** The parts of an Audius user object that are read here. */
 interface AudiusUser {
   readonly name: string;
-  readonly profile_picture?: Readonly<Record<string, string>> | null;
+  readonly profile_picture?: AudiusArtwork | null;
 }
 
 interface AudiusTrack {
@@ -37,7 +48,7 @@ interface AudiusTrack {
   readonly permalink: string;
   readonly is_streamable?: boolean;
   readonly is_stream_gated?: boolean;
-  readonly artwork?: Readonly<Record<string, string>> | null;
+  readonly artwork?: AudiusArtwork | null;
   readonly user: AudiusUser;
 }
 
@@ -158,7 +169,7 @@ export function mapTrack(track: AudiusTrack, host: string): TrackView {
     artist: track.user.name,
     duration: formatClock(track.duration),
     seconds: track.duration,
-    art: track.artwork?.['150x150'] ?? '',
+    art: artworkUrls(track.artwork, '150x150'),
     url: `${AUDIUS_SITE}${track.permalink}`,
     stream: `${host}/v1/tracks/${encodeURIComponent(track.id)}/stream?app_name=${AUDIUS_APP_NAME}`
   };
@@ -170,13 +181,41 @@ export function mapPlaylist(playlist: AudiusPlaylist, cardId: string, tracks: re
     id: cardId,
     title: playlist.playlist_name.trim(),
     description: (playlist.description ?? '').trim(),
-    curator: { name: playlist.user.name, avatar: playlist.user.profile_picture?.['150x150'] ?? '' },
+    curator: { name: playlist.user.name, avatar: artworkUrls(playlist.user.profile_picture, '150x150') },
     date: formatMonth(playlist.updated_at ?? playlist.created_at),
     plays: formatCount(playlist.total_play_count ?? 0),
     time: formatSpan(seconds),
     trackCount: tracks.length,
     url: `${AUDIUS_SITE}${playlist.permalink}`
   };
+}
+
+/**
+ * One picture at one size, as a url on every node that holds it: the
+ * one Audius answered with first, then each mirror with the same path.
+ * Audius's nodes come and go, and the one that served the response is
+ * not always the one that will serve the file, so an `Image` given the
+ * whole list can move on when the first does not answer.
+ */
+export function artworkUrls(artwork: AudiusArtwork | null | undefined, size: '150x150' | '480x480'): string[] {
+  const primary = artwork?.[size];
+  if (primary === undefined || primary === '') {
+    return [];
+  }
+  const urls = [primary];
+  let path: string;
+  try {
+    path = new URL(primary).pathname;
+  } catch {
+    return urls;
+  }
+  for (const mirror of artwork?.mirrors ?? []) {
+    const candidate = `${mirror.replace(/\/+$/, '')}${path}`;
+    if (!urls.includes(candidate)) {
+      urls.push(candidate);
+    }
+  }
+  return urls;
 }
 
 /** "1h 50m" or "48m", the way a playlist header writes a total. */
