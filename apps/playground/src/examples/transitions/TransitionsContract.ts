@@ -96,3 +96,59 @@ export const Catalogue = channel<CatalogueView, CatalogueCommands>('catalogue', 
   tracks: SNAPSHOT.tracks,
   source: 'snapshot'
 });
+
+/**
+ * What is queued to play, and what the person has liked and saved.
+ *
+ * Whether sound is coming out is *not* here: that is the shell's
+ * element, reported through `AudioService` on the render thread. The
+ * queue only says which track is current and what comes after it, and
+ * the render thread's player glue turns a change of `current` into a
+ * load. Likes and saves live here rather than in a module on the
+ * render side because they are application state that outlives a
+ * screen, which is what this thread is for.
+ */
+export interface QueueView {
+  /** The card whose tracks are queued, or null when nothing is. */
+  readonly playlistId: string | null;
+  /** Track ids in the order they will play. */
+  readonly order: readonly string[];
+  /** Index into `order`, or -1 when the queue is empty or finished. */
+  readonly index: number;
+  /** The track at `index`, flattened for the screen. */
+  readonly current: TrackView | null;
+  readonly shuffled: boolean;
+  /** Ids of liked tracks. */
+  readonly likedTracks: readonly string[];
+  /** Card ids of liked playlists. */
+  readonly likedPlaylists: readonly string[];
+  /** Card ids of playlists saved to the library. */
+  readonly savedPlaylists: readonly string[];
+}
+
+export interface QueueCommands {
+  /** Queue a playlist and start it, from a given track or from its first. */
+  play(target: { readonly playlistId: string; readonly trackId?: string }): void;
+  /** Advance; at the end the queue finishes and `current` becomes null. */
+  next(): void;
+  /** Step back; at the first track it stays there. */
+  previous(): void;
+  /** Slot a track in straight after the current one. */
+  playNext(trackId: string): void;
+  /** Flip shuffle; a queue already playing is reordered from the current track on. */
+  toggleShuffle(): void;
+  toggleLikeTrack(trackId: string): void;
+  toggleLikePlaylist(playlistId: string): void;
+  toggleSavedPlaylist(playlistId: string): void;
+}
+
+export const Queue = channel<QueueView, QueueCommands>('queue', {
+  playlistId: null,
+  order: [],
+  index: -1,
+  current: null,
+  shuffled: false,
+  likedTracks: [],
+  likedPlaylists: [],
+  savedPlaylists: []
+});

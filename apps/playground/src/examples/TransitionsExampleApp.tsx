@@ -1,6 +1,8 @@
-import { combineLatest, distinctUntilChanged, map, type Observable } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, type Observable, Subscription } from 'rxjs';
 
 import {
+  AnimationService,
+  AudioService,
   type ComponentContext,
   type Inputs,
   internalState,
@@ -11,7 +13,7 @@ import {
   RouterService,
   ShellService
 } from '@gesso/framework';
-import { Icon, Image, Video } from '@gesso/components';
+import { Icon, Image, Menu, Video } from '@gesso/components';
 import {
   fade,
   motion,
@@ -23,15 +25,16 @@ import {
   slideUp,
   focusRing,
   interactive,
+  linear,
   type UiChild,
   type UiKeyboardEvent,
   type UiModifier,
+  type UiNode,
   type UiPointerEvent
 } from '@gesso/core';
 
 import { CARDS, cardById, ICONS, type CardDesign } from './transitions/playlists';
-import { likedPlaylist, likedTrack, savedPlaylist, toggle } from './transitions/library';
-import { Catalogue, type PlaylistView, type TrackView } from './transitions/TransitionsContract';
+import { Catalogue, Queue, type PlaylistView, type TrackView } from './transitions/TransitionsContract';
 import { SNAPSHOT } from './transitions/snapshot';
 import { CHALK, INK, LINEN } from './brand';
 
@@ -125,6 +128,8 @@ const MARK_VIEWBOX = 64;
 const MARK_RADIUS = 12;
 /** The heart, once it is full. */
 const LIKED = '#ff5c7a';
+/** The title of the track that is playing, on the white sheet. */
+const NOW_PLAYING = '#4a53d8';
 
 /*
  * How a control answers the pointer. One shared value per look, because
@@ -164,6 +169,13 @@ const SHEET_CONTROL_INTERACTION = interactive({
   press: true,
   hovered: { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
   pressed: { backgroundColor: 'rgba(0, 0, 0, 0.1)' }
+});
+/** A track row, which plays on press. */
+const ROW_INTERACTION = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: 'rgba(0, 0, 0, 0.035)' },
+  pressed: { backgroundColor: 'rgba(0, 0, 0, 0.07)' }
 });
 const RING = focusRing();
 
@@ -216,6 +228,87 @@ function playlistFor(ctx: ComponentContext, id: string): Observable<PlaylistView
     map(list => list.find(playlist => playlist.id === id) ?? fallback),
     distinctUntilChanged()
   );
+}
+
+/**
+ * Whether a card's playlist is the one coming out of the speakers, or
+ * about to: the queue says which playlist is current and the audio
+ * service says whether it is playing, and neither knows the other.
+ */
+function playingHere(ctx: ComponentContext, id: string): Observable<boolean> {
+  const queue = ctx.channel(Queue);
+  const audio = ctx.inject(AudioService);
+  return combineLatest([queue.view.playlistId, queue.view.current, audio.state]).pipe(
+    map(
+      ([playlistId, current, state]) =>
+        playlistId === id && current !== null && (state.status === 'playing' || state.status === 'loading')
+    ),
+    distinctUntilChanged()
+  );
+}
+
+/**
+ * The glue between the queue and the sound, and the only place that
+ * knows both.
+ *
+ * The queue says which track is current; this loads it. The element
+ * says a track ended; this asks the queue for the next. The platform's
+ * media keys say next or previous; this passes them on, with the one
+ * convention a player is expected to have: previous inside the first
+ * few seconds goes back a track, and later restarts this one. Nothing
+ * else in the app touches `AudioService.load`.
+ */
+function attachPlayer(ctx: ComponentContext): void {
+  const queue = ctx.channel(Queue);
+  const audio = ctx.inject(AudioService);
+  const subscriptions = new Subscription();
+  let playing: string | null = null;
+  subscriptions.add(
+    queue.view.current.subscribe(track => {
+      const id = track?.id ?? null;
+      if (id === playing) {
+        return;
+      }
+      playing = id;
+      if (track === null) {
+        audio.pause();
+        audio.setMetadata(null);
+        return;
+      }
+      audio.load(track.stream, { autoplay: true });
+      audio.setMetadata({
+        title: track.title,
+        artist: track.artist,
+        ...(track.art === '' ? {} : { artwork: track.art })
+      });
+    })
+  );
+  subscriptions.add(
+    audio.state
+      .pipe(
+        map(state => state.status),
+        distinctUntilChanged()
+      )
+      .subscribe(status => {
+        if (status === 'ended') {
+          queue.send.next();
+        }
+      })
+  );
+  subscriptions.add(
+    audio.actions.subscribe(action => {
+      if (action === 'next') {
+        queue.send.next();
+      } else if (action === 'previous') {
+        if (audio.current.position > 3) {
+          audio.seek(0);
+        } else {
+          queue.send.previous();
+        }
+      }
+    })
+  );
+  ctx.onUnmount(() => subscriptions.unsubscribe());
 }
 
 // ---------------------------------------------------------------------------
@@ -404,10 +497,17 @@ function Control(
  * playlist page it is the 24px badge on the avatar. Same element, same
  * shared name, so it morphs between the two.
  */
-function SaveBadge(props: Inputs<{ card: CardDesign; size: number; iconSize: number }>): UiChild {
+function SaveBadge(
+  props: Inputs<{ card: CardDesign; size: number; iconSize: number }>,
+  ctx: ComponentContext
+): UiChild {
   const card = props.card.value;
   const size = props.size.value;
-  const saved = savedPlaylist(card.id);
+  const queue = ctx.channel(Queue);
+  const saved = queue.view.savedPlaylists.pipe(
+    map(ids => ids.includes(card.id)),
+    distinctUntilChanged()
+  );
   return (
     <button
       width={size}
@@ -421,7 +521,7 @@ function SaveBadge(props: Inputs<{ card: CardDesign; size: number; iconSize: num
       states={saved.pipe(map(on => (on ? ['pressed'] : [])))}
       onClick={(event: UiPointerEvent) => {
         event.stopPropagation();
-        toggle(saved);
+        queue.send.toggleSavedPlaylist(card.id);
       }}
       modifiers={[LIGHT_CONTROL_INTERACTION, RING, sharedElement({ name: `playlist-add-${card.id}` })]}>
       {[
@@ -456,9 +556,9 @@ function SaveBadge(props: Inputs<{ card: CardDesign; size: number; iconSize: num
  * way. The button that exists only on the page has nothing to pair
  * with; it simply arrives, like the back button.
  *
- * Play is wired to nothing yet, on purpose: it will drive the queue once
- * there is one, and a button that pretended to play would be worse than
- * one plainly waiting for its player.
+ * Play reads as Pause while this playlist is the one playing, on the
+ * card and on the page alike, because the control is the same shared
+ * element in both places and the state behind it is the same queue.
  */
 function PlayerControls(
   props: Inputs<{ card: CardDesign; playlist: PlaylistView; full?: boolean }>,
@@ -467,23 +567,58 @@ function PlayerControls(
   const card = props.card.value;
   const full = input(props.full, false).value;
   const shell = ctx.inject(ShellService);
-  const liked = likedPlaylist(card.id);
+  const audio = ctx.inject(AudioService);
+  const queue = ctx.channel(Queue);
+  const liked = queue.view.likedPlaylists.pipe(
+    map(ids => ids.includes(card.id)),
+    distinctUntilChanged()
+  );
+  const playing = playingHere(ctx, card.id);
   const shared = (control: string): readonly UiModifier[] => [
     sharedElement({ name: `playlist-control-${control}-${card.id}` })
   ];
   const arrives: readonly UiModifier[] = [motion({ initial: fade, duration: 'slow' })];
+  const togglePlay = (): void => {
+    const here = queue.view.playlistId.value === card.id && queue.view.current.value !== null;
+    if (!here) {
+      queue.send.play({ playlistId: card.id });
+      return;
+    }
+    const status = audio.current.status;
+    if (status === 'playing' || status === 'loading') {
+      audio.pause();
+    } else if (status === 'ended' || status === 'error') {
+      queue.send.play({ playlistId: card.id });
+    } else {
+      audio.play();
+    }
+  };
   return (
     <box position="absolute" left={0} right={0} bottom={0} x="center">
       <row gap={20} y="center" paddingTop={28} paddingBottom={28}>
-        <Control path={ICONS.shuffle} label="Shuffle" stroke onClick={() => {}} rootModifiers={shared('shuffle')} />
-        <Control path={ICONS.play} label="Play" big onClick={() => {}} rootModifiers={shared('play')} />
+        <Control
+          path={ICONS.shuffle}
+          label={queue.view.shuffled.pipe(map(on => (on ? 'Shuffle is on' : 'Shuffle')))}
+          stroke
+          active={queue.view.shuffled}
+          activeColor="#8be0ff"
+          onClick={() => queue.send.toggleShuffle()}
+          rootModifiers={shared('shuffle')}
+        />
+        <Control
+          path={playing.pipe(map(on => (on ? ICONS.pause : ICONS.play)))}
+          label={playing.pipe(map(on => (on ? 'Pause' : 'Play')))}
+          big
+          onClick={togglePlay}
+          rootModifiers={shared('play')}
+        />
         <Control
           path={liked.pipe(map(on => (on ? ICONS.heart : ICONS.heartOutline)))}
           stroke={liked.pipe(map(on => !on))}
           label={liked.pipe(map(on => (on ? 'Unlike this playlist' : 'Like this playlist')))}
           active={liked}
           activeColor={LIKED}
-          onClick={() => toggle(liked)}
+          onClick={() => queue.send.toggleLikePlaylist(card.id)}
           rootModifiers={shared('like')}
         />
         {full
@@ -737,67 +872,186 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
 // ---------------------------------------------------------------------------
 
 /**
- * One track. The heart is a toggle; the row itself is not yet a button,
- * because pressing a track has to play it and there is no player yet.
- * The more menu waits for the same reason: its items are things done to
- * a playing track.
+ * Three bars rising and falling over the artwork of the track that is
+ * playing.
+ *
+ * Each bar is one repeating tween on its own cell, at its own tempo, so
+ * the three never line up. Under reduced motion the tweens snap and the
+ * bars stand still, which still says which row is playing.
  */
-function TrackRow(props: Inputs<{ track: TrackView }>): UiChild {
-  const track = props.track.value;
-  const liked = likedTrack(track.id);
+function PlayingBars(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
+  const animations = ctx.inject(AnimationService);
+  const bars = [
+    { height: internalState(6), duration: 520 },
+    { height: internalState(14), duration: 680 },
+    { height: internalState(9), duration: 610 }
+  ];
+  for (const bar of bars) {
+    animations.animate(bar.height, 22, { duration: bar.duration, easing: linear, repeat: true, stepMs: 60 });
+  }
+  ctx.onUnmount(() => {
+    for (const bar of bars) {
+      animations.stop(bar.height);
+    }
+  });
   return (
-    <row width={percent(100)} gap={20} paddingLeft={20} paddingRight={20} paddingTop={10} paddingBottom={10} y="center">
-      {track.art !== '' ? (
-        <Image
-          src={track.art}
-          alt={track.title}
-          width={60}
-          height={60}
-          borderRadius={6}
-          objectFit="cover"
-          placeholderColor={ART_PLACEHOLDER}
-        />
-      ) : (
-        <box width={60} height={60} borderRadius={6} backgroundColor={ART_PLACEHOLDER} flexShrink={0} />
-      )}
-      <column flex={1} gap={4}>
-        <text color={INK} fontSize={14} fontWeight={700} selectable={false} maxLines={1} textOverflow="ellipsis">
-          {track.title}
-        </text>
-        <text color={MUTED} fontSize={13} selectable={false} maxLines={1} textOverflow="ellipsis">
-          {track.artist}
-        </text>
-      </column>
-      <text color={FAINT} fontSize={13} selectable={false}>
-        {track.duration}
-      </text>
-      <button
-        width={36}
-        height={36}
-        borderRadius={18}
-        x="center"
-        y="center"
-        cursor="pointer"
-        label={liked.pipe(map(on => (on ? `Unlike ${track.title}` : `Like ${track.title}`)))}
-        states={liked.pipe(map(on => (on ? ['pressed'] : [])))}
-        onClick={() => toggle(liked)}
-        modifiers={[SHEET_CONTROL_INTERACTION, RING]}>
-        {[
-          liked.pipe(
-            map(on => (
-              <Icon
-                key={on ? 'liked' : 'unliked'}
-                path={on ? ICONS.heart : ICONS.heartOutline}
-                style={on ? 'fill' : 'stroke'}
-                strokeWidth={1.8}
-                size={22}
-                color={on ? LIKED : FAINT}
-              />
-            ))
-          )
-        ]}
-      </button>
+    <row
+      position="absolute"
+      left={0}
+      top={0}
+      width={60}
+      height={60}
+      borderRadius={6}
+      backgroundColor="rgba(0, 0, 0, 0.45)"
+      gap={4}
+      x="center"
+      y="end"
+      paddingBottom={14}>
+      {bars.map((bar, index) => (
+        <box key={index} width={5} height={bar.height} borderRadius={2} backgroundColor={CHALK} />
+      ))}
     </row>
+  );
+}
+
+/**
+ * One track: press it to play the playlist from here. The heart likes
+ * it, and the menu offers the three things done to a track that is not
+ * the one playing: queue it next, open it on Audius, copy its link.
+ */
+function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: ComponentContext): UiChild {
+  const card = props.card.value;
+  const track = props.track.value;
+  const queue = ctx.channel(Queue);
+  const shell = ctx.inject(ShellService);
+  const liked = queue.view.likedTracks.pipe(
+    map(ids => ids.includes(track.id)),
+    distinctUntilChanged()
+  );
+  const current = queue.view.current.pipe(
+    map(playing => playing?.id === track.id),
+    distinctUntilChanged()
+  );
+  const menuOpen = internalState(false);
+  const menuAnchor = internalState<UiNode | null>(null);
+  const MENU_ITEMS = [
+    { value: 'next', label: 'Play next' },
+    { value: 'open', label: 'Open on Audius' },
+    { value: 'copy', label: 'Copy link' }
+  ];
+  const onMenu = (value: string): void => {
+    if (value === 'next') {
+      queue.send.playNext(track.id);
+    } else if (value === 'open') {
+      shell.openUrl(track.url);
+    } else {
+      shell.copyText(track.url);
+    }
+  };
+  return (
+    <button
+      width={percent(100)}
+      paddingLeft={20}
+      paddingRight={20}
+      paddingTop={10}
+      paddingBottom={10}
+      borderRadius={10}
+      cursor="pointer"
+      label={`${track.title} by ${track.artist}`}
+      states={current.pipe(map(on => (on ? ['selected'] : [])))}
+      onClick={() => queue.send.play({ playlistId: card.id, trackId: track.id })}
+      modifiers={[ROW_INTERACTION, RING]}>
+      {/* A button stacks its children; the row is what lays them out. */}
+      <row width={percent(100)} gap={20} y="center">
+        <box position="relative" width={60} height={60} flexShrink={0}>
+          {track.art !== '' ? (
+            <Image
+              src={track.art}
+              alt={track.title}
+              width={60}
+              height={60}
+              borderRadius={6}
+              objectFit="cover"
+              placeholderColor={ART_PLACEHOLDER}
+            />
+          ) : (
+            <box width={60} height={60} borderRadius={6} backgroundColor={ART_PLACEHOLDER} />
+          )}
+          {current.pipe(map(on => (on ? [<PlayingBars key="bars" />] : [])))}
+        </box>
+        <column flex={1} gap={4}>
+          <text
+            color={current.pipe(map(on => (on ? NOW_PLAYING : INK)))}
+            fontSize={14}
+            fontWeight={700}
+            selectable={false}
+            maxLines={1}
+            textOverflow="ellipsis">
+            {track.title}
+          </text>
+          <text color={MUTED} fontSize={13} selectable={false} maxLines={1} textOverflow="ellipsis">
+            {track.artist}
+          </text>
+        </column>
+        <text color={FAINT} fontSize={13} selectable={false}>
+          {track.duration}
+        </text>
+        <button
+          width={36}
+          height={36}
+          borderRadius={18}
+          x="center"
+          y="center"
+          cursor="pointer"
+          label={liked.pipe(map(on => (on ? `Unlike ${track.title}` : `Like ${track.title}`)))}
+          states={liked.pipe(map(on => (on ? ['pressed'] : [])))}
+          onClick={(event: UiPointerEvent) => {
+            event.stopPropagation();
+            queue.send.toggleLikeTrack(track.id);
+          }}
+          modifiers={[SHEET_CONTROL_INTERACTION, RING]}>
+          {[
+            liked.pipe(
+              map(on => (
+                <Icon
+                  key={on ? 'liked' : 'unliked'}
+                  path={on ? ICONS.heart : ICONS.heartOutline}
+                  style={on ? 'fill' : 'stroke'}
+                  strokeWidth={1.8}
+                  size={22}
+                  color={on ? LIKED : FAINT}
+                />
+              ))
+            )
+          ]}
+        </button>
+        <button
+          ref={(node: UiNode | null) => (menuAnchor.value = node)}
+          width={36}
+          height={36}
+          borderRadius={18}
+          x="center"
+          y="center"
+          cursor="pointer"
+          label={`More for ${track.title}`}
+          onClick={(event: UiPointerEvent) => {
+            event.stopPropagation();
+            menuOpen.value = true;
+          }}
+          modifiers={[SHEET_CONTROL_INTERACTION, RING]}>
+          <Icon path={ICONS.ellipsis} size={22} color={FAINT} fillRule="evenodd" />
+        </button>
+        <Menu
+          open={menuOpen}
+          anchor={menuAnchor}
+          items={MENU_ITEMS}
+          placement="bottom-end"
+          label={`Options for ${track.title}`}
+          onOpenChange={(next: boolean) => (menuOpen.value = next)}
+          onSelect={onMenu}
+        />
+      </row>
+    </button>
   );
 }
 
@@ -860,7 +1114,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
   // The rows, keyed by track id, so a refreshed count on the playlist
   // does not rebuild them and a changed list rebuilds only what moved.
   const rows = catalogue.view.tracks.pipe(
-    map(all => (all[card.id] ?? []).map(track => <TrackRow key={track.id} track={track} />))
+    map(all => (all[card.id] ?? []).map(track => <TrackRow key={track.id} card={card} track={track} />))
   );
 
   return (
@@ -1041,6 +1295,9 @@ function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
 export function TransitionsExampleApp(_props: Inputs<Record<string, never>>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
   const onDetail = router.match.pipe(map(match => match?.route === Detail));
+  // The player lives for the life of the app, above both screens, so a
+  // track keeps playing across every navigation.
+  attachPlayer(ctx);
   // Escape is Back. Keys go to the focused node and bubble; with nothing
   // focused they go to the app root, which is this box, so this one
   // handler covers a person who tabbed to a heart and one who never

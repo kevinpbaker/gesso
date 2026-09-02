@@ -1,6 +1,6 @@
 import { renderRoot } from '@gesso/framework';
 import { ROUTES, TransitionsExampleApp } from './TransitionsExampleApp';
-import { Catalogue } from './transitions/TransitionsContract';
+import { Catalogue, Queue } from './transitions/TransitionsContract';
 
 /**
  * Render worker for the transitions example.
@@ -15,4 +15,4 @@ import { Catalogue } from './transitions/TransitionsContract';
  * wires to this worker with one `MessagePort`. The shell exchanges a
  * url and nothing else.
  */
-renderRoot(TransitionsExampleApp).useRoutes(ROUTES).useChannel(Catalogue);
+renderRoot(TransitionsExampleApp).useRoutes(ROUTES).useChannel(Catalogue).useChannel(Queue);

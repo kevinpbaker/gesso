@@ -52,6 +52,11 @@ export class Catalogue {
     this.cards = cards;
   }
 
+  /** The tracks a card has right now, for the queue, which builds an order from them. */
+  tracksFor(playlistId: string): readonly TrackView[] {
+    return this.tracksSubject.value[playlistId] ?? [];
+  }
+
   /** Asks Audius for every card. One load at a time; a second call joins the first. */
   load(): Promise<void> {
     if (this.loading === null) {
