@@ -2509,6 +2509,9 @@ declare class LayoutEngine {
   private readonly scrollNodes;
   private readonly textScrollNodes;
   private readonly anchoredNodes;
+  private readonly anchorOf;
+  private readonly anchorDependents;
+  private readonly movedAnchored;
   private readonly stickyNodes;
   private readonly textMeasurer;
   private percentBase;
@@ -2584,6 +2587,10 @@ declare class LayoutEngine {
   private updateContentExtent;
   private placeAbsoluteChildren;
   private placeAnchored;
+  private trackAnchor;
+  private forgetAnchoring;
+  private replaceMovedAnchored;
+  private replaceAnchored;
   private parsePlacement;
   private scrollOffsetOf;
   private containingBlockOf;
@@ -4804,7 +4811,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-D5LqhdwF.js";
+} from "./index-Olu55rBU.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5486,7 +5493,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-D5LqhdwF.js";
+} from "./index-Olu55rBU.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
