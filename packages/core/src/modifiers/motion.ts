@@ -550,6 +550,14 @@ export interface SharedElementArgs extends MotionTiming {
    * has arrived — or when it leaves mid-flight, so nothing is left
    * holding a state that will never be cleared.
    *
+   * The `true` comes the moment the element takes a name something
+   * else held, which is during reconciliation and before the frame
+   * that first draws it. That is deliberately earlier than the FLIP,
+   * which needs the first layout: paint order is sorted during layout,
+   * so a `zIndex` written in answer to this has to be in place before
+   * that layout runs, or the first frame of the morph is drawn in the
+   * old order.
+   *
    * It exists for one thing, and stacking is the reason. A morphing
    * element is bigger than its resting self for most of the way, so it
    * overlaps whatever sits beside it, and it has to be drawn *over*
@@ -630,6 +638,22 @@ class SharedElementController {
     const claim = registry.claim(this.args.name, this.host.node, () => this.yieldName());
     this.claimed = claim.box;
     this.yieldPrevious = claim.yieldPrevious;
+    if (claim.box !== null) {
+      // Said now, during reconciliation, and not from the first layout
+      // as the FLIP itself is. `onMorph` exists so an ancestor can lift
+      // the morphing element over its neighbours with a `zIndex`, and
+      // paint order is sorted *during* layout from that property: a
+      // write made from the `onLayout` callback lands after the sort
+      // and is not seen until the next frame lays out. Measured in the
+      // transitions example on the frame after Back: the card whose
+      // background was shrinking from the page still had `zIndex` 0
+      // and painted at its tree position, so the card below it, painted
+      // later, covered the background for that one frame while the FLIP
+      // transform drew it over the whole page. The claim already says a
+      // morph is coming, so this is the earliest it can be said, and it
+      // gives the raise the same frame the FLIP has.
+      this.beginMorph();
+    }
     const box = this.host.layoutBox();
     if (box !== null) {
       registry.report(this.args.name, this.host.node, box);
@@ -723,8 +747,11 @@ class SharedElementController {
     // computing.
     this.claimed = null;
     if (box.width <= 0 || box.height <= 0 || from.width <= 0 || from.height <= 0) {
+      // Nothing to morph from or into, so whatever was raised at the
+      // claim comes down again.
       this.layer.snapTo(MOTION_REST);
       this.takeOver();
+      this.endMorph();
       return;
     }
     const timing = this.timing();
@@ -745,8 +772,9 @@ class SharedElementController {
     // The transform lands *this* frame — `onLayout` runs after the boxes
     // are final and before anything paints from them — so the element is
     // drawn over the departing one straight away and that one can step
-    // aside with nothing in between.
-    this.beginMorph();
+    // aside with nothing in between. The morph itself was announced at
+    // the claim (see `attach`), because a raise made in answer to it has
+    // to be in this frame's layout, which has already run by now.
     this.layer.snapTo(flip);
     this.takeOver();
     if (this.args.morph === 'geometry') {
