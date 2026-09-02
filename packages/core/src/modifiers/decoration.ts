@@ -128,10 +128,11 @@ const DEFAULT_RING: UiModifier<FocusRingOptions> = kind(Object.freeze({}));
 /**
  * The ring, with the theme's own colour and spacing.
  *
- * Called with no options it returns one shared value, so the modifier
- * survives a re-render in place rather than being re-attached on every
- * frame — arguments are compared by identity. A caller passing options
- * should hoist them for the same reason.
+ * Called with no options it returns one shared value, which `sameArgs`
+ * matches without walking anything. Options are plain data and are
+ * compared by what they hold, so a ring built inline in a render
+ * survives it; hoisting saves the allocation and the walk, not the
+ * attachment.
  */
 export function focusRing(options?: FocusRingOptions): UiModifier<FocusRingOptions> {
   return options === undefined ? DEFAULT_RING : kind(options);

@@ -123,8 +123,11 @@ export function pressable(): UiModifier<InteractiveOptions> {
 }
 
 /**
- * What every Button carries. One shared value, so its arguments keep
- * their identity across renders and the modifier is never re-attached.
+ * What every Button carries. One shared value, so `sameArgs` matches it
+ * on its first line and never walks the options: a button pays nothing
+ * per render for this. `interactive` declares no `update`, so arguments
+ * that genuinely differ do detach and re-attach it, losing the hover and
+ * press state with them, which is the reason this one is a constant.
  */
 export const BUTTON_INTERACTION: UiModifier<InteractiveOptions> = kind(BOTH);
 

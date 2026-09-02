@@ -202,10 +202,12 @@ decide its behaviour:
 
 The colour names a palette entry and is resolved at paint against
 whatever theme the node inherits, so a ring inside a dark card is the
-dark palette's without the modifier reading the environment. Call it
-with no options and it returns one shared value, which is what you want:
-[modifiers](/interaction/modifiers) explains why a fresh one per render
-would detach and re-attach the ring on every frame.
+dark palette's without the modifier reading the environment. Called with
+no options it returns one shared value, which is the cheapest a modifier
+can be: the comparison matches on the first line and does no work.
+Options of your own are compared by what they hold, so a ring declared
+inline survives a re-render as long as its options are plain data. See
+[modifiers](/interaction/modifiers).
 
 Every control in `@gesso/components` already carries it. An element of
 your own carries it by name.
