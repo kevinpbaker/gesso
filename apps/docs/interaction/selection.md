@@ -1,5 +1,5 @@
 ---
-description: Highlighting and copying text that nobody types into: which text is selectable, how a selection spans nodes, what copy sends to the shell, and what the model does not do.
+description: 'Highlighting and copying text that nobody types into: which text is selectable, how a selection spans nodes, what copy sends to the shell, and what the model does not do.'
 ---
 
 # Selection

@@ -56,7 +56,7 @@ the override cascade sits, on the write path for every property:
 `transition` is not a registered property. Nothing in layout, paint,
 input or the environment reads one, so it is reserved beside `key`,
 `ref` and `modifiers` rather than registered. Its _keys_ are checked
-against the registry, so `transition={{ opacty: 200 }}` throws the way
+against the registry, so `transition={ { opacty: 200 } }` throws the way
 a misspelled prop does, and fails to compile first.
 
 ## Tweens and springs

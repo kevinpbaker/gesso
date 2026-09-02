@@ -42,7 +42,10 @@ export default defineConfig({
           { text: 'Layout basics', link: '/guide/layout-basics' },
           { text: 'Text', link: '/guide/text' },
           { text: 'Using components', link: '/guide/using-components' },
-          { text: 'Light and dark', link: '/guide/appearance' }
+          { text: 'Light and dark', link: '/guide/appearance' },
+          { text: 'State and services', link: '/guide/state-and-services' },
+          { text: 'Workers', link: '/guide/workers' },
+          { text: 'Testing', link: '/guide/testing' }
         ]
       },
       {
@@ -51,22 +54,62 @@ export default defineConfig({
           { text: 'Flex in full', link: '/layout/flex' },
           { text: 'Grid', link: '/layout/grid' },
           { text: 'Overflow and scrolling', link: '/layout/overflow-and-scrolling' },
-          { text: 'Sticky positioning', link: '/layout/sticky' }
+          { text: 'Sticky positioning', link: '/layout/sticky' },
+          { text: 'Positioning and overlays', link: '/layout/positioning-and-overlays' },
+          { text: 'Virtualization', link: '/layout/virtualization' },
+          { text: 'Asking the engine why', link: '/layout/explain' }
         ]
       },
       {
         text: 'Interaction',
         items: [
           { text: 'Pointer and keyboard', link: '/interaction/pointer-and-keyboard' },
-          { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' }
+          { text: 'Touch and gestures', link: '/interaction/touch-and-gestures' },
+          { text: 'Focus and traps', link: '/interaction/focus-and-traps' },
+          { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' },
+          { text: 'Selection', link: '/interaction/selection' },
+          { text: 'Find', link: '/interaction/find' },
+          { text: 'Modifiers', link: '/interaction/modifiers' }
         ]
       },
       {
         text: 'Appearance',
         items: [
           { text: 'Themes and the environment', link: '/appearance/themes-and-the-environment' },
-          { text: 'The type scale', link: '/appearance/typography' }
+          { text: 'The type scale', link: '/appearance/typography' },
+          { text: 'Motion', link: '/appearance/motion' },
+          { text: 'Enter and exit', link: '/appearance/enter-and-exit' },
+          { text: 'Shared elements', link: '/appearance/shared-elements' }
         ]
+      },
+      {
+        text: 'Media',
+        items: [
+          { text: 'Images and the resolver', link: '/media/images-and-the-resolver' },
+          { text: 'Icons', link: '/media/icons' },
+          { text: 'Video', link: '/media/video' }
+        ]
+      },
+      {
+        text: 'Structure',
+        items: [
+          { text: 'Routing', link: '/structure/routing' },
+          { text: 'Channels and the barrier', link: '/structure/channels-and-the-barrier' },
+          { text: 'Shell services', link: '/structure/shell-services' },
+          { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' }
+        ]
+      },
+      {
+        text: 'Access',
+        items: [
+          { text: 'Semantics', link: '/access/semantics' },
+          { text: 'The mirror', link: '/access/the-mirror' },
+          { text: 'Keyboard operability', link: '/access/keyboard' }
+        ]
+      },
+      {
+        text: 'Rendering',
+        items: [{ text: 'Canvas2D and WebGPU', link: '/rendering/canvas2d-and-webgpu' }]
       },
       {
         text: 'Tooling',
@@ -96,7 +139,19 @@ export default defineConfig({
           { text: 'Accordion', link: '/components/accordion' },
           { text: 'Card', link: '/components/card' },
           { text: 'Divider', link: '/components/divider' },
-          { text: 'Toolbar', link: '/components/toolbar' }
+          { text: 'Toolbar', link: '/components/toolbar' },
+          { text: 'Dialog', link: '/components/dialog' },
+          { text: 'Menu', link: '/components/menu' },
+          { text: 'Select', link: '/components/select' },
+          { text: 'Tooltip', link: '/components/tooltip' },
+          { text: 'Toast', link: '/components/toast' },
+          { text: 'SplitPane', link: '/components/split-pane' },
+          { text: 'FindBar', link: '/components/find-bar' },
+          { text: 'Image', link: '/components/image' },
+          { text: 'Video', link: '/components/video' },
+          { text: 'Icon', link: '/components/icon' },
+          { text: 'Spinner', link: '/components/spinner' },
+          { text: 'ProgressBar', link: '/components/progress-bar' }
         ]
       }
     ]

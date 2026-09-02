@@ -1,5 +1,5 @@
 ---
-description: Attaching behaviour to an element without wrapping it: the modifiers prop, the override cascade, why a modifier value is shared rather than rebuilt, and what one is allowed to touch.
+description: 'Attaching behaviour to an element without wrapping it: the modifiers prop, the override cascade, why a modifier value is shared rather than rebuilt, and what one is allowed to touch.'
 ---
 
 # Modifiers
