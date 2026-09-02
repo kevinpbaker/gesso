@@ -126,8 +126,8 @@ as the only source of text.
 ## Render worker to shell
 
 The shell owns no UI state, so nothing here is a view update. It is
-observability, plus the four things only a thread with a window can
-carry out.
+observability, plus the requests only a thread with a window can carry
+out.
 
 | Message         | When the worker sends it                                                             | What it carries, and what the shell does                                                                                                         |
 | --------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
