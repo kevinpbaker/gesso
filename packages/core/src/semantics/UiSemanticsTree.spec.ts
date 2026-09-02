@@ -124,6 +124,24 @@ describe('buildSemanticsTree', () => {
     );
   });
 
+  it('claims the text inside a menu item, which is how the item is named', () => {
+    const t = new Tree();
+    const menu = t.node(UiNodeType.Column, { role: 'menu', label: 'Actions' });
+    const item = t.node(UiNodeType.Row, { role: 'menuitem', label: 'Rename' });
+    t.add(item, t.node(UiNodeType.Text, { text: 'Rename' }));
+    t.add(menu, item);
+    t.add(t.root, menu);
+
+    const records = t.build();
+
+    // Two records, not three: an item is named by the text it draws,
+    // and a reader that announced both would say it twice.
+    expect(records.map(record => [record.role, record.label])).toEqual([
+      ['menu', 'Actions'],
+      ['menuitem', 'Rename']
+    ]);
+  });
+
   it('carries disabled down the subtree, because inert is inherited', () => {
     const t = new Tree();
     const group = t.node(UiNodeType.Box, { role: 'group', disabled: true });

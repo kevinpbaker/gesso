@@ -61,12 +61,21 @@ const IMPLICIT_ROLES: Partial<Record<UiNodeType, UiRole>> = {
  * ARIA calls these "children presentational": the text inside a button
  * is how the button is named, not a paragraph next to it, and a screen
  * reader that announced both would say everything twice. The list is
- * ARIA's, narrowed to the roles `UiRole` has.
+ * ARIA's, narrowed to the roles `UiRole` has, plus `menuitem`: ARIA
+ * names a menu item from its contents but stops short of marking its
+ * children presentational, and the only difference that makes here is
+ * a row whose label is on the tree twice.
+ *
+ * The other roles ARIA names from their contents are deliberately out.
+ * A `listitem`, a `cell` or a `row` holds content rather than being
+ * spelled by it, and a button inside one has to stay a record of its
+ * own.
  */
 const PRESENTATIONAL_CHILDREN: ReadonlySet<UiRole> = new Set<UiRole>([
   'button',
   'checkbox',
   'image',
+  'menuitem',
   'menuitemcheckbox',
   'menuitemradio',
   'option',

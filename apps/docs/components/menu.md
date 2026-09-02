@@ -155,12 +155,11 @@ learns which item was chosen only when `onSelect` fires. A menu item
 also carries no `posInSet` and no `setSize`, so nothing announces
 "2 of 4"; the spec asserts both absences.
 
-One thing to know before relying on this with a screen reader: a menu
-item's own text keeps a record of its own, rather than being claimed as
-the item's name the way the text inside a [tab](/components/tabs) or an
-option is. ARIA calls the children of a `menuitem` presentational, and
-this framework's list of such roles does not yet include it, so the
-label is on the tree twice. The spec asserts the current shape.
+A menu item's own text has no record of its own. The children of a
+`menuitem` are presentational, the same as those of a
+[tab](/components/tabs) or an option, so the label is on the tree once
+and a reader announcing the row does not then read the text inside it as
+well.
 
 ## What has been checked
 

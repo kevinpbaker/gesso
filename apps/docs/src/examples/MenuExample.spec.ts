@@ -186,11 +186,10 @@ describe('the docs menu example', () => {
     expect(record.posInSet).toBeUndefined();
     expect(record.setSize).toBeUndefined();
 
-    // An item's text is *not* claimed by the item, unlike a tab's or
-    // an option's: `menuitem` is missing from the roles whose children
-    // are presentational, so the text has a record of its own and the
-    // name is on the tree twice. Asserted so the page can say so.
-    expect(ui.querySemantics(ui.getByText('Rename'))?.label).toBe('Rename');
+    // An item's own text is claimed as the item's name, the way a
+    // tab's or an option's is: the children of a `menuitem` are
+    // presentational, so the name is on the tree once and not twice.
+    expect(ui.querySemantics(ui.getByText('Rename'))).toBeNull();
   });
 
   it('reports a close exactly once, on every path that closes it', () => {
