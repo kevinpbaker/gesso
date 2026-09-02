@@ -1,4 +1,4 @@
-import { combineLatest, map } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, type Observable } from 'rxjs';
 
 import {
   type ComponentContext,
@@ -8,7 +8,8 @@ import {
   type OutletProps,
   route,
   RouterOutlet,
-  RouterService
+  RouterService,
+  ShellService
 } from '@gesso/framework';
 import { Icon, Image, Video } from '@gesso/components';
 import {
@@ -28,14 +29,18 @@ import {
   type UiPointerEvent
 } from '@gesso/core';
 
-import { ICONS, playlistById, PLAYLISTS, TRACKS, type Playlist } from './transitions/playlists';
+import { CARDS, cardById, ICONS, type CardDesign } from './transitions/playlists';
 import { likedPlaylist, likedTrack, savedPlaylist, toggle } from './transitions/library';
+import { Catalogue, type PlaylistView, type TrackView } from './transitions/TransitionsContract';
+import { SNAPSHOT } from './transitions/snapshot';
 import { CHALK, INK, LINEN } from './brand';
 
 /**
  * A replica of Maxi Ferreira's `view-transitions-live` demo — three
  * playlist cards that expand into a full screen — built on Gesso's
- * motion layer instead of the browser's View Transitions API.
+ * motion layer instead of the browser's View Transitions API, and then
+ * made real: the three playlists are real Audius playlists, read on the
+ * application worker and published over one channel.
  *
  * The original is worth knowing about, because the two solve the same
  * problem from opposite ends. In a document there is no old DOM left
@@ -78,6 +83,13 @@ import { CHALK, INK, LINEN } from './brand';
  *     resolver reference-counts playback by source: the detail screen's
  *     `Video` resolves the file the card is still holding and gets the
  *     decode that is already running. See `VideoResolver`.
+ *
+ * And one thing about the data. A card's colours and its photograph are
+ * design, and live in `transitions/playlists.ts`; everything a card
+ * *says* comes from `Catalogue`, a channel the application worker
+ * serves from Audius, starting on a committed snapshot so the first
+ * frame is already real. The screens bind to the channel's observables
+ * and never learn which of the two they are showing.
  */
 
 const COLUMN_WIDTH = 600;
@@ -107,6 +119,8 @@ const CARD = '#ffffff';
 /** Secondary and tertiary text, and the icons that behave like it. */
 const MUTED = '#6f675c';
 const FAINT = '#a09789';
+/** The placeholder behind artwork that has not arrived, or does not exist. */
+const ART_PLACEHOLDER = '#e9e2d6';
 const MARK_VIEWBOX = 64;
 const MARK_RADIUS = 12;
 /** The heart, once it is full. */
@@ -185,34 +199,128 @@ export const Detail = route({ path: '/playlist/:id', component: DetailScreen });
 export const ROUTES = { routes: [Home, Detail] };
 
 // ---------------------------------------------------------------------------
+// The catalogue, as a screen reads it
+// ---------------------------------------------------------------------------
+
+/**
+ * What Audius says about one card's playlist, as the screen has it now.
+ *
+ * Always a value: the snapshot has every card, so a list that has not
+ * yet been patched, or one whose live copy lost a card, still names
+ * something. `distinctUntilChanged` keeps a patch to another card from
+ * re-emitting this one.
+ */
+function playlistFor(ctx: ComponentContext, id: string): Observable<PlaylistView> {
+  const fallback = SNAPSHOT.playlists.find(playlist => playlist.id === id) ?? SNAPSHOT.playlists[0]!;
+  return ctx.channel(Catalogue).view.playlists.pipe(
+    map(list => list.find(playlist => playlist.id === id) ?? fallback),
+    distinctUntilChanged()
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared pieces
 // ---------------------------------------------------------------------------
 
 /** The play-count and duration line, which both screens show. */
-function Stats(props: Inputs<{ playlist: Playlist }>): UiChild {
-  const playlist = props.playlist.value;
+function Stats(props: Inputs<{ card: CardDesign; playlist: PlaylistView }>): UiChild {
+  const card = props.card.value;
   return (
     <row
       gap={8}
       x="center"
       y="center"
-      modifiers={[sharedElement({ name: `playlist-stats-${playlist.id}`, scale: 'uniform' })]}>
+      modifiers={[sharedElement({ name: `playlist-stats-${card.id}`, scale: 'uniform' })]}>
       <row gap={4} y="center">
-        <Icon path={ICONS.bars} size={14} color={playlist.secondaryText} />
-        <text color={playlist.secondaryText} fontSize={13} selectable={false}>
-          {playlist.stats.count}
+        <Icon path={ICONS.bars} size={14} color={card.secondaryText} />
+        <text color={card.secondaryText} fontSize={13} selectable={false}>
+          {props.playlist.pipe(map(playlist => playlist.plays))}
         </text>
       </row>
-      <text color={playlist.secondaryText} fontSize={13} selectable={false}>
+      <text color={card.secondaryText} fontSize={13} selectable={false}>
         -
       </text>
       <row gap={4} y="center">
-        <Icon path={ICONS.clock} size={14} color={playlist.secondaryText} fillRule="evenodd" />
-        <text color={playlist.secondaryText} fontSize={13} selectable={false}>
-          {playlist.stats.time}
+        <Icon path={ICONS.clock} size={14} color={card.secondaryText} fillRule="evenodd" />
+        <text color={card.secondaryText} fontSize={13} selectable={false}>
+          {props.playlist.pipe(map(playlist => playlist.time))}
         </text>
       </row>
     </row>
+  );
+}
+
+/**
+ * Audius serves one picture from whichever of its mirrors answers, so
+ * two requests for the same artwork return two urls that differ only
+ * in host. This is the part that names the picture: the content id and
+ * size after `/content/`, or the whole url for anything else.
+ *
+ * Found by watching the avatars vanish. The snapshot's url and the live
+ * copy's named different hosts, so the picture was thrown away and
+ * fetched again from a slower mirror, and the slot sat empty while it
+ * loaded. Compared by content instead, the same picture stays put.
+ */
+function artworkKey(url: string): string {
+  const at = url.indexOf('/content/');
+  return at === -1 ? url : url.slice(at);
+}
+
+/**
+ * The curator's picture, or their initial when Audius has none.
+ *
+ * The picture is an `Image`, which reads its source once, so a curator
+ * who changes (the snapshot giving way to a live copy with a different
+ * picture) is a new keyed node; `distinctUntilChanged` on the content
+ * keeps the usual case, where the two agree, from rebuilding anything.
+ * The shared name sits on the inner element either way, so it morphs
+ * between the screens.
+ */
+function Avatar(props: Inputs<{ card: CardDesign; playlist: PlaylistView; size: number }>): UiChild {
+  const card = props.card.value;
+  const size = props.size.value;
+  const shared = [sharedElement({ name: `playlist-avatar-${card.id}` })];
+  const picture = props.playlist.pipe(
+    map(playlist => playlist.curator),
+    distinctUntilChanged((a, b) => artworkKey(a.avatar) === artworkKey(b.avatar) && a.name === b.name),
+    map(curator =>
+      curator.avatar !== '' ? (
+        <Image
+          key={artworkKey(curator.avatar)}
+          src={curator.avatar}
+          alt={curator.name}
+          width={size}
+          height={size}
+          borderRadius={size / 2}
+          objectFit="cover"
+          // A tint of the card's text while the picture loads, so the
+          // slot reads as a picture on its way rather than a hole.
+          placeholderColor={alpha(card.text, 0.18)}
+          rootModifiers={shared}
+        />
+      ) : (
+        <box
+          key="initial"
+          width={size}
+          height={size}
+          borderRadius={size / 2}
+          backgroundColor={CARD}
+          x="center"
+          y="center"
+          role="image"
+          label={curator.name}
+          modifiers={shared}>
+          <text color={INK} fontSize={size * 0.44} fontWeight={700} selectable={false}>
+            {curator.name.slice(0, 1).toUpperCase()}
+          </text>
+        </box>
+      )
+    )
+  );
+  return (
+    <box width={size} height={size} flexShrink={0}>
+      {picture}
+    </box>
   );
 }
 
@@ -296,10 +404,10 @@ function Control(
  * playlist page it is the 24px badge on the avatar. Same element, same
  * shared name, so it morphs between the two.
  */
-function SaveBadge(props: Inputs<{ playlist: Playlist; size: number; iconSize: number }>): UiChild {
-  const playlist = props.playlist.value;
+function SaveBadge(props: Inputs<{ card: CardDesign; size: number; iconSize: number }>): UiChild {
+  const card = props.card.value;
   const size = props.size.value;
-  const saved = savedPlaylist(playlist.id);
+  const saved = savedPlaylist(card.id);
   return (
     <button
       width={size}
@@ -315,7 +423,7 @@ function SaveBadge(props: Inputs<{ playlist: Playlist; size: number; iconSize: n
         event.stopPropagation();
         toggle(saved);
       }}
-      modifiers={[LIGHT_CONTROL_INTERACTION, RING, sharedElement({ name: `playlist-add-${playlist.id}` })]}>
+      modifiers={[LIGHT_CONTROL_INTERACTION, RING, sharedElement({ name: `playlist-add-${card.id}` })]}>
       {[
         saved.pipe(
           map(on => (
@@ -335,7 +443,8 @@ function SaveBadge(props: Inputs<{ playlist: Playlist; size: number; iconSize: n
 }
 
 /**
- * The row of player controls over the artwork: shuffle, play, like.
+ * The row of player controls over the artwork: shuffle, play, like, and
+ * on the playlist page a fourth that opens the playlist on Audius.
  *
  * Each button is its own shared element, not the row. A shared element
  * scales by the ratio of the two boxes, so a row named as one piece
@@ -344,23 +453,25 @@ function SaveBadge(props: Inputs<{ playlist: Playlist; size: number; iconSize: n
  * whole of the morph. Measured exactly that, with the morph slowed
  * down. Named one by one, each button pairs with a box of its own size
  * and the morph is a pure translate, so a circle stays a circle all the
- * way.
+ * way. The button that exists only on the page has nothing to pair
+ * with; it simply arrives, like the back button.
  *
- * The original drew five glyphs on its playlist page and none of them
- * did anything. Three are here, and each one does what it says; the
- * two that need a track behind them (open on Audius, the more menu)
- * come back with the data that gives them meaning, arriving on the page
- * alone like the back button does. Play is wired to nothing yet, on
- * purpose: it will drive the queue once there is one, and a button that
- * pretended to play would be worse than one plainly waiting for its
- * player.
+ * Play is wired to nothing yet, on purpose: it will drive the queue once
+ * there is one, and a button that pretended to play would be worse than
+ * one plainly waiting for its player.
  */
-function PlayerControls(props: Inputs<{ playlist: Playlist }>): UiChild {
-  const playlist = props.playlist.value;
-  const liked = likedPlaylist(playlist.id);
+function PlayerControls(
+  props: Inputs<{ card: CardDesign; playlist: PlaylistView; full?: boolean }>,
+  ctx: ComponentContext
+): UiChild {
+  const card = props.card.value;
+  const full = input(props.full, false).value;
+  const shell = ctx.inject(ShellService);
+  const liked = likedPlaylist(card.id);
   const shared = (control: string): readonly UiModifier[] => [
-    sharedElement({ name: `playlist-control-${control}-${playlist.id}` })
+    sharedElement({ name: `playlist-control-${control}-${card.id}` })
   ];
+  const arrives: readonly UiModifier[] = [motion({ initial: fade, duration: 'slow' })];
   return (
     <box position="absolute" left={0} right={0} bottom={0} x="center">
       <row gap={20} y="center" paddingTop={28} paddingBottom={28}>
@@ -375,6 +486,18 @@ function PlayerControls(props: Inputs<{ playlist: Playlist }>): UiChild {
           onClick={() => toggle(liked)}
           rootModifiers={shared('like')}
         />
+        {full
+          ? [
+              <Control
+                key="open"
+                path={ICONS.external}
+                label="Open on Audius"
+                stroke
+                onClick={() => shell.openUrl(props.playlist.value.url)}
+                rootModifiers={arrives}
+              />
+            ]
+          : []}
       </row>
     </box>
   );
@@ -387,11 +510,12 @@ function PlayerControls(props: Inputs<{ playlist: Playlist }>): UiChild {
  * transition — the shared name, the fit, the rounded corner — is the
  * same for both, which is the point of `Video` having `Image`'s shape.
  */
-function Artwork(props: Inputs<{ playlist: Playlist; height: number }>): UiChild {
-  const playlist = props.playlist.value;
+function Artwork(props: Inputs<{ card: CardDesign; playlist: PlaylistView; height: number }>): UiChild {
+  const card = props.card.value;
   const height = props.height.value;
-  const media = playlist.media;
-  const shared = [sharedElement({ name: `playlist-image-${playlist.id}` })];
+  const media = card.media;
+  const alt = props.playlist.pipe(map(playlist => playlist.title));
+  const shared = [sharedElement({ name: `playlist-image-${card.id}` })];
   if (media.kind === 'video') {
     // Edge to edge, as the original's `video.playlist-image` is: full
     // width, cropped to fill, and rounded so its bottom corners meet
@@ -402,7 +526,7 @@ function Artwork(props: Inputs<{ playlist: Playlist; height: number }>): UiChild
     return (
       <Video
         src={media.url}
-        alt={playlist.title}
+        alt={alt}
         width={percent(100)}
         height={height}
         objectFit="cover"
@@ -412,16 +536,7 @@ function Artwork(props: Inputs<{ playlist: Playlist; height: number }>): UiChild
     );
   }
   const width = Math.round((media.width / media.height) * height);
-  return (
-    <Image
-      src={media.url}
-      alt={playlist.title}
-      width={width}
-      height={height}
-      objectFit="cover"
-      rootModifiers={shared}
-    />
-  );
+  return <Image src={media.url} alt={alt} width={width} height={height} objectFit="cover" rootModifiers={shared} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -435,8 +550,9 @@ function Artwork(props: Inputs<{ playlist: Playlist; height: number }>): UiChild
  * `sharedElement` with this playlist's id in its name. Nothing else
  * about the card knows a transition exists.
  */
-function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }>): UiChild {
-  const playlist = props.playlist.value;
+function Card(props: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>, ctx: ComponentContext): UiChild {
+  const card = props.card.value;
+  const playlist = playlistFor(ctx, card.id);
   const hovered = internalState(false);
   /**
    * Whether this card's background is morphing, which is the only time
@@ -464,8 +580,8 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
       zIndex={morphing.pipe(map(active => (active ? 1 : 0)))}
       x="center"
       cursor="pointer"
-      label={playlist.title}
-      onClick={() => props.onOpen.value(playlist.id)}
+      label={playlist.pipe(map(entry => entry.title))}
+      onClick={() => props.onOpen.value(card.id)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       modifiers={[
@@ -490,10 +606,10 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
         width={percent(100)}
         height={percent(100)}
         borderRadius={CARD_RADIUS}
-        backgroundColor={playlist.background}
+        backgroundColor={card.background}
         modifiers={[
           sharedElement({
-            name: `playlist-background-${playlist.id}`,
+            name: `playlist-background-${card.id}`,
             morph: 'geometry',
             onMorph: active => (morphing.value = active)
           })
@@ -506,15 +622,7 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
           exactly this reason. */}
       <column position="relative" width={percent(100)} height={percent(100)} x="center">
         <row width={percent(100)} gap={12} paddingLeft={30} paddingRight={30} paddingTop={20} paddingBottom={20}>
-          <Image
-            src={playlist.user.avatar}
-            alt={playlist.user.name}
-            width={50}
-            height={50}
-            borderRadius={25}
-            objectFit="cover"
-            rootModifiers={[sharedElement({ name: `playlist-avatar-${playlist.id}` })]}
-          />
+          <Avatar card={card} playlist={playlist} size={50} />
           {/* `x="start"` so each line hugs its text rather than
               stretching to the column: a shared element morphs by the
               ratio of the two boxes, and a name whose glyphs are 14px
@@ -525,40 +633,40 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
               centring. */}
           <column flex={1} gap={2} y="center" x="start">
             <text
-              color={playlist.text}
+              color={card.text}
               fontSize={14}
               fontWeight={700}
               selectable={false}
-              modifiers={[sharedElement({ name: `playlist-user-${playlist.id}`, scale: 'uniform' })]}>
-              {playlist.user.name.toUpperCase()}
+              modifiers={[sharedElement({ name: `playlist-user-${card.id}`, scale: 'uniform' })]}>
+              {playlist.pipe(map(entry => entry.curator.name.toUpperCase()))}
             </text>
             <text
-              color={playlist.secondaryText}
+              color={card.secondaryText}
               fontSize={13}
               selectable={false}
-              modifiers={[sharedElement({ name: `playlist-date-${playlist.id}`, scale: 'uniform' })]}>
-              {playlist.user.date}
+              modifiers={[sharedElement({ name: `playlist-date-${card.id}`, scale: 'uniform' })]}>
+              {playlist.pipe(map(entry => entry.date))}
             </text>
           </column>
-          <SaveBadge playlist={playlist} size={40} iconSize={20} />
+          <SaveBadge card={card} size={40} iconSize={20} />
         </row>
         <text
-          color={playlist.text}
+          color={card.text}
           fontSize={30}
           fontWeight={700}
           textAlign="center"
           selectable={false}
-          modifiers={[sharedElement({ name: `playlist-title-${playlist.id}`, scale: 'uniform' })]}>
-          {playlist.title}
+          modifiers={[sharedElement({ name: `playlist-title-${card.id}`, scale: 'uniform' })]}>
+          {playlist.pipe(map(entry => entry.title))}
         </text>
         <box height={10} />
-        <Stats playlist={playlist} />
+        <Stats card={card} playlist={playlist} />
         {/* The slack lives here, so the artwork is flush with the bottom
             of the card whatever the title wrapped to. */}
         <box flexGrow={1} minHeight={20} />
         <box position="relative" width={percent(100)} x="center">
-          <Artwork playlist={playlist} height={CARD_MEDIA_HEIGHT} />
-          <PlayerControls playlist={playlist} />
+          <Artwork card={card} playlist={playlist} height={CARD_MEDIA_HEIGHT} />
+          <PlayerControls card={card} playlist={playlist} />
         </box>
       </column>
     </button>
@@ -567,7 +675,22 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
 
 function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
+  const catalogue = ctx.channel(Catalogue);
   const open = (id: string): void => router.go(Detail, { id });
+  // One quiet line when Audius did not answer, and nothing at all
+  // otherwise: the snapshot is the same shape as the live copy, so the
+  // only thing worth saying is that it is a copy.
+  const offline = catalogue.view.source.pipe(
+    map(source =>
+      source === 'offline'
+        ? [
+            <text key="offline" color={FAINT} fontSize={12} textAlign="center" textWrap="word" maxWidth={480}>
+              Offline: showing a saved copy of the playlists.
+            </text>
+          ]
+        : []
+    )
+  );
   return (
     // The two halves of remembering a scroll position, and they are
     // deliberately different mechanisms. `scrollPosition` reports where
@@ -589,18 +712,20 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
         paddingRight={GUTTER}
         gap={20}
         x="center">
-        {PLAYLISTS.map(playlist => (
-          <Card key={playlist.id} playlist={playlist} onOpen={open} />
+        {CARDS.map(card => (
+          <Card key={card.id} card={card} onOpen={open} />
         ))}
         <column width={percent(100)} maxWidth={CARD_WIDTH} gap={10} paddingTop={20} x="center">
           <text color={MUTED} fontSize={13} textAlign="center" textWrap="word" maxWidth={480}>
             A replica of Maxi Ferreira’s View Transitions demo, built on Gesso’s motion layer: shared elements are FLIP
-            over the live scene graph rather than snapshots, and the video decodes in the render worker through
-            WebCodecs.
+            over the live scene graph rather than snapshots, the video decodes in the render worker through WebCodecs,
+            and the playlists are read from Audius on the application worker.
           </text>
           <text color={FAINT} fontSize={12} textAlign="center" textWrap="word" maxWidth={480}>
-            Original concept by Ehsan Rahimi. Photographs by Atikh Bana and Te NGuyen; video by Anna Shvets.
+            Original concept by Ehsan Rahimi. Photographs by Atikh Bana and Te NGuyen; video by Anna Shvets. Music from
+            Audius, where every track belongs to the artist who uploaded it.
           </text>
+          {offline}
         </column>
       </column>
     </scrollview>
@@ -614,24 +739,38 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
 /**
  * One track. The heart is a toggle; the row itself is not yet a button,
  * because pressing a track has to play it and there is no player yet.
- * The more menu went with it, for the same reason: its items are things
- * done to a real track.
+ * The more menu waits for the same reason: its items are things done to
+ * a playing track.
  */
-function TrackRow(props: Inputs<{ playlistId: string; index: number }>): UiChild {
-  const index = props.index.value;
-  const track = TRACKS[index]!;
-  const liked = likedTrack(props.playlistId.value, index);
+function TrackRow(props: Inputs<{ track: TrackView }>): UiChild {
+  const track = props.track.value;
+  const liked = likedTrack(track.id);
   return (
     <row width={percent(100)} gap={20} paddingLeft={20} paddingRight={20} paddingTop={10} paddingBottom={10} y="center">
-      <Image src={track.art} alt={track.title} width={60} height={60} borderRadius={6} objectFit="cover" />
+      {track.art !== '' ? (
+        <Image
+          src={track.art}
+          alt={track.title}
+          width={60}
+          height={60}
+          borderRadius={6}
+          objectFit="cover"
+          placeholderColor={ART_PLACEHOLDER}
+        />
+      ) : (
+        <box width={60} height={60} borderRadius={6} backgroundColor={ART_PLACEHOLDER} flexShrink={0} />
+      )}
       <column flex={1} gap={4}>
-        <text color={INK} fontSize={14} fontWeight={700} selectable={false}>
+        <text color={INK} fontSize={14} fontWeight={700} selectable={false} maxLines={1} textOverflow="ellipsis">
           {track.title}
         </text>
-        <text color={MUTED} fontSize={13} selectable={false}>
+        <text color={MUTED} fontSize={13} selectable={false} maxLines={1} textOverflow="ellipsis">
           {track.artist}
         </text>
       </column>
+      <text color={FAINT} fontSize={13} selectable={false}>
+        {track.duration}
+      </text>
       <button
         width={36}
         height={36}
@@ -664,8 +803,10 @@ function TrackRow(props: Inputs<{ playlistId: string; index: number }>): UiChild
 
 function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
+  const catalogue = ctx.channel(Catalogue);
   const params = router.params(Detail);
-  const playlist = playlistById(params?.id ?? '1');
+  const card = cardById(params?.id ?? '1');
+  const playlist = playlistFor(ctx, card.id);
 
   /**
    * The background's corner radius, animated declaratively.
@@ -686,9 +827,41 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
   const backInteraction = interactive({
     hover: true,
     press: true,
-    hovered: { backgroundColor: alpha(playlist.text, 0.26) },
-    pressed: { backgroundColor: alpha(playlist.text, 0.34) }
+    hovered: { backgroundColor: alpha(card.text, 0.26) },
+    pressed: { backgroundColor: alpha(card.text, 0.34) }
   });
+
+  // A curator who wrote nothing gets no empty paragraph.
+  const description = playlist.pipe(
+    map(entry => entry.description),
+    distinctUntilChanged(),
+    map(text =>
+      text === ''
+        ? []
+        : [
+            <text
+              key="description"
+              color={card.secondaryText}
+              fontSize={14}
+              lineHeight={22}
+              textAlign="center"
+              textWrap="word"
+              maxWidth={360}
+              maxLines={4}
+              textOverflow="ellipsis"
+              selfX="center"
+              selectable={false}
+              modifiers={[motion({ initial: [fade, slideUp(10)], duration: 'slow' })]}>
+              {text}
+            </text>
+          ]
+    )
+  );
+  // The rows, keyed by track id, so a refreshed count on the playlist
+  // does not rebuild them and a changed list rebuilds only what moved.
+  const rows = catalogue.view.tracks.pipe(
+    map(all => (all[card.id] ?? []).map(track => <TrackRow key={track.id} track={track} />))
+  );
 
   return (
     // No background of its own: the app root paints the page, and a
@@ -704,10 +877,10 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
             top={0}
             width={percent(100)}
             height={percent(100)}
-            backgroundColor={playlist.background}
+            backgroundColor={card.background}
             borderRadius={radius}
             transition={{ borderRadius: 420 }}
-            modifiers={[sharedElement({ name: `playlist-background-${playlist.id}`, morph: 'geometry' })]}
+            modifiers={[sharedElement({ name: `playlist-background-${card.id}`, morph: 'geometry' })]}
           />
           <button
             position="absolute"
@@ -722,7 +895,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
             // A tint of the playlist's own text colour, so the button
             // reads as a control on the black card and on the pink one
             // without being a third colour on either.
-            backgroundColor={alpha(playlist.text, 0.14)}
+            backgroundColor={alpha(card.text, 0.14)}
             cursor="pointer"
             x="center"
             y="center"
@@ -731,7 +904,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
             // No `sharedElement`: there is no back button on the list, so
             // it would never pair with anything. It simply arrives.
             modifiers={[backInteraction, RING, motion({ initial: fade })]}>
-            <Icon path={ICONS.back} size={24} color={playlist.text} style="stroke" strokeWidth={2.5} />
+            <Icon path={ICONS.back} size={24} color={card.text} style="stroke" strokeWidth={2.5} />
           </button>
           {/* One positioned column holds everything drawn over the
               background, because a positioned element paints above
@@ -740,64 +913,47 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
               the same reason. */}
           <column position="relative" width={percent(100)} x="center" paddingTop={40} gap={18}>
             <box position="relative" width={50} height={50}>
-              <Image
-                src={playlist.user.avatar}
-                alt={playlist.user.name}
-                width={50}
-                height={50}
-                borderRadius={25}
-                objectFit="cover"
-                rootModifiers={[sharedElement({ name: `playlist-avatar-${playlist.id}` })]}
-              />
+              <Avatar card={card} playlist={playlist} size={50} />
               <box position="absolute" right={-6} bottom={-6}>
-                <SaveBadge playlist={playlist} size={24} iconSize={14} />
+                <SaveBadge card={card} size={24} iconSize={14} />
               </box>
             </box>
             <column gap={3} x="center">
               <text
-                color={playlist.text}
+                color={card.text}
                 fontSize={14}
                 fontWeight={700}
                 selectable={false}
-                modifiers={[sharedElement({ name: `playlist-user-${playlist.id}`, scale: 'uniform' })]}>
-                {playlist.user.name.toUpperCase()}
+                modifiers={[sharedElement({ name: `playlist-user-${card.id}`, scale: 'uniform' })]}>
+                {playlist.pipe(map(entry => entry.curator.name.toUpperCase()))}
               </text>
               <text
-                color={playlist.secondaryText}
+                color={card.secondaryText}
                 fontSize={13}
                 selectable={false}
-                modifiers={[sharedElement({ name: `playlist-date-${playlist.id}`, scale: 'uniform' })]}>
-                {playlist.user.date}
+                modifiers={[sharedElement({ name: `playlist-date-${card.id}`, scale: 'uniform' })]}>
+                {playlist.pipe(map(entry => entry.date))}
               </text>
             </column>
             <text
-              color={playlist.text}
+              color={card.text}
               fontSize={44}
               fontWeight={700}
               textAlign="center"
+              textWrap="word"
+              maxWidth={COLUMN_WIDTH - 2 * GUTTER}
               selectable={false}
-              modifiers={[sharedElement({ name: `playlist-title-${playlist.id}`, scale: 'uniform' })]}>
-              {playlist.title}
+              modifiers={[sharedElement({ name: `playlist-title-${card.id}`, scale: 'uniform' })]}>
+              {playlist.pipe(map(entry => entry.title))}
             </text>
             <box height={14} />
-            <Stats playlist={playlist} />
+            <Stats card={card} playlist={playlist} />
             <box height={12} />
-            <text
-              color={playlist.secondaryText}
-              fontSize={14}
-              lineHeight={22}
-              textAlign="center"
-              textWrap="word"
-              maxWidth={360}
-              selfX="center"
-              selectable={false}
-              modifiers={[motion({ initial: [fade, slideUp(10)], duration: 'slow' })]}>
-              {playlist.description}
-            </text>
+            {description}
             <box height={20} />
             <box position="relative" width={percent(100)} x="center">
-              <Artwork playlist={playlist} height={PAGE_MEDIA_HEIGHT} />
-              <PlayerControls playlist={playlist} />
+              <Artwork card={card} playlist={playlist} height={PAGE_MEDIA_HEIGHT} />
+              <PlayerControls card={card} playlist={playlist} full />
             </box>
           </column>
         </column>
@@ -809,9 +965,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
           paddingBottom={40}
           x="center"
           modifiers={[motion({ initial: [fade, slideUp(24)], duration: 'slow' })]}>
-          {TRACKS.map((_track, index) => (
-            <TrackRow key={index} playlistId={playlist.id} index={index} />
-          ))}
+          {rows}
         </column>
       </column>
     </scrollview>
@@ -888,8 +1042,9 @@ export function TransitionsExampleApp(_props: Inputs<Record<string, never>>, ctx
   const router = ctx.inject(RouterService);
   const onDetail = router.match.pipe(map(match => match?.route === Detail));
   // Escape is Back. Keys go to the focused node and bubble; with nothing
-  // focused they go to the root, so this one handler covers a person
-  // who tabbed to a heart and one who never touched the keyboard.
+  // focused they go to the app root, which is this box, so this one
+  // handler covers a person who tabbed to a heart and one who never
+  // touched the keyboard.
   const onKeyDown = (event: UiKeyboardEvent): void => {
     if (event.key === 'Escape' && router.match.value?.route === Detail) {
       event.preventDefault();

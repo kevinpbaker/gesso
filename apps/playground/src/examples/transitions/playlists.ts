@@ -1,42 +1,37 @@
 /**
- * The three playlists, ported from the reference app's `data.json`.
+ * The three cards' own design: colours, type and the photograph or clip
+ * each one carries.
  *
- * Kept as plain data in its own module for the reason every other
- * example here keeps its data separate: the interesting part of this
- * example is the motion, and a reader looking for it should not have
- * to scroll past a wall of colours and captions to reach it.
+ * What the cards say, their titles, curators, counts and tracks, comes
+ * from Audius through the `Catalogue` channel, keyed by the same `id`.
+ * This module holds only what a designer chose and a network cannot
+ * supply, and it is kept apart for the reason every other example keeps
+ * its data separate: the interesting part of this example is the motion,
+ * and a reader looking for it should not have to scroll past a wall of
+ * colours to reach it.
  */
 
-export interface PlaylistMedia {
+export interface CardMedia {
   readonly kind: 'image' | 'video';
   readonly url: string;
   readonly width: number;
   readonly height: number;
 }
 
-export interface Playlist {
+export interface CardDesign {
+  /** Matches `PlaylistView.id` and `CuratedCard.id`. */
   readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly user: { readonly avatar: string; readonly name: string; readonly date: string };
-  readonly stats: { readonly count: string; readonly time: string };
   readonly background: string;
   /** A repeating texture over the background, as the pink card has. */
   readonly backgroundImage?: string;
   readonly text: string;
   readonly secondaryText: string;
-  readonly media: PlaylistMedia;
+  readonly media: CardMedia;
 }
 
-export const PLAYLISTS: readonly Playlist[] = [
+export const CARDS: readonly CardDesign[] = [
   {
     id: '1',
-    title: 'Saxophone House',
-    description:
-      'Most popular Saxophone House playlist on Spotify since 2013 | Updated weekly | Good vibes only | ' +
-      'Photo by Atikh Bana',
-    user: { avatar: '/transitions/user-avatar.webp', name: 'Annabelle Lucero', date: 'March 2023' },
-    stats: { count: '9,838', time: '5h 22m' },
     background: '#000000',
     text: '#ffffff',
     secondaryText: '#c3c3c3',
@@ -44,10 +39,6 @@ export const PLAYLISTS: readonly Playlist[] = [
   },
   {
     id: '2',
-    title: 'Feel-Good Indie Rock',
-    description: 'The best indie rock vibes — classic and current. Headphones on | Video by Anna Shvets on pexels.com',
-    user: { avatar: '/transitions/user-avatar-2.webp', name: 'Jessica Houston', date: 'February 2023' },
-    stats: { count: '12,502', time: '4h 18m' },
     background: '#ebd9ea',
     backgroundImage: '/transitions/pink-card-bg.png',
     text: '#8b689c',
@@ -56,10 +47,6 @@ export const PLAYLISTS: readonly Playlist[] = [
   },
   {
     id: '3',
-    title: 'Peaceful Guitar',
-    description: 'Unwind to these calm classical guitar pieces. Photo by Te NGuyen on Unsplash',
-    user: { avatar: '/transitions/user-avatar-3.webp', name: 'David Hickman', date: 'December 2022' },
-    stats: { count: '8,908', time: '6h 40m' },
     background: '#6d75ff',
     text: '#ffffff',
     secondaryText: '#e1e1e1',
@@ -67,30 +54,12 @@ export const PLAYLISTS: readonly Playlist[] = [
   }
 ];
 
-export function playlistById(id: string): Playlist {
-  return PLAYLISTS.find(playlist => playlist.id === id) ?? PLAYLISTS[0]!;
+export function cardById(id: string): CardDesign {
+  return CARDS.find(card => card.id === id) ?? CARDS[0]!;
 }
-
-export interface Track {
-  readonly title: string;
-  readonly artist: string;
-  readonly art: string;
-}
-
-const TRACK_SET: readonly Track[] = [
-  { title: 'Sthlm Sunset', artist: 'Ehrling', art: '/transitions/album1.webp' },
-  { title: 'Living For Love', artist: 'TWOPILOTS, Natty Rico', art: '/transitions/album2.webp' },
-  { title: 'Madan (King)', artist: 'Bakermat', art: '/transitions/album3.webp' },
-  { title: 'All the Time', artist: 'Max the Sax', art: '/transitions/album4.webp' },
-  { title: 'Maasai', artist: 'Axero', art: '/transitions/album5.webp' },
-  { title: 'Love Or Hate Me', artist: 'Charleon', art: '/transitions/album6.webp' }
-];
-
-/** Twelve rows, as the reference has: the six above, twice. */
-export const TRACKS: readonly Track[] = [...TRACK_SET, ...TRACK_SET];
 
 /**
- * The icon paths, straight from Heroicons, in a 24-unit box — except
+ * The icon paths, straight from Heroicons, in a 24-unit box, except
  * `gessoStroke`, which is the brand mark's and is drawn in 64.
  *
  * Inline rather than in an asset because that is what `Icon` takes: a
@@ -123,12 +92,6 @@ export const ICONS = {
   external:
     'M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 ' +
     '3m0 0h-5.25M21 3v5.25',
-  thumbsUp:
-    'M7.493 18.75c-.425 0-.82-.236-.975-.632A7.48 7.48 0 016 15.375c0-1.75.599-3.358 1.602-4.634.151-.192.373-.309.6-.397.473-.183.89-.514 1.212-.924a9.042 9.042 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75 2.25 2.25 0 012.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23h-.777z',
-  download:
-    'M10.5 3.75a6 6 0 00-5.98 6.496A5.25 5.25 0 006.75 20.25H18a4.5 4.5 0 002.206-8.423 3.75 3.75 0 ' +
-    '00-4.133-4.303A6.001 6.001 0 0010.5 3.75zm2.25 6a.75.75 0 00-1.5 0v4.94l-1.72-1.72a.75.75 0 ' +
-    '00-1.06 1.06l3 3a.75.75 0 001.06 0l3-3a.75.75 0 10-1.06-1.06l-1.72 1.72V9.75z',
   ellipsis:
     'M4.5 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm6 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm6 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z',
   heart:

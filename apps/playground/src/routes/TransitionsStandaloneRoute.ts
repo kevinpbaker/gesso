@@ -58,6 +58,8 @@ export function mountTransitionsStandaloneRoute(host: HTMLElement): () => void {
     // routes resolve to a single worker chunk rather than two copies.
     renderWorker: () =>
       new Worker(new URL('../examples/TransitionsExampleWorker.ts', import.meta.url), { type: 'module' }),
+    appLogicWorker: () =>
+      new Worker(new URL('../examples/transitions/TransitionsAppWorker.ts', import.meta.url), { type: 'module' }),
     // The app owns everything after the first segment, and it has to:
     // the playground's own router reads segment one on every
     // `hashchange` and remounts when it changes. An app given the

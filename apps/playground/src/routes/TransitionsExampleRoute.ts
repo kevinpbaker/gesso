@@ -24,6 +24,11 @@ export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
     // Written out literally so the bundler can see and split it.
     renderWorker: () =>
       new Worker(new URL('../examples/TransitionsExampleWorker.ts', import.meta.url), { type: 'module' }),
+    // The playlists themselves: the Audius client, the fallback chain
+    // and the shaping, on their own thread, as the notes example keeps
+    // its notebook.
+    appLogicWorker: () =>
+      new Worker(new URL('../examples/transitions/TransitionsAppWorker.ts', import.meta.url), { type: 'module' }),
     history: { mode: 'hash', base: 'example-transitions' },
     onFrame: metrics => {
       frames++;

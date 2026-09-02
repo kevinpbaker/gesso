@@ -35,9 +35,9 @@ export function likedPlaylist(id: string): InternalState<boolean> {
   return cell(`liked:${id}`);
 }
 
-/** Whether a track of a playlist is liked. */
-export function likedTrack(playlistId: string, index: number): InternalState<boolean> {
-  return cell(`liked:${playlistId}:${index}`);
+/** Whether a track is liked. */
+export function likedTrack(trackId: string): InternalState<boolean> {
+  return cell(`liked-track:${trackId}`);
 }
 
 export function toggle(state: InternalState<boolean>): void {
