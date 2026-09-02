@@ -42,7 +42,28 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
   let trapped = false;
   let placeholder: UiNode | null = null;
 
-  const enabled = (): readonly MenuItem[] => props.items.value.filter(item => item.disabled !== true);
+  /**
+   * `active` is an index into the whole list, not into the enabled
+   * subset, because that is the index the row compares itself against
+   * to paint the highlight. Walking the enabled subset and painting by
+   * position in the whole list are two different numbers, and a
+   * disabled item anywhere but the end makes them disagree.
+   */
+  const seek = (from: number, delta: number): number => {
+    const items = props.items.value;
+    for (let moved = 0; moved < items.length; moved += 1) {
+      const index = (((from + delta * moved) % items.length) + items.length) % items.length;
+      if (items[index].disabled !== true) {
+        return index;
+      }
+    }
+    return -1;
+  };
+
+  /** The first item that can be chosen at or after `from`, wrapping, or -1. */
+  const from = (start: number): number => seek(start, 1);
+  /** The last one, walking backwards from the end. */
+  const last = (): number => seek(props.items.value.length - 1, -1);
 
   const release = (): void => {
     if (trapped) {
@@ -52,28 +73,36 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
   };
   ctx.onUnmount(release);
 
+  /**
+   * Every close goes through the entry, so `onOpenChange` is reported
+   * from one place: the entry's callback below. A choice, Escape, the
+   * backdrop, a write of `false` and the unmount all end in
+   * `OverlayService.close`, and calling the prop here as well would
+   * report each of them twice.
+   */
   const close = (): void => {
     if (overlay.isOpen()) {
       overlay.hide();
     }
-    props.onOpenChange.value?.(false);
   };
 
-  const step = (delta: number): void => {
-    const items = enabled();
-    if (items.length === 0) {
-      return;
+  const moveTo = (index: number): void => {
+    if (index !== -1) {
+      active.next(index);
     }
-    active.next((active.value + delta + items.length) % items.length);
   };
+
+  const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
   const choose = (value?: string): void => {
-    const items = enabled();
-    const chosen = value ?? items[active.value]?.value;
-    if (chosen === undefined) {
+    const items = props.items.value;
+    const item = value === undefined ? items[active.value] : items.find(entry => entry.value === value);
+    // A disabled item is not a command: neither Enter on the highlight
+    // nor a press on the row itself can choose one.
+    if (item === undefined || item.disabled === true) {
       return;
     }
-    props.onSelect.value?.(chosen);
+    props.onSelect.value?.(item.value);
     close();
   };
 
@@ -99,8 +128,8 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
         onKeyDown: keymap({
           ArrowDown: () => step(1),
           ArrowUp: () => step(-1),
-          Home: () => active.next(0),
-          End: () => active.next(Math.max(0, enabled().length - 1)),
+          Home: () => moveTo(from(0)),
+          End: () => moveTo(last()),
           Enter: () => choose(),
           ' ': () => choose(),
           Escape: close
@@ -111,7 +140,7 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
 
   props.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
-      active.next(0);
+      active.next(Math.max(0, from(0)));
       overlay.show(body(), {
         anchor: props.anchor.value ?? null,
         environment: props.anchor.value ?? placeholder,

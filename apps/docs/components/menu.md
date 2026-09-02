@@ -50,10 +50,11 @@ takes, and it has no `rootModifiers`. Nothing is drawn where it is
 declared, so there is no root to place: the menu is a minimum of 160
 pixels wide and the layer decides where it goes.
 
-Write an `onOpenChange` that is safe to run more than once. A close is
-reported twice today, once by the overlay entry and once by the
-component, and the spec beside the example asserts that count. Writing
-`false` into a cell, which is what the example does, is unaffected.
+`onOpenChange` runs once per close, whatever closed the menu: choosing
+an item, Escape, a press outside, a write of `false` into `open`, or the
+component unmounting while the menu is up. The report comes from the
+overlay entry, which is the one point all of those paths pass through,
+so the count does not depend on which of them was taken.
 
 ## The anchor has to be a cell
 
@@ -127,14 +128,17 @@ Every key in the table is consumed; anything else is left for whatever
 is listening above. There is no type-ahead here, unlike
 [Select](/components/select): a printed character does nothing.
 
-### Put a disabled item last
+### A disabled item can sit anywhere
 
-The walk counts only the items that can be chosen, and the highlight is
-painted on the row at that index in the whole list. Where a disabled
-item comes first, the two disagree: the highlight sits on the disabled
-row while `Enter` chooses the row below it. The spec beside the example
-asserts this, so it is a known shape rather than a rumour, and both
-menus in the example keep their disabled item at the end.
+The walk moves over the items that can be chosen, and the highlight is
+painted on the row it lands on, so what `Enter` takes is always the row
+the highlight is on. Opening the menu highlights the first item that can
+be chosen, `Down` and `Up` step past a disabled row in both directions
+and wrap around it, and `Home` and `End` answer with the ends of what
+can be chosen. Position in the list makes no difference to any of that.
+
+A disabled row refuses a press as well, so nothing a pointer can do
+chooses an item the keyboard cannot reach.
 
 ## Semantics
 

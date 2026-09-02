@@ -135,13 +135,17 @@ Closed, a letter commits the value outright without ever drawing the
 list. Open, it only moves the highlight, and `Enter` still has to take
 it.
 
-### Put a disabled option last
+### A disabled option can sit anywhere
 
-The walk counts only the options that can be chosen, and the highlight
-is painted on the row at that index in the whole list. Where a disabled
-option comes first, the two disagree: the highlight sits on the disabled
-row while `Enter` chooses the row below it. The example keeps `Crypto`
-at the end for that reason, and the spec beside it asserts the walk.
+The walk moves over the options that can be chosen, and the highlight is
+painted on the row it lands on, so what `Enter` takes is always the row
+the highlight is on. Opening the list highlights the chosen option, or
+the first one that can be chosen when the value matches nothing
+available, and the arrows, `Home` and `End` all keep to that subset.
+Type-ahead does too: a letter matches only options that can be chosen.
+
+A disabled row refuses a press as well, so nothing a pointer can do
+chooses an option the keyboard cannot reach.
 
 ## Semantics
 

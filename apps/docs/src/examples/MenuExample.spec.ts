@@ -193,7 +193,7 @@ describe('the docs menu example', () => {
     expect(ui.querySemantics(ui.getByText('Rename'))?.label).toBe('Rename');
   });
 
-  it('reports a close through both the entry and the component, so onOpenChange runs twice', () => {
+  it('reports a close exactly once, on every path that closes it', () => {
     const open = new BehaviorSubject(false);
     const seen: boolean[] = [];
     const list: readonly MenuItem[] = [
@@ -213,18 +213,31 @@ describe('the docs menu example', () => {
       SIZE
     );
 
+    // Choosing an item closes the menu, and reports the close once.
     open.next(true);
     ui.frame();
     ui.fireEvent.keyDown('Enter');
     ui.frame();
+    expect(seen).toEqual([false]);
 
-    // Asserted rather than assumed: the page tells a reader to write a
-    // handler that is safe to run more than once, and this is why. It
-    // is never called with `true`; the caller does the opening.
+    // Escape closes it, and reports once again. It is never called
+    // with `true`; the caller does the opening.
+    open.next(true);
+    ui.frame();
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
     expect(seen).toEqual([false, false]);
+
+    // And so does a close the application asked for itself.
+    open.next(true);
+    ui.frame();
+    open.next(false);
+    ui.frame();
+    expect(seen).toEqual([false, false, false]);
+    expect(entries(ui)).toHaveLength(0);
   });
 
-  it('highlights by position in the whole list, so a disabled item is best placed last', () => {
+  it('highlights the item Enter would choose, wherever the disabled one sits', () => {
     const open = new BehaviorSubject(false);
     const chosen: string[] = [];
     const list: readonly MenuItem[] = [
@@ -245,13 +258,59 @@ describe('the docs menu example', () => {
     open.next(true);
     ui.frame();
 
-    // The walk counts only the items that can be chosen, and the
-    // highlight is painted on the row at that index in the whole list.
-    // With a disabled item first the two disagree: the highlight sits
-    // on Archive and Enter chooses Rename.
-    expect(highlighted(ui)).toEqual(['Archive']);
+    // Archive is disabled and first, so the highlight opens on Rename
+    // rather than on the row nothing can choose, and Enter takes the
+    // row the highlight is painted on.
+    expect(highlighted(ui)).toEqual(['Rename']);
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    expect(highlighted(ui)).toEqual(['Delete']);
+
+    // Wrapping steps over Archive in both directions.
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    expect(highlighted(ui)).toEqual(['Rename']);
+    ui.fireEvent.keyDown('ArrowUp');
+    ui.frame();
+    expect(highlighted(ui)).toEqual(['Delete']);
+
+    // Home and End answer with the ends of what can be chosen.
+    ui.fireEvent.keyDown('Home');
+    ui.frame();
+    expect(highlighted(ui)).toEqual(['Rename']);
+    ui.fireEvent.keyDown('End');
+    ui.frame();
+    expect(highlighted(ui)).toEqual(['Delete']);
+
+    ui.fireEvent.keyDown('Home');
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     expect(chosen).toEqual(['rename']);
+  });
+
+  it('refuses a disabled item, even on a click', () => {
+    const open = new BehaviorSubject(false);
+    const chosen: string[] = [];
+    const list: readonly MenuItem[] = [
+      { value: 'archive', label: 'Archive', disabled: true },
+      { value: 'rename', label: 'Rename' }
+    ];
+    const ui = renderTest(
+      createComponent(Menu, {
+        open,
+        items: list,
+        onSelect: (value: string) => chosen.push(value),
+        onOpenChange: (next: boolean) => open.next(next)
+      }),
+      SIZE
+    );
+
+    open.next(true);
+    ui.frame();
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'Archive' }));
+    ui.frame();
+
+    expect(chosen).toEqual([]);
+    expect(entries(ui)).toHaveLength(1);
   });
 });

@@ -107,6 +107,40 @@ describe('the docs select example', () => {
     expect(highlighted(ui)).toEqual(['Card']);
   });
 
+  it('highlights the option Enter would choose, wherever the disabled one sits', () => {
+    const seen: string[] = [];
+    const options: readonly SelectOption[] = [
+      { value: 'crypto', label: 'Crypto', disabled: true },
+      { value: 'card', label: 'Card' },
+      { value: 'invoice', label: 'Invoice' }
+    ];
+    const ui = renderTest(
+      createComponent(Select, { label: 'Payment', options, onChange: (next: string) => seen.push(next) }),
+      SIZE
+    );
+
+    ui.fireEvent.focus(ui.getByRole('combobox'));
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+
+    // Nothing is chosen and the first option cannot be, so the
+    // highlight opens on Card.
+    expect(highlighted(ui)).toEqual(['Card']);
+
+    ui.fireEvent.keyDown('ArrowUp');
+    ui.frame();
+    // Up wraps past Crypto to the end of what can be chosen.
+    expect(highlighted(ui)).toEqual(['Invoice']);
+
+    ui.fireEvent.keyDown('Home');
+    ui.frame();
+    expect(highlighted(ui)).toEqual(['Card']);
+
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(seen).toEqual(['card']);
+  });
+
   it('jumps to an option by its first letter, closed and open', () => {
     const ui = mount();
 

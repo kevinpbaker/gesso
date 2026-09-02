@@ -77,7 +77,38 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
     onChange: props.onChange
   });
 
-  const enabled = (): readonly SelectOption[] => props.options.value.filter(option => option.disabled !== true);
+  /**
+   * `active` is an index into the whole list, not into the subset that
+   * can be chosen, because that is the index the row compares itself
+   * against to paint the highlight. Walking one and painting by the
+   * other are two different numbers, and a disabled option anywhere
+   * but the end makes them disagree.
+   */
+  const seek = (start: number, delta: number): number => {
+    const options = props.options.value;
+    for (let moved = 0; moved < options.length; moved += 1) {
+      const index = (((start + delta * moved) % options.length) + options.length) % options.length;
+      if (options[index].disabled !== true) {
+        return index;
+      }
+    }
+    return -1;
+  };
+
+  /** The first option that can be chosen at or after `start`, wrapping, or -1. */
+  const from = (start: number): number => seek(start, 1);
+  /** The last one, walking backwards from the end. */
+  const last = (): number => seek(props.options.value.length - 1, -1);
+  const moveTo = (index: number): void => {
+    if (index !== -1) {
+      active.next(index);
+    }
+  };
+  const optionAt = (index: number): SelectOption | undefined => {
+    const option = props.options.value[index];
+    return option === undefined || option.disabled === true ? undefined : option;
+  };
+
   const labelFor = (chosen: string): string => props.options.value.find(option => option.value === chosen)?.label ?? '';
 
   const release = (): void => {
@@ -95,29 +126,31 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
   };
 
   const choose = (chosen: string): void => {
+    // A disabled option is not an answer: neither Enter on the
+    // highlight nor a press on the row itself can take one.
+    const option = props.options.value.find(entry => entry.value === chosen);
+    if (option === undefined || option.disabled === true) {
+      return;
+    }
     value.change(chosen);
     close();
   };
 
-  const step = (delta: number): void => {
-    const options = enabled();
-    if (options.length === 0) {
-      return;
-    }
-    active.next((active.value + delta + options.length) % options.length);
-  };
+  const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
   /** Type-ahead: the first option starting with the character typed. */
   const jumpTo = (character: string): void => {
-    const options = enabled();
-    const index = options.findIndex(option => option.label.toLowerCase().startsWith(character.toLowerCase()));
+    const wanted = character.toLowerCase();
+    const index = props.options.value.findIndex(
+      option => option.disabled !== true && option.label.toLowerCase().startsWith(wanted)
+    );
     if (index === -1) {
       return;
     }
     if (overlay.isOpen()) {
       active.next(index);
     } else {
-      choose(options[index].value);
+      choose(props.options.value[index].value);
     }
   };
 
@@ -144,16 +177,16 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
           const bound = keymap({
             ArrowDown: () => step(1),
             ArrowUp: () => step(-1),
-            Home: () => active.next(0),
-            End: () => active.next(Math.max(0, enabled().length - 1)),
+            Home: () => moveTo(from(0)),
+            End: () => moveTo(last()),
             Enter: () => {
-              const option = enabled()[active.value];
+              const option = optionAt(active.value);
               if (option !== undefined) {
                 choose(option.value);
               }
             },
             ' ': () => {
-              const option = enabled()[active.value];
+              const option = optionAt(active.value);
               if (option !== undefined) {
                 choose(option.value);
               }
@@ -175,9 +208,11 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
     if (disabled.value || overlay.isOpen()) {
       return;
     }
-    const options = enabled();
-    const index = options.findIndex(option => option.value === value.current());
-    active.next(index === -1 ? 0 : index);
+    const chosen = value.current();
+    const index = props.options.value.findIndex(option => option.value === chosen && option.disabled !== true);
+    // The walk starts on the value, or on the first option that can be
+    // chosen when the value matches nothing that can.
+    active.next(Math.max(0, index === -1 ? from(0) : index));
     overlay.show(list(), {
       anchor: focus.node(),
       placement: 'bottom-start',
