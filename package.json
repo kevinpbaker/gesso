@@ -11,6 +11,7 @@
     "docs:dev": "pnpm --filter @gesso/docs dev",
     "docs:build": "pnpm --filter @gesso/docs build",
     "docs:preview": "pnpm --filter @gesso/docs preview",
+    "docs:check": "node scripts/check-docs.ts",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint",
