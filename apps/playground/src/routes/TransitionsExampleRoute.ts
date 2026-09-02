@@ -48,9 +48,11 @@ export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
     },
     onError: errors.report
   });
-  shell.setStatus('Source: apps/playground/src/examples/TransitionsExampleApp.tsx — click a card, then press Back.');
+  shell.setStatus(
+    'Source: apps/playground/src/examples/TransitionsExampleApp.tsx — click a card, press Play, then press Back.'
+  );
   shell.setDetail(
-    'Shared elements morph between two live nodes rather than between two snapshots, and the video keeps playing across the navigation.'
+    'Shared elements morph between two live nodes rather than between two snapshots; the playlists come from Audius over a channel, and the sound from one element on the shell.'
   );
   const dispose = app.mount(shell.preview);
 
