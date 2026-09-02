@@ -99,6 +99,12 @@ export class ClipResolver implements VideoResolver {
   private readonly clips = new Map<string, GeneratedPlayback>();
 
   resolve(source: string): Promise<VideoPlayback> {
+    if (source === 'missing.clip') {
+      // What a fetch that failed, a fragmented MP4 and a thread with no
+      // `VideoDecoder` all look like from here: the promise rejects and
+      // no surface ever reaches the node.
+      return Promise.reject(new Error(`'${source}' is not there.`));
+    }
     const existing = this.clips.get(source);
     if (existing !== undefined) {
       return Promise.resolve(existing);
@@ -122,7 +128,8 @@ export class ClipResolver implements VideoResolver {
 
 // #region video
 /**
- * Two videos of the same shape, one playing and one held still.
+ * Three videos of the same shape: one playing, one held still, one
+ * that never resolves.
  *
  * `Video` takes the props `Image` takes, plus `loop` and `autoplay`,
  * and that is the whole control surface: there is no play method and
@@ -131,6 +138,12 @@ export class ClipResolver implements VideoResolver {
  * phase like any other animation. The right one was given
  * `autoplay={false}`, so it resolves the clip, presents the frame at
  * its position, and stops there.
+ *
+ * The third names a source the resolver refuses, which is what a fetch
+ * that failed or a thread without `VideoDecoder` looks like from a
+ * component's side. It keeps `placeholderColor`, the same prop and the
+ * same default an `Image` has, and that tinted box is the whole of what
+ * a clip that will not play looks like.
  *
  * The resolver above is not installed here: the worker entry that
  * renders this page declares it with `renderRoot(...).useMedia(...)`,
@@ -159,8 +172,22 @@ export function Player(_props: Inputs<{}>, _ctx: ComponentContext) {
           <text text="autoplay={false}: one frame, and no tween" fontSize={12} color="textMuted" />
         </column>
       </row>
+      <row gap={10} y="center">
+        <Video
+          src="missing.clip"
+          alt="A clip that failed"
+          placeholderColor="danger"
+          width={112}
+          height={72}
+          borderRadius={8}
+        />
+        <column gap={4}>
+          <text text="A source the resolver refuses keeps the placeholder tint, here danger." fontSize={12} />
+          <text text="There is no error slot: draw your own beside it." fontSize={12} color="textMuted" />
+        </column>
+      </row>
       <text
-        text="Neither clip is a file. Both are painted frame by frame by a VideoResolver this example supplies."
+        text="None of the three clips is a file. They are painted frame by frame by a VideoResolver this example supplies, and the third source is one it refuses."
         fontSize={12}
       />
     </column>

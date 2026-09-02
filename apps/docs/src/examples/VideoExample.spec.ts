@@ -9,6 +9,7 @@ import { ClipResolver, Player } from './VideoExample';
 
 const PLAYING = 'A generated clip, playing';
 const STILL = 'A generated clip, held on one frame';
+const FAILED = 'A clip that failed';
 
 // The decoder goes in through the `media` option, exactly as the
 // page's worker entry declares it with `useMedia`: a `Video` asks for
@@ -40,7 +41,28 @@ describe('the docs video example', () => {
     await ui.settle();
 
     expect(ui.getByRole('image', { name: PLAYING })).toHaveSemantics({ role: 'image', name: PLAYING });
-    expect(ui.getAllByRole('image')).toHaveLength(2);
+    expect(ui.getAllByRole('image')).toHaveLength(3);
+  });
+
+  it('keeps the placeholder tint on a source the resolver refuses', async () => {
+    const ui = mount();
+    const failed = ui.getByRole('image', { name: FAILED });
+    const playing = ui.getByRole('image', { name: PLAYING });
+
+    // Every box is tinted before anything resolves, each in its own
+    // colour: the theme's for the two that will play, the caller's for
+    // the one that will not.
+    expect(playing.properties.get('backgroundColor')).toBe('controlBackground');
+    expect(failed.properties.get('backgroundColor')).toBe('danger');
+
+    await ui.settle();
+
+    // Playing: the tint goes, so no colour sits behind the frames.
+    expect(playing.properties.get('backgroundColor')).toBeUndefined();
+    // Refused: no surface ever arrives, and the tinted box is the whole
+    // of what the reader is shown.
+    expect(failed.properties.get('video')).toBeUndefined();
+    expect(failed.properties.get('backgroundColor')).toBe('danger');
   });
 
   it('puts one surface on the node and keeps it there', async () => {

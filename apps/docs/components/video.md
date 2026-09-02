@@ -16,26 +16,28 @@ element anywhere: the file is fetched, demuxed and decoded on the
 thread the application runs on, and each decoded frame is drawn where
 it was produced.
 
-<LiveExample id="video" height="260" />
+<LiveExample id="video" height="330" />
 
 <<< @/src/examples/VideoExample.tsx#video
 
-Neither clip on this page is a file. The page fetches nothing, so the
-frames are painted on the spot by a resolver the example supplies, and
-what the left one demonstrates is the pacing rather than a codec. A
-real MP4 needs a browser: see the limits below.
+None of the three clips on this page is a file. The page fetches
+nothing, so the frames are painted on the spot by a resolver the
+example supplies, what the top left one demonstrates is the pacing
+rather than a codec, and the third names a source that resolver
+refuses. A real MP4 needs a browser: see the limits below.
 
 ## Props
 
-| Prop           | Type                                       | Default   | What it does                                                                         |
-| -------------- | ------------------------------------------ | --------- | ------------------------------------------------------------------------------------ |
-| `src`          | `string`                                   | required  | What the video resolver is asked for. Read once, when the component is built.        |
-| `alt`          | `string`                                   | none      | What a screen reader reads. Omitting it makes the video decorative.                  |
-| `objectFit`    | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'` | How each frame meets a box that is not its shape.                                    |
-| `borderRadius` | `number`                                   | `0`       | Rounds the box, and clips the picture to it.                                         |
-| `loop`         | `boolean`                                  | `true`    | Start again at the beginning when the clip ends.                                     |
-| `autoplay`     | `boolean`                                  | `true`    | Start playing as soon as the clip is ready. `false` shows one frame and stays on it. |
-| `ref`          | `UiNodeRef`                                | none      | Receives the node the frames are drawn on.                                           |
+| Prop               | Type                                       | Default             | What it does                                                                         |
+| ------------------ | ------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| `src`              | `string`                                   | required            | What the video resolver is asked for. Read once, when the component is built.        |
+| `alt`              | `string`                                   | none                | What a screen reader reads. Omitting it makes the video decorative.                  |
+| `objectFit`        | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'`           | How each frame meets a box that is not its shape.                                    |
+| `borderRadius`     | `number`                                   | `0`                 | Rounds the box, and clips the picture to it.                                         |
+| `placeholderColor` | `UiColorValue`                             | `controlBackground` | The tint while the box has no picture on it.                                         |
+| `loop`             | `boolean`                                  | `true`              | Start again at the beginning when the clip ends.                                     |
+| `autoplay`         | `boolean`                                  | `true`              | Start playing as soon as the clip is ready. `false` shows one frame and stays on it. |
+| `ref`              | `UiNodeRef`                                | none                | Receives the node the frames are drawn on.                                           |
 
 That is the whole control surface. There is no play method, no pause,
 no seek and no time you can read: a `Video` is a declaration that this
@@ -48,6 +50,39 @@ Like `Image`, it reads `src` once, because a body runs once and a clip
 whose source changed is a different clip: give it a `key`. It attaches
 `rootModifiers` to the node it draws on, which is how a clip can be
 carried through a route change by a `sharedElement`.
+
+## Before the first frame
+
+A clip arrives later than a picture does: there is a file to fetch, a
+container to demux and a decoder to configure before there is anything
+to draw. So the box is filled with `placeholderColor`, which is the
+theme's `controlBackground` unless the call site named another, and the
+fill is dropped once the playback is ready. It is the same prop
+[Image](/components/image) takes, with the same default and the same
+type, and it is read once for the same reason: a colour that arrived
+after the picture would have nothing left to tint. Name one where the
+video is going somewhere the theme cannot know about, over a photograph
+or in a panel of its own colour, where `controlBackground` would be a
+rectangle of the wrong shade until the clip starts.
+
+Three things can leave a `Video` with no picture on it, and the tint is
+what two of them look like:
+
+- **Nothing has resolved yet.** The tinted box is the whole of what is
+  drawn. It goes when the playback is ready, which is when the decoder
+  is configured rather than when the first frame has been presented.
+- **The source could not be read.** A fetch that failed, a thread with
+  no `VideoDecoder`, a fragmented MP4 the demuxer refuses: resolving
+  rejects, no surface ever reaches the node, and the tinted box is all
+  there is, exactly as it is for a broken picture.
+- **The decoder gave up part-way through.** Here the tint returns but
+  is not what a reader sees: the surface stays on the node, the video
+  is painted over the background, and the clip stops on the last frame
+  it drew.
+
+There is no error slot and no callback for any of the three. What to do
+about a clip that will not play is draw your own message beside it, and
+decide with the resolver whether to ask again.
 
 ## What drives the frames
 

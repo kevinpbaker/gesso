@@ -18,9 +18,12 @@ import {
   type IconCanvas,
   type IconContext,
   type UiImage,
-  type UiColorValue
+  type UiColorValue,
+  type UiVideoSurface,
+  type VideoPlayback,
+  type VideoResolver
 } from '@gesso/core';
-import { Icon, Image, ProgressBar, Spinner } from './Media';
+import { Icon, Image, ProgressBar, Spinner, Video } from './Media';
 
 /**
  * The Media tier (`COMPONENTS_ROADMAP.md` C7).
@@ -380,6 +383,143 @@ describe('Image', () => {
     mounted.frame();
 
     expect(resolver.size).toBe(0);
+  });
+});
+
+/**
+ * A playback that produces nothing, because nothing here looks at a
+ * frame: the subject is the box behind one.
+ */
+class FakePlayback implements VideoPlayback {
+  readonly surface: UiVideoSurface = { frame: null, version: 0, width: 4, height: 4 };
+  readonly width = 4;
+  readonly height = 4;
+  readonly duration = 4;
+  readonly frameDurationMs = 100;
+  positionMs = 0;
+  private readonly listeners = new Set<(error: unknown) => void>();
+
+  present(positionMs: number): boolean {
+    this.positionMs = positionMs;
+    return true;
+  }
+
+  onError(listener: (error: unknown) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /** What a decoder giving up part-way through the clip looks like. */
+  fail(error: unknown): void {
+    for (const listener of this.listeners) {
+      listener(error);
+    }
+  }
+}
+
+/**
+ * A runtime whose video resolver answers, or refuses.
+ *
+ * Through the `media` option for the reason `mountMedia` uses it: a
+ * `Video` asks for its playback while the tree is being built inside
+ * the runtime's constructor.
+ */
+function mountVideo(root: UiChild, options: { fails?: boolean } = {}) {
+  const playback = new FakePlayback();
+  const resolver: VideoResolver = {
+    resolve: () => (options.fails === true ? Promise.reject(new Error('no decoder')) : Promise.resolve(playback)),
+    release: () => {},
+    dispose: () => {}
+  };
+  const mounted = renderTest(root, { media: { videoResolver: resolver } });
+  return { ...mounted, playback };
+}
+
+describe('Video', () => {
+  it('tints the placeholder with the colour it was given, and drops it when the clip starts', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          placeholderColor: 'danger',
+          ref: (n: UiNode | null) => (node = n),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+
+    // The same promise `Image` waits on: nothing is on the node yet, so
+    // the box is the caller's colour rather than the theme's.
+    expect(node!.properties.get('backgroundColor')).toBe('danger');
+    await mounted.settle();
+    expect(node!.properties.get('backgroundColor')).toBeUndefined();
+  });
+
+  it('falls back to the theme tint when no placeholder colour is given', () => {
+    let node: UiNode | null = null;
+    mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', ref: (n: UiNode | null) => (node = n), width: 40 }))
+    );
+
+    expect(node!.properties.get('backgroundColor')).toBe('controlBackground');
+  });
+
+  it('keeps the given tint when the source cannot be read at all', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          placeholderColor: 'danger',
+          ref: (n: UiNode | null) => (node = n),
+          width: 40,
+          height: 20
+        })
+      ),
+      { fails: true }
+    );
+    await mounted.settle();
+
+    // A thread with no `VideoDecoder`, a fragmented file, a fetch that
+    // failed: the tinted box is the whole of what any of them looks
+    // like.
+    expect(node!.properties.get('video')).toBeUndefined();
+    expect(node!.properties.get('backgroundColor')).toBe('danger');
+  });
+
+  it('puts the tint back when the decoder gives up, behind the surface it keeps', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          placeholderColor: 'danger',
+          ref: (n: UiNode | null) => (node = n),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+    await mounted.settle();
+    expect(node!.properties.get('backgroundColor')).toBeUndefined();
+
+    mounted.playback.fail(new Error('the decoder gave up'));
+    await mounted.settle();
+
+    // The box is coloured again, but the surface stays on the node, so
+    // what a reader sees is the last frame rather than the tint. That
+    // is the one state of the three the tint does not describe, which
+    // is why the page says so.
+    expect(node!.properties.get('backgroundColor')).toBe('danger');
+    expect(node!.properties.get('video')).toBe(mounted.playback.surface);
   });
 });
 

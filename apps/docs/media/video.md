@@ -166,7 +166,10 @@ that has failed to load. An app that wants a still passes
   thread has a `VideoDecoder` at all. Where it does not, resolving
   rejects with a message naming Chrome 94 and up and worker
   availability, and the component's state goes to `failed`, which paints
-  the tinted box and nothing else.
+  the box in `placeholderColor` and nothing else. That prop is the same
+  one `Image` takes, defaulting to the theme's `controlBackground`, so a
+  clip sitting on a surface of its own colour can say what a box with no
+  picture in it should look like.
 - **Hardware acceleration is not requested.** `prefer-hardware` reads
   like a preference and is a requirement: `isConfigSupported` answers
   false wherever there is no hardware decoder for the codec, which on a
