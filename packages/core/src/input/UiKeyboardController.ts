@@ -50,6 +50,8 @@ export interface KeyboardControllerOptions {
  * moving focus to the next focusable node and Shift+Tab to the
  * previous, wrapping around.
  */
+const MODIFIER_KEYS: ReadonlySet<string> = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
+
 export class UiKeyboardController {
   private readonly tabNavigation: boolean;
   private readonly editing: KeyboardControllerOptions['editing'];
@@ -72,6 +74,12 @@ export class UiKeyboardController {
   }
 
   keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
+    // A key makes focus visible again after a mouse press, as
+    // `:focus-visible` does. A modifier on its own does not count: it is
+    // held for a click as often as for a shortcut.
+    if (!MODIFIER_KEYS.has(key)) {
+      this.focusManager.noteInput('keyboard');
+    }
     const event = new UiKeyboardEvent(UiEventType.KeyDown, key, modifiers);
     const focused = this.focusManager.focusedNode;
     const target = focused ?? this.root();

@@ -25,6 +25,15 @@ import type { UiInputDispatcher } from './UiInputDispatcher';
  */
 export type FocusSource = 'pointer' | 'keyboard' | 'program';
 
+/**
+ * How the person last drove the app, as far as focus can tell: the
+ * pointer or the keyboard. This is what decides whether focus is
+ * *visible*, the way `:focus-visible` does in a browser: a ring that
+ * appeared on every mouse click would mark a control nobody is about to
+ * drive with the keyboard, so the ring waits until the keyboard is used.
+ */
+export type FocusModality = 'pointer' | 'keyboard';
+
 interface FocusScope {
   readonly root: UiNode;
   readonly restore: UiNode | null;
@@ -57,6 +66,12 @@ interface FocusScope {
 export class UiFocusManager {
   private root: UiNode;
   private focused: UiNode | null = null;
+  /**
+   * Keyboard until told otherwise, so focus placed before any input
+   * (an `autoFocus`, a dialog's first field) is visible, as a browser
+   * would show it.
+   */
+  private modality: FocusModality = 'keyboard';
   private readonly listeners = new Set<(node: UiNode | null, source: FocusSource) => void>();
   private readonly scopeListeners = new Set<() => void>();
   private readonly scopes: FocusScope[] = [];
@@ -81,6 +96,36 @@ export class UiFocusManager {
 
   hasFocus(): boolean {
     return this.focused !== null;
+  }
+
+  /** How the person last drove the app. */
+  get focusModality(): FocusModality {
+    return this.modality;
+  }
+
+  /**
+   * Whether the focus held should be shown. True while focus was
+   * reached by the keyboard, or by code with no pointer since; false
+   * after a pointer press, until the next key.
+   */
+  get focusVisible(): boolean {
+    return this.focused !== null && this.modality === 'keyboard';
+  }
+
+  /**
+   * Records an input the person made. A change of modality while a node
+   * holds focus is reported to the focus listeners as a change on that
+   * node, so a ring can appear on a mouse-focused control the moment an
+   * arrow key is pressed, and disappear again on the next press.
+   */
+  noteInput(modality: FocusModality): void {
+    if (this.modality === modality) {
+      return;
+    }
+    this.modality = modality;
+    if (this.focused !== null) {
+      this.notify(this.focused, modality);
+    }
   }
 
   /**
@@ -108,6 +153,9 @@ export class UiFocusManager {
     }
     if (node === this.focused) {
       return true;
+    }
+    if (source !== 'program') {
+      this.modality = source;
     }
     const previous = this.focused;
     this.focused = node;
@@ -176,6 +224,10 @@ export class UiFocusManager {
    * pressing the page background is not a request to blur.
    */
   focusOnPress(node: UiNode): void {
+    // A press is a press whether or not it lands on something focusable:
+    // the person is on the mouse now, and a ring on whatever holds
+    // focus should go.
+    this.noteInput('pointer');
     for (let current: UiNode | null = node; current !== null; current = current.parent) {
       if (isNodeFocusable(current)) {
         this.focus(current, 'pointer');
@@ -289,7 +341,7 @@ export class UiFocusManager {
       index = delta > 0 ? focusables.length - 1 : 0;
     }
     const next = focusables[(index + delta + focusables.length) % focusables.length];
-    return this.focus(next);
+    return this.focus(next, 'keyboard');
   }
 
   /** Focusable nodes in document order (parent before children). */

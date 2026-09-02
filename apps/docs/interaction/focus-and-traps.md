@@ -167,9 +167,19 @@ non-focusable nodes.
 
 ## The focus ring
 
-`focusRing()` draws a ring around whatever holds focus, and it is a
-decoration rather than an overlay for two reasons that decide its
-behaviour:
+`focusRing()` draws a ring around whatever holds focus, when that focus
+is worth showing. Focus that a pointer press put there is not: a ring on
+every clicked button would mark a control nobody is about to drive with
+the keys, so the ring waits. It appears for focus the keyboard reached,
+for focus placed by code before any pointer press, and on a mouse-focused
+control the moment a key is pressed; the next press takes it away again.
+This is what a browser's `:focus-visible` does, and the focus manager
+does it here by remembering whether the last input was the pointer or
+the keyboard. A modifier can ask the same question through
+`host.isFocusVisible()`.
+
+The ring is a decoration rather than an overlay for two reasons that
+decide its behaviour:
 
 - **It is clipped with the node.** A ring on a row scrolled half out of
   a scroll container is cut off at the same edge the row is, because it

@@ -106,14 +106,19 @@ const kind = defineModifier<FocusRingOptions>({
   name: 'focusRing',
   attach(host, options) {
     const shapes = ringShapes(options);
-    const sync = (focused: boolean): void => {
-      host.decorate(focused ? shapes : null);
+    // Drawn for focus the keyboard can see, not for every focus: a mouse
+    // press focuses the control it lands on, and a ring there would mark
+    // something nobody is about to drive with the keys. The host reports
+    // the change when a key makes that focus visible, so the ring
+    // appears then. This is `:focus-visible`, done where the focus is.
+    const sync = (): void => {
+      host.decorate(host.isFocused() && host.isFocusVisible() ? shapes : null);
     };
     // A node may already hold focus when its ring attaches: a dialog
     // that auto-focused its first field re-renders, and the modifier
     // that lands on the focused node would otherwise wait for a focus
     // change that has already happened.
-    sync(host.isFocused());
+    sync();
     host.onFocusChange(sync);
   }
 });

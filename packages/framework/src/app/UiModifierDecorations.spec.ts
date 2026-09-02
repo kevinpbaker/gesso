@@ -18,7 +18,8 @@ import {
   type DecorationShape,
   type LayoutRecord,
   decorated,
-  focusRing
+  focusRing,
+  noKeyModifiers
 } from '@gesso/core';
 import { mountRuntime } from './RuntimeTestUtils';
 import { FocusService } from './FocusService';
@@ -151,6 +152,45 @@ describe('focusRing', () => {
 
     store.blur();
     expect(second.decorations).toBeNull();
+  });
+
+  it('stays away from focus a pointer press gave, and appears once the keyboard is used', () => {
+    const { runtime, first } = form();
+    // The column starts at the origin and the first button is its first
+    // child, so a press a few pixels in lands on it.
+    const box = { x: 0, y: 0 };
+    const modifiers = noKeyModifiers();
+
+    // A press focuses the button, as a press does, and draws no ring.
+    runtime.input.pointer.pointerDown(box.x + 5, box.y + 5, 1, modifiers);
+    runtime.input.pointer.pointerUp(box.x + 5, box.y + 5, 0, modifiers);
+    expect(runtime.input.focus.focusedNode).toBe(first);
+    expect(first.decorations).toBeNull();
+
+    // A modifier held for a click is not a keyboard interaction.
+    runtime.input.keyboard.keyDown('Shift', { ...modifiers, shift: true });
+    expect(first.decorations).toBeNull();
+
+    // An arrow is: the person is on the keys now, so the ring shows.
+    runtime.input.keyboard.keyDown('ArrowDown', modifiers);
+    expect(first.decorations).toHaveLength(1);
+
+    // And the next press takes it away, without moving focus.
+    runtime.input.pointer.pointerDown(box.x + 5, box.y + 5, 1, modifiers);
+    expect(runtime.input.focus.focusedNode).toBe(first);
+    expect(first.decorations).toBeNull();
+  });
+
+  it('shows the ring for focus moved by Tab, and for focus placed by code before any press', () => {
+    const { runtime, first, second } = form();
+
+    runtime.services.get(FocusService).focus(first);
+    expect(first.decorations).toHaveLength(1);
+
+    runtime.input.keyboard.keyDown('Tab', noKeyModifiers());
+    expect(runtime.input.focus.focusedNode).toBe(second);
+    expect(first.decorations).toBeNull();
+    expect(second.decorations).toHaveLength(1);
   });
 
   it('is a stroke outside the node, so it never covers the control it marks', () => {

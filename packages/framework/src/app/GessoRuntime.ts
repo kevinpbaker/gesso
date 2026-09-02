@@ -444,7 +444,7 @@ export class GessoRuntime {
     // tree for.
     this.focusManager = new UiFocusManager(this.graph.root, this.dispatcher);
     this.focusManager.onFocusChange(node => {
-      this.focusNotifier.handleFocusChange(node);
+      this.focusNotifier.handleFocusChange(node, this.focusManager.focusVisible);
       if (this.semanticsListener !== null) {
         // A mirror has to move DOM focus with the app's, and the frame
         // where it hears about it is the frame this arms. Most focus
@@ -460,6 +460,7 @@ export class GessoRuntime {
       dispatcher: this.dispatcher,
       focus: {
         isFocused: node => this.focusNotifier.isFocused(node),
+        isFocusVisible: node => this.focusNotifier.isFocusVisible(node),
         focus: node => {
           this.focusManager.focus(node);
         },
@@ -1387,6 +1388,10 @@ export class GessoRuntime {
         onPress: node => {
           if (node !== null) {
             focus.focusOnPress(node);
+          } else {
+            // Nothing under the press, but it was a press: the person is
+            // on the pointer, and a ring elsewhere should go.
+            focus.noteInput('pointer');
           }
         },
         scrollSink,

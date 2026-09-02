@@ -64,6 +64,8 @@ export interface UiModifierLayout {
  */
 export interface UiModifierFocus {
   isFocused(node: UiNode): boolean;
+  /** Whether the focus `node` holds should be shown; see `UiFocusManager.focusVisible`. */
+  isFocusVisible(node: UiNode): boolean;
   focus(node: UiNode): void;
   onFocusChange(node: UiNode, listener: (focused: boolean) => void): () => void;
 }
@@ -414,6 +416,10 @@ class Host implements UiModifierHost {
 
   isFocused(): boolean {
     return this.services.focus?.isFocused(this.node) ?? false;
+  }
+
+  isFocusVisible(): boolean {
+    return this.services.focus?.isFocusVisible(this.node) ?? false;
   }
 
   onFocusChange(listener: (focused: boolean) => void): void {

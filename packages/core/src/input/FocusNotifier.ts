@@ -17,6 +17,7 @@ import type { UiNode } from '../graph/UiNode';
 export class FocusNotifier {
   private readonly listeners = new Map<UiNode, Set<(focused: boolean) => void>>();
   private focused: UiNode | null = null;
+  private visible = true;
 
   /** Registers a listener for one node; the returned function removes it. */
   add(node: UiNode, listener: (focused: boolean) => void): () => void {
@@ -43,13 +44,29 @@ export class FocusNotifier {
     return this.focused === node;
   }
 
-  /** Fed from `UiFocusManager.onFocusChange`, which reports the new holder. */
-  handleFocusChange(node: UiNode | null): void {
+  /** Whether the focus `node` holds should be shown; false for any node without focus. */
+  isFocusVisible(node: UiNode): boolean {
+    return this.focused === node && this.visible;
+  }
+
+  /**
+   * Fed from `UiFocusManager.onFocusChange`, which reports the new
+   * holder and, through `visible`, whether its focus should be shown. A
+   * change of visibility alone is reported to the holder's listeners as
+   * a focus change, which is what lets a ring appear on a mouse-focused
+   * control when the keyboard is next used.
+   */
+  handleFocusChange(node: UiNode | null, visible = true): void {
     const previous = this.focused;
+    const wasVisible = this.visible;
+    this.focused = node;
+    this.visible = visible;
     if (previous === node) {
+      if (node !== null && wasVisible !== visible) {
+        this.notify(node, true);
+      }
       return;
     }
-    this.focused = node;
     if (previous !== null) {
       this.notify(previous, false);
     }

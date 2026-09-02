@@ -127,7 +127,16 @@ export interface UiModifierHost {
   focus(): void;
   /** Whether the node currently holds keyboard focus. */
   isFocused(): boolean;
-  /** Called when the node gains or loses focus, and only then. Removed on detach. */
+  /**
+   * Whether the focus the node holds should be shown: false after a
+   * pointer press put it there, true once the keyboard is used, the way
+   * `:focus-visible` behaves. False for a node without focus.
+   */
+  isFocusVisible(): boolean;
+  /**
+   * Called when the node gains or loses focus, and when the focus it
+   * holds becomes visible or stops being so. Removed on detach.
+   */
   onFocusChange(listener: (focused: boolean) => void): void;
   /**
    * The shapes this modifier contributes to the node's own paint pass,

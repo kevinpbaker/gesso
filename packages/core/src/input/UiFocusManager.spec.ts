@@ -37,6 +37,52 @@ function setup(): {
   return { h, box, btn1, btn2, btn3, disabled, focusableBox, focusManager };
 }
 
+describe('focus visibility', () => {
+  it('is visible for keyboard and programmatic focus, hidden after a pointer press, and back on the next key', () => {
+    const { h, btn1, btn2, focusManager } = setup();
+    const changes: [string | null, string][] = [];
+    focusManager.onFocusChange((node, source) => changes.push([node?.id ?? null, source]));
+
+    expect(focusManager.focusVisible).toBe(false);
+    focusManager.focus(btn1);
+    expect(focusManager.focusVisible).toBe(true);
+
+    focusManager.focusOnPress(btn2);
+    expect(focusManager.focusedNode).toBe(btn2);
+    expect(focusManager.focusModality).toBe('pointer');
+    expect(focusManager.focusVisible).toBe(false);
+
+    // Focus given by code after a press stays hidden: the person is still on the mouse.
+    focusManager.focus(btn1);
+    expect(focusManager.focusVisible).toBe(false);
+
+    // A key makes it visible, and the holder is told so it can redraw.
+    focusManager.noteInput('keyboard');
+    expect(focusManager.focusVisible).toBe(true);
+    expect(changes[changes.length - 1]).toEqual(['btn1', 'keyboard']);
+
+    // Saying the same thing twice reports nothing.
+    const count = changes.length;
+    focusManager.noteInput('keyboard');
+    expect(changes.length).toBe(count);
+
+    // A press on nothing focusable still hides the ring.
+    focusManager.focusOnPress(h.root);
+    expect(focusManager.focusedNode).toBe(btn1);
+    expect(focusManager.focusVisible).toBe(false);
+    expect(changes[changes.length - 1]).toEqual(['btn1', 'pointer']);
+  });
+
+  it('Tab moves focus as keyboard focus', () => {
+    const { btn1, focusManager } = setup();
+    focusManager.focusOnPress(btn1);
+    expect(focusManager.focusVisible).toBe(false);
+    focusManager.focusNext();
+    expect(focusManager.focusVisible).toBe(true);
+    expect(focusManager.focusModality).toBe('keyboard');
+  });
+});
+
 describe('UiFocusManager', () => {
   it('focuses a focusable node and dispatches Focus to it', () => {
     const { h, btn1, focusManager } = setup();
@@ -179,15 +225,15 @@ describe('UiFocusManager', () => {
     focusManager.focusOnPress(btn1);
     expect(sources).toEqual(['pointer']);
 
-    // Everything else keeps the reveal: tab navigation, and a
-    // component calling `focus()` itself, which is what `element.focus()`
-    // does in a browser too.
+    // Everything else keeps the reveal: tab navigation, which reports
+    // itself as the keyboard it is, and a component calling `focus()`
+    // itself, which is what `element.focus()` does in a browser too.
     focusManager.focusNext();
     expect(focusManager.focusedNode).toBe(btn2);
-    expect(sources).toEqual(['pointer', 'program']);
+    expect(sources).toEqual(['pointer', 'keyboard']);
 
     focusManager.focus(btn1);
-    expect(sources).toEqual(['pointer', 'program', 'program']);
+    expect(sources).toEqual(['pointer', 'keyboard', 'program']);
   });
 
   it('focusOnPress walks up to the nearest focusable ancestor', () => {
