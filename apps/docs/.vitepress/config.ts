@@ -40,6 +40,7 @@ export default defineConfig({
           { text: 'Your first component', link: '/guide/counter' },
           { text: 'Components run once', link: '/guide/components-run-once' },
           { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
+          { text: 'Inputs and outputs', link: '/guide/inputs-and-outputs' },
           { text: 'Layout basics', link: '/guide/layout-basics' },
           { text: 'Text', link: '/guide/text' },
           { text: 'Using components', link: '/guide/using-components' },
