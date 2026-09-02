@@ -17,6 +17,7 @@ import {
   wheelDeltaYOf,
   type UiScrollability
 } from '@gesso/core';
+import { AudioSink } from '../AudioSink';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
@@ -171,6 +172,8 @@ export class WorkerApp {
   private detachInput: (() => void) | null = null;
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
+  /** The one audio element, behind `AudioService`; see `AudioSink`. */
+  private audio: AudioSink | null = null;
   /**
    * Which way the runtime could scroll under the pointer, as of the
    * last frame the worker reported.
@@ -274,6 +277,12 @@ export class WorkerApp {
     this.observeResize(element);
     this.attachHistory();
     this.detachInput = this.attachInput(canvas);
+    // Sound. The element has to live here, and only here; the worker
+    // tells it what to do and hears what it did.
+    this.audio = new AudioSink({
+      sample: sample => this.post({ type: 'audioSample', sample }),
+      action: action => this.post({ type: 'audioAction', action })
+    });
     this.setColorScheme(this.colorSchemePreference);
     // The hidden textarea that turns keystrokes into text for the
     // worker. It has DOM focus while the worker reports a focused
@@ -443,6 +452,8 @@ export class WorkerApp {
     this.history = null;
     this.detachInput?.();
     this.detachInput = null;
+    this.audio?.dispose();
+    this.audio = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     if (this.renderWorker !== undefined) {
@@ -525,6 +536,10 @@ export class WorkerApp {
     }
     if (message.type === 'openUrl') {
       window.open(message.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (message.type === 'audio') {
+      this.audio?.handle(message.request);
       return;
     }
     if (message.type === 'semantics') {

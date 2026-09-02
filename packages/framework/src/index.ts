@@ -58,6 +58,22 @@ export {
 } from './app/NodeReport';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellService, type ShellRequest } from './app/ShellService';
+export {
+  AudioService,
+  type AudioAction,
+  type AudioMetadata,
+  type AudioRequest,
+  type AudioSample,
+  type AudioState,
+  type AudioStatus
+} from './app/AudioService';
+export {
+  AudioSink,
+  type AudioElementLike,
+  type AudioSinkOptions,
+  type AudioSinkOutput,
+  type MediaSessionLike
+} from './app/AudioSink';
 export { RouterService, type RouteMatch, type RouterHistorySink, type RouterRoutes } from './router/RouterService';
 export { RouterOutlet } from './router/RouterOutlet';
 export { Presence, type PresenceProps } from './Presence';

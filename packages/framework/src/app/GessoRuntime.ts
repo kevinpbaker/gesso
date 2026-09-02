@@ -84,6 +84,7 @@ import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayService } from '../overlay/OverlayService';
 import type { ColorScheme } from './colorScheme';
 import { ShellService, type ShellRequest } from './ShellService';
+import { AudioService, type AudioAction, type AudioRequest, type AudioSample } from './AudioService';
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
 import { FocusService } from './FocusService';
@@ -362,6 +363,7 @@ export class GessoRuntime {
   private semanticsStale = false;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
+  private audioListener: ((request: AudioRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -502,6 +504,11 @@ export class GessoRuntime {
       this.services.register(ShellService);
     }
     this.services.get(ShellService).setHandler(request => this.shellListener?.(request));
+    // And sound, which is the shell's element and this thread's client.
+    if (!this.services.has(AudioService)) {
+      this.services.register(AudioService);
+    }
+    this.services.get(AudioService).setHandler(request => this.audioListener?.(request));
     // And the find session, so a component can drive the search the
     // browser's own find bar cannot do over a canvas.
     if (!this.services.has(FindService)) {
@@ -526,6 +533,9 @@ export class GessoRuntime {
       this.services.register(AnimationService);
     }
     this.services.get(AnimationService).setDriver(this.animations);
+    // Sound reads the clock through the same driver, so a playback's
+    // position moves between the shell's samples.
+    this.services.get(AudioService).setAnimations(this.services.get(AnimationService));
     this.smoothScroller = new SmoothScroller(
       this.graph,
       this.services.get(AnimationService),
@@ -856,6 +866,25 @@ export class GessoRuntime {
    */
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void {
     this.shellListener = listener;
+  }
+
+  /**
+   * Receives what components ask of the shell's audio element through
+   * `AudioService`. Without a listener they are dropped, and the app
+   * plays nothing, which is what a headless runtime should do.
+   */
+  onAudioRequest(listener: ((request: AudioRequest) => void) | null): void {
+    this.audioListener = listener;
+  }
+
+  /** The shell reports its audio element; passed straight through to `AudioService`. */
+  applyAudioSample(sample: AudioSample): void {
+    this.services.get(AudioService).applySample(sample);
+  }
+
+  /** The platform's media controls acted; passed straight through to `AudioService`. */
+  applyAudioAction(action: AudioAction): void {
+    this.services.get(AudioService).applyAction(action);
   }
 
   /**
@@ -1205,6 +1234,7 @@ export class GessoRuntime {
     this.sharedElements.clear();
     this.animations.setWakeListener(null);
     this.services.get(AnimationService).setDriver(null);
+    this.services.get(AudioService).setAnimations(null);
     this.services.get(FindService).setController(null);
     this.services.get(FocusService).setManager(null);
     this.services.get(RouterService).setHistory(null);

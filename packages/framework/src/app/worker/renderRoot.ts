@@ -372,6 +372,12 @@ export class RenderWorkerApp {
       case 'inspector':
         runtime.setInspectorEnabled(message.enabled);
         break;
+      case 'audioSample':
+        runtime.applyAudioSample(message.sample);
+        break;
+      case 'audioAction':
+        runtime.applyAudioAction(message.action);
+        break;
       case 'semanticsAction':
         runtime.applySemanticsAction(message.action);
         break;
@@ -481,6 +487,9 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'semantics', update });
       });
     }
+    this.runtime.onAudioRequest(request => {
+      this.host.postMessage({ type: 'audio', request });
+    });
     this.runtime.onShellRequest(request => {
       if (request.type === 'clipboard') {
         this.host.postMessage({ type: 'clipboard', text: request.text });

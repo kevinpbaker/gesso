@@ -11,6 +11,7 @@ import {
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import type { UiNodeReport } from './NodeReport';
 import type { ShellRequest } from './ShellService';
+import { AudioSink } from './AudioSink';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
@@ -99,6 +100,8 @@ export class GessoApp {
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
   private proxy: EditingProxy | null = null;
+  /** The one audio element, behind `AudioService`; see `AudioSink`. */
+  private audio: AudioSink | null = null;
   private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
@@ -271,6 +274,9 @@ export class GessoApp {
    */
   dispose(): void {
     this.running = false;
+    this.audio?.dispose();
+    this.audio = null;
+    this.runtime.onAudioRequest(null);
     this.proxy?.dispose();
     this.proxy = null;
     this.mirror?.dispose();
@@ -317,6 +323,14 @@ export class GessoApp {
     });
     this.runtime.setTextInputSource('proxy');
     this.runtime.onEditingState(state => this.proxy?.update(state));
+    // Sound, driven directly instead of over the protocol: the same
+    // sink the worker configuration uses, which is the point of it not
+    // knowing where its requests come from.
+    this.audio = new AudioSink({
+      sample: sample => this.runtime.applyAudioSample(sample),
+      action: action => this.runtime.applyAudioAction(action)
+    });
+    this.runtime.onAudioRequest(request => this.audio?.handle(request));
     this.attachSemanticsMirror(canvas);
     if (typeof document !== 'undefined') {
       const onVisibility = (): void => this.runtime.setVisible(document.visibilityState !== 'hidden');

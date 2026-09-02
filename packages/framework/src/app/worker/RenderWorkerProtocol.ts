@@ -8,6 +8,7 @@ import type {
   UiScrollability,
   UiSemanticsUpdate
 } from '@gesso/core';
+import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
@@ -177,6 +178,20 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'semanticsAction'; action: UiSemanticsAction }
   /**
+   * What the shell's audio element is doing: on every state change and
+   * about once a second while it plays. The element lives on the shell
+   * because no worker can make a sound; `AudioService` is its client
+   * and moves the position on between samples. See `AudioSink`.
+   */
+  | { type: 'audioSample'; sample: AudioSample }
+  /**
+   * What the platform's media controls asked for (the keyboard's media
+   * keys, the OS overlay). Play and pause were already done to the
+   * element and arrive as samples too; next and previous are the
+   * application's to answer.
+   */
+  | { type: 'audioAction'; action: AudioAction }
+  /**
    * One display refresh, forwarded from the shell's
    * `requestAnimationFrame`.
    *
@@ -271,6 +286,8 @@ export type RuntimeToShellMessage =
   | { type: 'openUrl'; url: string }
   /** The router navigated; the shell owns the address bar (RouterService). */
   | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string }
+  /** Load, play, pause, seek, set the volume or the OS metadata (AudioService). */
+  | { type: 'audio'; request: AudioRequest }
   /**
    * What the accessibility mirror needs to keep up with this frame:
    * the semantics patches, the boxes that moved, and the focused node
