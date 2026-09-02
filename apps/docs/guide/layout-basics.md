@@ -18,8 +18,9 @@ property is set on an element, and that is where it comes from.
 | `<column>` | Along the vertical axis                              |
 | `<box>`    | Stacked on top of each other, aligned within the box |
 
-`<box>` is also the plain rectangle, meaning a background, a border and
-a size, and it is exported as `Stack` when what you mean is layering.
+`<box>` is also the plain rectangle: a background, a border and a size.
+The same element is exported as `Stack` for when layering is what you
+mean.
 
 ## `x` and `y` place everything
 

@@ -22,8 +22,8 @@ Tab into the group and try it. The terms box is unticked and `required`,
 so it is drawn with the `danger` border and announces `invalid` until it
 is ticked. The updates box is controlled by a handler that refuses to
 write while the terms are unticked, so clicking it does nothing at all,
-which is the point. Remember this device is uncontrolled and answers to
-nobody.
+which is the point. "Remember this device" is uncontrolled: it keeps its
+own value, and the application never hears about it.
 
 ## Props
 

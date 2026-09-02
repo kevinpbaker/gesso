@@ -41,17 +41,10 @@ step of `0.1` cannot leak a value of `0.30000000000000004`.
 
 ### Layout and modifiers
 
-The slider takes the layout props every control in the library takes,
-and spreads them onto its own root: `width`, `height`, `minWidth`,
-`minHeight`, `maxWidth`, `maxHeight`, `margin` and its four sides,
-`flex`, `flexGrow`, `flexShrink`, `flexBasis`, `selfX` and `selfY`. It
-takes no colour props; the fill and the track are theme tokens.
-
-`rootModifiers` attaches modifiers to the element that _is_ the slider,
-which is the node that takes focus and carries the role. Declare the
-value once at module scope rather than in the call: a modifier's
-arguments are compared by identity, so a fresh one detaches and
-re-attaches on every frame.
+The [shared layout props](/components/#layout-is-yours) land on the slider's root, and
+`rootModifiers` attaches to the node that takes focus and carries the
+role. There are no colour props: the fill and the track are theme
+tokens.
 
 ## Controlled and uncontrolled
 
@@ -60,9 +53,8 @@ re-attaches on every frame.
 <Slider label="Volume" defaultValue={40} />
 ```
 
-Which of the two applies is decided once, when the component is built,
-from whether `value` was supplied; passing both throws an error naming
-the component rather than choosing quietly.
+Which form applies is decided once, when the component is built, from
+whether `value` was supplied; supplying both throws.
 
 A controlled slider draws the value it is given, and `onChange` is a
 request rather than a change. The example above takes advantage of

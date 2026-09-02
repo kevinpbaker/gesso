@@ -6,9 +6,12 @@ description: Set up a project against the Gesso packages, and choose between the
 
 Gesso is four packages and a bundler that understands workers. There is
 no plugin and no build step of its own: a Gesso project is an ordinary
-Vite project that happens to draw its interface into a canvas. There is
-a scaffolding CLI, `create-gesso-app`, and what it writes is exactly
-that ordinary project, so nothing below depends on having used it.
+Vite project that happens to draw its interface into a canvas.
+
+The quickest way to get one is the scaffold,
+[create-gesso-app](/tooling/create-gesso-app), which writes every file
+on this page for you. Read on if you want to know what those files are
+and why, or to set a project up by hand.
 
 ## The packages
 
@@ -24,10 +27,10 @@ needs. `rxjs` is a peer of both: an Observable is the binding, so it is
 your dependency as much as theirs.
 
 ::: warning Not on a registry yet
-These packages are not published. A project consumes them today from
-tarballs. Run `pnpm pack` in each package directory and install the
-files, which is exactly what this repository's own `pnpm check:install`
-does before it runs a component test against the result.
+These packages are not published. A project consumes them from tarballs
+today: run `pnpm pack` in each package directory and install the files.
+The scaffold does this for you and writes `file:` specifiers pointing at
+them.
 :::
 
 ```json
@@ -35,10 +38,10 @@ does before it runs a component test against the result.
   "dependencies": {
     "@gesso/core": "^0.1.0",
     "@gesso/framework": "^0.1.0",
+    "@gesso/components": "^0.1.0",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@gesso/components": "^0.1.0",
     "@gesso/testing": "^0.1.0",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
@@ -49,9 +52,9 @@ does before it runs a component test against the result.
 ## TypeScript
 
 Nothing exotic. `moduleResolution: "bundler"` is the line that has to be
-right, because the packages ship `exports` maps; the two `jsx` lines are
-what let you write elements as markup, which is how this site's examples
-and the framework's own are written.
+right, because the packages ship `exports` maps. The two `jsx` lines let
+you write elements as markup, which is how this site's examples are
+written.
 
 ```json
 {
@@ -146,9 +149,9 @@ import { App } from './App';
 renderRoot(App);
 ```
 
-A component class cannot cross `postMessage`, which is why the root is
-named inside the worker rather than passed to it. That one constraint
-is the reason for the second file.
+A component cannot cross `postMessage`, which is why the root is named
+inside the worker rather than passed to it. That one constraint is the
+reason for the second file.
 
 **Single-thread** mounts the same tree on the calling thread:
 

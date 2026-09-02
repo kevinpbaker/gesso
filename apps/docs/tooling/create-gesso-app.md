@@ -88,10 +88,10 @@ that are not there.
 ## No Electrobun template yet
 
 `--template electrobun` prints why and creates nothing. The adapter
-`@gesso/electrobun` is roadmap E1 and has not been written, so the
-template would scaffold a project with nothing to depend on. The
-application code is the same either way: an Electrobun window is a
-webview, and a Gesso app inside one is the app you already have.
+`@gesso/electrobun` has not been written, so the template would scaffold
+a project with nothing to depend on. The application code is the same
+either way: an Electrobun window is a webview, and a Gesso app inside
+one is the app you already have.
 
 ## Checking it still works
 

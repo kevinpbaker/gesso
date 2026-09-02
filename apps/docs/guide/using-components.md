@@ -57,9 +57,9 @@ shows what you give it; hand it `defaultValue` and it keeps its own:
 <TextInput label="Email" defaultValue="you@example.com" />
 ```
 
-A controlled input given no `onChange` does not move, which is the same
-thing `readOnly` does and for the same reason, which is that nothing
-wrote the value back.
+A controlled input given no `onChange` does not move, because nothing
+writes the value back. That is the same effect `readOnly` has, for the
+same reason.
 
 ## The five tiers
 
@@ -87,14 +87,13 @@ at every call site. What they do take is layout:
 ```
 
 They also take `rootModifiers`, which attaches behaviour to the
-component's own root rather than to a box wrapped around it. That is what a modifier
-needs in order to see the control's real geometry: a `measure` on a
-wrapper reports the wrapper.
+component's own root rather than to a box wrapped around it. That is
+what a modifier needs in order to see the control's real geometry: a
+`measure` on a wrapper reports the wrapper.
 
-Pass a modifier value that keeps its identity, declared once at module
-scope rather than constructed in the call, because a modifier's
-arguments are compared by identity and a fresh one detaches and
-re-attaches every frame.
+Declare a modifier once at module scope rather than constructing it in
+the call. A modifier's arguments are compared by identity, so a fresh
+one detaches and re-attaches every frame.
 
 If a control needs to look different from the rest of the application,
 the answer is a different theme in the environment for that subtree, not

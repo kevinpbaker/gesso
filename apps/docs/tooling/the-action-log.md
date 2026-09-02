@@ -45,10 +45,10 @@ const dataWorker = actions.tap(
 const app = createApp(AppRoot).useChannel(Notes, { worker: dataWorker }).useChannel(Settings, { worker: dataWorker });
 ```
 
-A channel fed from this thread rather than from a worker is tapped with
-`tapPort` instead: `createChannelRegistry` builds the pair for a
-`source` registration itself and hands out neither end, so provide it
-by hand over a `MessageChannel` and register the tapped end.
+A channel served from this thread rather than from a worker is tapped
+with `tapPort` instead. Registering a `source` directly gives you no
+port to tap, so serve it over a `MessageChannel` of your own and
+register the tapped end.
 
 Standing on the wire rather than hooking a callback is what makes the
 second half work. A callback could only watch, and going back to a step
