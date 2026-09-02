@@ -74,10 +74,10 @@ and a bind group per frame and free neither promptly.
 So `UiVideoSurface` has a stable identity for the life of the playback,
 and a `version` that counts frames:
 
-| Field    | What it is                                             |
-| -------- | ------------------------------------------------------ |
-| `frame`  | The picture to draw now, or null before the first one   |
-| `version` | Bumped on every new frame; a cache re-uploads when it changes |
+| Field             | What it is                                                       |
+| ----------------- | ---------------------------------------------------------------- |
+| `frame`           | The picture to draw now, or null before the first one            |
+| `version`         | Bumped on every new frame; a cache re-uploads when it changes    |
 | `width`, `height` | The picture's size, known from the container before any frame is |
 
 The WebGPU backend compares versions and re-uploads into the texture it
@@ -126,10 +126,10 @@ WebCodecs decodes; it does not demux. Getting `EncodedVideoChunk`s out
 of a file means walking MP4's sample tables, which `Mp4Demuxer` does in
 about 500 lines rather than through a dependency.
 
-| Reads                                                                    | Does not read                                                     |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Reads                                                                                                       | Does not read                                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | Progressive MP4: `stsd` with `avcC` or `hvcC`, `stts`, `ctts`, `stsc`, `stsz`/`stz2`, `stco`/`co64`, `stss` | Fragmented MP4 (`moof`/`traf`/`trun`), which is what DASH and HLS segments are |
-| Samples in decode order, which `VideoDecoder` reorders on the way out     | Audio, because nothing on this side of the framework could play it |
+| Samples in decode order, which `VideoDecoder` reorders on the way out                                       | Audio, because nothing on this side of the framework could play it             |
 
 A fragmented file is detected and named, with a message saying how to
 remux, rather than parsed into silence: a demuxer returning zero samples

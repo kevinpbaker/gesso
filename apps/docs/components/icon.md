@@ -31,17 +31,17 @@ that uses them:
 
 ## Props
 
-| Prop          | Type                  | Default             | What it does                                                                     |
-| ------------- | --------------------- | ------------------- | ---------------------------------------------------------------------------------- |
-| `path`        | `string`              | required            | SVG path data, in the coordinates of `viewBox`.                                  |
-| `viewBox`     | `number`              | `24`                | The side of the square the path was authored in. 24 is the usual icon grid.      |
-| `size`        | `number`              | `16`                | The side of the box the icon occupies, in logical pixels.                        |
-| `color`       | `UiColorValue`        | `controlForeground` | A palette name or a colour outright.                                             |
-| `style`       | `'fill' \| 'stroke'`  | `'fill'`            | A solid glyph, or a line one.                                                    |
-| `strokeWidth` | `number`              | `2`                 | Line width for a stroked icon, in `viewBox` units rather than pixels.            |
-| `fillRule`    | `'nonzero' \| 'evenodd'` | `'nonzero'`      | Which points a filled path encloses.                                             |
-| `label`       | `string`              | none                | What a screen reader reads. Omitting it makes the icon decorative.               |
-| `ref`         | `UiNodeRef`           | none                | Receives the node the glyph is drawn on.                                         |
+| Prop          | Type                     | Default             | What it does                                                                |
+| ------------- | ------------------------ | ------------------- | --------------------------------------------------------------------------- |
+| `path`        | `string`                 | required            | SVG path data, in the coordinates of `viewBox`.                             |
+| `viewBox`     | `number`                 | `24`                | The side of the square the path was authored in. 24 is the usual icon grid. |
+| `size`        | `number`                 | `16`                | The side of the box the icon occupies, in logical pixels.                   |
+| `color`       | `UiColorValue`           | `controlForeground` | A palette name or a colour outright.                                        |
+| `style`       | `'fill' \| 'stroke'`     | `'fill'`            | A solid glyph, or a line one.                                               |
+| `strokeWidth` | `number`                 | `2`                 | Line width for a stroked icon, in `viewBox` units rather than pixels.       |
+| `fillRule`    | `'nonzero' \| 'evenodd'` | `'nonzero'`         | Which points a filled path encloses.                                        |
+| `label`       | `string`                 | none                | What a screen reader reads. Omitting it makes the icon decorative.          |
+| `ref`         | `UiNodeRef`              | none                | Receives the node the glyph is drawn on.                                    |
 
 `size` sets the box as well as the raster, and `flexShrink` is fixed at
 zero, so an icon in a tight row keeps its size and something else gives
@@ -92,8 +92,8 @@ hover and the press.
 ## Semantics
 
 | What   | Value                                                             |
-| ------ | ------------------------------------------------------------------- |
-| Role   | `image`, when `label` was given, on the box the glyph is drawn on  |
+| ------ | ----------------------------------------------------------------- |
+| Role   | `image`, when `label` was given, on the box the glyph is drawn on |
 | Name   | `label`                                                           |
 | States | None. A glyph has nothing to be                                   |
 | Value  | None                                                              |

@@ -12,6 +12,8 @@
   "ignorePatterns": [
     "dist/",
     "api/",
+    "apps/docs/reference/properties.md",
+    "apps/docs/reference/api.md",
     "build/",
     "out/",
     "public/build/",

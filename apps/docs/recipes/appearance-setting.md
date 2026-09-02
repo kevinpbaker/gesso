@@ -47,7 +47,7 @@ inherits, so an unchanged answer that still emitted would rebind the
 whole subtree. Both inputs re-emit on their own schedule, so without
 it that happens for real.
 
-Where the setting is *stored* is not the framework's business and this
+Where the setting is _stored_ is not the framework's business and this
 example does not pretend otherwise: it holds the choice in an
 `internalState`, which lasts as long as the screen. A real application
 puts it wherever its other preferences live, which is a service when
@@ -71,7 +71,7 @@ in full.
 Two details are easy to get wrong.
 
 **`textStyle` has to go with it.** A theme's palette answers a colour
-*token*, so `color="text"` follows the theme. Text that names no
+_token_, so `color="text"` follows the theme. Text that names no
 colour at all takes its colour from the type scale in the environment
 instead, so a root that provides only `theme` leaves every unstyled
 line painting the light theme's black on a dark background. The spec

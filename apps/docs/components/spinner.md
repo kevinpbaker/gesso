@@ -20,11 +20,11 @@ has no value, because it has none to have.
 
 ## Props
 
-| Prop    | Type           | Default         | What it does                                                 |
-| ------- | -------------- | --------------- | -------------------------------------------------------------- |
-| `size`  | `number`       | `20`            | The side of the square it occupies, in logical pixels.       |
-| `label` | `string`       | `'Loading'`     | What a screen reader reads while it turns.                   |
-| `color` | `UiColorValue` | `controlAccent` | A palette name or a colour outright, for the blades.         |
+| Prop    | Type           | Default         | What it does                                           |
+| ------- | -------------- | --------------- | ------------------------------------------------------ |
+| `size`  | `number`       | `20`            | The side of the square it occupies, in logical pixels. |
+| `label` | `string`       | `'Loading'`     | What a screen reader reads while it turns.             |
+| `color` | `UiColorValue` | `controlAccent` | A palette name or a colour outright, for the blades.   |
 
 `size` fixes the box and `flexShrink` is zero, so a spinner in a tight
 row keeps its size. The layout props on
@@ -81,11 +81,11 @@ through the control that started it.
 ## Semantics
 
 | What   | Value                                                          |
-| ------ | ---------------------------------------------------------------- |
+| ------ | -------------------------------------------------------------- |
 | Role   | `status`, on the square that turns                             |
 | Name   | `label`, which is `Loading` when none was given                |
-| States | `busy`, always. A spinner that is not busy should not be drawn  |
-| Value  | None. It cannot say how far along the work is                   |
+| States | `busy`, always. A spinner that is not busy should not be drawn |
+| Value  | None. It cannot say how far along the work is                  |
 
 A spinner with no label is still announced, which is the opposite of
 what an [image](/components/image) or an [icon](/components/icon) does

@@ -27,15 +27,15 @@ real MP4 needs a browser: see the limits below.
 
 ## Props
 
-| Prop           | Type                                       | Default   | What it does                                                                              |
-| -------------- | ------------------------------------------ | --------- | ------------------------------------------------------------------------------------------- |
-| `src`          | `string`                                   | required  | What the video resolver is asked for. Read once, when the component is built.             |
-| `alt`          | `string`                                   | none      | What a screen reader reads. Omitting it makes the video decorative.                       |
-| `objectFit`    | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'` | How each frame meets a box that is not its shape.                                         |
-| `borderRadius` | `number`                                   | `0`       | Rounds the box, and clips the picture to it.                                              |
-| `loop`         | `boolean`                                  | `true`    | Start again at the beginning when the clip ends.                                          |
-| `autoplay`     | `boolean`                                  | `true`    | Start playing as soon as the clip is ready. `false` shows one frame and stays on it.      |
-| `ref`          | `UiNodeRef`                                | none      | Receives the node the frames are drawn on.                                                |
+| Prop           | Type                                       | Default   | What it does                                                                         |
+| -------------- | ------------------------------------------ | --------- | ------------------------------------------------------------------------------------ |
+| `src`          | `string`                                   | required  | What the video resolver is asked for. Read once, when the component is built.        |
+| `alt`          | `string`                                   | none      | What a screen reader reads. Omitting it makes the video decorative.                  |
+| `objectFit`    | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'` | How each frame meets a box that is not its shape.                                    |
+| `borderRadius` | `number`                                   | `0`       | Rounds the box, and clips the picture to it.                                         |
+| `loop`         | `boolean`                                  | `true`    | Start again at the beginning when the clip ends.                                     |
+| `autoplay`     | `boolean`                                  | `true`    | Start playing as soon as the clip is ready. `false` shows one frame and stays on it. |
+| `ref`          | `UiNodeRef`                                | none      | Receives the node the frames are drawn on.                                           |
 
 That is the whole control surface. There is no play method, no pause,
 no seek and no time you can read: a `Video` is a declaration that this
@@ -123,12 +123,12 @@ it.
 
 ## Semantics
 
-| What   | Value                                                            |
-| ------ | ------------------------------------------------------------------ |
+| What   | Value                                                             |
+| ------ | ----------------------------------------------------------------- |
 | Role   | `image`, when `alt` was given, on the box the frames are drawn on |
-| Name   | `alt`                                                            |
-| States | None. Playing is not a state anything is told about              |
-| Value  | None                                                             |
+| Name   | `alt`                                                             |
+| States | None. Playing is not a state anything is told about               |
+| Value  | None                                                              |
 
 `image` rather than a role of its own, because that is what the record
 says about a rectangle showing a picture, and because a screen reader

@@ -48,11 +48,11 @@ storage layer and its domain models never reach the thread that draws.
 
 ## Where each half runs
 
-| Thread            | Holds                                                                                    |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| Shell (main)      | the canvas, input forwarding, and the platform APIs that exist only there                |
+| Thread             | Holds                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| Shell (main)       | the canvas, input forwarding, and the platform APIs that exist only there                 |
 | Application worker | api, storage, domain models, view models. Plain RxJS, no framework import above `provide` |
-| Render worker     | components, layout, input dispatch, rasterization, and the channel replicas               |
+| Render worker      | components, layout, input dispatch, rasterization, and the channel replicas               |
 
 The application layer is a worker rather than the main thread for a
 specific reason: `FileSystemSyncAccessHandle`, the fast OPFS path and
@@ -77,11 +77,11 @@ waits for the click; the frames and the data never notice.
 Where a channel's data lives is decided at registration and nowhere
 else. The view above it never learns which arrangement it got.
 
-| Registration                      | Where the data lives                           |
-| --------------------------------- | ---------------------------------------------- |
-| `.useChannel(Tasks)`              | the application worker the shell spawned       |
-| `.useChannel(Tasks, { worker })`  | a worker of this channel's own                 |
-| `.useChannel(Tasks, { source })`  | this thread, over a `MessageChannel` to itself |
+| Registration                     | Where the data lives                           |
+| -------------------------------- | ---------------------------------------------- |
+| `.useChannel(Tasks)`             | the application worker the shell spawned       |
+| `.useChannel(Tasks, { worker })` | a worker of this channel's own                 |
+| `.useChannel(Tasks, { source })` | this thread, over a `MessageChannel` to itself |
 
 A `WorkerHandle` shared between registrations puts those channels in
 one worker, which is the arrangement the barrier exists for: api,
@@ -112,10 +112,10 @@ nobody is watching costs nothing. When a key emits, its new value is
 compared against what the other side is known to hold and the
 difference is posted as patches.
 
-| Patch    | Says                                                     |
-| -------- | -------------------------------------------------------- |
-| `set`    | this path now holds this value                           |
-| `delete` | this key or index is gone                                |
+| Patch    | Says                                                      |
+| -------- | --------------------------------------------------------- |
+| `set`    | this path now holds this value                            |
+| `delete` | this key or index is gone                                 |
 | `splice` | this array changed length here, and here is what is in it |
 
 Paths are relative to the key's own root, so a patch is
@@ -148,12 +148,12 @@ touching one key three times emits once.
 
 ## The wire is a port and four messages
 
-| Direction    | Message                             | Carries                        |
-| ------------ | ----------------------------------- | ------------------------------ |
-| view → data  | `channel:sync`                      | nothing: "send me everything"  |
-| view → data  | `channel:command`                   | a command name and one payload |
-| data → view  | `channel:patch`                     | a batch of patches             |
-| data → view  | `channel:error`                     | a message and a stack          |
+| Direction   | Message           | Carries                        |
+| ----------- | ----------------- | ------------------------------ |
+| view → data | `channel:sync`    | nothing: "send me everything"  |
+| view → data | `channel:command` | a command name and one payload |
+| data → view | `channel:patch`   | a batch of patches             |
+| data → view | `channel:error`   | a message and a stack          |
 
 The replica asks for a sync rather than waiting to be pushed to, so
 neither end depends on which finished starting up first, and a
@@ -200,11 +200,11 @@ tab is open stays in a cell or a service.
 
 The test is not how important the value is:
 
-| The value                                           | Where it belongs        |
-| --------------------------------------------------- | ----------------------- |
-| Written by an event handler, dies with the component | `internalState`         |
-| Shared between screens, never leaves the thread     | a service               |
-| Authoritative, outlives a screen, or is on another thread | a channel         |
+| The value                                                 | Where it belongs |
+| --------------------------------------------------------- | ---------------- |
+| Written by an event handler, dies with the component      | `internalState`  |
+| Shared between screens, never leaves the thread           | a service        |
+| Authoritative, outlives a screen, or is on another thread | a channel        |
 
 ## Limits
 

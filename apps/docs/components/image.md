@@ -29,13 +29,13 @@ object.
 
 ## Props
 
-| Prop           | Type                                       | Default   | What it does                                                                                 |
-| -------------- | ------------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- |
-| `src`          | `string`                                   | required  | What the resolver is asked for. Read once, when the component is built.                      |
-| `alt`          | `string`                                   | none      | What a screen reader reads. Omitting it makes the picture decorative.                        |
-| `objectFit`    | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'` | How the bitmap meets a box that is not its shape.                                            |
-| `borderRadius` | `number`                                   | `0`       | Rounds the box, and clips the picture to it.                                                 |
-| `ref`          | `UiNodeRef`                                | none      | Receives the node the picture is drawn on, for measuring it or anchoring something to it.    |
+| Prop           | Type                                       | Default   | What it does                                                                              |
+| -------------- | ------------------------------------------ | --------- | ----------------------------------------------------------------------------------------- |
+| `src`          | `string`                                   | required  | What the resolver is asked for. Read once, when the component is built.                   |
+| `alt`          | `string`                                   | none      | What a screen reader reads. Omitting it makes the picture decorative.                     |
+| `objectFit`    | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'` | How the bitmap meets a box that is not its shape.                                         |
+| `borderRadius` | `number`                                   | `0`       | Rounds the box, and clips the picture to it.                                              |
+| `ref`          | `UiNodeRef`                                | none      | Receives the node the picture is drawn on, for measuring it or anchoring something to it. |
 
 `src` is read once because a component's body runs once, and an image
 whose source changed is a different image: give it a `key` that changes
@@ -113,8 +113,8 @@ that names the source does try again.
 
 ## Fits
 
-| `objectFit` | What it does                                                              |
-| ----------- | --------------------------------------------------------------------------- |
+| `objectFit` | What it does                                                               |
+| ----------- | -------------------------------------------------------------------------- |
 | `cover`     | Fills the box and crops what does not fit. The default, and usually right. |
 | `contain`   | Fits the whole picture inside the box and leaves the rest empty.           |
 | `fill`      | Stretches to the box, changing the picture's shape.                        |
@@ -132,12 +132,12 @@ in rather than becoming a text selection.
 
 ## Semantics
 
-| What   | Value                                                                   |
-| ------ | ------------------------------------------------------------------------- |
-| Role   | `image`, when `alt` was given, on the box the picture is drawn on        |
-| Name   | `alt`                                                                   |
-| States | None. A picture has nothing to be                                       |
-| Value  | None                                                                    |
+| What   | Value                                                             |
+| ------ | ----------------------------------------------------------------- |
+| Role   | `image`, when `alt` was given, on the box the picture is drawn on |
+| Name   | `alt`                                                             |
+| States | None. A picture has nothing to be                                 |
+| Value  | None                                                              |
 
 An `Image` with no `alt` has no role and no name, so it is not in the
 semantics tree at all. That is ARIA's rule for a decorative picture and

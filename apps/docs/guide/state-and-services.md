@@ -11,13 +11,13 @@ value something on another thread is authoritative about.
 
 There are two places for it, and one question picks between them.
 
-| What the value is                                   | Where it goes                                                       |
-| --------------------------------------------------- | -------------------------------------------------------------------- |
-| One component's own                                 | `internalState` in the body                                         |
-| A component's and its children's                    | The same cell, passed down as a prop                                |
-| A whole subtree's, without prop drilling            | An environment value, the way `theme` is provided                   |
+| What the value is                                    | Where it goes                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------- |
+| One component's own                                  | `internalState` in the body                                         |
+| A component's and its children's                     | The same cell, passed down as a prop                                |
+| A whole subtree's, without prop drilling             | An environment value, the way `theme` is provided                   |
 | Shared between screens, and never leaving the thread | A **service**: a class the runtime constructs once and hands out    |
-| Owned elsewhere, or outliving the screen            | A **channel**: a declared barrier with data on the other side of it |
+| Owned elsewhere, or outliving the screen             | A **channel**: a declared barrier with data on the other side of it |
 
 The last two rows are this page. The test between them is not how
 important the value is; it is whether it crosses a thread.

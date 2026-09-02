@@ -21,13 +21,13 @@ present or absent.
 
 ## Props
 
-| Prop        | Type     | Default      | What it does                                                              |
-| ----------- | -------- | ------------ | ---------------------------------------------------------------------------- |
-| `value`     | `number` | none         | The work done so far. Omitting it makes the bar indeterminate.            |
-| `min`       | `number` | `0`          | The bottom of the range the value is measured against.                    |
-| `max`       | `number` | `1`          | The top of it.                                                            |
-| `label`     | `string` | `'Progress'` | What a screen reader reads.                                               |
-| `thickness` | `number` | `6`          | The height of the track, and the radius of both its ends.                 |
+| Prop        | Type     | Default      | What it does                                                   |
+| ----------- | -------- | ------------ | -------------------------------------------------------------- |
+| `value`     | `number` | none         | The work done so far. Omitting it makes the bar indeterminate. |
+| `min`       | `number` | `0`          | The bottom of the range the value is measured against.         |
+| `max`       | `number` | `1`          | The top of it.                                                 |
+| `label`     | `string` | `'Progress'` | What a screen reader reads.                                    |
+| `thickness` | `number` | `6`          | The height of the track, and the radius of both its ends.      |
 
 The bar has no width of its own: it fills what it is given, so pass a
 `width` or a `flex`. The rest of the layout props on
@@ -79,12 +79,12 @@ thing entirely.
 
 ## Semantics
 
-| What     | Value                                                                    |
-| -------- | -------------------------------------------------------------------------- |
-| Role     | `progressbar`, on the track                                              |
-| Name     | `label`, which is `Progress` when none was given                         |
-| Value    | `value`, `min` and `max` while determinate; none of the three otherwise  |
-| States   | `busy` while indeterminate, and nothing while determinate                |
+| What   | Value                                                                   |
+| ------ | ----------------------------------------------------------------------- |
+| Role   | `progressbar`, on the track                                             |
+| Name   | `label`, which is `Progress` when none was given                        |
+| Value  | `value`, `min` and `max` while determinate; none of the three otherwise |
+| States | `busy` while indeterminate, and nothing while determinate               |
 
 An indeterminate bar omits its value rather than reporting zero. That
 is ARIA's rule and it is the right one: zero is a stronger and

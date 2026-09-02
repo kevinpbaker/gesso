@@ -35,13 +35,13 @@ is on.
 
 ## What the resolver guarantees
 
-| Guarantee                                  | What it means for an app                                                                       |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| One fetch and one decode per source        | Five `Image`s on one URL share one bitmap, whether or not their requests overlap in time         |
-| Reference counting first, LRU second       | A bitmap something on screen is holding is never evicted, however long the queue gets            |
-| A released bitmap stays cached             | Scrolling a list back and forth does not re-fetch, up to the capacity, which is 32 by default    |
-| Eviction closes the bitmap                 | An `ImageBitmap` holds decoded pixels and garbage collection is not prompt about them            |
-| A failure is not cached                    | The next caller tries again instead of inheriting a rejection forever                            |
+| Guarantee                            | What it means for an app                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| One fetch and one decode per source  | Five `Image`s on one URL share one bitmap, whether or not their requests overlap in time      |
+| Reference counting first, LRU second | A bitmap something on screen is holding is never evicted, however long the queue gets         |
+| A released bitmap stays cached       | Scrolling a list back and forth does not re-fetch, up to the capacity, which is 32 by default |
+| Eviction closes the bitmap           | An `ImageBitmap` holds decoded pixels and garbage collection is not prompt about them         |
+| A failure is not cached              | The next caller tries again instead of inheriting a rejection forever                         |
 
 The first row is what the example above measures: four fitted boxes and
 the card are five `Image`s pointed at one file, and the spec asserts one
@@ -119,12 +119,12 @@ const ui = renderTest(createComponent(Gallery, {}), { media: { resolver } });
 `objectFit` is a property of the node, resolved in `PaintState` and
 applied identically by both backends:
 
-| Value     | What is drawn                                                            |
-| --------- | ------------------------------------------------------------------------ |
-| `fill`    | The box exactly, whatever that does to the picture's shape                |
-| `cover`   | Scaled until both sides are covered, centred, and cropped by the box      |
+| Value     | What is drawn                                                              |
+| --------- | -------------------------------------------------------------------------- |
+| `fill`    | The box exactly, whatever that does to the picture's shape                 |
+| `cover`   | Scaled until both sides are covered, centred, and cropped by the box       |
 | `contain` | Scaled until both sides fit, centred, leaving the box's colour at the ends |
-| `none`    | The picture's own size, from the box's top left                           |
+| `none`    | The picture's own size, from the box's top left                            |
 
 `fill` is the property's default when nothing sets it, and `cover` is
 what the `Image` component passes when you do not. The picture is

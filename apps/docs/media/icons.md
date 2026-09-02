@@ -17,15 +17,15 @@ icons follow it:
 
 ## What an icon is
 
-| Field         | What it says                                                              |
-| ------------- | ------------------------------------------------------------------------- |
-| `path`        | SVG path data, in the coordinates of the viewBox                          |
-| `viewBox`     | The side of the square the path was authored in. 24 is the usual grid      |
-| `size`        | The side of the box the icon occupies, in logical pixels                   |
-| `color`       | A palette name or a literal colour                                        |
-| `style`       | `fill` for a solid glyph, `stroke` for a line one                         |
-| `strokeWidth` | Line width for a stroked icon, in viewBox units rather than pixels        |
-| `fillRule`    | Which points a filled path encloses: `nonzero` or `evenodd`               |
+| Field         | What it says                                                          |
+| ------------- | --------------------------------------------------------------------- |
+| `path`        | SVG path data, in the coordinates of the viewBox                      |
+| `viewBox`     | The side of the square the path was authored in. 24 is the usual grid |
+| `size`        | The side of the box the icon occupies, in logical pixels              |
+| `color`       | A palette name or a literal colour                                    |
+| `style`       | `fill` for a solid glyph, `stroke` for a line one                     |
+| `strokeWidth` | Line width for a stroked icon, in viewBox units rather than pixels    |
+| `fillRule`    | Which points a filled path encloses: `nonzero` or `evenodd`           |
 
 Those seven are `IconSpec`, which is the rasteriser's whole vocabulary,
 and they are also the identity of a raster: two icons agreeing on all

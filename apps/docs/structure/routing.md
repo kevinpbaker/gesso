@@ -33,11 +33,11 @@ segment by segment, so `/notebooks` cannot claim `/notes` as its
 parent. The cost is that a nested path repeats its parent's prefix,
 and that is the price being paid for the params.
 
-| In a pattern | Means                                            |
-| ------------ | ------------------------------------------------ |
-| `notes`      | that literal segment                             |
-| `:id`        | one segment, captured as `id`                    |
-| `/*`         | the rest of the path, captured as `rest`         |
+| In a pattern | Means                                    |
+| ------------ | ---------------------------------------- |
+| `notes`      | that literal segment                     |
+| `:id`        | one segment, captured as `id`            |
+| `/*`         | the rest of the path, captured as `rest` |
 
 Nothing else is special: no regular expressions, no optional segments,
 no repeats. A pattern whose params the compiler cannot name would give
@@ -82,16 +82,16 @@ A route whose path declares no params takes no second argument at all,
 which is what makes `go(Home, { id: '1' })` an error instead of a
 silent no-op.
 
-| On `RouterService`         | What it gives                                                   |
-| -------------------------- | --------------------------------------------------------------- |
-| `go(route, params?)`       | Navigates, with the params the path declares                    |
-| `navigate(url)`            | Navigates to a url, as a link would                             |
-| `back()`, `forward()`      | Walks the history the shell holds                               |
-| `url`                      | The current url, path and query, as a cell to bind              |
-| `match`                    | What that url resolved to, or null                              |
-| `params(route)`            | The params of the current match, typed, or null                 |
-| `observeParams(route)`     | The same as an Observable, for binding a title or a field       |
-| `isActive(route)`          | True while that route is anywhere in the chain, for a nav item  |
+| On `RouterService`     | What it gives                                                  |
+| ---------------------- | -------------------------------------------------------------- |
+| `go(route, params?)`   | Navigates, with the params the path declares                   |
+| `navigate(url)`        | Navigates to a url, as a link would                            |
+| `back()`, `forward()`  | Walks the history the shell holds                              |
+| `url`                  | The current url, path and query, as a cell to bind             |
+| `match`                | What that url resolved to, or null                             |
+| `params(route)`        | The params of the current match, typed, or null                |
+| `observeParams(route)` | The same as an Observable, for binding a title or a field      |
+| `isActive(route)`      | True while that route is anywhere in the chain, for a nav item |
 
 `go` takes `{ query }` for what follows the `?`, and both `go` and
 `navigate` take `{ replace: true }` to overwrite the current history
@@ -165,11 +165,11 @@ is at, once at start-up and again for every back, forward or typed
 address, and it performs the pushes the router asks for. It holds no
 routes and resolves nothing.
 
-| Mode     | Where the url lives                                          |
-| -------- | ------------------------------------------------------------ |
-| `path`   | `pushState` against the document's path. The default         |
-| `hash`   | the fragment, after an optional `base`                       |
-| `memory` | nowhere. No window involvement at all                        |
+| Mode     | Where the url lives                                  |
+| -------- | ---------------------------------------------------- |
+| `path`   | `pushState` against the document's path. The default |
+| `hash`   | the fragment, after an optional `base`               |
+| `memory` | nowhere. No window involvement at all                |
 
 `hash` mode is for an application sharing a page with something else
 that owns the path, and for a static host that will not rewrite unknown
