@@ -205,13 +205,40 @@ describe('RenderWorkerApp', () => {
     expect(error && 'source' in error && error.source).toBe('message');
   });
 
-  it('reports what threw outside a message, which is where a frame throws', () => {
+  it('reports a frame that threw under a forwarded tick, which `receive` does see', () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    const canvas = createMockCanvas();
+    const ctx = canvas.getContext('2d') as unknown as { fillText: () => void };
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+    send(initMessage(canvas));
+
+    // Paint is the last phase of a frame, so a canvas call that throws
+    // is a throw inside the frame and nowhere else. Nothing has been
+    // awaited, so no timer has run: this frame can only be the one the
+    // tick delivers.
+    ctx.fillText = () => {
+      throw new Error('paint exploded');
+    };
+    expect(() => send({ type: 'tick', time: 16 })).not.toThrow();
+
+    // `UiHostFrameClock.tick` delivers the frame synchronously, so the
+    // whole frame runs inside `receive`'s try and comes back labelled
+    // `message`. This is what a frame throws as whenever the shell is
+    // forwarding refreshes, which is every frame of a healthy app.
+    const error = sent.find(m => m.type === 'error');
+    expect(error).toBeDefined();
+    expect(error && 'message' in error && error.message).toBe('paint exploded');
+    expect(error && 'source' in error && error.source).toBe('message');
+  });
+
+  it('reports what threw outside any message handler', () => {
     const { host, sent, emit } = createFakeWorkerGlobal();
     new RenderWorkerApp(createComponent(WorkerRoot), host);
 
-    // A component that throws while rendering throws into the timer
-    // task that armed the frame, never into `receive`. Without this
-    // listener the page hears nothing at all.
+    // Module-scope work, a callback armed by something other than the
+    // shell, and the self-paced frames `UiHostFrameClock` runs from its
+    // own timer when no tick has arrived yet or the shell's thread is
+    // blocked. Without this listener the page hears none of them.
     emit('error', { error: new Error('frame exploded'), message: 'Uncaught Error: frame exploded' });
 
     const error = sent.find(m => m.type === 'error');
