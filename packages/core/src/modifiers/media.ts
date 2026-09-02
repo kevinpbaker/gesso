@@ -1,4 +1,7 @@
+import { combineLatest, distinctUntilChanged, isObservable, of, type Observable } from 'rxjs';
+
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
+import type { Reactive } from '../composition/UiElementProps';
 import type { UiColorValue } from '../properties/UiPropertyValues';
 import { resolveColorValue } from '../properties/UiThemeColor';
 import type { UiImage } from '../properties/UiImage';
@@ -8,56 +11,58 @@ import { defineModifier } from './UiModifier';
 import type { UiModifierHost } from './UiModifierHost';
 
 /**
- * The Media tier's two writers of the `image` property.
- *
- * Both are modifiers rather than subscriptions taken in a component
- * body, for the reason `decisions/0026` gives for `lazySource`: a
- * modifier's lifetime is exactly its node's. `host.own` releases the
- * decoded bitmap inside `removeSubtree`, so a list that scrolls a
- * thousand thumbnails past cannot leave a thousand of them held by an
- * application observable after their rows are gone — and an image is
- * the one thing in this framework where a leak is measured in
- * megabytes rather than in listeners.
+ * A value or an Observable of one, as one Observable. The media
+ * modifiers take their arguments this way so an `Image` whose `src` is
+ * bound to a cell follows it, rather than reading it once at attach.
  */
+function follow<T>(value: Reactive<T>): Observable<T> {
+  return isObservable(value) ? (value as Observable<T>) : of(value);
+}
 
 export interface ImageSourceArgs {
   readonly resolver: ImageResolver;
-  readonly source: string;
-  /** Told when the load finishes or fails, for a placeholder or an error slot. */
+  /** The url to resolve; an Observable is followed, and each new url replaces the last. */
+  readonly source: Reactive<string>;
   readonly onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 
 /**
- * Resolves a source and writes the bitmap onto the node's `image`.
+ * Resolves a source to a bitmap and writes it onto the node's `image`.
  *
- * The write goes through the override cascade, so detaching restores
- * whatever the element declared — which for an `Image` is nothing, and
- * so the property is removed rather than set to a stale bitmap.
+ * The source may be an Observable. Each distinct url it emits releases
+ * the one before and starts a new load, so an `Image` bound to a cell
+ * shows whatever the cell says rather than what it said when the node
+ * was built. A load that has been superseded is dropped when it
+ * arrives, never written.
  */
 export const imageSource = defineModifier<ImageSourceArgs>({
   name: 'imageSource',
   attach(host, args) {
-    load(host, args);
-  },
-  update(host, args, previous) {
-    if (args.resolver === previous.resolver && args.source === previous.source) {
-      return;
-    }
-    previous.resolver.release(previous.source);
-    load(host, args);
-  },
-  detach() {
-    // The release is registered with `own`, so it runs here whether the
-    // node was removed or the modifier merely left the list.
+    let release: (() => void) | null = null;
+    const subscription = follow(args.source)
+      .pipe(distinctUntilChanged())
+      .subscribe(source => {
+        release?.();
+        release = load(host, args, source);
+      });
+    host.own(() => {
+      subscription.unsubscribe();
+      release?.();
+      release = null;
+    });
   }
+  // No `update`: a changed args object is a detach and an attach, which
+  // is right, because the resolver or the whole source stream changed.
+  // A changed *url* inside the stream is handled above.
 });
 
-function load(host: UiModifierHost, args: ImageSourceArgs): void {
+/** Starts one load, and returns what undoes it: the in-flight result is dropped and the bitmap released. */
+function load(host: UiModifierHost, args: ImageSourceArgs, source: string): () => void {
   let live = true;
   args.onState?.('loading');
   host.clear('image');
   args.resolver
-    .resolve(args.source)
+    .resolve(source)
     .then((bitmap: UiImage) => {
       if (!live) {
         return;
@@ -71,23 +76,23 @@ function load(host: UiModifierHost, args: ImageSourceArgs): void {
       }
       args.onState?.('failed', error);
     });
-  host.own(() => {
+  return () => {
     live = false;
-    args.resolver.release(args.source);
-  });
+    args.resolver.release(source);
+  };
 }
 
 export interface IconSourceArgs {
   readonly rasterizer: IconRasterizer;
-  readonly path: string;
-  readonly viewBox: number;
-  readonly size: number;
+  readonly path: Reactive<string>;
+  readonly viewBox: Reactive<number>;
+  readonly size: Reactive<number>;
   /** A palette name or a literal; resolved against the theme the node inherits. */
-  readonly color: UiColorValue;
-  readonly style: 'fill' | 'stroke';
-  readonly strokeWidth: number;
+  readonly color: Reactive<UiColorValue>;
+  readonly style: Reactive<'fill' | 'stroke'>;
+  readonly strokeWidth: Reactive<number>;
   /** How a filled path decides what is inside it; see `IconSpec.fillRule`. */
-  readonly fillRule?: 'nonzero' | 'evenodd';
+  readonly fillRule?: Reactive<'nonzero' | 'evenodd' | undefined>;
 }
 
 /**
@@ -107,18 +112,31 @@ export const iconSource = defineModifier<IconSourceArgs>({
   attach(host, args) {
     let current: IconSpec | null = null;
     let generation = 0;
+    /** The arguments as last seen; each is followed, so a bound path or colour redraws the glyph. */
+    let seen: {
+      path: string;
+      viewBox: number;
+      size: number;
+      color: UiColorValue;
+      style: 'fill' | 'stroke';
+      strokeWidth: number;
+      fillRule: 'nonzero' | 'evenodd' | undefined;
+    } | null = null;
 
     const render = (): void => {
+      if (seen === null) {
+        return;
+      }
       const theme = host.environment(UiEnvironmentKeys.theme);
-      const color = resolveColorValue(host.node, args.color) ?? theme.colors.text;
+      const color = resolveColorValue(host.node, seen.color) ?? theme.colors.text;
       const spec: IconSpec = {
-        path: args.path,
-        viewBox: args.viewBox,
-        size: args.size,
+        path: seen.path,
+        viewBox: seen.viewBox,
+        size: seen.size,
         color,
-        style: args.style,
-        strokeWidth: args.strokeWidth,
-        fillRule: args.fillRule
+        style: seen.style,
+        strokeWidth: seen.strokeWidth,
+        fillRule: seen.fillRule
       };
       if (current !== null && sameSpec(current, spec)) {
         return;
@@ -143,9 +161,21 @@ export const iconSource = defineModifier<IconSourceArgs>({
       }
     };
 
-    render();
+    const subscription = combineLatest([
+      follow(args.path),
+      follow(args.viewBox),
+      follow(args.size),
+      follow(args.color),
+      follow(args.style),
+      follow(args.strokeWidth),
+      follow(args.fillRule ?? undefined)
+    ]).subscribe(([path, viewBox, size, color, style, strokeWidth, fillRule]) => {
+      seen = { path, viewBox, size, color, style, strokeWidth, fillRule };
+      render();
+    });
     host.onEnvironment(render);
     host.own(() => {
+      subscription.unsubscribe();
       generation++;
       if (current !== null) {
         args.rasterizer.release(current);

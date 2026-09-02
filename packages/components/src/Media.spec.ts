@@ -17,7 +17,8 @@ import {
   IconRasterizer,
   type IconCanvas,
   type IconContext,
-  type UiImage
+  type UiImage,
+  type UiColorValue
 } from '@gesso/core';
 import { Icon, Image, ProgressBar, Spinner } from './Media';
 
@@ -269,6 +270,44 @@ describe('Image', () => {
     expect(node!.properties.get('backgroundColor')).toBe('controlBackground');
   });
 
+  it('follows a src that changes: loads the new picture and releases the old', async () => {
+    const src = new BehaviorSubject('one.png');
+    const fetched: string[] = [];
+    const resolver = new DefaultImageResolver({
+      capacity: 0,
+      fetch: source => {
+        fetched.push(source);
+        return Promise.resolve(new Blob());
+      },
+      decode: () => Promise.resolve(fakeBitmap())
+    });
+    let node: UiNode | null = null;
+    const mounted = renderTest(
+      Column({}, createComponent(Image, { src, alt: 'A', ref: (n: UiNode | null) => (node = n) })),
+      { media: { resolver } }
+    );
+    mounted.frame();
+    await mounted.settle();
+    const first = node!.properties.get('image');
+    expect(first).toBeDefined();
+
+    src.next('two.png');
+    mounted.frame();
+    // The old picture is cleared at once, so a stale one never shows
+    // over a new source, and released; the new one arrives.
+    expect(node!.properties.get('image')).toBeUndefined();
+    await mounted.settle();
+    expect(node!.properties.get('image')).toBeDefined();
+    expect(node!.properties.get('image')).not.toBe(first);
+    expect(fetched).toEqual(['one.png', 'two.png']);
+    expect(resolver.size).toBe(1);
+
+    // The same url again is not a reload.
+    src.next('two.png');
+    mounted.frame();
+    expect(fetched).toEqual(['one.png', 'two.png']);
+  });
+
   it('releases the bitmap when its row leaves the tree', async () => {
     const resolver = new DefaultImageResolver({
       capacity: 0,
@@ -300,6 +339,34 @@ describe('Icon', () => {
   });
   afterEach(() => {
     delete (globalThis as { Path2D?: unknown }).Path2D;
+  });
+
+  it('follows a path and a colour that change, redrawing the glyph in place', async () => {
+    const { rasterizer, fills } = recordingRasterizer();
+    const path = new BehaviorSubject('M0 0h24v24H0z');
+    const color = new BehaviorSubject<UiColorValue>('#ff0000');
+    let node: UiNode | null = null;
+    const mounted = renderTest(
+      Column({}, createComponent(Icon, { path, color, size: 16, ref: (n: UiNode | null) => (node = n) })),
+      { media: { rasterizer } }
+    );
+    mounted.frame();
+    await mounted.settle();
+    expect(fills).toEqual(['#f00']);
+    const before = node!.properties.get('image');
+
+    color.next('#0000ff');
+    mounted.frame();
+    await mounted.settle();
+    expect(fills).toEqual(['#f00', '#00f']);
+    expect(node!.properties.get('image')).not.toBe(before);
+
+    path.next('M12 0L24 24H0z');
+    mounted.frame();
+    await mounted.settle();
+    expect(fills).toEqual(['#f00', '#00f', '#00f']);
+    // The node is the same one throughout: no key, no rebuild.
+    expect(node!.properties.get('image')).toBeDefined();
   });
 
   it('resolves its colour against the theme it inherits, and redraws when that changes', async () => {

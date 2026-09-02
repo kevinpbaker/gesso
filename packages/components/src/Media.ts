@@ -89,12 +89,12 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
   const status = internalState<'loading' | 'loaded' | 'failed'>('loading');
 
   // Built once, in the body, so its identity is stable across renders
-  // and the modifier is never re-attached. The source is read once for
-  // the same reason: a component's body runs once, and an `Image` whose
-  // src changes is a different image — give it a `key`.
+  // and the modifier is never re-attached. The source is the cell
+  // itself, not its value: the modifier follows it, so an `Image` bound
+  // to a `src` that changes shows the new picture and releases the old.
   const source = {
     resolver: store.images,
-    source: props.src.value,
+    source: props.src,
     onState: (next: 'loading' | 'loaded' | 'failed') => (status.value = next)
   };
 
@@ -216,17 +216,21 @@ export interface IconProps extends ControlLayoutProps {
 export function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild {
   const store = ctx.inject(MediaService);
   const label = input(props.label, undefined);
-  const size = props.size.value ?? 16;
+  const size = input(props.size, 16);
 
+  // The cells themselves, not their values: the modifier follows each
+  // one, so a glyph whose path or colour is bound to state redraws when
+  // that state changes, and a caller never needs to key a new `Icon`
+  // to change what it shows.
   const spec = {
     rasterizer: store.icons,
-    path: props.path.value,
-    viewBox: props.viewBox.value ?? 24,
+    path: props.path,
+    viewBox: input(props.viewBox, 24),
     size,
-    color: props.color.value ?? 'controlForeground',
-    style: props.style.value ?? 'fill',
-    strokeWidth: props.strokeWidth.value ?? 2,
-    fillRule: props.fillRule.value ?? 'nonzero'
+    color: input(props.color, 'controlForeground' as UiColorValue),
+    style: input(props.style, 'fill' as const),
+    strokeWidth: input(props.strokeWidth, 2),
+    fillRule: input(props.fillRule, 'nonzero' as const)
   };
 
   return Box({
