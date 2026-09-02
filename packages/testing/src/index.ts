@@ -31,3 +31,4 @@ export { nodesUnder, textProperty } from './queries';
 export type { Queries, RoleQueryOptions, TextMatch } from './queries';
 export { formatTree } from './debug';
 export { renderedFor } from './registry';
+export { serveForTest, type ServedForTest } from './channels';

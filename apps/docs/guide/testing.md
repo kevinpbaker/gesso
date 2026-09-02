@@ -266,6 +266,38 @@ assistive technology can see it.
 | `semanticsTree()`, `querySemantics()` | The whole mirror, and one record or `null`        |
 | `unmount()`                           | Stops the runtime and releases what it holds      |
 
+## The wiring behind a channel
+
+A component reads a channel; an application worker serves one. The
+classes behind the worker, a catalogue, a queue, are plain code with
+their own specs, and `serveForTest` covers what those specs cannot: the
+lines between the classes and the barrier. It takes the same data
+`serveChannels` takes and serves it over a real patch stream with no
+worker, handing back the replicas a screen would bind to.
+
+```ts
+import { serveForTest } from '@gesso/testing';
+
+const catalogue = new Catalogue(offlineApi());
+const queue = new Queue(catalogue);
+const served = serveForTest(transitionsChannels(catalogue, queue));
+const player = served.get(Queue);
+
+player.send.play({ playlistId: '2' });
+await served.settle(() => player.view.current.value !== null);
+
+expect(player.view.playlistId.value).toBe('2');
+expect(served.errors).toEqual([]);
+served.dispose();
+```
+
+`settle` waits for a condition to hold, or for the ports to drain when
+given none. `errors` collects what a served channel reported: a command
+nobody declared, a view key that is not plain data. The arrangement it
+suggests is the one worth adopting: the worker file itself is four lines
+that call a function returning the served channels, and the function is
+what the spec imports.
+
 ## Where this stops
 
 `renderTest` gives you the runtime, and stops exactly at the browser.
