@@ -49,6 +49,21 @@ describe('UiKeyboardController', () => {
     expect(rootKey).toHaveBeenCalledTimes(1);
   });
 
+  it('routes unfocused keys to the node a root getter returns, and bubbles from there', () => {
+    const { h, btn1 } = setup();
+    const keyboard = new UiKeyboardController(h.dispatcher, h.createFocusManager(), () => btn1);
+    const onButton = vi.fn();
+    const onRoot = vi.fn();
+    h.dispatcher.addEventListener(btn1, UiEventType.KeyDown, onButton);
+    h.dispatcher.addEventListener(h.root, UiEventType.KeyDown, onRoot);
+
+    keyboard.keyDown('Escape');
+
+    expect(onButton).toHaveBeenCalledTimes(1);
+    expect(onButton.mock.calls[0][0].target).toBe(btn1);
+    expect(onRoot).toHaveBeenCalledTimes(1);
+  });
+
   it('dispatches KeyUp to the focused node', () => {
     const { h, btn1, focusManager, keyboard } = setup();
     focusManager.focus(btn1);

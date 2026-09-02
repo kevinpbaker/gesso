@@ -114,14 +114,15 @@ describe('the docs pointer and keyboard example', () => {
     expect(readout(ui, /^focus is on /)).toBe('focus is on Second');
   });
 
-  it('sends a key to the focused node, and only there', () => {
+  it('sends a key to the focused node, or to the app root when nothing has focus', () => {
     const ui = surface();
 
-    // Nothing focused: the key goes to the root, which is above the
-    // example's own listener, so the readout does not move.
-    ui.fireEvent.press('ArrowRight');
+    // Nothing focused: the key goes to the application's root, which is
+    // the example's own column, so its listener hears it. That is what
+    // lets an app answer Escape or Space with nothing focused.
+    ui.fireEvent.press('Escape');
     ui.frame();
-    expect(readout(ui, /^last key: /)).toBe('last key: none');
+    expect(readout(ui, /^last key: /)).toBe('last key: Escape');
 
     ui.fireEvent.focus(ui.getByRole('button', { name: 'First' }));
     ui.fireEvent.press('ArrowRight');

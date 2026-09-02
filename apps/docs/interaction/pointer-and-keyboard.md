@@ -175,8 +175,10 @@ expects. Without that rule a tap leaves the tapped node lit for good.
 <<< @/src/examples/PointerExample.tsx#stops
 
 A key is dispatched to the focused node and bubbles from there. With
-nothing focused it goes to the root, so application-level shortcuts
-still work, and a listener partway down the tree hears nothing.
+nothing focused it goes to the application's root element, the one
+`renderRoot` or `createApp` was given, so a listener there answers
+Escape or Space whether or not anything has focus, and a listener
+partway down the tree hears nothing.
 
 After the application's listeners, and only if none of them called
 `preventDefault()`, the runtime applies its own defaults in this order:

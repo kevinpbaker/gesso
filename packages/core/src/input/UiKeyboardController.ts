@@ -37,7 +37,12 @@ export interface KeyboardControllerOptions {
  * KeyDown/KeyUp are dispatched to the focused node and bubble up the
  * tree, so a container can handle keys for its focused child. When
  * nothing is focused, events are routed to the root node so
- * application-level key handling still works.
+ * application-level key handling still works. The root may be given as
+ * a getter, for a host whose root is rebuilt while the controller
+ * lives (a reload) or that wants keys to land on the application's own
+ * root rather than the layout root it is wrapped in: an event
+ * dispatched to a node bubbles to its ancestors, so nothing above the
+ * chosen root is left out.
  *
  * Default behaviour (cancelled by preventDefault on the KeyDown), in
  * order: the focused editable's editing keys, then find's open/close,
@@ -51,12 +56,15 @@ export class UiKeyboardController {
   private readonly selection: KeyboardControllerOptions['selection'];
   private readonly find: KeyboardControllerOptions['find'];
 
+  private readonly root: () => UiNode;
+
   constructor(
     private readonly dispatcher: UiInputDispatcher,
     private readonly focusManager: UiFocusManager,
-    private readonly root: UiNode,
+    root: UiNode | (() => UiNode),
     options: KeyboardControllerOptions = {}
   ) {
+    this.root = typeof root === 'function' ? root : () => root;
     this.tabNavigation = options.tabNavigation ?? true;
     this.editing = options.editing;
     this.selection = options.selection;
@@ -66,7 +74,7 @@ export class UiKeyboardController {
   keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
     const event = new UiKeyboardEvent(UiEventType.KeyDown, key, modifiers);
     const focused = this.focusManager.focusedNode;
-    const target = focused ?? this.root;
+    const target = focused ?? this.root();
     this.dispatcher.dispatch(event, target);
     if (
       !event.defaultPrevented &&
@@ -97,7 +105,7 @@ export class UiKeyboardController {
 
   keyUp(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
     const event = new UiKeyboardEvent(UiEventType.KeyUp, key, modifiers);
-    const target = this.focusManager.focusedNode ?? this.root;
+    const target = this.focusManager.focusedNode ?? this.root();
     this.dispatcher.dispatch(event, target);
     return event;
   }

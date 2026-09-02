@@ -1365,7 +1365,16 @@ export class GessoRuntime {
         selection
       }),
       wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink, () => root),
-      keyboard: new UiKeyboardController(this.dispatcher, focus, root, { editing, selection, find }),
+      // Unfocused keys land on the application's root, not the layout
+      // root that wraps it: the wrapper is the runtime's, and an app
+      // listening for Escape on its own top element would otherwise
+      // never hear a key pressed with nothing focused. A getter, because
+      // `reload` rebuilds the tree under a controller that lives on.
+      keyboard: new UiKeyboardController(this.dispatcher, focus, () => this.appRoot ?? this.layoutRoot(), {
+        editing,
+        selection,
+        find
+      }),
       // Listens at the root, so a pan reaches it only when nothing
       // between the pressed node and here claimed the gesture. That is
       // the opt-out a `Slider` or a `SplitPane` already relies on.
