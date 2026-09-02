@@ -377,11 +377,10 @@ function artworkKey(url: string): string {
 /**
  * The curator's picture, or their initial when Audius has none.
  *
- * The picture is an `Image`, which reads its source once, so a curator
- * who changes (the snapshot giving way to a live copy with a different
- * picture) is a new keyed node; `distinctUntilChanged` on the content
- * keeps the usual case, where the two agree, from rebuilding anything.
- * The shared name sits on the inner element either way, so it morphs
+ * Two shapes, so the child is an Observable that picks one; within the
+ * picture shape the `Image` follows its `src`, and `distinctUntilChanged`
+ * on the content id keeps a mirror change from being a reload. The
+ * shared name sits on the inner element either way, so it morphs
  * between the screens.
  */
 function Avatar(props: Inputs<{ card: CardDesign; playlist: PlaylistView; size: number }>): UiChild {
@@ -394,7 +393,7 @@ function Avatar(props: Inputs<{ card: CardDesign; playlist: PlaylistView; size: 
     map(curator =>
       curator.avatar !== '' ? (
         <Image
-          key={artworkKey(curator.avatar)}
+          key="picture"
           src={curator.avatar}
           alt={curator.name}
           width={size}
@@ -458,24 +457,8 @@ function Control(
   const active = input(props.active, false);
   const size = big ? 70 : 46;
   const resting = big ? INK : CHALK;
-  // An `Icon` reads its props once, so a glyph that changes is a new
-  // `Icon`, keyed so the reconciler replaces the node rather than
-  // handing new props to a body that has already run; `Image`'s
-  // docblock says the same of a changing `src`. The child is an
-  // Observable, and each toggle costs one rasterisation, which is what
-  // a changed glyph costs whichever way it is asked for.
-  const icon = combineLatest([props.path, input(props.stroke, false), active, input(props.activeColor, resting)]).pipe(
-    map(([path, stroke, on, tint]) => (
-      <Icon
-        key={`${path}|${stroke ? 'stroke' : 'fill'}|${on ? 'on' : 'off'}`}
-        path={path}
-        size={big ? 26 : 20}
-        color={on ? tint : resting}
-        style={stroke ? 'stroke' : 'fill'}
-        strokeWidth={2}
-        fillRule="evenodd"
-      />
-    ))
+  const color = combineLatest([active, input(props.activeColor, resting)]).pipe(
+    map(([on, tint]) => (on ? tint : resting))
   );
   return (
     <button
@@ -499,9 +482,14 @@ function Control(
         RING,
         ...(props.rootModifiers.value ?? [])
       ]}>
-      {/* In an array, because a lone Observable child of a `button` is
-          read as its text label; see `jsx-runtime`. */}
-      {[icon]}
+      <Icon
+        path={props.path}
+        size={big ? 26 : 20}
+        color={color}
+        style={input(props.stroke, false).pipe(map(stroke => (stroke ? 'stroke' : 'fill')))}
+        strokeWidth={2}
+        fillRule="evenodd"
+      />
     </button>
   );
 }
@@ -539,20 +527,13 @@ function SaveBadge(
         queue.send.toggleSavedPlaylist(card.id);
       }}
       modifiers={[LIGHT_CONTROL_INTERACTION, RING, sharedElement({ name: `playlist-add-${card.id}` })]}>
-      {[
-        saved.pipe(
-          map(on => (
-            <Icon
-              key={on ? 'check' : 'plus'}
-              path={on ? ICONS.check : ICONS.plus}
-              size={props.iconSize.value}
-              color={INK}
-              style="stroke"
-              strokeWidth={3}
-            />
-          ))
-        )
-      ]}
+      <Icon
+        path={saved.pipe(map(on => (on ? ICONS.check : ICONS.plus)))}
+        size={props.iconSize}
+        color={INK}
+        style="stroke"
+        strokeWidth={3}
+      />
     </button>
   );
 }
@@ -1025,20 +1006,13 @@ function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: Co
             queue.send.toggleLikeTrack(track.id);
           }}
           modifiers={[SHEET_CONTROL_INTERACTION, RING]}>
-          {[
-            liked.pipe(
-              map(on => (
-                <Icon
-                  key={on ? 'liked' : 'unliked'}
-                  path={on ? ICONS.heart : ICONS.heartOutline}
-                  style={on ? 'fill' : 'stroke'}
-                  strokeWidth={1.8}
-                  size={22}
-                  color={on ? LIKED : FAINT}
-                />
-              ))
-            )
-          ]}
+          <Icon
+            path={liked.pipe(map(on => (on ? ICONS.heart : ICONS.heartOutline)))}
+            style={liked.pipe(map(on => (on ? 'fill' : 'stroke')))}
+            strokeWidth={1.8}
+            size={22}
+            color={liked.pipe(map(on => (on ? LIKED : FAINT)))}
+          />
         </button>
         <button
           ref={(node: UiNode | null) => (menuAnchor.value = node)}
@@ -1258,19 +1232,6 @@ function BarControl(
 ): UiChild {
   const big = input(props.big, false).value;
   const size = big ? 48 : 38;
-  const icon = combineLatest([props.path, input(props.stroke, false)]).pipe(
-    map(([path, stroke]) => (
-      <Icon
-        key={`${path}|${stroke ? 'stroke' : 'fill'}`}
-        path={path}
-        size={big ? 22 : 18}
-        color={INK}
-        style={stroke ? 'stroke' : 'fill'}
-        strokeWidth={2}
-        fillRule="evenodd"
-      />
-    ))
-  );
   return (
     <button
       width={size}
@@ -1283,7 +1244,14 @@ function BarControl(
       label={props.label}
       onClick={() => props.onClick.value()}
       modifiers={[BAR_CONTROL_INTERACTION, RING]}>
-      {[icon]}
+      <Icon
+        path={props.path}
+        size={big ? 22 : 18}
+        color={INK}
+        style={input(props.stroke, false).pipe(map(stroke => (stroke ? 'stroke' : 'fill')))}
+        strokeWidth={2}
+        fillRule="evenodd"
+      />
     </button>
   );
 }
