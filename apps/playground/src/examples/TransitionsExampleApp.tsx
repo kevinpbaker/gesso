@@ -324,8 +324,8 @@ function attachPlayer(ctx: ComponentContext): void {
 // ---------------------------------------------------------------------------
 
 /** The play-count and duration line, which both screens show. */
-function Stats(props: Inputs<{ card: CardDesign; playlist: PlaylistView }>): UiChild {
-  const card = props.card.value;
+function Stats(inputs: Inputs<{ card: CardDesign; playlist: PlaylistView }>): UiChild {
+  const card = inputs.card.value;
   return (
     <row
       gap={8}
@@ -335,7 +335,7 @@ function Stats(props: Inputs<{ card: CardDesign; playlist: PlaylistView }>): UiC
       <row gap={4} y="center">
         <Icon path={ICONS.bars} size={14} color={card.secondaryText} />
         <text color={card.secondaryText} fontSize={13} selectable={false}>
-          {props.playlist.pipe(map(playlist => playlist.plays))}
+          {inputs.playlist.pipe(map(playlist => playlist.plays))}
         </text>
       </row>
       <text color={card.secondaryText} fontSize={13} selectable={false}>
@@ -344,7 +344,7 @@ function Stats(props: Inputs<{ card: CardDesign; playlist: PlaylistView }>): UiC
       <row gap={4} y="center">
         <Icon path={ICONS.clock} size={14} color={card.secondaryText} fillRule="evenodd" />
         <text color={card.secondaryText} fontSize={13} selectable={false}>
-          {props.playlist.pipe(map(playlist => playlist.time))}
+          {inputs.playlist.pipe(map(playlist => playlist.time))}
         </text>
       </row>
     </row>
@@ -377,11 +377,11 @@ function artworkKey(urls: readonly string[]): string {
  * shared name sits on the inner element either way, so it morphs
  * between the screens.
  */
-function Avatar(props: Inputs<{ card: CardDesign; playlist: PlaylistView; size: number }>): UiChild {
-  const card = props.card.value;
-  const size = props.size.value;
+function Avatar(inputs: Inputs<{ card: CardDesign; playlist: PlaylistView; size: number }>): UiChild {
+  const card = inputs.card.value;
+  const size = inputs.size.value;
   const shared = [sharedElement({ name: `playlist-avatar-${card.id}` })];
-  const picture = props.playlist.pipe(
+  const picture = inputs.playlist.pipe(
     map(playlist => playlist.curator),
     distinctUntilChanged((a, b) => artworkKey(a.avatar) === artworkKey(b.avatar) && a.name === b.name),
     map(curator =>
@@ -435,7 +435,7 @@ function Avatar(props: Inputs<{ card: CardDesign; playlist: PlaylistView; size: 
  * than leaving the person to guess from the colour of a heart.
  */
 function Control(
-  props: Inputs<{
+  inputs: Inputs<{
     path: string;
     label: string;
     onClick: () => void;
@@ -447,11 +447,11 @@ function Control(
     rootModifiers?: readonly UiModifier[];
   }>
 ): UiChild {
-  const big = input(props.big, false).value;
-  const active = input(props.active, false);
+  const big = input(inputs.big, false).value;
+  const active = input(inputs.active, false);
   const size = big ? 70 : 46;
   const resting = big ? INK : CHALK;
-  const color = combineLatest([active, input(props.activeColor, resting)]).pipe(
+  const color = combineLatest([active, input(inputs.activeColor, resting)]).pipe(
     map(([on, tint]) => (on ? tint : resting))
   );
   return (
@@ -463,24 +463,24 @@ function Control(
       x="center"
       y="center"
       cursor="pointer"
-      label={props.label}
+      label={inputs.label}
       states={active.pipe(map(on => (on ? ['pressed'] : [])))}
       onClick={(event: UiPointerEvent) => {
         // The controls sit inside the card, which is a button of its
         // own: a press here must not also open the playlist.
         event.stopPropagation();
-        props.onClick.value();
+        inputs.onClick.emit();
       }}
       modifiers={[
         big ? LIGHT_CONTROL_INTERACTION : DARK_CONTROL_INTERACTION,
         RING,
-        ...(props.rootModifiers.value ?? [])
+        ...(inputs.rootModifiers.value ?? [])
       ]}>
       <Icon
-        path={props.path}
+        path={inputs.path}
         size={big ? 26 : 20}
         color={color}
-        style={input(props.stroke, false).pipe(map(stroke => (stroke ? 'stroke' : 'fill')))}
+        style={input(inputs.stroke, false).pipe(map(stroke => (stroke ? 'stroke' : 'fill')))}
         strokeWidth={2}
         fillRule="evenodd"
       />
@@ -495,11 +495,11 @@ function Control(
  * shared name, so it morphs between the two.
  */
 function SaveBadge(
-  props: Inputs<{ card: CardDesign; size: number; iconSize: number }>,
+  inputs: Inputs<{ card: CardDesign; size: number; iconSize: number }>,
   ctx: ComponentContext
 ): UiChild {
-  const card = props.card.value;
-  const size = props.size.value;
+  const card = inputs.card.value;
+  const size = inputs.size.value;
   const queue = ctx.channel(Queue);
   const saved = queue.view.savedPlaylists.pipe(
     map(ids => ids.includes(card.id)),
@@ -523,7 +523,7 @@ function SaveBadge(
       modifiers={[LIGHT_CONTROL_INTERACTION, RING, sharedElement({ name: `playlist-add-${card.id}` })]}>
       <Icon
         path={saved.pipe(map(on => (on ? ICONS.check : ICONS.plus)))}
-        size={props.iconSize}
+        size={inputs.iconSize}
         color={INK}
         style="stroke"
         strokeWidth={3}
@@ -551,11 +551,11 @@ function SaveBadge(
  * element in both places and the state behind it is the same queue.
  */
 function PlayerControls(
-  props: Inputs<{ card: CardDesign; playlist: PlaylistView; full?: boolean }>,
+  inputs: Inputs<{ card: CardDesign; playlist: PlaylistView; full?: boolean }>,
   ctx: ComponentContext
 ): UiChild {
-  const card = props.card.value;
-  const full = input(props.full, false).value;
+  const card = inputs.card.value;
+  const full = input(inputs.full, false).value;
   const shell = ctx.inject(ShellService);
   const audio = ctx.inject(AudioService);
   const queue = ctx.channel(Queue);
@@ -618,7 +618,7 @@ function PlayerControls(
                 path={ICONS.external}
                 label="Open on Audius"
                 stroke
-                onClick={() => shell.openUrl(props.playlist.value.url)}
+                onClick={() => shell.openUrl(inputs.playlist.value.url)}
                 rootModifiers={arrives}
               />
             ]
@@ -635,11 +635,11 @@ function PlayerControls(
  * transition — the shared name, the fit, the rounded corner — is the
  * same for both, which is the point of `Video` having `Image`'s shape.
  */
-function Artwork(props: Inputs<{ card: CardDesign; playlist: PlaylistView; height: number }>): UiChild {
-  const card = props.card.value;
-  const height = props.height.value;
+function Artwork(inputs: Inputs<{ card: CardDesign; playlist: PlaylistView; height: number }>): UiChild {
+  const card = inputs.card.value;
+  const height = inputs.height.value;
   const media = card.media;
-  const alt = props.playlist.pipe(map(playlist => playlist.title));
+  const alt = inputs.playlist.pipe(map(playlist => playlist.title));
   const shared = [sharedElement({ name: `playlist-image-${card.id}` })];
   if (media.kind === 'video') {
     // Edge to edge, as the original's `video.playlist-image` is: full
@@ -675,8 +675,8 @@ function Artwork(props: Inputs<{ card: CardDesign; playlist: PlaylistView; heigh
  * `sharedElement` with this playlist's id in its name. Nothing else
  * about the card knows a transition exists.
  */
-function Card(props: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>, ctx: ComponentContext): UiChild {
-  const card = props.card.value;
+function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>, ctx: ComponentContext): UiChild {
+  const card = inputs.card.value;
   const playlist = playlistFor(ctx, card.id);
   const hovered = internalState(false);
   /**
@@ -706,7 +706,7 @@ function Card(props: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>,
       x="center"
       cursor="pointer"
       label={playlist.pipe(map(entry => entry.title))}
-      onClick={() => props.onOpen.value(card.id)}
+      onClick={() => inputs.onOpen.emit(card.id)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       modifiers={[
@@ -909,13 +909,13 @@ function PlayingBars(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
  * it, and the menu offers the three things done to a track that is not
  * the one playing: queue it next, open it on Audius, copy its link.
  */
-function TrackRow(props: Inputs<{ card: CardDesign; track: TrackView }>, ctx: ComponentContext): UiChild {
-  const card = props.card.value;
+function TrackRow(inputs: Inputs<{ card: CardDesign; track: TrackView }>, ctx: ComponentContext): UiChild {
+  const card = inputs.card.value;
   // Bound, not read: the row keeps its key when the live catalogue
   // replaces the snapshot's copy of the track, so a body that had read
-  // `props.track.value` would show the old copy for good. Handlers read
+  // `inputs.track.value` would show the old copy for good. Handlers read
   // the current value at the moment they run, which is fine.
-  const track = props.track;
+  const track = inputs.track;
   const queue = ctx.channel(Queue);
   const shell = ctx.inject(ShellService);
   const liked = combineLatest([queue.view.likedTracks, track]).pipe(
@@ -1239,9 +1239,9 @@ function bottomPadding(ctx: ComponentContext, base: number): Observable<number> 
 
 /** A control on the now-playing bar. */
 function BarControl(
-  props: Inputs<{ path: string; label: string; onClick: () => void; big?: boolean; stroke?: boolean }>
+  inputs: Inputs<{ path: string; label: string; onClick: () => void; big?: boolean; stroke?: boolean }>
 ): UiChild {
-  const big = input(props.big, false).value;
+  const big = input(inputs.big, false).value;
   const size = big ? 48 : 38;
   return (
     <button
@@ -1252,14 +1252,14 @@ function BarControl(
       x="center"
       y="center"
       cursor="pointer"
-      label={props.label}
-      onClick={() => props.onClick.value()}
+      label={inputs.label}
+      onClick={() => inputs.onClick.emit()}
       modifiers={[BAR_CONTROL_INTERACTION, RING]}>
       <Icon
-        path={props.path}
+        path={inputs.path}
         size={big ? 22 : 18}
         color={INK}
-        style={input(props.stroke, false).pipe(map(stroke => (stroke ? 'stroke' : 'fill')))}
+        style={input(inputs.stroke, false).pipe(map(stroke => (stroke ? 'stroke' : 'fill')))}
         strokeWidth={2}
         fillRule="evenodd"
       />
@@ -1279,27 +1279,27 @@ function BarControl(
  * the way the `Slider` does. The arrows nudge by five seconds.
  */
 function SeekBar(
-  props: Inputs<{ position: number; duration: number; accent: string; onSeek: (seconds: number) => void }>
+  inputs: Inputs<{ position: number; duration: number; accent: string; onSeek: (seconds: number) => void }>
 ): UiChild {
   const strip = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
-  const fraction = combineLatest([props.position, props.duration]).pipe(
+  const fraction = combineLatest([inputs.position, inputs.duration]).pipe(
     map(([at, total]) => (total <= 0 ? 0 : Math.min(1, Math.max(0, at / total))))
   );
   const toSeconds = (event: UiPointerEvent): number => {
     const box = strip.value;
-    const total = props.duration.value;
+    const total = inputs.duration.value;
     if (box.width <= 0 || total <= 0) {
-      return props.position.value;
+      return inputs.position.value;
     }
     return Math.min(1, Math.max(0, (event.x - box.x) / box.width)) * total;
   };
   const seek = (event: UiPointerEvent): void => {
     event.stopPropagation();
-    props.onSeek.value(toSeconds(event));
+    inputs.onSeek.emit(toSeconds(event));
   };
   const nudge = (by: number): void => {
-    const total = props.duration.value;
-    props.onSeek.value(Math.min(total > 0 ? total : Infinity, Math.max(0, props.position.value + by)));
+    const total = inputs.duration.value;
+    inputs.onSeek.emit(Math.min(total > 0 ? total : Infinity, Math.max(0, inputs.position.value + by)));
   };
   return (
     <box
@@ -1310,10 +1310,10 @@ function SeekBar(
       cursor="pointer"
       role="slider"
       label="Seek"
-      valueNow={props.position}
+      valueNow={inputs.position}
       valueMin={0}
-      valueMax={props.duration}
-      valueText={props.position.pipe(map(at => formatClock(at)))}
+      valueMax={inputs.duration}
+      valueText={inputs.position.pipe(map(at => formatClock(at)))}
       onPanStart={seek}
       onPanMove={seek}
       onPointerDown={seek}
@@ -1329,7 +1329,7 @@ function SeekBar(
           height={4}
           borderRadius={2}
           width={fraction.pipe(map(part => percent(part * 100)))}
-          backgroundColor={props.accent}
+          backgroundColor={inputs.accent}
         />
       </box>
     </box>
@@ -1476,8 +1476,8 @@ function NowPlayingBar(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
  * rounded corners take the square away. The radius is 12 of the mark's
  * 64, so it stays proportional at whatever size the mark is asked for.
  */
-function BrandMark(props: Inputs<{ size: number }>): UiChild {
-  const size = props.size.value;
+function BrandMark(inputs: Inputs<{ size: number }>): UiChild {
+  const size = inputs.size.value;
   return (
     <box
       width={size}
@@ -1500,7 +1500,7 @@ function BrandMark(props: Inputs<{ size: number }>): UiChild {
  * off the top of the screen. The original does the same thing with a
  * `slide-out` keyframe on its `::view-transition-old(app-header)`.
  */
-function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
+function AppHeader(inputs: Inputs<{ hidden: boolean }>): UiChild {
   return (
     <box
       position="absolute"
@@ -1511,7 +1511,7 @@ function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
       backgroundColor={CARD}
       modifiers={[
         motion({
-          state: props.hidden.pipe(map(hide => (hide ? slideDown(HEADER_HEIGHT + 6) : null))),
+          state: inputs.hidden.pipe(map(hide => (hide ? slideDown(HEADER_HEIGHT + 6) : null))),
           duration: 250,
           easing: 'standard'
         })
