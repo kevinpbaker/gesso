@@ -22,6 +22,7 @@ import type { DecorationShape } from '../rendering/Decorations';
 import { findPropertyDefinition, propertyEffects } from '../properties/UiPropertyRegistry';
 import { resolveProperty } from '../properties/UiPropertyResolver';
 import { isUiModifier, type UiModifier, type UiModifierKind } from './UiModifier';
+import { sameArgs } from './sameArgs';
 import type { UiModifierHost, UiModifierTeardown } from './UiModifierHost';
 
 /**
@@ -211,7 +212,11 @@ export class UiModifierSet {
   }
 
   private update(entry: Attached, args: unknown): Attached | null {
-    if (Object.is(entry.args, args)) {
+    if (sameArgs(entry.args, args)) {
+      // The same arguments, whether the same object or an equal one
+      // written inline: nothing to tell the modifier, and nothing to
+      // re-attach. See `sameArgs` for what counts as equal.
+      entry.args = args;
       return entry;
     }
     if (entry.kind.update === undefined) {

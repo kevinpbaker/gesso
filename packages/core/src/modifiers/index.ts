@@ -12,3 +12,4 @@ export { motion, sharedElement, type MotionArgs, type SharedElementArgs } from '
 export { videoSource, type VideoSourceArgs } from './video';
 export { scrollPosition, type ScrollOffset, type ScrollPositionArgs } from './scroll';
 export type { UiModifierEnvironment, UiModifierFocus, UiModifierLayout } from './UiModifierSet';
+export { sameArgs } from './sameArgs';
