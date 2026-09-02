@@ -52,11 +52,11 @@ while the dialog is up is one element with an Observable inside it,
 never an Observable that resolves to an element. `title` and
 `description` are bound rather than read, so both follow a cell.
 
-Write an `onClose` that is safe to run more than once. A close is
-reported twice today, once by the overlay entry and once by the
-component, and the spec beside the example asserts that count so it is
-documented rather than a surprise. Setting a cell to `false`, which is
-what the example does, is unaffected; appending to a log is not.
+`onClose` runs once per close, whatever closed the dialog: Escape, a
+press on the backdrop, a write of `false` into `open`, or the component
+unmounting while the dialog is up. The report comes from the overlay
+entry, which is the one point all of those paths pass through, so the
+count does not depend on which of them was taken.
 
 ## Controlled and uncontrolled
 

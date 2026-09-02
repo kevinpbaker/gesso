@@ -33,12 +33,12 @@ about, `pending` holds the note that can still come back, and both are
 null the rest of the time.
 
 Every handler is written to be safe to run twice, and one of them has
-to be. `Dialog` reports a close twice, once from the overlay entry and
-once from the component; [its page](/components/dialog) has the note
-and the spec that asserts the count. Setting a cell is unaffected by
-being set again, which is why `dismiss` is one assignment. A handler
-that appended to a log, or decremented a counter, would be a bug
-waiting for its second call.
+to be. Confirming runs `dismiss` twice: `remove` clears `confirming`
+itself, which is what takes the dialog off the screen, and the close is
+then reported back through `onClose`, which is `dismiss` again. Setting
+a cell is unaffected by being set again, which is why `dismiss` is one
+assignment. A handler that appended to a log, or decremented a counter,
+would be a bug waiting for its second call.
 
 `undo` keeps the index as well as the note, so the row goes back where
 it was rather than onto the end. That is a one-word decision that a

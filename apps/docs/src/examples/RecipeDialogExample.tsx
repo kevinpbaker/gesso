@@ -67,11 +67,12 @@ function Action(options: {
  * still be taken back, and a deletion that cannot. Every handler is
  * written so that running it twice is the same as running it once.
  *
- * That last property is not decoration. `Dialog` reports a close
- * twice, once from the overlay entry and once from the component; the
- * note on the Dialog page has the detail. Writing a cell is
- * unaffected by being written again, which is why `dismiss` is one
- * assignment rather than an append to a log.
+ * That last property is not decoration. Confirming runs `dismiss`
+ * twice: `remove` clears `confirming` itself, which is what takes the
+ * dialog off the screen, and the close is then reported back through
+ * `onClose`, which is `dismiss` again. Writing a cell is unaffected by
+ * being written again, which is why `dismiss` is one assignment rather
+ * than an append to a log.
  *
  * The undo window is the notice's lifetime: when the `Toast` closes,
  * on its own timer, the deletion becomes permanent. Tying the two
@@ -86,7 +87,7 @@ function noteFlow() {
   const pending = internalState<{ note: Note; index: number } | null>(null);
   const notice = internalState(false);
 
-  /** Safe to run more than once, which is what `Dialog` requires. */
+  /** Safe to run more than once: confirming clears the cell, and the close reports back here. */
   const dismiss = (): void => {
     confirming.value = null;
   };

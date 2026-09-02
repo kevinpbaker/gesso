@@ -137,7 +137,7 @@ describe('the docs dialog example', () => {
     expect(entries(ui)[0].dismissOnOutsidePress).toBe(true);
   });
 
-  it('reports a close through both the entry and the component, so onClose runs twice', () => {
+  it('reports a close exactly once, whatever closed it', () => {
     const open = new BehaviorSubject(false);
     let calls = 0;
     const ui = renderTest(
@@ -158,10 +158,20 @@ describe('the docs dialog example', () => {
     ui.fireEvent.keyDown('Escape');
     ui.frame();
 
-    // Asserted rather than assumed: the page tells a reader to write a
-    // handler that is safe to run more than once, and this is why.
-    expect(calls).toBe(2);
+    // One close, one call: the overlay entry reports it, and the
+    // component does not report it a second time.
+    expect(calls).toBe(1);
     expect(open.value).toBe(false);
+
+    // The same on a programmatic close, where nothing in the dialog
+    // ran a handler at all.
+    open.next(true);
+    ui.frame();
+    open.next(false);
+    ui.frame();
+
+    expect(calls).toBe(2);
+    expect(entries(ui)).toHaveLength(0);
   });
 
   it('carries the declaring tree environment across to the overlay layer', () => {

@@ -57,11 +57,16 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
    */
   const enter = internalState(0);
 
+  /**
+   * Every close goes through the entry, so `onClose` is reported from
+   * one place: the entry's callback below. Escape, the backdrop, a
+   * write of `false` and the unmount all end in `OverlayService.close`,
+   * and calling the prop here as well would report each of them twice.
+   */
   const close = (): void => {
     if (overlay.isOpen()) {
       overlay.hide();
     }
-    props.onClose.value?.();
   };
 
   /** The trap is released here rather than in `close`, so a dialog that closes because it unmounted releases too. */

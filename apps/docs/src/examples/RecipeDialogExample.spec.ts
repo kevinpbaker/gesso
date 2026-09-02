@@ -100,8 +100,8 @@ describe('the docs dialog flow recipe', () => {
     expect(ui.queryByRole('dialog')).toBeNull();
     expect(ui.runtime.input.focus.focusedNode).toBe(opener);
 
-    // A close is reported twice, so the handler runs twice. Reopening
-    // is what proves the second run left nothing behind.
+    // Escape reports the close once, and reopening is what proves the
+    // handler left nothing behind either way.
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     expect(ui.getByRole('dialog')).toBeDefined();
