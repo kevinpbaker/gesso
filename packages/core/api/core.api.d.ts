@@ -2877,7 +2877,7 @@ declare class IconRasterizer {
 }
 interface ImageSourceArgs {
   readonly resolver: ImageResolver;
-  readonly source: string;
+  readonly source: Reactive<string>;
   readonly onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 declare const imageSource: ((args: ImageSourceArgs, key?: string | number) => UiModifier<ImageSourceArgs>) & {
@@ -2885,13 +2885,13 @@ declare const imageSource: ((args: ImageSourceArgs, key?: string | number) => Ui
 };
 interface IconSourceArgs {
   readonly rasterizer: IconRasterizer;
-  readonly path: string;
-  readonly viewBox: number;
-  readonly size: number;
-  readonly color: UiColorValue;
-  readonly style: 'fill' | 'stroke';
-  readonly strokeWidth: number;
-  readonly fillRule?: 'nonzero' | 'evenodd';
+  readonly path: Reactive<string>;
+  readonly viewBox: Reactive<number>;
+  readonly size: Reactive<number>;
+  readonly color: Reactive<UiColorValue>;
+  readonly style: Reactive<'fill' | 'stroke'>;
+  readonly strokeWidth: Reactive<number>;
+  readonly fillRule?: Reactive<'nonzero' | 'evenodd' | undefined>;
 }
 declare const iconSource: ((args: IconSourceArgs, key?: string | number) => UiModifier<IconSourceArgs>) & {
   readonly kind: UiModifierKind<IconSourceArgs>;
@@ -4820,7 +4820,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CZzlmdux.js";
+} from "./index-BtnZUlBA.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5502,7 +5502,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CZzlmdux.js";
+} from "./index-BtnZUlBA.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
