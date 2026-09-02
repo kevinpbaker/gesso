@@ -149,15 +149,15 @@ chooses an option the keyboard cannot reach.
 
 ## Semantics
 
-| What     | Value                                                                                     |
-| -------- | ----------------------------------------------------------------------------------------- |
-| Trigger  | `combobox`, named by `label`, on the node that takes focus                                |
-| Value    | `valueText`, the chosen option's `label`. No `valueNow`: the value is not a number        |
-| States   | `expanded` while the list is open, `invalid` while `invalid`, `required` while `required` |
-| List     | `listbox`, named by the same `label`                                                      |
+| What     | Value                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------ |
+| Trigger  | `combobox`, named by `label`, on the node that takes focus                                 |
+| Value    | `valueText`, the chosen option's `label`. No `valueNow`: the value is not a number         |
+| States   | `expanded` while the list is open, `invalid` while `invalid`, `required` while `required`  |
+| List     | `listbox`, named by the same `label`                                                       |
 | Option   | `option`, named by the option's `label`, with `posInSet` and `setSize` over the whole list |
-| Chosen   | `selected`, on the one option that matches the value                                      |
-| Disabled | `disabled` on the trigger or on an option marked so, and the subtree under it is inert    |
+| Chosen   | `selected`, on the one option that matches the value                                       |
+| Disabled | `disabled` on the trigger or on an option marked so, and the subtree under it is inert     |
 
 The states arrive as they change rather than being read once, so a value
 the application writes from elsewhere updates what an assistive
