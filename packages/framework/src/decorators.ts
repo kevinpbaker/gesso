@@ -32,6 +32,23 @@ export function Input(): PropertyDecorator {
  * The service must be registered with useService(), or be one of
  * the six a runtime registers itself.
  */
+/**
+ * Marks a class component's output field:
+ *
+ *   @Output() changed = output<[value: number]>();
+ *
+ * Wired exactly as an input is, because it is one: the cell holds the
+ * handler the parent passed, and `this.changed.emit(next)` calls it.
+ * The decorator exists so a reader can tell the two directions apart.
+ */
+export function Output(): PropertyDecorator {
+  return (target, propertyKey) => {
+    const constructor = target.constructor as unknown as new () => unknown;
+    const metadata = getComponentMetadata(constructor);
+    metadata.inputs.add(propertyKey as string);
+  };
+}
+
 export function Inject<T extends Function>(StoreClass: T): PropertyDecorator {
   return (target, propertyKey) => {
     const constructor = target.constructor as unknown as new () => unknown;

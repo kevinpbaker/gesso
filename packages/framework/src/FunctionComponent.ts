@@ -2,7 +2,7 @@ import type { Observable } from 'rxjs';
 
 import type { Reactive, UiChild } from '@gesso/core';
 import { Component } from './Component';
-import type { InputCell } from './Input';
+import type { InputCell, OutputTarget } from './Input';
 import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken } from './channel/ChannelToken';
 
@@ -42,14 +42,16 @@ export interface ComponentContext {
 }
 
 /**
- * The props a functional component receives: one host-owned input
- * cell per declared prop.
+ * The inputs a functional component receives: one host-owned cell per
+ * declared member, and for a member typed as a function, an output.
  *
  * The parent supplies values or Observables; the host feeds them into
- * these cells and keeps feeding them when the parent's props change,
- * so the function can run exactly once — like a class `render()` — and
- * still follow its parent. An optional prop is a cell whose value may
- * be `undefined`; `input(props.name, fallback)` gives it a default.
+ * these cells and keeps feeding them when the parent's values change,
+ * so the function can run exactly once, like a class `render()`, and
+ * still follow its parent. An optional input is a cell whose value may
+ * be `undefined`; `input(inputs.name, fallback)` gives it a default. An
+ * output is fired with `inputs.onChange.emit(next)`, and a parent may
+ * pass a handler or `into(subject)` for it.
  */
 export type Inputs<P> = {
   readonly [K in keyof P]-?: InputCell<P[K]>;
@@ -97,10 +99,18 @@ type OptionalCellKeys<I> = {
 type PropsForCells<I> = [keyof I] extends [never]
   ? NoProps
   : {
-      [K in OptionalCellKeys<I>]?: Reactive<CellValue<I[K]>>;
+      [K in OptionalCellKeys<I>]?: Passable<CellValue<I[K]>>;
     } & {
-      [K in Exclude<keyof I, OptionalCellKeys<I>>]: Reactive<CellValue<I[K]>>;
+      [K in Exclude<keyof I, OptionalCellKeys<I>>]: Passable<CellValue<I[K]>>;
     };
+
+/**
+ * What a parent may pass for one cell: a value or an Observable of it,
+ * and for an output, the handler itself or an `into(subject)` target
+ * that receives what the child emits.
+ */
+type Passable<T> =
+  NonNullable<T> extends (first: infer V, ...rest: never[]) => void ? Reactive<T> | OutputTarget<V> : Reactive<T>;
 
 /**
  * A component that declares no props accepts none: `{}` passes, anything

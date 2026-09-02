@@ -25,6 +25,8 @@ import { BehaviorSubject } from 'rxjs';
  * binds directly.
  */
 export class InternalState<T> extends BehaviorSubject<T> {
+  /** What to call this cell in a warning or the inspector; optional. */
+  label: string | undefined;
   constructor(initialValue: T) {
     super(initialValue);
   }
@@ -49,6 +51,10 @@ export class InternalState<T> extends BehaviorSubject<T> {
  *     this.count.value++;
  *   }
  */
-export function internalState<T>(initialValue: T): InternalState<T> {
-  return new InternalState(initialValue);
+export function internalState<T>(initialValue: T, label?: string): InternalState<T> {
+  const state = new InternalState(initialValue);
+  if (label !== undefined) {
+    state.label = label;
+  }
+  return state;
 }

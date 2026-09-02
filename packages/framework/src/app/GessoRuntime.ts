@@ -1075,7 +1075,11 @@ export class GessoRuntime {
       }
       const binding = this.graph.getBindingForProperty(node, name);
       if (binding !== undefined) {
-        out.push({ name, value: printPropValue(value), origin: 'binding', source: `bound (${binding.id})` });
+        // A labelled cell says where the value comes from: `Card.title`,
+        // `queue.current`. An anonymous pipe only has the binding's id.
+        const label = (binding.observable as { label?: unknown }).label;
+        const from = typeof label === 'string' ? label : binding.id;
+        out.push({ name, value: printPropValue(value), origin: 'binding', source: `bound to ${from}` });
         continue;
       }
       out.push({ name, value: printPropValue(value), origin: 'element' });

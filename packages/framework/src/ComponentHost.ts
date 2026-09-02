@@ -5,7 +5,7 @@ import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
 import { isObservable, type UiChild } from '@gesso/core';
-import { InputCell, withBodyOf } from './Input';
+import { InputCell, isOutputTarget, outputTargetOf, withBodyOf } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
 import {
@@ -231,6 +231,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     const props = this.element.props as Record<string, unknown>;
     for (const inputName of metadata.inputs) {
       const cell = (this.instance as unknown as Record<string, InputCell<unknown>>)[inputName];
+      cell.label ??= `${metadata.tag}.${inputName}`;
       this.applyInput(inputName, cell, props[inputName], false);
     }
   }
@@ -263,6 +264,14 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       if (resetWhenAbsent && hadSource) {
         cell.next(undefined);
       }
+      return;
+    }
+
+    if (isOutputTarget(provided)) {
+      // The parent wants the child's output as a stream: the cell holds
+      // a handler that forwards to the target, and `emit` calls it.
+      const target = outputTargetOf(provided);
+      cell.next((value: unknown) => target.next(value));
       return;
     }
 

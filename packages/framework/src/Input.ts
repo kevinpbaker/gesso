@@ -1,4 +1,4 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, type Observable, Subject } from 'rxjs';
 
 /**
  * Reactive cell holding a component input.
@@ -25,9 +25,38 @@ export class InputCell<T> extends BehaviorSubject<T> {
   /** The component whose body read `.value`, for the stale-read warning below. */
   private snapshotBy: string | null = null;
   private warnedStale = false;
+  /** Everything emitted through `emit`, created on the first `events` read. */
+  private emitted: Subject<unknown> | null = null;
 
   constructor(initialValue: T) {
     super(initialValue);
+  }
+
+  /**
+   * Fires the output this cell stands for.
+   *
+   * An output is a cell whose value is what the parent gave to be
+   * called: a function, or a target made by `into(subject)`. `emit`
+   * calls it with the arguments, and also pushes the first argument
+   * through `events`, so the component can fire from three places
+   * without passing the cell around and a parent that wants a stream
+   * can have one. A parent that passed nothing is fine: the call
+   * simply reaches nobody.
+   */
+  emit(...args: EmitArgs<T>): void {
+    const handler = super.getValue() as unknown;
+    if (typeof handler === 'function') {
+      (handler as (...values: unknown[]) => void)(...args);
+    }
+    this.emitted?.next(args[0]);
+  }
+
+  /** What `emit` has fired, as a stream: the first argument of each call. */
+  get events(): Observable<EmitValue<T>> {
+    if (this.emitted === null) {
+      this.emitted = new Subject<unknown>();
+    }
+    return this.emitted.asObservable() as Observable<EmitValue<T>>;
   }
 
   override get value(): T {
@@ -159,4 +188,61 @@ export function input<T>(first: T | InputCell<T | undefined>, fallback?: T): Inp
     complete: () => derived.complete()
   });
   return derived;
+}
+
+/** The arguments `emit` takes for a cell holding a handler of type `T`. */
+export type EmitArgs<T> = NonNullable<T> extends (...args: infer A) => void ? A : never;
+
+/** What `events` carries for a cell holding a handler of type `T`: the handler's first argument. */
+export type EmitValue<T> = NonNullable<T> extends (first: infer V, ...rest: never[]) => void ? V : void;
+
+/**
+ * A component's output: an input cell that holds whatever the parent
+ * gave to be called, fired through `emit`. Every function-typed member
+ * of a component's inputs is one, so on a component declared with
+ * `onOpen: (id: string) => void`, `inputs.onOpen.emit(id)` is how the
+ * component speaks, and a parent may pass a function or `into(subject)`.
+ * The name is for a class field: `@Output() changed = output<[number]>()`.
+ */
+export type OutputCell<A extends unknown[]> = InputCell<((...args: A) => void) | undefined>;
+
+/**
+ * An output a class component declares as a field:
+ *
+ *   @Output() changed = output<[value: number]>();
+ *
+ * The host wires the parent's handler into it exactly as it wires an
+ * input, and `this.changed.emit(next)` fires it.
+ */
+export function output<A extends unknown[]>(): OutputCell<A> {
+  return new InputCell<((...args: A) => void) | undefined>(undefined);
+}
+
+const OUTPUT_TARGET: unique symbol = Symbol('gesso:output-target');
+
+/**
+ * A parent's way of receiving an output as a stream rather than a call:
+ *
+ *   const opened = new Subject<string>();
+ *   <Card onOpen={into(opened)} />
+ *
+ * Wrapped rather than passed bare, because a bare `Subject` is an
+ * Observable and would be read as an *input* the parent is feeding the
+ * child, which is the opposite direction.
+ */
+export interface OutputTarget<V> {
+  readonly [OUTPUT_TARGET]: { next(value: V): void };
+}
+
+export function into<V>(target: { next(value: V): void }): OutputTarget<V> {
+  return { [OUTPUT_TARGET]: target };
+}
+
+export function isOutputTarget(value: unknown): value is OutputTarget<unknown> {
+  return typeof value === 'object' && value !== null && OUTPUT_TARGET in value;
+}
+
+/** The receiver an `into()` target wraps. */
+export function outputTargetOf<V>(target: OutputTarget<V>): { next(value: V): void } {
+  return target[OUTPUT_TARGET];
 }

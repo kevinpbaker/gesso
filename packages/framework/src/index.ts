@@ -1,8 +1,21 @@
 export { Component } from './Component';
 export { InternalState, internalState } from './InternalState';
 export { ServiceRegistry } from './service/ServiceRegistry';
-export { InputCell, input } from './Input';
-export { Define, Input, Inject, Channel } from './decorators';
+export {
+  InputCell,
+  input,
+  output,
+  into,
+  isOutputTarget,
+  type OutputCell,
+  type OutputTarget,
+  type EmitArgs,
+  type EmitValue
+} from './Input';
+export { derive, type DeriveOptions, type Equality } from './derive';
+export { bind } from './bind';
+export { controlled, type ControlledOptions, type ControlledValue } from './controlled';
+export { Define, Input, Output, Inject, Channel } from './decorators';
 export * from './channel';
 export { structurallyEqual } from './channel/structuralEquals';
 export { diffProjection, applyPatch, applyPatches, type Patch, type PatchPath } from './channel/StorePatch';

@@ -26,7 +26,7 @@ function WithFallback(props: Inputs<{ size?: number }>, _ctx: ComponentContext):
 
 /** Reads the value later, in a handler, which is the ordinary way to read a current value. */
 function InHandler(props: Inputs<{ label: string; onRead: (label: string) => void }>, _ctx: ComponentContext): UiChild {
-  return Text({ text: 'Press', onClick: () => props.onRead.value(props.label.value) });
+  return Text({ text: 'Press', onClick: () => props.onRead.emit(props.label.value) });
 }
 
 describe('the stale-read warning', () => {
