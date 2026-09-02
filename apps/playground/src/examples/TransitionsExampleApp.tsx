@@ -1,4 +1,4 @@
-import { map } from 'rxjs';
+import { combineLatest, map } from 'rxjs';
 
 import {
   type ComponentContext,
@@ -20,11 +20,16 @@ import {
   slideDown,
   scrollPosition,
   slideUp,
+  focusRing,
+  interactive,
   type UiChild,
-  type UiModifier
+  type UiKeyboardEvent,
+  type UiModifier,
+  type UiPointerEvent
 } from '@gesso/core';
 
 import { ICONS, playlistById, PLAYLISTS, TRACKS, type Playlist } from './transitions/playlists';
+import { likedPlaylist, likedTrack, savedPlaylist, toggle } from './transitions/library';
 import { CHALK, INK, LINEN } from './brand';
 
 /**
@@ -104,6 +109,57 @@ const MUTED = '#6f675c';
 const FAINT = '#a09789';
 const MARK_VIEWBOX = 64;
 const MARK_RADIUS = 12;
+/** The heart, once it is full. */
+const LIKED = '#ff5c7a';
+
+/*
+ * How a control answers the pointer. One shared value per look, because
+ * a modifier's arguments are compared by identity: a fresh
+ * `interactive(...)` per render would detach and re-attach on every
+ * frame. Passing one to a `button` replaces its default interaction
+ * rather than doubling it (see `Button` in `UiComponents.ts`).
+ */
+/**
+ * The dark round controls over the artwork: lighten a step on hover,
+ * settle back on press.
+ *
+ * Opaque greys rather than a lighter translucent black, which would be
+ * the natural choice over a photograph. A translucent override paints
+ * as nothing while the card's hover scale is active, though the same
+ * value paints correctly on the playlist page where nothing above it is
+ * transformed, and the declared translucent resting colour paints in
+ * both places. That is a renderer question, recorded in
+ * `docs/TRANSITIONS_ROADMAP.md`, and an opaque grey sidesteps it.
+ */
+const DARK_CONTROL_INTERACTION = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: '#3a3a3a' },
+  pressed: { backgroundColor: '#262626' }
+});
+/** The white controls: the big play button and the add badge. */
+const LIGHT_CONTROL_INTERACTION = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: '#f1ece3' },
+  pressed: { backgroundColor: '#e6dfd3' }
+});
+/** A small icon button on a white sheet, such as a track's heart. */
+const SHEET_CONTROL_INTERACTION = interactive({
+  hover: true,
+  press: true,
+  hovered: { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
+  pressed: { backgroundColor: 'rgba(0, 0, 0, 0.1)' }
+});
+const RING = focusRing();
+
+/** A hex colour at an opacity, for a tint drawn from the playlist's own palette. */
+function alpha(hex: string, opacity: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
 
 /**
  * Where the list was left, so Back returns to it.
@@ -160,64 +216,165 @@ function Stats(props: Inputs<{ playlist: Playlist }>): UiChild {
   );
 }
 
-/** A round control button, as the player row is made of. */
+/**
+ * A round control button, as the player row is made of.
+ *
+ * A real `button`: it has a label for a screen reader, answers hover
+ * and press through `interactive`, shows the focus ring, and asks for
+ * the pointer. `active` is for the controls that are toggles, and is
+ * reported as the `pressed` state so the mirror says "pressed" rather
+ * than leaving the person to guess from the colour of a heart.
+ */
 function Control(
-  props: Inputs<{ path: string; big?: boolean; stroke?: boolean; rootModifiers?: readonly UiModifier[] }>
+  props: Inputs<{
+    path: string;
+    label: string;
+    onClick: () => void;
+    big?: boolean;
+    stroke?: boolean;
+    active?: boolean;
+    /** The icon's colour while `active`; the resting colour otherwise. */
+    activeColor?: string;
+    rootModifiers?: readonly UiModifier[];
+  }>
 ): UiChild {
-  const big = input(props.big, false);
-  const size = big.value ? 70 : 46;
-  return (
-    <box
-      width={size}
-      height={size}
-      borderRadius={size / 2}
-      backgroundColor={big.value ? CARD : 'rgba(0, 0, 0, 0.8)'}
-      x="center"
-      y="center"
-      modifiers={props.rootModifiers.value}>
+  const big = input(props.big, false).value;
+  const active = input(props.active, false);
+  const size = big ? 70 : 46;
+  const resting = big ? INK : CHALK;
+  // An `Icon` reads its props once, so a glyph that changes is a new
+  // `Icon`, keyed so the reconciler replaces the node rather than
+  // handing new props to a body that has already run; `Image`'s
+  // docblock says the same of a changing `src`. The child is an
+  // Observable, and each toggle costs one rasterisation, which is what
+  // a changed glyph costs whichever way it is asked for.
+  const icon = combineLatest([props.path, input(props.stroke, false), active, input(props.activeColor, resting)]).pipe(
+    map(([path, stroke, on, tint]) => (
       <Icon
-        path={props.path.value}
-        size={big.value ? 26 : 20}
-        color={big.value ? INK : CHALK}
-        style={props.stroke.value === true ? 'stroke' : 'fill'}
+        key={`${path}|${stroke ? 'stroke' : 'fill'}|${on ? 'on' : 'off'}`}
+        path={path}
+        size={big ? 26 : 20}
+        color={on ? tint : resting}
+        style={stroke ? 'stroke' : 'fill'}
         strokeWidth={2}
         fillRule="evenodd"
       />
-    </box>
+    ))
+  );
+  return (
+    <button
+      width={size}
+      height={size}
+      borderRadius={size / 2}
+      backgroundColor={big ? CARD : 'rgba(0, 0, 0, 0.8)'}
+      x="center"
+      y="center"
+      cursor="pointer"
+      label={props.label}
+      states={active.pipe(map(on => (on ? ['pressed'] : [])))}
+      onClick={(event: UiPointerEvent) => {
+        // The controls sit inside the card, which is a button of its
+        // own: a press here must not also open the playlist.
+        event.stopPropagation();
+        props.onClick.value();
+      }}
+      modifiers={[
+        big ? LIGHT_CONTROL_INTERACTION : DARK_CONTROL_INTERACTION,
+        RING,
+        ...(props.rootModifiers.value ?? [])
+      ]}>
+      {/* In an array, because a lone Observable child of a `button` is
+          read as its text label; see `jsx-runtime`. */}
+      {[icon]}
+    </button>
   );
 }
 
 /**
- * The row of player controls over the artwork.
- *
- * Each button is its own shared element, not the row. The detail screen
- * shows two more buttons than the card, so the row is the one element
- * here that genuinely changes shape: 202px wide on the card, 334px on
- * the page, the same height on both. A shared element scales by the
- * ratio of the two boxes, so a row named as one piece arrived squashed
- * to 0.6 of its width at full height and stretched back out, and every
- * circle in it was an ellipse for the whole of the morph. Measured
- * exactly that, with the morph slowed down. Named one by one, each
- * button pairs with a box of its own size and the morph is a pure
- * translate, so a circle stays a circle all the way. The two buttons
- * that exist only on the page have nothing to pair with; they simply
- * arrive, like the back button.
+ * The `+` that saves a playlist to the library, and turns into a tick
+ * once it has. On the card it is the 40px button in the header; on the
+ * playlist page it is the 24px badge on the avatar. Same element, same
+ * shared name, so it morphs between the two.
  */
-function PlayerControls(props: Inputs<{ playlist: Playlist; full?: boolean }>): UiChild {
+function SaveBadge(props: Inputs<{ playlist: Playlist; size: number; iconSize: number }>): UiChild {
   const playlist = props.playlist.value;
-  const full = input(props.full, false).value;
+  const size = props.size.value;
+  const saved = savedPlaylist(playlist.id);
+  return (
+    <button
+      width={size}
+      height={size}
+      borderRadius={size / 2}
+      backgroundColor={CARD}
+      x="center"
+      y="center"
+      cursor="pointer"
+      label={saved.pipe(map(on => (on ? 'Remove from your library' : 'Save to your library')))}
+      states={saved.pipe(map(on => (on ? ['pressed'] : [])))}
+      onClick={(event: UiPointerEvent) => {
+        event.stopPropagation();
+        toggle(saved);
+      }}
+      modifiers={[LIGHT_CONTROL_INTERACTION, RING, sharedElement({ name: `playlist-add-${playlist.id}` })]}>
+      {[
+        saved.pipe(
+          map(on => (
+            <Icon
+              key={on ? 'check' : 'plus'}
+              path={on ? ICONS.check : ICONS.plus}
+              size={props.iconSize.value}
+              color={INK}
+              style="stroke"
+              strokeWidth={3}
+            />
+          ))
+        )
+      ]}
+    </button>
+  );
+}
+
+/**
+ * The row of player controls over the artwork: shuffle, play, like.
+ *
+ * Each button is its own shared element, not the row. A shared element
+ * scales by the ratio of the two boxes, so a row named as one piece
+ * whose width differed between the card and the page arrived squashed
+ * and stretched back out, and every circle in it was an ellipse for the
+ * whole of the morph. Measured exactly that, with the morph slowed
+ * down. Named one by one, each button pairs with a box of its own size
+ * and the morph is a pure translate, so a circle stays a circle all the
+ * way.
+ *
+ * The original drew five glyphs on its playlist page and none of them
+ * did anything. Three are here, and each one does what it says; the
+ * two that need a track behind them (open on Audius, the more menu)
+ * come back with the data that gives them meaning, arriving on the page
+ * alone like the back button does. Play is wired to nothing yet, on
+ * purpose: it will drive the queue once there is one, and a button that
+ * pretended to play would be worse than one plainly waiting for its
+ * player.
+ */
+function PlayerControls(props: Inputs<{ playlist: Playlist }>): UiChild {
+  const playlist = props.playlist.value;
+  const liked = likedPlaylist(playlist.id);
   const shared = (control: string): readonly UiModifier[] => [
     sharedElement({ name: `playlist-control-${control}-${playlist.id}` })
   ];
-  const arrives: readonly UiModifier[] = [motion({ initial: fade, duration: 'slow' })];
   return (
     <box position="absolute" left={0} right={0} bottom={0} x="center">
       <row gap={20} y="center" paddingTop={28} paddingBottom={28}>
-        {full ? [<Control path={ICONS.download} key="download" rootModifiers={arrives} />] : []}
-        <Control path={ICONS.ban} stroke rootModifiers={shared('ban')} />
-        <Control path={ICONS.play} big rootModifiers={shared('play')} />
-        <Control path={ICONS.thumbsUp} rootModifiers={shared('like')} />
-        {full ? [<Control path={ICONS.ellipsis} key="more" rootModifiers={arrives} />] : []}
+        <Control path={ICONS.shuffle} label="Shuffle" stroke onClick={() => {}} rootModifiers={shared('shuffle')} />
+        <Control path={ICONS.play} label="Play" big onClick={() => {}} rootModifiers={shared('play')} />
+        <Control
+          path={liked.pipe(map(on => (on ? ICONS.heart : ICONS.heartOutline)))}
+          stroke={liked.pipe(map(on => !on))}
+          label={liked.pipe(map(on => (on ? 'Unlike this playlist' : 'Like this playlist')))}
+          active={liked}
+          activeColor={LIKED}
+          onClick={() => toggle(liked)}
+          rootModifiers={shared('like')}
+        />
       </row>
     </box>
   );
@@ -383,16 +540,7 @@ function Card(props: Inputs<{ playlist: Playlist; onOpen: (id: string) => void }
               {playlist.user.date}
             </text>
           </column>
-          <box
-            width={40}
-            height={40}
-            borderRadius={20}
-            backgroundColor={CARD}
-            x="center"
-            y="center"
-            modifiers={[sharedElement({ name: `playlist-add-${playlist.id}` })]}>
-            <Icon path={ICONS.plus} size={20} color={INK} style="stroke" strokeWidth={3} />
-          </box>
+          <SaveBadge playlist={playlist} size={40} iconSize={20} />
         </row>
         <text
           color={playlist.text}
@@ -463,8 +611,16 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
 // The detail screen
 // ---------------------------------------------------------------------------
 
-function TrackRow(props: Inputs<{ index: number }>): UiChild {
-  const track = TRACKS[props.index.value]!;
+/**
+ * One track. The heart is a toggle; the row itself is not yet a button,
+ * because pressing a track has to play it and there is no player yet.
+ * The more menu went with it, for the same reason: its items are things
+ * done to a real track.
+ */
+function TrackRow(props: Inputs<{ playlistId: string; index: number }>): UiChild {
+  const index = props.index.value;
+  const track = TRACKS[index]!;
+  const liked = likedTrack(props.playlistId.value, index);
   return (
     <row width={percent(100)} gap={20} paddingLeft={20} paddingRight={20} paddingTop={10} paddingBottom={10} y="center">
       <Image src={track.art} alt={track.title} width={60} height={60} borderRadius={6} objectFit="cover" />
@@ -476,10 +632,32 @@ function TrackRow(props: Inputs<{ index: number }>): UiChild {
           {track.artist}
         </text>
       </column>
-      <row gap={8} y="center">
-        <Icon path={ICONS.heart} size={22} color={FAINT} />
-        <Icon path={ICONS.ellipsis} size={22} color={FAINT} fillRule="evenodd" />
-      </row>
+      <button
+        width={36}
+        height={36}
+        borderRadius={18}
+        x="center"
+        y="center"
+        cursor="pointer"
+        label={liked.pipe(map(on => (on ? `Unlike ${track.title}` : `Like ${track.title}`)))}
+        states={liked.pipe(map(on => (on ? ['pressed'] : [])))}
+        onClick={() => toggle(liked)}
+        modifiers={[SHEET_CONTROL_INTERACTION, RING]}>
+        {[
+          liked.pipe(
+            map(on => (
+              <Icon
+                key={on ? 'liked' : 'unliked'}
+                path={on ? ICONS.heart : ICONS.heartOutline}
+                style={on ? 'fill' : 'stroke'}
+                strokeWidth={1.8}
+                size={22}
+                color={on ? LIKED : FAINT}
+              />
+            ))
+          )
+        ]}
+      </button>
     </row>
   );
 }
@@ -502,6 +680,15 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
   ctx.onMount(() => {
     radius.value = 0;
   });
+  // Per screen rather than module-level like the others, because the
+  // tint follows the playlist. A component body runs once, so this is
+  // still one value for the life of the screen.
+  const backInteraction = interactive({
+    hover: true,
+    press: true,
+    hovered: { backgroundColor: alpha(playlist.text, 0.26) },
+    pressed: { backgroundColor: alpha(playlist.text, 0.34) }
+  });
 
   return (
     // No background of its own: the app root paints the page, and a
@@ -522,21 +709,30 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
             transition={{ borderRadius: 420 }}
             modifiers={[sharedElement({ name: `playlist-background-${playlist.id}`, morph: 'geometry' })]}
           />
-          <box
+          <button
             position="absolute"
-            left={24}
-            top={30}
-            width={34}
-            height={34}
+            left={20}
+            top={26}
+            width={40}
+            height={40}
+            borderRadius={20}
+            // Above the positioned column that follows it in the tree,
+            // which would otherwise paint over it and take its clicks.
+            zIndex={1}
+            // A tint of the playlist's own text colour, so the button
+            // reads as a control on the black card and on the pink one
+            // without being a third colour on either.
+            backgroundColor={alpha(playlist.text, 0.14)}
             cursor="pointer"
             x="center"
             y="center"
+            label="Back to playlists"
             onClick={() => router.go(Home)}
             // No `sharedElement`: there is no back button on the list, so
             // it would never pair with anything. It simply arrives.
-            modifiers={[motion({ initial: fade })]}>
-            <Icon path={ICONS.back} size={28} color={playlist.text} style="stroke" strokeWidth={2} />
-          </box>
+            modifiers={[backInteraction, RING, motion({ initial: fade })]}>
+            <Icon path={ICONS.back} size={24} color={playlist.text} style="stroke" strokeWidth={2.5} />
+          </button>
           {/* One positioned column holds everything drawn over the
               background, because a positioned element paints above
               in-flow content and the background is one. The original
@@ -553,18 +749,8 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
                 objectFit="cover"
                 rootModifiers={[sharedElement({ name: `playlist-avatar-${playlist.id}` })]}
               />
-              <box
-                position="absolute"
-                right={-6}
-                bottom={-6}
-                width={24}
-                height={24}
-                borderRadius={12}
-                backgroundColor={CARD}
-                x="center"
-                y="center"
-                modifiers={[sharedElement({ name: `playlist-add-${playlist.id}` })]}>
-                <Icon path={ICONS.plus} size={14} color={INK} style="stroke" strokeWidth={3} />
+              <box position="absolute" right={-6} bottom={-6}>
+                <SaveBadge playlist={playlist} size={24} iconSize={14} />
               </box>
             </box>
             <column gap={3} x="center">
@@ -611,7 +797,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
             <box height={20} />
             <box position="relative" width={percent(100)} x="center">
               <Artwork playlist={playlist} height={PAGE_MEDIA_HEIGHT} />
-              <PlayerControls playlist={playlist} full />
+              <PlayerControls playlist={playlist} />
             </box>
           </column>
         </column>
@@ -624,7 +810,7 @@ function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChi
           x="center"
           modifiers={[motion({ initial: [fade, slideUp(24)], duration: 'slow' })]}>
           {TRACKS.map((_track, index) => (
-            <TrackRow key={index} index={index} />
+            <TrackRow key={index} playlistId={playlist.id} index={index} />
           ))}
         </column>
       </column>
@@ -701,8 +887,22 @@ function AppHeader(props: Inputs<{ hidden: boolean }>): UiChild {
 export function TransitionsExampleApp(_props: Inputs<Record<string, never>>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
   const onDetail = router.match.pipe(map(match => match?.route === Detail));
+  // Escape is Back. Keys go to the focused node and bubble; with nothing
+  // focused they go to the root, so this one handler covers a person
+  // who tabbed to a heart and one who never touched the keyboard.
+  const onKeyDown = (event: UiKeyboardEvent): void => {
+    if (event.key === 'Escape' && router.match.value?.route === Detail) {
+      event.preventDefault();
+      router.go(Home);
+    }
+  };
   return (
-    <box width={percent(100)} height={percent(100)} position="relative" backgroundColor={PAGE_BACKGROUND}>
+    <box
+      width={percent(100)}
+      height={percent(100)}
+      position="relative"
+      backgroundColor={PAGE_BACKGROUND}
+      onKeyDown={onKeyDown}>
       {/* An `exit` and no `enter`, deliberately. The arriving screen has
           to be at full opacity from its first frame, because the
           elements morphing across the change are *inside* it and a
