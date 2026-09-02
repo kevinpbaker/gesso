@@ -1,4 +1,22 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["packages/*/src", "apps/*/src"]
+  /*
+   * The `.vitepress` entry is spelled out as a glob rather than as the
+   * directory. A directory in `include` expands to a wildcard, and a
+   * wildcard skips path segments beginning with a dot, so naming the
+   * folder alone matches nothing at all.
+   *
+   * It covers the `.ts` files there and not the two `.vue` components
+   * beside them, which `tsc` cannot read. See
+   * `apps/docs/.vitepress/vue-shim.d.ts`.
+   */
+  "include": ["packages/*/src", "apps/*/src", "apps/docs/.vitepress/**/*.ts"],
+  /*
+   * `node_modules` is the default exclusion and has to be repeated once
+   * anything else is listed. The other two are VitePress's build output
+   * and its transform cache, which sit inside the directory the glob
+   * above walks: without them the result of a typecheck would depend on
+   * whether somebody had built the site.
+   */
+  "exclude": ["**/node_modules", "apps/docs/.vitepress/dist", "apps/docs/.vitepress/cache"]
 }

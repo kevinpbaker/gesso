@@ -18,6 +18,8 @@
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
+    "typecheck": "tsc --noEmit",
+    "typecheck:docs": "tsc -p apps/docs --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
     "fixtures:layout": "node scripts/gen-layout-fixtures.ts",
