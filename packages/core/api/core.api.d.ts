@@ -2194,12 +2194,12 @@ interface KeyboardControllerOptions {
 declare class UiKeyboardController {
   private readonly dispatcher;
   private readonly focusManager;
-  private readonly root;
   private readonly tabNavigation;
   private readonly editing;
   private readonly selection;
   private readonly find;
-  constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode, options?: KeyboardControllerOptions);
+  private readonly root;
+  constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode | (() => UiNode), options?: KeyboardControllerOptions);
   keyDown(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
 }
@@ -4811,7 +4811,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-Olu55rBU.js";
+} from "./index-C0g8-pP4.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5493,7 +5493,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Olu55rBU.js";
+} from "./index-C0g8-pP4.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

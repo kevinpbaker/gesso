@@ -640,6 +640,106 @@ declare class ShellService {
   copyText(text: string): void;
   openUrl(url: string): void;
 }
+type UiDuration = UiDurationToken | number;
+type UiEasingChoice = UiEasingToken | UiEasing;
+interface AnimateOptions {
+  duration?: UiDuration;
+  easing?: UiEasingChoice;
+  stepMs?: number;
+  repeat?: boolean;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+}
+interface SpringOptions {
+  spring?: UiSpringToken | UiSpringSpec;
+  stiffness?: number;
+  damping?: number;
+  mass?: number;
+  velocity?: number;
+  restDelta?: number;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+}
+declare class AnimationService {
+  readonly reducedMotion: InternalState<boolean>;
+  private driver;
+  private motionVocabulary;
+  setDriver(driver: AnimationDriver | null): void;
+  setMotion(motion: UiMotion): void;
+  get motion(): UiMotion;
+  applyReducedMotion(reduced: boolean): void;
+  animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
+  spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
+  stop<T>(cell: AnimatedCell<T>): boolean;
+  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
+  private resolveDuration;
+  private resolveEasing;
+}
+interface AudioSample {
+  readonly status: AudioStatus;
+  readonly position: number;
+  readonly duration: number;
+  readonly buffered: number;
+  readonly at: number;
+  readonly error?: string;
+}
+type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
+type AudioRequest = {
+  readonly type: 'load';
+  readonly src: string;
+  readonly autoplay: boolean;
+} | {
+  readonly type: 'play';
+} | {
+  readonly type: 'pause';
+} | {
+  readonly type: 'seek';
+  readonly seconds: number;
+} | {
+  readonly type: 'volume';
+  readonly level: number;
+} | {
+  readonly type: 'metadata';
+  readonly metadata: AudioMetadata | null;
+};
+type AudioAction = 'play' | 'pause' | 'next' | 'previous';
+interface AudioMetadata {
+  readonly title: string;
+  readonly artist: string;
+  readonly album?: string;
+  readonly artwork?: string;
+}
+interface AudioState {
+  readonly status: AudioStatus;
+  readonly position: number;
+  readonly duration: number;
+  readonly buffered: number;
+  readonly src: string | null;
+  readonly error?: string;
+}
+declare class AudioService {
+  private handler;
+  private animations;
+  private readonly sample;
+  private readonly source;
+  private readonly position;
+  private readonly actionSubject;
+  readonly state: Observable<AudioState>;
+  readonly actions: Observable<AudioAction>;
+  get current(): AudioState;
+  setHandler(handler: ((request: AudioRequest) => void) | null): void;
+  setAnimations(animations: AnimationService | null): void;
+  applySample(sample: AudioSample): void;
+  applyAction(action: AudioAction): void;
+  load(src: string, options?: {
+    readonly autoplay?: boolean;
+  }): void;
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  setVolume(level: number): void;
+  setMetadata(metadata: AudioMetadata | null): void;
+}
 interface MediaOptions {
   resolver?: ImageResolver;
   rasterizer?: IconRasterizer;
@@ -743,6 +843,7 @@ declare class GessoRuntime {
   private semanticsStale;
   private lastEditingState;
   private shellListener;
+  private audioListener;
   private caretTimer;
   private scrollbarTimer;
   private inspectorTimer;
@@ -771,6 +872,9 @@ declare class GessoRuntime {
   onEditingState(listener: ((state: EditingState$1 | null) => void) | null): void;
   get editingState(): EditingState$1 | null;
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
+  onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
+  applyAudioSample(sample: AudioSample): void;
+  applyAudioAction(action: AudioAction): void;
   setTextInputSource(source: 'proxy' | 'keys'): void;
   setVisible(visible: boolean): void;
   setReducedMotion(reduced: boolean): void;
@@ -995,6 +1099,14 @@ type ShellToRuntimeMessage = {
   action: UiSemanticsAction;
 } |
 {
+  type: 'audioSample';
+  sample: AudioSample;
+} |
+{
+  type: 'audioAction';
+  action: AudioAction;
+} |
+{
   type: 'tick';
   time: number;
 } | {
@@ -1052,6 +1164,10 @@ type RuntimeToShellMessage = {
   url?: string;
 } |
 {
+  type: 'audio';
+  request: AudioRequest;
+} |
+{
   type: 'frameLoop';
   running: boolean;
 } | {
@@ -1081,6 +1197,7 @@ declare class WorkerApp {
   private detachInput;
   private proxy;
   private mirror;
+  private audio;
   private scrollability;
   private history;
   private ready;
@@ -1133,6 +1250,7 @@ declare class GessoApp {
   private running;
   private resizeObserver;
   private proxy;
+  private audio;
   private mirror;
   private history;
   private detachVisibility;
@@ -1160,6 +1278,64 @@ declare class GessoApp {
   private handleShellRequest;
   private observeResize;
 }
+interface AudioElementLike extends EventTarget {
+  src: string;
+  currentTime: number;
+  volume: number;
+  preload: string;
+  readonly duration: number;
+  readonly paused: boolean;
+  readonly ended: boolean;
+  readonly buffered: {
+    readonly length: number;
+    start(index: number): number;
+    end(index: number): number;
+  };
+  readonly error: {
+    readonly code: number;
+    readonly message?: string;
+  } | null;
+  play(): Promise<void>;
+  pause(): void;
+  load(): void;
+}
+interface MediaSessionLike {
+  metadata: unknown;
+  playbackState: 'none' | 'paused' | 'playing';
+  setActionHandler(action: string, handler: ((details: {
+    seekTime?: number;
+  }) => void) | null): void;
+}
+interface AudioSinkOutput {
+  sample(sample: AudioSample): void;
+  action(action: AudioAction): void;
+}
+interface AudioSinkOptions {
+  readonly createElement?: () => AudioElementLike;
+  readonly mediaSession?: MediaSessionLike | null;
+  readonly sampleEveryMs?: number;
+}
+declare class AudioSink {
+  private readonly out;
+  private readonly element;
+  private readonly session;
+  private readonly sampleEveryMs;
+  private timer;
+  private waiting;
+  private refused;
+  private readonly onEvent;
+  constructor(out: AudioSinkOutput, options?: AudioSinkOptions);
+  handle(request: AudioRequest): void;
+  dispose(): void;
+  private play;
+  private handleEvent;
+  private status;
+  private emit;
+  private startTimer;
+  private stopTimer;
+  private setMetadata;
+  private bindSession;
+}
 interface RouteTransition {
   enter?: MotionStateInput;
   exit?: MotionStateInput;
@@ -1182,41 +1358,6 @@ interface PresenceProps {
   exitTimeout?: number;
 }
 declare function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): UiChild;
-type UiDuration = UiDurationToken | number;
-type UiEasingChoice = UiEasingToken | UiEasing;
-interface AnimateOptions {
-  duration?: UiDuration;
-  easing?: UiEasingChoice;
-  stepMs?: number;
-  repeat?: boolean;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-}
-interface SpringOptions {
-  spring?: UiSpringToken | UiSpringSpec;
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  velocity?: number;
-  restDelta?: number;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-}
-declare class AnimationService {
-  readonly reducedMotion: InternalState<boolean>;
-  private driver;
-  private motionVocabulary;
-  setDriver(driver: AnimationDriver | null): void;
-  setMotion(motion: UiMotion): void;
-  get motion(): UiMotion;
-  applyReducedMotion(reduced: boolean): void;
-  animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
-  spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
-  stop<T>(cell: AnimatedCell<T>): boolean;
-  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
-  private resolveDuration;
-  private resolveEasing;
-}
 declare function observeReducedMotion(onChange: (reduced: boolean) => void): () => void;
 declare function observeMediaQuery(query: string, onChange: (matches: boolean) => void): () => void;
 declare class FindService {
@@ -1374,6 +1515,8 @@ export {
   APPLICATION_WORKER,
   applyPatch,
   applyPatches,
+  AudioService,
+  AudioSink,
   buildPath,
   channel,
   Channel,
@@ -1435,6 +1578,15 @@ export {
   structurallyEqual,
   to,
   type AnimateOptions,
+  type AudioAction,
+  type AudioElementLike,
+  type AudioMetadata,
+  type AudioRequest,
+  type AudioSample,
+  type AudioSinkOptions,
+  type AudioSinkOutput,
+  type AudioState,
+  type AudioStatus,
   type ChannelClientMessage,
   type ChannelHostMessage,
   type ChannelPort,
@@ -1462,6 +1614,7 @@ export {
   type GessoRuntimeOptions,
   type Inputs,
   type MediaOptions,
+  type MediaSessionLike,
   type MessageEndpoint,
   type OutletProps,
   type OverlayEntry,
