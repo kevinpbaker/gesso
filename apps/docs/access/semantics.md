@@ -86,12 +86,20 @@ buttons in the example are labelled, so the record reads "Fewer
 stories" while the pixels read "Fewer"; Save is not, so the word it
 draws is its name.
 
-Roles that ARIA calls "children presentational", among them `button`,
-`checkbox`, `switch`, `radio`, `option`, `tab`, `slider` and `image`,
-hide their subtree. A labelled button does not also announce the glyph
+Roles whose children are presentational, among them `button`,
+`checkbox`, `switch`, `radio`, `option`, `tab`, `slider`, `image` and
+`menuitem`, hide their subtree. A labelled button does not also announce the glyph
 inside it, and the switch row above is one record rather than a record
 plus the word next to it. A labelled _container_ claims nothing: its
 label names it, and its children are the content that label introduces.
+
+Most of that set is ARIA's own `childrenArePresentational` list.
+`menuitem` is not on it: ARIA names a menu item from its author or its
+contents, so a strict reading would leave the text inside a row with a
+record of its own. Gesso claims it anyway, for the same reason it
+claims `option` and `tab`, which is that a menu row named by its label
+and a menu row's label are one thing to a reader and were two records
+to a screen reader.
 
 Two consequences are worth knowing before you meet them.
 
