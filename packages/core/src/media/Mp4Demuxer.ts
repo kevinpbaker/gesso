@@ -243,7 +243,7 @@ export function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack {
     if (sawFragment) {
       throw new Error(
         'This is a fragmented MP4 (it has moof boxes), which this demuxer does not read. ' +
-          'Remux it to a progressive file — `ffmpeg -i in.mp4 -c copy -movflags +faststart out.mp4`.'
+          'Remux it to a progressive file: `ffmpeg -i in.mp4 -c copy -movflags +faststart out.mp4`.'
       );
     }
     throw new Error('This MP4 has no video track, or none this demuxer recognises.');

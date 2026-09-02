@@ -422,7 +422,7 @@ export class UiGraphBuilder {
       throw new Error(
         `Component '${element.tag}' cannot take 'modifiers': a component's node is its anchor, which is a ` +
           `fragment with no box and no paint, so there is nothing for a modifier to attach to. Put them on an ` +
-          `element the component renders — or, if the component offers it, pass 'rootModifiers', which is the ` +
+          `element the component renders, or, if the component offers it, pass 'rootModifiers', which is the ` +
           `convention for a component that places them on its own root element (see 'modifiersOf').`
       );
     }

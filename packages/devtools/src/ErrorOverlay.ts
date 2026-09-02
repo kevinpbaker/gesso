@@ -16,7 +16,7 @@ export type ErrorOrigin = RuntimeErrorSource | 'window';
 const ORIGINS: Record<ErrorOrigin, { label: string; note: string }> = {
   uncaught: {
     label: 'render worker',
-    note: 'Nothing caught this, so it happened outside a message — almost always during a frame. That frame’s work was already taken off the dirty set, so what you see may be stale.'
+    note: 'Nothing caught this, so it happened outside a message, almost always during a frame. That frame’s work was already taken off the dirty set, so what you see may be stale.'
   },
   message: {
     label: 'render worker',

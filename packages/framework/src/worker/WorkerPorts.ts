@@ -69,8 +69,8 @@ export const APPLICATION_WORKER: WorkerHandle = {
   open(): MessagePort {
     throw new Error(
       'APPLICATION_WORKER was used directly. It is a placeholder the render worker ' +
-        "replaces with the shell's port; reaching it means no application-logic worker was supplied — " +
-        'pass appLogicWorker to createApp.'
+        "replaces with the shell's port; reaching it means no application-logic worker was supplied. " +
+        'Pass appLogicWorker to createApp.'
     );
   },
   spawned: false,

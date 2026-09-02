@@ -190,7 +190,7 @@ function warnNotInterpolable(property: NodeProperty): void {
   console.warn(
     `A 'transition' was declared for '${property}', but its values cannot be blended, so it is written directly. ` +
       `Numbers, UiColor objects and transforms can be animated; typed lengths (percent, fr, auto) and palette ` +
-      `names cannot — see interpolatorFor in packages/core/src/animation/Interpolate.ts.`
+      `names cannot. See interpolatorFor in packages/core/src/animation/Interpolate.ts.`
   );
 }
 
