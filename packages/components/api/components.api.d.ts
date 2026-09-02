@@ -355,7 +355,7 @@ interface TreeProps extends ControlLayoutProps {
 declare function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
 interface ImageProps extends ControlLayoutProps {
   ref?: UiNodeRef;
-  src: string;
+  src: string | readonly string[];
   alt?: string;
   objectFit?: ObjectFit;
   borderRadius?: number;

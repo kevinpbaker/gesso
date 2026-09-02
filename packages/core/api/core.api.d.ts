@@ -2884,9 +2884,10 @@ declare class IconRasterizer {
   dispose(): void;
   private draw;
 }
+type ImageSources = string | readonly string[];
 interface ImageSourceArgs {
   readonly resolver: ImageResolver;
-  readonly source: Reactive<string>;
+  readonly source: Reactive<ImageSources>;
   readonly onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 declare const imageSource: ((args: ImageSourceArgs, key?: string | number) => UiModifier<ImageSourceArgs>) & {
@@ -3530,7 +3531,6 @@ interface UiSemanticsAction {
   readonly value?: string;
 }
 export {
-  Ac,
   accumulatedOffsetTo,
   Affine,
   AlignContent,
@@ -3732,6 +3732,7 @@ export {
   ImageResolver,
   imageSource,
   ImageSourceArgs,
+  ImageSources,
   inheritedPropertyFlags,
   inheritedPropertyNames,
   initializeWebGPU,
@@ -3768,6 +3769,7 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  jc,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -4384,6 +4386,7 @@ import {
   ImageResolver,
   imageSource,
   ImageSourceArgs,
+  ImageSources,
   inheritedPropertyFlags,
   inheritedPropertyNames,
   initializeWebGPU,
@@ -4832,7 +4835,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-B1vwWyzY.js";
+} from "./index-CJZoc529.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5208,6 +5211,7 @@ export {
   type ImageCommand,
   type ImageResolver,
   type ImageSourceArgs,
+  type ImageSources,
   type InspectorOverlay,
   type InteractionProps,
   type InteractiveOptions,
@@ -5515,7 +5519,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-B1vwWyzY.js";
+} from "./index-CJZoc529.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
