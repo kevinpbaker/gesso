@@ -20,7 +20,8 @@ import {
   slideDown,
   scrollPosition,
   slideUp,
-  type UiChild
+  type UiChild,
+  type UiModifier
 } from '@gesso/core';
 
 import { ICONS, playlistById, PLAYLISTS, TRACKS, type Playlist } from './transitions/playlists';
@@ -160,7 +161,9 @@ function Stats(props: Inputs<{ playlist: Playlist }>): UiChild {
 }
 
 /** A round control button, as the player row is made of. */
-function Control(props: Inputs<{ path: string; big?: boolean; stroke?: boolean }>): UiChild {
+function Control(
+  props: Inputs<{ path: string; big?: boolean; stroke?: boolean; rootModifiers?: readonly UiModifier[] }>
+): UiChild {
   const big = input(props.big, false);
   const size = big.value ? 70 : 46;
   return (
@@ -170,7 +173,8 @@ function Control(props: Inputs<{ path: string; big?: boolean; stroke?: boolean }
       borderRadius={size / 2}
       backgroundColor={big.value ? CARD : 'rgba(0, 0, 0, 0.8)'}
       x="center"
-      y="center">
+      y="center"
+      modifiers={props.rootModifiers.value}>
       <Icon
         path={props.path.value}
         size={big.value ? 26 : 20}
@@ -186,27 +190,34 @@ function Control(props: Inputs<{ path: string; big?: boolean; stroke?: boolean }
 /**
  * The row of player controls over the artwork.
  *
- * The detail screen shows two more of them, which is the one place the
- * shared element genuinely changes shape rather than only size — and
- * it morphs anyway, because a translate and a scale do not care what
- * is inside.
+ * Each button is its own shared element, not the row. The detail screen
+ * shows two more buttons than the card, so the row is the one element
+ * here that genuinely changes shape: 202px wide on the card, 334px on
+ * the page, the same height on both. A shared element scales by the
+ * ratio of the two boxes, so a row named as one piece arrived squashed
+ * to 0.6 of its width at full height and stretched back out, and every
+ * circle in it was an ellipse for the whole of the morph. Measured
+ * exactly that, with the morph slowed down. Named one by one, each
+ * button pairs with a box of its own size and the morph is a pure
+ * translate, so a circle stays a circle all the way. The two buttons
+ * that exist only on the page have nothing to pair with; they simply
+ * arrive, like the back button.
  */
 function PlayerControls(props: Inputs<{ playlist: Playlist; full?: boolean }>): UiChild {
   const playlist = props.playlist.value;
   const full = input(props.full, false).value;
+  const shared = (control: string): readonly UiModifier[] => [
+    sharedElement({ name: `playlist-control-${control}-${playlist.id}` })
+  ];
+  const arrives: readonly UiModifier[] = [motion({ initial: fade, duration: 'slow' })];
   return (
     <box position="absolute" left={0} right={0} bottom={0} x="center">
-      <row
-        gap={20}
-        y="center"
-        paddingTop={28}
-        paddingBottom={28}
-        modifiers={[sharedElement({ name: `playlist-controls-${playlist.id}` })]}>
-        {full ? [<Control path={ICONS.download} key="download" />] : []}
-        <Control path={ICONS.ban} stroke />
-        <Control path={ICONS.play} big />
-        <Control path={ICONS.thumbsUp} />
-        {full ? [<Control path={ICONS.ellipsis} key="more" />] : []}
+      <row gap={20} y="center" paddingTop={28} paddingBottom={28}>
+        {full ? [<Control path={ICONS.download} key="download" rootModifiers={arrives} />] : []}
+        <Control path={ICONS.ban} stroke rootModifiers={shared('ban')} />
+        <Control path={ICONS.play} big rootModifiers={shared('play')} />
+        <Control path={ICONS.thumbsUp} rootModifiers={shared('like')} />
+        {full ? [<Control path={ICONS.ellipsis} key="more" rootModifiers={arrives} />] : []}
       </row>
     </box>
   );

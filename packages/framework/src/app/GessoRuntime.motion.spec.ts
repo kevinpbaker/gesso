@@ -331,6 +331,10 @@ describe('sharedElement()', () => {
     expect(reported).toEqual([]);
 
     showSecond.value = true;
+    // Reported at the claim, before the frame runs: a raise made in
+    // answer to it has to be in that frame's layout, where paint order
+    // is sorted. The test below is what goes wrong otherwise.
+    expect(reported).toEqual([true]);
     mounted.frame();
     expect(reported).toEqual([true]);
 
@@ -414,11 +418,18 @@ describe('sharedElement()', () => {
     drain(mounted);
 
     // Coming back, the card's inner box morphs down from 400x600, so
-    // for the length of the morph it covers the neighbour's row.
+    // for the length of the morph it covers the neighbour's row. The
+    // very first frame included: the raise is asked for at the claim,
+    // before that frame lays out and sorts its paint order. Asked for
+    // from the layout callback instead (where the FLIP is applied) it
+    // landed after the sort, and that one frame with the neighbour
+    // drawn over the card was a visible flash in the transitions
+    // example.
     detail.value = false;
-    mounted.frame();
-    mounted.frame();
     expect(morphing.value).toBe(true);
+    fills.mockClear();
+    mounted.frame();
+    expect(onTop()).toBe('card');
     fills.mockClear();
     mounted.frame();
     expect(onTop()).toBe('card');
