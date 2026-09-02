@@ -1,5 +1,5 @@
 ---
-description: 'Attaching behaviour to an element without wrapping it: the modifiers prop, the override cascade, why a modifier value is shared rather than rebuilt, and what one is allowed to touch.'
+description: 'Attaching behaviour to an element without wrapping it: the modifiers prop, the override cascade, how a modifier survives the rebuild of the element it is on, and what one is allowed to touch.'
 ---
 
 # Modifiers
@@ -82,40 +82,57 @@ modifier's write of one property. A write to a property name the
 registry does not know throws, on the grounds that an unknown name is a
 typo and the registry's closedness is what makes that catchable.
 
-## Share the value, do not rebuild it
+## What survives a rebuild
 
 <<< @/src/examples/ModifiersExample.tsx#identity
 
-This is the one rule that will bite. A modifier's arguments are compared
-by identity, exactly as a property's value is. The set attached to a
-node is reconciled the way keyed children are, matched by kind and
-position, and `update` runs only when the arguments differ. A kind with
-no `update`, which is most of them, answers a change by detaching and
-attaching again: listeners dropped and re-registered, overrides taken
-off the node, and whatever per-attachment state it was keeping gone.
+The set attached to a node is reconciled the way keyed children are,
+matched by kind and position, and what happens to a match is decided by
+its arguments. They are compared by value: plain objects and arrays are
+walked, key by key and element by element, primitives compare as
+primitives, and everything else, a function, an Observable, a class
+instance, compares by identity, because a new callback or a new stream
+is a genuinely new argument. Two objects whose key sets differ are
+different arguments, even when the extra key holds `undefined`, and the
+walk gives up past eight levels of nesting and asks for the same object
+instead.
 
-So a modifier built inside a render body, with a fresh object literal
-for its arguments, is torn down and rebuilt on every render of that
-subtree. A hover highlight blinks off, an `autoFocus()` fires a second
-time, a drag in flight is dropped.
+Equal arguments mean there is nothing to do: the modifier stays
+attached and keeps whatever state it is holding. An
+`interactive({ hovered: { opacity: 0.9 } })` written in the render is
+the same modifier on the render after it, which is how it reads.
 
-The counter in the example measures exactly that: press the button and
-one number stays at one while the other climbs. Both boxes carry the
-same kind; only the arguments differ.
+Different arguments are a change to answer. A kind with an `update` is
+told, and stays attached. A kind with no `update`, which is most of
+them, detaches and attaches again: listeners dropped and re-registered,
+overrides taken off the node, and whatever per-attachment state it was
+keeping gone. A hover highlight blinks off, an `autoFocus()` fires a
+second time, a drag in flight is dropped.
 
-Two places are safe to build one:
+So the thing to watch is a callback. An arrow function written inside
+the render is a new function every time, and a new function is a new
+argument no matter what surrounds it. The example measures that: three
+boxes carry the same kind, and pressing the button leaves two counters
+at one while the third climbs. The one that climbs is the box whose
+handler is written in the render; the box beside it passes an equal
+object built just as freshly, and nothing happens to it.
+
+Sharing one value is then a question of cost rather than of
+correctness. A shared value matches on the first comparison and stops,
+allocating nothing per render, where an inline one is allocated and
+then walked in proportion to its size. Two places are the natural home
+for one:
 
 - **Module scope**, which is where the hover style every example on this
   site shares is declared, and where the component library keeps the
   interaction and the ring every control carries.
 - **A component body**, because [a component runs
   once](/guide/components-run-once). A value captured in a `const`
-  there keeps its identity for the life of the tree even when the
-  element around it is rebuilt.
+  there is built once for the life of the tree even when the element
+  around it is rebuilt, and so is a handler captured beside it.
 
-Factories with no arguments already do it for you: `focusRing()` and
-`autoFocus()` each return one shared value. A factory you call with
-options should have the options hoisted.
+Factories with no arguments hand one over anyway: `focusRing()` and
+`autoFocus()` each return a single shared value.
 
 The list itself is static per element. There is no Observable list of
 modifiers; the arguments are where a value may vary, and a genuinely
@@ -264,8 +281,8 @@ rather than a guaranteed one.
 **Where this page was checked.** Everything above is either taken from
 the source or measured by the spec beside the example, which drives the
 cascade through a real pointer, the ring through the focus manager and
-the identity rule through four renders. The reference modifiers were
-checked by hand in the framework playground in Chrome on Linux, in the
+the argument comparison through four renders. The reference modifiers
+were checked by hand in the framework playground in Chrome on Linux, in the
 render worker, on Canvas2D: hover and press write and restore, the ring
 follows Tab and is clipped by the scroller it is half scrolled out of,
 `measure` follows a divider and a slider, a dragged tile stays where it

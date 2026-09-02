@@ -51,9 +51,10 @@ component that renders the element hands over its own overlay entry,
 which is also what closes the tooltip when that component unmounts.
 
 Build the modifier once, in the component body, and pass the same value
-every time. A modifier's arguments are compared by identity, so a fresh
-object per frame detaches and re-attaches the listeners on every frame.
-The body runs once, so a `const` in it is exactly right.
+every time. Each call to `tooltip()` takes an overlay entry of its own,
+so calling it per render would be a new entry every render rather than
+another look at the same one. The body runs once, so a `const` in it is
+exactly right.
 
 The options are plain values rather than Observables. A tooltip whose
 text changes while it is open is reopened with the new text; one that

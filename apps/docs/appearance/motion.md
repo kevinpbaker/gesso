@@ -157,11 +157,16 @@ modifier absorbs a move only when its parent's child list actually
 changed. A window resize is followed rather than animated for the same
 reason.
 
-**A modifier's arguments are compared by identity.** Building
-`animateLayout({ ... })` inside the list would detach and re-attach the
-modifier on every emission, and a modifier that has just attached has no
-previous box to animate from, so nothing would move at all. Hoist one
-value and share it, as the example does.
+**It has to survive the render to have a previous box.** A modifier
+that has just attached has nothing to animate from, so anything that
+re-attaches this one on every emission leaves the list jumping instead
+of moving. Its arguments are compared by value, and these are plain
+options, so writing `animateLayout({ ... })` inside the list keeps the
+modifier attached across the emission. What would not survive is an
+argument holding a function or a stream built in the render, since those
+are compared as the same only when they are the same one. The example
+hoists a single value and shares it across the rows, which says the
+timing once and saves building it per row.
 
 The offset is written as the transform's **translation**, which is
 paint-only: a reordering list marks Paint and the layout engine does not

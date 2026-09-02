@@ -56,9 +56,11 @@ the runtime turns Enter on a focused button into a click, and
 and why. Writing the four once, in a helper, is the difference between
 a flow that works from the keyboard and one that mostly does.
 
-The modifiers are module constants. A modifier's arguments are
-compared by identity, so a fresh `focusRing()` per render would detach
-and re-attach the ring on every frame.
+The modifiers are module constants, so every button in the flow is
+given the same hover, the same press and the same ring rather than a
+description of them repeated at each call site. A modifier's arguments
+are compared by value, so building them in the render would keep them
+attached too; the constants are for saying it once.
 
 ## The row
 

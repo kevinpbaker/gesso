@@ -91,9 +91,12 @@ component's own root rather than to a box wrapped around it. That is
 what a modifier needs in order to see the control's real geometry: a
 `measure` on a wrapper reports the wrapper.
 
-Declare a modifier once at module scope rather than constructing it in
-the call. A modifier's arguments are compared by identity, so a fresh
-one detaches and re-attaches every frame.
+A modifier's arguments are compared by value when the control is
+rebuilt, so one constructed in the call stays attached as long as its
+options say the same thing. Declaring it once at module scope is the
+cheaper habit, and the one thing that does have to be the same value
+each time is a handler or a stream among those options: a fresh
+function is a new argument.
 
 If a control needs to look different from the rest of the application,
 the answer is a different theme in the environment for that subtree, not

@@ -59,9 +59,10 @@ Every prop takes a plain value or an Observable of one, and the shared
 layout props on [the library page](/components/) apply here: `Select`
 spreads them onto its own outer column. `rootModifiers` goes somewhere
 else, onto the trigger beside the focus ring, because that is the
-element that takes focus and carries the role. Declare the value once at
-module scope, since a modifier's arguments are compared by identity and
-a fresh one detaches and re-attaches on every frame.
+element that takes focus and carries the role. Its arguments are
+compared by value when the trigger is rebuilt, so a modifier written at
+the call site stays attached as long as its options say the same thing;
+declaring the value once at module scope just saves building it again.
 
 A value that matches no option leaves the trigger blank rather than
 throwing, and blank is not the placeholder: the placeholder is for the

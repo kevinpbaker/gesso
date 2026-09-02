@@ -9,11 +9,12 @@ const FOLDERS = ['Inbox', 'Drafts', 'Sent', 'Archive'] as const;
 /**
  * One modifier value, shared by every row.
  *
- * A modifier's arguments are compared by identity, so a fresh object
- * built inside the list would detach and re-attach the modifier on
- * every emission, and a modifier that has just attached has no
- * previous box to animate from. The shared controls on this site are
- * hoisted for the same reason.
+ * A modifier that has just attached has no previous box to animate
+ * from, so this one only moves anything if it survives the list's
+ * re-render. Arguments are compared by value and these are plain
+ * options, so they would survive written inside the list as well; one
+ * value shared by every row says the timing once and saves building it
+ * per row.
  */
 const FLIP = animateLayout({ spring: 'snappy' });
 

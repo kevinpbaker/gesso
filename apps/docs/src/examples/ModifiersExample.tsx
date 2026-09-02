@@ -53,15 +53,21 @@ const attachments = defineModifier<{ readonly seen: () => void }>({
 export function ModifierSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
   const renders = internalState(0);
   const kept = internalState(0);
+  const equal = internalState(0);
   const rebuilt = internalState(0);
   const size = new Subject<LayoutBox>();
 
   /**
-   * The component body runs once, so this object is made once and its
-   * identity holds for the life of the tree. The modifier below it is
-   * built inside the render, so it is a new object every time.
+   * The component body runs once, so this object is made once and the
+   * comparison below matches it without looking inside. The handler
+   * beside it is made once for the same reason, and is what lets the
+   * second box build a fresh object every render and still be holding
+   * the same argument.
    */
   const keptArgs = { seen: () => kept.value++ };
+  const countEqual = (): void => {
+    equal.value++;
+  };
 
   // #region cascade
   /**
@@ -99,22 +105,24 @@ export function ModifierSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
 
   // #region identity
   /**
-   * The same modifier twice, and only one of them survives a render.
+   * The same modifier three times, and only one of them is rebuilt.
    *
-   * A modifier's arguments are compared by identity, exactly as a
-   * property's value is. The left box passes an object made once, so
-   * every later render matches it and nothing happens. The right box
-   * builds its arguments inside the render, so every render is a fresh
-   * object, and a kind with no `update` answers that with a detach and
-   * an attach: its listeners are dropped and re-registered, its
-   * overrides are taken off the node, and any state it was keeping is
-   * gone.
+   * A modifier's arguments are compared by value. The first box passes
+   * an object made once, and the comparison matches it without looking
+   * inside. The second builds an equal object inside the render, and
+   * because its one field holds the same handler the comparison finds
+   * nothing different, so that modifier is left alone as well. The
+   * third writes its handler as an arrow function in the render, which
+   * is a new function every time and so a genuinely new argument: a
+   * kind with no `update` answers that with a detach and an attach, its
+   * listeners dropped and re-registered, its overrides taken off the
+   * node, and any state it was keeping gone.
    *
-   * Press the button and watch one counter stay at one.
+   * Press the button and watch two counters stay at one.
    */
   const pair = renders.pipe(
     map(() => (
-      <row gap={12} y="center">
+      <row gap={12} y="center" flexWrap="wrap">
         <box padding={10} borderRadius={8} borderWidth={1} borderColor="border" modifiers={[attachments(keptArgs)]}>
           <text text="one shared value" fontSize={12} color="text" />
         </box>
@@ -123,8 +131,16 @@ export function ModifierSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
           borderRadius={8}
           borderWidth={1}
           borderColor="border"
+          modifiers={[attachments({ seen: countEqual })]}>
+          <text text="an equal object" fontSize={12} color="text" />
+        </box>
+        <box
+          padding={10}
+          borderRadius={8}
+          borderWidth={1}
+          borderColor="border"
           modifiers={[attachments({ seen: () => rebuilt.value++ })]}>
-          <text text="built in the render" fontSize={12} color="text" />
+          <text text="a new callback" fontSize={12} color="text" />
         </box>
       </row>
     ))
@@ -157,11 +173,8 @@ export function ModifierSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
           color="textMuted"
         />
         <text text={kept.pipe(map(count => `shared value: attached ${count}`))} fontSize={12} color="textMuted" />
-        <text
-          text={rebuilt.pipe(map(count => `built in the render: attached ${count}`))}
-          fontSize={12}
-          color="textMuted"
-        />
+        <text text={equal.pipe(map(count => `equal object: attached ${count}`))} fontSize={12} color="textMuted" />
+        <text text={rebuilt.pipe(map(count => `new callback: attached ${count}`))} fontSize={12} color="textMuted" />
       </column>
     </column>
   );

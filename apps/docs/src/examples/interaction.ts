@@ -3,17 +3,18 @@ import { interactive, type UiModifier } from '@gesso/core';
 /**
  * Hover and press, for anything on this site a reader can click.
  *
- * Two shared values rather than one per call site, because a
- * modifier's arguments are compared by identity: a fresh object per
- * render would detach and re-attach on every frame
- * (`decisions/0022-modifiers.md`). The library's own controls share
- * `CONTROL_INTERACTION` for exactly this reason.
+ * Two shared values rather than one per call site, so what a clickable
+ * thing looks like here is settled in one place instead of being spelt
+ * out at every one of them. A modifier's arguments are compared by value,
+ * so the same options written inline would be the same modifier and
+ * would stay attached; sharing saves the object and the walk, not the
+ * modifier. The library's own controls share `CONTROL_INTERACTION` in
+ * the same way.
  *
  * A `<button>` already publishes `hovered` and `pressed` as
  * `visualState`, but nothing paints a colour from that state on its
  * own, because what a hovered control looks like is the application's.
- * These
- * two say what it looks like here.
+ * These two say what it looks like here.
  *
  * Colours are theme tokens, resolved at paint against whatever theme
  * the node inherits, so both work in light and dark without either

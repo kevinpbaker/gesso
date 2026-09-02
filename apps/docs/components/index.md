@@ -112,10 +112,14 @@ nothing about sizes itself.
 `rootModifiers` is the seam a modifier needs. It attaches to the
 component's own root rather than to a box wrapped around it, which
 matters because `measure`, `motion` and `sharedElement` all describe an
-element: a modifier on a wrapper reports the wrapper. Declare the
-modifier once at module scope and pass the same value every time, since
-a modifier's arguments are compared by identity and a fresh object
-detaches and re-attaches the modifier on every frame.
+element: a modifier on a wrapper reports the wrapper. A modifier's
+arguments are compared by value when the control around it is rebuilt,
+so one written at the call site stays attached as long as its options
+say the same thing. A callback or an Observable among them counts as the
+same only when it is the same one, so hold on to the Subject a `measure`
+reports into rather than making a fresh one per render. Declaring the
+modifier once at module scope is the cheapest form of all of this, and
+it is what the library's own controls do.
 
 ## How to read the pages that follow
 

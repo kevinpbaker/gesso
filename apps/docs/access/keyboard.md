@@ -88,10 +88,11 @@ key from moving to it.
 The focus ring goes on the element that _is_ the control, which for one
 of these containers is the container. That is the right thing to mark:
 the ring says where the keyboard is, and which item inside is chosen is
-said by the item's own colour. Every control in the library shares one
-`focusRing()` modifier, declared once, because a modifier's arguments
-are compared by identity and a fresh one per render would detach and
-re-attach the ring on every frame.
+said by the item's own colour. Every control in the library carries the
+same `focusRing()`: called with no options the factory hands back one
+shared value, and a ring given options is compared with the attached one
+by what those options say, so the ring survives the control's re-render
+either way.
 
 ## What the library binds
 

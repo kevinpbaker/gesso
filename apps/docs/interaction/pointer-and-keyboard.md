@@ -157,9 +157,11 @@ Hover is state, not paint. A `<button>` publishes `hovered` and
 own, because what a hovered control looks like belongs to the
 application. The examples on this site share two `interactive`
 modifiers that say what a hovered and a pressed control look like here,
-and both are declared once at module scope rather than per call site:
-declaring one inline in the render would detach and re-attach it on
-every frame, because a modifier's arguments are compared by identity.
+and both are declared once at module scope rather than per call site, so
+the two colours are settled in one file. Writing the same options inline
+would work too: a modifier's arguments are compared by value, so an
+`interactive({ ... })` in the render is the same modifier on the render
+after it and keeps the pointer state it is holding.
 
 The cursor is resolved the way CSS inherits it: the node's own
 `cursor`, else the nearest ancestor's, so a button sets

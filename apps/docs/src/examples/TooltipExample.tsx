@@ -15,9 +15,9 @@ import { HOVER_CONTROL } from './interaction';
  * it does not render, and that wrapper is a real node in the layout.
  *
  * The three modifiers are built here, in the body, and the body runs
- * once. A modifier's arguments are compared by identity, so a fresh
- * one per frame would detach and re-attach the listeners on every
- * frame.
+ * once. Each call to `tooltip()` takes an overlay entry of its own, so
+ * building one per render would leave a trail of entries behind
+ * instead of reusing the one this component owns.
  *
  * Nothing here opens a tooltip on a click: hovering opens one after
  * the delay, focusing opens one at once, and pressing closes it,
