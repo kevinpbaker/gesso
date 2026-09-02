@@ -214,8 +214,16 @@ describe('ErrorOverlay', () => {
   it('says what each origin costs the running application', () => {
     const { overlay, panel } = mount();
 
+    // What `uncaught` means is the narrow set a forwarded tick cannot
+    // reach, since the usual frame arrives as a message and is caught
+    // there: see `decisions/0036-error-overlay.md`, amended by 0039.
     overlay.report('boom', undefined, 'uncaught');
-    expect(panel().text()).toContain('during a frame');
+    expect(panel().text()).toContain('the clock paced itself');
+
+    // And `message` is where a frame most often lands, so this note
+    // must not tell a reader the application is intact.
+    overlay.report('halt', undefined, 'message');
+    expect(panel().text()).toContain('a frame that did not finish');
 
     overlay.report('nope', undefined, 'channel');
     expect(panel().text()).toContain('data behind it has stopped');

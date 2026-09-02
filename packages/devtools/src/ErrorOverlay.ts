@@ -16,11 +16,11 @@ export type ErrorOrigin = RuntimeErrorSource | 'window';
 const ORIGINS: Record<ErrorOrigin, { label: string; note: string }> = {
   uncaught: {
     label: 'render worker',
-    note: 'Nothing caught this, so it happened outside a message, almost always during a frame. That frame’s work was already taken off the dirty set, so what you see may be stale.'
+    note: 'Nothing caught this, so it ran outside any message from the shell: module scope, a callback the shell did not drive, or a frame the clock paced itself. If it was a frame, its work was already taken off the dirty set, so what you see may be stale.'
   },
   message: {
     label: 'render worker',
-    note: 'Thrown while handling a message from the shell, so that input or resize was dropped. The rest of the application is intact.'
+    note: 'Thrown while the runtime was handling a message from the shell. A frame usually arrives that way, so this is most often a frame that did not finish, and what you see may be stale. Where it was an input or a resize instead, that one message was dropped.'
   },
   renderer: {
     label: 'renderer',

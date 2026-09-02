@@ -88,13 +88,19 @@ export class RenderWorkerApp {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
     this.host = host;
     this.host.onmessage = event => this.receive(event.data);
-    // Everything `receive` cannot see. A frame runs from a timer, not
-    // from a message, so a component that throws while rendering,
-    // laying out or painting throws into the task that armed the
-    // frame — where the only witness is the worker's own console,
+    // Everything `receive` cannot see. The usual frame is not in that
+    // set: the shell forwards its `requestAnimationFrame` as a `tick`
+    // message and the clock delivers it synchronously, so a component
+    // that throws while rendering, laying out or painting throws
+    // inside `receive`'s own try and is reported as `message`. What
+    // lands here is the rest: module scope, a callback no shell
+    // message drove, and the frames the clock paces from its own
+    // timer, before the first tick arrives or while the shell's thread
+    // is blocked. Their only witness is the worker's own console,
     // which a page cannot read and a person only finds by opening the
     // right thread in devtools. These two listeners are what make a
-    // render worker's failures reach the shell at all.
+    // render worker's failures reach the shell at all. See
+    // `decisions/0036-error-overlay.md`, amended by 0039.
     this.host.addEventListener('error', event => {
       // The location only when the engine kept no Error: with one, the
       // stack says where it was in more detail and the event's
