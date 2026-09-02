@@ -353,16 +353,18 @@ interface TreeProps extends ControlLayoutProps {
   label?: string;
 }
 declare function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
-interface ImageProps extends ControlLayoutProps {
+interface MediaPlaceholderProps {
+  placeholderColor?: UiColorValue;
+}
+interface ImageProps extends ControlLayoutProps, MediaPlaceholderProps {
   ref?: UiNodeRef;
   src: string | readonly string[];
   alt?: string;
   objectFit?: ObjectFit;
   borderRadius?: number;
-  placeholderColor?: UiColorValue;
 }
 declare function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild;
-interface VideoProps extends ControlLayoutProps {
+interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
   ref?: UiNodeRef;
   src: string;
   alt?: string;
