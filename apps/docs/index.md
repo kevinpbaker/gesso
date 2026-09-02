@@ -45,20 +45,9 @@ reason about. Your component function runs once, so every closure in it
 is stable. And the cost of a change is visible in the source: the
 binding _is_ the update.
 
-A counter, as a function component in JSX:
+A counter, as a function component:
 
 <LiveExample id="counter" height="180" />
-
-<<< @/src/examples/CounterExample.tsx
-
-`input(props.label, 'Count')` is a prop with a default. `internalState(0)`
-is the value this component owns, the equivalent of `@State` or
-`mutableStateOf`. The caption is derived and stored nowhere: it is one
-expression over the other two, subscribed to by the node that shows it,
-so it cannot be stale and there is nothing to invalidate.
-
-JSX is optional. It compiles onto the element factories, which are the
-same tree in a different spelling:
 
 ```ts
 function Counter(props, _context) {
@@ -73,6 +62,18 @@ function Counter(props, _context) {
   );
 }
 ```
+
+`input(props.label, 'Count')` is a prop with a default. `internalState(0)`
+is the value this component owns, the equivalent of `@State` or
+`mutableStateOf`. The caption is derived and stored nowhere: it is one
+expression over the other two, subscribed to by the node that shows it,
+so it cannot be stale and there is nothing to invalidate.
+
+JSX is optional. It compiles onto those element factories and produces
+the same tree in a different spelling. This is the counter above as it
+is actually written, and the file the test suite asserts on:
+
+<<< @/src/examples/CounterExample.tsx
 
 Neither version names a colour. `primary` is a theme token resolved when
 it is painted, which is why the counter above follows this page's light
