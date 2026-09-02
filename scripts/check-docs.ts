@@ -14,6 +14,13 @@
  *     code block, so the page keeps its prose and loses the code the
  *     prose is about.
  *
+ * It also checks one thing `docs:build` does catch, but late and with a
+ * stack trace rather than a sentence: an unquoted `description` holding
+ * a colon. Front matter is YAML, so `description: A thing: and another`
+ * reads as a mapping and throws. It is the single most common way a new
+ * page fails the build, and the fix is quoting the value, so the gate
+ * says exactly that instead of leaving a `YAMLException` to be read.
+ *
  * Both are cheap to check by reading the files, which is what this
  * does: node and `fs`, no markdown parser, no VitePress. It reads the
  * same two syntaxes the pages use and nothing else, so a page that
@@ -92,9 +99,38 @@ const files = pages(site);
 let liveExamples = 0;
 let snippets = 0;
 
+/**
+ * A `description` whose value holds a colon and is not quoted.
+ *
+ * Only the front matter block is read, and only `description`, because
+ * that is the one key every page carries and the one that reliably
+ * contains prose. A value already wrapped in single or double quotes is
+ * fine however many colons it holds.
+ */
+function checkFrontMatter(source: string, where: string, problems: string[]): void {
+  const lines = source.split('\n');
+  if (lines[0] !== '---') {
+    return;
+  }
+  for (const line of lines.slice(1)) {
+    if (line === '---') {
+      return;
+    }
+    const value = line.startsWith('description: ') ? line.slice('description: '.length).trim() : '';
+    if (value.length > 0 && !value.startsWith("'") && !value.startsWith('"') && value.includes(':')) {
+      problems.push(
+        `${where}: front matter description holds a colon and is not quoted, so the YAML fails to parse. Wrap the value in single quotes.`
+      );
+      return;
+    }
+  }
+}
+
 for (const page of files) {
   const source = readFileSync(page, 'utf8');
   const where = relative(root, page);
+
+  checkFrontMatter(source, where, problems);
 
   for (const match of source.matchAll(LIVE_EXAMPLE)) {
     liveExamples += 1;
