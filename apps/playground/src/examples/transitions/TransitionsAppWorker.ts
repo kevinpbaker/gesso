@@ -1,6 +1,4 @@
-import { distinctUntilChanged, map, type Observable } from 'rxjs';
-
-import { serveChannels } from '@gesso/framework';
+import { pickKeys, serveChannels } from '@gesso/framework';
 import { AudiusApi } from './AudiusApi';
 import { Catalogue } from './Catalogue';
 import { Queue } from './Queue';
@@ -33,19 +31,19 @@ serveChannels([
   {
     token: QueueChannel,
     source: {
-      // One observable for eight keys: the differ patches only what
-      // changed, so a like is one small patch even though the view
-      // travels as a whole.
-      view: {
-        playlistId: pick(queue.view, 'playlistId'),
-        order: pick(queue.view, 'order'),
-        index: pick(queue.view, 'index'),
-        current: pick(queue.view, 'current'),
-        shuffled: pick(queue.view, 'shuffled'),
-        likedTracks: pick(queue.view, 'likedTracks'),
-        likedPlaylists: pick(queue.view, 'likedPlaylists'),
-        savedPlaylists: pick(queue.view, 'savedPlaylists')
-      },
+      // One observable for eight keys, split so the differ patches each
+      // on its own: a like is one small patch even though the view
+      // model is one object.
+      view: pickKeys(queue.view, [
+        'playlistId',
+        'order',
+        'index',
+        'current',
+        'shuffled',
+        'likedTracks',
+        'likedPlaylists',
+        'savedPlaylists'
+      ]),
       commands: {
         play: target => queue.play(target),
         next: () => queue.next(),
@@ -59,10 +57,3 @@ serveChannels([
     }
   }
 ]);
-
-function pick<T, K extends keyof T>(source: Observable<T>, key: K): Observable<T[K]> {
-  return source.pipe(
-    map(value => value[key]),
-    distinctUntilChanged()
-  );
-}
