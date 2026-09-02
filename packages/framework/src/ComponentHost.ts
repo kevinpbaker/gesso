@@ -5,7 +5,7 @@ import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
 import { isObservable, type UiChild } from '@gesso/core';
-import { InputCell } from './Input';
+import { InputCell, withBodyOf } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
 import {
@@ -160,7 +160,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     const context = this.createContext();
     this.rendering = true;
     try {
-      return component(this.createInputRecord(), context);
+      return withBodyOf(this.element.tag, () => component(this.createInputRecord(), context));
     } finally {
       this.rendering = false;
     }
@@ -179,6 +179,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       let cell = this.functionalCells.get(name);
       if (cell === undefined) {
         cell = new InputCell<unknown>(undefined);
+        cell.label = `${this.element.tag}.${name}`;
         this.functionalCells.set(name, cell);
         this.applyInput(name, cell, (this.element.props as Record<string, unknown>)[name], true);
       }

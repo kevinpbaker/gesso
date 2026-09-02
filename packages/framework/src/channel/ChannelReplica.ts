@@ -32,7 +32,9 @@ export class ChannelReplica<View extends object, Commands extends object> {
       // Seeded from the token, so nothing ever observes `undefined`
       // for a declared key. The provider starts from the same value,
       // so an application already in its initial state sends nothing.
-      this.cells.set(key, new InputCell((token.initial as Record<string, unknown>)[key]));
+      const cell = new InputCell((token.initial as Record<string, unknown>)[key]);
+      cell.label = `${token.name}.${key}`;
+      this.cells.set(key, cell);
     }
     this.commandProxy = this.createCommandProxy();
     this.port.onmessage = event => this.receive(event.data);
