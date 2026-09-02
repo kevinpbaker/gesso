@@ -19,8 +19,12 @@ declare abstract class Component {
   abstract render(): UiChild;
 }
 declare class InputCell<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  private snapshotBy;
+  private warnedStale;
   constructor(initialValue: T);
   get value(): T;
+  next(value: T): void;
 }
 declare function input<T>(initialValue: T): InputCell<T>;
 declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
@@ -182,7 +186,7 @@ import {
   Patch,
   PatchPath,
   viewKeys
-} from "./FunctionComponent-Bjd3Lj5d.js";
+} from "./FunctionComponent-DKAvpO-p.js";
 import {
   BehaviorSubject,
   Observable,
@@ -1692,7 +1696,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-Bjd3Lj5d.js";
+} from "../FunctionComponent-DKAvpO-p.js";
 import {
   Observable
 } from "rxjs";
