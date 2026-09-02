@@ -7,6 +7,25 @@ import {
 } from '@gesso/core';
 
 /**
+ * What an application hands a runtime so its pictures come from
+ * somewhere other than the defaults.
+ *
+ * All three are optional and independent: an app that fetches its
+ * images through its own stack still gets the default rasteriser and
+ * the default decoder. Whatever is left out, the runtime builds and
+ * owns; whatever is passed belongs to the caller, and the runtime will
+ * not dispose it. See `MediaService` for that rule in full.
+ */
+export interface MediaOptions {
+  /** Where an `Image` finds its bitmap. */
+  resolver?: ImageResolver;
+  /** Where an `Icon` finds its raster. */
+  rasterizer?: IconRasterizer;
+  /** Where a `Video` finds its decoder. */
+  videoResolver?: VideoResolver;
+}
+
+/**
  * Where an `Image` finds its bitmap, an `Icon` its raster and a
  * `Video` its decoder.
  *
@@ -26,8 +45,18 @@ export class MediaService {
   private imageResolver: ImageResolver = new DefaultImageResolver();
   private iconRasterizer = new IconRasterizer();
   private videoResolver: VideoResolver | null = null;
-  /** Set when the caller supplied one, so the default is not disposed twice. */
+  /**
+   * Whether each of the three is the service's to dispose.
+   *
+   * True for the ones built here, false once an application has
+   * supplied its own: a caller that passes a resolver usually keeps a
+   * reference to it and may well share it between runtimes, so
+   * closing it when one of them shuts down would take the other's
+   * bitmaps with it. The same rule for all three, because the
+   * question is the same for all three.
+   */
   private ownsResolver = true;
+  private ownsRasterizer = true;
   private ownsVideoResolver = true;
 
   get images(): ImageResolver {
@@ -75,9 +104,13 @@ export class MediaService {
     this.ownsVideoResolver = false;
   }
 
+  /** The same seam, for icons. */
   setRasterizer(rasterizer: IconRasterizer): void {
-    this.iconRasterizer.dispose();
+    if (this.ownsRasterizer) {
+      this.iconRasterizer.dispose();
+    }
     this.iconRasterizer = rasterizer;
+    this.ownsRasterizer = false;
   }
 
   /** Releases every decoded bitmap, for a runtime shutting down. */
@@ -88,6 +121,8 @@ export class MediaService {
     if (this.ownsVideoResolver) {
       this.videoResolver?.dispose();
     }
-    this.iconRasterizer.dispose();
+    if (this.ownsRasterizer) {
+      this.iconRasterizer.dispose();
+    }
   }
 }
