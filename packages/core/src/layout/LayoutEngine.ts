@@ -154,6 +154,14 @@ export class LayoutEngine {
   private readonly movedAnchored = new Set<UiNode>();
   /** position: 'sticky' nodes, re-offset whenever anything scrolls. */
   private readonly stickyNodes = new Set<UiNode>();
+  /**
+   * The sticky nodes whose shift came out different this pass. A shift
+   * moves a node without moving its box, so it is the one thing the
+   * anchor index cannot hear about from `assignBox`; this is what the
+   * overlays anchored inside a sticky header are asked about, and only
+   * on a pass where something actually stuck or let go.
+   */
+  private readonly stickyShifted = new Set<UiNode>();
   private readonly textMeasurer: TextMeasurer;
   /**
    * The definite size percentages resolve against while a container's
@@ -458,8 +466,15 @@ export class LayoutEngine {
     const rec = this.record(node);
     this.applyScroll();
     // Placement is one top-down walk, so an overlay placed before its
-    // anchor saw a box the anchor has since been given. Every box is
-    // final here, so the queue this pass filled settles them.
+    // anchor saw a box the anchor has since been given, and an anchor
+    // placed before the overlay reached the index moved without anything
+    // to name. Scroll offsets are clamped only once the pass is over, so
+    // every anchored node was placed against a list that had not
+    // scrolled yet. Every box is final here, and a full layout has just
+    // placed all of them, so each anchored node is settled once.
+    for (const anchored of this.anchoredNodes) {
+      this.movedAnchored.add(anchored);
+    }
     this.replaceMovedAnchored();
     const isScroll = node.type === UiNodeType.ScrollView;
     return {
@@ -896,6 +911,7 @@ export class LayoutEngine {
       this.movedAnchored.delete(current);
       this.forgetAnchoring(current);
       this.stickyNodes.delete(current);
+      this.stickyShifted.delete(current);
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
       }
@@ -2282,11 +2298,15 @@ export class LayoutEngine {
     const gap = this.numberProp(child, 'anchorOffset') ?? 0;
     const { side, align } = this.parsePlacement(child.properties.get('placement'));
 
-    // Anchor box in the child's coordinate space.
+    // Anchor box in the child's coordinate space: where each of the two
+    // is seen, which is its box less the scrolling above it and plus the
+    // sticky shifts holding it, brought back into the child's own frame.
     const scrollAnchor = this.scrollOffsetOf(anchor);
     const scrollChild = this.scrollOffsetOf(child);
-    const ax = anchorRec.x - scrollAnchor.x + scrollChild.x;
-    const ay = anchorRec.y - scrollAnchor.y + scrollChild.y;
+    const stickyAnchor = this.stickyOffsetOf(anchor);
+    const stickyChild = this.stickyOffsetOf(child);
+    const ax = anchorRec.x + stickyAnchor.x - scrollAnchor.x + scrollChild.x - stickyChild.x;
+    const ay = anchorRec.y + stickyAnchor.y - scrollAnchor.y + scrollChild.y - stickyChild.y;
     const aw = anchorRec.width;
     const ah = anchorRec.height;
 
@@ -2417,6 +2437,27 @@ export class LayoutEngine {
     const side = rawSide === 'top' || rawSide === 'left' || rawSide === 'right' ? rawSide : ('bottom' as const);
     const align = rawAlign === 'start' || rawAlign === 'end' ? rawAlign : ('center' as const);
     return { side, align };
+  }
+
+  /**
+   * Sum of the sticky shifts holding a node where it is seen: its own,
+   * and every ancestor's, since a sticky node carries its whole subtree
+   * with it. A tree with nothing sticky in it answers without walking.
+   */
+  private stickyOffsetOf(node: UiNode): { x: number; y: number } {
+    let x = 0;
+    let y = 0;
+    if (this.stickyNodes.size === 0) {
+      return { x, y };
+    }
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      const rec = this.records.get(current);
+      if (rec !== undefined) {
+        x += rec.stickyOffsetX;
+        y += rec.stickyOffsetY;
+      }
+    }
+    return { x, y };
   }
 
   /** Sum of the scroll offsets of a node's scroll-container ancestors. */
@@ -2905,56 +2946,103 @@ export class LayoutEngine {
    * scroll container itself, the parent's box is the scrollable extent.
    */
   private applySticky(): void {
+    this.stickyShifted.clear();
     for (const node of this.stickyNodes) {
       const rec = this.records.get(node);
       if (rec === undefined) {
         continue;
       }
-      rec.stickyOffsetX = 0;
-      rec.stickyOffsetY = 0;
-      const scroller = this.scrollAncestorOf(node);
-      const parent = this.flowParentOf(node);
-      if (scroller === null || parent === null) {
-        continue;
-      }
-      const sRec = this.record(scroller);
-      const pRec = this.record(parent);
-      const parentIsScroller = parent === scroller;
-      // Bounds the node may move within: its parent's content box, in
-      // the same pre-scroll frame as the node's record.
-      const boundTop = pRec.y + pRec.paddingTop;
-      const boundLeft = pRec.x + pRec.paddingLeft;
-      const boundBottom = parentIsScroller
-        ? pRec.y + pRec.contentHeight - pRec.paddingBottom
-        : pRec.y + pRec.height - pRec.paddingBottom;
-      const boundRight = parentIsScroller
-        ? pRec.x + pRec.contentWidth - pRec.paddingRight
-        : pRec.x + pRec.width - pRec.paddingRight;
-      // The scrollport's edges in that frame.
-      const viewTop = sRec.y + sRec.scrollY + (parentIsScroller ? 0 : 0);
-      const viewLeft = sRec.x + sRec.scrollX;
-      const viewBottom = viewTop + sRec.height;
-      const viewRight = viewLeft + sRec.width;
-
-      if (rec.top !== undefined) {
-        const wanted = viewTop + rec.top - rec.y;
-        const limit = boundBottom - rec.height - rec.y;
-        rec.stickyOffsetY = this.clamp(wanted, 0, Math.max(0, limit));
-      } else if (rec.bottom !== undefined) {
-        const wanted = viewBottom - rec.bottom - rec.height - rec.y;
-        const limit = boundTop - rec.y;
-        rec.stickyOffsetY = this.clamp(wanted, Math.min(0, limit), 0);
-      }
-      if (rec.left !== undefined) {
-        const wanted = viewLeft + rec.left - rec.x;
-        const limit = boundRight - rec.width - rec.x;
-        rec.stickyOffsetX = this.clamp(wanted, 0, Math.max(0, limit));
-      } else if (rec.right !== undefined) {
-        const wanted = viewRight - rec.right - rec.width - rec.x;
-        const limit = boundLeft - rec.x;
-        rec.stickyOffsetX = this.clamp(wanted, Math.min(0, limit), 0);
+      const wasX = rec.stickyOffsetX;
+      const wasY = rec.stickyOffsetY;
+      this.resolveStickyOffset(node, rec);
+      if (rec.stickyOffsetX !== wasX || rec.stickyOffsetY !== wasY) {
+        this.stickyShifted.add(node);
       }
     }
+    if (this.stickyShifted.size > 0 && this.anchorOf.size > 0) {
+      this.followStickyShifts();
+    }
+  }
+
+  /**
+   * The shift for one sticky node, written onto its record. Zero is the
+   * answer for a node with nothing to stick inside, or with no inset to
+   * hold it at an edge.
+   */
+  private resolveStickyOffset(node: UiNode, rec: LayoutRecord): void {
+    rec.stickyOffsetX = 0;
+    rec.stickyOffsetY = 0;
+    const scroller = this.scrollAncestorOf(node);
+    const parent = this.flowParentOf(node);
+    if (scroller === null || parent === null) {
+      return;
+    }
+    const sRec = this.record(scroller);
+    const pRec = this.record(parent);
+    const parentIsScroller = parent === scroller;
+    // Bounds the node may move within: its parent's content box, in
+    // the same pre-scroll frame as the node's record.
+    const boundTop = pRec.y + pRec.paddingTop;
+    const boundLeft = pRec.x + pRec.paddingLeft;
+    const boundBottom = parentIsScroller
+      ? pRec.y + pRec.contentHeight - pRec.paddingBottom
+      : pRec.y + pRec.height - pRec.paddingBottom;
+    const boundRight = parentIsScroller
+      ? pRec.x + pRec.contentWidth - pRec.paddingRight
+      : pRec.x + pRec.width - pRec.paddingRight;
+    // The scrollport's edges in that frame.
+    const viewTop = sRec.y + sRec.scrollY + (parentIsScroller ? 0 : 0);
+    const viewLeft = sRec.x + sRec.scrollX;
+    const viewBottom = viewTop + sRec.height;
+    const viewRight = viewLeft + sRec.width;
+
+    if (rec.top !== undefined) {
+      const wanted = viewTop + rec.top - rec.y;
+      const limit = boundBottom - rec.height - rec.y;
+      rec.stickyOffsetY = this.clamp(wanted, 0, Math.max(0, limit));
+    } else if (rec.bottom !== undefined) {
+      const wanted = viewBottom - rec.bottom - rec.height - rec.y;
+      const limit = boundTop - rec.y;
+      rec.stickyOffsetY = this.clamp(wanted, Math.min(0, limit), 0);
+    }
+    if (rec.left !== undefined) {
+      const wanted = viewLeft + rec.left - rec.x;
+      const limit = boundRight - rec.width - rec.x;
+      rec.stickyOffsetX = this.clamp(wanted, 0, Math.max(0, limit));
+    } else if (rec.right !== undefined) {
+      const wanted = viewRight - rec.right - rec.width - rec.x;
+      const limit = boundLeft - rec.x;
+      rec.stickyOffsetX = this.clamp(wanted, Math.min(0, limit), 0);
+    }
+  }
+
+  /**
+   * Queues the overlays a sticky shift moved. A sticky node carries its
+   * whole subtree, so an overlay anchored to the node, or to anything
+   * inside it, is now beside where its anchor used to be, and one that
+   * lives inside a shifted node has been carried away from an anchor
+   * that has not moved. Both are placed again once the pass settles.
+   *
+   * The question is asked of the anchored nodes, of which a screen has
+   * a handful, rather than of the shifted subtrees, which are as large
+   * as a header's contents; and only on a pass where a shift changed.
+   */
+  private followStickyShifts(): void {
+    for (const [child, anchor] of this.anchorOf) {
+      if (this.carriedBySticky(anchor) || this.carriedBySticky(child)) {
+        this.movedAnchored.add(child);
+      }
+    }
+  }
+
+  /** Whether a sticky node that shifted this pass is carrying `node`. */
+  private carriedBySticky(node: UiNode): boolean {
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      if (this.stickyShifted.has(current)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private scrollAncestorOf(node: UiNode): UiNode | null {

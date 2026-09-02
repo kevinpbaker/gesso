@@ -130,16 +130,28 @@ A box that comes out somewhere new names its overlays, and they are
 placed again at the end of the frame, once every box in the pass is
 final: it does not matter whether the anchor moved because the list
 scrolled, because its own offsets changed, or because something above
-it in the flow grew. A frame in which no box moved asks the index
-nothing, so an idle overlay costs nothing to keep open.
+it in the flow grew. A [sticky](/layout/sticky) anchor moves without
+its box moving at all, so the shift is watched the same way: a header
+that takes the top edge of its list takes its overlays with it, and
+hands them back when it lets go. A frame in which no box moved and no
+sticky node shifted asks the index nothing, so an idle overlay costs
+nothing to keep open. A full layout is the one pass that settles every
+anchored node rather than only the ones the index named: it places the
+whole tree anyway, and the offsets a scrolled list ends up with are
+known only once it is over.
 
 **The anchor and the overlay may be under different scroll
-containers.** Layout boxes are pre-scroll, so before comparing the two
-the engine sums the scroll offsets of each node's scroll ancestors and
-brings both into the same visible space. Scrolling is the one change
-that moves an anchor without changing any box, so a scroll frame hands
-the anchored nodes their fresh placement directly and still measures
-nothing.
+containers.** Layout boxes are pre-scroll and unshifted, so before
+comparing the two the engine sums the scroll offsets and the sticky
+shifts above each of them and brings both into the same visible space.
+Placement therefore reads where a node is seen, and so does the flip:
+an overlay whose anchor is held at the edge of a list takes the side
+that has room beside the held position, not beside the flow position
+the list scrolled away from. Scrolling and sticking are the two changes
+that move an anchor without changing any box, so a scroll frame hands
+the anchored nodes their fresh placement directly, and a pass in which
+a sticky node's shift changed hands it to the overlays that node
+carries. Neither measures anything.
 
 If the anchored panel in your own screen stops following its anchor,
 the usual cause is that the anchor never reached the prop. A `ref`
@@ -234,10 +246,17 @@ Anchored placement has no CSS equivalent that Chrome ships unflagged,
 so it is covered by engine specs instead: the side, the alignment, the
 offset, a flip on each axis, a shift, following a scroll, following an
 anchor pushed down by a sibling that grew, and following an anchor
-whose own offsets changed. Two of those specs count the placements the
-frame made: following an anchor costs the overlay's own placement and
-nothing else, and a layout frame that leaves every box where it was
-places no overlay at all. The spec beside the example above asserts
+whose own offsets changed. Four cover sticky anchors: an overlay that
+follows a header to the scrollport edge and back when it lets go, one
+anchored to a button inside such a header, one whose anchor is held in
+a new place by a layout frame that moved no box at all, and one that
+flips above its anchor because the held position leaves no room below.
+One more lays out a list that is already scrolled and asserts that the
+overlay starts beside where its anchor is seen rather than beside the
+flow position. Five specs count the placements the frame made: following an anchor
+costs the overlay's own placement and nothing else, a layout frame that
+leaves every box where it was places no overlay, and neither does a
+scroll frame that changes no sticky shift. The spec beside the example above asserts
 what this page claims about it, that the panel starts under its button,
 is shifted back inside the canvas, flips above the button when the
 scroll leaves no room below, returns underneath when the button moves

@@ -74,9 +74,9 @@ painted and undone when it is hit tested. Three consequences, and they
 are the ones that catch people out:
 
 - **Nothing re-measures when a list scrolls.** The offsets are
-  recomputed on scroll-only frames, which do no measuring or placing at
-  all, so a sticky header costs a translation per frame rather than a
-  layout.
+  recomputed on scroll-only frames, which measure nothing and place
+  nothing but the overlays anchored to what moved, so a sticky header
+  costs a translation per frame rather than a layout.
 - **Geometry read from layout is the flow position.** That is the
   answer a layout animation needs, since a node whose list scrolled has
   not moved. Where the node is _seen_ is a different question, and the
@@ -98,6 +98,16 @@ over the header, since the ordering is by `zIndex` first.
 A sticky node is also a containing block for absolutely positioned
 descendants, as in CSS.
 
+**It carries anchored overlays with it.** An overlay anchored to a
+sticky node, or to anything inside one, is placed against where the
+node is held rather than against the box it left behind, so a menu
+opened from a button in a sticky toolbar stays under its button while
+the list travels underneath, and rides back down with the toolbar when
+the group lets it go. The flip reads the held position too: the overlay
+takes the side that has room where the anchor is seen. See
+[positioning and overlays](/layout/positioning-and-overlays) for the
+rest of anchored placement.
+
 ## Everything that scrolls, scrolls it
 
 The offsets are recomputed from the scroll offset the container settled
@@ -111,10 +121,13 @@ sticky node to fall out of step with.
 The engine's sticky cases were compared against Chrome: the same trees
 in a browser, with the same `scrollTop`, agreeing with Gesso's visible
 boxes to within a tenth of a pixel, for `top`, `bottom` and `left`
-insets and for nested scroll containers. A parity spec runs a scrolled
-list with a sticky header through both renderers and compares the draws,
-and the same tree was checked by screenshot on the WebGPU worker route
-in Chromium. No other browser has been measured.
+insets and for nested scroll containers. Engine specs cover an overlay
+anchored to a sticky header, and one anchored to a button inside such a
+header, following it to the scrollport edge and back when it lets go. A
+parity spec runs a scrolled list with a sticky header through both
+renderers and compares the draws, and the same tree was checked by
+screenshot on the WebGPU worker route in Chromium. No other browser has
+been measured.
 
 ## Next
 

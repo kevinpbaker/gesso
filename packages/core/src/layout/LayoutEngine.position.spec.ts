@@ -371,5 +371,194 @@ describe('LayoutEngine positioning', () => {
       // The popup is not among them, and neither is the layer it sits in.
       expect(h.engine.stats.placed).toBe(3);
     });
+
+    /**
+     * A sticky anchor. Its layout box never moves, so an overlay placed
+     * against the box alone is left behind by exactly the sticky shift
+     * the moment the header holds at the scrollport edge. `inside` puts
+     * the anchor one level down, inside the header, which is the shape a
+     * menu button in a sticky toolbar has.
+     */
+    function stickyScene(inside: boolean) {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const scroller = node(h, 'scroller', UiNodeType.ScrollView, { width: 200, height: 100 });
+      const lead = box(h, 'lead', { width: 60, height: 40, flexShrink: 0 });
+      const header = inside
+        ? column(h, 'header', { position: 'sticky', top: 0, width: 60, height: 20, flexShrink: 0 })
+        : box(h, 'header', { position: 'sticky', top: 0, width: 60, height: 20, flexShrink: 0 });
+      const button = box(h, 'button', { width: 30, height: 20 });
+      if (inside) {
+        h.append(header, button);
+      }
+      const filler = box(h, 'filler', { width: 60, height: 300, flexShrink: 0 });
+      h.append(scroller, lead, header, filler);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor: inside ? button : header,
+        width: 40,
+        height: 10,
+        placement: 'bottom-start'
+      });
+      h.append(layer, popup);
+      h.append(root, scroller, layer);
+      h.layout(root, Constraints.loose(300, 200));
+      return { h, scroller, header, button, popup };
+    }
+
+    function scrollTo(h: LayoutHarness, scroller: UiNode, y: number, sequence: number): void {
+      scroller.setProperty('scrollY', y);
+      h.engine.layoutForFrame(
+        new UiFrame(sequence, 0, new Map([[scroller, DirtyFlags.Transform]])),
+        Constraints.loose(300, 200)
+      );
+    }
+
+    it('follows a sticky anchor to the scrollport edge and back when it lets go', () => {
+      const { h, scroller, header, popup } = stickyScene(false);
+      expect(h.visibleBox(header).y).toBe(40);
+      expect(h.box(popup)).toEqual({ x: 0, y: 60, width: 40, height: 10 });
+
+      // 70 past a header 40 down the list: it is held at the top edge,
+      // 30 below where its box says it is.
+      scrollTo(h, scroller, 70, 1);
+      expect(h.record(header).stickyOffsetY).toBe(30);
+      expect(h.visibleBox(header).y).toBe(0);
+      expect(h.box(popup)).toEqual({ x: 0, y: 20, width: 40, height: 10 });
+      // The overlay's own placement, and nothing else: the scroll frame
+      // measures nothing and places no other node.
+      expect(h.engine.stats.measured).toBe(0);
+      expect(h.engine.stats.placed).toBe(1);
+      expect(h.engine.stats.fullLayout).toBe(false);
+
+      scrollTo(h, scroller, 0, 2);
+      expect(h.record(header).stickyOffsetY).toBe(0);
+      expect(h.box(popup)).toEqual({ x: 0, y: 60, width: 40, height: 10 });
+    });
+
+    it('follows an anchor carried by a sticky ancestor', () => {
+      const { h, scroller, button, popup } = stickyScene(true);
+      expect(h.visibleBox(button).y).toBe(40);
+      expect(h.box(popup)).toEqual({ x: 0, y: 60, width: 40, height: 10 });
+
+      // The button's own sticky shift is zero; the header above it
+      // carries it, and the overlay has to be carried the same way.
+      scrollTo(h, scroller, 70, 1);
+      expect(h.record(button).stickyOffsetY).toBe(0);
+      expect(h.visibleBox(button).y).toBe(0);
+      expect(h.box(popup)).toEqual({ x: 0, y: 20, width: 40, height: 10 });
+    });
+
+    it('flips against where a sticky anchor is held, not where its box is', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'top');
+      const spacer = box(h, 'spacer', { width: 10, height: 150, flexShrink: 0 });
+      const scroller = node(h, 'scroller', UiNodeType.ScrollView, { width: 200, height: 50 });
+      const header = box(h, 'header', { position: 'sticky', top: 0, width: 60, height: 20, flexShrink: 0 });
+      const filler = box(h, 'filler', { width: 60, height: 300, flexShrink: 0 });
+      h.append(scroller, header, filler);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor: header,
+        width: 40,
+        height: 50,
+        placement: 'bottom-start'
+      });
+      h.append(layer, popup);
+      h.append(root, spacer, scroller, layer);
+      h.layout(root, Constraints.loose(300, 200));
+
+      // The scroll container is the bottom 50 of a 200-tall block, so a
+      // 50-tall overlay never fits under the header and goes above it.
+      expect(h.box(header).y).toBe(150);
+      expect(h.box(popup)).toEqual({ x: 0, y: 100, width: 40, height: 50 });
+
+      // Scrolling holds the header exactly where it was, so the overlay
+      // stays above it. Measured against the header's box instead, the
+      // list looks 60 further up than it is, room appears underneath
+      // that is not there, and the overlay drops below the anchor.
+      scrollTo(h, scroller, 60, 1);
+      expect(h.record(header).stickyOffsetY).toBe(60);
+      expect(h.visibleBox(header).y).toBe(150);
+      expect(h.box(popup)).toEqual({ x: 0, y: 100, width: 40, height: 50 });
+    });
+
+    it('follows a sticky anchor whose shift changed without any box moving', () => {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const scroller = node(h, 'scroller', UiNodeType.ScrollView, { width: 200, height: 100, scrollY: 60 });
+      const group = column(h, 'group', { width: 60, flexShrink: 0 });
+      const header = box(h, 'header', { position: 'sticky', top: 0, width: 60, height: 20 });
+      const inner = box(h, 'inner', { width: 60, height: 30 });
+      h.append(group, header, inner);
+      const rest = box(h, 'rest', { width: 60, height: 200, flexShrink: 0 });
+      h.append(scroller, group, rest);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor: header,
+        width: 40,
+        height: 10,
+        placement: 'bottom-start'
+      });
+      h.append(layer, popup);
+      h.append(root, scroller, layer);
+      h.layout(root, Constraints.loose(300, 200));
+
+      // The group is 50 tall, so the header can travel only 30 of the 60
+      // the list has scrolled: it is already on its way out of view.
+      expect(h.record(header).stickyOffsetY).toBe(30);
+      expect(h.box(popup).y).toBe(-10);
+
+      // Growing the group gives the header room to hold at the edge
+      // again. Its own box does not move, and nothing scrolled, so the
+      // shift is the only thing that changed.
+      inner.setProperty('height', 100);
+      h.engine.layoutForFrame(new UiFrame(1, 0, new Map([[inner, DirtyFlags.Layout]])), Constraints.loose(300, 200));
+      expect(h.box(header).y).toBe(0);
+      expect(h.record(header).stickyOffsetY).toBe(60);
+      expect(h.box(popup).y).toBe(20);
+    });
+
+    it('places overlays against the scroll offsets the first layout settles on', () => {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const scroller = node(h, 'scroller', UiNodeType.ScrollView, { width: 200, height: 100, scrollY: 50 });
+      const lead = box(h, 'lead', { width: 60, height: 40, flexShrink: 0 });
+      const anchor = box(h, 'anchor', { width: 60, height: 20, flexShrink: 0 });
+      const filler = box(h, 'filler', { width: 60, height: 300, flexShrink: 0 });
+      h.append(scroller, lead, anchor, filler);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor,
+        width: 40,
+        height: 10,
+        placement: 'bottom-start'
+      });
+      h.append(layer, popup);
+      h.append(root, scroller, layer);
+      // The list is already scrolled when it is first laid out, which is
+      // what restoring a position does. Scroll offsets are clamped once
+      // the pass is over, so every anchored node was placed against a
+      // list that had not scrolled yet and the pass has to settle them.
+      h.layout(root, Constraints.loose(300, 200));
+      expect(h.visibleBox(anchor).y).toBe(-10);
+      expect(h.box(popup)).toEqual({ x: 0, y: 10, width: 40, height: 10 });
+    });
+
+    it('costs no placement when a scroll frame changes no sticky shift', () => {
+      const { h, scroller, popup } = stickyScene(false);
+      scrollTo(h, scroller, 70, 1);
+      const before = h.box(popup);
+
+      // The list is scrolled to the same place it already was, so the
+      // header holds where it was holding and the overlay is final.
+      scrollTo(h, scroller, 70, 2);
+      expect(h.box(popup)).toEqual(before);
+      expect(h.engine.stats.placed).toBe(0);
+    });
   });
 });
