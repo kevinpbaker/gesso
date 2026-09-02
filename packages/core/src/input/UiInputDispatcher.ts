@@ -162,6 +162,12 @@ export class UiInputDispatcher {
     return (this.typeCount.get(type) ?? 0) > 0;
   }
 
+  /** The event types this node has listeners for, for the inspector. */
+  listenerTypes(node: UiNode): UiEventType[] {
+    const store = this.stores.get(node);
+    return store === undefined ? [] : ([...store.keys()] as UiEventType[]);
+  }
+
   /**
    * Dispatches the event, routed to the supplied target.
    *

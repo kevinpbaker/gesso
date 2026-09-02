@@ -71,6 +71,26 @@ export function mountNodeInspector(host: HTMLElement, options: NodeInspectorOpti
     if (report.modifiers.length > 0) {
       panel.append(line(doc, 'modifiers', report.modifiers.join(', ')));
     }
+    if (report.listens.length > 0) {
+      panel.append(line(doc, 'listens', report.listens.join(', ')));
+    }
+    if (report.beneath.length > 0) {
+      // The answer to a dead click: this node took the press, and these
+      // are the nodes it covers at the pointer, topmost first.
+      panel.append(
+        line(
+          doc,
+          'beneath',
+          report.beneath
+            .map(under => {
+              const owner = under.owner === undefined ? '' : ` (${under.owner})`;
+              const listens = under.listens.length === 0 ? '' : ` · ${under.listens.join(', ')}`;
+              return `${under.type}${owner}${listens}`;
+            })
+            .join('; ')
+        )
+      );
+    }
     if (report.semantics !== undefined) {
       const parts = [
         report.semantics.role,

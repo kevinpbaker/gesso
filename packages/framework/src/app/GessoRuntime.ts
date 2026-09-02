@@ -5,6 +5,7 @@ import {
   printPropValue,
   type UiEnvironmentReport,
   type UiNodeReport,
+  type UiBeneathReport,
   type UiOwnerReport,
   type UiPropReport,
   type UiSemanticsReport
@@ -323,6 +324,8 @@ export class GessoRuntime {
   private findController: UiFindController | null = null;
   /** Reachable before `input` is assigned, for the same reason. */
   private readonly focusManager: UiFocusManager;
+  /** The input stack's hit tester, kept for the inspector's questions about what lies where. */
+  private hitTester!: UiHitTester;
   private readonly layoutNotifier: LayoutNotifier;
   /** Animates a wheel scroll; see `SmoothScroller`. */
   private readonly smoothScroller: SmoothScroller;
@@ -1006,9 +1009,43 @@ export class GessoRuntime {
       props: this.propsOf(node),
       environment: this.environmentOf(node),
       modifiers: this.builder.modifiersFor(node)?.names ?? [],
+      listens: this.dispatcher.listenerTypes(node),
+      beneath: this.beneathAtPointer(node),
       semantics: this.semanticsOf(node),
       explanation: formatExplanation(this.engine.explain(node))
     };
+  }
+
+  /**
+   * The nodes under the pointer that this one is painted over, topmost
+   * first, when the pointer is over this node at all. This is how the
+   * inspector explains a dead click: the hovered node took the press,
+   * and the button the person meant is listed here beneath it.
+   */
+  private beneathAtPointer(node: UiNode): UiBeneathReport[] {
+    const at = this.input.pointer.position;
+    if (at === null) {
+      return [];
+    }
+    const stack = this.hitTester.hitStack(at.x, at.y);
+    const index = stack.indexOf(node);
+    if (index === -1) {
+      return [];
+    }
+    // The layout root is the runtime's own wrapper, under everything
+    // and never what a person meant to press.
+    return stack
+      .slice(index + 1)
+      .filter(under => under !== this.root)
+      .map(under => {
+        const owners = this.ownersOf(under);
+        return {
+          id: under.id,
+          type: under.type,
+          ...(owners.length === 0 ? {} : { owner: owners[0]!.name }),
+          listens: this.dispatcher.listenerTypes(under)
+        };
+      });
   }
 
   /** The components that rendered a node, nearest first. */
@@ -1307,6 +1344,7 @@ export class GessoRuntime {
   private createInput(): RuntimeInput {
     const root = this.layoutRoot();
     const hitTester = new UiHitTester(this.engine, root);
+    this.hitTester = hitTester;
     const focus = this.focusManager;
     focus.setRoot(root);
     const scrollSink = this.createScrollSink();

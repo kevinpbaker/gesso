@@ -131,6 +131,45 @@ describe('inspectNode', () => {
 });
 
 describe('the inspect listener', () => {
+  it('says what a node listens for, and what it covers at the pointer', () => {
+    // The dead click: an absolutely positioned button, then a positioned
+    // column that paints over it and takes the press.
+    let button: UiElement | undefined;
+    const mounted = mountRuntime(
+      Box(
+        { width: 300, height: 300, position: 'relative' },
+        (button = Button({ position: 'absolute', left: 10, top: 10, width: 40, height: 40, onClick: () => {} })),
+        Column({ position: 'relative', width: 300, height: 300 }, Text({ text: 'content' }))
+      )
+    );
+    void button;
+    mounted.frame();
+    const root = mounted.runtime.debugRoot();
+    const column = root.lastChild!;
+    const pressed = root.firstChild!;
+
+    mounted.runtime.input.pointer.pointerMove(20, 20, 0, noKeyModifiers());
+    expect(mounted.runtime.input.pointer.hoveredNode).toBe(column);
+
+    const report = mounted.runtime.inspectNode(column);
+    expect(report.listens).toEqual([]);
+    expect(report.beneath.map(under => under.id)).toEqual([pressed.id, root.id]);
+    // A button listens for its own click and for the pointer states its
+    // default interaction paints.
+    expect(report.beneath[0]?.type).toBe('button');
+    expect(report.beneath[0]?.listens).toContain('click');
+
+    // The button itself covers only the root, and says it listens.
+    const own = mounted.runtime.inspectNode(pressed);
+    expect(own.listens).toContain('click');
+    expect(own.beneath.map(under => under.id)).toEqual([root.id]);
+
+    // Away from the pointer there is nothing to report beneath.
+    mounted.runtime.input.pointer.pointerMove(250, 250, 0, noKeyModifiers());
+    expect(mounted.runtime.inspectNode(pressed).beneath).toEqual([]);
+    expect(formatNodeReport(mounted.runtime.inspectNode(column))).toContain('beneath, at the pointer:');
+  });
+
   it('reports the hovered node while the inspector is on', () => {
     const seen: (string | null)[] = [];
     const mounted = mountRuntime(Column({ padding: 10 }, Box({ width: 120, height: 40 })), {

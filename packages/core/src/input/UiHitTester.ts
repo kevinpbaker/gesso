@@ -129,6 +129,58 @@ export class UiHitTester implements HitTester {
     return null;
   }
 
+  /**
+   * Every hit-testable node under the point, topmost first: the one a
+   * press would reach, then each node it is painted over. For the
+   * inspector, which answers "why did my click land on this" by naming
+   * what lies beneath. Scrollbars are not counted; a press on one is
+   * not a press on a node.
+   */
+  hitStack(x: number, y: number): UiNode[] {
+    const out: UiNode[] = [];
+    this.collectNode(this.root, x, y, out);
+    return out;
+  }
+
+  private collectNode(node: UiNode, x: number, y: number, out: UiNode[]): void {
+    if (isNodeInert(node)) {
+      return;
+    }
+    const rec = this.layout.recordFor(node);
+    if (rec === undefined || !this.invertPoint(node, rec, x, y)) {
+      return;
+    }
+    const px = this.point.x - rec.stickyOffsetX;
+    const py = this.point.y - rec.stickyOffsetY;
+    const inside = px >= rec.x && px < rec.x + rec.width && py >= rec.y && py < rec.y + rec.height;
+    if (rec.clips && !inside) {
+      return;
+    }
+    const shiftX = rec.clips && rec.scrollable ? rec.scrollX : 0;
+    const shiftY = rec.clips && rec.scrollable ? rec.scrollY : 0;
+    this.collectChildren(node, px + shiftX, py + shiftY, out);
+    if (inside && isNodeHitTestable(node)) {
+      out.push(node);
+    }
+  }
+
+  private collectChildren(parent: UiNode, x: number, y: number, out: UiNode[]): void {
+    const order = this.layout.recordFor(parent)?.paintOrder;
+    if (order !== null && order !== undefined) {
+      for (let i = order.length - 1; i >= 0; i--) {
+        this.collectNode(order[i], x, y, out);
+      }
+      return;
+    }
+    for (let child = parent.lastChild; child !== null; child = child.previousSibling) {
+      if (child.type === UiNodeType.Fragment) {
+        this.collectChildren(child, x, y, out);
+      } else {
+        this.collectNode(child, x, y, out);
+      }
+    }
+  }
+
   scrollbarZoneAt(x: number, y: number): { node: UiNode; axis: ScrollbarAxis } | null {
     this.result.scrollbar = undefined;
     this.zoneOnly = true;

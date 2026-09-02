@@ -178,6 +178,13 @@ export class UiPointerController {
   }
 
   /** The node currently under the pointer, or null over empty space. */
+  /** Where the pointer was last seen, in canvas space; null before it has been. */
+  get position(): { readonly x: number; readonly y: number } | null {
+    return this.lastPosition;
+  }
+
+  private lastPosition: { x: number; y: number } | null = null;
+
   get hoveredNode(): UiNode | null {
     return this.hoverNode;
   }
@@ -204,6 +211,7 @@ export class UiPointerController {
     modifiers: UiKeyModifiers = noKeyModifiers(),
     pointer: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent {
+    this.lastPosition = { x, y };
     const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers, pointer);
     if (this.downTarget !== null || this.scrollbarDrag !== null) {
       return event;
@@ -253,6 +261,7 @@ export class UiPointerController {
     modifiers: UiKeyModifiers = noKeyModifiers(),
     pointer: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent | null {
+    this.lastPosition = { x, y };
     if (!this.ownsPress(pointer)) {
       return null;
     }

@@ -35,9 +35,29 @@ export interface UiNodeReport {
   readonly environment: readonly UiEnvironmentReport[];
   /** Attached modifier kinds, in the order the element listed them. */
   readonly modifiers: readonly string[];
+  /** The event types this node has listeners for, e.g. `click`. */
+  readonly listens: readonly string[];
+  /**
+   * What lies under the pointer beneath this node, topmost first: the
+   * nodes this one is painted over and would take a press from. The
+   * answer to "I clicked the button and nothing happened": the node the
+   * inspector shows is the one that took the press, and this is the
+   * button it covered. Empty when the pointer is not over the node.
+   */
+  readonly beneath: readonly UiBeneathReport[];
   readonly semantics?: UiSemanticsReport;
   /** `formatExplanation` of the node's layout, which is L8's answer. */
   readonly explanation: string;
+}
+
+/** A node under the inspected one at the pointer. */
+export interface UiBeneathReport {
+  readonly id: string;
+  readonly type: string;
+  /** The component that rendered it, if one did. */
+  readonly owner?: string;
+  /** The event types it listens for, so a covered button reads as one. */
+  readonly listens: readonly string[];
 }
 
 export interface UiOwnerReport {
@@ -129,6 +149,17 @@ export function formatNodeReport(report: UiNodeReport): string {
   }
   if (report.modifiers.length > 0) {
     lines.push(`modifiers: ${report.modifiers.join(', ')}`);
+  }
+  if (report.listens.length > 0) {
+    lines.push(`listens: ${report.listens.join(', ')}`);
+  }
+  if (report.beneath.length > 0) {
+    lines.push('beneath, at the pointer:');
+    for (const under of report.beneath) {
+      const owner = under.owner === undefined ? '' : ` (${under.owner})`;
+      const listens = under.listens.length === 0 ? '' : `, listens: ${under.listens.join(', ')}`;
+      lines.push(`  ${under.type} ${under.id}${owner}${listens}`);
+    }
   }
   if (report.props.length > 0) {
     lines.push('props:');
