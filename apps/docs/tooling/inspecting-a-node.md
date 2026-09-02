@@ -16,6 +16,7 @@ button root:0:0:0:component:5:0:2:0
 box 80.68 × 36.80 at (24, 452.40)
 rendered by modifier-demo
 modifiers interactive, focusRing
+listens click, pointerenter, pointerleave, pointerdown, pointerup
 semantics button · "Hover me"
 
 props
@@ -36,6 +37,25 @@ height 36.80   stretched across row 'root:0:0:0:component:5:0:2': 36.8
 The layout section is `formatExplanation` verbatim, trimmed here. It is
 the same text `engine.explain(node)` produces for a console or a failed
 assertion, so what you read in the panel is what a test would print.
+
+## What lies beneath
+
+The panel shows the node under the pointer, which is the node a press
+would reach. When that is not the node you meant, the `beneath` line
+says what it is covering at that point, topmost first, with the
+component that rendered each one and what it listens for:
+
+```text
+column root:0:0:0:component:3:0:4
+…
+beneath button (Control) · click, pointerenter, pointerleave, pointerdown, pointerup
+```
+
+That is the whole diagnosis of a dead click: the column took the press,
+and the button beneath it, which does listen, never saw it. Paint and
+hit order among siblings is tree order, then `zIndex`, so a positioned
+element that comes later in the tree covers one that comes earlier. Give
+the button a `zIndex`, or move it after the column.
 
 ## Props say where they came from
 
