@@ -81,10 +81,11 @@ removed rather than left holding a bitmap that is about to be closed.
 
 ## The resolver is a runtime option, not a store
 
-`GessoRuntimeOptions` has a `media` field:
+`GessoRuntimeOptions` has a `media` field, and so does every shell in
+front of it:
 
 ```ts
-media?: { resolver?: ImageResolver; rasterizer?: IconRasterizer };
+media?: { resolver?: ImageResolver; rasterizer?: IconRasterizer; videoResolver?: VideoResolver };
 ```
 
 It is given at construction and not set on the `MediaService`
@@ -100,11 +101,28 @@ something injected, and for one specific to them: they must be per
 runtime. Two runtimes in one worker sharing a bitmap that one of them
 is about to `close()` is a use-after-free.
 
-Two things follow that are worth knowing before you plan around this
-option. `renderRoot` and `GessoApp` do not forward `media` today, so an
-application built either way uses the default resolver; the option is
-reachable when you construct a `GessoRuntime` yourself, and from
-`renderTest`, which is where substituting a resolver is most useful:
+An application declares it where its root is declared. In a render
+worker that is the worker entry:
+
+```ts
+// app.render.worker.ts
+renderRoot(AppRoot).useMedia({ resolver: new CachingResolver() });
+```
+
+On the single thread it is the builder, which takes the same object:
+
+```ts
+createApp(AppRoot).useMedia({ resolver: new CachingResolver() }).mountSync('#app');
+```
+
+There is nothing about media in the shell's own `createApp({ renderWorker })`
+options, and there cannot be: a resolver is a function, and no function
+crosses a `postMessage`. The worker entry is the first code that runs
+on the thread which will do the fetching, so it is both the only place
+that can build one and the right place to.
+
+A spec goes in through the runtime option directly, which is where
+substituting a resolver is most useful of all:
 
 ```ts
 const resolver = new DefaultImageResolver({
@@ -113,6 +131,12 @@ const resolver = new DefaultImageResolver({
 });
 const ui = renderTest(createComponent(Gallery, {}), { media: { resolver } });
 ```
+
+Whatever you leave out, the runtime builds and owns, and disposes with
+the runtime. Whatever you pass stays yours: the runtime never disposes
+a resolver, rasteriser or decoder it was handed, because one is often
+shared between runtimes and closing it would take the other runtime's
+bitmaps with it.
 
 ## Fitting a picture to its box
 
@@ -162,9 +186,9 @@ does, leave the `alt` off.
 - **No `srcset`.** Nothing selects a variant per device pixel ratio,
   because the component cannot see one. Choose the file yourself.
 - **A failed load is a tinted box.** While the bitmap is decoding, and
-  after a failure, the node paints `controlBackground` from the theme so
-  a grid of thumbnails does not jump as they arrive. There is no error
-  slot on the component.
+  after a failure, the node paints `controlBackground` from the theme,
+  or whatever `placeholderColor` names, so a grid of thumbnails does not
+  jump as they arrive. There is no error slot on the component.
 
 ## What this page was checked against
 

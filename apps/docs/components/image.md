@@ -29,23 +29,27 @@ object.
 
 ## Props
 
-| Prop           | Type                                       | Default   | What it does                                                                              |
-| -------------- | ------------------------------------------ | --------- | ----------------------------------------------------------------------------------------- |
-| `src`          | `string`                                   | required  | What the resolver is asked for. Read once, when the component is built.                   |
-| `alt`          | `string`                                   | none      | What a screen reader reads. Omitting it makes the picture decorative.                     |
-| `objectFit`    | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'` | How the bitmap meets a box that is not its shape.                                         |
-| `borderRadius` | `number`                                   | `0`       | Rounds the box, and clips the picture to it.                                              |
-| `ref`          | `UiNodeRef`                                | none      | Receives the node the picture is drawn on, for measuring it or anchoring something to it. |
+| Prop               | Type                                       | Default             | What it does                                                                              |
+| ------------------ | ------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------- |
+| `src`              | `string`                                   | required            | What the resolver is asked for. Read once, when the component is built.                   |
+| `alt`              | `string`                                   | none                | What a screen reader reads. Omitting it makes the picture decorative.                     |
+| `objectFit`        | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'`           | How the bitmap meets a box that is not its shape.                                         |
+| `borderRadius`     | `number`                                   | `0`                 | Rounds the box, and clips the picture to it.                                              |
+| `placeholderColor` | `UiColorValue`                             | `controlBackground` | The tint while the bitmap decodes, and after it fails.                                    |
+| `ref`              | `UiNodeRef`                                | none                | Receives the node the picture is drawn on, for measuring it or anchoring something to it. |
 
 `src` is read once because a component's body runs once, and an image
 whose source changed is a different image: give it a `key` that changes
 with the source and let the old node go, which is also what releases
 the old bitmap.
 
-`placeholderColor` is declared on the props type as `never`, so it
-cannot be passed. The tint below is the theme's, deliberately, and a
-per-call-site placeholder colour would be the one colour prop in the
-library.
+`placeholderColor` takes a palette name or a colour outright, and the
+default is the theme's `controlBackground`. Reach for it only when the
+picture is going somewhere the theme cannot know about: over a
+photograph, or in a panel of its own colour, where the control
+background would be a rectangle of the wrong shade until the bitmap
+arrives. It is read once, like `src`, because a placeholder that
+changed after the picture landed would have nothing left to tint.
 
 Every prop takes a plain value or an Observable of one, and the layout
 props on [the library page](/components/) apply here too. `Image` also
@@ -61,28 +65,33 @@ decodes it with `createImageBitmap`, keeps one entry per source
 however many pictures asked for it, reference counts what is on screen
 and evicts what is not.
 
-An application that fetches through its own stack replaces it. There
-are two ways in, and which one you get depends on how the runtime was
-built. A runtime constructed directly takes the resolver as an option,
-which is what a test does through `renderTest`:
+An application that fetches through its own stack replaces it, where
+its root is declared. In a render worker that is the worker entry:
 
 ```ts
-renderTest(root, { media: { resolver: new DefaultImageResolver({ capacity: 128 }) } });
+// app.render.worker.ts
+renderRoot(AppRoot).useMedia({ resolver: new DefaultImageResolver({ capacity: 128 }) });
 ```
 
-Neither `createApp` nor `renderRoot` forwards that option today, so an
-ordinary application installs the resolver on the media store instead,
-from the body of a component above the first picture:
+On the single thread the builder takes the same object, and a spec
+hands it to the runtime directly:
 
-```tsx
-ctx.inject(MediaService).setResolver(myResolver);
+```ts
+createApp(AppRoot).useMedia({ resolver: myResolver }).mountSync('#app');
+renderTest(root, { media: { resolver: myResolver } });
 ```
 
-The position matters more than it looks. A component's body runs before
-the elements it returns are built, and an `Image` asks for its bitmap
-the moment it is built, so a resolver installed anywhere later has
-already missed the first screen. The example below does it from the
-body above the pictures, and the spec beside it holds that in place.
+Declaring it there rather than setting it afterwards matters more than
+it looks. The tree is built inside the runtime's constructor and an
+`Image` in it asks for its bitmap the moment it is built, so a resolver
+installed once there is an app to install it on has already missed the
+first screen. `MediaService.setResolver` is still there for a resolver
+that has to change with the screen, and it is subject to that same
+rule: call it from the body of a component above the first picture,
+because a body runs before the elements it returns are built.
+
+The resolver this page's pictures come from is below, and the worker
+entry beside the example declares it:
 
 <<< @/src/examples/ImageExample.tsx#resolver
 
@@ -100,16 +109,18 @@ glyph belongs in [Icon](/components/icon).
 ## Loading and failure
 
 The picture arrives late by construction, so the box has to look like
-something in the meantime. It is filled with the `controlBackground`
-token while the bitmap decodes, and the fill is dropped when the bitmap
-arrives, so a list of thumbnails holds its shape instead of jumping as
-they land.
+something in the meantime. It is filled with `placeholderColor`, which
+is the theme's `controlBackground` unless the call site named another,
+and the fill is dropped when the bitmap arrives, so a list of
+thumbnails holds its shape instead of jumping as they land.
 
 A source that fails keeps that same tint and nothing else happens:
-there is no error slot, no retry, and no callback to hang one on. What
-to do instead is draw your own beside it, and decide with the resolver
-whether to ask again. A rejection is not cached, so the next component
-that names the source does try again.
+there is no error slot, no retry, and no callback to hang one on. The
+broken picture in the example above is tinted `danger`, which is a
+placeholder colour doing the only thing a placeholder colour can do
+about a failure. What to do instead is draw your own beside it, and
+decide with the resolver whether to ask again. A rejection is not
+cached, so the next component that names the source does try again.
 
 ## Fits
 

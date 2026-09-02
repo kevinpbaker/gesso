@@ -5,12 +5,16 @@ import { isVideoSurface, type UiNode, type UiVideoSurface } from '@gesso/core';
 import { renderTest } from '@gesso/testing';
 import '@gesso/testing/matchers';
 
-import { Player } from './VideoExample';
+import { ClipResolver, Player } from './VideoExample';
 
 const PLAYING = 'A generated clip, playing';
 const STILL = 'A generated clip, held on one frame';
 
-const mount = () => renderTest(createComponent(Player, {}), { width: 520, height: 260 });
+// The decoder goes in through the `media` option, exactly as the
+// page's worker entry declares it with `useMedia`: a `Video` asks for
+// its playback the moment it is built.
+const mount = () =>
+  renderTest(createComponent(Player, {}), { width: 520, height: 260, media: { videoResolver: new ClipResolver() } });
 
 /** The surface a node is carrying, or a failure that says so. */
 function surfaceOf(node: UiNode): UiVideoSurface {

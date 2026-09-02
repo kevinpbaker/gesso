@@ -1,6 +1,6 @@
 import { percent, type UiVideoSurface, type VideoPlayback, type VideoResolver } from '@gesso/core';
 import { Video } from '@gesso/components';
-import { MediaService, type ComponentContext, type Inputs } from '@gesso/framework';
+import type { ComponentContext, Inputs } from '@gesso/framework';
 
 // #region playback
 /** The surface as its producer sees it: the same object, a new frame. */
@@ -95,7 +95,7 @@ class GeneratedPlayback implements VideoPlayback {
  * an arriving screen picks up the position a departing one had reached
  * rather than starting the clip again.
  */
-class ClipResolver implements VideoResolver {
+export class ClipResolver implements VideoResolver {
   private readonly clips = new Map<string, GeneratedPlayback>();
 
   resolve(source: string): Promise<VideoPlayback> {
@@ -132,14 +132,13 @@ class ClipResolver implements VideoResolver {
  * `autoplay={false}`, so it resolves the clip, presents the frame at
  * its position, and stops there.
  *
- * The resolver above is installed in this body, before either `Video`
- * is built, because a `Video` asks for its playback the moment it is.
- * An application that plays an MP4 installs nothing: the default
- * resolver fetches and decodes it.
+ * The resolver above is not installed here: the worker entry that
+ * renders this page declares it with `renderRoot(...).useMedia(...)`,
+ * so it is in place before either `Video` is built and asks for its
+ * playback. An application that plays an MP4 declares nothing: the
+ * default resolver fetches and decodes it.
  */
-export function Player(_props: Inputs<{}>, ctx: ComponentContext) {
-  ctx.inject(MediaService).setVideoResolver(new ClipResolver());
-
+export function Player(_props: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={16}>

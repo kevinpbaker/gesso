@@ -20,6 +20,7 @@ import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
 import type { RouterRoutes } from '../router/RouterService';
+import type { MediaOptions } from './MediaService';
 
 export interface GessoAppOptions {
   host: HTMLElement;
@@ -60,6 +61,16 @@ export interface GessoAppOptions {
    * See `WorkerApp` for why this is an option and not only a setter.
    */
   colorScheme?: ColorSchemePreference;
+  /**
+   * Where the app's pictures come from: the image resolver, the icon
+   * rasteriser and the video decoder.
+   *
+   * An option rather than a call on `MediaService` because the tree is
+   * built inside the runtime's constructor and an `Image` in it asks
+   * for its bitmap at that moment, so a resolver installed once there
+   * is an app to install it on has already missed the first screen.
+   */
+  media?: MediaOptions;
 }
 
 /**
@@ -112,6 +123,7 @@ export class GessoApp {
       services: options.services,
       channels: options.channels,
       routes: options.routes,
+      media: options.media,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
       dpr: devicePixelRatio()
     });

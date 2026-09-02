@@ -1,6 +1,6 @@
 import { percent, DefaultImageResolver, type ImageResolver, type UiImage } from '@gesso/core';
 import { Image } from '@gesso/components';
-import { MediaService, type ComponentContext, type Inputs } from '@gesso/framework';
+import type { ComponentContext, Inputs } from '@gesso/framework';
 
 // #region resolver
 /**
@@ -57,7 +57,7 @@ async function swatch(): Promise<UiImage> {
  * `missing.png` fails, because a page that only ever showed the happy
  * path would not say what a broken source looks like.
  */
-function swatchResolver(): ImageResolver {
+export function swatchResolver(): ImageResolver {
   return new DefaultImageResolver({
     fetch: source =>
       source === 'missing.png' ? Promise.reject(new Error(`'${source}' is not there.`)) : Promise.resolve(new Blob()),
@@ -81,16 +81,12 @@ function swatchResolver(): ImageResolver {
  * it is decorative: no role, no name, and nothing in the semantics
  * tree at all.
  *
- * The resolver is installed here, in the body of the component above
- * the pictures, because a body runs before the elements it returns are
- * built and an `Image` asks for its bitmap the moment it is. A runtime
- * built directly takes one as its `media` option instead; neither
- * `createApp` nor `renderRoot` forwards that option, so this is the
- * way in for an application as much as for a page.
+ * The resolver is not installed here. It is declared by the worker
+ * entry that renders this page, with `renderRoot(...).useMedia(...)`,
+ * because an `Image` asks for its bitmap the moment it is built and
+ * the tree is built inside the runtime's constructor.
  */
-export function Gallery(_props: Inputs<{}>, ctx: ComponentContext) {
-  ctx.inject(MediaService).setResolver(swatchResolver());
-
+export function Gallery(_props: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={12}>
@@ -100,9 +96,16 @@ export function Gallery(_props: Inputs<{}>, ctx: ComponentContext) {
         <Fitted fit="none" />
       </row>
       <row gap={10} y="center">
-        <Image src="missing.png" alt="A swatch that failed" width={112} height={72} borderRadius={8} />
+        <Image
+          src="missing.png"
+          alt="A swatch that failed"
+          placeholderColor="danger"
+          width={112}
+          height={72}
+          borderRadius={8}
+        />
         <column gap={4}>
-          <text text="A source that fails keeps the placeholder tint." fontSize={12} />
+          <text text="A source that fails keeps the placeholder tint, here danger." fontSize={12} />
           <text text="There is no error slot: draw your own beside it." fontSize={12} color="textMuted" />
         </column>
       </row>

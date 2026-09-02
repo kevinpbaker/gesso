@@ -640,6 +640,26 @@ declare class ShellService {
   copyText(text: string): void;
   openUrl(url: string): void;
 }
+interface MediaOptions {
+  resolver?: ImageResolver;
+  rasterizer?: IconRasterizer;
+  videoResolver?: VideoResolver;
+}
+declare class MediaService {
+  private imageResolver;
+  private iconRasterizer;
+  private videoResolver;
+  private ownsResolver;
+  private ownsRasterizer;
+  private ownsVideoResolver;
+  get images(): ImageResolver;
+  get icons(): IconRasterizer;
+  get videos(): VideoResolver;
+  setResolver(resolver: ImageResolver): void;
+  setVideoResolver(resolver: VideoResolver): void;
+  setRasterizer(rasterizer: IconRasterizer): void;
+  dispose(): void;
+}
 declare const UI_FRAME_PHASES: readonly ['ticks', 'patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'];
 type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
 type FramePhaseTimings = Record<UiFramePhase, number>;
@@ -661,10 +681,7 @@ interface GessoRuntimeOptions {
   renderer?: RendererChoice;
   measureCanvas?: CanvasHost;
   textMeasurer?: TextMeasurer;
-  media?: {
-    resolver?: ImageResolver;
-    rasterizer?: IconRasterizer;
-  };
+  media?: MediaOptions;
   services?: ServiceRegistry;
   routes?: RouterRoutes;
   channels?: ChannelRegistry;
@@ -840,6 +857,7 @@ declare class GessoAppBuilder {
   private rendererChoice;
   private routes;
   private historyOptions;
+  private mediaOptions;
   private app;
   private colorSchemePreference;
   constructor(root: FrameworkChild | ComponentType);
@@ -849,6 +867,7 @@ declare class GessoAppBuilder {
   }): this;
   useService(ServiceClass: new () => object): this;
   useRoutes(routes: RouterRoutes): this;
+  useMedia(media: MediaOptions): this;
   useHistory(history: ShellHistoryOptions): this;
   renderer(choice: RendererChoice): this;
   onFrame(listener: (metrics: FrameMetrics) => void): this;
@@ -1101,6 +1120,7 @@ interface GessoAppOptions {
   input?: boolean;
   accessibility?: boolean;
   colorScheme?: ColorSchemePreference;
+  media?: MediaOptions;
 }
 declare class GessoApp {
   private readonly runtime;
@@ -1217,20 +1237,6 @@ declare class FindService {
   refresh(): void;
   private sync;
 }
-declare class MediaService {
-  private imageResolver;
-  private iconRasterizer;
-  private videoResolver;
-  private ownsResolver;
-  private ownsVideoResolver;
-  get images(): ImageResolver;
-  get icons(): IconRasterizer;
-  get videos(): VideoResolver;
-  setResolver(resolver: ImageResolver): void;
-  setVideoResolver(resolver: VideoResolver): void;
-  setRasterizer(rasterizer: IconRasterizer): void;
-  dispose(): void;
-}
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
   readonly trapped: InternalState<boolean>;
@@ -1341,6 +1347,7 @@ declare class RenderWorkerApp {
   private readonly channelRegistrations;
   private readonly serviceRegistrations;
   private routes;
+  private media;
   private root;
   private readonly host;
   private runtime;
@@ -1356,6 +1363,7 @@ declare class RenderWorkerApp {
   }): this;
   useService(ServiceClass: new () => object): this;
   useRoutes(routes: RouterRoutes): this;
+  useMedia(media: MediaOptions): this;
   receive(message: ShellToRuntimeMessage): void;
   private dispatch;
   private resolveWorker;
@@ -1453,6 +1461,7 @@ export {
   type GessoAppOptions,
   type GessoRuntimeOptions,
   type Inputs,
+  type MediaOptions,
   type MessageEndpoint,
   type OutletProps,
   type OverlayEntry,

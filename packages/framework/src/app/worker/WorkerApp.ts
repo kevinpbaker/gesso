@@ -23,6 +23,15 @@ import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeReducedMotion } from '../reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
 
+/**
+ * What the shell needs to spawn and drive a render worker.
+ *
+ * There is deliberately nothing here about media. A resolver is a
+ * function and no function crosses a `postMessage`, so an option on
+ * this side could only ever be a promise the shell could not keep;
+ * the worker entry builds its own and declares it with
+ * `renderRoot(AppRoot).useMedia(...)`.
+ */
 export interface WorkerAppOptions {
   /**
    * Spawns the render worker: the one that calls renderRoot(), and so

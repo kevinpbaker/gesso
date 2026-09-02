@@ -111,7 +111,8 @@ looks wrong.
   [image](/media/images-and-the-resolver) either, because
   `createImageBitmap` refuses an SVG blob.
 - **Rasterised at 2, not at the display.** The scale is fixed at twice
-  the logical size unless a rasteriser is constructed with another one,
+  the logical size unless the application declares a rasteriser of its
+  own with `useMedia({ rasterizer: new IconRasterizer({ scale: 3 }) })`,
   and the runtime does not pass the device pixel ratio in. On a 3x
   screen an icon is upsampled from a 2x bitmap.
 - **An icon is decorative unless you name it.** No `label` means no role

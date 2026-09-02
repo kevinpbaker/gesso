@@ -50,8 +50,6 @@ import {
   UiFindController,
   AnimationDriver,
   UiSharedElements,
-  type ImageResolver,
-  type IconRasterizer,
   buildSemanticsTree,
   diffSemantics,
   LayoutNotifier,
@@ -89,7 +87,7 @@ import { ShellService, type ShellRequest } from './ShellService';
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
 import { FocusService } from './FocusService';
-import { MediaService } from './MediaService';
+import { MediaService, type MediaOptions } from './MediaService';
 import { AnimationService } from './AnimationService';
 import { InputLatencyTracker } from './InputLatency';
 import { SmoothScroller } from './SmoothScroller';
@@ -196,8 +194,8 @@ export interface GessoRuntimeOptions {
    */
   textMeasurer?: TextMeasurer;
   /**
-   * The image resolver and icon rasteriser the `MediaService` should
-   * use.
+   * The image resolver, icon rasteriser and video decoder the
+   * `MediaService` should use.
    *
    * Supplied here rather than through the store afterwards because the
    * tree is built inside this constructor, and an `Image` in it asks
@@ -205,8 +203,14 @@ export interface GessoRuntimeOptions {
    * runtime exists would already have missed the first screen. An app
    * that fetches through its own stack, or one that has measured a
    * reason to decode in a worker of its own, passes it here.
+   *
+   * An application reaches this through `createApp(Root).useMedia()`
+   * on the single thread and `renderRoot(Root).useMedia()` in a render
+   * worker. It is declared in the worker rather than in the shell
+   * because a resolver is a function and no function crosses a
+   * `postMessage`.
    */
-  media?: { resolver?: ImageResolver; rasterizer?: IconRasterizer };
+  media?: MediaOptions;
   /**
    * The runtime services this runtime's components may reach.
    *
@@ -559,6 +563,9 @@ export class GessoRuntime {
     }
     if (options.media?.rasterizer !== undefined) {
       this.services.get(MediaService).setRasterizer(options.media.rasterizer);
+    }
+    if (options.media?.videoResolver !== undefined) {
+      this.services.get(MediaService).setVideoResolver(options.media.videoResolver);
     }
 
     this.scheduler = new UiScheduler({

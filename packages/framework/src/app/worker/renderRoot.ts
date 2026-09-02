@@ -12,6 +12,7 @@ import type { ChannelToken } from '../../channel/ChannelToken';
 import { UiHostFrameClock } from '@gesso/core';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
+import type { MediaOptions } from '../MediaService';
 import type { RouterRoutes } from '../../router/RouterService';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
@@ -72,6 +73,7 @@ export class RenderWorkerApp {
   private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly serviceRegistrations: (new () => object)[] = [];
   private routes: RouterRoutes | undefined;
+  private media: MediaOptions | undefined;
   private root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
@@ -221,6 +223,32 @@ export class RenderWorkerApp {
       throw new Error('Routes were registered after the runtime started.');
     }
     this.routes = routes;
+    return this;
+  }
+
+  /**
+   * Declares where the app's pictures come from: the image resolver,
+   * the icon rasteriser and the video decoder.
+   *
+   *   renderRoot(AppRoot).useMedia({ resolver: new CachingResolver() });
+   *
+   * Declared in the worker, like the routes and for a related reason:
+   * a resolver is a function, and no function crosses a `postMessage`.
+   * The shell could not forward one it was given, so the thread that
+   * will do the fetching is where it is built. That is also the right
+   * thread for it: this one already has no main thread to block.
+   *
+   * Declared before `init` rather than set on `MediaService` later,
+   * because the tree is built when `init` arrives and an `Image` in it
+   * asks for its bitmap at that moment. Whatever is left out, the
+   * runtime builds and owns; whatever is passed stays the caller's,
+   * and the runtime will not dispose it.
+   */
+  useMedia(media: MediaOptions): this {
+    if (this.runtime !== undefined) {
+      throw new Error('A media resolver was registered after the runtime started.');
+    }
+    this.media = media;
     return this;
   }
 
@@ -409,6 +437,7 @@ export class RenderWorkerApp {
       root: this.root,
       services,
       routes: this.routes,
+      media: this.media,
       canvas,
       renderer,
       channels: this.channels.registry,

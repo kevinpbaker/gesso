@@ -99,12 +99,13 @@ page that a spec cannot reach are worth naming rather than implying:
   whether it looked right, is something only a running browser shows,
   and nothing on this page measures it.
 
-Substituting a resolver is the same seam as an image's, through
-`MediaService`, and it has to be in place before the first `Video` is
-built:
+Substituting a decoder is the same seam as an image's resolver, and it
+has to be in place before the first `Video` is built, so it is
+declared where the root is:
 
-```tsx
-ctx.inject(MediaService).setVideoResolver(myResolver);
+```ts
+// app.render.worker.ts
+renderRoot(AppRoot).useMedia({ videoResolver: myResolver });
 ```
 
 The example does exactly that, and its resolver is a real

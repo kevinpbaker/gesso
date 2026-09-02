@@ -4,9 +4,14 @@ import { createComponent } from '@gesso/framework';
 import { renderTest } from '@gesso/testing';
 import '@gesso/testing/matchers';
 
-import { Gallery } from './ImageExample';
+import { Gallery, swatchResolver } from './ImageExample';
 
-const mount = () => renderTest(createComponent(Gallery, {}), { width: 560, height: 300 });
+// The resolver goes in through the `media` option, exactly as the
+// page's worker entry declares it with `useMedia`: the tree is built
+// inside the runtime's constructor and every `Image` in it asks for
+// its bitmap then.
+const mount = () =>
+  renderTest(createComponent(Gallery, {}), { width: 560, height: 300, media: { resolver: swatchResolver() } });
 
 /**
  * The page claims four things about `Image`: that the bitmap comes
@@ -66,6 +71,9 @@ describe('the docs image example', () => {
     // Failed: the tint stays, which is the whole of what a broken
     // source looks like.
     expect(failed.properties.get('image')).toBeUndefined();
-    expect(failed.properties.get('backgroundColor')).toBe('controlBackground');
+    // And it is the colour that picture asked for: `placeholderColor`
+    // is the caller's answer for a picture the theme's control
+    // background does not suit.
+    expect(failed.properties.get('backgroundColor')).toBe('danger');
   });
 });

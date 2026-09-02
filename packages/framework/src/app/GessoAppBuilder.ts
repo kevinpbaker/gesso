@@ -11,6 +11,7 @@ import { GessoApp } from './GessoApp';
 import type { RouterRoutes } from '../router/RouterService';
 import type { ShellHistoryOptions } from './shellHistory';
 import type { FrameMetrics, RendererChoice } from './GessoRuntime';
+import type { MediaOptions } from './MediaService';
 import type { UiNodeReport } from './NodeReport';
 
 /**
@@ -27,6 +28,7 @@ export class GessoAppBuilder {
   private rendererChoice: RendererChoice | undefined;
   private routes: RouterRoutes | undefined;
   private historyOptions: ShellHistoryOptions | undefined;
+  private mediaOptions: MediaOptions | undefined;
   private app: GessoApp | undefined;
   private colorSchemePreference: ColorSchemePreference = 'auto';
 
@@ -76,6 +78,24 @@ export class GessoAppBuilder {
    */
   useRoutes(routes: RouterRoutes): this {
     this.routes = routes;
+    return this;
+  }
+
+  /**
+   * Declares where the app's pictures come from: the image resolver,
+   * the icon rasteriser and the video decoder. Mirrors
+   * `renderRoot().useMedia`.
+   *
+   *   createApp(AppRoot).useMedia({ resolver: new CachingResolver() });
+   *
+   * Declared here rather than set on `MediaService` afterwards because
+   * the tree is built inside the runtime's constructor and an `Image`
+   * in it asks for its bitmap at that moment. Whatever is left out,
+   * the runtime builds and owns; whatever is passed stays the
+   * caller's, and the runtime will not dispose it.
+   */
+  useMedia(media: MediaOptions): this {
+    this.mediaOptions = media;
     return this;
   }
 
@@ -179,6 +199,7 @@ export class GessoAppBuilder {
       channels: channels.registry,
       services,
       routes: this.routes,
+      media: this.mediaOptions,
       history: this.historyOptions,
       renderer: this.rendererChoice,
       colorScheme: this.colorSchemePreference

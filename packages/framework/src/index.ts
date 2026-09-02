@@ -89,7 +89,7 @@ export { observeReducedMotion } from './app/reducedMotion';
 export { observeColorScheme, type ColorScheme, type ColorSchemePreference } from './app/colorScheme';
 export { observeMediaQuery } from './app/mediaQuery';
 export { FindService } from './app/FindService';
-export { MediaService } from './app/MediaService';
+export { MediaService, type MediaOptions } from './app/MediaService';
 export { FocusService } from './app/FocusService';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';
