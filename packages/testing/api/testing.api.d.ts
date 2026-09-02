@@ -20,10 +20,13 @@ import {
   RecordedCall
 } from "@gesso/core/testing";
 import {
+  ChannelReplica,
+  ChannelToken,
   FrameMetrics,
   FrameworkChild,
   GessoRuntime,
-  GessoRuntimeOptions
+  GessoRuntimeOptions,
+  ServedChannel
 } from "@gesso/framework";
 interface PointAt {
   x?: number;
@@ -123,12 +126,20 @@ interface RenderTestOptions extends Omit<Partial<GessoRuntimeOptions>, 'root' | 
 declare function renderTest(root: FrameworkChild, options?: RenderTestOptions): Rendered;
 declare function formatTree(runtime: GessoRuntime, root: UiNode): string;
 declare function renderedFor(node: UiNode): Rendered | null;
+interface ServedForTest {
+  get<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
+  settle(until?: () => boolean, timeoutMs?: number): Promise<void>;
+  readonly errors: readonly string[];
+  dispose(): void;
+}
+declare function serveForTest(channels: readonly ServedChannel[]): ServedForTest;
 export {
   createFireEvent,
   formatTree,
   nodesUnder,
   renderedFor,
   renderTest,
+  serveForTest,
   textProperty,
   type FireEvent,
   type PointAt,
@@ -137,6 +148,7 @@ export {
   type RenderedBase,
   type RenderTestOptions,
   type RoleQueryOptions,
+  type ServedForTest,
   type TextMatch
 };
 // ==== matchers.d.ts ====
