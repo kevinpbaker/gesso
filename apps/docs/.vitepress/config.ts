@@ -28,7 +28,8 @@ export default defineConfig({
       { text: 'Interaction', link: '/interaction/pointer-and-keyboard' },
       { text: 'Appearance', link: '/appearance/themes-and-the-environment' },
       { text: 'Components', link: '/components/' },
-      { text: 'Tooling', link: '/tooling/devtools' }
+      { text: 'Tooling', link: '/tooling/devtools' },
+      { text: 'Reference', link: '/reference/api' }
     ],
     sidebar: [
       {
@@ -123,6 +124,14 @@ export default defineConfig({
         ]
       },
       {
+        text: 'Reference',
+        items: [
+          { text: 'Properties', link: '/reference/properties' },
+          { text: 'API index', link: '/reference/api' },
+          { text: 'The render-worker protocol', link: '/reference/render-worker-protocol' }
+        ]
+      },
+      {
         text: 'Components',
         items: [
           { text: 'Overview', link: '/components/' },
@@ -152,6 +161,16 @@ export default defineConfig({
           { text: 'Icon', link: '/components/icon' },
           { text: 'Spinner', link: '/components/spinner' },
           { text: 'ProgressBar', link: '/components/progress-bar' }
+        ]
+      },
+      {
+        text: 'Recipes',
+        items: [
+          { text: 'A settings page', link: '/recipes/settings-page' },
+          { text: 'A dialog flow', link: '/recipes/dialog-flow' },
+          { text: 'An appearance setting', link: '/recipes/appearance-setting' },
+          { text: 'A table over 100,000 rows', link: '/recipes/large-table' },
+          { text: 'A virtualized feed', link: '/recipes/virtualized-feed' }
         ]
       }
     ]

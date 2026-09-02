@@ -1,5 +1,5 @@
 ---
-description: A settings screen built from the component library: grouped controls, one cell behind all of them, and one setting that disables another.
+description: 'A settings screen built from the component library: grouped controls, one cell behind all of them, and one setting that disables another.'
 ---
 
 # A settings page
@@ -103,13 +103,13 @@ operability](/access/keyboard) is where that line is drawn.
 
 ## Which control for which choice
 
-| The choice                        | The control                                                                              |
-| --------------------------------- | ---------------------------------------------------------------------------------------- |
-| On or off, applied immediately    | [Switch](/components/switch)                                                             |
-| One of three or four, all visible | [RadioGroup](/components/radio-group)                                                    |
-| One of many, or a long list       | [Select](/components/select)                                                             |
+| The choice                        | The control                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------- |
+| On or off, applied immediately    | [Switch](/components/switch)                                                              |
+| One of three or four, all visible | [RadioGroup](/components/radio-group)                                                     |
+| One of many, or a long list       | [Select](/components/select)                                                              |
 | A number on a range               | [Slider](/components/slider), or [NumberInput](/components/number-input) for an exact one |
-| Free text                         | [TextInput](/components/text-input)                                                      |
+| Free text                         | [TextInput](/components/text-input)                                                       |
 
 A `Switch` and a `Checkbox` are the same control with different
 announcements: a screen reader says on and off for one, checked and
