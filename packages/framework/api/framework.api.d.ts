@@ -22,12 +22,29 @@ declare class InputCell<T> extends BehaviorSubject<T> {
   label: string | undefined;
   private snapshotBy;
   private warnedStale;
+  private emitted;
   constructor(initialValue: T);
+  emit(...args: EmitArgs<T>): void;
+  get events(): Observable<EmitValue<T>>;
   get value(): T;
   next(value: T): void;
 }
 declare function input<T>(initialValue: T): InputCell<T>;
 declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
+type EmitArgs<T> = NonNullable<T> extends ((...args: infer A) => void) ? A : never;
+type EmitValue<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? V : void;
+type OutputCell<A extends unknown[]> = InputCell<((...args: A) => void) | undefined>;
+declare function output<A extends unknown[]>(): OutputCell<A>;
+declare const OUTPUT_TARGET: unique symbol;
+interface OutputTarget<V> {
+  readonly [OUTPUT_TARGET]: {
+    next(value: V): void;
+  };
+}
+declare function into<V>(target: {
+  next(value: V): void;
+}): OutputTarget<V>;
+declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
 type Command = (...args: never[]) => void;
 type CommandMap = Record<string, Command>;
 interface ChannelToken<View extends object, Commands extends object = Record<string, never>> {
@@ -119,7 +136,8 @@ type ComponentType = ClassComponent | ((props: any, context: ComponentContext) =
 type IsAny<T> = 0 extends 1 & T ? true : false;
 type CellValue<C> = C extends InputCell<infer T> ? T : never;
 type OptionalCellKeys<I> = { [K in keyof I]: undefined extends CellValue<I[K]> ? K : never; }[keyof I];
-type PropsForCells<I> = [keyof I] extends [never] ? NoProps : { [K in OptionalCellKeys<I>]?: Reactive<CellValue<I[K]>>; } & { [K in Exclude<keyof I, OptionalCellKeys<I>>]: Reactive<CellValue<I[K]>>; };
+type PropsForCells<I> = [keyof I] extends [never] ? NoProps : { [K in OptionalCellKeys<I>]?: Passable<CellValue<I[K]>>; } & { [K in Exclude<keyof I, OptionalCellKeys<I>>]: Passable<CellValue<I[K]>>; };
+type Passable<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? Reactive<T> | OutputTarget<V> : Reactive<T>;
 type NoProps = {
   readonly __noProps?: never;
 };
@@ -146,13 +164,20 @@ export {
   ComponentProps,
   ComponentType,
   diffProjection,
+  EmitArgs,
+  EmitValue,
   FunctionComponent,
   input,
   InputCell,
   Inputs,
+  into,
   isChannelClientMessage,
   isChannelHostMessage,
   isClassComponent,
+  isOutputTarget,
+  output,
+  OutputCell,
+  OutputTarget,
   Patch,
   PatchPath,
   viewKeys
@@ -176,17 +201,24 @@ import {
   ComponentProps,
   ComponentType,
   diffProjection,
+  EmitArgs,
+  EmitValue,
   FunctionComponent,
   input,
   InputCell,
   Inputs,
+  into,
   isChannelClientMessage,
   isChannelHostMessage,
   isClassComponent,
+  isOutputTarget,
+  output,
+  OutputCell,
+  OutputTarget,
   Patch,
   PatchPath,
   viewKeys
-} from "./FunctionComponent-DKAvpO-p.js";
+} from "./FunctionComponent-D6YO-clS.js";
 import {
   BehaviorSubject,
   Observable,
@@ -248,11 +280,12 @@ import {
   VideoResolver
 } from "@gesso/core";
 declare class InternalState<T> extends BehaviorSubject<T> {
+  label: string | undefined;
   constructor(initialValue: T);
   get value(): T;
   set value(next: T);
 }
-declare function internalState<T>(initialValue: T): InternalState<T>;
+declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
 declare class ServiceRegistry {
   private readonly services;
   register<T extends object>(ServiceClass: new () => T): T;
@@ -260,8 +293,34 @@ declare class ServiceRegistry {
   get<T extends object>(ServiceClass: new () => T): T;
   has(ServiceClass: Function): boolean;
 }
+type Equality<T> = 'reference' | 'structural' | ((a: T, b: T) => boolean);
+interface DeriveOptions<T> {
+  readonly equal?: Equality<T>;
+}
+type Values<S extends readonly Observable<unknown>[]> = { [K in keyof S]: S[K] extends Observable<infer V> ? V : never; };
+declare function derive<S extends readonly Observable<unknown>[], T>(sources: readonly [...S], project: (...values: Values<S>) => T, options?: DeriveOptions<T>): Observable<T>;
+declare function bind<T>(cell: InternalState<T>): {
+  value: InternalState<T>;
+  onChange: (next: T) => void;
+};
+declare function bind<T, V extends string, E extends string = 'onChange'>(cell: InternalState<T>, value: V, onChange?: E): { [K in V]: InternalState<T>; } & { [K in E]: (next: T) => void; };
+interface ControlledValue<T> {
+  readonly value: Observable<T>;
+  current(): T;
+  change(next: T): void;
+}
+interface ControlledOptions<T> {
+  readonly component: string;
+  readonly name: string;
+  readonly source: InputCell<T | undefined>;
+  readonly initial: InputCell<T | undefined>;
+  readonly fallback: T;
+  readonly onChange: OutputCell<[next: T]>;
+}
+declare function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>;
 declare function Define(tag: string): ClassDecorator;
 declare function Input(): PropertyDecorator;
+declare function Output(): PropertyDecorator;
 declare function Inject<T extends Function>(StoreClass: T): PropertyDecorator;
 declare function Channel(token: {
   name: string;
@@ -1533,6 +1592,7 @@ export {
   applyPatches,
   AudioService,
   AudioSink,
+  bind,
   buildPath,
   channel,
   Channel,
@@ -1541,11 +1601,13 @@ export {
   Component,
   ComponentHost,
   ComponentHostResolver,
+  controlled,
   createApp,
   createChannelRegistry,
   createComponent,
   createShellHistory,
   Define,
+  derive,
   diffProjection,
   EditingProxy,
   FindService,
@@ -1562,16 +1624,20 @@ export {
   InputCell,
   internalState,
   InternalState,
+  into,
   isChannelClientMessage,
   isChannelHostMessage,
   isClassComponent,
   isComponentElement,
+  isOutputTarget,
   isPortErrorMessage,
   isPortHandshake,
   MediaService,
   observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
+  output,
+  Output,
   OverlayLayer,
   OverlayService,
   parseUrl,
@@ -1621,9 +1687,15 @@ export {
   type ComponentElement,
   type ComponentProps,
   type ComponentType,
+  type ControlledOptions,
+  type ControlledValue,
+  type DeriveOptions,
   type EditingMirrorTarget,
   type EditingProxySink,
   type EditingState,
+  type EmitArgs,
+  type EmitValue,
+  type Equality,
   type FrameMetrics,
   type FramePhaseTimings,
   type FrameworkChild,
@@ -1635,6 +1707,8 @@ export {
   type MediaSessionLike,
   type MessageEndpoint,
   type OutletProps,
+  type OutputCell,
+  type OutputTarget,
   type OverlayEntry,
   type OverlayPlacement,
   type Patch,
@@ -1710,7 +1784,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-DKAvpO-p.js";
+} from "../FunctionComponent-D6YO-clS.js";
 import {
   Observable
 } from "rxjs";

@@ -23,6 +23,8 @@ import {
 } from "@gesso/core";
 import {
   ComponentContext,
+  controlled,
+  ControlledValue,
   InputCell,
   Inputs,
   OverlayPlacement
@@ -410,20 +412,6 @@ interface VirtualList {
 }
 declare function virtualList(): VirtualList;
 declare function stepIndex(current: number, by: number, count: number): number;
-interface ControlledValue<T> {
-  readonly value: Observable<T>;
-  current(): T;
-  change(next: T): void;
-}
-interface ControlledOptions<T> {
-  readonly component: string;
-  readonly name: string;
-  readonly source: InputCell<T | undefined>;
-  readonly initial: InputCell<T | undefined>;
-  readonly fallback: T;
-  readonly onChange: InputCell<((next: T) => void) | undefined>;
-}
-declare function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>;
 interface ControlFocus {
   readonly ref: UiNodeRef;
   readonly focused: Observable<boolean>;

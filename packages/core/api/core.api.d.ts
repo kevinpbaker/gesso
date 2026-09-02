@@ -2531,6 +2531,7 @@ declare class LayoutEngine {
   private readonly anchorDependents;
   private readonly movedAnchored;
   private readonly stickyNodes;
+  private readonly stickyShifted;
   private readonly textMeasurer;
   private percentBase;
   private layoutRoot;
@@ -2610,6 +2611,7 @@ declare class LayoutEngine {
   private replaceMovedAnchored;
   private replaceAnchored;
   private parsePlacement;
+  private stickyOffsetOf;
   private scrollOffsetOf;
   private containingBlockOf;
   private updatePaintOrder;
@@ -2625,6 +2627,9 @@ declare class LayoutEngine {
   private applyScroll;
   private applyScrollOffset;
   private applySticky;
+  private resolveStickyOffset;
+  private followStickyShifts;
+  private carriedBySticky;
   private scrollAncestorOf;
   private flowParentOf;
   private now;
@@ -4835,7 +4840,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CJZoc529.js";
+} from "./index-wXd3FhFa.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5519,7 +5524,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CJZoc529.js";
+} from "./index-wXd3FhFa.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
