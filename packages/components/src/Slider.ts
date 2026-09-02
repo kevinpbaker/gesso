@@ -48,6 +48,12 @@ export interface SliderProps extends ControlLayoutProps {
   disabled?: boolean;
   /** How the value should be spoken, when the number is not it ("40%"). */
   format?: (value: number) => string;
+  /**
+   * Draw the track alone, without the label and value above it. The
+   * label still names the control for assistive technology. A media
+   * player's seek bar and a volume slider want this; a form does not.
+   */
+  labelHidden?: boolean;
 }
 
 export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChild {
@@ -127,7 +133,7 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
       })
     },
     Row(
-      { gap: 8, y: 'center' },
+      { gap: 8, y: 'center', visible: input(props.labelHidden, false).pipe(map(hidden => !hidden)) },
       Text({ text: label, color: foregroundToken(disabled), fontSize: 12, selectable: false }),
       Text({ text: spoken, color: foregroundToken(disabled), fontSize: 12, selectable: false })
     ),

@@ -117,6 +117,7 @@ interface SliderProps extends ControlLayoutProps {
   label?: string;
   disabled?: boolean;
   format?: (value: number) => string;
+  labelHidden?: boolean;
 }
 declare function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
 interface NumberInputProps extends ControlLayoutProps {
