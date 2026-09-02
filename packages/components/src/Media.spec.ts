@@ -308,6 +308,58 @@ describe('Image', () => {
     expect(fetched).toEqual(['one.png', 'two.png']);
   });
 
+  it('tries the next source when one fails, and reports failure only when all have', async () => {
+    const fetched: string[] = [];
+    const resolver = new DefaultImageResolver({
+      fetch: source => {
+        fetched.push(source);
+        return source.includes('down') ? Promise.reject(new Error('502')) : Promise.resolve(new Blob());
+      },
+      decode: () => Promise.resolve(fakeBitmap())
+    });
+    let node: UiNode | null = null;
+    const mounted = renderTest(
+      Column(
+        {},
+        createComponent(Image, {
+          src: ['https://down.example/a.jpg', 'https://also-down.example/a.jpg', 'https://up.example/a.jpg'],
+          alt: 'A',
+          ref: (n: UiNode | null) => (node = n)
+        })
+      ),
+      { media: { resolver } }
+    );
+    mounted.frame();
+    await mounted.settle();
+
+    expect(fetched).toEqual([
+      'https://down.example/a.jpg',
+      'https://also-down.example/a.jpg',
+      'https://up.example/a.jpg'
+    ]);
+    expect(node!.properties.get('image')).toBeDefined();
+    // Only the one that answered is held.
+    expect(resolver.size).toBe(1);
+
+    let failed: UiNode | null = null;
+    const hopeless = renderTest(
+      Column(
+        {},
+        createComponent(Image, {
+          src: ['https://down.example/b.jpg'],
+          alt: 'B',
+          placeholderColor: 'danger',
+          ref: (n: UiNode | null) => (failed = n)
+        })
+      ),
+      { media: { resolver } }
+    );
+    hopeless.frame();
+    await hopeless.settle();
+    expect(failed!.properties.get('image')).toBeUndefined();
+    expect(failed!.properties.get('backgroundColor')).toBe('danger');
+  });
+
   it('releases the bitmap when its row leaves the tree', async () => {
     const resolver = new DefaultImageResolver({
       capacity: 0,

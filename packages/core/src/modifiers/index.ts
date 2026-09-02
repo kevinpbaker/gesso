@@ -7,7 +7,7 @@ export { autoFocus } from './focus';
 export { clickOutside, type ClickOutsideOptions } from './clickOutside';
 export { draggable, type DragOffset, type DraggableOptions } from './drag';
 export { animateLayout, type AnimateLayoutOptions } from './animation';
-export { imageSource, iconSource, type ImageSourceArgs, type IconSourceArgs } from './media';
+export { imageSource, iconSource, type ImageSourceArgs, type IconSourceArgs, type ImageSources } from './media';
 export { motion, sharedElement, type MotionArgs, type SharedElementArgs } from './motion';
 export { videoSource, type VideoSourceArgs } from './video';
 export { scrollPosition, type ScrollOffset, type ScrollPositionArgs } from './scroll';

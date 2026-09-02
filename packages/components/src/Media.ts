@@ -40,8 +40,12 @@ import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 
 export interface ImageProps extends ControlLayoutProps {
   ref?: UiNodeRef;
-  /** A URL the resolver can fetch. */
-  src: string;
+  /**
+   * A URL the resolver can fetch, or several for the same picture tried
+   * in order until one resolves: mirrors of a file, say. A bound value
+   * is followed.
+   */
+  src: string | readonly string[];
   /**
    * What a screen reader reads instead of the picture.
    *

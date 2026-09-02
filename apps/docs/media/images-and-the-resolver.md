@@ -179,6 +179,11 @@ does, leave the `alt` off.
   an `Image` pointed at an `.svg` fails where the same file in an `<img>`
   would work. A vector glyph belongs in [`Icon`](/media/icons), which
   draws a path instead of decoding a document.
+- **Several urls for one picture.** `src` may be a list, tried in order
+  until one resolves: the same file on several mirrors, or a small
+  render then a large one. Only the url that answered is held, a failed
+  one is not cached, and the placeholder shows only when every candidate
+  has failed.
 - **A bound `src` is followed.** An `Image` whose `src` is an Observable
   shows each url it emits: the new file resolves, the old bitmap is
   released, and a load that was superseded before it arrived is dropped

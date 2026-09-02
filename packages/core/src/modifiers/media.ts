@@ -19,10 +19,17 @@ function follow<T>(value: Reactive<T>): Observable<T> {
   return isObservable(value) ? (value as Observable<T>) : of(value);
 }
 
+/** One url, or several to try in order until one resolves. */
+export type ImageSources = string | readonly string[];
+
 export interface ImageSourceArgs {
   readonly resolver: ImageResolver;
-  /** The url to resolve; an Observable is followed, and each new url replaces the last. */
-  readonly source: Reactive<string>;
+  /**
+   * The url to resolve, or a list of them tried in order: the same
+   * picture on several mirrors, say. An Observable is followed, and each
+   * new value replaces the last.
+   */
+  readonly source: Reactive<ImageSources>;
   readonly onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 
@@ -40,10 +47,10 @@ export const imageSource = defineModifier<ImageSourceArgs>({
   attach(host, args) {
     let release: (() => void) | null = null;
     const subscription = follow(args.source)
-      .pipe(distinctUntilChanged())
+      .pipe(distinctUntilChanged(sameSources))
       .subscribe(source => {
         release?.();
-        release = load(host, args, source);
+        release = load(host, args, typeof source === 'string' ? [source] : source);
       });
     host.own(() => {
       subscription.unsubscribe();
@@ -56,30 +63,58 @@ export const imageSource = defineModifier<ImageSourceArgs>({
   // A changed *url* inside the stream is handled above.
 });
 
-/** Starts one load, and returns what undoes it: the in-flight result is dropped and the bitmap released. */
-function load(host: UiModifierHost, args: ImageSourceArgs, source: string): () => void {
+/**
+ * Starts loading the first candidate, falling through to the next when
+ * one fails, and returns what undoes it: the in-flight result is
+ * dropped and whichever source is held is released. A failed candidate
+ * holds nothing, because the resolver does not cache failures.
+ */
+function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly string[]): () => void {
   let live = true;
+  let held: string | null = null;
   args.onState?.('loading');
   host.clear('image');
-  args.resolver
-    .resolve(source)
-    .then((bitmap: UiImage) => {
-      if (!live) {
-        return;
-      }
-      host.set('image', bitmap);
-      args.onState?.('loaded');
-    })
-    .catch((error: unknown) => {
-      if (!live) {
-        return;
-      }
-      args.onState?.('failed', error);
-    });
+  const attempt = (index: number, lastError: unknown): void => {
+    if (!live) {
+      return;
+    }
+    const source = sources[index];
+    if (source === undefined) {
+      args.onState?.('failed', lastError ?? new Error('No image source was given.'));
+      return;
+    }
+    held = source;
+    args.resolver
+      .resolve(source)
+      .then((bitmap: UiImage) => {
+        if (!live) {
+          return;
+        }
+        host.set('image', bitmap);
+        args.onState?.('loaded');
+      })
+      .catch((error: unknown) => {
+        if (held === source) {
+          held = null;
+        }
+        attempt(index + 1, error);
+      });
+  };
+  attempt(0, undefined);
   return () => {
     live = false;
-    args.resolver.release(source);
+    if (held !== null) {
+      args.resolver.release(held);
+      held = null;
+    }
   };
+}
+
+function sameSources(a: ImageSources, b: ImageSources): boolean {
+  if (typeof a === 'string' || typeof b === 'string') {
+    return a === b;
+  }
+  return a.length === b.length && a.every((url, index) => url === b[index]);
 }
 
 export interface IconSourceArgs {
