@@ -1,3 +1,7 @@
+---
+description: Write a component, bind a value into a node, and handle a click, with the counter that runs on this page.
+---
+
 # Your first component
 
 A Gesso component is a function. It is called once, and what it returns
@@ -22,5 +26,10 @@ bindings that read it.
 Notice what is _not_ in it: no colours. The text takes the theme's, and
 `primary` is a theme token rather than a hex value, so the counter
 follows this site's light and dark toggle without knowing that either
-exists. [Light and dark](/guide/appearance) is the eight lines that
-arrange it.
+exists. [Light and dark](/guide/appearance) shows the root component
+that arranges it.
+
+## Next
+
+[Components run once](/guide/components-run-once) is what "called once"
+means for where state and derived values go.

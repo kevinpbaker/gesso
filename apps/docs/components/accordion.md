@@ -56,10 +56,7 @@ your own where a group needs a name, the way the example does.
 
 ### Layout and modifiers
 
-The accordion takes the layout props every control in the library takes,
-and spreads them onto its own column: `width`, `height`, `minWidth`,
-`minHeight`, `maxWidth`, `maxHeight`, `margin` and its four sides,
-`flex`, `flexGrow`, `flexShrink`, `flexBasis`, `selfX` and `selfY`.
+The [shared layout props](/components/#layout-is-yours) land on the accordion's column.
 
 `rootModifiers` is declared on the shared props type but is not attached
 by this component, so a modifier passed there does nothing. Put it on a
@@ -75,9 +72,8 @@ box around the accordion until that changes.
 <Accordion sections={SETTINGS} defaultOpen={['basics']} />
 ```
 
-Which of the two applies is decided once, when the component is built,
-from whether `open` was supplied; passing both throws an error naming
-the component rather than choosing quietly.
+Which form applies is decided once, when the component is built, from
+whether `open` was supplied; supplying both throws.
 
 `onOpenChange` is handed the whole set the accordion would take, which
 is what makes a policy easy to write: the example filters the pinned

@@ -21,10 +21,10 @@ which one cares.
 
 <ThreadDemo />
 
-The worker's longest frame across the block: **41 ms**, against its own
-40 ms step. It doesn't miss one. The copy on the main thread reports
-**3,010 ms**, which is the block itself. Both readings hold, so press
-it and then look.
+Each copy advances on its own 40 ms timer and shows the longest gap it
+has ever seen between two ticks. Through the block, the copy in the
+worker reports **41 ms**: it did not miss a tick. The copy on the main
+thread reports **3,010 ms**, which is the block itself.
 
 ## Declarative, with nothing to re-run
 
@@ -41,9 +41,9 @@ differs is what happens when the state changes.
 That difference is the one you feel while writing. There is no re-run to
 make cheap, so there is nothing to memoise, no dependency array to keep
 honest, no stability annotations, no `remember`, and no view identity to
-reason about. Your component function runs once. Every closure in it is
-stable because nothing recreates them. And the cost of a change is
-visible in the source: the binding _is_ the update.
+reason about. Your component function runs once, so every closure in it
+is stable. And the cost of a change is visible in the source: the
+binding _is_ the update.
 
 A counter, as a function component in JSX:
 
@@ -53,9 +53,9 @@ A counter, as a function component in JSX:
 
 `input(props.label, 'Count')` is a prop with a default. `internalState(0)`
 is the value this component owns, the equivalent of `@State` or
-`mutableStateOf`. And the caption is a derived value that lives nowhere:
-one expression over the other two, subscribed to by the node that shows
-it, so it cannot be stale and there is nothing to invalidate.
+`mutableStateOf`. The caption is derived and stored nowhere: it is one
+expression over the other two, subscribed to by the node that shows it,
+so it cannot be stale and there is nothing to invalidate.
 
 JSX is optional. It compiles onto the element factories, which are the
 same tree in a different spelling:

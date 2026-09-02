@@ -73,8 +73,9 @@ The names in the shipped palette, in the three groups they fall into:
 - **Selection**, for a row that is chosen rather than operated:
   `selectionBackground`, `selectionForeground`.
 
-`packages/core/src/environment/UiColors.ts` is the source of truth for
-that list and for what each shipped theme sets them to.
+The `UiColors` interface in `@gesso/core` is the source of truth for
+that list, and `lightTheme` and `darkTheme` show what each name is set
+to.
 
 A name that is not in the palette is not an error. The value falls
 through to the CSS colour parser, so `'#1f6feb'` and `'rebeccapurple'`

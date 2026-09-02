@@ -64,16 +64,9 @@ bound to the selected value, which is the pattern to copy.
 
 ### Layout and modifiers
 
-The strip takes the layout props every control in the library takes, and
-spreads them onto its outer column: `width`, `height`, `minWidth`,
-`minHeight`, `maxWidth`, `maxHeight`, `margin` and its four sides,
-`flex`, `flexGrow`, `flexShrink`, `flexBasis`, `selfX` and `selfY`.
-
+The [shared layout props](/components/#layout-is-yours) land on the strip's outer column.
 `rootModifiers` goes somewhere else: onto the tab list, beside the focus
 ring, because that is the element that takes focus and carries the role.
-Declare the value once at module scope, since a modifier's arguments are
-compared by identity and a fresh one detaches and re-attaches on every
-frame.
 
 ## Controlled and uncontrolled
 
@@ -89,9 +82,8 @@ frame.
 </Tabs>;
 ```
 
-Which of the two applies is decided once, when the component is built,
-from whether `value` was supplied; passing both throws an error naming
-the component rather than choosing quietly.
+Which form applies is decided once, when the component is built, from
+whether `value` was supplied; supplying both throws.
 
 A controlled strip draws the value it is handed, and `onChange` is a
 request rather than a change. A controlled strip given no `onChange` at

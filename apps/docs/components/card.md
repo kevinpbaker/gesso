@@ -60,12 +60,9 @@ rather than an Observable that resolves to an element.
 
 ### Layout and modifiers
 
-The card takes the layout props every control in the library takes, and
-spreads them onto its own column: `width`, `height`, `minWidth`,
-`minHeight`, `maxWidth`, `maxHeight`, `margin` and its four sides,
-`flex`, `flexGrow`, `flexShrink`, `flexBasis`, `selfX` and `selfY`. A
-card sizes itself to its content, so `width` is usually the one prop
-worth passing.
+The [shared layout props](/components/#layout-is-yours) land on the card's column. A card
+sizes itself to its content, so `width` is usually the one prop worth
+passing.
 
 `rootModifiers` is declared on the shared props type but is not attached
 by this component, so a modifier passed there does nothing. Put it on a

@@ -64,10 +64,7 @@ take and disappears. Put the rule in a row that stretches instead.
 
 ### Layout and modifiers
 
-The toolbar takes the layout props every control in the library takes,
-and spreads them onto its own row: `width`, `height`, `minWidth`,
-`minHeight`, `maxWidth`, `maxHeight`, `margin` and its four sides,
-`flex`, `flexGrow`, `flexShrink`, `flexBasis`, `selfX` and `selfY`.
+The [shared layout props](/components/#layout-is-yours) land on the toolbar's row.
 
 `rootModifiers` is declared on the shared props type but is not attached
 by this component, so a modifier passed there does nothing. Put it on a

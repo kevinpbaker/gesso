@@ -61,17 +61,13 @@ it is everything in force at that node, with the entries the node
 itself provides marked `provided here`. A node that provides nothing
 shares its parent's environment, which is why the mark exists at all.
 
-## The owner chain is exact
+## Which component rendered it
 
-A `UiNode` has no pointer back to a component, and it deliberately does
-not need one: the builder gives every component slot a fragment anchor,
-and that anchor **is** the component's identity. The inspector walks up
-and asks the resolver whether it holds a host for each ancestor, so
-`rendered by TextInput inside sign-in-form-demo` is read from the place
-the link is actually kept rather than guessed from the id.
-
-A component reports its `@Define` tag when it has one and its class or
-function name otherwise, so a functional component is named too.
+`rendered by TextInput inside sign-in-form-demo` is read from the
+runtime's own record of which component owns which node, not guessed
+from the node's id, so it is exact. A component is named by its
+`@Define` tag when it has one and by its class or function name
+otherwise, so a function component is named too.
 
 ## The report crosses a thread
 

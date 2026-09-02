@@ -5,8 +5,8 @@ description: Choosing between a prop, an internal state cell and a derived expre
 # Cells and bindings
 
 A cell is a value a component holds and a binding reads. There are two
-of them and one non-thing, and picking between them is most of what
-authoring a Gesso component is.
+kinds of cell, plus a third case that needs no cell at all. Choosing
+between the three is most of what writing a Gesso component is.
 
 | Where the value comes from | What to use                | What it is                                         |
 | -------------------------- | -------------------------- | -------------------------------------------------- |
@@ -14,7 +14,7 @@ authoring a Gesso component is.
 | This component             | `internalState(value)`     | A cell only this component writes                  |
 | Other values               | nothing                    | An expression: `combineLatest(...).pipe(map(...))` |
 
-The third row is the one people reach past. A value computed from other
+The third row is the one people overlook. A value computed from other
 values needs no cell, no store and no synchronisation: it is an
 Observable derived from the ones it depends on, and it cannot be stale
 because there is no copy of it anywhere.
@@ -82,15 +82,11 @@ nothing else determines.
 
 A binding is attached to one property of one node. When it emits, that
 property is written and the node is marked. What that costs depends on
-which property:
-
-- `text`, `image`: content, so a repaint.
-- `backgroundColor`, `opacity`, `borderColor`: paint, so a repaint with
-  no layout.
-- `width`, `gap`, `flexGrow`, `padding`: layout, so a layout pass from
-  the nearest ancestor that can absorb the change.
-- `transform`: neither. The node moves without layout or paint
-  properties being touched.
+which property, and [components run once](/guide/components-run-once)
+lists the groups: content and paint properties repaint, layout
+properties run layout again from the nearest ancestor that can absorb
+the change, and `transform` does neither, moving the node without
+touching layout or paint.
 
 Fan-out is free. Ten nodes bound to the same Observable are ten writes
 from one emission, with no list to re-render and no diff. That is why

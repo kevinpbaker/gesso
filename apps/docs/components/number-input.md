@@ -46,19 +46,11 @@ it started instead.
 
 ### Layout and modifiers
 
-The layout props every control in the library takes are here too, and
-land on the component's own root: `width`, `height`, `minWidth`,
-`minHeight`, `maxWidth`, `maxHeight`, `margin` and its four sides,
-`flex`, `flexGrow`, `flexShrink`, `flexBasis`, `selfX` and `selfY`. The
-field inside grows to fill the row beside the two buttons and never
-goes below 80 pixels wide. There are no colour props: the field, the
-buttons and the message all read the theme.
-
-`rootModifiers` attaches modifiers to the element that _is_ the field,
-which is what a `measure` or a motion needs in order to see the real
-geometry. Declare the value once at module scope, because a modifier's
-arguments are compared by identity and a fresh one detaches and
-re-attaches every frame.
+The [shared layout props](/components/#layout-is-yours) land on the component's root, and
+`rootModifiers` attaches to the element that _is_ the field. The field
+inside grows to fill the row beside the two buttons and never goes below
+80 pixels wide. There are no colour props: the field, the buttons and
+the message all read the theme.
 
 ## Controlled and uncontrolled
 
@@ -67,11 +59,10 @@ re-attaches every frame.
 <NumberInput label="Guests" defaultValue={2} />
 ```
 
-Which of the two applies is decided once, when the component is built,
-from whether `value` was supplied; passing both throws an error naming
-the component. A controlled field handed no `onChange` does not move
-until the application moves it, and the value it is written is shown as
-it is: `min` and `max` bound what a person can produce with the
+Which form applies is decided once, when the component is built, from
+whether `value` was supplied; supplying both throws. A controlled field
+handed no `onChange` does not move until the application moves it, and
+the value it is written is shown as it is: `min` and `max` bound what a person can produce with the
 keyboard, the buttons or the text, not what the application can set. A
 value written from outside the range is shown, and the first step from
 there lands back inside it.

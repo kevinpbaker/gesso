@@ -40,10 +40,9 @@ Given `defaultChecked`, the control keeps its own value in one cell and
 the application hears about a change only if it asked for `onChange`.
 
 Given both, the component throws as it is built, naming itself and both
-props.
-A control that quietly owns state the application also thinks it owns is
-the bug that rule exists to prevent, so it is an error rather than a
-precedence rule you have to remember.
+props. A control that quietly owns state the application also thinks it
+owns is the bug that rule exists to prevent, so it is an error rather
+than a precedence rule you have to remember.
 
 Which of the two applies is decided once, when the component is built,
 from whether the value prop was supplied. A control cannot change owner
@@ -84,8 +83,8 @@ below is that table, read off the component.
 Every control sets `role`, `label` and `states` on the node that takes
 focus and carries the behaviour, not on a wrapper and not on the text
 inside it. Controls with a numeric value set `valueNow`, `valueMin` and
-`valueMax` as well; the ones on these three pages are on or off, and say
-so with the `checked` state instead.
+`valueMax` as well; controls that are on or off say so with the
+`checked` state instead.
 
 That is the same tree `@gesso/testing` queries, so the spec beside each
 example finds a checkbox by asking for a checkbox. There is no second

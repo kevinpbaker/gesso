@@ -1,3 +1,7 @@
+---
+description: Why a canvas inherits no appearance from the page, how the shell reports light or dark, and how a component follows it.
+---
+
 # Light and dark
 
 A Gesso application draws into a canvas, so it inherits nothing from the
@@ -16,8 +20,9 @@ for.
 
 The shell reports the appearance and `ShellService` carries it, as an
 Observable a component injects. Every example on this site is mounted
-inside this, which is why the counter on the previous page, which sets
-no colours at all, is legible in both appearances:
+inside the root below. That is why the counter on
+[your first component](/guide/counter), which sets no colours at all,
+is legible in both appearances:
 
 <<< @/src/examples/ExampleRoot.tsx#theme
 

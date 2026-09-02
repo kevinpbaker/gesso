@@ -42,20 +42,10 @@ else on this table is shared.
 
 ### Layout and modifiers
 
-Every control in the library also takes the props a caller needs in
-order to place it, and spreads them onto its own root: `width`,
-`height`, `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `margin`
-and its four sides, `flex`, `flexGrow`, `flexShrink`, `flexBasis`,
-`selfX` and `selfY`. Colours are not among them, by design: a control
-reads the theme, so restyling one is a theme over that subtree rather
-than a prop at the call site.
-
-`rootModifiers` attaches modifiers to the element that _is_ the field.
-That matters for anything that needs the real geometry, because a
-`measure` on a wrapper reports the wrapper. Declare the value once at
-module scope: a modifier's arguments are compared by identity, so a
-fresh array or a fresh options object detaches and re-attaches every
-frame.
+The [shared layout props](/components/#layout-is-yours) land on the component's root, and
+`rootModifiers` attaches to the element that _is_ the field, which is
+what a `measure` needs in order to see the real geometry. There are no
+colour props: the field reads the theme.
 
 A field is a window on its text rather than a label. In a row it
 shrinks to the space it is given and scrolls or wraps inside, and it
@@ -72,9 +62,8 @@ it `defaultValue` and it keeps its own text:
 <TextInput label="Email" defaultValue="you@example.com" />
 ```
 
-Which of the two applies is decided once, when the component is built,
-from whether `value` was supplied. Passing both throws an error naming
-the component rather than picking a winner quietly.
+Which form applies is decided once, when the component is built, from
+whether `value` was supplied; supplying both throws.
 
 The keystrokes themselves land in the field's own model, on the node,
 in the render worker. That is what keeps the caret off the round trip
