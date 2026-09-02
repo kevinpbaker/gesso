@@ -148,7 +148,7 @@ function failure(base: RenderedBase, wanted: string, found: number): Error {
   const roles = [...base.semanticsTree().values()]
     .map(
       record =>
-        `  ${record.role ?? '(no role)'}${record.label === undefined ? '' : ` — ${JSON.stringify(record.label)}`}`
+        `  ${record.role ?? '(no role)'}${record.label === undefined ? '' : ` · ${JSON.stringify(record.label)}`}`
     )
     .join('\n');
   const count = found === 0 ? 'Nothing matches' : `${found} nodes match`;

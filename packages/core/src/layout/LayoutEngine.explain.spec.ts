@@ -234,7 +234,7 @@ describe('LayoutEngine.explain', () => {
     const text = formatExplanation(h.engine.explain(scroller));
     console.info(text);
     const lines = text.split('\n');
-    expect(lines[0]).toBe("scroll-view 'scroller' — 400 × 100 at (0, 4)");
+    expect(lines[0]).toBe("scroll-view 'scroller' · 400 × 100 at (0, 4)");
     expect(lines[1]).toMatch(/^width {2}400 {5}stretched across column 'page': 400$/);
     expect(lines[2]).toMatch(
       /^height 100 {5}height: 100 \(explicit\) → 100; flex item of column 'page': kept its base 100/

@@ -191,7 +191,7 @@ describe('LayoutInspector', () => {
 
     inspector.setHovered(card);
     expect(inspector.explainHovered()?.node).toBe(card);
-    expect(inspector.explainHoveredText()).toMatch(/^box 'card' — 100 × 50 at \(10, 18\)/);
+    expect(inspector.explainHoveredText()).toMatch(/^box 'card' · 100 × 50 at \(10, 18\)/);
 
     inspector.setEnabled(false);
     expect(inspector.hoveredNode).toBeNull();

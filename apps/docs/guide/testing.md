@@ -175,6 +175,7 @@ Expected 'root:0:0:0:2' to have width 24, but its box is
 {"x":124.4,"y":22,"width":36,"height":16.8}.
 
 Why:
+text 'root:0:0:0:2' · 36 × 16.8 at (124.4, 22)
 width  36      width: 36 (explicit) → 36; flex item of row 'root:0:0:0':
                kept its base 36 (flexGrow 0, so free space goes to others)
 height 16.8    text needs 16.8 → 16.8
@@ -186,8 +187,8 @@ relayout: not a boundary · content stays inside · a change here is laid
 state: measured · placed · position static
 ```
 
-(Long lines wrapped for this page, and the block's first line dropped;
-the explanation itself prints one line per fact.) That is the same
+(Long lines are wrapped for this page; the explanation itself prints
+one line per fact.) That is the same
 answer the [node inspector](/tooling/inspecting-a-node) gives on a
 canvas, arriving in a terminal. `ui.explainText(node)` prints it on
 demand without a failing assertion, and `ui.explain(node)` returns it
@@ -204,9 +205,21 @@ as data.
 
 A failed query prints two things before it throws: every record in the
 semantics tree, as role and accessible name, and then the node tree.
-`ui.debug()` prints the second of those on demand.
+`ui.debug()` prints the second of those on demand. Ask this row for a
+`switch` and the whole of it comes back:
 
 ```text
+Nothing matches role "switch".
+
+The semantics tree has:
+  (no role) · "Tickets"
+  button · "One fewer ticket"
+  (no role) · "1"
+  button · "One more ticket"
+  checkbox · "Gift wrap this order"
+  (no role) · "1 ticket"
+
+The node tree is:
 box#root:0 [0,0 420×220]
   column#root:0:0 [0,0 420×220]
     row#root:0:0:0 [16,16 388×28.8]

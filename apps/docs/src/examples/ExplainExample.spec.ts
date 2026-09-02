@@ -37,12 +37,11 @@ describe('the docs explain example', () => {
     const ui = example();
     const lines = ui.explainText(ui.getByLabel('title')).split('\n');
 
-    // The page quotes this readout, so it is pinned here rather than
-    // described: a change of wording in the engine has to reach the page.
-    // The first line names the node and prints its border box.
-    expect(lines[0]).toContain("text 'root:0:0:0:1'");
-    expect(lines[0]).toContain('0 × 28 at (330, 79.6)');
-    expect(lines.slice(1)).toEqual([
+    // The page quotes this readout whole, so it is pinned here rather
+    // than described: a change of wording in the engine has to reach
+    // the page. The first line names the node and prints its border box.
+    expect(lines).toEqual([
+      "text 'root:0:0:0:1' · 0 × 28 at (330, 79.6)",
       "width  0       flex item of row 'root:0:0:0': base 124.8 from its max-content width; shrank to 0 " +
         "(flexShrink 1: the items' base sizes exceed the content box of row 'root:0:0:0', so they give up space); " +
         'its automatic minimum is 0: a scroll container or clipped text has none, so it may shrink to nothing; ' +

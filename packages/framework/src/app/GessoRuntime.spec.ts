@@ -199,7 +199,7 @@ describe('GessoRuntime layout inspector', () => {
     runtime.input.pointer.pointerMove(50, 50);
     const box = runtime.debugRoot().firstChild!;
     expect(runtime.inspector.hoveredNode).toBe(box);
-    expect(explanations.at(-1)).toMatch(/^box '.*' — 200 × 100 at \(10, 10\)/);
+    expect(explanations.at(-1)).toMatch(/^box '.*' · 200 × 100 at \(10, 10\)/);
     expect(explanations.at(-1)).toContain('width: 200 (explicit)');
     expect(clock.isPending).toBe(true);
     clock.tick(32);

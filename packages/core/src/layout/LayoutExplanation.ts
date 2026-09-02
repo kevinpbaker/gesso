@@ -479,7 +479,7 @@ export function formatExplanation(explanation: LayoutExplanation): string {
   const { box, width, height, relayout, state } = explanation;
   const lines: string[] = [];
   lines.push(
-    `${labelNode(node)} — ${formatNumber(box.width)} × ${formatNumber(box.height)} at (${formatNumber(
+    `${labelNode(node)} · ${formatNumber(box.width)} × ${formatNumber(box.height)} at (${formatNumber(
       box.x
     )}, ${formatNumber(box.y)})`
   );

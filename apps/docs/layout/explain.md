@@ -21,11 +21,10 @@ the tree, still measured, and it is zero pixels wide:
 
 `runtime.explain(node)` returns a `LayoutExplanation`, and
 `formatExplanation` prints it, one fact per line. Asked about that
-title, mounted in the 420 by 260 viewport its spec uses, it says this.
-The first line names the node, `text 'root:0:0:0:1'`, and gives its
-border box, `0 × 28 at (330, 79.6)`. Then:
+title, mounted in the 420 by 260 viewport its spec uses, it says this:
 
 ```text
+text 'root:0:0:0:1' · 0 × 28 at (330, 79.6)
 width  0       flex item of row 'root:0:0:0': base 124.8 from its max-content width; shrank to 0 (flexShrink 1: the items' base sizes exceed the content box of row 'root:0:0:0', so they give up space); its automatic minimum is 0: a scroll container or clipped text has none, so it may shrink to nothing; its content would need 70.2; the extra 70.2 is clipped
 height 28      stretched across row 'root:0:0:0': 28; its content would need 31.2; the extra 3.2 is clipped
 constraints from row 'root:0:0:0': width 0 (tight) · height 28 (tight)
@@ -114,7 +113,8 @@ screen when you go looking for it:
 Expected 'root:0:0:0:1' to have width 120, but its box is {"x":330,"y":79.6,"width":0,"height":28}.
 
 Why:
-text 'root:0:0:0:1' …
+text 'root:0:0:0:1' · 0 × 28 at (330, 79.6)
+…
 ```
 
 That is the whole explanation, not a summary of it, and the spec beside

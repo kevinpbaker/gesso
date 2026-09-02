@@ -99,7 +99,7 @@ describe('queries', () => {
     const ui = renderTest(app(), { width: 400, height: 200 });
 
     expect(() => ui.getByRole('switch')).toThrow(/Nothing matches role "switch"/);
-    expect(() => ui.getByRole('switch')).toThrow(/The semantics tree has:[\s\S]*button — "Save"/);
+    expect(() => ui.getByRole('switch')).toThrow(/The semantics tree has:[\s\S]*button · "Save"/);
     expect(() => ui.getByRole('switch')).toThrow(/The node tree is:[\s\S]*role=button/);
   });
 

@@ -109,4 +109,51 @@ describe('the docs testing example', () => {
     expect(ui.getLayout(more).x).toBe(before);
   });
   // #endregion layout
+
+  it('prints the semantics tree and the node tree when a query misses', () => {
+    const ui = mount();
+
+    let message = '';
+    try {
+      ui.getByRole('switch');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+
+    // The page quotes this message whole, so the half of it a reader
+    // skips over is pinned here: a change of wording has to reach the
+    // page.
+    expect(message).toContain(
+      [
+        'Nothing matches role "switch".',
+        '',
+        'The semantics tree has:',
+        '  (no role) · "Tickets"',
+        '  button · "One fewer ticket"',
+        '  (no role) · "1"',
+        '  button · "One more ticket"',
+        '  checkbox · "Gift wrap this order"',
+        '  (no role) · "1 ticket"'
+      ].join('\n')
+    );
+    expect(message).toContain('The node tree is:\nbox#root:0 [0,0 420×220]');
+  });
+
+  it('explains the box a failed assertion did not get', () => {
+    const ui = mount();
+
+    let message = '';
+    try {
+      expect(ui.getByText('1')).toHaveBox({ width: 24 });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+
+    expect(message).toContain(
+      `Expected 'root:0:0:0:2' to have width 24, but its box is {"x":124.4,"y":22,"width":36,"height":16.8}.`
+    );
+    // The explanation starts by naming the node and its border box, the
+    // line the page quotes under `Why:`.
+    expect(message).toContain("Why:\ntext 'root:0:0:0:2' · 36 × 16.8 at (124.4, 22)");
+  });
 });
