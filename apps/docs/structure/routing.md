@@ -93,9 +93,9 @@ silent no-op.
 | `observeParams(route)`     | The same as an Observable, for binding a title or a field       |
 | `isActive(route)`          | True while that route is anywhere in the chain, for a nav item  |
 
-Both `go` and `navigate` take `{ replace: true }` to overwrite the
-current history entry instead of pushing a new one, and `{ query }` for
-what follows the `?`.
+`go` takes `{ query }` for what follows the `?`, and both `go` and
+`navigate` take `{ replace: true }` to overwrite the current history
+entry instead of pushing a new one.
 
 ## What a route change does to the tree
 
@@ -222,9 +222,10 @@ screens swap under them.
 
 ## Limits
 
-- **`path` mode has no live consumer in this repository.** The
-  playground and this site both run their examples in other modes.
-  `path` mode is covered by its own spec against a fake window and by
+- **Nothing in this repository navigates in `path` mode.** The
+  playground runs in `hash` mode, and the example on this page is
+  handed a memory history of its own, so pushState navigation is
+  covered by `shellHistory`'s own spec against a fake window and by
   nothing else.
 - **Only Chrome.** `pushState`, `popstate` and `hashchange` behave the
   same on WKWebView and WebView2 by specification, but nothing here has
