@@ -1,9 +1,10 @@
-import { BehaviorSubject, combineLatest, distinctUntilChanged, map, type Observable, Subscription } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, map, type Observable, Subscription } from 'rxjs';
 
 import {
   AnimationService,
   AudioService,
   type ComponentContext,
+  derive,
   type Inputs,
   internalState,
   input,
@@ -246,12 +247,10 @@ function playlistFor(ctx: ComponentContext, id: string): Observable<PlaylistView
 function playingHere(ctx: ComponentContext, id: string): Observable<boolean> {
   const queue = ctx.channel(Queue);
   const audio = ctx.inject(AudioService);
-  return combineLatest([queue.view.playlistId, queue.view.current, audio.state]).pipe(
-    map(
-      ([playlistId, current, state]) =>
-        playlistId === id && current !== null && (state.status === 'playing' || state.status === 'loading')
-    ),
-    distinctUntilChanged()
+  return derive(
+    [queue.view.playlistId, queue.view.current, audio.state],
+    (playlistId, current, state) =>
+      playlistId === id && current !== null && (state.status === 'playing' || state.status === 'loading')
   );
 }
 
@@ -451,9 +450,7 @@ function Control(
   const active = input(inputs.active, false);
   const size = big ? 70 : 46;
   const resting = big ? INK : CHALK;
-  const color = combineLatest([active, input(inputs.activeColor, resting)]).pipe(
-    map(([on, tint]) => (on ? tint : resting))
-  );
+  const color = derive([active, input(inputs.activeColor, resting)], (on, tint) => (on ? tint : resting));
   return (
     <button
       width={size}
@@ -918,14 +915,8 @@ function TrackRow(inputs: Inputs<{ card: CardDesign; track: TrackView }>, ctx: C
   const track = inputs.track;
   const queue = ctx.channel(Queue);
   const shell = ctx.inject(ShellService);
-  const liked = combineLatest([queue.view.likedTracks, track]).pipe(
-    map(([ids, entry]) => ids.includes(entry.id)),
-    distinctUntilChanged()
-  );
-  const current = combineLatest([queue.view.current, track]).pipe(
-    map(([playing, entry]) => playing?.id === entry.id),
-    distinctUntilChanged()
-  );
+  const liked = derive([queue.view.likedTracks, track], (ids, entry) => ids.includes(entry.id));
+  const current = derive([queue.view.current, track], (playing, entry) => playing?.id === entry.id);
   const menuOpen = internalState(false);
   const menuAnchor = internalState<UiNode | null>(null);
   const MENU_ITEMS = [
@@ -1008,9 +999,7 @@ function TrackRow(inputs: Inputs<{ card: CardDesign; track: TrackView }>, ctx: C
           x="center"
           y="center"
           cursor="pointer"
-          label={combineLatest([liked, track]).pipe(
-            map(([on, entry]) => (on ? `Unlike ${entry.title}` : `Like ${entry.title}`))
-          )}
+          label={derive([liked, track], (on, entry) => (on ? `Unlike ${entry.title}` : `Like ${entry.title}`))}
           states={liked.pipe(map(on => (on ? ['pressed'] : [])))}
           onClick={(event: UiPointerEvent) => {
             event.stopPropagation();
@@ -1282,8 +1271,8 @@ function SeekBar(
   inputs: Inputs<{ position: number; duration: number; accent: string; onSeek: (seconds: number) => void }>
 ): UiChild {
   const strip = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
-  const fraction = combineLatest([inputs.position, inputs.duration]).pipe(
-    map(([at, total]) => (total <= 0 ? 0 : Math.min(1, Math.max(0, at / total))))
+  const fraction = derive([inputs.position, inputs.duration], (at, total) =>
+    total <= 0 ? 0 : Math.min(1, Math.max(0, at / total))
   );
   const toSeconds = (event: UiPointerEvent): number => {
     const box = strip.value;
@@ -1361,8 +1350,8 @@ function NowPlayingBar(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
     distinctUntilChanged()
   );
   const position = audio.state.pipe(map(state => state.position));
-  const remaining = combineLatest([position, duration]).pipe(
-    map(([at, total]) => (total === 0 ? '' : `-${formatClock(Math.max(0, total - at))}`))
+  const remaining = derive([position, duration], (at, total) =>
+    total === 0 ? '' : `-${formatClock(Math.max(0, total - at))}`
   );
   const togglePlay = (): void => {
     const status = audio.current.status;
