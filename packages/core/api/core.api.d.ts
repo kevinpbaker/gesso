@@ -709,6 +709,7 @@ declare class UiInputDispatcher {
   addEventListener(node: UiNode, type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   removeEventListener(node: UiNode, type: UiEventType, listener: UiEventListener, options?: UiEventListenerOptions): void;
   hasListeners(type: UiEventType): boolean;
+  listenerTypes(node: UiNode): UiEventType[];
   dispatch(event: UiInputEvent, target: UiNode): UiInputEvent;
   private invokeListeners;
 }
@@ -1884,6 +1885,9 @@ declare class UiHitTester implements HitTester {
   constructor(layout: HitTestLayoutReader, root: UiNode);
   setRoot(root: UiNode): void;
   hitTest(x: number, y: number): HitTestResult | null;
+  hitStack(x: number, y: number): UiNode[];
+  private collectNode;
+  private collectChildren;
   scrollbarZoneAt(x: number, y: number): {
     node: UiNode;
     axis: ScrollbarAxis;
@@ -2172,6 +2176,11 @@ declare class UiPointerController {
   private activePointer;
   private scrollbarDrag;
   constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, options?: PointerControllerOptions);
+  get position(): {
+    readonly x: number;
+    readonly y: number;
+  } | null;
+  private lastPosition;
   get hoveredNode(): UiNode | null;
   get pressedNode(): UiNode | null;
   get draggingScrollbarOf(): UiNode | null;
@@ -4823,7 +4832,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-BSyjX2F0.js";
+} from "./index-B1vwWyzY.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5506,7 +5515,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BSyjX2F0.js";
+} from "./index-B1vwWyzY.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

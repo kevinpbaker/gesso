@@ -594,8 +594,16 @@ interface UiNodeReport {
   readonly props: readonly UiPropReport[];
   readonly environment: readonly UiEnvironmentReport[];
   readonly modifiers: readonly string[];
+  readonly listens: readonly string[];
+  readonly beneath: readonly UiBeneathReport[];
   readonly semantics?: UiSemanticsReport;
   readonly explanation: string;
+}
+interface UiBeneathReport {
+  readonly id: string;
+  readonly type: string;
+  readonly owner?: string;
+  readonly listens: readonly string[];
 }
 interface UiOwnerReport {
   readonly name: string;
@@ -835,6 +843,7 @@ declare class GessoRuntime {
   private selectionController;
   private findController;
   private readonly focusManager;
+  private hitTester;
   private readonly layoutNotifier;
   private readonly smoothScroller;
   private visible;
@@ -891,6 +900,7 @@ declare class GessoRuntime {
   get sharedElementNames(): readonly string[];
   explain(node: UiNode): LayoutExplanation;
   inspectNode(node: UiNode): UiNodeReport;
+  private beneathAtPointer;
   private ownersOf;
   private propsOf;
   private environmentOf;
