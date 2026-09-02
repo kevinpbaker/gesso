@@ -200,7 +200,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
         }
       },
       props.options.pipe(
-        map(options => options.map((option, index) => row(option, index, active, value.value, choose)))
+        map(options => options.map((option, index) => row(option, index, options.length, active, value.value, choose)))
       )
     );
 
@@ -278,6 +278,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
 function row(
   option: SelectOption,
   index: number,
+  total: number,
   active: Observable<number>,
   chosen: Observable<string>,
   choose: (value: string) => void
@@ -294,7 +295,11 @@ function row(
       role: 'option',
       label: option.label,
       states: selected.pipe(map(on => (on ? (['selected'] as UiSemanticState[]) : []))),
+      // Both counted over the whole list, disabled options included,
+      // because a position without a size announces nothing: "1 of 4"
+      // needs the pair.
       posInSet: index + 1,
+      setSize: total,
       onClick: () => choose(option.value)
     },
     Text({

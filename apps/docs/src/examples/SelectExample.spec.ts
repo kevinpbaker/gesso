@@ -213,19 +213,18 @@ describe('the docs select example', () => {
     expect(ui.getByRole('listbox')).toHaveSemantics({ role: 'listbox', name: 'Payment method' });
 
     const records = ui.getAllByRole('option').map(node => ui.getSemantics(node));
-    expect(records.map(record => [record.label, record.states, record.posInSet])).toEqual([
-      ['Card', ['selected'], 1],
-      ['Bank transfer', undefined, 2],
-      ['Invoice', undefined, 3],
-      ['Crypto', undefined, 4]
+    expect(records.map(record => [record.label, record.states, record.posInSet, record.setSize])).toEqual([
+      ['Card', ['selected'], 1, 4],
+      ['Bank transfer', undefined, 2, 4],
+      ['Invoice', undefined, 3, 4],
+      ['Crypto', undefined, 4, 4]
     ]);
 
     // A disabled option is on the record as disabled rather than missing.
     expect(records[3].disabled).toBe(true);
 
-    // An option carries its position but not the size of the set, so
-    // nothing can announce "1 of 4".
-    expect(records[0].setSize).toBeUndefined();
+    // Position and size are both counted over the whole list, disabled
+    // options included, which is what lets something announce "1 of 4".
     // Which option is chosen is a state, not a number.
     expect(records[0].valueNow).toBeUndefined();
 

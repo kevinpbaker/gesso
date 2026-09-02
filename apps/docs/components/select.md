@@ -155,7 +155,7 @@ chooses an option the keyboard cannot reach.
 | Value    | `valueText`, the chosen option's `label`. No `valueNow`: the value is not a number        |
 | States   | `expanded` while the list is open, `invalid` while `invalid`, `required` while `required` |
 | List     | `listbox`, named by the same `label`                                                      |
-| Option   | `option`, named by the option's `label`, with `posInSet` counted over the whole list      |
+| Option   | `option`, named by the option's `label`, with `posInSet` and `setSize` over the whole list |
 | Chosen   | `selected`, on the one option that matches the value                                      |
 | Disabled | `disabled` on the trigger or on an option marked so, and the subtree under it is inert    |
 
@@ -167,9 +167,12 @@ An option's own text has no record of its own: ARIA calls the children
 of an `option` presentational, and a screen reader that read both the
 row and the text inside it would say everything twice.
 
-What is not emitted is worth knowing. An option carries `posInSet` but
-no `setSize`, so nothing can announce "1 of 4"; the spec asserts that
-absence, so it is documented rather than accidental.
+`posInSet` and `setSize` are a pair, and both are counted over the whole
+list rather than over the options that can be chosen, so a disabled
+option still takes up a place: the first of four options announces as
+"1 of 4" whether or not the fourth can be picked. Which option is chosen
+is the `selected` state and not a number, so there is no `valueNow` on
+an option.
 
 ## The list is an overlay
 
