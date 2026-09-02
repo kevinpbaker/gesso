@@ -1,0 +1,170 @@
+import { percent, type UiVideoSurface, type VideoPlayback, type VideoResolver } from '@gesso/core';
+import { Video } from '@gesso/components';
+import { MediaService, type ComponentContext, type Inputs } from '@gesso/framework';
+
+// #region playback
+/** The surface as its producer sees it: the same object, a new frame. */
+interface MutableSurface {
+  frame: ImageBitmap | null;
+  version: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+const FRAME_COUNT = 24;
+const FRAME_MS = 100;
+
+/**
+ * A clip drawn on the spot, so this page fetches nothing.
+ *
+ * It is a real `VideoPlayback` and not a mock: one surface whose
+ * identity never changes, a `version` that counts frames, and a
+ * `present` that is a pure function of a position. That is the whole
+ * contract a decoder has to meet, which is why an app can replace the
+ * MP4 one with a screen capture, a generator, or anything else that
+ * can produce a frame.
+ *
+ * The previous frame is closed rather than dropped, because a decoded
+ * frame holds pixels and often holds them on the GPU. Under a spec
+ * there is no `OffscreenCanvas`, so no frame is drawn and `frame`
+ * stays null; the version still counts, which is what makes "the
+ * animation driver is what moves a video on" measurable without a
+ * browser.
+ */
+class GeneratedPlayback implements VideoPlayback {
+  readonly width = 240;
+  readonly height = 135;
+  readonly duration = (FRAME_COUNT * FRAME_MS) / 1000;
+  readonly frameDurationMs = FRAME_MS;
+  positionMs = 0;
+
+  private readonly canvas: OffscreenCanvas | null =
+    typeof OffscreenCanvas === 'undefined' ? null : new OffscreenCanvas(240, 135);
+  private readonly mutable: MutableSurface = { frame: null, version: 0, width: 240, height: 135 };
+  private index = -1;
+
+  constructor(private readonly hue: number) {}
+
+  get surface(): UiVideoSurface {
+    return this.mutable;
+  }
+
+  present(positionMs: number): boolean {
+    this.positionMs = positionMs;
+    const next = Math.floor(positionMs / FRAME_MS) % FRAME_COUNT;
+    if (next === this.index) {
+      // The picture did not change, so nothing asks for a paint. A
+      // clip at ten frames a second inside an app at sixty paints ten
+      // times a second.
+      return false;
+    }
+    this.index = next;
+    this.mutable.frame?.close();
+    this.mutable.frame = this.draw(next);
+    this.mutable.version++;
+    return true;
+  }
+
+  onError(_listener: (error: unknown) => void): () => void {
+    return () => {};
+  }
+
+  private draw(index: number): ImageBitmap | null {
+    const context = this.canvas?.getContext('2d') ?? null;
+    if (this.canvas === null || context === null) {
+      return null;
+    }
+    const turn = (index / FRAME_COUNT) * Math.PI * 2;
+    context.fillStyle = `hsl(${this.hue} 45% 22%)`;
+    context.fillRect(0, 0, this.width, this.height);
+    context.fillStyle = `hsl(${this.hue} 70% 60%)`;
+    const x = (this.width / 2) * (1 + Math.sin(turn)) - 24;
+    context.fillRect(x, this.height / 2 - 24, 48, 48);
+    context.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    context.fillRect(0, this.height - 8, (this.width * (index + 1)) / FRAME_COUNT, 8);
+    return this.canvas.transferToImageBitmap();
+  }
+}
+
+/**
+ * One playback per source, shared by everything that names it.
+ *
+ * `DefaultVideoResolver` has this shape and adds the fetch, the
+ * demuxer and `VideoDecoder`. The reference counting is the part worth
+ * copying: two `Video`s pointed at one source watch one playback, and
+ * an arriving screen picks up the position a departing one had reached
+ * rather than starting the clip again.
+ */
+class ClipResolver implements VideoResolver {
+  private readonly clips = new Map<string, GeneratedPlayback>();
+
+  resolve(source: string): Promise<VideoPlayback> {
+    const existing = this.clips.get(source);
+    if (existing !== undefined) {
+      return Promise.resolve(existing);
+    }
+    const clip = new GeneratedPlayback(source === 'still.clip' ? 32 : 196);
+    this.clips.set(source, clip);
+    return Promise.resolve(clip);
+  }
+
+  release(_source: string): void {
+    // Kept, as the default resolver keeps a released playback: the
+    // usual reason a source loses its last holder is a navigation that
+    // is about to give it another.
+  }
+
+  dispose(): void {
+    this.clips.clear();
+  }
+}
+// #endregion playback
+
+// #region video
+/**
+ * Two videos of the same shape, one playing and one held still.
+ *
+ * `Video` takes the props `Image` takes, plus `loop` and `autoplay`,
+ * and that is the whole control surface: there is no play method and
+ * nothing to call. The left one loops, so its position is a repeating
+ * tween over the clip's length and its frames arrive on the `ticks`
+ * phase like any other animation. The right one was given
+ * `autoplay={false}`, so it resolves the clip, presents the frame at
+ * its position, and stops there.
+ *
+ * The resolver above is installed in this body, before either `Video`
+ * is built, because a `Video` asks for its playback the moment it is.
+ * An application that plays an MP4 installs nothing: the default
+ * resolver fetches and decodes it.
+ */
+export function Player(_props: Inputs<{}>, ctx: ComponentContext) {
+  ctx.inject(MediaService).setVideoResolver(new ClipResolver());
+
+  return (
+    <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
+      <row gap={16}>
+        <column gap={6}>
+          <Video src="loop.clip" alt="A generated clip, playing" width={200} height={112} borderRadius={8} />
+          <text text="loop and autoplay: the defaults" fontSize={12} color="textMuted" />
+        </column>
+        <column gap={6}>
+          <Video
+            src="still.clip"
+            alt="A generated clip, held on one frame"
+            width={200}
+            height={112}
+            borderRadius={8}
+            objectFit="contain"
+            autoplay={false}
+          />
+          <text text="autoplay={false}: one frame, and no tween" fontSize={12} color="textMuted" />
+        </column>
+      </row>
+      <text
+        text="Neither clip is a file. Both are painted frame by frame by a VideoResolver this example supplies."
+        fontSize={12}
+      />
+    </column>
+  );
+}
+// #endregion video
