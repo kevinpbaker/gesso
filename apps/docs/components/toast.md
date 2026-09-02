@@ -9,8 +9,9 @@ something that has already happened, or to report something that
 failed: the note saved, the upload finished, the server refused. It is
 for a notice the user does not have to answer.
 
-When the user does have to answer, that is a dialog, because a toast
-takes no focus and cannot hold a decision. When the message belongs to
+When the user does have to answer, that is a
+[dialog](/components/dialog), because a toast takes no focus and cannot
+hold a decision. When the message belongs to
 one control rather than to the screen, put it beside that control:
 `invalid` on a field says more than a notice in the corner. When the
 label only needs to appear on a hover, that is a
