@@ -133,18 +133,26 @@ Each control gets one page, in this shape.
 - **Semantics.** The role it declares, where its accessible name comes
   from, and the states it emits as they change.
 
-The pages written so far, by what they are for:
+The pages, by what they are for:
 
 - **Choosing:** [Checkbox](/components/checkbox),
   [Switch](/components/switch),
-  [RadioGroup](/components/radio-group).
+  [RadioGroup](/components/radio-group), [Select](/components/select).
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
   [Slider](/components/slider), [NumberInput](/components/number-input).
 - **Showing data:** [DataTable](/components/data-table),
   [Tree](/components/tree), [LazyList](/components/lazy-list).
 - **Arranging a screen:** [Tabs](/components/tabs),
   [Accordion](/components/accordion), [Card](/components/card),
-  [Divider](/components/divider), [Toolbar](/components/toolbar).
+  [Divider](/components/divider), [Toolbar](/components/toolbar),
+  [SplitPane](/components/split-pane), [FindBar](/components/find-bar).
+- **Layering over a screen:** [Dialog](/components/dialog),
+  [Menu](/components/menu), [Tooltip](/components/tooltip),
+  [Toast](/components/toast).
+- **Showing media:** [Image](/components/image),
+  [Video](/components/video), [Icon](/components/icon).
+- **Reporting progress:** [Spinner](/components/spinner),
+  [ProgressBar](/components/progress-bar).
 
 For a tour of the library rather than a reference,
 [using components](/guide/using-components) builds the form above.
