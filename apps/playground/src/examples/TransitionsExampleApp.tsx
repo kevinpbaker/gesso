@@ -147,22 +147,15 @@ const NOW_PLAYING = '#4a53d8';
  * rather than doubling it (see `Button` in `UiComponents.ts`).
  */
 /**
- * The dark round controls over the artwork: lighten a step on hover,
- * settle back on press.
- *
- * Opaque greys rather than a lighter translucent black, which would be
- * the natural choice over a photograph. A translucent override paints
- * as nothing while the card's hover scale is active, though the same
- * value paints correctly on the playlist page where nothing above it is
- * transformed, and the declared translucent resting colour paints in
- * both places. That is a renderer question, recorded in
- * `docs/TRANSITIONS_ROADMAP.md`, and an opaque grey sidesteps it.
+ * The dark round controls over the artwork: a lighter translucent black
+ * on hover, so the photograph shows through a little more, and back
+ * toward the resting shade on press.
  */
 const DARK_CONTROL_INTERACTION = interactive({
   hover: true,
   press: true,
-  hovered: { backgroundColor: '#3a3a3a' },
-  pressed: { backgroundColor: '#262626' }
+  hovered: { backgroundColor: 'rgba(0, 0, 0, 0.62)' },
+  pressed: { backgroundColor: 'rgba(0, 0, 0, 0.72)' }
 });
 /** The white controls: the big play button and the add badge. */
 const LIGHT_CONTROL_INTERACTION = interactive({
