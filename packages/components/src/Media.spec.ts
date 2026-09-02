@@ -13,6 +13,7 @@ import {
   lightTheme,
   type UiTheme,
   DefaultImageResolver,
+  defineModifier,
   IconRasterizer,
   type IconCanvas,
   type IconContext,
@@ -47,6 +48,21 @@ function firstElement(node: UiNode): UiNode {
   }
   return child;
 }
+
+/**
+ * A modifier that does nothing but say where it landed.
+ *
+ * `rootModifiers` is a promise about *which element* a caller's
+ * modifier reaches — `sharedElement` and `motion` both describe one —
+ * so the assertion has to be about the node, not about a property.
+ */
+const attachedTo: UiNode[] = [];
+const mark = defineModifier<void>({
+  name: 'mark',
+  attach(host) {
+    attachedTo.push(host.node);
+  }
+});
 
 function semanticsOf(node: UiNode): Record<string, unknown> {
   return {
@@ -220,6 +236,39 @@ describe('Image', () => {
     expect(node!.properties.get('label')).toBeUndefined();
   });
 
+  it('tints the placeholder with the colour it was given, and drops it when the bitmap arrives', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountMedia(
+      Column(
+        {},
+        createComponent(Image, {
+          src: 'photo.png',
+          alt: 'A photograph',
+          placeholderColor: 'danger',
+          ref: (n: UiNode | null) => (node = n),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+
+    // A tint while it decodes, so a grid of thumbnails does not jump
+    // as they arrive, and nothing once the picture is there to cover
+    // it.
+    expect(node!.properties.get('backgroundColor')).toBe('danger');
+    await mounted.settle();
+    expect(node!.properties.get('backgroundColor')).toBeUndefined();
+  });
+
+  it('falls back to the theme tint when no placeholder colour is given', () => {
+    let node: UiNode | null = null;
+    mountMedia(
+      Column({}, createComponent(Image, { src: 'photo.png', ref: (n: UiNode | null) => (node = n), width: 40 }))
+    );
+
+    expect(node!.properties.get('backgroundColor')).toBe('controlBackground');
+  });
+
   it('releases the bitmap when its row leaves the tree', async () => {
     const resolver = new DefaultImageResolver({
       capacity: 0,
@@ -297,6 +346,32 @@ describe('Spinner and ProgressBar', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("attaches a caller's rootModifiers to the element each of them draws", () => {
+    attachedTo.length = 0;
+    let spinnerHost: UiNode | null = null;
+    let barHost: UiNode | null = null;
+    const mounted = renderTest(
+      Column(
+        {},
+        Column(
+          { ref: (n: UiNode | null) => (spinnerHost = n) },
+          createComponent(Spinner, { rootModifiers: [mark(undefined)] })
+        ),
+        Column(
+          { ref: (n: UiNode | null) => (barHost = n) },
+          createComponent(ProgressBar, { value: 0.5, rootModifiers: [mark(undefined)] })
+        )
+      )
+    );
+    mounted.frame();
+
+    // A component's own node is its anchor fragment, which has no box
+    // and takes no modifier, so `rootModifiers` is the only way a
+    // `sharedElement` or a `motion` can reach either of these.
+    expect(attachedTo).toContain(firstElement(spinnerHost!));
+    expect(attachedTo).toContain(firstElement(barHost!));
   });
 
   it('a determinate bar reports its value; an indeterminate one reports busy and no value', () => {

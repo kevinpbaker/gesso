@@ -33,9 +33,9 @@ The bar has no width of its own: it fills what it is given, so pass a
 `width` or a `flex`. The rest of the layout props on
 [the library page](/components/) apply.
 
-`rootModifiers` is declared on the shared props type but is not
-attached by this component, so a modifier passed there does nothing.
-Put it on a box around the bar.
+`rootModifiers` reaches the track, which is the element the bar is, so
+a `sharedElement` or a `motion` can be put on one without wrapping it
+in a box of its own.
 
 There are no colour props. The track is `controlBackground` and the
 fill is `controlAccent`, so a theme restyles every bar at once.

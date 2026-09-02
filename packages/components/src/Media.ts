@@ -27,9 +27,12 @@ import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 /**
  * The Media tier (`COMPONENTS_ROADMAP.md` C7).
  *
- * All four are the same shape as the rest of the library — no colour
- * props, semantics from the first line, layout props passed through —
- * and none of them is renderer work. `UiImage` and `objectFit` have
+ * All four are the same shape as the rest of the library: semantics
+ * from the first line, layout props passed through, and a colour prop
+ * only where the colour is the thing being drawn (an icon's glyph, a
+ * spinner's blades) or where the theme cannot know what the picture
+ * sits on (an image's placeholder). None of them is renderer work.
+ * `UiImage` and `objectFit` have
  * been on both backends since the WebGPU parity milestone; what was
  * missing was everything in front of them, which is `ImageResolver`,
  * `IconRasterizer` and the two modifiers that write `image`.
@@ -52,8 +55,18 @@ export interface ImageProps extends ControlLayoutProps {
   alt?: string;
   objectFit?: ObjectFit;
   borderRadius?: number;
-  /** Shown while the bitmap is decoding and if it fails. */
-  placeholderColor?: never;
+  /**
+   * The tint the box carries while the bitmap is decoding and after it
+   * fails. A palette name or a colour outright; defaults to
+   * `controlBackground`.
+   *
+   * The default is what keeps a grid of thumbnails from jumping as
+   * they arrive, and it is the theme's answer rather than a colour
+   * named here. This prop is for the caller who is placing pictures on
+   * something the theme's control background does not sit on: a
+   * picture over a photograph, or in a panel of its own colour.
+   */
+  placeholderColor?: UiColorValue;
 }
 
 /**
@@ -69,6 +82,10 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
   const alt = input(props.alt, undefined);
   const objectFit = input(props.objectFit, 'cover' as ObjectFit);
   const radius = input(props.borderRadius, 0);
+  // Read once, like `Icon`'s colour: a placeholder is what stands in
+  // before the first frame that has a picture on it, so a colour that
+  // arrived later would have nothing left to tint.
+  const placeholder = props.placeholderColor.value ?? 'controlBackground';
   const status = internalState<'loading' | 'loaded' | 'failed'>('loading');
 
   // Built once, in the body, so its identity is stable across renders
@@ -89,8 +106,9 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
     borderRadius: radius,
     // A tint of the surface while it decodes and after it fails, so a
     // list of thumbnails does not jump as they arrive. The theme
-    // decides what that is; nothing here names a colour.
-    backgroundColor: status.pipe(map(current => (current === 'loaded' ? undefined : 'controlBackground'))),
+    // decides what that is unless the caller says otherwise; nothing
+    // here names a colour either way.
+    backgroundColor: status.pipe(map(current => (current === 'loaded' ? undefined : placeholder))),
     // No role at all when there is no name: an unnamed `image` record
     // is worse than none.
     role: alt.pipe(map(text => (text === undefined ? undefined : ('image' as const)))),
@@ -301,6 +319,7 @@ export function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiC
   return Box(
     {
       ...layoutOf(props),
+      modifiers: modifiersOf(props),
       width: size,
       height: size,
       flexShrink: 0,
@@ -411,6 +430,7 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
   return Box(
     {
       ...layoutOf(props),
+      modifiers: modifiersOf(props),
       height: thickness,
       borderRadius: thickness / 2,
       backgroundColor: 'controlBackground',

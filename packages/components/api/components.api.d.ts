@@ -358,7 +358,7 @@ interface ImageProps extends ControlLayoutProps {
   alt?: string;
   objectFit?: ObjectFit;
   borderRadius?: number;
-  placeholderColor?: never;
+  placeholderColor?: UiColorValue;
 }
 declare function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild;
 interface VideoProps extends ControlLayoutProps {

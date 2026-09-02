@@ -34,9 +34,9 @@ row keeps its size. The layout props on
 this one resolves at paint: the blades are boxes rather than a raster,
 so a theme change recolours them with nothing redrawn.
 
-`rootModifiers` is declared on the shared props type but is not
-attached by this component, so a modifier passed there does nothing.
-Put it on a box around the spinner.
+`rootModifiers` reaches the box the blades sit in, so a
+`sharedElement` or a `motion` can be put on a spinner without wrapping
+it in a box of its own.
 
 ## What a turn costs
 
