@@ -194,6 +194,9 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   } else {
     out.editor = undefined;
     out.text = resolveString(node, 'text');
+    if (out.text === undefined) {
+      warnIfTextIsNotText(node);
+    }
     out.placeholder = undefined;
     // Only a selected paragraph pays for the colour: the scratch is
     // reused across nodes, so an unselected one must not resolve it and
@@ -358,4 +361,28 @@ export function colorToCss(color: UiColor): string {
     return colorToHex(color);
   }
   return colorToRgba(color);
+}
+
+const warnedNonText = new WeakSet<UiNode>();
+
+/**
+ * A `text` that is not a string paints nothing and, until now, said
+ * nothing. The one honest way to write one is the JSX rule that a lone
+ * Observable child of <text> or <button> is its label: an icon written
+ * as `<button>{icon$}</button>` binds an element to `text`. Once per
+ * node, so a bound value that flickers through a wrong type is one line
+ * and not a stream.
+ */
+function warnIfTextIsNotText(node: UiNode): void {
+  const raw = resolveProperty(node, UiProperties.text) as unknown;
+  if (raw === undefined || raw === null || typeof raw === 'string' || warnedNonText.has(node)) {
+    return;
+  }
+  warnedNonText.add(node);
+  const kind = Array.isArray(raw) ? 'an array' : typeof raw === 'object' ? 'an element or object' : typeof raw;
+  console.warn(
+    `Node '${node.id}' has a text that is ${kind}, and nothing is drawn for it. A lone Observable child of ` +
+      `<text> or <button> is read as its text; if it was meant as children, put it in an array (\`{[child$]}\`) ` +
+      `or wrap it in a <box>.`
+  );
 }
