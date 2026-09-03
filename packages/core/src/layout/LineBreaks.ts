@@ -1,4 +1,4 @@
-import { graphemeBoundaries } from '../editing/TextBoundaries';
+import { graphemeBoundaries, wordBoundaries } from '../editing/TextBoundaries';
 import type { TextWrap } from './TextMeasurer';
 
 /**
@@ -33,6 +33,10 @@ import type { TextWrap } from './TextMeasurer';
  *     middle dot or leaders (LB13, LB16, LB22), after an opening bracket
  *     (LB14), between a currency prefix and the ideograph after it
  *     (LB23a) or between an ideograph and a percent sign (LB24);
+ *   - between two words of a script that writes without spaces (Thai,
+ *     Lao, Khmer, Myanmar; class SA), where the words are the ones
+ *     `Intl.Segmenter` finds, which is the browser's own dictionary and
+ *     therefore Chrome's (LB1 resolves SA by dictionary);
  *   - and never inside a grapheme cluster (LB9), so a base and its
  *     combining marks, or a surrogate pair, are one unit.
  *
@@ -61,6 +65,7 @@ export function segmentParagraph(paragraph: string, wrap: TextWrap): TextSegment
     return [{ start: 0, end: length }];
   }
   const boundaries = clusterBoundaries(paragraph);
+  const dictionary = hasComplexContext(paragraph) ? new Set(wordBoundaries(paragraph)) : null;
   const segments: TextSegment[] = [];
   let i = 0;
   while (i < boundaries.length - 1) {
@@ -76,7 +81,13 @@ export function segmentParagraph(paragraph: string, wrap: TextWrap): TextSegment
     i++;
     while (i < boundaries.length - 1) {
       const next = paragraph.codePointAt(boundaries[i])!;
-      if (isBlank(next) || wrap === 'char' || breaksBetween(paragraph.codePointAt(boundaries[i - 1])!, next)) {
+      const previous = paragraph.codePointAt(boundaries[i - 1])!;
+      if (
+        isBlank(next) ||
+        wrap === 'char' ||
+        breaksBetween(previous, next) ||
+        (dictionary !== null && dictionary.has(boundaries[i]) && isComplexContext(previous) && isComplexContext(next))
+      ) {
         break;
       }
       end = boundaries[i + 1];
@@ -180,6 +191,8 @@ function classOf(code: number): BreakClass {
     case 0x2010: // ‐
     case 0x2012: // ‒
     case 0x2013: // –
+    case 0x0964: // । danda
+    case 0x0965: // ॥ double danda
       return 'BA';
     case 0x2014: // —
       return 'B2';
@@ -323,6 +336,25 @@ export function isIdeographic(code: number): boolean {
     (code >= 0xffe0 && code <= 0xffe6) || // fullwidth signs
     (code >= 0x20000 && code <= 0x3134f) // Extensions B to G
   );
+}
+
+/** Class SA: scripts whose words are found by dictionary, not by spaces. */
+function isComplexContext(code: number): boolean {
+  return (
+    (code >= 0x0e00 && code <= 0x0e7f) || // Thai
+    (code >= 0x0e80 && code <= 0x0eff) || // Lao
+    (code >= 0x1000 && code <= 0x109f) || // Myanmar
+    (code >= 0x1780 && code <= 0x17ff) // Khmer
+  );
+}
+
+function hasComplexContext(paragraph: string): boolean {
+  for (let i = 0; i < paragraph.length; i++) {
+    if (isComplexContext(paragraph.charCodeAt(i))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

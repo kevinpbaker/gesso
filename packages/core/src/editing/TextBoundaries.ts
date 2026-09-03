@@ -101,6 +101,26 @@ export function graphemeBoundaries(text: string): number[] {
 }
 
 /**
+ * Every word boundary in `text`, as `Intl.Segmenter` sees them: 0, the
+ * end of each segment, `text.length`. Segments include the spaces and
+ * punctuation between words, so a boundary falls on both sides of each.
+ * The line breaker asks for these where a script writes without spaces
+ * (Thai, Lao, Khmer, Myanmar), because there a break is a dictionary
+ * decision and the segmenter's dictionary is the browser's own. Empty
+ * where no segmenter exists.
+ */
+export function wordBoundaries(text: string): number[] {
+  if (words === null) {
+    return [];
+  }
+  const boundaries = [0];
+  for (const segment of words.segment(text)) {
+    boundaries.push(segment.index + segment.segment.length);
+  }
+  return boundaries;
+}
+
+/**
  * Where a word-wise move to the right stops: past any spaces and
  * punctuation, at the end of the next word. A newline is a boundary
  * of its own so word moves never skip a line.

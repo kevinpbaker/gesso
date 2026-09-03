@@ -387,6 +387,49 @@ export const textCases: readonly TextCase[] = [
   { name: 'rtl/he-digits', text: 'הזמנה מספר 42 הגיעה', font: 'hebrew', lang: 'he', direction: 'rtl', maxWidth: 200 },
 
   // -------------------------------------------------------------------------
+  // Devanagari: spaces between words, conjunct clusters that must never
+  // split, and a danda that stays with the word before it.
+  // -------------------------------------------------------------------------
+  {
+    name: 'indic/hi-wraps-at-spaces',
+    text: 'नमस्ते दुनिया, यह एक परीक्षण वाक्य है।',
+    font: 'devanagari',
+    lang: 'hi',
+    maxWidth: 120
+  },
+  { name: 'indic/hi-conjuncts-stay-whole', text: 'क्षत्रिय संस्कृति स्त्री', font: 'devanagari', lang: 'hi', maxWidth: 90 },
+  { name: 'indic/hi-digits-both-kinds', text: 'कुल १२३ वस्तुएँ और 456 रुपये', font: 'devanagari', lang: 'hi', maxWidth: 100 },
+  { name: 'indic/hi-natural-width', text: 'नमस्ते दुनिया', font: 'devanagari', lang: 'hi' },
+  {
+    name: 'indic/hi-char-wrap-breaks-between-clusters',
+    text: 'क्षत्रियसंस्कृति',
+    font: 'devanagari',
+    lang: 'hi',
+    maxWidth: 40,
+    wrap: 'char',
+    divergence:
+      'Chrome takes no break-all opportunity directly after a cluster that ends in a vowel sign or virama and overflows the box; Gesso breaks between any two clusters. The same Chrome quirk as char/combining-marks-stay-with-base.'
+  },
+  { name: 'indic/hi-danda-then-word', text: 'यह है।वह है', font: 'devanagari', lang: 'hi', maxWidth: 50 },
+
+  // -------------------------------------------------------------------------
+  // Thai: no spaces between words, so a break is a dictionary decision.
+  // Chrome's are ICU's, and Intl.Segmenter's word boundaries are the
+  // same dictionary; the fixtures check they agree.
+  // -------------------------------------------------------------------------
+  {
+    name: 'thai/breaks-at-word-boundaries',
+    text: 'ภาษาไทยเป็นภาษาที่เขียนโดยไม่เว้นวรรคระหว่างคำ',
+    font: 'thai',
+    lang: 'th',
+    maxWidth: 120
+  },
+  { name: 'thai/narrow', text: 'ภาษาไทยเป็นภาษาที่เขียนโดยไม่เว้นวรรคระหว่างคำ', font: 'thai', lang: 'th', maxWidth: 60 },
+  { name: 'thai/spaces-and-digits', text: 'วันนี้อากาศดี ราคา 250 บาท', font: 'thai', lang: 'th', maxWidth: 140 },
+  { name: 'thai/natural-width', text: 'สวัสดีชาวโลก', font: 'thai', lang: 'th' },
+  { name: 'thai/mixed-with-latin', text: 'ใช้ Gesso สร้างหน้าจอได้เร็ว', font: 'thai', lang: 'th', maxWidth: 110 },
+
+  // -------------------------------------------------------------------------
   // Breaking between characters
   // -------------------------------------------------------------------------
   { name: 'char/breaks-anywhere', text: 'Supercalifragilistic', maxWidth: 50, wrap: 'char' },

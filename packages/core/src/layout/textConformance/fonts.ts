@@ -15,7 +15,7 @@
  * file did not load, `document.fonts.check` says so and the generator
  * refuses to write fixtures.
  */
-export type ConformanceFontId = 'sans' | 'cjk' | 'arabic' | 'hebrew';
+export type ConformanceFontId = 'sans' | 'cjk' | 'arabic' | 'hebrew' | 'devanagari' | 'thai';
 
 export interface ConformanceFont {
   readonly id: ConformanceFontId;
@@ -80,6 +80,30 @@ export const conformanceFonts: readonly ConformanceFont[] = [
       '/usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf',
       '/usr/share/fonts/google-noto/NotoSansHebrew-Regular.ttf',
       '~/Library/Fonts/NotoSansHebrew-Regular.ttf'
+    ]
+  },
+  {
+    id: 'devanagari',
+    family: 'Gesso Conformance Devanagari',
+    face: 'Noto Sans Devanagari Regular',
+    env: 'GESSO_FONT_DEVANAGARI',
+    candidates: [
+      '/usr/share/fonts/noto/NotoSansDevanagari-Regular.ttf',
+      '/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf',
+      '/usr/share/fonts/google-noto/NotoSansDevanagari-Regular.ttf',
+      '~/Library/Fonts/NotoSansDevanagari-Regular.ttf'
+    ]
+  },
+  {
+    id: 'thai',
+    family: 'Gesso Conformance Thai',
+    face: 'Noto Sans Thai Regular',
+    env: 'GESSO_FONT_THAI',
+    candidates: [
+      '/usr/share/fonts/noto/NotoSansThai-Regular.ttf',
+      '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
+      '/usr/share/fonts/google-noto/NotoSansThai-Regular.ttf',
+      '~/Library/Fonts/NotoSansThai-Regular.ttf'
     ]
   }
 ];

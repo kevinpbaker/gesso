@@ -73,6 +73,17 @@ describe('segmentParagraph', () => {
     expect(segments('東京\u3000大阪')).toEqual(['東', '京', '大', '阪']);
   });
 
+  it('breaks Thai at dictionary word boundaries and nowhere else inside a run', () => {
+    expect(segments('ภาษาไทยเป็น')).toEqual(['ภาษา', 'ไทย', 'เป็น']);
+    expect(segments('ราคา 250 บาท')).toEqual(['ราคา', '250', 'บาท']);
+  });
+
+  it('keeps Devanagari conjuncts whole and a danda with its word', () => {
+    expect(segments('क्षत्रिय संस्कृति')).toEqual(['क्षत्रिय', 'संस्कृति']);
+    expect(segments('है।वह')).toEqual(['है।', 'वह']);
+    expect(segments('क्षत्रिय', 'char')).toEqual(['क्ष', 'त्रि', 'य']);
+  });
+
   it("treats 'char' as a break between every cluster and 'none' as no break at all", () => {
     expect(segments('ab cd', 'char')).toEqual(['a', 'b', 'c', 'd']);
     expect(segments('ab cd', 'none')).toEqual(['ab cd']);
