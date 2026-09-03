@@ -23,6 +23,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "fixtures:layout": "node scripts/gen-layout-fixtures.ts",
+    "fixtures:text": "vite-node scripts/gen-text-fixtures.ts",
     "parity:webgpu": "node scripts/check-webgpu-parity.ts",
     "check:a11y": "node scripts/check-a11y-tree.ts",
     "bench:graph": "vite-node scripts/bench-graph.ts",
