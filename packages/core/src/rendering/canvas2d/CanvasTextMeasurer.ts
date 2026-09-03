@@ -45,6 +45,12 @@ export class CanvasTextMeasurer extends ParagraphTextMeasurer {
     return width;
   }
 
+  /** Drops every cached width and metric; see `TextMeasurer.invalidate`. */
+  invalidate(): void {
+    this.widths.clear();
+    this.metrics.clear();
+  }
+
   fontMetrics(request: TextMeasureRequest): FontMetrics {
     const font = fontOf(request);
     // Metrics are the font's own; tracking moves glyphs apart and does

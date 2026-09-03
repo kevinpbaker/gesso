@@ -1607,6 +1607,7 @@ interface TextMeasurer {
   measure(request: TextMeasureRequest): Size;
   layout(request: TextMeasureRequest): ParagraphLayout;
   measureRunWidth(text: string, request: TextMeasureRequest): number;
+  invalidate?(): void;
 }
 interface TextRunMeasurer {
   measureRunWidth(text: string, request: TextMeasureRequest): number;
@@ -2547,6 +2548,7 @@ declare class LayoutEngine {
   readonly stats: LayoutStats;
   trace: boolean;
   private readonly relayoutRoots;
+  invalidateMeasurements(): void;
   layout(node: UiNode, constraints: Constraints): LayoutResult;
   layoutForFrame(frame: UiFrame, constraints: Constraints, root?: UiNode): void;
   private relayout;
@@ -3061,6 +3063,7 @@ interface UiRenderer {
   readonly isReady: boolean;
   render(root: UiNode, context: RenderContext): void;
   resize(width: number, height: number, dpr: number): void;
+  fontsChanged?(): void;
   dispose(): void;
 }
 interface Canvas2DRendererOptions {
@@ -3108,6 +3111,7 @@ declare class CanvasTextMeasurer extends ParagraphTextMeasurer {
   private readonly metrics;
   constructor(context: Canvas2DContext);
   measureRunWidth(text: string, request: TextMeasureRequest): number;
+  invalidate(): void;
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
 declare const INSPECTOR_HEAT_MS = 1500;
@@ -3139,6 +3143,10 @@ declare class LayoutInspector {
   private hoveredShapes;
   private clippedVisibleBox;
 }
+declare function registerFontStack(family: string, fallback: readonly string[]): void;
+declare function fontStackFor(family: string): string;
+declare function bumpFontStack(family: string): void;
+declare function clearFontStacks(): void;
 interface WebGPUCanvasHost {
   width: number;
   height: number;
@@ -3222,6 +3230,7 @@ declare class WebGPURenderer implements UiRenderer {
   private takeCapture;
   private clearFrame;
   resize(width: number, height: number, dpr?: number): void;
+  fontsChanged(): void;
   dispose(): void;
   private uploadInstanceData;
   private ensureBuffer;
@@ -3563,6 +3572,7 @@ export {
   buildFontString,
   buildRenderList,
   buildSemanticsTree,
+  bumpFontStack,
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
@@ -3585,6 +3595,7 @@ export {
   CharacterCountTextMeasurer,
   ChildrenBindingId,
   clampSize,
+  clearFontStacks,
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
@@ -3679,6 +3690,7 @@ export {
   EnvironmentNotifier,
   EnvironmentProps,
   fade,
+  Fc,
   findEnvironmentKey,
   FindHost,
   FindMatch,
@@ -3694,6 +3706,7 @@ export {
   FocusRingOptions,
   FocusSource,
   FontMetrics,
+  fontStackFor,
   formatConstraints,
   formatExplanation,
   FrLength,
@@ -3774,7 +3787,6 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
-  jc,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -3892,6 +3904,7 @@ export {
   radialGradient,
   Reactive,
   recordsEqual,
+  registerFontStack,
   RelayoutExplanation,
   RenderCommand,
   RenderContext,
@@ -4217,6 +4230,7 @@ import {
   buildFontString,
   buildRenderList,
   buildSemanticsTree,
+  bumpFontStack,
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
@@ -4238,6 +4252,7 @@ import {
   CharacterCountTextMeasurer,
   ChildrenBindingId,
   clampSize,
+  clearFontStacks,
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
@@ -4347,6 +4362,7 @@ import {
   FocusRingOptions,
   FocusSource,
   FontMetrics,
+  fontStackFor,
   formatConstraints,
   formatExplanation,
   fr,
@@ -4545,6 +4561,7 @@ import {
   radialGradient,
   Reactive,
   recordsEqual,
+  registerFontStack,
   RelayoutExplanation,
   RenderCommand,
   RenderContext,
@@ -4840,7 +4857,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-wXd3FhFa.js";
+} from "./index-CIWD4-0X.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -4861,6 +4878,7 @@ export {
   buildFontString,
   buildRenderList,
   buildSemanticsTree,
+  bumpFontStack,
   Button,
   BUTTON_INTERACTION,
   canDecodeVideo,
@@ -4875,6 +4893,7 @@ export {
   caretVisibleAt,
   CharacterCountTextMeasurer,
   clampSize,
+  clearFontStacks,
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
@@ -4950,6 +4969,7 @@ export {
   FlexDirection,
   FocusNotifier,
   focusRing,
+  fontStackFor,
   formatConstraints,
   formatExplanation,
   fr,
@@ -5078,6 +5098,7 @@ export {
   provideEnvironment,
   radialGradient,
   recordsEqual,
+  registerFontStack,
   repeat,
   resetOverrideWarnings,
   resetTransitionWarnings,
@@ -5524,7 +5545,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-wXd3FhFa.js";
+} from "./index-CIWD4-0X.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

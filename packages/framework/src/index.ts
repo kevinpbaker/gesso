@@ -119,6 +119,14 @@ export { observeColorScheme, type ColorScheme, type ColorSchemePreference } from
 export { observeMediaQuery } from './app/mediaQuery';
 export { FindService } from './app/FindService';
 export { MediaService, type MediaOptions } from './app/MediaService';
+export {
+  FontService,
+  type FontFamilyDeclaration,
+  type FontFaceDeclaration,
+  type FontFamilyStatus,
+  type FontHost,
+  type FontFaceLike
+} from './app/FontService';
 export { FocusService } from './app/FocusService';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';

@@ -13,6 +13,7 @@ import { UiHostFrameClock } from '@gesso/core';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { MediaOptions } from '../MediaService';
+import type { FontFamilyDeclaration } from '../FontService';
 import type { RouterRoutes } from '../../router/RouterService';
 import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
@@ -74,6 +75,7 @@ export class RenderWorkerApp {
   private readonly serviceRegistrations: (new () => object)[] = [];
   private routes: RouterRoutes | undefined;
   private media: MediaOptions | undefined;
+  private fonts: readonly FontFamilyDeclaration[] | undefined;
   private root: FrameworkChild;
   private readonly host: WorkerGlobal;
 
@@ -255,6 +257,32 @@ export class RenderWorkerApp {
       throw new Error('A media resolver was registered after the runtime started.');
     }
     this.media = media;
+    return this;
+  }
+
+  /**
+   * Declares the font families the app's text may name, with their
+   * faces and fallback stacks.
+   *
+   *   renderRoot(AppRoot).useFonts([
+   *     {
+   *       family: 'Inter',
+   *       faces: [{ source: new URL('./Inter.woff2', import.meta.url).href, weight: '100 900' }],
+   *       fallback: ['system-ui', 'sans-serif']
+   *     }
+   *   ]);
+   *
+   * Declared in the worker because that is the thread whose font set
+   * the canvas draws from: a font the page loaded is not in it. The
+   * faces are fetched here, text draws in the fallback until each
+   * arrives, and the tree is laid out again when it does. See
+   * `FontService`.
+   */
+  useFonts(families: readonly FontFamilyDeclaration[]): this {
+    if (this.runtime !== undefined) {
+      throw new Error('Fonts were declared after the runtime started.');
+    }
+    this.fonts = families;
     return this;
   }
 
@@ -450,6 +478,7 @@ export class RenderWorkerApp {
       services,
       routes: this.routes,
       media: this.media,
+      fonts: this.fonts,
       canvas,
       renderer,
       channels: this.channels.registry,

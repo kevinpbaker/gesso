@@ -12,6 +12,7 @@ import type { RouterRoutes } from '../router/RouterService';
 import type { ShellHistoryOptions } from './shellHistory';
 import type { FrameMetrics, RendererChoice } from './GessoRuntime';
 import type { MediaOptions } from './MediaService';
+import type { FontFamilyDeclaration } from './FontService';
 import type { UiNodeReport } from './NodeReport';
 
 /**
@@ -29,6 +30,7 @@ export class GessoAppBuilder {
   private routes: RouterRoutes | undefined;
   private historyOptions: ShellHistoryOptions | undefined;
   private mediaOptions: MediaOptions | undefined;
+  private fontDeclarations: readonly FontFamilyDeclaration[] | undefined;
   private app: GessoApp | undefined;
   private colorSchemePreference: ColorSchemePreference = 'auto';
 
@@ -96,6 +98,16 @@ export class GessoAppBuilder {
    */
   useMedia(media: MediaOptions): this {
     this.mediaOptions = media;
+    return this;
+  }
+
+  /**
+   * Declares the font families the app's text may name; the
+   * single-thread twin of `renderRoot().useFonts`, loading into
+   * `document.fonts` instead of a worker's set.
+   */
+  useFonts(families: readonly FontFamilyDeclaration[]): this {
+    this.fontDeclarations = families;
     return this;
   }
 
@@ -200,6 +212,7 @@ export class GessoAppBuilder {
       services,
       routes: this.routes,
       media: this.mediaOptions,
+      fonts: this.fontDeclarations,
       history: this.historyOptions,
       renderer: this.rendererChoice,
       colorScheme: this.colorSchemePreference

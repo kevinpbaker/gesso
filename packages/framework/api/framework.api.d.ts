@@ -112,6 +112,7 @@ declare class ChannelReplica<View extends object, Commands extends object> {
   get view(): { readonly [K in keyof View]: InputCell<View[K]>; };
   get send(): Commands;
   private readonly viewProxy;
+  private readonly warnedArity;
   private createCommandProxy;
   onError(listener: ((message: string, stack?: string) => void) | null): void;
   private receive;
@@ -218,7 +219,7 @@ import {
   Patch,
   PatchPath,
   viewKeys
-} from "./FunctionComponent-D6YO-clS.js";
+} from "./FunctionComponent-DPWGerAA.js";
 import {
   BehaviorSubject,
   Observable,
@@ -833,6 +834,46 @@ declare class MediaService {
   setRasterizer(rasterizer: IconRasterizer): void;
   dispose(): void;
 }
+interface FontFaceDeclaration {
+  source: string | ArrayBuffer;
+  weight?: string | number;
+  style?: 'normal' | 'italic' | 'oblique';
+  stretch?: string;
+  unicodeRange?: string;
+  display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
+}
+interface FontFamilyDeclaration {
+  family: string;
+  faces: readonly FontFaceDeclaration[];
+  fallback?: readonly string[];
+}
+type FontFamilyStatus = 'undeclared' | 'unavailable' | 'loading' | 'loaded' | 'error';
+interface FontFaceLike {
+  readonly family: string;
+  load(): Promise<unknown>;
+}
+interface FontHost {
+  readonly fonts: {
+    add(face: FontFaceLike): unknown;
+  } | undefined;
+  createFace(family: string, source: string | ArrayBuffer, descriptors: FontFaceDescriptors): FontFaceLike;
+}
+declare class FontService {
+  private readonly statuses;
+  private readonly pending;
+  private readonly failed;
+  private readonly batches;
+  private listener;
+  private disposed;
+  declare(families: readonly FontFamilyDeclaration[], host?: FontHost): void;
+  get ready(): Promise<void>;
+  statusOf(family: string): FontFamilyStatus;
+  get families(): readonly string[];
+  setListener(listener: ((family: string) => void) | null): void;
+  dispose(): void;
+  private loadFace;
+  private settle;
+}
 declare const UI_FRAME_PHASES: readonly ['ticks', 'patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'];
 type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
 type FramePhaseTimings = Record<UiFramePhase, number>;
@@ -855,6 +896,7 @@ interface GessoRuntimeOptions {
   measureCanvas?: CanvasHost;
   textMeasurer?: TextMeasurer;
   media?: MediaOptions;
+  fonts?: readonly FontFamilyDeclaration[];
   services?: ServiceRegistry;
   routes?: RouterRoutes;
   channels?: ChannelRegistry;
@@ -934,6 +976,7 @@ declare class GessoRuntime {
   private reportRendererError;
   private fallBackToCanvas2D;
   private requestRepaint;
+  private fontsChanged;
   resize(width: number, height: number, dpr?: number): void;
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
   noteInput(at: number | undefined): void;
@@ -1037,6 +1080,7 @@ declare class GessoAppBuilder {
   private routes;
   private historyOptions;
   private mediaOptions;
+  private fontDeclarations;
   private app;
   private colorSchemePreference;
   constructor(root: FrameworkChild | ComponentType);
@@ -1047,6 +1091,7 @@ declare class GessoAppBuilder {
   useService(ServiceClass: new () => object): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
+  useFonts(families: readonly FontFamilyDeclaration[]): this;
   useHistory(history: ShellHistoryOptions): this;
   renderer(choice: RendererChoice): this;
   onFrame(listener: (metrics: FrameMetrics) => void): this;
@@ -1313,6 +1358,7 @@ interface GessoAppOptions {
   accessibility?: boolean;
   colorScheme?: ColorSchemePreference;
   media?: MediaOptions;
+  fonts?: readonly FontFamilyDeclaration[];
 }
 declare class GessoApp {
   private readonly runtime;
@@ -1564,6 +1610,7 @@ declare class RenderWorkerApp {
   private readonly serviceRegistrations;
   private routes;
   private media;
+  private fonts;
   private root;
   private readonly host;
   private runtime;
@@ -1580,6 +1627,7 @@ declare class RenderWorkerApp {
   useService(ServiceClass: new () => object): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
+  useFonts(families: readonly FontFamilyDeclaration[]): this;
   receive(message: ShellToRuntimeMessage): void;
   private dispatch;
   private resolveWorker;
@@ -1613,6 +1661,7 @@ export {
   FindService,
   findUnplainPath,
   FocusService,
+  FontService,
   formatNodeReport,
   formatUrl,
   GessoApp,
@@ -1696,6 +1745,11 @@ export {
   type EmitArgs,
   type EmitValue,
   type Equality,
+  type FontFaceDeclaration,
+  type FontFaceLike,
+  type FontFamilyDeclaration,
+  type FontFamilyStatus,
+  type FontHost,
   type FrameMetrics,
   type FramePhaseTimings,
   type FrameworkChild,
@@ -1784,7 +1838,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-D6YO-clS.js";
+} from "../FunctionComponent-DPWGerAA.js";
 import {
   Observable
 } from "rxjs";

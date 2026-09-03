@@ -452,6 +452,21 @@ export class LayoutEngine {
    * Full layout pass for a subtree. Every record in the subtree
    * is measured and placed; other records are dropped.
    */
+  /**
+   * Forgets every measurement, for when what text measures has changed
+   * under an unchanged tree: a declared font face arrived, so every
+   * width measured with its fallback is wrong. The caller marks the
+   * root's subtree dirty; the next layout then re-measures every node
+   * instead of trusting the sizes it had for the same constraints.
+   */
+  invalidateMeasurements(): void {
+    for (const rec of this.records.values()) {
+      rec.measureDirty = true;
+      rec.placeDirty = true;
+      rec.altValid = false;
+    }
+  }
+
   layout(node: UiNode, constraints: Constraints): LayoutResult {
     this.layoutRoot = node;
     this.rootConstraints = constraints;

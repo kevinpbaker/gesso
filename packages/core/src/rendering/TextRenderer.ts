@@ -3,6 +3,7 @@ import type { LayoutBox } from '../layout/LayoutTypes';
 import type { Canvas2DContext } from './canvas2d/Canvas2DContext';
 import type { PaintState } from './PaintState';
 import { colorToCss } from './PaintState';
+import { fontStackFor } from './FontStacks';
 
 /**
  * A positioned line ready to draw.
@@ -97,9 +98,13 @@ export function placeLines(
 
 /**
  * Builds a Canvas2D font shorthand from a resolved text style.
+ *
+ * The family goes through `fontStackFor`, so a declared family carries
+ * its fallback stack here and nowhere else: the measurer and both
+ * renderers build their font strings with this function.
  */
 export function buildFontString(state: Pick<PaintState, 'fontWeight' | 'fontSize' | 'fontFamily'>): string {
-  return `${String(state.fontWeight)} ${state.fontSize}px ${state.fontFamily}`;
+  return `${String(state.fontWeight)} ${state.fontSize}px ${fontStackFor(state.fontFamily)}`;
 }
 
 /**

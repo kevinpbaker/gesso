@@ -90,6 +90,7 @@ import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
 import { FocusService } from './FocusService';
 import { MediaService, type MediaOptions } from './MediaService';
+import { FontService, type FontFamilyDeclaration } from './FontService';
 import { AnimationService } from './AnimationService';
 import { InputLatencyTracker } from './InputLatency';
 import { SmoothScroller } from './SmoothScroller';
@@ -213,6 +214,13 @@ export interface GessoRuntimeOptions {
    * `postMessage`.
    */
   media?: MediaOptions;
+  /**
+   * The font families this runtime's text may name, with their faces
+   * and fallback stacks. Each face is loaded into this thread's font
+   * set, and the tree is measured again as it arrives; until then text
+   * draws in the fallback. See `FontService`.
+   */
+  fonts?: readonly FontFamilyDeclaration[];
   /**
    * The runtime services this runtime's components may reach.
    *
@@ -529,6 +537,15 @@ export class GessoRuntime {
     if (!this.services.has(MediaService)) {
       this.services.register(MediaService);
     }
+    // And the fonts, which load into this thread's font set and re-lay
+    // the tree out as they arrive.
+    if (!this.services.has(FontService)) {
+      this.services.register(FontService);
+    }
+    this.services.get(FontService).setListener(() => this.fontsChanged());
+    if (options.fonts !== undefined) {
+      this.services.get(FontService).declare(options.fonts);
+    }
     // And animation, whose running set must be per runtime for the
     // same reason the media caches are: the playground has several
     // runtimes in one worker, and a shared driver would tick a
@@ -715,6 +732,24 @@ export class GessoRuntime {
   private requestRepaint(): void {
     if (this.root !== undefined) {
       this.graph.markDirty(this.root, DirtyFlags.Paint);
+    }
+  }
+
+  /**
+   * A declared font face finished loading (or failed, which changes
+   * nothing but is not worth telling apart here). Every width measured
+   * so far was measured in the fallback, so the measurer's cache, the
+   * renderer's glyphs and the engine's sizes are all dropped, and the
+   * whole tree is laid out and painted again in the face that was
+   * meant. Text moves at most once per face, as with `font-display:
+   * swap`.
+   */
+  private fontsChanged(): void {
+    this.textMeasurer.invalidate?.();
+    this.renderer.fontsChanged?.();
+    this.engine.invalidateMeasurements();
+    if (this.root !== undefined) {
+      this.graph.markDirty(this.root, DirtyFlags.SubtreeLayout | DirtyFlags.Paint);
     }
   }
 
@@ -1283,6 +1318,7 @@ export class GessoRuntime {
     // Decoded bitmaps hold pixels; garbage collection is not prompt
     // about them, so they are closed rather than dropped.
     this.services.get(MediaService).dispose();
+    this.services.get(FontService).dispose();
     this.graph.setEnvironmentChangedListener(null);
     this.graph.setDirtyListener(null);
     this.graph.setNodeRemovedListener(null);

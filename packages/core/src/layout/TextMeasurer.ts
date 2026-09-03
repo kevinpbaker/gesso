@@ -79,6 +79,13 @@ export interface TextMeasurer {
    * from the same source as the line widths.
    */
   measureRunWidth(text: string, request: TextMeasureRequest): number;
+  /**
+   * Forgets every cached answer. Called when what a font string means
+   * has changed under the measurer: a declared face finished loading,
+   * so widths measured with its fallback are wrong now. Measurers with
+   * nothing cached need not implement it.
+   */
+  invalidate?(): void;
 }
 
 /**

@@ -22,6 +22,7 @@ import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
 import type { RouterRoutes } from '../router/RouterService';
 import type { MediaOptions } from './MediaService';
+import type { FontFamilyDeclaration } from './FontService';
 
 export interface GessoAppOptions {
   host: HTMLElement;
@@ -72,6 +73,8 @@ export interface GessoAppOptions {
    * is an app to install it on has already missed the first screen.
    */
   media?: MediaOptions;
+  /** The font families the app's text may name; see `FontService`. */
+  fonts?: readonly FontFamilyDeclaration[];
 }
 
 /**
@@ -127,6 +130,7 @@ export class GessoApp {
       channels: options.channels,
       routes: options.routes,
       media: options.media,
+      fonts: options.fonts,
       clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
       dpr: devicePixelRatio()
     });

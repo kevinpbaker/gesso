@@ -32,6 +32,7 @@ export { parseTransform } from '../properties/UiTransform';
 export type { UiTransform } from '../properties/UiTransform';
 export type { LayoutReader, RenderContext } from './RenderContext';
 export { layoutTextLines, drawText, buildFontString } from './TextRenderer';
+export { registerFontStack, fontStackFor, bumpFontStack, clearFontStacks } from './FontStacks';
 export type { TextLinePlacement } from './TextRenderer';
 export type { UiRenderer, RendererBackend } from './UiRenderer';
 export { WebGPURenderer } from './webgpu/WebGPURenderer';

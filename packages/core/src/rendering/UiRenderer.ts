@@ -27,5 +27,11 @@ export interface UiRenderer {
   render(root: UiNode, context: RenderContext): void;
   /** Resizes the drawing surface to a logical size at a device pixel ratio. */
   resize(width: number, height: number, dpr: number): void;
+  /**
+   * A declared font face finished loading. A renderer that keeps
+   * rasterised glyphs drops them, because the ones it has were drawn
+   * with the fallback. Canvas2D keeps none and need not implement it.
+   */
+  fontsChanged?(): void;
   dispose(): void;
 }

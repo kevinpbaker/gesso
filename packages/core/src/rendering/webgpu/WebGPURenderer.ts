@@ -463,6 +463,18 @@ export class WebGPURenderer implements UiRenderer {
     }
   }
 
+  /**
+   * Drops every shaped line and every atlas cell. The cells were
+   * rasterised with whatever font the string resolved to at the time,
+   * which was the fallback; the page textures go with them, since a
+   * page index would otherwise be reused over stale pixels.
+   */
+  fontsChanged(): void {
+    this.textCache.shaper.clear();
+    this.textCache.atlas.reset();
+    this.glyphPages?.dispose();
+  }
+
   dispose(): void {
     if (this.disposed) {
       return;
