@@ -79,6 +79,7 @@ export default defineConfig({
         items: [
           { text: 'Themes and the environment', link: '/appearance/themes-and-the-environment' },
           { text: 'The type scale', link: '/appearance/typography' },
+          { text: 'Fonts', link: '/appearance/fonts' },
           { text: 'Motion', link: '/appearance/motion' },
           { text: 'Enter and exit', link: '/appearance/enter-and-exit' },
           { text: 'Shared elements', link: '/appearance/shared-elements' }
