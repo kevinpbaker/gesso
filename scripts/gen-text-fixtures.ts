@@ -28,13 +28,8 @@
  * erasable-syntax-only.
  */
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-
-import { rolldown } from 'rolldown';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { textCaseFingerprint, textCases } from '../packages/core/src/layout/textConformance/cases.ts';
 import {
@@ -44,19 +39,13 @@ import {
 } from '../packages/core/src/layout/textConformance/compare.ts';
 import { REGENERATE_TEXT_FIXTURES } from '../packages/core/src/layout/textConformance/RecordedTextMeasurer.ts';
 import type { ChromeParagraph } from '../packages/core/src/layout/textConformance/toHtml.ts';
-import type {
-  ExpectedTextFixtures,
-  FixtureFont
-} from '../packages/core/src/layout/textConformance/expectedFixtures.ts';
-import type { ConformanceFont, ConformanceFontId } from '../packages/core/src/layout/textConformance/fonts.ts';
+import type { ExpectedTextFixtures } from '../packages/core/src/layout/textConformance/expectedFixtures.ts';
 import { conformanceFonts } from '../packages/core/src/layout/textConformance/fonts.ts';
-import { casesToHtml, parseResults } from '../packages/core/src/layout/textConformance/toHtml.ts';
 import { findChrome } from './lib/devtools.ts';
+import { conformanceDir, prepareChrome, renderInChrome } from './lib/textConformance.ts';
 
 const checkOnly = process.argv.includes('--check');
 
-const here = dirname(fileURLToPath(import.meta.url));
-const conformanceDir = join(here, '..', 'packages', 'core', 'src', 'layout', 'textConformance');
 const outputPath = join(conformanceDir, 'expected.json');
 
 async function main(): Promise<void> {
@@ -68,45 +57,10 @@ async function main(): Promise<void> {
     throw new Error(`Two text cases are named '${duplicate}'.`);
   }
 
-  const fontFiles = resolveFonts();
-  const fontSources = Object.fromEntries(
-    conformanceFonts.map(font => [font.id, pathToFileURL(fontFiles[font.id].path).href])
-  ) as Record<ConformanceFontId, string>;
-  const gessoScript = await bundleInPage();
-
-  const workDir = mkdtempSync(join(tmpdir(), 'gesso-text-fixtures-'));
-  try {
-    const pagePath = join(workDir, 'cases.html');
-    writeFileSync(pagePath, casesToHtml(textCases, { fontSources, gessoScript }));
-    const dom = execFileSync(
-      chrome,
-      [
-        '--headless=new',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-default-browser-check',
-        '--hide-scrollbars',
-        '--force-device-scale-factor=1',
-        '--window-size=1600,1200',
-        // The fonts are served from file: URLs, which a file: page may
-        // not read without this.
-        '--allow-file-access-from-files',
-        // The page measures after document.fonts.ready; virtual time
-        // lets that promise settle before the DOM is dumped.
-        '--virtual-time-budget=20000',
-        `--user-data-dir=${join(workDir, 'profile')}`,
-        '--dump-dom',
-        pathToFileURL(pagePath).href
-      ],
-      { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }
-    );
-    const { fonts, results } = parseResults(dom);
-    for (const font of conformanceFonts) {
-      if (fonts[font.family] !== true) {
-        throw new Error(`${font.face} did not load in Chrome from ${fontFiles[font.id].path}.`);
-      }
-    }
-    const byName = new Map(results.map(result => [result.name, result]));
+  const run = await prepareChrome(chrome);
+  const fontFiles = run.fontFiles;
+  {
+    const byName = renderInChrome(run, textCases);
 
     const fixtures: ExpectedTextFixtures = {
       generator: {
@@ -187,8 +141,6 @@ async function main(): Promise<void> {
         console.log(`  ${entry}`);
       }
     }
-  } finally {
-    rmSync(workDir, { recursive: true, force: true });
   }
 }
 
@@ -263,61 +215,6 @@ function compareChrome(before: ChromeParagraph, now: ChromeParagraph, tolerance:
     }
   }
   return differences;
-}
-
-/** `inPage.ts` as one self-contained script defining `GessoTextConformance`. */
-async function bundleInPage(): Promise<string> {
-  const bundle = await rolldown({
-    input: join(conformanceDir, 'inPage.ts'),
-    platform: 'browser',
-    logLevel: 'silent'
-  });
-  try {
-    const { output } = await bundle.generate({ format: 'iife', name: 'GessoTextConformance' });
-    return output[0].code;
-  } finally {
-    await bundle.close();
-  }
-}
-
-interface ResolvedFont {
-  path: string;
-  record: FixtureFont;
-}
-
-function resolveFonts(): Record<ConformanceFontId, ResolvedFont> {
-  const resolved = {} as Record<ConformanceFontId, ResolvedFont>;
-  for (const font of conformanceFonts) {
-    const path = findFontFile(font);
-    const bytes = readFileSync(path);
-    resolved[font.id] = {
-      path,
-      record: {
-        face: font.face,
-        file: path.slice(path.lastIndexOf('/') + 1),
-        bytes: bytes.byteLength,
-        sha256: createHash('sha256').update(bytes).digest('hex')
-      }
-    };
-  }
-  return resolved;
-}
-
-function findFontFile(font: ConformanceFont): string {
-  const override = process.env[font.env];
-  const candidates = override !== undefined ? [override] : font.candidates.map(expandHome);
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  throw new Error(
-    `${font.face} was not found. Tried: ${candidates.join(', ')}. Install it or set ${font.env} to the file.`
-  );
-}
-
-function expandHome(path: string): string {
-  return path.startsWith('~/') ? join(homedir(), path.slice(2)) : path;
 }
 
 function findDuplicateName(): string | undefined {
