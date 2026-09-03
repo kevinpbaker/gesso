@@ -56,12 +56,13 @@ export function seedSegments(text: string): string[] {
   for (const segment of segmenter.segment(text)) {
     segments.add(segment.segment);
   }
-  for (const word of text.split(/[ \t\n]+/)) {
+  for (const word of text.split(/[ \t\n\u3000]+/)) {
     if (word.length > 0) {
       segments.add(word);
     }
   }
   segments.add(' ');
+  segments.add('\u3000');
   return [...segments];
 }
 

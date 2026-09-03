@@ -40,7 +40,11 @@ describe('ParagraphLayout conformance with Chrome', () => {
       continue;
     }
     const run = () => {
-      const differences = compareParagraphs(layoutWithGesso(textCase, expected.recording), expected.chrome);
+      const differences = compareParagraphs(
+        layoutWithGesso(textCase, expected.recording),
+        expected.chrome,
+        textCase.tolerance
+      );
       if (differences.length > 0) {
         throw new Error(`${textCase.name}: differs from Chrome\n${differences.join('\n')}`);
       }

@@ -51,6 +51,28 @@ describe('segmentParagraph', () => {
     expect(segments('café-bar')).toEqual(['café-', 'bar']);
   });
 
+  it('breaks between ideographs and kana, and between them and Latin', () => {
+    expect(segments('東京は日本')).toEqual(['東', '京', 'は', '日', '本']);
+    expect(segments('私はGessoを')).toEqual(['私', 'は', 'Gesso', 'を']);
+    expect(segments('キャンペーン')).toEqual(['キ', 'ャ', 'ン', 'ペ', 'ー', 'ン']);
+    expect(segments('서울은 대한')).toEqual(['서', '울', '은', '대', '한']);
+  });
+
+  it('keeps CJK punctuation with its neighbour (kinsoku)', () => {
+    expect(segments('はい、そう。')).toEqual(['は', 'い、', 'そ', 'う。']);
+    expect(segments('「テスト」です')).toEqual(['「テ', 'ス', 'ト」', 'で', 'す']);
+    expect(segments('りんご・みかん……')).toEqual(['り', 'ん', 'ご・', 'み', 'か', 'ん……']);
+    expect(segments('你好，世界！')).toEqual(['你', '好，', '世', '界！']);
+  });
+
+  it('keeps a currency prefix and a percent postfix with their ideograph', () => {
+    expect(segments('¥1200から50％オフ')).toEqual(['¥1200', 'か', 'ら', '50％', 'オ', 'フ']);
+  });
+
+  it('treats an ideographic space as a blank', () => {
+    expect(segments('東京\u3000大阪')).toEqual(['東', '京', '大', '阪']);
+  });
+
   it("treats 'char' as a break between every cluster and 'none' as no break at all", () => {
     expect(segments('ab cd', 'char')).toEqual(['a', 'b', 'c', 'd']);
     expect(segments('ab cd', 'none')).toEqual(['ab cd']);

@@ -45,32 +45,41 @@ export function layoutWithGesso(textCase: TextCase, recording: GessoRecording): 
   );
   // Chrome reports a line's ink, from its first glyph; a Gesso line that
   // keeps its leading blanks starts before them. Measure the ink the
-  // same way, with the blanks at the algorithm's own space width.
-  const spaceWidth = recording.widths[' '] ?? 0;
+  // same way, with each blank at the width the algorithm gives it.
   return {
     width,
     height: paragraph.height,
     baseline: paragraph.firstBaseline,
     lines: placed.map(line => {
-      const leading = leadingBlanks(textCase.text.slice(line.start, line.end)) * spaceWidth;
+      const leading = leadingBlankWidth(textCase.text.slice(line.start, line.end), recording.widths);
       return { start: line.start, end: line.end, x: line.x + leading, width: line.width - leading };
     })
   };
 }
 
-function leadingBlanks(text: string): number {
-  let count = 0;
-  while (count < text.length && (text[count] === ' ' || text[count] === '\t')) {
-    count++;
+function leadingBlankWidth(text: string, widths: Record<string, number>): number {
+  let width = 0;
+  for (const character of text) {
+    if (character === ' ' || character === '\t') {
+      width += widths[' '] ?? 0;
+    } else if (character === '\u3000') {
+      width += widths['\u3000'] ?? 0;
+    } else {
+      break;
+    }
   }
-  return count;
+  return width;
 }
 
 /** Every way the two paragraphs differ, one line each; empty when they agree. */
-export function compareParagraphs(gesso: GessoParagraph, chrome: ChromeParagraph): string[] {
+export function compareParagraphs(
+  gesso: GessoParagraph,
+  chrome: ChromeParagraph,
+  tolerance: number = TEXT_TOLERANCE
+): string[] {
   const differences: string[] = [];
   for (const key of ['width', 'height', 'baseline'] as const) {
-    if (Math.abs(gesso[key] - chrome[key]) > TEXT_TOLERANCE) {
+    if (Math.abs(gesso[key] - chrome[key]) > tolerance) {
       differences.push(`  ${key}: gesso ${n(gesso[key])} vs chrome ${n(chrome[key])}`);
     }
   }
@@ -89,10 +98,10 @@ export function compareParagraphs(gesso: GessoParagraph, chrome: ChromeParagraph
       if (actual.end !== expected.end) {
         differing.push('end');
       }
-      if (Math.abs(actual.x - expected.x) > TEXT_TOLERANCE) {
+      if (Math.abs(actual.x - expected.x) > tolerance) {
         differing.push('x');
       }
-      if (Math.abs(actual.width - expected.width) > TEXT_TOLERANCE) {
+      if (Math.abs(actual.width - expected.width) > tolerance) {
         differing.push('width');
       }
     }

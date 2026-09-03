@@ -6,7 +6,7 @@ import type {
   TextRunMeasurer,
   TextWrap
 } from './TextMeasurer';
-import { segmentParagraph } from './LineBreaks';
+import { IDEOGRAPHIC_SPACE, segmentParagraph } from './LineBreaks';
 import type { TextSegment } from './LineBreaks';
 
 export { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
@@ -14,6 +14,17 @@ import { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 export const ELLIPSIS = '…';
 
 type Measure = (segment: string) => number;
+
+/**
+ * How far past the available width a line may reach and still fit.
+ *
+ * Chrome lays text out in 1/64 px units and snaps each advance to one,
+ * so five 16 px ideographs fit an 80 px line exactly. `measureText`
+ * answers in floats with the shaper's fixed-point noise in them
+ * (16.00003 px per ideograph in one font), and five of those would not
+ * fit without this. One layout unit of slack is what Chrome itself has.
+ */
+const FIT_EPSILON = 1 / 64;
 
 /**
  * Breaks a text into lines and sizes the paragraph.
@@ -156,11 +167,12 @@ export function proportionalFontMetrics(fontSize: number, ascentFactor = 0.8, de
  * new line with the segment. The first segment on a line always goes
  * on it, so an oversized segment overflows rather than vanishing.
  *
- * Blanks between two segments on one line are counted as spaces (a tab
- * is one space wide here; the fixture that pins it says so). Blanks
- * before the first segment of the paragraph are part of its first
- * line; blanks before the first segment of any later line hang off the
- * line before, as pre-wrap hangs them.
+ * Blanks between two segments on one line are counted at their own
+ * widths: a space or a tab as one space (a tab stop is a position the
+ * renderer does not know; the fixture that pins it says so), an
+ * ideographic space as itself. Blanks before the first segment of the
+ * paragraph are part of its first line; blanks before the first segment
+ * of any later line hang off the line before, as pre-wrap hangs them.
  */
 function breakGreedy(
   paragraph: string,
@@ -171,6 +183,13 @@ function breakGreedy(
   out: TextLine[]
 ): void {
   const spaceWidth = measure(' ');
+  const blanks = (from: number, to: number): number => {
+    let width = 0;
+    for (let i = from; i < to; i++) {
+      width += paragraph.charCodeAt(i) === IDEOGRAPHIC_SPACE ? measure('\u3000') : spaceWidth;
+    }
+    return width;
+  };
   let lineStart = -1;
   let lineEnd = -1;
   let lineWidth = 0;
@@ -181,10 +200,10 @@ function breakGreedy(
     if (lineStart < 0) {
       lineStart = firstLine ? 0 : segment.start;
       lineEnd = segment.end;
-      lineWidth = (segment.start - lineStart) * spaceWidth + segmentWidth;
+      lineWidth = blanks(lineStart, segment.start) + segmentWidth;
     } else {
-      const candidate = lineWidth + (segment.start - lineEnd) * spaceWidth + segmentWidth;
-      if (candidate <= available) {
+      const candidate = lineWidth + blanks(lineEnd, segment.start) + segmentWidth;
+      if (candidate <= available + FIT_EPSILON) {
         lineEnd = segment.end;
         lineWidth = candidate;
       } else {

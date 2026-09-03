@@ -15,7 +15,7 @@
  * file did not load, `document.fonts.check` says so and the generator
  * refuses to write fixtures.
  */
-export type ConformanceFontId = 'sans';
+export type ConformanceFontId = 'sans' | 'cjk';
 
 export interface ConformanceFont {
   readonly id: ConformanceFontId;
@@ -42,6 +42,20 @@ export const conformanceFonts: readonly ConformanceFont[] = [
       '/usr/share/fonts/TTF/NotoSans-Regular.ttf',
       '~/Library/Fonts/NotoSans-Regular.ttf',
       '/Library/Fonts/NotoSans-Regular.ttf'
+    ]
+  },
+  {
+    id: 'cjk',
+    family: 'Gesso Conformance CJK',
+    // A TrueType collection; Chrome takes its first face, which is the
+    // Japanese one. Every ideograph and kana in it is one em wide.
+    face: 'Noto Sans CJK JP Regular',
+    env: 'GESSO_FONT_CJK',
+    candidates: [
+      '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+      '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+      '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+      '~/Library/Fonts/NotoSansCJK-Regular.ttc'
     ]
   }
 ];

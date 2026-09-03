@@ -30,6 +30,8 @@ export interface TextCase {
   readonly text: string;
   /** Default 'sans'. */
   readonly font?: ConformanceFontId;
+  /** A BCP 47 tag for Chrome's `lang`; Gesso has no locale, so it only documents the case. */
+  readonly lang?: string;
   /** Default `DEFAULT_TEXT_CASE_FONT_SIZE`. */
   readonly fontSize?: number;
   /** Default `fontSize × TEXT_CASE_LINE_HEIGHT_FACTOR`, a normal line height. */
@@ -52,6 +54,12 @@ export interface TextCase {
    */
   readonly box?: 'fit' | 'fixed';
   /**
+   * How far a width or position may differ from Chrome's and still
+   * agree, in px. Default `TEXT_TOLERANCE` (0.1); a case sets it only
+   * for a reason the case states.
+   */
+  readonly tolerance?: number;
+  /**
    * Set when Gesso is known to disagree with Chrome. The spec then
    * expects the comparison to fail, so fixing the algorithm surfaces as
    * a test that must have its divergence note removed.
@@ -72,6 +80,8 @@ export function textCaseLineHeight(textCase: TextCase): number {
 }
 
 const FOX = 'The quick brown fox jumps over the lazy dog';
+/** See the CJK group below. */
+const CJK_TOLERANCE = 2;
 
 export const textCases: readonly TextCase[] = [
   // -------------------------------------------------------------------------
@@ -148,6 +158,132 @@ export const textCases: readonly TextCase[] = [
     text: '',
     maxWidth: 300,
     divergence: 'An empty block has no height in CSS; Gesso keeps one line, so an empty label holds its place.'
+  },
+
+  // -------------------------------------------------------------------------
+  // CJK: no spaces, a break between any two ideographs, kinsoku at
+  // punctuation. Every glyph in the face is one em wide.
+  //
+  // Chrome's DOM shapes a CJK line as one run and applies the font's
+  // kana kerning; its canvas shapes CJK character by character and does
+  // not, so `measureText` and the DOM differ by up to 2 px on a line
+  // whatever `lang` says (measured: まってく 62.09 vs 64.00, 서울은
+  // 대한민 92.81 vs 91.90). Gesso draws with the canvas, so it is
+  // consistent with itself; these cases allow Chrome that gap.
+  // -------------------------------------------------------------------------
+  {
+    name: 'cjk/ja-breaks-between-ideographs-and-kana',
+    text: '東京は日本の首都であり、世界最大の都市圏です。',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 100
+  },
+  {
+    name: 'cjk/ja-no-break-before-comma-or-full-stop',
+    text: 'これは、テストです。はい、そうです。',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 80
+  },
+  {
+    name: 'cjk/ja-brackets-stay-with-their-content',
+    text: 'これは「テスト」です。はい、そうです！',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 80
+  },
+  {
+    name: 'cjk/ja-small-kana-and-prolonged-mark-are-breakable',
+    text: 'ちょっとまってください。キャンペーン',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 64
+  },
+  {
+    name: 'cjk/ja-mixed-with-latin',
+    text: '私はGessoフレームワークを使います',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 90
+  },
+  {
+    name: 'cjk/ja-digits-and-counters',
+    text: '合計12個で1,000円になります',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 70
+  },
+  {
+    name: 'cjk/ja-percent-and-yen',
+    text: '本日は50％オフ、¥1200からです',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 70
+  },
+  {
+    name: 'cjk/ja-middle-dot-and-leaders',
+    text: 'りんご・みかん・バナナ……以上です',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 64
+  },
+  {
+    name: 'cjk/ja-ideographic-space-hangs',
+    text: '東京　大阪　名古屋　京都　福岡',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 70
+  },
+  {
+    name: 'cjk/ja-wave-dash-and-tilde',
+    text: '午前9時〜午後5時まで営業しています',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 70
+  },
+  {
+    name: 'cjk/zh-breaks-between-ideographs',
+    text: '北京是中华人民共和国的首都，也是政治中心。',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'zh',
+    maxWidth: 100
+  },
+  {
+    name: 'cjk/zh-fullwidth-punctuation',
+    text: '你好，世界！你好吗？很好。',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'zh',
+    maxWidth: 56
+  },
+  {
+    name: 'cjk/ko-breaks-between-syllables-and-at-spaces',
+    text: '서울은 대한민국의 수도이며 가장 큰 도시입니다.',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ko',
+    maxWidth: 100
+  },
+  { name: 'cjk/ja-natural-width', text: '日本語のテキスト', font: 'cjk', tolerance: CJK_TOLERANCE, lang: 'ja' },
+  {
+    name: 'cjk/ja-clamped',
+    text: '東京は日本の首都であり、世界最大の都市圏です。',
+    font: 'cjk',
+    tolerance: CJK_TOLERANCE,
+    lang: 'ja',
+    maxWidth: 100,
+    maxLines: 2
   },
 
   // -------------------------------------------------------------------------

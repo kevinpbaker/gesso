@@ -132,7 +132,7 @@ async function main(): Promise<void> {
         );
       }
 
-      const differences = compareParagraphs(replay, result.chrome);
+      const differences = compareParagraphs(replay, result.chrome, textCase.tolerance);
       if (differences.length === 0) {
         if (textCase.divergence !== undefined) {
           resolved.push(textCase.name);

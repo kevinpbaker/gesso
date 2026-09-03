@@ -28,7 +28,7 @@ import { conformanceFonts, cssFamily } from './fonts.ts';
  * Lines are read back through `Range.getClientRects()` one grapheme
  * cluster at a time and grouped by their top edge. A line's `start` is
  * the offset of its first cluster and its `end` the end of its last
- * non-blank cluster, so hanging spaces fall outside it as they do in a
+ * non-blank cluster (an ideographic space hangs like a space), so hanging spaces fall outside it as they do in a
  * Gesso `TextLine`; `x` and `width` are the ink extent of the same
  * clusters. Chrome does not expose which characters an ellipsis
  * replaced, so a clamped or ellipsised line is marked `truncated` and
@@ -176,11 +176,15 @@ function caseToHtml(textCase: TextCase): string {
   return (
     `<div class="case" data-case="${escapeAttribute(textCase.name)}">` +
     `<div class="row" style="width:${rowWidth}">` +
-    `<div class="para" style="${[font, ...paragraphStyles(textCase)].join(';')}">${escapeText(textCase.text)}</div>` +
+    `<div class="para"${langAttribute(textCase)} style="${[font, ...paragraphStyles(textCase)].join(';')}">${escapeText(textCase.text)}</div>` +
     `</div>` +
     `<div class="probe" style="${font}">x<span class="bl"></span></div>` +
     `</div>`
   );
+}
+
+function langAttribute(textCase: TextCase): string {
+  return textCase.lang !== undefined ? ` lang="${escapeAttribute(textCase.lang)}"` : '';
 }
 
 function paragraphStyles(textCase: TextCase): string[] {
@@ -231,7 +235,7 @@ function reportScript(families: readonly string[]): string {
   return `
 (function () {
   function round(value) { return Math.round(value * 1000) / 1000; }
-  function isBlank(text) { return /^[ \\t\\n]+$/.test(text); }
+  function isBlank(text) { return /^[ \\t\\n\\u3000]+$/.test(text); }
   var families = ${JSON.stringify(families)};
   var specs = JSON.parse(document.getElementById('cases').textContent);
   var segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
