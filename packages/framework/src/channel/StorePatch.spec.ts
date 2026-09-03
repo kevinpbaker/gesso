@@ -165,4 +165,13 @@ describe('diffProjection', () => {
 
     expect(structurallyEqual(result, current)).toBe(true);
   });
+
+  it('applies a splice of two hundred thousand items without spreading them onto the stack', () => {
+    const items = Array.from({ length: 200_000 }, (_, n) => ({ id: n }));
+    const patches = diffProjection('stream', { batch: [] as unknown[], seq: 0 }, { batch: items, seq: 1 });
+    const next = applyPatches({ batch: [], seq: 0 }, patches) as { batch: unknown[]; seq: number };
+    expect(next.seq).toBe(1);
+    expect(next.batch).toHaveLength(200_000);
+    expect(next.batch[199_999]).toEqual({ id: 199_999 });
+  });
 });

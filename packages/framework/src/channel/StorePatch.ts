@@ -139,9 +139,11 @@ export function applyPatch(root: unknown, patch: Patch): unknown {
       return deleteIn(root, patch.path, 0);
     case 'splice':
       return updateIn(root, patch.path, 0, node => {
-        const array = Array.isArray(node) ? node.slice() : [];
-        array.splice(patch.index, patch.deleteCount, ...patch.items);
-        return array;
+        // Concatenation rather than `splice(..., ...items)`: spreading
+        // the items passes each as an argument, and a batch of two
+        // hundred thousand overflows the call stack.
+        const array = Array.isArray(node) ? node : [];
+        return array.slice(0, patch.index).concat(patch.items, array.slice(patch.index + patch.deleteCount));
       });
   }
 }
