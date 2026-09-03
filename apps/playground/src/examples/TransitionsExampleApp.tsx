@@ -693,8 +693,15 @@ function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>
    * `SharedElementArgs.onMorph`.
    */
   const morphing = internalState(false);
+  const open = (): void => inputs.onOpen.emit(card.id);
+  // A group, not a button: the card holds Save, Shuffle, Play and Like,
+  // and a control may not contain controls. As a button it hid all four
+  // from assistive technology while the keyboard still tabbed into them
+  // (docs/accessibility/example-transitions.md found it). The pointer
+  // still opens the card from anywhere on it; the keyboard opens it from
+  // the title, which is the card's button.
   return (
-    <button
+    <box
       width={percent(100)}
       maxWidth={CARD_WIDTH}
       height={CARD_HEIGHT}
@@ -702,8 +709,9 @@ function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>
       zIndex={morphing.pipe(map(active => (active ? 1 : 0)))}
       x="center"
       cursor="pointer"
+      role="group"
       label={playlist.pipe(map(entry => entry.title))}
-      onClick={() => inputs.onOpen.emit(card.id)}
+      onClick={open}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       modifiers={[
@@ -778,6 +786,14 @@ function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>
           fontWeight={700}
           textAlign="center"
           selectable={false}
+          role="button"
+          focusable
+          onKeyDown={(event: UiKeyboardEvent) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              open();
+            }
+          }}
           modifiers={[sharedElement({ name: `playlist-title-${card.id}`, scale: 'uniform' })]}>
           {playlist.pipe(map(entry => entry.title))}
         </text>
@@ -791,7 +807,7 @@ function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>
           <PlayerControls card={card} playlist={playlist} />
         </box>
       </column>
-    </button>
+    </box>
   );
 }
 

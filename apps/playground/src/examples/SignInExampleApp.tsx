@@ -1,7 +1,7 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-import type { UiSemanticState } from '@gesso/core';
+import type { UiKeyboardEvent, UiSemanticState } from '@gesso/core';
 import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
 import { SignIn } from './signin/SignInContract';
 import {
@@ -281,6 +281,16 @@ function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void
       label={props.label}
       states={props.on.pipe(map((on): UiSemanticState[] => (on ? ['checked'] : [])))}
       onClick={() => props.onToggle.value()}
+      // A switch is a control: Tab reaches it and Space or Enter flips
+      // it, as they do the library's Switch. The accessibility report
+      // for this route is what found it missing.
+      focusable
+      onKeyDown={(event: UiKeyboardEvent) => {
+        if (event.key === ' ' || event.key === 'Enter') {
+          event.preventDefault();
+          props.onToggle.value();
+        }
+      }}
       cursor="pointer">
       <box width={36} height={20} borderRadius={10} backgroundColor={trackColor} x={knobX} y="center" padding={2}>
         <box width={16} height={16} borderRadius={8} backgroundColor={CHALK} />
@@ -323,7 +333,7 @@ function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
       <column gap={12} x="center" selfX="center">
         <row
           gap={12}
-          role="group"
+          role="status"
           label={view.pipe(map(v => `Passcode, ${v.entered} of ${CODE_LENGTH} digits entered`))}>
           {Array.from({ length: CODE_LENGTH }, (_, index) => (
             <Dot key={index} index={index} />

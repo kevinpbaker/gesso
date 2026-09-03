@@ -36,7 +36,9 @@ export class NotesViewModel {
               id: note.id,
               title: note.title,
               body: note.body,
-              editedAt: new Date(note.updatedAt).toLocaleString()
+              // One locale and one zone, so the line reads the same in
+              // every environment the route is checked in.
+              editedAt: new Date(note.updatedAt).toLocaleString('en-US', { timeZone: 'UTC' })
             }
       )
     );
