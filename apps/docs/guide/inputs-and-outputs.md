@@ -39,8 +39,9 @@ warns once if that snapshot goes stale.
 one value and emitted only when it changes:
 
 ```ts
-const playing = derive([queue.view.playlistId, audio.state], (id, state) =>
-  id === card.id && state.status === 'playing'
+const playing = derive(
+  [queue.view.playlistId, audio.state],
+  (id, state) => id === card.id && state.status === 'playing'
 );
 ```
 

@@ -135,7 +135,10 @@ async function main(): Promise<void> {
     devtools?.close();
     browser?.kill();
     vite?.kill();
-    rmSync(profile, { recursive: true, force: true });
+    // Chrome may still be flushing its profile when kill() returns; the
+    // other Chrome scripts retry for the same reason, and CI failed a
+    // passing parity run on ENOTEMPTY here before this did.
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }
 
