@@ -27,7 +27,8 @@ import type { TextWrap } from './TextMeasurer';
  *   - after a zero-width space (LB8);
  *   - after closing punctuation (LB31), except after a comma, full
  *     stop, colon, semicolon or closing parenthesis when a letter or
- *     digit follows (LB25, LB29, LB30); after a slash only before a
+ *     digit follows (LB25, LB29, LB30); after a prefix sign only before
+ *     an opening bracket ("5327+" | "(numero)", as Chrome does); after a slash only before a
  *     character outside ASCII, which is what Chrome does: its fast
  *     path for pairs of ASCII characters keeps "path/to" whole, and
  *     ICU, which decides every other pair, has no rule against a break
@@ -139,6 +140,13 @@ function breaksBetween(beforeCode: number, afterCode: number, beforePreviousCode
   }
   if (before === 'OP' || before === 'QU' || after === 'QU') {
     return false; // LB14, LB19
+  }
+  if (before === 'PR' && after === 'OP') {
+    // Chrome breaks after a prefix sign before an opening bracket,
+    // "5327+" | "(numero)", the one pair of ASCII symbols it breaks at
+    // besides the hyphen. Found by a Commons file name; probed against
+    // every other ASCII symbol, which all stay glued.
+    return true;
   }
   if (beforeCode === 0x2d && afterCode === 0x2d) {
     // Two hyphen-minus in a row: Chrome breaks between them ("0075-" |
@@ -259,6 +267,9 @@ function classOf(code: number): BreakClass {
     case 0x201c: // “
     case 0x201d: // ”
       return 'QU';
+    case 0x2b: // +
+    case 0xb1: // ±
+    case 0x2212: // − minus sign
     case 0x24: // $
     case 0xa3: // £
     case 0xa5: // ¥
