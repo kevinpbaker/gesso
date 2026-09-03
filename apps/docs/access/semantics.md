@@ -25,16 +25,17 @@ what every accessibility API on the target webviews understands.
 Borrowing the names makes the translation a rename rather than a
 mapping table.
 
-| Prop                               | What it says                                                                                                      |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `role`                             | What the node is. A closed set of 49 ARIA names: `button`, `switch`, `listbox`, `dialog`, `heading`, and the rest |
-| `label`                            | The accessible name. Without one, the node is named by the text it draws                                          |
-| `description`                      | Read after the name: a hint, or the reason a field is invalid                                                     |
-| `states`                           | Conditions beyond role and value, as an array. Also a closed set                                                  |
-| `valueNow`, `valueMin`, `valueMax` | A range control's position and its bounds                                                                         |
-| `valueText`                        | How the value should be spoken when the number is not it, as in `40%` or `3 stories`                              |
-| `posInSet`, `setSize`              | A row's 1-based place in a set, including the items that are not mounted                                          |
-| `level`                            | How deep a `treeitem` sits, 1 for a root                                                                          |
+| Prop                               | What it says                                                                                                            |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `role`                             | What the node is. A closed set of 49 ARIA names: `button`, `switch`, `listbox`, `dialog`, `heading`, and the rest       |
+| `label`                            | The accessible name. Without one, the node is named by the text it draws                                                |
+| `description`                      | Read after the name: a hint, or the reason a field is invalid                                                           |
+| `live`                             | `polite` or `assertive`: announce this node's text when it changes, without focus moving. `status` and `alert` imply it |
+| `states`                           | Conditions beyond role and value, as an array. Also a closed set                                                        |
+| `valueNow`, `valueMin`, `valueMax` | A range control's position and its bounds                                                                               |
+| `valueText`                        | How the value should be spoken when the number is not it, as in `40%` or `3 stories`                                    |
+| `posInSet`, `setSize`              | A row's 1-based place in a set, including the items that are not mounted                                                |
+| `level`                            | How deep a `treeitem` sits, 1 for a root                                                                                |
 
 The states are `checked`, `mixed`, `expanded`, `collapsed`, `selected`,
 `pressed`, `busy`, `invalid`, `required`, `readonly` and `modal`. Order

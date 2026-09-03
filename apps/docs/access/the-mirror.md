@@ -71,7 +71,7 @@ not over the node it stands for gives a screen reader's cursor, a
 magnifier and touch exploration the wrong answer.
 
 Each record becomes attributes on its element: `role`, `aria-label`,
-`aria-description`, `aria-disabled`, the value and set attributes, and
+`aria-description`, `aria-disabled`, `aria-live`, the value and set attributes, and
 one attribute per state, so `checked` is `aria-checked="true"` and
 `collapsed` is `aria-expanded="false"`. Every attribute a record can
 write is cleared before the record is written, so an attribute a node
