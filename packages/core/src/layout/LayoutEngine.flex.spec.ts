@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
+import { percent } from './UiLength';
 
 describe('LayoutEngine flex (Row/Column)', () => {
   function columnHarness(children: Array<{ id: string; width: number; height: number }>) {
@@ -352,6 +353,35 @@ describe('LayoutEngine flex (Row/Column)', () => {
       harness.append(row, column);
       harness.layout(row, Constraints.loose(300, 200));
       expect(harness.boxOf(a)).toEqual({ x: 25, y: 0, width: 20, height: 20 });
+    });
+  });
+  describe('percentages of a grown item', () => {
+    it("resolves a grown item's percent width against its own container, not the grandparent", () => {
+      // Row 900 > Column 449 > Column { width: 100%, flexGrow: 1 }. The
+      // item grows along the column's main axis, so it is measured a
+      // second time with its final height; that second measure used to
+      // see the percent base left over from measuring the column
+      // itself, which was the row's box, and came out 900 wide.
+      const harness = new LayoutHarness();
+      const root = harness.createNode('app', UiNodeType.Row);
+      root.setProperty('width', 900);
+      root.setProperty('height', 100);
+      const pane = harness.createNode('pane', UiNodeType.Column);
+      pane.setProperty('width', 449);
+      const grown = harness.createNode('grown', UiNodeType.Column);
+      grown.setProperty('width', percent(100));
+      grown.setProperty('flexGrow', 1);
+      const stretched = harness.createNode('stretched', UiNodeType.Column);
+      stretched.setProperty('width', percent(100));
+      stretched.setProperty('height', 10);
+      harness.append(pane, grown, stretched);
+      harness.append(root, pane);
+      harness.layout(root, Constraints.tight(900, 100));
+
+      expect(harness.record(pane).width).toBe(449);
+      expect(harness.record(grown).width).toBe(449);
+      expect(harness.record(grown).height).toBe(90);
+      expect(harness.record(stretched).width).toBe(449);
     });
   });
 });

@@ -1821,6 +1821,16 @@ export class LayoutEngine {
     crossAvailable: number | undefined
   ): void {
     const row = direction === FlexDirection.Row;
+    // The items' own percentages resolve against this container's
+    // content box, as they did when the items were collected. Without
+    // this the second measure of a grown item saw the base left over
+    // from measuring the container itself, its parent's box, and a
+    // `width: percent(100)` item in a column came out the width of the
+    // grandparent.
+    const mainBase = this.definiteAxis(content, row ? 'width' : 'height');
+    const crossBase = this.definiteAxis(content, row ? 'height' : 'width');
+    const savedBase = this.percentBase;
+    this.percentBase = row ? { width: mainBase, height: crossBase } : { width: crossBase, height: mainBase };
     for (const item of items) {
       const measuredMain = row ? item.rec.measuredWidth : item.rec.measuredHeight;
       // A stretched item of a single-line container whose cross size is
@@ -1844,6 +1854,7 @@ export class LayoutEngine {
       this.measure(item.child, constraints);
       item.cross = row ? item.rec.measuredHeight : item.rec.measuredWidth;
     }
+    this.percentBase = savedBase;
   }
 
   /**
@@ -2748,6 +2759,12 @@ export class LayoutEngine {
   /** Re-measures a line's stretched items at the line's cross size. */
   private stretchItems(items: FlexItem[], content: Constraints, direction: FlexDirection, lineCross: number): void {
     const row = direction === FlexDirection.Row;
+    // As in `measureFlexedItems`: the items' percentages are this
+    // container's, not the base left over from measuring the container.
+    const mainBase = this.definiteAxis(content, row ? 'width' : 'height');
+    const crossBase = this.definiteAxis(content, row ? 'height' : 'width');
+    const savedBase = this.percentBase;
+    this.percentBase = row ? { width: mainBase, height: crossBase } : { width: crossBase, height: mainBase };
     for (const item of items) {
       if (item.align !== CrossAxisAlignment.Stretch || item.marginCrossStartAuto || item.marginCrossEndAuto) {
         continue;
@@ -2761,6 +2778,7 @@ export class LayoutEngine {
       // The child clamps a stretched size by its own min/max.
       item.cross = row ? item.rec.measuredHeight : item.rec.measuredWidth;
     }
+    this.percentBase = savedBase;
   }
 
   /**
