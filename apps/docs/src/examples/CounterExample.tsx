@@ -1,13 +1,11 @@
-import { combineLatest } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { percent } from '@gesso/core';
 import { HOVER_ACCENT } from './interaction';
-import { type ComponentContext, type Inputs, input, internalState } from '@gesso/framework';
+import { type ComponentContext, type Inputs, derive, input, internalState } from '@gesso/framework';
 
-export function Counter(props: Inputs<{ label?: string }>, _context: ComponentContext) {
-  const label = input(props.label, 'Count'); // props are cells; this one has a default
+export function Counter(inputs: Inputs<{ label?: string }>, _context: ComponentContext) {
+  const label = input(inputs.label, 'Count'); // inputs are cells; this one has a default
   const count = internalState(0);
-  const caption = combineLatest([label, count]).pipe(map(([text, value]) => `${text}: ${value}`));
+  const caption = derive([label, count], (text, value) => `${text}: ${value}`);
 
   return (
     <row gap={12} x="center" y="center" width={percent(100)} height={percent(100)}>

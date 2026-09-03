@@ -50,10 +50,10 @@ A counter, as a function component:
 <LiveExample id="counter" height="180" />
 
 ```ts
-function Counter(props, _context) {
-  const label = input(props.label, 'Count');
+function Counter(inputs, _context) {
+  const label = input(inputs.label, 'Count');
   const count = internalState(0);
-  const caption = combineLatest([label, count]).pipe(map(([text, value]) => `${text}: ${value}`));
+  const caption = derive([label, count], (text, value) => `${text}: ${value}`);
 
   return Row(
     { gap: 12, x: 'center', y: 'center', width: percent(100), height: percent(100) },
@@ -63,7 +63,7 @@ function Counter(props, _context) {
 }
 ```
 
-`input(props.label, 'Count')` is a prop with a default. `internalState(0)`
+`input(inputs.label, 'Count')` is an input with a default. `internalState(0)`
 is the value this component owns, the equivalent of `@State` or
 `mutableStateOf`. The caption is derived and stored nowhere: it is one
 expression over the other two, subscribed to by the node that shows it,
@@ -93,6 +93,37 @@ and dark toggle without being told either exists.
 - **A hundred thousand rows at sixty frames.** Virtualization, shared
   grid tracks, and a frame cost proportional to what changed rather than
   to what is on screen.
+
+## What is measured
+
+Every figure here is produced by a script in the repository, and the
+script is the claim.
+
+| Claim                                               | Figure                                                            | Produced by                                                                                               |
+| --------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Application work cannot stall the interface         | 41 ms worst tick through a 3,000 ms block, against 3,010 ms       | the demo above; `decisions/0030-thread-model.md` for the same measurement over input latency              |
+| Flex, grid, text and positioning agree with Chrome  | 239 generated cases within 0.1 px, one divergence pinned by name  | `pnpm fixtures:layout` renders the cases in headless Chrome; `LayoutEngine.conformance.spec` asserts them |
+| The two renderers draw the same pixels              | under 0.03% of pixels differ per route                            | `pnpm parity:webgpu`                                                                                      |
+| Every route paints what it painted                  | pixel diff against a committed baseline per route                 | `pnpm screenshots`                                                                                        |
+| What a screen reader is given is what the tree says | Chrome's computed accessibility tree, per route                   | `pnpm check:a11y`; VoiceOver and NVDA have not been run, and `decisions/0034` says so                     |
+| It stays this way                                   | 2,600 tests in 250 files, the public surface as committed reports | `pnpm test:run`, `pnpm api:check`                                                                         |
+
+## How it compares
+
+The axes that decide the choice, not a feature list.
+
+| Axis                              | Gesso                                                                                                             | React (DOM)                                                      | Solid (DOM)                                               | Flutter Web                                     |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------- |
+| Where application work runs       | its own worker, by design; the interface never shares its thread                                                  | the main thread, unless you move it and message the results back | the main thread, likewise                                 | the main thread, in Dart compiled to JS or Wasm |
+| Input while the app is busy       | unaffected; the shell forwards events to a thread that is drawing                                                 | delayed by however long the work takes                           | delayed, likewise                                         | delayed, likewise                               |
+| What a state change costs         | one property on one node; nothing re-runs                                                                         | a component re-renders and is diffed                             | one signal's subscribers run; the DOM is patched in place | widgets rebuild and the element tree is diffed  |
+| A shared element across screens   | FLIP over the live node, interruptible, no raster                                                                 | the View Transitions API: snapshots cross-faded by the browser   | the same API                                              | Hero animations over the live widget            |
+| Text                              | measured and drawn by the engine; wraps, clamps, selects, finds; one font at a time is proven, more is roadmapped | the browser's, complete                                          | the browser's, complete                                   | its own engine, with the same class of gaps     |
+| Accessibility                     | a semantics tree mirrored into an off-screen DOM                                                                  | the DOM itself                                                   | the DOM itself                                            | a semantics tree mirrored into off-screen DOM   |
+| Indexing, view source, extensions | none; not the goal                                                                                                | complete                                                         | complete                                                  | none                                            |
+| Ecosystem                         | one component library, one theme system, young                                                                    | the largest there is                                             | large                                                     | large, Dart                                     |
+
+Read the right-hand columns as the price. If your screen is a document, or its value is being indexed, or you need the ecosystem more than the thread, they are the better tools and it is not close.
 
 ## Where it doesn't belong
 
