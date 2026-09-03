@@ -1325,6 +1325,7 @@ declare class WorkerApp {
   private detachColorScheme;
   private colorSchemePreference;
   constructor(options: WorkerAppOptions);
+  get appLogic(): WorkerHandle | undefined;
   mount(host: HTMLElement | string): () => void;
   private handleWorkerFailure;
   private report;
@@ -1398,6 +1399,11 @@ declare class GessoApp {
   private attachHistory;
   private handleShellRequest;
   private observeResize;
+}
+declare class FrameService {
+  private readonly subject;
+  readonly frames: Observable<FrameMetrics>;
+  publish(metrics: FrameMetrics): void;
 }
 interface AudioElementLike extends EventTarget {
   src: string;
@@ -1664,6 +1670,7 @@ export {
   FontService,
   formatNodeReport,
   formatUrl,
+  FrameService,
   GessoApp,
   GessoAppBuilder,
   GessoRuntime,
