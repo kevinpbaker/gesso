@@ -20,16 +20,16 @@ the whole column is under.
 `UiTextStyle` is eight fields, and each one is also a prop you can set
 on a node:
 
-| Field           | Prop            | Notes                                              |
-| --------------- | --------------- | -------------------------------------------------- |
-| `fontFamily`    | `fontFamily`    | A CSS family list, as a string                     |
-| `fontSize`      | `fontSize`      | Logical pixels                                     |
-| `fontWeight`    | `fontWeight`    | `'normal'`, `'bold'`, or a number                  |
-| `lineHeight`    | `lineHeight`    | Logical pixels, not a multiplier                   |
-| `letterSpacing` | `letterSpacing` | Logical pixels of extra space per character        |
-| `color`         | `color`         | Where text gets its colour, and not from the theme |
-| `textAlign`     | `textAlign`     | `left`, `center` or `right`                        |
-| `textDirection` | `textDirection` | `ltr` or `rtl`                                     |
+| Field           | Prop            | Notes                                                                                           |
+| --------------- | --------------- | ----------------------------------------------------------------------------------------------- |
+| `fontFamily`    | `fontFamily`    | A CSS family list, as a string                                                                  |
+| `fontSize`      | `fontSize`      | Logical pixels                                                                                  |
+| `fontWeight`    | `fontWeight`    | `'normal'`, `'bold'`, or a number                                                               |
+| `lineHeight`    | `lineHeight`    | Logical pixels, not a multiplier                                                                |
+| `letterSpacing` | `letterSpacing` | Logical pixels of extra space per character                                                     |
+| `color`         | `color`         | Where text gets its colour, and not from the theme                                              |
+| `textAlign`     | `textAlign`     | `start` (the default), `end`, `left`, `center` or `right`; start and end follow `textDirection` |
+| `textDirection` | `textDirection` | `ltr` or `rtl`                                                                                  |
 
 The style is the unit of inheritance, which is why it carries a colour.
 Providing a theme does not colour your text: the palette answers
