@@ -21,7 +21,8 @@ describe('segmentParagraph', () => {
 
   it('breaks after a hyphen before digits unless the hyphen begins its word, and never before a dash or closing punctuation', () => {
     expect(segments('10-15 -5 2024-07-25')).toEqual(['10-', '15', '-5', '2024-', '07-', '25']);
-    expect(segments('a--b')).toEqual(['a--', 'b']);
+    expect(segments('0001--0075')).toEqual(['0001-', '-0075']);
+    expect(segments('a--b')).toEqual(['a-', '-', 'b']);
     expect(segments('(re-) x')).toEqual(['(re-)', 'x']);
   });
 

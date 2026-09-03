@@ -142,6 +142,8 @@ export const textCases: readonly TextCase[] = [
   { name: 'wrap/hyphen-before-digit-breaks-when-forced', text: '2024-07-25 and 1234-56', maxWidth: 60 },
   { name: 'wrap/minus-sign-stays-with-its-digit', text: 'to -5 tonight', maxWidth: 30 },
   { name: 'wrap/letters-hyphen-digits-break-after-the-hyphen', text: 'Ägypten-2015-03-69a.JPG', maxWidth: 100 },
+  // Chrome also breaks between two hyphen-minus, against LB21.
+  { name: 'wrap/double-hyphen-breaks-between-the-hyphens', text: 'files--0001--0075--010001-75-00036', maxWidth: 100 },
   // Chrome's fast path for pairs of ASCII characters never breaks after
   // a slash; a character outside ASCII after it is decided by ICU, which
   // allows the break. Both are what Wikipedia titles meet.

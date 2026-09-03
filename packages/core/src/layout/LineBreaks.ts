@@ -18,7 +18,8 @@ import type { TextWrap } from './TextMeasurer';
  *   - a break is allowed after a blank (LB18);
  *   - after a hyphen-minus, a hyphen, a figure dash or an en dash
  *     (classes HY and BA), except before closing punctuation (LB13),
- *     before another dash (LB21), or between a hyphen that begins its
+ *     before another dash (LB21, though Chrome breaks between two
+ *     hyphen-minus and so does this), or between a hyphen that begins its
  *     word and the digit after it, where it is a sign (LB25 as Chrome
  *     applies it: "2024-" | "07" breaks, "-5" does not);
  *   - before and after an em dash (class B2), except between two of
@@ -139,6 +140,12 @@ function breaksBetween(beforeCode: number, afterCode: number, beforePreviousCode
   if (before === 'OP' || before === 'QU' || after === 'QU') {
     return false; // LB14, LB19
   }
+  if (beforeCode === 0x2d && afterCode === 0x2d) {
+    // Two hyphen-minus in a row: Chrome breaks between them ("0075-" |
+    // "-010001"), against LB21, which never breaks before a dash. Found
+    // by a Wikipedia title made of double-hyphen separators.
+    return true;
+  }
   if (after === 'HY' || after === 'BA') {
     return false; // LB21
   }
@@ -148,11 +155,12 @@ function breaksBetween(beforeCode: number, afterCode: number, beforePreviousCode
     }
     if (before === 'HY' && after === 'NU') {
       // LB25's HY × NU, as Chrome applies it: only a hyphen that begins
-      // its word is a number's sign and sticks to it ("-5"); one inside
-      // a word is a break opportunity before digits too ("2024-" | "07",
-      // "Ägypten-" | "2015"). Found by the Wikipedia titles; see the
-      // wrap/hyphen fixtures.
-      return beforePreviousCode !== undefined && !isBlank(beforePreviousCode);
+      // its word is a number's sign and sticks to it ("-5", and the
+      // second of "--0075", which follows a break opportunity); one
+      // inside a word is a break opportunity before digits too ("2024-"
+      // | "07", "Ägypten-" | "2015"). Found by the Wikipedia titles; see
+      // the wrap/hyphen fixtures.
+      return beforePreviousCode !== undefined && !isBlank(beforePreviousCode) && beforePreviousCode !== 0x2d;
     }
     return true;
   }
