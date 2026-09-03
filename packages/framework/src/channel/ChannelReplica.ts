@@ -76,14 +76,27 @@ export class ChannelReplica<View extends object, Commands extends object> {
     }
   });
 
+  private readonly warnedArity = new Set<string>();
+
   private createCommandProxy(): Commands {
     return new Proxy({} as Commands, {
       get: (_target, property): unknown => {
         if (typeof property !== 'string') {
           return undefined;
         }
-        return (payload?: unknown) => {
-          this.post({ type: 'channel:command', command: property, payload });
+        return (...args: unknown[]) => {
+          if (args.length > 1 && !this.warnedArity.has(property)) {
+            // A command crosses the barrier as one payload. A second
+            // argument is dropped on the floor, silently, and the handler
+            // sees `undefined` where it expected a count: say so once.
+            this.warnedArity.add(property);
+            console.warn(
+              `Channel '${this.token.name}' command '${property}' was called with ${args.length} arguments, ` +
+                `and a command carries one payload: only the first crossed. Pass one object instead, ` +
+                `\`${property}({ ... })\`, and take it apart on the other side.`
+            );
+          }
+          this.post({ type: 'channel:command', command: property, payload: args[0] });
         };
       }
     }) as Commands;
