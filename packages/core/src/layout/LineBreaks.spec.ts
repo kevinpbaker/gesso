@@ -19,10 +19,16 @@ describe('segmentParagraph', () => {
     expect(segments('-verbose')).toEqual(['-', 'verbose']);
   });
 
-  it('does not break a hyphen from a following digit, dash or closing punctuation', () => {
-    expect(segments('10-15 -5')).toEqual(['10-15', '-5']);
+  it('breaks after a hyphen before digits unless the hyphen begins its word, and never before a dash or closing punctuation', () => {
+    expect(segments('10-15 -5 2024-07-25')).toEqual(['10-', '15', '-5', '2024-', '07-', '25']);
     expect(segments('a--b')).toEqual(['a--', 'b']);
     expect(segments('(re-) x')).toEqual(['(re-)', 'x']);
+  });
+
+  it('breaks after a slash only before a character outside ASCII, as Chrome does', () => {
+    expect(segments('path/to/file.txt')).toEqual(['path/to/file.txt']);
+    expect(segments('fantastique/Évaluation/Index/7')).toEqual(['fantastique/', 'Évaluation/Index/7']);
+    expect(segments('문서/핀란드')).toEqual(['문', '서/', '핀', '란', '드']);
   });
 
   it('breaks after en dashes and hyphens but never a non-breaking hyphen', () => {

@@ -135,7 +135,21 @@ export const textCases: readonly TextCase[] = [
     maxWidth: 80
   },
   { name: 'wrap/en-dash-is-a-break-opportunity', text: 'pages 10\u201315 and 20\u201325 follow', maxWidth: 60 },
-  { name: 'wrap/hyphen-before-digit-does-not-break', text: 'from 10-15 degrees to -5 tonight', maxWidth: 52 },
+  // Chrome breaks after a hyphen before digits when it has to, but a
+  // hyphen that begins its word is a minus sign and sticks: the range
+  // fits at 52 and stays whole; the date at 60 does not, and breaks.
+  { name: 'wrap/hyphen-in-a-range-stays-when-it-fits', text: 'from 10-15 degrees to -5 tonight', maxWidth: 52 },
+  { name: 'wrap/hyphen-before-digit-breaks-when-forced', text: '2024-07-25 and 1234-56', maxWidth: 60 },
+  { name: 'wrap/minus-sign-stays-with-its-digit', text: 'to -5 tonight', maxWidth: 30 },
+  { name: 'wrap/letters-hyphen-digits-break-after-the-hyphen', text: 'Ägypten-2015-03-69a.JPG', maxWidth: 100 },
+  // Chrome's fast path for pairs of ASCII characters never breaks after
+  // a slash; a character outside ASCII after it is decided by ICU, which
+  // allows the break. Both are what Wikipedia titles meet.
+  {
+    name: 'wrap/slash-breaks-before-non-ascii',
+    text: 'Projet:Fantasy et fantastique/Évaluation/Index/7',
+    maxWidth: 160
+  },
   { name: 'wrap/word-initial-hyphen-still-breaks', text: 'use -verbose -quiet -all here', maxWidth: 52 },
   { name: 'wrap/hyphen-before-closing-punctuation', text: 'one (re-) use it now', maxWidth: 40 },
   { name: 'wrap/em-dash-between-spaces', text: 'fox \u2014 jumps \u2014 over', maxWidth: 40 },
@@ -517,7 +531,38 @@ export const textCases: readonly TextCase[] = [
   { name: 'align/center-ignores-hanging-spaces', text: 'alpha beta   gamma delta', maxWidth: 80, align: 'center' },
   { name: 'align/right-single-line-natural-width', text: 'right', maxWidth: 200, align: 'right' },
   { name: 'align/right-in-fixed-box', text: 'right', maxWidth: 200, align: 'right', box: 'fixed' },
-  { name: 'align/center-in-fixed-box', text: 'centre', maxWidth: 200, align: 'center', box: 'fixed' }
+  { name: 'align/center-in-fixed-box', text: 'centre', maxWidth: 200, align: 'center', box: 'fixed' },
+
+  // Found by scripts/wring-titles.ts in live Wikipedia titles; see
+  // docs/FIREHOSE_ROADMAP.md S4.
+  {
+    name: 'cjk/ko-slash-after-hangul',
+    text: '위키백과:미번역 문서/핀란드',
+    font: ['cjk', 'sans'],
+    lang: 'ko',
+    maxWidth: 160,
+    tolerance: CJK_TOLERANCE
+  },
+  {
+    name: 'cjk/zh-fullwidth-closing-bracket-at-line-end',
+    text: '湖北省武汉经济技术开发区人民法院（2022）鄂0191民初9069号民事判决书',
+    font: ['cjk', 'sans'],
+    lang: 'zh',
+    maxWidth: 160,
+    tolerance: CJK_TOLERANCE,
+    divergence:
+      'Lets a full-width closing bracket at a line end give up its trailing half em (text-spacing-trim: normal, the allow-end part), so twelve characters fit in 160 px; Gesso measures the bracket at its full advance and breaks a character earlier.'
+  },
+  {
+    name: 'clamp/ellipsis-not-for-a-fifth-of-a-pixel',
+    text: 'User:Emiya1980/sandbox6',
+    maxWidth: 200,
+    maxLines: 1,
+    overflow: 'ellipsis',
+    box: 'fixed',
+    divergence:
+      'Draws the whole line, 200.16 px in a 200 px box, without an ellipsis; Gesso ellipsises any line wider than its box.'
+  }
 ];
 
 /**

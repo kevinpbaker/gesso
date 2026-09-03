@@ -17,14 +17,20 @@ import type { TextWrap } from './TextMeasurer';
  *
  *   - a break is allowed after a blank (LB18);
  *   - after a hyphen-minus, a hyphen, a figure dash or an en dash
- *     (classes HY and BA), except before a digit (LB25), before
- *     closing punctuation (LB13) or before another dash (LB21);
+ *     (classes HY and BA), except before closing punctuation (LB13),
+ *     before another dash (LB21), or between a hyphen that begins its
+ *     word and the digit after it, where it is a sign (LB25 as Chrome
+ *     applies it: "2024-" | "07" breaks, "-5" does not);
  *   - before and after an em dash (class B2), except between two of
  *     them (LB17) or after an opening bracket (LB14);
  *   - after a zero-width space (LB8);
  *   - after closing punctuation (LB31), except after a comma, full
  *     stop, colon, semicolon or closing parenthesis when a letter or
- *     digit follows (LB25, LB29, LB30), and never after a slash;
+ *     digit follows (LB25, LB29, LB30); after a slash only before a
+ *     character outside ASCII, which is what Chrome does: its fast
+ *     path for pairs of ASCII characters keeps "path/to" whole, and
+ *     ICU, which decides every other pair, has no rule against a break
+ *     after a slash, so "fantastique/" | "Évaluation" breaks;
  *   - never next to a quotation mark (LB19) or a no-break space,
  *     non-breaking hyphen or word joiner (LB12);
  *   - before or after an ideograph, kana or Hangul syllable (class ID,
@@ -85,10 +91,11 @@ export function segmentParagraph(paragraph: string, wrap: TextWrap): TextSegment
     while (i < boundaries.length - 1) {
       const next = paragraph.codePointAt(boundaries[i])!;
       const previous = paragraph.codePointAt(boundaries[i - 1])!;
+      const beforePrevious = i >= 2 ? paragraph.codePointAt(boundaries[i - 2]) : undefined;
       if (
         isBlank(next) ||
         wrap === 'char' ||
-        breaksBetween(previous, next) ||
+        breaksBetween(previous, next, beforePrevious) ||
         (dictionary !== null && dictionary.has(boundaries[i]) && isComplexContext(previous) && isComplexContext(next))
       ) {
         break;
@@ -113,9 +120,11 @@ export const IDEOGRAPHIC_SPACE = 0x3000;
  * blanks, given the code point each starts with. UAX #14's shape: a
  * break is allowed everywhere (LB31) except where a rule forbids it,
  * and the rules that keep letters, digits and their prefixes together
- * are what make a Latin word one segment.
+ * are what make a Latin word one segment. `beforePreviousCode` is the
+ * cluster before `beforeCode`, or undefined at the start of a word,
+ * for the one rule that looks that far back.
  */
-function breaksBetween(beforeCode: number, afterCode: number): boolean {
+function breaksBetween(beforeCode: number, afterCode: number, beforePreviousCode?: number): boolean {
   const before = classOf(beforeCode);
   const after = classOf(afterCode);
   if (before === 'ZW') {
@@ -137,7 +146,15 @@ function breaksBetween(beforeCode: number, afterCode: number): boolean {
     if (after === 'B2') {
       return false;
     }
-    return !(before === 'HY' && after === 'NU'); // LB25
+    if (before === 'HY' && after === 'NU') {
+      // LB25's HY × NU, as Chrome applies it: only a hyphen that begins
+      // its word is a number's sign and sticks to it ("-5"); one inside
+      // a word is a break opportunity before digits too ("2024-" | "07",
+      // "Ägypten-" | "2015"). Found by the Wikipedia titles; see the
+      // wrap/hyphen fixtures.
+      return beforePreviousCode !== undefined && !isBlank(beforePreviousCode);
+    }
+    return true;
   }
   if (before === 'B2') {
     return after !== 'B2'; // LB17
@@ -146,7 +163,11 @@ function breaksBetween(beforeCode: number, afterCode: number): boolean {
     return true;
   }
   if (before === 'SY') {
-    return false; // Chrome does not break after a slash; the fixture says so.
+    // Chrome breaks after a slash only before a character outside
+    // ASCII: its fast path for pairs of ASCII characters keeps "path/to"
+    // whole, and ICU, which decides every other pair, has no rule
+    // against a break after SY. Both fixtures say so.
+    return afterCode > 0x7f;
   }
   if (before === 'IS' || before === 'CP') {
     return after !== 'AL' && after !== 'NU'; // LB29, LB25, LB30
