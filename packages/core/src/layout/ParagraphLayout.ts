@@ -38,6 +38,14 @@ type Measure = (segment: string) => number;
  * The paragraph width is CSS fit-content: the available width when
  * wrapping occurred, the natural width when it did not, and never
  * narrower than the widest unbreakable segment.
+ *
+ * The first baseline sits half the leading below the line top, plus the
+ * ascent, with the half-leading floored to a whole pixel. That floor is
+ * what Chrome does (its line layout floors the half-leading before
+ * adding it to the ascent), and the text conformance fixtures showed
+ * every baseline a fraction of a pixel below Chrome's without it. It is
+ * also why DOM text is crisp: with whole-pixel font metrics and a
+ * whole-pixel line height, the baseline lands on a pixel boundary.
  */
 export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasurer): ParagraphLayout {
   const fontSize = request.fontSize;
@@ -105,7 +113,7 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     lineHeight,
     ascent: metrics.ascent,
     descent: metrics.descent,
-    firstBaseline: (lineHeight - (metrics.ascent + metrics.descent)) / 2 + metrics.ascent,
+    firstBaseline: metrics.ascent + Math.floor((lineHeight - (metrics.ascent + metrics.descent)) / 2),
     minContentWidth,
     maxContentWidth
   };

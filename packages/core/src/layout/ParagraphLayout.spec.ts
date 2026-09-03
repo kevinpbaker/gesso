@@ -148,6 +148,13 @@ describe('layoutParagraph', () => {
       expect(layout('x', { lineHeight: 20 }).firstBaseline).toBe(13);
     });
 
+    it('floors the half-leading to a whole pixel, as Chrome does', () => {
+      // 10px glyph box in a 15px line: half-leading 2.5 → 2, not 2.5.
+      expect(layout('x', { lineHeight: 15 }).firstBaseline).toBe(10);
+      // Negative leading floors away from zero: (9 - 10) / 2 = -0.5 → -1.
+      expect(layout('x', { lineHeight: 9 }).firstBaseline).toBe(7);
+    });
+
     it('falls back to 1.2× the font size for the line height', () => {
       expect(layout('x').lineHeight).toBe(12);
       expect(layout('x', { lineHeight: 0 }).lineHeight).toBe(12);

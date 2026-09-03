@@ -477,8 +477,9 @@ describe('Canvas2DRenderer text', () => {
     expect(callArgs(h.context, 'set:font')).toEqual(['normal 14px sans-serif']);
     expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#000']);
     expect(callArgs(h.context, 'set:textBaseline')).toEqual(['alphabetic']);
-    // 16.8 line box around a 14px font: 1.4 half-leading + 11.2 ascent.
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, 22.6]]);
+    // 16.8 line box around a 14px font: 1.4 half-leading floored to 1,
+    // plus 11.2 ascent, as Chrome places it.
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, expect.closeTo(22.2, 6)]]);
   });
 
   it("draws text inside the node's own padding", () => {
@@ -492,8 +493,8 @@ describe('Canvas2DRenderer text', () => {
     h.layout(root);
     h.render(root);
     // Box is 42 + 12 wide; the glyphs start after the left padding and
-    // sit on the baseline 6 + 12.6 below the box top.
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 6, 18.6]]);
+    // sit on the baseline 6 + 12.2 below the box top.
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 6, expect.closeTo(18.2, 6)]]);
   });
 
   it('centers text within a wider box', () => {
@@ -508,7 +509,7 @@ describe('Canvas2DRenderer text', () => {
     h.append(root, text);
     h.layout(root);
     h.render(root);
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 39, 22.6]]);
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 39, expect.closeTo(22.2, 6)]]);
   });
 
   it('aligns text vertically within the box', () => {
@@ -524,7 +525,7 @@ describe('Canvas2DRenderer text', () => {
     h.append(root, text);
     h.layout(root);
     h.render(root);
-    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, 39.2]]);
+    expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, expect.closeTo(38.8, 6)]]);
   });
 });
 
