@@ -24,7 +24,7 @@ const defaultBody: UiTextStyle = {
   lineHeight: 16.8,
   letterSpacing: 0,
   color: { r: 0, g: 0, b: 0, a: 1 },
-  textAlign: 'left',
+  textAlign: 'start',
   textDirection: 'ltr'
 } as const;
 

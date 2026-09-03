@@ -32,7 +32,7 @@ export const lightTheme: UiTheme = {
       lineHeight: 16.8,
       letterSpacing: 0,
       color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'left',
+      textAlign: 'start',
       textDirection: 'ltr'
     },
     bodyLarge: {
@@ -42,7 +42,7 @@ export const lightTheme: UiTheme = {
       lineHeight: 19.2,
       letterSpacing: 0,
       color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'left',
+      textAlign: 'start',
       textDirection: 'ltr'
     },
     bodySmall: {
@@ -52,7 +52,7 @@ export const lightTheme: UiTheme = {
       lineHeight: 14.4,
       letterSpacing: 0,
       color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'left',
+      textAlign: 'start',
       textDirection: 'ltr'
     },
     headline: {
@@ -62,7 +62,7 @@ export const lightTheme: UiTheme = {
       lineHeight: 28.8,
       letterSpacing: 0,
       color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'left',
+      textAlign: 'start',
       textDirection: 'ltr'
     },
     title: {
@@ -72,7 +72,7 @@ export const lightTheme: UiTheme = {
       lineHeight: 24,
       letterSpacing: 0,
       color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'left',
+      textAlign: 'start',
       textDirection: 'ltr'
     },
     label: {
@@ -82,7 +82,7 @@ export const lightTheme: UiTheme = {
       lineHeight: 13.2,
       letterSpacing: 0.5,
       color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'left',
+      textAlign: 'start',
       textDirection: 'ltr'
     }
   },

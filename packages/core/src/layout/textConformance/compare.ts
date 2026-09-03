@@ -40,7 +40,7 @@ export function layoutWithGesso(textCase: TextCase, recording: GessoRecording): 
   const width = textCase.box === 'fixed' && textCase.maxWidth !== undefined ? textCase.maxWidth : paragraph.width;
   const placed = placeLines(
     { x: 0, y: 0, width, height: paragraph.height },
-    { textAlign: textCase.align ?? 'left', verticalAlign: 'top' },
+    { textAlign: textCase.align ?? 'start', verticalAlign: 'top', rtl: textCase.direction === 'rtl' },
     paragraph
   );
   // Chrome reports a line's ink, from its first glyph; a Gesso line that

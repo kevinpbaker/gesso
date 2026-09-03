@@ -405,7 +405,7 @@ type UiOverflow = 'visible' | 'hidden' | 'scroll' | 'auto';
 type UiPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
 type UiTextWrapValue = 'word' | 'char' | 'none';
 type UiTextOverflowValue = 'clip' | 'ellipsis';
-type UiTextAlign = 'left' | 'center' | 'right';
+type UiTextAlign = 'start' | 'end' | 'left' | 'center' | 'right';
 type UiTextDirection = 'ltr' | 'rtl';
 type UiVerticalAlign = 'top' | 'middle' | 'bottom';
 type UiObjectFit = 'fill' | 'cover' | 'contain' | 'none';
@@ -1644,7 +1644,7 @@ declare function clearSelectionRange(node: UiNode): boolean;
 declare function selectableTextOf(node: UiNode): string | undefined;
 declare function selectableTextNodes(root: UiNode): UiNode[];
 declare const DEFAULT_LINE_HEIGHT_FACTOR = 1.2;
-type TextAlign = 'left' | 'center' | 'right';
+type TextAlign = 'start' | 'end' | 'left' | 'center' | 'right';
 type VerticalAlign = 'top' | 'middle' | 'bottom';
 type ObjectFit = 'fill' | 'cover' | 'contain' | 'none';
 interface PaintState {
@@ -1709,6 +1709,7 @@ interface Canvas2DContext {
   rotate(angle: number): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
   letterSpacing?: string;
+  direction?: CanvasDirection;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
   strokeRect(x: number, y: number, width: number, height: number): void;
@@ -4857,7 +4858,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CIWD4-0X.js";
+} from "./index-0S3eHQmD.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5545,7 +5546,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CIWD4-0X.js";
+} from "./index-0S3eHQmD.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

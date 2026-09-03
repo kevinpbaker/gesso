@@ -34,6 +34,13 @@ export interface Canvas2DContext {
    * still agree with each other.
    */
   letterSpacing?: string;
+  /**
+   * The base direction bidi resolves against: which side a neutral
+   * character at the end of an Arabic line lands on, and which way a
+   * mixed line reads. Set per text draw from the paragraph's
+   * `textDirection`. Optional for the same reason `letterSpacing` is.
+   */
+  direction?: CanvasDirection;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
   strokeRect(x: number, y: number, width: number, height: number): void;

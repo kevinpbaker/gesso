@@ -15,7 +15,7 @@
  * file did not load, `document.fonts.check` says so and the generator
  * refuses to write fixtures.
  */
-export type ConformanceFontId = 'sans' | 'cjk';
+export type ConformanceFontId = 'sans' | 'cjk' | 'arabic' | 'hebrew';
 
 export interface ConformanceFont {
   readonly id: ConformanceFontId;
@@ -56,6 +56,30 @@ export const conformanceFonts: readonly ConformanceFont[] = [
       '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
       '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
       '~/Library/Fonts/NotoSansCJK-Regular.ttc'
+    ]
+  },
+  {
+    id: 'arabic',
+    family: 'Gesso Conformance Arabic',
+    face: 'Noto Sans Arabic Regular',
+    env: 'GESSO_FONT_ARABIC',
+    candidates: [
+      '/usr/share/fonts/noto/NotoSansArabic-Regular.ttf',
+      '/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf',
+      '/usr/share/fonts/google-noto/NotoSansArabic-Regular.ttf',
+      '~/Library/Fonts/NotoSansArabic-Regular.ttf'
+    ]
+  },
+  {
+    id: 'hebrew',
+    family: 'Gesso Conformance Hebrew',
+    face: 'Noto Sans Hebrew Regular',
+    env: 'GESSO_FONT_HEBREW',
+    candidates: [
+      '/usr/share/fonts/noto/NotoSansHebrew-Regular.ttf',
+      '/usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf',
+      '/usr/share/fonts/google-noto/NotoSansHebrew-Regular.ttf',
+      '~/Library/Fonts/NotoSansHebrew-Regular.ttf'
     ]
   }
 ];

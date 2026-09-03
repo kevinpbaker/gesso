@@ -458,7 +458,7 @@ export class Canvas2DRenderer implements UiRenderer {
         ctx.fillRect(box.x, box.y, box.width, box.height);
       }
     }
-    drawTextLines(ctx, lines, buildFontString(paint), colorToCss(paint.textColor), paint.letterSpacing);
+    drawTextLines(ctx, lines, buildFontString(paint), colorToCss(paint.textColor), paint.letterSpacing, paint.rtl);
   }
 
   /**
@@ -483,10 +483,18 @@ export class Canvas2DRenderer implements UiRenderer {
         layout.placeholderLines,
         buildFontString(paint),
         colorToCss(paint.placeholderColor),
-        paint.letterSpacing
+        paint.letterSpacing,
+        paint.rtl
       );
     } else {
-      drawTextLines(ctx, layout.lines, buildFontString(paint), colorToCss(paint.textColor), paint.letterSpacing);
+      drawTextLines(
+        ctx,
+        layout.lines,
+        buildFontString(paint),
+        colorToCss(paint.textColor),
+        paint.letterSpacing,
+        paint.rtl
+      );
     }
     if (model.composing) {
       ctx.fillStyle = colorToCss(paint.textColor);

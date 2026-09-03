@@ -94,7 +94,12 @@ export type UiTextWrapValue = 'word' | 'char' | 'none';
 
 export type UiTextOverflowValue = 'clip' | 'ellipsis';
 
-export type UiTextAlign = 'left' | 'center' | 'right';
+/**
+ * Where a line sits in its box. `start` and `end` follow the paragraph's
+ * `textDirection`, as CSS's do, and `start` is the default: a right-to-left
+ * paragraph aligns right without being told to.
+ */
+export type UiTextAlign = 'start' | 'end' | 'left' | 'center' | 'right';
 
 export type UiTextDirection = 'ltr' | 'rtl';
 

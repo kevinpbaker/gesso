@@ -41,7 +41,7 @@ describe('resolvePaintState', () => {
     expect(state.fontWeight).toBe(DEFAULT_FONT_WEIGHT);
     expect(state.lineHeight).toBe(DEFAULT_FONT_SIZE * 1.2);
     expect(state.textColor).toEqual(DEFAULT_TEXT_COLOR);
-    expect(state.textAlign).toBe('left');
+    expect(state.textAlign).toBe('start');
     expect(state.verticalAlign).toBe('top');
   });
 
@@ -117,9 +117,11 @@ describe('resolvePaintState', () => {
   it('normalizes text alignment', () => {
     expect(resolve({ textAlign: 'center' }).textAlign).toBe('center');
     expect(resolve({ textAlign: 'right' }).textAlign).toBe('right');
-    expect(resolve({ textAlign: 'end' }).textAlign).toBe('right');
-    expect(resolve({ textAlign: 'start' }).textAlign).toBe('left');
-    expect(resolve({}).textAlign).toBe('left');
+    // start and end are kept as they are: which edge they mean depends
+    // on the paragraph's direction, and placeLines decides it.
+    expect(resolve({ textAlign: 'end' }).textAlign).toBe('end');
+    expect(resolve({ textAlign: 'start' }).textAlign).toBe('start');
+    expect(resolve({}).textAlign).toBe('start');
   });
 
   it('normalizes vertical alignment', () => {
@@ -169,9 +171,10 @@ describe('alignment normalization helpers', () => {
     expect(normalizeTextAlign('left')).toBe('left');
     expect(normalizeTextAlign('center')).toBe('center');
     expect(normalizeTextAlign('right')).toBe('right');
-    expect(normalizeTextAlign('end')).toBe('right');
-    expect(normalizeTextAlign('start')).toBe('left');
-    expect(normalizeTextAlign(undefined)).toBe('left');
+    expect(normalizeTextAlign('end')).toBe('end');
+    expect(normalizeTextAlign('start')).toBe('start');
+    expect(normalizeTextAlign(undefined)).toBe('start');
+    expect(normalizeTextAlign('bogus')).toBe('start');
   });
 
   it('normalizes vertical alignment', () => {

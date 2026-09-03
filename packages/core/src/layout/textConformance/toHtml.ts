@@ -24,6 +24,7 @@ import { conformanceFonts, cssFamily } from './fonts.ts';
  *   maxLines     → -webkit-line-clamp
  *   overflow     → text-overflow: ellipsis
  *   align        → text-align
+ *   direction    → dir="rtl", so `start` alignment and neutral characters resolve as Chrome resolves them
  *
  * Lines are read back through `Range.getClientRects()` one grapheme
  * cluster at a time and grouped by their top edge. A line's `start` is
@@ -184,7 +185,9 @@ function caseToHtml(textCase: TextCase): string {
 }
 
 function langAttribute(textCase: TextCase): string {
-  return textCase.lang !== undefined ? ` lang="${escapeAttribute(textCase.lang)}"` : '';
+  const lang = textCase.lang !== undefined ? ` lang="${escapeAttribute(textCase.lang)}"` : '';
+  const dir = textCase.direction === 'rtl' ? ' dir="rtl"' : '';
+  return lang + dir;
 }
 
 function paragraphStyles(textCase: TextCase): string[] {

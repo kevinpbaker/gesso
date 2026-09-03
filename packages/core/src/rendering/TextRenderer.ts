@@ -73,14 +73,14 @@ export function textMeasureRequest(
  */
 export function placeLines(
   box: LayoutBox,
-  state: Pick<PaintState, 'textAlign' | 'verticalAlign'>,
+  state: Pick<PaintState, 'textAlign' | 'verticalAlign' | 'rtl'>,
   paragraph: ParagraphLayout
 ): TextLinePlacement[] {
   const offsetY = verticalOffset(state.verticalAlign, box.height, paragraph.height);
   const placements: TextLinePlacement[] = [];
   for (let i = 0; i < paragraph.lines.length; i++) {
     const line = paragraph.lines[i];
-    const x = horizontalOffset(state.textAlign, box.x, box.width, line.width);
+    const x = horizontalOffset(state.textAlign, state.rtl, box.x, box.width, line.width);
     const y = box.y + offsetY + i * paragraph.lineHeight;
     placements.push({
       text: line.text,
@@ -123,7 +123,8 @@ export function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState
     layoutTextLines(box, state, measurer),
     buildFontString(state),
     colorToCss(state.textColor),
-    state.letterSpacing
+    state.letterSpacing,
+    state.rtl
   );
 }
 
@@ -133,20 +134,26 @@ export function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState
  * `letterSpacing` is passed separately because it is not part of the
  * font shorthand, and it is set on every call rather than only when
  * non-zero because the context keeps it: a label with tracking would
- * otherwise leave every run drawn after it spaced out too.
+ * otherwise leave every run drawn after it spaced out too. `rtl` is
+ * the paragraph's base direction, set the same way and for the same
+ * reason: the canvas keeps it, and it decides which side a neutral
+ * character at the end of a line lands on. Lines are placed by
+ * `placeLines` already, so the canvas's own alignment stays `left`.
  */
 export function drawTextLines(
   ctx: Canvas2DContext,
   placements: readonly TextLinePlacement[],
   font: string,
   color: string,
-  letterSpacing = 0
+  letterSpacing = 0,
+  rtl = false
 ): void {
   if (placements.length === 0) {
     return;
   }
   ctx.font = font;
   ctx.letterSpacing = `${letterSpacing}px`;
+  ctx.direction = rtl ? 'rtl' : 'ltr';
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -157,14 +164,19 @@ export function drawTextLines(
   }
 }
 
-function horizontalOffset(align: string, x: number, width: number, lineWidth: number): number {
+/** `start` and `end` follow the paragraph's direction; `left` and `right` do not. */
+function horizontalOffset(align: string, rtl: boolean, x: number, width: number, lineWidth: number): number {
   switch (align) {
     case 'center':
       return x + (width - lineWidth) / 2;
     case 'right':
       return x + width - lineWidth;
-    default:
+    case 'left':
       return x;
+    case 'end':
+      return rtl ? x : x + width - lineWidth;
+    default:
+      return rtl ? x + width - lineWidth : x;
   }
 }
 

@@ -45,6 +45,8 @@ export interface TextCase {
   readonly overflow?: TextOverflow;
   /** Default 'left'. */
   readonly align?: TextAlignment;
+  /** The paragraph's base direction. Default 'ltr'. */
+  readonly direction?: 'ltr' | 'rtl';
   /**
    * How wide the paragraph's box is. 'fit', the default, shrink-wraps
    * the paragraph as a flex item does: fit-content, floored at
@@ -285,6 +287,104 @@ export const textCases: readonly TextCase[] = [
     maxWidth: 100,
     maxLines: 2
   },
+
+  // -------------------------------------------------------------------------
+  // Right to left: Arabic and Hebrew. Breaking is at spaces, as in Latin;
+  // what changes is where a line sits, which way neutral characters
+  // resolve, and where a run of digits or Latin goes on the line.
+  // -------------------------------------------------------------------------
+  {
+    name: 'rtl/ar-wraps-and-aligns-right',
+    text: 'السلام عليكم ورحمة الله وبركاته',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 120
+  },
+  { name: 'rtl/ar-natural-width', text: 'مرحبا بالعالم', font: 'arabic', lang: 'ar', direction: 'rtl' },
+  {
+    name: 'rtl/ar-digits-run-left-to-right',
+    text: 'الطلب رقم 1024 وصل في 3 أيام',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 160
+  },
+  {
+    name: 'rtl/ar-latin-word',
+    text: 'استخدم Gesso للواجهة',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 200
+  },
+  {
+    name: 'rtl/ar-punctuation-at-line-end',
+    text: 'مرحبا، كيف حالك؟ أنا بخير!',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 110
+  },
+  {
+    name: 'rtl/ar-brackets-mirror',
+    text: '(نص) بين قوسين',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 200
+  },
+  {
+    name: 'rtl/ar-hanging-spaces',
+    text: 'كلمة   كلمة   كلمة',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 60
+  },
+  {
+    name: 'rtl/ar-center',
+    text: 'السلام عليكم ورحمة الله',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 120,
+    align: 'center'
+  },
+  {
+    name: 'rtl/ar-left-explicit',
+    text: 'السلام عليكم ورحمة الله',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 120,
+    align: 'left'
+  },
+  {
+    name: 'rtl/ar-in-ltr-paragraph',
+    text: 'السلام عليكم ورحمة الله وبركاته',
+    font: 'arabic',
+    lang: 'ar',
+    maxWidth: 120
+  },
+  {
+    name: 'rtl/ar-fixed-box',
+    text: 'مرحبا',
+    font: 'arabic',
+    lang: 'ar',
+    direction: 'rtl',
+    maxWidth: 200,
+    box: 'fixed'
+  },
+  {
+    name: 'rtl/he-wraps-and-aligns-right',
+    text: 'שלום עולם, זהו משפט בעברית שנשבר לשורות',
+    font: 'hebrew',
+    lang: 'he',
+    direction: 'rtl',
+    maxWidth: 120
+  },
+  { name: 'rtl/he-digits', text: 'הזמנה מספר 42 הגיעה', font: 'hebrew', lang: 'he', direction: 'rtl', maxWidth: 200 },
 
   // -------------------------------------------------------------------------
   // Breaking between characters

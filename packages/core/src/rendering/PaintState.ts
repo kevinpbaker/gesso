@@ -23,7 +23,7 @@ import { parseTransform } from '../properties/UiTransform';
 export type { UiImage } from '../properties/UiImage';
 export type { UiVideoSurface } from '../properties/UiVideo';
 
-export type TextAlign = 'left' | 'center' | 'right';
+export type TextAlign = 'start' | 'end' | 'left' | 'center' | 'right';
 export type VerticalAlign = 'top' | 'middle' | 'bottom';
 export type ObjectFit = 'fill' | 'cover' | 'contain' | 'none';
 
@@ -111,13 +111,15 @@ export const DEFAULT_TEXT_COLOR = UiBasicColors.black;
 export { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 
 export function normalizeTextAlign(value: unknown): TextAlign {
-  if (value === 'center') {
-    return 'center';
+  switch (value) {
+    case 'center':
+    case 'right':
+    case 'left':
+    case 'end':
+      return value;
+    default:
+      return 'start';
   }
-  if (value === 'right' || value === 'end') {
-    return 'right';
-  }
-  return 'left';
 }
 
 export function normalizeTextWrap(value: unknown): TextWrap {
@@ -313,7 +315,7 @@ export function createPaintState(): PaintState {
     lineHeight: 0,
     letterSpacing: 0,
     textColor: DEFAULT_TEXT_COLOR,
-    textAlign: 'left',
+    textAlign: 'start',
     verticalAlign: 'top',
     textWrap: 'word',
     maxLines: undefined,
