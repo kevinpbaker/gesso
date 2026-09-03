@@ -145,7 +145,7 @@ The text style properties are the inherited ones. Set them on a container and ev
 | `fontWeight` | `normal` | yes | Paint, Layout | A number, a numeric string, or a CSS keyword. |
 | `lineHeight` | `16.8` | yes | Paint, Layout | Line box height in pixels. The default is 1.2 times the default size. |
 | `letterSpacing` | `0` | yes | Paint, Layout | Extra space between characters, in pixels. |
-| `textAlign` | `left` | yes | Paint | How lines sit within the text box. |
+| `textAlign` | `start` | yes | Paint | How lines sit within the text box. |
 | `textDirection` | `ltr` | yes | Paint | Base direction for bidirectional text. |
 | `verticalAlign` | `unset` | no | Paint | How a text run sits against the baseline of its line. |
 | `textWrap` | `unset` | no | Paint, Layout | How text breaks into lines: `word`, `char`, or `none`. |

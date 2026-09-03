@@ -397,7 +397,9 @@ pnpm format            # oxfmt
 pnpm api:check         # each package's public surface against its committed report
 pnpm api:update        # rewrite those reports after an intended change
 pnpm fixtures:layout   # re-render layout conformance cases in headless Chrome → expected.json
-pnpm fixtures:text     # re-render text conformance paragraphs in a real font → expected.json
+pnpm fixtures:text     # re-render text conformance paragraphs in real fonts → expected.json
+pnpm fixtures:text:check # a fresh Chrome against the committed text fixtures, writing nothing (CI)
+pnpm check             # format, lint, types, tests, build, API reports and the docs gates, in CI's order
 pnpm parity:webgpu     # Canvas2D vs WebGPU pixel diff in headless Chrome (needs a WebGPU adapter)
 pnpm screenshots       # each covered route against its committed baseline
 pnpm check:a11y        # Chrome's computed accessibility tree for the example routes
