@@ -18,6 +18,7 @@ import {
   type UiScrollability
 } from '@gesso/core';
 import { AudioSink } from '../AudioSink';
+import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
@@ -205,6 +206,17 @@ export class WorkerApp {
    *
    * Returns a dispose function.
    */
+  /**
+   * A handle on the application-logic worker, for something on this
+   * thread that wants its channels too: `createChannelRegistry` takes
+   * it as a registration's `worker`. Undefined before `mount`, and
+   * when no application-logic worker was given. The shell itself never
+   * uses this; its own view of the application is nothing at all.
+   */
+  get appLogic(): WorkerHandle | undefined {
+    return this.appLogicWorker === undefined ? undefined : portHandle(this.appLogicWorker);
+  }
+
   mount(host: HTMLElement | string): () => void {
     const element = resolveHost(host);
     this.host = element;

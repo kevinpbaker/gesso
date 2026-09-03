@@ -92,6 +92,7 @@ import { FocusService } from './FocusService';
 import { MediaService, type MediaOptions } from './MediaService';
 import { FontService, type FontFamilyDeclaration } from './FontService';
 import { AnimationService } from './AnimationService';
+import { FrameService } from './FrameService';
 import { InputLatencyTracker } from './InputLatency';
 import { SmoothScroller } from './SmoothScroller';
 import { ChannelRegistry } from '../channel/ChannelRegistry';
@@ -530,6 +531,11 @@ export class GessoRuntime {
     // of a component's reach without a store in front of it.
     if (!this.services.has(FocusService)) {
       this.services.register(FocusService);
+    }
+    // And the frames themselves, for a screen that shows its own
+    // frame gap or input latency.
+    if (!this.services.has(FrameService)) {
+      this.services.register(FrameService);
     }
     // And the image resolver and icon rasteriser, whose caches must be
     // per runtime: two runtimes in one worker must not share a bitmap
@@ -1995,7 +2001,7 @@ export class GessoRuntime {
     // The same is true of the scroll chain — a container that reached
     // its end, or content that grew under a still cursor.
     this.sendScrollability();
-    this.frameListener?.({
+    const metrics: FrameMetrics = {
       frame: frame.id,
       durationMs: elapsed,
       nodes: frame.size,
@@ -2006,7 +2012,10 @@ export class GessoRuntime {
       phases: this.phaseTimings,
       renderer: this.rendererState,
       gpu: this.gpuTimings
-    });
+    };
+    this.frameListener?.(metrics);
+    // And to any component on this thread that asked to hear frames.
+    this.services.get(FrameService).publish(metrics);
   }
 
   /**

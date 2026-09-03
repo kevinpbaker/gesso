@@ -71,6 +71,7 @@ export {
 } from './app/NodeReport';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
 export { ShellService, type ShellRequest } from './app/ShellService';
+export { FrameService } from './app/FrameService';
 export {
   AudioService,
   type AudioAction,
