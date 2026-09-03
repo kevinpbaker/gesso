@@ -1,8 +1,8 @@
 import type { TextMeasureRequest } from '../TextMeasurer.ts';
 import type { TextCase } from './cases.ts';
-import { textCaseFontSize, textCaseLineHeight } from './cases.ts';
+import { textCaseFontSize, textCaseFonts, textCaseLineHeight } from './cases.ts';
 import type { ConformanceFontId } from './fonts.ts';
-import { conformanceFonts, cssFamily } from './fonts.ts';
+import { conformanceFonts, cssFamilyList } from './fonts.ts';
 
 /**
  * Translates text cases into one HTML document that headless Chrome can
@@ -101,7 +101,7 @@ export function requestFor(textCase: TextCase): TextMeasureRequest {
   return {
     text: textCase.text,
     fontSize: textCaseFontSize(textCase),
-    fontFamily: cssFamily(textCase.font ?? 'sans'),
+    fontFamily: cssFamilyList(textCaseFonts(textCase)),
     lineHeight: textCaseLineHeight(textCase),
     letterSpacing: textCase.letterSpacing,
     maxWidth: textCase.maxWidth,
@@ -172,7 +172,7 @@ function caseToHtml(textCase: TextCase): string {
   const fontSize = textCaseFontSize(textCase);
   const lineHeight = textCaseLineHeight(textCase);
   // Single quotes: the shorthand sits inside a double-quoted style attribute.
-  const font = `font:${px(fontSize)}/${px(lineHeight)} ${cssFamily(textCase.font ?? 'sans').replace(/"/g, "'")}`;
+  const font = `font:${px(fontSize)}/${px(lineHeight)} ${cssFamilyList(textCaseFonts(textCase)).replace(/"/g, "'")}`;
   const rowWidth = textCase.maxWidth !== undefined ? px(textCase.maxWidth) : 'max-content';
   return (
     `<div class="case" data-case="${escapeAttribute(textCase.name)}">` +

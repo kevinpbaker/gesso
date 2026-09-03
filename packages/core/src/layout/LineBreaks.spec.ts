@@ -84,6 +84,14 @@ describe('segmentParagraph', () => {
     expect(segments('क्षत्रिय', 'char')).toEqual(['क्ष', 'त्रि', 'य']);
   });
 
+  it('breaks on either side of an emoji and keeps a sequence whole', () => {
+    expect(segments('wow😀amazing')).toEqual(['wow', '😀', 'amazing']);
+    expect(segments('😀😃')).toEqual(['😀', '😃']);
+    expect(segments('👨\u200d👩\u200d👧👍🏽🇯🇵')).toEqual(['👨\u200d👩\u200d👧', '👍🏽', '🇯🇵']);
+    expect(segments('©2024 ™')).toEqual(['©2024', '™']);
+    expect(segments('🇯🇵🇫🇷')).toEqual(['🇯🇵', '🇫🇷']);
+  });
+
   it("treats 'char' as a break between every cluster and 'none' as no break at all", () => {
     expect(segments('ab cd', 'char')).toEqual(['a', 'b', 'c', 'd']);
     expect(segments('ab cd', 'none')).toEqual(['ab cd']);

@@ -37,6 +37,9 @@ import type { TextWrap } from './TextMeasurer';
  *     Lao, Khmer, Myanmar; class SA), where the words are the ones
  *     `Intl.Segmenter` finds, which is the browser's own dictionary and
  *     therefore Chrome's (LB1 resolves SA by dictionary);
+ *   - before or after an emoji (classes EB and ID), whose sequences
+ *     (skin tones, flags, keycaps, families joined with U+200D) are one
+ *     grapheme cluster and so one unit;
  *   - and never inside a grapheme cluster (LB9), so a base and its
  *     combining marks, or a surrogate pair, are one unit.
  *
@@ -300,9 +303,24 @@ function classOf(code: number): BreakClass {
     case 0xff65: // ･
       return 'NS';
     default:
-      return isIdeographic(code) ? 'ID' : 'AL';
+      return isIdeographic(code) || isEmoji(code) ? 'ID' : 'AL';
   }
 }
+
+/**
+ * Emoji and the pictographic symbols that render as emoji, from the
+ * miscellaneous symbols block upward. The `Extended_Pictographic`
+ * property alone would also claim © ® and ™, which UAX #14 keeps as
+ * letters, so the block floor excludes them.
+ */
+function isEmoji(code: number): boolean {
+  if (code >= 0x1f1e6 && code <= 0x1f1ff) {
+    return true; // regional indicators: a flag is a pair, and the cluster keeps the pair
+  }
+  return code >= 0x2600 && EXTENDED_PICTOGRAPHIC.test(String.fromCodePoint(code));
+}
+
+const EXTENDED_PICTOGRAPHIC = /^\p{Extended_Pictographic}$/u;
 
 /**
  * Class ID, as a line breaker sees it: Han, kana (with CJ folded in),

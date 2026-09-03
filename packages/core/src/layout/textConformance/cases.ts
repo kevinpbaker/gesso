@@ -28,8 +28,8 @@ export interface TextCase {
   /** Unique, slash-grouped: `wrap/greedy-at-spaces`. */
   readonly name: string;
   readonly text: string;
-  /** Default 'sans'. */
-  readonly font?: ConformanceFontId;
+  /** The face, or the faces tried in order. Default 'sans'. */
+  readonly font?: ConformanceFontId | readonly ConformanceFontId[];
   /** A BCP 47 tag for Chrome's `lang`; Gesso has no locale, so it only documents the case. */
   readonly lang?: string;
   /** Default `DEFAULT_TEXT_CASE_FONT_SIZE`. */
@@ -72,6 +72,12 @@ export interface TextCase {
 export const DEFAULT_TEXT_CASE_FONT_SIZE = 16;
 /** `line-height: normal` in Gesso's terms; see `DEFAULT_LINE_HEIGHT_FACTOR`. */
 export const TEXT_CASE_LINE_HEIGHT_FACTOR = 1.2;
+
+/** The case's faces as a list, first tried first. */
+export function textCaseFonts(textCase: TextCase): readonly ConformanceFontId[] {
+  const font = textCase.font ?? 'sans';
+  return typeof font === 'string' ? [font] : font;
+}
 
 export function textCaseFontSize(textCase: TextCase): number {
   return textCase.fontSize ?? DEFAULT_TEXT_CASE_FONT_SIZE;
@@ -428,6 +434,19 @@ export const textCases: readonly TextCase[] = [
   { name: 'thai/spaces-and-digits', text: 'วันนี้อากาศดี ราคา 250 บาท', font: 'thai', lang: 'th', maxWidth: 140 },
   { name: 'thai/natural-width', text: 'สวัสดีชาวโลก', font: 'thai', lang: 'th' },
   { name: 'thai/mixed-with-latin', text: 'ใช้ Gesso สร้างหน้าจอได้เร็ว', font: 'thai', lang: 'th', maxWidth: 110 },
+
+  // -------------------------------------------------------------------------
+  // Emoji: colour glyphs from a second face, sequences that must stay
+  // whole, and a break allowed on either side of one.
+  // -------------------------------------------------------------------------
+  { name: 'emoji/run-breaks-between-emoji', text: '😀😃😄😁😆😅', font: ['sans', 'emoji'], maxWidth: 70 },
+  { name: 'emoji/mixed-with-words', text: 'Hello 😀 world 🌍 ok', font: ['sans', 'emoji'], maxWidth: 120 },
+  { name: 'emoji/sequences-stay-whole', text: '👨‍👩‍👧‍👦 🇯🇵 1️⃣ 👍🏽 ❤️ 🏳️‍🌈', font: ['sans', 'emoji'] },
+  { name: 'emoji/zwj-sequences-narrow', text: '👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦', font: ['sans', 'emoji'], maxWidth: 50 },
+  { name: 'emoji/breaks-beside-a-word', text: 'wow😀amazing😀yes', font: ['sans', 'emoji'], maxWidth: 120 },
+  { name: 'emoji/flags-pair-up', text: '🇯🇵🇫🇷🇩🇪🇮🇹🇪🇸', font: ['sans', 'emoji'], maxWidth: 50 },
+  { name: 'emoji/char-wrap-keeps-sequences', text: '👍🏽👍🏽👍🏽👍🏽', font: ['sans', 'emoji'], maxWidth: 45, wrap: 'char' },
+  { name: 'emoji/symbols-as-emoji', text: 'sun ☀️ heart ❤️ check ✅ done', font: ['sans', 'emoji'], maxWidth: 90 },
 
   // -------------------------------------------------------------------------
   // Breaking between characters

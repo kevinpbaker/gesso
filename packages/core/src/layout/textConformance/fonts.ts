@@ -15,7 +15,7 @@
  * file did not load, `document.fonts.check` says so and the generator
  * refuses to write fixtures.
  */
-export type ConformanceFontId = 'sans' | 'cjk' | 'arabic' | 'hebrew' | 'devanagari' | 'thai';
+export type ConformanceFontId = 'sans' | 'cjk' | 'arabic' | 'hebrew' | 'devanagari' | 'thai' | 'emoji';
 
 export interface ConformanceFont {
   readonly id: ConformanceFontId;
@@ -105,6 +105,19 @@ export const conformanceFonts: readonly ConformanceFont[] = [
       '/usr/share/fonts/google-noto/NotoSansThai-Regular.ttf',
       '~/Library/Fonts/NotoSansThai-Regular.ttf'
     ]
+  },
+  {
+    id: 'emoji',
+    family: 'Gesso Conformance Emoji',
+    // A colour (CBDT) font, ten megabytes; served by URL like the rest.
+    face: 'Noto Color Emoji',
+    env: 'GESSO_FONT_EMOJI',
+    candidates: [
+      '/usr/share/fonts/noto/NotoColorEmoji.ttf',
+      '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf',
+      '/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf',
+      '~/Library/Fonts/NotoColorEmoji.ttf'
+    ]
   }
 ];
 
@@ -119,4 +132,9 @@ export function conformanceFont(id: ConformanceFontId): ConformanceFont {
 /** The family as it appears in a CSS `font` shorthand: quoted, because the names have spaces. */
 export function cssFamily(id: ConformanceFontId): string {
   return `"${conformanceFont(id).family}"`;
+}
+
+/** A font-family list for a case's faces, first face first. */
+export function cssFamilyList(ids: readonly ConformanceFontId[]): string {
+  return ids.map(cssFamily).join(', ');
 }
