@@ -1,6 +1,6 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
-import type { UiRole, UiSemanticState, UiSemanticStates } from '../properties/UiSemantics';
+import type { UiRole, UiSemanticState, UiSemanticStates, UiLiveRegion } from '../properties/UiSemantics';
 import { normalizeStates } from '../properties/UiSemantics';
 
 /**
@@ -26,6 +26,8 @@ export interface UiSemanticsRecord {
   /** The accessible name: an explicit `label`, else the node's text. */
   readonly label?: string;
   readonly description?: string;
+  /** Announced on change without focus; see `UiProperties.live`. */
+  readonly live?: UiLiveRegion;
   /** Sorted and de-duplicated, so declaration order does not diff. */
   readonly states?: readonly UiSemanticState[];
   readonly disabled?: true;
@@ -167,6 +169,7 @@ function describe(
     role,
     label: name,
     description: node.properties.get('description') as string | undefined,
+    live: node.properties.get('live') as UiLiveRegion | undefined,
     states: states === undefined || states.length === 0 ? undefined : normalizeStates(states),
     disabled: disabled ? true : undefined,
     valueNow: node.properties.get('valueNow') as number | undefined,

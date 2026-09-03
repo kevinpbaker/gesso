@@ -212,6 +212,24 @@ describe('SemanticsMirror', () => {
     expect(element.getAttribute('role')).toBeNull();
   });
 
+  it('writes a status as live text, so a screen reader announces the change', () => {
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [{ op: 'add', node: record('n1', { role: 'status', label: 'Passcode, 0 of 6 digits entered' }) }]
+    });
+
+    const element = elementFor('n1');
+    expect(element.getAttribute('role')).toBe('status');
+    // Named by the label, as every control is, and carrying the same
+    // words as content: a live region announces what its content
+    // becomes, and an aria-label changing on its own would be silent.
+    expect(element.getAttribute('aria-label')).toBe('Passcode, 0 of 6 digits entered');
+    expect(element.textContent).toBe('Passcode, 0 of 6 digits entered');
+
+    apply({ patches: [{ op: 'add', node: record('n2', { role: 'group', label: 'Feed', live: 'polite' }) }] });
+    expect(elementFor('n2').getAttribute('aria-live')).toBe('polite');
+  });
+
   it('turns states, values and set position into ARIA attributes', () => {
     const { elementFor, apply } = setup();
     apply({

@@ -138,6 +138,7 @@ export type SemanticsProps = PropsOf<
   | 'role'
   | 'label'
   | 'description'
+  | 'live'
   | 'states'
   | 'valueNow'
   | 'valueMin'

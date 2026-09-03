@@ -72,6 +72,9 @@ export type UiRole =
   | 'search'
   | 'contentinfo';
 
+/** How urgently a live region's changes are announced. */
+export type UiLiveRegion = 'polite' | 'assertive';
+
 export const UI_ROLES: readonly UiRole[] = [
   'button',
   'checkbox',

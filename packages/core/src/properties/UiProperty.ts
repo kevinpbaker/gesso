@@ -47,6 +47,7 @@ import { validateSubgrid } from './UiPropertyValues';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 import type { UiRole, UiSemanticStates } from './UiSemantics';
 import { statesEqual, validateRole, validateStates } from './UiSemantics';
+import type { UiLiveRegion } from './UiSemantics';
 
 const L = DirtyFlags.Layout;
 const P = DirtyFlags.Paint;
@@ -886,6 +887,18 @@ export const UiProperties = {
   /** Supplementary text read after the name: a hint, an error. */
   description: defineProperty<string | undefined>({
     name: 'description',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * A live region: a screen reader announces this node's text when it
+   * changes, without focus moving there. `polite` waits for a pause,
+   * `assertive` interrupts. The roles `status` and `alert` imply one.
+   */
+  live: defineProperty<UiLiveRegion | undefined>({
+    name: 'live',
     defaultValue: undefined,
     inherited: false,
     affects: S

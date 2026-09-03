@@ -1164,6 +1164,7 @@ declare class EditableTextModel {
   private touch;
 }
 type UiRole = 'button' | 'checkbox' | 'switch' | 'radio' | 'radiogroup' | 'slider' | 'spinbutton' | 'textbox' | 'searchbox' | 'combobox' | 'listbox' | 'option' | 'menu' | 'menubar' | 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' | 'tab' | 'tablist' | 'tabpanel' | 'link' | 'progressbar' | 'list' | 'listitem' | 'tree' | 'treeitem' | 'grid' | 'row' | 'columnheader' | 'rowheader' | 'cell' | 'group' | 'separator' | 'toolbar' | 'heading' | 'image' | 'paragraph' | 'dialog' | 'alertdialog' | 'tooltip' | 'alert' | 'status' | 'banner' | 'navigation' | 'main' | 'region' | 'form' | 'search' | 'contentinfo';
+type UiLiveRegion = 'polite' | 'assertive';
 declare const UI_ROLES: readonly UiRole[];
 declare function isUiRole(value: unknown): value is UiRole;
 type UiSemanticState = 'checked' | 'mixed' | 'expanded' | 'collapsed' | 'selected' | 'pressed' | 'busy' | 'invalid' | 'required' | 'readonly' | 'modal';
@@ -1265,6 +1266,7 @@ declare const UiProperties: {
   readonly role: UiPropertyDefinition<UiRole | undefined>;
   readonly label: UiPropertyDefinition<string | undefined>;
   readonly description: UiPropertyDefinition<string | undefined>;
+  readonly live: UiPropertyDefinition<UiLiveRegion | undefined>;
   readonly states: UiPropertyDefinition<UiSemanticStates | undefined>;
   readonly valueNow: UiPropertyDefinition<number | undefined>;
   readonly valueMin: UiPropertyDefinition<number | undefined>;
@@ -1331,7 +1333,7 @@ type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
-type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
+type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
@@ -3511,6 +3513,7 @@ interface UiSemanticsRecord {
   readonly role?: UiRole;
   readonly label?: string;
   readonly description?: string;
+  readonly live?: UiLiveRegion;
   readonly states?: readonly UiSemanticState[];
   readonly disabled?: true;
   readonly valueNow?: number;
@@ -3695,7 +3698,6 @@ export {
   EnvironmentNotifier,
   EnvironmentProps,
   fade,
-  Fc,
   findEnvironmentKey,
   FindHost,
   FindMatch,
@@ -3742,6 +3744,7 @@ export {
   HitTestLayoutReader,
   HitTestResult,
   hoverable,
+  Ic,
   IconCanvas,
   IconContext,
   iconKey,
@@ -4084,6 +4087,7 @@ export {
   UiLength,
   UiLinearGradient,
   UiListenerErrorReporter,
+  UiLiveRegion,
   UiManualFrameClock,
   UiModifier,
   UiModifierEnvironment,
@@ -4741,6 +4745,7 @@ import {
   UiLength,
   UiLinearGradient,
   UiListenerErrorReporter,
+  UiLiveRegion,
   UiManualFrameClock,
   UiModifier,
   UiModifierEnvironment,
@@ -4862,7 +4867,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DkDTOyH-.js";
+} from "./index-DGWpKApV.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5440,6 +5445,7 @@ export {
   UiKeyboardController,
   UiKeyboardEvent,
   UiLinearGradient,
+  UiLiveRegion,
   UiManualFrameClock,
   UiModifierSet,
   UiMotion,
@@ -5550,7 +5556,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DkDTOyH-.js";
+} from "./index-DGWpKApV.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

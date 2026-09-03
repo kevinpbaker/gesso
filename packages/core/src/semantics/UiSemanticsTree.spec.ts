@@ -46,6 +46,22 @@ describe('buildSemanticsTree', () => {
     expect(records).toEqual([{ id: button.id, parent: null, index: 0, role: 'button', label: 'Save' }]);
   });
 
+  it('carries a live region setting so changing text can be announced', () => {
+    const t = new Tree();
+    const status = t.node(UiNodeType.Row, { role: 'status', label: 'Passcode, 1 of 6 digits entered', live: 'polite' });
+    t.add(t.root, status);
+    expect(t.build()).toEqual([
+      {
+        id: status.id,
+        parent: null,
+        index: 0,
+        role: 'status',
+        label: 'Passcode, 1 of 6 digits entered',
+        live: 'polite'
+      }
+    ]);
+  });
+
   it('sees through the boxes a layout needs', () => {
     const t = new Tree();
     const outer = t.node(UiNodeType.Box);

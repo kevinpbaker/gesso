@@ -60,6 +60,7 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'role',
   'aria-label',
   'aria-description',
+  'aria-live',
   'aria-disabled',
   'aria-valuenow',
   'aria-valuemin',
@@ -85,6 +86,15 @@ const RECORD_ATTRIBUTES: readonly string[] = [
  * all. Everything else is a control, and a control is named.
  */
 const NAMED_BY_CONTENT: ReadonlySet<string> = new Set(['heading', 'paragraph']);
+
+/**
+ * Live regions. Their name comes from an `aria-label` like any control's,
+ * because the platform does not name a status from its content; but a
+ * live region announces its *content* when it changes, and an
+ * `aria-label` changing is silent, so the name is written as the text
+ * as well. Chrome reports both, and reads the text out on change.
+ */
+const LIVE_ROLES: ReadonlySet<string> = new Set(['status', 'alert']);
 
 /**
  * Roles whose value the platform reads out of the element's content
@@ -296,7 +306,11 @@ export class SemanticsMirror {
       // it from there: `aria-valuetext` is for a slider, not a field.
       // Without this a person could hear that a note's body exists and
       // never hear a word of it.
-      element.textContent = VALUE_IN_CONTENT.has(record.role) ? (record.valueText ?? '') : '';
+      element.textContent = VALUE_IN_CONTENT.has(record.role)
+        ? (record.valueText ?? '')
+        : LIVE_ROLES.has(record.role)
+          ? label
+          : '';
     } else {
       // Prose, a heading and a paragraph are named by what they
       // contain — and prose is most of what a screen reader reads, so
@@ -306,6 +320,9 @@ export class SemanticsMirror {
     }
     if (record.description !== undefined) {
       element.setAttribute('aria-description', record.description);
+    }
+    if (record.live !== undefined) {
+      element.setAttribute('aria-live', record.live);
     }
     if (record.disabled === true) {
       element.setAttribute('aria-disabled', 'true');
