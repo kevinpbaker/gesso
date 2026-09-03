@@ -6,6 +6,8 @@ import type {
   TextRunMeasurer,
   TextWrap
 } from './TextMeasurer';
+import { segmentParagraph } from './LineBreaks';
+import type { TextSegment } from './LineBreaks';
 
 export { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 import { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
@@ -21,23 +23,31 @@ type Measure = (segment: string) => number;
  * tests all get their lines from here, so a line can never wrap in
  * one place and not another.
  *
- * Semantics follow CSS where Gesso borrows its names:
+ * Semantics follow CSS where Gesso borrows its names, with
+ * `white-space: pre-wrap` as the model for wrapping text: runs of
+ * spaces are preserved, `\n` always breaks, and spaces at a break hang.
  *
- *   wrap 'word'  — `white-space: normal`: break at spaces; a word wider
- *                  than the available width overflows on its own line.
+ *   wrap 'word'  — break after blanks and at the opportunities
+ *                  `LineBreaks.ts` knows (hyphens, dashes, zero-width
+ *                  spaces); a segment wider than the available width
+ *                  overflows on its own line.
  *   wrap 'char'  — `word-break: break-all`: break between any two
- *                  characters.
+ *                  grapheme clusters.
  *   wrap 'none'  — `white-space: nowrap`: only '\n' breaks.
  *
- * Spaces at a break hang: they neither count toward the line width
- * nor start the next line. Widths are accumulated per segment (word
- * or character) so a paragraph re-laid out at a new width asks the
- * platform only for segments it has not seen; the final width of each
- * line is measured once as a whole.
+ * Blanks at a break hang: they neither count toward the line width nor
+ * start the next line. Blanks at the start of a paragraph are kept, as
+ * pre-wrap keeps them, so an indented line stays indented. Widths are
+ * accumulated per segment so a paragraph re-laid out at a new width
+ * asks the platform only for segments it has not seen; the final width
+ * of each line is measured once as a whole.
  *
  * The paragraph width is CSS fit-content: the available width when
  * wrapping occurred, the natural width when it did not, and never
- * narrower than the widest unbreakable segment.
+ * narrower than the widest segment. When a segment is wider than the
+ * available width the paragraph grows to it, and every line wraps
+ * against that grown width rather than the one asked for, because that
+ * is the box the lines will be painted in.
  *
  * The first baseline sits half the leading below the line top, plus the
  * ascent, with the half-leading floored to a whole pixel. That floor is
@@ -59,10 +69,12 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
   const text = request.text;
   const measure: Measure = segment => (segment.length === 0 ? 0 : runs.measureRunWidth(segment, request));
 
-  const lines: TextLine[] = [];
+  // Split into paragraphs and segment each, so the widest segment is
+  // known before any line is broken: it is the floor of the box, and
+  // the width the lines wrap against.
+  const paragraphs: { start: number; text: string; segments: TextSegment[] }[] = [];
   let maxContentWidth = 0;
   let minContentWidth = 0;
-
   let paragraphStart = 0;
   for (;;) {
     let paragraphEnd = text.indexOf('\n', paragraphStart);
@@ -70,25 +82,36 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
       paragraphEnd = text.length;
     }
     const paragraph = text.slice(paragraphStart, paragraphEnd);
-
+    const segments = segmentParagraph(paragraph, wrap);
+    paragraphs.push({ start: paragraphStart, text: paragraph, segments });
     maxContentWidth = Math.max(maxContentWidth, measure(paragraph));
-    minContentWidth = Math.max(minContentWidth, minContentOf(paragraph, wrap, measure));
-
-    const before = lines.length;
-    if (wrap === 'none' || !isFinite(maxWidth)) {
-      lines.push({ start: paragraphStart, end: paragraphEnd, text: paragraph, width: measure(paragraph) });
-    } else {
-      breakGreedy(paragraph, paragraphStart, maxWidth, measure, wrap === 'char' ? characterEnd : wordEnd, lines);
+    for (const segment of segments) {
+      minContentWidth = Math.max(minContentWidth, measure(paragraph.slice(segment.start, segment.end)));
     }
-    if (lines.length === before) {
-      // A blank or all-space paragraph still occupies a line.
-      lines.push({ start: paragraphStart, end: paragraphStart, text: '', width: 0 });
-    }
-
     if (paragraphEnd >= text.length) {
       break;
     }
     paragraphStart = paragraphEnd + 1;
+  }
+  const available = Math.max(maxWidth, minContentWidth);
+
+  const lines: TextLine[] = [];
+  for (const paragraph of paragraphs) {
+    const before = lines.length;
+    if (wrap === 'none' || !isFinite(available)) {
+      lines.push({
+        start: paragraph.start,
+        end: paragraph.start + paragraph.text.length,
+        text: paragraph.text,
+        width: measure(paragraph.text)
+      });
+    } else {
+      breakGreedy(paragraph.text, paragraph.start, paragraph.segments, available, measure, lines);
+    }
+    if (lines.length === before) {
+      // A blank or all-space paragraph still occupies a line.
+      lines.push({ start: paragraph.start, end: paragraph.start, text: '', width: 0 });
+    }
   }
 
   if (request.maxLines !== undefined && request.maxLines >= 1 && lines.length > request.maxLines) {
@@ -97,8 +120,8 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
       lines[lines.length - 1] = ellipsize(lines[lines.length - 1], maxWidth, measure);
     }
   } else if (request.overflow === 'ellipsis' && isFinite(maxWidth)) {
-    // A line that does not fit — no wrapping, or a word wider than the
-    // box — is ellipsised in place.
+    // A line that does not fit — no wrapping, or a segment wider than
+    // the box — is ellipsised in place.
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].width > maxWidth) {
         lines[i] = ellipsize(lines[i], maxWidth, measure);
@@ -128,74 +151,50 @@ export function proportionalFontMetrics(fontSize: number, ascentFactor = 0.8, de
 // Breaking
 // ---------------------------------------------------------------------------
 
-/** Returns the end of the segment starting at `from` (never a space). */
-type SegmentEnd = (paragraph: string, from: number) => number;
-
-const wordEnd: SegmentEnd = (paragraph, from) => {
-  let end = from;
-  while (end < paragraph.length && !isSpace(paragraph[end])) {
-    end++;
-  }
-  return end;
-};
-
-const characterEnd: SegmentEnd = (paragraph, from) => {
-  const code = paragraph.charCodeAt(from);
-  // Keep surrogate pairs together so an emoji never splits across lines.
-  if (code >= 0xd800 && code <= 0xdbff && from + 1 < paragraph.length) {
-    return from + 2;
-  }
-  return from + 1;
-};
-
 /**
  * Greedy first-fit: append segments while they fit, otherwise start a
  * new line with the segment. The first segment on a line always goes
  * on it, so an oversized segment overflows rather than vanishing.
+ *
+ * Blanks between two segments on one line are counted as spaces (a tab
+ * is one space wide here; the fixture that pins it says so). Blanks
+ * before the first segment of the paragraph are part of its first
+ * line; blanks before the first segment of any later line hang off the
+ * line before, as pre-wrap hangs them.
  */
 function breakGreedy(
   paragraph: string,
   offset: number,
-  maxWidth: number,
+  segments: readonly TextSegment[],
+  available: number,
   measure: Measure,
-  segmentEnd: SegmentEnd,
   out: TextLine[]
 ): void {
-  const length = paragraph.length;
   const spaceWidth = measure(' ');
   let lineStart = -1;
   let lineEnd = -1;
   let lineWidth = 0;
-  let position = 0;
+  let firstLine = true;
 
-  while (position < length) {
-    let segmentStart = position;
-    while (segmentStart < length && isSpace(paragraph[segmentStart])) {
-      segmentStart++;
-    }
-    if (segmentStart >= length) {
-      break;
-    }
-    const end = segmentEnd(paragraph, segmentStart);
-    const segmentWidth = measure(paragraph.slice(segmentStart, end));
-
+  for (const segment of segments) {
+    const segmentWidth = measure(paragraph.slice(segment.start, segment.end));
     if (lineStart < 0) {
-      lineStart = segmentStart;
-      lineEnd = end;
-      lineWidth = segmentWidth;
+      lineStart = firstLine ? 0 : segment.start;
+      lineEnd = segment.end;
+      lineWidth = (segment.start - lineStart) * spaceWidth + segmentWidth;
     } else {
-      const candidate = lineWidth + (segmentStart - lineEnd) * spaceWidth + segmentWidth;
-      if (candidate <= maxWidth) {
-        lineEnd = end;
+      const candidate = lineWidth + (segment.start - lineEnd) * spaceWidth + segmentWidth;
+      if (candidate <= available) {
+        lineEnd = segment.end;
         lineWidth = candidate;
       } else {
         pushLine(paragraph, offset, lineStart, lineEnd, measure, out);
-        lineStart = segmentStart;
-        lineEnd = end;
+        firstLine = false;
+        lineStart = segment.start;
+        lineEnd = segment.end;
         lineWidth = segmentWidth;
       }
     }
-    position = end;
   }
 
   if (lineStart >= 0) {
@@ -213,29 +212,6 @@ function pushLine(
 ): void {
   const text = paragraph.slice(start, end);
   out.push({ start: offset + start, end: offset + end, text, width: measure(text) });
-}
-
-/**
- * The widest unbreakable segment: a word when breaking at spaces, one
- * character when breaking anywhere, the whole paragraph otherwise.
- */
-function minContentOf(paragraph: string, wrap: TextWrap, measure: Measure): number {
-  if (wrap === 'none') {
-    return measure(paragraph);
-  }
-  const segmentEnd = wrap === 'char' ? characterEnd : wordEnd;
-  let widest = 0;
-  let position = 0;
-  while (position < paragraph.length) {
-    if (isSpace(paragraph[position])) {
-      position++;
-      continue;
-    }
-    const end = segmentEnd(paragraph, position);
-    widest = Math.max(widest, measure(paragraph.slice(position, end)));
-    position = end;
-  }
-  return widest;
 }
 
 /**
@@ -264,8 +240,4 @@ function previousCharacterStart(text: string, index: number): number {
     return index - 2;
   }
   return index - 1;
-}
-
-function isSpace(character: string): boolean {
-  return character === ' ' || character === '\t';
 }

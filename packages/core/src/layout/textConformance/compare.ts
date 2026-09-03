@@ -43,12 +43,27 @@ export function layoutWithGesso(textCase: TextCase, recording: GessoRecording): 
     { textAlign: textCase.align ?? 'left', verticalAlign: 'top' },
     paragraph
   );
+  // Chrome reports a line's ink, from its first glyph; a Gesso line that
+  // keeps its leading blanks starts before them. Measure the ink the
+  // same way, with the blanks at the algorithm's own space width.
+  const spaceWidth = recording.widths[' '] ?? 0;
   return {
     width,
     height: paragraph.height,
     baseline: paragraph.firstBaseline,
-    lines: placed.map(line => ({ start: line.start, end: line.end, x: line.x, width: line.width }))
+    lines: placed.map(line => {
+      const leading = leadingBlanks(textCase.text.slice(line.start, line.end)) * spaceWidth;
+      return { start: line.start, end: line.end, x: line.x + leading, width: line.width - leading };
+    })
   };
+}
+
+function leadingBlanks(text: string): number {
+  let count = 0;
+  while (count < text.length && (text[count] === ' ' || text[count] === '\t')) {
+    count++;
+  }
+  return count;
 }
 
 /** Every way the two paragraphs differ, one line each; empty when they agree. */

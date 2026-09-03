@@ -73,11 +73,6 @@ export function textCaseLineHeight(textCase: TextCase): number {
 
 const FOX = 'The quick brown fox jumps over the lazy dog';
 
-const NO_BREAK_AFTER_HYPHEN = 'Breaks after a hyphen between letters (UAX #14 class HY); Gesso breaks at spaces only.';
-const NO_BREAK_AT_DASH = 'Breaks on either side of an em dash (UAX #14 class B2); Gesso breaks at spaces only.';
-const LEADING_SPACES_DROPPED =
-  'Preserves leading spaces on a line, as pre-wrap does; Gesso skips spaces at the start of every line.';
-
 export const textCases: readonly TextCase[] = [
   // -------------------------------------------------------------------------
   // Sizing without wrapping
@@ -106,20 +101,10 @@ export const textCases: readonly TextCase[] = [
   { name: 'wrap/blank-line', text: 'first\n\nthird', maxWidth: 300 },
   { name: 'wrap/one-letter-words', text: 'a b c d e f g h i j k l m n o p', maxWidth: 40 },
 
-  // Break opportunities Chrome takes and Gesso does not, yet.
-  {
-    name: 'wrap/hyphen-is-a-break-opportunity',
-    text: 'over-the-counter medicine',
-    maxWidth: 70,
-    divergence: NO_BREAK_AFTER_HYPHEN
-  },
-  { name: 'wrap/em-dash-is-a-break-opportunity', text: 'fox—jumps over', maxWidth: 50, divergence: NO_BREAK_AT_DASH },
-  {
-    name: 'wrap/zero-width-space-is-a-break-opportunity',
-    text: 'alpha\u200bbeta\u200bgamma',
-    maxWidth: 50,
-    divergence: 'Breaks at U+200B ZERO WIDTH SPACE; Gesso treats it as part of the word.'
-  },
+  // Break opportunities inside words (LineBreaks.ts).
+  { name: 'wrap/hyphen-is-a-break-opportunity', text: 'over-the-counter medicine', maxWidth: 70 },
+  { name: 'wrap/em-dash-is-a-break-opportunity', text: 'fox\u2014jumps over', maxWidth: 50 },
+  { name: 'wrap/zero-width-space-is-a-break-opportunity', text: 'alpha\u200bbeta\u200bgamma', maxWidth: 50 },
   {
     name: 'wrap/soft-hyphen',
     text: 'super\u00adcalifragilistic',
@@ -131,20 +116,20 @@ export const textCases: readonly TextCase[] = [
     text: 'path/to/some/deeply/nested/file.txt',
     maxWidth: 80
   },
+  { name: 'wrap/en-dash-is-a-break-opportunity', text: 'pages 10\u201315 and 20\u201325 follow', maxWidth: 60 },
+  { name: 'wrap/hyphen-before-digit-does-not-break', text: 'from 10-15 degrees to -5 tonight', maxWidth: 52 },
+  { name: 'wrap/word-initial-hyphen-still-breaks', text: 'use -verbose -quiet -all here', maxWidth: 52 },
+  { name: 'wrap/hyphen-before-closing-punctuation', text: 'one (re-) use it now', maxWidth: 40 },
+  { name: 'wrap/em-dash-between-spaces', text: 'fox \u2014 jumps \u2014 over', maxWidth: 40 },
+  { name: 'wrap/em-dash-pair-stays-together', text: 'wait\u2014\u2014what comes next', maxWidth: 50 },
+  { name: 'wrap/non-breaking-hyphen', text: 'non\u2011breaking\u2011hyphen words', maxWidth: 70 },
+  { name: 'wrap/hyphenated-chain', text: 'state-of-the-art up-to-date know-how', maxWidth: 45 },
+  { name: 'wrap/leading-spaces-centered', text: '   led', maxWidth: 200, align: 'center' },
 
-  // Whitespace Gesso handles differently from pre-wrap.
-  {
-    name: 'wrap/leading-spaces-first-line',
-    text: '  two leading spaces',
-    maxWidth: 300,
-    divergence: LEADING_SPACES_DROPPED
-  },
-  {
-    name: 'wrap/leading-spaces-after-newline',
-    text: 'first\n   three after break',
-    maxWidth: 300,
-    divergence: LEADING_SPACES_DROPPED
-  },
+  // Whitespace: pre-wrap keeps a paragraph's leading blanks.
+  { name: 'wrap/leading-spaces-first-line', text: '  two leading spaces', maxWidth: 300 },
+  { name: 'wrap/leading-spaces-after-newline', text: 'first\n   three after break', maxWidth: 300 },
+  { name: 'wrap/leading-spaces-then-wrap', text: `  ${FOX}`, maxWidth: 120 },
   {
     name: 'wrap/tab-advances-to-tab-stop',
     text: 'a\tb\tc',
@@ -155,7 +140,8 @@ export const textCases: readonly TextCase[] = [
     name: 'wrap/trailing-newline',
     text: 'first\n',
     maxWidth: 300,
-    divergence: 'A segment break at the end of the text creates no line box in CSS; Gesso adds an empty line.'
+    divergence:
+      'A segment break at the end of the text creates no line box in CSS; Gesso keeps the empty line so a caret has somewhere to go after Enter. Intended.'
   },
   {
     name: 'wrap/empty-text',
