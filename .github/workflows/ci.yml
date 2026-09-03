@@ -5,10 +5,15 @@
 # budgets, renderer parity — was a command someone remembered to type.
 #
 # The jobs are split by what they need. `checks` needs nothing but Node.
-# `install` and `parity` need a browser, and the runner images ship
-# Google Chrome. `screenshots` needs a browser *and* baselines captured
-# in the same environment, which is why it is the one job here that
-# cannot yet be authoritative; see decisions/0033-packaging.md.
+# `install`, `scaffold`, `parity` and `accessibility` need a browser,
+# and the runner images ship Google Chrome. `text` needs a browser and
+# the seven Noto faces the text fixtures were rendered in, which apt
+# provides. `screenshots` needs a browser *and* baselines captured in
+# the same environment, which is why it is the one job here that cannot
+# yet be authoritative; see decisions/0033-packaging.md.
+#
+# `pnpm check` runs the `checks` job's steps locally in the same order;
+# decisions/0058-release-gate.md is the list of what each gate proves.
 
 name: CI
 
@@ -55,6 +60,69 @@ jobs:
         run: pnpm build
       - name: Public API report
         run: pnpm api:check
+
+      # The docs site: every live example has a worker and every snippet
+      # region exists, the generated reference page matches the source,
+      # the site's own TypeScript checks, and VitePress builds it.
+      - name: Docs gate
+        run: pnpm docs:check
+      - name: Docs reference page matches the source
+        run: pnpm docs:reference:check
+      - name: Docs types
+        run: pnpm typecheck:docs
+      - name: Docs build
+        run: pnpm docs:build
+
+  text:
+    name: text conformance against a fresh Chrome
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The faces the fixtures were rendered in, at the paths
+      # packages/core/src/layout/textConformance/fonts.ts looks for on
+      # Debian and Ubuntu. A different release of a face can move a
+      # glyph's advance; if that happens the check names the case and
+      # the fix is a regeneration on a machine with the same faces.
+      - name: Noto faces
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
+
+      # Renders every paragraph the way `pnpm fixtures:text` does and
+      # fails if Chrome's lines, box or baseline for any case have moved
+      # from the committed expectations by more than the case's
+      # tolerance. The replay half of the harness runs in `checks` as a
+      # vitest spec; this is the half that needs a browser.
+      - name: Text fixtures still match Chrome
+        run: pnpm fixtures:text:check
+        env:
+          CHROME_BIN: google-chrome
+
+  scaffold:
+    name: create-gesso-app scaffolds a working app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Runs the CLI into a temporary directory, installs the result with
+      # npm, typechecks and builds it, then drives its dev server in
+      # Chrome until the counter counts. What it checks is the template
+      # and the CLI, not a committed example.
+      - name: Scaffold check
+        run: pnpm check:scaffold
+        env:
+          CHROME_BIN: google-chrome
 
   install:
     name: packed packages install, test and run

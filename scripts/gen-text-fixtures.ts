@@ -1,7 +1,16 @@
 /**
  * Regenerates `packages/core/src/layout/textConformance/expected.json` from Chrome.
  *
- *   pnpm fixtures:text
+ *   pnpm fixtures:text            # rewrite expected.json
+ *   pnpm fixtures:text:check      # compare a fresh Chrome run with expected.json, write nothing
+ *
+ * `--check` is the CI form: it renders every case exactly as a
+ * regeneration would and fails if Chrome's lines, box or baseline for
+ * any case have moved from the committed ones by more than the case's
+ * tolerance, or if a case's fingerprint is stale. The Chrome version,
+ * the font files and the recorded widths are not compared, because the
+ * runner's Chrome and fonts are not this machine's; what has to hold is
+ * that the committed lines are still the lines Chrome draws.
  *
  * The twin of `gen-layout-fixtures.ts` for real text. Every case in
  * `textConformance/cases.ts` becomes a paragraph in one HTML document,
@@ -28,7 +37,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { rolldown } from 'rolldown';
 
 import { textCaseFingerprint, textCases } from '../packages/core/src/layout/textConformance/cases.ts';
-import { compareParagraphs, layoutWithGesso } from '../packages/core/src/layout/textConformance/compare.ts';
+import {
+  compareParagraphs,
+  layoutWithGesso,
+  TEXT_TOLERANCE
+} from '../packages/core/src/layout/textConformance/compare.ts';
+import { REGENERATE_TEXT_FIXTURES } from '../packages/core/src/layout/textConformance/RecordedTextMeasurer.ts';
+import type { ChromeParagraph } from '../packages/core/src/layout/textConformance/toHtml.ts';
 import type {
   ExpectedTextFixtures,
   FixtureFont
@@ -37,6 +52,8 @@ import type { ConformanceFont, ConformanceFontId } from '../packages/core/src/la
 import { conformanceFonts } from '../packages/core/src/layout/textConformance/fonts.ts';
 import { casesToHtml, parseResults } from '../packages/core/src/layout/textConformance/toHtml.ts';
 import { findChrome } from './lib/devtools.ts';
+
+const checkOnly = process.argv.includes('--check');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const conformanceDir = join(here, '..', 'packages', 'core', 'src', 'layout', 'textConformance');
@@ -146,6 +163,10 @@ async function main(): Promise<void> {
         unpinned.push(`${textCase.name}\n${differences.join('\n')}`);
       }
     }
+    if (checkOnly) {
+      checkAgainstCommitted(fixtures);
+      return;
+    }
     writeFileSync(outputPath, `${JSON.stringify(fixtures, null, 2)}\n`);
 
     const fontSummary = conformanceFonts.map(font => `${font.face} (${fontFiles[font.id].record.file})`).join(', ');
@@ -169,6 +190,79 @@ async function main(): Promise<void> {
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Compares what Chrome drew now with what `expected.json` says it drew
+ * when the fixtures were generated, case by case, within each case's
+ * tolerance. Exits non-zero on the first difference set.
+ */
+function checkAgainstCommitted(fresh: ExpectedTextFixtures): void {
+  const committed = JSON.parse(readFileSync(outputPath, 'utf8')) as ExpectedTextFixtures;
+  const problems: string[] = [];
+  for (const textCase of textCases) {
+    const before = committed.cases[textCase.name];
+    const now = fresh.cases[textCase.name];
+    if (before === undefined) {
+      problems.push(`${textCase.name}: not in expected.json`);
+      continue;
+    }
+    if (before.fingerprint !== now.fingerprint) {
+      problems.push(`${textCase.name}: the case changed since expected.json was generated`);
+      continue;
+    }
+    const differences = compareChrome(before.chrome, now.chrome, textCase.tolerance ?? TEXT_TOLERANCE);
+    if (differences.length > 0) {
+      problems.push(`${textCase.name}: Chrome's layout moved\n${differences.join('\n')}`);
+    }
+  }
+  for (const name of Object.keys(committed.cases)) {
+    if (fresh.cases[name] === undefined) {
+      problems.push(`${name}: in expected.json but no longer a case`);
+    }
+  }
+  const summary = `${textCases.length} cases against ${committed.generator.chrome} and ${Object.values(
+    committed.generator.fonts
+  )
+    .map(font => font.face)
+    .join(', ')}, now on ${fresh.generator.chrome}`;
+  if (problems.length > 0) {
+    console.error(`Text fixtures: ${problems.length} problem(s) checking ${summary}.\n${problems.join('\n')}`);
+    console.error(REGENERATE_TEXT_FIXTURES);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`Text fixtures: Chrome still draws every one of ${summary}.`);
+}
+
+/** Chrome's paragraph then and now: the same lines, box and baseline within the tolerance. */
+function compareChrome(before: ChromeParagraph, now: ChromeParagraph, tolerance: number): string[] {
+  const differences: string[] = [];
+  for (const key of ['width', 'height', 'baseline'] as const) {
+    if (Math.abs(before[key] - now[key]) > tolerance) {
+      differences.push(`  ${key}: was ${before[key]}, now ${now[key]}`);
+    }
+  }
+  if (before.lines.length !== now.lines.length) {
+    differences.push(`  line count: was ${before.lines.length}, now ${now.lines.length}`);
+  }
+  const count = Math.min(before.lines.length, now.lines.length);
+  for (let i = 0; i < count; i++) {
+    const a = before.lines[i];
+    const b = now.lines[i];
+    if (
+      a.start !== b.start ||
+      a.end !== b.end ||
+      Math.abs(a.x - b.x) > tolerance ||
+      Math.abs(a.width - b.width) > tolerance ||
+      (a.truncated ?? false) !== (b.truncated ?? false)
+    ) {
+      differences.push(
+        `  line ${i}: was [${a.start}..${a.end}) x ${a.x} w ${a.width}, now [${b.start}..${b.end}) x ${b.x} w ${b.width}`
+      );
+    }
+  }
+  return differences;
 }
 
 /** `inPage.ts` as one self-contained script defining `GessoTextConformance`. */
