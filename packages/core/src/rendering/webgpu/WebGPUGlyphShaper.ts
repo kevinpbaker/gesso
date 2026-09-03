@@ -1,4 +1,5 @@
 import { graphemeBoundaries } from '../../editing/TextBoundaries';
+import { needsVisualOrder, visualOrder } from '../BidiRuns';
 
 /**
  * Where each grapheme cluster of a line starts, and how wide it is.
@@ -19,6 +20,11 @@ import { graphemeBoundaries } from '../../editing/TextBoundaries';
  * a base and its marks are one cluster and rasterise together. This is
  * the cost of rasterising with a canvas instead of a shaping engine,
  * and it is the same trade the editing caret already makes.
+ *
+ * The exception is a line that holds a right-to-left script, or sits in
+ * a right-to-left paragraph. There a cluster is a whole word, so Arabic
+ * keeps its joining forms, and the words are placed in visual order by
+ * `BidiRuns.ts`; see `shapeWords`.
  */
 export interface ShapedCluster {
   text: string;
@@ -63,16 +69,50 @@ export class GlyphShaper {
    * used as the last cluster's end so the run closes exactly where
    * layout put it.
    */
-  shape(text: string, font: string, width: number, measure: MeasureRun): readonly ShapedCluster[] {
+  shape(text: string, font: string, width: number, measure: MeasureRun, rtl = false): readonly ShapedCluster[] {
     if (text.length === 0) {
       return [];
     }
-    const key = `${font}\0${text}`;
+    const key = `${font}\0${rtl ? 'R' : 'L'}\0${text}`;
     const cached = this.cache.get(key);
     if (cached !== undefined) {
       return cached;
     }
 
+    const clusters: ShapedCluster[] = needsVisualOrder(text, rtl)
+      ? this.shapeWords(text, measure, rtl)
+      : this.shapeClusters(text, width, measure);
+
+    if (this.cache.size >= MAX_CACHE_ENTRIES) {
+      this.cache.clear();
+    }
+    this.cache.set(key, clusters);
+    return clusters;
+  }
+
+  /**
+   * A line with a right-to-left script in it, or in a right-to-left
+   * paragraph: one cell per word, placed in visual order. A cursive
+   * word rasterised whole keeps its joining forms, and `visualOrder`
+   * puts the words where Chrome's `fillText` would, so a number inside
+   * an Arabic sentence lands on the side it belongs. Positions are
+   * cumulative measured widths in visual order; kerning does not cross
+   * a blank, so they are the prefix widths the other path uses, in a
+   * different order.
+   */
+  private shapeWords(text: string, measure: MeasureRun, rtl: boolean): ShapedCluster[] {
+    const clusters: ShapedCluster[] = [];
+    let x = 0;
+    for (const token of visualOrder(text, rtl)) {
+      const advance = measure(token.text);
+      clusters.push({ text: token.text, x, advance, blank: token.blank });
+      x += advance;
+    }
+    return clusters;
+  }
+
+  /** The common path: one cell per grapheme cluster at its prefix width. */
+  private shapeClusters(text: string, width: number, measure: MeasureRun): ShapedCluster[] {
     const boundaries = graphemeBoundaries(text);
     const clusters: ShapedCluster[] = [];
     let previous = 0;
@@ -91,11 +131,6 @@ export class GlyphShaper {
       });
       previous = advanceEnd;
     }
-
-    if (this.cache.size >= MAX_CACHE_ENTRIES) {
-      this.cache.clear();
-    }
-    this.cache.set(key, clusters);
     return clusters;
   }
 

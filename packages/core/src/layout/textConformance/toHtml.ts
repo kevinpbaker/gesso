@@ -51,6 +51,19 @@ export interface ChromeLine {
   width: number;
   /** Clamped or ellipsised: `end`, `x` and `width` are not comparable. */
   truncated?: boolean;
+  /**
+   * Each grapheme cluster's visual position, recorded for right-to-left
+   * cases, where a cluster's place on the line is not its place in the
+   * text. What the WebGPU glyph shaper's word order is checked against.
+   */
+  clusters?: ChromeCluster[];
+}
+
+export interface ChromeCluster {
+  start: number;
+  end: number;
+  x: number;
+  width: number;
 }
 
 export interface ChromeParagraph {
@@ -120,6 +133,7 @@ export function casesToHtml(cases: readonly TextCase[], options: HtmlOptions): s
     name: textCase.name,
     lineHeight: textCaseLineHeight(textCase),
     ellipsis: textCase.overflow === 'ellipsis',
+    clusters: textCase.direction === 'rtl' || textCase.name.startsWith('rtl/'),
     request: requestFor(textCase)
   }));
   return [
@@ -264,7 +278,7 @@ function reportScript(families: readonly string[]): string {
         var rect = rects.length > 0 ? rects[0] : null;
         var top = rect !== null ? round(rect.top - box.top) : null;
         if (current === null || (top !== null && current.top !== null && Math.abs(top - current.top) > 0.5)) {
-          current = { top: top, start: start, end: start, left: null, right: null };
+          current = { top: top, start: start, end: start, left: null, right: null, clusters: [] };
           lines.push(current);
         } else if (current.top === null) {
           current.top = top;
@@ -272,6 +286,9 @@ function reportScript(families: readonly string[]): string {
         if (rect !== null && !isBlank(segment.segment)) {
           var left = rect.left - box.left;
           var right = left + rect.width;
+          if (spec.clusters) {
+            current.clusters.push({ start: start, end: end, x: round(left), width: round(rect.width) });
+          }
           current.left = current.left === null ? left : Math.min(current.left, left);
           current.right = current.right === null ? right : Math.max(current.right, right);
           current.end = end;
@@ -290,6 +307,9 @@ function reportScript(families: readonly string[]): string {
       var entry = { start: line.start, end: line.end, x: round(x), width: round(width) };
       if ((clamped && i === lines.length - 1) || (spec.ellipsis && x + width > box.width + 0.5)) {
         entry.truncated = true;
+      }
+      if (spec.clusters) {
+        entry.clusters = line.clusters;
       }
       out.push(entry);
     }

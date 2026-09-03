@@ -396,6 +396,8 @@ export function buildRenderList(
     color: string;
     fontSize: number;
     measureRun: MeasureRun;
+    /** The paragraph's base direction; see `GlyphShaper.shape`. */
+    rtl: boolean;
     originX: number;
     originY: number;
     ctm: Affine;
@@ -403,10 +405,10 @@ export function buildRenderList(
     rounded: number;
     scissor: ScissorRect | null;
   }): void {
-    const { lines, font, color, fontSize, originX, originY, ctm, scissor } = options;
+    const { lines, font, color, fontSize, originX, originY, ctm, scissor, rtl } = options;
     const opacity = options.opacity;
     const rounded = options.rounded;
-    const style = atlas.styleFor(font, color, fontSize, dpr);
+    const style = atlas.styleFor(font, color, fontSize, dpr, rtl);
     for (const line of lines) {
       if (line.text.length === 0) {
         continue;
@@ -428,7 +430,7 @@ export function buildRenderList(
       textRuns.push(run);
 
       const lineX = originX + line.x;
-      for (const cluster of shaper.shape(line.text, font, line.width, options.measureRun)) {
+      for (const cluster of shaper.shape(line.text, font, line.width, options.measureRun, rtl)) {
         if (cluster.blank) {
           continue;
         }
@@ -819,6 +821,7 @@ export function buildRenderList(
           color,
           fontSize: text.fontSize,
           measureRun,
+          rtl: text.rtl,
           originX: offsetX,
           originY: offsetY,
           ctm: nodeCtm,
@@ -1011,6 +1014,8 @@ export function buildRenderList(
           lines,
           font: shape.font,
           color: shape.textColor,
+          // Overlay labels (the inspector's) are the framework's own text.
+          rtl: false,
           fontSize: shape.fontSize,
           measureRun: run => (run.length === 0 ? 0 : measurer.measureRunWidth(run, labelRequest)),
           originX: origin.x + LABEL_PADDING_X,

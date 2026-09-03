@@ -96,6 +96,7 @@ export class WebGPUGlyphPages {
     context.clearRect(0, 0, upload.pixelWidth, upload.pixelHeight);
     context.scale(upload.dpr, upload.dpr);
     context.font = upload.font;
+    context.direction = upload.rtl ? 'rtl' : 'ltr';
     context.fillStyle = upload.color;
     context.textAlign = 'left';
     context.textBaseline = 'alphabetic';

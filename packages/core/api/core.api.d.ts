@@ -3275,6 +3275,7 @@ interface GlyphStyle {
   readonly color: string;
   readonly fontSize: number;
   readonly dpr: number;
+  readonly rtl: boolean;
   readonly cells: Map<string, (GlyphSlot | null)[]>;
 }
 interface GlyphSlot {
@@ -3294,6 +3295,7 @@ interface GlyphUpload {
   font: string;
   color: string;
   dpr: number;
+  rtl: boolean;
   pageX: number;
   pageY: number;
   pixelWidth: number;
@@ -3318,7 +3320,7 @@ declare class WebGPUGlyphAtlas {
   get pageCount(): number;
   get glyphCount(): number;
   beginFrame(): void;
-  styleFor(font: string, color: string, fontSize: number, dpr: number): GlyphStyle;
+  styleFor(font: string, color: string, fontSize: number, dpr: number, rtl?: boolean): GlyphStyle;
   slotFor(style: GlyphStyle, cluster: string, advance: number, phase: number): GlyphSlot | null;
   takePending(): GlyphUpload[];
   takeCleared(): number[];
@@ -3338,7 +3340,9 @@ type MeasureRun = (text: string) => number;
 declare class GlyphShaper {
   private readonly cache;
   get size(): number;
-  shape(text: string, font: string, width: number, measure: MeasureRun): readonly ShapedCluster[];
+  shape(text: string, font: string, width: number, measure: MeasureRun, rtl?: boolean): readonly ShapedCluster[];
+  private shapeWords;
+  private shapeClusters;
   clear(): void;
 }
 declare const INSTANCE_STRIDE_FLOATS = 20;
@@ -4858,7 +4862,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-0S3eHQmD.js";
+} from "./index-DkDTOyH-.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5546,7 +5550,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-0S3eHQmD.js";
+} from "./index-DkDTOyH-.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

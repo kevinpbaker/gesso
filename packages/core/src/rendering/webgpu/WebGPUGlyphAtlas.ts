@@ -78,6 +78,13 @@ export interface GlyphStyle {
   readonly color: string;
   readonly fontSize: number;
   readonly dpr: number;
+  /**
+   * The paragraph's base direction, which decides where a neutral
+   * character inside a word cell lands when the cell is rasterised: an
+   * Arabic word ending in a question mark puts it on the left in a
+   * right-to-left paragraph and on the right otherwise.
+   */
+  readonly rtl: boolean;
   /** Cluster to its cell per subpixel phase; null where it cannot be packed. */
   readonly cells: Map<string, (GlyphSlot | null)[]>;
 }
@@ -105,6 +112,8 @@ export interface GlyphUpload {
   font: string;
   color: string;
   dpr: number;
+  /** The direction the cell is rasterised in; see `GlyphStyle.rtl`. */
+  rtl: boolean;
   /** Cell origin in the page, physical pixels. */
   pageX: number;
   pageY: number;
@@ -176,11 +185,11 @@ export class WebGPUGlyphAtlas {
   }
 
   /** The style handle a run looks its clusters up in; created on first sight. */
-  styleFor(font: string, color: string, fontSize: number, dpr: number): GlyphStyle {
-    const key = `${font}\0${color}\0${dpr}`;
+  styleFor(font: string, color: string, fontSize: number, dpr: number, rtl = false): GlyphStyle {
+    const key = `${font}\0${color}\0${dpr}\0${rtl ? 'R' : 'L'}`;
     let style = this.styles.get(key);
     if (style === undefined) {
-      style = { font, color, fontSize, dpr, cells: new Map() };
+      style = { font, color, fontSize, dpr, rtl, cells: new Map() };
       this.styles.set(key, style);
     }
     return style;
@@ -238,6 +247,7 @@ export class WebGPUGlyphAtlas {
       font: style.font,
       color: style.color,
       dpr,
+      rtl: style.rtl,
       pageX: placed.x,
       pageY: placed.y,
       pixelWidth,
