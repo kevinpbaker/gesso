@@ -788,11 +788,12 @@ function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>
           selectable={false}
           role="button"
           focusable
-          onKeyDown={(event: UiKeyboardEvent) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              open();
-            }
+          onClick={event => {
+            // The keyboard's Enter arrives here as a click, like the
+            // pointer's; stop it before the card's own handler opens
+            // the same playlist a second time.
+            event.stopPropagation();
+            open();
           }}
           modifiers={[sharedElement({ name: `playlist-title-${card.id}`, scale: 'uniform' })]}>
           {playlist.pipe(map(entry => entry.title))}

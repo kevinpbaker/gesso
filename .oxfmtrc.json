@@ -14,6 +14,7 @@
     "api/",
     "apps/docs/reference/properties.md",
     "apps/docs/reference/api.md",
+    "docs/accessibility/",
     "build/",
     "out/",
     "public/build/",
