@@ -1,5 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
-import { noKeyModifiers, UiEventType, UiKeyboardEvent, type UiKeyModifiers } from './UiInputEvent';
+import { UiNodeType } from '../graph/UiNodeType';
+import { noKeyModifiers, UiEventType, UiKeyboardEvent, UiPointerEvent, type UiKeyModifiers } from './UiInputEvent';
+import { isNodeInert } from './UiInteraction';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
 
@@ -29,6 +31,13 @@ export interface KeyboardControllerOptions {
    * find rather than clearing the match it has selected.
    */
   find?: { handleKey(key: string, modifiers: UiKeyModifiers): boolean };
+  /**
+   * Where a keyboard press lands on a node, for the click Enter or Space
+   * synthesises on a focused button: its centre, when the host can lay
+   * hands on a layout box. Without it the click is at the node's origin,
+   * which every `onClick` that ignores its coordinates is fine with.
+   */
+  activation?: { clickAt(node: UiNode): { x: number; y: number } };
 }
 
 /**
@@ -46,9 +55,16 @@ export interface KeyboardControllerOptions {
  *
  * Default behaviour (cancelled by preventDefault on the KeyDown), in
  * order: the focused editable's editing keys, then find's open/close,
- * then the canvas text selection's copy / select-all / clear, then Tab
- * moving focus to the next focusable node and Shift+Tab to the
- * previous, wrapping around.
+ * then the canvas text selection's copy / select-all / clear, then
+ * Enter or Space pressing a focused button (a `Button`, or a node whose
+ * role is `button` or `link`) as a click, then Tab moving focus to the
+ * next focusable node and Shift+Tab to the previous, wrapping around.
+ *
+ * The button press is the one a keyboard-only or screen-reader user
+ * relies on: every control in the component library binds its own keys,
+ * but a plain `Button` element did not press on Enter until the
+ * keyboard gallery (`Keyboard.spec.ts` in the components package) tabbed
+ * to one and found it inert.
  */
 const MODIFIER_KEYS: ReadonlySet<string> = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
 
@@ -57,6 +73,7 @@ export class UiKeyboardController {
   private readonly editing: KeyboardControllerOptions['editing'];
   private readonly selection: KeyboardControllerOptions['selection'];
   private readonly find: KeyboardControllerOptions['find'];
+  private readonly activation: KeyboardControllerOptions['activation'];
 
   private readonly root: () => UiNode;
 
@@ -71,6 +88,7 @@ export class UiKeyboardController {
     this.editing = options.editing;
     this.selection = options.selection;
     this.find = options.find;
+    this.activation = options.activation;
   }
 
   keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
@@ -101,6 +119,17 @@ export class UiKeyboardController {
       event.preventDefault();
       return event;
     }
+    if (!event.defaultPrevented && focused !== null && (key === 'Enter' || key === ' ') && isPressable(focused)) {
+      // What Enter and Space do to a focused button everywhere else:
+      // press it. A synthesised click, so the button's `onClick` is the
+      // one handler an author writes, for the pointer and the keyboard
+      // and an assistive technology alike (`GessoRuntime.applySemanticsAction`
+      // sends the same event).
+      const at = this.activation?.clickAt(focused) ?? { x: 0, y: 0 };
+      this.dispatcher.dispatch(new UiPointerEvent(UiEventType.Click, at.x, at.y, 1), focused);
+      event.preventDefault();
+      return event;
+    }
     if (!event.defaultPrevented && this.tabNavigation && key === 'Tab') {
       if (modifiers.shift) {
         this.focusManager.focusPrevious();
@@ -117,4 +146,13 @@ export class UiKeyboardController {
     this.dispatcher.dispatch(event, target);
     return event;
   }
+}
+
+/** A focused node Enter and Space press: a Button, or anything playing one that is not inert. */
+function isPressable(node: UiNode): boolean {
+  if (isNodeInert(node)) {
+    return false;
+  }
+  const role = node.properties.get('role');
+  return node.type === UiNodeType.Button || role === 'button' || role === 'link';
 }

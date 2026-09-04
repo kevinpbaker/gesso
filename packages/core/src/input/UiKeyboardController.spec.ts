@@ -39,6 +39,44 @@ describe('UiKeyboardController', () => {
     expect(rootKey).toHaveBeenCalledTimes(1);
   });
 
+  it('presses a focused button on Enter and on Space, as a click', () => {
+    const { h, btn1, focusManager, keyboard } = setup();
+    focusManager.focus(btn1);
+    const click = vi.fn();
+    h.dispatcher.addEventListener(btn1, UiEventType.Click, click);
+
+    expect(keyboard.keyDown('Enter').defaultPrevented).toBe(true);
+    expect(keyboard.keyDown(' ').defaultPrevented).toBe(true);
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(click.mock.calls[0][0].target).toBe(btn1);
+
+    // A key the button's own handler claimed is not also a press.
+    h.dispatcher.addEventListener(btn1, UiEventType.KeyDown, event => event.preventDefault());
+    keyboard.keyDown('Enter');
+    expect(click).toHaveBeenCalledTimes(2);
+
+    // Other keys press nothing.
+    keyboard.keyDown('a');
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('presses nothing that is not a button, or that is disabled', () => {
+    const { h, btn1, focusManager, keyboard } = setup();
+    const click = vi.fn();
+    const plain = h.node('plain', UiNodeType.Box, { width: 10, height: 10, focusable: true });
+    h.add(h.root, plain);
+    h.dispatcher.addEventListener(plain, UiEventType.Click, click);
+    focusManager.focus(plain);
+    keyboard.keyDown('Enter');
+    expect(click).not.toHaveBeenCalled();
+
+    btn1.setProperty('disabled', true);
+    h.dispatcher.addEventListener(btn1, UiEventType.Click, click);
+    focusManager.focus(btn1);
+    keyboard.keyDown('Enter');
+    expect(click).not.toHaveBeenCalled();
+  });
+
   it('routes KeyDown to the root when nothing is focused', () => {
     const { h, keyboard } = setup();
     const rootKey = vi.fn();

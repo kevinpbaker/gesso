@@ -2212,6 +2212,12 @@ interface KeyboardControllerOptions {
   find?: {
     handleKey(key: string, modifiers: UiKeyModifiers): boolean;
   };
+  activation?: {
+    clickAt(node: UiNode): {
+      x: number;
+      y: number;
+    };
+  };
 }
 declare class UiKeyboardController {
   private readonly dispatcher;
@@ -2220,6 +2226,7 @@ declare class UiKeyboardController {
   private readonly editing;
   private readonly selection;
   private readonly find;
+  private readonly activation;
   private readonly root;
   constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode | (() => UiNode), options?: KeyboardControllerOptions);
   keyDown(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
@@ -4867,7 +4874,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DGWpKApV.js";
+} from "./index-DlziBGnO.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5556,7 +5563,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DGWpKApV.js";
+} from "./index-DlziBGnO.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

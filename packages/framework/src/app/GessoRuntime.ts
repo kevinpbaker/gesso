@@ -1492,7 +1492,15 @@ export class GessoRuntime {
       keyboard: new UiKeyboardController(this.dispatcher, focus, () => this.appRoot ?? this.layoutRoot(), {
         editing,
         selection,
-        find
+        find,
+        // Enter on a focused button clicks its centre, as an assistive
+        // technology's press does.
+        activation: {
+          clickAt: node => {
+            const box = this.engine.visibleBox(node);
+            return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+          }
+        }
       }),
       // Listens at the root, so a pan reaches it only when nothing
       // between the pressed node and here claimed the gesture. That is
