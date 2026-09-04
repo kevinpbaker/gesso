@@ -186,6 +186,9 @@ export class UiGraphBuilder {
    * subtree rather than a half-reconciled one.
    */
   private reconcileDepth = 0;
+  /** Fragments whose pass is on the stack, and the emissions they must run afterwards. */
+  private readonly reconciling = new Set<UiNode>();
+  private readonly deferredChildren = new Map<UiNode, readonly UiChild[]>();
 
   private readonly components: ComponentResolver | undefined;
 
@@ -248,12 +251,30 @@ export class UiGraphBuilder {
    * the fragment's children on each emission.
    */
   reconcileChildren(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
+    if (this.reconciling.has(parent)) {
+      // A binding emitted into a fragment whose own pass is still on the
+      // stack: a component body, run while its list was being
+      // reconciled, wrote to the observable that holds the list. The
+      // pass in progress works from a snapshot of the chain and would
+      // continue over one a second pass had rewritten, leaving nodes
+      // registered but unreachable. Keep the newest definitions and run
+      // them once the pass returns; only the last emission matters.
+      this.deferredChildren.set(parent, definitions);
+      return { nodes: this.collectChildren(parent), changed: false };
+    }
+    this.reconciling.add(parent);
     this.reconcileDepth++;
     let result: { nodes: UiNode[]; changed: boolean };
     try {
       result = this.reconcile(parent, definitions);
     } finally {
       this.reconcileDepth--;
+      this.reconciling.delete(parent);
+    }
+    const deferred = this.deferredChildren.get(parent);
+    if (deferred !== undefined) {
+      this.deferredChildren.delete(parent);
+      return this.reconcileChildren(parent, deferred);
     }
     // Deliberately outside the finally: a pass that threw left the
     // tree half-built, and mounting components onto it would only
