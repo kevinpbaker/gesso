@@ -1,8 +1,5 @@
-import { combineLatest } from 'rxjs';
-import { map } from 'rxjs/operators';
-
 import { percent } from '@gesso/core';
-import { input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { computed, input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 
 const PRICE_USD = 12.5;
@@ -19,23 +16,23 @@ type Currency = keyof typeof RATES;
  *    its mind, without this body running a second time.
  *  - `quantity` is the line's own. `internalState` is for what
  *    originates here and dies with the component.
- *  - `total` is derived, and is therefore **not** a cell. It is one
- *    expression over the two above: nothing to keep in sync, nothing to
+ *  - `total` is `computed` from the two above. It reads them as values
+ *    and follows them as cells: nothing to keep in sync, nothing to
  *    invalidate, and no way for it to disagree with them.
  */
 function OrderLine(props: Inputs<{ currency?: Currency }>, _ctx: ComponentContext) {
   const currency = input(props.currency, 'USD');
   const quantity = internalState(1);
 
-  const total = combineLatest([currency, quantity]).pipe(
-    map(([unit, count]) => `${unit === 'EUR' ? '€' : '$'}${(count * PRICE_USD * RATES[unit]).toFixed(2)}`)
+  const total = computed(
+    () => `${currency.value === 'EUR' ? '€' : '$'}${(quantity.value * PRICE_USD * RATES[currency.value]).toFixed(2)}`
   );
 
   return (
     <row gap={14} y="center">
       <text text="Widget" fontSize={14} color="text" width={70} />
       <Step label="Fewer" glyph="−" onPress={() => (quantity.value = Math.max(1, quantity.value - 1))} />
-      <text text={quantity.pipe(map(String))} fontSize={14} color="text" width={20} textAlign="center" />
+      <text text={computed(() => String(quantity.value))} fontSize={14} color="text" width={20} textAlign="center" />
       <Step label="More" glyph="+" onPress={() => quantity.value++} />
       <text text={total} fontSize={15} color="text" width={70} textAlign="right" />
     </row>
@@ -82,7 +79,7 @@ export function Cells(_props: Inputs<{}>, _ctx: ComponentContext) {
         backgroundColor="primary"
         cursor="pointer"
         modifiers={[HOVER_ACCENT]}>
-        <text text={currency.pipe(map(unit => `Showing ${unit}, switch`))} fontSize={13} color="background" />
+        <text text={computed(() => `Showing ${currency.value}, switch`)} fontSize={13} color="background" />
       </button>
     </column>
   );

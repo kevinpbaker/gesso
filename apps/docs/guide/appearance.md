@@ -71,8 +71,8 @@ preference that outlives a screen, and combines it with what the shell
 reports:
 
 ```ts
-const scheme = combineLatest([settings.appearance, shell.colorScheme]).pipe(
-  map(([chosen, platform]) => (chosen === 'auto' ? platform : chosen))
+const scheme = computed(() =>
+  settings.appearance.value === 'auto' ? shell.colorScheme.value : settings.appearance.value
 );
 ```
 

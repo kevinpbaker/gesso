@@ -76,11 +76,11 @@ node that already exists.
 // Runs once, when the row is mounted.
 const format = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 });
 
-// Runs on every emission, because it is inside the binding.
-return Text({ text: reading.pipe(map(value => format.format(value))) });
+// Runs on every change, because it is inside the computed.
+return Text({ text: computed(() => format.format(reading.value)) });
 ```
 
-That distinction, outside the binding once and inside it per emission,
+That distinction, outside the computed once and inside it per change,
 is the whole performance model, and it is visible in the source rather
 than in a profiler.
 
@@ -88,8 +88,8 @@ than in a profiler.
 
 Every prop reaches a component as a cell. Reading `props.label.value`
 inside the body gives the value at that moment and nothing afterwards;
-binding `props.label`, or a `pipe` of it, into a node's prop gives every
-value it will ever have. The body runs once, so a `.value` read in it is
+binding `props.label`, or a `computed` that reads it, into a node's prop
+gives every value it will ever have. The body runs once, so a `.value` read in it is
 a snapshot, and a snapshot of something that changes is a bug that
 fails silently: the screen simply stays as it was.
 

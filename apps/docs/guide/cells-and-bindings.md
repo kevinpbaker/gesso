@@ -1,23 +1,23 @@
 ---
-description: Choosing between a prop, an internal state cell and a derived expression, and what each one costs per frame.
+description: Choosing between a prop, an internal state cell and a computed one, and what each one costs per frame.
 ---
 
 # Cells and bindings
 
-A cell is a value a component holds and a binding reads. There are two
-kinds of cell, plus a third case that needs no cell at all. Choosing
-between the three is most of what writing a Gesso component is.
+A cell is a value a component holds and a binding reads. There are three
+kinds, and choosing between them is most of what writing a Gesso
+component is.
 
-| Where the value comes from | What to use                | What it is                                         |
-| -------------------------- | -------------------------- | -------------------------------------------------- |
-| The parent                 | `input(props.x, fallback)` | A prop cell the host keeps feeding                 |
-| This component             | `internalState(value)`     | A cell only this component writes                  |
-| Other values               | nothing                    | An expression: `combineLatest(...).pipe(map(...))` |
+| Where the value comes from | What to use                 | What it is                                      |
+| -------------------------- | --------------------------- | ----------------------------------------------- |
+| The parent                 | `input(inputs.x, fallback)` | A prop cell the host keeps feeding              |
+| This component             | `internalState(value)`      | A cell only this component writes               |
+| Other cells                | `computed(() => ...)`       | A cell that is a function of the cells it reads |
 
-The third row is the one people overlook. A value computed from other
-values needs no cell, no store and no synchronisation: it is an
-Observable derived from the ones it depends on, and it cannot be stale
-because there is no copy of it anywhere.
+The third row is the one people overlook. A value that is a function of
+other values needs no store and no synchronisation: `computed` reads the
+cells its function touches, follows them, and cannot be stale because
+there is no copy of it anywhere that a change could miss.
 
 <LiveExample id="cells" height="300" />
 
@@ -63,20 +63,48 @@ mistake it usually is. Anything that survives a reload, or that another
 screen cares about, is application state and belongs on a channel or in
 a service, not in a component.
 
-## Derived, with no cell at all
+## `computed`, a function of other cells
 
 ```ts
-const total = combineLatest([currency, quantity]).pipe(map(([unit, count]) => format(count * PRICE * RATES[unit])));
+const total = computed(() => format(quantity.value * PRICE * RATES[currency.value]));
 ```
 
-There is no `total` cell, no effect that recomputes one, and no moment
-where `total` disagrees with `quantity`. Anything that would be a
-`useMemo`, a `computed`, or a `useEffect` writing into a second piece of
-state is this instead.
+Write the value as the expression it is, reading each cell with
+`.value`. The function runs, `computed` notes which cells it read, and
+from then on follows exactly those: when one changes the function runs
+again, and if the result differs, everything bound to `total` is written.
+A cell the function did not read this time is not followed; a branch
+that reads a different cell next time is.
+
+There is no effect that recomputes `total` into a second piece of state,
+and no moment where it disagrees with `quantity`. Anything that would be
+a `useMemo` or a `useEffect` writing into state is this instead. Read it
+in a handler with `total.value`; bind it to a prop like any cell. Pass
+`{ equal: 'structural' }` when the function builds an object and a
+rebuilt equal one should not count as a change.
 
 The rule of thumb: **if you can write the value as an expression over
-other values, do not put it in a cell.** A cell is for a value that
-nothing else determines.
+other cells, it is a `computed`, not a state.** `internalState` is for a
+value that nothing else determines.
+
+## Observables underneath
+
+Every cell is an RxJS `Observable`, and every prop accepts one, so a
+value that arrives as a stream rather than a cell binds the same way:
+`text={stream}`. To project such a stream, or several, use `derive`,
+which is `combineLatest` and `map` with a change check:
+
+```ts
+const scheme = derive([settings.appearance, shell.colorScheme], (chosen, platform) =>
+  chosen === 'auto' ? platform : chosen
+);
+```
+
+`computed` and `derive` produce the same thing, an Observable a prop
+takes, and a component written with one composes with a component
+written with the other. Reach for `computed` when the sources are cells,
+which inside a component they nearly always are; for `derive` or a
+`pipe` when they are not.
 
 ## What a binding costs
 

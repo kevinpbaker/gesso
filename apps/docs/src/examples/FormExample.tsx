@@ -1,9 +1,6 @@
-import { combineLatest } from 'rxjs';
-import { map } from 'rxjs/operators';
-
 import { percent } from '@gesso/core';
 import { Checkbox, Select, TextInput } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { computed, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
 
 import { HOVER_ACCENT } from './interaction';
 
@@ -32,10 +29,10 @@ export function Form(_props: Inputs<{}>, _ctx: ComponentContext) {
   const updates = internalState(true);
   const submitted = internalState(false);
 
-  const summary = combineLatest([email, plan, updates]).pipe(
-    map(([address, chosen, wants]) =>
-      address === '' ? 'Enter an address to continue' : `${address} on ${chosen}${wants ? ', with updates' : ''}`
-    )
+  const summary = computed(() =>
+    email.value === ''
+      ? 'Enter an address to continue'
+      : `${email.value} on ${plan.value}${updates.value ? ', with updates' : ''}`
   );
 
   return (
@@ -64,7 +61,7 @@ export function Form(_props: Inputs<{}>, _ctx: ComponentContext) {
           <text text="Continue" fontSize={13} color="background" />
         </button>
         <text
-          text={combineLatest([submitted, summary]).pipe(map(([sent, line]) => (sent ? `Sent: ${line}` : line)))}
+          text={computed(() => (submitted.value ? `Sent: ${summary.value}` : summary.value))}
           fontSize={12}
           color="textMuted"
         />

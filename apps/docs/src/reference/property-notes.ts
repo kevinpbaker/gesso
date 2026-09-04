@@ -290,6 +290,7 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   },
   label: { group: 'Semantics', note: 'The accessible name.' },
   description: { group: 'Semantics', note: 'Longer detail, read after the name.' },
+  live: { group: 'Semantics', note: 'A live region: polite or assertive. Its text is announced when it changes.' },
   states: { group: 'Semantics', note: 'Checked, expanded, busy, and the rest. Validated on write.' },
   valueNow: { group: 'Semantics', note: 'Current value of a range widget.' },
   valueMin: { group: 'Semantics', note: 'Lowest value that range accepts.' },
