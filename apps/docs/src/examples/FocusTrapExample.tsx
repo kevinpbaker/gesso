@@ -39,7 +39,7 @@ function stop(label: string, onClick: () => void) {
  * Nothing here watches for Tab. The trap is one call, the ring is one
  * modifier, and the field takes the caret because it says so.
  */
-export function FocusTrapSurface(_props: Inputs<{}>, ctx: ComponentContext) {
+export function FocusTrapSurface(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const focus = ctx.inject(FocusService);
   const open = internalState(false);
   const name = internalState('Quarterly notes');

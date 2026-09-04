@@ -36,7 +36,7 @@ const THREAD = typeof document === 'undefined' ? 'No document on this thread' : 
  * says; `colorScheme` is where the application hears about it, and it
  * is what this site's light and dark toggle drives.
  */
-export function ShellNeeds(_props: Inputs<{}>, ctx: ComponentContext) {
+export function ShellNeeds(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const shell = ctx.inject(ShellService);
   const message = internalState('Typed into a canvas in a worker');
   const copies = internalState(0);

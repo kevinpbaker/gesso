@@ -26,7 +26,7 @@ const ADDRESS = 'ada@example.com';
  * The difference that matters is Enter: in the single-line field it is
  * the form's, and calls `onSubmit`; here it belongs to the text.
  */
-export function TextFields(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function TextFields(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const email = internalState('');
   const notes = internalState('');
   const sent = internalState(false);

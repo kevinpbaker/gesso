@@ -33,9 +33,9 @@ export interface MenuProps {
   at?: { readonly x: number; readonly y: number };
 }
 
-export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'Menu');
-  const placement = input(props.placement, 'bottom-start');
+export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'Menu');
+  const placement = input(inputs.placement, 'bottom-start');
   const focus = ctx.inject(FocusService);
   const overlay = useOverlay(ctx, 'menu');
   const active = new BehaviorSubject(0);
@@ -50,7 +50,7 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
    * disabled item anywhere but the end makes them disagree.
    */
   const seek = (from: number, delta: number): number => {
-    const items = props.items.value;
+    const items = inputs.items.value;
     for (let moved = 0; moved < items.length; moved += 1) {
       const index = (((from + delta * moved) % items.length) + items.length) % items.length;
       if (items[index].disabled !== true) {
@@ -63,7 +63,7 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
   /** The first item that can be chosen at or after `from`, wrapping, or -1. */
   const from = (start: number): number => seek(start, 1);
   /** The last one, walking backwards from the end. */
-  const last = (): number => seek(props.items.value.length - 1, -1);
+  const last = (): number => seek(inputs.items.value.length - 1, -1);
 
   const release = (): void => {
     if (trapped) {
@@ -95,14 +95,14 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
   const choose = (value?: string): void => {
-    const items = props.items.value;
+    const items = inputs.items.value;
     const item = value === undefined ? items[active.value] : items.find(entry => entry.value === value);
     // A disabled item is not a command: neither Enter on the highlight
     // nor a press on the row itself can choose one.
     if (item === undefined || item.disabled === true) {
       return;
     }
-    props.onSelect.value?.(item.value);
+    inputs.onSelect.value?.(item.value);
     close();
   };
 
@@ -135,23 +135,23 @@ export function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
           Escape: close
         })
       },
-      props.items.pipe(map(items => items.map((item, index) => row(item, index, active, choose))))
+      inputs.items.pipe(map(items => items.map((item, index) => row(item, index, active, choose))))
     );
 
-  props.open.subscribe(isOpen => {
+  inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
       active.next(Math.max(0, from(0)));
       overlay.show(body(), {
-        anchor: props.anchor.value ?? null,
-        environment: props.anchor.value ?? placeholder,
+        anchor: inputs.anchor.value ?? null,
+        environment: inputs.anchor.value ?? placeholder,
         placement: placement.value,
         offset: 4,
-        top: props.at.value?.y,
-        left: props.at.value?.x,
+        top: inputs.at.value?.y,
+        left: inputs.at.value?.x,
         dismissOnOutsidePress: true,
         onClose: () => {
           release();
-          props.onOpenChange.value?.(false);
+          inputs.onOpenChange.value?.(false);
         }
       });
     } else if (isOpen !== true && overlay.isOpen()) {

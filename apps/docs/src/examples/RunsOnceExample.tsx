@@ -24,20 +24,20 @@ export function resetBodyCount(): void {
  * `value` is a cell, so a new number is written into the node that is
  * already on screen.
  */
-function Reading(props: Inputs<{ name: string; value: number }>, _ctx: ComponentContext) {
+function Reading(inputs: Inputs<{ name: string; value: number }>, _ctx: ComponentContext) {
   bodies.value++;
 
   return (
     <row gap={12} y="center">
-      <text text={props.name} fontSize={13} color="textMuted" width={80} />
-      <text text={props.value.pipe(map(value => value.toFixed(2)))} fontSize={15} color="text" />
+      <text text={inputs.name} fontSize={13} color="textMuted" width={80} />
+      <text text={inputs.value.pipe(map(value => value.toFixed(2)))} fontSize={15} color="text" />
     </row>
   );
 }
 // #endregion rows
 
 // #region root
-export function RunsOnce(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function RunsOnce(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   bodies.value++;
   const tick = internalState(0);
 

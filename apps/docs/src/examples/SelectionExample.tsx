@@ -30,7 +30,7 @@ export const ARTICLE = {
  * strength; `selectionColor` on the node, or on any container above
  * it, overrides that.
  */
-function Article(_props: Inputs<{}>, _ctx: ComponentContext) {
+function Article(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={10} padding={16} borderRadius={10} borderWidth={1} borderColor="border" backgroundColor="surface">
       <text text={ARTICLE.heading} fontSize={16} fontWeight={600} color="text" />
@@ -55,7 +55,7 @@ function Article(_props: Inputs<{}>, _ctx: ComponentContext) {
  * A button's label is not selectable, so dragging over this one presses
  * it instead of highlighting it.
  */
-function CopyHeading(_props: Inputs<{}>, ctx: ComponentContext) {
+function CopyHeading(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const shell = ctx.inject(ShellService);
   const copied = internalState(false);
 
@@ -87,7 +87,7 @@ function CopyHeading(_props: Inputs<{}>, ctx: ComponentContext) {
 }
 // #endregion copy
 
-export function SelectableArticle(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function SelectableArticle(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={14} padding={20} width={percent(100)} height={percent(100)}>
       <Article />

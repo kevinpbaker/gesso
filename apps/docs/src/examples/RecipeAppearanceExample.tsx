@@ -30,13 +30,13 @@ const CHOICES: readonly RadioOption[] = [
  * The setting and the platform, combined into the one answer that
  * decides colours.
  *
- * Two inputs and one rule: an explicit choice wins, and `system`
+ * Two props and one rule: an explicit choice wins, and `system`
  * passes the question through to `ShellService.colorScheme`, which is
  * the signal the thread with a window reports. The framework
  * deliberately stops there and derives no colour from it, because
  * what dark looks like is the application's.
  *
- * `distinctUntilChanged` matters more than it looks. Both inputs
+ * `distinctUntilChanged` matters more than it looks. Both props
  * re-emit, and the theme feeds an environment value inherited by
  * every node below it, so an unchanged answer that still emitted
  * would rebind the whole subtree.
@@ -67,7 +67,7 @@ function resolveScheme(choice: Observable<Choice>, platform: Observable<ColorSch
  * the environment. A root that provides only `theme` leaves every
  * unstyled line painting the default black.
  */
-export function AppearanceSetting(_props: Inputs<{}>, ctx: ComponentContext) {
+export function AppearanceSetting(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const shell = ctx.inject(ShellService);
   const choice = internalState<Choice>('system');
   const scheme = resolveScheme(choice, shell.colorScheme);

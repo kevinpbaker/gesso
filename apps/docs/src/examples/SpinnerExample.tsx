@@ -24,7 +24,7 @@ import { type ComponentContext, type Inputs } from '@gesso/framework';
  * A spinner that stands still is not a calmer spinner; it is one that
  * says the work has stopped.
  */
-export function Waiting(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Waiting(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={18} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={12} y="center">

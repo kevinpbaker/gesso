@@ -33,7 +33,7 @@ const STARTING_ROWS = 50000;
  *    The mounted rows are rendered again in place, keys unchanged, so
  *    the list does not jump.
  */
-export function Feed(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Feed(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const count = internalState(STARTING_ROWS);
   const newestFirst = internalState(false);
   const at = internalState(0);
@@ -86,11 +86,11 @@ export function Feed(_props: Inputs<{}>, _ctx: ComponentContext) {
 // #endregion lazy
 
 /** One control, so the hover and the padding are written once. */
-function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext) {
+function Control(inputs: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       padding={8}
       borderRadius={6}
       borderWidth={1}
@@ -98,7 +98,7 @@ function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: Co
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.label} fontSize={12} color="text" />
+      <text text={inputs.label} fontSize={12} color="text" />
     </button>
   );
 }

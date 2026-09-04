@@ -113,7 +113,7 @@ function shipment(chosen: InternalState<string>): UiChild {
 // #endregion card
 
 /** The three of them, on one screen. */
-export function Shipment(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Shipment(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const chosen = internalState('none yet');
 
   return (

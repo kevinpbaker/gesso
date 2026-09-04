@@ -19,7 +19,7 @@ const LABELS = ['Text', 'Text measurement'] as const;
  * note across both tracks without a container of its own, which is the
  * other thing nested rows cannot do.
  */
-function Specs(props: Inputs<{ middle: string }>, _ctx: ComponentContext) {
+function Specs(inputs: Inputs<{ middle: string }>, _ctx: ComponentContext) {
   return (
     <grid
       columns={[auto, fr(1)]}
@@ -35,7 +35,7 @@ function Specs(props: Inputs<{ middle: string }>, _ctx: ComponentContext) {
       <text text="Renderer" color="textMuted" />
       <text text="Canvas2D or WebGPU, chosen at startup" color="text" />
 
-      <text text={props.middle} color="textMuted" />
+      <text text={inputs.middle} color="textMuted" />
       <text text="One measurer for layout, paint and the caret" color="text" />
 
       <text text="Threads" color="textMuted" />
@@ -52,7 +52,7 @@ function Specs(props: Inputs<{ middle: string }>, _ctx: ComponentContext) {
 }
 // #endregion table
 
-export function GridTable(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function GridTable(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const step = internalState(0);
   const middle = step.pipe(map(index => LABELS[index % LABELS.length]!));
 

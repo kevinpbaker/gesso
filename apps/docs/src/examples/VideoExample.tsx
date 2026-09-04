@@ -151,7 +151,7 @@ export class ClipResolver implements VideoResolver {
  * playback. An application that plays an MP4 declares nothing: the
  * default resolver fetches and decodes it.
  */
-export function Player(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Player(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={16}>

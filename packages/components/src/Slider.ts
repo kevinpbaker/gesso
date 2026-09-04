@@ -56,21 +56,21 @@ export interface SliderProps extends ControlLayoutProps {
   labelHidden?: boolean;
 }
 
-export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, '');
-  const disabled = input(props.disabled, false);
-  const min = input(props.min, 0);
-  const max = input(props.max, 100);
-  const step = input(props.step, 1);
-  const focus = trackFocus(ctx, props.ref);
+export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, '');
+  const disabled = input(inputs.disabled, false);
+  const min = input(inputs.min, 0);
+  const max = input(inputs.max, 100);
+  const step = input(inputs.step, 1);
+  const focus = trackFocus(ctx, inputs.ref);
   const track = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   const value = controlled<number>({
     component: 'Slider',
     name: 'value',
-    source: props.value,
-    initial: props.defaultValue,
+    source: inputs.value,
+    initial: inputs.defaultValue,
     fallback: 0,
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   const move = (by: number): void => {
@@ -103,17 +103,17 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
   const fraction = combineLatest([value.value, min, max]).pipe(
     map(([current, low, high]) => (high === low ? 0 : Math.min(1, Math.max(0, (current - low) / (high - low)))))
   );
-  const spoken = combineLatest([value.value, props.format]).pipe(
+  const spoken = combineLatest([value.value, inputs.format]).pipe(
     map(([current, format]) => (format === undefined ? String(current) : format(current)))
   );
 
   return Column(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
       gap: 6,
       role: 'slider',
       label,
@@ -133,7 +133,7 @@ export function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChi
       })
     },
     Row(
-      { gap: 8, y: 'center', visible: input(props.labelHidden, false).pipe(map(hidden => !hidden)) },
+      { gap: 8, y: 'center', visible: input(inputs.labelHidden, false).pipe(map(hidden => !hidden)) },
       Text({ text: label, color: foregroundToken(disabled), fontSize: 12, selectable: false }),
       Text({ text: spoken, color: foregroundToken(disabled), fontSize: 12, selectable: false })
     ),

@@ -29,7 +29,7 @@ import { internalState, type ComponentContext, type Inputs } from '@gesso/framew
  * import in React. `Switch` is capitalised because it is a component
  * from `@gesso/components`, so it is imported like any other value.
  */
-export function App(_props: Inputs<{}>, _context: ComponentContext) {
+export function App(_inputs: Inputs<{}>, _context: ComponentContext) {
   const count = internalState(0);
   const hinted = internalState(true);
 

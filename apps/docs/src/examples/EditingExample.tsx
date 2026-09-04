@@ -10,7 +10,7 @@ import { internalState, type ComponentContext, type Inputs } from '@gesso/framew
  * is the node's, and the component is the label, the message and the
  * theming around exactly this.
  */
-export function NameField(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function NameField(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const text = internalState('Ada Lovelace');
   const selection = internalState('0 to 0');
   const refused = internalState(0);

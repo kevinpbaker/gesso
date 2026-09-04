@@ -176,8 +176,8 @@ export class GeneratedVideoResolver implements VideoResolver {
  * than waiting for anything to notice, and the view that is left keeps
  * playing.
  */
-export function MediaVideo(props: Inputs<{ resolver?: VideoResolver }>, _ctx: ComponentContext) {
-  const resolver = props.resolver.value ?? new GeneratedVideoResolver();
+export function MediaVideo(inputs: Inputs<{ resolver?: VideoResolver }>, _ctx: ComponentContext) {
+  const resolver = inputs.resolver.value ?? new GeneratedVideoResolver();
   const status = internalState<'loading' | 'playing' | 'failed'>('loading');
   const second = internalState(true);
 

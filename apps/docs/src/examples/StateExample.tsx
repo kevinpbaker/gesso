@@ -117,43 +117,43 @@ export class Highlight {
  * here. The two step buttons send a command, because the quantity
  * belongs to whoever owns the basket.
  */
-function Line(props: Inputs<{ line: BasketLine }>, ctx: ComponentContext) {
+function Line(inputs: Inputs<{ line: BasketLine }>, ctx: ComponentContext) {
   const basket = ctx.channel(Basket);
   const highlight = ctx.inject(Highlight);
 
-  const background = combineLatest([props.line, highlight.id]).pipe(
+  const background = combineLatest([inputs.line, highlight.id]).pipe(
     map(([line, id]) => (line.id === id ? 'controlBackground' : 'transparent'))
   );
 
   return (
     <row gap={8} y="center">
       <button
-        label={props.line.pipe(map(line => `Look at ${line.name}`))}
-        onClick={() => (highlight.id.value = props.line.value.id)}
+        label={inputs.line.pipe(map(line => `Look at ${line.name}`))}
+        onClick={() => (highlight.id.value = inputs.line.value.id)}
         flex={1}
         padding={6}
         borderRadius={6}
         backgroundColor={background}
         cursor="pointer"
         modifiers={[HOVER_CONTROL]}>
-        <text text={props.line.pipe(map(line => line.name))} fontSize={13} color="text" />
+        <text text={inputs.line.pipe(map(line => line.name))} fontSize={13} color="text" />
       </button>
       <text
-        text={props.line.pipe(map(line => String(line.quantity)))}
+        text={inputs.line.pipe(map(line => String(line.quantity)))}
         fontSize={13}
         color="textMuted"
         width={18}
         textAlign="center"
       />
       <Step
-        label={props.line.pipe(map(line => `One fewer ${line.name}`))}
+        label={inputs.line.pipe(map(line => `One fewer ${line.name}`))}
         glyph="−"
-        onPress={() => basket.send.remove(props.line.value.id)}
+        onPress={() => basket.send.remove(inputs.line.value.id)}
       />
       <Step
-        label={props.line.pipe(map(line => `One more ${line.name}`))}
+        label={inputs.line.pipe(map(line => `One more ${line.name}`))}
         glyph="+"
-        onPress={() => basket.send.add(props.line.value.id)}
+        onPress={() => basket.send.add(inputs.line.value.id)}
       />
     </row>
   );
@@ -170,7 +170,7 @@ function Line(props: Inputs<{ line: BasketLine }>, ctx: ComponentContext) {
  * anywhere, and `looking` is one expression over a view key and a
  * service.
  */
-function Summary(_props: Inputs<{}>, ctx: ComponentContext) {
+function Summary(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const basket = ctx.channel(Basket);
   const highlight = ctx.inject(Highlight);
 
@@ -198,11 +198,11 @@ function Summary(_props: Inputs<{}>, ctx: ComponentContext) {
 // #endregion read
 
 /** A small square button, so a line reads as what it is. */
-function Step(props: Inputs<{ label: string; glyph: string; onPress: () => void }>, _ctx: ComponentContext) {
+function Step(inputs: Inputs<{ label: string; glyph: string; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       width={26}
       height={26}
       x="center"
@@ -213,13 +213,13 @@ function Step(props: Inputs<{ label: string; glyph: string; onPress: () => void 
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.glyph} fontSize={14} color="text" />
+      <text text={inputs.glyph} fontSize={14} color="text" />
     </button>
   );
 }
 
 /** Two panels, one basket. Neither panel passes anything to the other. */
-export function StateScreen(_props: Inputs<{}>, ctx: ComponentContext) {
+export function StateScreen(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const basket = ctx.channel(Basket);
   const lines = basket.view.lines.pipe(map(rows => rows.map(line => <Line key={line.id} line={line} />)));
 

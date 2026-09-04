@@ -49,10 +49,10 @@ export interface TooltipProps {
   children?: UiChild;
 }
 
-export function Tooltip(props: Inputs<TooltipProps>, ctx: ComponentContext): UiChild {
-  const text = input(props.text, '');
-  const placement = input(props.placement, 'top');
-  const delay = input(props.delay, 400);
+export function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): UiChild {
+  const text = input(inputs.text, '');
+  const placement = input(inputs.placement, 'top');
+  const delay = input(inputs.delay, 400);
   const overlay = useOverlay(ctx, 'tooltip');
   let anchor: UiNode | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -91,7 +91,7 @@ export function Tooltip(props: Inputs<TooltipProps>, ctx: ComponentContext): UiC
       onFocus: show,
       onBlur: hide
     },
-    props.children.value ?? Text({ text: '' })
+    inputs.children.value ?? Text({ text: '' })
   );
 }
 

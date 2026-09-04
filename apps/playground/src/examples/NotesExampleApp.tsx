@@ -58,10 +58,10 @@ const FAINT = TEXT_FAINT;
 // Sidebar
 // ---------------------------------------------------------------------------
 
-function NoteRow(props: Inputs<{ note: NoteRowData }>, ctx: ComponentContext) {
+function NoteRow(inputs: Inputs<{ note: NoteRowData }>, ctx: ComponentContext) {
   const notes = ctx.channel(Notes);
   const hovered = internalState(false);
-  const background = combineLatest([props.note, hovered]).pipe(
+  const background = combineLatest([inputs.note, hovered]).pipe(
     map(([note, hover]) => (note.selected ? ROW_SELECTED : hover ? ROW_HOVER : 'transparent'))
   );
   return (
@@ -82,21 +82,21 @@ function NoteRow(props: Inputs<{ note: NoteRowData }>, ctx: ComponentContext) {
       // it is dropped by the platform on a `listitem` anyway. Which
       // note is open is announced by the editor beside it.
       role="listitem"
-      label={props.note.pipe(map(note => note.title))}
-      onClick={() => notes.send.open(props.note.value.id)}
+      label={inputs.note.pipe(map(note => note.title))}
+      onClick={() => notes.send.open(inputs.note.value.id)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}>
       <text color={TEXT} fontSize={14} fontWeight={600} maxLines={1} textOverflow="ellipsis">
-        {props.note.pipe(map(note => note.title))}
+        {inputs.note.pipe(map(note => note.title))}
       </text>
       <text color={MUTED} fontSize={12} maxLines={1} textOverflow="ellipsis">
-        {props.note.pipe(map(note => note.preview))}
+        {inputs.note.pipe(map(note => note.preview))}
       </text>
     </column>
   );
 }
 
-function Sidebar(_props: Inputs<{}>, ctx: ComponentContext) {
+function Sidebar(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const notes = ctx.channel(Notes);
   // Bound straight off the view key. No projection, no store, no
   // `undefined` before the first patch — the token's initial value is
@@ -138,7 +138,7 @@ function wordCount(text: string): number {
   return words === null ? 0 : words.length;
 }
 
-function Editor(_props: Inputs<{}>, ctx: ComponentContext) {
+function Editor(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const notes = ctx.channel(Notes);
   const shell = ctx.inject(ShellService);
   const open = notes.view.open;
@@ -260,7 +260,7 @@ function EmptyState() {
 }
 
 /** The editor while a note is selected, else the empty state; the sidebar stays. */
-export function NotesApp(_props: Inputs<{}>, ctx: ComponentContext) {
+export function NotesApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const notes = ctx.channel(Notes);
   const main = notes.view.open.pipe(
     map(note => note !== null),

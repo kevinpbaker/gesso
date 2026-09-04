@@ -45,7 +45,7 @@ const CLOCK =
  * path in one colour by construction, so a two-colour mark is two
  * `Icon`s rather than one.
  */
-export function Glyphs(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Glyphs(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={16} y="center">

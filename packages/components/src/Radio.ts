@@ -58,20 +58,20 @@ export interface RadioGroupProps extends ControlLayoutProps {
   direction?: 'row' | 'column';
 }
 
-export function RadioGroup(props: Inputs<RadioGroupProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, '');
-  const disabled = input(props.disabled, false);
-  const invalid = input(props.invalid, false);
-  const required = input(props.required, false);
-  const direction = input(props.direction, 'column');
-  const focus = trackFocus(ctx, props.ref);
+export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, '');
+  const disabled = input(inputs.disabled, false);
+  const invalid = input(inputs.invalid, false);
+  const required = input(inputs.required, false);
+  const direction = input(inputs.direction, 'column');
+  const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<string>({
     component: 'RadioGroup',
     name: 'value',
-    source: props.value,
-    initial: props.defaultValue,
+    source: inputs.value,
+    initial: inputs.defaultValue,
     fallback: '',
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   /** Moves the choice by `delta`, skipping options that are disabled. */
@@ -96,7 +96,7 @@ export function RadioGroup(props: Inputs<RadioGroupProps>, ctx: ComponentContext
     }
   };
   const enabled = (): readonly RadioOption[] =>
-    disabled.value ? [] : props.options.value.filter(option => option.disabled !== true);
+    disabled.value ? [] : inputs.options.value.filter(option => option.disabled !== true);
 
   const select = (option: RadioOption): void => {
     if (!disabled.value && option.disabled !== true) {
@@ -104,16 +104,16 @@ export function RadioGroup(props: Inputs<RadioGroupProps>, ctx: ComponentContext
     }
   };
 
-  const rows = props.options.pipe(
+  const rows = inputs.options.pipe(
     map(options => options.map(option => radio(option, value, disabled, focus.focused, select)))
   );
 
   const group = {
-    ...layoutOf(props),
+    ...layoutOf(inputs),
     ref: focus.ref,
     focusable: true,
     disabled,
-    modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
+    modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
     gap: 4,
     role: 'radiogroup' as const,
     label,

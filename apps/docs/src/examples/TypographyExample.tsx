@@ -65,19 +65,19 @@ export const SCALES: readonly { readonly name: string; readonly build: (base: Ui
  * mechanism: an inherited text property with no value on the node
  * resolves against the style in the environment.
  */
-function Role(props: Inputs<{ label: string; style: UiTextStyle }>, _ctx: ComponentContext) {
+function Role(inputs: Inputs<{ label: string; style: UiTextStyle }>, _ctx: ComponentContext) {
   return (
     <row gap={12} y="center">
       <box width={78}>
         <text
-          text={props.style.pipe(map(style => `${style.fontSize} px`))}
+          text={inputs.style.pipe(map(style => `${style.fontSize} px`))}
           fontSize={11}
           color="textMuted"
           textAlign="right"
         />
       </box>
-      <box textStyle={props.style}>
-        <text text={props.label} />
+      <box textStyle={inputs.style}>
+        <text text={inputs.label} />
       </box>
     </row>
   );
@@ -94,7 +94,7 @@ function Role(props: Inputs<{ label: string; style: UiTextStyle }>, _ctx: Compon
  * the boxes that are already there: no component function runs again,
  * and the samples re-measure because a font size is a layout input.
  */
-export function TypeScale(_props: Inputs<{}>, ctx: ComponentContext) {
+export function TypeScale(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const index = internalState(0);
   const base = ctx
     .inject(ShellService)

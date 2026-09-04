@@ -31,7 +31,7 @@ export const PAGE = {
  * itself while a session is open, searches on every keystroke, and
  * steps with Enter and its own two arrows.
  */
-export function FindablePage(_props: Inputs<{}>, ctx: ComponentContext) {
+export function FindablePage(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const find = ctx.inject(FindService);
 
   return (

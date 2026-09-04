@@ -50,7 +50,7 @@ const attachments = defineModifier<{ readonly seen: () => void }>({
 /**
  * What a modifier writes, and what it costs to build one per render.
  */
-export function ModifierSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function ModifierSurface(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const renders = internalState(0);
   const kept = internalState(0);
   const equal = internalState(0);

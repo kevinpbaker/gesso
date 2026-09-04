@@ -26,11 +26,11 @@ function cycle<T>(values: readonly T[], current: T): T {
  * when the child has not already chosen one. Give a box a `height` and
  * it keeps that height under every value of `y`.
  */
-function Boxes(props: Inputs<{ x: UiAlignment; y: UiAlignment }>, _ctx: ComponentContext) {
+function Boxes(inputs: Inputs<{ x: UiAlignment; y: UiAlignment }>, _ctx: ComponentContext) {
   return (
     <row
-      x={props.x}
-      y={props.y}
+      x={inputs.x}
+      y={inputs.y}
       gap={10}
       padding={12}
       width={percent(100)}
@@ -47,16 +47,16 @@ function Boxes(props: Inputs<{ x: UiAlignment; y: UiAlignment }>, _ctx: Componen
 }
 
 /** A box sized by what is in it, so `stretch` has something to change. */
-function Tile(props: Inputs<{ name: string }>, _ctx: ComponentContext) {
+function Tile(inputs: Inputs<{ name: string }>, _ctx: ComponentContext) {
   return (
     <box width={72} padding={10} x="center" borderRadius={4} backgroundColor="primary">
-      <text text={props.name} fontSize={12} color="background" />
+      <text text={inputs.name} fontSize={12} color="background" />
     </box>
   );
 }
 // #endregion row
 
-export function Layout(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Layout(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const x = internalState<UiAlignment>('start');
   const y = internalState<UiAlignment>('stretch');
 
@@ -73,11 +73,11 @@ export function Layout(_props: Inputs<{}>, _ctx: ComponentContext) {
 }
 
 /** One button that shows a prop's current value and moves it on. */
-function Choice(props: Inputs<{ label: string; value: UiAlignment; onPress: () => void }>, _ctx: ComponentContext) {
+function Choice(inputs: Inputs<{ label: string; value: UiAlignment; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       padding={8}
       borderRadius={6}
       borderWidth={1}
@@ -86,8 +86,8 @@ function Choice(props: Inputs<{ label: string; value: UiAlignment; onPress: () =
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
       <row gap={8} y="center">
-        <text text={props.label} fontSize={12} color="textMuted" />
-        <text text={props.value.pipe(map(String))} fontSize={13} color="text" width={92} />
+        <text text={inputs.label} fontSize={12} color="textMuted" />
+        <text text={inputs.value.pipe(map(String))} fontSize={13} color="text" width={92} />
       </row>
     </button>
   );

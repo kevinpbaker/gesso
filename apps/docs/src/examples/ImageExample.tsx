@@ -86,7 +86,7 @@ export function swatchResolver(): ImageResolver {
  * because an `Image` asks for its bitmap the moment it is built and
  * the tree is built inside the runtime's constructor.
  */
-export function Gallery(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Gallery(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={12}>
@@ -118,8 +118,8 @@ export function Gallery(_props: Inputs<{}>, _ctx: ComponentContext) {
 }
 
 /** One box, captioned with the fit it was given. */
-function Fitted(props: Inputs<{ fit: 'cover' | 'contain' | 'fill' | 'none' }>) {
-  const fit = props.fit.value;
+function Fitted(inputs: Inputs<{ fit: 'cover' | 'contain' | 'fill' | 'none' }>) {
+  const fit = inputs.fit.value;
   return (
     <column gap={6}>
       <Image src="swatch.png" alt={fit} width={112} height={72} objectFit={fit} borderRadius={8} />

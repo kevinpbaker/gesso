@@ -39,7 +39,7 @@ const EDITS: readonly MenuItem[] = [
  * choice, Escape or a press outside closes it, and the cell has to
  * follow.
  */
-export function Commands(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Commands(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const anchor = internalState<UiNode | null>(null);
   const actionsOpen = internalState(false);
   const noteOpen = internalState(false);

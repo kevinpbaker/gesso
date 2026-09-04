@@ -30,9 +30,9 @@ export interface FindBarProps {
   placeholder?: string;
 }
 
-export function FindBar(props: Inputs<FindBarProps>, ctx: ComponentContext): UiChild {
-  const inset = input(props.inset, 12);
-  const placeholder = input(props.placeholder, 'Find on page');
+export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): UiChild {
+  const inset = input(inputs.inset, 12);
+  const placeholder = input(inputs.placeholder, 'Find on page');
   const find = ctx.inject(FindService);
   const query = internalState('');
   const focus = trackFocus(ctx);

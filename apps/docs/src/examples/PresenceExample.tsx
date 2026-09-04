@@ -19,8 +19,8 @@ export const NOTES = {
 
 export type NoteId = keyof typeof NOTES;
 
-function Note(props: Inputs<{ id: NoteId }>, _ctx: ComponentContext): UiChild {
-  const note = NOTES[props.id.value];
+function Note(inputs: Inputs<{ id: NoteId }>, _ctx: ComponentContext): UiChild {
+  const note = NOTES[inputs.id.value];
   return (
     <row
       gap={10}
@@ -53,18 +53,18 @@ function Note(props: Inputs<{ id: NoteId }>, _ctx: ComponentContext): UiChild {
  * a different key is a child leaving and another arriving, and both
  * are on screen together for the length of the transition.
  */
-function Slot(props: Inputs<{ shown: NoteId | null }>, _ctx: ComponentContext): UiChild {
+function Slot(inputs: Inputs<{ shown: NoteId | null }>, _ctx: ComponentContext): UiChild {
   return (
     <box width={320} height={96}>
       <Presence enter={[fade, slideUp(12)]} exit={[fade, scaleFrom(0.96)]} timing={{ duration: 220 }}>
-        {props.shown.pipe(map(id => (id === null ? [] : [<Note key={id} id={id} />])))}
+        {inputs.shown.pipe(map(id => (id === null ? [] : [<Note key={id} id={id} />])))}
       </Presence>
     </box>
   );
 }
 // #endregion presence
 
-export function PresenceStage(_props: Inputs<{}>, _ctx: ComponentContext): UiChild {
+export function PresenceStage(_inputs: Inputs<{}>, _ctx: ComponentContext): UiChild {
   const shown = internalState<NoteId | null>('saved');
 
   return (
@@ -86,10 +86,10 @@ export function PresenceStage(_props: Inputs<{}>, _ctx: ComponentContext): UiChi
   );
 }
 
-function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext): UiChild {
+function Control(inputs: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext): UiChild {
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       padding={8}
       borderRadius={6}
       borderWidth={1}
@@ -97,7 +97,7 @@ function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: Co
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.label} fontSize={12} color="text" />
+      <text text={inputs.label} fontSize={12} color="text" />
     </button>
   );
 }

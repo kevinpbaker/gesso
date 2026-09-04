@@ -94,35 +94,35 @@ export interface DataTableProps<T> extends ControlLayoutProps {
   label?: string;
 }
 
-export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'Table');
-  const rowHeight = input(props.rowHeight, 28);
-  const columnGap = input(props.columnGap, 0);
-  const focus = trackFocus(ctx, props.ref);
+export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'Table');
+  const rowHeight = input(inputs.rowHeight, 28);
+  const columnGap = input(inputs.columnGap, 0);
+  const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
   const headerBox = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   headerBox.subscribe(box => list.setLead(box.height));
 
-  const columns = props.columns.value;
+  const columns = inputs.columns.value;
 
   const sort = controlled<DataTableSort | null>({
     component: 'DataTable',
     name: 'sort',
-    source: props.sort,
-    initial: props.defaultSort,
+    source: inputs.sort,
+    initial: inputs.defaultSort,
     fallback: null,
-    onChange: props.onSortChange
+    onChange: inputs.onSortChange
   });
   const selected = controlled<number>({
     component: 'DataTable',
     name: 'selectedRow',
-    source: props.selectedRow,
-    initial: props.defaultSelectedRow,
+    source: inputs.selectedRow,
+    initial: inputs.defaultSelectedRow,
     fallback: -1,
-    onChange: props.onSelect
+    onChange: inputs.onSelect
   });
 
-  const count = props.rows.pipe(map(rows => rows.length));
+  const count = inputs.rows.pipe(map(rows => rows.length));
   /**
    * Every change of the data or the sort, as one value.
    *
@@ -131,7 +131,7 @@ export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentCon
    * them does. It is also what the window's `count` cannot say — a
    * hundred thousand rows sorted are still a hundred thousand rows.
    */
-  const revision = combineLatest([props.rows, sort.value]);
+  const revision = combineLatest([inputs.rows, sort.value]);
 
   // The order is a permutation of the row indices, recomputed only when
   // the rows or the sort actually change: the renderer asks for it once
@@ -139,7 +139,7 @@ export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentCon
   // a frame is the obvious way to make this component useless.
   let cached: { rows: readonly T[]; sort: DataTableSort | null; order: number[]; positionOf: number[] } | null = null;
   const view = (): { order: number[]; positionOf: number[] } => {
-    const rows = props.rows.value;
+    const rows = inputs.rows.value;
     const current = sort.current();
     if (cached !== null && cached.rows === rows && sameSort(cached.sort, current)) {
       return cached;
@@ -170,11 +170,11 @@ export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentCon
     const row = selected.current();
     return row >= 0 && row < positionOf.length ? positionOf[row] : -1;
   };
-  const step = (by: number): void => choose(stepIndex(positionOfSelected(), by, props.rows.value.length));
+  const step = (by: number): void => choose(stepIndex(positionOfSelected(), by, inputs.rows.value.length));
   const activate = (): void => {
     const row = selected.current();
     if (row >= 0) {
-      props.onActivate.value?.(row);
+      inputs.onActivate.value?.(row);
     }
   };
 
@@ -212,7 +212,7 @@ export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentCon
   const row = (position: number): UiElement => {
     const { order } = view();
     const rowIndex = order[position];
-    const data = props.rows.value[rowIndex];
+    const data = inputs.rows.value[rowIndex];
     const chosen = selected.value.pipe(map(current => current === rowIndex));
     return Grid(
       {
@@ -246,13 +246,13 @@ export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentCon
 
   return LazyGrid(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       ref: node => {
         list.ref(node);
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(props, list.viewport, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING),
       scrollY: list.scrollY,
       focusable: true,
       count,
@@ -273,7 +273,7 @@ export function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentCon
         PageDown: () => step(PAGE),
         PageUp: () => step(-PAGE),
         Home: () => choose(0),
-        End: () => choose(props.rows.value.length - 1),
+        End: () => choose(inputs.rows.value.length - 1),
         Enter: activate,
         ' ': activate
       })

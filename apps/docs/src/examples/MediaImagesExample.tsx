@@ -30,8 +30,8 @@ export const FITS: readonly ObjectFit[] = ['fill', 'cover', 'contain', 'none'];
  * screen reader reads, and four announcements of one picture would be
  * noise.
  */
-function Fitted(props: Inputs<{ fit: ObjectFit }>, _ctx: ComponentContext) {
-  const fit = props.fit.value;
+function Fitted(inputs: Inputs<{ fit: ObjectFit }>, _ctx: ComponentContext) {
+  const fit = inputs.fit.value;
   return (
     <column gap={6} x="center">
       <Image src={SAMPLE} objectFit={fit} width={BOX} height={BOX} borderRadius={8} />
@@ -49,7 +49,7 @@ function Fitted(props: Inputs<{ fit: ObjectFit }>, _ctx: ComponentContext) {
  * with it the node is an `image` with that name, and without it there
  * is no record. There is deliberately no way to get a nameless one.
  */
-function Card(_props: Inputs<{}>, _ctx: ComponentContext) {
+function Card(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <row
       gap={12}
@@ -70,7 +70,7 @@ function Card(_props: Inputs<{}>, _ctx: ComponentContext) {
 // #endregion named
 
 /** The whole example: four fits of one bitmap, and a named picture. */
-export function MediaImages(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function MediaImages(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={18} x="center" y="center" width={percent(100)} height={percent(100)} padding={20}>
       <row gap={14} y="start">

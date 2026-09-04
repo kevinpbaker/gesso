@@ -10,8 +10,8 @@ import { parsePattern, type HasNoParams, type PatternSegment, type RouteParams }
  * belongs — beside a sidebar, inside a card, under a header. A screen
  * nobody nests inside never receives one.
  *
- *   function MailLayout(props: Inputs<OutletProps>) {
- *     return Row(Sidebar(), Box({ flexGrow: 1 }, props.outlet));
+ *   function MailLayout(inputs: Inputs<OutletProps>) {
+ *     return Row(Sidebar(), Box({ flexGrow: 1 }, inputs.outlet));
  *   }
  *
  * It is an `Inputs` cell like any other prop, so binding it as a child

@@ -66,7 +66,7 @@ const PINNED = 'basics';
  * Enter to open and close it. A closed section is not in the tree at
  * all, so it costs no layout and says nothing to a screen reader.
  */
-export function Settings(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Settings(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const open = internalState<readonly string[]>([PINNED]);
 
   return (

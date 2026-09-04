@@ -88,7 +88,7 @@ function actionOf(entry: number): string {
  * is the better choice for a list that never has to be moved from
  * outside.
  */
-export function Activity(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Activity(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const count = internalState(STARTING_ENTRIES);
   const first = internalState(FIRST_ENTRY);
   /** Where the list is scrolled to, in the application's hands. */
@@ -226,11 +226,11 @@ export function Activity(_props: Inputs<{}>, _ctx: ComponentContext) {
 // #endregion feed
 
 /** One control, so the hover and the padding are written once. */
-function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext) {
+function Control(inputs: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       paddingLeft={8}
       paddingRight={8}
       paddingTop={7}
@@ -241,7 +241,7 @@ function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: Co
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.label} fontSize={12} color="text" />
+      <text text={inputs.label} fontSize={12} color="text" />
     </button>
   );
 }

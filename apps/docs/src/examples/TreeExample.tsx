@@ -75,7 +75,7 @@ function branchKeys(nodes: readonly TreeNode[]): string[] {
  * Home and End go to the ends of the open list, and Enter or Space opens
  * the chosen row.
  */
-export function Files(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Files(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const expanded = internalState<readonly string[]>(['src']);
   const selected = internalState<string | null>('src');
   const opened = internalState('nothing yet');

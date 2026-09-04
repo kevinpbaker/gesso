@@ -144,7 +144,7 @@ const DRAG_LIFT = Object.freeze({ opacity: 0.85, zIndex: 10 });
  * cascade, so leaving restores exactly what the element declared,
  * including the absence of a transform.
  */
-function HoverPressCard(_props: Inputs<{}>, _ctx: ComponentContext) {
+function HoverPressCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return card(
     '1 · hover and press',
     <column gap={10}>
@@ -184,7 +184,7 @@ function HoverPressCard(_props: Inputs<{}>, _ctx: ComponentContext) {
  * decorations existing at all: an overlay drawn over the finished
  * frame would float past the edge.
  */
-function FocusRingCard(_props: Inputs<{}>, _ctx: ComponentContext) {
+function FocusRingCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return card(
     '2 · focus ring',
     <column gap={10}>
@@ -240,7 +240,7 @@ function ringButton(label: string, key?: string) {
  * readout sits outside the measured box, and the card is a fixed
  * width, so nothing here can feed back into what it measures.
  */
-function MeasureCard(_props: Inputs<{}>, _ctx: ComponentContext) {
+function MeasureCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const size = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   // Built once, not in the render body: the subject is the argument,
   // and a fresh one every render would be a fresh modifier.
@@ -310,7 +310,7 @@ const AUTO_FOCUS_MODIFIERS: readonly UiModifier[] = Object.freeze([autoFocus(), 
  * moved off it by hand, does not take it back on the next frame,
  * because an autofocus that did that would be a focus trap.
  */
-function AutoFocusCard(_props: Inputs<{}>, _ctx: ComponentContext) {
+function AutoFocusCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const mounted = internalState(true);
   const note = internalState('');
 
@@ -378,7 +378,7 @@ function AutoFocusCard(_props: Inputs<{}>, _ctx: ComponentContext) {
  * a node's own `cursor` property already sends it, so the tiles say
  * `cursor="grab"` and the modifier stays inside the render thread.
  */
-function DraggableCard(_props: Inputs<{}>, _ctx: ComponentContext) {
+function DraggableCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const kept = new BehaviorSubject(ZERO_OFFSET);
   const sprung = new BehaviorSubject(ZERO_OFFSET);
   const dropped = internalState('nothing dropped yet');
@@ -477,7 +477,7 @@ function filler(label: string) {
  * the same press: the modifier hears the press and lets it through
  * rather than swallowing it the way a backdrop would.
  */
-function ClickOutsideCard(_props: Inputs<{}>, _ctx: ComponentContext) {
+function ClickOutsideCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const open = internalState(false);
   const notify = internalState(false);
   let opener: UiNode | null = null;
@@ -562,7 +562,7 @@ function ClickOutsideCard(_props: Inputs<{}>, _ctx: ComponentContext) {
  * `BottomEdgeTooltip`, so that it is genuinely against the edge
  * however far the page is scrolled.
  */
-function TooltipCard(_props: Inputs<{}>, ctx: ComponentContext) {
+function TooltipCard(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const above: readonly UiModifier[] = [
     tooltip(ctx, { text: 'Placed above, after the default 400 ms pause.' }),
     ...BUTTON_MODIFIERS
@@ -622,7 +622,7 @@ function chip(label: string, modifiers: readonly UiModifier[]) {
  * chip is a sibling of the scroller rather than a card in it, because
  * a card scrolls and the point of this one is where it sits on screen.
  */
-function BottomEdgeTooltip(_props: Inputs<{}>, ctx: ComponentContext) {
+function BottomEdgeTooltip(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const flips: readonly UiModifier[] = [
     tooltip(ctx, {
       text: 'Asked for below, given above: an anchored overlay flips when it would leave the viewport.',
@@ -669,7 +669,7 @@ function BottomEdgeTooltip(_props: Inputs<{}>, ctx: ComponentContext) {
 // The page
 // ---------------------------------------------------------------------------
 
-export function ModifiersApp(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function ModifiersApp(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <box theme={darkTheme} width={percent(100)} height={percent(100)} position="relative" backgroundColor="background">
       <scrollview width={percent(100)} height={percent(100)} padding={16} paddingBottom={56} gap={12}>

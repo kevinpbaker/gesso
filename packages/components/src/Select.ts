@@ -57,24 +57,24 @@ export interface SelectProps extends ControlLayoutProps {
   ref?: (node: UiNode | null) => void;
 }
 
-export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, '');
-  const placeholder = input(props.placeholder, 'Choose…');
-  const disabled = input(props.disabled, false);
-  const invalid = input(props.invalid, false);
-  const required = input(props.required, false);
+export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, '');
+  const placeholder = input(inputs.placeholder, 'Choose…');
+  const disabled = input(inputs.disabled, false);
+  const invalid = input(inputs.invalid, false);
+  const required = input(inputs.required, false);
   const focusStore = ctx.inject(FocusService);
-  const focus = trackFocus(ctx, props.ref);
+  const focus = trackFocus(ctx, inputs.ref);
   const overlay = useOverlay(ctx, 'select');
   const active = new BehaviorSubject(0);
   let trapped = false;
   const value = controlled<string>({
     component: 'Select',
     name: 'value',
-    source: props.value,
-    initial: props.defaultValue,
+    source: inputs.value,
+    initial: inputs.defaultValue,
     fallback: '',
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   /**
@@ -85,7 +85,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
    * but the end makes them disagree.
    */
   const seek = (start: number, delta: number): number => {
-    const options = props.options.value;
+    const options = inputs.options.value;
     for (let moved = 0; moved < options.length; moved += 1) {
       const index = (((start + delta * moved) % options.length) + options.length) % options.length;
       if (options[index].disabled !== true) {
@@ -98,18 +98,19 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
   /** The first option that can be chosen at or after `start`, wrapping, or -1. */
   const from = (start: number): number => seek(start, 1);
   /** The last one, walking backwards from the end. */
-  const last = (): number => seek(props.options.value.length - 1, -1);
+  const last = (): number => seek(inputs.options.value.length - 1, -1);
   const moveTo = (index: number): void => {
     if (index !== -1) {
       active.next(index);
     }
   };
   const optionAt = (index: number): SelectOption | undefined => {
-    const option = props.options.value[index];
+    const option = inputs.options.value[index];
     return option === undefined || option.disabled === true ? undefined : option;
   };
 
-  const labelFor = (chosen: string): string => props.options.value.find(option => option.value === chosen)?.label ?? '';
+  const labelFor = (chosen: string): string =>
+    inputs.options.value.find(option => option.value === chosen)?.label ?? '';
 
   const release = (): void => {
     if (trapped) {
@@ -128,7 +129,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
   const choose = (chosen: string): void => {
     // A disabled option is not an answer: neither Enter on the
     // highlight nor a press on the row itself can take one.
-    const option = props.options.value.find(entry => entry.value === chosen);
+    const option = inputs.options.value.find(entry => entry.value === chosen);
     if (option === undefined || option.disabled === true) {
       return;
     }
@@ -141,7 +142,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
   /** Type-ahead: the first option starting with the character typed. */
   const jumpTo = (character: string): void => {
     const wanted = character.toLowerCase();
-    const index = props.options.value.findIndex(
+    const index = inputs.options.value.findIndex(
       option => option.disabled !== true && option.label.toLowerCase().startsWith(wanted)
     );
     if (index === -1) {
@@ -150,7 +151,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
     if (overlay.isOpen()) {
       active.next(index);
     } else {
-      choose(props.options.value[index].value);
+      choose(inputs.options.value[index].value);
     }
   };
 
@@ -199,7 +200,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
           }
         }
       },
-      props.options.pipe(
+      inputs.options.pipe(
         map(options => options.map((option, index) => row(option, index, options.length, active, value.value, choose)))
       )
     );
@@ -209,7 +210,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
       return;
     }
     const chosen = value.current();
-    const index = props.options.value.findIndex(option => option.value === chosen && option.disabled !== true);
+    const index = inputs.options.value.findIndex(option => option.value === chosen && option.disabled !== true);
     // The walk starts on the value, or on the first option that can be
     // chosen when the value matches nothing that can.
     active.next(Math.max(0, index === -1 ? from(0) : index));
@@ -225,7 +226,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
   };
 
   return Column(
-    { ...layoutOf(props), gap: 4 },
+    { ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(text =>
         text.length === 0 ? [] : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
@@ -236,7 +237,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
         ref: focus.ref,
         focusable: true,
         disabled,
-        modifiers: modifiersOf(props, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
+        modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
         y: 'center',
         padding: 8,
         gap: 8,
@@ -263,7 +264,7 @@ export function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChi
         }
       },
       Text({
-        text: combineLatest([value.value, props.options]).pipe(
+        text: combineLatest([value.value, inputs.options]).pipe(
           map(([chosen]) => (chosen === '' ? placeholder.value : labelFor(chosen)))
         ),
         color: foregroundToken(disabled),

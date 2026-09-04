@@ -27,7 +27,7 @@ import { internalState, type ComponentContext, type Inputs } from '@gesso/framew
  * press and the red of the invalid box all come from the control
  * tokens in whatever theme the tree inherits.
  */
-export function Preferences(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Preferences(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const terms = internalState(false);
   const updates = internalState(false);
 

@@ -37,11 +37,11 @@ export interface DialogProps {
   width?: number;
 }
 
-export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChild {
-  const title = input(props.title, '');
-  const description = input(props.description, '');
-  const dismissible = input(props.dismissible, true);
-  const width = input(props.width, 360);
+export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild {
+  const title = input(inputs.title, '');
+  const description = input(inputs.description, '');
+  const dismissible = input(inputs.dismissible, true);
+  const width = input(inputs.width, 360);
   const focus = ctx.inject(FocusService);
   const animations = ctx.inject(AnimationService);
   const overlay = useOverlay(ctx, 'dialog');
@@ -123,13 +123,13 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
           map(text => (text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600 })]))
         ),
         description.pipe(map(text => (text.length === 0 ? [] : [Text({ text, color: 'textMuted', fontSize: 13 })]))),
-        props.content.value ?? Row()
+        inputs.content.value ?? Row()
       )
     );
 
   // Opening and closing follow the `open` prop: a dialog is controlled
   // by whoever owns the reason it is open.
-  props.open.subscribe(isOpen => {
+  inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
       // Reset before the tree is built, so the first frame the dialog
       // is on screen is the one it starts from rather than a frame of
@@ -148,7 +148,7 @@ export function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChi
         dismissOnOutsidePress: dismissible.value,
         onClose: () => {
           release();
-          props.onClose.value?.();
+          inputs.onClose.value?.();
         }
       });
       // Started after `show`, so the node the binding writes exists.

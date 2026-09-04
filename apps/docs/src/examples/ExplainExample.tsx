@@ -22,7 +22,7 @@ const EMPTY: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
  * not have, and it is the only thing here that is about the example
  * rather than about the bug.
  */
-export function Vanished(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Vanished(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const rigid = internalState(true);
   const titleBox = new BehaviorSubject<LayoutBox>(EMPTY);
   const action = rigid.pipe(map(fixed => (fixed ? 'Let the badge shrink' : 'Make the badge rigid again')));

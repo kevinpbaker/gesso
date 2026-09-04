@@ -314,22 +314,22 @@ const boardTheme: UiTheme = { ...gessoTheme, colors: boardColors };
 // ---------------------------------------------------------------------------
 
 /** A small pill button. Nothing here animates; the board it moves does. */
-function Chip(props: Inputs<{ label: string; onPress: () => void; wide?: boolean; on?: boolean }>) {
-  const background = props.on.pipe(map(on => (on === true ? 'primary' : 'surfaceRaised')));
-  const color = props.on.pipe(map(on => (on === true ? 'background' : 'textMuted')));
+function Chip(inputs: Inputs<{ label: string; onPress: () => void; wide?: boolean; on?: boolean }>) {
+  const background = inputs.on.pipe(map(on => (on === true ? 'primary' : 'surfaceRaised')));
+  const color = inputs.on.pipe(map(on => (on === true ? 'background' : 'textMuted')));
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       height={24}
-      paddingLeft={props.wide.pipe(map(wide => (wide === true ? 12 : 8)))}
-      paddingRight={props.wide.pipe(map(wide => (wide === true ? 12 : 8)))}
+      paddingLeft={inputs.wide.pipe(map(wide => (wide === true ? 12 : 8)))}
+      paddingRight={inputs.wide.pipe(map(wide => (wide === true ? 12 : 8)))}
       borderRadius={12}
       backgroundColor={background}
       x="center"
       y="center"
       cursor="pointer">
       <text color={color} fontSize={12} fontWeight={500}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
@@ -357,13 +357,13 @@ const CARD_EXPANDED = 116;
  * half the card's size each is what scales it about its middle.
  */
 function TaskCard(
-  props: Inputs<{ task: Task; selected: boolean; motion: MotionName; lane: Lane }>,
+  inputs: Inputs<{ task: Task; selected: boolean; motion: MotionName; lane: Lane }>,
   ctx: ComponentContext
 ) {
   const board = ctx.channel(Board);
   const animations = ctx.inject(AnimationService);
-  const task = props.task.value;
-  const laneIndex = LANES.indexOf(props.lane.value);
+  const task = inputs.task.value;
+  const laneIndex = LANES.indexOf(inputs.lane.value);
 
   /** 1 at rest, 0.96 while held. A number, because a spring integrates one. */
   const press = internalState(1);
@@ -371,14 +371,14 @@ function TaskCard(
     animations.spring(press, to, { spring: 'stiff' });
   };
 
-  const height = props.selected.pipe(map(on => (on ? CARD_EXPANDED : CARD_COLLAPSED)));
+  const height = inputs.selected.pipe(map(on => (on ? CARD_EXPANDED : CARD_COLLAPSED)));
 
   return (
     <column
       // The modifier list is static per element; its arguments are read
       // when it attaches, which is why the picker's choice is part of
       // the observable that produces these cards.
-      modifiers={[animateLayout(layoutMotion(props.motion.value))]}
+      modifiers={[animateLayout(layoutMotion(inputs.motion.value))]}
       transition={{ height: spring('gentle'), opacity: 160 }}
       height={height}
       transform={press.pipe(map(scale => ({ x: 128, y: CARD_COLLAPSED / 2, scaleX: scale, scaleY: scale })))}
@@ -386,7 +386,7 @@ function TaskCard(
       gap={6}
       overflow="hidden"
       backgroundColor="surfaceRaised"
-      borderColor={props.selected.pipe(map(on => (on ? 'primary' : 'border')))}
+      borderColor={inputs.selected.pipe(map(on => (on ? 'primary' : 'border')))}
       borderWidth={1}
       borderRadius={8}
       cursor="pointer"
@@ -406,13 +406,13 @@ function TaskCard(
 
       {/* Bound, not conditional: the node is always here and its opacity
           travels, so there is nothing to add to or remove from the tree. */}
-      <text color="textMuted" fontSize={11} opacity={props.selected.pipe(map(on => (on ? 1 : 0)))} maxLines={2}>
+      <text color="textMuted" fontSize={11} opacity={inputs.selected.pipe(map(on => (on ? 1 : 0)))} maxLines={2}>
         {task.detail}
       </text>
 
       <box flexGrow={1} />
 
-      <row gap={6} opacity={props.selected.pipe(map(on => (on ? 1 : 0)))} y="center">
+      <row gap={6} opacity={inputs.selected.pipe(map(on => (on ? 1 : 0)))} y="center">
         <Chip label="◀" onPress={() => board.send.shift({ id: task.id, delta: -1 })} />
         <Chip label="▲" onPress={() => board.send.reorder({ id: task.id, delta: -1 })} />
         <Chip label="▼" onPress={() => board.send.reorder({ id: task.id, delta: 1 })} />
@@ -426,9 +426,9 @@ function TaskCard(
 }
 
 /** One lane, and the keyed cards in it. */
-function LaneColumn(props: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
+function LaneColumn(inputs: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
   const board = ctx.channel(Board);
-  const lane = props.lane.value;
+  const lane = inputs.lane.value;
   const view = board.view.board;
 
   // Keyed children, so a card that moves is the *same node* moved. A
@@ -480,7 +480,7 @@ function LaneColumn(props: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
  * a node that has logically left — `decisions/0029` says why — so an
  * app that wants an exit owns the node until the animation is done.
  */
-function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
+function UndoBar(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const board = ctx.channel(Board);
   const animations = ctx.inject(AnimationService);
   const slide = internalState(0);
@@ -541,7 +541,7 @@ function UndoBar(_props: Inputs<{}>, ctx: ComponentContext) {
 }
 
 /** The picker: how the board moves, and whether it moves at all. */
-function MotionPanel(_props: Inputs<{}>, ctx: ComponentContext) {
+function MotionPanel(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const board = ctx.channel(Board);
   const animations = ctx.inject(AnimationService);
   const chosen = board.view.board.pipe(map(view => view.motion));
@@ -576,7 +576,7 @@ function MotionPanel(_props: Inputs<{}>, ctx: ComponentContext) {
   );
 }
 
-export function BoardApp(_props: Inputs<{}>, ctx: ComponentContext) {
+export function BoardApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const animations = ctx.inject(AnimationService);
   const hint = combineLatest([animations.reducedMotion]).pipe(
     map(([reduced]) =>

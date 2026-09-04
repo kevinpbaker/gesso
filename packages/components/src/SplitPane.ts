@@ -40,20 +40,20 @@ export interface SplitPaneProps extends ControlLayoutProps {
   label?: string;
 }
 
-export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild {
-  const direction = input(props.direction, 'row');
-  const min = input(props.min, 0.1);
-  const max = input(props.max, 0.9);
-  const label = input(props.label, 'Resize panes');
+export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild {
+  const direction = input(inputs.direction, 'row');
+  const min = input(inputs.min, 0.1);
+  const max = input(inputs.max, 0.9);
+  const label = input(inputs.label, 'Resize panes');
   const focus = trackFocus(ctx);
   const track = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   const split = controlled<number>({
     component: 'SplitPane',
     name: 'split',
-    source: props.split,
-    initial: props.defaultSplit,
+    source: inputs.split,
+    initial: inputs.defaultSplit,
     fallback: 0.5,
-    onChange: props.onSplitChange
+    onChange: inputs.onSplitChange
   });
 
   const horizontal = (): boolean => direction.value === 'row';
@@ -107,10 +107,10 @@ export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext):
   });
 
   const container = {
-    ...layoutOf(props),
+    ...layoutOf(inputs),
     // The track measures itself, so the divider knows what a pointer
     // position means without anything reaching into the engine.
-    modifiers: modifiersOf(props, measure(track)),
+    modifiers: modifiersOf(inputs, measure(track)),
     width: percent(100),
     height: percent(100)
   };
@@ -133,9 +133,9 @@ export function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext):
       flexShrink: 0,
       ...shrinkable
     },
-    props.first.value ?? Row()
+    inputs.first.value ?? Row()
   );
-  const second = Box({ flexGrow: 1, ...shrinkable }, props.second.value ?? Row());
+  const second = Box({ flexGrow: 1, ...shrinkable }, inputs.second.value ?? Row());
 
   return horizontal() ? Row(container, first, divider, second) : Column(container, first, divider, second);
 }

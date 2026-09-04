@@ -143,7 +143,7 @@ function collectText(node: UiNode, into: string[] = []): string[] {
   return into;
 }
 
-function Appearance(_props: Inputs<{}>, ctx: ComponentContext) {
+function Appearance(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const shell = ctx.inject(ShellService);
   return Text({ text: shell.colorScheme.pipe(map(scheme => `scheme: ${scheme}`)) });
 }

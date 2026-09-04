@@ -23,7 +23,7 @@ import { HOVER_CONTROL } from './interaction';
  * the delay, focusing opens one at once, and pressing closes it,
  * because the pointer is on its way to the control underneath.
  */
-export function Actions(_props: Inputs<{}>, ctx: ComponentContext) {
+export function Actions(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const last = internalState('Hover a button, or tab onto one');
 
   const saveTip = tooltip(ctx, { text: 'Writes the note to the server' });

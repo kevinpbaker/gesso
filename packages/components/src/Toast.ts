@@ -26,11 +26,11 @@ export interface ToastProps {
   dismissible?: boolean;
 }
 
-export function Toast(props: Inputs<ToastProps>, ctx: ComponentContext): UiChild {
-  const message = input(props.message, '');
-  const tone = input(props.tone, 'info');
-  const duration = input(props.duration, 4000);
-  const dismissible = input(props.dismissible, true);
+export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChild {
+  const message = input(inputs.message, '');
+  const tone = input(inputs.tone, 'info');
+  const duration = input(inputs.duration, 4000);
+  const dismissible = input(inputs.dismissible, true);
   const overlay = useOverlay(ctx, 'toast');
   let timer: ReturnType<typeof setTimeout> | null = null;
   let placeholder: UiNode | null = null;
@@ -46,7 +46,7 @@ export function Toast(props: Inputs<ToastProps>, ctx: ComponentContext): UiChild
   const close = (): void => {
     cancel();
     overlay.hide();
-    props.onClose.value?.();
+    inputs.onClose.value?.();
   };
 
   const body = (): UiChild =>
@@ -83,7 +83,7 @@ export function Toast(props: Inputs<ToastProps>, ctx: ComponentContext): UiChild
         : Row({ width: 0 })
     );
 
-  props.open.subscribe(isOpen => {
+  inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
       overlay.show(body(), { bottom: 24, left: 24, environment: placeholder, onClose: cancel });
       if (duration.value > 0) {

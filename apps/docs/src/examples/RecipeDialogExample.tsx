@@ -177,7 +177,7 @@ function noteRow(title: string, onDelete: () => void): UiChild {
  * predict from the page, so the action lives in the page instead and
  * the notice only announces.
  */
-export function NoteList(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function NoteList(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const flow = noteFlow();
 
   return (

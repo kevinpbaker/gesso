@@ -43,7 +43,7 @@ const BILLING: readonly RadioOption[] = [
  * heading above each one is the application's, in the application's own
  * type. Both strings say the same thing on purpose.
  */
-export function Shipping(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Shipping(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const method = internalState('standard');
   const refused = internalState(false);
 

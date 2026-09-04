@@ -34,7 +34,7 @@ export const RING = 'M3 3 H21 V21 H3 Z M9 9 H15 V15 H9 Z';
  * Nothing is rebuilt: the modifier hears the environment change and
  * re-rasterises in place.
  */
-export function MediaIcons(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function MediaIcons(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const dark = internalState(false);
   const theme = dark.pipe(map((on): UiTheme => (on ? darkTheme : lightTheme)));
 

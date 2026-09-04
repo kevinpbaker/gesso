@@ -32,7 +32,7 @@ const REGIONS = [
  * reader's cursor lands on the header where the eye finds it.
  */
 function Region(
-  props: Inputs<{ title: string; places: readonly string[]; onPick: (place: string) => void }>,
+  inputs: Inputs<{ title: string; places: readonly string[]; onPick: (place: string) => void }>,
   _ctx: ComponentContext
 ) {
   return (
@@ -48,14 +48,14 @@ function Region(
         borderColor="border"
         role="heading"
         level={2}
-        label={props.title}>
-        <text text={props.title} fontSize={11} fontWeight={600} color="textMuted" />
+        label={inputs.title}>
+        <text text={inputs.title} fontSize={11} fontWeight={600} color="textMuted" />
       </box>
-      {props.places.value.map(place => (
+      {inputs.places.value.map(place => (
         <button
           key={place}
           label={place}
-          onClick={() => props.onPick.value(place)}
+          onClick={() => inputs.onPick.value(place)}
           height={36}
           paddingLeft={10}
           y="center"
@@ -70,7 +70,7 @@ function Region(
 }
 // #endregion section
 
-export function StickyList(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function StickyList(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const picked = internalState('nothing yet');
 
   return (

@@ -48,23 +48,23 @@ export interface NumberInputProps extends ControlLayoutProps {
   required?: boolean;
 }
 
-export function NumberInput(props: Inputs<NumberInputProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, '');
-  const error = input(props.error, '');
-  const disabled = input(props.disabled, false);
-  const required = input(props.required, false);
-  const min = input(props.min, Number.NEGATIVE_INFINITY);
-  const max = input(props.max, Number.POSITIVE_INFINITY);
-  const step = input(props.step, 1);
+export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, '');
+  const error = input(inputs.error, '');
+  const disabled = input(inputs.disabled, false);
+  const required = input(inputs.required, false);
+  const min = input(inputs.min, Number.NEGATIVE_INFINITY);
+  const max = input(inputs.max, Number.POSITIVE_INFINITY);
+  const step = input(inputs.step, 1);
   const invalid = error.pipe(map(text => text.length > 0));
-  const focus = trackFocus(ctx, props.ref);
+  const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<number>({
     component: 'NumberInput',
     name: 'value',
-    source: props.value,
-    initial: props.defaultValue,
+    source: inputs.value,
+    initial: inputs.defaultValue,
     fallback: 0,
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   // What the field shows: the value, unless the user is mid-edit.
@@ -94,7 +94,7 @@ export function NumberInput(props: Inputs<NumberInputProps>, ctx: ComponentConte
   };
 
   return Column(
-    { ...layoutOf(props), gap: 4 },
+    { ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(name =>
         name.length === 0
@@ -106,7 +106,7 @@ export function NumberInput(props: Inputs<NumberInputProps>, ctx: ComponentConte
       { gap: 4, y: 'center' },
       EditableText({
         ref: focus.ref,
-        modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
+        modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
         value: text,
         disabled,
         textWrap: 'none',

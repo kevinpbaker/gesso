@@ -17,7 +17,7 @@ import { HOVER_CONTROL } from './interaction';
  * dispatcher does with the exception is report it, and the spec beside
  * this file is where that is checked.
  */
-export function BreakOnClick(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function BreakOnClick(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const reached = internalState(0);
 
   return (
@@ -60,7 +60,7 @@ export function BreakOnClick(_props: Inputs<{}>, _ctx: ComponentContext) {
  * stopped. This is the one failure on this page that does not reach
  * the overlay.
  */
-export function BreakTheBinding(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function BreakTheBinding(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const feed = concat(
     of('Ready'),
     throwError(() => new Error('The feed failed.'))

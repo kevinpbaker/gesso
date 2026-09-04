@@ -25,7 +25,7 @@ const PER_SEAT = 45;
  * "1." or "-" is not a number yet. Nothing is reported until the text
  * parses, and blurring normalises what is left there.
  */
-export function Numbers(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Numbers(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const guests = internalState(2);
   const total = guests.pipe(map(count => `${count} × ${PER_SEAT} = ${count * PER_SEAT}`));
 

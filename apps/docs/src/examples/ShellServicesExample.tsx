@@ -34,7 +34,7 @@ const linkFor = (scheme: ColorScheme) => `https://gesso.invalid/report?theme=${s
  * clipboard is the one for the appearance the reader is in at the
  * moment they press it.
  */
-export function ShellSignals(_props: Inputs<{}>, ctx: ComponentContext) {
+export function ShellSignals(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const shell = ctx.inject(ShellService);
   const reducedMotion = ctx.inject(AnimationService).reducedMotion;
   const copied = internalState(false);

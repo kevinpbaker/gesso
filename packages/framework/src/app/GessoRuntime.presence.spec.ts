@@ -168,7 +168,7 @@ describe('Presence', () => {
 // The two together: a route change with a shared element across it
 // ---------------------------------------------------------------------------
 
-function ListScreen(_props: Inputs<OutletProps>): ReturnType<typeof Column> {
+function ListScreen(_inputs: Inputs<OutletProps>): ReturnType<typeof Column> {
   return Column(
     { width: 400, height: 400 },
     Box({
@@ -180,7 +180,7 @@ function ListScreen(_props: Inputs<OutletProps>): ReturnType<typeof Column> {
   );
 }
 
-function DetailScreen(_props: Inputs<OutletProps>): ReturnType<typeof Column> {
+function DetailScreen(_inputs: Inputs<OutletProps>): ReturnType<typeof Column> {
   return Column(
     { width: 400, height: 400 },
     Box({

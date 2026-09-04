@@ -199,8 +199,8 @@ function describe(value: unknown): string {
  * two-argument form derives a cell that replaces `undefined` with a
  * fallback, which is how an optional prop gets its default:
  *
- *   function Counter(props: Inputs<{ label?: string }>) {
- *     const label = input(props.label, 'Count');   // InputCell<string>
+ *   function Counter(inputs: Inputs<{ label?: string }>) {
+ *     const label = input(inputs.label, 'Count');   // InputCell<string>
  *     return Text({ text: label });
  *   }
  *

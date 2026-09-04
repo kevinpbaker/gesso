@@ -64,11 +64,11 @@ describe('functional components', () => {
     ).toBe(false);
   });
 
-  it('renders the function once and binds its props as cells', () => {
+  it('renders the function once and binds its inputs as cells', () => {
     const renders = vi.fn();
-    function Greeting(props: Inputs<{ name: string }>) {
+    function Greeting(inputs: Inputs<{ name: string }>) {
       renders();
-      return Text({ text: props.name.pipe(map(name => `Hello ${name}`)) });
+      return Text({ text: inputs.name.pipe(map(name => `Hello ${name}`)) });
     }
     const { builder } = createHarness();
     const name$ = new BehaviorSubject('World');
@@ -80,11 +80,11 @@ describe('functional components', () => {
     expect(renders).toHaveBeenCalledTimes(1);
   });
 
-  it('follows new props from the parent without re-running the function', () => {
+  it('follows new inputs from the parent without re-running the function', () => {
     const renders = vi.fn();
-    function Label(props: Inputs<{ text: string }>) {
+    function Label(inputs: Inputs<{ text: string }>) {
       renders();
-      return Text({ text: props.text });
+      return Text({ text: inputs.text });
     }
     const { builder } = createHarness();
     const root = builder.build(Column(createComponent(Label, { text: 'one' })));
@@ -95,9 +95,9 @@ describe('functional components', () => {
     expect(renders).toHaveBeenCalledTimes(1);
   });
 
-  it('applies input() fallbacks for omitted props and re-applies them when a prop is dropped', () => {
-    function Titled(props: Inputs<{ title?: string }>) {
-      const title = input(props.title, 'Untitled');
+  it('applies input() fallbacks for omitted inputs and re-applies them when a prop is dropped', () => {
+    function Titled(inputs: Inputs<{ title?: string }>) {
+      const title = input(inputs.title, 'Untitled');
       return Text({ text: title });
     }
     const { builder } = createHarness();
@@ -112,8 +112,8 @@ describe('functional components', () => {
   });
 
   it('keeps local internalState() cells across parent reconciles', () => {
-    function Counter(props: Inputs<{ step?: number }>) {
-      const step = input(props.step, 1);
+    function Counter(inputs: Inputs<{ step?: number }>) {
+      const step = input(inputs.step, 1);
       const count = internalState(0);
       return Row(
         Text({ text: count.pipe(map(c => `count ${c}`)) }),
@@ -138,7 +138,7 @@ describe('functional components', () => {
   it('injects services and runs lifecycle hooks through the context', () => {
     const mounted = vi.fn();
     const unmounted = vi.fn();
-    function Clicks(_props: Inputs<{}>, ctx: ComponentContext) {
+    function Clicks(_inputs: Inputs<{}>, ctx: ComponentContext) {
       const clicks = ctx.inject(ClickService);
       ctx.onMount(mounted);
       ctx.onUnmount(unmounted);
@@ -160,7 +160,7 @@ describe('functional components', () => {
 
   it('rejects lifecycle registration outside the function body', () => {
     let saved!: ComponentContext;
-    function Late(_props: Inputs<{}>, ctx: ComponentContext) {
+    function Late(_inputs: Inputs<{}>, ctx: ComponentContext) {
       saved = ctx;
       return Text({ text: 'late' });
     }
@@ -169,19 +169,19 @@ describe('functional components', () => {
     expect(() => saved.onMount(() => {})).toThrow(/ctx\.onMount\(\) outside its function body/);
   });
 
-  it('rejects writes to the props record', () => {
-    function Writer(props: Inputs<{ name?: string }>) {
-      (props as unknown as Record<string, unknown>).name = 'x';
+  it('rejects writes to the inputs record', () => {
+    function Writer(inputs: Inputs<{ name?: string }>) {
+      (inputs as unknown as Record<string, unknown>).name = 'x';
       return Text();
     }
     const { builder } = createHarness();
-    expect(() => builder.build(Column(createComponent(Writer)))).toThrow(/tried to assign props\.name/);
+    expect(() => builder.build(Column(createComponent(Writer)))).toThrow(/tried to assign inputs\.name/);
   });
 
   it('completes the cells on unmount so derived cells end with the component', () => {
     let derivedCompleted = false;
-    function Ends(props: Inputs<{ label?: string }>) {
-      const label = input(props.label, 'x');
+    function Ends(inputs: Inputs<{ label?: string }>) {
+      const label = input(inputs.label, 'x');
       label.subscribe({ complete: () => (derivedCompleted = true) });
       return Text({ text: label });
     }
@@ -192,8 +192,8 @@ describe('functional components', () => {
   });
 
   it('mounts functions and classes side by side, keyed, inside observable children', () => {
-    function Fn(props: Inputs<{ n: number }>) {
-      return Text({ text: props.n.pipe(map(n => `fn ${n}`)) });
+    function Fn(inputs: Inputs<{ n: number }>) {
+      return Text({ text: inputs.n.pipe(map(n => `fn ${n}`)) });
     }
     const { builder, resolver } = createHarness();
     const list$ = new BehaviorSubject([createComponent(Fn, { n: 1 }, 'a'), createComponent(AClass, {}, 'b')]);

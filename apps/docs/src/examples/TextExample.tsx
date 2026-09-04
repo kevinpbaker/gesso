@@ -22,10 +22,10 @@ const BODY =
  *  - The footer row aligns on `baseline`, so a large number and a small
  *    label sit on the same line rather than on their box centres.
  */
-function Card(props: Inputs<{ width: number }>, _ctx: ComponentContext) {
+function Card(inputs: Inputs<{ width: number }>, _ctx: ComponentContext) {
   return (
     <column
-      width={props.width}
+      width={inputs.width}
       gap={10}
       padding={16}
       borderRadius={10}
@@ -50,7 +50,7 @@ function Card(props: Inputs<{ width: number }>, _ctx: ComponentContext) {
 }
 // #endregion card
 
-export function TextLayout(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function TextLayout(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const step = internalState(0);
   const width = step.pipe(map(index => WIDTHS[index % WIDTHS.length]!));
 

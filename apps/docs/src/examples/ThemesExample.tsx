@@ -150,7 +150,7 @@ export const SCOPED_THEME: UiTheme = themeFor({
  * against whatever theme the node inherits, so this component is the
  * same component under every palette on the page.
  */
-function Card(props: Inputs<{ heading: string; body: string }>, _ctx: ComponentContext) {
+function Card(inputs: Inputs<{ heading: string; body: string }>, _ctx: ComponentContext) {
   return (
     <column
       width={200}
@@ -160,8 +160,8 @@ function Card(props: Inputs<{ heading: string; body: string }>, _ctx: ComponentC
       borderWidth={1}
       borderColor="border"
       backgroundColor="surface">
-      <text text={props.heading} fontSize={15} fontWeight={600} color="text" />
-      <text text={props.body} fontSize={12} />
+      <text text={inputs.heading} fontSize={15} fontWeight={600} color="text" />
+      <text text={inputs.body} fontSize={12} />
       <box padding={6} borderRadius={6} backgroundColor="accentSoft">
         <text text="accentSoft" fontSize={11} color="primary" />
       </box>
@@ -182,7 +182,7 @@ function Card(props: Inputs<{ heading: string; body: string }>, _ctx: ComponentC
  * the nearest provider above a node wins, and the button below swaps
  * only the outer one.
  */
-export function Themes(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Themes(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const index = internalState(0);
   const chosen = index.pipe(map(value => APP_THEMES[value % APP_THEMES.length]!));
   const theme = chosen.pipe(map(entry => entry.theme));

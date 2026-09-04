@@ -148,7 +148,7 @@ const RequestTable = DataTable<Request>;
  * window places unmeasured rows at the estimate, so a wrong one makes
  * the scrollbar settle visibly as the reader scrolls.
  */
-export function Requests(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Requests(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const chosen = internalState(-1);
 
   return (

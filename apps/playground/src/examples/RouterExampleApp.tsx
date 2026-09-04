@@ -118,12 +118,12 @@ export const ROUTES = {
 // ---------------------------------------------------------------------------
 
 /** A link in the top bar: navigates, and lights up while its route is showing. */
-function NavLink(props: Inputs<{ label: string; onPress: () => void; active: boolean }>) {
-  const background = props.active.pipe(map(active => (active ? 'primary' : 'controlBackground')));
-  const color = props.active.pipe(map(active => (active ? 'background' : 'text')));
+function NavLink(inputs: Inputs<{ label: string; onPress: () => void; active: boolean }>) {
+  const background = inputs.active.pipe(map(active => (active ? 'primary' : 'controlBackground')));
+  const color = inputs.active.pipe(map(active => (active ? 'background' : 'text')));
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       height={28}
       paddingLeft={12}
       paddingRight={12}
@@ -133,17 +133,17 @@ function NavLink(props: Inputs<{ label: string; onPress: () => void; active: boo
       y="center"
       cursor="pointer">
       <text color={color} fontSize={13}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
 }
 
 /** A plain button, for the screens' own actions. */
-function Action(props: Inputs<{ label: string; onPress: () => void }>) {
+function Action(inputs: Inputs<{ label: string; onPress: () => void }>) {
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       height={28}
       paddingLeft={12}
       paddingRight={12}
@@ -155,7 +155,7 @@ function Action(props: Inputs<{ label: string; onPress: () => void }>) {
       y="center"
       cursor="pointer">
       <text color="text" fontSize={13}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
@@ -176,7 +176,7 @@ function Action(props: Inputs<{ label: string; onPress: () => void }>) {
  * screens — including the ones the outlet has not mounted yet, which
  * inherit it when they arrive.
  */
-export function RouterExampleApp(_props: Inputs<{}>, ctx: ComponentContext) {
+export function RouterExampleApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
     <column theme={gessoTheme} backgroundColor="background" x="stretch" y="stretch">
@@ -212,7 +212,7 @@ export function RouterExampleApp(_props: Inputs<{}>, ctx: ComponentContext) {
 // The screens
 // ---------------------------------------------------------------------------
 
-function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
+function HomeScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
     <column gap={12} maxWidth={520}>
@@ -241,7 +241,7 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
  * proves: it is written when this function runs, and this function
  * runs once per mount.
  */
-function MailLayout(props: Inputs<OutletProps>, ctx: ComponentContext) {
+function MailLayout(inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   const builtAt = new Date().toLocaleTimeString();
   return (
@@ -264,14 +264,14 @@ function MailLayout(props: Inputs<OutletProps>, ctx: ComponentContext) {
         </text>
       </column>
       <box flexGrow={1} x="stretch" y="stretch">
-        {props.outlet as UiChild}
+        {inputs.outlet as UiChild}
       </box>
     </row>
   );
 }
 
 /** A folder: the message list, and the message below it when one is open. */
-function FolderScreen(props: Inputs<OutletProps>, ctx: ComponentContext) {
+function FolderScreen(inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   const params = router.observeParams(Folder);
   return (
@@ -305,7 +305,7 @@ function FolderScreen(props: Inputs<OutletProps>, ctx: ComponentContext) {
         )}
       </column>
       <box flexGrow={1} x="stretch" y="stretch">
-        {props.outlet as UiChild}
+        {inputs.outlet as UiChild}
       </box>
     </row>
   );
@@ -319,7 +319,7 @@ function FolderScreen(props: Inputs<OutletProps>, ctx: ComponentContext) {
  * follows the params through the observable below. Nothing here is
  * keyed to the id.
  */
-function MessageScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
+function MessageScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   const params = router.observeParams(Message);
   const message = params.pipe(
@@ -364,7 +364,7 @@ function MessageScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
   );
 }
 
-function SignInScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
+function SignInScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
     <column gap={12} maxWidth={420}>
@@ -389,7 +389,7 @@ function SignInScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
   );
 }
 
-function SettingsScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
+function SettingsScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
     <column gap={12} maxWidth={420}>
@@ -413,7 +413,7 @@ function SettingsScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
   );
 }
 
-function MissingScreen(_props: Inputs<OutletProps>, ctx: ComponentContext) {
+function MissingScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
   return (
     <column gap={12} maxWidth={420}>

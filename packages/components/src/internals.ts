@@ -189,15 +189,15 @@ const LAYOUT_PROPS: readonly (keyof ControlLayoutProps)[] = [
  * favour of whichever modifier is later, and a caller who attached
  * something to a control means it.
  */
-export function modifiersOf(props: Inputs<ControlLayoutProps>, ...own: readonly UiModifier[]): readonly UiModifier[] {
-  const supplied = props.rootModifiers?.value;
+export function modifiersOf(inputs: Inputs<ControlLayoutProps>, ...own: readonly UiModifier[]): readonly UiModifier[] {
+  const supplied = inputs.rootModifiers?.value;
   return supplied === undefined || supplied.length === 0 ? own : [...own, ...supplied];
 }
 
 /** The layout props the caller actually supplied, as cells to bind. */
-export function layoutOf(props: Inputs<ControlLayoutProps>): Record<string, unknown> {
+export function layoutOf(inputs: Inputs<ControlLayoutProps>): Record<string, unknown> {
   const passed: Record<string, unknown> = {};
-  const cells = props as unknown as Record<string, InputCell<unknown> | undefined>;
+  const cells = inputs as unknown as Record<string, InputCell<unknown> | undefined>;
   for (const name of LAYOUT_PROPS) {
     const cell = cells[name];
     if (cell !== undefined && cell.value !== undefined) {

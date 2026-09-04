@@ -34,7 +34,7 @@ const SAFE = 80;
  * draggable: the track measures itself, so a pointer inside it is a
  * fraction of the range.
  */
-export function Sliders(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Sliders(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const volume = internalState(40);
 
   return (

@@ -16,7 +16,7 @@ import { ShellService, type ComponentContext, type Inputs } from '@gesso/framewo
  * when an application needs the answer itself rather than a colour
  * derived from it.
  */
-export function Appearance(_props: Inputs<{}>, ctx: ComponentContext) {
+export function Appearance(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const scheme = ctx.inject(ShellService).colorScheme;
 
   return (

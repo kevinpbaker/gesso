@@ -31,7 +31,7 @@ const DETAIL =
  * it animates and says how each one travels, a bare number being
  * milliseconds and `spring()` being the longer form.
  */
-function Panel(props: Inputs<{ open: boolean }>, _ctx: ComponentContext): UiChild {
+function Panel(inputs: Inputs<{ open: boolean }>, _ctx: ComponentContext): UiChild {
   return (
     <column
       width={260}
@@ -42,14 +42,14 @@ function Panel(props: Inputs<{ open: boolean }>, _ctx: ComponentContext): UiChil
       borderWidth={1}
       borderColor="border"
       backgroundColor="surface"
-      height={props.open.pipe(map(on => (on ? 140 : 64)))}
+      height={inputs.open.pipe(map(on => (on ? 140 : 64)))}
       transition={{ height: spring('gentle') }}>
       <text text="A property that travels" fontSize={14} fontWeight={600} color="text" />
       <text
         text={DETAIL}
         fontSize={12}
         color="textMuted"
-        opacity={props.open.pipe(map(on => (on ? 1 : 0)))}
+        opacity={inputs.open.pipe(map(on => (on ? 1 : 0)))}
         transition={{ opacity: 180 }}
       />
     </column>
@@ -67,10 +67,10 @@ function Panel(props: Inputs<{ open: boolean }>, _ctx: ComponentContext): UiChil
  * changed places, so a neighbour resizing is followed rather than
  * animated.
  */
-function Folders(props: Inputs<{ order: readonly string[] }>, _ctx: ComponentContext): UiChild {
+function Folders(inputs: Inputs<{ order: readonly string[] }>, _ctx: ComponentContext): UiChild {
   return (
     <column gap={8} width={200}>
-      {props.order.pipe(
+      {inputs.order.pipe(
         map(names =>
           names.map(name => (
             <row
@@ -94,7 +94,7 @@ function Folders(props: Inputs<{ order: readonly string[] }>, _ctx: ComponentCon
 }
 // #endregion flip
 
-export function MotionBoard(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
+export function MotionBoard(_inputs: Inputs<{}>, ctx: ComponentContext): UiChild {
   const open = internalState(false);
   const order = internalState<readonly string[]>([...FOLDERS]);
   // #region reduced
@@ -132,10 +132,10 @@ export function MotionBoard(_props: Inputs<{}>, ctx: ComponentContext): UiChild 
   );
 }
 
-function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext): UiChild {
+function Control(inputs: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext): UiChild {
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       padding={8}
       borderRadius={6}
       borderWidth={1}
@@ -143,7 +143,7 @@ function Control(props: Inputs<{ label: string; onPress: () => void }>, _ctx: Co
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.label} fontSize={12} color="text" />
+      <text text={inputs.label} fontSize={12} color="text" />
     </button>
   );
 }

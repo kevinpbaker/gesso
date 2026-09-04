@@ -60,8 +60,8 @@ export type Inputs<P> = {
 /**
  * A component written as a function.
  *
- *   function Counter(props: Inputs<{ label?: string }>, ctx: ComponentContext) {
- *     const label = input(props.label, 'Count');
+ *   function Counter(inputs: Inputs<{ label?: string }>, ctx: ComponentContext) {
+ *     const label = input(inputs.label, 'Count');
  *     const count = state(0);
  *     const store = ctx.inject(DemoStore);
  *     return Row(Text({ text: label }), Button({ onClick: () => count.value++ }));
@@ -71,7 +71,7 @@ export type Inputs<P> = {
  * and everything dynamic in the returned tree is an Observable. Local
  * state is `internalState()` cells created in the body.
  */
-export type FunctionComponent<P = {}> = (props: Inputs<P>, context: ComponentContext) => UiChild;
+export type FunctionComponent<P = {}> = (inputs: Inputs<P>, context: ComponentContext) => UiChild;
 
 export type ClassComponent = new () => Component;
 
@@ -80,7 +80,7 @@ export type ClassComponent = new () => Component;
  * loose on purpose: a function's own `Inputs<P>` parameter is what
  * `ComponentProps` reads its props from.
  */
-export type ComponentType = ClassComponent | ((props: any, context: ComponentContext) => UiChild);
+export type ComponentType = ClassComponent | ((inputs: any, context: ComponentContext) => UiChild);
 
 type IsAny<T> = 0 extends 1 & T ? true : false;
 
@@ -137,7 +137,7 @@ type InputFields<I> = {
  */
 export type ComponentProps<C> = C extends ClassComponent
   ? Partial<PropsForCells<InputFields<InstanceType<C>>>>
-  : C extends (props: infer I, ...rest: any[]) => UiChild
+  : C extends (inputs: infer I, ...rest: any[]) => UiChild
     ? IsAny<I> extends true
       ? Record<string, unknown>
       : unknown extends I
@@ -157,8 +157,8 @@ type RequiredKeys<T> = {
  */
 export type ComponentArgs<C> =
   RequiredKeys<ComponentProps<C>> extends never
-    ? [props?: ComponentProps<C>, key?: string | number]
-    : [props: ComponentProps<C>, key?: string | number];
+    ? [inputs?: ComponentProps<C>, key?: string | number]
+    : [inputs: ComponentProps<C>, key?: string | number];
 
 /**
  * Whether a component is a class (extends Component) rather than a

@@ -36,19 +36,19 @@ export interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 
-export function Checkbox(props: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, '');
-  const disabled = input(props.disabled, false);
-  const invalid = input(props.invalid, false);
-  const required = input(props.required, false);
-  const focus = trackFocus(ctx, props.ref);
+export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, '');
+  const disabled = input(inputs.disabled, false);
+  const invalid = input(inputs.invalid, false);
+  const required = input(inputs.required, false);
+  const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<boolean>({
     component: 'Checkbox',
     name: 'checked',
-    source: props.checked,
-    initial: props.defaultChecked,
+    source: inputs.checked,
+    initial: inputs.defaultChecked,
     fallback: false,
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   const toggle = (): void => {
@@ -60,11 +60,11 @@ export function Checkbox(props: Inputs<CheckboxProps>, ctx: ComponentContext): U
 
   return Row(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: modifiersOf(props, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
       gap: 8,
       y: 'center',
       padding: 4,

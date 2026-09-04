@@ -36,13 +36,13 @@ export interface CardProps extends ControlLayoutProps {
 }
 
 /** A surface that groups what is on it. */
-export function Card(props: Inputs<CardProps>, _ctx: ComponentContext): UiChild {
-  const title = input(props.title, '');
-  const label = input(props.label, '');
-  const padding = input(props.padding, 16);
+export function Card(inputs: Inputs<CardProps>, _ctx: ComponentContext): UiChild {
+  const title = input(inputs.title, '');
+  const label = input(inputs.label, '');
+  const padding = input(inputs.padding, 16);
   return Column(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       padding: padding.value,
       gap: 12,
       backgroundColor: 'surface',
@@ -57,7 +57,7 @@ export function Card(props: Inputs<CardProps>, _ctx: ComponentContext): UiChild 
         text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 15, fontWeight: 600, selectable: false })]
       )
     ),
-    props.children.value ?? Row()
+    inputs.children.value ?? Row()
   );
 }
 
@@ -66,11 +66,11 @@ export interface DividerProps extends ControlLayoutProps {
 }
 
 /** A rule between things. Decorative, and says so. */
-export function Divider(props: Inputs<DividerProps>, _ctx: ComponentContext): UiChild {
-  const direction = input(props.direction, 'row');
+export function Divider(inputs: Inputs<DividerProps>, _ctx: ComponentContext): UiChild {
+  const direction = input(inputs.direction, 'row');
   const horizontal = direction.value === 'row';
   return Box({
-    ...layoutOf(props),
+    ...layoutOf(inputs),
     width: horizontal ? undefined : 1,
     height: horizontal ? 1 : undefined,
     flexGrow: horizontal ? 1 : undefined,
@@ -98,11 +98,11 @@ export interface ToolbarProps extends ControlLayoutProps {
  * than describing every button as loose furniture; the buttons inside
  * stay ordinary tab stops.
  */
-export function Toolbar(props: Inputs<ToolbarProps>, _ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'Toolbar');
+export function Toolbar(inputs: Inputs<ToolbarProps>, _ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'Toolbar');
   return Row(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       gap: 6,
       y: 'center',
       padding: 6,
@@ -113,7 +113,7 @@ export function Toolbar(props: Inputs<ToolbarProps>, _ctx: ComponentContext): Ui
       role: 'toolbar',
       label
     },
-    props.children.value ?? Row()
+    inputs.children.value ?? Row()
   );
 }
 
@@ -145,19 +145,19 @@ export interface TabsProps extends ControlLayoutProps {
  * with Tab to reach the content behind them is worse than walking them
  * with the arrows.
  */
-export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'Tabs');
+export function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'Tabs');
   const focus = trackFocus(ctx);
   const value = controlled<string>({
     component: 'Tabs',
     name: 'value',
-    source: props.value,
-    initial: props.defaultValue,
+    source: inputs.value,
+    initial: inputs.defaultValue,
     fallback: '',
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
-  const enabled = (): readonly TabDefinition[] => props.tabs.value.filter(tab => tab.disabled !== true);
+  const enabled = (): readonly TabDefinition[] => inputs.tabs.value.filter(tab => tab.disabled !== true);
   const step = (delta: number): void => {
     const tabs = enabled();
     if (tabs.length === 0) {
@@ -169,12 +169,12 @@ export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
   };
 
   return Column(
-    { ...layoutOf(props), gap: 12 },
+    { ...layoutOf(inputs), gap: 12 },
     Row(
       {
         ref: focus.ref,
         focusable: true,
-        modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
+        modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
         gap: 4,
         role: 'tablist',
         label,
@@ -195,12 +195,12 @@ export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
           }
         })
       },
-      props.tabs.pipe(map(tabs => tabs.map(tab => tabButton(tab, value.value, value.change))))
+      inputs.tabs.pipe(map(tabs => tabs.map(tab => tabButton(tab, value.value, value.change))))
     ),
     Box(
       {
         role: 'tabpanel',
-        label: value.value.pipe(map(current => labelOf(props.tabs.value, current))),
+        label: value.value.pipe(map(current => labelOf(inputs.tabs.value, current))),
         // A panel is as wide as the tabs above it, and so is what it
         // holds. A Box is a Stack, whose children are aligned rather
         // than stretched, so without this the panel's content shrinks
@@ -210,7 +210,7 @@ export function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
         // to be a fraction of, and quietly stopped responding.
         x: 'stretch'
       },
-      props.children.value ?? Row()
+      inputs.children.value ?? Row()
     )
   );
 }
@@ -267,15 +267,15 @@ export interface AccordionProps extends ControlLayoutProps {
   exclusive?: boolean;
 }
 
-export function Accordion(props: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild {
-  const exclusive = input(props.exclusive, false);
+export function Accordion(inputs: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild {
+  const exclusive = input(inputs.exclusive, false);
   const open = controlled<readonly string[]>({
     component: 'Accordion',
     name: 'open',
-    source: props.open,
-    initial: props.defaultOpen,
+    source: inputs.open,
+    initial: inputs.defaultOpen,
     fallback: [],
-    onChange: props.onOpenChange
+    onChange: inputs.onOpenChange
   });
 
   const toggle = (value: string): void => {
@@ -288,8 +288,8 @@ export function Accordion(props: Inputs<AccordionProps>, _ctx: ComponentContext)
   };
 
   return Column(
-    { ...layoutOf(props), gap: 4 },
-    props.sections.pipe(map(sections => sections.map(section => panel(section, open.value, toggle))))
+    { ...layoutOf(inputs), gap: 4 },
+    inputs.sections.pipe(map(sections => sections.map(section => panel(section, open.value, toggle))))
   );
 }
 

@@ -368,7 +368,7 @@ describe('RenderWorkerApp colour scheme', () => {
   it('carries the appearance the shell reports through to a component', async () => {
     const seen: string[] = [];
 
-    function Appearance(_props: Inputs<{}>, ctx: ComponentContext) {
+    function Appearance(_inputs: Inputs<{}>, ctx: ComponentContext) {
       const shell = ctx.inject(ShellService);
       shell.colorScheme.subscribe(scheme => seen.push(scheme));
       return Text({ text: 'appearance' });

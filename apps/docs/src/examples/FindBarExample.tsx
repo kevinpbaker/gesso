@@ -27,7 +27,7 @@ const PARAGRAPHS = [
  * takes that chord over a page like this one unless the shell is told
  * to cancel it.
  */
-export function Searchable(_props: Inputs<{}>, ctx: ComponentContext) {
+export function Searchable(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const find = ctx.inject(FindService);
 
   return (

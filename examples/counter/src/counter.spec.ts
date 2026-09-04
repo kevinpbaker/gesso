@@ -19,8 +19,8 @@ import { createComponent, input, internalState, type ComponentContext, type Inpu
 import { renderTest } from '@gesso/testing';
 import '@gesso/testing/matchers';
 
-function Stepper(props: Inputs<{ label?: string }>, _context: ComponentContext) {
-  const label = input(props.label, 'Count');
+function Stepper(inputs: Inputs<{ label?: string }>, _context: ComponentContext) {
+  const label = input(inputs.label, 'Count');
   const count = internalState(0);
   return Column(
     { gap: 8, padding: 8 },

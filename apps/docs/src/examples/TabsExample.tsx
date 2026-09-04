@@ -63,7 +63,7 @@ const ROWS: Record<string, string> = {
  * The panel each strip shows is its single child, which is what a
  * component's content is: one `UiChild`, not a list.
  */
-export function Views(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Views(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const view = internalState('summary');
   const refused = internalState(false);
   const density = internalState('comfortable');

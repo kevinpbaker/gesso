@@ -27,7 +27,7 @@ import { HOVER_CONTROL } from './interaction';
  * bar that starts with no value and later gets one has to be built
  * again: give it a `key` that changes with it.
  */
-export function Uploads(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Uploads(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const progress = internalState(0.35);
   const caption = progress.pipe(map(value => `${Math.round(value * 100)}% of 24 MB`));
 
@@ -57,11 +57,11 @@ export function Uploads(_props: Inputs<{}>, _ctx: ComponentContext) {
 }
 
 /** A button, hovering and pressing as everything clickable here does. */
-function Step(props: Inputs<{ label: string; onPress: () => void }>) {
+function Step(inputs: Inputs<{ label: string; onPress: () => void }>) {
   return (
     <button
-      label={props.label.value}
-      onClick={props.onPress.value}
+      label={inputs.label.value}
+      onClick={inputs.onPress.value}
       paddingLeft={12}
       paddingRight={12}
       paddingTop={6}
@@ -70,7 +70,7 @@ function Step(props: Inputs<{ label: string; onPress: () => void }>) {
       backgroundColor="controlBackground"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.label} fontSize={12} color="controlForeground" />
+      <text text={inputs.label} fontSize={12} color="controlForeground" />
     </button>
   );
 }

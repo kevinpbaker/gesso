@@ -112,11 +112,11 @@ export interface ImageProps extends ControlLayoutProps, MediaPlaceholderProps {
  * when the node goes — see `media.ts` for why that matters more for an
  * image than for anything else in the library.
  */
-export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild {
+export function Image(inputs: Inputs<ImageProps>, ctx: ComponentContext): UiChild {
   const store = ctx.inject(MediaService);
-  const alt = input(props.alt, undefined);
-  const objectFit = input(props.objectFit, 'cover' as ObjectFit);
-  const radius = input(props.borderRadius, 0);
+  const alt = input(inputs.alt, undefined);
+  const objectFit = input(inputs.objectFit, 'cover' as ObjectFit);
+  const radius = input(inputs.borderRadius, 0);
   const status = internalState<'loading' | 'loaded' | 'failed'>('loading');
 
   // Built once, in the body, so its identity is stable across renders
@@ -125,21 +125,21 @@ export function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild
   // to a `src` that changes shows the new picture and releases the old.
   const source = {
     resolver: store.images,
-    source: props.src,
+    source: inputs.src,
     onState: (next: 'loading' | 'loaded' | 'failed') => (status.value = next)
   };
 
   return Box({
-    ...layoutOf(props),
-    ref: props.ref?.value,
-    modifiers: modifiersOf(props, imageSource(source)),
+    ...layoutOf(inputs),
+    ref: inputs.ref?.value,
+    modifiers: modifiersOf(inputs, imageSource(source)),
     objectFit,
     borderRadius: radius,
     // A tint of the surface while it decodes and after it fails, so a
     // list of thumbnails does not jump as they arrive. The theme
     // decides what that is unless the caller says otherwise; nothing
     // here names a colour either way.
-    backgroundColor: placeholderTint(props.placeholderColor, status, 'loaded'),
+    backgroundColor: placeholderTint(inputs.placeholderColor, status, 'loaded'),
     // No role at all when there is no name: an unnamed `image` record
     // is worse than none.
     role: alt.pipe(map(text => (text === undefined ? undefined : ('image' as const)))),
@@ -184,11 +184,11 @@ export interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
  * one is still leaving picks up the playback already running rather
  * than starting over.
  */
-export function Video(props: Inputs<VideoProps>, ctx: ComponentContext): UiChild {
+export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChild {
   const store = ctx.inject(MediaService);
-  const alt = input(props.alt, undefined);
-  const objectFit = input(props.objectFit, 'cover' as ObjectFit);
-  const radius = input(props.borderRadius, 0);
+  const alt = input(inputs.alt, undefined);
+  const objectFit = input(inputs.objectFit, 'cover' as ObjectFit);
+  const radius = input(inputs.borderRadius, 0);
   const status = internalState<'loading' | 'playing' | 'failed'>('loading');
 
   // Built once, in the body, for the reason `Image`'s source is: the
@@ -196,23 +196,23 @@ export function Video(props: Inputs<VideoProps>, ctx: ComponentContext): UiChild
   // different video — give it a `key`.
   const source = {
     resolver: store.videos,
-    source: props.src.value,
-    loop: props.loop.value,
-    autoplay: props.autoplay.value,
+    source: inputs.src.value,
+    loop: inputs.loop.value,
+    autoplay: inputs.autoplay.value,
     onState: (next: 'loading' | 'playing' | 'failed') => (status.value = next)
   };
 
   return Box({
-    ...layoutOf(props),
-    ref: props.ref?.value,
-    modifiers: modifiersOf(props, videoSource(source)),
+    ...layoutOf(inputs),
+    ref: inputs.ref?.value,
+    modifiers: modifiersOf(inputs, videoSource(source)),
     objectFit,
     borderRadius: radius,
     // The same tint `Image` draws, from the same prop: a clip waiting
     // on a fetch, a demux and a decoder configuration has nothing to
     // show for longer than a picture does, and a clip that never
     // resolves has this box and nothing else.
-    backgroundColor: placeholderTint(props.placeholderColor, status, 'playing'),
+    backgroundColor: placeholderTint(inputs.placeholderColor, status, 'playing'),
     role: alt.pipe(map(text => (text === undefined ? undefined : ('image' as const)))),
     label: alt,
     selectable: false
@@ -248,10 +248,10 @@ export interface IconProps extends ControlLayoutProps {
  * what an icon is. `IconRasterizer`'s docblock states what the per-icon
  * version costs, so the atlas has a number to beat.
  */
-export function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild {
+export function Icon(inputs: Inputs<IconProps>, ctx: ComponentContext): UiChild {
   const store = ctx.inject(MediaService);
-  const label = input(props.label, undefined);
-  const size = input(props.size, 16);
+  const label = input(inputs.label, undefined);
+  const size = input(inputs.size, 16);
 
   // The cells themselves, not their values: the modifier follows each
   // one, so a glyph whose path or colour is bound to state redraws when
@@ -259,19 +259,19 @@ export function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild {
   // to change what it shows.
   const spec = {
     rasterizer: store.icons,
-    path: props.path,
-    viewBox: input(props.viewBox, 24),
+    path: inputs.path,
+    viewBox: input(inputs.viewBox, 24),
     size,
-    color: input(props.color, 'controlForeground' as UiColorValue),
-    style: input(props.style, 'fill' as const),
-    strokeWidth: input(props.strokeWidth, 2),
-    fillRule: input(props.fillRule, 'nonzero' as const)
+    color: input(inputs.color, 'controlForeground' as UiColorValue),
+    style: input(inputs.style, 'fill' as const),
+    strokeWidth: input(inputs.strokeWidth, 2),
+    fillRule: input(inputs.fillRule, 'nonzero' as const)
   };
 
   return Box({
-    ...layoutOf(props),
-    ref: props.ref?.value,
-    modifiers: modifiersOf(props, iconSource(spec)),
+    ...layoutOf(inputs),
+    ref: inputs.ref?.value,
+    modifiers: modifiersOf(inputs, iconSource(spec)),
     width: size,
     height: size,
     flexShrink: 0,
@@ -317,10 +317,10 @@ const SPINNER_BLADES = 8;
  * It is a `status` rather than a `progressbar`: a spinner says work is
  * happening and cannot say how much, and `busy` is the state for that.
  */
-export function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiChild {
-  const size = props.size.value ?? 20;
-  const label = input(props.label, 'Loading');
-  const color = props.color.value ?? 'controlAccent';
+export function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): UiChild {
+  const size = inputs.size.value ?? 20;
+  const label = input(inputs.label, 'Loading');
+  const color = inputs.color.value ?? 'controlAccent';
   const step = internalState(0);
 
   const animations = ctx.inject(AnimationService);
@@ -357,8 +357,8 @@ export function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiC
 
   return Box(
     {
-      ...layoutOf(props),
-      modifiers: modifiersOf(props),
+      ...layoutOf(inputs),
+      modifiers: modifiersOf(inputs),
       width: size,
       height: size,
       flexShrink: 0,
@@ -406,12 +406,12 @@ const PROGRESS_STEPS = 24;
  * reporting zero would tell a reader that no progress has been made,
  * which is a stronger and different claim than "unknown".
  */
-export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'Progress');
-  const min = input(props.min, 0);
-  const max = input(props.max, 1);
-  const thickness = props.thickness.value ?? 6;
-  const indeterminate = props.value.value === undefined;
+export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'Progress');
+  const min = input(inputs.min, 0);
+  const max = input(inputs.max, 1);
+  const thickness = inputs.thickness.value ?? 6;
+  const indeterminate = inputs.value.value === undefined;
   const step = internalState(0);
 
   if (indeterminate) {
@@ -434,7 +434,7 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
 
   const fraction: Observable<number> = indeterminate
     ? step.pipe(map(() => 0))
-    : props.value.pipe(
+    : inputs.value.pipe(
         map(current => {
           const low = min.value;
           const high = max.value;
@@ -468,8 +468,8 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
 
   return Box(
     {
-      ...layoutOf(props),
-      modifiers: modifiersOf(props),
+      ...layoutOf(inputs),
+      modifiers: modifiersOf(inputs),
       height: thickness,
       borderRadius: thickness / 2,
       backgroundColor: 'controlBackground',
@@ -478,7 +478,7 @@ export function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentConte
       role: 'progressbar',
       label,
       // Absent while indeterminate, which is what ARIA means by it.
-      valueNow: indeterminate ? undefined : props.value,
+      valueNow: indeterminate ? undefined : inputs.value,
       valueMin: indeterminate ? undefined : min,
       valueMax: indeterminate ? undefined : max,
       states: (indeterminate ? ['busy'] : []) as UiSemanticState[]

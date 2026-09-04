@@ -49,18 +49,18 @@ export interface LazyListProps extends ControlLayoutProps {
   label?: string;
 }
 
-export function LazyList(props: Inputs<LazyListProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'List');
-  const estimated = input(props.estimatedItemExtent, 28);
-  const focus = trackFocus(ctx, props.ref);
+export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'List');
+  const estimated = input(inputs.estimatedItemExtent, 28);
+  const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
   const selected = controlled<number>({
     component: 'LazyList',
     name: 'selectedIndex',
-    source: props.selectedIndex,
-    initial: props.defaultSelectedIndex,
+    source: inputs.selectedIndex,
+    initial: inputs.defaultSelectedIndex,
     fallback: -1,
-    onChange: props.onSelect
+    onChange: inputs.onSelect
   });
 
   /**
@@ -76,14 +76,14 @@ export function LazyList(props: Inputs<LazyListProps>, ctx: ComponentContext): U
     selected.change(index);
     list.reveal(index);
   };
-  const step = (by: number): void => choose(stepIndex(selected.current(), by, props.count.value));
+  const step = (by: number): void => choose(stepIndex(selected.current(), by, inputs.count.value));
 
   const row = (index: number): UiChild =>
     Box(
       {
         role: 'listitem',
         posInSet: index + 1,
-        setSize: props.count,
+        setSize: inputs.count,
         states: selected.value.pipe(map(current => (current === index ? (['selected'] as UiSemanticState[]) : []))),
         backgroundColor: selected.value.pipe(
           map(current => (current === index ? 'selectionBackground' : 'transparent'))
@@ -91,25 +91,25 @@ export function LazyList(props: Inputs<LazyListProps>, ctx: ComponentContext): U
         color: selected.value.pipe(map(current => (current === index ? 'selectionForeground' : 'controlForeground'))),
         onClick: () => choose(index)
       },
-      props.item.value(index)
+      inputs.item.value(index)
     );
 
   return LazyColumn(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       ref: node => {
         list.ref(node);
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(props, list.viewport, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING),
       scrollY: list.scrollY,
       focusable: true,
-      count: props.count,
-      revision: props.revision,
+      count: inputs.count,
+      revision: inputs.revision,
       estimatedExtent: estimated.value,
-      overscan: props.overscan.value,
-      itemKey: props.itemKey.value,
+      overscan: inputs.overscan.value,
+      itemKey: inputs.itemKey.value,
       role: 'list',
       label,
       backgroundColor: 'controlBackground',
@@ -122,18 +122,18 @@ export function LazyList(props: Inputs<LazyListProps>, ctx: ComponentContext): U
         PageDown: () => step(PAGE),
         PageUp: () => step(-PAGE),
         Home: () => choose(0),
-        End: () => choose(props.count.value - 1),
-        Enter: () => activate(props, selected.current()),
-        ' ': () => activate(props, selected.current())
+        End: () => choose(inputs.count.value - 1),
+        Enter: () => activate(inputs, selected.current()),
+        ' ': () => activate(inputs, selected.current())
       })
     },
     row
   );
 }
 
-function activate(props: Inputs<LazyListProps>, index: number): void {
+function activate(inputs: Inputs<LazyListProps>, index: number): void {
   if (index >= 0) {
-    props.onActivate.value?.(index);
+    inputs.onActivate.value?.(index);
   }
 }
 

@@ -25,7 +25,7 @@ import { createComponent, ShellService, type ComponentContext, type Inputs } fro
  * theme, so a root that provides only `theme` leaves every unstyled
  * line painting the default black.
  */
-function ExampleRoot(props: Inputs<{ content: UiChild }>, ctx: ComponentContext) {
+function ExampleRoot(inputs: Inputs<{ content: UiChild }>, ctx: ComponentContext) {
   const theme = ctx.inject(ShellService).colorScheme.pipe(map(scheme => (scheme === 'dark' ? darkTheme : lightTheme)));
 
   return (
@@ -35,7 +35,7 @@ function ExampleRoot(props: Inputs<{ content: UiChild }>, ctx: ComponentContext)
       backgroundColor="background"
       width={percent(100)}
       height={percent(100)}>
-      {props.content}
+      {inputs.content}
     </box>
   );
 }

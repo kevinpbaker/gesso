@@ -65,31 +65,31 @@ interface TreeRow {
   readonly parent: string | null;
 }
 
-export function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, 'Tree');
-  const rowHeight = input(props.rowHeight, 24);
-  const focus = trackFocus(ctx, props.ref);
+export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, 'Tree');
+  const rowHeight = input(inputs.rowHeight, 24);
+  const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
   const expanded = controlled<readonly string[]>({
     component: 'Tree',
     name: 'expanded',
-    source: props.expanded,
-    initial: props.defaultExpanded,
+    source: inputs.expanded,
+    initial: inputs.defaultExpanded,
     fallback: [],
-    onChange: props.onExpandedChange
+    onChange: inputs.onExpandedChange
   });
   const selected = controlled<string | null>({
     component: 'Tree',
     name: 'selectedKey',
-    source: props.selectedKey,
-    initial: props.defaultSelectedKey,
+    source: inputs.selectedKey,
+    initial: inputs.defaultSelectedKey,
     fallback: null,
-    onChange: props.onSelect
+    onChange: inputs.onSelect
   });
 
   let cached: { nodes: readonly TreeNode[]; open: readonly string[]; rows: TreeRow[] } | null = null;
   const rows = (): TreeRow[] => {
-    const nodes = props.nodes.value;
+    const nodes = inputs.nodes.value;
     const open = expanded.current();
     if (cached !== null && cached.nodes === nodes && sameKeys(cached.open, open)) {
       return cached.rows;
@@ -103,7 +103,7 @@ export function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
     return key === null ? -1 : rows().findIndex(row => row.node.key === key);
   };
 
-  const revision = combineLatest([props.nodes, expanded.value]);
+  const revision = combineLatest([inputs.nodes, expanded.value]);
   const count = revision.pipe(map(() => rows().length));
 
   const choose = (index: number): void => {
@@ -159,7 +159,7 @@ export function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
   const activate = (): void => {
     const key = selected.current();
     if (key !== null) {
-      props.onActivate.value?.(key);
+      inputs.onActivate.value?.(key);
     }
   };
 
@@ -223,13 +223,13 @@ export function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
 
   return LazyColumn(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       ref: node => {
         list.ref(node);
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(props, list.viewport, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING),
       scrollY: list.scrollY,
       focusable: true,
       count,

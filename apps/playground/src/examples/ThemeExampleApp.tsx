@@ -437,17 +437,17 @@ interface Option {
 }
 
 function SegmentButton(
-  props: Inputs<{ label: string; selected: boolean; onPress: () => void }>,
+  inputs: Inputs<{ label: string; selected: boolean; onPress: () => void }>,
   ctx: ComponentContext
 ) {
   const { radius } = appearance(ctx);
   const hovered = internalState(false);
-  const background = combineLatest([props.selected, hovered]).pipe(
+  const background = combineLatest([inputs.selected, hovered]).pipe(
     map(([selected, hover]) => (selected ? 'primary' : hover ? 'surfaceAlt' : 'transparent'))
   );
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       flexGrow={1}
@@ -456,29 +456,31 @@ function SegmentButton(
       y="center"
       borderRadius={radius('small')}
       borderWidth={1}
-      borderColor={props.selected.pipe(map(selected => (selected ? 'primary' : 'border')))}
+      borderColor={inputs.selected.pipe(map(selected => (selected ? 'primary' : 'border')))}
       backgroundColor={background}
       cursor="pointer">
       <text
-        color={props.selected.pipe(map(selected => (selected ? 'onPrimary' : 'text')))}
+        color={inputs.selected.pipe(map(selected => (selected ? 'onPrimary' : 'text')))}
         fontSize={12.5}
         fontWeight={600}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
 }
 
 /** One row of mutually exclusive choices. */
-function Segmented(props: Inputs<{ options: readonly Option[]; selected: string; onSelect: (value: string) => void }>) {
+function Segmented(
+  inputs: Inputs<{ options: readonly Option[]; selected: string; onSelect: (value: string) => void }>
+) {
   return (
     <row gap={6} selfX="stretch">
-      {props.options.value.map(option => (
+      {inputs.options.value.map(option => (
         <SegmentButton
           key={option.value}
           label={option.label}
-          selected={props.selected.pipe(map(value => value === option.value))}
-          onPress={() => props.onSelect.value(option.value)}
+          selected={inputs.selected.pipe(map(value => value === option.value))}
+          onPress={() => inputs.onSelect.value(option.value)}
         />
       ))}
     </row>
@@ -493,15 +495,15 @@ function Segmented(props: Inputs<{ options: readonly Option[]; selected: string;
  * of the palette, it is the palette, painted by the same resolution
  * path as the page.
  */
-function PaletteChip(props: Inputs<{ name: PaletteName }>, ctx: ComponentContext) {
+function PaletteChip(inputs: Inputs<{ name: PaletteName }>, ctx: ComponentContext) {
   const { view, send, radius } = appearance(ctx);
-  const preview = combineLatest([props.name, view]).pipe(
+  const preview = combineLatest([inputs.name, view]).pipe(
     map(([name, current]) => buildTheme({ ...specOf(current), palette: name }))
   );
-  const selected = combineLatest([props.name, view]).pipe(map(([name, current]) => name === current.palette));
+  const selected = combineLatest([inputs.name, view]).pipe(map(([name, current]) => name === current.palette));
   return (
     <column
-      onClick={() => send.setPalette(props.name.value)}
+      onClick={() => send.setPalette(inputs.name.value)}
       flexGrow={1}
       gap={8}
       padding={8}
@@ -525,18 +527,18 @@ function PaletteChip(props: Inputs<{ name: PaletteName }>, ctx: ComponentContext
         <box height={7} width={30} borderRadius={3} backgroundColor="surfaceAlt" />
       </column>
       <text color={selected.pipe(map(on => (on ? 'primary' : 'textMuted')))} fontSize={12} fontWeight={600}>
-        {props.name.pipe(map(name => PALETTES[name].label))}
+        {inputs.name.pipe(map(name => PALETTES[name].label))}
       </text>
     </column>
   );
 }
 
-function AccentSwatch(props: Inputs<{ name: AccentName }>, ctx: ComponentContext) {
+function AccentSwatch(inputs: Inputs<{ name: AccentName }>, ctx: ComponentContext) {
   const { view, send } = appearance(ctx);
-  const selected = view.pipe(map(choices => choices.accent === props.name.value));
+  const selected = view.pipe(map(choices => choices.accent === inputs.name.value));
   return (
     <box
-      onClick={() => send.setAccent(props.name.value)}
+      onClick={() => send.setAccent(inputs.name.value)}
       width={36}
       height={36}
       x="center"
@@ -549,13 +551,13 @@ function AccentSwatch(props: Inputs<{ name: AccentName }>, ctx: ComponentContext
         width={22}
         height={22}
         borderRadius={11}
-        backgroundColor={props.name.pipe(map(name => ACCENTS[name].color))}
+        backgroundColor={inputs.name.pipe(map(name => ACCENTS[name].color))}
       />
     </box>
   );
 }
 
-function SettingsPanel(_props: Inputs<{}>, ctx: ComponentContext) {
+function SettingsPanel(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const { view, send, theme, text, radius } = appearance(ctx);
   const label = text('label');
 
@@ -639,10 +641,10 @@ function SettingsPanel(_props: Inputs<{}>, ctx: ComponentContext) {
 // Preview: an ordinary screen, written only in palette names
 // ---------------------------------------------------------------------------
 
-function Pill(props: Inputs<{ label: string; primary?: boolean }>, ctx: ComponentContext) {
+function Pill(inputs: Inputs<{ label: string; primary?: boolean }>, ctx: ComponentContext) {
   const { radius, size } = appearance(ctx);
   const hovered = internalState(false);
-  const background = combineLatest([props.primary, hovered]).pipe(
+  const background = combineLatest([inputs.primary, hovered]).pipe(
     map(([primary, hover]) => (primary === true ? 'primary' : hover ? 'surfaceAlt' : 'transparent'))
   );
   return (
@@ -657,20 +659,20 @@ function Pill(props: Inputs<{ label: string; primary?: boolean }>, ctx: Componen
       y="center"
       borderRadius={radius('small')}
       borderWidth={1}
-      borderColor={props.primary.pipe(map(primary => (primary === true ? 'primary' : 'border')))}
+      borderColor={inputs.primary.pipe(map(primary => (primary === true ? 'primary' : 'border')))}
       backgroundColor={background}
       cursor="pointer">
       <text
-        color={props.primary.pipe(map(primary => (primary === true ? 'onPrimary' : 'text')))}
+        color={inputs.primary.pipe(map(primary => (primary === true ? 'onPrimary' : 'text')))}
         fontSize={size('bodySmall')}
         fontWeight={600}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
 }
 
-function Tile(props: Inputs<{ label: string; value: string; delta?: string }>, ctx: ComponentContext) {
+function Tile(inputs: Inputs<{ label: string; value: string; delta?: string }>, ctx: ComponentContext) {
   const { text, radius, size } = appearance(ctx);
   return (
     <column
@@ -681,11 +683,11 @@ function Tile(props: Inputs<{ label: string; value: string; delta?: string }>, c
       borderColor="border"
       borderWidth={1}
       borderRadius={radius('medium')}>
-      <text textStyle={text('label')}>{props.label}</text>
+      <text textStyle={text('label')}>{inputs.label}</text>
       <row gap={8} y="center">
-        <text textStyle={text('headline')}>{props.value}</text>
+        <text textStyle={text('headline')}>{inputs.value}</text>
         <text color="positive" fontSize={size('bodySmall')} fontWeight={600}>
-          {props.delta.pipe(map(delta => delta ?? ''))}
+          {inputs.delta.pipe(map(delta => delta ?? ''))}
         </text>
       </row>
     </column>
@@ -706,9 +708,9 @@ const ACTIVITY: readonly Activity[] = [
   { id: 'a3', title: 'Layout conformance suite green', when: 'this morning', mark: '↑', good: true }
 ];
 
-function ActivityRow(props: Inputs<{ item: Activity }>, ctx: ComponentContext) {
+function ActivityRow(inputs: Inputs<{ item: Activity }>, ctx: ComponentContext) {
   const { text, size } = appearance(ctx);
-  const item = props.item;
+  const item = inputs.item;
   return (
     <row gap={12} y="center" paddingTop={10} paddingBottom={10}>
       <box
@@ -742,7 +744,7 @@ function ActivityRow(props: Inputs<{ item: Activity }>, ctx: ComponentContext) {
  * page, no hex — which is what lets the second copy come out in a
  * different theme with no change to the component.
  */
-function SampleCard(_props: Inputs<{}>, ctx: ComponentContext) {
+function SampleCard(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const { radius, shadow, size } = appearance(ctx);
   return (
     <column
@@ -787,7 +789,7 @@ function SampleCard(_props: Inputs<{}>, ctx: ComponentContext) {
   );
 }
 
-function Preview(_props: Inputs<{}>, ctx: ComponentContext) {
+function Preview(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const { view, text, radius, shadow } = appearance(ctx);
   // The same choices in the opposite mode, so a light card can live
   // inside a dark page. Derived here for the same reason the theme is.
@@ -864,7 +866,7 @@ function Preview(_props: Inputs<{}>, ctx: ComponentContext) {
  * follows the type scale; both are ordinary props, so both accept an
  * Observable and neither costs a rebuild when it changes.
  */
-export function ThemeApp(_props: Inputs<{}>, ctx: ComponentContext) {
+export function ThemeApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const { theme, text } = appearance(ctx);
   return (
     <row theme={theme} textStyle={text('body')} backgroundColor="background" y="stretch">

@@ -18,7 +18,7 @@ import { HOVER_CONTROL } from './interaction';
  * through the mirror the shell put over the canvas. The spec beside
  * this file drives all three from the runtime's side of that seam.
  */
-export function Note(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Note(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const title = internalState('Groceries');
   const filed = internalState(0);
 

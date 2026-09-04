@@ -23,7 +23,7 @@ const PLANS = [
  *
  * What the application supplies is the state and what to do with it.
  */
-export function Form(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Form(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const email = internalState('');
   const plan = internalState('team');
   const updates = internalState(true);

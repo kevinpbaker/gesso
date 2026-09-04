@@ -24,7 +24,7 @@ import { internalState, type ComponentContext, type Inputs } from '@gesso/framew
  * drawing: a screen reader says on and off for a switch, and checked
  * and unchecked for a checkbox, which is the reason both exist.
  */
-export function Connectivity(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Connectivity(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const airplane = internalState(false);
   const wifi = internalState(true);
 

@@ -58,42 +58,42 @@ export interface TextInputProps extends ControlLayoutProps {
   onSubmit?: () => void;
 }
 
-export function TextInput(props: Inputs<TextInputProps>, ctx: ComponentContext): UiChild {
-  return textField(props, ctx, false);
+export function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext): UiChild {
+  return textField(inputs, ctx, false);
 }
 
 export type TextAreaProps = Omit<TextInputProps, 'multiline'>;
 
-export function TextArea(props: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild {
-  return textField(props as Inputs<TextInputProps>, ctx, true);
+export function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild {
+  return textField(inputs as Inputs<TextInputProps>, ctx, true);
 }
 
-function textField(props: Inputs<TextInputProps>, ctx: ComponentContext, forceMultiline: boolean): UiChild {
-  const label = input(props.label, '');
-  const description = input(props.description, '');
-  const error = input(props.error, '');
-  const disabled = input(props.disabled, false);
-  const readOnly = input(props.readOnly, false);
-  const required = input(props.required, false);
-  const multiline = forceMultiline ? new BehaviorSubject(true) : input(props.multiline, false);
+function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceMultiline: boolean): UiChild {
+  const label = input(inputs.label, '');
+  const description = input(inputs.description, '');
+  const error = input(inputs.error, '');
+  const disabled = input(inputs.disabled, false);
+  const readOnly = input(inputs.readOnly, false);
+  const required = input(inputs.required, false);
+  const multiline = forceMultiline ? new BehaviorSubject(true) : input(inputs.multiline, false);
   const invalid = error.pipe(map(text => text.length > 0));
-  const focus = trackFocus(ctx, props.ref);
+  const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<string>({
     component: forceMultiline ? 'TextArea' : 'TextInput',
     name: 'value',
-    source: props.value,
-    initial: props.defaultValue,
+    source: inputs.value,
+    initial: inputs.defaultValue,
     fallback: '',
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   // The message under the field: the error when there is one, else the
   // description. One node, so the two can never both be read out.
   const message = combineLatest([error, description]).pipe(map(([bad, hint]) => (bad.length > 0 ? bad : hint)));
-  const submit = keymap({ Enter: () => props.onSubmit.value?.() });
+  const submit = keymap({ Enter: () => inputs.onSubmit.value?.() });
 
   return Column(
-    { ...layoutOf(props), gap: 4 },
+    { ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(text =>
         text.length === 0 ? [] : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
@@ -101,9 +101,9 @@ function textField(props: Inputs<TextInputProps>, ctx: ComponentContext, forceMu
     ),
     EditableText({
       ref: focus.ref,
-      modifiers: modifiersOf(props, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
       value: value.value,
-      placeholder: props.placeholder,
+      placeholder: inputs.placeholder,
       disabled,
       readOnly,
       multiline,

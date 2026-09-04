@@ -134,9 +134,9 @@ interface ComponentContext {
   onUnmount(hook: () => void): void;
 }
 type Inputs<P> = { readonly [K in keyof P]-?: InputCell<P[K]>; };
-type FunctionComponent<P = {}> = (props: Inputs<P>, context: ComponentContext) => UiChild;
+type FunctionComponent<P = {}> = (inputs: Inputs<P>, context: ComponentContext) => UiChild;
 type ClassComponent = new () => Component;
-type ComponentType = ClassComponent | ((props: any, context: ComponentContext) => UiChild);
+type ComponentType = ClassComponent | ((inputs: any, context: ComponentContext) => UiChild);
 type IsAny<T> = 0 extends 1 & T ? true : false;
 type CellValue<C> = C extends InputCell<infer T> ? T : never;
 type OptionalCellKeys<I> = { [K in keyof I]: undefined extends CellValue<I[K]> ? K : never; }[keyof I];
@@ -146,9 +146,9 @@ type NoProps = {
   readonly __noProps?: never;
 };
 type InputFields<I> = { [K in keyof I as I[K] extends InputCell<any> ? K : never]: I[K]; };
-type ComponentProps<C> = C extends ClassComponent ? Partial<PropsForCells<InputFields<InstanceType<C>>>> : C extends ((props: infer I, ...rest: any[]) => UiChild) ? IsAny<I> extends true ? Record<string, unknown> : unknown extends I ? NoProps : [I] extends [undefined] ? NoProps : PropsForCells<I> : never;
+type ComponentProps<C> = C extends ClassComponent ? Partial<PropsForCells<InputFields<InstanceType<C>>>> : C extends ((inputs: infer I, ...rest: any[]) => UiChild) ? IsAny<I> extends true ? Record<string, unknown> : unknown extends I ? NoProps : [I] extends [undefined] ? NoProps : PropsForCells<I> : never;
 type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K; }[keyof T];
-type ComponentArgs<C> = RequiredKeys<ComponentProps<C>> extends never ? [props?: ComponentProps<C>, key?: string | number] : [props: ComponentProps<C>, key?: string | number];
+type ComponentArgs<C> = RequiredKeys<ComponentProps<C>> extends never ? [inputs?: ComponentProps<C>, key?: string | number] : [inputs: ComponentProps<C>, key?: string | number];
 declare function isClassComponent(component: ComponentType): component is ClassComponent;
 export {
   applyPatch,
@@ -224,7 +224,7 @@ import {
   PatchPath,
   ReadableCell,
   viewKeys
-} from "./FunctionComponent-CEoy33Hr.js";
+} from "./FunctionComponent-BSsqDvbp.js";
 import {
   BehaviorSubject,
   Observable,
@@ -1518,7 +1518,7 @@ interface PresenceProps {
   height?: UiLength | number;
   exitTimeout?: number;
 }
-declare function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): UiChild;
+declare function Presence(inputs: Inputs<PresenceProps>, ctx: ComponentContext): UiChild;
 declare function observeReducedMotion(onChange: (reduced: boolean) => void): () => void;
 declare function observeMediaQuery(query: string, onChange: (matches: boolean) => void): () => void;
 declare class FindService {
@@ -1883,7 +1883,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-CEoy33Hr.js";
+} from "../FunctionComponent-BSsqDvbp.js";
 import {
   Observable
 } from "rxjs";

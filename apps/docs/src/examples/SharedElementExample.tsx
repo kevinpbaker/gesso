@@ -21,7 +21,7 @@ const SUMMARY =
  * and reports the box this element is seen in whenever the layout
  * moves it.
  */
-function Summary(props: Inputs<{ onOpen: () => void }>, _ctx: ComponentContext): UiChild {
+function Summary(inputs: Inputs<{ onOpen: () => void }>, _ctx: ComponentContext): UiChild {
   return (
     <column gap={12} padding={20} width={percent(100)}>
       <text text="Collections" fontSize={12} fontWeight={600} color="textMuted" />
@@ -48,7 +48,7 @@ function Summary(props: Inputs<{ onOpen: () => void }>, _ctx: ComponentContext):
           <text text="Nine recordings" fontSize={12} color="textMuted" />
         </column>
         <button
-          onClick={() => props.onOpen.value()}
+          onClick={() => inputs.onOpen.value()}
           padding={8}
           borderRadius={6}
           borderWidth={1}
@@ -74,7 +74,7 @@ function Summary(props: Inputs<{ onOpen: () => void }>, _ctx: ComponentContext):
  * departing element yields the moment the name changes hands, so there
  * are never two of the same thing on screen.
  */
-function Detail(props: Inputs<{ onBack: () => void }>, _ctx: ComponentContext): UiChild {
+function Detail(inputs: Inputs<{ onBack: () => void }>, _ctx: ComponentContext): UiChild {
   return (
     <column gap={12} padding={20} width={percent(100)}>
       <box
@@ -90,7 +90,7 @@ function Detail(props: Inputs<{ onBack: () => void }>, _ctx: ComponentContext): 
       <text text={SUMMARY} fontSize={12} color="textMuted" />
       <row>
         <button
-          onClick={() => props.onBack.value()}
+          onClick={() => inputs.onBack.value()}
           padding={8}
           borderRadius={6}
           borderWidth={1}
@@ -116,7 +116,7 @@ function Detail(props: Inputs<{ onBack: () => void }>, _ctx: ComponentContext): 
  * it. The departing screen may fade, because nothing is morphing out
  * of it.
  */
-export function SharedElementStage(_props: Inputs<{}>, _ctx: ComponentContext): UiChild {
+export function SharedElementStage(_inputs: Inputs<{}>, _ctx: ComponentContext): UiChild {
   const view = internalState<'list' | 'detail'>('list');
 
   return (

@@ -12,7 +12,7 @@ import { HOVER_CONTROL } from './interaction';
  * handler, so what the reader sees is the routing itself rather than a
  * description of it.
  */
-export function PointerSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function PointerSurface(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const press = internalState('nothing yet');
   const hover = internalState('nothing');
   const focus = internalState('nothing');

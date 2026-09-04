@@ -643,17 +643,17 @@ function counted(): void {
 // Controls
 // ---------------------------------------------------------------------------
 
-function RailButton(props: Inputs<{ label: string; primary?: boolean; onPress: () => void }>) {
+function RailButton(inputs: Inputs<{ label: string; primary?: boolean; onPress: () => void }>) {
   counted();
   const hovered = internalState(false);
-  const background = combineLatest([props.primary, hovered]).pipe(
+  const background = combineLatest([inputs.primary, hovered]).pipe(
     map(([primary, hover]) =>
       primary === true ? (hover ? ACCENT_HOVER : ACCENT) : hover ? SURFACE_OVERLAY : 'transparent'
     )
   );
   return (
     <button
-      onClick={() => props.onPress.value()}
+      onClick={() => inputs.onPress.value()}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       selfX="stretch"
@@ -662,27 +662,27 @@ function RailButton(props: Inputs<{ label: string; primary?: boolean; onPress: (
       y="center"
       borderRadius={7}
       borderWidth={1}
-      borderColor={props.primary.pipe(map(primary => (primary === true ? ACCENT : BORDER)))}
+      borderColor={inputs.primary.pipe(map(primary => (primary === true ? ACCENT : BORDER)))}
       backgroundColor={background}
       cursor="pointer">
       <text
-        color={props.primary.pipe(map(primary => (primary === true ? CHALK : TEXT)))}
+        color={inputs.primary.pipe(map(primary => (primary === true ? CHALK : TEXT)))}
         fontSize={13}
         fontWeight={600}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
 }
 
-function RateButton(props: Inputs<{ rate: RateName }>, ctx: ComponentContext) {
+function RateButton(inputs: Inputs<{ rate: RateName }>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
-  const selected = store.stream.pipe(map(view => view.rate === props.rate.value));
+  const selected = store.stream.pipe(map(view => view.rate === inputs.rate.value));
   const hovered = internalState(false);
   return (
     <button
-      onClick={() => store.setRate(props.rate.value)}
+      onClick={() => store.setRate(inputs.rate.value)}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => (hovered.value = false)}
       flexGrow={1}
@@ -697,39 +697,39 @@ function RateButton(props: Inputs<{ rate: RateName }>, ctx: ComponentContext) {
       )}
       cursor="pointer">
       <text color={selected.pipe(map(on => (on ? ACCENT : MUTED)))} fontSize={12.5} fontWeight={600}>
-        {props.rate.pipe(map(rate => RATES[rate].label))}
+        {inputs.rate.pipe(map(rate => RATES[rate].label))}
       </text>
     </button>
   );
 }
 
-function Label(props: Inputs<{ text: string }>) {
+function Label(inputs: Inputs<{ text: string }>) {
   counted();
   return (
     <text color={FAINT} fontSize={10.5} fontWeight={700} letterSpacing={0.9}>
-      {props.text}
+      {inputs.text}
     </text>
   );
 }
 
-function Readout(props: Inputs<{ label: string; value: string; accent?: boolean }>) {
+function Readout(inputs: Inputs<{ label: string; value: string; accent?: boolean }>) {
   counted();
   return (
     <row y="center" gap={10} selfX="stretch">
       <text color={MUTED} fontSize={12} flexGrow={1} maxLines={1} textOverflow="ellipsis">
-        {props.label}
+        {inputs.label}
       </text>
       <text
-        color={props.accent.pipe(map(accent => (accent === true ? ACCENT : TEXT)))}
+        color={inputs.accent.pipe(map(accent => (accent === true ? ACCENT : TEXT)))}
         fontSize={13.5}
         fontWeight={700}>
-        {props.value}
+        {inputs.value}
       </text>
     </row>
   );
 }
 
-function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
+function ControlRail(inputs: Inputs<{ bodies: number }>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   const stream = store.stream;
@@ -800,7 +800,7 @@ function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
         <Readout label="Samples taken" value={store.ticks$.pipe(map(formatCount))} />
         <Readout label="Incidents seen" value={store.incidents$.pipe(map(formatCount))} />
         <box height={1} selfX="stretch" backgroundColor={BORDER_SOFT} />
-        <Readout label="Component bodies run" value={props.bodies.pipe(map(formatCount))} />
+        <Readout label="Component bodies run" value={inputs.bodies.pipe(map(formatCount))} />
         <Readout label="Tree built at" value={builtAt} />
       </column>
 
@@ -825,9 +825,9 @@ function ControlRail(props: Inputs<{ bodies: number }>, ctx: ComponentContext) {
  * Knowing which props are static is half of what makes a bound tree
  * cheap.
  */
-function Sparkline(props: Inputs<{ channel: LiveChannel }>) {
+function Sparkline(inputs: Inputs<{ channel: LiveChannel }>) {
   counted();
-  const channel = props.channel.value;
+  const channel = inputs.channel.value;
   return (
     <row gap={2} y="end" height={BAR_MAX} selfX="stretch">
       {channel.heights.map((height$, index) => (
@@ -845,9 +845,9 @@ function Sparkline(props: Inputs<{ channel: LiveChannel }>) {
   );
 }
 
-function ChannelCard(props: Inputs<{ channel: LiveChannel }>) {
+function ChannelCard(inputs: Inputs<{ channel: LiveChannel }>) {
   counted();
-  const channel = props.channel.value;
+  const channel = inputs.channel.value;
   const spec = channel.spec;
   return (
     <column
@@ -899,7 +899,7 @@ function ChannelCard(props: Inputs<{ channel: LiveChannel }>) {
  * layout nor changes a paint property of the node — so this moves for
  * free while everything else on the page is being measured.
  */
-function Scanner(_props: Inputs<{}>, ctx: ComponentContext) {
+function Scanner(_inputs: Inputs<{}>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   const travel = 132 - 34;
@@ -921,7 +921,7 @@ function Scanner(_props: Inputs<{}>, ctx: ComponentContext) {
  * bound and sum to one. A layout binding, so the row is re-measured
  * every time the load moves.
  */
-function SaturationMeter(_props: Inputs<{}>, ctx: ComponentContext) {
+function SaturationMeter(_inputs: Inputs<{}>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   const load = store.load$;
@@ -953,9 +953,9 @@ function SaturationMeter(_props: Inputs<{}>, ctx: ComponentContext) {
   );
 }
 
-function LogLine(props: Inputs<{ row: LogRowCells }>) {
+function LogLine(inputs: Inputs<{ row: LogRowCells }>) {
   counted();
-  const row = props.row.value;
+  const row = inputs.row.value;
   return (
     <row gap={11} y="center" height={26} selfX="stretch" opacity={row.opacity$}>
       <box width={6} height={6} borderRadius={3} backgroundColor={row.colour$} />
@@ -969,7 +969,7 @@ function LogLine(props: Inputs<{ row: LogRowCells }>) {
   );
 }
 
-function EventLog(_props: Inputs<{}>, ctx: ComponentContext) {
+function EventLog(_inputs: Inputs<{}>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   return (
@@ -995,7 +995,7 @@ function EventLog(_props: Inputs<{}>, ctx: ComponentContext) {
   );
 }
 
-function Board(_props: Inputs<{}>, ctx: ComponentContext) {
+function Board(_inputs: Inputs<{}>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   const stream = store.stream;
@@ -1047,7 +1047,7 @@ function Board(_props: Inputs<{}>, ctx: ComponentContext) {
  * The root. It owns the feed's lifetime and the body counter, and
  * nothing else — every moving value below it arrives by binding.
  */
-export function LiveApp(_props: Inputs<{}>, ctx: ComponentContext) {
+export function LiveApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
   counted();
   const store = ctx.inject(LiveFeed);
   const bodies = internalState(0);

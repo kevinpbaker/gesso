@@ -35,20 +35,20 @@ class Greeting extends Component {
 }
 
 /** A component that takes its content as a prop, the way `Card` does. */
-function Panel(props: Inputs<{ title: string; children?: UiChild }>) {
+function Panel(inputs: Inputs<{ title: string; children?: UiChild }>) {
   return (
     <column gap={2}>
-      <text>{props.title}</text>
-      {props.children.value ?? Row()}
+      <text>{inputs.title}</text>
+      {inputs.children.value ?? Row()}
     </column>
   );
 }
 
-function Badge(props: Inputs<{ count: number; tone?: string }>) {
-  const tone = input(props.tone, 'neutral');
+function Badge(inputs: Inputs<{ count: number; tone?: string }>) {
+  const tone = input(inputs.tone, 'neutral');
   return (
     <row gap={4}>
-      <text>{props.count.pipe(map(String))}</text>
+      <text>{inputs.count.pipe(map(String))}</text>
       <text>{tone}</text>
     </row>
   );

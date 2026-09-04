@@ -141,7 +141,7 @@ const asPixels = (value: number) => `${value} px`;
  * a click. Every control above it is the library's and needs no such
  * line.
  */
-export function SettingsScreen(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function SettingsScreen(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const { settings, field, update, reset } = settingsStore();
 
   const summary = settings.pipe(

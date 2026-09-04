@@ -30,7 +30,7 @@ const labelOf = (value: string) => SORTS.find(sort => sort.value === value)?.lab
  * bind the keys, which is why every component in the library carries a
  * keymap of its own.
  */
-export function SortBar(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function SortBar(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const sort = internalState('recent');
   const applied = internalState('recent');
   const apply = () => (applied.value = sort.value);

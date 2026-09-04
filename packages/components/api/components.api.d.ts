@@ -62,7 +62,7 @@ interface CheckboxProps extends ControlLayoutProps {
   invalid?: boolean;
   required?: boolean;
 }
-declare function Checkbox(props: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
 interface SwitchProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   checked?: boolean;
@@ -71,7 +71,7 @@ interface SwitchProps extends ControlLayoutProps {
   label?: string;
   disabled?: boolean;
 }
-declare function Switch(props: Inputs<SwitchProps>, ctx: ComponentContext): UiChild;
+declare function Switch(inputs: Inputs<SwitchProps>, ctx: ComponentContext): UiChild;
 interface RadioOption {
   readonly value: string;
   readonly label: string;
@@ -89,7 +89,7 @@ interface RadioGroupProps extends ControlLayoutProps {
   required?: boolean;
   direction?: 'row' | 'column';
 }
-declare function RadioGroup(props: Inputs<RadioGroupProps>, ctx: ComponentContext): UiChild;
+declare function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContext): UiChild;
 interface TextInputProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   value?: string;
@@ -105,9 +105,9 @@ interface TextInputProps extends ControlLayoutProps {
   multiline?: boolean;
   onSubmit?: () => void;
 }
-declare function TextInput(props: Inputs<TextInputProps>, ctx: ComponentContext): UiChild;
+declare function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext): UiChild;
 type TextAreaProps = Omit<TextInputProps, 'multiline'>;
-declare function TextArea(props: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild;
+declare function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild;
 interface SliderProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   value?: number;
@@ -121,7 +121,7 @@ interface SliderProps extends ControlLayoutProps {
   format?: (value: number) => string;
   labelHidden?: boolean;
 }
-declare function Slider(props: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
+declare function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
 interface NumberInputProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   value?: number;
@@ -135,23 +135,23 @@ interface NumberInputProps extends ControlLayoutProps {
   disabled?: boolean;
   required?: boolean;
 }
-declare function NumberInput(props: Inputs<NumberInputProps>, ctx: ComponentContext): UiChild;
+declare function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentContext): UiChild;
 interface CardProps extends ControlLayoutProps {
   title?: string;
   label?: string;
   padding?: number;
   children?: UiChild;
 }
-declare function Card(props: Inputs<CardProps>, _ctx: ComponentContext): UiChild;
+declare function Card(inputs: Inputs<CardProps>, _ctx: ComponentContext): UiChild;
 interface DividerProps extends ControlLayoutProps {
   direction?: 'row' | 'column';
 }
-declare function Divider(props: Inputs<DividerProps>, _ctx: ComponentContext): UiChild;
+declare function Divider(inputs: Inputs<DividerProps>, _ctx: ComponentContext): UiChild;
 interface ToolbarProps extends ControlLayoutProps {
   label?: string;
   children?: UiChild;
 }
-declare function Toolbar(props: Inputs<ToolbarProps>, _ctx: ComponentContext): UiChild;
+declare function Toolbar(inputs: Inputs<ToolbarProps>, _ctx: ComponentContext): UiChild;
 interface TabDefinition {
   readonly value: string;
   readonly label: string;
@@ -165,7 +165,7 @@ interface TabsProps extends ControlLayoutProps {
   label?: string;
   children?: UiChild;
 }
-declare function Tabs(props: Inputs<TabsProps>, ctx: ComponentContext): UiChild;
+declare function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild;
 interface AccordionSection {
   readonly value: string;
   readonly label: string;
@@ -179,7 +179,7 @@ interface AccordionProps extends ControlLayoutProps {
   sections: readonly AccordionSection[];
   exclusive?: boolean;
 }
-declare function Accordion(props: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild;
+declare function Accordion(inputs: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild;
 interface SplitPaneProps extends ControlLayoutProps {
   split?: number;
   defaultSplit?: number;
@@ -191,12 +191,12 @@ interface SplitPaneProps extends ControlLayoutProps {
   max?: number;
   label?: string;
 }
-declare function SplitPane(props: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild;
+declare function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild;
 interface FindBarProps {
   inset?: number;
   placeholder?: string;
 }
-declare function FindBar(props: Inputs<FindBarProps>, ctx: ComponentContext): UiChild;
+declare function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): UiChild;
 interface DialogProps {
   open?: boolean;
   onClose?: () => void;
@@ -206,7 +206,7 @@ interface DialogProps {
   dismissible?: boolean;
   width?: number;
 }
-declare function Dialog(props: Inputs<DialogProps>, ctx: ComponentContext): UiChild;
+declare function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild;
 interface OverlayHandle {
   readonly id: string;
   readonly open: Observable<boolean>;
@@ -247,7 +247,7 @@ interface MenuProps {
     readonly y: number;
   };
 }
-declare function Menu(props: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
+declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
 interface SelectOption {
   readonly value: string;
   readonly label: string;
@@ -265,7 +265,7 @@ interface SelectProps extends ControlLayoutProps {
   required?: boolean;
   ref?: (node: UiNode | null) => void;
 }
-declare function Select(props: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
+declare function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
 declare function tooltipContent(text: string): UiChild;
 interface TooltipProps {
   text?: string;
@@ -273,7 +273,7 @@ interface TooltipProps {
   delay?: number;
   children?: UiChild;
 }
-declare function Tooltip(props: Inputs<TooltipProps>, ctx: ComponentContext): UiChild;
+declare function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): UiChild;
 interface TooltipModifierOptions {
   text: string;
   placement?: OverlayPlacement;
@@ -291,7 +291,7 @@ interface ToastProps {
   duration?: number;
   dismissible?: boolean;
 }
-declare function Toast(props: Inputs<ToastProps>, ctx: ComponentContext): UiChild;
+declare function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChild;
 interface LazyListProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   count: number;
@@ -306,7 +306,7 @@ interface LazyListProps extends ControlLayoutProps {
   onActivate?: (index: number) => void;
   label?: string;
 }
-declare function LazyList(props: Inputs<LazyListProps>, ctx: ComponentContext): UiChild;
+declare function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild;
 interface DataColumn<T> {
   readonly key: string;
   readonly header: string;
@@ -334,7 +334,7 @@ interface DataTableProps<T> extends ControlLayoutProps {
   columnGap?: number;
   label?: string;
 }
-declare function DataTable<T>(props: Inputs<DataTableProps<T>>, ctx: ComponentContext): UiChild;
+declare function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentContext): UiChild;
 interface TreeNode {
   readonly key: string;
   readonly label: string;
@@ -354,7 +354,7 @@ interface TreeProps extends ControlLayoutProps {
   rowHeight?: number;
   label?: string;
 }
-declare function Tree(props: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
+declare function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
 interface MediaPlaceholderProps {
   placeholderColor?: UiColorValue;
 }
@@ -365,7 +365,7 @@ interface ImageProps extends ControlLayoutProps, MediaPlaceholderProps {
   objectFit?: ObjectFit;
   borderRadius?: number;
 }
-declare function Image(props: Inputs<ImageProps>, ctx: ComponentContext): UiChild;
+declare function Image(inputs: Inputs<ImageProps>, ctx: ComponentContext): UiChild;
 interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
   ref?: UiNodeRef;
   src: string;
@@ -375,7 +375,7 @@ interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
   loop?: boolean;
   autoplay?: boolean;
 }
-declare function Video(props: Inputs<VideoProps>, ctx: ComponentContext): UiChild;
+declare function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChild;
 interface IconProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   path: string;
@@ -387,13 +387,13 @@ interface IconProps extends ControlLayoutProps {
   fillRule?: 'nonzero' | 'evenodd';
   label?: string;
 }
-declare function Icon(props: Inputs<IconProps>, ctx: ComponentContext): UiChild;
+declare function Icon(inputs: Inputs<IconProps>, ctx: ComponentContext): UiChild;
 interface SpinnerProps extends ControlLayoutProps {
   size?: number;
   label?: string;
   color?: UiColorValue;
 }
-declare function Spinner(props: Inputs<SpinnerProps>, ctx: ComponentContext): UiChild;
+declare function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): UiChild;
 interface ProgressBarProps extends ControlLayoutProps {
   value?: number;
   min?: number;
@@ -401,7 +401,7 @@ interface ProgressBarProps extends ControlLayoutProps {
   label?: string;
   thickness?: number;
 }
-declare function ProgressBar(props: Inputs<ProgressBarProps>, ctx: ComponentContext): UiChild;
+declare function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentContext): UiChild;
 interface VirtualList {
   readonly windowRef: (window: UiVirtualWindow) => void;
   readonly ref: UiNodeRef;

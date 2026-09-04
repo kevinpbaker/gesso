@@ -29,9 +29,9 @@ const STEP_MS = 40;
  * written outside a frame is what asks the runtime for the next one, so
  * the sweep on screen is the timer made visible.
  */
-export function Pulse(props: Inputs<{ label?: string; caption?: string }>, ctx: ComponentContext) {
-  const label = input(props.label, 'Gesso');
-  const caption = input(props.caption, '');
+export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx: ComponentContext) {
+  const label = input(inputs.label, 'Gesso');
+  const caption = input(inputs.caption, '');
   const sweep = internalState(0);
   const ticks = internalState(0);
   const worstMs = internalState(0);

@@ -24,10 +24,10 @@ class TypedClass extends Component {
   }
 }
 
-function TypedFunction(props: Inputs<{ title: string; subtitle?: string; count?: number }>, _ctx: ComponentContext) {
-  expectTypeOf(props.title.value).toEqualTypeOf<string>();
-  expectTypeOf(props.subtitle.value).toEqualTypeOf<string | undefined>();
-  return Text({ text: props.title });
+function TypedFunction(inputs: Inputs<{ title: string; subtitle?: string; count?: number }>, _ctx: ComponentContext) {
+  expectTypeOf(inputs.title.value).toEqualTypeOf<string>();
+  expectTypeOf(inputs.subtitle.value).toEqualTypeOf<string | undefined>();
+  return Text({ text: inputs.title });
 }
 
 function NoProps() {
@@ -61,7 +61,7 @@ describe('createComponent types', () => {
     createComponent(TypedFunction, { title: 'T', count: 'many' });
   });
 
-  it('lets a component without props be created bare', () => {
+  it('lets a component without inputs be created bare', () => {
     expect(createComponent(NoProps).props).toEqual({});
     createComponent(NoProps, {});
     // @ts-expect-error it declares no props

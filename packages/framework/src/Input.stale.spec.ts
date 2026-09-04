@@ -9,24 +9,27 @@ import { input } from './Input';
 import { mountRuntime } from './app/RuntimeTestUtils';
 
 /** Reads its label once, the way a body should not. */
-function Snapshot(props: Inputs<{ label: string }>, _ctx: ComponentContext): UiChild {
-  return Text({ text: `Hello ${props.label.value}` });
+function Snapshot(inputs: Inputs<{ label: string }>, _ctx: ComponentContext): UiChild {
+  return Text({ text: `Hello ${inputs.label.value}` });
 }
 
 /** Binds its label, the way a body should. */
-function Bound(props: Inputs<{ label: string }>, _ctx: ComponentContext): UiChild {
-  return Text({ text: props.label.pipe(map(label => `Hello ${label}`)) });
+function Bound(inputs: Inputs<{ label: string }>, _ctx: ComponentContext): UiChild {
+  return Text({ text: inputs.label.pipe(map(label => `Hello ${label}`)) });
 }
 
 /** Reads a fallback cell once. */
-function WithFallback(props: Inputs<{ size?: number }>, _ctx: ComponentContext): UiChild {
-  const size = input(props.size, 16).value;
+function WithFallback(inputs: Inputs<{ size?: number }>, _ctx: ComponentContext): UiChild {
+  const size = input(inputs.size, 16).value;
   return Text({ text: `Size ${size}` });
 }
 
 /** Reads the value later, in a handler, which is the ordinary way to read a current value. */
-function InHandler(props: Inputs<{ label: string; onRead: (label: string) => void }>, _ctx: ComponentContext): UiChild {
-  return Text({ text: 'Press', onClick: () => props.onRead.emit(props.label.value) });
+function InHandler(
+  inputs: Inputs<{ label: string; onRead: (label: string) => void }>,
+  _ctx: ComponentContext
+): UiChild {
+  return Text({ text: 'Press', onClick: () => inputs.onRead.emit(inputs.label.value) });
 }
 
 describe('the stale-read warning', () => {
@@ -82,8 +85,8 @@ describe('the stale-read warning', () => {
   it('names the field that changed when the value is an object', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const track = new BehaviorSubject({ id: 't1', title: 'One', art: 'a.jpg' });
-    function Row(props: Inputs<{ track: { id: string; title: string; art: string } }>): UiChild {
-      return Text({ text: props.track.value.title });
+    function Row(inputs: Inputs<{ track: { id: string; title: string; art: string } }>): UiChild {
+      return Text({ text: inputs.track.value.title });
     }
     mountRuntime(Column({}, createComponent(Row, { track })));
 

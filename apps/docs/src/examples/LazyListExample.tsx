@@ -37,7 +37,7 @@ const ROW = 26;
  * scrolled to it, and the list scrolls to it because the window can say
  * where an index sits without mounting it.
  */
-export function Events(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Events(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const count = internalState(LONG);
   const newestFirst = internalState(false);
   const chosen = internalState(-1);

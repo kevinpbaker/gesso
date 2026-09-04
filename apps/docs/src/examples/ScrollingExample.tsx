@@ -19,16 +19,16 @@ const CITIES = [
 ] as const;
 
 /** One row: a fixed height, so the arithmetic on the page is checkable. */
-function City(props: Inputs<{ name: string; zone: string }>, _ctx: ComponentContext) {
+function City(inputs: Inputs<{ name: string; zone: string }>, _ctx: ComponentContext) {
   return (
     <row height={36} paddingLeft={10} paddingRight={10} x="space-between" y="center" borderRadius={6}>
-      <text text={props.name} fontSize={13} color="text" />
-      <text text={props.zone} fontSize={12} color="textMuted" />
+      <text text={inputs.name} fontSize={13} color="text" />
+      <text text={inputs.zone} fontSize={12} color="textMuted" />
     </row>
   );
 }
 
-export function ScrollingList(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function ScrollingList(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const at = internalState(0);
 
   // #region list

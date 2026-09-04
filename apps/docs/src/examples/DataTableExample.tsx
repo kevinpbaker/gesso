@@ -104,7 +104,7 @@ const RunTable = DataTable<Run>;
  * Click the table and use the arrows, Page Up and Page Down, Home and
  * End to move the choice; Enter or Space opens it.
  */
-export function Runs(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Runs(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const sort = internalState<DataTableSort | null>(null);
   const chosen = internalState(-1);
   const opened = internalState('nothing yet');

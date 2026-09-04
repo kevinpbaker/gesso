@@ -23,7 +23,7 @@ const MAX_TICKETS = 6;
  * derived from both cells rather than written out twice. Those three
  * properties are also what makes the spec beside this file short.
  */
-export function TicketRow(_props: Inputs<{}>, _context: ComponentContext) {
+export function TicketRow(_inputs: Inputs<{}>, _context: ComponentContext) {
   const tickets = internalState(1);
   const wrapped = internalState(false);
 

@@ -812,7 +812,7 @@ function Card(inputs: Inputs<{ card: CardDesign; onOpen: (id: string) => void }>
   );
 }
 
-function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild {
+function HomeScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
   const catalogue = ctx.channel(Catalogue);
   const open = (id: string): void => router.go(Detail, { id });
@@ -883,7 +883,7 @@ function HomeScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild
  * the three never line up. Under reduced motion the tweens snap and the
  * bars stand still, which still says which row is playing.
  */
-function PlayingBars(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
+function PlayingBars(_inputs: Inputs<{}>, ctx: ComponentContext): UiChild {
   const animations = ctx.inject(AnimationService);
   const bars = [
     { height: internalState(6), duration: 520 },
@@ -1061,7 +1061,7 @@ function TrackRow(inputs: Inputs<{ card: CardDesign; track: TrackView }>, ctx: C
   );
 }
 
-function DetailScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): UiChild {
+function DetailScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
   const catalogue = ctx.channel(Catalogue);
   const params = router.params(Detail);
@@ -1353,7 +1353,7 @@ function SeekBar(
  * slides it in the first time a track starts and out when the queue
  * finishes.
  */
-function NowPlayingBar(_props: Inputs<{}>, ctx: ComponentContext): UiChild {
+function NowPlayingBar(_inputs: Inputs<{}>, ctx: ComponentContext): UiChild {
   const queue = ctx.channel(Queue);
   const audio = ctx.inject(AudioService);
   const track = queue.view.current;
@@ -1532,7 +1532,7 @@ function AppHeader(inputs: Inputs<{ hidden: boolean }>): UiChild {
   );
 }
 
-export function TransitionsExampleApp(_props: Inputs<Record<string, never>>, ctx: ComponentContext): UiChild {
+export function TransitionsExampleApp(_inputs: Inputs<Record<string, never>>, ctx: ComponentContext): UiChild {
   const router = ctx.inject(RouterService);
   const onDetail = router.match.pipe(map(match => match?.route === Detail));
   // The player lives for the life of the app, above both screens, so a

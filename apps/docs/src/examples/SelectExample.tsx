@@ -42,7 +42,7 @@ const SPEEDS: readonly SelectOption[] = [
  * letter jumps to the option it starts, Enter chooses, and Escape
  * closes without choosing and puts the keyboard back on the trigger.
  */
-export function Checkout(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Checkout(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const payment = internalState('card');
   const refused = internalState(false);
   const speed = internalState('');

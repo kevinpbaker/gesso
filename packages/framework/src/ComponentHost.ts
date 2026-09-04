@@ -195,8 +195,8 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
           : undefined,
       set: (_target, name) => {
         throw new Error(
-          `Component '${this.element.tag}' tried to assign props.${String(name)}. ` +
-            `Props are input cells written by the host; read props.${String(name)}.value or bind the cell.`
+          `Component '${this.element.tag}' tried to assign inputs.${String(name)}. ` +
+            `Inputs are cells written by the host; read inputs.${String(name)}.value or bind the cell.`
         );
       }
     });

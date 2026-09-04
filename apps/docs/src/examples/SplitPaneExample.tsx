@@ -23,7 +23,7 @@ import { internalState, type ComponentContext, type Inputs } from '@gesso/framew
  * fraction is, and text wider than the fraction would otherwise refuse
  * to shrink and stop the divider partway across.
  */
-export function Panes(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Panes(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const split = internalState(0.4);
 
   return (

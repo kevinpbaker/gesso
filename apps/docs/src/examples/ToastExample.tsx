@@ -27,7 +27,7 @@ import { HOVER_CONTROL } from './interaction';
  * once would be drawn on top of each other, so this raises one at a
  * time.
  */
-export function Notices(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Notices(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const saved = internalState(false);
   const failed = internalState(false);
 

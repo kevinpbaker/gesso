@@ -17,8 +17,8 @@ import { Button, Row, Text } from '@gesso/core';
 import { createApp, createComponent, input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
 import { combineLatest, map } from 'rxjs';
 
-function Counter(props: Inputs<{ label?: string }>, _ctx: ComponentContext) {
-  const label = input(props.label, 'Count'); // props are cells; this one has a default
+function Counter(inputs: Inputs<{ label?: string }>, _ctx: ComponentContext) {
+  const label = input(inputs.label, 'Count'); // props are cells; this one has a default
   const count = internalState(0);
   return Row(
     { gap: 8, y: 'center', padding: 24 },

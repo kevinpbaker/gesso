@@ -194,7 +194,7 @@ function patchLine(patch: Patch): string {
  * came from a parent or from across a barrier makes no difference
  * here, which is why it is not worth a second name.
  */
-export function BarrierScreen(props: Inputs<{ traffic: readonly string[] }>, ctx: ComponentContext) {
+export function BarrierScreen(inputs: Inputs<{ traffic: readonly string[] }>, ctx: ComponentContext) {
   const tasks = ctx.channel(Tasks);
 
   return (
@@ -240,7 +240,7 @@ export function BarrierScreen(props: Inputs<{ traffic: readonly string[] }>, ctx
       </column>
       <column gap={4} flexGrow={1}>
         <text text="on the wire" fontSize={11} color="textMuted" />
-        {props.traffic.pipe(
+        {inputs.traffic.pipe(
           map(lines =>
             lines.map((line, index) => (
               <text key={String(index)} text={line} fontSize={11} fontFamily="monospace" color="text" />

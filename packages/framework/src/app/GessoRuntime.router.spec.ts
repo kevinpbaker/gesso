@@ -39,12 +39,12 @@ function HomeScreen(): ReturnType<typeof Text> {
  * A layout: it renders its own chrome and places whatever route is
  * below it. Nothing about it knows which route that is.
  */
-function MailLayout(props: Inputs<OutletProps>): ReturnType<typeof Column> {
+function MailLayout(inputs: Inputs<OutletProps>): ReturnType<typeof Column> {
   count('layout');
-  return Column(Text({ text: 'Mail' }), Box({}, props.outlet));
+  return Column(Text({ text: 'Mail' }), Box({}, inputs.outlet));
 }
 
-function MailItemScreen(_props: Inputs<OutletProps>, ctx: ComponentContext): ReturnType<typeof Text> {
+function MailItemScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext): ReturnType<typeof Text> {
   count('item');
   const router = ctx.inject(RouterService);
   return Text({ text: router.observeParams(MailItem).pipe(map(params => `Message ${params?.id ?? '-'}`)) });

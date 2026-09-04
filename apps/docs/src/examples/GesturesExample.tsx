@@ -25,7 +25,7 @@ function offsetText(offset: Subject<DragOffset>) {
  * the reader sees is the recognizer's own answer rather than a
  * description of it.
  */
-export function GestureSurface(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function GestureSurface(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const gesture = internalState('nothing yet');
   const at = internalState(0);
   const panned = new Subject<DragOffset>();

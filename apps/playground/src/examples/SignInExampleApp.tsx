@@ -187,9 +187,9 @@ const SUCCESS = POSITIVE;
 // ---------------------------------------------------------------------------
 
 /** One of the six passcode dots; fills as digits are entered, turns red on a wrong code. */
-function Dot(props: Inputs<{ index: number }>, ctx: ComponentContext) {
+function Dot(inputs: Inputs<{ index: number }>, ctx: ComponentContext) {
   const auth = ctx.channel(SignIn);
-  const color = combineLatest([auth.view.view, props.index]).pipe(
+  const color = combineLatest([auth.view.view, inputs.index]).pipe(
     map(([view, index]) => {
       if (view.status === 'wrong') return DANGER;
       if (view.status === 'signedIn') return SUCCESS;
@@ -205,23 +205,23 @@ function Dot(props: Inputs<{ index: number }>, ctx: ComponentContext) {
  * runtime routes to the key: enter/leave for hover, down/up for the
  * press, with a leave while pressed ending both.
  */
-function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean; name?: string }>) {
+function Key(inputs: Inputs<{ label: string; onPress: () => void; dim?: boolean; name?: string }>) {
   const hovered = internalState(false);
   const pressed = internalState(false);
-  const background = combineLatest([props.dim, hovered, pressed]).pipe(
+  const background = combineLatest([inputs.dim, hovered, pressed]).pipe(
     map(([dim, hover, press]) => {
       if (press) return dim ? KEY : KEY_PRESSED;
       if (hover) return dim ? KEY : KEY_HOVER;
       return dim ? 'transparent' : KEY;
     })
   );
-  const color = combineLatest([props.dim, hovered]).pipe(map(([dim, hover]) => (dim && !hover ? MUTED : KEY_TEXT)));
+  const color = combineLatest([inputs.dim, hovered]).pipe(map(([dim, hover]) => (dim && !hover ? MUTED : KEY_TEXT)));
   return (
     <button
       // A `button` announces itself; what it is *called* is its text,
       // which is a word for the digits and a glyph for the other two.
-      label={props.name}
-      onClick={() => props.onPress.value()}
+      label={inputs.name}
+      onClick={() => inputs.onPress.value()}
       onPointerEnter={() => (hovered.value = true)}
       onPointerLeave={() => {
         hovered.value = false;
@@ -237,14 +237,14 @@ function Key(props: Inputs<{ label: string; onPress: () => void; dim?: boolean; 
       y="center"
       cursor="pointer">
       <text color={color} fontSize={22} fontWeight={500}>
-        {props.label}
+        {inputs.label}
       </text>
     </button>
   );
 }
 
 /** The line under the dots: a prompt, the checking state, an error, or the lockout countdown. */
-function StatusLine(_props: Inputs<{}>, ctx: ComponentContext) {
+function StatusLine(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const auth = ctx.channel(SignIn);
   const view = auth.view.view;
   const text = view.pipe(
@@ -270,17 +270,17 @@ function StatusLine(_props: Inputs<{}>, ctx: ComponentContext) {
 }
 
 /** A labelled switch. */
-function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void }>) {
-  const trackColor = props.on.pipe(map(on => (on ? 'primary' : DOT_EMPTY)));
-  const knobX = props.on.pipe(map(on => (on ? 'end' : 'start')));
+function Switch(inputs: Inputs<{ label: string; on: boolean; onToggle: () => void }>) {
+  const trackColor = inputs.on.pipe(map(on => (on ? 'primary' : DOT_EMPTY)));
+  const knobX = inputs.on.pipe(map(on => (on ? 'end' : 'start')));
   return (
     <row
       gap={10}
       y="center"
       role="switch"
-      label={props.label}
-      states={props.on.pipe(map((on): UiSemanticState[] => (on ? ['checked'] : [])))}
-      onClick={() => props.onToggle.value()}
+      label={inputs.label}
+      states={inputs.on.pipe(map((on): UiSemanticState[] => (on ? ['checked'] : [])))}
+      onClick={() => inputs.onToggle.value()}
       // A switch is a control: Tab reaches it and Space or Enter flips
       // it, as they do the library's Switch. The accessibility report
       // for this route is what found it missing.
@@ -288,7 +288,7 @@ function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void
       onKeyDown={(event: UiKeyboardEvent) => {
         if (event.key === ' ' || event.key === 'Enter') {
           event.preventDefault();
-          props.onToggle.value();
+          inputs.onToggle.value();
         }
       }}
       cursor="pointer">
@@ -296,13 +296,13 @@ function Switch(props: Inputs<{ label: string; on: boolean; onToggle: () => void
         <box width={16} height={16} borderRadius={8} backgroundColor={CHALK} />
       </box>
       <text color={MUTED} fontSize={13}>
-        {props.label}
+        {inputs.label}
       </text>
     </row>
   );
 }
 
-function SignInScreen(_props: Inputs<{}>, ctx: ComponentContext) {
+function SignInScreen(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const auth = ctx.channel(SignIn);
   const view = auth.view.view;
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
@@ -389,21 +389,21 @@ function formatAmount(amount: number): string {
   return `${sign}$${Math.abs(amount).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function Stat(props: Inputs<{ label: string; value: string; tone?: string }>) {
+function Stat(inputs: Inputs<{ label: string; value: string; tone?: string }>) {
   return (
     <column flexGrow={1} padding={14} gap={4} backgroundColor={KEY} borderRadius={12}>
       <text color={MUTED} fontSize={12}>
-        {props.label}
+        {inputs.label}
       </text>
-      <text color={props.tone.pipe(map(tone => tone ?? KEY_TEXT))} fontSize={20} fontWeight={600}>
-        {props.value}
+      <text color={inputs.tone.pipe(map(tone => tone ?? KEY_TEXT))} fontSize={20} fontWeight={600}>
+        {inputs.value}
       </text>
     </column>
   );
 }
 
-function MovementRow(props: Inputs<{ movement: Movement }>) {
-  const movement = props.movement;
+function MovementRow(inputs: Inputs<{ movement: Movement }>) {
+  const movement = inputs.movement;
   return (
     <row gap={12} y="center" paddingTop={10} paddingBottom={10}>
       <box
@@ -432,7 +432,7 @@ function MovementRow(props: Inputs<{ movement: Movement }>) {
   );
 }
 
-function AccountScreen(_props: Inputs<{}>, ctx: ComponentContext) {
+function AccountScreen(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const auth = ctx.channel(SignIn);
   const signedInAt = auth.view.view.pipe(
     map(v => (v.signedInAt === null ? '' : new Date(v.signedInAt).toLocaleTimeString()))
@@ -493,7 +493,7 @@ function AccountScreen(_props: Inputs<{}>, ctx: ComponentContext) {
 // state while it is up, and remounts only when the answer changes.
 // ---------------------------------------------------------------------------
 
-export function SignInApp(_props: Inputs<{}>, ctx: ComponentContext) {
+export function SignInApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const auth = ctx.channel(SignIn);
   const screen = auth.view.view.pipe(
     map(v => v.status === 'signedIn'),

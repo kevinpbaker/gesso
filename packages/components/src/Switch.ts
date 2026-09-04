@@ -32,17 +32,17 @@ export interface SwitchProps extends ControlLayoutProps {
   disabled?: boolean;
 }
 
-export function Switch(props: Inputs<SwitchProps>, ctx: ComponentContext): UiChild {
-  const label = input(props.label, '');
-  const disabled = input(props.disabled, false);
-  const focus = trackFocus(ctx, props.ref);
+export function Switch(inputs: Inputs<SwitchProps>, ctx: ComponentContext): UiChild {
+  const label = input(inputs.label, '');
+  const disabled = input(inputs.disabled, false);
+  const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<boolean>({
     component: 'Switch',
     name: 'checked',
-    source: props.checked,
-    initial: props.defaultChecked,
+    source: inputs.checked,
+    initial: inputs.defaultChecked,
     fallback: false,
-    onChange: props.onChange
+    onChange: inputs.onChange
   });
 
   const toggle = (): void => {
@@ -54,11 +54,11 @@ export function Switch(props: Inputs<SwitchProps>, ctx: ComponentContext): UiChi
 
   return Row(
     {
-      ...layoutOf(props),
+      ...layoutOf(inputs),
       ref: focus.ref,
       focusable: true,
       disabled,
-      modifiers: modifiersOf(props, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
       gap: 8,
       y: 'center',
       padding: 4,

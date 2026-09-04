@@ -52,7 +52,7 @@ const NOTICE_LARGE = 96;
  * this example's theme, since the layer it renders in is nowhere near
  * the tree that opened it.
  */
-export function Anchored(_props: Inputs<{}>, ctx: ComponentContext) {
+export function Anchored(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const panel = useOverlay(ctx, 'docs-position');
   const at = internalState(ANCHOR_HIGH);
   const notice = internalState(NOTICE_SMALL);
@@ -154,11 +154,11 @@ export function Anchored(_props: Inputs<{}>, ctx: ComponentContext) {
 // #endregion anchored
 
 /** One of the two controls, so the hover and the padding are written once. */
-function Step(props: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext) {
+function Step(inputs: Inputs<{ label: string; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       padding={8}
       borderRadius={6}
       borderWidth={1}
@@ -166,7 +166,7 @@ function Step(props: Inputs<{ label: string; onPress: () => void }>, _ctx: Compo
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.label} fontSize={12} color="text" />
+      <text text={inputs.label} fontSize={12} color="text" />
     </button>
   );
 }

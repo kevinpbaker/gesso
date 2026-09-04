@@ -27,11 +27,11 @@ const WRAPS: readonly UiFlexWrap[] = ['nowrap', 'wrap'];
  * None of them shrinks below its own longest word, which is why the
  * narrowest width overflows the row rather than crushing its contents.
  */
-function Bar(props: Inputs<{ width: number; wrap: UiFlexWrap }>, _ctx: ComponentContext) {
+function Bar(inputs: Inputs<{ width: number; wrap: UiFlexWrap }>, _ctx: ComponentContext) {
   return (
     <row
-      width={props.width}
-      flexWrap={props.wrap}
+      width={inputs.width}
+      flexWrap={inputs.wrap}
       gap={10}
       rowGap={10}
       padding={12}
@@ -50,7 +50,7 @@ function Bar(props: Inputs<{ width: number; wrap: UiFlexWrap }>, _ctx: Component
 }
 // #endregion bar
 
-export function FlexBar(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function FlexBar(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const widthStep = internalState(0);
   const wrapStep = internalState(0);
   const width = widthStep.pipe(map(index => WIDTHS[index % WIDTHS.length]!));
@@ -69,11 +69,11 @@ export function FlexBar(_props: Inputs<{}>, _ctx: ComponentContext) {
 }
 
 /** One button that shows a prop's current value and moves it on. */
-function Choice(props: Inputs<{ label: string; value: string; onPress: () => void }>, _ctx: ComponentContext) {
+function Choice(inputs: Inputs<{ label: string; value: string; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       padding={8}
       borderRadius={6}
       borderWidth={1}
@@ -82,8 +82,8 @@ function Choice(props: Inputs<{ label: string; value: string; onPress: () => voi
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
       <row gap={8} y="center">
-        <text text={props.label} fontSize={12} color="textMuted" />
-        <text text={props.value} fontSize={13} color="text" width={64} />
+        <text text={inputs.label} fontSize={12} color="textMuted" />
+        <text text={inputs.value} fontSize={13} color="text" width={64} />
       </row>
     </button>
   );

@@ -30,7 +30,7 @@ const MAX = 9;
  *  - "Preferences saved" is bound to `visible`, so it is absent from
  *    the tree until there is something to say.
  */
-export function Preferences(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Preferences(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const digest = internalState(true);
   const stories = internalState(3);
   const saved = internalState(false);

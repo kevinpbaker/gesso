@@ -27,7 +27,7 @@ import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
  * `open` is a plain cell the application owns. A dialog never opens
  * itself, and `onClose` is a request to close rather than the closing.
  */
-export function Notes(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Notes(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const confirming = internalState(false);
   const uploading = internalState(false);
   const status = internalState('Nothing has happened yet.');

@@ -113,7 +113,7 @@ interface PresenceEntry {
 
 const DEFAULT_EXIT_TIMEOUT_MS = 2000;
 
-export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): UiChild {
+export function Presence(inputs: Inputs<PresenceProps>, ctx: ComponentContext): UiChild {
   /** What is on screen: departing children first, so arrivals paint over them. */
   let entries: PresenceEntry[] = [];
   /** In `wait` mode, the children held back until the screen is clear. */
@@ -143,9 +143,9 @@ export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): U
         height: percent(100),
         modifiers: [
           motion({
-            ...props.timing.value,
-            initial: props.enter.value,
-            state: entry.leaving ? (props.exit.value ?? null) : null,
+            ...inputs.timing.value,
+            initial: inputs.enter.value,
+            state: entry.leaving ? (inputs.exit.value ?? null) : null,
             onSettled: entry.leaving ? () => settle(entry) : undefined
           })
         ]
@@ -191,7 +191,7 @@ export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): U
       setTimeout(() => {
         timers.delete(entry.key);
         settle(entry);
-      }, props.exitTimeout.value ?? DEFAULT_EXIT_TIMEOUT_MS)
+      }, inputs.exitTimeout.value ?? DEFAULT_EXIT_TIMEOUT_MS)
     );
   };
 
@@ -216,7 +216,7 @@ export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): U
       existing.child = child;
       staying.push(existing);
     }
-    const hasExit = props.exit.value !== undefined;
+    const hasExit = inputs.exit.value !== undefined;
     const leaving = hasExit ? entries.filter(entry => entry.leaving || !wanted.has(entry.key)) : [];
     for (const entry of leaving) {
       if (!entry.leaving) {
@@ -229,7 +229,7 @@ export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): U
         clearTimer(entry.key);
       }
     }
-    if (props.mode.value === 'wait' && leaving.length > 0) {
+    if (inputs.mode.value === 'wait' && leaving.length > 0) {
       entries = leaving;
       held = staying;
     } else {
@@ -239,7 +239,7 @@ export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): U
     emit();
   };
 
-  const subscription = props.children.subscribe(children => apply(children));
+  const subscription = inputs.children.subscribe(children => apply(children));
 
   ctx.onUnmount(() => {
     disposed = true;
@@ -256,8 +256,8 @@ export function Presence(props: Inputs<PresenceProps>, ctx: ComponentContext): U
       // resolve against whichever positioned ancestor happened to be
       // above, which is usually the whole screen.
       position: 'relative',
-      width: props.width.value ?? percent(100),
-      height: props.height.value ?? percent(100)
+      width: inputs.width.value ?? percent(100),
+      height: inputs.height.value ?? percent(100)
     },
     output as Observable<readonly UiChild[]>
   );

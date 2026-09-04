@@ -20,8 +20,8 @@ type Currency = keyof typeof RATES;
  *    and follows them as cells: nothing to keep in sync, nothing to
  *    invalidate, and no way for it to disagree with them.
  */
-function OrderLine(props: Inputs<{ currency?: Currency }>, _ctx: ComponentContext) {
-  const currency = input(props.currency, 'USD');
+function OrderLine(inputs: Inputs<{ currency?: Currency }>, _ctx: ComponentContext) {
+  const currency = input(inputs.currency, 'USD');
   const quantity = internalState(1);
 
   const total = computed(
@@ -41,11 +41,11 @@ function OrderLine(props: Inputs<{ currency?: Currency }>, _ctx: ComponentContex
 // #endregion line
 
 /** A small square button, so the line above reads as what it is. */
-function Step(props: Inputs<{ label: string; glyph: string; onPress: () => void }>, _ctx: ComponentContext) {
+function Step(inputs: Inputs<{ label: string; glyph: string; onPress: () => void }>, _ctx: ComponentContext) {
   return (
     <button
-      label={props.label}
-      onClick={() => props.onPress.value()}
+      label={inputs.label}
+      onClick={() => inputs.onPress.value()}
       width={26}
       height={26}
       x="center"
@@ -56,12 +56,12 @@ function Step(props: Inputs<{ label: string; glyph: string; onPress: () => void 
       backgroundColor="background"
       cursor="pointer"
       modifiers={[HOVER_CONTROL]}>
-      <text text={props.glyph} fontSize={14} color="text" />
+      <text text={inputs.glyph} fontSize={14} color="text" />
     </button>
   );
 }
 
-export function Cells(_props: Inputs<{}>, _ctx: ComponentContext) {
+export function Cells(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const currency = internalState<Currency>('USD');
 
   return (
