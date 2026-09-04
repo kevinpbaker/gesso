@@ -29,6 +29,9 @@ declare class InputCell<T> extends BehaviorSubject<T> {
   get value(): T;
   next(value: T): void;
 }
+interface ReadableCell<T> extends Observable<T> {
+  readonly value: T;
+}
 declare function input<T>(initialValue: T): InputCell<T>;
 declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
 type EmitArgs<T> = NonNullable<T> extends ((...args: infer A) => void) ? A : never;
@@ -181,6 +184,7 @@ export {
   OutputTarget,
   Patch,
   PatchPath,
+  ReadableCell,
   viewKeys
 };
 // ==== index.d.ts ====
@@ -218,8 +222,9 @@ import {
   OutputTarget,
   Patch,
   PatchPath,
+  ReadableCell,
   viewKeys
-} from "./FunctionComponent-DPWGerAA.js";
+} from "./FunctionComponent-CEoy33Hr.js";
 import {
   BehaviorSubject,
   Observable,
@@ -300,6 +305,35 @@ interface DeriveOptions<T> {
 }
 type Values<S extends readonly Observable<unknown>[]> = { [K in keyof S]: S[K] extends Observable<infer V> ? V : never; };
 declare function derive<S extends readonly Observable<unknown>[], T>(sources: readonly [...S], project: (...values: Values<S>) => T, options?: DeriveOptions<T>): Observable<T>;
+interface ComputedOptions<T> {
+  readonly equal?: Equality<T>;
+  readonly label?: string;
+}
+declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
+  private readonly compute;
+  label: string | undefined;
+  private readonly equal;
+  private readonly changes;
+  private sources;
+  private cached;
+  private hasValue;
+  private upstream;
+  private subscribers;
+  private attaching;
+  private snapshotBy;
+  private warnedStale;
+  private staleWatch;
+  constructor(compute: () => T, options?: ComputedOptions<T>);
+  get value(): T;
+  private watchForStaleRead;
+  private warnStale;
+  get observed(): boolean;
+  private recompute;
+  private attach;
+  private detach;
+  private onSourceChanged;
+}
+declare function computed<T>(compute: () => T, options?: ComputedOptions<T>): ComputedCell<T>;
 declare function bind<T>(cell: InternalState<T>): {
   value: InternalState<T>;
   onChange: (next: T) => void;
@@ -707,7 +741,7 @@ type ShellRequest = {
 declare class ShellService {
   private handler;
   private readonly scheme;
-  readonly colorScheme: Observable<ColorScheme>;
+  readonly colorScheme: ReadableCell<ColorScheme>;
   get currentColorScheme(): ColorScheme;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
@@ -1655,6 +1689,8 @@ export {
   Component,
   ComponentHost,
   ComponentHostResolver,
+  computed,
+  ComputedCell,
   controlled,
   createApp,
   createChannelRegistry,
@@ -1743,6 +1779,7 @@ export {
   type ComponentElement,
   type ComponentProps,
   type ComponentType,
+  type ComputedOptions,
   type ControlledOptions,
   type ControlledValue,
   type DeriveOptions,
@@ -1777,6 +1814,7 @@ export {
   type PortHandshake,
   type PortHost,
   type PresenceProps,
+  type ReadableCell,
   type RendererChoice,
   type RouteContext,
   type RouteDefinition,
@@ -1845,7 +1883,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-DPWGerAA.js";
+} from "../FunctionComponent-CEoy33Hr.js";
 import {
   Observable
 } from "rxjs";

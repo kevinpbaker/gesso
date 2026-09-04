@@ -1,7 +1,6 @@
-import type { Observable } from 'rxjs';
-
 import { internalState } from '../InternalState';
 import type { ColorScheme } from './colorScheme';
+import type { ReadableCell } from '../Input';
 
 /**
  * Something only the shell — the thread with a window — can do.
@@ -59,7 +58,11 @@ export class ShellService {
    * does not decide what dark looks like, and does not remember what
    * the person picked.
    */
-  readonly colorScheme: Observable<ColorScheme> = this.scheme.asObservable();
+  /**
+   * A cell rather than a bare Observable, so `computed(() => ...)` can
+   * read it beside a channel's view; its setter stays private here.
+   */
+  readonly colorScheme: ReadableCell<ColorScheme> = this.scheme;
 
   /** The current appearance, for code that needs it without subscribing. */
   get currentColorScheme(): ColorScheme {

@@ -60,6 +60,7 @@ export class InputCell<T> extends BehaviorSubject<T> {
   }
 
   override get value(): T {
+    trackRead(this);
     if (bodyOf !== null && this.snapshotBy === null) {
       this.snapshotBy = bodyOf;
     }
@@ -85,6 +86,39 @@ export class InputCell<T> extends BehaviorSubject<T> {
 
 /** The component whose function body is running, while one is. */
 let bodyOf: string | null = null;
+
+/** The component whose body is running, for a cell that wants to remember being read there. */
+export function currentBody(): string | null {
+  return bodyOf;
+}
+
+/**
+ * Anything with a current value that can be followed: an input, an
+ * internal state, a channel view key, a computed. What `computed`
+ * collects as it runs.
+ */
+export interface ReadableCell<T> extends Observable<T> {
+  readonly value: T;
+}
+
+/** The set a running `computed` is collecting its reads into, while one is. */
+let tracking: Set<ReadableCell<unknown>> | null = null;
+
+/** Records a `.value` read for whatever `computed` is running, if one is. */
+export function trackRead(cell: ReadableCell<unknown>): void {
+  tracking?.add(cell);
+}
+
+/** Runs `run` with every `.value` read on the way recorded into `into`. */
+export function withTracking<T>(into: Set<ReadableCell<unknown>>, run: () => T): T {
+  const previous = tracking;
+  tracking = into;
+  try {
+    return run();
+  } finally {
+    tracking = previous;
+  }
+}
 
 /**
  * Runs a component's body with its name on record, so a `.value` read

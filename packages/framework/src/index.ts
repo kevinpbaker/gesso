@@ -10,9 +10,11 @@ export {
   type OutputCell,
   type OutputTarget,
   type EmitArgs,
-  type EmitValue
+  type EmitValue,
+  type ReadableCell
 } from './Input';
 export { derive, type DeriveOptions, type Equality } from './derive';
+export { computed, ComputedCell, type ComputedOptions } from './computed';
 export { bind } from './bind';
 export { controlled, type ControlledOptions, type ControlledValue } from './controlled';
 export { Define, Input, Output, Inject, Channel } from './decorators';

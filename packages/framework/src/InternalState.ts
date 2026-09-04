@@ -1,4 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
+import { trackRead } from './Input';
 
 /**
  * A component's own state: originated here, and never crossing the
@@ -21,8 +22,7 @@ import { BehaviorSubject } from 'rxjs';
  * a tooltip's open flag, a caret, a scroll offset, the active tab.
  * Anything that survives a reload, or that another screen cares about,
  * is application state and belongs on a channel. Anything derived from
- * other observables needs no cell at all — `combineLatest(...).pipe(...)`
- * binds directly.
+ * other cells is a `computed`; from other Observables, a `derive`.
  */
 export class InternalState<T> extends BehaviorSubject<T> {
   /** What to call this cell in a warning or the inspector; optional. */
@@ -32,6 +32,7 @@ export class InternalState<T> extends BehaviorSubject<T> {
   }
 
   override get value(): T {
+    trackRead(this);
     return super.getValue();
   }
 

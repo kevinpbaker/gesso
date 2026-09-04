@@ -44,7 +44,8 @@ export function derive<S extends readonly Observable<unknown>[], T>(
   );
 }
 
-function equalityOf<T>(equal: Equality<T>): (a: T, b: T) => boolean {
+/** The comparison an `Equality` names. Shared with `computed`. */
+export function equalityOf<T>(equal: Equality<T>): (a: T, b: T) => boolean {
   if (equal === 'reference') {
     return Object.is;
   }
