@@ -36,6 +36,7 @@ export default defineConfig({
         text: 'Guide',
         items: [
           { text: 'What Gesso is', link: '/guide/what-is-gesso' },
+          { text: 'Is Gesso for your project?', link: '/guide/is-gesso-for-you' },
           { text: 'Installation', link: '/guide/installation' },
           { text: 'Your first component', link: '/guide/counter' },
           { text: 'Components run once', link: '/guide/components-run-once' },

@@ -110,9 +110,10 @@ Gesso is young. This is what that means where it would touch you.
   not, so nothing depends on having it.
 - **No screen reader has been sat in front of it.** What your components
   emit does reach the platform's accessibility layer as real elements
-  with roles, states and actions. Whether VoiceOver or NVDA announces a
-  screen _well_ is a question only a person with one can answer, and
-  nobody has.
+  with roles, states and actions, and `docs/accessibility/` holds a
+  report per example route of what it will find there. Whether VoiceOver
+  or NVDA announces a screen _well_ is a question only a person with one
+  can answer, and nobody has.
 - **Desktop webviews are untested.** Running this on macOS, Windows and
   Linux means WKWebView, WebView2 and WebKitGTK: three IME
   implementations, three font stacks, three ideas about device pixel
