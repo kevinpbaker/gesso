@@ -177,9 +177,10 @@ export class UiGraph {
     child.previousSibling = previous;
     child.nextSibling = reference;
     reference.previousSibling = child;
-    if (parent.lastChild === reference) {
-      parent.lastChild = child;
-    }
+    // The reference keeps its place after the child, so the last child
+    // does not change. Setting it to the child here, as this once did,
+    // made every later append hang off the middle of the chain and left
+    // the true tail registered but unreachable.
     this.inheritEnvironment(child);
   }
 

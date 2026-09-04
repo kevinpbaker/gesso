@@ -187,7 +187,11 @@ describe('UiGraph', () => {
       expect(a.nextSibling).toBe(b);
     });
 
-    it('becomes the last child when inserted before the last child', () => {
+    it('leaves the last child in place when inserting before it', () => {
+      // The old expectation here, that the inserted node became the last
+      // child while still having a next sibling, described the defect:
+      // every append after such an insert hung off the middle of the
+      // chain, and the true tail stayed registered but unreachable.
       const graph = new UiGraph();
       const parent = graph.createNode('parent', UiNodeType.Column);
       const a = graph.createNode('a', UiNodeType.Text);
@@ -196,8 +200,13 @@ describe('UiGraph', () => {
       graph.appendChild(parent, b);
       const c = graph.createNode('c', UiNodeType.Text);
       graph.insertBefore(parent, c, b);
-      expect(parent.lastChild).toBe(c);
+      expect(parent.lastChild).toBe(b);
       expect(c.nextSibling).toBe(b);
+      expect(b.previousSibling).toBe(c);
+      const d = graph.createNode('d', UiNodeType.Text);
+      graph.appendChild(parent, d);
+      expect(b.nextSibling).toBe(d);
+      expect(parent.lastChild).toBe(d);
     });
 
     it('rejects a child that already has a parent', () => {
