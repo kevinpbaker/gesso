@@ -5,7 +5,7 @@ description: Why a Gesso component function runs exactly once, and what that cha
 # Components run once
 
 A component function is called once per instance. It is not called again
-when its state changes, when its props change, or when the screen
+when its state changes, when its inputs change, or when the screen
 repaints. What it returns is a tree of retained nodes that stays on
 screen, and everything dynamic in that tree is an Observable bound
 straight into it.
@@ -86,9 +86,9 @@ than in a profiler.
 
 ## What is live, and what is read once
 
-Every prop reaches a component as a cell. Reading `props.label.value`
+Every input reaches a component as a cell. Reading `inputs.label.value`
 inside the body gives the value at that moment and nothing afterwards;
-binding `props.label`, or a `computed` that reads it, into a node's prop
+binding `inputs.label`, or a `computed` that reads it, into a node's prop
 gives every value it will ever have. The body runs once, so a `.value` read in it is
 a snapshot, and a snapshot of something that changes is a bug that
 fails silently: the screen simply stays as it was.
@@ -96,7 +96,7 @@ fails silently: the screen simply stays as it was.
 Two things make that bug visible. If a body reads a prop with `.value`
 and that prop later changes with nothing following it, the framework
 warns once, naming the component, the prop and, for an object, the
-field that moved. And the library's own components follow their props:
+field that moved. And the library's own components follow their inputs:
 an `Image` bound to a `src` that changes shows the new picture and
 releases the old, an `Icon` bound to a `path` or `color` redraws in
 place. Neither needs a `key` to change what it shows.
@@ -105,7 +105,7 @@ A `key` is for identity, not for change. Give one to each item of a
 list bound to an Observable, so a reordered list moves nodes rather than
 rebuilding them; give one to a child whose _shape_ changes, an `Image`
 that becomes a lettered box when there is no picture, so the reconciler
-replaces the node rather than handing new props to a body that has
+replaces the node rather than handing new inputs to a body that has
 already run.
 
 A few rules that follow from the same model and are worth knowing before

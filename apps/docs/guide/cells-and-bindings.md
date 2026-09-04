@@ -10,7 +10,7 @@ component is.
 
 | Where the value comes from | What to use                 | What it is                                      |
 | -------------------------- | --------------------------- | ----------------------------------------------- |
-| The parent                 | `input(inputs.x, fallback)` | A prop cell the host keeps feeding              |
+| The parent                 | `input(inputs.x, fallback)` | An input cell the host keeps feeding            |
 | This component             | `internalState(value)`      | A cell only this component writes               |
 | Other cells                | `computed(() => ...)`       | A cell that is a function of the cells it reads |
 
@@ -28,20 +28,20 @@ changes both. The total is neither: it is one expression over the two.
 
 ## `input`, a prop that keeps arriving
 
-Props arrive as cells, not as values, which is what lets the body run
-once and still follow its parent. `props.currency` is an `InputCell`,
-and `input(props.currency, 'USD')` reads it with a default:
+Inputs arrive as cells, not as values, which is what lets the body run
+once and still follow its parent. `inputs.currency` is an `InputCell`,
+and `input(inputs.currency, 'USD')` reads it with a default:
 
 ```ts
-function OrderLine(props: Inputs<{ currency?: Currency }>) {
-  const currency = input(props.currency, 'USD');
+function OrderLine(inputs: Inputs<{ currency?: Currency }>) {
+  const currency = input(inputs.currency, 'USD');
 }
 ```
 
-A parent can pass a plain value or an Observable, since every prop is
+A parent can pass a plain value or an Observable, since every input is
 `Reactive<T> = T | Observable<T>`, and the child cannot tell the
 difference. That is why the example passes `currency` (a cell) straight
-down: to `OrderLine` it is simply a prop that changes.
+down: to `OrderLine` it is simply an input that changes.
 
 ## `internalState`, what the component owns
 

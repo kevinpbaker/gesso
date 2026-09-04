@@ -17,7 +17,7 @@ on:
 
 <<< @/src/examples/CounterExample.tsx
 
-Two things in it are worth naming. `input(props.label, 'Count')` gives an
+Two things in it are worth naming. `input(inputs.label, 'Count')` gives an
 optional prop a default while keeping it a cell, so a parent that later
 changes the label still reaches this node. And `internalState(0)` is
 state the component owns; writing `count.value++` marks exactly the

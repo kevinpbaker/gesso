@@ -13,9 +13,11 @@ except through a binding.
 A note on the word "props". Elements have props: `width`, `color`,
 `onClick` on a `<box>` or a `<text>`, which become properties of a node.
 Components have inputs and outputs. The parameter a function component
-receives is its inputs, and this guide calls it `inputs` throughout;
-older code and the framework's own types still say `props`, and the two
-words mean the same record.
+receives is its inputs, and it is called `inputs` throughout the guide,
+the library and the examples; its type is `Inputs<...>`. A component
+element's `props` property, where the parent's values are held before
+they become cells, is the one place the framework's own types keep the
+other word.
 
 ## Declaring inputs
 
