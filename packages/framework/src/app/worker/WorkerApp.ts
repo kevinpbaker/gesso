@@ -365,6 +365,10 @@ export class WorkerApp {
 
   /** Reports an error, to `onError` or to the console it defaults to. */
   private report(message: string, stack: string | undefined, source: RuntimeErrorSource): void {
+    // A panel hears every error the shell does, whatever the shell
+    // does with it; the overlay and the panel are two readers, not
+    // two sources.
+    this.devtoolsListener?.({ kind: 'error', message, ...(stack === undefined ? {} : { stack }), source });
     const report =
       this.options.onError ?? ((text, trace, from) => console.error(`[gesso render worker: ${from}] ${text}`, trace));
     report(message, stack, source);

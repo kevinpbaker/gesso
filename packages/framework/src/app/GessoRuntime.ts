@@ -319,6 +319,8 @@ export class GessoRuntime {
   private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
   /** Whether a panel wants a tree snapshot after every frame that changed the tree. */
   private watchingTree = false;
+  /** Whether a panel wants every frame's metrics. */
+  private watchingFrames = false;
   /** The node a panel has selected, whose report is kept fresh; null for none. */
   private selectedId: string | null = null;
   /** The selected node's last report, serialised, which is what tells two apart. */
@@ -849,6 +851,7 @@ export class GessoRuntime {
     const report = this.hoveredReport();
     this.lastInspection = report?.explanation ?? null;
     this.inspectListener?.(report);
+    this.devtoolsListener?.({ kind: 'hover', report });
     if (this.root !== undefined) {
       this.graph.markDirty(this.root, DirtyFlags.Paint);
     }
@@ -910,6 +913,12 @@ export class GessoRuntime {
         break;
       case 'highlight':
         this.setHighlightedNode(request.id);
+        break;
+      case 'watchFrames':
+        this.watchingFrames = request.enabled;
+        break;
+      case 'inspector':
+        this.setInspectorEnabled(request.enabled);
         break;
       case 'console':
         break;
@@ -2137,6 +2146,9 @@ export class GessoRuntime {
       gpu: this.gpuTimings
     };
     this.frameListener?.(metrics);
+    if (this.watchingFrames) {
+      this.devtoolsListener?.({ kind: 'frame', metrics });
+    }
     // And to any component on this thread that asked to hear frames.
     this.services.get(FrameService).publish(metrics);
   }
@@ -2327,7 +2339,9 @@ export class GessoRuntime {
       return;
     }
     this.lastInspection = text;
-    this.inspectListener?.(this.hoveredReport());
+    const report = this.hoveredReport();
+    this.inspectListener?.(report);
+    this.devtoolsListener?.({ kind: 'hover', report });
   }
 
   /** A report on whatever the inspector says is hovered, or null. */

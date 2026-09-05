@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Column, Text } from '@gesso/core';
+import { Box, Column, Text, noKeyModifiers } from '@gesso/core';
 import type { UiElement } from '@gesso/core';
 import { Component } from '../Component';
 import { Define } from '../decorators';
@@ -175,6 +175,47 @@ describe('devtools requests', () => {
     // An id the tree does not have points at nothing.
     mounted.runtime.handleDevtools({ kind: 'highlight', id: 'nope' });
     expect(mounted.runtime.inspector.highlightedNode).toBeNull();
+  });
+
+  it('sends frame metrics while frames are watched, and nothing otherwise', () => {
+    const width = new BehaviorSubject(10);
+    const mounted = mountRuntime(Column({}, Box({ width, height: 10 })));
+    mounted.frame();
+    const events = attach(mounted);
+
+    width.next(11);
+    mounted.frame();
+    expect(events).toEqual([]);
+
+    mounted.runtime.handleDevtools({ kind: 'watchFrames', enabled: true });
+    width.next(12);
+    mounted.frame();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'frame', metrics: { nodes: expect.any(Number) } });
+
+    mounted.runtime.handleDevtools({ kind: 'watchFrames', enabled: false });
+    width.next(13);
+    mounted.frame();
+    expect(events).toHaveLength(1);
+  });
+
+  it('turns the layout inspector on for a panel and reports the hovered node to it', () => {
+    const mounted = mountRuntime(Column({}, Box({ width: 100, height: 100 })));
+    mounted.frame();
+    const events = attach(mounted);
+
+    mounted.runtime.handleDevtools({ kind: 'inspector', enabled: true });
+    expect(mounted.runtime.inspector.isEnabled).toBe(true);
+    // The toggle itself is reported, with nothing under a pointer that is nowhere.
+    expect(events).toEqual([{ kind: 'hover', report: null }]);
+
+    mounted.runtime.input.pointer.pointerMove(50, 50, 0, noKeyModifiers());
+    mounted.frame();
+    const hover = events.find(event => event.kind === 'hover' && event.report !== null);
+    expect(hover).toMatchObject({ kind: 'hover', report: { type: 'box' } });
+
+    mounted.runtime.handleDevtools({ kind: 'inspector', enabled: false });
+    expect(mounted.runtime.inspector.isEnabled).toBe(false);
   });
 
   it('drops the highlight when the node leaves the tree', () => {

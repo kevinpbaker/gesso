@@ -1,4 +1,6 @@
 import type { UiNodeReport } from './NodeReport';
+import type { FrameMetrics } from './GessoRuntime';
+import type { RuntimeErrorSource } from './worker/RenderWorkerProtocol';
 
 /**
  * What a devtools panel says to a running application and what it
@@ -81,13 +83,30 @@ export type DevtoolsRequest =
    */
   | { kind: 'highlight'; id: string | null }
   /** Forward `console.*` from the workers, with the thread named. */
-  | { kind: 'console'; enabled: boolean };
+  | { kind: 'console'; enabled: boolean }
+  /** A `frame` event per frame, until turned off: the profiler's feed. */
+  | { kind: 'watchFrames'; enabled: boolean }
+  /**
+   * The layout inspector's own toggle: hover boxes and the measure
+   * heatmap on the canvas, and a `hover` event for the node under the
+   * pointer. The panel's "pick from the canvas".
+   */
+  | { kind: 'inspector'; enabled: boolean };
 
 /** What the application answers, and volunteers while something is watched. */
 export type DevtoolsEvent =
   | { kind: 'tree'; tree: UiTreeSnapshot }
   | { kind: 'report'; id: string; report: UiNodeReport | null }
-  | { kind: 'console'; entry: ConsoleEntry };
+  | { kind: 'console'; entry: ConsoleEntry }
+  | { kind: 'frame'; metrics: FrameMetrics }
+  /** The node under the pointer while the inspector is on; null when none, or when it was turned off. */
+  | { kind: 'hover'; report: UiNodeReport | null }
+  /**
+   * An error the render worker reported to its shell. Only a worker
+   * shell sends these: with the runtime in the page, an error is an
+   * ordinary page error and the page's console already has it.
+   */
+  | { kind: 'error'; message: string; stack?: string; source: RuntimeErrorSource };
 
 /** Longer text than this is cut in a tree snapshot; the report has the whole of it. */
 export const TREE_TEXT_LIMIT = 40;
