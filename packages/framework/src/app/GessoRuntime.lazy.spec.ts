@@ -3,7 +3,17 @@ import { BehaviorSubject } from 'rxjs';
 
 import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
-import { LazyColumn, Row, Text, type UiNode, UiNodeType, noKeyModifiers, UiManualFrameClock } from '@gesso/core';
+import {
+  LazyColumn,
+  LazyRow,
+  Row,
+  ScrollView,
+  Text,
+  type UiNode,
+  UiNodeType,
+  noKeyModifiers,
+  UiManualFrameClock
+} from '@gesso/core';
 
 function countNodes(root: UiNode, type: UiNodeType): number {
   let count = root.type === type ? 1 : 0;
@@ -123,6 +133,79 @@ describe('GessoRuntime lazy lists', () => {
     runtime.input.wheel.wheel(100, 100, 0, 1_000_000, noKeyModifiers());
     // Clamped by the engine to content − viewport: 1000 × 20 − 200.
     expect(list.getProperty('scrollY')).toBe(1_000_000);
+    runtime.dispose();
+  });
+});
+
+/**
+ * A page of horizontal shelves, which is what Segue's home screen is.
+ *
+ * A `LazyRow` is a scroll container, so a vertical wheel over one has a
+ * choice of two containers to move. The chain gives the delta to the
+ * first container with room *in the wheel's own axis*, and a horizontal
+ * row is asked for `deltaX`, which a plain scroll wheel leaves at zero;
+ * the page underneath gets it. Asserted because the alternative is a
+ * page that will not scroll wherever the pointer happens to rest, and
+ * on a page made of shelves that is nearly everywhere.
+ *
+ * Written while chasing a home screen that appeared not to scroll. It
+ * was not this: the browser window had stopped being composited. The
+ * assertion is worth keeping anyway, and the wrong guess is worth
+ * recording, because the shape of the bug it would have been is real.
+ */
+describe('GessoRuntime shelves of lazy rows', () => {
+  const ROW_HEIGHT = 120;
+
+  function shelfPage(itemHeight: number) {
+    let clock!: UiManualFrameClock;
+    const shelf = (key: string) =>
+      LazyRow(
+        {
+          key,
+          width: 400,
+          height: ROW_HEIGHT,
+          count: 50,
+          estimatedExtent: 100,
+          overscan: 1,
+          initialViewportExtent: 400
+        },
+        index => Row({ key: `${key}-${index}`, width: 100, height: itemHeight }, Text({ text: `${index}` }))
+      );
+    const runtime = new GessoRuntime({
+      root: ScrollView({ width: 400, height: 300 }, shelf('a'), shelf('b'), shelf('c'), shelf('d')),
+      canvas: mockCanvas(400, 300),
+      width: 400,
+      height: 300,
+      clock: callback => (clock = new UiManualFrameClock(callback))
+    });
+    runtime.start();
+    const frame = () => {
+      if (clock.isPending) {
+        clock.tick(0);
+      }
+    };
+    frame();
+    return { runtime, frame, page: runtime.debugRoot() };
+  }
+
+  it('gives a downward wheel over a shelf to the page under it', () => {
+    const { runtime, frame, page } = shelfPage(ROW_HEIGHT);
+    // Squarely over the first shelf, which is where a pointer usually is
+    // on a page made of shelves.
+    runtime.input.wheel.wheel(200, 60, 0, 200, noKeyModifiers());
+    frame();
+    expect(page.getProperty('scrollY')).toBeGreaterThan(0);
+    runtime.dispose();
+  });
+
+  it('still gives it to the page when the shelf overflows its row a little', () => {
+    // The row is asked for `deltaX` whatever its content does
+    // vertically, so a few stray pixels of height do not capture a
+    // scroll wheel.
+    const { runtime, frame, page } = shelfPage(ROW_HEIGHT + 1);
+    runtime.input.wheel.wheel(200, 60, 0, 200, noKeyModifiers());
+    frame();
+    expect(page.getProperty('scrollY')).toBeGreaterThan(0);
     runtime.dispose();
   });
 });
