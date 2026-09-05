@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Gesso Devtools",
+  "version": "0.1.0",
+  "description": "A Gesso panel in Chrome devtools: the node tree, a node's report, the workers' consoles, the frame profiler and the store action log.",
+  "minimum_chrome_version": "116",
+  "devtools_page": "devtools.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "js": ["content.iife.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

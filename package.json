@@ -6,7 +6,7 @@
   "packageManager": "pnpm@11.3.0",
   "scripts": {
     "dev": "pnpm --filter @gesso/playground dev",
-    "build": "pnpm --filter './packages/*' build && pnpm --filter @gesso/playground build",
+    "build": "pnpm --filter './packages/*' build && pnpm --filter @gesso/playground build && pnpm --filter @gesso/devtools-extension build",
     "preview": "pnpm --filter @gesso/playground preview",
     "docs:dev": "pnpm --filter @gesso/docs dev",
     "sluice:dev": "pnpm --filter @gesso/sluice dev",
