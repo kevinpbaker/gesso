@@ -2,6 +2,7 @@ import { serveChannels } from '@gesso/framework';
 import { Heavy, HeavyWork } from './HeavyWork';
 import { Ticker } from './TickerChannel';
 import { TickerViewModel } from './TickerViewModel';
+import { isStill } from './shell/still';
 
 /**
  * The playground's application worker.
@@ -26,4 +27,7 @@ serveChannels([
     source: { view: { status: heavy.status }, commands: { compute: () => heavy.compute() } }
   }
 ]);
-ticker.start();
+// Still mode: the counter the screenshot gate could never catch up with.
+if (!isStill()) {
+  ticker.start();
+}

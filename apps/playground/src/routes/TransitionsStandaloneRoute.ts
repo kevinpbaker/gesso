@@ -2,6 +2,7 @@ import { mountErrorOverlay } from '@gesso/devtools';
 import { createApp } from '@gesso/framework';
 import { createElement } from '../shell/dom';
 import { connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /**
  * The transitions example as an application in its own right.
@@ -58,9 +59,15 @@ export function mountTransitionsStandaloneRoute(host: HTMLElement): () => void {
     // specifier matches the one in `TransitionsExampleRoute`, so both
     // routes resolve to a single worker chunk rather than two copies.
     renderWorker: () =>
-      new Worker(new URL('../examples/TransitionsExampleWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/TransitionsExampleWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     appLogicWorker: () =>
-      new Worker(new URL('../examples/transitions/TransitionsAppWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/transitions/TransitionsAppWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     // The app owns everything after the first segment, and it has to:
     // the playground's own router reads segment one on every
     // `hashchange` and remounts when it changes. An app given the

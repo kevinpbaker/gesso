@@ -17,6 +17,7 @@ import {
   type UiColor,
   type UiTextStyle
 } from '@gesso/core';
+import { stillNow } from '../shell/still';
 
 /**
  * Theming: a settings pane wired to the app it restyles.
@@ -799,7 +800,7 @@ function Preview(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const contrastBody = contrast.pipe(map(value => value.typography.body));
   // Written once, when this component's body runs. A theme change that
   // rebuilt the tree would reset it; it never does.
-  const builtAt = new Date().toLocaleTimeString();
+  const builtAt = new Date(stillNow()).toLocaleTimeString();
 
   return (
     <scrollview flexGrow={1} padding={28} gap={18} backgroundColor="background">

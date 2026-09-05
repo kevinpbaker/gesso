@@ -2,6 +2,7 @@ import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /**
  * Runs the routing example in a render worker behind the shared page
@@ -25,7 +26,11 @@ export function mountRouterExampleRoute(host: HTMLElement): () => void {
 
   const app = createApp({
     // Written out literally so the bundler can see and split it.
-    renderWorker: () => new Worker(new URL('../examples/RouterExampleWorker.ts', import.meta.url), { type: 'module' }),
+    renderWorker: () =>
+      new Worker(new URL('../examples/RouterExampleWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     history: { mode: 'hash', base: 'example-router' },
     onFrame: metrics => {
       frames++;

@@ -2,6 +2,7 @@ import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /**
  * Runs the notes example in a render worker behind the shared page
@@ -16,12 +17,16 @@ export function mountNotesExampleRoute(host: HTMLElement): () => void {
 
   const app = createApp({
     // Written out literally so the bundler can see and split it.
-    renderWorker: () => new Worker(new URL('../examples/NotesExampleWorker.ts', import.meta.url), { type: 'module' }),
+    renderWorker: () =>
+      new Worker(new URL('../examples/NotesExampleWorker.ts', import.meta.url), { type: 'module', name: workerName() }),
     // The notebook itself: repository, rules and shaping, on their own
     // thread. The shell wires the two workers together and then has
     // nothing more to do with either.
     appLogicWorker: () =>
-      new Worker(new URL('../examples/notes/NotesAppWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/notes/NotesAppWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();

@@ -20,6 +20,7 @@ import {
   TEXT_MUTED,
   WARNING
 } from './brand';
+import { isStill, stillNow } from '../shell/still';
 
 /**
  * Live: an operations board fed by a stream that never stops.
@@ -476,7 +477,7 @@ export class LiveFeed {
   );
   readonly log = new LogRing();
   readonly sweep$ = new BehaviorSubject(0);
-  readonly clock$ = new BehaviorSubject(clockText(Date.now()));
+  readonly clock$ = new BehaviorSubject(clockText(stillNow()));
   readonly load$ = new BehaviorSubject(0);
   readonly loadColour$ = new BehaviorSubject(GOOD);
   readonly updates$ = new BehaviorSubject(0);
@@ -487,7 +488,7 @@ export class LiveFeed {
   private timer: ReturnType<typeof setInterval> | null = null;
   private tickCount = 0;
   private emits = 0;
-  private windowStart = Date.now();
+  private windowStart = stillNow();
   private sinceRoutine = 0;
 
   constructor() {
@@ -580,7 +581,7 @@ export class LiveFeed {
     // The rate readout is itself a bound property, so it is measured
     // twice a second rather than on every frame.
     this.emits += emits;
-    const now = Date.now();
+    const now = stillNow();
     const elapsed = now - this.windowStart;
     if (elapsed >= 500) {
       this.updates$.next(Math.round((this.emits * 1000) / elapsed));
@@ -591,7 +592,7 @@ export class LiveFeed {
   }
 
   private record(text: string, level: LogLevel): number {
-    return this.log.push({ time: clockText(Date.now()), text, level });
+    return this.log.push({ time: clockText(stillNow()), text, level });
   }
 
   private restart(): void {
@@ -600,7 +601,7 @@ export class LiveFeed {
     // again whenever the feed does — otherwise the first reading after
     // a pause would be an average across the pause.
     this.emits = 0;
-    this.windowStart = Date.now();
+    this.windowStart = stillNow();
     if (!this.running.value) {
       this.updates$.next(0);
       return;
@@ -735,7 +736,7 @@ function ControlRail(inputs: Inputs<{ bodies: number }>, ctx: ComponentContext) 
   const stream = store.stream;
   // Written while this body runs, and never again. If the numbers
   // above it keep climbing while this stays put, nothing was rebuilt.
-  const builtAt = clockText(Date.now());
+  const builtAt = clockText(stillNow());
 
   return (
     <scrollview
@@ -1056,7 +1057,9 @@ export function LiveApp(_inputs: Inputs<{}>, ctx: ComponentContext) {
     // Mount hooks are flushed once the whole tree exists, so this is
     // the total for the page rather than for the root alone.
     bodies.value = bodyRuns;
-    store.start();
+    if (!isStill()) {
+      store.start();
+    }
   });
   ctx.onUnmount(() => store.stop());
 

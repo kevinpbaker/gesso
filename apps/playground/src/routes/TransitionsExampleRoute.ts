@@ -2,6 +2,7 @@ import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /**
  * Runs the transitions example in a render worker behind the shared
@@ -24,12 +25,18 @@ export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
   const app = createApp({
     // Written out literally so the bundler can see and split it.
     renderWorker: () =>
-      new Worker(new URL('../examples/TransitionsExampleWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/TransitionsExampleWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     // The playlists themselves: the Audius client, the fallback chain
     // and the shaping, on their own thread, as the notes example keeps
     // its notebook.
     appLogicWorker: () =>
-      new Worker(new URL('../examples/transitions/TransitionsAppWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/transitions/TransitionsAppWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     history: { mode: 'hash', base: 'example-transitions' },
     onFrame: metrics => {
       frames++;

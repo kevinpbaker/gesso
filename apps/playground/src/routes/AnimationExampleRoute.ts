@@ -2,6 +2,7 @@ import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /**
  * Runs the animation example in a render worker behind the shared page
@@ -25,9 +26,15 @@ export function mountAnimationExampleRoute(host: HTMLElement): () => void {
   const app = createApp({
     // Written out literally so the bundler can see and split it.
     renderWorker: () =>
-      new Worker(new URL('../examples/AnimationExampleWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/AnimationExampleWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     appLogicWorker: () =>
-      new Worker(new URL('../examples/board/BoardAppWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/board/BoardAppWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();

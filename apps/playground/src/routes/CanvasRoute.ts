@@ -4,6 +4,7 @@ import { applyPatch, applyPatchToState, stateToSnapshot, type PlaygroundStateSna
 import type { DataWorkerMessage, DataWorkerOutputMessage } from '../DataWorkerMessages';
 import type { RenderWorkerMessage, RenderWorkerOutputMessage } from '../RenderWorkerMessages';
 import { createPreviewCanvas, observeSize } from '../shell/dom';
+import { workerName } from '../shell/still';
 
 const FALLBACK_SIZE = 600;
 
@@ -42,8 +43,11 @@ export function mountCanvasRoute(host: HTMLElement): () => void {
   }
 
   const offscreen = canvas.transferControlToOffscreen();
-  dataWorker = new Worker(new URL('../DataWorker.ts', import.meta.url), { type: 'module' });
-  renderWorker = new Worker(new URL('../CanvasPlaygroundWorker.ts', import.meta.url), { type: 'module' });
+  dataWorker = new Worker(new URL('../DataWorker.ts', import.meta.url), { type: 'module', name: workerName() });
+  renderWorker = new Worker(new URL('../CanvasPlaygroundWorker.ts', import.meta.url), {
+    type: 'module',
+    name: workerName()
+  });
 
   // 1. Give the data worker a port connected to the render worker.
   const channel = new MessageChannel();

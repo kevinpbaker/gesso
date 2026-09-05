@@ -42,6 +42,7 @@ import { Catalogue, Queue, type PlaylistView, type TrackView } from './transitio
 import { formatClock } from './transitions/time';
 import { SNAPSHOT } from './transitions/snapshot';
 import { CHALK, INK, LINEN } from './brand';
+import { isStill } from '../shell/still';
 
 /**
  * A replica of Maxi Ferreira's `view-transitions-live` demo — three
@@ -654,6 +655,9 @@ function Artwork(inputs: Inputs<{ card: CardDesign; playlist: PlaylistView; heig
         objectFit="cover"
         borderRadius={CARD_RADIUS}
         rootModifiers={shared}
+        // Still mode holds the first frame: a video that does not
+        // autoplay is exactly that, and the gate can photograph it.
+        autoplay={!isStill()}
       />
     );
   }

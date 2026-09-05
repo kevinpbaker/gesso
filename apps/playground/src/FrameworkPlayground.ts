@@ -66,6 +66,7 @@ import { createDemoBitmap } from './demoBitmap';
 import { Heavy } from './HeavyWork';
 import { Ticker, type TickerCommands, type TickerView } from './TickerChannel';
 import type { HeavyCommands, HeavyStatus } from './HeavyWork';
+import { isStill } from './shell/still';
 
 /**
  * Demo store used by the framework playground.
@@ -201,6 +202,9 @@ export class Heartbeat extends Component {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   override onMount(): void {
+    if (isStill()) {
+      return;
+    }
     this.timer = setInterval(() => {
       this.ticks.value++;
     }, 100);

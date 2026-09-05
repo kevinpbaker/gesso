@@ -2,6 +2,7 @@ import { createApp, type RendererChoice } from '@gesso/framework';
 import { mountShell, type AppShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /** How often the reporter is allowed to touch the DOM. */
 const REPORT_INTERVAL_MS = 500;
@@ -40,7 +41,8 @@ export function mountModifiersRoute(host: HTMLElement): () => void {
     const report = createFrameReporter(shell, renderer);
     const app = createApp({
       // Written out literally so the bundler can see and split it.
-      renderWorker: () => new Worker(new URL('../examples/ModifiersWorker.ts', import.meta.url), { type: 'module' }),
+      renderWorker: () =>
+        new Worker(new URL('../examples/ModifiersWorker.ts', import.meta.url), { type: 'module', name: workerName() }),
       renderer,
       onFrame: report,
       onError: errors.report

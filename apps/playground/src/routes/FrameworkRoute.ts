@@ -7,6 +7,7 @@ import { mountRouteErrors } from '../shell/errors';
 import { createActionLog, mountActionLogPanel, mountFrameProfiler, mountNodeInspector } from '@gesso/devtools';
 import { addInspectAction, addProfileAction, addToggleAction } from '../shell/InspectorPanel';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 const BLOCK_MS = 2000;
 /** How often the reporter is allowed to touch the DOM. */
@@ -64,13 +65,17 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
   // owned by that lifetime would restart for a reason that has nothing
   // to do with the application. Written out literally so the bundler
   // emits a chunk for it.
-  const applicationWorker = new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' });
+  const applicationWorker = new Worker(new URL('../HeavyWorker.ts', import.meta.url), {
+    type: 'module',
+    name: workerName()
+  });
 
   const start = (renderer: RendererChoice): { dispose: () => void; setInspector(enabled: boolean): void } => {
     const report = createFrameReporter(shell, 'Render worker', renderer);
     const app = createApp({
       // Written out literally so the bundler can see and split it.
-      renderWorker: () => new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module' }),
+      renderWorker: () =>
+        new Worker(new URL('../FrameworkWorker.ts', import.meta.url), { type: 'module', name: workerName() }),
       // Handed over rather than spawned here, so it survives the
       // renderer switch: what WorkerApp is given, it leaves alone.
       appLogicWorker: applicationWorker,
@@ -164,7 +169,9 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     // gone.
     const actions = createActionLog();
     const dataWorker = actions.tap(
-      workerHandle(() => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module' })),
+      workerHandle(
+        () => new Worker(new URL('../HeavyWorker.ts', import.meta.url), { type: 'module', name: workerName() })
+      ),
       [Ticker, Heavy]
     );
     const actionPanel = mountActionLogPanel(shell.preview, actions);

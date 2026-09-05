@@ -104,37 +104,22 @@ const MAX_GROSS_PERCENT = Number(process.env.SCREENSHOT_MAX_GROSS_PERCENT ?? '0.
  * one was inconvenient to make.
  */
 const CANNOT_SETTLE: Record<string, string> = {
-  benchmark: 'drives a continuous load and reports a moving frame time; it never reaches a still frame',
-  framework:
-    "paints two counters that never stop — HeavyWorker's TickerViewModel steps one on a setInterval, and the Heartbeat component steps the other every 100 ms",
-  'framework-sync': 'the same two counters as `framework`, in one thread',
-  'example-live': 'a continuously sampled feed is the whole point of the example',
-  'example-notes':
-    "paints the note's edited time (NotesViewModel: `new Date(note.updatedAt).toLocaleString()`), whose width changes with the clock and reflows the line around it",
-  'example-theme':
-    'paints the time the tree was built (ThemeExampleApp: `new Date().toLocaleTimeString()`), which re-wraps the paragraph it sits in when its width changes',
-  'example-transitions':
-    'plays a video: the second card decodes an MP4 continuously, so the frame on screen depends on when the shot was taken and the route never reaches a still frame',
-  'transitions-app': 'the same example as `example-transitions`, and the same video, with the shell taken away'
+  benchmark: 'drives a continuous load and reports a moving frame time; it never reaches a still frame'
 };
 
 /*
- * The two timestamp routes are the more interesting exclusions: they
- * passed twice in a row and then started failing by 1.5%, because two
- * runs a minute apart render the same-width string and two runs an hour
- * apart do not — the kind of gate that is green until it is
- * inexplicably red. Freezing the clock cannot be done from the outside
- * either: `Page.addScriptToEvaluateOnNewDocument` does not reach a
- * worker, and both times are rendered in the render worker.
- *
- * Covering the ticker routes would take a "still" mode in the playground: a
- * flag that reaches the data worker (whose `location` is its own script,
- * not the page's, so it would have to arrive on the worker URL or by
- * message) and that `Heartbeat` also reads. That is a test-only branch in
- * three places in the harness, which is why it is not here; what the
- * exclusions cost is coverage of the component runtime's rendering, and
- * `canvas`, `compare` and the five example routes cover that ground from
- * other directions.
+ * Every other route is opened in the playground's "still" mode (`?still`
+ * on the URL, `apps/playground/src/shell/still.ts`): the routes name the
+ * workers they spawn, the tickers do not start, the clocks read one
+ * fixed instant, and the video holds its first frame. Before that mode
+ * existed seven routes were excluded here: the two framework routes for
+ * their counters, the live example for its feed, the notes and theme
+ * examples for a rendered time whose width changed with the clock, and
+ * the two transitions routes for a video that decoded continuously.
+ * Freezing them from outside was not possible — a script evaluated on
+ * the page does not reach a worker, and every one of those sources ran
+ * in one — so the freeze is a branch at each source, taken only when the
+ * flag says so.
  */
 
 const root = join(import.meta.dirname, '..');
@@ -373,7 +358,8 @@ async function main(): Promise<void> {
       // is how this first hung, with a `Runtime.evaluate` whose context
       // had been torn down never getting a reply.
       await devtools.send('Page.navigate', { url: 'about:blank' });
-      await devtools.send('Page.navigate', { url: `${base}#${route.id}` });
+      // In still mode, so a route that ticks or plays holds one frame.
+      await devtools.send('Page.navigate', { url: `${base}?still#${route.id}` });
 
       const name = `${route.id}.png`;
       const file = join(baselineDir, name);

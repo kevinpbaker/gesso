@@ -12,6 +12,7 @@ import {
 } from '@gesso/framework';
 import type { UiChild } from '@gesso/core';
 import { gessoTheme } from './brand';
+import { stillNow } from '../shell/still';
 
 /**
  * A routed app: three levels of nested screens, typed params, a guard,
@@ -243,7 +244,7 @@ function HomeScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext) {
  */
 function MailLayout(inputs: Inputs<OutletProps>, ctx: ComponentContext) {
   const router = ctx.inject(RouterService);
-  const builtAt = new Date().toLocaleTimeString();
+  const builtAt = new Date(stillNow()).toLocaleTimeString();
   return (
     <row gap={16} x="stretch" y="stretch">
       <column gap={6} width={160}>

@@ -2,6 +2,7 @@ import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /**
  * Runs the theming example in a render worker behind the shared page
@@ -16,9 +17,13 @@ export function mountThemeExampleRoute(host: HTMLElement): () => void {
 
   const app = createApp({
     // Written out literally so the bundler can see and split it.
-    renderWorker: () => new Worker(new URL('../examples/ThemeExampleWorker.ts', import.meta.url), { type: 'module' }),
+    renderWorker: () =>
+      new Worker(new URL('../examples/ThemeExampleWorker.ts', import.meta.url), { type: 'module', name: workerName() }),
     appLogicWorker: () =>
-      new Worker(new URL('../examples/theme/ThemeAppWorker.ts', import.meta.url), { type: 'module' }),
+      new Worker(new URL('../examples/theme/ThemeAppWorker.ts', import.meta.url), {
+        type: 'module',
+        name: workerName()
+      }),
     onFrame: metrics => {
       frames++;
       const now = performance.now();

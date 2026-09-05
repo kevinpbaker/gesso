@@ -2,6 +2,7 @@ import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
+import { workerName } from '../shell/still';
 
 /** Placeholder shown for a reading no frame has supplied yet. */
 const PENDING = '—';
@@ -37,7 +38,8 @@ export function mountLiveExampleRoute(host: HTMLElement): () => void {
 
   const app = createApp({
     // Written out literally so the bundler can see and split it.
-    renderWorker: () => new Worker(new URL('../examples/LiveExampleWorker.ts', import.meta.url), { type: 'module' }),
+    renderWorker: () =>
+      new Worker(new URL('../examples/LiveExampleWorker.ts', import.meta.url), { type: 'module', name: workerName() }),
     onFrame: metrics => {
       frames++;
       // A frame rate only means something over a window, so that one
