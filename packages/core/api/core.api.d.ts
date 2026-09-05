@@ -3260,6 +3260,7 @@ interface WebGPUDeviceInit {
   device: GPUDevice;
   format: GPUTextureFormat;
 }
+declare function isWebGPUAvailable(): boolean;
 declare function initializeWebGPU(): Promise<WebGPUDeviceInit>;
 interface TexturedPipeline {
   pipeline: GPURenderPipeline;
@@ -3807,6 +3808,7 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  isWebGPUAvailable,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -4465,6 +4467,7 @@ import {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  isWebGPUAvailable,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -5045,6 +5048,7 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  isWebGPUAvailable,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
