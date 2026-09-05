@@ -4,6 +4,8 @@ import { map } from 'rxjs';
 import {
   Box,
   Column,
+  LazyRow,
+  noKeyModifiers,
   ScrollView,
   fade,
   linear,
@@ -609,5 +611,93 @@ describe('sharedElement()', () => {
     drain(mounted);
     expect(mounted.runtime.sharedElementNames).not.toContain('gone');
     expect(last).not.toBeNull();
+  });
+});
+
+describe('sharedElement() and a virtualised shelf', () => {
+  /**
+   * A shelf of cards that mounts only what is in view, and a page that
+   * opens from one of them.
+   *
+   * This is the arrangement `docs/MUSIC_ROADMAP.md` M1 asks to check
+   * before it builds eight of them: a shelf item scrolled out of a
+   * `LazyRow` has no node left to morph from, and the wrong answer
+   * would be to morph the page in from whatever box the registry
+   * happened to be holding. Named per item, so the page claims the name
+   * of the one it was opened from.
+   */
+  function shelf(open: ReturnType<typeof internalState<number | null>>, morphs: boolean[]) {
+    return Column(
+      { width: 400, height: 500 },
+      LazyRow(
+        { width: 400, height: 100, count: 100, estimatedExtent: 100, overscan: 1, initialViewportExtent: 400 },
+        index =>
+          Box({
+            key: `item-${index}`,
+            width: 100,
+            height: 100,
+            modifiers: [sharedElement({ name: `shelf-${index}`, duration: 200, easing: linear })]
+          })
+      ),
+      open.pipe(
+        map(index =>
+          index === null
+            ? []
+            : [
+                Box({
+                  key: 'page',
+                  width: 400,
+                  height: 300,
+                  modifiers: [
+                    sharedElement({
+                      name: `shelf-${index}`,
+                      duration: 200,
+                      easing: linear,
+                      onMorph: active => morphs.push(active)
+                    })
+                  ]
+                })
+              ]
+        )
+      )
+    );
+  }
+
+  it('morphs the page in from a shelf item that is still mounted', () => {
+    const open = internalState<number | null>(null);
+    const morphs: boolean[] = [];
+    const mounted = mountRuntime(shelf(open, morphs));
+    drain(mounted);
+
+    open.value = 1;
+    mounted.frame();
+    // Item 1 is in view, so the registry still holds its box and the
+    // page arrives as a morph rather than as a new element.
+    expect(morphs[0]).toBe(true);
+
+    drain(mounted);
+    expect(morphs).toEqual([true, false]);
+  });
+
+  it('lets the page simply arrive when the shelf item has scrolled out of the window', () => {
+    const open = internalState<number | null>(null);
+    const morphs: boolean[] = [];
+    const mounted = mountRuntime(shelf(open, morphs));
+    drain(mounted);
+    expect(mounted.runtime.sharedElementNames).toContain('shelf-1');
+
+    // Far enough right that item 1 is well outside the window and its
+    // node has gone, which is what releases the name.
+    mounted.runtime.input.wheel.wheel(100, 50, 4000, 0, noKeyModifiers());
+    drain(mounted);
+    expect(mounted.runtime.sharedElementNames).not.toContain('shelf-1');
+
+    open.value = 1;
+    drain(mounted);
+    // No morph was ever begun, and nothing wrote a transform onto the
+    // page: with no box to come from it is an element that is simply
+    // appearing, which is what an `initial` motion beside it would
+    // then animate.
+    expect(morphs).toEqual([]);
   });
 });
