@@ -379,7 +379,6 @@ interface UiColors {
   readonly controlBackgroundHovered: UiColor;
   readonly controlBackgroundPressed: UiColor;
   readonly controlBorder: UiColor;
-  readonly controlBorderFocused: UiColor;
   readonly controlForeground: UiColor;
   readonly controlForegroundDisabled: UiColor;
   readonly controlAccent: UiColor;
