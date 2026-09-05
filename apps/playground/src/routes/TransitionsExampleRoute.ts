@@ -1,6 +1,7 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /**
  * Runs the transitions example in a render worker behind the shared
@@ -55,8 +56,12 @@ export function mountTransitionsExampleRoute(host: HTMLElement): () => void {
     'Shared elements morph between two live nodes rather than between two snapshots; the playlists come from Audius over a channel, and the sound from one element on the shell.'
   );
   const dispose = app.mount(shell.preview);
+  const disconnectDevtools = connectRouteDevtools(app, 'example-transitions');
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
+    disconnectDevtools();
     dispose();
     errors.dispose();
     shell.dispose();

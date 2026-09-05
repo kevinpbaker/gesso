@@ -6,6 +6,7 @@ import { mountShell, type AppShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { createActionLog, mountActionLogPanel, mountFrameProfiler, mountNodeInspector } from '@gesso/devtools';
 import { addInspectAction, addProfileAction, addToggleAction } from '../shell/InspectorPanel';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 const BLOCK_MS = 2000;
 /** How often the reporter is allowed to touch the DOM. */
@@ -91,7 +92,14 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     if (inspecting) {
       app.setInspector(true);
     }
-    return { dispose, setInspector: enabled => app.setInspector(enabled) };
+    const disconnectDevtools = connectRouteDevtools(app, 'framework');
+    return {
+      dispose: () => {
+        disconnectDevtools();
+        dispose();
+      },
+      setInspector: enabled => app.setInspector(enabled)
+    };
   };
 
   let app = start(loadRendererChoice());
@@ -105,8 +113,10 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     app = start(choice);
   });
   addBlockAction(shell);
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
     app.dispose();
     // Ours to stop, since the route spawned it.
     applicationWorker.terminate();
@@ -179,8 +189,12 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     if (inspecting) {
       builder.setInspector(true);
     }
+    // The one route whose action log the panel can show: the log is
+    // here, on the ports, and the panel is sent each entry.
+    const disconnectDevtools = connectRouteDevtools(builder, 'framework-sync', actions);
     return {
       dispose: () => {
+        disconnectDevtools();
         dispose();
         actionPanel.dispose();
         actions.dispose();
@@ -205,8 +219,10 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     app = start(choice);
   });
   addBlockAction(shell);
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
     app.dispose();
     inspectorPanel.dispose();
     profiler.dispose();

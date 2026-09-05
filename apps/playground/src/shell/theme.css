@@ -711,6 +711,22 @@ canvas.pg-canvas:focus-visible {
 /* Status bar                                                       */
 /* --------------------------------------------------------------- */
 
+/* --------------------------------------------------------------- */
+/* Devtools pane                                                    */
+/* --------------------------------------------------------------- */
+
+.pg-devtools {
+  flex: none;
+  height: 40vh;
+  min-height: 200px;
+  border-top: 1px solid var(--border-strong);
+  background: #0d1117;
+}
+
+.pg-devtools[hidden] {
+  display: none;
+}
+
 .pg-debug {
   flex: none;
   display: flex;

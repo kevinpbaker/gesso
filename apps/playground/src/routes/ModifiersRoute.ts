@@ -1,6 +1,7 @@
 import { createApp, type RendererChoice } from '@gesso/framework';
 import { mountShell, type AppShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /** How often the reporter is allowed to touch the DOM. */
 const REPORT_INTERVAL_MS = 500;
@@ -48,7 +49,14 @@ export function mountModifiersRoute(host: HTMLElement): () => void {
     shell.setDetail(
       'Hover, press, Tab, drag and rest the pointer: seven modifiers, and no wrapper component around any of them.'
     );
-    return { dispose: app.mount(shell.preview) };
+    const dispose = app.mount(shell.preview);
+    const disconnectDevtools = connectRouteDevtools(app, 'modifiers');
+    return {
+      dispose: () => {
+        disconnectDevtools();
+        dispose();
+      }
+    };
   };
 
   let app = start(loadRendererChoice());
@@ -56,8 +64,10 @@ export function mountModifiersRoute(host: HTMLElement): () => void {
     app.dispose();
     app = start(choice);
   });
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
     app.dispose();
     errors.dispose();
     shell.dispose();

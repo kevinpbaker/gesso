@@ -21,6 +21,12 @@ export interface AppShell {
   readonly preview: HTMLElement;
   /** Control sidebar. Throws unless the route asked for one. */
   readonly sidebar: HTMLElement;
+  /**
+   * A pane under the preview for the devtools panel, hidden until
+   * something is put in it. Under rather than beside, because the
+   * panel's tree and report are two columns already.
+   */
+  readonly devtools: HTMLElement;
   /** Replaces the metric row. Labels may change between calls. */
   setMetrics(metrics: readonly ShellMetric[]): void;
   /** Primary status line. */
@@ -54,11 +60,13 @@ export function mountShell(host: HTMLElement, options: ShellOptions): AppShell {
   root.append(
     renderHeader(options.routeId, route?.title ?? options.routeId),
     renderMain(withSidebar),
+    createElement('section', { className: 'pg-devtools', attrs: { hidden: '' } }),
     renderStatusBar(options.metrics ?? false)
   );
   host.appendChild(root);
 
   const preview = requireElement(root, '.pg-preview');
+  const devtools = requireElement(root, '.pg-devtools');
   const metricRow = root.querySelector<HTMLElement>('.pg-metrics');
   const statusLine = requireElement(root, '.pg-status-primary');
   const detailLine = requireElement(root, '.pg-status-secondary');
@@ -74,6 +82,7 @@ export function mountShell(host: HTMLElement, options: ShellOptions): AppShell {
 
   return {
     preview,
+    devtools,
     get sidebar(): HTMLElement {
       if (!withSidebar) {
         throw new Error('This route was mounted without a sidebar.');

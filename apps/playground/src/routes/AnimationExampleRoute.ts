@@ -1,6 +1,7 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /**
  * Runs the animation example in a render worker behind the shared page
@@ -53,8 +54,12 @@ export function mountAnimationExampleRoute(host: HTMLElement): () => void {
       'an idle app schedules no frames at all.'
   );
   const dispose = app.mount(shell.preview);
+  const disconnectDevtools = connectRouteDevtools(app, 'example-animation');
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
+    disconnectDevtools();
     dispose();
     errors.dispose();
     shell.dispose();

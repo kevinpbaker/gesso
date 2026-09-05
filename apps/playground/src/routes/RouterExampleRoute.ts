@@ -1,6 +1,7 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /**
  * Runs the routing example in a render worker behind the shared page
@@ -51,8 +52,12 @@ export function mountRouterExampleRoute(host: HTMLElement): () => void {
     'Nested routes, params the compiler checks, and a guard, all in the render worker; the shell exchanges a url.'
   );
   const dispose = app.mount(shell.preview);
+  const disconnectDevtools = connectRouteDevtools(app, 'example-router');
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
+    disconnectDevtools();
     dispose();
     errors.dispose();
     shell.dispose();

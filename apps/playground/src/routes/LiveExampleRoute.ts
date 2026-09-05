@@ -1,6 +1,7 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /** Placeholder shown for a reading no frame has supplied yet. */
 const PENDING = '—';
@@ -57,8 +58,12 @@ export function mountLiveExampleRoute(host: HTMLElement): () => void {
     'Every frame dirties a few hundred properties and rebuilds nothing. Compare "Component bodies run" on the left.'
   );
   const dispose = app.mount(shell.preview);
+  const disconnectDevtools = connectRouteDevtools(app, 'example-live');
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
+    disconnectDevtools();
     dispose();
     errors.dispose();
     shell.dispose();

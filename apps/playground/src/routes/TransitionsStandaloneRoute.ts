@@ -1,6 +1,7 @@
 import { mountErrorOverlay } from '@gesso/devtools';
 import { createApp } from '@gesso/framework';
 import { createElement } from '../shell/dom';
+import { connectRouteDevtools } from '../shell/devtools';
 
 /**
  * The transitions example as an application in its own right.
@@ -73,8 +74,12 @@ export function mountTransitionsStandaloneRoute(host: HTMLElement): () => void {
     onError: overlay.report
   });
   const dispose = app.mount(root);
+  // No shell here, so no pane; the Chrome extension is how this route
+  // is inspected, which is the configuration it exists to resemble.
+  const disconnectDevtools = connectRouteDevtools(app, 'transitions-app');
 
   return () => {
+    disconnectDevtools();
     dispose();
     document.title = playgroundTitle;
     detachWindowErrors();

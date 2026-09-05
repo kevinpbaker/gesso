@@ -1,6 +1,7 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /**
  * Runs the sign-in example in a render worker behind the shared page
@@ -40,8 +41,12 @@ export function mountSignInExampleRoute(host: HTMLElement): () => void {
   shell.setStatus('Source: apps/playground/src/examples/SignInExampleApp.tsx — the passcode is 246813.');
   shell.setDetail('Functional components in JSX over one channel; the authentication runs on the application worker.');
   const dispose = app.mount(shell.preview);
+  const disconnectDevtools = connectRouteDevtools(app, 'example-signin');
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
+    disconnectDevtools();
     dispose();
     errors.dispose();
     shell.dispose();

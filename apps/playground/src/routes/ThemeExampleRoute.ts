@@ -1,6 +1,7 @@
 import { createApp } from '@gesso/framework';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
+import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 
 /**
  * Runs the theming example in a render worker behind the shared page
@@ -39,8 +40,12 @@ export function mountThemeExampleRoute(host: HTMLElement): () => void {
   shell.setStatus('Source: apps/playground/src/examples/ThemeExampleApp.tsx — change a setting on the left.');
   shell.setDetail('One theme in the environment; the page repaints without a node being rebuilt.');
   const dispose = app.mount(shell.preview);
+  const disconnectDevtools = connectRouteDevtools(app, 'example-theme');
+  const closeDevtools = addDevtoolsAction(shell);
 
   return () => {
+    closeDevtools();
+    disconnectDevtools();
     dispose();
     errors.dispose();
     shell.dispose();

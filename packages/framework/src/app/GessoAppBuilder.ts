@@ -14,6 +14,7 @@ import type { FrameMetrics, RendererChoice } from './GessoRuntime';
 import type { MediaOptions } from './MediaService';
 import type { FontFamilyDeclaration } from './FontService';
 import type { UiNodeReport } from './NodeReport';
+import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
 
 /**
  * Fluent builder for the single-thread configuration.
@@ -23,6 +24,7 @@ export class GessoAppBuilder {
   private readonly serviceRegistrations: (new () => object)[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((report: UiNodeReport | null) => void) | undefined;
+  private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
   private errorListener:
     | ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void)
     | undefined;
@@ -161,6 +163,21 @@ export class GessoAppBuilder {
   }
 
   /**
+   * Receives a devtools panel's answers and updates, mirroring
+   * `WorkerApp.onDevtools`. Remembered before `mountSync`, so a panel
+   * connected to the builder hears the app once there is one.
+   */
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void {
+    this.devtoolsListener = listener;
+    this.app?.onDevtools(listener);
+  }
+
+  /** Answers a devtools panel, mirroring `WorkerApp.devtools`. A no-op before mountSync. */
+  devtools(request: DevtoolsRequest): void {
+    this.app?.devtools(request);
+  }
+
+  /**
    * Replaces the root and rebuilds the tree, for hot module
    * replacement, mirroring `RenderWorkerApp.reload`.
    *
@@ -226,6 +243,9 @@ export class GessoAppBuilder {
     }
     if (this.errorListener !== undefined) {
       app.onError(this.errorListener);
+    }
+    if (this.devtoolsListener !== null) {
+      app.onDevtools(this.devtoolsListener);
     }
     this.app = app;
     app.mount();
