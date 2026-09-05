@@ -10,6 +10,7 @@
     "preview": "pnpm --filter @gesso/playground preview",
     "docs:dev": "pnpm --filter @gesso/docs dev",
     "sluice:dev": "pnpm --filter @gesso/sluice dev",
+    "segue:dev": "pnpm --filter @gesso/segue dev",
     "docs:build": "pnpm --filter @gesso/docs build",
     "docs:preview": "pnpm --filter @gesso/docs preview",
     "docs:check": "node scripts/check-docs.ts",

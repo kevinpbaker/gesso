@@ -102,6 +102,31 @@ importers:
         specifier: ^8.2.0
         version: 8.2.1(yaml@2.9.0)
 
+  apps/segue:
+    dependencies:
+      '@gesso/components':
+        specifier: workspace:^
+        version: link:../../packages/components
+      '@gesso/core':
+        specifier: workspace:^
+        version: link:../../packages/core
+      '@gesso/devtools':
+        specifier: workspace:^
+        version: link:../../packages/devtools
+      '@gesso/framework':
+        specifier: workspace:^
+        version: link:../../packages/framework
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+    devDependencies:
+      '@gesso/testing':
+        specifier: workspace:^
+        version: link:../../packages/testing
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.1(yaml@2.9.0)
+
   apps/sluice:
     dependencies:
       '@gesso/components':
