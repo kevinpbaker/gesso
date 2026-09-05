@@ -265,7 +265,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
       label,
       backgroundColor: 'controlBackground',
       borderWidth: 1,
-      borderColor: focus.focused.pipe(map(on => (on ? 'controlBorderFocused' : 'controlBorder'))),
+      borderColor: 'controlBorder',
       borderRadius: 6,
       onKeyDown: keymap({
         ArrowDown: () => step(1),

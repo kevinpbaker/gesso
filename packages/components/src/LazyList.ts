@@ -1,4 +1,4 @@
-import { map, type Observable } from 'rxjs';
+import { map } from 'rxjs';
 
 import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { Box, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from '@gesso/core';
@@ -114,7 +114,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
       label,
       backgroundColor: 'controlBackground',
       borderWidth: 1,
-      borderColor: borderOf(focus.focused),
+      borderColor: 'controlBorder',
       borderRadius: 6,
       onKeyDown: keymap({
         ArrowDown: () => step(1),
@@ -135,10 +135,6 @@ function activate(inputs: Inputs<LazyListProps>, index: number): void {
   if (index >= 0) {
     inputs.onActivate.value?.(index);
   }
-}
-
-function borderOf(focused: Observable<boolean>): Observable<string> {
-  return focused.pipe(map(on => (on ? 'controlBorderFocused' : 'controlBorder')));
 }
 
 /**

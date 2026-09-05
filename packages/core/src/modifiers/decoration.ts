@@ -50,11 +50,11 @@ export const decorated = defineModifier<readonly DecorationShape[]>({
  * whatever theme the node inherits, so a ring inside a dark card is
  * the dark palette's without this modifier reading the environment.
  *
- * Not here: `:focus-visible`. The ring shows for any focus, including
- * focus taken by a pointer press. Distinguishing the two means the
- * input stack recording which device last moved focus and the host
- * reporting it, which is a proposal against the host budget rather
- * than an option on this modifier.
+ * The ring is `:focus-visible`, not `:focus`: `attach` draws it only
+ * while the host reports the focus as visible, so a control a pointer
+ * press focused stays unmarked until a key is pressed. A control that
+ * also recoloured its border on focus would say the same thing twice,
+ * and say it for the wrong focus, which is why no component does.
  */
 export interface FocusRingOptions {
   /** A palette name or a literal colour. Defaults to the `focusRing` token. */

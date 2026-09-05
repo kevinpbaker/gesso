@@ -240,7 +240,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       label,
       backgroundColor: 'controlBackground',
       borderWidth: 1,
-      borderColor: focus.focused.pipe(map(on => (on ? 'controlBorderFocused' : 'controlBorder'))),
+      borderColor: 'controlBorder',
       borderRadius: 6,
       onKeyDown: keymap({
         ArrowDown: () => step(1),
