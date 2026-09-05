@@ -4,9 +4,10 @@ description: 'The two rendering backends: how an application picks one, what the
 
 # Canvas2D and WebGPU
 
-Gesso paints through one of two backends. Canvas2D is the default and
-runs wherever a canvas does. WebGPU draws the same tree on the GPU where
-the engine offers it, and falls back to Canvas2D where it does not.
+Gesso paints through one of two backends. An app that says nothing gets
+`'auto'`: WebGPU where the engine offers it, Canvas2D where it does not.
+Canvas2D runs wherever a canvas does, which is everywhere, and is still
+there to be asked for by name.
 
 Which one drew is an implementation detail of a frame, not of your code.
 Elements, layout, text, input, themes and components are the same either
@@ -22,33 +23,40 @@ message; `renderRoot` does not choose:
 // main.ts
 createApp({
   renderWorker: () => new Worker(new URL('./app.render.worker.ts', import.meta.url), { type: 'module' }),
-  renderer: 'auto'
+  renderer: 'canvas2d'
 }).mount('#app');
 ```
 
 Single-thread, the builder carries the same choice:
 
 ```ts
-createApp(AppRoot).renderer('auto').mountSync('#app');
+createApp(AppRoot).renderer('canvas2d').mountSync('#app');
 ```
 
-| Value        | What happens                                                                                             |
-| ------------ | -------------------------------------------------------------------------------------------------------- |
-| `'canvas2d'` | The default. Draws immediately, on the app's canvas, with no adapter to ask for.                         |
-| `'webgpu'`   | Asks for an adapter and a device. Falls back to Canvas2D when it cannot have them, and logs that it did. |
-| `'auto'`     | The same request and the same fallback, without the log.                                                 |
+| Value        | What happens                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `'auto'`     | The default. WebGPU where the engine has it, Canvas2D where it does not, decided without a word from you. |
+| `'canvas2d'` | Draws immediately, on the app's canvas, with no adapter to ask for.                                       |
+| `'webgpu'`   | Asks for an adapter and a device. Falls back to Canvas2D when it cannot have them, and logs that it did.  |
 
-`'webgpu'` and `'auto'` differ in one thing only: whether an
-unavailable GPU is worth a console message. Ask for `'webgpu'` when the
-absence is a surprise you want to hear about, and `'auto'` when it is
-the expected case.
+`'webgpu'` and `'auto'` differ in two things. `'webgpu'` asks for an
+adapter even on an engine with no WebGPU at all, so that it can tell
+you it did not get one; `'auto'` looks first and does not ask. Name
+`'webgpu'` while developing against the GPU path, when a missing
+adapter is a surprise you want to hear about.
 
-Starting on the GPU is asynchronous, so the first frames have nothing to
-draw with and are skipped. When the device arrives, the surface is
-resized to the size the canvas already had and a repaint is requested,
-so the first painted frame is the right size. A device lost later falls
-back to Canvas2D on the next frame, on the same canvas: the WebGPU path
-never takes the 2D context, which is what leaves it free.
+That first difference is what keeps the default cheap where it cannot
+pay off. `'auto'` checks for the WebGPU entry point synchronously, as
+the app is built, so an engine that never shipped it is on Canvas2D
+from the first frame with nothing skipped and nothing to unwind. Only
+an engine that has the entry point goes on to ask for a device.
+
+Asking for a device is asynchronous, so on that path the first frames
+have nothing to draw with and are skipped. When the device arrives, the
+surface is resized to the size the canvas already had and a repaint is
+requested, so the first painted frame is the right size. A device lost
+later falls back to Canvas2D on the next frame, on the same canvas: the
+WebGPU path never takes the 2D context, which is what leaves it free.
 
 ## Knowing which one drew
 
@@ -61,7 +69,6 @@ resolves, then the backend that painted:
 ```ts
 createApp({
   renderWorker: () => new Worker(new URL('./app.render.worker.ts', import.meta.url), { type: 'module' }),
-  renderer: 'auto',
   onFrame: metrics => console.log(metrics.renderer, metrics.gpu)
 }).mount('#app');
 ```
@@ -88,9 +95,10 @@ validation failures and device loss reach `onError` with a source of
 - **WebGPU in a worker, on a transferred `OffscreenCanvas`**, is solid on
   Chromium and WebView2 and absent elsewhere.
 
-That is the whole reason for the default. Canvas2D in a worker is the
-portable path, WebGPU is progressive enhancement, and an application must
-never fail to paint because a webview lacks it.
+That is the shape `'auto'` is built around. An application must never
+fail to paint because a webview lacks WebGPU, and under `'auto'` it
+cannot: the engines in the second and third bullets take the Canvas2D
+branch before a device is ever requested.
 
 ## What is identical by construction
 
@@ -200,10 +208,18 @@ has been looked at, and every reading was taken on Chromium.
 
 ## Choosing, honestly
 
-**Take the default unless you have a reason.** Canvas2D paints on the
-first frame, cannot lose a device, and runs on every engine Gesso is
-meant to ship in. Nothing on this site or in the component library needs
-more than it.
+**Take the default unless you have a reason.** `'auto'` gives a
+Chromium engine the GPU path and everything else the portable one, and
+no application code can tell which it got.
+
+**Ask for `'canvas2d'` when the first frame is what matters.** It paints
+immediately and cannot lose a device. On Chromium on Linux, in the
+render worker, the Segue demo's first painted frame landed at 598 and
+689 ms under `'auto'` against 428 and 508 ms pinned to Canvas2D, so the
+adapter and the pipelines cost something like 130 to 180 ms of cold
+start. Until that frame the canvas is empty rather than wrong. A screen
+behind a splash or a network round trip will not notice; a screen that
+is meant to be there instantly might.
 
 **WebGPU is not currently a speed win on these screens.** Measured in the
 render worker in Chromium, on the framework playground: scrolling a
@@ -212,14 +228,9 @@ upload 0.00, encode 0.18) against Canvas2D's 0.58 ms; with the glyph
 atlas in place, 0.50 ms against 0.43 to 0.46. That is parity within
 sampling noise. The cost on both is walking the tree, and the GPU work is
 a fifth of it, so a screen whose expense is the traversal will not get
-cheaper by changing backend.
-
-**Reach for `'auto'`** when the app ships in a Chromium engine you
-control, such as WebView2 or bundled CEF, and you want the GPU path where
-it exists without an application-visible difference where it does not.
-Reach for `'webgpu'` while developing against the GPU path, so an
-unavailable adapter says so instead of quietly drawing the same picture
-another way.
+cheaper by changing backend. The default is not a claim about frame
+cost. It is that the GPU path is the one with room left in it, and that
+an application should be on it wherever it runs at all.
 
 **Do not condition application behaviour on the backend.** The fallback
 is silent by design, and code that assumed the GPU would win is code that
@@ -227,11 +238,11 @@ breaks on the machine that matters.
 
 ## Why this page has no live example
 
-Every canvas on this site is Canvas2D, including the ones on the pages
-that describe painting. The site's embed mounts an app with no `renderer`
-option, and the option belongs to the host rather than to the worker, so
-a page cannot offer a backend switch without changing the site's own
-shell. A toggle that flipped a label while the same backend kept drawing
+The site's embed mounts an app with no `renderer` option, so every
+canvas on this site is drawn by whichever backend `'auto'` picked in
+your browser: WebGPU on Chrome, Canvas2D on Safari and Firefox. The
+option belongs to the host rather than to the worker, so a page cannot
+offer a backend switch without changing the site's own shell. A toggle that flipped a label while the same backend kept drawing
 would be worse than none, and on a reader's Safari or Firefox even a
 working switch would fall back and show Canvas2D twice.
 
