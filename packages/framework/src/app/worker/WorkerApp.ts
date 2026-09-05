@@ -53,9 +53,11 @@ export interface WorkerAppOptions {
    */
   renderWorker: (() => Worker) | URL | string;
   /**
-   * The rendering backend the worker draws with. Defaults to Canvas2D;
-   * `webgpu` and `auto` fall back to it when the browser has no WebGPU
-   * in workers, and the frame metrics say which one is drawing.
+   * The rendering backend the worker draws with. Defaults to `auto`,
+   * which is WebGPU where the worker has it and Canvas2D elsewhere;
+   * `webgpu` and `auto` both fall back to Canvas2D when the browser
+   * has no WebGPU in workers, and the frame metrics say which one is
+   * drawing.
    */
   renderer?: RendererChoice;
   /**

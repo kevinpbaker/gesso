@@ -75,6 +75,7 @@ import {
   type TextMeasurer,
   createCanvasSurface,
   createWebGPUSurface,
+  isWebGPUAvailable,
   LayoutInspector,
   WebGPURenderer,
   type CanvasHost,
@@ -171,10 +172,18 @@ export interface RuntimeInput {
 /**
  * Which backend draws.
  *
- * `canvas2d` is the default and the portable choice: WKWebView and
- * WebKitGTK do not ship WebGPU. `webgpu` asks for it and falls back to
- * Canvas2D when the adapter or device cannot be had, reporting the
- * fallback once; `auto` does the same without the report.
+ * `auto` is the default: WebGPU where the browser has it, Canvas2D
+ * everywhere else. The choice between them is made synchronously on
+ * whether `navigator.gpu` exists, so an engine that never shipped
+ * WebGPU (WKWebView, WebKitGTK) is on Canvas2D from the first frame
+ * rather than after a rejected adapter request. A browser that has the
+ * entry point but cannot produce an adapter or a device still falls
+ * back, asynchronously, once that request fails.
+ *
+ * `canvas2d` pins the portable backend and never asks for an adapter.
+ * `webgpu` asks for it and falls back the same way `auto` does, but
+ * reports the fallback to the console, because a caller that named the
+ * backend wants to know it did not get it.
  */
 export type RendererChoice = RendererBackend | 'auto';
 
@@ -183,7 +192,7 @@ export interface GessoRuntimeOptions {
   root: FrameworkChild;
   /** Canvas to draw into: HTMLCanvasElement, OffscreenCanvas, or a test double. */
   canvas: CanvasHost;
-  /** The rendering backend. Defaults to `canvas2d`; see RendererChoice. */
+  /** The rendering backend. Defaults to `auto`; see RendererChoice. */
   renderer?: RendererChoice;
   /**
    * A canvas for text measurement when the draw canvas is WebGPU's — a
@@ -410,8 +419,15 @@ export class GessoRuntime {
     this.height = options.height ?? 600;
     this.constraints = Constraints.loose(this.width, this.height);
 
-    const choice = options.renderer ?? 'canvas2d';
-    if (choice === 'canvas2d') {
+    // `auto` decides here, in the constructor, rather than by letting
+    // the WebGPU path fail: a browser with no `navigator.gpu` gets the
+    // Canvas2D renderer immediately, with no `pending` frames and no
+    // fallback to unwind. Only `webgpu` asked for by name goes to the
+    // GPU path on an engine that has no entry point, so that it can
+    // report what it could not have.
+    const choice = options.renderer ?? 'auto';
+    const drawWithWebGPU = choice === 'webgpu' || (choice === 'auto' && isWebGPUAvailable());
+    if (!drawWithWebGPU) {
       this.canvasSurface = createCanvasSurface(options.canvas);
       this.textMeasurer = options.textMeasurer ?? new CanvasTextMeasurer(this.canvasSurface.getContext2D());
       this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });

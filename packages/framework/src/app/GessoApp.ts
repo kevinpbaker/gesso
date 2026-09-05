@@ -39,7 +39,7 @@ export interface GessoAppOptions {
    */
   history?: ShellHistoryOptions;
   canvas?: CanvasHost;
-  /** The rendering backend; see RendererChoice. Defaults to `canvas2d`. */
+  /** The rendering backend; see RendererChoice. Defaults to `auto`. */
   renderer?: RendererChoice;
   clock?: UiFrameClockFactory;
   /**
