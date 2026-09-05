@@ -1369,6 +1369,8 @@ declare class UiGraphBuilder {
   private readonly modifiers;
   private nextChildrenBindingId;
   private reconcileDepth;
+  private readonly reconciling;
+  private readonly deferredChildren;
   private readonly components;
   private readonly dispatcher;
   private readonly layout;
@@ -3137,12 +3139,16 @@ declare class LayoutInspector {
   private readonly options;
   private enabled;
   private hovered;
+  private highlighted;
   private readonly heat;
   constructor(engine: LayoutEngine, options?: LayoutInspectorOptions);
   get isEnabled(): boolean;
   get hoveredNode(): UiNode | null;
+  get highlightedNode(): UiNode | null;
+  get hasOverlay(): boolean;
   setEnabled(enabled: boolean): void;
   setHovered(node: UiNode | null): boolean;
+  setHighlighted(node: UiNode | null): boolean;
   recordLayout(now: number): void;
   get heatCount(): number;
   explainHovered(): LayoutExplanation | null;
@@ -4874,7 +4880,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DlziBGnO.js";
+} from "./index-Cfk_ueHR.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5563,7 +5569,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DlziBGnO.js";
+} from "./index-Cfk_ueHR.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

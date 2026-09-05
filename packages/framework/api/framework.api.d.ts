@@ -723,6 +723,59 @@ interface UiSemanticsReport {
 }
 declare function printPropValue(value: unknown): string;
 declare function formatNodeReport(report: UiNodeReport): string;
+interface UiTreeNode {
+  readonly id: string;
+  readonly type: string;
+  readonly component?: string;
+  readonly text?: string;
+  readonly children: readonly UiTreeNode[];
+}
+interface UiTreeSnapshot {
+  readonly root: UiTreeNode;
+  readonly nodes: number;
+}
+interface ConsoleEntry {
+  readonly thread: 'render' | 'app';
+  readonly level: 'log' | 'info' | 'warn' | 'error' | 'debug';
+  readonly args: readonly string[];
+  readonly at: number;
+}
+type DevtoolsRequest =
+{
+  kind: 'tree';
+} |
+{
+  kind: 'watchTree';
+  enabled: boolean;
+} |
+{
+  kind: 'inspect';
+  id: string;
+} |
+{
+  kind: 'select';
+  id: string | null;
+} |
+{
+  kind: 'highlight';
+  id: string | null;
+} |
+{
+  kind: 'console';
+  enabled: boolean;
+};
+type DevtoolsEvent = {
+  kind: 'tree';
+  tree: UiTreeSnapshot;
+} | {
+  kind: 'report';
+  id: string;
+  report: UiNodeReport | null;
+} | {
+  kind: 'console';
+  entry: ConsoleEntry;
+};
+declare function treeText(text: unknown): string | undefined;
 type ShellRequest = {
   type: 'clipboard';
   text: string;
@@ -969,6 +1022,10 @@ declare class GessoRuntime {
   private gpuTimings;
   private inspectListener;
   private lastInspection;
+  private devtoolsListener;
+  private watchingTree;
+  private selectedId;
+  private lastSelectedReport;
   private cursorListener;
   private lastCursor;
   private scrollabilityListener;
@@ -1016,6 +1073,11 @@ declare class GessoRuntime {
   noteInput(at: number | undefined): void;
   setInspectorEnabled(enabled: boolean): void;
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  handleDevtools(request: DevtoolsRequest): void;
+  snapshotTree(): UiTreeSnapshot;
+  inspectNodeById(id: string): UiNodeReport | null;
+  setHighlightedNode(id: string | null): void;
   onCursor(listener: ((cursor: string | null) => void) | null): void;
   get cursor(): string | null;
   onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
@@ -1078,6 +1140,8 @@ declare class GessoRuntime {
   private sendScrollability;
   private sendInspection;
   private hoveredReport;
+  private sendDevtoolsUpdates;
+  private sendSelectedReport;
   private timePhase;
   get lastFrameDurationMs(): number;
 }
@@ -1151,6 +1215,10 @@ type ShellToRuntimeMessage = {
   width: number;
   height: number;
   dpr: number;
+} |
+{
+  type: 'devtools';
+  request: DevtoolsRequest;
 } |
 {
   type: 'pointerDown';
@@ -1292,6 +1360,10 @@ type RuntimeToShellMessage = {
   report: UiNodeReport | null;
 } |
 {
+  type: 'devtools';
+  event: DevtoolsEvent;
+} |
+{
   type: 'cursor';
   cursor: string | null;
 } |
@@ -1344,6 +1416,8 @@ declare class WorkerApp {
   private readonly options;
   private renderWorker;
   private appLogicWorker;
+  private devtoolsListener;
+  private consoleForwarding;
   private ownsAppLogicWorker;
   private canvas;
   private host;
@@ -1366,9 +1440,12 @@ declare class WorkerApp {
   private forwardKeyDown;
   private forwardKeyUp;
   setInspector(enabled: boolean): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  devtools(request: DevtoolsRequest): void;
   setColorScheme(preference: ColorSchemePreference): void;
   private setFrameLoop;
   dispose(): void;
+  private readonly handleAppWorkerMessage;
   private readonly handleWorkerMessage;
   private attachHistory;
   private applyHistory;
@@ -1425,6 +1502,8 @@ declare class GessoApp {
   setInspector(enabled: boolean): void;
   setColorScheme(preference: ColorSchemePreference): void;
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  devtools(request: DevtoolsRequest): void;
   onError(listener: ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void) | null): void;
   debugRoot(): UiNode;
   dispose(): void;
@@ -1657,6 +1736,7 @@ declare class RenderWorkerApp {
   private clock;
   private channels;
   private appLogicWorker;
+  private restoreConsole;
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
   private reportUncaught;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
@@ -1669,6 +1749,7 @@ declare class RenderWorkerApp {
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
   receive(message: ShellToRuntimeMessage): void;
+  private setConsoleForwarding;
   private dispatch;
   private resolveWorker;
   private initialize;
@@ -1753,6 +1834,7 @@ export {
   ShellService,
   structurallyEqual,
   to,
+  treeText,
   type AnimateOptions,
   type AudioAction,
   type AudioElementLike,
@@ -1780,9 +1862,12 @@ export {
   type ComponentProps,
   type ComponentType,
   type ComputedOptions,
+  type ConsoleEntry,
   type ControlledOptions,
   type ControlledValue,
   type DeriveOptions,
+  type DevtoolsEvent,
+  type DevtoolsRequest,
   type EditingMirrorTarget,
   type EditingProxySink,
   type EditingState,
@@ -1850,6 +1935,8 @@ export {
   type UiSemanticsRecord,
   type UiSemanticsReport,
   type UiSemanticState,
+  type UiTreeNode,
+  type UiTreeSnapshot,
   type WorkerAppOptions,
   type WorkerHandle,
   UI_FRAME_PHASES,
