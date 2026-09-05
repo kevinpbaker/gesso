@@ -84,7 +84,6 @@ function themeFor(spec: PaletteSpec): UiTheme {
     controlBackgroundHovered: mix(surface, text, 0.08),
     controlBackgroundPressed: mix(surface, text, 0.16),
     controlBorder: hex(spec.border),
-    controlBorderFocused: primary,
     controlForeground: text,
     controlAccent: primary,
     focusRing: primary

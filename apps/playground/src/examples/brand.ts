@@ -96,7 +96,6 @@ export const gessoColors: UiColors = {
   controlBackgroundHovered: hex(SURFACE_OVERLAY),
   controlBackgroundPressed: hex(BORDER_STRONG),
   controlBorder: hex(BORDER_STRONG),
-  controlBorderFocused: hex(ACCENT),
   controlForeground: hex(TEXT),
   controlForegroundDisabled: hex(TEXT_FAINT),
   controlAccent: hex(ACCENT),

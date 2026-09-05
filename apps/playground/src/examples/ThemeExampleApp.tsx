@@ -312,7 +312,6 @@ export function buildTheme(spec: ThemeSpec): UiTheme {
     controlBackgroundHovered: mix(hex(palette.surface), text, palette.dark ? 0.12 : 0.06),
     controlBackgroundPressed: mix(hex(palette.surface), text, palette.dark ? 0.2 : 0.12),
     controlBorder: hex(palette.border),
-    controlBorderFocused: primary,
     controlForeground: text,
     controlForegroundDisabled: hex(palette.textMuted),
     controlAccent: primary,

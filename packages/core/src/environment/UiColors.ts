@@ -27,8 +27,6 @@ export interface UiColors {
   readonly controlBackgroundHovered: UiColor;
   readonly controlBackgroundPressed: UiColor;
   readonly controlBorder: UiColor;
-  /** The border of the control that has keyboard focus. */
-  readonly controlBorderFocused: UiColor;
   readonly controlForeground: UiColor;
   readonly controlForegroundDisabled: UiColor;
   /** The fill of a control that is on: a ticked box, a thrown switch. */
@@ -40,6 +38,12 @@ export interface UiColors {
    * the background rather than on the control, so it is its own token
    * and not `controlAccent`: a ring has to stay legible against the
    * surface behind every control, including a chosen row.
+   *
+   * Both palettes make it the ink they already write text in, rather
+   * than an accent. A ring is the one piece of colour a control grows
+   * without the app asking for it, so the stock one should be a colour
+   * the app is using anyway; a themed accent that nobody chose reads
+   * as the framework's colour showing through the app's.
    */
   readonly focusRing: UiColor;
 
@@ -64,12 +68,11 @@ export const lightColors: UiColors = {
   controlBackgroundHovered: { r: 0.95, g: 0.95, b: 0.96, a: 1 },
   controlBackgroundPressed: { r: 0.9, g: 0.9, b: 0.92, a: 1 },
   controlBorder: { r: 0.76, g: 0.77, b: 0.79, a: 1 },
-  controlBorderFocused: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
   controlForeground: { r: 0.07, g: 0.09, b: 0.13, a: 1 },
   controlForegroundDisabled: { r: 0.6, g: 0.62, b: 0.65, a: 1 },
   controlAccent: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
   danger: { r: 0.86, g: 0.15, b: 0.15, a: 1 },
-  focusRing: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
+  focusRing: { r: 0.07, g: 0.09, b: 0.13, a: 1 },
   selectionBackground: { r: 0.85, g: 0.92, b: 0.99, a: 1 },
   selectionForeground: { r: 0.05, g: 0.24, b: 0.44, a: 1 }
 } as const;
@@ -87,12 +90,11 @@ export const darkColors: UiColors = {
   controlBackgroundHovered: { r: 0.21, g: 0.23, b: 0.27, a: 1 },
   controlBackgroundPressed: { r: 0.26, g: 0.28, b: 0.33, a: 1 },
   controlBorder: { r: 0.34, g: 0.36, b: 0.41, a: 1 },
-  controlBorderFocused: { r: 0.4, g: 0.76, b: 1, a: 1 },
   controlForeground: { r: 0.9, g: 0.91, b: 0.94, a: 1 },
   controlForegroundDisabled: { r: 0.48, g: 0.5, b: 0.55, a: 1 },
   controlAccent: { r: 0.4, g: 0.76, b: 1, a: 1 },
   danger: { r: 0.94, g: 0.42, b: 0.42, a: 1 },
-  focusRing: { r: 0.45, g: 0.79, b: 1, a: 1 },
+  focusRing: { r: 0.9, g: 0.91, b: 0.94, a: 1 },
   selectionBackground: { r: 0.16, g: 0.29, b: 0.42, a: 1 },
   selectionForeground: { r: 0.85, g: 0.93, b: 1, a: 1 }
 } as const;

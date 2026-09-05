@@ -68,8 +68,8 @@ The names in the shipped palette, in the three groups they fall into:
   widget, so one set serves the checkbox, the switch, the radio, the
   slider and the fields: `controlBackground`,
   `controlBackgroundHovered`, `controlBackgroundPressed`,
-  `controlBorder`, `controlBorderFocused`, `controlForeground`,
-  `controlForegroundDisabled`, `controlAccent`, `danger`, `focusRing`.
+  `controlBorder`, `controlForeground`, `controlForegroundDisabled`,
+  `controlAccent`, `danger`, `focusRing`.
 - **Selection**, for a row that is chosen rather than operated:
   `selectionBackground`, `selectionForeground`.
 
