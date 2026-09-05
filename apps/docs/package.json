@@ -17,6 +17,7 @@
   "devDependencies": {
     "@gesso/devtools": "workspace:^",
     "@gesso/testing": "workspace:^",
-    "vitepress": "2.0.0-alpha.19"
+    "vitepress": "2.0.0-alpha.19",
+    "vue": "^3.5.42"
   }
 }

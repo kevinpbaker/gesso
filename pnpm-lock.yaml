@@ -76,6 +76,9 @@ importers:
       vitepress:
         specifier: 2.0.0-alpha.19
         version: 2.0.0-alpha.19(postcss@8.5.26)(typescript@7.0.2)(yaml@2.9.0)
+      vue:
+        specifier: ^3.5.42
+        version: 3.5.42(typescript@7.0.2)
 
   apps/playground:
     dependencies:

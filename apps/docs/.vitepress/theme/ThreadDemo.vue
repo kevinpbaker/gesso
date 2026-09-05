@@ -27,7 +27,23 @@ import PulseWorker from '../../src/examples/PulseExampleWorker?worker';
  * to cross to the main thread could not be trusted while the main
  * thread is the thing being blocked.
  */
+const props = withDefaults(defineProps<{ scheme?: 'auto' | 'light' | 'dark' }>(), {
+  scheme: 'auto'
+});
+
 const { isDark } = useData();
+
+/**
+ * The appearance the two canvases paint in.
+ *
+ * `auto` follows the site's own toggle, which is what a documentation
+ * page wants. The landing page pins it to `dark`, because the band the
+ * demo sits in there is ink in both appearances and a light canvas
+ * inside it would read as a hole in the page.
+ */
+function scheme(): 'light' | 'dark' {
+  return props.scheme === 'auto' ? (isDark.value ? 'dark' : 'light') : props.scheme;
+}
 
 const workerHost = ref<HTMLElement | null>(null);
 const syncHost = ref<HTMLElement | null>(null);
@@ -39,18 +55,20 @@ let disposeWorker: (() => void) | undefined;
 let disposeSync: (() => void) | undefined;
 let syncApp: { setColorScheme(preference: 'light' | 'dark' | 'auto'): unknown } | undefined;
 
-watch(isDark, dark => {
-  const scheme = dark ? 'dark' : 'light';
-  worker?.setColorScheme(scheme);
-  syncApp?.setColorScheme(scheme);
+watch(isDark, () => {
+  if (props.scheme !== 'auto') {
+    return;
+  }
+  worker?.setColorScheme(scheme());
+  syncApp?.setColorScheme(scheme());
 });
 
 onMounted(() => {
-  const scheme = isDark.value ? 'dark' : 'light';
+  const colorScheme = scheme();
   try {
     worker = createApp({
       renderWorker: () => new PulseWorker(),
-      colorScheme: scheme,
+      colorScheme,
       onError: message => {
         failure.value = message;
       }
@@ -60,7 +78,7 @@ onMounted(() => {
     const builder = createApp(
       exampleRoot(createComponent(Pulse, { label: 'Main thread', caption: 'On the main thread' }))
     );
-    builder.setColorScheme(scheme);
+    builder.setColorScheme(colorScheme);
     syncApp = builder;
     disposeSync = builder.mountSync(syncHost.value!);
   } catch (error) {

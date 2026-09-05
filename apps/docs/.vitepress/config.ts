@@ -21,7 +21,32 @@ export default defineConfig({
   title: 'Gesso',
   description: 'A canvas UI framework that keeps the whole interface off the main thread.',
   cleanUrls: true,
+  /**
+   * Three faces, from Google Fonts: `Newsreader` sets the display line,
+   * `Instrument Sans` the running text, `JetBrains Mono` the code.
+   * `brand/README.md` fixes the mark and five colours and names no
+   * typeface, so this is the site's own choice rather than the brand's,
+   * and it is deliberately not the grotesque every framework site uses.
+   * Each stack falls back to a face with close enough metrics that a
+   * page laid out before the webfont arrives does not jump.
+   */
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'Gesso' }],
+    ['meta', { name: 'twitter:card', content: 'summary' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    [
+      'link',
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,200;6..72,300;6..72,400&display=swap'
+      }
+    ]
+  ],
   themeConfig: {
+    logo: '/gesso-mark.svg',
     nav: [
       { text: 'Guide', link: '/guide/what-is-gesso' },
       { text: 'Layout', link: '/layout/flex' },
@@ -35,6 +60,7 @@ export default defineConfig({
       {
         text: 'Guide',
         items: [
+          { text: 'Why Gesso', link: '/guide/why-gesso' },
           { text: 'What Gesso is', link: '/guide/what-is-gesso' },
           { text: 'Is Gesso for your project?', link: '/guide/is-gesso-for-you' },
           { text: 'Installation', link: '/guide/installation' },

@@ -1,0 +1,126 @@
+/**
+ * The brand, applied to every page on the site.
+ *
+ * `brand/README.md` fixes five colours and the mark; nothing there
+ * names a typeface, so the three faces below are this site's choice and
+ * the only thing here that is not lifted from the brand file. The
+ * palette is used the way that file describes it: raw linen and chalk
+ * are the ground, ink is the text, and ultramarine is "the first paint
+ * after the primer dries", which on a documentation site means links,
+ * focus rings and the one primary action per page.
+ *
+ * Everything is set as VitePress's own custom properties rather than as
+ * rules against its class names, so the default theme keeps working and
+ * a component this file has never heard of still lands in the palette.
+ * The exceptions are at the bottom, and each says why it is there.
+ */
+
+:root {
+  --gesso-linen: #be9a6e;
+  --gesso-linen-shade: #8a6a45;
+  --gesso-chalk: #f7f3ea;
+  --gesso-ink: #16181d;
+  --gesso-ultramarine: #2a3e8c;
+
+  --vp-font-family-base: 'Instrument Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --gesso-font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+
+  --vp-c-bg: var(--gesso-chalk);
+  --vp-c-bg-alt: #f1ebdd;
+  --vp-c-bg-soft: #fffdf8;
+  --vp-c-bg-elv: #fffdf8;
+
+  --vp-c-text-1: var(--gesso-ink);
+  --vp-c-text-2: #55504a;
+  --vp-c-text-3: #8a8378;
+
+  --vp-c-border: #dbd0ba;
+  --vp-c-divider: #e3d9c6;
+  --vp-c-gutter: #e3d9c6;
+
+  --vp-c-brand-1: var(--gesso-ultramarine);
+  --vp-c-brand-2: #1f2f6e;
+  --vp-c-brand-3: var(--gesso-ultramarine);
+  --vp-c-brand-soft: rgb(42 62 140 / 10%);
+
+  /* A snippet sits on a linen-tinted panel rather than on the chalk of
+     the page, so it reads as a laid-on surface. The token colours are
+     VitePress's own light theme, which follows the appearance toggle;
+     the panel changes with it. */
+  --vp-code-block-bg: #f2ebdc;
+
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: var(--gesso-chalk);
+  --vp-button-brand-bg: var(--gesso-ultramarine);
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: var(--gesso-chalk);
+  --vp-button-brand-hover-bg: #1f2f6e;
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: var(--gesso-chalk);
+  --vp-button-brand-active-bg: #18265a;
+}
+
+.dark {
+  --vp-c-bg: var(--gesso-ink);
+  --vp-c-bg-alt: #121419;
+  --vp-c-bg-soft: #1e2128;
+  --vp-c-bg-elv: #1e2128;
+
+  --vp-c-text-1: #f1ece1;
+  --vp-c-text-2: #a69f91;
+  --vp-c-text-3: #7c7668;
+
+  --vp-c-border: #333845;
+  --vp-c-divider: #2a2e38;
+  --vp-c-gutter: #2a2e38;
+
+  /* Ultramarine is a dark blue; on ink it fails contrast, so links take
+     a tint of it that keeps the hue and clears 4.5:1. The mark is never
+     recoloured, only the paint is. */
+  --vp-c-brand-1: #97a9e2;
+  --vp-c-brand-2: #b6c3ee;
+  --vp-c-brand-3: #7c8ab8;
+  --vp-c-brand-soft: rgb(151 169 226 / 14%);
+
+  /* Ink, one step below the page, so the panel still reads as laid on
+     rather than cut out of it. */
+  --vp-code-block-bg: #101216;
+
+  --vp-button-brand-text: var(--gesso-ink);
+  --vp-button-brand-bg: #97a9e2;
+  --vp-button-brand-hover-text: var(--gesso-ink);
+  --vp-button-brand-hover-bg: #b6c3ee;
+  --vp-button-brand-active-bg: #8296d8;
+}
+
+/* The display face, on the two levels that carry a page's structure.
+   Below h2 the sans is clearer at small sizes, so the serif stops
+   there rather than running the whole ramp. */
+.vp-doc h1,
+.vp-doc h2,
+.VPHome .name,
+.VPHome .text {
+  font-family: var(--gesso-font-display);
+  font-weight: 300;
+  letter-spacing: -0.018em;
+}
+
+.vp-doc h1 {
+  font-size: 44px;
+  line-height: 1.12;
+}
+
+.vp-doc h2 {
+  font-size: 31px;
+  line-height: 1.18;
+  border-top-color: var(--vp-c-divider);
+}
+
+/* The nav title sits beside the mark, so it follows the mark's own
+   drawing rather than the body face. */
+.VPNavBarTitle .title {
+  font-family: var(--gesso-font-display);
+  font-size: 21px;
+  font-weight: 400;
+}
