@@ -21,6 +21,7 @@ import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import { drawOverlayShapes } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
+import { ScaledImageCache } from './ScaledImageCache';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -77,6 +78,14 @@ export class Canvas2DRenderer implements UiRenderer {
   private cullWidth = 0;
   private cullHeight = 0;
   private readonly cullStack: number[] = [];
+  /**
+   * Copies of images at the size they are drawn.
+   *
+   * A `drawImage` that resamples is the most expensive call this
+   * renderer makes on an engine that resamples on the CPU, and it
+   * makes one per picture per frame. See `ScaledImageCache`.
+   */
+  private readonly scaledImages = new ScaledImageCache();
 
   constructor(private readonly options: Canvas2DRendererOptions) {}
 
@@ -99,6 +108,7 @@ export class Canvas2DRenderer implements UiRenderer {
 
   dispose(): void {
     this.disposed = true;
+    this.scaledImages.dispose();
   }
 
   render(root: UiNode, context: RenderContext): void {
@@ -315,15 +325,39 @@ export class Canvas2DRenderer implements UiRenderer {
       rect.x + rect.width > rec.x + rec.width ||
       rect.y + rect.height > rec.y + rec.height;
     const rounded = !borderRadiusIsZero(paint.borderRadius);
+    // Only a still is worth a pre-scaled copy. A video's frame is a
+    // different object every time, so a copy of one could never be
+    // reused; the saving there is made in `VideoResolver` instead, by
+    // converting each decoded frame once rather than on every draw.
+    const still = video === undefined ? paint.image : undefined;
+    const drawn = still === undefined || still === null ? source : this.scaledFor(ctx, still, rect.width, rect.height);
     if (!overflows && !rounded) {
-      ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height);
+      ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
       return;
     }
     ctx.save();
     traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? uniformBorderRadius(paint.borderRadius) : 0);
     ctx.clip();
-    ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height);
+    ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
+  }
+
+  /**
+   * The image to draw for a destination `width` x `height` in the
+   * units the current transform is in.
+   *
+   * The cache works in device pixels, because a copy only saves the
+   * resample when it is the size the backing store actually receives.
+   * That is the box under the whole current transform, not under the
+   * device pixel ratio alone: a node a morph is scaling covers a
+   * different number of pixels every frame, and a copy made for the
+   * untransformed size would be resampled again on the way down.
+   */
+  private scaledFor(ctx: Canvas2DContext, source: ImageBitmap, width: number, height: number): ImageBitmap {
+    const transform = ctx.getTransform?.();
+    const scaleX = transform === undefined ? this.surface.dpr : Math.hypot(transform.a, transform.b);
+    const scaleY = transform === undefined ? this.surface.dpr : Math.hypot(transform.c, transform.d);
+    return this.scaledImages.resolve(source, width * scaleX, height * scaleY);
   }
 
   /**
