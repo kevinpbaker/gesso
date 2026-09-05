@@ -635,7 +635,12 @@ class SharedElementController {
     if (registry === null) {
       return;
     }
-    const claim = registry.claim(this.args.name, this.host.node, () => this.yieldName());
+    const claim = registry.claim(
+      this.args.name,
+      this.host.node,
+      () => this.yieldName(),
+      () => this.unyield()
+    );
     this.claimed = claim.box;
     this.yieldPrevious = claim.yieldPrevious;
     if (claim.box !== null) {
@@ -711,6 +716,30 @@ class SharedElementController {
     }
     this.yielded = true;
     this.layer.snapTo({ ...MOTION_REST, opacity: 0 });
+  }
+
+  /**
+   * The name has come back, so this element does too.
+   *
+   * Stepping aside used to be a one-way door, and an interrupted
+   * transition walked straight into it. A route change keeps the
+   * departing screen alive for the length of its exit, so pressing Back
+   * part-way through returns to a screen whose element has already
+   * yielded; the arriving element then leaves without anything
+   * replacing it, and the only copy left is the invisible one. The
+   * picture simply disappeared.
+   *
+   * A snap rather than a fade, for the reason the yield is a snap: the
+   * element it was standing aside for is going away this frame, and
+   * anything gradual puts a gap between the two where the picture is
+   * half there.
+   */
+  private unyield(): void {
+    if (!this.yielded) {
+      return;
+    }
+    this.yielded = false;
+    this.layer.snapTo(MOTION_REST);
   }
 
   private handleLayout(): void {

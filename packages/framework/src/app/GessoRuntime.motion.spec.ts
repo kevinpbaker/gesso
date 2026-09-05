@@ -701,3 +701,82 @@ describe('sharedElement() and a virtualised shelf', () => {
     expect(morphs).toEqual([]);
   });
 });
+
+describe('sharedElement() when a handover is interrupted', () => {
+  /**
+   * Taking a name hides whoever held it, because two copies of one
+   * thing on screen is a double image rather than a transition. That is
+   * right while the previous holder is on its way out, and it is a
+   * one-way door: nothing ever put it back.
+   *
+   * An interrupted transition walks straight into that. A route change
+   * keeps the departing screen alive for the length of its exit, so
+   * pressing Back part-way through returns to a screen whose element
+   * has already yielded. The arriving element then leaves again, and the
+   * one that was hidden for it is still hidden, with nothing left to
+   * take its place. It simply disappears.
+   */
+  it('gives the name back, and the element with it, when the taker leaves first', () => {
+    const takerShown = internalState(false);
+    const seen = new Map<string, UiNode>();
+    const hero = (key: string, size: number) =>
+      Box({
+        key,
+        ref: (node: UiNode | null) => node !== null && seen.set(key, node),
+        width: size,
+        height: size,
+        modifiers: [sharedElement({ name: 'hero', duration: 200, easing: linear })]
+      });
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 400 },
+        // The one that stays, as a screen kept alive through an exit does.
+        hero('held', 50),
+        takerShown.pipe(map(shown => (shown ? [hero('taker', 100)] : [])))
+      )
+    );
+    drain(mounted);
+    expect(motionOf(seen.get('held')!).opacity).toBe(1);
+
+    // The taker arrives and the holder steps aside, as it must.
+    takerShown.value = true;
+    drain(mounted);
+    expect(motionOf(seen.get('held')!).opacity).toBe(0);
+
+    // The taker leaves again without anything replacing it. The element
+    // that stepped aside is the only one left, so it comes back.
+    takerShown.value = false;
+    drain(mounted);
+    expect(motionOf(seen.get('held')!).opacity).toBe(1);
+  });
+
+  it('does not bring back an element that has itself gone away', () => {
+    // The ordinary forward case, which must keep working: the departing
+    // screen's element yields and is then removed. Restoring it later
+    // would put a dead node back in the registry and let the next
+    // arrival morph from a box nothing occupies.
+    const step = internalState(0);
+    const seen = new Map<string, UiNode>();
+    const hero = (key: string, size: number) =>
+      Box({
+        key,
+        ref: (node: UiNode | null) => node !== null && seen.set(key, node),
+        width: size,
+        height: size,
+        modifiers: [sharedElement({ name: 'hero', duration: 200, easing: linear })]
+      });
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 400 },
+        step.pipe(map(at => (at === 0 ? [hero('first', 50)] : at === 1 ? [hero('second', 100)] : [])))
+      )
+    );
+    drain(mounted);
+    step.value = 1;
+    drain(mounted);
+    step.value = 2;
+    drain(mounted);
+    // Both are gone, so nobody holds the name.
+    expect(mounted.runtime.sharedElementNames).not.toContain('hero');
+  });
+});
