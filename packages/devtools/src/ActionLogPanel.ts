@@ -183,7 +183,7 @@ function row(
 
   const text = doc.createElement('span');
   text.className = 'text';
-  text.textContent = describe(entry);
+  text.textContent = describeActionEntry(entry);
 
   item.append(time, arrow, text);
   const activate = (): void => jump(entry.seq);
@@ -197,7 +197,8 @@ function row(
   return item;
 }
 
-function describe(entry: ActionEntry): string {
+/** One entry as a line: the command and its payload, the patched keys, or the error. */
+export function describeActionEntry(entry: ActionEntry): string {
   switch (entry.kind) {
     case 'command':
       return `${entry.channel}.${entry.command}(${entry.payload === undefined ? '' : print(entry.payload)})`;

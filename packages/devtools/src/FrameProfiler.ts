@@ -31,6 +31,11 @@ export interface FrameProfilerOptions {
   /** How often the picture is repainted, in milliseconds. Default 250. */
   readonly redrawMs?: number;
   readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  /**
+   * `floating` (the default) sits in a corner over the application;
+   * `docked` fills its host, for a panel that is not over anything.
+   */
+  readonly layout?: 'floating' | 'docked';
 }
 
 /** One bar's worth of history. */
@@ -68,7 +73,8 @@ export function mountFrameProfiler(host: HTMLElement, options: FrameProfilerOpti
   const capacity = options.history ?? 180;
   const redrawMs = options.redrawMs ?? 250;
 
-  const position = view?.getComputedStyle(host).position ?? 'static';
+  const docked = options.layout === 'docked';
+  const position = docked ? 'relative' : (view?.getComputedStyle(host).position ?? 'static');
   const restore = position === 'static' ? host.style.position : null;
   if (position === 'static') {
     host.style.position = 'relative';
@@ -79,7 +85,7 @@ export function mountFrameProfiler(host: HTMLElement, options: FrameProfilerOpti
   const style = doc.createElement('style');
   style.textContent = STYLES;
   const panel = doc.createElement('div');
-  panel.className = `panel ${options.corner ?? 'top-right'}`;
+  panel.className = docked ? 'panel docked' : `panel ${options.corner ?? 'top-right'}`;
   panel.hidden = true;
   const readout = doc.createElement('div');
   readout.className = 'readout';
@@ -282,6 +288,8 @@ const STYLES = `
   font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .panel[hidden] { display: none; }
+.panel.docked { position: static; width: auto; margin: 0; pointer-events: auto; border: none; background: transparent; }
+.panel.docked .strip { height: 96px; }
 .top-left { top: 0; left: 0; }
 .top-right { top: 0; right: 0; }
 .bottom-left { bottom: 0; left: 0; }
