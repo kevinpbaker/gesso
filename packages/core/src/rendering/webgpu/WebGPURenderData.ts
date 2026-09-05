@@ -153,6 +153,17 @@ export interface ImageCommand {
   scissor: ScissorRect | null;
   /** A still, or a video's surface; the texture cache tells them apart. */
   source: TextureSource;
+  /**
+   * How many device pixels the quad covers, so a still can be uploaded
+   * at the size it is drawn rather than the size it was decoded.
+   *
+   * Under the node's whole transform, not the device pixel ratio alone:
+   * a node a morph is scaling covers a different number of pixels every
+   * frame, which is the same reason `Canvas2DRenderer.scaledFor` reads
+   * the current transform.
+   */
+  drawWidth: number;
+  drawHeight: number;
 }
 
 export type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
@@ -677,7 +688,19 @@ export function buildRenderList(
           imageRounded,
           FULL_TEXTURE
         );
-        commands.push({ kind: CommandKind.Image, instance, scissor: imageScissor, source: textureSource });
+        // The quad's size in device pixels, from the node's transform.
+        // `nodeCtm` is a 2x3 in column-major order, so the two column
+        // lengths are the axis scales.
+        const scaleX = Math.hypot(nodeCtm[0], nodeCtm[1]) * dpr;
+        const scaleY = Math.hypot(nodeCtm[2], nodeCtm[3]) * dpr;
+        commands.push({
+          kind: CommandKind.Image,
+          instance,
+          scissor: imageScissor,
+          source: textureSource,
+          drawWidth: rect.width * scaleX,
+          drawHeight: rect.height * scaleY
+        });
       }
     }
 

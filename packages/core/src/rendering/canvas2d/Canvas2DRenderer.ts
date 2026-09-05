@@ -21,7 +21,7 @@ import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import { drawOverlayShapes } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
-import { ScaledImageCache } from './ScaledImageCache';
+import { ScaledImageCache } from '../ScaledImageCache';
 
 export interface Canvas2DRendererOptions {
   /**

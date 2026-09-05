@@ -352,7 +352,9 @@ export class WebGPURenderer implements UiRenderer {
       }
 
       const glyphs = command.kind === CommandKind.Glyphs;
-      const bindGroup = glyphs ? glyphPages.bindGroup(command.page) : textures.imageBindGroup(command.source);
+      const bindGroup = glyphs
+        ? glyphPages.bindGroup(command.page)
+        : textures.imageBindGroup(command.source, command.drawWidth, command.drawHeight);
       if (bindGroup === null) {
         continue;
       }
@@ -482,6 +484,7 @@ export class WebGPURenderer implements UiRenderer {
     this.disposed = true;
     this.removeLostListener();
     this.surface.unconfigure();
+    this.textures?.dispose();
     this.textures = null;
     this.glyphPages?.dispose();
     this.glyphPages = null;
