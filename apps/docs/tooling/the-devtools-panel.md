@@ -49,6 +49,9 @@ Chrome does not inject a content script into a page that loaded first.
 Open devtools on a page that called `connectDevtools` and choose the
 Gesso tab.
 
+The panel takes the theme of the devtools window, light or dark, from
+Chrome rather than from the system.
+
 The extension is wire and nothing else: a content script that reaches
 the page over `window.postMessage`, a background service worker that
 pairs each tab with the panels inspecting it, and a devtools page that
@@ -65,7 +68,9 @@ import { createDirectPorts, getDevtoolsHook, mountDevtoolsPanel } from '@gesso/d
 
 const { page, panel } = createDirectPorts();
 const detach = getDevtoolsHook().attach(page);
-const mounted = mountDevtoolsPanel(paneElement, panel);
+// `theme` is `light`, `dark` or `auto` (the default), which follows
+// the viewer's prefers-color-scheme.
+const mounted = mountDevtoolsPanel(paneElement, panel, { theme: 'dark' });
 // Later:
 mounted.dispose();
 detach();

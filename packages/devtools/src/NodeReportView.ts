@@ -134,24 +134,31 @@ function round(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-/** The rules the report's elements use, for any stylesheet that shows one. */
+/**
+ * The rules the report's elements use, for any stylesheet that shows one.
+ *
+ * Colours are the devtools panel's custom properties with the dark
+ * palette as fallback, so the corner inspector, which defines none of
+ * them, is unchanged, and the panel recolours the same report by
+ * defining them.
+ */
 export const NODE_REPORT_STYLES = `
-h1 { margin: 0 0 6px; font-size: 12px; color: #79c0ff; overflow-wrap: anywhere; }
+h1 { margin: 0 0 6px; font-size: 12px; color: var(--gd-accent, #79c0ff); overflow-wrap: anywhere; }
 h2 {
   margin: 10px 0 4px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #8b949e;
+  color: var(--gd-muted, #8b949e);
 }
 p { margin: 0 0 2px; }
-.label { color: #8b949e; }
+.label { color: var(--gd-muted, #8b949e); }
 .rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }
-dt { color: #8b949e; overflow-wrap: anywhere; }
-dt.modifier { color: #d2a8ff; }
-dt.binding { color: #7ee787; }
-dt.provided { color: #ffa657; }
+dt { color: var(--gd-muted, #8b949e); overflow-wrap: anywhere; }
+dt.modifier { color: var(--gd-purple, #d2a8ff); }
+dt.binding { color: var(--gd-green, #7ee787); }
+dt.provided { color: var(--gd-orange, #ffa657); }
 dd { margin: 0; overflow-wrap: anywhere; }
-.note { color: #6e7681; }
-.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #c9d1d9; }
+.note { color: var(--gd-faint, #6e7681); }
+.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gd-text-strong, #c9d1d9); }
 `;

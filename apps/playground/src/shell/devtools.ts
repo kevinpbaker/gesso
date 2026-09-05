@@ -26,7 +26,8 @@ export function addDevtoolsAction(shell: AppShell): () => void {
     const { page, panel } = createDirectPorts();
     const detach = getDevtoolsHook().attach(page);
     shell.devtools.hidden = false;
-    const mounted = mountDevtoolsPanel(shell.devtools, panel);
+    // The playground is dark whatever the system prefers.
+    const mounted = mountDevtoolsPanel(shell.devtools, panel, { theme: 'dark' });
     dispose = () => {
       mounted.dispose();
       detach();

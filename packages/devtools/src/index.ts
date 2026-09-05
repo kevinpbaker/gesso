@@ -57,7 +57,12 @@ export {
   type PanelPort,
   type WindowLike
 } from './PanelProtocol';
-export { mountDevtoolsPanel, type DevtoolsPanel, type DevtoolsPanelOptions } from './DevtoolsPanel';
+export {
+  mountDevtoolsPanel,
+  type DevtoolsPanel,
+  type DevtoolsPanelOptions,
+  type DevtoolsPanelTheme
+} from './DevtoolsPanel';
 export { idsToDepth, pathTo, rowLabel, treeRows, type TreeRow } from './TreeRows';
 export { mountNodeInspector, type NodeInspector, type NodeInspectorOptions } from './NodeInspector';
 export {

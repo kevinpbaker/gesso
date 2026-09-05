@@ -132,7 +132,9 @@ export function mountFrameProfiler(host: HTMLElement, options: FrameProfilerOpti
       }
     });
     const budgetY = height - (BUDGET_MS / peak) * height;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    // The panel's token when docked in one, else the floating panel's own.
+    ctx.strokeStyle =
+      view?.getComputedStyle(panel).getPropertyValue('--gd-budget').trim() || 'rgba(255, 255, 255, 0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, budgetY + 0.5);
@@ -288,7 +290,8 @@ const STYLES = `
   font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .panel[hidden] { display: none; }
-.panel.docked { position: static; width: auto; margin: 0; pointer-events: auto; border: none; background: transparent; }
+.panel.docked { position: static; width: auto; margin: 0; pointer-events: auto; border: none; background: transparent; color: var(--gd-text, #e6edf3); }
+.panel.docked .stat i, .panel.docked .legend { color: var(--gd-muted, #8b949e); }
 .panel.docked .strip { height: 96px; }
 .top-left { top: 0; left: 0; }
 .top-right { top: 0; right: 0; }

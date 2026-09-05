@@ -13,5 +13,11 @@ mountDevtoolsPanel(
   extensionPanelPort({
     connect: name => chrome.runtime.connect({ name }),
     tabId: chrome.devtools.inspectedWindow.tabId
-  })
+  }),
+  {
+    // Devtools has a theme of its own, which need not be the system's;
+    // the panel follows the window it is in. Chrome reloads devtools on
+    // a theme change, so reading it once is enough.
+    theme: chrome.devtools.panels.themeName === 'dark' ? 'dark' : 'light'
+  }
 );

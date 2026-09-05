@@ -26,10 +26,23 @@ export interface DevtoolsPanel {
   readonly app: DevtoolsAppInfo | null;
   /** Shows a different connected application. */
   show(appId: string): void;
+  /** Changes the theme; see `DevtoolsPanelOptions.theme`. */
+  setTheme(theme: DevtoolsPanelTheme): void;
   dispose(): void;
 }
 
+/**
+ * `light` and `dark` are the panel's two palettes; `auto` follows the
+ * viewer's `prefers-color-scheme`. A host that knows better than the
+ * media query says so: Chrome's devtools has its own theme setting,
+ * which the extension reads and passes here, and the playground is
+ * dark whatever the system prefers.
+ */
+export type DevtoolsPanelTheme = 'light' | 'dark' | 'auto';
+
 export interface DevtoolsPanelOptions {
+  /** Which palette. Default `auto`. */
+  readonly theme?: DevtoolsPanelTheme;
   /** How many levels of the tree open on the first snapshot. Default 4. */
   readonly openDepth?: number;
   /** How many console entries are kept. Default 500. */
@@ -58,6 +71,15 @@ export function mountDevtoolsPanel(
 
   const container = doc.createElement('div');
   container.className = 'gesso-devtools';
+  const applyTheme = (theme: DevtoolsPanelTheme): void => {
+    // No attribute for `auto`, so the stylesheet's media query decides.
+    if (theme === 'auto') {
+      delete container.dataset['theme'];
+    } else {
+      container.dataset['theme'] = theme;
+    }
+  };
+  applyTheme(options.theme ?? 'auto');
   const root = container.attachShadow({ mode: 'open' });
   const style = doc.createElement('style');
   style.textContent = STYLES;
@@ -464,6 +486,7 @@ export function mountDevtoolsPanel(
         showApp(info);
       }
     },
+    setTheme: applyTheme,
     dispose() {
       if (current !== null) {
         unsubscribe();
@@ -487,16 +510,73 @@ function badge(doc: Document, text: string, extra = ''): HTMLElement {
   return element;
 }
 
+/**
+ * The two palettes, as custom properties on the shadow host.
+ *
+ * Light is the default set and dark overrides it, twice: once for a
+ * host that asked for dark, and once for a viewer who prefers it when
+ * the host did not say. The report view and the docked profiler read
+ * the same properties with the dark values as fallbacks, so the
+ * in-page corner tools, which define none of them, look as they did.
+ */
+const DARK_TOKENS = `
+  --gd-bg: #0d1117;
+  --gd-bg-raised: #161b22;
+  --gd-bg-hover: #21262d;
+  --gd-border: #30363d;
+  --gd-text: #e6edf3;
+  --gd-text-strong: #c9d1d9;
+  --gd-muted: #8b949e;
+  --gd-faint: #6e7681;
+  --gd-fainter: #484f58;
+  --gd-accent: #79c0ff;
+  --gd-info: #a5d6ff;
+  --gd-purple: #d2a8ff;
+  --gd-green: #7ee787;
+  --gd-orange: #ffa657;
+  --gd-red: #ff7b72;
+  --gd-yellow: #e3b341;
+  --gd-row-hovered: #1f2a3a;
+  --gd-row-selected: #1f3b5c;
+  --gd-budget: rgba(255, 255, 255, 0.35);
+`;
+
+const LIGHT_TOKENS = `
+  --gd-bg: #ffffff;
+  --gd-bg-raised: #f1f3f4;
+  --gd-bg-hover: #e8eaed;
+  --gd-border: #dadce0;
+  --gd-text: #202124;
+  --gd-text-strong: #3c4043;
+  --gd-muted: #5f6368;
+  --gd-faint: #80868b;
+  --gd-fainter: #9aa0a6;
+  --gd-accent: #1a73e8;
+  --gd-info: #185abc;
+  --gd-purple: #8430ce;
+  --gd-green: #188038;
+  --gd-orange: #b06000;
+  --gd-red: #c5221f;
+  --gd-yellow: #a05f00;
+  --gd-row-hovered: #e8f0fe;
+  --gd-row-selected: #d2e3fc;
+  --gd-budget: rgba(0, 0, 0, 0.35);
+`;
+
 const STYLES = `
-:host { all: initial; display: block; height: 100%; }
+:host { all: initial; display: block; height: 100%; ${LIGHT_TOKENS} }
+:host([data-theme="dark"]) { ${DARK_TOKENS} }
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme="light"])) { ${DARK_TOKENS} }
+}
 .toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 4px 8px;
-  border-bottom: 1px solid #30363d;
-  background: #161b22;
-  color: #e6edf3;
+  border-bottom: 1px solid var(--gd-border);
+  background: var(--gd-bg-raised);
+  color: var(--gd-text);
   font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .tabs { display: flex; gap: 2px; }
@@ -505,57 +585,57 @@ const STYLES = `
   border-radius: 4px;
   padding: 2px 8px;
   background: transparent;
-  color: #8b949e;
+  color: var(--gd-muted);
   font: inherit;
   cursor: pointer;
 }
-.tabs button:hover, .bar button:hover { color: #e6edf3; background: #21262d; }
-.tabs button.active { color: #e6edf3; border-color: #30363d; background: #0d1117; }
-.picker { font: inherit; background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; }
-.toggle { display: inline-flex; align-items: center; gap: 2px; color: #8b949e; cursor: pointer; }
-.status { margin-left: auto; color: #8b949e; }
-.views { height: calc(100% - 30px); background: #0d1117; color: #e6edf3; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.tabs button:hover, .bar button:hover { color: var(--gd-text); background: var(--gd-bg-hover); }
+.tabs button.active { color: var(--gd-text); border-color: var(--gd-border); background: var(--gd-bg); }
+.picker { font: inherit; background: var(--gd-bg); color: var(--gd-text); border: 1px solid var(--gd-border); border-radius: 4px; }
+.toggle { display: inline-flex; align-items: center; gap: 2px; color: var(--gd-muted); cursor: pointer; }
+.status { margin-left: auto; color: var(--gd-muted); }
+.views { height: calc(100% - 30px); background: var(--gd-bg); color: var(--gd-text); font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .view { height: 100%; }
 .view[hidden] { display: none; }
 .tree-view { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(240px, 1fr); }
-.tree { overflow: auto; border-right: 1px solid #30363d; padding: 4px 0; }
+.tree { overflow: auto; border-right: 1px solid var(--gd-border); padding: 4px 0; }
 .row { display: flex; gap: 6px; white-space: nowrap; padding: 1px 8px; cursor: pointer; }
-.row:hover { background: #161b22; }
-.row.hovered { background: #1f2a3a; }
-.row.selected { background: #1f3b5c; }
-.disclosure { width: 10px; color: #8b949e; }
-.type { color: #79c0ff; }
-.component { color: #d2a8ff; }
-.text { color: #a5d6ff; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-.id { color: #484f58; }
-.count { padding: 4px 8px; color: #6e7681; }
+.row:hover { background: var(--gd-bg-raised); }
+.row.hovered { background: var(--gd-row-hovered); }
+.row.selected { background: var(--gd-row-selected); }
+.disclosure { width: 10px; color: var(--gd-muted); }
+.type { color: var(--gd-accent); }
+.component { color: var(--gd-purple); }
+.text { color: var(--gd-info); overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.id { color: var(--gd-fainter); }
+.count { padding: 4px 8px; color: var(--gd-faint); }
 .report { overflow: auto; padding: 8px 12px; }
-.empty { color: #8b949e; margin: 0; padding: 4px 8px; }
+.empty { color: var(--gd-muted); margin: 0; padding: 4px 8px; }
 .console-view { display: flex; flex-direction: column; }
-.bar { padding: 4px 8px; border-bottom: 1px solid #30363d; }
+.bar { padding: 4px 8px; border-bottom: 1px solid var(--gd-border); }
 .log { flex: 1; margin: 0; padding: 4px 0; list-style: none; overflow: auto; }
-.entry { padding: 1px 8px; border-bottom: 1px solid #161b22; white-space: pre-wrap; overflow-wrap: anywhere; }
-.entry.warn { color: #e3b341; }
-.entry.error { color: #ff7b72; }
-.entry.debug, .entry.info { color: #8b949e; }
-.entry pre { margin: 2px 0 0 0; color: #8b949e; white-space: pre-wrap; }
+.entry { padding: 1px 8px; border-bottom: 1px solid var(--gd-bg-raised); white-space: pre-wrap; overflow-wrap: anywhere; }
+.entry.warn { color: var(--gd-yellow); }
+.entry.error { color: var(--gd-red); }
+.entry.debug, .entry.info { color: var(--gd-muted); }
+.entry pre { margin: 2px 0 0 0; color: var(--gd-muted); white-space: pre-wrap; }
 .badge {
   display: inline-block;
   min-width: 36px;
   margin-right: 6px;
   padding: 0 4px;
   border-radius: 3px;
-  background: #21262d;
-  color: #8b949e;
+  background: var(--gd-bg-hover);
+  color: var(--gd-muted);
   font-size: 10px;
   text-align: center;
 }
-.badge.app { color: #7ee787; }
-.badge.render { color: #79c0ff; }
-.badge.command { color: #d2a8ff; }
-.badge.patch { color: #79c0ff; }
-.badge.source { color: #ffa657; }
-.time { color: #6e7681; margin-right: 6px; }
+.badge.app { color: var(--gd-green); }
+.badge.render { color: var(--gd-accent); }
+.badge.command { color: var(--gd-purple); }
+.badge.patch { color: var(--gd-accent); }
+.badge.source { color: var(--gd-orange); }
+.time { color: var(--gd-faint); margin-right: 6px; }
 .frames-view { padding: 8px; }
 ${NODE_REPORT_STYLES}
 `;

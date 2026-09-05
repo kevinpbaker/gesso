@@ -137,7 +137,7 @@ interface ActionLogPanelOptions {
 declare function mountActionLogPanel(host: HTMLElement, log: ActionLog, options?: ActionLogPanelOptions): ActionLogPanel;
 declare function describeActionEntry(entry: ActionEntry): string;
 declare function renderNodeReport(doc: Document, report: UiNodeReport): HTMLElement[];
-declare const NODE_REPORT_STYLES = "\nh1 { margin: 0 0 6px; font-size: 12px; color: #79c0ff; overflow-wrap: anywhere; }\nh2 {\n  margin: 10px 0 4px;\n  font-size: 10px;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: #8b949e;\n}\np { margin: 0 0 2px; }\n.label { color: #8b949e; }\n.rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }\ndt { color: #8b949e; overflow-wrap: anywhere; }\ndt.modifier { color: #d2a8ff; }\ndt.binding { color: #7ee787; }\ndt.provided { color: #ffa657; }\ndd { margin: 0; overflow-wrap: anywhere; }\n.note { color: #6e7681; }\n.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #c9d1d9; }\n";
+declare const NODE_REPORT_STYLES = "\nh1 { margin: 0 0 6px; font-size: 12px; color: var(--gd-accent, #79c0ff); overflow-wrap: anywhere; }\nh2 {\n  margin: 10px 0 4px;\n  font-size: 10px;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: var(--gd-muted, #8b949e);\n}\np { margin: 0 0 2px; }\n.label { color: var(--gd-muted, #8b949e); }\n.rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }\ndt { color: var(--gd-muted, #8b949e); overflow-wrap: anywhere; }\ndt.modifier { color: var(--gd-purple, #d2a8ff); }\ndt.binding { color: var(--gd-green, #7ee787); }\ndt.provided { color: var(--gd-orange, #ffa657); }\ndd { margin: 0; overflow-wrap: anywhere; }\n.note { color: var(--gd-faint, #6e7681); }\n.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gd-text-strong, #c9d1d9); }\n";
 interface DevtoolsAppInfo {
   readonly id: string;
   readonly name: string;
@@ -221,9 +221,12 @@ declare function connectDevtools(app: DevtoolsApp, options?: ConnectDevtoolsOpti
 interface DevtoolsPanel {
   readonly app: DevtoolsAppInfo | null;
   show(appId: string): void;
+  setTheme(theme: DevtoolsPanelTheme): void;
   dispose(): void;
 }
+type DevtoolsPanelTheme = 'light' | 'dark' | 'auto';
 interface DevtoolsPanelOptions {
+  readonly theme?: DevtoolsPanelTheme;
   readonly openDepth?: number;
   readonly consoleLimit?: number;
   readonly actionLimit?: number;
@@ -350,6 +353,7 @@ export {
   type DevtoolsHook,
   type DevtoolsPanel,
   type DevtoolsPanelOptions,
+  type DevtoolsPanelTheme,
   type DevtoolsPort,
   type Envelope,
   type ErrorOrigin,
