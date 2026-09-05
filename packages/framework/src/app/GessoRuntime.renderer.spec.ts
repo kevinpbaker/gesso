@@ -80,6 +80,18 @@ function createMockDevice(): GPUDevice {
     createBindGroup: vi.fn(() => ({})),
     createSampler: vi.fn(() => ({})),
     createTexture: vi.fn(() => ({ width: 1, height: 1, createView: vi.fn(() => ({})), destroy: vi.fn() })),
+    // The renderer records its draw work into a bundle and replays it
+    // while the frame keeps its shape, so a device double that cannot
+    // make one is a device the renderer cannot draw on. Mirrors the
+    // double in `WebGPURenderer.spec.ts`.
+    createRenderBundleEncoder: vi.fn(() => ({
+      setPipeline: vi.fn(),
+      setVertexBuffer: vi.fn(),
+      setIndexBuffer: vi.fn(),
+      setBindGroup: vi.fn(),
+      drawIndexed: vi.fn(),
+      finish: vi.fn(() => ({}))
+    })),
     createCommandEncoder: vi.fn(() => ({
       beginRenderPass: vi.fn(() => ({
         setPipeline: vi.fn(),
@@ -87,6 +99,7 @@ function createMockDevice(): GPUDevice {
         setIndexBuffer: vi.fn(),
         setBindGroup: vi.fn(),
         setScissorRect: vi.fn(),
+        executeBundles: vi.fn(),
         drawIndexed: vi.fn(),
         end: vi.fn()
       })),
