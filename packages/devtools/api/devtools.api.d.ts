@@ -7,11 +7,14 @@
 // ==== index.d.ts ====
 import {
   ChannelPort,
+  DevtoolsEvent,
+  DevtoolsRequest,
   FrameMetrics,
   Patch,
   RuntimeErrorSource,
   UiFramePhase,
   UiNodeReport,
+  UiTreeNode,
   WorkerHandle
 } from "@gesso/framework";
 interface SourceMapV3 {
@@ -132,6 +135,111 @@ interface ActionLogPanelOptions {
   readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 declare function mountActionLogPanel(host: HTMLElement, log: ActionLog, options?: ActionLogPanelOptions): ActionLogPanel;
+declare function describeActionEntry(entry: ActionEntry): string;
+declare function renderNodeReport(doc: Document, report: UiNodeReport): HTMLElement[];
+declare const NODE_REPORT_STYLES = "\nh1 { margin: 0 0 6px; font-size: 12px; color: #79c0ff; overflow-wrap: anywhere; }\nh2 {\n  margin: 10px 0 4px;\n  font-size: 10px;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: #8b949e;\n}\np { margin: 0 0 2px; }\n.label { color: #8b949e; }\n.rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }\ndt { color: #8b949e; overflow-wrap: anywhere; }\ndt.modifier { color: #d2a8ff; }\ndt.binding { color: #7ee787; }\ndt.provided { color: #ffa657; }\ndd { margin: 0; overflow-wrap: anywhere; }\n.note { color: #6e7681; }\n.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #c9d1d9; }\n";
+interface DevtoolsAppInfo {
+  readonly id: string;
+  readonly name: string;
+}
+type PageMessage =
+{
+  type: 'apps';
+  apps: readonly DevtoolsAppInfo[];
+} | {
+  type: 'event';
+  app: string;
+  event: DevtoolsEvent;
+} |
+{
+  type: 'action';
+  app: string;
+  entry: ActionEntry;
+};
+type PanelMessage =
+{
+  type: 'hello';
+} | {
+  type: 'request';
+  app: string;
+  request: DevtoolsRequest;
+};
+interface DevtoolsPort<In, Out> {
+  post(message: Out): void;
+  onMessage(listener: (message: In) => void): () => void;
+  close(): void;
+}
+type PagePort = DevtoolsPort<PanelMessage, PageMessage>;
+type PanelPort = DevtoolsPort<PageMessage, PanelMessage>;
+declare function createDirectPorts(): {
+  page: PagePort;
+  panel: PanelPort;
+};
+interface Envelope<T> {
+  readonly source: typeof ENVELOPE_SOURCE;
+  readonly to: 'page' | 'panel';
+  readonly message: T;
+}
+declare const ENVELOPE_SOURCE = "gesso-devtools";
+declare function isEnvelope(value: unknown, to: 'page' | 'panel'): value is Envelope<unknown>;
+interface WindowLike {
+  addEventListener(type: 'message', listener: (event: {
+    data: unknown;
+    source?: unknown;
+  }) => void): void;
+  removeEventListener(type: 'message', listener: (event: {
+    data: unknown;
+    source?: unknown;
+  }) => void): void;
+  postMessage(message: unknown, targetOrigin: string): void;
+  readonly location?: {
+    readonly origin: string;
+  };
+}
+declare function windowPagePort(win: WindowLike): PagePort;
+declare function windowPanelPort(win: WindowLike): PanelPort;
+interface DevtoolsApp {
+  devtools(request: DevtoolsRequest): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+}
+interface ConnectDevtoolsOptions {
+  readonly name?: string;
+  readonly actions?: ActionLog;
+  readonly window?: (WindowLike & HookHost) | null;
+}
+interface DevtoolsHook {
+  readonly apps: readonly DevtoolsAppInfo[];
+  register(app: DevtoolsApp, options?: Omit<ConnectDevtoolsOptions, 'window'>): () => void;
+  attach(port: PagePort): () => void;
+}
+declare const HOOK_PROPERTY = "__GESSO_DEVTOOLS__";
+interface HookHost {
+  [HOOK_PROPERTY]?: DevtoolsHook;
+}
+declare function getDevtoolsHook(win?: (WindowLike & HookHost) | null): DevtoolsHook;
+declare function connectDevtools(app: DevtoolsApp, options?: ConnectDevtoolsOptions): () => void;
+interface DevtoolsPanel {
+  readonly app: DevtoolsAppInfo | null;
+  show(appId: string): void;
+  dispose(): void;
+}
+interface DevtoolsPanelOptions {
+  readonly openDepth?: number;
+  readonly consoleLimit?: number;
+  readonly actionLimit?: number;
+}
+declare function mountDevtoolsPanel(host: HTMLElement, port: PanelPort, options?: DevtoolsPanelOptions): DevtoolsPanel;
+interface TreeRow {
+  readonly node: UiTreeNode;
+  readonly depth: number;
+  readonly expandable: boolean;
+  readonly expanded: boolean;
+  readonly owner?: string;
+}
+declare function treeRows(root: UiTreeNode, expanded: ReadonlySet<string>): TreeRow[];
+declare function idsToDepth(root: UiTreeNode, depth: number): string[];
+declare function pathTo(root: UiTreeNode, id: string): string[] | null;
+declare function rowLabel(row: TreeRow): string;
 interface NodeInspector {
   set(report: UiNodeReport | null): void;
   dispose(): void;
@@ -150,6 +258,7 @@ interface FrameProfilerOptions {
   readonly history?: number;
   readonly redrawMs?: number;
   readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  readonly layout?: 'floating' | 'docked';
 }
 interface FrameSample {
   readonly phases: Readonly<Record<UiFramePhase, number>>;
@@ -195,22 +304,36 @@ declare function shortenPath(url: string, origin?: string): string;
 declare function formatFrame(frame: StackFrame, origin?: string): string;
 export {
   codeFrame,
+  connectDevtools,
   createActionLog,
+  createDirectPorts,
   decodeMappings,
+  describeActionEntry,
+  ENVELOPE_SOURCE,
   ErrorOverlay,
   formatFrame,
+  getDevtoolsHook,
+  HOOK_PROPERTY,
+  idsToDepth,
+  isEnvelope,
   mapStack,
   mountActionLogPanel,
+  mountDevtoolsPanel,
   mountErrorOverlay,
   mountFrameProfiler,
   mountNodeInspector,
+  NODE_REPORT_STYLES,
   parseSourceMappingUrl,
   parseStack,
+  pathTo,
   primaryFrame,
+  renderNodeReport,
+  rowLabel,
   shortenPath,
   SourceMapConsumer,
   SourceMapStore,
   summarize,
+  treeRows,
   type ActionEntry,
   type ActionLog,
   type ActionLogOptions,
@@ -221,17 +344,34 @@ export {
   type CodeFrame,
   type CodeFrameLine,
   type CommandEntry,
+  type ConnectDevtoolsOptions,
+  type DevtoolsApp,
+  type DevtoolsAppInfo,
+  type DevtoolsHook,
+  type DevtoolsPanel,
+  type DevtoolsPanelOptions,
+  type DevtoolsPort,
+  type Envelope,
   type ErrorOrigin,
   type ErrorOverlayOptions,
   type FrameProfiler,
   type FrameProfilerOptions,
   type FrameSample,
   type FrameSummary,
+  type HookHost,
   type NodeInspector,
   type NodeInspectorOptions,
   type OriginalPosition,
+  type PageMessage,
+  type PagePort,
+  type PanelMessage,
+  type PanelPort,
   type PatchEntry,
   type SourceMapV3,
   type StackFrame,
-  type StackLocation
+  type StackLocation,
+  type TreeRow,
+  type WindowLike,
+  windowPagePort,
+  windowPanelPort
 };
