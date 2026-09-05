@@ -122,6 +122,7 @@ export default defineConfig({
           { text: 'Inspecting a node', link: '/tooling/inspecting-a-node' },
           { text: 'Frames and phases', link: '/tooling/frames-and-phases' },
           { text: 'The action log', link: '/tooling/the-action-log' },
+          { text: 'The devtools panel', link: '/tooling/the-devtools-panel' },
           { text: 'Hot module replacement', link: '/tooling/hot-module-replacement' },
           { text: 'create-gesso-app', link: '/tooling/create-gesso-app' }
         ]

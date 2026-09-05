@@ -8,20 +8,23 @@ A canvas application is opaque to the browser. The elements panel shows
 one `<canvas>`, breakpoints land in a worker whose console the page
 cannot read, and an exception leaves the last good frame on screen
 looking like nothing happened. `@gesso/devtools` is four tools that
-answer the questions the browser's own would have answered.
+answer the questions the browser's own would have answered, and a fifth
+that puts the answers where a developer already looks.
 
-| Tool           | The question it answers                                                |
-| -------------- | ---------------------------------------------------------------------- |
-| Error overlay  | What threw, where, and what it cost the running application            |
-| Node inspector | What is this thing under the pointer, and who decided its values       |
-| Frame profiler | Where did the last three seconds of frames go                          |
-| Action log     | What has this application done, and what did the screen look like then |
+| Tool           | The question it answers                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| Error overlay  | What threw, where, and what it cost the running application                                      |
+| Node inspector | What is this thing under the pointer, and who decided its values                                 |
+| Frame profiler | Where did the last three seconds of frames go                                                    |
+| Action log     | What has this application done, and what did the screen look like then                           |
+| Devtools panel | All of it, in a Chrome devtools tab or a pane: [the devtools panel](/tooling/the-devtools-panel) |
 
 ## They are DOM, over the canvas
 
-Every one of them is an element in a shadow root, appended to the
+Every one of the four is an element in a shadow root, appended to the
 element the application was mounted into. None of them is drawn into
-the scene.
+the scene. The panel is the exception, and it is outside the page
+altogether.
 
 That is deliberate, and the reason is the same in all four cases: a
 panel drawn inside the scene would be part of the scene it is

@@ -1226,5 +1226,19 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     group: 'Devtools',
     what: 'Shows an error from the worker over the canvas, with its stack.',
     page: '/structure/errors-and-the-overlay'
+  },
+  {
+    name: 'connectDevtools',
+    package: 'devtools',
+    group: 'Devtools',
+    what: 'Registers the app with the page so the devtools panel, or the Chrome extension, finds it.',
+    page: '/tooling/the-devtools-panel'
+  },
+  {
+    name: 'mountDevtoolsPanel',
+    package: 'devtools',
+    group: 'Devtools',
+    what: 'Mounts the panel itself, over a port, anywhere in a page.',
+    page: '/tooling/the-devtools-panel'
   }
 ] as const;

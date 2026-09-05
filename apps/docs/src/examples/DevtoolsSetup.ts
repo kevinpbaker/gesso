@@ -1,5 +1,6 @@
 import { createApp } from '@gesso/framework';
 import {
+  connectDevtools,
   createActionLog,
   mountActionLogPanel,
   mountErrorOverlay,
@@ -42,6 +43,11 @@ export function mountWithDevtools(host: HTMLElement): () => void {
   const dispose = app.mount(host);
   // #endregion app
 
+  // #region connect
+  // Found by the Chrome extension, and by a panel mounted in this page.
+  const disconnect = connectDevtools(app, { name: 'Counter', actions });
+  // #endregion connect
+
   // #region toggles
   app.setInspector(true);
   profiler.setVisible(true);
@@ -49,6 +55,7 @@ export function mountWithDevtools(host: HTMLElement): () => void {
   // #endregion toggles
 
   return () => {
+    disconnect();
     dispose();
     detachWindow();
     actionPanel.dispose();

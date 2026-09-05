@@ -347,7 +347,7 @@ Six workspace packages, five of them publishable:
 | `@gesso/framework`  | `packages/framework`  | Components, the frame runtime, the worker barrier.                                      |
 | `@gesso/components` | `packages/components` | The component library — five tiers, one contract.                                       |
 | `@gesso/testing`    | `packages/testing`    | `renderTest` — mount a component with no browser and query it as a screen reader would. |
-| `@gesso/devtools`   | `packages/devtools`   | What the runtime will not tell you by itself. So far: the error overlay.                |
+| `@gesso/devtools`   | `packages/devtools`   | The error overlay, node inspector, frame profiler, action log, and the devtools panel.  |
 | `@gesso/playground` | `apps/playground`     | The demo harness — the routes and one shell. Private, and not the framework.            |
 
 `@gesso/core` and `@gesso/framework` each carry a second entry, `./testing`, holding the doubles and the mount harness their own suites use; nothing an application builds against reaches through it. `@gesso/testing` is the published one — its root entry imports no test runner at all, and the vitest matchers sit behind `@gesso/testing/matchers` because `expect.extend` is a side effect on a global. Cross-package imports go through a package's root entry, never a deep path, so `api/*.api.d.ts` reviews the whole surface rather than one file at a time.
