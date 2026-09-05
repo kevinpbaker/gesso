@@ -1,7 +1,9 @@
 import { map } from 'rxjs/operators';
 
-import { darkTheme, lightTheme, percent, type UiChild } from '@gesso/core';
+import { percent, type UiChild } from '@gesso/core';
 import { createComponent, ShellService, type ComponentContext, type Inputs } from '@gesso/framework';
+
+import { brandDarkTheme, brandLightTheme } from './brandTheme';
 
 // #region theme
 /**
@@ -15,9 +17,10 @@ import { createComponent, ShellService, type ComponentContext, type Inputs } fro
  *
  * `theme` is an environment value: provided here, inherited by
  * everything below, and, because it is an ordinary prop that accepts an
- * Observable, rebound rather than rebuilt when the appearance changes. `lightTheme` and `darkTheme` ship with `@gesso/core`; an
- * application with its own palette maps the same signal onto that
- * instead.
+ * Observable, rebound rather than rebuilt when the appearance changes.
+ * `lightTheme` and `darkTheme` ship with `@gesso/core`; this site maps
+ * the signal onto a palette of its own instead, which is what any
+ * application with a brand does. See `brandTheme.ts`.
  *
  * `textStyle` has to go with it. A theme's palette answers a colour
  * *token*, as in `backgroundColor="surface"`, but text that names no colour
@@ -26,7 +29,9 @@ import { createComponent, ShellService, type ComponentContext, type Inputs } fro
  * line painting the default black.
  */
 function ExampleRoot(inputs: Inputs<{ content: UiChild }>, ctx: ComponentContext) {
-  const theme = ctx.inject(ShellService).colorScheme.pipe(map(scheme => (scheme === 'dark' ? darkTheme : lightTheme)));
+  const theme = ctx
+    .inject(ShellService)
+    .colorScheme.pipe(map(scheme => (scheme === 'dark' ? brandDarkTheme : brandLightTheme)));
 
   return (
     <box

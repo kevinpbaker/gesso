@@ -39,6 +39,14 @@ appearances the platform is in and has no opinion beyond that, so an
 application with its own palette maps the same signal onto that
 instead.
 
+This site is one of those applications, which is why the pair above is
+`brandLightTheme` and `brandDarkTheme` rather than the two that ship
+with the package. They answer the same token names in Gesso's own five
+colours, so the canvas on this page is painted out of the same palette
+as the prose beside it. A palette is an ordinary value in application
+code: `src/examples/brandTheme.ts` is the whole of it, and swapping
+which one the line above reaches for is the whole of adopting it.
+
 ## Telling the shell what to report
 
 By default a shell follows `prefers-color-scheme` and reports what it

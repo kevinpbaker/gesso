@@ -58,7 +58,7 @@ export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx:
   ctx.onUnmount(() => ticking?.unsubscribe());
 
   return (
-    <column width={percent(100)} height={percent(100)} backgroundColor="background">
+    <column width={percent(100)} height={percent(100)} backgroundColor="surface">
       <column gap={12} padding={16} flexGrow={1} y="center">
         <row gap={10} y="center">
           <text text={label} fontSize={12} fontWeight={600} color="text" />
@@ -73,7 +73,7 @@ export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx:
               flexGrow={1}
               height={sweep.pipe(map(phase => barHeight(phase, index)))}
               borderRadius={2}
-              backgroundColor={sweep.pipe(map(phase => (isLit(phase, index) ? 'primary' : 'border')))}
+              backgroundColor={sweep.pipe(map(phase => (isLit(phase, index) ? 'primary' : 'borderStrong')))}
             />
           ))}
         </row>
