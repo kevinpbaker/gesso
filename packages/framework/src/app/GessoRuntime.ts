@@ -172,13 +172,29 @@ export interface RuntimeInput {
 /**
  * Which backend draws.
  *
- * `auto` is the default: WebGPU where the browser has it, Canvas2D
- * everywhere else. The choice between them is made synchronously on
- * whether `navigator.gpu` exists, so an engine that never shipped
- * WebGPU (WKWebView, WebKitGTK) is on Canvas2D from the first frame
- * rather than after a rejected adapter request. A browser that has the
- * entry point but cannot produce an adapter or a device still falls
- * back, asynchronously, once that request fails.
+ * **`canvas2d` is the default, and that is not the obvious answer.** A
+ * GPU backend sounds like the faster one and on a scene of shapes and
+ * text it is. On a scene dense with pictures it is currently not, and
+ * the reason is one asymmetry rather than anything fundamental:
+ * Canvas2D keeps a copy of each still at the size it is drawn (see
+ * `ScaledImageCache`), while `WebGPUTextureCache` uploads a still at
+ * the source's own size. A 480px cover shown at 164 is therefore about
+ * eight times the texture on WebGPU, and a screen holding ninety of
+ * them feels it. Measured on Segue's home screen, where the difference
+ * was plain enough to notice without instrumenting anything.
+ *
+ * So the default is the one that is fast everywhere today, and the
+ * faster ceiling is opt-in until the gap is closed. When
+ * `WebGPUTextureCache` learns the drawn size the way its video path
+ * already has, this should flip back.
+ *
+ * `auto` picks WebGPU where the browser has it and Canvas2D everywhere
+ * else. The choice is made synchronously on whether `navigator.gpu`
+ * exists, so an engine that never shipped WebGPU (WKWebView, WebKitGTK)
+ * is on Canvas2D from the first frame rather than after a rejected
+ * adapter request. A browser that has the entry point but cannot
+ * produce an adapter or a device still falls back, asynchronously, once
+ * that request fails.
  *
  * `canvas2d` pins the portable backend and never asks for an adapter.
  * `webgpu` asks for it and falls back the same way `auto` does, but
@@ -192,7 +208,7 @@ export interface GessoRuntimeOptions {
   root: FrameworkChild;
   /** Canvas to draw into: HTMLCanvasElement, OffscreenCanvas, or a test double. */
   canvas: CanvasHost;
-  /** The rendering backend. Defaults to `auto`; see RendererChoice. */
+  /** The rendering backend. Defaults to `canvas2d`; see RendererChoice. */
   renderer?: RendererChoice;
   /**
    * A canvas for text measurement when the draw canvas is WebGPU's — a
@@ -425,7 +441,7 @@ export class GessoRuntime {
     // fallback to unwind. Only `webgpu` asked for by name goes to the
     // GPU path on an engine that has no entry point, so that it can
     // report what it could not have.
-    const choice = options.renderer ?? 'auto';
+    const choice = options.renderer ?? 'canvas2d';
     const drawWithWebGPU = choice === 'webgpu' || (choice === 'auto' && isWebGPUAvailable());
     if (!drawWithWebGPU) {
       this.canvasSurface = createCanvasSurface(options.canvas);

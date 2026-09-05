@@ -168,7 +168,13 @@ describe('GessoRuntime renderer option', () => {
     runtime.dispose();
   });
 
-  it('draws with WebGPU by default where the browser has it', async () => {
+  it('draws with Canvas2D by default, even where the browser has WebGPU', () => {
+    // The default is the portable backend, and deliberately so: a scene
+    // dense with pictures is currently faster on it, because Canvas2D
+    // keeps a copy of a still at the size it is drawn and
+    // `WebGPUTextureCache` uploads one at the source's own size. See
+    // `RendererChoice`. Nothing is asked of the adapter, so this is
+    // synchronous.
     withMockWebGPU(createMockDevice());
     const canvas = mockCanvas(mockGPUContext());
     const clock = manualClock();
@@ -176,6 +182,29 @@ describe('GessoRuntime renderer option', () => {
     const runtime = new GessoRuntime({
       root,
       canvas,
+      measureCanvas: mockCanvas(),
+      clock: clock.factory,
+      width: 200,
+      height: 100
+    });
+    runtime.onFrame(metrics => frames.push(metrics));
+    runtime.start();
+
+    clock.tick();
+    expect(frames.at(-1)?.renderer).toBe('canvas2d');
+    expect(canvas.contexts.every(id => id === '2d')).toBe(true);
+    runtime.dispose();
+  });
+
+  it('draws with WebGPU when `auto` is named and the browser has it', async () => {
+    withMockWebGPU(createMockDevice());
+    const canvas = mockCanvas(mockGPUContext());
+    const clock = manualClock();
+    const frames: FrameMetrics[] = [];
+    const runtime = new GessoRuntime({
+      root,
+      canvas,
+      renderer: 'auto',
       measureCanvas: mockCanvas(),
       clock: clock.factory,
       width: 200,

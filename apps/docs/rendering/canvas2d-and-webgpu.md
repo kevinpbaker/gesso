@@ -33,11 +33,11 @@ Single-thread, the builder carries the same choice:
 createApp(AppRoot).renderer('canvas2d').mountSync('#app');
 ```
 
-| Value        | What happens                                                                                              |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| `'auto'`     | The default. WebGPU where the engine has it, Canvas2D where it does not, decided without a word from you. |
-| `'canvas2d'` | Draws immediately, on the app's canvas, with no adapter to ask for.                                       |
-| `'webgpu'`   | Asks for an adapter and a device. Falls back to Canvas2D when it cannot have them, and logs that it did.  |
+| Value        | What happens                                                                                             |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `'auto'`     | WebGPU where the engine has it, Canvas2D where it does not, decided without a word from you.             |
+| `'canvas2d'` | The default. Draws immediately, on the app's canvas, with no adapter to ask for.                         |
+| `'webgpu'`   | Asks for an adapter and a device. Falls back to Canvas2D when it cannot have them, and logs that it did. |
 
 `'webgpu'` and `'auto'` differ in two things. `'webgpu'` asks for an
 adapter even on an engine with no WebGPU at all, so that it can tell
@@ -208,18 +208,22 @@ has been looked at, and every reading was taken on Chromium.
 
 ## Choosing, honestly
 
-**Take the default unless you have a reason.** `'auto'` gives a
-Chromium engine the GPU path and everything else the portable one, and
-no application code can tell which it got.
+**Take the default unless you have a reason.** `'canvas2d'` paints
+immediately, cannot lose a device, and runs the same everywhere. On
+Chromium on Linux, in the render worker, the Segue demo's first painted
+frame landed at 598 and 689 ms under `'auto'` against 428 and 508 ms
+pinned to Canvas2D, so the adapter and the pipelines cost something like
+130 to 180 ms of cold start. Until that frame the canvas is empty rather
+than wrong.
 
-**Ask for `'canvas2d'` when the first frame is what matters.** It paints
-immediately and cannot lose a device. On Chromium on Linux, in the
-render worker, the Segue demo's first painted frame landed at 598 and
-689 ms under `'auto'` against 428 and 508 ms pinned to Canvas2D, so the
-adapter and the pipelines cost something like 130 to 180 ms of cold
-start. Until that frame the canvas is empty rather than wrong. A screen
-behind a splash or a network round trip will not notice; a screen that
-is meant to be there instantly might.
+**Ask for `'auto'` when you want the GPU path where it exists.** It is
+the ceiling with room left in it, and on a screen of shapes and text it
+is at parity or better. On a screen dense with pictures it is currently
+behind, and by enough to feel while scrolling: Canvas2D keeps a copy of
+each still at the size it is drawn, and the WebGPU texture cache uploads
+one at the source's own size, so an image shown much smaller than it was
+decoded is sampled down on every frame with no mip chain under it. Segue
+noticed it first, on a home screen holding around ninety covers.
 
 **WebGPU is not currently a speed win on these screens.** Measured in the
 render worker in Chromium, on the framework playground: scrolling a
