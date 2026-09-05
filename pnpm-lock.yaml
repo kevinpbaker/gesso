@@ -110,6 +110,9 @@ importers:
       '@gesso/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@gesso/devtools':
+        specifier: workspace:^
+        version: link:../../packages/devtools
       '@gesso/framework':
         specifier: workspace:^
         version: link:../../packages/framework
