@@ -10,6 +10,7 @@ import {
 } from '@gesso/core';
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import type { UiNodeReport } from './NodeReport';
+import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
 import type { ShellRequest } from './ShellService';
 import { AudioSink } from './AudioSink';
 import { EditingProxy, writeClipboard } from './EditingProxy';
@@ -250,6 +251,20 @@ export class GessoApp {
   /** Receives a report on the hovered node while the inspector is on. */
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void {
     this.runtime.onInspect(listener);
+  }
+
+  /** Receives a devtools panel's answers and updates; see `WorkerApp.onDevtools`. */
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void {
+    this.runtime.onDevtools(listener);
+  }
+
+  /**
+   * Answers a devtools panel, with the runtime in this thread. A
+   * `console` request does nothing here: the page's console is already
+   * the one the developer is reading.
+   */
+  devtools(request: DevtoolsRequest): void {
+    this.runtime.handleDevtools(request);
   }
 
   /**

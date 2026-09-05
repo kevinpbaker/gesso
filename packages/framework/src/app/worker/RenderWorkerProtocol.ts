@@ -1,4 +1,5 @@
 import type { UiNodeReport } from '../NodeReport';
+import type { DevtoolsEvent, DevtoolsRequest } from '../DevtoolsProtocol';
 import type {
   UiKeyModifiers,
   EditingState,
@@ -55,6 +56,12 @@ export type ShellToRuntimeMessage =
       accessibility?: boolean;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
+  /**
+   * A devtools panel's request (`DevtoolsProtocol.ts`). The worker
+   * answers with `devtools` messages; `console` is handled by the
+   * worker host, which owns the global the calls are made on.
+   */
+  | { type: 'devtools'; request: DevtoolsRequest }
   /**
    * `pointer` is the contact: which device, and which of its
    * simultaneous contacts. Optional, so a shell written before touch
@@ -258,6 +265,8 @@ export type RuntimeToShellMessage =
   | { type: 'error'; message: string; stack?: string; source: RuntimeErrorSource }
   /** A report on the hovered node while the inspector is on; null when nothing is hovered. */
   | { type: 'inspect'; report: UiNodeReport | null }
+  /** An answer to a devtools request, or an update to something a panel is watching. */
+  | { type: 'devtools'; event: DevtoolsEvent }
   /** The CSS cursor the hovered node asks for; null for the default arrow. */
   | { type: 'cursor'; cursor: string | null }
   /**

@@ -1,4 +1,6 @@
 import type { UiNodeReport } from '../NodeReport';
+import type { DevtoolsEvent, DevtoolsRequest } from '../DevtoolsProtocol';
+import { isConsoleEntryMessage, type ConsoleForwardingMessage } from '../../worker/captureConsole';
 import type { FrameMetrics, RendererChoice } from '../GessoRuntime';
 import {
   epochFromEvent,
@@ -165,6 +167,9 @@ export class WorkerApp {
 
   private renderWorker: Worker | undefined;
   private appLogicWorker: Worker | undefined;
+  private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
+  /** Whether a panel has asked for the workers' consoles, remembered across a remount. */
+  private consoleForwarding = false;
   /** True only when this class spawned the application-logic worker. */
   private ownsAppLogicWorker = false;
   private canvas: HTMLCanvasElement | undefined;
@@ -262,6 +267,12 @@ export class WorkerApp {
       const application = given ? spec : typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
       this.appLogicWorker = application;
       this.ownsAppLogicWorker = !given;
+      application.addEventListener('message', this.handleAppWorkerMessage);
+      if (this.consoleForwarding) {
+        // A panel asked before the worker existed (a remount), and the
+        // new worker has not been told.
+        application.postMessage({ type: 'gesso:console', enabled: true } as ConsoleForwardingMessage);
+      }
       // One channel between the two workers. The shell holds neither
       // end afterwards, so it cannot be in the way of a patch even by
       // accident.
@@ -387,6 +398,29 @@ export class WorkerApp {
   }
 
   /**
+   * Receives what a devtools panel asked for through `devtools`, and
+   * updates to whatever it is watching. A method rather than an option
+   * because a panel attaches to an application that is already
+   * running, and detaches from one that keeps running.
+   */
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void {
+    this.devtoolsListener = listener;
+  }
+
+  /**
+   * Passes a devtools panel's request to the render worker, and a
+   * console request to the application worker as well: each worker
+   * forwards its own console, and the shell names the thread.
+   */
+  devtools(request: DevtoolsRequest): void {
+    this.post({ type: 'devtools', request });
+    if (request.kind === 'console') {
+      this.consoleForwarding = request.enabled;
+      this.appLogicWorker?.postMessage({ type: 'gesso:console', enabled: request.enabled } as ConsoleForwardingMessage);
+    }
+  }
+
+  /**
    * Chooses what the application is told about the appearance.
    *
    * `auto` watches `prefers-color-scheme` and reports what it says;
@@ -475,6 +509,7 @@ export class WorkerApp {
       this.renderWorker.terminate();
       this.renderWorker = undefined;
     }
+    this.appLogicWorker?.removeEventListener('message', this.handleAppWorkerMessage);
     if (this.ownsAppLogicWorker) {
       this.appLogicWorker?.terminate();
     }
@@ -486,6 +521,18 @@ export class WorkerApp {
     this.canvas = undefined;
     this.host = undefined;
   }
+
+  /**
+   * The application worker talks to the render worker over the hub,
+   * never to the shell; the one thing it says to the shell is a
+   * forwarded console entry, which is the one thing the render worker
+   * cannot say for it.
+   */
+  private readonly handleAppWorkerMessage = (event: MessageEvent<unknown>): void => {
+    if (isConsoleEntryMessage(event.data)) {
+      this.devtoolsListener?.({ kind: 'console', entry: { ...event.data.entry, thread: 'app' } });
+    }
+  };
 
   private readonly handleWorkerMessage = (event: MessageEvent<RuntimeToShellMessage>): void => {
     const message = event.data;
@@ -518,6 +565,10 @@ export class WorkerApp {
     }
     if (message.type === 'inspect') {
       this.options.onInspect?.(message.report);
+      return;
+    }
+    if (message.type === 'devtools') {
+      this.devtoolsListener?.(message.event);
       return;
     }
     if (message.type === 'cursor') {

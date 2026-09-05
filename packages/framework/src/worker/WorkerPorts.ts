@@ -17,6 +17,8 @@
  * contract will run on next.
  */
 
+import { captureConsole, isConsoleForwardingMessage, type ConsoleEntryMessage } from './captureConsole';
+
 /** A port-shaped thing: `MessagePort` and `Worker` both satisfy it. */
 export interface MessageEndpoint {
   postMessage(message: unknown): void;
@@ -127,6 +129,25 @@ export function isHubMessage(value: unknown): value is HubMessage {
 }
 
 const BASE_INSTALLED = Symbol.for('gesso:port-base-installed');
+const CONSOLE_RESTORE = Symbol.for('gesso:port-console-restore');
+
+/**
+ * Starts or stops copying this worker's console to whoever posts to
+ * it, as `ConsoleEntryMessage`s. A host with no `postMessage` (a test's
+ * bare object) has nowhere to send them and forwards nothing.
+ */
+function setConsoleForwarding(host: PortHost & { [CONSOLE_RESTORE]?: () => void }, enabled: boolean): void {
+  host[CONSOLE_RESTORE]?.();
+  delete host[CONSOLE_RESTORE];
+  const post = (host as { postMessage?: (message: unknown) => void }).postMessage;
+  if (!enabled || typeof post !== 'function') {
+    return;
+  }
+  host[CONSOLE_RESTORE] = captureConsole(entry => {
+    const message: ConsoleEntryMessage = { type: 'gesso:console', entry };
+    post.call(host, message);
+  });
+}
 
 /**
  * The handler every `servePorts` chain sits on top of.
@@ -147,6 +168,13 @@ function installBase(host: PortHost & { [BASE_INSTALLED]?: boolean }): void {
   const registered = (host as HostWithNames)[SERVED_NAMES] ?? [];
 
   host.onmessage = event => {
+    if (isConsoleForwardingMessage(event.data)) {
+      // The shell, on behalf of a devtools panel, asking for this
+      // worker's console. Answered here because this is the one handler
+      // every application worker has, whatever it serves.
+      setConsoleForwarding(host, event.data.enabled);
+      return;
+    }
     if (isHubMessage(event.data)) {
       const port = event.ports?.[0];
       if (port === undefined) {

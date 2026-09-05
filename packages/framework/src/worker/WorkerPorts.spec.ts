@@ -262,6 +262,30 @@ describe('workerHandle', () => {
     });
   });
 
+  it('forwards the console to whoever posts to it while asked, and stops when told', () => {
+    const posted: unknown[] = [];
+    const host = { onmessage: null, postMessage: (message: unknown) => posted.push(message) } as PortHost;
+    servePorts(
+      () => false,
+      () => ['store'],
+      host
+    );
+    const quiet = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    host.onmessage?.({ data: { type: 'gesso:console', enabled: true } });
+    console.log('from the worker', 7);
+    expect(posted).toEqual([
+      { type: 'gesso:console', entry: { level: 'log', args: ['from the worker', '7'], at: expect.any(Number) } }
+    ]);
+
+    host.onmessage?.({ data: { type: 'gesso:console', enabled: false } });
+    console.log('unheard');
+    expect(posted).toHaveLength(1);
+    // Off again means the original method, not a wrapper around it.
+    expect(console.log).toBe(quiet);
+    quiet.mockRestore();
+  });
+
   it('recognises only a well-formed handshake', () => {
     expect(isPortHandshake({ type: 'gesso:port', key: 'a' })).toBe(true);
     expect(isPortHandshake({ type: 'gesso:port' })).toBe(false);

@@ -72,6 +72,14 @@ export {
   type UiSemanticsReport
 } from './app/NodeReport';
 export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
+export {
+  treeText,
+  type ConsoleEntry,
+  type DevtoolsEvent,
+  type DevtoolsRequest,
+  type UiTreeNode,
+  type UiTreeSnapshot
+} from './app/DevtoolsProtocol';
 export { ShellService, type ShellRequest } from './app/ShellService';
 export { FrameService } from './app/FrameService';
 export {

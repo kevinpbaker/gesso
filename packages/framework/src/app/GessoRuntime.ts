@@ -11,6 +11,13 @@ import {
   type UiSemanticsReport
 } from './NodeReport';
 import {
+  treeText,
+  type DevtoolsEvent,
+  type DevtoolsRequest,
+  type UiTreeNode,
+  type UiTreeSnapshot
+} from './DevtoolsProtocol';
+import {
   UiGraph,
   UiGraphBuilder,
   describeOverrides,
@@ -309,6 +316,13 @@ export class GessoRuntime {
   private inspectListener: ((report: UiNodeReport | null) => void) | null = null;
   /** The last report's explanation text, which is what tells two reports apart. */
   private lastInspection: string | null = null;
+  private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
+  /** Whether a panel wants a tree snapshot after every frame that changed the tree. */
+  private watchingTree = false;
+  /** The node a panel has selected, whose report is kept fresh; null for none. */
+  private selectedId: string | null = null;
+  /** The selected node's last report, serialised, which is what tells two apart. */
+  private lastSelectedReport: string | null = null;
   private cursorListener: ((cursor: string | null) => void) | null = null;
   private lastCursor: string | null = null;
   private scrollabilityListener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null = null;
@@ -854,6 +868,103 @@ export class GessoRuntime {
   }
 
   /**
+   * Receives what a devtools panel asked for and what it is watching:
+   * tree snapshots, node reports, and nothing else from here (console
+   * entries are added by whoever owns the worker global).
+   *
+   * One listener, like the others on this class: the host forwards
+   * events to its shell, and the shell fans them out.
+   */
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void {
+    this.devtoolsListener = listener;
+  }
+
+  /**
+   * Answers a devtools panel (`DevtoolsProtocol.ts`).
+   *
+   * `console` is not handled here: the runtime does not own the
+   * worker's global, and in the same-thread configuration there is
+   * nothing to forward. The host that owns the global handles it
+   * before the request gets this far.
+   */
+  handleDevtools(request: DevtoolsRequest): void {
+    switch (request.kind) {
+      case 'tree':
+        this.devtoolsListener?.({ kind: 'tree', tree: this.snapshotTree() });
+        break;
+      case 'watchTree':
+        this.watchingTree = request.enabled;
+        if (request.enabled) {
+          this.devtoolsListener?.({ kind: 'tree', tree: this.snapshotTree() });
+        }
+        break;
+      case 'inspect':
+        this.devtoolsListener?.({ kind: 'report', id: request.id, report: this.inspectNodeById(request.id) });
+        break;
+      case 'select':
+        this.selectedId = request.id;
+        this.lastSelectedReport = null;
+        if (request.id !== null) {
+          this.sendSelectedReport();
+        }
+        break;
+      case 'highlight':
+        this.setHighlightedNode(request.id);
+        break;
+      case 'console':
+        break;
+    }
+  }
+
+  /**
+   * The tree as a panel lists it, from the application's root.
+   *
+   * The runtime's own layout root and the overlay layer beside the app
+   * root are left out: neither is something the application wrote,
+   * and the layout root is exactly the node `beneathAtPointer` also
+   * hides for being nobody's intent.
+   */
+  snapshotTree(): UiTreeSnapshot {
+    const root = this.debugRoot();
+    let count = 0;
+    const visit = (node: UiNode): UiTreeNode => {
+      count++;
+      const children: UiTreeNode[] = [];
+      for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+        children.push(visit(child));
+      }
+      const host = this.resolver.hostFor(node.id);
+      const text = treeText(node.getProperty('text'));
+      return {
+        id: node.id,
+        type: node.type,
+        ...(host === undefined ? {} : { component: getComponentMetadata(host.component).tag }),
+        ...(text === undefined ? {} : { text }),
+        children
+      };
+    };
+    return { root: visit(root), nodes: count };
+  }
+
+  /** `inspectNode` for a node named by id, or null when the tree has no such node. */
+  inspectNodeById(id: string): UiNodeReport | null {
+    const node = this.graph.getNode(id);
+    return node === undefined ? null : this.inspectNode(node);
+  }
+
+  /**
+   * Outlines a node on the canvas for a panel that picked it from the
+   * tree, or clears the outline with null. An id the tree does not
+   * have clears it too, since there is nothing to point at.
+   */
+  setHighlightedNode(id: string | null): void {
+    const node = id === null ? undefined : this.graph.getNode(id);
+    if (this.inspector.setHighlighted(node ?? null) && this.root !== undefined) {
+      this.graph.markDirty(this.root, DirtyFlags.Paint);
+    }
+  }
+
+  /**
    * Receives the cursor the hovered node asks for (`cursor: 'pointer'`
    * on it or an ancestor) whenever it changes, and null when nothing
    * under the pointer sets one. The shell applies it to the canvas —
@@ -1280,8 +1391,10 @@ export class GessoRuntime {
       }
     }
     // The hovered node may be about to be removed, and the inspector
-    // would go on explaining it until the pointer next moved.
+    // would go on explaining it until the pointer next moved. The
+    // highlighted one is about to be removed for certain.
     this.inspector.setHovered(null);
+    this.inspector.setHighlighted(null);
     this.buildRoot(rootDefinition);
     this.graph.markDirty(this.root, DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Paint);
   }
@@ -1307,6 +1420,7 @@ export class GessoRuntime {
       this.animationTimer = null;
     }
     this.inspectListener = null;
+    this.devtoolsListener = null;
     this.cursorListener = null;
     this.scrollabilityListener = null;
     this.rendererErrorListener = null;
@@ -1979,7 +2093,7 @@ export class GessoRuntime {
     // backend draws it over the finished scene. The hovered node's
     // explanation only changes with layout, so it is re-read then and
     // sent when it differs from what the listener already has.
-    const overlay = this.inspector.isEnabled ? this.inspector.overlay(started) : null;
+    const overlay = this.inspector.hasOverlay ? this.inspector.overlay(started) : null;
     this.gpuTimings = null;
     this.phaseTimings.render = this.timePhase(
       () => this.renderer.isReady,
@@ -1997,6 +2111,7 @@ export class GessoRuntime {
       }
       this.scheduleInspectorRepaint(overlay.nextChange);
     }
+    this.sendDevtoolsUpdates(frame);
 
     const finished = now();
     const elapsed = finished - started;
@@ -2222,6 +2337,56 @@ export class GessoRuntime {
   }
 
   /**
+   * What a devtools panel is watching, after a frame: the tree when
+   * its shape or text changed, and the selected node's report when
+   * anything about it did. Nothing when no panel is attached.
+   */
+  private sendDevtoolsUpdates(frame: UiFrame): void {
+    if (this.devtoolsListener === null) {
+      return;
+    }
+    // A highlighted node that left the tree would keep its last box
+    // drawn over whatever took its place.
+    const highlighted = this.inspector.highlightedNode;
+    if (highlighted !== null && this.graph.getNode(highlighted.id) !== highlighted) {
+      this.inspector.setHighlighted(null);
+    }
+    if (this.watchingTree && frameChangedTree(frame)) {
+      this.devtoolsListener({ kind: 'tree', tree: this.snapshotTree() });
+    }
+    if (this.selectedId !== null) {
+      this.sendSelectedReport();
+    }
+  }
+
+  /**
+   * The selected node's report, when it differs from the last one
+   * sent. A node that has gone is reported as null once, and then the
+   * selection is dropped so the panel is not told again.
+   */
+  private sendSelectedReport(): void {
+    const id = this.selectedId;
+    if (id === null) {
+      return;
+    }
+    const report = this.inspectNodeById(id);
+    if (report === null) {
+      this.selectedId = null;
+      this.lastSelectedReport = null;
+      this.devtoolsListener?.({ kind: 'report', id, report: null });
+      return;
+    }
+    // Serialised rather than deep-compared: the report is plain data
+    // by contract, and only one node's worth of it per frame.
+    const text = JSON.stringify(report);
+    if (text === this.lastSelectedReport) {
+      return;
+    }
+    this.lastSelectedReport = text;
+    this.devtoolsListener?.({ kind: 'report', id, report });
+  }
+
+  /**
    * Runs a phase when it has work, returning what it cost.
    *
    * A skipped phase reports 0, which is what makes the breakdown
@@ -2382,6 +2547,16 @@ const EMPTY_BOXES: readonly UiSemanticsBox[] = [];
 
 function boxesEqual(a: LayoutBox, b: LayoutBox): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+/**
+ * Whether the frame changed what a tree snapshot shows: a node added,
+ * removed or moved, or a text node's text. The same flags the
+ * semantics tree rebuilds on, for the same reason: a box that only
+ * moved changed neither.
+ */
+function frameChangedTree(frame: UiFrame): boolean {
+  return frameNeedsSemantics(frame);
 }
 
 function frameNeedsSemantics(frame: UiFrame): boolean {

@@ -91,6 +91,15 @@ export interface LayoutInspectorOptions {
 export class LayoutInspector {
   private enabled = false;
   private hovered: UiNode | null = null;
+  /**
+   * A node picked from outside the canvas — a devtools panel's tree —
+   * and outlined here so a person can find it on the screen.
+   *
+   * Separate from `hovered` and from `enabled`: the panel points at a
+   * node without the pointer being anywhere near it, and without the
+   * heatmap and the measure trace that the toggle turns on.
+   */
+  private highlighted: UiNode | null = null;
   /** When each node was last measured, for the heatmap. */
   private readonly heat = new Map<UiNode, number>();
 
@@ -105,6 +114,15 @@ export class LayoutInspector {
 
   get hoveredNode(): UiNode | null {
     return this.hovered;
+  }
+
+  get highlightedNode(): UiNode | null {
+    return this.highlighted;
+  }
+
+  /** Whether `overlay` would draw anything: the toggle is on, or a node is highlighted. */
+  get hasOverlay(): boolean {
+    return this.enabled || this.highlighted !== null;
   }
 
   /** Turns the inspector, and the engine's measure trace, on or off. */
@@ -126,6 +144,15 @@ export class LayoutInspector {
       return false;
     }
     this.hovered = node;
+    return true;
+  }
+
+  /** Sets the node a panel is pointing at. Returns true when it changed. */
+  setHighlighted(node: UiNode | null): boolean {
+    if (node === this.highlighted) {
+      return false;
+    }
+    this.highlighted = node;
     return true;
   }
 
@@ -166,11 +193,18 @@ export class LayoutInspector {
    */
   overlay(now: number): InspectorOverlay {
     const shapes: OverlayShape[] = [];
-    if (!this.enabled) {
+    if (!this.hasOverlay) {
       return { shapes, nextChange: undefined };
     }
-    const nextChange = this.heatShapes(shapes, now);
-    if (this.hovered !== null) {
+    const nextChange = this.enabled ? this.heatShapes(shapes, now) : undefined;
+    // The highlighted node is drawn exactly as a hovered one is: the
+    // box model is what a person picking a node from a tree wants to
+    // see, and a second vocabulary for the same boxes would be one more
+    // thing to learn. Once when they coincide.
+    if (this.highlighted !== null) {
+      this.hoveredShapes(shapes, this.highlighted);
+    }
+    if (this.enabled && this.hovered !== null && this.hovered !== this.highlighted) {
       this.hoveredShapes(shapes, this.hovered);
     }
     return { shapes, nextChange };

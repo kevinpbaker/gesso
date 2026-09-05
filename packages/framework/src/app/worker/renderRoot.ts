@@ -2,6 +2,7 @@ import type { FrameworkChild } from '../../ComponentElement';
 import { createComponent } from '../../createComponent';
 import type { ComponentType } from '../../FunctionComponent';
 import { APPLICATION_WORKER, portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
+import { captureConsole } from '../../worker/captureConsole';
 import {
   createChannelRegistry,
   type ChannelRegistration,
@@ -85,6 +86,8 @@ export class RenderWorkerApp {
   private channels: ChannelRegistryHandle | undefined;
   /** The shell's port to the application-logic worker, if there is one. */
   private appLogicWorker: WorkerHandle | undefined;
+  /** Undoes `captureConsole` while a devtools panel has the console forwarded. */
+  private restoreConsole: (() => void) | null = null;
 
   constructor(root: FrameworkChild | ComponentType, host: WorkerGlobal = self as unknown as WorkerGlobal) {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
@@ -306,6 +309,23 @@ export class RenderWorkerApp {
     }
   }
 
+  /**
+   * Copies this worker's `console.*` to the shell while a devtools
+   * panel asks for it. Here rather than in the runtime because the
+   * console is the worker global's, and this class is what owns the
+   * global.
+   */
+  private setConsoleForwarding(enabled: boolean): void {
+    this.restoreConsole?.();
+    this.restoreConsole = null;
+    if (!enabled) {
+      return;
+    }
+    this.restoreConsole = captureConsole(entry => {
+      this.host.postMessage({ type: 'devtools', event: { kind: 'console', entry: { ...entry, thread: 'render' } } });
+    });
+  }
+
   private dispatch(message: ShellToRuntimeMessage): void {
     if (message.type === 'init') {
       // The shell's channel to the application-logic worker, when it spawned
@@ -400,6 +420,13 @@ export class RenderWorkerApp {
       case 'inspector':
         runtime.setInspectorEnabled(message.enabled);
         break;
+      case 'devtools':
+        if (message.request.kind === 'console') {
+          this.setConsoleForwarding(message.request.enabled);
+        } else {
+          runtime.handleDevtools(message.request);
+        }
+        break;
       case 'audioSample':
         runtime.applyAudioSample(message.sample);
         break;
@@ -410,6 +437,7 @@ export class RenderWorkerApp {
         runtime.applySemanticsAction(message.action);
         break;
       case 'dispose':
+        this.setConsoleForwarding(false);
         runtime.dispose();
         this.channels?.dispose();
         this.channels = undefined;
@@ -499,6 +527,9 @@ export class RenderWorkerApp {
     this.runtime.deferPatchesFrom(this.channels.registry.all());
     this.runtime.onInspect(report => {
       this.host.postMessage({ type: 'inspect', report });
+    });
+    this.runtime.onDevtools(event => {
+      this.host.postMessage({ type: 'devtools', event });
     });
     this.runtime.onCursor(cursor => {
       this.host.postMessage({ type: 'cursor', cursor });
