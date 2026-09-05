@@ -98,22 +98,84 @@ export interface TextRunMeasurer {
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
 
+/** Paragraphs remembered before the least recently asked for is forgotten. */
+const PARAGRAPH_CACHE_ENTRIES = 4096;
+
 /**
  * Base class for measurers: implement the two primitives and the
  * paragraph algorithm does the rest.
+ *
+ * **Every paragraph is laid out once per distinct request.** The same
+ * request arrives several times a frame and on every frame after: the
+ * layout engine asks when it measures the node, and both renderers ask
+ * again when they paint it, because a `PaintState` and a box are all a
+ * renderer holds. Without a cache a repaint is a line break, and a
+ * transition that repaints the whole screen for half a second breaks
+ * every paragraph on it sixty times a second. Measured on Sluice's
+ * Bluesky feed opening a post: 30 to 50 ms a frame in `segmentParagraph`,
+ * `measureRunWidth` and `applySpacing`, against under 13 ms on the same
+ * click over short Wikipedia titles. The cache is keyed by every field
+ * of the request, so a paragraph that changed in any way is laid out
+ * again, and it is least-recently-used with a cap, so a feed that
+ * mounts forty new rows a second does not grow it without bound.
+ *
+ * The result is shared between callers and must not be mutated.
  */
 export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
+  private readonly paragraphs = new Map<string, ParagraphLayout>();
+
   abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
   abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
 
   layout(request: TextMeasureRequest): ParagraphLayout {
-    return layoutParagraph(request, this);
+    const key = paragraphKey(request);
+    const cached = this.paragraphs.get(key);
+    if (cached !== undefined) {
+      // Re-inserted so the map's order is recency, which is what the
+      // eviction below reads.
+      this.paragraphs.delete(key);
+      this.paragraphs.set(key, cached);
+      return cached;
+    }
+    const paragraph = layoutParagraph(request, this);
+    if (this.paragraphs.size >= PARAGRAPH_CACHE_ENTRIES) {
+      const oldest = this.paragraphs.keys().next().value;
+      if (oldest !== undefined) {
+        this.paragraphs.delete(oldest);
+      }
+    }
+    this.paragraphs.set(key, paragraph);
+    return paragraph;
   }
 
   measure(request: TextMeasureRequest): Size {
     const paragraph = this.layout(request);
     return { width: paragraph.width, height: paragraph.height };
   }
+
+  /** How many paragraphs are remembered right now; for specs. */
+  get cachedParagraphs(): number {
+    return this.paragraphs.size;
+  }
+
+  /**
+   * Forgets every laid-out paragraph. A subclass that caches its own
+   * primitives overrides this and calls it, so a font that finished
+   * loading invalidates the lines as well as the widths they were
+   * built from.
+   */
+  invalidate(): void {
+    this.paragraphs.clear();
+  }
+}
+
+/** Every field of a request, in a fixed order; two requests that lay out alike share a key. */
+function paragraphKey(request: TextMeasureRequest): string {
+  return `${request.fontSize}\0${request.maxWidth ?? ''}\0${request.fontFamily ?? ''}\0${request.fontWeight ?? ''}\0${
+    request.lineHeight ?? ''
+  }\0${request.letterSpacing ?? ''}\0${request.wrap ?? ''}\0${request.maxLines ?? ''}\0${request.overflow ?? ''}\0${
+    request.text
+  }`;
 }
 
 export interface FixedMetricsOptions {

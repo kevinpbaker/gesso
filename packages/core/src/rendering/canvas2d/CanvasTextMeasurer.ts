@@ -45,8 +45,9 @@ export class CanvasTextMeasurer extends ParagraphTextMeasurer {
     return width;
   }
 
-  /** Drops every cached width and metric; see `TextMeasurer.invalidate`. */
-  invalidate(): void {
+  /** Drops every cached width, metric and paragraph; see `TextMeasurer.invalidate`. */
+  override invalidate(): void {
+    super.invalidate();
     this.widths.clear();
     this.metrics.clear();
   }

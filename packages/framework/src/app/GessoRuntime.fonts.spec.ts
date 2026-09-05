@@ -24,7 +24,10 @@ class CountingMeasurer extends CharacterCountTextMeasurer {
     return super.measureRunWidth(text, request);
   }
 
-  invalidate(): void {
+  override invalidate(): void {
+    // The base class forgets its laid-out paragraphs; a measurer that
+    // did not would answer the re-measure below from memory.
+    super.invalidate();
     this.invalidations++;
   }
 }
