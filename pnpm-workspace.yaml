@@ -7,3 +7,10 @@ packages:
   # Listing it as an importer would put an entry in the lockfile that
   # buys nothing, and CI installs with `--frozen-lockfile`.
   - '!packages/create-gesso-app'
+  # `apps/desk` is an Electrobun application, and Hutch installs its
+  # dependencies and projects the Electrobun devkit into it. Listing it
+  # here would put pnpm and Hutch in charge of the same `node_modules`,
+  # and CI installs with `--frozen-lockfile`. It resolves the framework
+  # by source through its own Vite config, as an application inside the
+  # repository that builds it has to.
+  - '!apps/desk'

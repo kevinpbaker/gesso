@@ -39,3 +39,14 @@ apps/docs/screenshots/*.actual.png
 
 # Docs site: VitePress's transform cache (its build output is covered by `dist`)
 apps/docs/.vitepress/cache
+
+# Electrobun projects (apps/desk, spikes/*): Hutch's projected devkit and
+# the built application bundle. Both are downloaded or generated, and the
+# devkit is pinned by `hutch.config.ts` rather than by anything here.
+.hutch/
+build/
+# Cottontail's per-build scratch, one directory per process id.
+.cottontail-tmp/
+# The main process, pre-bundled by `pnpm desk:bundle`. Generated from
+# `src/main/index.ts` and the workspace packages, so it is output.
+apps/desk/src/main/index.gen.js

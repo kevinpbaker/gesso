@@ -12,6 +12,7 @@
     "sluice:dev": "pnpm --filter @gesso/sluice dev",
     "segue:dev": "pnpm --filter @gesso/segue dev",
     "docs:build": "pnpm --filter @gesso/docs build",
+    "desk:bundle": "bash scripts/desk-bundle.sh",
     "docs:preview": "pnpm --filter @gesso/docs preview",
     "docs:check": "node scripts/check-docs.ts",
     "docs:reference": "vite-node scripts/gen-docs-reference.ts",
