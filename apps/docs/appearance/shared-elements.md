@@ -88,6 +88,7 @@ list at the top.
 | `scale`    | `'free' \| 'uniform'`         | `'free'`      | One ratio per axis, or the width's ratio on both                 |
 | `fadeFrom` | `number`                      | none          | Fade the arriving element up from this opacity as it morphs      |
 | `onMorph`  | `(morphing: boolean) => void` | none          | Told when a morph starts and when it arrives. See stacking below |
+| `lift`     | `boolean`                     | `false`       | Paint the element above its screen and outside every clip in it  |
 
 It also takes the timing every motion takes: `duration`, `easing`,
 `spring`, `delay` and `reducedMotion`.
@@ -142,6 +143,53 @@ const morphing = internalState(false);
   <box modifiers={[sharedElement({ name, onMorph: active => (morphing.value = active) })]} />
 </button>;
 ```
+
+**A clip is a different question, and `zIndex` cannot answer it.**
+Raising an ancestor decides who is drawn over whom; it does nothing at
+all about `overflow`. An element morphing back into something that clips
+has both problems, and only the second one is fatal: a picture landing
+in a horizontal row starts its journey at the middle of the page, which
+is outside the row's scroll clip, so most of the morph is cut away and
+the artwork appears out of nothing as it shrinks into the row.
+
+`lift: true` is the answer to that one. For the length of the morph the
+element is painted in a top layer: above the rest of the screen, and
+outside every clip its ancestors impose. It keeps everything else about
+them, their transforms, their scroll offsets and their opacity, so it is
+drawn exactly where it would have been drawn and travels with whatever
+it belongs to.
+
+```tsx
+<Image src={cover} rootModifiers={[sharedElement({ name, lift: true })]} />
+```
+
+"Above" stops at the screen. `Presence` marks each of its layers as a
+boundary (the `liftBoundary` property), so a lifted element rises to the
+top of the screen holding it and no further. Without that, a screen on
+its way out would fly its morphing artwork across the screen arriving
+behind it, which is the previous navigation's picture drawn over the new
+page.
+
+Lift only what needs it. An element that is not landing inside a clip is
+better drawn where it belongs, and a lifted element is over everything
+on its screen: a header and a now-playing bar included.
+
+**A name has to be unique on the screen, and stable while it lives.**
+A shared name is a claim: whichever element takes it last owns it, and
+whatever held it before is hidden and morphed from. That is exactly
+right across a screen change and exactly wrong between two elements
+that are both on screen and staying, so two of them answering to one
+name is not a tie, it is a picture flying in from somewhere else and a
+card left invisible.
+
+Both halves matter. Naming a card for the item it holds is not unique
+when the same track is in two rows, and it is not stable either: a list
+whose data is replaced hands the name from the card that held the item
+to the card that holds it now, and reconciliation builds the new node
+before it drops the old one, so the new one claims a name the old one
+still owns. Name a card for its place instead, and let the page it
+opens adopt the name of the card that was pressed. `apps/segue`'s
+`hero.ts` is that pattern in about thirty lines.
 
 **The arriving screen may not fade.** A screen's opacity is inherited by
 everything inside it, and the morphing element is inside the arriving
