@@ -113,6 +113,8 @@ export default defineConfig({
         items: [
           { text: 'Pointer and keyboard', link: '/interaction/pointer-and-keyboard' },
           { text: 'Touch and gestures', link: '/interaction/touch-and-gestures' },
+          { text: 'Drag and drop', link: '/interaction/drag-and-drop' },
+          { text: 'Shortcuts', link: '/interaction/shortcuts' },
           { text: 'Focus and traps', link: '/interaction/focus-and-traps' },
           { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' },
           { text: 'Selection', link: '/interaction/selection' },
@@ -168,7 +170,9 @@ export default defineConfig({
           { text: 'Frames and phases', link: '/tooling/frames-and-phases' },
           { text: 'The action log', link: '/tooling/the-action-log' },
           { text: 'The devtools panel', link: '/tooling/the-devtools-panel' },
+          { text: 'The Vite plugin', link: '/tooling/vite-plugin' },
           { text: 'Hot module replacement', link: '/tooling/hot-module-replacement' },
+          { text: 'Reporting errors', link: '/tooling/reporting-errors' },
           { text: 'create-gesso-app', link: '/tooling/create-gesso-app' }
         ]
       },
@@ -219,6 +223,7 @@ export default defineConfig({
           { text: 'A settings page', link: '/recipes/settings-page' },
           { text: 'A dialog flow', link: '/recipes/dialog-flow' },
           { text: 'An appearance setting', link: '/recipes/appearance-setting' },
+          { text: 'Loading, failing, and saving', link: '/recipes/loading-and-saving' },
           { text: 'A table over 100,000 rows', link: '/recipes/large-table' },
           { text: 'A virtualized feed', link: '/recipes/virtualized-feed' }
         ]

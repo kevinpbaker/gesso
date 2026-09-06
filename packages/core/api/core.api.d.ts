@@ -682,6 +682,11 @@ declare class UiPointerEvent extends UiInputEvent {
   constructor(type: UiEventType, x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers,
   pointer?: UiPointerDevice);
 }
+declare class UiGestureEvent extends UiPointerEvent {
+  readonly velocityX: number;
+  readonly velocityY: number;
+  constructor(type: UiEventType, x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice, velocityX?: number, velocityY?: number);
+}
 declare class UiPinchEvent extends UiInputEvent {
   readonly x: number;
   readonly y: number;
@@ -2286,6 +2291,33 @@ interface PinchRecognizerOptions {
   scaleThreshold?: number;
   rotationThreshold?: number;
 }
+declare class UiPinchRecognizer {
+  private readonly dispatcher;
+  private readonly scaleThreshold;
+  private readonly rotationThreshold;
+  private readonly first;
+  private readonly second;
+  private target;
+  private modifiers;
+  private startDistance;
+  private startAngle;
+  private lastScale;
+  private lastRotation;
+  private lastCenterX;
+  private lastCenterY;
+  private recognized;
+  constructor(dispatcher: UiInputDispatcher, options?: PinchRecognizerOptions);
+  get pinching(): boolean;
+  get holding(): boolean;
+  contactDown(pointer: UiPointerDevice, x: number, y: number, target: UiNode | null, modifiers: UiKeyModifiers): boolean;
+  contactMove(pointer: UiPointerDevice, x: number, y: number): void;
+  contactUp(pointer: UiPointerDevice): void;
+  cancel(): void;
+  private contactFor;
+  private distance;
+  private angle;
+  private emit;
+}
 interface GestureRecognizerOptions {
   slop?: number;
   touchSlop?: number;
@@ -2479,6 +2511,103 @@ declare class UiKeyboardController {
   keyDown(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
 }
+interface UiShortcutStep {
+  readonly key: string;
+  readonly mod: boolean;
+  readonly ctrl: boolean;
+  readonly meta: boolean;
+  readonly shift: boolean;
+  readonly alt: boolean;
+}
+interface UiShortcut {
+  readonly keys: string;
+  readonly label: string;
+  readonly run: () => void;
+  readonly scope?: UiNode | null;
+  readonly priority?: number;
+  readonly when?: () => boolean;
+  readonly group?: string;
+}
+interface UiShortcutBinding extends UiShortcut {
+  readonly steps: readonly UiShortcutStep[];
+  readonly display: string;
+}
+interface ShortcutRegistryOptions {
+  chordTimeout?: number;
+  now?: () => number;
+}
+declare class UiShortcutRegistry {
+  private readonly bindings;
+  private readonly chordTimeout;
+  private readonly now;
+  private pending;
+  private pendingAt;
+  constructor(options?: ShortcutRegistryOptions);
+  register(shortcut: UiShortcut): () => void;
+  get all(): readonly UiShortcutBinding[];
+  active(focused: UiNode | null): readonly UiShortcutBinding[];
+  handleKey(key: string, modifiers: UiKeyModifiers, focused: UiNode | null): boolean;
+  reset(): void;
+  private isLive;
+}
+declare function parseShortcut(keys: string): readonly UiShortcutStep[];
+declare function formatShortcut(steps: readonly UiShortcutStep[]): string;
+interface UiDragPayload {
+  readonly type: string;
+  readonly data: unknown;
+}
+type UiDropEffect = 'move' | 'copy' | 'link' | 'none';
+interface UiDragState {
+  readonly payload: UiDragPayload;
+  readonly x: number;
+  readonly y: number;
+  readonly source: UiNode | null;
+  readonly external: boolean;
+}
+interface UiDropZone {
+  readonly node: UiNode;
+  boxOf(): LayoutBox | null;
+  accepts(payload: UiDragPayload): boolean;
+  enter(state: UiDragState): void;
+  over(state: UiDragState): void;
+  leave(): void;
+  drop(state: UiDragState): UiDropEffect;
+}
+interface UiDragResult {
+  readonly node: UiNode;
+  readonly effect: UiDropEffect;
+}
+interface UiDroppedFile {
+  readonly name: string;
+  readonly mediaType: string;
+  readonly size: number;
+  readonly lastModified: number;
+  readonly bytes?: ArrayBuffer;
+}
+interface UiFileDropMessage {
+  readonly type: 'fileDrop';
+  readonly phase: 'enter' | 'over' | 'leave' | 'drop';
+  readonly x: number;
+  readonly y: number;
+  readonly files: readonly UiDroppedFile[];
+}
+declare const EXTERNAL_FILES = "gesso/files";
+declare class UiDragSession {
+  private readonly zones;
+  private current;
+  private inside;
+  addZone(zone: UiDropZone): () => void;
+  get state(): UiDragState | null;
+  get overNode(): UiNode | null;
+  get accepted(): boolean;
+  begin(payload: UiDragPayload, x: number, y: number, source: UiNode | null, external?: boolean): void;
+  move(x: number, y: number): void;
+  end(): UiDragResult | null;
+  cancel(): void;
+  applyFileDrop(message: UiFileDropMessage): UiDragResult | null;
+  private resolve;
+}
+declare function dragSessionFor(node: UiNode): UiDragSession;
 interface TouchScrollerOptions {
   momentum?: number;
   flingVelocity?: number;
@@ -3077,6 +3206,8 @@ declare function clickOutside(options: ClickOutsideOptions): UiModifier<ClickOut
 interface DragOffset {
   readonly x: number;
   readonly y: number;
+  readonly velocityX?: number;
+  readonly velocityY?: number;
 }
 interface DraggableOptions {
   readonly axis?: 'x' | 'y' | 'both';
@@ -3088,6 +3219,78 @@ interface DraggableOptions {
   readonly keepOffset?: boolean;
 }
 declare function draggable(options?: DraggableOptions): UiModifier<DraggableOptions>;
+interface AutoScrollOptions {
+  readonly edge?: number;
+  readonly speed?: number;
+}
+interface DropTargetOptions {
+  readonly accepts: string | readonly string[] | ((payload: UiDragPayload) => boolean);
+  readonly onDrop: (payload: UiDragPayload, at: {
+    readonly x: number;
+    readonly y: number;
+  }) => UiDropEffect | void;
+  readonly onEnter?: (payload: UiDragPayload) => void;
+  readonly onOver?: (payload: UiDragPayload, at: {
+    readonly x: number;
+    readonly y: number;
+  }) => void;
+  readonly onLeave?: () => void;
+  readonly over?: Readonly<Record<string, unknown>>;
+  readonly autoScroll?: boolean | AutoScrollOptions;
+}
+interface DragSourceOptions {
+  readonly payload: UiDragPayload | (() => UiDragPayload);
+  readonly start?: 'press' | 'longPress';
+  readonly dragging?: Readonly<Record<string, unknown>>;
+  readonly onEnd?: (result: UiDragResult | null, velocity: {
+    readonly x: number;
+    readonly y: number;
+  }) => void;
+}
+declare function dropTarget(options: DropTargetOptions): UiModifier<DropTargetOptions>;
+declare function dragSource(options: DragSourceOptions): UiModifier<DragSourceOptions>;
+interface ReorderableOptions {
+  readonly list: string;
+  readonly index: number;
+  readonly onMove: (from: number, to: number) => void;
+  readonly axis?: 'x' | 'y' | 'both';
+  readonly start?: 'press' | 'longPress';
+  readonly dragging?: Readonly<Record<string, unknown>>;
+  readonly onDragChange?: (dragging: boolean) => void;
+}
+declare function reorderable(options: ReorderableOptions): UiModifier<ReorderableOptions>;
+interface ZoomState {
+  readonly scale: number;
+  readonly rotation: number;
+  readonly translateX: number;
+  readonly translateY: number;
+}
+interface PinchableOptions {
+  readonly minScale?: number;
+  readonly maxScale?: number;
+  readonly rotate?: boolean;
+  readonly wheel?: boolean;
+  readonly wheelSensitivity?: number;
+  readonly onChange?: (state: ZoomState) => void;
+}
+declare function pinchable(options?: PinchableOptions): UiModifier<PinchableOptions>;
+interface ShortcutsOptions {
+  readonly registry: UiShortcutRegistry;
+}
+declare function shortcuts(options: ShortcutsOptions): UiModifier<ShortcutsOptions>;
+interface ShortcutOptions extends Omit<UiShortcut, 'scope'> {
+  readonly registry: UiShortcutRegistry;
+  readonly scoped?: boolean;
+}
+declare function shortcut(options: ShortcutOptions): UiModifier<ShortcutOptions>;
+interface ContextMenuOptions {
+  readonly onOpen: (at: {
+    readonly x: number;
+    readonly y: number;
+  }) => void;
+  readonly stopPropagation?: boolean;
+}
+declare function contextMenu(options: ContextMenuOptions): UiModifier<ContextMenuOptions>;
 interface AnimateLayoutOptions {
   spring?: UiSpringToken | UiSpringSpec;
   duration?: number;
@@ -4188,6 +4391,7 @@ export {
   auto,
   autoFocus,
   AutoLength,
+  AutoScrollOptions,
   AxisExplanation,
   BindingId,
   borderRadius,
@@ -4255,6 +4459,8 @@ export {
   constraintsEqual,
   ContainerProps,
   contentOffset,
+  contextMenu,
+  ContextMenuOptions,
   contrastRatio,
   createCanvasSurface,
   createElement,
@@ -4304,9 +4510,14 @@ export {
   draggable,
   DraggableOptions,
   DragOffset,
+  dragSessionFor,
+  dragSource,
+  DragSourceOptions,
   drawOverlayShapes,
   DrawStats,
   drawText,
+  dropTarget,
+  DropTargetOptions,
   easings,
   Edges,
   EditableLayout,
@@ -4326,6 +4537,7 @@ export {
   EMPTY_RECORDING,
   EnvironmentNotifier,
   EnvironmentProps,
+  EXTERNAL_FILES,
   fade,
   findEnvironmentKey,
   FindHost,
@@ -4345,7 +4557,9 @@ export {
   fontStackFor,
   formatConstraints,
   formatExplanation,
+  formatShortcut,
   FrLength,
+  Fu,
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
@@ -4550,11 +4764,15 @@ export {
   parseCrossAxisAlignment,
   parseFlexDirection,
   parseMainAxisAlignment,
+  parseShortcut,
   parseTransform,
   pathValuesEqual,
   percent,
   PercentLength,
   performanceMarksEnabled,
+  pinchable,
+  PinchableOptions,
+  PinchRecognizerOptions,
   PlacedLine,
   placeGridItems,
   PlatformAdapterOptions,
@@ -4591,6 +4809,8 @@ export {
   RenderHooks,
   RenderList,
   RenderTextCache,
+  reorderable,
+  ReorderableOptions,
   repeat,
   replayPaint,
   resetOverrideWarnings,
@@ -4651,6 +4871,11 @@ export {
   SharedClaim,
   sharedElement,
   SharedElementArgs,
+  shortcut,
+  ShortcutOptions,
+  ShortcutRegistryOptions,
+  shortcuts,
+  ShortcutsOptions,
   Size,
   SizeDecision,
   sizeGridTracks,
@@ -4699,7 +4924,6 @@ export {
   Transform,
   transformIsIdentity,
   transformsEqual,
-  tu,
   tween,
   typographyEqual,
   TypographyProps,
@@ -4727,6 +4951,12 @@ export {
   UiDefinition,
   UiDensity,
   UiDirection,
+  UiDragPayload,
+  UiDragSession,
+  UiDragState,
+  UiDropEffect,
+  UiDroppedFile,
+  UiDropZone,
   UiDurationToken,
   UiEasing,
   UiEasingToken,
@@ -4741,6 +4971,7 @@ export {
   UiEventListenerOptions,
   UiEventProps,
   UiEventType,
+  UiFileDropMessage,
   UiFindController,
   UiFlexWrap,
   UiFocusEvent,
@@ -4751,6 +4982,7 @@ export {
   UiFrameClock,
   UiFrameClockFactory,
   UiFrameTime,
+  UiGestureEvent,
   UiGestureRecognizer,
   UiGradient,
   UiGradientOffset,
@@ -4791,6 +5023,8 @@ export {
   UiOverflow,
   UiPaint,
   UiPath,
+  UiPinchEvent,
+  UiPinchRecognizer,
   UiPlacement,
   UiPlatformAdapter,
   UiPoint,
@@ -4830,6 +5064,10 @@ export {
   UiShadows,
   UiShapes,
   UiSharedElements,
+  UiShortcut,
+  UiShortcutBinding,
+  UiShortcutRegistry,
+  UiShortcutStep,
   UiSpacing,
   UiSpring,
   UiSpringOptions,
@@ -4904,7 +5142,8 @@ export {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty
+  writeOverrideProperty,
+  ZoomState
 };
 // ==== index.d.ts ====
 import {
@@ -4920,6 +5159,7 @@ import {
   auto,
   autoFocus,
   AutoLength,
+  AutoScrollOptions,
   AxisExplanation,
   BindingId,
   borderRadius,
@@ -4986,6 +5226,8 @@ import {
   constraintsEqual,
   ContainerProps,
   contentOffset,
+  contextMenu,
+  ContextMenuOptions,
   contrastRatio,
   createCanvasSurface,
   createElement,
@@ -5035,9 +5277,14 @@ import {
   draggable,
   DraggableOptions,
   DragOffset,
+  dragSessionFor,
+  dragSource,
+  DragSourceOptions,
   drawOverlayShapes,
   DrawStats,
   drawText,
+  dropTarget,
+  DropTargetOptions,
   easings,
   Edges,
   EditableLayout,
@@ -5057,6 +5304,7 @@ import {
   EMPTY_RECORDING,
   EnvironmentNotifier,
   EnvironmentProps,
+  EXTERNAL_FILES,
   fade,
   findEnvironmentKey,
   FindHost,
@@ -5076,6 +5324,7 @@ import {
   fontStackFor,
   formatConstraints,
   formatExplanation,
+  formatShortcut,
   fr,
   FrLength,
   GestureInput,
@@ -5282,11 +5531,15 @@ import {
   parseCrossAxisAlignment,
   parseFlexDirection,
   parseMainAxisAlignment,
+  parseShortcut,
   parseTransform,
   pathValuesEqual,
   percent,
   PercentLength,
   performanceMarksEnabled,
+  pinchable,
+  PinchableOptions,
+  PinchRecognizerOptions,
   PlacedLine,
   placeGridItems,
   PlatformAdapterOptions,
@@ -5323,6 +5576,8 @@ import {
   RenderHooks,
   RenderList,
   RenderTextCache,
+  reorderable,
+  ReorderableOptions,
   repeat,
   replayPaint,
   resetOverrideWarnings,
@@ -5383,6 +5638,11 @@ import {
   SharedClaim,
   sharedElement,
   SharedElementArgs,
+  shortcut,
+  ShortcutOptions,
+  ShortcutRegistryOptions,
+  shortcuts,
+  ShortcutsOptions,
   Size,
   SizeDecision,
   sizeGridTracks,
@@ -5458,6 +5718,12 @@ import {
   UiDefinition,
   UiDensity,
   UiDirection,
+  UiDragPayload,
+  UiDragSession,
+  UiDragState,
+  UiDropEffect,
+  UiDroppedFile,
+  UiDropZone,
   UiDurationToken,
   UiEasing,
   UiEasingToken,
@@ -5472,6 +5738,7 @@ import {
   UiEventListenerOptions,
   UiEventProps,
   UiEventType,
+  UiFileDropMessage,
   UiFindController,
   UiFlexWrap,
   UiFocusEvent,
@@ -5482,6 +5749,7 @@ import {
   UiFrameClock,
   UiFrameClockFactory,
   UiFrameTime,
+  UiGestureEvent,
   UiGestureRecognizer,
   UiGradient,
   UiGradientOffset,
@@ -5522,6 +5790,8 @@ import {
   UiOverflow,
   UiPaint,
   UiPath,
+  UiPinchEvent,
+  UiPinchRecognizer,
   UiPlacement,
   UiPlatformAdapter,
   UiPoint,
@@ -5561,6 +5831,10 @@ import {
   UiShadows,
   UiShapes,
   UiSharedElements,
+  UiShortcut,
+  UiShortcutBinding,
+  UiShortcutRegistry,
+  UiShortcutStep,
   UiSpacing,
   UiSpring,
   UiSpringOptions,
@@ -5635,8 +5909,9 @@ import {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty
-} from "./index-DHVz6MFU.js";
+  writeOverrideProperty,
+  ZoomState
+} from "./index-CBIPTJ9u.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5694,6 +5969,7 @@ export {
   Constraints,
   constraintsEqual,
   contentOffset,
+  contextMenu,
   contrastRatio,
   createCanvasSurface,
   createElement,
@@ -5735,8 +6011,11 @@ export {
   DirtyFlags,
   DirtyNodeSet,
   draggable,
+  dragSessionFor,
+  dragSource,
   drawOverlayShapes,
   drawText,
+  dropTarget,
   easings,
   EditableLayout,
   EditableText,
@@ -5747,6 +6026,7 @@ export {
   ELLIPSIS,
   EMPTY_RECORDING,
   EnvironmentNotifier,
+  EXTERNAL_FILES,
   fade,
   findEnvironmentKey,
   findMatchesIn,
@@ -5757,6 +6037,7 @@ export {
   fontStackFor,
   formatConstraints,
   formatExplanation,
+  formatShortcut,
   fr,
   getPropertyNames,
   GLYPH_SUBPIXEL_PHASES,
@@ -5884,10 +6165,12 @@ export {
   parseCrossAxisAlignment,
   parseFlexDirection,
   parseMainAxisAlignment,
+  parseShortcut,
   parseTransform,
   pathValuesEqual,
   percent,
   performanceMarksEnabled,
+  pinchable,
   placeGridItems,
   pointerDeviceOf,
   pop,
@@ -5908,6 +6191,7 @@ export {
   recordsEqual,
   registerFontStack,
   relativeLuminance,
+  reorderable,
   repeat,
   replayPaint,
   resetOverrideWarnings,
@@ -5952,6 +6236,8 @@ export {
   shadowsEqual,
   shapesEqual,
   sharedElement,
+  shortcut,
+  shortcuts,
   sizeGridTracks,
   slideDown,
   slideFrom,
@@ -5986,6 +6272,7 @@ export {
   type AnimatedCell,
   type AnimateLayoutOptions,
   type AutoLength,
+  type AutoScrollOptions,
   type AxisExplanation,
   type BindingId,
   type BoxModelProps,
@@ -6004,6 +6291,7 @@ export {
   type ComponentResolver,
   type CompositionRange,
   type ContainerProps,
+  type ContextMenuOptions,
   type DecorationFill,
   type DecorationRect,
   type DecorationShape,
@@ -6012,7 +6300,9 @@ export {
   type DefaultVideoResolverOptions,
   type DraggableOptions,
   type DragOffset,
+  type DragSourceOptions,
   type DrawStats,
+  type DropTargetOptions,
   type Edges,
   type EditableTextProps,
   type EditCommand,
@@ -6111,6 +6401,8 @@ export {
   type ParagraphGeometry,
   type ParagraphLayout,
   type PercentLength,
+  type PinchableOptions,
+  type PinchRecognizerOptions,
   type PlacedLine,
   type PlatformAdapterOptions,
   type PlatformEventTarget,
@@ -6127,6 +6419,7 @@ export {
   type RenderHooks,
   type RenderList,
   type RenderTextCache,
+  type ReorderableOptions,
   type ResolvedMotionState,
   type RowProps,
   type RunMeasure,
@@ -6143,6 +6436,9 @@ export {
   type SelectionHost,
   type SharedClaim,
   type SharedElementArgs,
+  type ShortcutOptions,
+  type ShortcutRegistryOptions,
+  type ShortcutsOptions,
   type Size,
   type SizeDecision,
   type StackProps,
@@ -6166,11 +6462,17 @@ export {
   type UiAnimationOptions,
   type UiChild,
   type UiDefinition,
+  type UiDragPayload,
+  type UiDragState,
+  type UiDropEffect,
+  type UiDroppedFile,
+  type UiDropZone,
   type UiEasing,
   type UiElement,
   type UiEventListener,
   type UiEventListenerOptions,
   type UiEventProps,
+  type UiFileDropMessage,
   type UiFrameCallback,
   type UiFrameClock,
   type UiFrameClockFactory,
@@ -6211,6 +6513,9 @@ export {
   type UiSemanticsPatch,
   type UiSemanticsRecord,
   type UiSemanticsUpdate,
+  type UiShortcut,
+  type UiShortcutBinding,
+  type UiShortcutStep,
   type UiSpringOptions,
   type UiTimerFrameClockOptions,
   type UiTrackSize,
@@ -6227,6 +6532,7 @@ export {
   type VirtualViewport,
   type WebGPUCanvasHost,
   type WebGPURendererOptions,
+  type ZoomState,
   typographyEqual,
   UI_ROLES,
   UI_SEMANTIC_STATES,
@@ -6249,6 +6555,7 @@ export {
   UiCursor,
   UiDensity,
   UiDirection,
+  UiDragSession,
   UiDurationToken,
   UiEasingToken,
   UiEditingController,
@@ -6264,6 +6571,7 @@ export {
   UiFocusManager,
   UiFontWeight,
   UiFrame,
+  UiGestureEvent,
   UiGestureRecognizer,
   UiGradient,
   UiGradientOffset,
@@ -6286,6 +6594,8 @@ export {
   UiNodeType,
   UiObjectFit,
   UiOverflow,
+  UiPinchEvent,
+  UiPinchRecognizer,
   UiPlacement,
   UiPlatformAdapter,
   UiPointerController,
@@ -6307,6 +6617,7 @@ export {
   UiShadows,
   UiShapes,
   UiSharedElements,
+  UiShortcutRegistry,
   UiSpacing,
   UiSpring,
   UiSpringSpec,
@@ -6398,7 +6709,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DHVz6MFU.js";
+} from "./index-CBIPTJ9u.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

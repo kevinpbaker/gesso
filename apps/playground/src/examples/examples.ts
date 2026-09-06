@@ -118,6 +118,21 @@ export const EXAMPLES: readonly ExampleMeta[] = [
     tags: ['animation', 'transitions', 'springs', 'layout animation', 'reduced motion', 'JSX', 'render worker']
   },
   {
+    route: 'example-input',
+    title: 'Gestures and shortcuts',
+    description:
+      'The four gestures an application reaches for and a canvas framework usually leaves you to write yourself. A ' +
+      'photo that zooms about the point your fingers are on, or that Ctrl and the wheel zooms, and that lands back ' +
+      'exactly where it started after the same number of notches each way. Chips carried between two trays, where ' +
+      'the tray that would take one says so, and a list whose rows reorder as the carried row crosses them and ' +
+      'which scrolls itself when a row is held at its edge. A palette on Ctrl+K listing every command that is live ' +
+      'right now, which is the same question the key handler asks, so it cannot offer one that would not fire. And ' +
+      'a right-click, or a finger held on a row, opening a menu the framework raised rather than the page guessed ' +
+      'at. Every one of them is a modifier on an element.',
+    source: 'apps/playground/src/examples/InputExampleApp.tsx',
+    tags: ['drag and drop', 'pinch', 'shortcuts', 'context menu', 'modifiers', 'JSX', 'render worker']
+  },
+  {
     route: 'example-paint',
     title: 'Painting',
     description:

@@ -239,7 +239,7 @@ import {
   OutputCell,
   Patch,
   ReadableCell
-} from "./FunctionComponent-B3siYSBz.js";
+} from "./FunctionComponent-CDaTE30Y.js";
 import {
   Observable,
   Subscription
@@ -740,8 +740,8 @@ declare class RouterService {
   applyUrl(url: string): void;
   params<Path extends string>(route: RouteDefinition<Path>): RouteParams<Path> | null;
   observeParams<Path extends string>(route: RouteDefinition<Path>): ComputedCell<RouteParams<Path> | null>;
-  remember<T>(route: RouteDefinition, key: string, initial: T): InternalState<T>;
-  forget(route: RouteDefinition): void;
+  remember<T>(route: RouteDefinition | null, key: string, initial: T): InternalState<T>;
+  forget(route: RouteDefinition | null): void;
   answerFor<Path extends string, T>(route: RouteDefinition<Path>, source: Observable<T>, keys: RouteAnswer<Path, T>): ComputedCell<T | null>;
   isActive(route: RouteDefinition): ComputedCell<boolean>;
   private resolveInto;
@@ -2260,7 +2260,7 @@ import {
   ReadableCell,
   viewKeys,
   ViewOf
-} from "./FunctionComponent-B3siYSBz.js";
+} from "./FunctionComponent-CDaTE30Y.js";
 import {
   ActionCause,
   ActionEntry,
@@ -2461,7 +2461,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-5DEbm2Bg.js";
+} from "./index-DS_EeSdN.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2728,7 +2728,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-B3siYSBz.js";
+} from "../FunctionComponent-CDaTE30Y.js";
 import {
   Observable
 } from "rxjs";
@@ -2832,7 +2832,7 @@ import {
   ReadableCell,
   viewKeys,
   ViewOf
-} from "../FunctionComponent-B3siYSBz.js";
+} from "../FunctionComponent-CDaTE30Y.js";
 import {
   APPLICATION_WORKER,
   ChannelSource,
@@ -2871,7 +2871,7 @@ import {
   servePorts,
   structurallyEqual,
   throttled
-} from "../index-5DEbm2Bg.js";
+} from "../index-DS_EeSdN.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

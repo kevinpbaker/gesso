@@ -246,6 +246,34 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/guide/lists-and-conditionals'
   },
   {
+    name: 'resource',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'A keyed request with a status, a value, an error and a retry. A stale answer cannot win.',
+    page: '/recipes/loading-and-saving'
+  },
+  {
+    name: 'mutate',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'An optimistic change to a cell, with a rollback that does not clobber a newer one.',
+    page: '/recipes/loading-and-saving'
+  },
+  {
+    name: 'debounced',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'A cell that follows its source once it has stopped moving.',
+    page: '/recipes/loading-and-saving'
+  },
+  {
+    name: 'throttled',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'A cell that follows its source at most once every so often, leading and trailing.',
+    page: '/recipes/loading-and-saving'
+  },
+  {
     name: 'UiChild',
     package: 'core',
     group: 'Components and state',
@@ -743,6 +771,20 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     group: 'Channels and the barrier',
     what: 'Declares a typed channel: a view the worker reads, and commands it sends.',
     page: '/structure/channels-and-the-barrier'
+  },
+  {
+    name: 'defineChannel',
+    package: 'framework',
+    group: 'Channels and the barrier',
+    what: 'The same token from one object, so the view keys and their initial values are written once.',
+    page: '/recipes/loading-and-saving'
+  },
+  {
+    name: 'ViewOf',
+    package: 'framework',
+    group: 'Channels and the barrier',
+    what: 'The view type of a token declared with `defineChannel`.',
+    page: '/recipes/loading-and-saving'
   },
   {
     name: 'provide',

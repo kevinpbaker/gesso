@@ -36,6 +36,7 @@ interface OriginalPosition {
   source: string;
   line: number;
   column: number;
+  content?: string | null;
 }
 type Segment = [generatedColumn: number, sourceIndex: number, sourceLine: number, sourceColumn: number];
 declare function decodeMappings(mappings: string): Segment[][];
@@ -53,6 +54,7 @@ declare class SourceMapStore {
   private readonly load;
   constructor(load?: (url: string) => Promise<string>);
   consumerFor(scriptUrl: string): Promise<SourceMapConsumer | null>;
+  originalFor(scriptUrl: string, line: number, column: number, depth?: number): Promise<OriginalPosition | null>;
   private resolve;
 }
 type ErrorOrigin = RuntimeErrorSource | 'window';

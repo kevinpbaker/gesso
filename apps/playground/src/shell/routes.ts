@@ -82,6 +82,12 @@ export const ROUTES: readonly RouteMeta[] = [
     parent: 'examples'
   },
   {
+    id: 'example-input',
+    label: 'Gestures',
+    title: 'Example · drop targets, a pinch, shortcuts and a context menu',
+    parent: 'examples'
+  },
+  {
     id: 'example-transitions',
     label: 'Transitions',
     title: 'Example · shared elements across a route change, and a video that keeps playing',
