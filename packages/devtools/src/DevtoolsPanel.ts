@@ -121,8 +121,17 @@ export function mountDevtoolsPanel(
   pickBox.type = 'checkbox';
   pickToggle.append(pickBox, doc.createTextNode(' Pick'));
   pickToggle.title = 'Click a node on the canvas to select it here. The click does not reach the application.';
+  const marksToggle = doc.createElement('label');
+  marksToggle.className = 'toggle';
+  const marksBox = doc.createElement('input');
+  marksBox.type = 'checkbox';
+  marksToggle.append(marksBox, doc.createTextNode(' Marks'));
+  marksToggle.title =
+    "Name the frame phases and the channel traffic for the browser's own profiler, " +
+    'so a performance recording shows what Gesso was doing. Off by default: a frame ' +
+    'nobody is profiling pays nothing.';
   const status = el(doc, 'span', 'status');
-  toolbar.append(picker, tabs, inspectToggle, pickToggle, status);
+  toolbar.append(picker, tabs, inspectToggle, pickToggle, marksToggle, status);
   root.append(toolbar);
 
   // ---- views
@@ -215,6 +224,7 @@ export function mountDevtoolsPanel(
     request({ kind: 'inspector', enabled: false });
     request({ kind: 'select', id: null });
     request({ kind: 'highlight', id: null });
+    request({ kind: 'marks', enabled: false });
     if (current !== null && pickBox.checked) {
       port.post({ type: 'pick', app: current.id, enabled: false });
     }
@@ -605,6 +615,9 @@ export function mountDevtoolsPanel(
     }
     if (message.type === 'picked') {
       // The click never reached the application; this is what it meant.
+      // The tree comes forward with it, because somebody who pointed
+      // at a node meant to read it and not to keep watching the log.
+      showTab('tree');
       reveal(message.id);
       select(message.id);
       return;
@@ -640,6 +653,10 @@ export function mountDevtoolsPanel(
     port.post({ type: 'pick', app: current.id, enabled: pickBox.checked });
     request({ kind: 'inspector', enabled: pickBox.checked || inspectBox.checked });
   });
+  // The browser's own profiler, and nothing else: the runtime names
+  // its spans while this is on and pays one boolean read for the
+  // question while it is off.
+  marksBox.addEventListener('change', () => request({ kind: 'marks', enabled: marksBox.checked }));
 
   const stop = port.onMessage(onMessage);
   showTab('tree');
