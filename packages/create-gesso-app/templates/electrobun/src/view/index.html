@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{name}}</title>
+    <style>
+      /*
+        The canvas is sized to its host, so the host needs a size. This
+        is the whole of the CSS a Gesso window needs; everything else
+        in it is painted, not styled. The background is here so that
+        the moment before the first frame is not a white flash on a
+        dark desktop.
+      */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #14161a;
+      }
+      #app {
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
