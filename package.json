@@ -32,6 +32,7 @@
     "check:a11y": "node scripts/check-a11y-tree.ts",
     "check:a11y:update": "node scripts/check-a11y-tree.ts --update",
     "bench:graph": "vite-node scripts/bench-graph.ts",
+    "bench:frame": "vite-node scripts/bench-frame.ts",
     "api:check": "node scripts/check-api.ts",
     "api:update": "node scripts/check-api.ts --update",
     "changeset": "changeset",
