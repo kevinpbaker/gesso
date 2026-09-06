@@ -186,6 +186,14 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   bottom: { group: 'Position', note: 'Offset from the bottom edge.' },
   left: { group: 'Position', note: 'Offset from the left edge.' },
   zIndex: { group: 'Position', note: 'Paint and hit-test order among siblings; higher paints later and is hit first.' },
+  lift: {
+    group: 'Position',
+    note: 'Paints this node above the tree and outside every clip its ancestors impose, keeping their transforms and scrolling. For a shared element morphing into something that clips; see `sharedElement`.'
+  },
+  liftBoundary: {
+    group: 'Position',
+    note: 'How far a lifted descendant rises: to the end of this node rather than the end of the frame. `Presence` marks every layer with it, so a lift is held to its own screen.'
+  },
   anchor: {
     group: 'Position',
     note: 'The node an absolute box is placed beside. Flips and shifts to stay inside its containing block.'

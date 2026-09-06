@@ -371,6 +371,9 @@ export function buildRenderList(
     cull: { x: 0, y: 0, width: logicalWidth, height: logicalHeight }
   };
 
+  /** The nodes asking for `lift`, met on the walk and drawn after it. */
+  const liftedPass: { node: UiNode; opacity: number; ctm: Affine }[] = [];
+
   function closePrimitives(): void {
     const end = instanceData.length / INSTANCE_STRIDE_FLOATS;
     if (end > openStart) {
@@ -518,7 +521,7 @@ export function buildRenderList(
     }
   }
 
-  function visit(node: UiNode): void {
+  function visit(node: UiNode, lifted = false): void {
     const rec = layout.recordFor(node);
     if (rec === undefined) {
       return;
@@ -526,6 +529,17 @@ export function buildRenderList(
 
     const paint = resolvePaintState(node, paintScratch);
     if (!paint.visible || paint.opacity === 0) {
+      return;
+    }
+
+    if (rec.lifted && !lifted) {
+      // Held for the top layer, with the two things a lifted node keeps
+      // of its ancestors: their accumulated transform, so it is drawn
+      // where it belongs and scrolls with what it belongs to, and their
+      // opacity. Their clips are exactly what it is escaping. Captured
+      // before the cull test, because a lifted node is nearly always
+      // somewhere its record box is not.
+      liftedPass.push({ node, opacity: state.opacity, ctm: state.ctm });
       return;
     }
 
@@ -781,7 +795,9 @@ export function buildRenderList(
     // editable always has foreground work: its caret and placeholder.
     const hasText = paint.editor !== undefined || (paint.text !== undefined && paint.text.length > 0);
 
-    // Children.
+    // Children. A boundary drains whatever they lifted once they are
+    // done, so `lift` reaches the top of this subtree and no further.
+    let liftedFrom = liftedPass.length;
     if (node.hasChildren()) {
       const saved: RenderState = {
         opacity: state.opacity,
@@ -807,6 +823,7 @@ export function buildRenderList(
         state.ctm = translateTransform(state.ctm, -rec.scrollX, -rec.scrollY);
       }
 
+      liftedFrom = liftedPass.length;
       visitChildren(node, rec.paintOrder);
 
       state.opacity = saved.opacity;
@@ -943,13 +960,57 @@ export function buildRenderList(
       pushDecorations(decorations, true);
     }
 
+    if (rec.liftBoundary) {
+      // Inside this node's own clip, over everything under it, and
+      // still under whatever comes after this node.
+      drawLifted(liftedFrom, nextClip, nextRounded);
+    }
+
     if (rec.scrollable) {
       beginPrimitives(ownScissor);
       pushScrollbars(instanceData, rec, effectiveOpacity, nodeCtm, ownRounded, now);
     }
   }
 
+  /**
+   * The top layer, drawn once the tree is done: no clip, no scissor,
+   * no cull, and after every command the walk emitted, which is the
+   * whole of what `lift` promises. The list is walked by index rather
+   * than iterated, so a lifted node inside a lifted subtree lands
+   * after the one that carried it, as paint order says it should.
+   */
+  function drawLifted(from = 0, clip: ScissorRect | null = null, rounded: number = NO_CLIP_INDEX): void {
+    if (liftedPass.length <= from) {
+      return;
+    }
+    const saved: RenderState = {
+      opacity: state.opacity,
+      ctm: state.ctm,
+      clip: state.clip,
+      rounded: state.rounded,
+      cull: state.cull
+    };
+    for (let i = from; i < liftedPass.length; i++) {
+      const entry = liftedPass[i]!;
+      state.opacity = entry.opacity;
+      state.ctm = entry.ctm;
+      // The boundary's own clip still applies; everything inside it
+      // does not, which is the whole of what `lift` escapes.
+      state.clip = clip;
+      state.rounded = rounded;
+      state.cull = null;
+      visit(entry.node, true);
+    }
+    liftedPass.length = from;
+    state.opacity = saved.opacity;
+    state.ctm = saved.ctm;
+    state.clip = saved.clip;
+    state.rounded = saved.rounded;
+    state.cull = saved.cull;
+  }
+
   visit(root);
+  drawLifted();
   closePrimitives();
 
   // The debugging overlay: unclipped, untransformed, over everything.

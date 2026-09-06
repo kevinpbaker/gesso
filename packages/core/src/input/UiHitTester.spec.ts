@@ -454,4 +454,69 @@ describe('UiHitTester', () => {
       expect(tester.toLocal(orphan, 10, 20)).toEqual({ x: 10, y: 20 });
     });
   });
+  describe('lifted nodes', () => {
+    /**
+     * A clipping row with a lifted card in it, transformed out of the
+     * row: the shape a shared element morphing back into a list makes.
+     */
+    function liftedHarness(lift: boolean) {
+      const h = new InputTestHarness();
+      const scroll = h.node('scroll', UiNodeType.ScrollView, { width: 200, height: 100 });
+      const card = h.node('card', UiNodeType.Box, {
+        width: 200,
+        height: 100,
+        flexShrink: 0,
+        // 300 straight up, well outside the row.
+        transform: { x: 0, y: 0, translateX: 0, translateY: -300, scaleX: 1, scaleY: 1, rotation: 0 }
+      });
+      if (lift) {
+        card.setProperty('lift', true);
+      }
+      h.add(scroll, card);
+      h.add(h.root, scroll);
+      h.root.setProperty('hitTestable', false);
+      scroll.setProperty('hitTestable', false);
+      h.layoutTree();
+      return { h, card, tester: h.createHitTester() };
+    }
+
+    it('hits a lifted node where it is drawn, outside its ancestor clip', () => {
+      const { card, tester } = liftedHarness(true);
+      // Screen y=-250 is where the transform puts the card's y=50; the
+      // row's clip would have rejected the point long before.
+      const hit = tester.hitTest(100, -250);
+      expect(hit?.node).toBe(card);
+      expect(hit?.localY).toBe(50);
+    });
+
+    it('does not hit a lifted node at the box it was lifted out of', () => {
+      const { tester } = liftedHarness(true);
+      expect(tester.hitTest(100, 50)).toBeNull();
+    });
+
+    it('leaves an unlifted node clipped by its ancestors', () => {
+      const { tester } = liftedHarness(false);
+      expect(tester.hitTest(100, -250)).toBeNull();
+    });
+
+    it('puts a lifted node at the top of the hit stack', () => {
+      const h = new InputTestHarness();
+      const under = h.node('under', UiNodeType.Box, { width: 200, height: 100, position: 'absolute', top: 0, left: 0 });
+      const over = h.node('over', UiNodeType.Box, {
+        width: 200,
+        height: 100,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        lift: true
+      });
+      // Tree order puts `over` first, so without the top layer it would
+      // be the one *under*.
+      h.add(h.root, over, under);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+      expect(tester.hitStack(100, 50)).toEqual([over, under]);
+    });
+  });
 });

@@ -1395,6 +1395,7 @@ declare class GessoAppBuilder {
   private readonly serviceRegistrations;
   private frameListener;
   private inspectListener;
+  private devtoolsListener;
   private errorListener;
   private rendererChoice;
   private routes;
@@ -1418,6 +1419,8 @@ declare class GessoAppBuilder {
   onInspect(listener: (report: UiNodeReport | null) => void): this;
   onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
   setInspector(enabled: boolean): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  devtools(request: DevtoolsRequest): void;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): this;
   setColorScheme(preference: ColorSchemePreference): this;
   mountSync(host: HTMLElement | string): () => void;

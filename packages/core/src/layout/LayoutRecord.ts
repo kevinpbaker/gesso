@@ -113,6 +113,21 @@ export class LayoutRecord {
   zIndex = 0;
 
   /**
+   * `lift`: this node and its subtree are painted in a top layer,
+   * above the whole tree and outside every ancestor's clip. Hit
+   * testing tries the lifted nodes before the tree, for the same
+   * reason it walks `paintOrder` in reverse: what is drawn last is
+   * pressed first.
+   */
+  lifted = false;
+
+  /**
+   * `liftBoundary`: lifted descendants of this node are painted at the
+   * end of this node's subtree rather than at the end of the frame.
+   */
+  liftBoundary = false;
+
+  /**
    * Overflow. A clipping node paints and hit-tests its children inside
    * its own box; a scrollable one (a ScrollView, or overflow 'scroll'
    * / 'auto') also translates them by its scroll offset and clamps

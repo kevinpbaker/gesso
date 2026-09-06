@@ -86,6 +86,13 @@ export class Canvas2DRenderer implements UiRenderer {
    * makes one per picture per frame. See `ScaledImageCache`.
    */
   private readonly scaledImages = new ScaledImageCache();
+  /**
+   * The lifted nodes met on this frame's walk, with the state they
+   * were met in: the matrix and the alpha their ancestors had built
+   * up, which is everything about the ancestors a lifted node keeps.
+   * Drained after the walk; see `render`.
+   */
+  private readonly liftedPass: UiNode[] = [];
 
   constructor(private readonly options: Canvas2DRendererOptions) {}
 
@@ -119,7 +126,9 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullY = 0;
     this.cullWidth = this.surface.logicalWidth;
     this.cullHeight = this.surface.logicalHeight;
-    this.renderNode(root, context, ctx, true);
+    this.liftedPass.length = 0;
+    this.renderNode(root, context, ctx, true, false);
+    this.renderLifted(context, ctx);
     if (context.overlay !== undefined && context.overlay.length > 0) {
       drawOverlayShapes(ctx, context.overlay);
     }
@@ -143,13 +152,21 @@ export class Canvas2DRenderer implements UiRenderer {
   // Traversal
   // -------------------------------------------------------------------------
 
-  private renderNode(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean): void {
+  private renderNode(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean, lifted: boolean): void {
     const paint = resolvePaintState(node, this.paint);
     if (!paint.visible || paint.opacity === 0) {
       return;
     }
     const rec = context.layout.recordFor(node);
     if (rec === undefined) {
+      return;
+    }
+    if (rec.lifted && !lifted) {
+      // Held back for the top layer, and held back *before* the cull
+      // test: a lifted node is nearly always somewhere its record box
+      // is not — that is what it is for — so the box it would be culled
+      // by says nothing about where it will be drawn.
+      this.liftedPass.push(node);
       return;
     }
     const sticky = rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0;
@@ -211,6 +228,7 @@ export class Canvas2DRenderer implements UiRenderer {
 
     // Culling works in record coordinates; a transform or a sticky shift
     // moves what is drawn away from them, so descendants are not culled.
+    const liftedBefore = this.liftedPass.length;
     this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
 
     if (rec.scrollable) {
@@ -227,6 +245,14 @@ export class Canvas2DRenderer implements UiRenderer {
       // style so the text renders with its own color/size/alignment.
       resolvePaintState(node, this.paint);
       this.paintContent(ctx, rec, this.paint, context);
+    }
+    if (rec.liftBoundary && this.liftedPass.length > liftedBefore) {
+      // A boundary: everything the subtree lifted is drawn here, over
+      // the rest of this subtree and inside whatever holds it. The
+      // context is back at this node's own state, because every clip
+      // and transform the walk opened below it has been restored, so
+      // the descendants' clips are gone and this node's is not.
+      this.renderLifted(context, ctx, liftedBefore, node);
     }
 
     if (rec.clips) {
@@ -251,7 +277,7 @@ export class Canvas2DRenderer implements UiRenderer {
     const order = context.layout.recordFor(node)?.paintOrder;
     if (order !== null && order !== undefined) {
       for (const child of order) {
-        this.renderNode(child, context, ctx, cull);
+        this.renderNode(child, context, ctx, cull, false);
       }
       return;
     }
@@ -260,9 +286,86 @@ export class Canvas2DRenderer implements UiRenderer {
       if (child.type === UiNodeType.Fragment) {
         this.renderChildren(child, context, ctx, cull);
       } else {
-        this.renderNode(child, context, ctx, cull);
+        this.renderNode(child, context, ctx, cull, false);
       }
       child = child.nextSibling;
+    }
+  }
+
+  /**
+   * The top layer: the nodes that asked for `lift`, drawn after the
+   * tree and outside every clip in it.
+   *
+   * The clips are gone because the walk has unwound: every `save` it
+   * made is restored by the time this runs, so the context is back at
+   * the frame's base transform with no clipping region at all. What is
+   * *not* free is everything else a lifted node keeps, so the ancestor
+   * chain is replayed here: their sticky shifts, opacities, transforms
+   * and scroll offsets, in the same order `renderNode` applies them.
+   * Replaying beats recording the matrix on the way past, because it
+   * costs nothing at all on the frames where nothing is lifted, which
+   * is nearly every frame.
+   */
+  private renderLifted(context: RenderContext, ctx: Canvas2DContext, from = 0, boundary: UiNode | null = null): void {
+    if (this.liftedPass.length <= from) {
+      return;
+    }
+    // Walked by index rather than iterated: a lifted node inside a
+    // lifted subtree is appended while this runs, and it belongs after
+    // the one that carried it, as paint order says.
+    const dpr = this.surface.dpr;
+    for (let i = from; i < this.liftedPass.length; i++) {
+      const node = this.liftedPass[i]!;
+      ctx.save();
+      if (boundary === null) {
+        // The frame's own base: every clip is unwound and the walk is
+        // over, so this is the top of everything.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      // From the boundary, or from the root when there is none. The
+      // boundary's own transform and clip are already in force, so
+      // only what lies below it is replayed.
+      this.applyAncestors(node, context, ctx, boundary);
+      // No culling: the ancestors' cull rectangles have been unwound
+      // with their clips, and the node is drawn wherever its transform
+      // puts it.
+      this.renderNode(node, context, ctx, false, true);
+      ctx.restore();
+    }
+    this.liftedPass.length = from;
+  }
+
+  /** Everything between the boundary (or the root) and a lifted node. */
+  private applyAncestors(
+    node: UiNode,
+    context: RenderContext,
+    ctx: Canvas2DContext,
+    boundary: UiNode | null = null
+  ): void {
+    const chain: UiNode[] = [];
+    for (let parent = node.parent; parent !== null && parent !== boundary; parent = parent.parent) {
+      chain.push(parent);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const ancestor = chain[i]!;
+      const rec = context.layout.recordFor(ancestor);
+      if (rec === undefined) {
+        // A fragment: no box, no transform, nothing to apply.
+        continue;
+      }
+      const paint = resolvePaintState(ancestor, this.paint);
+      if (rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0) {
+        ctx.translate(rec.stickyOffsetX, rec.stickyOffsetY);
+      }
+      if (paint.opacity < 1) {
+        ctx.globalAlpha *= paint.opacity;
+      }
+      if (paint.hasTransform) {
+        this.applyTransform(ctx, rec, paint);
+      }
+      if (rec.scrollable) {
+        ctx.translate(-rec.scrollX, -rec.scrollY);
+      }
     }
   }
 

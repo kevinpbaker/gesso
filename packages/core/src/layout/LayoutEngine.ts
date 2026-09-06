@@ -152,6 +152,16 @@ export class LayoutEngine {
   private readonly anchorDependents = new Map<UiNode, Set<UiNode>>();
   /** Anchored nodes whose anchor moved this frame, re-placed once it settles. */
   private readonly movedAnchored = new Set<UiNode>();
+  /**
+   * The nodes asking for `lift`, in the order they asked.
+   *
+   * Kept as a set rather than rebuilt per pass because layout is
+   * incremental: a node whose subtree was not re-placed this frame is
+   * still lifted, and a list gathered during placement would have lost
+   * it. Hit testing reads this, and it is empty in every frame nothing
+   * is morphing, which is nearly all of them.
+   */
+  private readonly liftedNodes = new Set<UiNode>();
   /** position: 'sticky' nodes, re-offset whenever anything scrolls. */
   private readonly stickyNodes = new Set<UiNode>();
   /**
@@ -471,6 +481,7 @@ export class LayoutEngine {
     this.layoutRoot = node;
     this.rootConstraints = constraints;
     this.records.clear();
+    this.liftedNodes.clear();
     this.scrollNodes.clear();
     this.textScrollNodes.clear();
     this.anchorOf.clear();
@@ -920,6 +931,7 @@ export class LayoutEngine {
     while (stack.length > 0) {
       const current = stack.pop()!;
       this.records.delete(current);
+      this.liftedNodes.delete(current);
       this.scrollNodes.delete(current);
       this.textScrollNodes.delete(current);
       this.anchoredNodes.delete(current);
@@ -3185,6 +3197,8 @@ export class LayoutEngine {
     rec.bottom = this.lengthProp(node, 'bottom', base.height) ?? insetV;
     rec.left = this.lengthProp(node, 'left', base.width) ?? insetH;
     rec.zIndex = this.numberProp(node, 'zIndex') ?? 0;
+    this.setLifted(node, rec, node.properties.get('lift') === true);
+    rec.liftBoundary = node.properties.get('liftBoundary') === true;
     const ratio = this.numberProp(node, 'aspectRatio');
     rec.aspectRatio = ratio !== undefined && ratio > 0 ? ratio : undefined;
   }
@@ -3367,6 +3381,38 @@ export class LayoutEngine {
 
   private isFragment(node: UiNode): boolean {
     return node.type === UiNodeType.Fragment;
+  }
+
+  /**
+   * Records whether a node is lifted, keeping the index in step.
+   *
+   * The set is the index and the record field is the answer to "is
+   * this one lifted", because the renderers ask that of every node
+   * they walk and a set lookup per node per frame is a cost the walk
+   * does not need to pay.
+   */
+  private setLifted(node: UiNode, rec: LayoutRecord, lifted: boolean): void {
+    if (rec.lifted === lifted) {
+      return;
+    }
+    rec.lifted = lifted;
+    if (lifted) {
+      this.liftedNodes.add(node);
+    } else {
+      this.liftedNodes.delete(node);
+    }
+  }
+
+  /**
+   * The nodes painted in the top layer, in the order they were lifted.
+   *
+   * Hit testing tries them last-first, so the most recently lifted
+   * wins a point two of them cover. Two lifted elements overlapping at
+   * all is already unusual: this exists so a morph can escape a clip,
+   * and one thing morphs at a time.
+   */
+  get lifted(): ReadonlySet<UiNode> {
+    return this.liftedNodes;
   }
 
   private numberProp(node: UiNode, property: string): number | undefined {

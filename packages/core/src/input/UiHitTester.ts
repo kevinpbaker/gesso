@@ -14,6 +14,15 @@ import { pointInBox, scrollbarThumb, scrollbarZoneAt, type ScrollbarAxis } from 
  */
 export interface HitTestLayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
+  /**
+   * The nodes asking for `lift`, which are painted in a top layer and
+   * so are pressed before anything in the tree.
+   *
+   * Optional because it is an index rather than a geometry: a reader
+   * that does not keep one simply has no top layer, and every node is
+   * tested where the tree puts it. `LayoutEngine` keeps one.
+   */
+  readonly lifted?: ReadonlySet<UiNode>;
 }
 
 export interface UiPoint {
@@ -104,6 +113,10 @@ export class UiHitTester implements HitTester {
   private zoneOnly = false;
   /** Root-to-node scratch for toLocal, reused so a pointer drag allocates nothing. */
   private readonly path: UiNode[] = [];
+  /** The lifted nodes of the moment, ordered so the last is tried first. */
+  private readonly liftedScratch: UiNode[] = [];
+  /** True while testing inside a lifted subtree, so it is not skipped again. */
+  private inLifted = false;
 
   constructor(
     private layout: HitTestLayoutReader,
@@ -118,7 +131,9 @@ export class UiHitTester implements HitTester {
   hitTest(x: number, y: number): HitTestResult | null {
     this.result.scrollbar = undefined;
     this.zoneOnly = false;
-    if (this.hitTestNode(this.root, x, y)) {
+    // The top layer first: `lift` paints those nodes over the whole
+    // tree, and what is drawn last is pressed first.
+    if (this.hitTestLifted(x, y) || this.hitTestNode(this.root, x, y)) {
       const result: HitTestResult = { node: this.result.node!, localX: this.result.localX, localY: this.result.localY };
       const scrollbar = this.result.takeScrollbar();
       if (scrollbar !== undefined) {
@@ -138,6 +153,12 @@ export class UiHitTester implements HitTester {
    */
   hitStack(x: number, y: number): UiNode[] {
     const out: UiNode[] = [];
+    this.forEachLifted(x, y, (node, px, py) => {
+      this.inLifted = true;
+      this.collectNode(node, px, py, out);
+      this.inLifted = false;
+      return false;
+    });
     this.collectNode(this.root, x, y, out);
     return out;
   }
@@ -148,6 +169,10 @@ export class UiHitTester implements HitTester {
     }
     const rec = this.layout.recordFor(node);
     if (rec === undefined || !this.invertPoint(node, rec, x, y)) {
+      return;
+    }
+    if (rec.lifted && !this.inLifted) {
+      // Already collected from the top layer, where it is drawn.
       return;
     }
     const px = this.point.x - rec.stickyOffsetX;
@@ -248,6 +273,102 @@ export class UiHitTester implements HitTester {
   }
 
   // -------------------------------------------------------------------------
+  // The top layer
+  // -------------------------------------------------------------------------
+
+  /**
+   * Tries the lifted nodes, last one first, and reports whether one
+   * took the point.
+   *
+   * Last first because `lift` puts them over the tree in the order
+   * they were lifted, and the reason the ordinary walk reads
+   * `paintOrder` backwards holds here too: whatever is drawn on top is
+   * pressed first.
+   */
+  private hitTestLifted(x: number, y: number): boolean {
+    return this.forEachLifted(x, y, (node, px, py) => {
+      this.inLifted = true;
+      const hit = this.hitTestNode(node, px, py);
+      this.inLifted = false;
+      return hit;
+    });
+  }
+
+  /**
+   * Runs `visit` for each lifted node with the point in the space its
+   * record box lives in, stopping at the first that answers true.
+   *
+   * The point is replayed down the ancestor chain rather than taken
+   * from the walk, because there is no walk to take it from: the whole
+   * point of the top layer is that the descent to it went through
+   * clips that would have rejected the point long before it arrived.
+   * `toLocal` replays the same chain for the same reason.
+   */
+  private forEachLifted(x: number, y: number, visit: (node: UiNode, px: number, py: number) => boolean): boolean {
+    const lifted = this.layout.lifted;
+    if (lifted === undefined || lifted.size === 0) {
+      return false;
+    }
+    const nodes = this.liftedScratch;
+    nodes.length = 0;
+    for (const node of lifted) {
+      nodes.push(node);
+    }
+    let hit = false;
+    for (let i = nodes.length - 1; i >= 0 && !hit; i--) {
+      const node = nodes[i]!;
+      if (this.layout.recordFor(node) === undefined) {
+        continue;
+      }
+      this.pointInParentSpace(node, x, y);
+      hit = visit(node, this.point.x, this.point.y);
+    }
+    nodes.length = 0;
+    return hit;
+  }
+
+  /**
+   * Puts `this.point` in the coordinate space a node's record box
+   * lives in: every ancestor's transform, sticky shift and scroll
+   * offset applied, and the node's own left alone, which is exactly
+   * what `hitTestNode` expects to be handed.
+   */
+  private pointInParentSpace(node: UiNode, x: number, y: number): void {
+    const path = this.path;
+    path.length = 0;
+    for (let current: UiNode | null = node.parent; current !== null; current = current.parent) {
+      if (current.type !== UiNodeType.Fragment) {
+        path.push(current);
+      }
+      if (current === this.root) {
+        break;
+      }
+    }
+    let px = x;
+    let py = y;
+    for (let i = path.length - 1; i >= 0; i--) {
+      const ancestor = path[i]!;
+      const record = this.layout.recordFor(ancestor);
+      if (record === undefined) {
+        continue;
+      }
+      if (this.invertPoint(ancestor, record, px, py)) {
+        px = this.point.x;
+        py = this.point.y;
+      }
+      px -= record.stickyOffsetX;
+      py -= record.stickyOffsetY;
+      if (record.clips && record.scrollable) {
+        px += record.scrollX;
+        py += record.scrollY;
+      }
+    }
+    path.length = 0;
+    this.point.x = px;
+    this.point.y = py;
+  }
+
+  // -------------------------------------------------------------------------
   // Traversal
   // -------------------------------------------------------------------------
 
@@ -257,6 +378,13 @@ export class UiHitTester implements HitTester {
     }
     const rec = this.layout.recordFor(node);
     if (rec === undefined) {
+      return false;
+    }
+    if (rec.lifted && !this.inLifted) {
+      // Tested in the top layer, where it is drawn. Testing it here as
+      // well would let a press land on a picture that is halfway across
+      // the screen, which is the clipped position `lift` exists to stop
+      // it being drawn at.
       return false;
     }
     if (!this.invertPoint(node, rec, x, y)) {

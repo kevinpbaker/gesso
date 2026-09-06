@@ -444,6 +444,124 @@ describe('sharedElement()', () => {
     expect(onTop()).toBe('neighbour');
   });
 
+  it('lifts a morphing element out of the clip it is landing inside', () => {
+    // The shape a picture morphing back into a list makes: the element
+    // it arrives as lives in a scroll container, and the box it is
+    // morphing from is nowhere near it. Without `lift` the row's clip
+    // cuts the first half of the journey away.
+    const detail = internalState(false);
+    let card: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 600 },
+        detail.pipe(
+          map(open =>
+            open
+              ? Box({
+                  key: 'detail',
+                  width: 400,
+                  height: 400,
+                  backgroundColor: '#000000',
+                  modifiers: [sharedElement({ name: 'hero', duration: 200, easing: linear })]
+                })
+              : ScrollView(
+                  { key: 'row', width: 400, height: 100 },
+                  Box({
+                    key: 'card',
+                    ref: (n: UiNode | null) => n !== null && (card = n),
+                    width: 100,
+                    height: 100,
+                    backgroundColor: '#000000',
+                    modifiers: [sharedElement({ name: 'hero', duration: 200, easing: linear, lift: true })]
+                  })
+                )
+          )
+        )
+      )
+    );
+    drain(mounted);
+    expect(card!.properties.get('lift')).toBeUndefined();
+
+    detail.value = true;
+    drain(mounted);
+    card = null;
+
+    // Coming back: lifted from the claim, before the frame that draws
+    // the first flipped position, and put down once it has arrived.
+    detail.value = false;
+    expect(card!.properties.get('lift')).toBe(true);
+    mounted.frame();
+    expect(card!.properties.get('lift')).toBe(true);
+    drain(mounted);
+    expect(card!.properties.get('lift')).toBeUndefined();
+  });
+
+  it('puts a morph down when another element takes the name from under it', () => {
+    // Interrupting a morph: press back into a card while it is still on
+    // its way home from the last press. The card is asked to yield the
+    // name mid-flight, and the yield cancels the animation it was
+    // waiting on — so the arrival never comes, and a `lift` or a raise
+    // left switched on outlives the transition it belonged to. In Segue
+    // that is a card from one navigation painted over the next screen.
+    //
+    // The two are toggled separately so the card is still in the tree
+    // when the detail takes the name from it, which is what a route
+    // transition does: the screen being left is kept for its exit.
+    const cardShown = internalState(false);
+    const detailShown = internalState(true);
+    const reported: boolean[] = [];
+    let card: UiNode | null = null;
+    const hero = (lift: boolean): ReturnType<typeof sharedElement> =>
+      sharedElement({
+        name: 'hero',
+        duration: 400,
+        easing: linear,
+        lift,
+        onMorph: active => reported.push(active)
+      });
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 600 },
+        cardShown.pipe(
+          map(shown =>
+            shown
+              ? [
+                  Box({
+                    key: 'card',
+                    ref: (n: UiNode | null) => n !== null && (card = n),
+                    width: 100,
+                    height: 100,
+                    marginTop: 400,
+                    modifiers: [hero(true)]
+                  })
+                ]
+              : []
+          )
+        ),
+        detailShown.pipe(
+          map(shown => (shown ? [Box({ key: 'detail', width: 400, height: 400, modifiers: [hero(false)] })] : []))
+        )
+      )
+    );
+    drain(mounted);
+
+    // Back: the card arrives, claims the name and starts morphing home.
+    cardShown.value = true;
+    detailShown.value = false;
+    mounted.frame();
+    mounted.frame();
+    expect(card!.properties.get('lift')).toBe(true);
+    expect(reported.at(-1)).toBe(true);
+
+    // And straight into the detail again, two frames into a 400ms
+    // morph. The card yields on the frame the detail takes its place,
+    // and must put down everything the morph switched on.
+    detailShown.value = true;
+    mounted.frame();
+    expect(reported.at(-1)).toBe(false);
+    expect(card!.properties.get('lift')).toBeUndefined();
+  });
+
   /**
    * Where a morph spends its time: the fraction of the journey elapsed
    * by the moment it has covered half the distance, plus how long the

@@ -339,6 +339,8 @@ declare class LayoutRecord {
   bottom: number | undefined;
   left: number | undefined;
   zIndex: number;
+  lifted: boolean;
+  liftBoundary: boolean;
   clips: boolean;
   scrollable: boolean;
   sticky: boolean;
@@ -538,7 +540,7 @@ interface SharedClaim {
 }
 declare class UiSharedElements {
   private readonly holders;
-  claim(name: string, node: UiNode, onYield: () => void): SharedClaim;
+  claim(name: string, node: UiNode, onYield: () => void, onRestore?: () => void): SharedClaim;
   report(name: string, node: UiNode, box: LayoutBox): void;
   release(name: string, node: UiNode): void;
   get names(): readonly string[];
@@ -1222,6 +1224,8 @@ declare const UiProperties: {
   readonly bottom: UiPropertyDefinition<UiLength | undefined>;
   readonly left: UiPropertyDefinition<UiLength | undefined>;
   readonly zIndex: UiPropertyDefinition<number | undefined>;
+  readonly lift: UiPropertyDefinition<boolean | undefined>;
+  readonly liftBoundary: UiPropertyDefinition<boolean | undefined>;
   readonly anchor: UiPropertyDefinition<UiNode | null | undefined>;
   readonly placement: UiPropertyDefinition<UiPlacement | undefined>;
   readonly anchorOffset: UiPropertyDefinition<number | undefined>;
@@ -1328,7 +1332,7 @@ type IdentityProps = {
 type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'margin' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'aspectRatio'>;
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
-type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'anchor' | 'placement' | 'anchorOffset'>;
+type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
@@ -1617,10 +1621,13 @@ interface TextRunMeasurer {
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
 declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
+  private readonly paragraphs;
   abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
   abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
   layout(request: TextMeasureRequest): ParagraphLayout;
   measure(request: TextMeasureRequest): Size;
+  get cachedParagraphs(): number;
+  invalidate(): void;
 }
 interface FixedMetricsOptions {
   glyphWidth?: number;
@@ -1728,6 +1735,12 @@ interface Canvas2DContext {
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
   drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
+  getTransform?(): {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+  };
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
   createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
   fillStyle: string | Canvas2DGradient | CanvasPattern;
@@ -1858,6 +1871,7 @@ declare function scrollbarThumb(rec: LayoutRecord, axis: ScrollbarAxis): Scrollb
 declare function scrollbarZoneAt(rec: LayoutRecord, x: number, y: number): ScrollbarAxis | null;
 interface HitTestLayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
+  readonly lifted?: ReadonlySet<UiNode>;
 }
 interface UiPoint {
   x: number;
@@ -1887,6 +1901,8 @@ declare class UiHitTester implements HitTester {
   private readonly result;
   private zoneOnly;
   private readonly path;
+  private readonly liftedScratch;
+  private inLifted;
   constructor(layout: HitTestLayoutReader, root: UiNode);
   setRoot(root: UiNode): void;
   hitTest(x: number, y: number): HitTestResult | null;
@@ -1898,6 +1914,9 @@ declare class UiHitTester implements HitTester {
     axis: ScrollbarAxis;
   } | null;
   toLocal(node: UiNode, x: number, y: number): UiPoint;
+  private hitTestLifted;
+  private forEachLifted;
+  private pointInParentSpace;
   private hitTestNode;
   private hitTestChildren;
   private recordHit;
@@ -2542,6 +2561,7 @@ declare class LayoutEngine {
   private readonly anchorOf;
   private readonly anchorDependents;
   private readonly movedAnchored;
+  private readonly liftedNodes;
   private readonly stickyNodes;
   private readonly stickyShifted;
   private readonly textMeasurer;
@@ -2661,6 +2681,8 @@ declare class LayoutEngine {
   private forEachChild;
   private isAbsolute;
   private isFragment;
+  private setLifted;
+  get lifted(): ReadonlySet<UiNode>;
   private numberProp;
   private lengthProp;
   private lengthPropOrAuto;
@@ -2937,6 +2959,7 @@ interface SharedElementArgs extends MotionTiming {
   readonly morph?: 'transform' | 'geometry';
   readonly fadeFrom?: number;
   readonly scale?: 'free' | 'uniform';
+  readonly lift?: boolean;
   readonly onMorph?: (morphing: boolean) => void;
 }
 declare const sharedElement: ((args: SharedElementArgs, key?: string | number) => UiModifier<SharedElementArgs>) & {
@@ -3091,6 +3114,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private cullWidth;
   private cullHeight;
   private readonly cullStack;
+  private readonly scaledImages;
+  private readonly liftedPass;
   constructor(options: Canvas2DRendererOptions);
   private get surface();
   initialize(): Promise<void>;
@@ -3101,9 +3126,12 @@ declare class Canvas2DRenderer implements UiRenderer {
   private beginFrame;
   private renderNode;
   private renderChildren;
+  private renderLifted;
+  private applyAncestors;
   private paintBackground;
   private fillBox;
   private paintImage;
+  private scaledFor;
   private paintBorder;
   private paintDecorations;
   private paintContent;
@@ -3262,6 +3290,15 @@ interface WebGPUDeviceInit {
 }
 declare function isWebGPUAvailable(): boolean;
 declare function initializeWebGPU(): Promise<WebGPUDeviceInit>;
+interface ScaledImageSurface {
+  width: number;
+  height: number;
+  getContext(contextId: '2d'): {
+    drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  } | null;
+  transferToImageBitmap(): ImageBitmap;
+}
+type ScaledImageSurfaceFactory = (width: number, height: number) => ScaledImageSurface;
 interface TexturedPipeline {
   pipeline: GPURenderPipeline;
   vertexBuffer: GPUBuffer;
@@ -3277,12 +3314,14 @@ declare class WebGPUTextureCache {
   private readonly device;
   private readonly pipeline;
   private readonly images;
-  constructor(device: GPUDevice, pipeline: TexturedPipeline);
-  imageBindGroup(source: TextureSource): GPUBindGroup | null;
+  private readonly scaled;
+  constructor(device: GPUDevice, pipeline: TexturedPipeline, createSurface?: ScaledImageSurfaceFactory);
+  imageBindGroup(source: TextureSource, drawWidth?: number, drawHeight?: number): GPUBindGroup | null;
   private stillBindGroup;
   private videoBindGroup;
   private upload;
   private copyInto;
+  dispose(): void;
 }
 declare const GLYPH_SUBPIXEL_PHASES = 3;
 interface GlyphStyle {
@@ -3401,6 +3440,8 @@ interface ImageCommand {
   instance: number;
   scissor: ScissorRect | null;
   source: TextureSource;
+  drawWidth: number;
+  drawHeight: number;
 }
 type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
 interface TextRunDraw {
@@ -3757,7 +3798,6 @@ export {
   HitTestLayoutReader,
   HitTestResult,
   hoverable,
-  Ic,
   IconCanvas,
   IconContext,
   iconKey,
@@ -3837,6 +3877,7 @@ export {
   LazyRow,
   lazySource,
   LazySourceArgs,
+  Lc,
   lightColors,
   lightTheme,
   linear,
@@ -4882,7 +4923,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-Cfk_ueHR.js";
+} from "./index-B7Bj0tYS.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5572,7 +5613,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Cfk_ueHR.js";
+} from "./index-B7Bj0tYS.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
