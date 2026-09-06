@@ -3519,6 +3519,57 @@ declare class WebGPUGlyphPages {
   private upload;
   private scratchFor;
 }
+interface Mp3Format {
+  readonly version: 'mpeg1' | 'mpeg2' | 'mpeg2.5';
+  readonly layer: 1 | 2 | 3;
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly bitrate: number;
+  readonly samplesPerFrame: number;
+  readonly totalFrames?: number;
+  readonly totalBytes?: number;
+}
+interface Mp3Frame {
+  readonly bytes: Uint8Array;
+  readonly offset: number;
+  readonly samples: number;
+  readonly sampleOffset: number;
+  readonly timestampUs: number;
+  readonly durationUs: number;
+}
+interface Mp3Header {
+  readonly version: Mp3Format['version'];
+  readonly layer: 1 | 2 | 3;
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly bitrate: number;
+  readonly samples: number;
+  readonly length: number;
+  readonly stereo: boolean;
+}
+declare function readMp3Header(bytes: Uint8Array, at: number): Mp3Header | null;
+declare class Mp3Frames {
+  private carry;
+  private consumed;
+  private skipping;
+  private atStart;
+  private locked;
+  private shape;
+  private frames;
+  private samples;
+  get format(): Mp3Format | null;
+  get frameCount(): number;
+  get sampleCount(): number;
+  get seconds(): number;
+  push(bytes: Uint8Array): readonly Mp3Frame[];
+  flush(): readonly Mp3Frame[];
+  private append;
+  private split;
+}
+declare function splitMp3Frames(bytes: Uint8Array): {
+  format: Mp3Format | null;
+  frames: readonly Mp3Frame[];
+};
 interface Mp4Sample {
   readonly offset: number;
   readonly size: number;
@@ -3795,6 +3846,7 @@ export {
   formatConstraints,
   formatExplanation,
   FrLength,
+  Gc,
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
@@ -3926,6 +3978,10 @@ export {
   MotionStateInput,
   MotionTiming,
   MOUSE_POINTER,
+  Mp3Format,
+  Mp3Frame,
+  Mp3Frames,
+  Mp3Header,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -3990,6 +4046,7 @@ export {
   provideEnvironment,
   radialGradient,
   Reactive,
+  readMp3Header,
   recordsEqual,
   registerFontStack,
   RelayoutExplanation,
@@ -4062,6 +4119,7 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  splitMp3Frames,
   spring,
   Stack,
   StackProps,
@@ -4288,8 +4346,7 @@ export {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty,
-  zc
+  writeOverrideProperty
 };
 // ==== index.d.ts ====
 import {
@@ -4588,6 +4645,10 @@ import {
   MotionStateInput,
   MotionTiming,
   MOUSE_POINTER,
+  Mp3Format,
+  Mp3Frame,
+  Mp3Frames,
+  Mp3Header,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -4652,6 +4713,7 @@ import {
   provideEnvironment,
   radialGradient,
   Reactive,
+  readMp3Header,
   recordsEqual,
   registerFontStack,
   RelayoutExplanation,
@@ -4724,6 +4786,7 @@ import {
   slideDown,
   slideFrom,
   slideUp,
+  splitMp3Frames,
   spring,
   Stack,
   StackProps,
@@ -4951,7 +5014,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-PnWLCyHv.js";
+} from "./index-DJRJplAI.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5150,6 +5213,7 @@ export {
   MOTION_CHANNELS,
   MOTION_REST,
   MOUSE_POINTER,
+  Mp3Frames,
   nextCaretToggle,
   nextGraphemeEnd,
   nextWordEnd,
@@ -5193,6 +5257,7 @@ export {
   proportionalFontMetrics,
   provideEnvironment,
   radialGradient,
+  readMp3Header,
   recordsEqual,
   registerFontStack,
   repeat,
@@ -5240,6 +5305,7 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  splitMp3Frames,
   spring,
   Stack,
   statesEqual,
@@ -5358,6 +5424,9 @@ export {
   type MotionState,
   type MotionStateInput,
   type MotionTiming,
+  type Mp3Format,
+  type Mp3Frame,
+  type Mp3Header,
   type Mp4Sample,
   type Mp4VideoTrack,
   type NodeId,
@@ -5643,7 +5712,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-PnWLCyHv.js";
+} from "./index-DJRJplAI.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
