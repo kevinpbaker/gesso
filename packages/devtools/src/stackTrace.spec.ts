@@ -60,8 +60,37 @@ describe('mapStack', () => {
 
     const [frame] = await mapStack(parseStack('Error: x\n    at render (http://host/a.js:1:1)'), store);
 
-    expect(frame.original).toEqual({ source: 'src/App.tsx', line: 154, column: 11 });
-    expect(formatFrame(frame)).toBe('src/App.tsx:154:11');
+    // The source is resolved against the script that named it, because
+    // a chained lookup has to fetch the next map from somewhere.
+    expect(frame.original).toMatchObject({ source: 'http://host/src/App.tsx', line: 154, column: 11 });
+    expect(formatFrame(frame, 'http://host')).toBe('/src/App.tsx:154:11');
+  });
+
+  it('follows a map of a map, which is what a frame inside a package needs', async () => {
+    // What a dependency bundle looks like: the bundler's map points at
+    // the package's own dist file, and the package's map is the one
+    // that knows about its TypeScript. One lookup stops at the dist
+    // file with a five-figure line number; two reach the source.
+    const bundleMap = JSON.stringify({ version: 3, sources: ['../pkg/dist/index.js'], mappings: 'AAAA' });
+    const packageMap = JSON.stringify({
+      version: 3,
+      sources: ['../src/Runtime.ts'],
+      sourcesContent: ['export class Runtime {}\n'],
+      mappings: 'AAAA'
+    });
+    const store = new SourceMapStore(async url => {
+      if (url.endsWith('.ts')) {
+        // The end of the chain: what somebody wrote has no map.
+        return 'export class Runtime {}\n';
+      }
+      const map = url.includes('/pkg/dist/') ? packageMap : bundleMap;
+      return `code\n//# sourceMappingURL=data:application/json;base64,${btoa(map)}`;
+    });
+
+    const [frame] = await mapStack(parseStack('Error: x\n    at run (http://host/deps/pkg.js:1:1)'), store);
+
+    expect(frame.original?.source).toBe('http://host/pkg/src/Runtime.ts');
+    expect(frame.original?.content).toBe('export class Runtime {}\n');
   });
 
   it('leaves a frame alone when its script has no map', async () => {

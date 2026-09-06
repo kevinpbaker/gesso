@@ -291,12 +291,12 @@ export class ErrorOverlay {
     entry.frames = await mapStack(entry.frames, this.maps);
     entry.mapped = true;
     const frame = primaryFrame(entry.frames);
-    if (frame?.original != null && frame.location !== null) {
-      const consumer = await this.maps.consumerFor(frame.location.url);
-      const content = consumer?.contentFor(frame.original.source) ?? null;
-      if (content !== null) {
-        entry.code = codeFrame(content, frame.original.line, frame.original.column);
-      }
+    // The text comes with the position rather than from a second
+    // lookup: a frame inside a package is mapped through two maps, and
+    // it is the last one in that chain that inlined the source.
+    const content = frame?.original?.content ?? null;
+    if (frame?.original != null && content !== null) {
+      entry.code = codeFrame(content, frame.original.line, frame.original.column);
     }
     if (!this.disposed && this.visible && this.entries[this.shown] === entry) {
       this.render();

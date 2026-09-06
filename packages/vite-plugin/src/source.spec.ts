@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { blankLiterals, findCall, findCalls, firstArgumentName, importSources } from './source';
+import { blankLiterals, findCall, findCalls, firstArgumentName, importSources } from './source.ts';
 
 describe('blankLiterals', () => {
   it('keeps the length and the lines', () => {

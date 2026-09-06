@@ -16,7 +16,21 @@ a channel. A replica's cells, the services, the renderer, the canvas,
 the focus manager and the scheduler all belong to the runtime. The tree
 is the one part that is cheap to lose.
 
-## Two lines in the entry module
+## The plugin writes it for you
+
+With [`@gesso/vite-plugin`](/tooling/vite-plugin) in the config, the
+render worker entry stays as it was written and the wiring is emitted
+into it:
+
+```ts
+// RenderWorker.ts, and nothing else
+renderRoot(AppRoot).useService(Feed);
+```
+
+The rest of this page is what that wiring does, and what it still cannot
+do for you.
+
+## The two lines, if you write them yourself
 
 The framework imports no bundler and knows nothing about one. It offers
 `reload`, and your entry asks its own HMR client for the new module:
@@ -101,14 +115,49 @@ reloads and takes the worker with it.
 That is a property of your module graph rather than of the framework,
 and the fix is to stop importing the app's root on the main thread.
 
+The plugin knows both ends of that graph, so it does not leave you to
+work it out. When a save is about to reload the page for this reason it
+says which file and why, once per file, in the dev server's own output:
+
+```text
+[gesso] src/App.tsx is imported by the main thread as well as by the
+render worker, so saving it reloads the page instead of replacing the
+tree. Reach it only from the render worker's own graph to get hot
+replacement back; see decisions/0049.
+```
+
+The other thing that reloads rather than replaces is a change to a route
+table. `useRoutes` is read once, when the runtime is built, so nothing
+wires it into a replacement: a tree rebuilt around the old routes would
+be worse than a reload, because it would look like it had worked.
+
+## Focus stays where you left it
+
+A reload used to lose the caret, and `autoFocus` used to fire again on
+the way past, which for a form in the middle of being filled in is worse
+than doing nothing at all. Neither happens now.
+
+The caret's position is read before the tree is thrown away and put back
+on the frame that lays the new one out, after the layout listeners
+rather than before, because `autoFocus` is a layout listener and every
+node in a replaced subtree is having its first layout on that frame. So
+the restore is the last word in both directions: it puts the caret back
+where you had it, and where you had it nowhere, it takes it off whatever
+autofocused.
+
+Node ids are positional and the builder reconciles, so the field that
+had focus keeps its id across a replacement of the module that rendered
+it. A field the edit removed is the one case with nothing to go back to,
+and there the focus is cleared rather than left wherever the rebuild
+happened to put it.
+
 ## What it does not do
 
-- **Focus is not restored.** A focused node in a replaced subtree is
-  removed, the focus manager clears, and nothing puts the caret back.
-  If you use `autoFocus`, it fires again, which for a form in the
-  middle of being filled in is worse than doing nothing.
 - **A reload is not free.** It rebuilds a tree and lays it out, and on
   a large screen that is a visible frame. Nothing budgets it.
 - **A reload during a gesture or an animation is uncharted.** There is
   no coverage and no argument for what a tree replaced under a running
   drag should do.
+- **Text that was being edited is not restored**, only the focus. The
+  caret goes back to the field; what the field holds is whatever the new
+  tree built it with.

@@ -134,9 +134,18 @@ worth checking the worker's console for.
 `@gesso/devtools` mounts an error overlay over the application: the
 message, a sentence saying which of the five sources it came from and
 what that costs, the original source line with a caret under the column,
-and every stack frame mapped back through the source maps. The wiring is
-two lines and it is on the [devtools page](/tooling/devtools), which is
-also where the production-build arrangement is.
+and every stack frame mapped back through the source maps. The node is
+named as a path through your own components, `App > TrackScreen >
+ActionRow > Button "Like"` rather than an id nothing else will ever
+mention.
+
+With [`@gesso/vite-plugin`](/tooling/vite-plugin) in the config there is
+no wiring at all: `onError` is connected while the dev server is
+running, and the package is fetched the first time something throws.
+Mounting it by hand is two lines and is on the
+[devtools page](/tooling/devtools);
+[reporting errors](/tooling/reporting-errors) is what a shipped build
+does instead.
 
 The overlay is worth mounting before any of the other three tools,
 because it is the only one that is useful without being switched on.

@@ -122,12 +122,12 @@ describe('SourceMapConsumer', () => {
   );
 
   it('answers in the 1-based coordinates a stack is written in', () => {
-    expect(consumer.lookup(1, 1)).toEqual({ source: 'src/App.ts', line: 10, column: 1 });
+    expect(consumer.lookup(1, 1)).toEqual({ source: 'src/App.ts', line: 10, column: 1, content: null });
   });
 
   it('holds a mapping until the next one starts', () => {
-    expect(consumer.lookup(1, 15)).toEqual({ source: 'src/App.ts', line: 10, column: 1 });
-    expect(consumer.lookup(1, 21)).toEqual({ source: 'src/App.ts', line: 10, column: 15 });
+    expect(consumer.lookup(1, 15)).toEqual({ source: 'src/App.ts', line: 10, column: 1, content: null });
+    expect(consumer.lookup(1, 21)).toEqual({ source: 'src/App.ts', line: 10, column: 15, content: null });
   });
 
   it('has no answer for a line with no mappings', () => {
@@ -171,7 +171,7 @@ describe('SourceMapStore', () => {
 
     const consumer = await store.consumerFor('http://host/src/App.ts');
 
-    expect(consumer?.lookup(1, 1)).toEqual({ source: 'src/App.ts', line: 42, column: 5 });
+    expect(consumer?.lookup(1, 1)).toEqual({ source: 'src/App.ts', line: 42, column: 5, content: 'x\n' });
   });
 
   it('fetches a map named relative to its script', async () => {

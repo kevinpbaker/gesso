@@ -1,4 +1,4 @@
-import { blankLiterals, findCall, findCalls, firstArgumentName, importSources } from './source';
+import { blankLiterals, findCall, findCalls, firstArgumentName, importSources } from './source.ts';
 
 /** What the plugin found in a render worker entry, and could wire. */
 export interface RenderWiring {

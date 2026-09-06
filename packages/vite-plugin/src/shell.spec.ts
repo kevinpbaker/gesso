@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { transformShell, type WorkerEntries } from './shell';
+import { transformShell, type WorkerEntries } from './shell.ts';
 
 const ENTRIES: WorkerEntries = { renderWorker: './RenderWorker.ts', appLogicWorker: './AppWorker.ts' };
 

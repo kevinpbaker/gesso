@@ -4,9 +4,12 @@ description: Set up a project against the Gesso packages, and choose between the
 
 # Installation
 
-Gesso is four packages and a bundler that understands workers. There is
-no plugin and no build step of its own: a Gesso project is an ordinary
-Vite project that happens to draw its interface into a canvas.
+Gesso is four packages and a bundler that understands workers. A Gesso
+project is an ordinary Vite project that happens to draw its interface
+into a canvas, with no build step of its own and one optional plugin:
+[`@gesso/vite-plugin`](/tooling/vite-plugin) writes the worker
+construction, the hot-replacement wiring and the development error
+overlay, all of which you can also write yourself.
 
 The quickest way to get one is the scaffold,
 [create-gesso-app](/tooling/create-gesso-app), which writes every file

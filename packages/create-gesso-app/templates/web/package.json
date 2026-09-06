@@ -16,6 +16,8 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@gesso/devtools": "^0.1.0",
+    "@gesso/vite-plugin": "^0.1.0",
     "typescript": "~7.0.2",
     "vite": "^8.2.0"
   }

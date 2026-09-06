@@ -1,4 +1,4 @@
-import { blankLiterals, findCall, importSources } from './source';
+import { blankLiterals, findCall, importSources, type CallSite } from './source.ts';
 
 /** Where the plugin found the two worker entries, as the shell imports them. */
 export interface WorkerEntries {
@@ -8,18 +8,53 @@ export interface WorkerEntries {
   readonly appLogicWorker: string | null;
 }
 
+/** A `createApp` call the plugin could write for, and what it still needs. */
+export interface ShellCall {
+  readonly call: CallSite;
+  /**
+   * False when the author wrote `renderWorker` themselves, which is the
+   * documented fallback and the case where the plugin has no worker to
+   * find. It still wires the overlay in.
+   */
+  readonly needsWorkers: boolean;
+}
+
 export interface ShellTransformOptions {
-  readonly entries: WorkerEntries;
+  /** The entries to construct, or null when the author named them. */
+  readonly entries: WorkerEntries | null;
   /**
    * Whether to wire the error overlay in as well. True while the dev
    * server is running and never in a build, so a production bundle
-   * carries no reference to `@gesso/devtools` at all.
+   * carries no reference to `@gesso/devtools`.
    */
   readonly overlay: boolean;
 }
 
 /** Marks a module the plugin has already rewritten, so it is not done twice. */
 const MARKER = '/* @gesso/vite-plugin */';
+
+/**
+ * The `createApp` call in a module, when the module has one that came
+ * from the framework.
+ *
+ * Separate from the transform because finding the worker entries is an
+ * asynchronous resolution against the bundler and worth doing only for
+ * a module that turns out to be a shell, which is one module in an
+ * application.
+ */
+export function findShellCall(code: string, blank = blankLiterals(code)): ShellCall | null {
+  if (code.includes(MARKER)) {
+    return null;
+  }
+  if (importSources(code, blank).get('createApp') !== '@gesso/framework') {
+    return null;
+  }
+  const call = findCall(code, 'createApp', blank);
+  if (call === null) {
+    return null;
+  }
+  return { call, needsWorkers: !blank.slice(call.argsStart, call.argsEnd).includes('renderWorker') };
+}
 
 /**
  * Rewrites the shell module so that it names no worker.
@@ -33,24 +68,21 @@ const MARKER = '/* @gesso/vite-plugin */';
  * The merge order is what keeps `decisions/0048`'s promise that the
  * literal construction stays the documented fallback: the plugin's
  * factories go in first and the author's options spread over them, so
- * a `renderWorker` written by hand still wins and the plugin is
- * inert in that module.
+ * a `renderWorker` written by hand still wins.
  *
  * Returns null when there is nothing to do, which is the common case:
  * most modules do not call `createApp`.
  */
 export function transformShell(code: string, options: ShellTransformOptions): string | null {
-  if (code.includes(MARKER)) {
-    return null;
-  }
   const blank = blankLiterals(code);
-  if (importSources(code, blank).get('createApp') !== '@gesso/framework') {
+  const shell = findShellCall(code, blank);
+  if (shell === null) {
     return null;
   }
-  const call = findCall(code, 'createApp', blank);
-  if (call === null) {
+  if (options.entries === null && !options.overlay) {
     return null;
   }
+  const { call } = shell;
   const args = code.slice(call.argsStart, call.argsEnd).trim();
   const rewritten = `${code.slice(0, call.argsStart)}__gessoOptions(${args === '' ? '{}' : args})${code.slice(call.argsEnd)}`;
   return `${rewritten}\n${prelude(options)}`;
@@ -69,16 +101,20 @@ export function transformShell(code: string, options: ShellTransformOptions): st
  * both the named and the unnamed case.
  */
 function prelude(options: ShellTransformOptions): string {
-  const { renderWorker, appLogicWorker } = options.entries;
+  const entries = options.entries;
   const lines = [
     MARKER,
     'function __gessoOptions(options = {}) {',
     '  return {',
-    `    renderWorker: () => new Worker(new URL(${JSON.stringify(renderWorker)}, import.meta.url), { type: 'module', name: options.workerName }),`,
-    ...(appLogicWorker === null
+    ...(entries === null
       ? []
       : [
-          `    appLogicWorker: () => new Worker(new URL(${JSON.stringify(appLogicWorker)}, import.meta.url), { type: 'module', name: options.workerName }),`
+          `    renderWorker: () => new Worker(new URL(${JSON.stringify(entries.renderWorker)}, import.meta.url), { type: 'module', name: options.workerName }),`
+        ]),
+    ...(entries?.appLogicWorker == null
+      ? []
+      : [
+          `    appLogicWorker: () => new Worker(new URL(${JSON.stringify(entries.appLogicWorker)}, import.meta.url), { type: 'module', name: options.workerName }),`
         ]),
     ...(options.overlay ? ['    onError: __gessoReportError,'] : []),
     '    ...options',

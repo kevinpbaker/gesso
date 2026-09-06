@@ -1,11 +1,17 @@
 import type { EnvironmentModuleNode, Plugin } from 'vite';
 
-import { transformRenderWorker } from './render';
-import { transformShell, type WorkerEntries } from './shell';
+import { transformRenderWorker } from './render.ts';
+import { findShellCall, transformShell, type WorkerEntries } from './shell.ts';
 
-export { transformRenderWorker, type RenderWiring } from './render';
-export { transformShell, type ShellTransformOptions, type WorkerEntries } from './shell';
-export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, type CallSite } from './source';
+export { transformRenderWorker, type RenderWiring } from './render.ts';
+export {
+  findShellCall,
+  transformShell,
+  type ShellCall,
+  type ShellTransformOptions,
+  type WorkerEntries
+} from './shell.ts';
+export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, type CallSite } from './source.ts';
 
 /**
  * `@gesso/vite-plugin` — the plumbing between saving a file and seeing
@@ -38,7 +44,7 @@ export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, t
  * The literal construction stays supported and stays documented: the
  * plugin merges its factories *under* the options the author wrote, so
  * a hand-written `renderWorker` wins and an application that would
- * rather say it out loud can. See `decisions/0078`.
+ * rather say it out loud can. See `decisions/0082`.
  */
 export interface GessoPluginOptions {
   /**
@@ -128,16 +134,14 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         }
       }
 
-      const entries = await resolveEntries(this, id, code, options);
-      if (entries === null) {
-        return null;
-      }
-      const shell = transformShell(code, { entries, overlay: serving && options.overlay !== false });
-      if (shell === null) {
+      const call = findShellCall(code);
+      if (call === null) {
         return null;
       }
       shellId = id;
-      return { code: shell, map: null };
+      const entries = call.needsWorkers ? await resolveEntries(this, id, options) : null;
+      const shell = transformShell(code, { entries, overlay: serving && options.overlay !== false });
+      return shell === null ? null : { code: shell, map: null };
     },
 
     /**
@@ -201,23 +205,16 @@ interface Resolver {
 }
 
 /**
- * Finds the worker entries beside a shell module, or returns null when
- * the module is not a shell at all.
+ * Finds the worker entries beside a shell module.
  *
- * The `createApp` test comes first and costs a string search, because
- * every module in the application passes through here and only one of
- * them names it. The resolution that follows is a handful of `resolve`
- * calls against a bundler that has the answer cached.
+ * The names are tried against the bundler's own resolver rather than
+ * read off the disk: it already has the answer cached, it applies the
+ * project's aliases and extensions, and it is the only thing that can
+ * say whether the specifier the plugin is about to write would have
+ * resolved. Nothing here touches the filesystem, which is also why the
+ * package needs no node types.
  */
-async function resolveEntries(
-  context: Resolver,
-  id: string,
-  code: string,
-  options: GessoPluginOptions
-): Promise<WorkerEntries | null> {
-  if (!code.includes('createApp')) {
-    return null;
-  }
+async function resolveEntries(context: Resolver, id: string, options: GessoPluginOptions): Promise<WorkerEntries> {
   const renderWorker = await firstResolved(
     context,
     id,

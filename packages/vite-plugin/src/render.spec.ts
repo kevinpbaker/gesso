@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { transformRenderWorker } from './render';
+import { transformRenderWorker } from './render.ts';
 
 /** Sluice's render worker entry, near enough. */
 const ENTRY = [

@@ -105,7 +105,10 @@ if (import.meta.env.DEV) {
 ```
 
 A dynamic import inside a `DEV` branch leaves the package out of the
-production bundle entirely.
+production bundle entirely, and it is what
+[`@gesso/vite-plugin`](/tooling/vite-plugin) emits for the overlay if
+you let it. What a shipped build should do with the reports instead is
+[reporting errors](/tooling/reporting-errors).
 
 ## What they do not do
 

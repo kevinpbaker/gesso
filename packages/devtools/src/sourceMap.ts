@@ -33,6 +33,16 @@ export interface OriginalPosition {
   source: string;
   line: number;
   column: number;
+  /**
+   * The original text of the source, when the map inlined it.
+   *
+   * Carried on the position rather than fetched from the consumer
+   * afterwards because a chained lookup ends in a consumer the caller
+   * never sees: the map that knows the text is the last one in the
+   * chain, not the one the caller started from. See
+   * `SourceMapStore.originalFor`.
+   */
+  content?: string | null;
 }
 
 /**
@@ -174,7 +184,12 @@ export class SourceMapConsumer {
     if (source === undefined) {
       return null;
     }
-    return { source, line: segment[2] + 1, column: segment[3] + 1 };
+    return {
+      source,
+      line: segment[2] + 1,
+      column: segment[3] + 1,
+      content: this.contents[segment[1]] ?? null
+    };
   }
 
   /** The original text of a source, when the map inlined it. */
@@ -265,6 +280,45 @@ export class SourceMapStore {
     return pending;
   }
 
+  /**
+   * Where a position in a script was written, following the chain of
+   * maps as far as it goes.
+   *
+   * One lookup is not enough, and the reason took a browser to find. A
+   * frame inside `@gesso/framework` names Vite's optimised dependency
+   * bundle; that bundle's map points at the package's own
+   * `dist/index.js`, because the optimiser does not chain to the map
+   * the package ships; and it is the package's map that knows about
+   * `src/app/worker/RenderWorkerApp.ts`. Stopping after one step gave
+   * a frame in a bundled file with a five-figure line number, which is
+   * exactly the thing shipping the maps was meant to prevent.
+   *
+   * So each answer is resolved against the map that gave it and asked
+   * again, until a source has no map of its own — which is the source
+   * somebody wrote. `depth` is a guard against a map that names
+   * itself; four is more levels than any real toolchain stacks.
+   */
+  async originalFor(scriptUrl: string, line: number, column: number, depth = 4): Promise<OriginalPosition | null> {
+    let url = scriptUrl;
+    let position: OriginalPosition | null = null;
+    for (let step = 0; step < depth; step++) {
+      const consumer = await this.consumerFor(url);
+      const next = consumer?.lookup(line, column) ?? null;
+      if (next === null) {
+        return position;
+      }
+      const resolved = absolute(next.source, url);
+      position = { ...next, source: resolved };
+      if (resolved === url) {
+        return position;
+      }
+      url = resolved;
+      line = next.line;
+      column = next.column;
+    }
+    return position;
+  }
+
   private async resolve(scriptUrl: string): Promise<SourceMapConsumer | null> {
     const script = await this.load(scriptUrl);
     const mapUrl = parseSourceMappingUrl(script);
@@ -282,6 +336,23 @@ export class SourceMapStore {
       return null;
     }
     return new SourceMapConsumer(map);
+  }
+}
+
+/**
+ * A source name resolved against the script whose map named it.
+ *
+ * A map's `sources` are relative to the map, and the map is beside the
+ * script often enough that the script is the right base. When it is
+ * not a URL at all — a webpack `webpack://` name, an absolute path —
+ * `new URL` throws and the name is kept as it was, which still reads
+ * correctly and simply ends the chain.
+ */
+function absolute(source: string, base: string): string {
+  try {
+    return new URL(source, base).toString();
+  } catch {
+    return source;
   }
 }
 

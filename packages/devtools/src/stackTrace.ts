@@ -75,6 +75,10 @@ export function parseStack(stack: string): StackFrame[] {
  * name two or three scripts, so this is a couple of requests. It never
  * rejects: a frame that cannot be mapped keeps its compiled location,
  * which is what the console would have shown anyway.
+ *
+ * `originalFor` rather than one `lookup`, because a frame inside a
+ * published package is two maps deep: the bundler's map of the
+ * dependency bundle, then the package's own. See its comment.
  */
 export async function mapStack(frames: StackFrame[], store: SourceMapStore): Promise<StackFrame[]> {
   return Promise.all(
@@ -82,11 +86,7 @@ export async function mapStack(frames: StackFrame[], store: SourceMapStore): Pro
       if (frame.location === null) {
         return frame;
       }
-      const consumer = await store.consumerFor(frame.location.url);
-      if (consumer === null) {
-        return frame;
-      }
-      const original = consumer.lookup(frame.location.line, frame.location.column);
+      const original = await store.originalFor(frame.location.url, frame.location.line, frame.location.column);
       return original === null ? frame : { ...frame, original };
     })
   );

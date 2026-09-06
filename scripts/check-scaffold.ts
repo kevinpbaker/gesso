@@ -92,9 +92,21 @@ function run(command: string, args: string[], cwd: string): void {
 
 /** The names the generated screen has to expose, whatever else it grows. */
 function checkTemplateShape(app: string): void {
+  // The literal `new Worker(new URL(...))` used to be asserted here,
+  // because a refactor into a variable would leave the template looking
+  // fine and emitting no worker chunk. It is now written by
+  // `@gesso/vite-plugin` instead of by the template (`decisions/0082`),
+  // so what has to be true has moved: the config has to carry the
+  // plugin, and `main.ts` has to be free of the incantation the plugin
+  // exists to remove. The chunk itself is still checked, harder than a
+  // string search could: the browser below has to start a real worker.
+  const config = readFileSync(join(app, 'vite.config.ts'), 'utf8');
+  if (!config.includes('gesso()')) {
+    throw new Error('vite.config.ts no longer uses @gesso/vite-plugin, so nothing will construct the render worker.');
+  }
   const main = readFileSync(join(app, 'src', 'main.ts'), 'utf8');
-  if (!main.includes("new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })")) {
-    throw new Error('src/main.ts no longer constructs the worker literally, so no bundler will emit its chunk.');
+  if (/^\s*renderWorker:/m.test(main)) {
+    throw new Error('src/main.ts names a worker again; the plugin is meant to be what writes that.');
   }
   const tsconfig = readFileSync(join(app, 'tsconfig.json'), 'utf8');
   for (const line of ['"jsx": "react-jsx"', '"jsxImportSource": "@gesso/framework"']) {

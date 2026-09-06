@@ -24,31 +24,34 @@ pnpm create:app ../my-app
 ## What it writes
 
 ```text
-index.html        a host element with a size, and nothing else
-tsconfig.json     bundler resolution, and the two lines that buy JSX
-vite.config.ts    empty, because Gesso needs no plugin
-src/main.ts       the main thread: name the worker, mount into #app
-src/worker.ts     the render worker: name the root component
-src/App.tsx       the screen
-vendor/           the three Gesso packages, packed
+index.html          a host element with a size, and nothing else
+tsconfig.json       bundler resolution, and the two lines that buy JSX
+vite.config.ts      one plugin: @gesso/vite-plugin
+pnpm-workspace.yaml the vendored tarballs again, for pnpm
+src/main.ts         the main thread: create the app, mount into #app
+src/worker.ts       the render worker: name the root component
+src/App.tsx         the screen
+vendor/             the Gesso packages, packed
 ```
 
 Four of those are worth knowing about even if you write them yourself.
 
-**`src/main.ts` writes the worker constructor out literally.**
+**`src/main.ts` names no worker.**
 
 ```ts
-const app = createApp({
-  renderWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
-});
+const app = createApp();
 app.mount(document.querySelector('#app')!);
 ```
 
-`new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })`
-has to appear exactly like that. A bundler recognises the shape
-statically and emits a chunk for it; assemble the URL in a variable
-first and it emits nothing, and the app fails at run time rather than
-at build time.
+[`@gesso/vite-plugin`](/tooling/vite-plugin) finds `worker.ts` beside
+it and writes the construction, which has to appear literally as `new
+Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })`: a
+bundler recognises that shape statically and emits a chunk for it, and
+assembling the URL in a variable first emits nothing and fails at run
+time rather than at build time. The plugin also draws the error overlay
+over the app when the worker throws, and replaces the screen when you
+save `App.tsx` instead of reloading the page. Writing the construction
+yourself still works, and the plugin then leaves it alone.
 
 **`src/worker.ts` is one line.** `renderRoot(App)`. The root component
 cannot be passed from the main thread, because a class reference does
@@ -73,17 +76,23 @@ site are written in.
 
 Gesso is not published. A template with a version range would scaffold
 a project that cannot install, so the CLI packs `@gesso/core`,
-`@gesso/framework` and `@gesso/components` into the project's
-`vendor/` and writes `file:` specifiers pointing at them.
+`@gesso/framework`, `@gesso/components`, `@gesso/devtools` and
+`@gesso/vite-plugin` into the project's `vendor/` and writes `file:`
+specifiers pointing at them. The last two are development dependencies:
+the plugin writes the wiring, and it loads the overlay from devtools the
+first time the render worker throws.
 
 The consequence is that the scaffold has to run from inside this
 workspace, and that a scaffolded project is pinned to the packages as
 they were when you ran it. Rerun the scaffold, or repack by hand, to
 move it forward. When there is a registry this goes away.
 
-Use npm in the generated project. pnpm resolves the packages' own
-declared dependencies against the registry and gets a 404 for packages
-that are not there.
+**pnpm and npm both work.** The packed packages ask each other for
+version ranges no registry can answer, so each package manager has to be
+pointed at the tarballs: `overrides` in `package.json` is what npm
+reads, and `overrides` in `pnpm-workspace.yaml` is the only place pnpm
+11 reads them from. The CLI writes both. They are deleted together with
+`vendor/` the day the packages are published.
 
 ## No Electrobun template yet
 
@@ -99,5 +108,6 @@ one is the app you already have.
 repository's gates: scaffold into a temporary directory, install,
 typecheck, build, start the dev server the CLI printed, and drive it in
 headless Chrome. It asserts that the canvas was transferred to the
-worker and that a click repaints, and that the worker constructor and
-the two `jsx` lines survived into the generated files.
+worker and that a click repaints, that the plugin is still in the
+config and `main.ts` still names no worker, and that the two `jsx` lines
+survived into the generated files.
