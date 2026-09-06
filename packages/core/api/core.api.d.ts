@@ -362,11 +362,20 @@ declare class LayoutRecord {
   lastConstraints: Constraints;
   altValid: boolean;
   altConstraints: Constraints;
-  private altOutputs;
+  private altMeasuredWidth;
+  private altMeasuredHeight;
+  private altOuterWidth;
+  private altOuterHeight;
+  private altMinContentWidth;
+  private altMaxContentWidth;
+  private altIntrinsicWidth;
+  private altIntrinsicHeight;
+  private altHasBaseline;
+  private altBaseline;
+  private altContentWidth;
+  private altContentHeight;
   saveAlt(): void;
   swapAlt(): void;
-  private outputs;
-  private restore;
   contentMatters: boolean;
   relayoutBoundary: boolean;
   measureDirty: boolean;
@@ -375,6 +384,7 @@ declare class LayoutRecord {
   propsPass: number;
   propsBaseWidth: number | undefined;
   propsBaseHeight: number | undefined;
+  reset(): void;
 }
 interface UiColors {
   readonly background: UiColor;
@@ -2574,7 +2584,8 @@ interface ScrollAdjustment {
   scrollY: number;
 }
 declare class LayoutEngine {
-  private readonly records;
+  private records;
+  private retiredRecords;
   private readonly scrollNodes;
   private readonly textScrollNodes;
   private readonly anchoredNodes;
@@ -2697,13 +2708,14 @@ declare class LayoutEngine {
   private rootPercentBase;
   private definiteAxis;
   private effectiveConstraints;
+  private axisMin;
+  private axisMax;
   private axisConstraints;
   private assignBox;
   private scrollDirection;
   private forEachLayoutChild;
   private forEachAbsoluteChild;
   private forEachChild;
-  private isAbsolute;
   private isFragment;
   private setLifted;
   get lifted(): ReadonlySet<UiNode>;
@@ -2842,8 +2854,9 @@ declare const BUTTON_INTERACTION: UiModifier<InteractiveOptions>;
 declare const measure: ((args: Subject<LayoutBox>, key?: string | number) => UiModifier<Subject<LayoutBox>>) & {
   readonly kind: UiModifierKind<Subject<LayoutBox>>;
 };
-declare const decorated: ((args: readonly DecorationShape[], key?: string | number) => UiModifier<readonly DecorationShape[]>) & {
-  readonly kind: UiModifierKind<readonly DecorationShape[]>;
+type Decorations = readonly DecorationShape[] | Observable<readonly DecorationShape[]>;
+declare const decorated: ((args: Decorations, key?: string | number) => UiModifier<Decorations>) & {
+  readonly kind: UiModifierKind<Decorations>;
 };
 interface FocusRingOptions {
   readonly color?: UiColorValue;
@@ -3776,6 +3789,7 @@ export {
   DecorationFill,
   decorationRect,
   DecorationRect,
+  Decorations,
   DecorationShape,
   DecorationStroke,
   DEFAULT_FONT_FAMILY,
@@ -3846,7 +3860,6 @@ export {
   formatConstraints,
   formatExplanation,
   FrLength,
-  Gc,
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
@@ -3926,6 +3939,7 @@ export {
   isUiSemanticState,
   isVideoSurface,
   isWebGPUAvailable,
+  Kc,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -4443,6 +4457,7 @@ import {
   DecorationFill,
   decorationRect,
   DecorationRect,
+  Decorations,
   DecorationShape,
   DecorationStroke,
   DEFAULT_FONT_FAMILY,
@@ -5014,7 +5029,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DJRJplAI.js";
+} from "./index-CC7AFRP0.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5350,6 +5365,7 @@ export {
   type ContainerProps,
   type DecorationFill,
   type DecorationRect,
+  type Decorations,
   type DecorationShape,
   type DecorationStroke,
   type DefaultImageResolverOptions,
@@ -5712,7 +5728,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DJRJplAI.js";
+} from "./index-CC7AFRP0.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
