@@ -7,20 +7,6 @@ export interface WebGPUDeviceInit {
 }
 
 /**
- * Whether this thread has a WebGPU entry point at all.
- *
- * A synchronous answer, deliberately: it is what lets a runtime asked
- * for `auto` settle on Canvas2D during its constructor rather than
- * after a rejected promise, so a browser that never shipped WebGPU
- * draws its first frame with no blank period and no async state. It
- * says nothing about whether an adapter can actually be had, which
- * only `initializeWebGPU` can find out.
- */
-export function isWebGPUAvailable(): boolean {
-  return typeof navigator !== 'undefined' && navigator.gpu !== undefined;
-}
-
-/**
  * Acquires a WebGPU adapter and device.
  *
  * Fails cleanly with descriptive errors when navigator.gpu, the

@@ -102,18 +102,7 @@ export type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBa
 export type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 
 export type PositionProps = PropsOf<
-  | 'position'
-  | 'top'
-  | 'right'
-  | 'bottom'
-  | 'left'
-  | 'inset'
-  | 'zIndex'
-  | 'lift'
-  | 'liftBoundary'
-  | 'anchor'
-  | 'placement'
-  | 'anchorOffset'
+  'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'anchor' | 'placement' | 'anchorOffset'
 >;
 
 export type PaintProps = PropsOf<

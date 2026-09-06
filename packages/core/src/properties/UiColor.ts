@@ -59,45 +59,12 @@ export function colorsEqual(a: UiColor, b: UiColor): boolean {
 }
 
 /**
- * Formatting caches, keyed on the identity of the color object.
- *
- * A UiColor is an immutable record, so once a given instance has been
- * turned into a string that string stays correct for the life of the
- * instance. Nothing in the repository writes to a color's channels;
- * the interface declares them readonly and every derived color is
- * built as a fresh object, so identity is a safe key here.
- *
- * These caches only pay for themselves because parseColor memoizes
- * too. The colors a renderer formats every frame come either from a
- * theme palette, whose objects are module constants, or from a parsed
- * CSS string. Without the parse cache below, every frame would hand
- * these maps a brand new object and every lookup would miss, so the
- * two caches have to be kept together: removing the parse cache turns
- * these into pure overhead.
- *
- * A WeakMap needs no size bound, because an entry cannot outlive the
- * color that keys it.
- */
-const hexCache = new WeakMap<UiColor, string>();
-const rgbaCache = new WeakMap<UiColor, string>();
-
-/**
  * Converts a UiColor to a CSS-compatible hex string.
  *
  * This is a renderer convenience only; the canonical representation
  * remains the float object.
  */
 export function colorToHex(color: UiColor): string {
-  const cached = hexCache.get(color);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const formatted = formatHex(color);
-  hexCache.set(color, formatted);
-  return formatted;
-}
-
-function formatHex(color: UiColor): string {
   const r = Math.round(color.r * 255);
   const g = Math.round(color.g * 255);
   const b = Math.round(color.b * 255);
@@ -121,16 +88,10 @@ function formatHex(color: UiColor): string {
  * Converts a UiColor to a CSS rgba() string.
  */
 export function colorToRgba(color: UiColor): string {
-  const cached = rgbaCache.get(color);
-  if (cached !== undefined) {
-    return cached;
-  }
   const r = Math.round(color.r * 255);
   const g = Math.round(color.g * 255);
   const b = Math.round(color.b * 255);
-  const formatted = `rgba(${r}, ${g}, ${b}, ${color.a})`;
-  rgbaCache.set(color, formatted);
-  return formatted;
+  return `rgba(${r}, ${g}, ${b}, ${color.a})`;
 }
 
 const NAMED_COLORS: Record<string, UiColor> = {
@@ -218,65 +179,13 @@ function parseRgbColor(source: string): UiColor | undefined {
 }
 
 /**
- * Marks a string that has already been found unparseable.
- *
- * "Unsupported" is a real answer worth caching, and a bare undefined
- * in the map could not be told apart from a miss without a second
- * lookup through has(). A sentinel object keeps the hot path to one
- * map read.
- */
-const UNSUPPORTED: UiColor = { r: 0, g: 0, b: 0, a: 0 };
-
-/**
- * How many distinct color strings the parse cache will hold.
- *
- * An application's colors come from a small fixed set, usually a
- * theme palette and a handful of literals, so a few hundred entries
- * covers the working set several times over. But a color can also
- * arrive through a binding, and an animated rgba() produces a fresh
- * string on every frame; caching those without a bound would be a
- * leak that grows for as long as the application runs.
- *
- * When the cache fills it is cleared wholesale rather than evicted
- * entry by entry. That is the right trade here precisely because the
- * real working set is tiny: rebuilding it costs one parse per
- * distinct color, which is a single frame's worth of work at most,
- * and it buys us a cache with no bookkeeping of recency at all.
- */
-const PARSE_CACHE_LIMIT = 256;
-
-const parseCache = new Map<string, UiColor>();
-
-/**
  * Parses a CSS color string into a UiColor.
  *
  * Supports hex (#rgb, #rgba, #rrggbb, #rrggbbaa), rgb()/rgba(),
  * and a small set of named colors. Returns undefined for unsupported
  * values.
- *
- * The result is memoized on the raw input string, which matters for
- * more than the parse itself: resolving a node's paint state parses
- * the same handful of constant strings on every node of every frame,
- * and returning the same instance each time is what lets colorToHex
- * and colorToRgba cache their output by identity. Callers must treat
- * the returned color as immutable, as the interface's readonly
- * channels already require, because they are very likely holding the
- * same object as everyone else who asked for that color.
  */
 export function parseColor(value: string): UiColor | undefined {
-  const cached = parseCache.get(value);
-  if (cached !== undefined) {
-    return cached === UNSUPPORTED ? undefined : cached;
-  }
-  const parsed = parseColorUncached(value);
-  if (parseCache.size >= PARSE_CACHE_LIMIT) {
-    parseCache.clear();
-  }
-  parseCache.set(value, parsed ?? UNSUPPORTED);
-  return parsed;
-}
-
-function parseColorUncached(value: string): UiColor | undefined {
   const trimmed = value.trim().toLowerCase();
   if (trimmed.length === 0) {
     return undefined;

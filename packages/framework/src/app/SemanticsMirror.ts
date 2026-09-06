@@ -55,29 +55,6 @@ const STATE_ATTRIBUTES: Record<string, [attribute: string, value: string]> = {
   modal: ['aria-modal', 'true']
 };
 
-/**
- * Roles whose checked state is required rather than optional.
- *
- * A component publishes `checked` when it is on and nothing when it is
- * off, which is the right shape for a state list. ARIA does not agree:
- * on these roles `aria-checked` is a required attribute, and one that
- * is absent means "this is not a checkbox after all" rather than "this
- * checkbox is off". A screen reader then has nothing to announce.
- *
- * Filled in here rather than in each component for the reason
- * `ADOPTION_ROADMAP.md` A3 gives: what an assistive technology needs is
- * the mirror's business, and a rule in one file cannot be forgotten by
- * the next control somebody writes. Found on a `RadioGroup` in a native
- * window, where the unselected radio carried no `aria-checked` at all.
- */
-const CHECKABLE_ROLES: ReadonlySet<string> = new Set([
-  'checkbox',
-  'radio',
-  'switch',
-  'menuitemcheckbox',
-  'menuitemradio'
-]);
-
 /** Every attribute a record can write, so clearing one is a fixed list. */
 const RECORD_ATTRIBUTES: readonly string[] = [
   'role',
@@ -329,16 +306,17 @@ export class SemanticsMirror {
       // it from there: `aria-valuetext` is for a slider, not a field.
       // Without this a person could hear that a note's body exists and
       // never hear a word of it.
-      setText(
-        element,
-        VALUE_IN_CONTENT.has(record.role) ? (record.valueText ?? '') : LIVE_ROLES.has(record.role) ? label : ''
-      );
+      element.textContent = VALUE_IN_CONTENT.has(record.role)
+        ? (record.valueText ?? '')
+        : LIVE_ROLES.has(record.role)
+          ? label
+          : '';
     } else {
       // Prose, a heading and a paragraph are named by what they
       // contain — and prose is most of what a screen reader reads, so
       // it has to be real text in the document rather than a label on
       // an empty box.
-      setText(element, label ?? '');
+      element.textContent = label ?? '';
     }
     if (record.description !== undefined) {
       element.setAttribute('aria-description', record.description);
@@ -354,10 +332,6 @@ export class SemanticsMirror {
       if (attribute !== undefined) {
         element.setAttribute(attribute[0], attribute[1]);
       }
-    }
-    const saysChecked = (record.states ?? []).some(state => state === 'checked' || state === 'mixed');
-    if (record.role !== undefined && CHECKABLE_ROLES.has(record.role) && !saysChecked) {
-      element.setAttribute('aria-checked', 'false');
     }
     setNumber(element, 'aria-valuenow', record.valueNow);
     setNumber(element, 'aria-valuemin', record.valueMin);
@@ -537,32 +511,5 @@ export class SemanticsMirror {
 function setNumber(element: HTMLElement, attribute: string, value: number | undefined): void {
   if (value !== undefined) {
     element.setAttribute(attribute, String(value));
-  }
-}
-
-/**
- * Writes an element's text without throwing away what is inside it.
- *
- * Assigning `textContent` replaces *every* child node, elements
- * included. That is what is wanted for prose and for a control named by
- * an `aria-label`, both of which are leaves, and it is exactly wrong
- * for a container: a `tablist` full of tabs, a labelled `group`, a
- * `region` holding a page. Describing one of those a second time — a
- * label that changed, a state that came and went — emptied it, and a
- * screen reader was told the container existed and nothing about what
- * was in it.
- *
- * Found on a tabbed page whose tabs were missing from the
- * accessibility tree while drawing correctly on screen, which is the
- * worst way for it to be wrong: no screenshot gate can see it. An
- * element with element children keeps them and takes its name from the
- * `aria-label` that was just written.
- */
-function setText(element: HTMLElement, text: string): void {
-  if (element.children.length > 0) {
-    return;
-  }
-  if (element.textContent !== text) {
-    element.textContent = text;
   }
 }

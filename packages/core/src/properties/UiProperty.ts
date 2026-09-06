@@ -466,66 +466,6 @@ export const UiProperties = {
   }),
 
   /**
-   * Paints this node, and everything under it, in a top layer: above
-   * the whole tree and outside every clip an ancestor imposes.
-   *
-   * `zIndex` orders a node among its siblings and nowhere else, and it
-   * cannot do anything at all about `overflow`. That is enough for an
-   * element that has to cover the row beside it, and no use to one
-   * that has to leave the row: a picture morphing back into a card in
-   * a `LazyRow` starts its journey at the middle of the page, which is
-   * outside the row's scroll clip, so most of the morph is simply cut
-   * away. Lifting is the answer to that, and only to that.
-   *
-   * What is kept and what is dropped is the whole of the definition.
-   * Kept: the node's place in the layout, and every ancestor's
-   * transform, scroll offset and opacity, so a lifted node is drawn
-   * exactly where it would have been drawn and moves with what it
-   * belongs to. Dropped: every ancestor's clip, and the node's place
-   * in paint order, which becomes "after everything else".
-   *
-   * Layout rather than Paint, for the reason `zIndex` is: the flag is
-   * read while the tree is laid out, and a property that only marked
-   * Paint would be read back from a record nothing had recomputed.
-   *
-   * It is a transient. `sharedElement({ lift: true })` sets it for the
-   * length of a morph and clears it after; an element that is lifted
-   * for good is over everything for good, hit testing included, which
-   * is almost never what anyone wants.
-   */
-  lift: defineProperty<boolean | undefined>({
-    name: 'lift',
-    defaultValue: undefined,
-    inherited: false,
-    affects: L
-  }),
-
-  /**
-   * How far up "above everything" reaches: a lifted descendant of this
-   * node is painted at the end of *this* node rather than at the end
-   * of the frame.
-   *
-   * Without one, `lift` means above the whole tree, and across a
-   * screen transition that is too far. Two screens are on screen at
-   * once while one replaces the other, and the one being left may hold
-   * an element still morphing: lifted to the very top, it paints over
-   * the screen that is arriving, so the picture from the last
-   * navigation flies across the new page. Held to its own screen it
-   * escapes the row it lives in, which is what it was lifted for, and
-   * is covered by the arriving screen, which is what a departing
-   * screen should be.
-   *
-   * `Presence` marks each of its layers with this, so every screen,
-   * dialog and toast is one, and an application rarely sets it itself.
-   */
-  liftBoundary: defineProperty<boolean | undefined>({
-    name: 'liftBoundary',
-    defaultValue: undefined,
-    inherited: false,
-    affects: L
-  }),
-
-  /**
    * The UiNode an absolutely positioned node is placed next to. With
    * an anchor, top/right/bottom/left are ignored and `placement`
    * decides the side; the node flips to the opposite side when it

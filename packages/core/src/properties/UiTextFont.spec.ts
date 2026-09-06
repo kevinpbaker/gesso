@@ -8,7 +8,7 @@ import { LayoutEngine } from '../layout/LayoutEngine';
 import { Constraints } from '../layout/LayoutTypes';
 import { CharacterCountTextMeasurer } from '../layout/TextMeasurer';
 import { createPaintState, resolvePaintState } from '../rendering/PaintState';
-import { resolveFont, resolveFontInto } from './UiTextFont';
+import { resolveFont } from './UiTextFont';
 
 /**
  * Layout and paint must agree on the font, or text is measured in one
@@ -73,17 +73,5 @@ describe('resolveFont', () => {
     expect(laidOutHeight).toBeCloseTo(painted.lineHeight);
     expect(painted.lineHeight).toBeCloseTo(26.4);
     expect(painted.fontFamily).toBe(defaultTypography.headline.fontFamily);
-  });
-
-  /**
-   * Paint resolves into the scratch it already owns rather than into a
-   * record it allocates per node per frame, so the two entry points
-   * have to fill the same five fields the same way.
-   */
-  it('writes the same font into a caller-owned target', () => {
-    const { text } = tree({ textStyle: defaultTypography.headline }, { fontSize: 22, letterSpacing: 1.5 });
-    const target = { fontSize: 0, fontFamily: '', fontWeight: '' as string | number, lineHeight: 0, letterSpacing: 0 };
-    resolveFontInto(text, target);
-    expect(target).toEqual({ ...resolveFont(text) });
   });
 });

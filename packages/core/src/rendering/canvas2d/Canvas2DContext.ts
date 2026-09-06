@@ -62,21 +62,6 @@ export interface Canvas2DContext {
    * the only two anything in this renderer can produce.
    */
   drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
-  /**
-   * The current transform, read to size pre-scaled image copies.
-   *
-   * Only the four scaling and skewing terms are named, because the
-   * only question asked of it is how many device pixels a box of a
-   * given size covers; the translation says where, which does not
-   * change the answer. A real context returns a `DOMMatrix`, which
-   * satisfies this structurally.
-   *
-   * Optional, like `letterSpacing`: a recording or stub context has
-   * no transform worth reporting, and the one caller falls back to
-   * the surface's device pixel ratio when it is absent, which is the
-   * right answer for everything but a scaled node.
-   */
-  getTransform?(): { a: number; b: number; c: number; d: number };
 
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
   createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;

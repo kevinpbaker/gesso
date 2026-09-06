@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import { UiEventType, type UiPointerEvent } from './UiInputEvent';
-import { prepareInputSurface } from './UiPlatformAdapter';
 import { InputTestHarness, FakePlatformSurface } from './UiInputTestUtils';
 
 function pointerEvent(props: {
@@ -329,43 +328,5 @@ describe('UiPlatformAdapter', () => {
     expect(() =>
       surface.pointerTarget.emit('pointerdown', pointerEvent({ target: { setPointerCapture } }))
     ).not.toThrow();
-  });
-});
-
-describe('prepareInputSurface', () => {
-  /**
-   * The suite runs in node, so there is no `document` to make a canvas
-   * from. `prepareInputSurface` only ever writes to `style`, and that
-   * is the whole of what these assert, so a recorder shaped like a
-   * `CSSStyleDeclaration` is the honest double.
-   */
-  function surfaceDouble(): { element: HTMLElement; style: Record<string, string> } {
-    const style: Record<string, string> = {
-      setProperty(name: string, value: string) {
-        style[name] = value;
-      }
-    } as unknown as Record<string, string>;
-    return { element: { style } as unknown as HTMLElement, style };
-  }
-
-  it('suppresses the platform focus outline', () => {
-    // The canvas is focusable so that Tab can reach the application,
-    // which otherwise means clicking anything drawn on it rings the
-    // whole canvas. Gesso draws its own ring around the focused node.
-    const { element, style } = surfaceDouble();
-
-    prepareInputSurface(element);
-
-    expect(style.outline).toBe('none');
-  });
-
-  it('leaves the browser nothing else to interpret as a gesture', () => {
-    const { element, style } = surfaceDouble();
-
-    prepareInputSurface(element);
-
-    expect(style.touchAction).toBe('none');
-    expect(style.userSelect).toBe('none');
-    expect(style['-webkit-tap-highlight-color']).toBe('transparent');
   });
 });

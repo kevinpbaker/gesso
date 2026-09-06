@@ -1,7 +1,6 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from '../layout/LayoutRecord';
-import type { SubtreeBounds } from '../layout/SubtreeBounds';
 import { isNodeHitTestable, isNodeInert } from './UiInteraction';
 import { pointInBox, scrollbarThumb, scrollbarZoneAt, type ScrollbarAxis } from '../layout/Scrollbars';
 
@@ -15,29 +14,6 @@ import { pointInBox, scrollbarThumb, scrollbarZoneAt, type ScrollbarAxis } from 
  */
 export interface HitTestLayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
-  /**
-   * The nodes asking for `lift`, which are painted in a top layer and
-   * so are pressed before anything in the tree.
-   *
-   * Optional because it is an index rather than a geometry: a reader
-   * that does not keep one simply has no top layer, and every node is
-   * tested where the tree puts it. `LayoutEngine` keeps one.
-   */
-  readonly lifted?: ReadonlySet<UiNode>;
-  /**
-   * A box around everything in a node's subtree that could take a
-   * point, in the space the node's own record lives in, so that a
-   * subtree the point falls outside of is passed over rather than
-   * descended into.
-   *
-   * Optional for the same reason `lifted` is: a reader that cannot
-   * summarise its geometry offers none, and the walk descends into
-   * everything, which is what it did before bounds existed. The
-   * summary is only ever allowed to be too large, so a reader that
-   * offers one changes how long a hit test takes and never what it
-   * answers.
-   */
-  subtreeBoundsFor?(node: UiNode): SubtreeBounds | undefined;
 }
 
 export interface UiPoint {
@@ -66,13 +42,11 @@ export interface HitTestResult {
 /**
  * Abstraction over hit testing.
  *
- * The initial implementation is a reverse-paint-order tree walk. It
- * is O(n) in the worst case, and close to the depth of the pointer
- * path in the ordinary one: a subtree whose bounds the point falls
- * outside of is passed over, when the reader offers bounds at all.
- * Later implementations could back this interface with a spatial
- * hash, an R-tree, a grid, or GPU picking without the pointer
- * pipeline changing.
+ * The initial implementation is a reverse-paint-order tree walk
+ * (O(n) worst case, but only the nodes on the pointer path are
+ * descended). Later implementations could back this interface with
+ * a spatial hash, an R-tree, a grid, or GPU picking without the
+ * pointer pipeline changing.
  */
 export interface HitTester {
   hitTest(x: number, y: number): HitTestResult | null;
@@ -122,13 +96,6 @@ interface TransformScratch {
  * paint on top of the parent's background. No per-node allocations
  * happen on the traversal path; a result object is produced only
  * when a hit is found.
- *
- * The walk descends into a child only when the point is inside the
- * bounds of that child's subtree, which is what stops a list of a
- * thousand rows costing a thousand descents for a point in one of
- * them. Those bounds come from the layout reader and are conservative
- * by construction, so they change how much of the tree is visited and
- * never which node comes back.
  */
 export class UiHitTester implements HitTester {
   private readonly point: TransformScratch = { x: 0, y: 0 };
@@ -137,10 +104,6 @@ export class UiHitTester implements HitTester {
   private zoneOnly = false;
   /** Root-to-node scratch for toLocal, reused so a pointer drag allocates nothing. */
   private readonly path: UiNode[] = [];
-  /** The lifted nodes of the moment, ordered so the last is tried first. */
-  private readonly liftedScratch: UiNode[] = [];
-  /** True while testing inside a lifted subtree, so it is not skipped again. */
-  private inLifted = false;
 
   constructor(
     private layout: HitTestLayoutReader,
@@ -155,9 +118,7 @@ export class UiHitTester implements HitTester {
   hitTest(x: number, y: number): HitTestResult | null {
     this.result.scrollbar = undefined;
     this.zoneOnly = false;
-    // The top layer first: `lift` paints those nodes over the whole
-    // tree, and what is drawn last is pressed first.
-    if (this.hitTestLifted(x, y) || this.hitTestNode(this.root, x, y)) {
+    if (this.hitTestNode(this.root, x, y)) {
       const result: HitTestResult = { node: this.result.node!, localX: this.result.localX, localY: this.result.localY };
       const scrollbar = this.result.takeScrollbar();
       if (scrollbar !== undefined) {
@@ -177,12 +138,6 @@ export class UiHitTester implements HitTester {
    */
   hitStack(x: number, y: number): UiNode[] {
     const out: UiNode[] = [];
-    this.forEachLifted(x, y, (node, px, py) => {
-      this.inLifted = true;
-      this.collectNode(node, px, py, out);
-      this.inLifted = false;
-      return false;
-    });
     this.collectNode(this.root, x, y, out);
     return out;
   }
@@ -193,10 +148,6 @@ export class UiHitTester implements HitTester {
     }
     const rec = this.layout.recordFor(node);
     if (rec === undefined || !this.invertPoint(node, rec, x, y)) {
-      return;
-    }
-    if (rec.lifted && !this.inLifted) {
-      // Already collected from the top layer, where it is drawn.
       return;
     }
     const px = this.point.x - rec.stickyOffsetX;
@@ -297,102 +248,6 @@ export class UiHitTester implements HitTester {
   }
 
   // -------------------------------------------------------------------------
-  // The top layer
-  // -------------------------------------------------------------------------
-
-  /**
-   * Tries the lifted nodes, last one first, and reports whether one
-   * took the point.
-   *
-   * Last first because `lift` puts them over the tree in the order
-   * they were lifted, and the reason the ordinary walk reads
-   * `paintOrder` backwards holds here too: whatever is drawn on top is
-   * pressed first.
-   */
-  private hitTestLifted(x: number, y: number): boolean {
-    return this.forEachLifted(x, y, (node, px, py) => {
-      this.inLifted = true;
-      const hit = this.hitTestNode(node, px, py);
-      this.inLifted = false;
-      return hit;
-    });
-  }
-
-  /**
-   * Runs `visit` for each lifted node with the point in the space its
-   * record box lives in, stopping at the first that answers true.
-   *
-   * The point is replayed down the ancestor chain rather than taken
-   * from the walk, because there is no walk to take it from: the whole
-   * point of the top layer is that the descent to it went through
-   * clips that would have rejected the point long before it arrived.
-   * `toLocal` replays the same chain for the same reason.
-   */
-  private forEachLifted(x: number, y: number, visit: (node: UiNode, px: number, py: number) => boolean): boolean {
-    const lifted = this.layout.lifted;
-    if (lifted === undefined || lifted.size === 0) {
-      return false;
-    }
-    const nodes = this.liftedScratch;
-    nodes.length = 0;
-    for (const node of lifted) {
-      nodes.push(node);
-    }
-    let hit = false;
-    for (let i = nodes.length - 1; i >= 0 && !hit; i--) {
-      const node = nodes[i]!;
-      if (this.layout.recordFor(node) === undefined) {
-        continue;
-      }
-      this.pointInParentSpace(node, x, y);
-      hit = visit(node, this.point.x, this.point.y);
-    }
-    nodes.length = 0;
-    return hit;
-  }
-
-  /**
-   * Puts `this.point` in the coordinate space a node's record box
-   * lives in: every ancestor's transform, sticky shift and scroll
-   * offset applied, and the node's own left alone, which is exactly
-   * what `hitTestNode` expects to be handed.
-   */
-  private pointInParentSpace(node: UiNode, x: number, y: number): void {
-    const path = this.path;
-    path.length = 0;
-    for (let current: UiNode | null = node.parent; current !== null; current = current.parent) {
-      if (current.type !== UiNodeType.Fragment) {
-        path.push(current);
-      }
-      if (current === this.root) {
-        break;
-      }
-    }
-    let px = x;
-    let py = y;
-    for (let i = path.length - 1; i >= 0; i--) {
-      const ancestor = path[i]!;
-      const record = this.layout.recordFor(ancestor);
-      if (record === undefined) {
-        continue;
-      }
-      if (this.invertPoint(ancestor, record, px, py)) {
-        px = this.point.x;
-        py = this.point.y;
-      }
-      px -= record.stickyOffsetX;
-      py -= record.stickyOffsetY;
-      if (record.clips && record.scrollable) {
-        px += record.scrollX;
-        py += record.scrollY;
-      }
-    }
-    path.length = 0;
-    this.point.x = px;
-    this.point.y = py;
-  }
-
-  // -------------------------------------------------------------------------
   // Traversal
   // -------------------------------------------------------------------------
 
@@ -402,13 +257,6 @@ export class UiHitTester implements HitTester {
     }
     const rec = this.layout.recordFor(node);
     if (rec === undefined) {
-      return false;
-    }
-    if (rec.lifted && !this.inLifted) {
-      // Tested in the top layer, where it is drawn. Testing it here as
-      // well would let a press land on a picture that is halfway across
-      // the screen, which is the clipped position `lift` exists to stop
-      // it being drawn at.
       return false;
     }
     if (!this.invertPoint(node, rec, x, y)) {
@@ -447,9 +295,6 @@ export class UiHitTester implements HitTester {
 
     // Non-clipping nodes let children paint outside them, so children
     // are tested regardless of whether the point falls inside the box.
-    // What keeps that from meaning "every node in the tree, on every
-    // pointer move" is the bounds check in `hitTestChildren`, which
-    // knows how far outside the box the children actually reach.
     if (this.hitTestChildren(node, px, py)) {
       return true;
     }
@@ -468,7 +313,7 @@ export class UiHitTester implements HitTester {
     const order = this.layout.recordFor(parent)?.paintOrder;
     if (order !== null && order !== undefined) {
       for (let i = order.length - 1; i >= 0; i--) {
-        if (!this.outsideSubtree(order[i], x, y) && this.hitTestNode(order[i], x, y)) {
+        if (this.hitTestNode(order[i], x, y)) {
           return true;
         }
       }
@@ -476,38 +321,16 @@ export class UiHitTester implements HitTester {
     }
     for (let child = parent.lastChild; child !== null; child = child.previousSibling) {
       if (child.type === UiNodeType.Fragment) {
-        // A fragment has no record and so no bounds of its own; its
-        // children carry theirs, and are checked one by one below.
         if (this.hitTestChildren(child, x, y)) {
           return true;
         }
         continue;
       }
-      if (!this.outsideSubtree(child, x, y) && this.hitTestNode(child, x, y)) {
+      if (this.hitTestNode(child, x, y)) {
         return true;
       }
     }
     return false;
-  }
-
-  /**
-   * Whether a subtree can be passed over without being descended into.
-   *
-   * This is the only thing standing between a pointer move and a walk
-   * of the whole tree, and it is allowed to be wrong in exactly one
-   * direction: a box that is too large costs a descent that finds
-   * nothing, and a box that is too small loses a click at a position
-   * where something is visibly drawn. The reader is what promises that
-   * (see `SubtreeBounds`); here the edges are compared inclusively, so
-   * a point exactly on one is descended into and left for the node's
-   * own half-open box test to reject.
-   */
-  private outsideSubtree(node: UiNode, x: number, y: number): boolean {
-    const bounds = this.layout.subtreeBoundsFor?.(node);
-    if (bounds === undefined || bounds.boundsUnbounded) {
-      return false;
-    }
-    return x < bounds.boundsMinX || x > bounds.boundsMaxX || y < bounds.boundsMinY || y > bounds.boundsMaxY;
   }
 
   private recordHit(node: UiNode, rec: LayoutRecord, px: number, py: number): boolean {

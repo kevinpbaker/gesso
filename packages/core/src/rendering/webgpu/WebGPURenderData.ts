@@ -5,7 +5,7 @@ import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { TextMeasurer } from '../../layout/TextMeasurer';
-import { resolvePaintState, createPaintState, computeObjectFitRect, isPaintVisible } from '../PaintState';
+import { resolvePaintState, createPaintState, computeObjectFitRect } from '../PaintState';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { TextureSource } from './WebGPUTextureCache';
 import { colorToCss } from '../PaintState';
@@ -153,17 +153,6 @@ export interface ImageCommand {
   scissor: ScissorRect | null;
   /** A still, or a video's surface; the texture cache tells them apart. */
   source: TextureSource;
-  /**
-   * How many device pixels the quad covers, so a still can be uploaded
-   * at the size it is drawn rather than the size it was decoded.
-   *
-   * Under the node's whole transform, not the device pixel ratio alone:
-   * a node a morph is scaling covers a different number of pixels every
-   * frame, which is the same reason `Canvas2DRenderer.scaledFor` reads
-   * the current transform.
-   */
-  drawWidth: number;
-  drawHeight: number;
 }
 
 export type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
@@ -371,9 +360,6 @@ export function buildRenderList(
     cull: { x: 0, y: 0, width: logicalWidth, height: logicalHeight }
   };
 
-  /** The nodes asking for `lift`, met on the walk and drawn after it. */
-  const liftedPass: { node: UiNode; opacity: number; ctm: Affine }[] = [];
-
   function closePrimitives(): void {
     const end = instanceData.length / INSTANCE_STRIDE_FLOATS;
     if (end > openStart) {
@@ -521,29 +507,14 @@ export function buildRenderList(
     }
   }
 
-  function visit(node: UiNode, lifted = false): void {
+  function visit(node: UiNode): void {
     const rec = layout.recordFor(node);
     if (rec === undefined) {
       return;
     }
 
-    // Visibility from its own two properties rather than from the paint
-    // state, and the cull test from the record alone, so that a node
-    // this walk is about to discard never pays for the twenty-five or so
-    // property resolutions the full state costs. A long list culls most
-    // of what it walks, which is where that adds up.
-    if (!isPaintVisible(node)) {
-      return;
-    }
-
-    if (rec.lifted && !lifted) {
-      // Held for the top layer, with the two things a lifted node keeps
-      // of its ancestors: their accumulated transform, so it is drawn
-      // where it belongs and scrolls with what it belongs to, and their
-      // opacity. Their clips are exactly what it is escaping. Captured
-      // before the cull test, because a lifted node is nearly always
-      // somewhere its record box is not.
-      liftedPass.push({ node, opacity: state.opacity, ctm: state.ctm });
+    const paint = resolvePaintState(node, paintScratch);
+    if (!paint.visible || paint.opacity === 0) {
       return;
     }
 
@@ -555,7 +526,6 @@ export function buildRenderList(
       return;
     }
 
-    const paint = resolvePaintState(node, paintScratch);
     const effectiveOpacity = state.opacity * paint.opacity;
     // A sticky node (and its children) is shifted to its scroll
     // container's edge; the record keeps the flow position.
@@ -707,19 +677,7 @@ export function buildRenderList(
           imageRounded,
           FULL_TEXTURE
         );
-        // The quad's size in device pixels, from the node's transform.
-        // `nodeCtm` is a 2x3 in column-major order, so the two column
-        // lengths are the axis scales.
-        const scaleX = Math.hypot(nodeCtm[0], nodeCtm[1]) * dpr;
-        const scaleY = Math.hypot(nodeCtm[2], nodeCtm[3]) * dpr;
-        commands.push({
-          kind: CommandKind.Image,
-          instance,
-          scissor: imageScissor,
-          source: textureSource,
-          drawWidth: rect.width * scaleX,
-          drawHeight: rect.height * scaleY
-        });
+        commands.push({ kind: CommandKind.Image, instance, scissor: imageScissor, source: textureSource });
       }
     }
 
@@ -800,9 +758,7 @@ export function buildRenderList(
     // editable always has foreground work: its caret and placeholder.
     const hasText = paint.editor !== undefined || (paint.text !== undefined && paint.text.length > 0);
 
-    // Children. A boundary drains whatever they lifted once they are
-    // done, so `lift` reaches the top of this subtree and no further.
-    let liftedFrom = liftedPass.length;
+    // Children.
     if (node.hasChildren()) {
       const saved: RenderState = {
         opacity: state.opacity,
@@ -828,7 +784,6 @@ export function buildRenderList(
         state.ctm = translateTransform(state.ctm, -rec.scrollX, -rec.scrollY);
       }
 
-      liftedFrom = liftedPass.length;
       visitChildren(node, rec.paintOrder);
 
       state.opacity = saved.opacity;
@@ -965,57 +920,13 @@ export function buildRenderList(
       pushDecorations(decorations, true);
     }
 
-    if (rec.liftBoundary) {
-      // Inside this node's own clip, over everything under it, and
-      // still under whatever comes after this node.
-      drawLifted(liftedFrom, nextClip, nextRounded);
-    }
-
     if (rec.scrollable) {
       beginPrimitives(ownScissor);
       pushScrollbars(instanceData, rec, effectiveOpacity, nodeCtm, ownRounded, now);
     }
   }
 
-  /**
-   * The top layer, drawn once the tree is done: no clip, no scissor,
-   * no cull, and after every command the walk emitted, which is the
-   * whole of what `lift` promises. The list is walked by index rather
-   * than iterated, so a lifted node inside a lifted subtree lands
-   * after the one that carried it, as paint order says it should.
-   */
-  function drawLifted(from = 0, clip: ScissorRect | null = null, rounded: number = NO_CLIP_INDEX): void {
-    if (liftedPass.length <= from) {
-      return;
-    }
-    const saved: RenderState = {
-      opacity: state.opacity,
-      ctm: state.ctm,
-      clip: state.clip,
-      rounded: state.rounded,
-      cull: state.cull
-    };
-    for (let i = from; i < liftedPass.length; i++) {
-      const entry = liftedPass[i]!;
-      state.opacity = entry.opacity;
-      state.ctm = entry.ctm;
-      // The boundary's own clip still applies; everything inside it
-      // does not, which is the whole of what `lift` escapes.
-      state.clip = clip;
-      state.rounded = rounded;
-      state.cull = null;
-      visit(entry.node, true);
-    }
-    liftedPass.length = from;
-    state.opacity = saved.opacity;
-    state.ctm = saved.ctm;
-    state.clip = saved.clip;
-    state.rounded = saved.rounded;
-    state.cull = saved.cull;
-  }
-
   visit(root);
-  drawLifted();
   closePrimitives();
 
   // The debugging overlay: unclipped, untransformed, over everything.

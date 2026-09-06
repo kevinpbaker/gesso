@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type { UiColor } from './UiColor';
 import { colorToHex, colorToRgba, colorsEqual, normalizeColor, parseColor, rgb8, rgba } from './UiColor';
 
 describe('UiColor', () => {
@@ -77,58 +76,6 @@ describe('UiColor', () => {
     it('returns undefined for unsupported values', () => {
       expect(parseColor('hsl(0, 100%, 50%)')).toBeUndefined();
       expect(parseColor('')).toBeUndefined();
-    });
-  });
-
-  describe('parseColor memoization', () => {
-    it('returns the same instance for repeated input', () => {
-      expect(parseColor('#123456')).toBe(parseColor('#123456'));
-    });
-
-    it('keeps returning undefined for an unsupported value', () => {
-      expect(parseColor('hsl(200, 50%, 50%)')).toBeUndefined();
-      expect(parseColor('hsl(200, 50%, 50%)')).toBeUndefined();
-    });
-
-    it('does not confuse an unsupported value with transparent', () => {
-      expect(parseColor('not-a-color')).toBeUndefined();
-      expect(parseColor('transparent')).toEqual({ r: 0, g: 0, b: 0, a: 0 });
-      expect(parseColor('not-a-color')).toBeUndefined();
-    });
-
-    it('still parses correctly once entries have been evicted', () => {
-      const first = '#010203';
-      expect(parseColor(first)).toEqual({ r: 1 / 255, g: 2 / 255, b: 3 / 255, a: 1 });
-
-      // Push well past the cache limit with distinct strings, which
-      // forces at least one wholesale clear.
-      for (let i = 0; i < 600; i++) {
-        expect(parseColor(`rgb(${i % 256}, ${(i * 3) % 256}, 0)`)).toEqual({
-          r: (i % 256) / 255,
-          g: ((i * 3) % 256) / 255,
-          b: 0,
-          a: 1
-        });
-      }
-
-      expect(parseColor(first)).toEqual({ r: 1 / 255, g: 2 / 255, b: 3 / 255, a: 1 });
-    });
-  });
-
-  describe('color formatting memoization', () => {
-    it('returns the same hex string for a repeated instance', () => {
-      const color = parseColor('#2196f2') as UiColor;
-      expect(colorToHex(color)).toBe('#2196f2');
-      expect(colorToHex(color)).toBe('#2196f2');
-    });
-
-    it('formats distinct instances independently', () => {
-      const a = rgba(1, 0, 0, 0.5);
-      const b = rgba(0, 0, 1);
-      expect(colorToHex(a)).toBe('#ff000080');
-      expect(colorToHex(b)).toBe('#00f');
-      expect(colorToRgba(a)).toBe('rgba(255, 0, 0, 0.5)');
-      expect(colorToRgba(b)).toBe('rgba(0, 0, 255, 1)');
     });
   });
 

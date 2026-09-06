@@ -1,12 +1,6 @@
-import { isObservable, type Observable, type Subscription } from 'rxjs';
-
 import type { DecorationShape } from '../rendering/Decorations';
 import type { UiColorValue } from '../properties/UiPropertyValues';
 import { defineModifier, type UiModifier } from './UiModifier';
-import type { UiModifierHost } from './UiModifierHost';
-
-/** What `decorated` takes: a list, or one that changes over time. */
-export type Decorations = readonly DecorationShape[] | Observable<readonly DecorationShape[]>;
 
 /**
  * Shapes on a node, for as long as the modifier is attached.
@@ -19,50 +13,16 @@ export type Decorations = readonly DecorationShape[] | Observable<readonly Decor
  *
  * The argument is compared by identity, as every modifier's arguments
  * are, so hoist the array rather than building it in a render body.
- *
- * **An Observable of shapes is also accepted**, and is the only way to
- * draw something whose shape changes while it is on screen. A
- * modifier list is static per element, so a component that recomputed
- * its shapes could not hand them over; it subscribes here instead, and
- * the subscription is released on detach. What this buys is a picture
- * made of many rectangles that would otherwise have to be many nodes:
- * Segue's waveform is four hundred columns on one node, redrawn as the
- * track's peaks arrive, with nothing to lay out and nothing to hit
- * test. Hoist the Observable for the same reason you would hoist the
- * array.
  */
-export const decorated = defineModifier<Decorations>({
+export const decorated = defineModifier<readonly DecorationShape[]>({
   name: 'decorated',
   attach(host, shapes) {
-    draw(host, shapes);
+    host.decorate(shapes);
   },
   update(host, shapes) {
-    draw(host, shapes);
+    host.decorate(shapes);
   }
 });
-
-/**
- * The live subscription per host, so a second `update` replaces the
- * first rather than drawing from both.
- *
- * `host.own` releases on detach, which is right for the last one and
- * not enough for the one before it. Keyed by the host, which is one
- * per node per modifier, so two decorations on the same node keep
- * their own.
- */
-const live = new WeakMap<UiModifierHost, Subscription>();
-
-function draw(host: UiModifierHost, shapes: Decorations): void {
-  live.get(host)?.unsubscribe();
-  live.delete(host);
-  if (isObservable(shapes)) {
-    const subscription = shapes.subscribe(next => host.decorate(next));
-    live.set(host, subscription);
-    host.own(subscription);
-    return;
-  }
-  host.decorate(shapes);
-}
 
 /**
  * A ring outside whatever holds keyboard focus.

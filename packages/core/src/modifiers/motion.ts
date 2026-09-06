@@ -546,34 +546,6 @@ export interface SharedElementArgs extends MotionTiming {
    */
   readonly scale?: 'free' | 'uniform';
   /**
-   * Paints the element in the top layer for the length of the morph,
-   * above the whole tree and outside every clip its ancestors impose.
-   *
-   * For the morph that ends *inside* something that clips. A picture
-   * that lives in a scrolling row starts its journey back at the
-   * middle of the page, which is nowhere near the row, so the row's
-   * clip cuts most of the morph away: the slot is empty for the first
-   * half of it and the picture appears out of nothing as it shrinks
-   * back into the band. Measured in Segue, coming back from a track
-   * page to the shelf it was opened from.
-   *
-   * `onMorph` cannot help with that, and neither can any `zIndex` an
-   * ancestor writes: order decides who is drawn over whom, and this is
-   * not a question of order. It is `overflow`.
-   *
-   * So it is the same question the browser answers by lifting its
-   * named elements out of the page into a layer of their own, and the
-   * same answer, held to the length of the morph: the element keeps
-   * its place in the layout and every ancestor transform, scroll
-   * offset and opacity, and loses their clipping and its place in
-   * paint order. See the `lift` property.
-   *
-   * Not the default, because most morphs do not need it and one that
-   * does not is better off drawn where it belongs: a lifted element is
-   * over *everything*, a header and a now-playing bar included.
-   */
-  readonly lift?: boolean;
-  /**
    * Told `true` when this element starts morphing and `false` when it
    * has arrived — or when it leaves mid-flight, so nothing is left
    * holding a state that will never be cleared.
@@ -663,12 +635,7 @@ class SharedElementController {
     if (registry === null) {
       return;
     }
-    const claim = registry.claim(
-      this.args.name,
-      this.host.node,
-      () => this.yieldName(),
-      () => this.unyield()
-    );
+    const claim = registry.claim(this.args.name, this.host.node, () => this.yieldName());
     this.claimed = claim.box;
     this.yieldPrevious = claim.yieldPrevious;
     if (claim.box !== null) {
@@ -710,21 +677,6 @@ class SharedElementController {
       return;
     }
     this.morphing = true;
-    // Written here, at the claim, for the reason `onMorph` is told
-    // here: `lift` is read while the tree is laid out, and this frame's
-    // layout is the one the morph's first frame is drawn from.
-    if (this.args.lift === true) {
-      this.host.set('lift', true);
-    }
-    // An element in flight is scenery, not a target. It is somewhere it
-    // does not belong, it is there for a few hundred milliseconds, and
-    // for most of that it is larger than its resting self and covering
-    // its neighbours: a press that lands on it was aimed at whatever it
-    // is passing over. Pressing a second card while the first was still
-    // flying home opened the first one again, which is what this stops,
-    // and it is why a browser's view-transition pseudo-elements take no
-    // pointer events either.
-    this.host.set('pointerEvents', 'none');
     this.args.onMorph?.(true);
   }
 
@@ -733,10 +685,6 @@ class SharedElementController {
       return;
     }
     this.morphing = false;
-    if (this.args.lift === true) {
-      this.host.clear('lift');
-    }
-    this.host.clear('pointerEvents');
     this.args.onMorph?.(false);
   }
 
@@ -762,41 +710,7 @@ class SharedElementController {
       return;
     }
     this.yielded = true;
-    // Whatever this element was in the middle of is over: something
-    // else holds the name now and this one is about to be invisible.
-    // Said before the snap, because the snap is what cancels the
-    // animation this morph was waiting on — `animateTo`'s callback
-    // fires only for the run that is still current, so a morph
-    // interrupted here would never report that it had finished, and
-    // the raise (`onMorph`) and the `lift` it asked for would both be
-    // left switched on for the life of the element. Visible as a card
-    // from an earlier transition painting over the next screen.
-    this.endMorph();
     this.layer.snapTo({ ...MOTION_REST, opacity: 0 });
-  }
-
-  /**
-   * The name has come back, so this element does too.
-   *
-   * Stepping aside used to be a one-way door, and an interrupted
-   * transition walked straight into it. A route change keeps the
-   * departing screen alive for the length of its exit, so pressing Back
-   * part-way through returns to a screen whose element has already
-   * yielded; the arriving element then leaves without anything
-   * replacing it, and the only copy left is the invisible one. The
-   * picture simply disappeared.
-   *
-   * A snap rather than a fade, for the reason the yield is a snap: the
-   * element it was standing aside for is going away this frame, and
-   * anything gradual puts a gap between the two where the picture is
-   * half there.
-   */
-  private unyield(): void {
-    if (!this.yielded) {
-      return;
-    }
-    this.yielded = false;
-    this.layer.snapTo(MOTION_REST);
   }
 
   private handleLayout(): void {

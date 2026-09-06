@@ -10,23 +10,17 @@ import {
   DEFAULT_FONT_SIZE,
   DEFAULT_FONT_WEIGHT,
   DEFAULT_TEXT_COLOR,
-  isPaintVisible,
   normalizeTextAlign,
   normalizeVerticalAlign,
-  resolvePaintState,
-  type PaintState
+  resolvePaintState
 } from './PaintState';
 
-function nodeWith(props: Record<string, unknown>): UiNode {
+function resolve(props: Record<string, unknown>) {
   const node = new UiNode('node', UiNodeType.Box);
   for (const [key, value] of Object.entries(props)) {
     node.setProperty(key, value);
   }
-  return node;
-}
-
-function resolve(props: Record<string, unknown>) {
-  return resolvePaintState(nodeWith(props), createPaintState());
+  return resolvePaintState(node, createPaintState());
 }
 
 describe('resolvePaintState', () => {
@@ -42,14 +36,10 @@ describe('resolvePaintState', () => {
     expect(state.borderRadius).toEqual({ topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 });
     expect(state.hasTransform).toBe(false);
     expect(state.text).toBeUndefined();
-    // The text half is not resolved for a node with no text, so these
-    // are the untouched defaults rather than this node's answers. That
-    // is why `lineHeight` is 0 and not a normal line height for the
-    // default size: nothing resolved a font.
     expect(state.fontSize).toBe(DEFAULT_FONT_SIZE);
     expect(state.fontFamily).toBe(DEFAULT_FONT_FAMILY);
     expect(state.fontWeight).toBe(DEFAULT_FONT_WEIGHT);
-    expect(state.lineHeight).toBe(0);
+    expect(state.lineHeight).toBe(DEFAULT_FONT_SIZE * 1.2);
     expect(state.textColor).toEqual(DEFAULT_TEXT_COLOR);
     expect(state.textAlign).toBe('start');
     expect(state.verticalAlign).toBe('top');
@@ -115,12 +105,9 @@ describe('resolvePaintState', () => {
     expect(state.textColor).toEqual({ r: 0, g: 1, b: 0, a: 1 });
   });
 
-  it('treats empty text as absent', () => {
-    expect(resolve({ text: '' }).text).toBeUndefined();
-  });
-
-  it('treats invalid numeric styles as absent', () => {
-    const state = resolve({ text: 'Hello', fontSize: 'big', fontWeight: '', lineHeight: -4, color: 5 });
+  it('treats empty text and invalid numeric styles as absent', () => {
+    const state = resolve({ text: '', fontSize: 'big', fontWeight: '', lineHeight: -4, color: 5 });
+    expect(state.text).toBeUndefined();
     expect(state.fontSize).toBe(DEFAULT_FONT_SIZE);
     expect(state.fontWeight).toBe(DEFAULT_FONT_WEIGHT);
     expect(state.lineHeight).toBe(DEFAULT_FONT_SIZE * 1.2);
@@ -128,121 +115,20 @@ describe('resolvePaintState', () => {
   });
 
   it('normalizes text alignment', () => {
-    expect(resolve({ text: 'a', textAlign: 'center' }).textAlign).toBe('center');
-    expect(resolve({ text: 'a', textAlign: 'right' }).textAlign).toBe('right');
+    expect(resolve({ textAlign: 'center' }).textAlign).toBe('center');
+    expect(resolve({ textAlign: 'right' }).textAlign).toBe('right');
     // start and end are kept as they are: which edge they mean depends
     // on the paragraph's direction, and placeLines decides it.
-    expect(resolve({ text: 'a', textAlign: 'end' }).textAlign).toBe('end');
-    expect(resolve({ text: 'a', textAlign: 'start' }).textAlign).toBe('start');
-    expect(resolve({ text: 'a' }).textAlign).toBe('start');
+    expect(resolve({ textAlign: 'end' }).textAlign).toBe('end');
+    expect(resolve({ textAlign: 'start' }).textAlign).toBe('start');
+    expect(resolve({}).textAlign).toBe('start');
   });
 
   it('normalizes vertical alignment', () => {
-    expect(resolve({ text: 'a', verticalAlign: 'middle' }).verticalAlign).toBe('middle');
-    expect(resolve({ text: 'a', verticalAlign: 'center' }).verticalAlign).toBe('middle');
-    expect(resolve({ text: 'a', verticalAlign: 'bottom' }).verticalAlign).toBe('bottom');
-    expect(resolve({ text: 'a', verticalAlign: 'top' }).verticalAlign).toBe('top');
-  });
-});
-
-/**
- * The scratch is one object walked over the whole tree, so the failure
- * this half of the function can cause is a box drawn in the font and
- * colour of whichever text node the walk passed last. These check the
- * scratch itself; `Canvas2DRenderer.spec` checks that a real walk over
- * a label and its neighbour draws them apart.
- */
-describe('resolvePaintState reusing a scratch', () => {
-  it('leaves a box none of the text node resolved before it', () => {
-    const scratch = createPaintState();
-    resolvePaintState(
-      nodeWith({
-        text: 'Loud',
-        fontSize: 40,
-        fontFamily: 'Georgia',
-        fontWeight: 900,
-        lineHeight: 60,
-        letterSpacing: 3,
-        color: '#ff0000',
-        textAlign: 'right',
-        verticalAlign: 'bottom',
-        textWrap: 'none',
-        maxLines: 2,
-        textOverflow: 'ellipsis',
-        textDirection: 'rtl'
-      }),
-      scratch
-    );
-    expect(scratch.fontSize).toBe(40);
-
-    const box = resolvePaintState(nodeWith({ backgroundColor: '#00ff00' }), scratch);
-    expect(box.text).toBeUndefined();
-    expect(box.fontSize).toBe(DEFAULT_FONT_SIZE);
-    expect(box.fontFamily).toBe(DEFAULT_FONT_FAMILY);
-    expect(box.fontWeight).toBe(DEFAULT_FONT_WEIGHT);
-    expect(box.lineHeight).toBe(0);
-    expect(box.letterSpacing).toBe(0);
-    expect(box.textColor).toEqual(DEFAULT_TEXT_COLOR);
-    expect(box.textAlign).toBe('start');
-    expect(box.verticalAlign).toBe('top');
-    expect(box.textWrap).toBe('word');
-    expect(box.maxLines).toBeUndefined();
-    expect(box.textOverflow).toBe('clip');
-    expect(box.rtl).toBe(false);
-  });
-
-  it('leaves a box exactly the text half a fresh scratch has', () => {
-    const scratch = createPaintState();
-    resolvePaintState(nodeWith({ text: 'Loud', fontSize: 40, color: '#ff0000', textDirection: 'rtl' }), scratch);
-    const box = resolvePaintState(nodeWith({}), scratch);
-    const fresh = createPaintState();
-    for (const field of TEXT_STYLE_FIELDS) {
-      expect(box[field]).toEqual(fresh[field]);
-    }
-  });
-});
-
-/** Every field of the paint state that describes a paragraph. */
-const TEXT_STYLE_FIELDS = [
-  'fontSize',
-  'fontFamily',
-  'fontWeight',
-  'lineHeight',
-  'letterSpacing',
-  'textColor',
-  'textAlign',
-  'verticalAlign',
-  'textWrap',
-  'maxLines',
-  'textOverflow',
-  'rtl'
-] as const satisfies readonly (keyof PaintState)[];
-
-describe('isPaintVisible', () => {
-  // The renderers ask this before they resolve anything else, and then
-  // draw whatever it lets through, so its only real requirement is that
-  // it agrees with the test it replaced: `!visible || opacity === 0`
-  // read off a fully resolved paint state.
-  function agrees(props: Record<string, unknown>): void {
-    const node = nodeWith(props);
-    const state = resolvePaintState(node, createPaintState());
-    expect(isPaintVisible(node)).toBe(state.visible && state.opacity !== 0);
-  }
-
-  it('agrees with the resolved paint state', () => {
-    agrees({});
-    agrees({ visible: true });
-    agrees({ visible: false });
-    agrees({ opacity: 1 });
-    agrees({ opacity: 0.5 });
-    agrees({ opacity: 0 });
-    // Clamped to zero by resolvePaintState, so invisible either way.
-    agrees({ opacity: -0.2 });
-    agrees({ opacity: 1.5 });
-    // Neither a number nor absent: it survives both comparisons.
-    agrees({ opacity: 'half' });
-    agrees({ visible: false, opacity: 1 });
-    agrees({ visible: true, opacity: 0 });
+    expect(resolve({ verticalAlign: 'middle' }).verticalAlign).toBe('middle');
+    expect(resolve({ verticalAlign: 'center' }).verticalAlign).toBe('middle');
+    expect(resolve({ verticalAlign: 'bottom' }).verticalAlign).toBe('bottom');
+    expect(resolve({ verticalAlign: 'top' }).verticalAlign).toBe('top');
   });
 });
 

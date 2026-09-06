@@ -17,7 +17,7 @@ import type { EditableTextModel } from '../editing/EditableTextModel';
 import { editorFor, isEditableNode } from '../editing/UiEditable';
 import { selectionRangeOf, type TextRange } from '../selection/UiSelectable';
 import { matchRangesOf } from '../find/UiTextMatches';
-import { resolveFontInto } from '../properties/UiTextFont';
+import { resolveFont } from '../properties/UiTextFont';
 import { parseTransform } from '../properties/UiTransform';
 
 export type { UiImage } from '../properties/UiImage';
@@ -152,47 +152,6 @@ export function normalizeVerticalAlign(value: unknown): VerticalAlign {
  * Mutates `out` and returns it. The renderer owns one scratch and
  * calls this per node, so the tree stays structural and no paint
  * objects are allocated per frame.
- *
- * The text half is resolved only for a node that has text, because
- * most nodes in a real tree are boxes and the half is about ten
- * property resolutions they would never read. The condition is
- * `out.text`, which is set a few lines above by the branch that knows:
- * an editable takes it from its model, so it is a string (possibly
- * empty) for every editable and drives the caret and placeholder that
- * an empty field still paints; everything else takes it from
- * `resolveString`, which reports an empty string as absent, so a
- * `<text text="" />` and a `<box />` are the same node to paint and
- * were before this split too.
- *
- * What makes that safe is that nothing reads a text field without
- * first asking whether the node has text. Both renderer walks capture
- * a `hasText` from the resolved state and enter their foreground block
- * only if it is set; Canvas2D's `paintContent` tests `text` again
- * before it draws. Decorations, backgrounds, borders, images,
- * scrollbars and the lifted-node replay read only the geometry half.
- * The three controllers that resolve a state of their own reach a text
- * field only through `paragraphGeometry` or `EditableLayout`, and each
- * of them is already behind a guard that requires text: the selection
- * and find controllers only ever ask about a node `selectableTextOf`
- * returned a non-empty string for, and the editing controller only
- * about a node with an editor. `rtl` lives here rather than with the
- * geometry because paint's copy is the paragraph's base direction and
- * nothing else; the row reversal that reads the same declared property
- * asks the node directly, in `LayoutEngine`.
- *
- * The skipped fields are reset rather than left holding the previous
- * node's, so the scratch a box comes out of is exactly the one
- * `createPaintState` builds. That costs about a twentieth of what
- * resolving them costs and it is what makes the split safe by
- * construction: a reader added later that forgets the guard gets a
- * default font and a black, top-left, wrapping paragraph, not the
- * neighbouring label's.
- *
- * A new reader of any of these fields must therefore be reachable only
- * when `text` is set, or it must resolve what it needs from the node
- * itself. Widening the condition is the wrong repair: the fields exist
- * to describe a paragraph, and a node with no paragraph has no honest
- * answer for them.
  */
 export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.visible = resolveBoolean(node, 'visible') ?? true;
@@ -253,18 +212,15 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
       out.matchColor = resolveColor(node, UiProperties.matchColor) ?? defaultMatchColor(node);
     }
   }
-
-  if (out.text === undefined) {
-    resetTextStyle(out);
-    return out;
-  }
-
   out.rtl = resolveProperty(node, UiProperties.textDirection) === 'rtl';
 
-  // Resolved the same way layout measured it (see resolveFont), and
-  // straight into the scratch: the state already has the five fields
-  // under those names, so paint has no record to allocate and copy.
-  resolveFontInto(node, out);
+  // Resolved the same way layout measured it (see resolveFont).
+  const font = resolveFont(node);
+  out.fontSize = font.fontSize;
+  out.fontFamily = font.fontFamily;
+  out.fontWeight = font.fontWeight;
+  out.lineHeight = font.lineHeight;
+  out.letterSpacing = font.letterSpacing;
   out.textColor = resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
   out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
   out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
@@ -274,65 +230,6 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.textOverflow = normalizeTextOverflow(resolveString(node, 'textOverflow'));
 
   return out;
-}
-
-/**
- * Returns the text half of a reused scratch to the values
- * `createPaintState` gives it, for a node that has no text.
- *
- * Twelve assignments of constants, against the ten property
- * resolutions they stand in for: on the frame benchmark's tree the
- * reset is 0.09ms of a 3.2ms pass over 5,001 nodes, where skipping the
- * resolutions saves 1.7ms of it. Keeping the previous node's values
- * instead would save that twentieth and cost the one guarantee worth
- * having here, which is that a box never comes out of this function
- * wearing a label's font.
- *
- * `lineHeight` resets to zero rather than to a normal line height for
- * the default size, because zero is what the field means when nothing
- * has resolved it: `textMeasureRequest` reads any value at or below
- * zero as "no declared line height" and lets the paragraph choose.
- */
-function resetTextStyle(out: PaintState): void {
-  out.fontSize = DEFAULT_FONT_SIZE;
-  out.fontFamily = DEFAULT_FONT_FAMILY;
-  out.fontWeight = DEFAULT_FONT_WEIGHT;
-  out.lineHeight = 0;
-  out.letterSpacing = 0;
-  out.textColor = DEFAULT_TEXT_COLOR;
-  out.textAlign = 'start';
-  out.verticalAlign = 'top';
-  out.textWrap = 'word';
-  out.maxLines = undefined;
-  out.textOverflow = 'clip';
-  out.rtl = false;
-}
-
-/**
- * Whether a node paints at all, answered from its two cheapest
- * properties.
- *
- * Both renderer walks need to know this before they know anything else:
- * an invisible node is skipped whether or not it is on screen, and a
- * lifted one must not join the top layer if it is invisible. Resolving
- * the whole paint state to learn it costs about twenty-five property
- * resolutions, which a long list pays for every row it then culls, so
- * the walks ask this first and resolve the rest only for the nodes that
- * survive the cull.
- *
- * It reads `visible` and `opacity` through the same resolvers
- * `resolvePaintState` uses, so the two cannot come to different
- * answers. `resolvePaintState` clamps opacity into [0, 1] and the
- * renderers then test it against zero, which is the same question as
- * "is it zero or less" asked of the unclamped value; a non-numeric
- * opacity fails both comparisons and stays visible either way.
- */
-export function isPaintVisible(node: UiNode): boolean {
-  if (resolveBoolean(node, 'visible') === false) {
-    return false;
-  }
-  const opacity = resolveNumber(node, 'opacity');
-  return !(opacity !== undefined && opacity <= 0);
 }
 
 /**

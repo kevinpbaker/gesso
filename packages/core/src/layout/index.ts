@@ -11,7 +11,6 @@ export {
   type ScrollbarThumb
 } from './Scrollbars';
 export { LayoutRecord } from './LayoutRecord';
-export type { SubtreeBounds } from './SubtreeBounds';
 export { LayoutNotifier } from './LayoutNotifier';
 export {
   formatExplanation,

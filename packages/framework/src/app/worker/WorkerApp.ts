@@ -36,27 +36,6 @@ import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from 
  * the worker entry builds its own and declares it with
  * `renderRoot(AppRoot).useMedia(...)`.
  */
-/**
- * Somewhere to send the application handshake that is not a `Worker`.
- *
- * A `MessagePort` satisfies it, and so does anything else that can
- * carry a message and a transferred port. It exists because the
- * application layer does not always live in a worker in this page: in
- * a desktop window it lives in another process, and what the shell
- * holds is one end of a bridge to it (`@gesso/electrobun`).
- *
- * The shell treats an endpoint exactly as it treats a worker it was
- * handed rather than one it spawned: it wires it up, and it never
- * closes it.
- */
-export interface AppLogicEndpoint {
-  postMessage(message: unknown, transfer?: Transferable[]): void;
-  addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
-  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
-  /** A `MessagePort` delivers nothing until this is called; a `Worker` has no such method. */
-  start?: () => void;
-}
-
 export interface WorkerAppOptions {
   /**
    * Spawns the render worker: the one that calls renderRoot(), and so
@@ -74,11 +53,9 @@ export interface WorkerAppOptions {
    */
   renderWorker: (() => Worker) | URL | string;
   /**
-   * The rendering backend the worker draws with. Defaults to `auto`,
-   * which is WebGPU where the worker has it and Canvas2D elsewhere;
-   * `webgpu` and `auto` both fall back to Canvas2D when the browser
-   * has no WebGPU in workers, and the frame metrics say which one is
-   * drawing.
+   * The rendering backend the worker draws with. Defaults to Canvas2D;
+   * `webgpu` and `auto` fall back to it when the browser has no WebGPU
+   * in workers, and the frame metrics say which one is drawing.
    */
   renderer?: RendererChoice;
   /**
@@ -110,17 +87,7 @@ export interface WorkerAppOptions {
    * application. What this class spawned, it terminates; what it was
    * handed, it leaves alone.
    */
-  appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
-  /**
-   * Opens a url the application asked for, in place of a new tab.
-   *
-   * A page wants `window.open`, which is the default. A desktop window
-   * does not: `window.open` in a webview opens another webview or
-   * nothing at all, and a link in a desktop application belongs in the
-   * person's browser, which only the process outside the window can
-   * reach. `@gesso/electrobun`'s bridge is what goes here.
-   */
-  onOpenUrl?: (url: string) => void;
+  appLogicWorker?: Worker | (() => Worker) | URL | string;
   /**
    * Receives errors thrown inside the render worker: while handling a
    * message, uncaught during a frame, from the renderer, or from a
@@ -195,55 +162,11 @@ export interface WorkerAppOptions {
  * into the worker. No component, node, layout record or render call
  * exists on this thread, so main-thread work cannot delay a frame.
  */
-/**
- * Which application layer the shell was given, and whether it is the
- * shell's to close.
- *
- * A factory, a URL or a path names a worker this class creates, and
- * what it creates it terminates. Anything else was handed over
- * already running: a `Worker` kept across a remount, or an endpoint
- * that is not a worker at all, which is how a desktop window reaches
- * an application layer living in another process
- * (`@gesso/electrobun`). Neither is closed here, because a handle
- * that could kill something it did not start is the wrong handle.
- *
- * Exported for its spec: the ownership half is the part that goes
- * quietly wrong, by discarding an application the shell had merely
- * borrowed.
- */
-/**
- * Opens a url through the host's handler, or in a new tab.
- *
- * Exported for its spec: the default carries `noopener,noreferrer`,
- * which is the difference between opening a link and handing the
- * opener to whatever is on the other end of it.
- */
-export function openUrlWith(handler: ((url: string) => void) | undefined, url: string): void {
-  if (handler !== undefined) {
-    handler(url);
-    return;
-  }
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-export function resolveAppLogic(spec: NonNullable<WorkerAppOptions['appLogicWorker']>): {
-  endpoint: AppLogicEndpoint;
-  owned: boolean;
-} {
-  if (typeof spec === 'function') {
-    return { endpoint: spec(), owned: true };
-  }
-  if (typeof spec === 'string' || spec instanceof URL) {
-    return { endpoint: new Worker(spec, { type: 'module' }), owned: true };
-  }
-  return { endpoint: spec, owned: false };
-}
-
 export class WorkerApp {
   private readonly options: WorkerAppOptions;
 
   private renderWorker: Worker | undefined;
-  private appLogicWorker: AppLogicEndpoint | undefined;
+  private appLogicWorker: Worker | undefined;
   private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
   /** Whether a panel has asked for the workers' consoles, remembered across a remount. */
   private consoleForwarding = false;
@@ -339,15 +262,12 @@ export class WorkerApp {
     const transfer: Transferable[] = [offscreen];
     let appPort: MessagePort | undefined;
     if (this.options.appLogicWorker !== undefined) {
-      const resolved = resolveAppLogic(this.options.appLogicWorker);
-      const application = resolved.endpoint;
+      const spec = this.options.appLogicWorker;
+      const given = typeof spec === 'object' && spec instanceof Worker;
+      const application = given ? spec : typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
       this.appLogicWorker = application;
-      this.ownsAppLogicWorker = resolved.owned;
+      this.ownsAppLogicWorker = !given;
       application.addEventListener('message', this.handleAppWorkerMessage);
-      // A port delivers nothing until it is started, and a worker has
-      // no such method. Calling it here rather than asking the caller
-      // to is what makes a port a drop-in for a worker.
-      application.start?.();
       if (this.consoleForwarding) {
         // A panel asked before the worker existed (a remount), and the
         // new worker has not been told.
@@ -595,7 +515,7 @@ export class WorkerApp {
     }
     this.appLogicWorker?.removeEventListener('message', this.handleAppWorkerMessage);
     if (this.ownsAppLogicWorker) {
-      (this.appLogicWorker as Worker | undefined)?.terminate();
+      this.appLogicWorker?.terminate();
     }
     this.appLogicWorker = undefined;
     this.ownsAppLogicWorker = false;
@@ -682,11 +602,7 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'openUrl') {
-      openUrlWith(this.options.onOpenUrl, message.url);
-      return;
-    }
-    if (message.type === 'popup') {
-      this.openPopup(message);
+      window.open(message.url, '_blank', 'noopener,noreferrer');
       return;
     }
     if (message.type === 'audio') {
@@ -714,32 +630,6 @@ export class WorkerApp {
     this.history = history;
     history.onChange(url => this.post({ type: 'url', url }));
     this.post({ type: 'url', url: history.url });
-  }
-
-  /**
-   * Opens a popup for the render worker and tells it what happened.
-   *
-   * `noopener` is deliberately absent, though the sibling `openUrl`
-   * above sets it. `window.open` answers `null` whenever `noopener` is
-   * given, whether the window appeared or was refused, so a popup
-   * opened that way could not be reported on, and reporting is the
-   * whole reason this request exists rather than another `openUrl`.
-   * The page opened is a different origin, so the opener reference it
-   * gains is the ordinary one every OAuth popup has.
-   *
-   * A reply is posted on every path, including the throwing one, so the
-   * promise on the other side always settles.
-   */
-  private openPopup(request: { id: number; url: string; name: string; width: number; height: number }): void {
-    let opened = false;
-    try {
-      const features = `popup,width=${request.width},height=${request.height}`;
-      opened = window.open(request.url, request.name, features) !== null;
-    } catch {
-      // A sandboxed frame throws rather than returning null.
-      opened = false;
-    }
-    this.post({ type: 'popupResult', id: request.id, opened });
   }
 
   private applyHistory(action: 'push' | 'replace' | 'back' | 'forward', url?: string): void {

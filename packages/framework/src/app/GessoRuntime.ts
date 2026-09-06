@@ -75,7 +75,6 @@ import {
   type TextMeasurer,
   createCanvasSurface,
   createWebGPUSurface,
-  isWebGPUAvailable,
   LayoutInspector,
   WebGPURenderer,
   type CanvasHost,
@@ -172,34 +171,10 @@ export interface RuntimeInput {
 /**
  * Which backend draws.
  *
- * **`canvas2d` is the default, and that is not the obvious answer.** A
- * GPU backend sounds like the faster one and on a scene of shapes and
- * text it is. On a scene dense with pictures it is currently not, and
- * the reason is one asymmetry rather than anything fundamental:
- * Canvas2D keeps a copy of each still at the size it is drawn (see
- * `ScaledImageCache`), while `WebGPUTextureCache` uploads a still at
- * the source's own size. A 480px cover shown at 164 is therefore about
- * eight times the texture on WebGPU, and a screen holding ninety of
- * them feels it. Measured on Segue's home screen, where the difference
- * was plain enough to notice without instrumenting anything.
- *
- * So the default is the one that is fast everywhere today, and the
- * faster ceiling is opt-in until the gap is closed. When
- * `WebGPUTextureCache` learns the drawn size the way its video path
- * already has, this should flip back.
- *
- * `auto` picks WebGPU where the browser has it and Canvas2D everywhere
- * else. The choice is made synchronously on whether `navigator.gpu`
- * exists, so an engine that never shipped WebGPU (WKWebView, WebKitGTK)
- * is on Canvas2D from the first frame rather than after a rejected
- * adapter request. A browser that has the entry point but cannot
- * produce an adapter or a device still falls back, asynchronously, once
- * that request fails.
- *
- * `canvas2d` pins the portable backend and never asks for an adapter.
- * `webgpu` asks for it and falls back the same way `auto` does, but
- * reports the fallback to the console, because a caller that named the
- * backend wants to know it did not get it.
+ * `canvas2d` is the default and the portable choice: WKWebView and
+ * WebKitGTK do not ship WebGPU. `webgpu` asks for it and falls back to
+ * Canvas2D when the adapter or device cannot be had, reporting the
+ * fallback once; `auto` does the same without the report.
  */
 export type RendererChoice = RendererBackend | 'auto';
 
@@ -435,15 +410,8 @@ export class GessoRuntime {
     this.height = options.height ?? 600;
     this.constraints = Constraints.loose(this.width, this.height);
 
-    // `auto` decides here, in the constructor, rather than by letting
-    // the WebGPU path fail: a browser with no `navigator.gpu` gets the
-    // Canvas2D renderer immediately, with no `pending` frames and no
-    // fallback to unwind. Only `webgpu` asked for by name goes to the
-    // GPU path on an engine that has no entry point, so that it can
-    // report what it could not have.
     const choice = options.renderer ?? 'canvas2d';
-    const drawWithWebGPU = choice === 'webgpu' || (choice === 'auto' && isWebGPUAvailable());
-    if (!drawWithWebGPU) {
+    if (choice === 'canvas2d') {
       this.canvasSurface = createCanvasSurface(options.canvas);
       this.textMeasurer = options.textMeasurer ?? new CanvasTextMeasurer(this.canvasSurface.getContext2D());
       this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
@@ -1097,13 +1065,6 @@ export class GessoRuntime {
   /**
    * The page was hidden or shown. A hidden page stops the caret blink,
    * so a background tab with a focused field schedules no frames.
-   *
-   * The driver is told as well, and it is the half that matters to
-   * what the page looks like: a hidden page goes on painting but runs
-   * no animation frames, so anything the driver is holding would be
-   * drawn frozen at whatever value it had reached. See
-   * `AnimationDriver.setHidden` for why an entrance frozen at its
-   * first value is a hole in the page rather than a paused animation.
    */
   setVisible(visible: boolean): void {
     this.input.editing.setVisible(visible);
@@ -1111,7 +1072,6 @@ export class GessoRuntime {
       return;
     }
     this.visible = visible;
-    this.animations.setHidden(!visible);
     if (!visible) {
       return;
     }
@@ -1119,7 +1079,7 @@ export class GessoRuntime {
       return;
     }
     // One frame on the way back, whether or not anything is dirty: an
-    // animation the driver kept running while hidden is still in it,
+    // animation that was frozen while hidden is still in the driver,
     // and `scheduleAnimationTick` only re-arms from inside a frame.
     this.scheduler.wake();
   }
@@ -1168,17 +1128,6 @@ export class GessoRuntime {
    */
   setColorScheme(scheme: ColorScheme): void {
     this.services.get(ShellService).applyColorScheme(scheme);
-  }
-
-  /**
-   * Reports what became of a popup a component asked for, settling the
-   * promise `ShellService.openPopup` returned.
-   *
-   * The one inbound message that answers an outbound one, so unlike the
-   * preference setters beside it this carries the id it is replying to.
-   */
-  settlePopup(id: number, opened: boolean): void {
-    this.services.get(ShellService).settlePopup(id, opened);
   }
 
   /** Whether the runtime is currently honouring a reduced-motion preference. */
@@ -2597,7 +2546,8 @@ function emptyPhaseTimings(): FramePhaseTimings {
  * spending an immeasurable amount of time deciding to do nothing.
  */
 function frameNeedsLayout(frame: UiFrame): boolean {
-  return frame.anyFlags(DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform);
+  const layoutFlags = DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform;
+  return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & layoutFlags) !== 0);
 }
 
 /**
@@ -2624,5 +2574,6 @@ function frameChangedTree(frame: UiFrame): boolean {
 }
 
 function frameNeedsSemantics(frame: UiFrame): boolean {
-  return frame.anyFlags(DirtyFlags.Semantics | DirtyFlags.Children);
+  const flags = DirtyFlags.Semantics | DirtyFlags.Children;
+  return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & flags) !== 0);
 }

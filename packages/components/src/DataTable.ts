@@ -19,7 +19,6 @@ import {
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
-  CONTROL_EDGE,
   CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
   keymap,
@@ -253,7 +252,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING),
       scrollY: list.scrollY,
       focusable: true,
       count,
@@ -265,8 +264,8 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
       role: 'grid',
       label,
       backgroundColor: 'controlBackground',
-      // The border is `CONTROL_EDGE` rather than a `borderWidth`: the
-      // sticky header's own background would be painted over it.
+      borderWidth: 1,
+      borderColor: 'controlBorder',
       borderRadius: 6,
       onKeyDown: keymap({
         ArrowDown: () => step(1),

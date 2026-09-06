@@ -20,21 +20,6 @@ interface Holder {
   box: LayoutBox | null;
   /** Told to get out of the way when another node takes the name. */
   yield: () => void;
-  /** Told to come back, if this one outlives whatever displaced it. */
-  restore: () => void;
-  /**
-   * Whoever held the name before this one and is still alive.
-   *
-   * Kept so the name can be handed back. Stepping aside is otherwise a
-   * one-way door: an element that yields is hidden outright, and if the
-   * element it yielded to leaves without anything replacing it, the
-   * only copy left is an invisible one.
-   *
-   * That is not a corner case. A route change keeps the departing
-   * screen alive for the length of its exit, so pressing Back part-way
-   * through returns to a screen whose element has already yielded.
-   */
-  displaced: Holder | null;
 }
 
 /**
@@ -96,11 +81,10 @@ export class UiSharedElements {
    * A null box is the ordinary case: an element that is simply
    * appearing has nothing to morph from and should enter instead.
    */
-  claim(name: string, node: UiNode, onYield: () => void, onRestore: () => void = () => {}): SharedClaim {
+  claim(name: string, node: UiNode, onYield: () => void): SharedClaim {
     const previous = this.holders.get(name);
-    const displaced = previous === undefined || previous.node === node ? null : previous;
-    this.holders.set(name, { node, box: null, yield: onYield, restore: onRestore, displaced });
-    if (previous === undefined || displaced === null) {
+    this.holders.set(name, { node, box: null, yield: onYield });
+    if (previous === undefined || previous.node === node) {
       return { box: previous?.box ?? null, yieldPrevious: () => {} };
     }
     let yielded = false;
@@ -133,32 +117,9 @@ export class UiSharedElements {
    * and an unguarded release would delete the arriving node's entry.
    */
   release(name: string, node: UiNode): void {
-    const holder = this.holders.get(name);
-    if (holder === undefined) {
-      return;
-    }
-    if (holder.node !== node) {
-      // Something further back in the chain has gone. Forget it, so it
-      // is never brought back and never measured: a removed node's last
-      // box is a rectangle nothing occupies, and morphing from it is
-      // worse than not morphing at all.
-      for (let entry: Holder = holder; entry.displaced !== null; entry = entry.displaced) {
-        if (entry.displaced.node === node) {
-          entry.displaced = entry.displaced.displaced;
-          break;
-        }
-      }
-      return;
-    }
-    // The holder itself is going. If it displaced someone who is still
-    // here, that one takes the name back and stops being hidden.
-    const displaced = holder.displaced;
-    if (displaced === null) {
+    if (this.holders.get(name)?.node === node) {
       this.holders.delete(name);
-      return;
     }
-    this.holders.set(name, displaced);
-    displaced.restore();
   }
 
   /** The names currently held, for specs and the inspector. */

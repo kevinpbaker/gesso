@@ -196,54 +196,6 @@ function DetailScreen(_inputs: Inputs<OutletProps>): ReturnType<typeof Column> {
 const List = route({ path: '/', component: ListScreen });
 const Detail = route({ path: '/detail', component: DetailScreen });
 
-/**
- * Segue's shape, small enough to drive: a clipping row of three cards,
- * and a page showing one of them large. Which card the page is for is
- * module state rather than a route param, because what is being tested
- * is the pairing of names across the change and not the router.
- */
-let openItem = 0;
-const shelfCards = new Map<number, UiNode>();
-const pageArt = new Map<number, UiNode>();
-
-function ShelfScreen(_inputs: Inputs<OutletProps>): ReturnType<typeof Column> {
-  return Column(
-    { width: 400, height: 400 },
-    // A ScrollView, so it clips exactly as a LazyRow does.
-    Box(
-      { width: 400, height: 100, overflow: 'hidden', marginTop: 300 },
-      ...[0, 1, 2].map(index =>
-        Box({
-          key: `card-${index}`,
-          width: 100,
-          height: 100,
-          ref: (n: UiNode | null) => n !== null && shelfCards.set(index, n),
-          modifiers: [sharedElement({ name: `item-${index}`, duration: 200, easing: linear, lift: true })]
-        })
-      )
-    ),
-    Text({ text: 'shelf' })
-  );
-}
-
-function PageScreen(_inputs: Inputs<OutletProps>): ReturnType<typeof Column> {
-  const index = openItem;
-  return Column(
-    { width: 400, height: 400 },
-    Box({
-      key: `page-${index}`,
-      width: 300,
-      height: 300,
-      ref: (n: UiNode | null) => n !== null && pageArt.set(index, n),
-      modifiers: [sharedElement({ name: `item-${index}`, duration: 200, easing: linear })]
-    }),
-    Text({ text: 'page' })
-  );
-}
-
-const Shelf = route({ path: '/shelf', component: ShelfScreen });
-const Page = route({ path: '/page', component: PageScreen });
-
 /** The translation a motion layer wrote, or zeroes when it wrote none. */
 function translationOf(node: UiNode): { x: number; y: number } {
   const transform = node.properties.get('transform') as { translateX?: number; translateY?: number } | undefined;
@@ -349,58 +301,5 @@ describe('a route transition', () => {
     mounted.frame();
     // The behaviour every routed app already had, unchanged.
     expect(textsIn(rootOf(mounted))).toEqual(['detail']);
-  });
-});
-
-describe('opening one card after another', () => {
-  /**
-   * Kevin's sequence, and the one that broke: open a card, let it
-   * settle, come back, let it settle, and then do the same with a
-   * *different* card. Every return must morph its own artwork, not the
-   * one before it and not nothing at all.
-   */
-  it('morphs each card back from its own page, three in a row', () => {
-    shelfCards.clear();
-    pageArt.clear();
-    openItem = 0;
-    const mounted = mountRuntime(
-      Column(
-        { width: 400, height: 400 },
-        createComponent(RouterOutlet, {
-          transition: { exit: fade, mode: 'together', timing: { duration: 200, easing: linear } }
-        })
-      ),
-      { routes: { routes: [Shelf, Page] } }
-    );
-    const router = mounted.runtime.services.get(RouterService);
-    router.go(Shelf);
-    drain(mounted);
-
-    for (const index of [0, 1, 2]) {
-      openItem = index;
-      shelfCards.delete(index);
-      router.go(Page);
-      mounted.frame();
-      // Out: the page's artwork starts on the card's box.
-      expect(translationOf(pageArt.get(index)!).y).not.toBe(0);
-      drain(mounted);
-
-      router.go(Shelf);
-      mounted.frame();
-      // Back: this card, and no other, is morphing from the page it
-      // was opened from — lifted out of the row while it travels.
-      const card = shelfCards.get(index)!;
-      expect(translationOf(card).y).not.toBe(0);
-      expect(card.properties.get('lift')).toBe(true);
-      for (const other of [0, 1, 2].filter(n => n !== index)) {
-        const quiet = shelfCards.get(other);
-        if (quiet !== undefined) {
-          expect(translationOf(quiet)).toEqual({ x: 0, y: 0 });
-          expect(quiet.properties.get('lift')).toBeUndefined();
-        }
-      }
-      drain(mounted);
-      expect(card.properties.get('lift')).toBeUndefined();
-    }
   });
 });

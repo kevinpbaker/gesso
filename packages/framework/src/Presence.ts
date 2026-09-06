@@ -141,13 +141,6 @@ export function Presence(inputs: Inputs<PresenceProps>, ctx: ComponentContext): 
         top: 0,
         width: percent(100),
         height: percent(100),
-        // Each layer is its own top layer. A `lift`ed element inside a
-        // child escapes whatever clips it within that child, and stops
-        // there: without this it would be painted over every layer,
-        // and a screen on its way out would fly its morphing artwork
-        // across the screen arriving behind it. See the `liftBoundary`
-        // property.
-        liftBoundary: true,
         modifiers: [
           motion({
             ...inputs.timing.value,

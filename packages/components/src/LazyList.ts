@@ -4,7 +4,7 @@ import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { Box, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
-import { CONTROL_EDGE, CONTROL_FOCUS_RING, keymap, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
+import { CONTROL_FOCUS_RING, keymap, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import { stepIndex, virtualList } from './virtual';
 
 /**
@@ -102,7 +102,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING),
       scrollY: list.scrollY,
       focusable: true,
       count: inputs.count,
@@ -113,8 +113,8 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
       role: 'list',
       label,
       backgroundColor: 'controlBackground',
-      // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
-      // chosen row's own background would be painted over it.
+      borderWidth: 1,
+      borderColor: 'controlBorder',
       borderRadius: 6,
       onKeyDown: keymap({
         ArrowDown: () => step(1),

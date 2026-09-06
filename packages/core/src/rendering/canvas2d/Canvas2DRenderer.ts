@@ -5,7 +5,7 @@ import type { Canvas2DContext, Canvas2DGradient } from './Canvas2DContext';
 import type { CanvasSurface } from './CanvasSurface';
 import type { ResolvedGradient } from '../../properties/UiGradient';
 import { gradientPaint } from '../../properties/UiGradient';
-import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
+import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
 import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import { videoFrameSize } from '../../properties/UiVideo';
@@ -21,7 +21,6 @@ import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import { drawOverlayShapes } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
-import { ScaledImageCache } from '../ScaledImageCache';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -78,21 +77,6 @@ export class Canvas2DRenderer implements UiRenderer {
   private cullWidth = 0;
   private cullHeight = 0;
   private readonly cullStack: number[] = [];
-  /**
-   * Copies of images at the size they are drawn.
-   *
-   * A `drawImage` that resamples is the most expensive call this
-   * renderer makes on an engine that resamples on the CPU, and it
-   * makes one per picture per frame. See `ScaledImageCache`.
-   */
-  private readonly scaledImages = new ScaledImageCache();
-  /**
-   * The lifted nodes met on this frame's walk, with the state they
-   * were met in: the matrix and the alpha their ancestors had built
-   * up, which is everything about the ancestors a lifted node keeps.
-   * Drained after the walk; see `render`.
-   */
-  private readonly liftedPass: UiNode[] = [];
 
   constructor(private readonly options: Canvas2DRendererOptions) {}
 
@@ -115,7 +99,6 @@ export class Canvas2DRenderer implements UiRenderer {
 
   dispose(): void {
     this.disposed = true;
-    this.scaledImages.dispose();
   }
 
   render(root: UiNode, context: RenderContext): void {
@@ -126,9 +109,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullY = 0;
     this.cullWidth = this.surface.logicalWidth;
     this.cullHeight = this.surface.logicalHeight;
-    this.liftedPass.length = 0;
-    this.renderNode(root, context, ctx, true, false);
-    this.renderLifted(context, ctx);
+    this.renderNode(root, context, ctx, true);
     if (context.overlay !== undefined && context.overlay.length > 0) {
       drawOverlayShapes(ctx, context.overlay);
     }
@@ -152,33 +133,19 @@ export class Canvas2DRenderer implements UiRenderer {
   // Traversal
   // -------------------------------------------------------------------------
 
-  private renderNode(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean, lifted: boolean): void {
+  private renderNode(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean): void {
+    const paint = resolvePaintState(node, this.paint);
+    if (!paint.visible || paint.opacity === 0) {
+      return;
+    }
     const rec = context.layout.recordFor(node);
     if (rec === undefined) {
-      return;
-    }
-    // Visibility from its own two properties rather than from the paint
-    // state, and the cull test from the record alone, so that a node
-    // this walk is about to discard never pays for the twenty-five or so
-    // property resolutions the full state costs. A long list culls most
-    // of what it walks, which is where that adds up.
-    if (!isPaintVisible(node)) {
-      return;
-    }
-    if (rec.lifted && !lifted) {
-      // Held back for the top layer, and held back *before* the cull
-      // test: a lifted node is nearly always somewhere its record box
-      // is not — that is what it is for — so the box it would be culled
-      // by says nothing about where it will be drawn.
-      this.liftedPass.push(node);
       return;
     }
     const sticky = rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0;
     if (cull && !this.intersectsCull(rec.x + rec.stickyOffsetX, rec.y + rec.stickyOffsetY, rec.width, rec.height)) {
       return;
     }
-
-    const paint = resolvePaintState(node, this.paint);
 
     // Captured before children reuse the shared scratch below.
     const hasText = paint.text !== undefined;
@@ -234,7 +201,6 @@ export class Canvas2DRenderer implements UiRenderer {
 
     // Culling works in record coordinates; a transform or a sticky shift
     // moves what is drawn away from them, so descendants are not culled.
-    const liftedBefore = this.liftedPass.length;
     this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
 
     if (rec.scrollable) {
@@ -251,14 +217,6 @@ export class Canvas2DRenderer implements UiRenderer {
       // style so the text renders with its own color/size/alignment.
       resolvePaintState(node, this.paint);
       this.paintContent(ctx, rec, this.paint, context);
-    }
-    if (rec.liftBoundary && this.liftedPass.length > liftedBefore) {
-      // A boundary: everything the subtree lifted is drawn here, over
-      // the rest of this subtree and inside whatever holds it. The
-      // context is back at this node's own state, because every clip
-      // and transform the walk opened below it has been restored, so
-      // the descendants' clips are gone and this node's is not.
-      this.renderLifted(context, ctx, liftedBefore, node);
     }
 
     if (rec.clips) {
@@ -283,7 +241,7 @@ export class Canvas2DRenderer implements UiRenderer {
     const order = context.layout.recordFor(node)?.paintOrder;
     if (order !== null && order !== undefined) {
       for (const child of order) {
-        this.renderNode(child, context, ctx, cull, false);
+        this.renderNode(child, context, ctx, cull);
       }
       return;
     }
@@ -292,86 +250,9 @@ export class Canvas2DRenderer implements UiRenderer {
       if (child.type === UiNodeType.Fragment) {
         this.renderChildren(child, context, ctx, cull);
       } else {
-        this.renderNode(child, context, ctx, cull, false);
+        this.renderNode(child, context, ctx, cull);
       }
       child = child.nextSibling;
-    }
-  }
-
-  /**
-   * The top layer: the nodes that asked for `lift`, drawn after the
-   * tree and outside every clip in it.
-   *
-   * The clips are gone because the walk has unwound: every `save` it
-   * made is restored by the time this runs, so the context is back at
-   * the frame's base transform with no clipping region at all. What is
-   * *not* free is everything else a lifted node keeps, so the ancestor
-   * chain is replayed here: their sticky shifts, opacities, transforms
-   * and scroll offsets, in the same order `renderNode` applies them.
-   * Replaying beats recording the matrix on the way past, because it
-   * costs nothing at all on the frames where nothing is lifted, which
-   * is nearly every frame.
-   */
-  private renderLifted(context: RenderContext, ctx: Canvas2DContext, from = 0, boundary: UiNode | null = null): void {
-    if (this.liftedPass.length <= from) {
-      return;
-    }
-    // Walked by index rather than iterated: a lifted node inside a
-    // lifted subtree is appended while this runs, and it belongs after
-    // the one that carried it, as paint order says.
-    const dpr = this.surface.dpr;
-    for (let i = from; i < this.liftedPass.length; i++) {
-      const node = this.liftedPass[i]!;
-      ctx.save();
-      if (boundary === null) {
-        // The frame's own base: every clip is unwound and the walk is
-        // over, so this is the top of everything.
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-      // From the boundary, or from the root when there is none. The
-      // boundary's own transform and clip are already in force, so
-      // only what lies below it is replayed.
-      this.applyAncestors(node, context, ctx, boundary);
-      // No culling: the ancestors' cull rectangles have been unwound
-      // with their clips, and the node is drawn wherever its transform
-      // puts it.
-      this.renderNode(node, context, ctx, false, true);
-      ctx.restore();
-    }
-    this.liftedPass.length = from;
-  }
-
-  /** Everything between the boundary (or the root) and a lifted node. */
-  private applyAncestors(
-    node: UiNode,
-    context: RenderContext,
-    ctx: Canvas2DContext,
-    boundary: UiNode | null = null
-  ): void {
-    const chain: UiNode[] = [];
-    for (let parent = node.parent; parent !== null && parent !== boundary; parent = parent.parent) {
-      chain.push(parent);
-    }
-    for (let i = chain.length - 1; i >= 0; i--) {
-      const ancestor = chain[i]!;
-      const rec = context.layout.recordFor(ancestor);
-      if (rec === undefined) {
-        // A fragment: no box, no transform, nothing to apply.
-        continue;
-      }
-      const paint = resolvePaintState(ancestor, this.paint);
-      if (rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0) {
-        ctx.translate(rec.stickyOffsetX, rec.stickyOffsetY);
-      }
-      if (paint.opacity < 1) {
-        ctx.globalAlpha *= paint.opacity;
-      }
-      if (paint.hasTransform) {
-        this.applyTransform(ctx, rec, paint);
-      }
-      if (rec.scrollable) {
-        ctx.translate(-rec.scrollX, -rec.scrollY);
-      }
     }
   }
 
@@ -434,39 +315,15 @@ export class Canvas2DRenderer implements UiRenderer {
       rect.x + rect.width > rec.x + rec.width ||
       rect.y + rect.height > rec.y + rec.height;
     const rounded = !borderRadiusIsZero(paint.borderRadius);
-    // Only a still is worth a pre-scaled copy. A video's frame is a
-    // different object every time, so a copy of one could never be
-    // reused; the saving there is made in `VideoResolver` instead, by
-    // converting each decoded frame once rather than on every draw.
-    const still = video === undefined ? paint.image : undefined;
-    const drawn = still === undefined || still === null ? source : this.scaledFor(ctx, still, rect.width, rect.height);
     if (!overflows && !rounded) {
-      ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
+      ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height);
       return;
     }
     ctx.save();
     traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? uniformBorderRadius(paint.borderRadius) : 0);
     ctx.clip();
-    ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
+    ctx.drawImage(source, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
-  }
-
-  /**
-   * The image to draw for a destination `width` x `height` in the
-   * units the current transform is in.
-   *
-   * The cache works in device pixels, because a copy only saves the
-   * resample when it is the size the backing store actually receives.
-   * That is the box under the whole current transform, not under the
-   * device pixel ratio alone: a node a morph is scaling covers a
-   * different number of pixels every frame, and a copy made for the
-   * untransformed size would be resampled again on the way down.
-   */
-  private scaledFor(ctx: Canvas2DContext, source: ImageBitmap, width: number, height: number): ImageBitmap {
-    const transform = ctx.getTransform?.();
-    const scaleX = transform === undefined ? this.surface.dpr : Math.hypot(transform.a, transform.b);
-    const scaleY = transform === undefined ? this.surface.dpr : Math.hypot(transform.c, transform.d);
-    return this.scaledImages.resolve(source, width * scaleX, height * scaleY);
   }
 
   /**

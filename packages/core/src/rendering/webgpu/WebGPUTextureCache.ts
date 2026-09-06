@@ -1,6 +1,5 @@
 import type { UiImage } from '../PaintState';
 import { isVideoSurface, videoFrameSize, type UiVideoSurface } from '../../properties/UiVideo';
-import { ScaledImageCache, type ScaledImageSurfaceFactory } from '../ScaledImageCache';
 import type { TexturedPipeline } from './WebGPUPipeline';
 
 /** A GPU texture with the bind group that draws it, ready to reuse. */
@@ -41,49 +40,23 @@ export type TextureSource = UiImage | UiVideoSurface;
  */
 export class WebGPUTextureCache {
   private readonly images = new WeakMap<TextureSource, TextureEntry>();
-  /**
-   * Copies of stills at the size they are drawn, shared with the other
-   * backend.
-   *
-   * A texture is uploaded once and sampled every frame, so what the
-   * source size costs here is not upload bandwidth but minification: a
-   * 480px cover drawn into 56 logical pixels is sampled down by more
-   * than four with `minFilter: 'linear'` and no mip chain under it,
-   * which both aliases and reads texels far apart. Uploading the copy
-   * instead makes the sampling one-to-one, and takes the memory with
-   * it: the same cover is a fifty-sixth of the texture.
-   *
-   * The cache hands back the source until a copy is worth making and
-   * ready, so the first frames draw exactly as they did before. The
-   * `WeakMap` keys on whichever bitmap it returned, so the copy gets
-   * its own texture and the full-size one is dropped when the source
-   * is.
-   */
-  private readonly scaled: ScaledImageCache;
 
   constructor(
     private readonly device: GPUDevice,
-    private readonly pipeline: TexturedPipeline,
-    createSurface?: ScaledImageSurfaceFactory
-  ) {
-    this.scaled = new ScaledImageCache(createSurface);
-  }
+    private readonly pipeline: TexturedPipeline
+  ) {}
 
   /** The bind group for a still or a video, uploading it when it must. */
-  imageBindGroup(source: TextureSource, drawWidth = 0, drawHeight = 0): GPUBindGroup | null {
-    return isVideoSurface(source) ? this.videoBindGroup(source) : this.stillBindGroup(source, drawWidth, drawHeight);
+  imageBindGroup(source: TextureSource): GPUBindGroup | null {
+    return isVideoSurface(source) ? this.videoBindGroup(source) : this.stillBindGroup(source);
   }
 
-  private stillBindGroup(image: UiImage, drawWidth: number, drawHeight: number): GPUBindGroup | null {
-    // A caller that does not know the size gets the source, which is
-    // what this did for every still before.
-    const drawn =
-      drawWidth > 0 && drawHeight > 0 ? this.scaled.resolve(image as ImageBitmap, drawWidth, drawHeight) : image;
-    const entry = this.images.get(drawn);
+  private stillBindGroup(image: UiImage): GPUBindGroup | null {
+    const entry = this.images.get(image);
     if (entry !== undefined) {
       return entry.bindGroup;
     }
-    return this.upload(drawn, drawn, drawn.width, drawn.height, undefined)?.bindGroup ?? null;
+    return this.upload(image, image, image.width, image.height, undefined)?.bindGroup ?? null;
   }
 
   /**
@@ -147,17 +120,6 @@ export class WebGPUTextureCache {
     } catch {
       return false;
     }
-  }
-
-  /**
-   * Drops the scaled copies.
-   *
-   * The textures are keyed weakly and go when their bitmaps do, but a
-   * copy is held strongly by the scaled cache until it is evicted, so
-   * the renderer has to say when it is finished with them.
-   */
-  dispose(): void {
-    this.scaled.dispose();
   }
 }
 

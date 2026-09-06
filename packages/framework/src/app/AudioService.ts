@@ -42,15 +42,6 @@ export type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 
 /** What the render thread asks the shell's audio element to do. */
 export type AudioRequest =
   | { readonly type: 'load'; readonly src: string; readonly autoplay: boolean }
-  /**
-   * Start buffering the source that will play next, on a second
-   * element, so the change when it arrives is gapless.
-   *
-   * A hint and not a command: nothing plays, nothing is reported, and a
-   * `load` of some other source ignores it. A `load` of exactly this
-   * source is what redeems it. An empty string clears it.
-   */
-  | { readonly type: 'preload'; readonly src: string }
   | { readonly type: 'play' }
   | { readonly type: 'pause' }
   | { readonly type: 'seek'; readonly seconds: number }
@@ -207,20 +198,6 @@ export class AudioService {
     this.position.value = 0;
     this.sample.value = { status: 'loading', position: 0, duration: NaN, buffered: 0, at: epochNow() };
     this.handler?.({ type: 'load', src, autoplay: options.autoplay ?? true });
-  }
-
-  /**
-   * Says what will play next, so the shell can have it buffered before
-   * it is asked for.
-   *
-   * Nothing about the current playback changes, and nothing is
-   * reported: this only speaks to a second element the shell keeps. A
-   * later `load` of the same source is answered from what was
-   * buffered, and a `load` of anything else discards it. Pass an empty
-   * string when nothing follows.
-   */
-  preload(src: string): void {
-    this.handler?.({ type: 'preload', src });
   }
 
   play(): void {
