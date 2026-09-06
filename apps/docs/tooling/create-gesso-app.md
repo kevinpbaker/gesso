@@ -85,13 +85,19 @@ Use npm in the generated project. pnpm resolves the packages' own
 declared dependencies against the registry and gets a 404 for packages
 that are not there.
 
-## No Electrobun template yet
+## No Electrobun template
 
-`--template electrobun` prints why and creates nothing. The adapter
-`@gesso/electrobun` has not been written, so the template would scaffold
-a project with nothing to depend on. The application code is the same
-either way: an Electrobun window is a webview, and a Gesso app inside
-one is the app you already have.
+`--template electrobun` prints a sentence and creates nothing. The
+adapter it would scaffold against does exist, so what is missing is the
+template and the toolchain wiring around it rather than the code it
+would depend on: an Electrobun project is set up by Electrobun's own
+toolchain, which is not this CLI's to drive.
+
+Use `--template web` and wire the window by hand.
+[Desktop windows](/structure/desktop-windows) is the four files that
+takes, and the application code is the same either way: an Electrobun
+window is a webview, and a Gesso app inside one is the app you already
+have.
 
 ## Checking it still works
 

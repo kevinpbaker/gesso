@@ -144,7 +144,8 @@ export default defineConfig({
           { text: 'Routing', link: '/structure/routing' },
           { text: 'Channels and the barrier', link: '/structure/channels-and-the-barrier' },
           { text: 'Shell services', link: '/structure/shell-services' },
-          { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' }
+          { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
+          { text: 'Desktop windows', link: '/structure/desktop-windows' }
         ]
       },
       {
