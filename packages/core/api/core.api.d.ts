@@ -227,16 +227,20 @@ declare function assertTransitionMap(nodeId: string, value: unknown, isKnownProp
 declare class AnimationDriver {
   private readonly running;
   private reducedMotion;
+  private hidden;
   private wake;
   setWakeListener(listener: (() => void) | null): void;
   get isRunning(): boolean;
   get size(): number;
   get isReducedMotion(): boolean;
+  private lands;
   start<T>(animation: UiAnimation<T>): Observable<T>;
   animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
   stop<T>(cell: AnimatedCell<T>): boolean;
   stopAll(): void;
   setReducedMotion(reduced: boolean): void;
+  setHidden(hidden: boolean): void;
+  private landRunning;
   nextTickAt(now: number): number | undefined;
   advance(now: number): void;
 }
@@ -5029,7 +5033,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-CC7AFRP0.js";
+} from "./index-CM-BETo-.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5728,7 +5732,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CC7AFRP0.js";
+} from "./index-CM-BETo-.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
