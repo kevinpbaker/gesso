@@ -6,15 +6,18 @@
 
 // ==== index.d.ts ====
 import {
+  ActionCause,
   ActionEntry,
   ChannelErrorEntry,
   ChannelPort,
   CommandEntry,
   DevtoolsEvent,
   DevtoolsRequest,
+  FrameEntry,
   FrameMetrics,
   PatchEntry,
   RuntimeErrorSource,
+  ShellToRuntimeMessage,
   UiFramePhase,
   UiNodeReport,
   UiTreeNode,
@@ -111,6 +114,7 @@ interface ActionLogOptions {
   readonly limit?: number;
 }
 declare function createActionLog(options?: ActionLogOptions): ActionLog;
+declare function forwardNewEntries(log: ActionLog, send: (entry: ActionEntry) => void): () => void;
 interface ActionLogPanel {
   setVisible(visible: boolean): void;
   readonly visible: boolean;
@@ -120,15 +124,40 @@ interface ActionLogPanelOptions {
   readonly corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 declare function mountActionLogPanel(host: HTMLElement, log: ActionLog, options?: ActionLogPanelOptions): ActionLogPanel;
+declare function actionGlyph(entry: ActionEntry): string;
 declare function describeActionEntry(entry: ActionEntry): string;
-declare function renderNodeReport(doc: Document, report: UiNodeReport): HTMLElement[];
-declare const NODE_REPORT_STYLES = "\nh1 { margin: 0 0 6px; font-size: 12px; color: var(--gd-accent, #79c0ff); overflow-wrap: anywhere; }\nh2 {\n  margin: 10px 0 4px;\n  font-size: 10px;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: var(--gd-muted, #8b949e);\n}\np { margin: 0 0 2px; }\n.label { color: var(--gd-muted, #8b949e); }\n.rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }\ndt { color: var(--gd-muted, #8b949e); overflow-wrap: anywhere; }\ndt.modifier { color: var(--gd-purple, #d2a8ff); }\ndt.binding { color: var(--gd-green, #7ee787); }\ndt.provided { color: var(--gd-orange, #ffa657); }\ndd { margin: 0; overflow-wrap: anywhere; }\n.note { color: var(--gd-faint, #6e7681); }\n.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gd-text-strong, #c9d1d9); }\n";
+interface RenderWorkerHost {
+  onmessage: ((event: {
+    data: unknown;
+  }) => void) | null;
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+}
+interface RenderWorkerTapOptions {
+  readonly host?: RenderWorkerHost;
+  readonly forward?: boolean;
+}
+interface RenderWorkerTap {
+  applicationWorker(tokens: readonly ActionLogToken[]): WorkerHandle;
+  dispose(): void;
+}
+declare function tapRenderWorker(log: ActionLog, options?: RenderWorkerTapOptions): RenderWorkerTap;
+declare function inputLabel(message: ShellToRuntimeMessage | undefined): string | null;
+interface NodePickerOptions {
+  readonly host: EventTarget;
+  hovered(): string | null;
+}
 interface DevtoolsPicker {
   setEnabled(enabled: boolean): void;
   readonly enabled: boolean;
   onPick(listener: ((id: string) => void) | null): void;
   dispose(): void;
 }
+declare function createNodePicker(options: NodePickerOptions): DevtoolsPicker;
+interface NodeReportViewOptions {
+  onEditProp?(name: string, value: unknown): void;
+}
+declare function renderNodeReport(doc: Document, report: UiNodeReport, options?: NodeReportViewOptions): HTMLElement[];
+declare const NODE_REPORT_STYLES = "\nh1 { margin: 0 0 6px; font-size: 12px; color: var(--gd-accent, #79c0ff); overflow-wrap: anywhere; }\nh2 {\n  margin: 10px 0 4px;\n  font-size: 10px;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: var(--gd-muted, #8b949e);\n}\np { margin: 0 0 2px; }\n.label { color: var(--gd-muted, #8b949e); }\n.rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }\ndt { color: var(--gd-muted, #8b949e); overflow-wrap: anywhere; }\ndt.modifier { color: var(--gd-purple, #d2a8ff); }\ndt.binding { color: var(--gd-green, #7ee787); }\ndt.provided { color: var(--gd-orange, #ffa657); }\ndd { margin: 0; overflow-wrap: anywhere; }\ndd.editable { cursor: pointer; border-radius: 3px; }\ndd.editable:hover { background: var(--gd-bg-hover, #21262d); }\n.edit {\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--gd-accent, #79c0ff);\n  border-radius: 3px;\n  padding: 0 3px;\n  background: var(--gd-bg, #0d1117);\n  color: var(--gd-text, #e6edf3);\n  font: inherit;\n}\n.note { color: var(--gd-faint, #6e7681); }\n.stream { display: block; color: var(--gd-green, #7ee787); }\n.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gd-text-strong, #c9d1d9); }\n";
 interface DevtoolsAppInfo {
   readonly id: string;
   readonly name: string;
@@ -308,18 +337,22 @@ declare function primaryFrame(frames: StackFrame[]): StackFrame | null;
 declare function shortenPath(url: string, origin?: string): string;
 declare function formatFrame(frame: StackFrame, origin?: string): string;
 export {
+  actionGlyph,
   codeFrame,
   connectDevtools,
   createActionLog,
   createDirectPorts,
+  createNodePicker,
   decodeMappings,
   describeActionEntry,
   ENVELOPE_SOURCE,
   ErrorOverlay,
   formatFrame,
+  forwardNewEntries,
   getDevtoolsHook,
   HOOK_PROPERTY,
   idsToDepth,
+  inputLabel,
   isEnvelope,
   mapStack,
   mountActionLogPanel,
@@ -338,7 +371,9 @@ export {
   SourceMapConsumer,
   SourceMapStore,
   summarize,
+  tapRenderWorker,
   treeRows,
+  type ActionCause,
   type ActionEntry,
   type ActionLog,
   type ActionLogOptions,
@@ -356,10 +391,12 @@ export {
   type DevtoolsPanel,
   type DevtoolsPanelOptions,
   type DevtoolsPanelTheme,
+  type DevtoolsPicker,
   type DevtoolsPort,
   type Envelope,
   type ErrorOrigin,
   type ErrorOverlayOptions,
+  type FrameEntry,
   type FrameProfiler,
   type FrameProfilerOptions,
   type FrameSample,
@@ -367,12 +404,17 @@ export {
   type HookHost,
   type NodeInspector,
   type NodeInspectorOptions,
+  type NodePickerOptions,
+  type NodeReportViewOptions,
   type OriginalPosition,
   type PageMessage,
   type PagePort,
   type PanelMessage,
   type PanelPort,
   type PatchEntry,
+  type RenderWorkerHost,
+  type RenderWorkerTap,
+  type RenderWorkerTapOptions,
   type SourceMapV3,
   type StackFrame,
   type StackLocation,

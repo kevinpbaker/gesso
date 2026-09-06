@@ -509,7 +509,7 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     name: 'defineThemeExtension',
     package: 'core',
     group: 'Colour, theme and type',
-    what: "A token group of your own on a theme, typed, with no change to `UiTheme`.",
+    what: 'A token group of your own on a theme, typed, with no change to `UiTheme`.',
     page: '/appearance/themes-and-the-environment'
   },
   {

@@ -7,6 +7,7 @@ import type {
   UiBeforeInputEvent,
   UiFocusEvent,
   UiKeyboardEvent,
+  UiPinchEvent,
   UiPointerEvent,
   UiTextChangeEvent,
   UiWheelEvent
@@ -58,6 +59,11 @@ export type UiEventProps = {
   onPanStart?: (event: UiPointerEvent) => void;
   onPanMove?: (event: UiPointerEvent) => void;
   onPanEnd?: (event: UiPointerEvent) => void;
+  /** A secondary press or a long press asked for a menu. */
+  onContextMenu?: (event: UiPointerEvent) => void;
+  onPinchStart?: (event: UiPinchEvent) => void;
+  onPinchMove?: (event: UiPinchEvent) => void;
+  onPinchEnd?: (event: UiPinchEvent) => void;
   onWheel?: (event: UiWheelEvent) => void;
   onKeyDown?: (event: UiKeyboardEvent) => void;
   onKeyUp?: (event: UiKeyboardEvent) => void;

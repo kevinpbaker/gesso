@@ -239,6 +239,13 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   opacity: { group: 'Paint', note: 'Applies to the whole subtree, not just this node.' },
   visible: { group: 'Paint', note: 'Hides the box and its subtree without taking it out of layout.' },
   transform: { group: 'Paint', note: 'Translation, scale and rotation applied at paint time. Layout does not see it.' },
+  paint: {
+    group: 'Paint',
+    note: 'A painter given a drawing surface, the resolved box and the device scale, with the inputs it reads. Repainted when those change and not otherwise.'
+  },
+  path: { group: 'Paint', note: 'A static vector shape, with its own fill rule, stroke, dash, caps and joins.' },
+  clipPath: { group: 'Paint', note: 'Clips this node to a path, in the same vocabulary `path` takes.' },
+  blur: { group: 'Paint', note: "Blurs a painted node's own picture, in pixels. Not a backdrop blur." },
 
   // Text
   color: {

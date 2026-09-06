@@ -318,7 +318,14 @@ export class UiGestureRecognizer implements GestureInput {
       // listener said the press was for picking the node up.
       if (this.contextMenuOnLongPress && down.pointer.kind !== 'mouse' && !held.defaultPrevented) {
         this.dispatcher.dispatch(
-          new UiPointerEvent(UiEventType.ContextMenu, this.startX, this.startY, down.buttons, down.modifiers, down.pointer),
+          new UiPointerEvent(
+            UiEventType.ContextMenu,
+            this.startX,
+            this.startY,
+            down.buttons,
+            down.modifiers,
+            down.pointer
+          ),
           target
         );
       }
@@ -353,13 +360,7 @@ export class UiGestureRecognizer implements GestureInput {
    * than a release — a second contact landing — and the buttons,
    * modifiers and device of the last event seen are used instead.
    */
-  private dispatchEnd(
-    type: UiEventType,
-    target: UiNode,
-    x: number,
-    y: number,
-    source: UiPointerEvent | null
-  ): void {
+  private dispatchEnd(type: UiEventType, target: UiNode, x: number, y: number, source: UiPointerEvent | null): void {
     const buttons = source?.buttons ?? this.lastButtons;
     const modifiers = source?.modifiers ?? this.lastModifiers;
     const pointer = source?.pointer ?? this.lastPointer ?? undefined;

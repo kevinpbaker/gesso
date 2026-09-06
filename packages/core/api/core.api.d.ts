@@ -634,7 +634,11 @@ declare enum UiEventType {
   DragEnd = "dragend",
   PanStart = "panstart",
   PanMove = "panmove",
-  PanEnd = "panend"
+  PanEnd = "panend",
+  ContextMenu = "contextmenu",
+  PinchStart = "pinchstart",
+  PinchMove = "pinchmove",
+  PinchEnd = "pinchend"
 }
 interface UiKeyModifiers {
   ctrl: boolean;
@@ -677,6 +681,18 @@ declare class UiPointerEvent extends UiInputEvent {
   readonly pointer: UiPointerDevice;
   constructor(type: UiEventType, x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers,
   pointer?: UiPointerDevice);
+}
+declare class UiPinchEvent extends UiInputEvent {
+  readonly x: number;
+  readonly y: number;
+  readonly scale: number;
+  readonly rotation: number;
+  readonly scaleDelta: number;
+  readonly rotationDelta: number;
+  readonly translateX: number;
+  readonly translateY: number;
+  readonly modifiers: UiKeyModifiers;
+  constructor(type: UiEventType.PinchStart | UiEventType.PinchMove | UiEventType.PinchEnd, x: number, y: number, scale: number, rotation: number, scaleDelta: number, rotationDelta: number, translateX: number, translateY: number, modifiers?: UiKeyModifiers);
 }
 declare class UiKeyboardEvent extends UiInputEvent {
   readonly key: string;
@@ -1473,6 +1489,10 @@ type UiEventProps = {
   onPanStart?: (event: UiPointerEvent) => void;
   onPanMove?: (event: UiPointerEvent) => void;
   onPanEnd?: (event: UiPointerEvent) => void;
+  onContextMenu?: (event: UiPointerEvent) => void;
+  onPinchStart?: (event: UiPinchEvent) => void;
+  onPinchMove?: (event: UiPinchEvent) => void;
+  onPinchEnd?: (event: UiPinchEvent) => void;
   onWheel?: (event: UiWheelEvent) => void;
   onKeyDown?: (event: UiKeyboardEvent) => void;
   onKeyUp?: (event: UiKeyboardEvent) => void;
@@ -2262,10 +2282,18 @@ declare class FocusNotifier {
   handleNodeRemoved(node: UiNode): void;
   private notify;
 }
+interface PinchRecognizerOptions {
+  scaleThreshold?: number;
+  rotationThreshold?: number;
+}
 interface GestureRecognizerOptions {
   slop?: number;
   touchSlop?: number;
   longPressDelay?: number;
+  velocityWindow?: number;
+  now?: () => number;
+  contextMenuOnLongPress?: boolean;
+  pinch?: PinchRecognizerOptions;
 }
 interface GestureInput {
   pointerDown(event: UiPointerEvent, target: UiNode): void;
@@ -2273,28 +2301,52 @@ interface GestureInput {
   pointerUp(event: UiPointerEvent, target: UiNode): void;
   pointerCancel(): void;
   claimed(): boolean;
+  contactDown?(pointer: UiPointerDevice, x: number, y: number, target: UiNode | null, modifiers: UiKeyModifiers): void;
+  contactMove?(pointer: UiPointerDevice, x: number, y: number): void;
+  contactUp?(pointer: UiPointerDevice): void;
 }
 declare class UiGestureRecognizer implements GestureInput {
   private readonly dispatcher;
   private readonly slop;
   private readonly touchSlop;
   private readonly longPressDelay;
+  private readonly velocityWindow;
+  private readonly now;
+  private readonly contextMenuOnLongPress;
+  private readonly pinch;
   private state;
   private startX;
   private startY;
   private startKind;
   private claimedPress;
   private timer;
+  private readonly samples;
+  private sampleCount;
+  private sampleNext;
+  private pressTarget;
+  private lastX;
+  private lastY;
+  private lastButtons;
+  private lastModifiers;
+  private lastPointer;
   constructor(dispatcher: UiInputDispatcher, options?: GestureRecognizerOptions);
   pointerDown(event: UiPointerEvent, target: UiNode): void;
   pointerMove(event: UiPointerEvent, target: UiNode): void;
   pointerUp(event: UiPointerEvent, target: UiNode): void;
   pointerCancel(): void;
   claimed(): boolean;
+  contactDown(pointer: UiPointerDevice, x: number, y: number, target: UiNode | null, modifiers: UiKeyModifiers): void;
+  contactMove(pointer: UiPointerDevice, x: number, y: number): void;
+  contactUp(pointer: UiPointerDevice): void;
+  private endForPinch;
   private armLongPress;
   private clearTimer;
   private pressSlop;
   private dispatch;
+  private dispatchEnd;
+  private resetSamples;
+  private remember;
+  private velocityAlong;
 }
 interface ScrollContainerState {
   scrollX: number;
@@ -3640,7 +3692,6 @@ declare class PaintPictureCache {
   constructor(createCanvas?: PaintCanvasFactory);
   setCanvasFactory(factory: PaintCanvasFactory): void;
   resetStats(): void;
-  static paints(node: UiNode): boolean;
   pictureFor(node: UiNode, rec: LayoutRecord, scale: number): UiImage | undefined;
   recordingFor(node: UiNode): PaintRecording;
   private record;
@@ -5585,7 +5636,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-BvUyVX7K.js";
+} from "./index-DHVz6MFU.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6347,7 +6398,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BvUyVX7K.js";
+} from "./index-DHVz6MFU.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

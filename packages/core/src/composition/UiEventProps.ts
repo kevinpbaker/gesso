@@ -37,7 +37,11 @@ const EVENT_PROPS: Readonly<Record<string, UiEventType>> = {
   onDragEnd: UiEventType.DragEnd,
   onPanStart: UiEventType.PanStart,
   onPanMove: UiEventType.PanMove,
-  onPanEnd: UiEventType.PanEnd
+  onPanEnd: UiEventType.PanEnd,
+  onContextMenu: UiEventType.ContextMenu,
+  onPinchStart: UiEventType.PinchStart,
+  onPinchMove: UiEventType.PinchMove,
+  onPinchEnd: UiEventType.PinchEnd
 };
 
 /**

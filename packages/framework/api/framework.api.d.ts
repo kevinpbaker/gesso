@@ -7,17 +7,28 @@
 // ==== FunctionComponent.d.ts ====
 import {
   BehaviorSubject,
-  Observable
+  Observable,
+  Subject,
+  Subscription
 } from "rxjs";
 import {
+  LayoutBox,
   Reactive,
-  UiChild
+  UiChild,
+  UiModifier
 } from "@gesso/core";
 declare abstract class Component {
   onMount?(): void;
   onUnmount?(): void;
   abstract render(): UiChild;
 }
+declare class InternalState<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  constructor(initialValue: T);
+  get value(): T;
+  set value(next: T);
+}
+declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
 declare class InputCell<T> extends BehaviorSubject<T> {
   label: string | undefined;
   private snapshotBy;
@@ -48,6 +59,12 @@ declare function into<V>(target: {
   next(value: V): void;
 }): OutputTarget<V>;
 declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
+declare class BoundsCell extends InternalState<LayoutBox> {
+  readonly modifier: UiModifier<Subject<LayoutBox>>;
+  constructor();
+  next(box: LayoutBox): void;
+}
+declare function bounds(label?: string): BoundsCell;
 type Command = (...args: never[]) => void;
 type CommandMap = Record<string, Command>;
 interface ChannelToken<View extends object, Commands extends object = Record<string, never>> {
@@ -56,6 +73,13 @@ interface ChannelToken<View extends object, Commands extends object = Record<str
   readonly commands?: Commands;
 }
 declare function channel<View extends object, Commands extends object = Record<string, never>>(name: string, initial: View): ChannelToken<View, Commands>;
+interface ChannelSpec<View extends object, Commands extends object> {
+  readonly view: View;
+  readonly commands?: Commands;
+}
+declare function defineChannel<View extends object, Commands extends object = Record<string, never>>(name: string, spec: ChannelSpec<View, Commands>): ChannelToken<View, Commands>;
+type ViewOf<T> = T extends ChannelToken<infer View, object> ? View : never;
+type CommandsOf<T> = T extends ChannelToken<object, infer Commands> ? Commands : never;
 declare function viewKeys(token: {
   initial: object;
 }): string[];
@@ -92,6 +116,7 @@ type ChannelClientMessage = {
   type: 'channel:command';
   command: string;
   payload: unknown;
+  rest?: unknown[];
 };
 type ChannelHostMessage = {
   type: 'channel:patch';
@@ -115,7 +140,6 @@ declare class ChannelReplica<View extends object, Commands extends object> {
   get view(): { readonly [K in keyof View]: InputCell<View[K]>; };
   get send(): Commands;
   private readonly viewProxy;
-  private readonly warnedArity;
   private createCommandProxy;
   onError(listener: ((message: string, stack?: string) => void) | null): void;
   private receive;
@@ -132,6 +156,8 @@ interface ComponentContext {
   channel<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
   onMount(hook: () => void): void;
   onUnmount(hook: () => void): void;
+  effect<T>(source: Observable<T>, run: (value: T) => void): Subscription;
+  bounds(label?: string): BoundsCell;
 }
 type Inputs<P> = { readonly [K in keyof P]-?: InputCell<P[K]>; };
 type FunctionComponent<P = {}> = (inputs: Inputs<P>, context: ComponentContext) => UiChild;
@@ -153,20 +179,25 @@ declare function isClassComponent(component: ComponentType): component is ClassC
 export {
   applyPatch,
   applyPatches,
+  bounds,
+  BoundsCell,
   channel,
   ChannelClientMessage,
   ChannelHostMessage,
   ChannelPort,
   ChannelReplica,
+  ChannelSpec,
   ChannelToken,
   ClassComponent,
   Command,
   CommandMap,
+  CommandsOf,
   Component,
   ComponentArgs,
   ComponentContext,
   ComponentProps,
   ComponentType,
+  defineChannel,
   diffProjection,
   EmitArgs,
   EmitValue,
@@ -174,6 +205,8 @@ export {
   input,
   InputCell,
   Inputs,
+  internalState,
+  InternalState,
   into,
   isChannelClientMessage,
   isChannelHostMessage,
@@ -185,19 +218,14 @@ export {
   Patch,
   PatchPath,
   ReadableCell,
-  viewKeys
+  viewKeys,
+  ViewOf
 };
 // ==== index.d.ts ====
 import {
-  applyPatch,
-  applyPatches,
-  channel,
-  ChannelClientMessage,
-  ChannelHostMessage,
   ChannelPort,
   ChannelReplica,
   ChannelToken,
-  ClassComponent,
   Command,
   CommandMap,
   Component,
@@ -205,28 +233,14 @@ import {
   ComponentContext,
   ComponentProps,
   ComponentType,
-  diffProjection,
-  EmitArgs,
-  EmitValue,
-  FunctionComponent,
-  input,
   InputCell,
   Inputs,
-  into,
-  isChannelClientMessage,
-  isChannelHostMessage,
-  isClassComponent,
-  isOutputTarget,
-  output,
+  InternalState,
   OutputCell,
-  OutputTarget,
   Patch,
-  PatchPath,
-  ReadableCell,
-  viewKeys
-} from "./FunctionComponent-Dm-wXgRx.js";
+  ReadableCell
+} from "./FunctionComponent-B3siYSBz.js";
 import {
-  BehaviorSubject,
   Observable,
   Subscription
 } from "rxjs";
@@ -250,7 +264,7 @@ import {
   MotionTiming,
   performanceMarksEnabled,
   RendererBackend,
-  setPerformanceMarks,
+  setPerformanceMarks as setPerformanceMarks$1,
   TextMeasurer,
   UI_ROLES,
   UI_SEMANTIC_STATES,
@@ -291,13 +305,6 @@ import {
   UiWheelController,
   VideoResolver
 } from "@gesso/core";
-declare class InternalState<T> extends BehaviorSubject<T> {
-  label: string | undefined;
-  constructor(initialValue: T);
-  get value(): T;
-  set value(next: T);
-}
-declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
 declare class ServiceRegistry {
   private readonly services;
   register<T extends object>(ServiceClass: new () => T): T;
@@ -347,6 +354,52 @@ interface SelectOptions<T> {
 }
 declare function select<T extends object, K extends keyof T>(source: Observable<T>, key: K, options?: SelectOptions<T[K]>): ComputedCell<T[K]>;
 declare function select<T, R>(source: Observable<T>, project: (value: T) => R, options?: SelectOptions<R>): ComputedCell<R>;
+type ResourceStatus = 'idle' | 'loading' | 'ready' | 'missing' | 'failed';
+interface ResourceState<T> {
+  readonly status: ResourceStatus;
+  readonly value: T | null;
+  readonly error: string | null;
+}
+interface ResourceOptions<K, T> {
+  readonly peek?: (key: K) => T | null | undefined;
+  readonly label?: string;
+}
+declare class Resource<K, T> {
+  private readonly fetch;
+  private readonly options;
+  private readonly cell;
+  private requests;
+  private asked;
+  private settling;
+  private readonly following;
+  readonly state: ReadableCell<ResourceState<T>>;
+  readonly status: ComputedCell<ResourceStatus>;
+  readonly value: ComputedCell<T | null>;
+  readonly error: ComputedCell<string | null>;
+  constructor(key: Observable<K | null | undefined>, fetch: (key: K) => Promise<T | null>, options?: ResourceOptions<K, T>);
+  get requested(): K | null;
+  get settled(): Promise<void>;
+  retry(): Promise<void>;
+  set(value: T): void;
+  dispose(): void;
+  private request;
+  private run;
+  private answered;
+  private refused;
+  private write;
+}
+declare function resource<K, T>(key: Observable<K | null | undefined>, fetch: (key: K) => Promise<T | null>, options?: ResourceOptions<K, T>): Resource<K, T>;
+interface MutateOptions<T> {
+  readonly equal?: Equality<T>;
+  readonly label?: string;
+}
+interface Mutation<A> {
+  readonly pending: ReadableCell<number>;
+  run(argument: A): Promise<boolean>;
+}
+declare function mutate<T, A = void>(cell: InternalState<T>, apply: (current: T, argument: A) => T, commit: (argument: A, applied: T) => Promise<unknown>, options?: MutateOptions<T>): Mutation<A>;
+declare function debounced<T>(source: Observable<T>, ms: number): ReadableCell<T>;
+declare function throttled<T>(source: Observable<T>, ms: number): ReadableCell<T>;
 type EachKey<T> = (keyof T & string) | ((item: T, index: number) => string | number);
 interface EachProps<T> {
   readonly of: Observable<readonly T[]> | readonly T[];
@@ -367,6 +420,11 @@ declare function bind<T>(cell: InternalState<T>): {
   onChange: (next: T) => void;
 };
 declare function bind<T, V extends string, E extends string = 'onChange'>(cell: InternalState<T>, value: V, onChange?: E): { [K in V]: InternalState<T>; } & { [K in E]: (next: T) => void; };
+declare function bind<T>(cell: ReadableCell<T>, write: (next: T) => void): {
+  value: ReadableCell<T>;
+  onChange: (next: T) => void;
+};
+declare function bind<T, V extends string, E extends string = 'onChange'>(cell: ReadableCell<T>, write: (next: T) => void, value: V, onChange?: E): { [K in V]: ReadableCell<T>; } & { [K in E]: (next: T) => void; };
 interface ControlledValue<T> {
   readonly value: Observable<T>;
   current(): T;
@@ -629,6 +687,13 @@ interface ToOptions {
   readonly query?: Readonly<Record<string, string>>;
 }
 type ToArgs<Path extends string> = HasNoParams<Path> extends true ? [] : [params: RouteParams<Path>, options?: ToOptions];
+declare class RouteState {
+  private readonly byRoute;
+  cell<T>(route: RouteDefinition | null, key: string, initial: T): InternalState<T>;
+  has(route: RouteDefinition | null, key: string): boolean;
+  forget(route: RouteDefinition | null): void;
+  clear(): void;
+}
 interface RouteMatch {
   readonly route: RouteDefinition;
   readonly chain: readonly RouteDefinition[];
@@ -652,9 +717,14 @@ interface NavigateOptions {
   readonly replace?: boolean;
 }
 type GoArgs<Path extends string> = HasNoParams<Path> extends true ? [options?: NavigateOptions] : [params: RouteParams<Path>, options?: NavigateOptions];
+interface RouteAnswer<Path extends string, T> {
+  readonly asks: (params: RouteParams<Path>) => string;
+  readonly answers: (value: NonNullable<T>) => string;
+}
 declare class RouterService {
   readonly url: InternalState<string>;
   readonly match: InternalState<RouteMatch | null>;
+  readonly state: RouteState;
   private routes;
   private notFound;
   private history;
@@ -670,6 +740,9 @@ declare class RouterService {
   applyUrl(url: string): void;
   params<Path extends string>(route: RouteDefinition<Path>): RouteParams<Path> | null;
   observeParams<Path extends string>(route: RouteDefinition<Path>): ComputedCell<RouteParams<Path> | null>;
+  remember<T>(route: RouteDefinition, key: string, initial: T): InternalState<T>;
+  forget(route: RouteDefinition): void;
+  answerFor<Path extends string, T>(route: RouteDefinition<Path>, source: Observable<T>, keys: RouteAnswer<Path, T>): ComputedCell<T | null>;
   isActive(route: RouteDefinition): ComputedCell<boolean>;
   private resolveInto;
   private publish;
@@ -735,6 +808,12 @@ interface UiOwnerReport {
   readonly name: string;
   readonly anchorId: string;
 }
+interface NodePathTarget {
+  readonly type: string;
+  readonly id: string;
+  readonly label?: string;
+}
+declare function formatNodePath(owners: readonly UiOwnerReport[], node: NodePathTarget): string;
 type UiPropOrigin = 'element' | 'binding' | 'modifier';
 interface UiPropReport {
   readonly name: string;
@@ -748,7 +827,7 @@ interface UiStreamReport {
   readonly kind: 'cell' | 'observable';
   readonly value: string;
   readonly emissions: number;
-  readonly age: number | null;
+  readonly emittedAt: number | null;
   readonly connected: boolean;
 }
 interface BoundStream {
@@ -759,8 +838,8 @@ interface BoundStream {
   emittedAt(): number | null;
   connected(): boolean;
 }
-declare function describeStream(binding: BoundStream, now: number): UiStreamReport;
-declare function formatStream(stream: UiStreamReport): string;
+declare function describeStream(binding: BoundStream, timeOrigin: number): UiStreamReport;
+declare function formatStream(stream: UiStreamReport, now?: number): string;
 declare function formatAge(ms: number): string;
 interface UiEnvironmentReport {
   readonly key: string;
@@ -1059,7 +1138,7 @@ type RuntimeToShellMessage = {
 } |
 {
   type: 'editing';
-  state: EditingState$1 | null;
+  state: EditingState | null;
 } |
 {
   type: 'clipboard';
@@ -1403,6 +1482,8 @@ declare class GessoRuntime {
   private semanticsListener;
   private semanticsBoxes;
   private lastFocusedId;
+  private focusAfterReload;
+  private restoringFocus;
   private semanticsStale;
   private lastEditingState;
   private shellListener;
@@ -1433,14 +1514,15 @@ declare class GessoRuntime {
   handleDevtools(request: DevtoolsRequest): void;
   private writeInspectedProperty;
   snapshotTree(): UiTreeSnapshot;
+  private sendTree;
   inspectNodeById(id: string): UiNodeReport | null;
   setHighlightedNode(id: string | null): void;
   onCursor(listener: ((cursor: string | null) => void) | null): void;
   get cursor(): string | null;
   onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
   get scrollability(): UiScrollability;
-  onEditingState(listener: ((state: EditingState$1 | null) => void) | null): void;
-  get editingState(): EditingState$1 | null;
+  onEditingState(listener: ((state: EditingState | null) => void) | null): void;
+  get editingState(): EditingState | null;
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
   onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
   applyAudioSample(sample: AudioSample): void;
@@ -1457,6 +1539,7 @@ declare class GessoRuntime {
   explain(node: UiNode): LayoutExplanation;
   inspectNode(node: UiNode): UiNodeReport;
   private beneathAtPointer;
+  private pathOf;
   private ownersOf;
   private propsOf;
   private environmentOf;
@@ -1471,12 +1554,13 @@ declare class GessoRuntime {
   layoutRoot(): UiNode;
   scrollIntoView(node: UiNode, padding?: number): void;
   reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
+  private restoreFocusAfterReload;
   dispose(): void;
   private buildRoot;
   private resolveRootElement;
   private createInput;
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
-  semanticsTree(): UiSemanticsMap$1;
+  semanticsTree(): UiSemanticsMap;
   applySemanticsAction(action: UiSemanticsAction): void;
   private updateSemantics;
   private collectSemanticsBoxes;
@@ -1623,7 +1707,11 @@ declare class WorkerApp {
   private wouldConsumeWheel;
   private attachInput;
 }
-declare function createApp(options: WorkerAppOptions): WorkerApp;
+interface CreateAppOptions extends Omit<WorkerAppOptions, 'renderWorker'> {
+  renderWorker?: WorkerAppOptions['renderWorker'];
+  workerName?: string;
+}
+declare function createApp(options?: CreateAppOptions): WorkerApp;
 declare function createApp(root: FrameworkChild | ComponentType): GessoAppBuilder;
 interface GessoAppOptions {
   host: HTMLElement;
@@ -1831,10 +1919,10 @@ declare class EditingProxy {
   constructor(canvas: HTMLCanvasElement, sink: EditingProxySink);
   get active(): boolean;
   get element(): HTMLTextAreaElement;
-  update(state: EditingState$1 | null): void;
+  update(state: EditingState | null): void;
   focus(): void;
   raiseKeyboard(): void;
-  describe(record: UiSemanticsRecord$1 | null): void;
+  describe(record: UiSemanticsRecord | null): void;
   dispose(): void;
   private position;
   private mirror;
@@ -1848,7 +1936,7 @@ interface SemanticsMirrorSink {
 }
 interface EditingMirrorTarget {
   readonly active: boolean;
-  describe(record: UiSemanticsRecord$1 | null): void;
+  describe(record: UiSemanticsRecord | null): void;
   focus(): void;
 }
 declare class SemanticsMirror {
@@ -1928,6 +2016,453 @@ declare class RenderWorkerApp {
   private initialize;
 }
 export {
+  ActionCause,
+  ActionEntry,
+  AnimateOptions,
+  AnimationService,
+  APPLICATION_WORKER,
+  AppLogicEndpoint,
+  AudioAction,
+  AudioElementLike,
+  AudioMetadata,
+  AudioRequest,
+  AudioSample,
+  AudioService,
+  AudioSink,
+  AudioSinkOptions,
+  AudioSinkOutput,
+  AudioState,
+  AudioStatus,
+  bind,
+  BoundStream,
+  buildPath,
+  Channel,
+  ChannelErrorEntry,
+  ChannelRegistration,
+  ChannelRegistry,
+  ChannelRegistryHandle,
+  ChannelSource,
+  ColorScheme,
+  ColorSchemePreference,
+  CommandEntry,
+  ComponentElement,
+  ComponentHost,
+  ComponentHostResolver,
+  computed,
+  ComputedCell,
+  ComputedOptions,
+  ConsoleEntry,
+  controlled,
+  ControlledOptions,
+  ControlledValue,
+  createApp,
+  CreateAppOptions,
+  createChannelRegistry,
+  createComponent,
+  createShellHistory,
+  debounced,
+  Define,
+  derive,
+  DeriveOptions,
+  describeStream,
+  DevtoolsEvent,
+  DevtoolsRequest,
+  each,
+  Each,
+  EachKey,
+  EachProps,
+  EditingMirrorTarget,
+  EditingProxy,
+  EditingProxySink,
+  EditingState$1,
+  Equality,
+  FindService,
+  findUnplainPath,
+  FocusService,
+  FontFaceDeclaration,
+  FontFaceLike,
+  FontFamilyDeclaration,
+  FontFamilyStatus,
+  FontHost,
+  FontService,
+  formatAge,
+  formatNodePath,
+  formatNodeReport,
+  formatStream,
+  formatUrl,
+  FrameEntry,
+  FrameMetrics,
+  FramePhaseTimings,
+  FrameService,
+  FrameworkChild,
+  GessoApp,
+  GessoAppBuilder,
+  GessoAppOptions,
+  GessoRuntime,
+  GessoRuntimeOptions,
+  Inject,
+  Input,
+  isComponentElement,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
+  measureSpan,
+  MediaOptions,
+  MediaService,
+  MediaSessionLike,
+  MessageEndpoint,
+  mutate,
+  MutateOptions,
+  Mutation,
+  NodePathTarget,
+  observeColorScheme,
+  observeMediaQuery,
+  observeReducedMotion,
+  OutletProps,
+  Output,
+  OverlayEntry,
+  OverlayLayer,
+  OverlayPlacement,
+  OverlayService,
+  parseUrl,
+  PatchEntry,
+  performanceMarksEnabled,
+  pick,
+  pickKeys,
+  pn,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  Presence,
+  PresenceProps,
+  printPropValue,
+  provide,
+  ProvidedChannel,
+  ReadSource,
+  RendererChoice,
+  renderRoot,
+  RenderWorkerApp,
+  requirePlainData,
+  resource,
+  Resource,
+  ResourceOptions,
+  ResourceState,
+  ResourceStatus,
+  route,
+  RouteAnswer,
+  RouteContext,
+  RouteDefinition,
+  RouteGuard,
+  RouteMatch,
+  RouteOptions,
+  RouteParams,
+  RouterHistorySink,
+  RouterOutlet,
+  RouterRoutes,
+  RouterService,
+  RouteState,
+  RouteTarget,
+  RuntimeErrorSource,
+  RuntimeInput,
+  RuntimeToShellMessage,
+  select,
+  SelectOptions,
+  SemanticsMirror,
+  SemanticsMirrorSink,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  ServiceRegistry,
+  setPerformanceMarks$1,
+  ShellHistory,
+  ShellHistoryMode,
+  ShellHistoryOptions,
+  ShellRequest,
+  ShellService,
+  ShellToRuntimeMessage,
+  show,
+  Show,
+  ShowProps,
+  SpringOptions,
+  structurallyEqual,
+  throttled,
+  treeText,
+  UI_FRAME_PHASES,
+  UI_ROLES,
+  UI_SEMANTIC_STATES,
+  UiDuration,
+  UiEasingChoice,
+  UiEnvironmentReport,
+  UiFramePhase,
+  UiNodeReport,
+  UiOwnerReport,
+  UiPropOrigin,
+  UiPropReport,
+  UiRole,
+  UiSemanticsMap$1,
+  UiSemanticsPatch,
+  UiSemanticsRecord$1,
+  UiSemanticsReport,
+  UiSemanticState,
+  UiStreamReport,
+  UiTreeNode,
+  UiTreeSnapshot,
+  WorkerApp,
+  WorkerAppOptions,
+  workerHandle,
+  WorkerHandle,
+  writeClipboard
+};
+// ==== index.d.ts ====
+import {
+  applyPatch,
+  applyPatches,
+  bounds,
+  BoundsCell,
+  channel,
+  ChannelClientMessage,
+  ChannelHostMessage,
+  ChannelPort,
+  ChannelReplica,
+  ChannelSpec,
+  ChannelToken,
+  ClassComponent,
+  Command,
+  CommandMap,
+  CommandsOf,
+  Component,
+  ComponentContext,
+  ComponentProps,
+  ComponentType,
+  defineChannel,
+  diffProjection,
+  EmitArgs,
+  EmitValue,
+  FunctionComponent,
+  input,
+  InputCell,
+  Inputs,
+  internalState,
+  InternalState,
+  into,
+  isChannelClientMessage,
+  isChannelHostMessage,
+  isClassComponent,
+  isOutputTarget,
+  output,
+  OutputCell,
+  OutputTarget,
+  Patch,
+  PatchPath,
+  ReadableCell,
+  viewKeys,
+  ViewOf
+} from "./FunctionComponent-B3siYSBz.js";
+import {
+  ActionCause,
+  ActionEntry,
+  AnimateOptions,
+  AnimationService,
+  APPLICATION_WORKER,
+  AppLogicEndpoint,
+  AudioAction,
+  AudioElementLike,
+  AudioMetadata,
+  AudioRequest,
+  AudioSample,
+  AudioService,
+  AudioSink,
+  AudioSinkOptions,
+  AudioSinkOutput,
+  AudioState,
+  AudioStatus,
+  bind,
+  BoundStream,
+  buildPath,
+  Channel,
+  ChannelErrorEntry,
+  ChannelRegistration,
+  ChannelRegistry,
+  ChannelRegistryHandle,
+  ChannelSource,
+  ColorScheme,
+  ColorSchemePreference,
+  CommandEntry,
+  ComponentElement,
+  ComponentHost,
+  ComponentHostResolver,
+  computed,
+  ComputedCell,
+  ComputedOptions,
+  ConsoleEntry,
+  controlled,
+  ControlledOptions,
+  ControlledValue,
+  createApp,
+  CreateAppOptions,
+  createChannelRegistry,
+  createComponent,
+  createShellHistory,
+  debounced,
+  Define,
+  derive,
+  DeriveOptions,
+  describeStream,
+  DevtoolsEvent,
+  DevtoolsRequest,
+  each,
+  Each,
+  EachKey,
+  EachProps,
+  EditingMirrorTarget,
+  EditingProxy,
+  EditingProxySink,
+  EditingState,
+  Equality,
+  FindService,
+  findUnplainPath,
+  FocusService,
+  FontFaceDeclaration,
+  FontFaceLike,
+  FontFamilyDeclaration,
+  FontFamilyStatus,
+  FontHost,
+  FontService,
+  formatAge,
+  formatNodePath,
+  formatNodeReport,
+  formatStream,
+  formatUrl,
+  FrameEntry,
+  FrameMetrics,
+  FramePhaseTimings,
+  FrameService,
+  FrameworkChild,
+  GessoApp,
+  GessoAppBuilder,
+  GessoAppOptions,
+  GessoRuntime,
+  GessoRuntimeOptions,
+  Inject,
+  Input,
+  isComponentElement,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
+  measureSpan,
+  MediaOptions,
+  MediaService,
+  MediaSessionLike,
+  MessageEndpoint,
+  mutate,
+  MutateOptions,
+  Mutation,
+  NodePathTarget,
+  observeColorScheme,
+  observeMediaQuery,
+  observeReducedMotion,
+  OutletProps,
+  Output,
+  OverlayEntry,
+  OverlayLayer,
+  OverlayPlacement,
+  OverlayService,
+  parseUrl,
+  PatchEntry,
+  performanceMarksEnabled,
+  pick,
+  pickKeys,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  Presence,
+  PresenceProps,
+  printPropValue,
+  provide,
+  ProvidedChannel,
+  ReadSource,
+  RendererChoice,
+  renderRoot,
+  RenderWorkerApp,
+  requirePlainData,
+  resource,
+  Resource,
+  ResourceOptions,
+  ResourceState,
+  ResourceStatus,
+  route,
+  RouteAnswer,
+  RouteContext,
+  RouteDefinition,
+  RouteGuard,
+  RouteMatch,
+  RouteOptions,
+  RouteParams,
+  RouterHistorySink,
+  RouterOutlet,
+  RouterRoutes,
+  RouterService,
+  RouteState,
+  RouteTarget,
+  RuntimeErrorSource,
+  RuntimeInput,
+  RuntimeToShellMessage,
+  select,
+  SelectOptions,
+  SemanticsMirror,
+  SemanticsMirrorSink,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  ServiceRegistry,
+  setPerformanceMarks,
+  ShellHistory,
+  ShellHistoryMode,
+  ShellHistoryOptions,
+  ShellRequest,
+  ShellService,
+  ShellToRuntimeMessage,
+  show,
+  Show,
+  ShowProps,
+  SpringOptions,
+  structurallyEqual,
+  throttled,
+  to,
+  treeText,
+  UI_FRAME_PHASES,
+  UI_ROLES,
+  UI_SEMANTIC_STATES,
+  UiDuration,
+  UiEasingChoice,
+  UiEnvironmentReport,
+  UiFramePhase,
+  UiNodeReport,
+  UiOwnerReport,
+  UiPropOrigin,
+  UiPropReport,
+  UiRole,
+  UiSemanticsMap,
+  UiSemanticsPatch,
+  UiSemanticsRecord,
+  UiSemanticsReport,
+  UiSemanticState,
+  UiStreamReport,
+  UiTreeNode,
+  UiTreeSnapshot,
+  WorkerApp,
+  WorkerAppOptions,
+  workerHandle,
+  WorkerHandle,
+  writeClipboard
+} from "./index-5DEbm2Bg.js";
+export {
   AnimationService,
   APPLICATION_WORKER,
   applyPatch,
@@ -1935,6 +2470,8 @@ export {
   AudioService,
   AudioSink,
   bind,
+  bounds,
+  BoundsCell,
   buildPath,
   channel,
   Channel,
@@ -1950,7 +2487,9 @@ export {
   createChannelRegistry,
   createComponent,
   createShellHistory,
+  debounced,
   Define,
+  defineChannel,
   derive,
   describeStream,
   diffProjection,
@@ -1962,6 +2501,7 @@ export {
   FocusService,
   FontService,
   formatAge,
+  formatNodePath,
   formatNodeReport,
   formatStream,
   formatUrl,
@@ -1989,6 +2529,7 @@ export {
   markNow,
   measureSpan,
   MediaService,
+  mutate,
   observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
@@ -2008,9 +2549,12 @@ export {
   renderRoot,
   RenderWorkerApp,
   requirePlainData,
+  resource,
+  Resource,
   route,
   RouterOutlet,
   RouterService,
+  RouteState,
   select,
   SemanticsMirror,
   serveChannels,
@@ -2021,6 +2565,7 @@ export {
   show,
   Show,
   structurallyEqual,
+  throttled,
   to,
   treeText,
   type ActionCause,
@@ -2044,6 +2589,7 @@ export {
   type ChannelRegistration,
   type ChannelRegistryHandle,
   type ChannelSource,
+  type ChannelSpec,
   type ChannelToken,
   type ClassComponent,
   type ColorScheme,
@@ -2051,6 +2597,7 @@ export {
   type Command,
   type CommandEntry,
   type CommandMap,
+  type CommandsOf,
   type ComponentContext,
   type ComponentElement,
   type ComponentProps,
@@ -2059,6 +2606,7 @@ export {
   type ConsoleEntry,
   type ControlledOptions,
   type ControlledValue,
+  type CreateAppOptions,
   type DeriveOptions,
   type DevtoolsEvent,
   type DevtoolsRequest,
@@ -2086,6 +2634,9 @@ export {
   type MediaOptions,
   type MediaSessionLike,
   type MessageEndpoint,
+  type MutateOptions,
+  type Mutation,
+  type NodePathTarget,
   type OutletProps,
   type OutputCell,
   type OutputTarget,
@@ -2100,6 +2651,10 @@ export {
   type ReadableCell,
   type ReadSource,
   type RendererChoice,
+  type ResourceOptions,
+  type ResourceState,
+  type ResourceStatus,
+  type RouteAnswer,
   type RouteContext,
   type RouteDefinition,
   type RouteGuard,
@@ -2139,6 +2694,7 @@ export {
   type UiStreamReport,
   type UiTreeNode,
   type UiTreeSnapshot,
+  type ViewOf,
   type WorkerAppOptions,
   type WorkerHandle,
   UI_FRAME_PHASES,
@@ -2172,7 +2728,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-Dm-wXgRx.js";
+} from "../FunctionComponent-B3siYSBz.js";
 import {
   Observable
 } from "rxjs";
@@ -2256,4 +2812,124 @@ export {
   jsxs,
   type Component,
   type ComponentContext
+};
+// ==== worker/index.d.ts ====
+import {
+  channel,
+  ChannelClientMessage,
+  ChannelHostMessage,
+  ChannelPort,
+  ChannelSpec,
+  ChannelToken,
+  Command,
+  CommandMap,
+  CommandsOf,
+  defineChannel,
+  internalState,
+  InternalState,
+  isChannelClientMessage,
+  isChannelHostMessage,
+  ReadableCell,
+  viewKeys,
+  ViewOf
+} from "../FunctionComponent-B3siYSBz.js";
+import {
+  APPLICATION_WORKER,
+  ChannelSource,
+  computed,
+  ComputedCell,
+  ComputedOptions,
+  ConsoleEntry,
+  debounced,
+  derive,
+  DeriveOptions,
+  Equality,
+  findUnplainPath,
+  isPortErrorMessage,
+  isPortHandshake,
+  MessageEndpoint,
+  mutate,
+  MutateOptions,
+  Mutation,
+  pick,
+  pickKeys,
+  portHandle,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  ReadSource,
+  requirePlainData,
+  resource,
+  Resource,
+  ResourceOptions,
+  ResourceState,
+  ResourceStatus,
+  select,
+  SelectOptions,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  structurallyEqual,
+  throttled
+} from "../index-5DEbm2Bg.js";
+type ConsoleLevel = ConsoleEntry['level'];
+type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
+declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
+export {
+  APPLICATION_WORKER,
+  captureConsole,
+  channel,
+  computed,
+  ComputedCell,
+  debounced,
+  defineChannel,
+  derive,
+  findUnplainPath,
+  internalState,
+  InternalState,
+  isChannelClientMessage,
+  isChannelHostMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  mutate,
+  pick,
+  pickKeys,
+  portHandle,
+  provide,
+  ProvidedChannel,
+  requirePlainData,
+  resource,
+  Resource,
+  select,
+  serveChannels,
+  servePorts,
+  structurallyEqual,
+  throttled,
+  type ChannelClientMessage,
+  type ChannelHostMessage,
+  type ChannelPort,
+  type ChannelSource,
+  type ChannelSpec,
+  type ChannelToken,
+  type Command,
+  type CommandMap,
+  type CommandsOf,
+  type ComputedOptions,
+  type ConsoleEntryBody,
+  type ConsoleLevel,
+  type DeriveOptions,
+  type Equality,
+  type MessageEndpoint,
+  type MutateOptions,
+  type Mutation,
+  type PortHost,
+  type ReadableCell,
+  type ReadSource,
+  type ResourceOptions,
+  type ResourceState,
+  type ResourceStatus,
+  type SelectOptions,
+  type ServedChannel,
+  type ViewOf,
+  viewKeys
 };

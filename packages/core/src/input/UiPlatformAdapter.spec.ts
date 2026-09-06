@@ -335,17 +335,29 @@ describe('UiPlatformAdapter', () => {
 describe('prepareInputSurface', () => {
   /**
    * The suite runs in node, so there is no `document` to make a canvas
-   * from. `prepareInputSurface` only ever writes to `style`, and that
-   * is the whole of what these assert, so a recorder shaped like a
-   * `CSSStyleDeclaration` is the honest double.
+   * from. `prepareInputSurface` writes to `style` and registers one
+   * listener, which is the whole of what these assert, so a recorder
+   * shaped like a `CSSStyleDeclaration` plus a listener log is the
+   * honest double.
    */
-  function surfaceDouble(): { element: HTMLElement; style: Record<string, string> } {
+  function surfaceDouble(): {
+    element: HTMLElement;
+    style: Record<string, string>;
+    listeners: string[];
+  } {
     const style: Record<string, string> = {
       setProperty(name: string, value: string) {
         style[name] = value;
       }
     } as unknown as Record<string, string>;
-    return { element: { style } as unknown as HTMLElement, style };
+    const listeners: string[] = [];
+    const element = {
+      style,
+      addEventListener(type: string) {
+        listeners.push(type);
+      }
+    } as unknown as HTMLElement;
+    return { element, style, listeners };
   }
 
   it('suppresses the platform focus outline', () => {
@@ -360,12 +372,15 @@ describe('prepareInputSurface', () => {
   });
 
   it('leaves the browser nothing else to interpret as a gesture', () => {
-    const { element, style } = surfaceDouble();
+    const { element, style, listeners } = surfaceDouble();
 
     prepareInputSurface(element);
 
     expect(style.touchAction).toBe('none');
     expect(style.userSelect).toBe('none');
     expect(style['-webkit-tap-highlight-color']).toBe('transparent');
+    // The platform menu would otherwise land on top of the
+    // `ContextMenu` event the runtime dispatches for the same press.
+    expect(listeners).toContain('contextmenu');
   });
 });

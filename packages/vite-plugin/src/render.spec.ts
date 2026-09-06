@@ -26,8 +26,9 @@ describe('transformRenderWorker', () => {
   it('keeps the builder chain, whether or not the entry assigned it', () => {
     const out = transformRenderWorker(ENTRY).code!;
     expect(out).toContain('__gessoRenderRoot(SluiceApp).useRoutes(ROUTES);');
-    const assigned = transformRenderWorker(ENTRY.replace('renderRoot(SluiceApp)', 'const app = renderRoot(SluiceApp)'))
-      .code!;
+    const assigned = transformRenderWorker(
+      ENTRY.replace('renderRoot(SluiceApp)', 'const app = renderRoot(SluiceApp)')
+    ).code!;
     expect(assigned).toContain('const app = __gessoRenderRoot(SluiceApp)');
   });
 

@@ -26,7 +26,7 @@ describe('blankLiterals', () => {
   });
 
   it('treats a regular expression as a literal but division as division', () => {
-    expect(blankLiterals("const r = /['\"]/;\n")).not.toContain("'");
+    expect(blankLiterals('const r = /[\'"]/;\n')).not.toContain("'");
     // `a / b` and `c / d`: the slash is division, so nothing between
     // them is blanked and the identifiers survive.
     expect(blankLiterals('const x = a / b + c / d;')).toContain('b + c');

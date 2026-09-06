@@ -105,7 +105,13 @@ export class UiPinchRecognizer {
    * A contact landed. Returns true when this is the second one, which
    * is the moment the caller has to end whatever the first was doing.
    */
-  contactDown(pointer: UiPointerDevice, x: number, y: number, target: UiNode | null, modifiers: UiKeyModifiers): boolean {
+  contactDown(
+    pointer: UiPointerDevice,
+    x: number,
+    y: number,
+    target: UiNode | null,
+    modifiers: UiKeyModifiers
+  ): boolean {
     if (!this.first.down) {
       write(this.first, pointer.id, x, y);
       this.target = target;
@@ -204,7 +210,11 @@ export class UiPinchRecognizer {
     return (Math.atan2(this.second.y - this.first.y, this.second.x - this.first.x) * 180) / Math.PI;
   }
 
-  private emit(type: UiEventType.PinchStart | UiEventType.PinchMove | UiEventType.PinchEnd, scale: number, rotation: number): void {
+  private emit(
+    type: UiEventType.PinchStart | UiEventType.PinchMove | UiEventType.PinchEnd,
+    scale: number,
+    rotation: number
+  ): void {
     const centerX = (this.first.x + this.second.x) / 2;
     const centerY = (this.first.y + this.second.y) / 2;
     const event = new UiPinchEvent(
