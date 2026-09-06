@@ -182,6 +182,13 @@ that are both on screen and staying, so two of them answering to one
 name is not a tie, it is a picture flying in from somewhere else and a
 card left invisible.
 
+A third way to lose the name is to change it on an element that is
+reused. A component reads `rootModifiers` once, when it renders, so a
+component instance handed a new list later keeps the modifiers it was
+built with: the element answers to the old name, never claims the new
+one, and the morph quietly stops happening. Key the component by
+whatever the name is derived from, so a change builds a new element.
+
 Both halves matter. Naming a card for the item it holds is not unique
 when the same track is in two rows, and it is not stable either: a list
 whose data is replaced hands the name from the card that held the item

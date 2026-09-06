@@ -158,6 +158,18 @@ export interface ControlLayoutProps {
    * The component's own modifiers are listed first, so a caller's
    * write of a property wins over the component's, which is the same
    * rule as everywhere else in the cascade.
+   *
+   * **Read once, when the component renders.** A component's render
+   * runs a single time and builds its root element from what it was
+   * given, so a caller who passes a *different* list to the same
+   * component instance later is passing it to nothing: the element
+   * keeps the modifiers it was built with. That is invisible until a
+   * modifier's arguments carry identity, and then it is not: a
+   * `sharedElement` whose name changed on a reused component goes on
+   * answering to the old name, claims nothing under the new one, and
+   * the transition silently stops happening. Give the component a
+   * `key` that changes with whatever the modifiers name, so a change
+   * builds a new element rather than re-using one.
    */
   rootModifiers?: readonly UiModifier[];
 }
