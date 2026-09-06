@@ -362,20 +362,11 @@ declare class LayoutRecord {
   lastConstraints: Constraints;
   altValid: boolean;
   altConstraints: Constraints;
-  private altMeasuredWidth;
-  private altMeasuredHeight;
-  private altOuterWidth;
-  private altOuterHeight;
-  private altMinContentWidth;
-  private altMaxContentWidth;
-  private altIntrinsicWidth;
-  private altIntrinsicHeight;
-  private altHasBaseline;
-  private altBaseline;
-  private altContentWidth;
-  private altContentHeight;
+  private altOutputs;
   saveAlt(): void;
   swapAlt(): void;
+  private outputs;
+  private restore;
   contentMatters: boolean;
   relayoutBoundary: boolean;
   measureDirty: boolean;
@@ -384,7 +375,6 @@ declare class LayoutRecord {
   propsPass: number;
   propsBaseWidth: number | undefined;
   propsBaseHeight: number | undefined;
-  reset(): void;
 }
 interface UiColors {
   readonly background: UiColor;
@@ -2584,8 +2574,7 @@ interface ScrollAdjustment {
   scrollY: number;
 }
 declare class LayoutEngine {
-  private records;
-  private retiredRecords;
+  private readonly records;
   private readonly scrollNodes;
   private readonly textScrollNodes;
   private readonly anchoredNodes;
@@ -2708,14 +2697,13 @@ declare class LayoutEngine {
   private rootPercentBase;
   private definiteAxis;
   private effectiveConstraints;
-  private axisMin;
-  private axisMax;
   private axisConstraints;
   private assignBox;
   private scrollDirection;
   private forEachLayoutChild;
   private forEachAbsoluteChild;
   private forEachChild;
+  private isAbsolute;
   private isFragment;
   private setLifted;
   get lifted(): ReadonlySet<UiNode>;
@@ -5026,7 +5014,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-BWK1F5TH.js";
+} from "./index-DJRJplAI.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5724,7 +5712,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BWK1F5TH.js";
+} from "./index-DJRJplAI.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
