@@ -350,6 +350,11 @@ declare class LayoutRecord {
   subgridColumns: number[] | undefined;
   subgridColumnGap: number;
   paintOrder: UiNode[] | null;
+  boundsMinX: number;
+  boundsMinY: number;
+  boundsMaxX: number;
+  boundsMaxY: number;
+  boundsUnbounded: boolean;
   scrollX: number;
   scrollY: number;
   contentWidth: number;
@@ -367,6 +372,9 @@ declare class LayoutRecord {
   measureDirty: boolean;
   placeDirty: boolean;
   transformDirty: boolean;
+  propsPass: number;
+  propsBaseWidth: number | undefined;
+  propsBaseHeight: number | undefined;
 }
 interface UiColors {
   readonly background: UiColor;
@@ -1705,6 +1713,7 @@ declare const DEFAULT_TEXT_COLOR: {
 declare function normalizeTextAlign(value: unknown): TextAlign;
 declare function normalizeVerticalAlign(value: unknown): VerticalAlign;
 declare function resolvePaintState(node: UiNode, out: PaintState): PaintState;
+declare function isPaintVisible(node: UiNode): boolean;
 declare function computeObjectFitRect(fit: ObjectFit, imageWidth: number, imageHeight: number, box: LayoutBox): LayoutBox;
 declare function createPaintState(): PaintState;
 declare function colorToCss(color: UiColor): string;
@@ -1850,6 +1859,13 @@ declare const TEXT_MATCHES_PROP = "textMatches";
 declare function matchRangesOf(node: UiNode): readonly TextRange[] | undefined;
 declare function setMatchRanges(node: UiNode, ranges: readonly TextRange[]): boolean;
 declare function clearMatchRanges(node: UiNode): boolean;
+interface SubtreeBounds {
+  readonly boundsMinX: number;
+  readonly boundsMinY: number;
+  readonly boundsMaxX: number;
+  readonly boundsMaxY: number;
+  readonly boundsUnbounded: boolean;
+}
 declare const SCROLLBAR_THICKNESS = 6;
 declare const SCROLLBAR_INSET = 2;
 declare const SCROLLBAR_MIN_THUMB = 24;
@@ -1872,6 +1888,7 @@ declare function scrollbarZoneAt(rec: LayoutRecord, x: number, y: number): Scrol
 interface HitTestLayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
   readonly lifted?: ReadonlySet<UiNode>;
+  subtreeBoundsFor?(node: UiNode): SubtreeBounds | undefined;
 }
 interface UiPoint {
   x: number;
@@ -1919,6 +1936,7 @@ declare class UiHitTester implements HitTester {
   private pointInParentSpace;
   private hitTestNode;
   private hitTestChildren;
+  private outsideSubtree;
   private recordHit;
   private hitScrollbar;
   private invertPoint;
@@ -2482,6 +2500,8 @@ declare class UiFrame {
   private readonly dirty;
   constructor(id: number, time: UiFrameTime, dirty: ReadonlyMap<UiNode, DirtyFlags>);
   get nodes(): UiNode[];
+  entries(): IterableIterator<[UiNode, DirtyFlags]>;
+  anyFlags(flags: DirtyFlags): boolean;
   get size(): number;
   isEmpty(): boolean;
   dirtyFlagsFor(node: UiNode): DirtyFlags;
@@ -2566,10 +2586,14 @@ declare class LayoutEngine {
   private readonly stickyShifted;
   private readonly textMeasurer;
   private percentBase;
+  private layoutPass;
   private layoutRoot;
   private rootConstraints;
+  private layoutVersion;
+  private boundsVersion;
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
+  subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined;
   get root(): UiNode | null;
   explain(node: UiNode): LayoutExplanation;
   private unexplained;
@@ -3838,6 +3862,7 @@ export {
   isNodeInert,
   isNodeSelectable,
   isObservable$1,
+  isPaintVisible,
   isPercentLength,
   isPrintable,
   isReadOnly,
@@ -3877,7 +3902,6 @@ export {
   LazyRow,
   lazySource,
   LazySourceArgs,
-  Lc,
   lightColors,
   lightTheme,
   linear,
@@ -4043,6 +4067,7 @@ export {
   StackProps,
   statesEqual,
   steps,
+  SubtreeBounds,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -4263,7 +4288,8 @@ export {
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
-  writeOverrideProperty
+  writeOverrideProperty,
+  zc
 };
 // ==== index.d.ts ====
 import {
@@ -4498,6 +4524,7 @@ import {
   isNodeInert,
   isNodeSelectable,
   isObservable,
+  isPaintVisible,
   isPercentLength,
   isPrintable,
   isReadOnly,
@@ -4702,6 +4729,7 @@ import {
   StackProps,
   statesEqual,
   steps,
+  SubtreeBounds,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -4923,7 +4951,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-B7Bj0tYS.js";
+} from "./index-C0fpo7vV.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5079,6 +5107,7 @@ export {
   isNodeInert,
   isNodeSelectable,
   isObservable,
+  isPaintVisible,
   isPercentLength,
   isPrintable,
   isReadOnly,
@@ -5376,6 +5405,7 @@ export {
   type Size,
   type SizeDecision,
   type StackProps,
+  type SubtreeBounds,
   type TextAlign,
   type TextContentProps,
   type TextLine,
@@ -5613,7 +5643,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-B7Bj0tYS.js";
+} from "./index-C0fpo7vV.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
