@@ -50,6 +50,8 @@
  *   node scripts/check-route-screenshots.ts             # verify
  *   node scripts/check-route-screenshots.ts --update    # rewrite baselines
  *   node scripts/check-route-screenshots.ts --route framework
+ *   node scripts/check-route-screenshots.ts --route modifiers,compare
+ *   node scripts/check-route-screenshots.ts --app segue
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import {
@@ -179,6 +181,23 @@ const CANNOT_SETTLE: Record<string, string> = {
   benchmark: 'drives a continuous load and reports a moving frame time; it never reaches a still frame'
 };
 
+/**
+ * Known headroom, so the next person to see one of these is not
+ * surprised by it.
+ *
+ * `compare` carries a scrollbar thumb that is sometimes captured
+ * visible and sometimes fully faded into the panel, worth about 381
+ * pixels either way. Quiescence does not catch it, because both states
+ * are still. That is 0.059% against a 0.1% budget, so it passes, and it
+ * eats over half the headroom: a real change to that route of the size
+ * that would normally be caught might not be. The fix, when someone
+ * wants it, is for still mode to settle the thumb rather than for the
+ * threshold to grow.
+ *
+ * `example-transitions` and `transitions-app` sit at 0.076% and 0.077%
+ * of the same budget, with 30 gross pixels each against 129.
+ */
+
 /*
  * Every other route is opened in the playground's "still" mode (`?still`
  * on the URL, `apps/playground/src/shell/still.ts`): the routes name the
@@ -200,9 +219,15 @@ const onlyApp = (() => {
   const at = process.argv.indexOf('--app');
   return at === -1 ? undefined : process.argv[at + 1];
 })();
-const onlyRoute = (() => {
+/**
+ * `--route a,b` rather than one route, so two routes that need
+ * attributing to the same change can be photographed from one build
+ * instead of two.
+ */
+const onlyRoutes = (() => {
   const at = process.argv.indexOf('--route');
-  return at === -1 ? undefined : process.argv[at + 1];
+  const value = at === -1 ? undefined : process.argv[at + 1];
+  return value === undefined ? undefined : new Set(value.split(',').map(name => name.trim()));
 })();
 
 interface Manifest {
@@ -501,7 +526,7 @@ async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[
       // Anything left over is a baseline for a canvas that no longer
       // exists; leaving it would make the gate quietly cover less.
       for (const name of readdirSync(baselineDir)) {
-        if (name.endsWith('.png') && !written.includes(name) && onlyRoute === undefined) {
+        if (name.endsWith('.png') && !written.includes(name) && onlyRoutes === undefined) {
           unlinkSync(join(baselineDir, name));
           console.log(`  removed ${name}, which nothing captures any more`);
         }
@@ -555,9 +580,9 @@ async function main(): Promise<void> {
             id: route.id,
             address: route.id
           }));
-    const routes = all.filter(route => onlyRoute === undefined || route.id === onlyRoute);
+    const routes = all.filter(route => onlyRoutes === undefined || onlyRoutes.has(route.id));
     if (routes.length === 0) {
-      if (onlyRoute !== undefined) {
+      if (onlyRoutes !== undefined) {
         continue;
       }
       throw new Error(`No routes to capture for ${name}.`);
@@ -566,7 +591,9 @@ async function main(): Promise<void> {
     failures.push(...(await shoot(name, app, routes)));
   }
   if (captured === 0) {
-    throw new Error(`No routes to capture${onlyRoute === undefined ? '' : ` for --route ${onlyRoute}`}.`);
+    throw new Error(
+      `No routes to capture${onlyRoutes === undefined ? '' : ` for --route ${[...onlyRoutes].join(',')}`}.`
+    );
   }
 
   const excluded = Object.entries(CANNOT_SETTLE)
