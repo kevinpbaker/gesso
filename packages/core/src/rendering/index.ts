@@ -17,6 +17,7 @@ export type { IconSpec, IconRasterizerOptions, IconCanvas, IconContext } from '.
 export {
   createPaintState,
   resolvePaintState,
+  isPaintVisible,
   normalizeTextAlign,
   normalizeVerticalAlign,
   computeObjectFitRect,
@@ -40,7 +41,7 @@ export type { WebGPURendererOptions, RenderHooks, DrawStats, CapturedFrame } fro
 export { createWebGPUSurface, WebGPUSurface } from './webgpu/WebGPUSurface';
 export type { WebGPUCanvasHost } from './webgpu/WebGPUSurface';
 export { WebGPUError } from './webgpu/WebGPUError';
-export { initializeWebGPU } from './webgpu/WebGPUDevice';
+export { initializeWebGPU, isWebGPUAvailable } from './webgpu/WebGPUDevice';
 export {
   buildRenderList,
   createTextCache,

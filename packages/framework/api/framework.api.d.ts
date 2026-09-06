@@ -413,6 +413,10 @@ interface TransferTarget {
   postMessage(message: unknown, transfer: Transferable[]): void;
 }
 declare function portHandle(endpoint: TransferTarget): WorkerHandle;
+interface HubMessage {
+  type: 'gesso:hub';
+}
+declare function isHubMessage(value: unknown): value is HubMessage;
 declare function workerHandle(factory: () => Worker): WorkerHandle;
 interface PortHost {
   onmessage: ((event: {
@@ -771,6 +775,10 @@ type AudioRequest = {
   readonly type: 'load';
   readonly src: string;
   readonly autoplay: boolean;
+} |
+{
+  readonly type: 'preload';
+  readonly src: string;
 } | {
   readonly type: 'play';
 } | {
@@ -817,6 +825,7 @@ declare class AudioService {
   load(src: string, options?: {
     readonly autoplay?: boolean;
   }): void;
+  preload(src: string): void;
   play(): void;
   pause(): void;
   seek(seconds: number): void;
@@ -935,6 +944,11 @@ type ShellToRuntimeMessage = {
 {
   type: 'url';
   url: string;
+} |
+{
+  type: 'popupResult';
+  id: number;
+  opened: boolean;
 } | {
   type: 'inspector';
   enabled: boolean;
@@ -1006,6 +1020,14 @@ type RuntimeToShellMessage = {
 {
   type: 'openUrl';
   url: string;
+} |
+{
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
 } |
 {
   type: 'history';
@@ -1104,6 +1126,13 @@ type ShellRequest = {
   type: 'openUrl';
   url: string;
 } | {
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
+} | {
   type: 'history';
   action: 'push' | 'replace';
   url: string;
@@ -1115,12 +1144,21 @@ type ShellRequest = {
 declare class ShellService {
   private handler;
   private readonly scheme;
+  private readonly popups;
+  private nextPopupId;
   readonly colorScheme: ReadableCell<ColorScheme>;
   get currentColorScheme(): ColorScheme;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
   copyText(text: string): void;
   openUrl(url: string): void;
+  openPopup(request: {
+    readonly url: string;
+    readonly name?: string;
+    readonly width?: number;
+    readonly height?: number;
+  }): Promise<boolean>;
+  settlePopup(id: number, opened: boolean): void;
 }
 interface MediaOptions {
   resolver?: ImageResolver;
@@ -1315,6 +1353,7 @@ declare class GessoRuntime {
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
+  settlePopup(id: number, opened: boolean): void;
   get reducedMotion(): boolean;
   get colorScheme(): ColorScheme;
   get sharedElementNames(): readonly string[];
@@ -1395,6 +1434,7 @@ declare class GessoAppBuilder {
   private readonly serviceRegistrations;
   private frameListener;
   private inspectListener;
+  private devtoolsListener;
   private errorListener;
   private rendererChoice;
   private routes;
@@ -1418,15 +1458,24 @@ declare class GessoAppBuilder {
   onInspect(listener: (report: UiNodeReport | null) => void): this;
   onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
   setInspector(enabled: boolean): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  devtools(request: DevtoolsRequest): void;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): this;
   setColorScheme(preference: ColorSchemePreference): this;
   mountSync(host: HTMLElement | string): () => void;
+}
+interface AppLogicEndpoint {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  start?: () => void;
 }
 interface WorkerAppOptions {
   renderWorker: (() => Worker) | URL | string;
   renderer?: RendererChoice;
   onFrame?: (metrics: FrameMetrics) => void;
-  appLogicWorker?: Worker | (() => Worker) | URL | string;
+  appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
+  onOpenUrl?: (url: string) => void;
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;
@@ -1470,6 +1519,7 @@ declare class WorkerApp {
   private readonly handleAppWorkerMessage;
   private readonly handleWorkerMessage;
   private attachHistory;
+  private openPopup;
   private applyHistory;
   private post;
   private observeResize;
@@ -1579,7 +1629,9 @@ interface AudioSinkOptions {
 }
 declare class AudioSink {
   private readonly out;
-  private readonly element;
+  private element;
+  private spare;
+  private prepared;
   private readonly session;
   private readonly sampleEveryMs;
   private timer;
@@ -1588,6 +1640,8 @@ declare class AudioSink {
   private readonly onEvent;
   constructor(out: AudioSinkOutput, options?: AudioSinkOptions);
   handle(request: AudioRequest): void;
+  private preload;
+  private swap;
   dispose(): void;
   private play;
   private handleEvent;
@@ -1824,6 +1878,7 @@ export {
   isChannelHostMessage,
   isClassComponent,
   isComponentElement,
+  isHubMessage,
   isOutputTarget,
   isPortErrorMessage,
   isPortHandshake,
@@ -1858,6 +1913,7 @@ export {
   to,
   treeText,
   type AnimateOptions,
+  type AppLogicEndpoint,
   type AudioAction,
   type AudioElementLike,
   type AudioMetadata,

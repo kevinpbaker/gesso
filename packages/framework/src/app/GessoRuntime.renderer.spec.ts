@@ -4,10 +4,17 @@ import { Box, Column, Text, type CanvasHost, UiManualFrameClock, type UiFrameClo
 import { GessoRuntime, type FrameMetrics } from './GessoRuntime';
 
 /**
- * The renderer option (WebGPU roadmap G2): a runtime asked for WebGPU
- * draws with it once the device is up, and draws with Canvas2D — on the
- * same canvas — when there is no WebGPU to be had. Either way the
+ * The renderer option (WebGPU roadmap G2, redecided in
+ * `decisions/0066-webgpu-by-default.md`): the default is `auto`, which
+ * draws with WebGPU once the device is up and with Canvas2D, on the
+ * same canvas, when there is no WebGPU to be had. Either way the
  * metrics say which backend painted.
+ *
+ * The part worth pinning is where `auto` decides. A thread with no
+ * `navigator.gpu` gets Canvas2D inside the constructor, with no
+ * `pending` frames, because nothing about that answer needs a promise.
+ * A thread that has the entry point but no adapter cannot know that
+ * synchronously, so it goes through `pending` and unwinds.
  */
 
 function mock2DContext(): Record<string, unknown> {
@@ -73,6 +80,18 @@ function createMockDevice(): GPUDevice {
     createBindGroup: vi.fn(() => ({})),
     createSampler: vi.fn(() => ({})),
     createTexture: vi.fn(() => ({ width: 1, height: 1, createView: vi.fn(() => ({})), destroy: vi.fn() })),
+    // The renderer records its draw work into a bundle and replays it
+    // while the frame keeps its shape, so a device double that cannot
+    // make one is a device the renderer cannot draw on. Mirrors the
+    // double in `WebGPURenderer.spec.ts`.
+    createRenderBundleEncoder: vi.fn(() => ({
+      setPipeline: vi.fn(),
+      setVertexBuffer: vi.fn(),
+      setIndexBuffer: vi.fn(),
+      setBindGroup: vi.fn(),
+      drawIndexed: vi.fn(),
+      finish: vi.fn(() => ({}))
+    })),
     createCommandEncoder: vi.fn(() => ({
       beginRenderPass: vi.fn(() => ({
         setPipeline: vi.fn(),
@@ -80,6 +99,7 @@ function createMockDevice(): GPUDevice {
         setIndexBuffer: vi.fn(),
         setBindGroup: vi.fn(),
         setScissorRect: vi.fn(),
+        executeBundles: vi.fn(),
         drawIndexed: vi.fn(),
         end: vi.fn()
       })),
@@ -130,17 +150,90 @@ function withMockWebGPU(device: GPUDevice): void {
 }
 
 describe('GessoRuntime renderer option', () => {
-  it('draws with Canvas2D by default and says so', () => {
+  it('draws with Canvas2D by default where the browser has no WebGPU, without a pending frame', () => {
+    withoutWebGPU();
     const canvas = mockCanvas();
     const clock = manualClock();
     const frames: FrameMetrics[] = [];
     const runtime = new GessoRuntime({ root, canvas, clock: clock.factory, width: 200, height: 100 });
     runtime.onFrame(metrics => frames.push(metrics));
     runtime.start();
-    clock.tick();
+    // Decided in the constructor, so the very first frame draws.
     expect(runtime.rendererBackend).toBe('canvas2d');
+    clock.tick();
     expect(frames.at(-1)?.renderer).toBe('canvas2d');
+    expect(frames.at(-1)?.phases.render).toBeGreaterThan(0);
     expect(canvas.contexts.length).toBeGreaterThan(0);
+    expect(canvas.contexts.every(id => id === '2d')).toBe(true);
+    runtime.dispose();
+  });
+
+  it('draws with Canvas2D by default, even where the browser has WebGPU', () => {
+    // The default is the portable backend, and deliberately so: a scene
+    // dense with pictures is currently faster on it, because Canvas2D
+    // keeps a copy of a still at the size it is drawn and
+    // `WebGPUTextureCache` uploads one at the source's own size. See
+    // `RendererChoice`. Nothing is asked of the adapter, so this is
+    // synchronous.
+    withMockWebGPU(createMockDevice());
+    const canvas = mockCanvas(mockGPUContext());
+    const clock = manualClock();
+    const frames: FrameMetrics[] = [];
+    const runtime = new GessoRuntime({
+      root,
+      canvas,
+      measureCanvas: mockCanvas(),
+      clock: clock.factory,
+      width: 200,
+      height: 100
+    });
+    runtime.onFrame(metrics => frames.push(metrics));
+    runtime.start();
+
+    clock.tick();
+    expect(frames.at(-1)?.renderer).toBe('canvas2d');
+    expect(canvas.contexts.every(id => id === '2d')).toBe(true);
+    runtime.dispose();
+  });
+
+  it('draws with WebGPU when `auto` is named and the browser has it', async () => {
+    withMockWebGPU(createMockDevice());
+    const canvas = mockCanvas(mockGPUContext());
+    const clock = manualClock();
+    const frames: FrameMetrics[] = [];
+    const runtime = new GessoRuntime({
+      root,
+      canvas,
+      renderer: 'auto',
+      measureCanvas: mockCanvas(),
+      clock: clock.factory,
+      width: 200,
+      height: 100
+    });
+    runtime.onFrame(metrics => frames.push(metrics));
+    runtime.start();
+
+    await expect(runtime.rendererReady).resolves.toBe('webgpu');
+    clock.tick();
+    expect(frames.at(-1)?.renderer).toBe('webgpu');
+    expect(canvas.contexts).toEqual(['webgpu']);
+    runtime.dispose();
+  });
+
+  it('never asks for an adapter when Canvas2D is named', () => {
+    withMockWebGPU(createMockDevice());
+    const requestAdapter = navigator.gpu.requestAdapter as unknown as ReturnType<typeof vi.fn>;
+    const canvas = mockCanvas(mockGPUContext());
+    const runtime = new GessoRuntime({
+      root,
+      canvas,
+      renderer: 'canvas2d',
+      clock: manualClock().factory,
+      width: 200,
+      height: 100
+    });
+    expect(runtime.rendererBackend).toBe('canvas2d');
+    expect(requestAdapter).not.toHaveBeenCalled();
     expect(canvas.contexts.every(id => id === '2d')).toBe(true);
     runtime.dispose();
   });

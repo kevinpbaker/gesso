@@ -527,6 +527,38 @@ describe('Canvas2DRenderer text', () => {
     h.render(root);
     expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, expect.closeTo(38.8, 6)]]);
   });
+
+  /**
+   * `resolvePaintState` resolves the text half only for a node that has
+   * text, over a scratch every node in the walk shares, so a box walked
+   * after a label is the case where a leaked font or colour would show.
+   * The scratch's own fields are checked in `PaintState.spec`; what
+   * this asks is the question the canvas can answer, which is that a
+   * box between two labels draws nothing of either and leaves neither
+   * of them drawn in the other's style.
+   */
+  it('draws a box between two labels without either label bleeding into it', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const loud = h.createNode('loud', UiNodeType.Text);
+    loud.setProperty('text', 'Loud');
+    loud.setProperty('fontSize', 40);
+    loud.setProperty('fontFamily', 'Georgia');
+    loud.setProperty('fontWeight', 900);
+    loud.setProperty('color', '#ff0000');
+    const swatch = box(h, 'swatch', { width: 20, height: 20, backgroundColor: '#00ff00' });
+    const quiet = h.createNode('quiet', UiNodeType.Text);
+    quiet.setProperty('text', 'Quiet');
+    h.append(root, loud, swatch, quiet);
+    h.layout(root);
+    h.render(root);
+    // Two runs of glyphs and no third: the swatch draws a rectangle.
+    expect(callArgs(h.context, 'fillText').map(args => args[0])).toEqual(['Loud', 'Quiet']);
+    expect(callArgs(h.context, 'set:font')).toEqual(['900 40px Georgia', 'normal 14px sans-serif']);
+    // The swatch's fill is its own, and the label after it is back to
+    // the default colour rather than carrying the first one's red.
+    expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#f00', '#0f0', '#000']);
+  });
 });
 
 describe('Canvas2DRenderer device pixel ratio', () => {
@@ -592,5 +624,135 @@ describe('Canvas2DRenderer images', () => {
     h.layout(root);
     h.render(root);
     expect(callArgs(h.context, 'drawImage')).toEqual([]);
+  });
+});
+
+describe('Canvas2DRenderer lifted nodes', () => {
+  /**
+   * A scrolled row with three cards, the middle one carrying a picture
+   * that is `lift`ed and transformed far outside the row. It is the
+   * shape a shared element morphing back into a list makes, and the
+   * only shape `lift` exists for.
+   */
+  function liftedHarness(lift: boolean) {
+    const h = new RenderHarness();
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 200);
+    scroll.setProperty('height', 100);
+    scroll.setProperty('direction', 'row');
+    const a = box(h, 'a', { width: 60, height: 100, backgroundColor: '#aaa', flexShrink: 0 });
+    const picture = box(h, 'picture', {
+      width: 60,
+      height: 100,
+      backgroundColor: '#bbb',
+      flexShrink: 0,
+      // Straight up, out of the row's band entirely.
+      transform: { x: 0, y: 0, translateX: 0, translateY: -300, scaleX: 1, scaleY: 1, rotation: 0 }
+    });
+    const c = box(h, 'c', { width: 60, height: 100, backgroundColor: '#ccc', flexShrink: 0 });
+    if (lift) {
+      picture.setProperty('lift', true);
+    }
+    h.append(scroll, a, picture, c);
+    h.layout(scroll, Constraints.loose(800, 600));
+    h.render(scroll);
+    return h;
+  }
+
+  it('paints a lifted node last, so it is over everything in the tree', () => {
+    const h = liftedHarness(true);
+    expect(callArgs(h.context, 'fillRect')).toEqual([
+      [0, 0, 60, 100],
+      [120, 0, 60, 100],
+      [60, 0, 60, 100]
+    ]);
+  });
+
+  it('paints an unlifted node in tree order', () => {
+    const h = liftedHarness(false);
+    expect(callArgs(h.context, 'fillRect')).toEqual([
+      [0, 0, 60, 100],
+      [60, 0, 60, 100],
+      [120, 0, 60, 100]
+    ]);
+  });
+
+  it('draws a lifted node outside the clip its ancestors impose', () => {
+    const h = liftedHarness(true);
+    // Every clip the walk opened is closed before the top layer runs,
+    // so the picture is drawn with the row's rectangle no longer in
+    // force: the last `clip` call comes before the last `fillRect`.
+    const names = callNames(h.context);
+    expect(names.lastIndexOf('clip')).toBeLessThan(names.lastIndexOf('fillRect'));
+    expect(names.lastIndexOf('restore')).toBeGreaterThan(names.lastIndexOf('fillRect'));
+  });
+
+  it('keeps the ancestors scroll offset, which is not a clip', () => {
+    const h = new RenderHarness();
+    const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+    scroll.setProperty('width', 100);
+    scroll.setProperty('height', 100);
+    scroll.setProperty('scrollY', 40);
+    const a = box(h, 'a', { width: 40, height: 100, backgroundColor: '#aaa', flexShrink: 0 });
+    const picture = box(h, 'picture', { width: 40, height: 100, backgroundColor: '#bbb', flexShrink: 0, lift: true });
+    h.append(scroll, a, picture);
+    h.layout(scroll, Constraints.loose(800, 600));
+    h.render(scroll);
+    // The scroll offset is applied twice: once by the walk, and once
+    // again when the top layer replays the ancestors. A lifted node
+    // escapes the clip and nothing else, so it lands where it would
+    // have landed had nothing lifted it.
+    expect(callArgs(h.context, 'translate')).toEqual([
+      [0, -40],
+      [0, -40]
+    ]);
+    expect(callArgs(h.context, 'fillRect')).toEqual([
+      [0, 0, 40, 100],
+      [0, 100, 40, 100]
+    ]);
+  });
+
+  it('holds a lift to its boundary, so a later layer still paints over it', () => {
+    // Two screens overlapping while one replaces the other, as a route
+    // transition has them: the one leaving holds a lifted picture. It
+    // must escape the row it lives in and still go under the screen
+    // arriving after it, or the last navigation's artwork flies across
+    // the new page.
+    const h = new RenderHarness();
+    const stack = h.createNode('stack', UiNodeType.Box);
+    const leaving = box(h, 'leaving', { position: 'absolute', left: 0, top: 0, width: 400, height: 300 });
+    leaving.setProperty('liftBoundary', true);
+    const row = h.createNode('row', UiNodeType.ScrollView);
+    row.setProperty('width', 400);
+    row.setProperty('height', 60);
+    const picture = box(h, 'picture', {
+      width: 60,
+      height: 60,
+      backgroundColor: '#bbb',
+      flexShrink: 0,
+      lift: true,
+      transform: { x: 0, y: 0, translateX: 0, translateY: -200, scaleX: 1, scaleY: 1, rotation: 0 }
+    });
+    const arriving = box(h, 'arriving', {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 300,
+      backgroundColor: '#ccc'
+    });
+    arriving.setProperty('liftBoundary', true);
+    h.append(row, picture);
+    h.append(leaving, row);
+    h.append(stack, leaving, arriving);
+    h.layout(stack, Constraints.loose(800, 600));
+    h.render(stack);
+    const fills = callArgs(h.context, 'fillRect');
+    // The picture is drawn (so it escaped the row's clip) and the
+    // arriving screen is drawn after it.
+    expect(fills).toEqual([
+      [0, 0, 60, 60],
+      [0, 0, 400, 300]
+    ]);
   });
 });

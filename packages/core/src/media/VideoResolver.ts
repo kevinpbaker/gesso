@@ -489,17 +489,79 @@ class MutableVideoSurface implements UiVideoSurface {
     readonly height: number
   ) {}
 
+  /**
+   * Which conversion is the newest, so a slower one that finishes
+   * after it can be thrown away rather than shown out of order.
+   */
+  private pending = 0;
+
+  /**
+   * Takes a decoded frame, and shows it once it is something cheap to
+   * draw.
+   *
+   * A `VideoFrame` from a software decoder holds planar YUV in CPU
+   * memory, and `drawImage` has to convert it to RGB before it can
+   * put it anywhere. Whether that is visible depends on the engine:
+   * Chromium uploads the frame and converts it in a shader, while
+   * Gecko converts on whichever thread issued the draw, which is the
+   * render worker, inside the frame. Measured on Firefox 154 in the
+   * transitions example, one 1280x992 frame drawn into a 0.42
+   * megapixel box cost **4.6ms**, against a whole-frame budget of
+   * 6ms on a 165Hz display. It was two thirds of the frame, and it
+   * was paid again on every draw.
+   *
+   * `createImageBitmap` is specified to do its work in parallel, so
+   * converting here rather than at the draw takes that cost off the
+   * render thread and pays it once per decoded frame instead of once
+   * per drawn frame. The same measurement then reads **1.7ms**, and
+   * a display faster than the video no longer multiplies it.
+   *
+   * The frame is closed as soon as the bitmap exists, and the bitmap
+   * is what `UiVideoSurface.frame` was already allowed to be.
+   */
   show(frame: VideoFrame): void {
-    // The frame being replaced is closed here rather than left to the
+    const conversion = ++this.pending;
+    if (typeof createImageBitmap !== 'function') {
+      this.replace(frame);
+      return;
+    }
+    createImageBitmap(frame)
+      .then(bitmap => {
+        frame.close();
+        if (conversion !== this.pending) {
+          // A newer frame has already been shown. Presenting this one
+          // would run the video backwards for a frame.
+          bitmap.close();
+          return;
+        }
+        this.replace(bitmap);
+      })
+      .catch(() => {
+        // No `createImageBitmap` here, or it refused this frame. The
+        // frame itself is still drawable, which is what every renderer
+        // did before this conversion existed.
+        if (conversion !== this.pending) {
+          frame.close();
+          return;
+        }
+        this.replace(frame);
+      });
+  }
+
+  private replace(frame: VideoFrame | ImageBitmap): void {
+    // What is being replaced is closed here rather than left to the
     // collector: a `VideoFrame` holds decoded pixels, often in GPU
     // memory, and Chrome warns loudly when one is collected unclosed.
-    (this.frame as VideoFrame | null)?.close?.();
+    (this.frame as { close?: () => void } | null)?.close?.();
     this.frame = frame;
     this.version++;
   }
 
   clear(): void {
-    (this.frame as VideoFrame | null)?.close?.();
+    // Also abandons any conversion still in flight: it will find its
+    // sequence number stale and close what it made.
+    this.pending++;
+    (this.frame as { close?: () => void } | null)?.close?.();
     this.frame = null;
     this.version++;
   }

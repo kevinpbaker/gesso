@@ -16,8 +16,48 @@ export class UiFrame {
     private readonly dirty: ReadonlyMap<UiNode, DirtyFlags>
   ) {}
 
+  /**
+   * The dirty nodes as an array.
+   *
+   * Copies, so it is the wrong thing to reach for on the frame path:
+   * prefer `entries()` to walk them, and `anyFlags` to ask a question
+   * about them. It stays because a caller that needs to hold the list
+   * past the walk, or to index into it, wants a copy and should get an
+   * honest one rather than a view that changes underneath it.
+   */
   get nodes(): UiNode[] {
     return [...this.dirty.keys()];
+  }
+
+  /**
+   * The dirty nodes with their flags, without copying either.
+   *
+   * The pairing matters as much as the absence of a copy. Walking
+   * `nodes` and calling `dirtyFlagsFor` on each one asks the map for
+   * something it just handed over, so a frame of a thousand dirty
+   * nodes paid an array and a thousand lookups to learn what iterating
+   * the entries says for free.
+   */
+  entries(): IterableIterator<[UiNode, DirtyFlags]> {
+    return this.dirty.entries();
+  }
+
+  /**
+   * Whether any node in the frame carries one of `flags`.
+   *
+   * The question the runtime actually asks three times a frame: does
+   * this frame need layout, does it need semantics, did it change the
+   * tree. Answering it here lets it stop at the first node that says
+   * yes, which on a frame that does need layout is usually the first
+   * node looked at.
+   */
+  anyFlags(flags: DirtyFlags): boolean {
+    for (const value of this.dirty.values()) {
+      if ((value & flags) !== 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   get size(): number {

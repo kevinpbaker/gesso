@@ -227,16 +227,20 @@ declare function assertTransitionMap(nodeId: string, value: unknown, isKnownProp
 declare class AnimationDriver {
   private readonly running;
   private reducedMotion;
+  private hidden;
   private wake;
   setWakeListener(listener: (() => void) | null): void;
   get isRunning(): boolean;
   get size(): number;
   get isReducedMotion(): boolean;
+  private lands;
   start<T>(animation: UiAnimation<T>): Observable<T>;
   animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
   stop<T>(cell: AnimatedCell<T>): boolean;
   stopAll(): void;
   setReducedMotion(reduced: boolean): void;
+  setHidden(hidden: boolean): void;
+  private landRunning;
   nextTickAt(now: number): number | undefined;
   advance(now: number): void;
 }
@@ -339,6 +343,8 @@ declare class LayoutRecord {
   bottom: number | undefined;
   left: number | undefined;
   zIndex: number;
+  lifted: boolean;
+  liftBoundary: boolean;
   clips: boolean;
   scrollable: boolean;
   sticky: boolean;
@@ -348,6 +354,11 @@ declare class LayoutRecord {
   subgridColumns: number[] | undefined;
   subgridColumnGap: number;
   paintOrder: UiNode[] | null;
+  boundsMinX: number;
+  boundsMinY: number;
+  boundsMaxX: number;
+  boundsMaxY: number;
+  boundsUnbounded: boolean;
   scrollX: number;
   scrollY: number;
   contentWidth: number;
@@ -355,16 +366,29 @@ declare class LayoutRecord {
   lastConstraints: Constraints;
   altValid: boolean;
   altConstraints: Constraints;
-  private altOutputs;
+  private altMeasuredWidth;
+  private altMeasuredHeight;
+  private altOuterWidth;
+  private altOuterHeight;
+  private altMinContentWidth;
+  private altMaxContentWidth;
+  private altIntrinsicWidth;
+  private altIntrinsicHeight;
+  private altHasBaseline;
+  private altBaseline;
+  private altContentWidth;
+  private altContentHeight;
   saveAlt(): void;
   swapAlt(): void;
-  private outputs;
-  private restore;
   contentMatters: boolean;
   relayoutBoundary: boolean;
   measureDirty: boolean;
   placeDirty: boolean;
   transformDirty: boolean;
+  propsPass: number;
+  propsBaseWidth: number | undefined;
+  propsBaseHeight: number | undefined;
+  reset(): void;
 }
 interface UiColors {
   readonly background: UiColor;
@@ -538,7 +562,7 @@ interface SharedClaim {
 }
 declare class UiSharedElements {
   private readonly holders;
-  claim(name: string, node: UiNode, onYield: () => void): SharedClaim;
+  claim(name: string, node: UiNode, onYield: () => void, onRestore?: () => void): SharedClaim;
   report(name: string, node: UiNode, box: LayoutBox): void;
   release(name: string, node: UiNode): void;
   get names(): readonly string[];
@@ -1222,6 +1246,8 @@ declare const UiProperties: {
   readonly bottom: UiPropertyDefinition<UiLength | undefined>;
   readonly left: UiPropertyDefinition<UiLength | undefined>;
   readonly zIndex: UiPropertyDefinition<number | undefined>;
+  readonly lift: UiPropertyDefinition<boolean | undefined>;
+  readonly liftBoundary: UiPropertyDefinition<boolean | undefined>;
   readonly anchor: UiPropertyDefinition<UiNode | null | undefined>;
   readonly placement: UiPropertyDefinition<UiPlacement | undefined>;
   readonly anchorOffset: UiPropertyDefinition<number | undefined>;
@@ -1328,7 +1354,7 @@ type IdentityProps = {
 type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'margin' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'aspectRatio'>;
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
-type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'anchor' | 'placement' | 'anchorOffset'>;
+type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
@@ -1617,10 +1643,13 @@ interface TextRunMeasurer {
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
 declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
+  private readonly paragraphs;
   abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
   abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
   layout(request: TextMeasureRequest): ParagraphLayout;
   measure(request: TextMeasureRequest): Size;
+  get cachedParagraphs(): number;
+  invalidate(): void;
 }
 interface FixedMetricsOptions {
   glyphWidth?: number;
@@ -1698,6 +1727,7 @@ declare const DEFAULT_TEXT_COLOR: {
 declare function normalizeTextAlign(value: unknown): TextAlign;
 declare function normalizeVerticalAlign(value: unknown): VerticalAlign;
 declare function resolvePaintState(node: UiNode, out: PaintState): PaintState;
+declare function isPaintVisible(node: UiNode): boolean;
 declare function computeObjectFitRect(fit: ObjectFit, imageWidth: number, imageHeight: number, box: LayoutBox): LayoutBox;
 declare function createPaintState(): PaintState;
 declare function colorToCss(color: UiColor): string;
@@ -1728,6 +1758,12 @@ interface Canvas2DContext {
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
   drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
+  getTransform?(): {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+  };
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
   createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
   fillStyle: string | Canvas2DGradient | CanvasPattern;
@@ -1837,6 +1873,13 @@ declare const TEXT_MATCHES_PROP = "textMatches";
 declare function matchRangesOf(node: UiNode): readonly TextRange[] | undefined;
 declare function setMatchRanges(node: UiNode, ranges: readonly TextRange[]): boolean;
 declare function clearMatchRanges(node: UiNode): boolean;
+interface SubtreeBounds {
+  readonly boundsMinX: number;
+  readonly boundsMinY: number;
+  readonly boundsMaxX: number;
+  readonly boundsMaxY: number;
+  readonly boundsUnbounded: boolean;
+}
 declare const SCROLLBAR_THICKNESS = 6;
 declare const SCROLLBAR_INSET = 2;
 declare const SCROLLBAR_MIN_THUMB = 24;
@@ -1858,6 +1901,8 @@ declare function scrollbarThumb(rec: LayoutRecord, axis: ScrollbarAxis): Scrollb
 declare function scrollbarZoneAt(rec: LayoutRecord, x: number, y: number): ScrollbarAxis | null;
 interface HitTestLayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
+  readonly lifted?: ReadonlySet<UiNode>;
+  subtreeBoundsFor?(node: UiNode): SubtreeBounds | undefined;
 }
 interface UiPoint {
   x: number;
@@ -1887,6 +1932,8 @@ declare class UiHitTester implements HitTester {
   private readonly result;
   private zoneOnly;
   private readonly path;
+  private readonly liftedScratch;
+  private inLifted;
   constructor(layout: HitTestLayoutReader, root: UiNode);
   setRoot(root: UiNode): void;
   hitTest(x: number, y: number): HitTestResult | null;
@@ -1898,8 +1945,12 @@ declare class UiHitTester implements HitTester {
     axis: ScrollbarAxis;
   } | null;
   toLocal(node: UiNode, x: number, y: number): UiPoint;
+  private hitTestLifted;
+  private forEachLifted;
+  private pointInParentSpace;
   private hitTestNode;
   private hitTestChildren;
+  private outsideSubtree;
   private recordHit;
   private hitScrollbar;
   private invertPoint;
@@ -2463,6 +2514,8 @@ declare class UiFrame {
   private readonly dirty;
   constructor(id: number, time: UiFrameTime, dirty: ReadonlyMap<UiNode, DirtyFlags>);
   get nodes(): UiNode[];
+  entries(): IterableIterator<[UiNode, DirtyFlags]>;
+  anyFlags(flags: DirtyFlags): boolean;
   get size(): number;
   isEmpty(): boolean;
   dirtyFlagsFor(node: UiNode): DirtyFlags;
@@ -2535,21 +2588,27 @@ interface ScrollAdjustment {
   scrollY: number;
 }
 declare class LayoutEngine {
-  private readonly records;
+  private records;
+  private retiredRecords;
   private readonly scrollNodes;
   private readonly textScrollNodes;
   private readonly anchoredNodes;
   private readonly anchorOf;
   private readonly anchorDependents;
   private readonly movedAnchored;
+  private readonly liftedNodes;
   private readonly stickyNodes;
   private readonly stickyShifted;
   private readonly textMeasurer;
   private percentBase;
+  private layoutPass;
   private layoutRoot;
   private rootConstraints;
+  private layoutVersion;
+  private boundsVersion;
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
+  subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined;
   get root(): UiNode | null;
   explain(node: UiNode): LayoutExplanation;
   private unexplained;
@@ -2653,14 +2712,17 @@ declare class LayoutEngine {
   private rootPercentBase;
   private definiteAxis;
   private effectiveConstraints;
+  private axisMin;
+  private axisMax;
   private axisConstraints;
   private assignBox;
   private scrollDirection;
   private forEachLayoutChild;
   private forEachAbsoluteChild;
   private forEachChild;
-  private isAbsolute;
   private isFragment;
+  private setLifted;
+  get lifted(): ReadonlySet<UiNode>;
   private numberProp;
   private lengthProp;
   private lengthPropOrAuto;
@@ -2796,8 +2858,9 @@ declare const BUTTON_INTERACTION: UiModifier<InteractiveOptions>;
 declare const measure: ((args: Subject<LayoutBox>, key?: string | number) => UiModifier<Subject<LayoutBox>>) & {
   readonly kind: UiModifierKind<Subject<LayoutBox>>;
 };
-declare const decorated: ((args: readonly DecorationShape[], key?: string | number) => UiModifier<readonly DecorationShape[]>) & {
-  readonly kind: UiModifierKind<readonly DecorationShape[]>;
+type Decorations = readonly DecorationShape[] | Observable<readonly DecorationShape[]>;
+declare const decorated: ((args: Decorations, key?: string | number) => UiModifier<Decorations>) & {
+  readonly kind: UiModifierKind<Decorations>;
 };
 interface FocusRingOptions {
   readonly color?: UiColorValue;
@@ -2937,6 +3000,7 @@ interface SharedElementArgs extends MotionTiming {
   readonly morph?: 'transform' | 'geometry';
   readonly fadeFrom?: number;
   readonly scale?: 'free' | 'uniform';
+  readonly lift?: boolean;
   readonly onMorph?: (morphing: boolean) => void;
 }
 declare const sharedElement: ((args: SharedElementArgs, key?: string | number) => UiModifier<SharedElementArgs>) & {
@@ -3091,6 +3155,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private cullWidth;
   private cullHeight;
   private readonly cullStack;
+  private readonly scaledImages;
+  private readonly liftedPass;
   constructor(options: Canvas2DRendererOptions);
   private get surface();
   initialize(): Promise<void>;
@@ -3101,9 +3167,12 @@ declare class Canvas2DRenderer implements UiRenderer {
   private beginFrame;
   private renderNode;
   private renderChildren;
+  private renderLifted;
+  private applyAncestors;
   private paintBackground;
   private fillBox;
   private paintImage;
+  private scaledFor;
   private paintBorder;
   private paintDecorations;
   private paintContent;
@@ -3260,7 +3329,17 @@ interface WebGPUDeviceInit {
   device: GPUDevice;
   format: GPUTextureFormat;
 }
+declare function isWebGPUAvailable(): boolean;
 declare function initializeWebGPU(): Promise<WebGPUDeviceInit>;
+interface ScaledImageSurface {
+  width: number;
+  height: number;
+  getContext(contextId: '2d'): {
+    drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  } | null;
+  transferToImageBitmap(): ImageBitmap;
+}
+type ScaledImageSurfaceFactory = (width: number, height: number) => ScaledImageSurface;
 interface TexturedPipeline {
   pipeline: GPURenderPipeline;
   vertexBuffer: GPUBuffer;
@@ -3276,12 +3355,14 @@ declare class WebGPUTextureCache {
   private readonly device;
   private readonly pipeline;
   private readonly images;
-  constructor(device: GPUDevice, pipeline: TexturedPipeline);
-  imageBindGroup(source: TextureSource): GPUBindGroup | null;
+  private readonly scaled;
+  constructor(device: GPUDevice, pipeline: TexturedPipeline, createSurface?: ScaledImageSurfaceFactory);
+  imageBindGroup(source: TextureSource, drawWidth?: number, drawHeight?: number): GPUBindGroup | null;
   private stillBindGroup;
   private videoBindGroup;
   private upload;
   private copyInto;
+  dispose(): void;
 }
 declare const GLYPH_SUBPIXEL_PHASES = 3;
 interface GlyphStyle {
@@ -3400,6 +3481,8 @@ interface ImageCommand {
   instance: number;
   scissor: ScissorRect | null;
   source: TextureSource;
+  drawWidth: number;
+  drawHeight: number;
 }
 type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
 interface TextRunDraw {
@@ -3453,6 +3536,57 @@ declare class WebGPUGlyphPages {
   private upload;
   private scratchFor;
 }
+interface Mp3Format {
+  readonly version: 'mpeg1' | 'mpeg2' | 'mpeg2.5';
+  readonly layer: 1 | 2 | 3;
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly bitrate: number;
+  readonly samplesPerFrame: number;
+  readonly totalFrames?: number;
+  readonly totalBytes?: number;
+}
+interface Mp3Frame {
+  readonly bytes: Uint8Array;
+  readonly offset: number;
+  readonly samples: number;
+  readonly sampleOffset: number;
+  readonly timestampUs: number;
+  readonly durationUs: number;
+}
+interface Mp3Header {
+  readonly version: Mp3Format['version'];
+  readonly layer: 1 | 2 | 3;
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly bitrate: number;
+  readonly samples: number;
+  readonly length: number;
+  readonly stereo: boolean;
+}
+declare function readMp3Header(bytes: Uint8Array, at: number): Mp3Header | null;
+declare class Mp3Frames {
+  private carry;
+  private consumed;
+  private skipping;
+  private atStart;
+  private locked;
+  private shape;
+  private frames;
+  private samples;
+  get format(): Mp3Format | null;
+  get frameCount(): number;
+  get sampleCount(): number;
+  get seconds(): number;
+  push(bytes: Uint8Array): readonly Mp3Frame[];
+  flush(): readonly Mp3Frame[];
+  private append;
+  private split;
+}
+declare function splitMp3Frames(bytes: Uint8Array): {
+  format: Mp3Format | null;
+  frames: readonly Mp3Frame[];
+};
 interface Mp4Sample {
   readonly offset: number;
   readonly size: number;
@@ -3659,6 +3793,7 @@ export {
   DecorationFill,
   decorationRect,
   DecorationRect,
+  Decorations,
   DecorationShape,
   DecorationStroke,
   DEFAULT_FONT_FAMILY,
@@ -3756,7 +3891,6 @@ export {
   HitTestLayoutReader,
   HitTestResult,
   hoverable,
-  Ic,
   IconCanvas,
   IconContext,
   iconKey,
@@ -3797,6 +3931,7 @@ export {
   isNodeInert,
   isNodeSelectable,
   isObservable$1,
+  isPaintVisible,
   isPercentLength,
   isPrintable,
   isReadOnly,
@@ -3807,6 +3942,8 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  isWebGPUAvailable,
+  Kc,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -3859,6 +3996,10 @@ export {
   MotionStateInput,
   MotionTiming,
   MOUSE_POINTER,
+  Mp3Format,
+  Mp3Frame,
+  Mp3Frames,
+  Mp3Header,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -3923,6 +4064,7 @@ export {
   provideEnvironment,
   radialGradient,
   Reactive,
+  readMp3Header,
   recordsEqual,
   registerFontStack,
   RelayoutExplanation,
@@ -3995,11 +4137,13 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  splitMp3Frames,
   spring,
   Stack,
   StackProps,
   statesEqual,
   steps,
+  SubtreeBounds,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -4317,6 +4461,7 @@ import {
   DecorationFill,
   decorationRect,
   DecorationRect,
+  Decorations,
   DecorationShape,
   DecorationStroke,
   DEFAULT_FONT_FAMILY,
@@ -4455,6 +4600,7 @@ import {
   isNodeInert,
   isNodeSelectable,
   isObservable,
+  isPaintVisible,
   isPercentLength,
   isPrintable,
   isReadOnly,
@@ -4465,6 +4611,7 @@ import {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  isWebGPUAvailable,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -4517,6 +4664,10 @@ import {
   MotionStateInput,
   MotionTiming,
   MOUSE_POINTER,
+  Mp3Format,
+  Mp3Frame,
+  Mp3Frames,
+  Mp3Header,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -4581,6 +4732,7 @@ import {
   provideEnvironment,
   radialGradient,
   Reactive,
+  readMp3Header,
   recordsEqual,
   registerFontStack,
   RelayoutExplanation,
@@ -4653,11 +4805,13 @@ import {
   slideDown,
   slideFrom,
   slideUp,
+  splitMp3Frames,
   spring,
   Stack,
   StackProps,
   statesEqual,
   steps,
+  SubtreeBounds,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -4879,7 +5033,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-Cfk_ueHR.js";
+} from "./index-CM-BETo-.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5035,6 +5189,7 @@ export {
   isNodeInert,
   isNodeSelectable,
   isObservable,
+  isPaintVisible,
   isPercentLength,
   isPrintable,
   isReadOnly,
@@ -5045,6 +5200,7 @@ export {
   isUiRole,
   isUiSemanticState,
   isVideoSurface,
+  isWebGPUAvailable,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
@@ -5076,6 +5232,7 @@ export {
   MOTION_CHANNELS,
   MOTION_REST,
   MOUSE_POINTER,
+  Mp3Frames,
   nextCaretToggle,
   nextGraphemeEnd,
   nextWordEnd,
@@ -5119,6 +5276,7 @@ export {
   proportionalFontMetrics,
   provideEnvironment,
   radialGradient,
+  readMp3Header,
   recordsEqual,
   registerFontStack,
   repeat,
@@ -5166,6 +5324,7 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  splitMp3Frames,
   spring,
   Stack,
   statesEqual,
@@ -5210,6 +5369,7 @@ export {
   type ContainerProps,
   type DecorationFill,
   type DecorationRect,
+  type Decorations,
   type DecorationShape,
   type DecorationStroke,
   type DefaultImageResolverOptions,
@@ -5284,6 +5444,9 @@ export {
   type MotionState,
   type MotionStateInput,
   type MotionTiming,
+  type Mp3Format,
+  type Mp3Frame,
+  type Mp3Header,
   type Mp4Sample,
   type Mp4VideoTrack,
   type NodeId,
@@ -5331,6 +5494,7 @@ export {
   type Size,
   type SizeDecision,
   type StackProps,
+  type SubtreeBounds,
   type TextAlign,
   type TextContentProps,
   type TextLine,
@@ -5568,7 +5732,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Cfk_ueHR.js";
+} from "./index-CM-BETo-.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

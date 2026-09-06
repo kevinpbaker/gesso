@@ -39,7 +39,7 @@ export interface GessoAppOptions {
    */
   history?: ShellHistoryOptions;
   canvas?: CanvasHost;
-  /** The rendering backend; see RendererChoice. Defaults to `canvas2d`. */
+  /** The rendering backend; see RendererChoice. Defaults to `auto`. */
   renderer?: RendererChoice;
   clock?: UiFrameClockFactory;
   /**
@@ -413,13 +413,32 @@ export class GessoApp {
     }
     if (!isCanvasElement(this.canvas)) {
       // No document to write a clipboard through or open a window from.
+      // A popup still has to be answered, because a promise nobody
+      // settles is worse than a popup nobody opened.
+      if (request.type === 'popup') {
+        this.runtime.settlePopup(request.id, false);
+      }
       return;
     }
     if (request.type === 'clipboard') {
       writeClipboard(request.text, this.canvas.ownerDocument);
       return;
     }
-    this.canvas.ownerDocument.defaultView?.open(request.url, '_blank', 'noopener,noreferrer');
+    const view = this.canvas.ownerDocument.defaultView;
+    if (request.type === 'popup') {
+      // Same shape as `WorkerApp.openPopup`, and `noopener` is absent
+      // for the same reason: it would make the answer always `null`.
+      let opened = false;
+      try {
+        const features = `popup,width=${request.width},height=${request.height}`;
+        opened = (view?.open(request.url, request.name, features) ?? null) !== null;
+      } catch {
+        opened = false;
+      }
+      this.runtime.settlePopup(request.id, opened);
+      return;
+    }
+    view?.open(request.url, '_blank', 'noopener,noreferrer');
   }
 
   private observeResize(): void {

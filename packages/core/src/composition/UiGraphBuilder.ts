@@ -154,6 +154,46 @@ export interface UiGraphBuilderOptions {
 }
 
 /**
+ * Where one reconcile pass has got to in the parent's existing
+ * children while matching the unkeyed definitions among them.
+ *
+ * An unkeyed definition has no identity of its own, so it takes the
+ * first child that is still unclaimed and of the right type. Searching
+ * for that from the start of the list every time is what made a flat
+ * list of n unkeyed children cost n²/2 comparisons: definition i walks
+ * past the i entries the definitions before it already took. A cursor
+ * naming where the next search may begin walks that ground once across
+ * the whole pass instead of once per definition.
+ *
+ * There is a cursor per node type rather than one for the pass, because
+ * a single cursor can only be moved past entries that are *claimed*,
+ * and a run of those is not the only thing a search wastes its time on.
+ * A list of two interleaved types whose definitions all want one of
+ * them has an unclaimed entry of the wrong type at the front for the
+ * whole pass, which pins one shared cursor at zero and leaves every
+ * definition rescanning the list. Per type, that entry is skipped for
+ * good, and each type's searching adds up to one walk of the list.
+ *
+ * It is pass state rather than builder state on purpose. `reconcile`
+ * re-enters itself, through `reconcileChildren` for every matched child
+ * and through the deferred-children path for a fragment whose binding
+ * emitted mid-pass, and each of those passes has its own `existing`
+ * snapshot and its own `matched` set. Cursors held on the builder would
+ * be shared between them and would point into the wrong list.
+ */
+interface UnkeyedMatchState {
+  /** The parent's children when the pass began, in tree order. */
+  readonly existing: readonly UiNode[];
+  /**
+   * Per node type, the index where the next search for that type may
+   * begin. Built on the first unkeyed match rather than with the pass,
+   * so the leaf nodes a pass recurses into, which have no children to
+   * match at all, do not each pay for a map they never read.
+   */
+  cursors: Map<UiNodeType, number> | null;
+}
+
+/**
  * Converts declarative UiElements into runtime UiNodes.
  *
  * The builder is intentionally separated from UiGraph.
@@ -288,6 +328,7 @@ export class UiGraphBuilder {
   private reconcile(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
     const existing = this.collectChildren(parent);
     const matched = new Set<UiNode>();
+    const unkeyed: UnkeyedMatchState = { existing, cursors: null };
     const result: UiNode[] = [];
     let changed = false;
     let cursor: UiNode | null = parent.firstChild;
@@ -315,7 +356,7 @@ export class UiGraphBuilder {
         continue;
       }
 
-      let node = this.matchNode(parent, definition, existing, matched);
+      let node = this.matchNode(parent, definition, unkeyed, matched);
       if (node === undefined) {
         const id = this.createNodeId(parent, definition, index);
         const stale = this.graph.getNode(id);
@@ -541,14 +582,15 @@ export class UiGraphBuilder {
   /**
    * Finds an existing child that should host a definition.
    *
-   * Keyed definitions match by the id derived from the key.
-   * Unkeyed definitions match the first unmatched child with
-   * the same type.
+   * Keyed definitions match by the id derived from the key, which is a
+   * map lookup and needs no search. Unkeyed definitions match the first
+   * unmatched child with the same type, searched for from the pass's
+   * cursor rather than from the head of the list.
    */
   private matchNode(
     parent: UiNode,
     definition: UiElement,
-    existing: readonly UiNode[],
+    unkeyed: UnkeyedMatchState,
     matched: Set<UiNode>
   ): UiNode | undefined {
     const key = this.elementKey(definition);
@@ -562,7 +604,47 @@ export class UiGraphBuilder {
       }
       return candidate;
     }
-    return existing.find(node => !matched.has(node) && node.type === definition.type);
+
+    const existing = unkeyed.existing;
+    const type = definition.type;
+    let cursors = unkeyed.cursors;
+    if (cursors === null) {
+      cursors = new Map<UiNodeType, number>();
+      unkeyed.cursors = cursors;
+    }
+
+    // Walk this type's cursor to the first entry that could answer for
+    // it, dropping everything passed over on the way. Both grounds for
+    // dropping an entry are settled for the rest of the pass:
+    //
+    // Claimed. Nothing ever leaves `matched` within a pass and a
+    // claimed entry is never returned twice, so an entry claimed now is
+    // one every later search would skip anyway.
+    //
+    // Wrong type. This is the part worth pausing on, because it is only
+    // permanent for a cursor that belongs to one type. A node's type is
+    // fixed from the moment it is created, and a type change is a
+    // different node replacing this one rather than this one changing,
+    // so an entry that is not a T now will not be a T later either, and
+    // no later definition of type T can want it. A cursor shared by
+    // every type could make no such promise: the entry it stepped over
+    // was merely the wrong type for the definition in hand, and the
+    // next definition might be exactly the type it is.
+    //
+    // What the cursor may not do is move past the entry it lands on. A
+    // keyed definition can claim an entry anywhere in the list, so the
+    // free entries a cursor has already reached must stay reachable;
+    // the walk resumes here next time and re-tests this entry then.
+    let index = cursors.get(type) ?? 0;
+    while (index < existing.length && (matched.has(existing[index]) || existing[index].type !== type)) {
+      index++;
+    }
+    cursors.set(type, index);
+
+    // The walk stopped either on an unclaimed entry of the right type,
+    // which is the first such entry in the list and so the one `find`
+    // over the whole array would have returned, or off the end.
+    return index < existing.length ? existing[index] : undefined;
   }
 
   /**
@@ -868,10 +950,20 @@ export class UiGraphBuilder {
   }
 
   /**
-   * Determines whether a value is an RxJS Observable.
+   * Determines whether a prop's value is an Observable to bind.
+   *
+   * The shared structural check rather than `instanceof Observable`,
+   * for the reason `isObservable` in `UiElement.ts` already gives for
+   * children: an application whose bundle holds a second copy of rxjs
+   * produces observables that fail an `instanceof` against this one.
+   * Children were structural and props were not, so an app-authored
+   * `combineLatest` reached a child correctly and reached a prop as a
+   * plain object, which is written once and never updates. It fails
+   * silently, which is what makes it worth a named method: nothing
+   * warns, nothing throws, and the element simply has no text.
    */
   private isObservable(value: unknown): value is Observable<unknown> {
-    return value instanceof Observable;
+    return isObservable(value);
   }
 
   /**

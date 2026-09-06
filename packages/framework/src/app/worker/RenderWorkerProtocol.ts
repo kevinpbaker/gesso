@@ -171,6 +171,16 @@ export type ShellToRuntimeMessage =
    * class and a component class cannot be posted anywhere.
    */
   | { type: 'url'; url: string }
+  /**
+   * What became of a popup the render worker asked for: `opened` is
+   * false when the browser refused it, which is a thing an application
+   * must be able to route around rather than a failure to log.
+   *
+   * The only reply on this protocol to a request from the other side,
+   * which is why it carries the request's `id` rather than standing on
+   * its own like the preference messages above it.
+   */
+  | { type: 'popupResult'; id: number; opened: boolean }
   | { type: 'inspector'; enabled: boolean }
   /**
    * What an assistive technology did to the accessibility mirror: a
@@ -293,6 +303,19 @@ export type RuntimeToShellMessage =
   | { type: 'clipboard'; text: string }
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
+  /**
+   * Open a sized, named window and report back whether the browser
+   * allowed it (ShellService.openPopup).
+   *
+   * The only shell request that is answered. `id` pairs this with the
+   * `popupResult` that comes back; the shell must send exactly one per
+   * request, because the promise waiting on it settles once.
+   *
+   * Sent ahead of any slow work on purpose: the browser grants a window
+   * only while the click that prompted it is still fresh, so a render
+   * worker that resolves a url first will find the window refused.
+   */
+  | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   /** The router navigated; the shell owns the address bar (RouterService). */
   | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string }
   /** Load, play, pause, seek, set the volume or the OS metadata (AudioService). */

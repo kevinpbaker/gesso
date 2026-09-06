@@ -84,7 +84,22 @@ const SAMPLED_EVENTS = [
  * playlist is.
  */
 export class AudioSink {
-  private readonly element: AudioElementLike;
+  /**
+   * The element that is playing, and a spare that may be holding the
+   * next track.
+   *
+   * Two rather than one because a gapless change needs the next track
+   * already buffered when the current one ends, and an element cannot
+   * buffer a second source. `preload` fills the spare; a `load` of the
+   * source the spare is holding swaps them, so the gap between tracks
+   * is the browser's and not this app's.
+   *
+   * Not readonly: swapping is the whole mechanism.
+   */
+  private element: AudioElementLike;
+  private spare: AudioElementLike;
+  /** What the spare has been asked to hold, or '' when it holds nothing. */
+  private prepared = '';
   private readonly session: MediaSessionLike | null;
   private readonly sampleEveryMs: number;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -97,8 +112,11 @@ export class AudioSink {
     private readonly out: AudioSinkOutput,
     options: AudioSinkOptions = {}
   ) {
-    this.element = options.createElement?.() ?? (new Audio() as unknown as AudioElementLike);
+    const create = options.createElement ?? (() => new Audio() as unknown as AudioElementLike);
+    this.element = create();
     this.element.preload = 'auto';
+    this.spare = create();
+    this.spare.preload = 'auto';
     this.session =
       options.mediaSession !== undefined
         ? options.mediaSession
@@ -115,14 +133,24 @@ export class AudioSink {
   handle(request: AudioRequest): void {
     switch (request.type) {
       case 'load':
-        this.element.src = request.src;
-        this.element.load();
+        // The spare is holding exactly this: swap to it rather than
+        // fetching the same bytes twice, which is what makes the change
+        // gapless.
+        if (this.prepared !== '' && this.prepared === request.src) {
+          this.swap();
+        } else {
+          this.element.src = request.src;
+          this.element.load();
+        }
         this.waiting = true;
         if (request.autoplay) {
           this.play();
         } else {
           this.emit();
         }
+        return;
+      case 'preload':
+        this.preload(request.src);
         return;
       case 'play':
         this.play();
@@ -142,6 +170,53 @@ export class AudioSink {
     }
   }
 
+  /**
+   * Asks the spare element to start buffering a source.
+   *
+   * Idempotent, because the application worker resolves the next url
+   * whenever the queue moves and will often ask for the same one twice.
+   * An empty source clears the spare, which is what happens when the
+   * queue is at its end.
+   */
+  private preload(src: string): void {
+    if (src === this.prepared) {
+      return;
+    }
+    this.prepared = src;
+    if (src === '') {
+      this.spare.pause();
+      this.spare.src = '';
+      return;
+    }
+    // The volume has to travel, or a swap is a jump in loudness.
+    this.spare.volume = this.element.volume;
+    this.spare.src = src;
+    this.spare.load();
+  }
+
+  /**
+   * Makes the spare the element that plays.
+   *
+   * The listeners move with the role rather than sitting on both, so a
+   * spare quietly buffering never emits a sample and the application
+   * hears one timeline. The element that steps aside is emptied so it
+   * holds no bytes while it waits to be the spare again.
+   */
+  private swap(): void {
+    for (const type of SAMPLED_EVENTS) {
+      this.element.removeEventListener(type, this.onEvent);
+    }
+    const previous = this.element;
+    this.element = this.spare;
+    this.spare = previous;
+    this.prepared = '';
+    this.spare.pause();
+    this.spare.src = '';
+    for (const type of SAMPLED_EVENTS) {
+      this.element.addEventListener(type, this.onEvent);
+    }
+  }
+
   dispose(): void {
     this.stopTimer();
     for (const type of SAMPLED_EVENTS) {
@@ -149,6 +224,8 @@ export class AudioSink {
     }
     this.element.pause();
     this.element.src = '';
+    this.spare.pause();
+    this.spare.src = '';
     if (this.session !== null) {
       for (const action of ['play', 'pause', 'previoustrack', 'nexttrack', 'seekto']) {
         try {

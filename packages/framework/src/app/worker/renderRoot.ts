@@ -411,6 +411,9 @@ export class RenderWorkerApp {
       case 'url':
         runtime.setUrl(message.url);
         break;
+      case 'popupResult':
+        runtime.settlePopup(message.id, message.opened);
+        break;
       case 'tick':
         this.clock?.tick(message.time);
         break;
@@ -555,6 +558,15 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'clipboard', text: request.text });
       } else if (request.type === 'openUrl') {
         this.host.postMessage({ type: 'openUrl', url: request.url });
+      } else if (request.type === 'popup') {
+        this.host.postMessage({
+          type: 'popup',
+          id: request.id,
+          url: request.url,
+          name: request.name,
+          width: request.width,
+          height: request.height
+        });
       } else {
         this.host.postMessage({ type: 'history', action: request.action, url: request.url });
       }

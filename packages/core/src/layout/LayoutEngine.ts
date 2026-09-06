@@ -19,6 +19,8 @@ import { placeGridItems, sizeGridTracks } from './GridLayout';
 import type { GridContribution, GridItemRequest, GridPlacement, GridTrackSizingResult } from './GridLayout';
 import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { LayoutRecord } from './LayoutRecord';
+import { fillSubtreeBounds } from './SubtreeBounds';
+import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer } from './TextMeasurer';
 import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
 import { accumulatedOffsetTo } from './LayoutTransform';
@@ -130,7 +132,31 @@ interface FlexConfig {
  * scrolling never re-measures or re-places them.
  */
 export class LayoutEngine {
-  private readonly records = new Map<UiNode, LayoutRecord>();
+  private records = new Map<UiNode, LayoutRecord>();
+  /**
+   * The records the previous full layout ended with, held for the
+   * length of the next one so their objects can be reused.
+   *
+   * `layout()` starts every full pass with an empty map, because the
+   * contract is that a node outside the subtree it lays out ends
+   * without a record, and the only honest way to say that is to make
+   * the pass re-add whatever it touches. Building the records again as
+   * well is the part that was not necessary: on the benchmark list
+   * that is 5,001 objects of eighty fields per pass, which was 71% of
+   * everything a full pass allocated and most of the tenth of its time
+   * the collector was taking. The record for a node the pass asks for
+   * is lifted out of here, reset, and reused; a node the pass never
+   * asks for is dropped with the map when the pass ends, exactly as
+   * before.
+   *
+   * A record is only ever reused for the node it already belongs to,
+   * so anything still holding one sees its own node's record cleared
+   * rather than somebody else's values.
+   *
+   * Empty except while a full pass is running, so `record()`'s second
+   * lookup costs nothing on an incremental frame.
+   */
+  private retiredRecords = new Map<UiNode, LayoutRecord>();
   private readonly scrollNodes = new Set<UiNode>();
   /**
    * Editables, which scroll their own text inside their box the way a
@@ -152,6 +178,16 @@ export class LayoutEngine {
   private readonly anchorDependents = new Map<UiNode, Set<UiNode>>();
   /** Anchored nodes whose anchor moved this frame, re-placed once it settles. */
   private readonly movedAnchored = new Set<UiNode>();
+  /**
+   * The nodes asking for `lift`, in the order they asked.
+   *
+   * Kept as a set rather than rebuilt per pass because layout is
+   * incremental: a node whose subtree was not re-placed this frame is
+   * still lifted, and a list gathered during placement would have lost
+   * it. Hit testing reads this, and it is empty in every frame nothing
+   * is morphing, which is nearly all of them.
+   */
+  private readonly liftedNodes = new Set<UiNode>();
   /** position: 'sticky' nodes, re-offset whenever anything scrolls. */
   private readonly stickyNodes = new Set<UiNode>();
   /**
@@ -173,8 +209,30 @@ export class LayoutEngine {
     width: undefined,
     height: undefined
   };
+  /**
+   * Which layout pass this is, counted from one and bumped by every
+   * `layout` and `layoutForFrame`. Records stamp it when their
+   * properties are folded onto them, which is what lets
+   * `resolveLayoutProps` tell "already done, this pass" from "done
+   * under some earlier state of the tree".
+   */
+  private layoutPass = 0;
   private layoutRoot: UiNode | null = null;
   private rootConstraints: Constraints = Constraints.unbounded();
+  /**
+   * Bumped by anything that can move where a node is hit: every box
+   * written, every pass that did any work at all, and every sticky
+   * shift that came out different. Subtree bounds are a summary of the
+   * records, and this is what keeps them from outliving the records
+   * they summarise.
+   *
+   * A pass that changes nothing leaves it alone, which is the whole
+   * point: a pointer crossing a still tree re-uses the same bounds
+   * from the first move to the last.
+   */
+  private layoutVersion = 0;
+  /** The version `subtreeBounds` on the records was filled from. */
+  private boundsVersion = -1;
 
   constructor(textMeasurer: TextMeasurer = new CharacterCountTextMeasurer()) {
     this.textMeasurer = textMeasurer;
@@ -185,6 +243,33 @@ export class LayoutEngine {
   // ---------------------------------------------------------------------------
 
   recordFor(node: UiNode): LayoutRecord | undefined {
+    return this.records.get(node);
+  }
+
+  /**
+   * A box around everything in a node's subtree that could take a
+   * point, so a hit test can pass the subtree over instead of
+   * descending into it. Undefined for a node with no record, and
+   * `boundsUnbounded` where no honest box exists (see `SubtreeBounds`).
+   *
+   * The bounds are computed for the whole tree at once, on the first
+   * ask after anything moved, rather than kept up to date as layout
+   * runs. That is not laziness for its own sake: an incremental pass
+   * re-places only from a relayout boundary downwards, and a boundary
+   * is any node whose container fixed its size, not just a clipping
+   * one, so a descendant can move and grow past the cached bounds of
+   * ancestors that were never re-placed. Filling every record from one
+   * walk over boxes that have all settled cannot get that wrong, and
+   * it costs four number reads a node on the frames where layout
+   * changed rather than a walk of the tree on every pointer move.
+   */
+  subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined {
+    if (this.boundsVersion !== this.layoutVersion) {
+      this.boundsVersion = this.layoutVersion;
+      if (this.layoutRoot !== null) {
+        fillSubtreeBounds(this.layoutRoot, this.records);
+      }
+    }
     return this.records.get(node);
   }
 
@@ -227,7 +312,7 @@ export class LayoutEngine {
               height: Math.max(0, pRec.height - pRec.paddingTop - pRec.paddingBottom)
             };
     const constraints = rec.lastConstraints;
-    const effective = this.effectiveConstraints(node, constraints);
+    const effective = this.effectiveConstraints(node, constraints, undefined);
     const parentLabel = parent === null ? 'the viewport' : labelNode(parent);
     const clipsContent =
       rec.clips ||
@@ -468,9 +553,23 @@ export class LayoutEngine {
   }
 
   layout(node: UiNode, constraints: Constraints): LayoutResult {
+    this.layoutPass++;
+    this.layoutVersion++;
     this.layoutRoot = node;
     this.rootConstraints = constraints;
-    this.records.clear();
+    // The pass starts with no records and re-adds what it touches, so
+    // that a node outside this subtree ends without one. The map that
+    // held them is kept aside rather than cleared, so `record()` can
+    // hand each node back the object it had; see `retiredRecords`.
+    const retired = this.records;
+    this.records = this.retiredRecords;
+    if (this.records.size > 0) {
+      // Only reachable if a previous pass threw part way through and
+      // left its records behind; the contract is an empty map either way.
+      this.records.clear();
+    }
+    this.retiredRecords = retired;
+    this.liftedNodes.clear();
     this.scrollNodes.clear();
     this.textScrollNodes.clear();
     this.anchorOf.clear();
@@ -491,6 +590,9 @@ export class LayoutEngine {
       this.movedAnchored.add(anchored);
     }
     this.replaceMovedAnchored();
+    // Whatever is still in here belongs to a node this pass never
+    // reached, which is exactly what a full layout drops.
+    this.retiredRecords.clear();
     const isScroll = node.type === UiNodeType.ScrollView;
     return {
       root: node,
@@ -511,6 +613,7 @@ export class LayoutEngine {
    * changes skip layout entirely.
    */
   layoutForFrame(frame: UiFrame, constraints: Constraints, root?: UiNode): void {
+    this.layoutPass++;
     if (root !== undefined) {
       this.layoutRoot = root;
       this.rootConstraints = constraints;
@@ -523,8 +626,7 @@ export class LayoutEngine {
     this.resetStats();
     this.relayoutRoots.clear();
     let anyLayout = false;
-    for (const node of frame.nodes) {
-      const flags = frame.dirtyFlagsFor(node);
+    for (const [node, flags] of frame.entries()) {
       if ((flags & (DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout)) !== 0) {
         anyLayout = true;
         // A node whose own layout properties changed may have a new
@@ -533,6 +635,21 @@ export class LayoutEngine {
         this.markLayoutDirty(node, (flags & DirtyFlags.Layout) === 0);
       }
       if ((flags & DirtyFlags.Transform) !== 0) {
+        // A transform is the one thing a hit test reads straight off
+        // the node rather than off the record, so a node that has just
+        // been given one is drawn and hit somewhere its cached subtree
+        // bounds never described. Asking whether it has one now is
+        // what keeps the far more common member of this flag, a scroll
+        // offset changing, from throwing the bounds away every frame a
+        // list is scrolled: a scroll container clips, so its bounds are
+        // its own box whatever its offset, and its descendants keep
+        // their pre-scroll coordinates. A node that has just *lost* its
+        // transform is left alone for the same reason it is safe to:
+        // its bounds say unbounded, which only costs a descent.
+        const transform = node.properties.get('transform');
+        if (typeof transform === 'object' && transform !== null) {
+          this.layoutVersion++;
+        }
         this.record(node).transformDirty = true;
         (node.type === UiNodeType.EditableText ? this.textScrollNodes : this.scrollNodes).add(node);
         // An anchored node sits next to something that may just have
@@ -549,6 +666,12 @@ export class LayoutEngine {
       return;
     }
 
+    // Every box a pass writes bumps the version on its own, but a pass
+    // can also change what a box means without moving it: a node that
+    // stops clipping starts letting its children be hit outside it,
+    // and its cached bounds are its own box. Work was done, so the
+    // summary of it is thrown away.
+    this.layoutVersion++;
     this.relayout(constraints);
     this.applyScroll();
     this.replaceMovedAnchored();
@@ -920,6 +1043,10 @@ export class LayoutEngine {
     while (stack.length > 0) {
       const current = stack.pop()!;
       this.records.delete(current);
+      // A node removed part way through a full pass must not be handed
+      // back the record it had when the pass reaches it.
+      this.retiredRecords.delete(current);
+      this.liftedNodes.delete(current);
       this.scrollNodes.delete(current);
       this.textScrollNodes.delete(current);
       this.anchoredNodes.delete(current);
@@ -969,7 +1096,7 @@ export class LayoutEngine {
     rec.lastConstraints = constraints;
     this.resolveLayoutProps(node, rec);
     rec.hasBaseline = false;
-    const effective = this.effectiveConstraints(node, constraints);
+    const effective = this.effectiveConstraints(node, constraints, rec);
     let size: Size;
     if (
       node.type === UiNodeType.Row ||
@@ -2992,8 +3119,14 @@ export class LayoutEngine {
         this.stickyShifted.add(node);
       }
     }
-    if (this.stickyShifted.size > 0 && this.anchorOf.size > 0) {
-      this.followStickyShifts();
+    if (this.stickyShifted.size > 0) {
+      // A shift moves a node, and everything under it, without moving
+      // a box, so nothing else here would tell the subtree bounds that
+      // the tree they summarise has changed shape.
+      this.layoutVersion++;
+      if (this.anchorOf.size > 0) {
+        this.followStickyShifts();
+      }
     }
   }
 
@@ -3109,7 +3242,19 @@ export class LayoutEngine {
   private record(node: UiNode): LayoutRecord {
     let rec = this.records.get(node);
     if (rec === undefined) {
-      rec = new LayoutRecord(node);
+      // A full pass in progress has the previous pass's records here;
+      // outside one the map is empty and this is a miss on nothing.
+      rec = this.retiredRecords.get(node);
+      if (rec === undefined) {
+        rec = new LayoutRecord(node);
+      } else {
+        // Left where it is rather than deleted: the record is in the
+        // live map from here on, so nothing looks for it here again,
+        // and the whole map is dropped when the pass ends. Five
+        // thousand deletes a pass is not a cost worth paying for
+        // tidiness the caller cannot see.
+        rec.reset();
+      }
       this.records.set(node, rec);
     }
     return rec;
@@ -3135,9 +3280,56 @@ export class LayoutEngine {
     return { width, height };
   }
 
+  /**
+   * Folds the node's layout properties onto its record: sizes, minima
+   * and maxima, padding, margins, positioning, the insets, and the
+   * flags the walks read off the record rather than off the property
+   * map.
+   *
+   * Ten places call this, because a node is measured by one container
+   * and then placed by another and each wants the record current
+   * before it reads it. On a list of five thousand nodes that came to
+   * five full re-resolutions per node per pass, each one about thirty
+   * property lookups with a length resolution on most of them, which
+   * was a tenth of the time a full pass took and a good deal of the
+   * garbage it made. So the result is memoized, but only for the
+   * duration of one pass.
+   *
+   * Only for one pass, deliberately. A cache that outlived a pass
+   * would have to be invalidated whenever any layout property changed,
+   * and would be silently wrong the first time some path wrote a
+   * property without marking the node layout-dirty. Within a pass the
+   * question does not arise: nothing writes node properties while a
+   * pass is running, so the second through fifth resolutions provably
+   * produce exactly what the first one did, and the memo cannot be
+   * stale because there is nothing to go stale against. The stamp is
+   * thrown away between frames on purpose; it is not a bug that the
+   * work is done again next frame.
+   *
+   * The percentage base is part of the key rather than assumed
+   * constant, because it is not. The engine reassigns `percentBase` as
+   * it descends, and on the benchmark list two fifths of the nodes
+   * (the text inside each row's column) are first resolved while their
+   * container's content width is still unknown and again once it is
+   * known, against a base of `undefined` and then of a number. Those
+   * must resolve twice or a percentage would keep the answer it got
+   * when there was nothing to be a percentage of.
+   *
+   * `setLifted` is the one thing here that writes engine state rather
+   * than record state, and skipping it on a repeat call is safe for
+   * the same reason the rest is: `lift` cannot change mid-pass, so the
+   * first call already put the node in or out of `liftedNodes` and a
+   * later call would find `rec.lifted` equal and return.
+   */
   private resolveLayoutProps(node: UiNode, rec: LayoutRecord): void {
     const props = node.properties;
     const base = this.percentBase;
+    if (rec.propsPass === this.layoutPass && rec.propsBaseWidth === base.width && rec.propsBaseHeight === base.height) {
+      return;
+    }
+    rec.propsPass = this.layoutPass;
+    rec.propsBaseWidth = base.width;
+    rec.propsBaseHeight = base.height;
     // `flex: n` is CSS's shorthand for grow n, shrink 1, basis 0.
     const flex = this.numberProp(node, 'flex');
     rec.flexGrow = this.numberProp(node, 'flexGrow') ?? flex ?? 0;
@@ -3185,6 +3377,8 @@ export class LayoutEngine {
     rec.bottom = this.lengthProp(node, 'bottom', base.height) ?? insetV;
     rec.left = this.lengthProp(node, 'left', base.width) ?? insetH;
     rec.zIndex = this.numberProp(node, 'zIndex') ?? 0;
+    this.setLifted(node, rec, node.properties.get('lift') === true);
+    rec.liftBoundary = node.properties.get('liftBoundary') === true;
     const ratio = this.numberProp(node, 'aspectRatio');
     rec.aspectRatio = ratio !== undefined && ratio > 0 ? ratio : undefined;
   }
@@ -3241,25 +3435,57 @@ export class LayoutEngine {
    * node overflows rather than being squeezed. Without an explicit
    * size the bounds intersect, and the parent's max is the available
    * space content lays out against.
+   *
+   * `rec` is the node's record when its properties have just been
+   * folded onto it against the same percentage base, and undefined
+   * when they have not. It is only an optimisation: the four minimums
+   * and maximums this needs are the four `resolveLayoutProps` has
+   * already resolved from the same properties against the same base
+   * (`minWidth` resolves through `lengthPropOrAuto`, whose `'auto'`
+   * lands on the record as zero exactly as `?? 0` does here), so
+   * passing the record turns six length resolutions per measured node
+   * into two. A pass over the benchmark list did 173,018 of them and
+   * 66,006 were these four.
+   *
+   * The one caller that passes undefined is `explain`, which reads a
+   * record it did not resolve, under a percentage base it worked out
+   * for itself; it asks the properties instead rather than trusting
+   * that the two bases agree.
    */
-  private effectiveConstraints(node: UiNode, constraints: Constraints): Constraints {
+  private effectiveConstraints(node: UiNode, constraints: Constraints, rec: LayoutRecord | undefined): Constraints {
     const base = this.percentBase;
-    const width = this.axisConstraints(
+    this.axisConstraints(
       constraints.minWidth,
       constraints.maxWidth,
       this.lengthProp(node, 'width', base.width),
-      this.lengthProp(node, 'minWidth', base.width) ?? 0,
-      this.lengthProp(node, 'maxWidth', base.width) ?? Infinity
+      rec !== undefined ? rec.minWidth : (this.lengthProp(node, 'minWidth', base.width) ?? 0),
+      rec !== undefined ? rec.maxWidth : (this.lengthProp(node, 'maxWidth', base.width) ?? Infinity)
     );
-    const height = this.axisConstraints(
+    const minWidth = this.axisMin;
+    const maxWidth = this.axisMax;
+    this.axisConstraints(
       constraints.minHeight,
       constraints.maxHeight,
       this.lengthProp(node, 'height', base.height),
-      this.lengthProp(node, 'minHeight', base.height) ?? 0,
-      this.lengthProp(node, 'maxHeight', base.height) ?? Infinity
+      rec !== undefined ? rec.minHeight : (this.lengthProp(node, 'minHeight', base.height) ?? 0),
+      rec !== undefined ? rec.maxHeight : (this.lengthProp(node, 'maxHeight', base.height) ?? Infinity)
     );
-    return new Constraints(width[0], width[1], height[0], height[1]);
+    return new Constraints(minWidth, maxWidth, this.axisMin, this.axisMax);
   }
+
+  /**
+   * The lower and upper bound `axisConstraints` last worked out.
+   *
+   * It returned them as a two-element tuple, which allocated an array
+   * per axis per measured node, 22,002 of them in a pass over the
+   * benchmark list. Two fields cannot be misread across a nested call
+   * because there is no nested call: `axisConstraints` is arithmetic
+   * over its arguments and reaches nothing that could measure anything,
+   * so the only code that runs between writing these and reading them
+   * is the read itself.
+   */
+  private axisMin = 0;
+  private axisMax = 0;
 
   private axisConstraints(
     parentMin: number,
@@ -3267,7 +3493,7 @@ export class LayoutEngine {
     own: number | undefined,
     ownMin: number,
     ownMax: number
-  ): [number, number] {
+  ): void {
     const min = Math.max(0, ownMin);
     // Like CSS, a min bound wins over a conflicting max bound.
     const max = Math.max(min, ownMax);
@@ -3275,14 +3501,19 @@ export class LayoutEngine {
       // A stretched or flexed size is still clamped by the node's own
       // min/max, as CSS clamps a stretched cross size.
       const size = this.clamp(parentMin, min, max);
-      return [size, size];
+      this.axisMin = size;
+      this.axisMax = size;
+      return;
     }
     if (own !== undefined) {
       const size = this.clamp(own, min, max);
-      return [size, size];
+      this.axisMin = size;
+      this.axisMax = size;
+      return;
     }
     const lower = Math.max(parentMin, min);
-    return [lower, Math.max(lower, Math.min(parentMax, max))];
+    this.axisMin = lower;
+    this.axisMax = Math.max(lower, Math.min(parentMax, max));
   }
 
   /**
@@ -3304,6 +3535,12 @@ export class LayoutEngine {
       rec.width = width;
       rec.height = height;
       rec.placeDirty = true;
+      // Subtree bounds are a summary of these four numbers, so this is
+      // the one place that can promise they are never stale: a box
+      // written after a pass has ended, by an overlay following the
+      // anchor it hangs off, invalidates them just as one written
+      // inside the pass does.
+      this.layoutVersion++;
       // Anything anchored to this node was placed against the box it
       // had a moment ago and has to be placed again. A box that did not
       // move asks nothing, and a tree with no anchored node at all does
@@ -3328,12 +3565,24 @@ export class LayoutEngine {
    * Fragment anchors so their children participate in layout as if
    * they were direct children of the parent. Absolutely positioned
    * children are skipped: they take no space and are placed separately.
+   *
+   * The two questions are asked inline here and in the two iterators
+   * below rather than through named predicates, which read better. A
+   * pass over the benchmark list asked the pair 80,002 times, 48,000
+   * of them from these three loops, and the profile put the two at
+   * 5.4% of the pass between them. The callback differs at every call
+   * site, so nothing about this loop is inlined into anything, and a
+   * predicate call per child per iterator is a real fraction of a walk
+   * that does very little else. The absolute test had no caller
+   * outside these loops and is gone; `isFragment` stayed, because
+   * everywhere else it is asked once for a node rather than once per
+   * sibling.
    */
   private forEachLayoutChild(node: UiNode, callback: (child: UiNode) => void): void {
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      if (this.isFragment(child)) {
+      if (child.type === UiNodeType.Fragment) {
         this.forEachLayoutChild(child, callback);
-      } else if (!this.isAbsolute(child)) {
+      } else if (child.properties.get('position') !== 'absolute') {
         callback(child);
       }
     }
@@ -3342,9 +3591,9 @@ export class LayoutEngine {
   /** The absolutely positioned children, fragments expanded. */
   private forEachAbsoluteChild(node: UiNode, callback: (child: UiNode) => void): void {
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      if (this.isFragment(child)) {
+      if (child.type === UiNodeType.Fragment) {
         this.forEachAbsoluteChild(child, callback);
-      } else if (this.isAbsolute(child)) {
+      } else if (child.properties.get('position') === 'absolute') {
         callback(child);
       }
     }
@@ -3353,7 +3602,7 @@ export class LayoutEngine {
   /** Every child, in flow or not, fragments expanded, in tree order. */
   private forEachChild(node: UiNode, callback: (child: UiNode) => void): void {
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
-      if (this.isFragment(child)) {
+      if (child.type === UiNodeType.Fragment) {
         this.forEachChild(child, callback);
       } else {
         callback(child);
@@ -3361,12 +3610,40 @@ export class LayoutEngine {
     }
   }
 
-  private isAbsolute(node: UiNode): boolean {
-    return node.properties.get('position') === 'absolute';
-  }
-
   private isFragment(node: UiNode): boolean {
     return node.type === UiNodeType.Fragment;
+  }
+
+  /**
+   * Records whether a node is lifted, keeping the index in step.
+   *
+   * The set is the index and the record field is the answer to "is
+   * this one lifted", because the renderers ask that of every node
+   * they walk and a set lookup per node per frame is a cost the walk
+   * does not need to pay.
+   */
+  private setLifted(node: UiNode, rec: LayoutRecord, lifted: boolean): void {
+    if (rec.lifted === lifted) {
+      return;
+    }
+    rec.lifted = lifted;
+    if (lifted) {
+      this.liftedNodes.add(node);
+    } else {
+      this.liftedNodes.delete(node);
+    }
+  }
+
+  /**
+   * The nodes painted in the top layer, in the order they were lifted.
+   *
+   * Hit testing tries them last-first, so the most recently lifted
+   * wins a point two of them cover. Two lifted elements overlapping at
+   * all is already unusual: this exists so a morph can escape a clip,
+   * and one thing morphs at a time.
+   */
+  get lifted(): ReadonlySet<UiNode> {
+    return this.liftedNodes;
   }
 
   private numberProp(node: UiNode, property: string): number | undefined {
@@ -3377,20 +3654,53 @@ export class LayoutEngine {
     return undefined;
   }
 
-  /** A length property in pixels; percentages resolve against `base`. */
+  /**
+   * A length property in pixels; percentages resolve against `base`.
+   *
+   * The two cases answered here rather than in `resolveLength` are the
+   * two a tree is almost entirely made of: a property nobody set, and
+   * a plain number of pixels. A pass over the benchmark list asks this
+   * 129,014 times and never once reaches a percentage or an `auto`,
+   * because an application writes its sizes as numbers and only
+   * reaches for a tagged length where it means one. So the call, its
+   * default argument and its chain of type tests were most of what
+   * every resolution cost. Anything that is not a finite number still
+   * goes to `resolveLength`, which is where the rules and the errors
+   * live.
+   */
   private lengthProp(node: UiNode, property: string, base: number | undefined): number | undefined {
-    const value = resolveLength(node.properties.get(property), base, property);
+    const raw = node.properties.get(property);
+    if (raw === undefined) {
+      return undefined;
+    }
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      return raw;
+    }
+    const value = resolveLength(raw, base, property);
     return value === 'auto' ? undefined : value;
   }
 
   private lengthPropOrAuto(node: UiNode, property: string, base: number | undefined): number | undefined | 'auto' {
-    return resolveLength(node.properties.get(property), base, property, true);
+    const raw = node.properties.get(property);
+    if (raw === undefined) {
+      return undefined;
+    }
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      return raw;
+    }
+    return resolveLength(raw, base, property, true);
   }
 
   /** A margin side: the side's own value, else the shorthand; may be auto. */
   private marginProp(props: ReadonlyMap<string, unknown>, side: string): number | 'auto' {
     const explicit = props.get(side);
     const value = explicit !== undefined ? explicit : props.get('margin');
+    if (value === undefined) {
+      return 0;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
     return resolveLength(value, undefined, side, true) ?? 0;
   }
 

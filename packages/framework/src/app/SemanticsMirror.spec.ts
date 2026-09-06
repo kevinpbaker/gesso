@@ -17,8 +17,31 @@ class FakeElement {
   readonly children: FakeElement[] = [];
   parent: FakeElement | null = null;
   tabIndex = 0;
-  textContent = '';
   rect = { left: 24, top: 16, width: 800, height: 600 };
+
+  /**
+   * Text, with the DOM's own destructive semantics.
+   *
+   * Assigning `textContent` replaces *every* child node, elements
+   * included. Modelling it as a plain field, which this did at first,
+   * makes the fake disagree with the browser in the one way that
+   * matters for a container: the mirror writes `textContent` while
+   * describing a node, and in a real document that empties it. A
+   * labelled `tablist` full of tabs came back from Chrome as a leaf
+   * while these specs said it was fine.
+   */
+  private text = '';
+
+  get textContent(): string {
+    return this.text;
+  }
+
+  set textContent(value: string) {
+    this.text = value;
+    for (const child of this.children.splice(0)) {
+      child.parent = null;
+    }
+  }
 
   constructor(
     readonly ownerDocument: FakeDocument,
@@ -258,13 +281,44 @@ describe('SemanticsMirror', () => {
 
   it('clears an attribute a record stopped saying', () => {
     const { elementFor, apply } = setup();
-    const checked = record('n1', { role: 'checkbox', label: 'Wrap', states: ['checked'] });
-    apply({ patches: [{ op: 'add', node: checked }] });
+    const required = record('n1', { role: 'textbox', label: 'Name', states: ['required'] });
+    apply({ patches: [{ op: 'add', node: required }] });
     apply({
-      patches: [{ op: 'update', node: record('n1', { role: 'checkbox', label: 'Wrap' }) }]
+      patches: [{ op: 'update', node: record('n1', { role: 'textbox', label: 'Name' }) }]
     });
 
-    expect(elementFor('n1').getAttribute('aria-checked')).toBeNull();
+    expect(elementFor('n1').getAttribute('aria-required')).toBeNull();
+  });
+
+  it('says a checkable role is not checked, rather than saying nothing', () => {
+    // A control publishes `checked` when it is on and nothing when it is
+    // off, which is the right shape for a state list and the wrong shape
+    // for ARIA: on these roles the attribute is required, and an absent
+    // one reads as "not a checkbox" rather than "not checked". A
+    // `RadioGroup` in a native window is where this was noticed.
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('n1', { role: 'radio', label: 'Newest first', states: ['checked'] }) },
+        { op: 'add', node: record('n2', { role: 'radio', label: 'Title' }) },
+        { op: 'add', node: record('n3', { role: 'switch', label: 'Wrap lines' }) },
+        { op: 'add', node: record('n4', { role: 'button', label: 'Save' }) }
+      ]
+    });
+
+    expect(elementFor('n1').getAttribute('aria-checked')).toBe('true');
+    expect(elementFor('n2').getAttribute('aria-checked')).toBe('false');
+    expect(elementFor('n3').getAttribute('aria-checked')).toBe('false');
+    // Not every role has a checked state to report.
+    expect(elementFor('n4').getAttribute('aria-checked')).toBeNull();
+  });
+
+  it('turns a checkable role back to false when it stops being checked', () => {
+    const { elementFor, apply } = setup();
+    apply({ patches: [{ op: 'add', node: record('n1', { role: 'checkbox', label: 'Wrap', states: ['checked'] }) }] });
+    apply({ patches: [{ op: 'update', node: record('n1', { role: 'checkbox', label: 'Wrap' }) }] });
+
+    expect(elementFor('n1').getAttribute('aria-checked')).toBe('false');
   });
 
   it('nests records under their parent, in index order', () => {
@@ -386,5 +440,52 @@ describe('SemanticsMirror', () => {
     mirror.dispose();
 
     expect(doc.body.children).not.toContain(container);
+  });
+});
+
+describe('a labelled container and its children', () => {
+  /**
+   * The bug this pins: `describe` writes `element.textContent`, and
+   * assigning `textContent` replaces every child node an element has,
+   * elements included. A container that carries a role and a label
+   * therefore loses whatever the mirror had already put inside it, and
+   * a screen reader is told the container exists and nothing about
+   * what is in it.
+   *
+   * Found on Segue's artist page, whose four tabs were absent from the
+   * accessibility tree while drawing correctly on screen: a `tablist`
+   * and a `tabpanel` were both leaves. It is not specific to tabs. Any
+   * labelled `group`, `region` or `list` is a container, and the
+   * screenshot gate cannot see this because the pixels are right.
+   */
+  it('keeps the children of a container that has a role and a label', () => {
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('tabs', { role: 'tablist', label: 'What this artist has made' }) },
+        { op: 'add', node: record('t0', { parent: 'tabs', index: 0, role: 'tab', label: 'Tracks' }) },
+        { op: 'add', node: record('t1', { parent: 'tabs', index: 1, role: 'tab', label: 'Albums' }) }
+      ]
+    });
+    const tabs = elementFor('tabs');
+    expect(tabs.getAttribute('aria-label')).toBe('What this artist has made');
+    expect(tabs.children.map(child => child.getAttribute('aria-label'))).toEqual(['Tracks', 'Albums']);
+  });
+
+  it('keeps them when the container is described again after they arrive', () => {
+    // The order that actually happens: the container is placed, its
+    // children are placed, and then something about the container
+    // changes and it is described a second time.
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('panel', { role: 'tabpanel', label: 'Tracks' }) },
+        { op: 'add', node: record('row', { parent: 'panel', index: 0, role: 'button', label: 'A track' }) }
+      ]
+    });
+    apply({ patches: [{ op: 'update', node: record('panel', { role: 'tabpanel', label: 'Albums' }) }] });
+    const panel = elementFor('panel');
+    expect(panel.getAttribute('aria-label')).toBe('Albums');
+    expect(panel.children.map(child => child.getAttribute('aria-label'))).toEqual(['A track']);
   });
 });

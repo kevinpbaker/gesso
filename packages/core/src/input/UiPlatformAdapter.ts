@@ -309,6 +309,15 @@ export function prepareInputSurface(element: HTMLElement): void {
   style.setProperty('-webkit-user-select', 'none');
   style.setProperty('-webkit-touch-callout', 'none');
   style.setProperty('-webkit-tap-highlight-color', 'transparent');
+  // The surface carries `tabIndex = 0` so that Tab reaches the
+  // application at all, which also gives it the browser's own focus
+  // outline: click a button drawn on the canvas and the ring lands
+  // around the whole canvas rather than around the button. Gesso draws
+  // its own indicator for whichever node holds focus (`focusRing` in
+  // `modifiers`, coloured by the `focusRing` token), so the platform
+  // ring is not the only one and suppressing it costs nothing a
+  // keyboard user can see.
+  style.outline = 'none';
 }
 
 /**

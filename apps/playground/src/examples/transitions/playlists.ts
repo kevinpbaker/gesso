@@ -39,7 +39,7 @@ export const CARDS: readonly CardDesign[] = [
   },
   {
     id: '2',
-    background: '#ebd9ea',
+    background: '#fadff3',
     backgroundImage: '/transitions/pink-card-bg.png',
     text: '#8b689c',
     secondaryText: '#ab91b8',

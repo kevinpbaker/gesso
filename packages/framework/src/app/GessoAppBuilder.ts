@@ -122,6 +122,10 @@ export class GessoAppBuilder {
     return this;
   }
 
+  /**
+   * Pins the rendering backend. Without this the app is on `auto`:
+   * WebGPU where the browser has it, Canvas2D elsewhere.
+   */
   renderer(choice: RendererChoice): this {
     this.rendererChoice = choice;
     return this;
