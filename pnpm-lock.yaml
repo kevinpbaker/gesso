@@ -199,6 +199,16 @@ importers:
         specifier: workspace:^
         version: link:../framework
 
+  packages/electrobun:
+    dependencies:
+      '@gesso/framework':
+        specifier: workspace:^
+        version: link:../framework
+    devDependencies:
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+
   packages/framework:
     dependencies:
       '@gesso/core':
