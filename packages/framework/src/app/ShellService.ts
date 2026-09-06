@@ -16,6 +16,7 @@ import type { ReadableCell } from '../Input';
 export type ShellRequest =
   | { type: 'clipboard'; text: string }
   | { type: 'openUrl'; url: string }
+  | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'history'; action: 'push' | 'replace'; url: string }
   | { type: 'history'; action: 'back' | 'forward'; url?: undefined };
 
@@ -33,6 +34,9 @@ export type ShellRequest =
 export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
+  /** Popups asked for and not yet answered, by the id sent with each. */
+  private readonly popups = new Map<number, (opened: boolean) => void>();
+  private nextPopupId = 1;
 
   /**
    * The appearance the platform is asking for, as the shell reports it:
@@ -94,5 +98,83 @@ export class ShellService {
   /** Opens a URL in the user's browser, in a new tab or window. */
   openUrl(url: string): void {
     this.handler?.({ type: 'openUrl', url });
+  }
+
+  /**
+   * Opens a sized window and answers whether the browser allowed it.
+   *
+   * Separate from `openUrl` because the two differ in three ways that
+   * matter. A popup is a small window rather than a tab, so it carries
+   * a size; it is named, so asking twice reuses one window rather than
+   * littering the desktop; and the caller has to hear whether it opened,
+   * because a blocked popup is a dead end an application must route
+   * around rather than a request it can post and forget.
+   *
+   * The answer is a promise, the one place in the framework where a
+   * shell request has a reply, because there is nothing useful an
+   * application can do with a popup it cannot see the fate of. A sign-in
+   * flow that is blocked falls back to a full-page redirect, and it can
+   * only choose that if it is told.
+   *
+   * Two browser rules shape the contract and both were measured in
+   * Chrome before this existed:
+   *
+   * - The window must be asked for while the click that prompted it is
+   *   still fresh, so the request travels ahead of any slow work. A
+   *   round trip through a worker is fast enough; resolving a url over
+   *   the network first is not, so build the url before calling this.
+   * - One gesture buys one window. A second call on the same click is
+   *   refused by the browser and resolves `false`.
+   *
+   * The window is opened *with* an opener, unlike `openUrl`, which
+   * passes `noopener`. That is not a relaxation for its own sake:
+   * `window.open` returns `null` when `noopener` is set whether or not
+   * the window appeared, so a popup asked for that way could never
+   * report the one thing this method exists to report. The opened page
+   * is a different origin, so what the opener reference grants it is
+   * what any OAuth popup's does.
+   */
+  openPopup(request: {
+    readonly url: string;
+    readonly name?: string;
+    readonly width?: number;
+    readonly height?: number;
+  }): Promise<boolean> {
+    const handler = this.handler;
+    if (handler === undefined || handler === null) {
+      // No shell, so no window; a headless runtime says so rather than
+      // leaving a promise that never settles.
+      return Promise.resolve(false);
+    }
+    const id = this.nextPopupId++;
+    const settled = new Promise<boolean>(resolve => {
+      this.popups.set(id, resolve);
+    });
+    handler({
+      type: 'popup',
+      id,
+      url: request.url,
+      name: request.name ?? 'gesso-popup',
+      width: request.width ?? 520,
+      height: request.height ?? 680
+    });
+    return settled;
+  }
+
+  /**
+   * Called by the runtime when the shell reports what became of a
+   * popup. Not for applications.
+   *
+   * An id the map does not hold is ignored rather than thrown on: a
+   * duplicate reply, or one arriving after the runtime was torn down,
+   * is the shell being noisy and not the application being wrong.
+   */
+  settlePopup(id: number, opened: boolean): void {
+    const resolve = this.popups.get(id);
+    if (resolve === undefined) {
+      return;
+    }
+    this.popups.delete(id);
+    resolve(opened);
   }
 }

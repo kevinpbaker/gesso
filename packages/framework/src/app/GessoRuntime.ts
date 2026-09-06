@@ -1162,6 +1162,17 @@ export class GessoRuntime {
     this.services.get(ShellService).applyColorScheme(scheme);
   }
 
+  /**
+   * Reports what became of a popup a component asked for, settling the
+   * promise `ShellService.openPopup` returned.
+   *
+   * The one inbound message that answers an outbound one, so unlike the
+   * preference setters beside it this carries the id it is replying to.
+   */
+  settlePopup(id: number, opened: boolean): void {
+    this.services.get(ShellService).settlePopup(id, opened);
+  }
+
   /** Whether the runtime is currently honouring a reduced-motion preference. */
   get reducedMotion(): boolean {
     return this.animations.isReducedMotion;

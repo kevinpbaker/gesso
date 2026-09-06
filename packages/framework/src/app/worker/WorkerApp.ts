@@ -607,6 +607,10 @@ export class WorkerApp {
       window.open(message.url, '_blank', 'noopener,noreferrer');
       return;
     }
+    if (message.type === 'popup') {
+      this.openPopup(message);
+      return;
+    }
     if (message.type === 'audio') {
       this.audio?.handle(message.request);
       return;
@@ -632,6 +636,32 @@ export class WorkerApp {
     this.history = history;
     history.onChange(url => this.post({ type: 'url', url }));
     this.post({ type: 'url', url: history.url });
+  }
+
+  /**
+   * Opens a popup for the render worker and tells it what happened.
+   *
+   * `noopener` is deliberately absent, though the sibling `openUrl`
+   * above sets it. `window.open` answers `null` whenever `noopener` is
+   * given, whether the window appeared or was refused, so a popup
+   * opened that way could not be reported on, and reporting is the
+   * whole reason this request exists rather than another `openUrl`.
+   * The page opened is a different origin, so the opener reference it
+   * gains is the ordinary one every OAuth popup has.
+   *
+   * A reply is posted on every path, including the throwing one, so the
+   * promise on the other side always settles.
+   */
+  private openPopup(request: { id: number; url: string; name: string; width: number; height: number }): void {
+    let opened = false;
+    try {
+      const features = `popup,width=${request.width},height=${request.height}`;
+      opened = window.open(request.url, request.name, features) !== null;
+    } catch {
+      // A sandboxed frame throws rather than returning null.
+      opened = false;
+    }
+    this.post({ type: 'popupResult', id: request.id, opened });
   }
 
   private applyHistory(action: 'push' | 'replace' | 'back' | 'forward', url?: string): void {
