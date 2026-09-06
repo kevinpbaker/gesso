@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiNodeType } from '../graph/UiNodeType';
+import { Constraints } from '../layout/LayoutTypes';
+import { UiFrame } from '../scheduler/UiFrame';
 import { InputTestHarness } from './UiInputTestUtils';
 
 describe('UiHitTester', () => {
@@ -499,6 +502,27 @@ describe('UiHitTester', () => {
       expect(tester.hitTest(100, -250)).toBeNull();
     });
 
+    it('hits a lifted node drawn outside a parent that does not clip', () => {
+      const h = new InputTestHarness();
+      const section = h.node('section', UiNodeType.Column, { width: 200, height: 40 });
+      const card = h.node('card', UiNodeType.Box, {
+        width: 100,
+        height: 40,
+        lift: true,
+        transform: { translateY: 260 }
+      });
+      h.add(section, card);
+      h.add(h.root, section);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // Nothing clips here, so the point could reach the card either
+      // through the section or through the top layer. The top layer is
+      // tried first and is not bounded by anything the tree says.
+      expect(tester.hitTest(50, 280)?.node).toBe(card);
+    });
+
     it('puts a lifted node at the top of the hit stack', () => {
       const h = new InputTestHarness();
       const under = h.node('under', UiNodeType.Box, { width: 200, height: 100, position: 'absolute', top: 0, left: 0 });
@@ -517,6 +541,199 @@ describe('UiHitTester', () => {
       h.layoutTree();
       const tester = h.createHitTester();
       expect(tester.hitStack(100, 50)).toEqual([over, under]);
+    });
+  });
+
+  /**
+   * The walk descends into a child only when the point is inside the
+   * bounds of that child's subtree. Every case here is a position
+   * where something is plainly drawn and must therefore be hit; a box
+   * that comes out too small loses the click in silence, so these are
+   * the whole safety net under the optimisation.
+   */
+  describe('subtree bounds', () => {
+    /**
+     * A section that does not clip, with a badge inside it placed well
+     * outside its box: bounds taken from a node's own record alone
+     * would stop the walk at the section.
+     */
+    function spillingSection(badgeTop: number) {
+      const h = new InputTestHarness();
+      const section = h.node('section', UiNodeType.Column);
+      const row = h.node('row', UiNodeType.Row, { height: 40 });
+      const badge = h.node('badge', UiNodeType.Box, {
+        position: 'absolute',
+        top: badgeTop,
+        left: 20,
+        width: 30,
+        height: 30
+      });
+      h.add(row, badge);
+      h.add(section, row);
+      h.add(h.root, section);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      return { h, section, row, badge, tester: h.createHitTester() };
+    }
+
+    it('hits a child painted outside its non-clipping parent', () => {
+      const { badge, tester } = spillingSection(300);
+      expect(tester.hitTest(30, 310)?.node).toBe(badge);
+    });
+
+    it('hits a descendant that an incremental relayout moved inside a relayout boundary', () => {
+      const { h, row, badge, tester } = spillingSection(10);
+      // The first test is what fills the bounds in, so the frame below
+      // has something to make stale.
+      expect(tester.hitTest(30, 20)?.node).toBe(badge);
+      // The row's height is fixed by its own property and its width by
+      // the section, so nothing inside it can change its size: it is a
+      // relayout boundary, and the walk that follows stops there.
+      expect(h.layout.record(row).relayoutBoundary).toBe(true);
+
+      badge.setProperty('top', 300);
+      h.layout.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[badge, DirtyFlags.Layout]])),
+        Constraints.loose(400, 400)
+      );
+
+      // The row and the badge, and neither the section above them nor
+      // the root above that: the ancestors whose bounds the badge just
+      // grew past are exactly the ones this frame never re-placed.
+      expect(h.layout.engine.stats.fullLayout).toBe(false);
+      expect(h.layout.engine.stats.placed).toBe(2);
+      expect(tester.hitTest(30, 310)?.node).toBe(badge);
+    });
+
+    it('hits a row scrolled into view', () => {
+      const h = new InputTestHarness();
+      const list = h.node('list', UiNodeType.ScrollView, { width: 200, height: 100, scrollY: 0 });
+      const rows = [];
+      for (let i = 0; i < 20; i++) {
+        rows.push(h.node(`row-${i}`, UiNodeType.Box, { width: 200, height: 20, flexShrink: 0 }));
+      }
+      h.add(list, ...rows);
+      h.add(h.root, list);
+      h.root.setProperty('hitTestable', false);
+      list.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      expect(tester.hitTest(10, 10)?.node).toBe(rows[0]);
+      list.setProperty('scrollY', 150);
+      // An incremental frame, so the records the first hit test was
+      // answered from are the ones this one is answered from too.
+      h.layout.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[list, DirtyFlags.Transform]])),
+        Constraints.loose(400, 400)
+      );
+      // Row 8 spans content y 160..180, which the scroll puts at screen
+      // y 10..30. Its record has not moved, and neither have the bounds
+      // the list's children are checked against: a scroll shifts the
+      // point into their space rather than moving them.
+      expect(tester.hitTest(10, 15)?.node).toBe(rows[8]);
+    });
+
+    it('hits a sticky header where it is held, not where its record sits', () => {
+      const h = new InputTestHarness();
+      const list = h.node('list', UiNodeType.Column, {
+        width: 200,
+        height: 60,
+        overflow: 'scroll',
+        scrollY: 30
+      });
+      const header = h.node('header', UiNodeType.Box, {
+        position: 'sticky',
+        top: 0,
+        width: 20,
+        height: 10,
+        flexShrink: 0
+      });
+      const body = h.node('body', UiNodeType.Box, { width: 20, height: 200, flexShrink: 0 });
+      h.add(list, header, body);
+      h.add(h.root, list);
+      h.root.setProperty('hitTestable', false);
+      list.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // The header's record is at content y 0..10 and the list is
+      // scrolled 30, so it is drawn at the top of the list only because
+      // of a shift that no box on the way down mentions.
+      expect(h.layout.record(header).stickyOffsetY).toBe(30);
+      expect(tester.hitTest(5, 5)?.node).toBe(header);
+    });
+
+    it('hits a node its transform moved clear of its layout box', () => {
+      const h = new InputTestHarness();
+      const box = h.node('box', UiNodeType.Box, {
+        width: 100,
+        height: 100,
+        transform: { translateY: 300 }
+      });
+      h.add(h.root, box);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      expect(tester.hitTest(50, 350)?.node).toBe(box);
+      expect(tester.hitTest(50, 50)).toBeNull();
+    });
+
+    it('hits an anchored overlay that moved after its frame had placed everything else', () => {
+      const h = new InputTestHarness();
+      const page = h.node('page', UiNodeType.Column);
+      const spacer = h.node('spacer', UiNodeType.Box, { width: 60, height: 30 });
+      const anchor = h.node('anchor', UiNodeType.Box, { width: 60, height: 20 });
+      h.add(page, spacer, anchor);
+      const layer = h.node('layer', UiNodeType.Box, { position: 'absolute', inset: 0 });
+      const popup = h.node('popup', UiNodeType.Box, {
+        position: 'absolute',
+        anchor,
+        width: 100,
+        height: 50,
+        placement: 'bottom-start'
+      });
+      h.add(layer, popup);
+      h.add(h.root, page, layer);
+      h.root.setProperty('hitTestable', false);
+      layer.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // The popup hangs below the anchor, which starts at y 30..50.
+      expect(tester.hitTest(10, 60)?.node).toBe(popup);
+
+      spacer.setProperty('height', 90);
+      h.layout.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[spacer, DirtyFlags.Layout]])),
+        Constraints.loose(400, 400)
+      );
+      // `replaceMovedAnchored` runs after the pass has placed the flow,
+      // so the popup's box is written last of all; the bounds have to
+      // be taken from the tree as it settled and not as it was walked.
+      expect(h.layout.box(popup).y).toBe(110);
+      expect(tester.hitTest(10, 120)?.node).toBe(popup);
+    });
+
+    it('finds a scrollbar band inside a nested container', () => {
+      const h = new InputTestHarness();
+      const section = h.node('section', UiNodeType.Column);
+      const list = h.node('list', UiNodeType.ScrollView, { width: 200, height: 100 });
+      const tall = h.node('tall', UiNodeType.Box, { width: 200, height: 600, flexShrink: 0 });
+      h.add(list, tall);
+      h.add(section, list);
+      h.add(h.root, section);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // The band along the right edge, whether or not the bar is
+      // showing: `scrollbarZoneAt` walks the same tree with the same
+      // early-out, and a scrollbar is always inside its container's
+      // box, which is what a clipping node's bounds are.
+      expect(tester.scrollbarZoneAt(196, 50)).toEqual({ node: list, axis: 'y' });
+      expect(tester.scrollbarZoneAt(100, 50)).toBeNull();
     });
   });
 });

@@ -166,6 +166,19 @@ export class LayoutRecord {
    */
   paintOrder: UiNode[] | null = null;
 
+  /**
+   * A box around everything in this node's subtree that could take a
+   * point, filled in by `LayoutEngine.subtreeBoundsFor` and read by
+   * hit testing to pass whole subtrees over. Never smaller than the
+   * true hit area, and unbounded where it cannot promise that; see
+   * `SubtreeBounds`, which is the read view of these five.
+   */
+  boundsMinX = 0;
+  boundsMinY = 0;
+  boundsMaxX = 0;
+  boundsMaxY = 0;
+  boundsUnbounded = true;
+
   /** Effective scroll offset of a scroll container. */
   scrollX = 0;
   scrollY = 0;

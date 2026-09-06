@@ -19,6 +19,8 @@ import { placeGridItems, sizeGridTracks } from './GridLayout';
 import type { GridContribution, GridItemRequest, GridPlacement, GridTrackSizingResult } from './GridLayout';
 import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { LayoutRecord } from './LayoutRecord';
+import { fillSubtreeBounds } from './SubtreeBounds';
+import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer } from './TextMeasurer';
 import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
 import { accumulatedOffsetTo } from './LayoutTransform';
@@ -193,6 +195,20 @@ export class LayoutEngine {
   private layoutPass = 0;
   private layoutRoot: UiNode | null = null;
   private rootConstraints: Constraints = Constraints.unbounded();
+  /**
+   * Bumped by anything that can move where a node is hit: every box
+   * written, every pass that did any work at all, and every sticky
+   * shift that came out different. Subtree bounds are a summary of the
+   * records, and this is what keeps them from outliving the records
+   * they summarise.
+   *
+   * A pass that changes nothing leaves it alone, which is the whole
+   * point: a pointer crossing a still tree re-uses the same bounds
+   * from the first move to the last.
+   */
+  private layoutVersion = 0;
+  /** The version `subtreeBounds` on the records was filled from. */
+  private boundsVersion = -1;
 
   constructor(textMeasurer: TextMeasurer = new CharacterCountTextMeasurer()) {
     this.textMeasurer = textMeasurer;
@@ -203,6 +219,33 @@ export class LayoutEngine {
   // ---------------------------------------------------------------------------
 
   recordFor(node: UiNode): LayoutRecord | undefined {
+    return this.records.get(node);
+  }
+
+  /**
+   * A box around everything in a node's subtree that could take a
+   * point, so a hit test can pass the subtree over instead of
+   * descending into it. Undefined for a node with no record, and
+   * `boundsUnbounded` where no honest box exists (see `SubtreeBounds`).
+   *
+   * The bounds are computed for the whole tree at once, on the first
+   * ask after anything moved, rather than kept up to date as layout
+   * runs. That is not laziness for its own sake: an incremental pass
+   * re-places only from a relayout boundary downwards, and a boundary
+   * is any node whose container fixed its size, not just a clipping
+   * one, so a descendant can move and grow past the cached bounds of
+   * ancestors that were never re-placed. Filling every record from one
+   * walk over boxes that have all settled cannot get that wrong, and
+   * it costs four number reads a node on the frames where layout
+   * changed rather than a walk of the tree on every pointer move.
+   */
+  subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined {
+    if (this.boundsVersion !== this.layoutVersion) {
+      this.boundsVersion = this.layoutVersion;
+      if (this.layoutRoot !== null) {
+        fillSubtreeBounds(this.layoutRoot, this.records);
+      }
+    }
     return this.records.get(node);
   }
 
@@ -487,6 +530,7 @@ export class LayoutEngine {
 
   layout(node: UiNode, constraints: Constraints): LayoutResult {
     this.layoutPass++;
+    this.layoutVersion++;
     this.layoutRoot = node;
     this.rootConstraints = constraints;
     this.records.clear();
@@ -554,6 +598,21 @@ export class LayoutEngine {
         this.markLayoutDirty(node, (flags & DirtyFlags.Layout) === 0);
       }
       if ((flags & DirtyFlags.Transform) !== 0) {
+        // A transform is the one thing a hit test reads straight off
+        // the node rather than off the record, so a node that has just
+        // been given one is drawn and hit somewhere its cached subtree
+        // bounds never described. Asking whether it has one now is
+        // what keeps the far more common member of this flag, a scroll
+        // offset changing, from throwing the bounds away every frame a
+        // list is scrolled: a scroll container clips, so its bounds are
+        // its own box whatever its offset, and its descendants keep
+        // their pre-scroll coordinates. A node that has just *lost* its
+        // transform is left alone for the same reason it is safe to:
+        // its bounds say unbounded, which only costs a descent.
+        const transform = node.properties.get('transform');
+        if (typeof transform === 'object' && transform !== null) {
+          this.layoutVersion++;
+        }
         this.record(node).transformDirty = true;
         (node.type === UiNodeType.EditableText ? this.textScrollNodes : this.scrollNodes).add(node);
         // An anchored node sits next to something that may just have
@@ -570,6 +629,12 @@ export class LayoutEngine {
       return;
     }
 
+    // Every box a pass writes bumps the version on its own, but a pass
+    // can also change what a box means without moving it: a node that
+    // stops clipping starts letting its children be hit outside it,
+    // and its cached bounds are its own box. Work was done, so the
+    // summary of it is thrown away.
+    this.layoutVersion++;
     this.relayout(constraints);
     this.applyScroll();
     this.replaceMovedAnchored();
@@ -3014,8 +3079,14 @@ export class LayoutEngine {
         this.stickyShifted.add(node);
       }
     }
-    if (this.stickyShifted.size > 0 && this.anchorOf.size > 0) {
-      this.followStickyShifts();
+    if (this.stickyShifted.size > 0) {
+      // A shift moves a node, and everything under it, without moving
+      // a box, so nothing else here would tell the subtree bounds that
+      // the tree they summarise has changed shape.
+      this.layoutVersion++;
+      if (this.anchorOf.size > 0) {
+        this.followStickyShifts();
+      }
     }
   }
 
@@ -3375,6 +3446,12 @@ export class LayoutEngine {
       rec.width = width;
       rec.height = height;
       rec.placeDirty = true;
+      // Subtree bounds are a summary of these four numbers, so this is
+      // the one place that can promise they are never stale: a box
+      // written after a pass has ended, by an overlay following the
+      // anchor it hangs off, invalidates them just as one written
+      // inside the pass does.
+      this.layoutVersion++;
       // Anything anchored to this node was placed against the box it
       // had a moment ago and has to be placed again. A box that did not
       // move asks nothing, and a tree with no anchored node at all does

@@ -1,6 +1,7 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from '../layout/LayoutRecord';
+import type { SubtreeBounds } from '../layout/SubtreeBounds';
 import { isNodeHitTestable, isNodeInert } from './UiInteraction';
 import { pointInBox, scrollbarThumb, scrollbarZoneAt, type ScrollbarAxis } from '../layout/Scrollbars';
 
@@ -23,6 +24,20 @@ export interface HitTestLayoutReader {
    * tested where the tree puts it. `LayoutEngine` keeps one.
    */
   readonly lifted?: ReadonlySet<UiNode>;
+  /**
+   * A box around everything in a node's subtree that could take a
+   * point, in the space the node's own record lives in, so that a
+   * subtree the point falls outside of is passed over rather than
+   * descended into.
+   *
+   * Optional for the same reason `lifted` is: a reader that cannot
+   * summarise its geometry offers none, and the walk descends into
+   * everything, which is what it did before bounds existed. The
+   * summary is only ever allowed to be too large, so a reader that
+   * offers one changes how long a hit test takes and never what it
+   * answers.
+   */
+  subtreeBoundsFor?(node: UiNode): SubtreeBounds | undefined;
 }
 
 export interface UiPoint {
@@ -51,11 +66,13 @@ export interface HitTestResult {
 /**
  * Abstraction over hit testing.
  *
- * The initial implementation is a reverse-paint-order tree walk
- * (O(n) worst case, but only the nodes on the pointer path are
- * descended). Later implementations could back this interface with
- * a spatial hash, an R-tree, a grid, or GPU picking without the
- * pointer pipeline changing.
+ * The initial implementation is a reverse-paint-order tree walk. It
+ * is O(n) in the worst case, and close to the depth of the pointer
+ * path in the ordinary one: a subtree whose bounds the point falls
+ * outside of is passed over, when the reader offers bounds at all.
+ * Later implementations could back this interface with a spatial
+ * hash, an R-tree, a grid, or GPU picking without the pointer
+ * pipeline changing.
  */
 export interface HitTester {
   hitTest(x: number, y: number): HitTestResult | null;
@@ -105,6 +122,13 @@ interface TransformScratch {
  * paint on top of the parent's background. No per-node allocations
  * happen on the traversal path; a result object is produced only
  * when a hit is found.
+ *
+ * The walk descends into a child only when the point is inside the
+ * bounds of that child's subtree, which is what stops a list of a
+ * thousand rows costing a thousand descents for a point in one of
+ * them. Those bounds come from the layout reader and are conservative
+ * by construction, so they change how much of the tree is visited and
+ * never which node comes back.
  */
 export class UiHitTester implements HitTester {
   private readonly point: TransformScratch = { x: 0, y: 0 };
@@ -423,6 +447,9 @@ export class UiHitTester implements HitTester {
 
     // Non-clipping nodes let children paint outside them, so children
     // are tested regardless of whether the point falls inside the box.
+    // What keeps that from meaning "every node in the tree, on every
+    // pointer move" is the bounds check in `hitTestChildren`, which
+    // knows how far outside the box the children actually reach.
     if (this.hitTestChildren(node, px, py)) {
       return true;
     }
@@ -441,7 +468,7 @@ export class UiHitTester implements HitTester {
     const order = this.layout.recordFor(parent)?.paintOrder;
     if (order !== null && order !== undefined) {
       for (let i = order.length - 1; i >= 0; i--) {
-        if (this.hitTestNode(order[i], x, y)) {
+        if (!this.outsideSubtree(order[i], x, y) && this.hitTestNode(order[i], x, y)) {
           return true;
         }
       }
@@ -449,16 +476,38 @@ export class UiHitTester implements HitTester {
     }
     for (let child = parent.lastChild; child !== null; child = child.previousSibling) {
       if (child.type === UiNodeType.Fragment) {
+        // A fragment has no record and so no bounds of its own; its
+        // children carry theirs, and are checked one by one below.
         if (this.hitTestChildren(child, x, y)) {
           return true;
         }
         continue;
       }
-      if (this.hitTestNode(child, x, y)) {
+      if (!this.outsideSubtree(child, x, y) && this.hitTestNode(child, x, y)) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Whether a subtree can be passed over without being descended into.
+   *
+   * This is the only thing standing between a pointer move and a walk
+   * of the whole tree, and it is allowed to be wrong in exactly one
+   * direction: a box that is too large costs a descent that finds
+   * nothing, and a box that is too small loses a click at a position
+   * where something is visibly drawn. The reader is what promises that
+   * (see `SubtreeBounds`); here the edges are compared inclusively, so
+   * a point exactly on one is descended into and left for the node's
+   * own half-open box test to reject.
+   */
+  private outsideSubtree(node: UiNode, x: number, y: number): boolean {
+    const bounds = this.layout.subtreeBoundsFor?.(node);
+    if (bounds === undefined || bounds.boundsUnbounded) {
+      return false;
+    }
+    return x < bounds.boundsMinX || x > bounds.boundsMaxX || y < bounds.boundsMinY || y > bounds.boundsMaxY;
   }
 
   private recordHit(node: UiNode, rec: LayoutRecord, px: number, py: number): boolean {
