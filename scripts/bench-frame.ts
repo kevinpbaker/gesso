@@ -59,7 +59,16 @@ interface List {
   titles: UiNode[];
 }
 
-/** A list of `rows` rows: artwork, then a column of two text lines. */
+/**
+ * A list of `rows` rows: artwork, then a column of two text lines.
+ *
+ * Modelled on a real one, Segue's `ItemRow`, down to the detail that
+ * decides how much colour work a frame does: every colour is written
+ * as a hex string, because that is what an application's palette is.
+ * A palette name would be looked up in the theme instead and never
+ * reach the parser, so a tree of palette names would measure a
+ * different program from the one people run.
+ */
 function buildList(rows: number): List {
   const graph = new UiGraph();
   const root = graph.createNode('list', UiNodeType.Column);
@@ -72,14 +81,15 @@ function buildList(rows: number): List {
     row.setProperty('height', 56);
     row.setProperty('padding', 8);
     row.setProperty('gap', 8);
+    row.setProperty('borderRadius', 10);
     row.setProperty('backgroundColor', '#ffffff');
     graph.appendChild(root, row);
 
     const artwork = graph.createNode(`artwork-${i}`, UiNodeType.Box);
     artwork.setProperty('width', 40);
     artwork.setProperty('height', 40);
-    artwork.setProperty('backgroundColor', '#cccccc');
-    artwork.setProperty('borderRadius', 4);
+    artwork.setProperty('backgroundColor', '#e9e2d6');
+    artwork.setProperty('borderRadius', 6);
     graph.appendChild(row, artwork);
 
     const lines = graph.createNode(`lines-${i}`, UiNodeType.Column);
@@ -89,12 +99,13 @@ function buildList(rows: number): List {
     const title = graph.createNode(`title-${i}`, UiNodeType.Text);
     title.setProperty('text', `Track number ${i}`);
     title.setProperty('fontSize', 14);
+    title.setProperty('color', '#16181d');
     graph.appendChild(lines, title);
 
     const artist = graph.createNode(`artist-${i}`, UiNodeType.Text);
     artist.setProperty('text', `Artist ${i}`);
     artist.setProperty('fontSize', 12);
-    artist.setProperty('color', '#666666');
+    artist.setProperty('color', '#6f675c');
     graph.appendChild(lines, artist);
 
     nodes.push(row, artwork, lines, title, artist);
@@ -270,20 +281,35 @@ function paintSection(): void {
   }
 }
 
+/**
+ * One Canvas2D walk, twice: once at a real viewport and once at a
+ * viewport tall enough to hold the whole list.
+ *
+ * The two measure opposite halves of the walk and both are worth
+ * having. At a real viewport almost every row is culled, so what is
+ * timed is how cheaply the walk says no, which is the case an
+ * application is in for all but a screenful of any list it shows. With
+ * nothing culled every node is resolved and drawn, so what is timed is
+ * the paint path itself: the state resolution, the colour formatting,
+ * the text. A change that helps one of these can easily do nothing for
+ * the other, and reading only the first would have hidden that.
+ */
 function renderSection(): void {
   console.log('render');
-  {
+  for (const culled of [true, false]) {
     const { root } = buildList(ROWS);
+    const height = culled ? VIEWPORT_HEIGHT : ROWS * 56 + 1;
     const measurer = new CharacterCountTextMeasurer();
     const engine = new LayoutEngine(measurer);
-    engine.layout(root, Constraints.tight(VIEWPORT_WIDTH, VIEWPORT_HEIGHT));
+    root.setProperty('height', height);
+    engine.layout(root, Constraints.tight(VIEWPORT_WIDTH, height));
     const surface = new CanvasSurface(new NullCanvasHost(new NullCanvasContext()));
-    surface.setLogicalSize(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 1);
+    surface.setLogicalSize(VIEWPORT_WIDTH, height, 1);
     const renderer = new Canvas2DRenderer({ surface });
     // Far in the future, so the overlay scrollbars have faded and what
     // is timed is the scene alone.
     const context = { layout: engine, text: measurer, now: Number.MAX_SAFE_INTEGER };
-    measure('canvas2d walk', ITERATIONS, () => {
+    measure(culled ? 'canvas2d walk, mostly culled' : 'canvas2d walk, nothing culled', ITERATIONS, () => {
       renderer.render(root, context);
     });
   }
