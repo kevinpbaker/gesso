@@ -5,6 +5,8 @@ import { map } from 'rxjs/operators';
 import { percent } from '@gesso/core';
 import { input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
 
+import { isStill } from '../still';
+
 const BARS = 28;
 const STEP_MS = 40;
 
@@ -40,6 +42,11 @@ export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx:
   let ticking: Subscription | undefined;
 
   ctx.onMount(() => {
+    if (isStill()) {
+      // The sweep is the one thing on this page a screenshot could
+      // never catch twice the same way, so it does not start.
+      return;
+    }
     ticking = interval(STEP_MS).subscribe(() => {
       const now = performance.now();
       if (previous !== null) {

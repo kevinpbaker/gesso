@@ -2,6 +2,8 @@ import { percent, type UiVideoSurface, type VideoPlayback, type VideoResolver } 
 import { Video } from '@gesso/components';
 import type { ComponentContext, Inputs } from '@gesso/framework';
 
+import { isStill } from '../still';
+
 // #region playback
 /** The surface as its producer sees it: the same object, a new frame. */
 interface MutableSurface {
@@ -156,7 +158,18 @@ export function Player(_inputs: Inputs<{}>, _ctx: ComponentContext) {
     <column gap={16} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={16}>
         <column gap={6}>
-          <Video src="loop.clip" alt="A generated clip, playing" width={200} height={112} borderRadius={8} />
+          <Video
+            src="loop.clip"
+            alt="A generated clip, playing"
+            width={200}
+            height={112}
+            borderRadius={8}
+            // Ordinarily this prop is not written at all, and the clip
+            // plays. `isStill` is this site's screenshot flag, and a
+            // video that does not autoplay is a video holding its first
+            // frame, which is what a gate can photograph.
+            autoplay={!isStill()}
+          />
           <text text="loop and autoplay: the defaults" fontSize={12} color="textMuted" />
         </column>
         <column gap={6}>

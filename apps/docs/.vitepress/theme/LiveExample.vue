@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
 import { createApp, type WorkerApp } from '@gesso/framework';
+import { workerName } from '../../src/still';
 import { embeddedAppOptions } from './embeddedApp';
 
 /**
@@ -26,6 +27,11 @@ import { embeddedAppOptions } from './embeddedApp';
  *     history lives: an example with routes navigates a history of
  *     its own and never the site's address bar.
  *
+ * `?still` on the page's url asks every example on it to hold a frame,
+ * so a screenshot gate has something to photograph. A worker has no
+ * url of its own, so the flag crosses as the worker's name; see
+ * `src/still.ts`.
+ *
  * The appearance is handed over rather than left to the platform. A
  * Gesso shell follows `prefers-color-scheme` on its own, but this
  * site's toggle *overrides* the OS, since a reader on a light system
@@ -38,7 +44,7 @@ import { embeddedAppOptions } from './embeddedApp';
 // prop takes either and the style interpolates whichever it got.
 const props = withDefaults(defineProps<{ id: string; height?: number | string }>(), { height: 240 });
 
-type WorkerModule = { default: new () => Worker };
+type WorkerModule = { default: new (options?: WorkerOptions) => Worker };
 
 const modules = import.meta.glob('../../src/examples/*Worker.ts', { query: '?worker' }) as Record<
   string,
@@ -81,7 +87,7 @@ onMounted(async () => {
   try {
     app = createApp(
       embeddedAppOptions({
-        renderWorker: () => new ExampleWorker(),
+        renderWorker: () => new ExampleWorker({ name: workerName() }),
         colorScheme: isDark.value ? 'dark' : 'light',
         onError: message => {
           failure.value = message;

@@ -6,6 +6,7 @@ import { createApp, createComponent, type WorkerApp } from '@gesso/framework';
 import { exampleRoot } from '../../src/examples/ExampleRoot';
 import { Pulse } from '../../src/examples/PulseExample';
 import PulseWorker from '../../src/examples/PulseExampleWorker?worker';
+import { workerName } from '../../src/still';
 
 /**
  * The same application, twice, on two different threads, with a button
@@ -26,6 +27,11 @@ import PulseWorker from '../../src/examples/PulseExampleWorker?worker';
  * itself and paints its own worst frame gap, because a reading that had
  * to cross to the main thread could not be trusted while the main
  * thread is the thing being blocked.
+ *
+ * `?still` stops both sweeps, so the home page can be photographed.
+ * The right-hand copy runs here and reads the flag off the url; the
+ * left-hand one is in a worker and reads it off its own name, which is
+ * why the worker is named at construction. See `src/still.ts`.
  */
 const props = withDefaults(defineProps<{ scheme?: 'auto' | 'light' | 'dark' }>(), {
   scheme: 'auto'
@@ -67,7 +73,7 @@ onMounted(() => {
   const colorScheme = scheme();
   try {
     worker = createApp({
-      renderWorker: () => new PulseWorker(),
+      renderWorker: () => new PulseWorker({ name: workerName() }),
       colorScheme,
       onError: message => {
         failure.value = message;

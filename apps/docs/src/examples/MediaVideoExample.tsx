@@ -3,6 +3,7 @@ import { map } from 'rxjs/operators';
 import { percent, videoSource, type UiVideoSurface, type VideoPlayback, type VideoResolver } from '@gesso/core';
 import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
 
+import { isStill } from '../still';
 import { HOVER_CONTROL } from './interaction';
 
 /** The clip is generated, so the name is not a URL. Any string a resolver understands will do. */
@@ -181,13 +182,20 @@ export function MediaVideo(inputs: Inputs<{ resolver?: VideoResolver }>, _ctx: C
   const status = internalState<'loading' | 'playing' | 'failed'>('loading');
   const second = internalState(true);
 
+  // `autoplay` is left out of an ordinary app, and the clip plays.
+  // `isStill` is this site's screenshot flag: not autoplaying is what
+  // holds a video on its first frame, and both views take the same
+  // answer because they share one playback.
+  const playing = !isStill();
+
   const main = videoSource({
     resolver,
     source: SOURCE,
     loop: true,
+    autoplay: playing,
     onState: next => (status.value = next)
   });
-  const thumbnail = videoSource({ resolver, source: SOURCE, loop: true });
+  const thumbnail = videoSource({ resolver, source: SOURCE, loop: true, autoplay: playing });
 
   return (
     <column gap={14} x="center" y="center" width={percent(100)} height={percent(100)} padding={20}>
