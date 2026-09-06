@@ -318,6 +318,19 @@ export function prepareInputSurface(element: HTMLElement): void {
   // ring is not the only one and suppressing it costs nothing a
   // keyboard user can see.
   style.outline = 'none';
+  // The browser's own menu would land directly on top of the
+  // `ContextMenu` event the runtime dispatches for the same press,
+  // which is the mistake `-webkit-touch-callout` above was added to
+  // stop iOS making. Registered on the element rather than removed on
+  // detach for the same reason the styles are written and never
+  // unwritten: the surface is the application's, and the listener
+  // stops existing when the element does.
+  element.addEventListener('contextmenu', suppressContextMenu);
+}
+
+/** Keeps the platform menu out of the way of the framework's own. */
+function suppressContextMenu(event: Event): void {
+  event.preventDefault();
 }
 
 /**

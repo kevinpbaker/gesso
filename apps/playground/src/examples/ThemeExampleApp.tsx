@@ -13,6 +13,7 @@ import {
   boxShadow,
   type UiBoxShadow,
   colorToHex,
+  lightTheme,
   parseColor,
   type UiColor,
   type UiTextStyle
@@ -323,6 +324,7 @@ export function buildTheme(spec: ThemeSpec): UiTheme {
     selectionForeground: text
   };
   return {
+    ...lightTheme,
     colors,
     typography: typographyFor(colors, spec.textSize),
     shapes: shapesFor(spec.corners),

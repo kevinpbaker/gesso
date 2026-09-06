@@ -76,6 +76,12 @@ export const ROUTES: readonly RouteMeta[] = [
     parent: 'examples'
   },
   {
+    id: 'example-paint',
+    label: 'Painting',
+    title: 'Example · a paint hook and vector paths, on both renderers',
+    parent: 'examples'
+  },
+  {
     id: 'example-transitions',
     label: 'Transitions',
     title: 'Example · shared elements across a route change, and a video that keeps playing',

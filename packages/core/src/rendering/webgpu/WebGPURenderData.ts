@@ -21,6 +21,7 @@ import { gradientPaint, MAX_GRADIENT_STOPS, type ResolvedGradient } from '../../
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
+import { paintPictures } from '../PaintPicture';
 import { toPhysicalPixels } from './WebGPUSurface';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
@@ -328,7 +329,7 @@ export function createTextCache(): RenderTextCache {
  * Builds a CPU-side render list from the retained UI tree.
  *
  * One ordered command list holds fills, borders, glyphs and images in
- * paint order — background, image, border, decorations, children,
+ * paint order — background, image, picture, border, decorations, children,
  * text, the decorations marked `after: 'children'`, then the node's
  * scrollbars — exactly as the Canvas2D renderer paints them.
  * Primitive instances are batched into one command until the scissor
@@ -719,6 +720,44 @@ export function buildRenderList(
           source: textureSource,
           drawWidth: rect.width * scaleX,
           drawHeight: rect.height * scaleY
+        });
+      }
+    }
+
+    /**
+     * A painted node's picture: one textured quad the size of the box,
+     * where the Canvas2D backend puts its one `drawImage`.
+     *
+     * The bitmap is the same object that backend draws, from the same
+     * cache, so the two cannot disagree about what a painter drew.
+     * What remains for the parity gate to check is what a backend
+     * could still get wrong on its own: the box, the place in paint
+     * order, the clip and the opacity. See `PaintPicture.ts`.
+     */
+    if (node.type === UiNodeType.Paint) {
+      const picture = paintPictures.pictureFor(node, rec, dpr);
+      if (picture !== undefined) {
+        closePrimitives();
+        const instance = pushTextured(
+          texturedData,
+          rec.x,
+          rec.y,
+          rec.width,
+          rec.height,
+          effectiveOpacity,
+          nodeCtm,
+          ownRounded,
+          FULL_TEXTURE
+        );
+        commands.push({
+          kind: CommandKind.Image,
+          instance,
+          scissor: ownScissor,
+          source: picture,
+          // The picture was rasterised at exactly this size, so the
+          // texture cache has nothing to gain by copying it smaller.
+          drawWidth: rec.width * dpr,
+          drawHeight: rec.height * dpr
         });
       }
     }

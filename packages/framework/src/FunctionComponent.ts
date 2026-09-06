@@ -1,6 +1,7 @@
-import type { Observable } from 'rxjs';
+import type { Observable, Subscription } from 'rxjs';
 
 import type { Reactive, UiChild } from '@gesso/core';
+import type { BoundsCell } from './bounds';
 import { Component } from './Component';
 import type { InputCell, OutputTarget } from './Input';
 import type { ChannelReplica } from './channel/ChannelReplica';
@@ -39,6 +40,43 @@ export interface ComponentContext {
    * function runs.
    */
   onUnmount(hook: () => void): void;
+
+  /**
+   * Follows a stream for as long as the component is in the tree.
+   *
+   * A component that has to *act* on a value rather than draw it —
+   * telling the audio element to load a track, asking a channel for the
+   * page a url names, writing a scroll offset somewhere — subscribes,
+   * and something has to unsubscribe. Every screen in both applications
+   * wrote that pair by hand, and one of them had grown a `Subscription`
+   * bag to hold four of them.
+   *
+   *   ctx.effect(queue.view.current, track => audio.load(track.stream));
+   *
+   * The subscription is the host's and is torn down with the component,
+   * after `onUnmount` has run, in the order the host tears down every
+   * subscription it opened on the component's behalf. It is handed back
+   * for the rare case that wants to stop early; nothing has to hold it.
+   *
+   * Unlike `onMount` and `onUnmount` this may be called after the body,
+   * from a callback the component registered, since what it registers
+   * is a teardown rather than a hook that has already been run past.
+   */
+  effect<T>(source: Observable<T>, run: (value: T) => void): Subscription;
+
+  /**
+   * A cell holding a node's box, with the modifier that fills it.
+   *
+   * Turning a pointer position into a fraction of a track, or a drag
+   * into a seek, starts with knowing where the element is, and until
+   * now that meant declaring `new BehaviorSubject<LayoutBox>` with a
+   * zero box in it and passing it to `measure`. This is that, named,
+   * and it drops a report of a box that has not moved.
+   *
+   *   const track = ctx.bounds();
+   *   <box modifiers={[track.modifier]} onPointerDown={e => seek(e.x - track.value.x)} />
+   */
+  bounds(label?: string): BoundsCell;
 }
 
 /**
@@ -48,10 +86,19 @@ export interface ComponentContext {
  * The parent supplies values or Observables; the host feeds them into
  * these cells and keeps feeding them when the parent's values change,
  * so the function can run exactly once, like a class `render()`, and
- * still follow its parent. An optional input is a cell whose value may
- * be `undefined`; `input(inputs.name, fallback)` gives it a default. An
- * output is fired with `inputs.onChange.emit(next)`, and a parent may
- * pass a handler or `into(subject)` for it.
+ * still follow its parent. An output is fired with
+ * `inputs.onChange.emit(next)`, and a parent may pass a handler or
+ * `into(subject)` for it.
+ *
+ * Every declared input is a cell, whether or not the parent passed
+ * anything: the record hands one out on first access and the host keeps
+ * feeding it, so an optional input that was omitted is a live cell
+ * holding `undefined`, and it takes a value if the parent starts
+ * passing one. What it is *not* is a value, so binding it straight to a
+ * property writes `undefined` there and the property draws as though it
+ * had never been set. `input(inputs.name, fallback)` gives it a
+ * default, and `select(inputs.name, ...)` projects one.
+ * `Input.optional.spec.ts` is that case written down.
  */
 export type Inputs<P> = {
   readonly [K in keyof P]-?: InputCell<P[K]>;

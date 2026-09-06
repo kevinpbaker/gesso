@@ -1,4 +1,5 @@
 export { defineModifier, isUiModifier, type UiModifier, type UiModifierKind } from './UiModifier';
+export { bundle, noModifiers, type UiModifierBundle } from './bundle';
 export type { UiModifierHost, UiModifierTeardown } from './UiModifierHost';
 export { UiModifierSet, UiUnknownModifierPropertyError, assertModifierList } from './UiModifierSet';
 export { interactive, hoverable, pressable, measure, BUTTON_INTERACTION, type InteractiveOptions } from './interaction';

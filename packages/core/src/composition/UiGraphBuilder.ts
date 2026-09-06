@@ -244,6 +244,8 @@ export class UiGraphBuilder {
   private warnedAboutDispatcher = false;
   /** The same, for a `transition` with no driver behind it. */
   private warnedAboutAnimations = false;
+  /** The same, for a list that arrived from an observable with no keys on it. */
+  private warnedAboutIndexKeys = false;
 
   constructor(
     private readonly graph: UiGraph,
@@ -329,6 +331,22 @@ export class UiGraphBuilder {
     const existing = this.collectChildren(parent);
     const matched = new Set<UiNode>();
     const unkeyed: UnkeyedMatchState = { existing, cursors: null };
+    if (!this.warnedAboutIndexKeys && definitions.length > 1 && parent.type === UiNodeType.Fragment) {
+      // A list that arrived from an observable and carries no keys is
+      // matched by position, so inserting a row anywhere but the end
+      // shifts every row after it onto a different node: state moves
+      // between rows and an animation runs on the wrong element. The
+      // fallback is silent otherwise, and silence is the defect.
+      // `each` supplies the key; this is the hand-written case.
+      this.warnedAboutIndexKeys = definitions.every(child => this.isIndexKeyed(child));
+      if (this.warnedAboutIndexKeys) {
+        console.warn(
+          `A list of ${definitions.length} children under '${parent.id}' arrived from an observable with no keys, ` +
+            `so it is reconciled by index. Give each child a key, or build the list with \`each\`, ` +
+            `which supplies one: each(items, 'id', item => ...).`
+        );
+      }
+    }
     const result: UiNode[] = [];
     let changed = false;
     let cursor: UiNode | null = parent.firstChild;
@@ -964,6 +982,17 @@ export class UiGraphBuilder {
    */
   private isObservable(value: unknown): value is Observable<unknown> {
     return isObservable(value);
+  }
+
+  /** Whether a child would fall back to its position for identity. */
+  private isIndexKeyed(child: UiChild): boolean {
+    if (isObservable(child)) {
+      return true;
+    }
+    if (isComponentLikeElement(child)) {
+      return child.key === undefined || child.key === null;
+    }
+    return this.elementKey(child) === undefined;
   }
 
   /**

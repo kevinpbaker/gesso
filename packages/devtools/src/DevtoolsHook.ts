@@ -1,5 +1,6 @@
 import type { DevtoolsEvent, DevtoolsRequest } from '@gesso/framework';
-import type { ActionLog } from './ActionLog';
+import { forwardNewEntries, type ActionLog } from './ActionLog';
+import type { DevtoolsPicker } from './NodePicker';
 import {
   windowPagePort,
   type DevtoolsAppInfo,
@@ -46,6 +47,14 @@ export interface ConnectDevtoolsOptions {
    */
   readonly actions?: ActionLog;
   /**
+   * Lets the panel pick a node by clicking the canvas.
+   *
+   * The page's half of picking, because a click has to be taken before
+   * the application sees it and only the page has it in time. See
+   * `createNodePicker`.
+   */
+  readonly picker?: DevtoolsPicker;
+  /**
    * Where the hook lives and where the `postMessage` transport
    * listens. Default: the global window. `null` keeps the hook off any
    * window and installs no transport, for a panel mounted directly.
@@ -73,6 +82,7 @@ export interface HookHost {
 interface Registered {
   readonly info: DevtoolsAppInfo;
   readonly app: DevtoolsApp;
+  readonly picker: DevtoolsPicker | undefined;
   readonly release: () => void;
 }
 
@@ -124,6 +134,14 @@ function createHook(): DevtoolsHook {
       from.post({ type: 'apps', apps: infos() });
       return;
     }
+    if (message.type === 'pick') {
+      // An application registered without a picker simply cannot be
+      // picked from; the panel's toggle then does nothing, which is
+      // better than the panel refusing to show the toggle to some
+      // applications and not others.
+      registered.get(message.app)?.picker?.setEnabled(message.enabled);
+      return;
+    }
     // A request for an application that has gone is dropped: the panel
     // has been sent the new list and will catch up.
     registered.get(message.app)?.app.devtools(message.request);
@@ -138,11 +156,15 @@ function createHook(): DevtoolsHook {
       const info: DevtoolsAppInfo = { id, name: options.name ?? defaultName() };
       app.onDevtools(event => broadcast({ type: 'event', app: id, event }));
       const stopActions = forwardActions(options.actions, entry => broadcast({ type: 'action', app: id, entry }));
+      const picker = options.picker;
+      picker?.onPick(picked => broadcast({ type: 'picked', app: id, id: picked }));
       const release = (): void => {
         app.onDevtools(null);
         stopActions();
+        picker?.onPick(null);
+        picker?.setEnabled(false);
       };
-      registered.set(id, { info, app, release });
+      registered.set(id, { info, app, picker, release });
       broadcast({ type: 'apps', apps: infos() });
       return () => {
         const entry = registered.get(id);
@@ -165,33 +187,9 @@ function createHook(): DevtoolsHook {
   };
 }
 
-/**
- * Sends each new action log entry as it is recorded. The log's
- * `subscribe` says only that something changed, so the sequence number
- * is what tells a new entry from the ones already sent; a `clear`
- * resets it, and a bounded log retiring old entries does not.
- */
+/** Sends each new action log entry as it is recorded, when there is a log to read. */
 function forwardActions(log: ActionLog | undefined, send: (entry: ActionLog['entries'][number]) => void): () => void {
-  if (log === undefined) {
-    return () => {};
-  }
-  // Below the first sequence number, which is zero.
-  let lastSeq = -1;
-  const flush = (): void => {
-    const entries = log.entries;
-    if (entries.length === 0) {
-      lastSeq = -1;
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.seq > lastSeq) {
-        lastSeq = entry.seq;
-        send(entry);
-      }
-    }
-  };
-  flush();
-  return log.subscribe(flush);
+  return log === undefined ? () => {} : forwardNewEntries(log, send);
 }
 
 function defaultWindow(): (WindowLike & HookHost) | null {

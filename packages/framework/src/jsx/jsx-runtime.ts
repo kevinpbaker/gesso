@@ -28,6 +28,8 @@ import {
 import type { Component } from '../Component';
 import type { InputCell } from '../Input';
 import { createComponent } from '../createComponent';
+import { Each } from '../each';
+import { Show } from '../show';
 import type { ClassComponent, ComponentContext, ComponentProps, ComponentType } from '../FunctionComponent';
 
 /**
@@ -142,6 +144,15 @@ export function jsx(type: JSX.ElementType, props: JsxProps | null, key?: string 
   }
   if (typeof type !== 'function') {
     throw new Error(`JSX tag must be an intrinsic name or a component, got ${describe(type)}.`);
+  }
+  if (type === (Each as unknown as JSX.ElementType) || type === (Show as unknown as JSX.ElementType)) {
+    // The two structural tags. Neither mounts a component: each one
+    // returns the observable list of children its parent binds, so
+    // `<Show>` really does add no node and `<Each>` adds no anchor
+    // beyond the one an observable child already has. They take a
+    // function as their child, which is the other reason they cannot
+    // go through `componentProps` below.
+    return (type as unknown as (props: JsxProps) => JSX.Element)({ ...props });
   }
   return createComponent(
     type as ClassComponent,

@@ -22,6 +22,7 @@ import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import { drawOverlayShapes } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
 import { ScaledImageCache } from '../ScaledImageCache';
+import { paintPictures } from '../PaintPicture';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -47,6 +48,7 @@ export interface Canvas2DRendererOptions {
  *
  *   1. background fill   (backgroundColor, rounded rect when radius > 0)
  *   2. background image  (image + objectFit)
+ *   2b. picture          (what a Paint node's `paint`/`path` drew)
  *   3. border            (borderWidth/borderColor)
  *   4. decorations       (what the node's modifiers drew)
  *   5. children          (tree order)
@@ -202,6 +204,9 @@ export class Canvas2DRenderer implements UiRenderer {
 
     this.paintBackground(ctx, rec, paint);
     this.paintImage(ctx, rec, paint);
+    if (node.type === UiNodeType.Paint) {
+      this.paintPicture(ctx, node, rec);
+    }
     this.paintBorder(ctx, rec, paint);
     // Decorations sit beside the border, outside the node's own clip:
     // a focus ring's every pixel lies outside the box that would clip
@@ -449,6 +454,30 @@ export class Canvas2DRenderer implements UiRenderer {
     ctx.clip();
     ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
+  }
+
+  /**
+   * What the node's `paint` or `path` drew, as one image the size of
+   * the box.
+   *
+   * The picture is made by `PaintPicture.ts` when the painter's inputs
+   * move and reused otherwise, so a still frame costs this one
+   * `drawImage` and nothing else. It is drawn at the device scale
+   * rather than at the node's full transform scale, which is what
+   * `PaintSurface` promises a painter: a node a morph is scaling is
+   * resampled for the length of the morph, exactly as a picture on it
+   * would be, instead of being redrawn sixty times.
+   *
+   * The WebGPU backend draws the same bitmap in the same box, because
+   * it asks the same cache for it. That is the whole of the parity
+   * story for a painted node; `decisions/0078` is the argument.
+   */
+  private paintPicture(ctx: Canvas2DContext, node: UiNode, rec: LayoutRecord): void {
+    const picture = paintPictures.pictureFor(node, rec, this.surface.dpr);
+    if (picture === undefined) {
+      return;
+    }
+    ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
   }
 
   /**

@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   Column,
+  Paint,
   Row,
   ScrollView,
   Text,
@@ -11,7 +12,9 @@ import {
   linearGradient,
   percent,
   radialGradient,
-  type DecorationShape
+  type DecorationShape,
+  type UiPaint,
+  type UiPath
 } from '@gesso/core';
 import type { PlaygroundState } from './PlaygroundState';
 
@@ -91,6 +94,59 @@ const CARD_DECORATION: readonly DecorationShape[] = [
  */
 const ROW_DECORATION: readonly DecorationShape[] = [{ kind: 'stroke', color: '#facc15', lineWidth: 2, outset: 3 }];
 
+/**
+ * A painted node for the pixel gate: `EXCELLENCE_ROADMAP.md` X5's
+ * paint hook, exercising a cubic curve, an arc, a dash pattern and an
+ * even-odd fill, none of which either backend can draw as a rectangle.
+ *
+ * It is here because the risk the workstream was written against is
+ * exactly what this gate measures. The unit parity spec compares the
+ * two backends' draw lists; this compares their pixels on a real GPU,
+ * which is the only place a picture that reached one backend and not
+ * the other would show.
+ *
+ * Hoisted, with no `inputs`, so the picture is made once for the life
+ * of the page and the two panes are diffing a still image.
+ */
+const PARITY_PAINT: UiPaint = {
+  draw(surface, box) {
+    surface.beginPath();
+    surface.moveTo(2, box.height - 4);
+    surface.bezierCurveTo(box.width * 0.3, 2, box.width * 0.6, box.height - 2, box.width - 2, 6);
+    surface.strokeColor('#38bdf8');
+    surface.lineWidth(2);
+    surface.lineCap('round');
+    surface.stroke();
+
+    surface.beginPath();
+    surface.arc(box.width / 2, box.height / 2, 14, 0, Math.PI * 1.6);
+    surface.strokeColor('#f472b6');
+    surface.lineWidth(3);
+    surface.lineDash([4, 3]);
+    surface.stroke();
+
+    // A square with a square hole in it, wound the same way, so the
+    // fill rule decides whether there is a hole at all.
+    surface.beginPath();
+    surface.rect(4, 4, 20, 20);
+    surface.rect(9, 9, 10, 10);
+    surface.fillColor('#facc15');
+    surface.fill('evenodd');
+  }
+};
+
+/** The same geometry a `path` prop states rather than draws. */
+const PARITY_PATH: UiPath = {
+  d: 'M12 2 A10 10 0 1 1 11.99 2 Z M8 12 L11 15 L16 8',
+  viewBox: 24,
+  fill: '#1e293b',
+  fillRule: 'evenodd',
+  stroke: '#34d399',
+  strokeWidth: 2,
+  lineCap: 'round',
+  lineJoin: 'round'
+};
+
 function paritySection(state: PlaygroundState): UiElement {
   return Row(
     { gap: 10, y: 'start' },
@@ -148,6 +204,14 @@ function paritySection(state: PlaygroundState): UiElement {
     Box(
       { width: 44, height: 80, y: 'center', x: 'center' },
       Box({ width: 28, height: 28, image: state.icon$, objectFit: 'contain' })
+    ),
+    // The painted tier (X5): a picture drawn by the application, and a
+    // static vector path. Both backends draw the same bitmap, so this
+    // reads zero unless one of them stopped drawing it.
+    Column(
+      { gap: 6 },
+      Paint({ width: 44, height: 44, backgroundColor: '#0f172a', paint: PARITY_PAINT }),
+      Paint({ width: 44, height: 30, path: PARITY_PATH })
     ),
     // A radial gradient with a centre off the middle, in a square box:
     // the other half of F9, and square so it adds no rounded corners to

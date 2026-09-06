@@ -15,6 +15,7 @@ import type {
   ColumnProps,
   EditableTextProps,
   GridProps,
+  PaintElementProps,
   RowProps,
   ScrollViewProps,
   StackProps,
@@ -87,6 +88,23 @@ export function Box(props: BoxProps = {}, ...children: UiChild[]): UiElement {
  */
 export function Stack(props: StackProps = {}, ...children: UiChild[]): UiElement {
   return createElement(UiNodeType.Box, props, children);
+}
+
+/**
+ * Creates a Paint element: a Box the application draws into.
+ *
+ * `paint` is a function given a `PaintSurface`, the resolved box and
+ * the device scale; `path` is a static vector shape stated as a
+ * property. A node may carry either or both, and children stack over
+ * whatever it drew, so a gauge with a label in the middle is one
+ * element with a text child.
+ *
+ * The drawing runs when the painter's `inputs` change and not once per
+ * frame, which is the whole reason `UiPaint` has an `inputs` field.
+ * See `rendering/PaintSurface.ts`.
+ */
+export function Paint(props: PaintElementProps = {}, ...children: UiChild[]): UiElement {
+  return createElement(UiNodeType.Paint, props, children);
 }
 
 /**

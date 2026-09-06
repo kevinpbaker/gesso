@@ -1,7 +1,9 @@
-import { distinctUntilChanged, map, type Observable } from 'rxjs';
+import type { Observable } from 'rxjs';
 
-import { internalState } from '../InternalState';
+import { computed, type ComputedCell } from '../computed';
+import { internalState, type InternalState } from '../InternalState';
 import type { RouteDefinition, RouteTarget } from './RouteDefinition';
+import { RouteState } from './RouteState';
 import {
   buildPath,
   formatUrl,
@@ -72,6 +74,23 @@ export type GoArgs<Path extends string> =
 const MAX_REDIRECTS = 10;
 
 /**
+ * How a route's question and a shared slot's answer are compared, for
+ * `answerFor`.
+ *
+ * Both sides return a string because both sides are naming the same
+ * thing in the application's own words, and a string is the only shape
+ * the router can compare without knowing what the thing is. Whatever
+ * normalising the comparison needs — a case, a trailing slash — is done
+ * in these two functions, where the application knows which it wants.
+ */
+export interface RouteAnswer<Path extends string, T> {
+  /** What this route's params are asking for. */
+  readonly asks: (params: RouteParams<Path>) => string;
+  /** What a value from the slot is an answer about. */
+  readonly answers: (value: NonNullable<T>) => string;
+}
+
+/**
  * Routing, as a service components inject.
  *
  * Every runtime registers one, and it is inert until routes are given
@@ -93,6 +112,13 @@ export class RouterService {
   readonly url = internalState('/');
   /** What that url resolved to, or null when nothing matched. */
   readonly match = internalState<RouteMatch | null>(null);
+  /**
+   * What each route remembers between the times its screen exists.
+   *
+   * Reached through `remember` and `forget`; exposed because a test and
+   * a devtools panel both want to look at it whole.
+   */
+  readonly state = new RouteState();
 
   private routes: readonly RouteDefinition[] = [];
   private notFound: RouteDefinition | undefined;
@@ -176,11 +202,96 @@ export class RouterService {
     return match.params as RouteParams<Path>;
   }
 
-  /** The same, as an observable, for binding a screen's title or fields. */
-  observeParams<Path extends string>(route: RouteDefinition<Path>): Observable<RouteParams<Path> | null> {
-    return this.match.pipe(
-      map(match => (match === null || !match.chain.includes(route) ? null : (match.params as RouteParams<Path>))),
-      distinctUntilChanged<RouteParams<Path> | null>((a, b) => sameParams(a, b))
+  /** The same, as a cell, for binding a screen's title or fields. */
+  observeParams<Path extends string>(route: RouteDefinition<Path>): ComputedCell<RouteParams<Path> | null> {
+    return computed(() => this.params(route), { equal: sameParams, label: 'RouterService.params' });
+  }
+
+  /**
+   * A cell a route keeps while its screen does not exist: a scroll
+   * offset, a keyboard cursor, the text in a filter field.
+   *
+   * A screen is built when its route matches and destroyed when it
+   * stops matching, so a list rebuilt after Back starts at the top
+   * unless somebody remembered where it was. This is where that is
+   * kept, and it is why Back returns to the row a person left rather
+   * than to the top of the list.
+   *
+   *   const scroll = router.remember(Home, 'scroll', 0);
+   *   <scrollview scrollY={scroll} modifiers={[scrollPosition({ … })]}>
+   *
+   * `initial` is used the first time the key is asked for and ignored
+   * afterwards. The cell is scoped to the route, so two screens may
+   * both call their offset `scroll`.
+   *
+   * This is a facility, not an architecture. `decisions/0030` leaves an
+   * application's data to the application, and that has not changed:
+   * what belongs here is the screen-shaped remainder that exists only
+   * to put a screen back where it was. Anything that must survive a
+   * reload, or that another part of the application acts on, is still
+   * state on a channel.
+   */
+  remember<T>(route: RouteDefinition, key: string, initial: T): InternalState<T> {
+    return this.state.cell(route, key, initial);
+  }
+
+  /** Drops what a route remembered, so its next screen starts fresh. */
+  forget(route: RouteDefinition): void {
+    this.state.forget(route);
+  }
+
+  /**
+   * A shared slot's value, but only while it is the answer to *this*
+   * route's own parameters.
+   *
+   * The case it exists for is a page loaded across the barrier. A
+   * channel key that holds "the track page" holds whichever track was
+   * asked for last, and a screen arriving during a transition asks for
+   * its own and is handed the previous one until the answer lands. That
+   * is one or two frames of the wrong cover, and it is worse than it
+   * looks: the artwork element mounts carrying the previous track's
+   * shared name, claims it, and never claims its own, so a second trip
+   * between two pages does not animate at all.
+   *
+   *   const track = router.answerFor(Track, page.view.track, {
+   *     asks: params => `/${params.handle}/${params.slug}`.toLowerCase(),
+   *     answers: entry => entry.path.toLowerCase()
+   *   });
+   *
+   * Two things about it are the router's to know rather than the
+   * screen's. It follows the *current* params, so a navigation from one
+   * track to another — which keeps the same screen mounted, since the
+   * chain did not change — asks the new question rather than staying on
+   * the one the body read once. And when the route stops matching the
+   * cell **keeps what it last held** instead of emptying: a screen is
+   * still on screen while it leaves, and a departing page whose artwork
+   * blanks for the last frames of its own fade is the flicker this is
+   * meant to remove, not a new one to add.
+   */
+  answerFor<Path extends string, T>(
+    route: RouteDefinition<Path>,
+    source: Observable<T>,
+    keys: RouteAnswer<Path, T>
+  ): ComputedCell<T | null> {
+    let held: T | null = null;
+    return computed(
+      read => {
+        const params = this.params(route);
+        if (params === null) {
+          // Not showing: either this screen is on its way out, in which
+          // case it keeps its own page, or it was never in.
+          return held;
+        }
+        const value = read(source);
+        held =
+          value === null || value === undefined
+            ? null
+            : keys.answers(value as NonNullable<T>) === keys.asks(params)
+              ? value
+              : null;
+        return held;
+      },
+      { label: `RouterService.answerFor(${route.path})` }
     );
   }
 
@@ -188,11 +299,11 @@ export class RouterService {
    * Whether a route is in the current chain — true for a layout while
    * any of its children shows, which is what a nav item highlights on.
    */
-  isActive(route: RouteDefinition): Observable<boolean> {
-    return this.match.pipe(
-      map(match => match !== null && match.chain.includes(route)),
-      distinctUntilChanged()
-    );
+  isActive(route: RouteDefinition): ComputedCell<boolean> {
+    return computed(() => {
+      const match = this.match.value;
+      return match !== null && match.chain.includes(route);
+    });
   }
 
   /**

@@ -156,6 +156,52 @@ describe('devtools requests', () => {
     expect(events[2]).toEqual({ kind: 'report', id: boxId, report: null });
   });
 
+  it('writes a property on a node the panel named, and puts an inherited one back', () => {
+    // The write half of the addressed channel `decisions/0045`
+    // deferred: `select` names a node to read, `setProp` names one to
+    // change. Through the graph, so the frame that follows is an
+    // ordinary frame.
+    const mounted = mountRuntime(Column({}, Box({ width: 10, height: 10 })));
+    mounted.frame();
+    const box = mounted.runtime.debugRoot().firstChild!;
+
+    mounted.runtime.handleDevtools({ kind: 'setProp', id: box.id, name: 'width', value: 64 });
+    mounted.frame();
+    expect(mounted.runtime.inspectNode(box).box.width).toBe(64);
+
+    // Null removes it, which is how a value the environment or the
+    // layout would otherwise decide is handed back to them.
+    mounted.runtime.handleDevtools({ kind: 'setProp', id: box.id, name: 'width', value: null });
+    mounted.frame();
+    expect(box.getProperty('width')).toBeUndefined();
+
+    // A node that has gone is not an error; the panel has been told.
+    expect(() =>
+      mounted.runtime.handleDevtools({ kind: 'setProp', id: 'nope', name: 'width', value: 1 })
+    ).not.toThrow();
+  });
+
+  it('sends a new snapshot when subscriptions change without the tree changing shape', () => {
+    // What makes a leak visible: the count climbs while the shape
+    // stands still, and `frameChangedTree` sees nothing at all.
+    const width = new BehaviorSubject(10);
+    const mounted = mountRuntime(Column({}, Box({ width, height: 10 })));
+    mounted.frame();
+    const events = attach(mounted);
+    mounted.runtime.handleDevtools({ kind: 'watchTree', enabled: true });
+    expect(events).toHaveLength(1);
+
+    width.next(20);
+    mounted.frame();
+    expect(events).toHaveLength(1);
+
+    mounted.runtime.reload(Column({}, Box({ width, height: width })));
+    mounted.frame();
+
+    const last = events.at(-1);
+    expect(last?.kind === 'tree' && last.tree.subscriptions).toBeGreaterThan(1);
+  });
+
   it('outlines a highlighted node without the layout inspector being on, and clears it', () => {
     const mounted = mountRuntime(Column({}, Box({ width: 10, height: 10 })));
     mounted.frame();

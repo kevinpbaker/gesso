@@ -4,7 +4,13 @@ import { Heavy } from '../HeavyWork';
 import { Ticker } from '../TickerChannel';
 import { mountShell, type AppShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
-import { createActionLog, mountActionLogPanel, mountFrameProfiler, mountNodeInspector } from '@gesso/devtools';
+import {
+  createActionLog,
+  createNodePicker,
+  mountActionLogPanel,
+  mountFrameProfiler,
+  mountNodeInspector
+} from '@gesso/devtools';
 import { addInspectAction, addProfileAction, addToggleAction } from '../shell/InspectorPanel';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 import { workerName } from '../shell/still';
@@ -43,13 +49,14 @@ interface FrameMetrics {
  * Compare with #framework-sync, which runs the same app on the main
  * thread and visibly stalls.
  *
- * No action log here, and the reason is the thread model rather than an
- * omission. A channel's ports are made where the replicas are, which in
- * this configuration is the render worker; the shell holds neither end
- * and never sees a patch, deliberately. Tapping one from here would
- * mean routing every patch through the shell to watch it go past, which
- * is the opposite of what this route exists to demonstrate. See
- * `decisions/0047-store-action-log.md`.
+ * The action log is not here, and that is still the thread model
+ * rather than an omission: a channel's ports are made where the
+ * replicas are, which in this configuration is the render worker, and
+ * the shell holds neither end. What changed is that the log now runs
+ * where those ports are. `FrameworkWorker.ts` taps them there and
+ * posts what it records to the panel, so the shell is no more in the
+ * way of a patch than it was. See `decisions/0047-store-action-log.md`
+ * and the record for X15.
  */
 export function mountFrameworkRoute(host: HTMLElement): () => void {
   const shell = mountShell(host, { routeId: 'framework', metrics: true });
@@ -60,6 +67,12 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
   const profiler = mountFrameProfiler(shell.preview);
   const errors = mountRouteErrors(shell);
   let inspecting = false;
+  // The panel's "Pick": a click on the canvas selects the node under
+  // it instead of reaching the application. What it pins is whatever
+  // the inspector last reported as hovered, which arrives here through
+  // `onInspect` in both configurations.
+  let hovered: string | null = null;
+  const picker = createNodePicker({ host: shell.preview, hovered: () => hovered });
   // Spawned once for the route, not once per mount. Switching renderer
   // below disposes the app and builds a new one; an application worker
   // owned by that lifetime would restart for a reason that has nothing
@@ -90,14 +103,17 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
       onError: errors.report,
       // The report is built in the worker, where the tree is; it
       // crosses as plain data.
-      onInspect: inspection => inspectorPanel.set(inspection)
+      onInspect: inspection => {
+        hovered = inspection?.id ?? null;
+        inspectorPanel.set(inspection);
+      }
     });
     shell.setStatus(`Starting the render worker on ${describeRenderer(renderer)}…`);
     const dispose = app.mount(shell.preview);
     if (inspecting) {
       app.setInspector(true);
     }
-    const disconnectDevtools = connectRouteDevtools(app, 'framework');
+    const disconnectDevtools = connectRouteDevtools(app, 'framework', { picker });
     return {
       dispose: () => {
         disconnectDevtools();
@@ -125,6 +141,7 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     app.dispose();
     // Ours to stop, since the route spawned it.
     applicationWorker.terminate();
+    picker.dispose();
     inspectorPanel.dispose();
     profiler.dispose();
     errors.dispose();
@@ -151,6 +168,8 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   // Kept across a renderer switch the way `inspecting` is, so a toggle
   // that is on stays on when the app underneath it is rebuilt.
   let logging = false;
+  let hovered: string | null = null;
+  const picker = createNodePicker({ host: shell.preview, hovered: () => hovered });
 
   const start = (
     renderer: RendererChoice
@@ -185,7 +204,10 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
         report(metrics);
         profiler.report(metrics);
       })
-      .onInspect(inspection => inspectorPanel.set(inspection))
+      .onInspect(inspection => {
+        hovered = inspection?.id ?? null;
+        inspectorPanel.set(inspection);
+      })
       // The two the runtime swallows on this thread as well: a
       // renderer that cannot draw, and a listener that threw. An
       // exception nothing catches needs no wiring here — it is an
@@ -198,7 +220,7 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     }
     // The one route whose action log the panel can show: the log is
     // here, on the ports, and the panel is sent each entry.
-    const disconnectDevtools = connectRouteDevtools(builder, 'framework-sync', actions);
+    const disconnectDevtools = connectRouteDevtools(builder, 'framework-sync', { actions, picker });
     return {
       dispose: () => {
         disconnectDevtools();
@@ -231,6 +253,7 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
   return () => {
     closeDevtools();
     app.dispose();
+    picker.dispose();
     inspectorPanel.dispose();
     profiler.dispose();
     errors.dispose();

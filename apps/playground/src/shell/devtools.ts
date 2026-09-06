@@ -1,5 +1,5 @@
 import { connectDevtools, createDirectPorts, getDevtoolsHook, mountDevtoolsPanel } from '@gesso/devtools';
-import type { ActionLog, DevtoolsApp } from '@gesso/devtools';
+import type { ActionLog, DevtoolsApp, DevtoolsPicker } from '@gesso/devtools';
 import type { AppShell } from './AppShell';
 import { addToggleAction } from './InspectorPanel';
 import { findRoute } from './routes';
@@ -49,11 +49,21 @@ export function addDevtoolsAction(shell: AppShell): () => void {
 /**
  * Connects a route's application to the page's devtools hook under the
  * route's title, so the panel names it the way the header does.
+ *
+ * `actions` is for a log that lives in the page; a log in the render
+ * worker sends its own entries over the devtools channel instead.
+ * `picker` is the page's half of click-to-pick, because a click has to
+ * be taken before the application sees it.
  */
-export function connectRouteDevtools(app: DevtoolsApp, routeId: string, actions?: ActionLog): () => void {
+export function connectRouteDevtools(
+  app: DevtoolsApp,
+  routeId: string,
+  extras: { actions?: ActionLog; picker?: DevtoolsPicker } = {}
+): () => void {
   return connectDevtools(app, {
     name: findRoute(routeId)?.title ?? routeId,
-    ...(actions === undefined ? {} : { actions })
+    ...(extras.actions === undefined ? {} : { actions: extras.actions }),
+    ...(extras.picker === undefined ? {} : { picker: extras.picker })
   });
 }
 

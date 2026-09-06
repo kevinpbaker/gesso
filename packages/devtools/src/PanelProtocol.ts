@@ -32,12 +32,31 @@ export type PageMessage =
   | { type: 'apps'; apps: readonly DevtoolsAppInfo[] }
   | { type: 'event'; app: string; event: DevtoolsEvent }
   /** A store action log entry, from an `ActionLog` the application connected alongside itself. */
-  | { type: 'action'; app: string; entry: ActionEntry };
+  | { type: 'action'; app: string; entry: ActionEntry }
+  /**
+   * A node the person clicked on the canvas while the panel was
+   * picking. The panel selects it; the click never reaches the
+   * application.
+   */
+  | { type: 'picked'; app: string; id: string };
 
 /** Panel to page. */
 export type PanelMessage =
   /** "Is anyone there": answered with `apps`. */
-  { type: 'hello' } | { type: 'request'; app: string; request: DevtoolsRequest };
+  | { type: 'hello' }
+  | { type: 'request'; app: string; request: DevtoolsRequest }
+  /**
+   * Turns click-to-pick on or off.
+   *
+   * Not a `DevtoolsRequest`, because it is not a question for the
+   * runtime. Picking is a click that must be taken before the
+   * application sees it, and the only place a click can be taken is
+   * the page, where it arrives; the runtime is a thread away and would
+   * have to be asked to un-dispatch something. So the page answers
+   * this one, and the runtime is asked to `select` the node the page
+   * names, which is a question it already answers.
+   */
+  | { type: 'pick'; app: string; enabled: boolean };
 
 /** One end of a conversation: what it hears and what it says. */
 export interface DevtoolsPort<In, Out> {

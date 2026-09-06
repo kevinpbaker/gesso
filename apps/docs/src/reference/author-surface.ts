@@ -218,6 +218,34 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/guide/cells-and-bindings'
   },
   {
+    name: 'computed',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'A cell that is a function of what it reads. The one derivation to reach for.',
+    page: '/guide/cells-and-bindings'
+  },
+  {
+    name: 'select',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'One field, or one projection, of a cell, as a cell. Structural by default.',
+    page: '/guide/lists-and-conditionals'
+  },
+  {
+    name: 'Each',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'A keyed list: `<Each of={rows} by="id">{row => ...}</Each>`.',
+    page: '/guide/lists-and-conditionals'
+  },
+  {
+    name: 'Show',
+    package: 'framework',
+    group: 'Components and state',
+    what: 'One child while a condition holds, with a stable key and no node of its own.',
+    page: '/guide/lists-and-conditionals'
+  },
+  {
     name: 'UiChild',
     package: 'core',
     group: 'Components and state',
@@ -296,6 +324,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     package: 'core',
     group: 'Modifiers',
     what: 'Hover, press and disabled visual states, plus the cursor that goes with them.',
+    page: '/interaction/modifiers'
+  },
+  {
+    name: 'bundle',
+    package: 'core',
+    group: 'Modifiers',
+    what: 'A set of modifiers named once and attached as one, built at module level.',
     page: '/interaction/modifiers'
   },
   {
@@ -448,6 +483,48 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     group: 'Colour, theme and type',
     what: 'The light theme that ships with the framework.',
     page: '/guide/appearance'
+  },
+  {
+    name: 'defaultSpacing',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: 'The spacing scale a theme carries: eight steps, from `none` to `huge`.',
+    page: '/appearance/themes-and-the-environment'
+  },
+  {
+    name: 'withDensity',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: 'The same theme at another density. Scales the spacing scale and nothing else.',
+    page: '/appearance/themes-and-the-environment'
+  },
+  {
+    name: 'withContrast',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: 'The same theme with every foreground raised to a 7:1 ratio against its ground.',
+    page: '/appearance/themes-and-the-environment'
+  },
+  {
+    name: 'defineThemeExtension',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: "A token group of your own on a theme, typed, with no change to `UiTheme`.",
+    page: '/appearance/themes-and-the-environment'
+  },
+  {
+    name: 'withThemeExtension',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: 'The same theme carrying one extension’s tokens.',
+    page: '/appearance/themes-and-the-environment'
+  },
+  {
+    name: 'themeExtension',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: 'Reads a token group back off a theme, completing on its names.',
+    page: '/appearance/themes-and-the-environment'
   },
   {
     name: 'darkTheme',

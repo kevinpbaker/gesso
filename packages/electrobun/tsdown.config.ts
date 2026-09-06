@@ -13,5 +13,6 @@ export default defineConfig({
   format: 'esm',
   dts: true,
   platform: 'neutral',
+  sourcemap: true,
   clean: true
 });

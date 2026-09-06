@@ -6,11 +6,14 @@
 
 // ==== index.d.ts ====
 import {
+  ActionEntry,
+  ChannelErrorEntry,
   ChannelPort,
+  CommandEntry,
   DevtoolsEvent,
   DevtoolsRequest,
   FrameMetrics,
-  Patch,
+  PatchEntry,
   RuntimeErrorSource,
   UiFramePhase,
   UiNodeReport,
@@ -90,6 +93,8 @@ declare function mountErrorOverlay(host: HTMLElement, options?: ErrorOverlayOpti
 interface ActionLog {
   tap(handle: WorkerHandle, tokens: readonly ActionLogToken[]): WorkerHandle;
   tapPort(port: ChannelPort, token: ActionLogToken): ChannelPort;
+  cause(label: string): () => void;
+  frame(id: number): void;
   readonly entries: readonly ActionEntry[];
   readonly channels: readonly string[];
   readonly pinnedTo: number | null;
@@ -105,26 +110,6 @@ interface ActionLogToken {
 interface ActionLogOptions {
   readonly limit?: number;
 }
-interface EntryBase {
-  readonly seq: number;
-  readonly at: number;
-  readonly channel: string;
-}
-interface CommandEntry extends EntryBase {
-  readonly kind: 'command';
-  readonly command: string;
-  readonly payload: unknown;
-}
-interface PatchEntry extends EntryBase {
-  readonly kind: 'patch';
-  readonly patches: readonly Patch[];
-  readonly keys: readonly string[];
-}
-interface ChannelErrorEntry extends EntryBase {
-  readonly kind: 'error';
-  readonly message: string;
-}
-type ActionEntry = CommandEntry | PatchEntry | ChannelErrorEntry;
 declare function createActionLog(options?: ActionLogOptions): ActionLog;
 interface ActionLogPanel {
   setVisible(visible: boolean): void;
@@ -138,6 +123,12 @@ declare function mountActionLogPanel(host: HTMLElement, log: ActionLog, options?
 declare function describeActionEntry(entry: ActionEntry): string;
 declare function renderNodeReport(doc: Document, report: UiNodeReport): HTMLElement[];
 declare const NODE_REPORT_STYLES = "\nh1 { margin: 0 0 6px; font-size: 12px; color: var(--gd-accent, #79c0ff); overflow-wrap: anywhere; }\nh2 {\n  margin: 10px 0 4px;\n  font-size: 10px;\n  text-transform: uppercase;\n  letter-spacing: 0.08em;\n  color: var(--gd-muted, #8b949e);\n}\np { margin: 0 0 2px; }\n.label { color: var(--gd-muted, #8b949e); }\n.rows { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; }\ndt { color: var(--gd-muted, #8b949e); overflow-wrap: anywhere; }\ndt.modifier { color: var(--gd-purple, #d2a8ff); }\ndt.binding { color: var(--gd-green, #7ee787); }\ndt.provided { color: var(--gd-orange, #ffa657); }\ndd { margin: 0; overflow-wrap: anywhere; }\n.note { color: var(--gd-faint, #6e7681); }\n.explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gd-text-strong, #c9d1d9); }\n";
+interface DevtoolsPicker {
+  setEnabled(enabled: boolean): void;
+  readonly enabled: boolean;
+  onPick(listener: ((id: string) => void) | null): void;
+  dispose(): void;
+}
 interface DevtoolsAppInfo {
   readonly id: string;
   readonly name: string;
@@ -155,6 +146,11 @@ type PageMessage =
   type: 'action';
   app: string;
   entry: ActionEntry;
+} |
+{
+  type: 'picked';
+  app: string;
+  id: string;
 };
 type PanelMessage =
 {
@@ -163,6 +159,11 @@ type PanelMessage =
   type: 'request';
   app: string;
   request: DevtoolsRequest;
+} |
+{
+  type: 'pick';
+  app: string;
+  enabled: boolean;
 };
 interface DevtoolsPort<In, Out> {
   post(message: Out): void;
@@ -205,6 +206,7 @@ interface DevtoolsApp {
 interface ConnectDevtoolsOptions {
   readonly name?: string;
   readonly actions?: ActionLog;
+  readonly picker?: DevtoolsPicker;
   readonly window?: (WindowLike & HookHost) | null;
 }
 interface DevtoolsHook {

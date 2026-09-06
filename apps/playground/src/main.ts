@@ -8,6 +8,7 @@ import { mountExamplesRoute } from './routes/ExamplesRoute';
 import { mountFrameworkRoute, mountFrameworkSyncRoute } from './routes/FrameworkRoute';
 import { mountSignInExampleRoute } from './routes/SignInExampleRoute';
 import { mountNotesExampleRoute } from './routes/NotesExampleRoute';
+import { mountPaintRoute } from './routes/PaintRoute';
 import { mountLayoutRoute } from './routes/LayoutRoute';
 import { mountLiveExampleRoute } from './routes/LiveExampleRoute';
 import { mountModifiersRoute } from './routes/ModifiersRoute';
@@ -46,6 +47,7 @@ const MOUNTS: Record<string, Mount> = {
   'example-live': mountLiveExampleRoute,
   'example-router': mountRouterExampleRoute,
   'example-animation': mountAnimationExampleRoute,
+  'example-paint': mountPaintRoute,
   'example-transitions': mountTransitionsExampleRoute,
   'transitions-app': mountTransitionsStandaloneRoute
 };

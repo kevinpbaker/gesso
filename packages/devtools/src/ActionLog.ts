@@ -2,10 +2,27 @@ import {
   applyPatch,
   isChannelClientMessage,
   isChannelHostMessage,
+  markInstant,
+  type ActionCause,
+  type ActionEntry,
+  type ChannelErrorEntry,
   type ChannelPort,
+  type CommandEntry,
+  type FrameEntry,
   type Patch,
+  type PatchEntry,
   type WorkerHandle
 } from '@gesso/framework';
+
+/**
+ * The entries are declared with the rest of the devtools vocabulary in
+ * `@gesso/framework`, for the reason `ConsoleEntry` is: they are plain
+ * data that crosses a thread to reach a panel, and in the worker
+ * configuration they cross on the framework's own devtools channel.
+ * They are re-exported here because this is where a reader looks for
+ * them.
+ */
+export type { ActionCause, ActionEntry, ChannelErrorEntry, CommandEntry, FrameEntry, PatchEntry };
 
 /**
  * The store action log (`ROADMAP.md` F7): every command a view sent
@@ -54,6 +71,34 @@ export interface ActionLog {
    * this.
    */
   tapPort(port: ChannelPort, token: ActionLogToken): ChannelPort;
+  /**
+   * Names what is being answered for as long as the returned function
+   * has not been called, so everything recorded meanwhile carries the
+   * same `ActionCause` (`EXCELLENCE_ROADMAP.md` X15).
+   *
+   * Called around the dispatch of one input, which is the only moment
+   * where a cause is known rather than guessed: the command a click's
+   * listener sends is sent synchronously inside it. Nothing is
+   * allocated for an input that records nothing, so wrapping every
+   * pointer move costs a function call and a null check.
+   *
+   * The patches that answer such a command are given the same cause,
+   * which is an inference and the record says so: the barrier carries
+   * no request id, so the recorder ties the next patch batch on that
+   * channel to the command that preceded it, until a frame has drawn
+   * one or another command replaces it.
+   */
+  cause(label: string): () => void;
+  /**
+   * Records the frame that drew whatever has been recorded since the
+   * last one, closing the chain from click to command to patches to
+   * pixels.
+   *
+   * Nothing is recorded for a frame with nothing to close, so an
+   * application drawing sixty frames a second while its channels are
+   * quiet adds nothing to the timeline.
+   */
+  frame(id: number): void;
   /** The timeline, oldest first. */
   readonly entries: readonly ActionEntry[];
   /** The channels this log is tapping, by name, in the order tapped. */
@@ -115,43 +160,43 @@ export interface ActionLogOptions {
   readonly limit?: number;
 }
 
-interface EntryBase {
-  /** Position on the timeline. Never reused, never renumbered. */
-  readonly seq: number;
-  /** `performance.now()` when the message crossed. */
-  readonly at: number;
-  readonly channel: string;
-}
-
-/** A command a view sent. This is the action half of the log. */
-export interface CommandEntry extends EntryBase {
-  readonly kind: 'command';
-  readonly command: string;
-  readonly payload: unknown;
-}
-
-/** A batch of patches the owning thread sent back. */
-export interface PatchEntry extends EntryBase {
-  readonly kind: 'patch';
-  readonly patches: readonly Patch[];
-  /** The projections this batch touched, in the order first touched. */
-  readonly keys: readonly string[];
-}
-
-/** A channel error, kept on the timeline so it has a position on it. */
-export interface ChannelErrorEntry extends EntryBase {
-  readonly kind: 'error';
-  readonly message: string;
-}
-
-export type ActionEntry = CommandEntry | PatchEntry | ChannelErrorEntry;
-
 export function createActionLog(options: ActionLogOptions = {}): ActionLog {
   return new Recorder(options.limit ?? 200);
 }
 
 function now(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now();
+}
+
+/**
+ * Sends each new entry as it is recorded, and returns a function that
+ * stops.
+ *
+ * `subscribe` says only that something changed, so the sequence number
+ * is what tells a new entry from the ones already sent; a `clear`
+ * resets it, and a bounded log retiring old entries does not. Both
+ * routes to a panel need exactly this: the hook, for a log in the
+ * page, and the render worker tap, for one on the other side of a
+ * thread.
+ */
+export function forwardNewEntries(log: ActionLog, send: (entry: ActionEntry) => void): () => void {
+  // Below the first sequence number, which is zero.
+  let lastSeq = -1;
+  const flush = (): void => {
+    const entries = log.entries;
+    if (entries.length === 0) {
+      lastSeq = -1;
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.seq > lastSeq) {
+        lastSeq = entry.seq;
+        send(entry);
+      }
+    }
+  };
+  flush();
+  return log.subscribe(flush);
 }
 
 /**
@@ -184,6 +229,10 @@ class TappedChannel {
   /** The replica's end: commands out, and the sync that starts it all. */
   fromReplica(data: unknown): void {
     if (this.open && isChannelClientMessage(data) && data.type === 'channel:command') {
+      // In the browser's own profiler too, on the same timeline as the
+      // frame spans, so a command and the frame that answered it are
+      // read off one recording rather than two panels.
+      markInstant(`command ${this.name}.${data.command}`, data.payload);
       this.recorder.record({ kind: 'command', channel: this.name, command: data.command, payload: data.payload });
     }
     this.toProvider(data);
@@ -196,6 +245,7 @@ class TappedChannel {
         for (const patch of data.patches) {
           this.live.set(patch.projection, applyPatch(this.live.get(patch.projection), patch));
         }
+        markInstant(`patch ${this.name}`, projectionsOf(data.patches));
         this.recorder.record({
           kind: 'patch',
           channel: this.name,
@@ -247,12 +297,47 @@ function projectionsOf(patches: readonly Patch[]): string[] {
   return keys;
 }
 
+/**
+ * A command waiting to be answered, so the patches that answer it can
+ * be given the cause the command had.
+ *
+ * `claimed` is what ends the wait: once a patch batch has taken this
+ * cause, the next frame closes it, because that frame is the one that
+ * drew the answer. An unclaimed one waits as long as it takes, which
+ * is the case that matters — the playground's `heavy.compute()` takes
+ * a second and a half, and a cause that timed out before then would
+ * lose exactly the round trip a person most wants to see.
+ */
+interface PendingCause {
+  readonly cause: ActionCause;
+  claimed: boolean;
+}
+
+/** An entry before the recorder gives it its place on the timeline. */
+type NewEntry =
+  | Omit<CommandEntry, 'seq' | 'at'>
+  | Omit<PatchEntry, 'seq' | 'at'>
+  | Omit<ChannelErrorEntry, 'seq' | 'at'>
+  | Omit<FrameEntry, 'seq' | 'at'>;
+
 class Recorder implements ActionLog {
   private readonly tapped: TappedChannel[] = [];
   private readonly log: ActionEntry[] = [];
   private readonly listeners = new Set<() => void>();
   private seq = 0;
   private pinned: number | null = null;
+  /** The input being dispatched, if one is, and the label it was opened with. */
+  private openLabel: string | null = null;
+  private openCause: ActionCause | null = null;
+  private causeId = 0;
+  /** Commands awaiting their patches, by channel. */
+  private readonly awaiting = new Map<string, PendingCause>();
+  /**
+   * The cause shared by everything recorded since the last frame
+   * entry: undefined when nothing has been, null when two causes have.
+   */
+  private frameCause: ActionCause | null | undefined = undefined;
+  private recordedSinceFrame = false;
 
   constructor(private readonly limit: number) {}
 
@@ -323,10 +408,95 @@ class Recorder implements ActionLog {
     };
   }
 
+  cause(label: string): () => void {
+    const previousLabel = this.openLabel;
+    const previousCause = this.openCause;
+    this.openLabel = label;
+    // Not minted yet: an input that sends no command should not
+    // consume an id, so a person reading the timeline sees the causes
+    // that did something and not a counter jumping in tens.
+    this.openCause = null;
+    let closed = false;
+    return () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      this.openLabel = previousLabel;
+      this.openCause = previousCause;
+    };
+  }
+
+  frame(id: number): void {
+    if (!this.recordedSinceFrame) {
+      return;
+    }
+    this.recordedSinceFrame = false;
+    const cause = this.frameCause ?? undefined;
+    this.frameCause = undefined;
+    // A cause whose answer has been drawn is spent. One still waiting
+    // for its first patch is left alone.
+    for (const [channel, pending] of this.awaiting) {
+      if (pending.claimed) {
+        this.awaiting.delete(channel);
+      }
+    }
+    this.append({ kind: 'frame', frame: id, ...(cause === undefined ? {} : { cause }) });
+  }
+
   record(
     entry: Omit<CommandEntry, 'seq' | 'at'> | Omit<PatchEntry, 'seq' | 'at'> | Omit<ChannelErrorEntry, 'seq' | 'at'>
   ): void {
-    this.log.push({ ...entry, seq: this.seq++, at: now() } as ActionEntry);
+    const cause = this.causeFor(entry);
+    this.append(cause === undefined ? entry : { ...entry, cause });
+  }
+
+  /**
+   * Which cause an entry belongs to.
+   *
+   * A command belongs to the input being dispatched, which is known
+   * rather than guessed. A patch belongs to the command it answers,
+   * which is not: the barrier carries no request id, so what stands
+   * for one is "the last command on this channel that nothing has
+   * answered yet". It is right whenever a channel is answering one
+   * thing at a time, which is what a channel driven by a person does,
+   * and it is wrong for a channel that also emits on its own between
+   * the command and its answer. The panel says `via` rather than
+   * `from` for that reason.
+   */
+  private causeFor(entry: { kind: string; channel: string }): ActionCause | undefined {
+    if (entry.kind === 'command') {
+      if (this.openLabel === null) {
+        this.awaiting.delete(entry.channel);
+        return undefined;
+      }
+      this.openCause ??= { id: ++this.causeId, label: this.openLabel };
+      this.awaiting.set(entry.channel, { cause: this.openCause, claimed: false });
+      return this.openCause;
+    }
+    const pending = this.awaiting.get(entry.channel);
+    // The open cause first: on a thread where the provider answers
+    // synchronously, the patch arrives before the click's dispatch has
+    // returned and is the same answer either way.
+    const cause = this.openCause ?? pending?.cause;
+    if (cause !== undefined && pending?.cause === cause) {
+      pending.claimed = true;
+    }
+    return cause;
+  }
+
+  private append(entry: NewEntry): void {
+    const complete = { ...entry, seq: this.seq++, at: now() } as ActionEntry;
+    if (complete.kind !== 'frame') {
+      this.recordedSinceFrame = true;
+      const cause = complete.cause;
+      if (cause !== undefined) {
+        // Null means two causes met before a frame closed them, and
+        // the frame then belongs to neither.
+        this.frameCause = this.frameCause === undefined || this.frameCause === cause ? cause : null;
+      }
+    }
+    this.log.push(complete);
     while (this.log.length > this.limit) {
       this.drop();
     }
@@ -346,6 +516,12 @@ class Recorder implements ActionLog {
     while (this.log.length > 0) {
       this.drop();
     }
+    // A command whose answer is still coming would otherwise hand its
+    // cause to a patch on an empty timeline, naming a click nothing
+    // shows any more.
+    this.awaiting.clear();
+    this.frameCause = undefined;
+    this.recordedSinceFrame = false;
     this.notify();
   }
 
@@ -364,6 +540,11 @@ class Recorder implements ActionLog {
     this.tapped.length = 0;
     this.log.length = 0;
     this.pinned = null;
+    this.awaiting.clear();
+    this.openLabel = null;
+    this.openCause = null;
+    this.frameCause = undefined;
+    this.recordedSinceFrame = false;
     this.listeners.clear();
   }
 

@@ -1,4 +1,14 @@
-export { channel, viewKeys, type ChannelToken, type Command, type CommandMap } from './ChannelToken';
+export {
+  channel,
+  defineChannel,
+  viewKeys,
+  type ChannelSpec,
+  type ChannelToken,
+  type Command,
+  type CommandMap,
+  type CommandsOf,
+  type ViewOf
+} from './ChannelToken';
 export {
   isChannelClientMessage,
   isChannelHostMessage,

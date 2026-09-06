@@ -31,6 +31,18 @@ type Values<S extends readonly Observable<unknown>[]> = {
  *   const playing = derive([queue.view.playlistId, audio.state], (id, state) =>
  *     id === card.id && state.status === 'playing'
  *   );
+ *
+ * @deprecated Write it as a `computed`, which is the one derivation the
+ * documentation teaches (`decisions/0077`). A cell is read with
+ * `.value` and anything else through the `read` the function is handed,
+ * so the sources are the reads themselves and there is no list beside
+ * the expression to keep in step with it:
+ *
+ *   const playing = computed(read =>
+ *     queue.view.playlistId.value === card.id && read(audio.state).status === 'playing'
+ *   );
+ *
+ * It still works and nothing that uses it needs changing today.
  */
 export function derive<S extends readonly Observable<unknown>[], T>(
   sources: readonly [...S],

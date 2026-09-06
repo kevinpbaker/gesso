@@ -248,6 +248,37 @@ that is also what makes the tooltip close when the component unmounts.
 nothing to the tree, which is the reason to prefer it on an element you
 control.
 
+## Naming a set of them
+
+A set of modifiers that belongs together should be named once, at module
+level, and spread onto every element that wants it:
+
+```ts
+export const ROW = bundle(ROW_INTERACTION, focusRing({ color: 'focusRing' }));
+```
+
+```tsx
+<row modifiers={ROW}>…</row>
+```
+
+`bundle` is the analogue of a SwiftUI `ViewModifier` or a Compose
+`Modifier` chain: it flattens whatever it is given, including other
+bundles, keeps the order, and freezes the result. Nesting composes, so
+`bundle(BASE, OTHER_BUNDLE, focusRing())` is one flat list.
+
+There are two reasons to name it. The ordinary one is that the set has
+a meaning and the meaning is worth a word. The second is that
+`modifiers={[INTERACTION, ...RING]}` is not free: it allocates a fresh
+array and copies the ring into it on every render of the component that
+element is in, and it was written seventy-two times across the two
+applications in this repository. A bundle is built once and is the same
+frozen array every time.
+
+A bundle carries behaviour and not paint. The colours a hovered element
+is drawn in ride inside `interactive()`'s options as palette names, so
+one bundle is right in both appearances; the properties an element is
+drawn with at rest stay on the element.
+
 ## When one goes wrong
 
 `attach`, `update` and `detach` are each guarded. A modifier that throws

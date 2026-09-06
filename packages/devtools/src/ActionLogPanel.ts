@@ -179,13 +179,24 @@ function row(
 
   const arrow = doc.createElement('span');
   arrow.className = 'arrow';
-  arrow.textContent = entry.kind === 'command' ? '↑' : entry.kind === 'patch' ? '↓' : '!';
+  arrow.textContent = actionGlyph(entry);
 
   const text = doc.createElement('span');
   text.className = 'text';
   text.textContent = describeActionEntry(entry);
 
   item.append(time, arrow, text);
+  if (entry.cause !== undefined) {
+    // The thread through the timeline: every row the same click
+    // produced carries the same number, so a round trip across three
+    // threads is read by looking for one glyph rather than by
+    // comparing timestamps.
+    const cause = doc.createElement('span');
+    cause.className = 'cause';
+    cause.textContent = `#${entry.cause.id}`;
+    cause.title = entry.cause.label;
+    item.append(cause);
+  }
   const activate = (): void => jump(entry.seq);
   item.addEventListener('click', activate);
   item.addEventListener('keydown', event => {
@@ -197,13 +208,32 @@ function row(
   return item;
 }
 
-/** One entry as a line: the command and its payload, the patched keys, or the error. */
+/**
+ * The direction, as one glyph: up for what the view sent, down for
+ * what came back, a square for the frame that drew it.
+ */
+export function actionGlyph(entry: ActionEntry): string {
+  switch (entry.kind) {
+    case 'command':
+      return '↑';
+    case 'patch':
+      return '↓';
+    case 'frame':
+      return '▣';
+    case 'error':
+      return '!';
+  }
+}
+
+/** One entry as a line: the command and its payload, the patched keys, the frame, or the error. */
 export function describeActionEntry(entry: ActionEntry): string {
   switch (entry.kind) {
     case 'command':
       return `${entry.channel}.${entry.command}(${entry.payload === undefined ? '' : print(entry.payload)})`;
     case 'patch':
       return `${entry.channel} ${entry.keys.join(', ')}`;
+    case 'frame':
+      return `frame ${entry.frame}`;
     case 'error':
       return `${entry.channel} ${entry.message}`;
   }
@@ -295,9 +325,12 @@ button:disabled { cursor: default; opacity: 0.45; }
 .arrow { width: 8px; flex: none; }
 .command .arrow { color: #d2a8ff; }
 .patch .arrow { color: #79c0ff; }
+.frame .arrow { color: #7ee787; }
+.frame .text { color: #8b949e; }
 .error .arrow { color: #ff7b72; }
 .error .text { color: #ff7b72; }
 .text { flex: 1; }
+.cause { flex: none; color: #ffa657; }
 .note {
   margin: 0;
   padding: 6px 10px;

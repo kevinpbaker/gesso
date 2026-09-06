@@ -71,15 +71,43 @@ parent's definite content box, and behave as `auto` when it has none.
 ## Space
 
 `gap` between children, `padding` inside a container, `margin` outside a
-child, all in pixels, each with a per-side property beside it:
+child, all in pixels. Both `padding` and `margin` come with an axis and
+four sides:
 
 ```tsx
-<column gap={12} padding={16} paddingLeft={24} paddingRight={24}>
+<column gap={12} paddingX={24} paddingY={16}>
 ```
+
+`paddingX` is the left and right of the box, `paddingY` the top and
+bottom, and `marginX` and `marginY` are the same outside it. Nearly
+every box is padded more on one axis than the other, so those two are
+the pair to reach for; `padding` on its own is for the box that really
+is padded equally.
+
+The four sides are still there for the inset that is genuinely on one
+edge, and the most specific value wins: a side beats its axis, and an
+axis beats the shorthand. So
+
+```tsx
+<row padding={8} paddingX={16} paddingLeft={0}>
+```
+
+is nothing on the left, sixteen on the right, and eight top and bottom.
+What has gone is the pair: `paddingLeft={24} paddingRight={24}` says
+one thing twice, and `paddingX={24}` is that thing.
+
+`padding` is a number and nothing else. It does not take a tuple or an
+object, deliberately; `decisions/0079` says why.
 
 A row and a column can also space their axes apart independently with
 `rowGap` and `columnGap`. `margin` takes `auto` on either axis, which is
 still the shortest way to push one child to the far end of a row.
+
+The numbers themselves belong in a theme rather than in the markup.
+`theme.spacing` is an eight step scale on the same names as the shape
+scale, so a screen written from it reads `paddingX={theme.spacing.large}`
+and a compact density shrinks every box on the page at once. See
+[themes and the environment](/appearance/themes-and-the-environment).
 
 ## Who grows
 

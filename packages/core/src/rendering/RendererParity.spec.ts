@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
@@ -10,7 +10,9 @@ import { setMatchRanges } from '../find/UiTextMatches';
 import type { DecorationShape } from './Decorations';
 import { linearGradient, radialGradient } from '../properties/UiGradient';
 import { percent } from '../layout/UiLength';
-import { RenderHarness, RecordedGradient } from './RenderTestUtils';
+import { FakePaintCanvases, RenderHarness, RecordedGradient } from './RenderTestUtils';
+import { paintPictures } from './PaintPicture';
+import type { UiPaint, UiPath } from './PaintSurface';
 import type { RecordedCall } from './RenderTestUtils';
 import { parseColor } from './webgpu/WebGPUColor';
 import {
@@ -448,6 +450,20 @@ function box(h: RenderHarness, id: string, props: Record<string, unknown>, type 
 }
 
 describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
+  /**
+   * A painted node's picture is made by a shared rasteriser, which
+   * needs a canvas the suite does not have. The double stands in for
+   * it, and is installed for every case rather than for the painted
+   * ones alone so that nothing here depends on the order they run in.
+   */
+  beforeEach(() => {
+    paintPictures.setCanvasFactory(new FakePaintCanvases().create);
+  });
+
+  afterEach(() => {
+    paintPictures.setCanvasFactory(() => null);
+  });
+
   it('a card with background, border, padding and text', () => {
     const h = new RenderHarness();
     const root = h.createNode('app', UiNodeType.Column);
@@ -908,5 +924,129 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     }
     const draws = expectParity(h, grid, Constraints.loose(800, 600));
     expect(draws.filter(d => d.kind === 'text').length).toBeGreaterThanOrEqual(3);
+  });
+
+  /**
+   * A painted node draws one picture, and both backends draw the same
+   * one, because there is one per node in the process. What the gate
+   * checks is therefore everything else a backend could still get
+   * wrong on its own: the box the picture lands in, where it sits in
+   * paint order among the node's own background, border and children,
+   * the clip in force, and the opacity it inherited.
+   *
+   * See `decisions/0078` for why the picture is shared rather than
+   * replayed twice, and `PaintPicture.budget.spec.ts` for the assertion
+   * that the second backend repaints nothing.
+   */
+  const SPARKLINE: UiPaint = {
+    draw(surface, box) {
+      surface.beginPath();
+      surface.moveTo(0, box.height);
+      for (let i = 1; i <= 8; i++) {
+        surface.lineTo((box.width * i) / 8, box.height * (i % 2 === 0 ? 0.2 : 0.8));
+      }
+      surface.strokeColor('#0088ff');
+      surface.lineWidth(1.5);
+      surface.lineCap('round');
+      surface.stroke();
+    },
+    inputs: [1]
+  };
+
+  const LOGO: UiPath = {
+    d: 'M12 2 A10 10 0 1 1 11.99 2 Z M7 12 L11 16 L17 8',
+    viewBox: 24,
+    fill: '#223344',
+    fillRule: 'evenodd',
+    stroke: '#ffffff',
+    strokeWidth: 2,
+    lineCap: 'round',
+    lineJoin: 'round'
+  };
+
+  function painted(h: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
+    return box(h, id, props, UiNodeType.Paint);
+  }
+
+  it('a painted node, between its own background and its border', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    h.append(
+      root,
+      painted(h, 'spark', {
+        width: 200,
+        height: 48,
+        backgroundColor: '#f4f4f5',
+        borderWidth: 1,
+        borderColor: '#d4d4d8',
+        paint: SPARKLINE
+      })
+    );
+    const draws = expectParity(h, root);
+    expect(draws.map(d => d.kind)).toEqual(['fill', 'image', 'border']);
+    expect(draws[1]).toMatchObject({ x: 0, y: 0, width: 200, height: 48 });
+  });
+
+  it('a static path node beside a painted one', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Row);
+    root.setProperty('gap', 8);
+    h.append(
+      root,
+      painted(h, 'logo', { width: 32, height: 32, path: LOGO }),
+      painted(h, 'spark', { width: 120, height: 32, paint: SPARKLINE })
+    );
+    const draws = expectParity(h, root);
+    expect(draws.map(d => d.kind)).toEqual(['image', 'image']);
+  });
+
+  it('a painted node under an opacity, a transform and a rounded clip', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const clipper = box(h, 'clipper', {
+      width: 160,
+      height: 80,
+      overflow: 'hidden',
+      borderRadius: 12,
+      backgroundColor: '#101014'
+    });
+    h.append(
+      clipper,
+      painted(h, 'gauge', {
+        width: 220,
+        height: 60,
+        opacity: 0.6,
+        transform: { translateX: 10, scaleX: 1.25 },
+        paint: SPARKLINE
+      })
+    );
+    h.append(root, clipper);
+    const draws = expectParity(h, root);
+    const picture = draws.find(d => d.kind === 'image')!;
+    expect(picture.opacity).toBe(0.6);
+    expect(picture.clip).not.toBeNull();
+  });
+
+  it('a painted node with children stacked over its picture', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const gauge = painted(h, 'gauge', { width: 100, height: 100, paint: SPARKLINE, x: 'center', y: 'center' });
+    h.append(gauge, box(h, 'label', { text: '72%', fontSize: 14, color: '#111' }, UiNodeType.Text));
+    h.append(root, gauge);
+    const draws = expectParity(h, root);
+    expect(draws.map(d => d.kind)).toEqual(['image', 'text']);
+  });
+
+  it('painted nodes in a scrolled list, clipped and culled alike', () => {
+    const h = new RenderHarness();
+    const list = h.createNode('list', UiNodeType.ScrollView);
+    list.setProperty('width', 240);
+    list.setProperty('height', 120);
+    list.setProperty('scrollY', 30);
+    for (let i = 0; i < 8; i++) {
+      h.append(list, painted(h, `row${i}`, { width: 240, height: 40, flexShrink: 0, paint: SPARKLINE }));
+    }
+    const draws = expectParity(h, list, Constraints.tight(240, 120));
+    expect(draws.filter(d => d.kind === 'image').length).toBeGreaterThan(0);
   });
 });

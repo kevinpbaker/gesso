@@ -1,4 +1,5 @@
 import { renderRoot } from '@gesso/framework';
+import { createActionLog, tapRenderWorker } from '@gesso/devtools';
 import { DemoCounter, FrameworkDemoRoot } from './FrameworkPlayground';
 import { Heavy } from './HeavyWork';
 import { Ticker } from './TickerChannel';
@@ -15,7 +16,35 @@ import { Ticker } from './TickerChannel';
  * simply called. `Heavy` and `Ticker` are application state on another
  * thread, reached through view keys and commands.
  */
-const app = renderRoot(FrameworkDemoRoot).useService(DemoCounter).useChannel(Heavy).useChannel(Ticker);
+const app = renderRoot(FrameworkDemoRoot).useService(DemoCounter);
+
+/**
+ * The action log, here in the render worker, which is where the ports
+ * are (`EXCELLENCE_ROADMAP.md` X15).
+ *
+ * `decisions/0047` wrote the recorder to run in a worker and then did
+ * not run it in one, because the only two ways to wire it up at the
+ * time were a line in this file, which that change did not own, or
+ * routing every patch through the shell, which would have falsified
+ * the one thing this route exists to show. This is that line. The
+ * shell still holds neither end of a channel: the tap stands on the
+ * worker's own global, between the shell's messages and the runtime,
+ * and posts what it records to the panel as devtools events.
+ *
+ * Development only. A recorder in a production bundle holds patch
+ * batches for a session nobody is watching.
+ */
+if (import.meta.env.DEV) {
+  const actions = createActionLog();
+  // After `renderRoot`, whose constructor installs the handler this
+  // wraps, and before `init` arrives, which is when the channels are
+  // opened over the port it captures.
+  const tap = tapRenderWorker(actions);
+  const applicationWorker = tap.applicationWorker([Heavy, Ticker]);
+  app.useChannel(Heavy, { worker: applicationWorker }).useChannel(Ticker, { worker: applicationWorker });
+} else {
+  app.useChannel(Heavy).useChannel(Ticker);
+}
 
 /**
  * Hot module replacement (`ROADMAP.md` F7).

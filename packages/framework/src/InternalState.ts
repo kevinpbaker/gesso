@@ -22,7 +22,18 @@ import { trackRead } from './Input';
  * a tooltip's open flag, a caret, a scroll offset, the active tab.
  * Anything that survives a reload, or that another screen cares about,
  * is application state and belongs on a channel. Anything derived from
- * other cells is a `computed`; from other Observables, a `derive`.
+ * other cells is a `computed`.
+ *
+ * It is not only for components. The thread that owns a channel's data
+ * writes cells too, and wrote them as a `BehaviorSubject` mirrored
+ * into an `asObservable()` because this was reachable only through the
+ * framework's main entry. `@gesso/framework/worker` is the same cell
+ * with none of the renderer behind it, so an application worker holds
+ * one cell rather than a subject and a copy of it, and reads it with
+ * `.value` in a `computed` rather than listing it in a
+ * `combineLatest`. "Internal" still means what it says there: written
+ * here, and crossing the barrier only as the plain data a view key
+ * publishes.
  */
 export class InternalState<T> extends BehaviorSubject<T> {
   /** What to call this cell in a warning or the inspector; optional. */

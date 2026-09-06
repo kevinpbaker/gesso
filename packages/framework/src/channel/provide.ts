@@ -67,7 +67,7 @@ export class ProvidedChannel {
         this.sync();
         return;
       }
-      this.runCommand(data.command, data.payload);
+      this.runCommand(data.command, data.payload, data.rest);
     } catch (error) {
       // Reported rather than thrown: this runs on the thread that owns
       // the data, and a throw here would leave the view waiting for a
@@ -80,7 +80,7 @@ export class ProvidedChannel {
     }
   }
 
-  private runCommand(name: string, payload: unknown): void {
+  private runCommand(name: string, payload: unknown, rest?: readonly unknown[]): void {
     const handler = this.source.commands?.[name];
     if (handler === undefined) {
       const names = Object.keys(this.source.commands ?? {})
@@ -91,7 +91,11 @@ export class ProvidedChannel {
           `Declared commands: ${names.length > 0 ? names : '(none)'}.`
       );
     }
-    (handler as (payload: unknown) => void)(payload);
+    // Spread rather than passed as one payload: a command carries as
+    // many arguments as it declares. A client that sent none beyond
+    // the first sends no `rest`, so this is the single-argument call
+    // it always was.
+    (handler as (...args: unknown[]) => void)(payload, ...(rest ?? []));
   }
 
   private sync(): void {

@@ -85,6 +85,7 @@ export default defineConfig({
           { text: 'Your first component', link: '/guide/counter' },
           { text: 'Components run once', link: '/guide/components-run-once' },
           { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
+          { text: 'Lists and conditionals', link: '/guide/lists-and-conditionals' },
           { text: 'Inputs and outputs', link: '/guide/inputs-and-outputs' },
           { text: 'Layout basics', link: '/guide/layout-basics' },
           { text: 'Text', link: '/guide/text' },
@@ -183,6 +184,7 @@ export default defineConfig({
         text: 'Components',
         items: [
           { text: 'Overview', link: '/components/' },
+          { text: 'Button', link: '/components/button' },
           { text: 'Checkbox', link: '/components/checkbox' },
           { text: 'Switch', link: '/components/switch' },
           { text: 'RadioGroup', link: '/components/radio-group' },

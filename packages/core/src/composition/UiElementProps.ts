@@ -83,11 +83,15 @@ export type BoxModelProps = PropsOf<
   | 'minHeight'
   | 'maxHeight'
   | 'padding'
+  | 'paddingX'
+  | 'paddingY'
   | 'paddingTop'
   | 'paddingRight'
   | 'paddingBottom'
   | 'paddingLeft'
   | 'margin'
+  | 'marginX'
+  | 'marginY'
   | 'marginTop'
   | 'marginRight'
   | 'marginBottom'
@@ -243,6 +247,16 @@ export type EditableTextProps = CommonProps &
 export type BoxProps = ContainerProps & PropsOf<'x' | 'y' | 'image' | 'objectFit'>;
 
 export type StackProps = BoxProps;
+
+/**
+ * A Paint element draws itself, through a `paint` function or a static
+ * `path`, and is otherwise a Box: a box model, a background, a border,
+ * children stacked in its content box.
+ *
+ * `clipPath` and `blur` shape what it drew. See
+ * `rendering/PaintSurface.ts` for the drawing vocabulary.
+ */
+export type PaintElementProps = BoxProps & PropsOf<'paint' | 'path' | 'clipPath' | 'blur'>;
 
 /** A Button is a Box that also draws `text` when it has no children. */
 export type ButtonProps = BoxProps & TextContentProps;

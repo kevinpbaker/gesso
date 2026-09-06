@@ -51,13 +51,22 @@ export interface DevtoolsPanelOptions {
   readonly actionLimit?: number;
 }
 
-type Tab = 'tree' | 'console' | 'frames' | 'actions';
+type Tab = 'tree' | 'streams' | 'console' | 'frames' | 'actions';
 const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
   { id: 'tree', label: 'Tree' },
+  { id: 'streams', label: 'Streams' },
   { id: 'console', label: 'Console' },
   { id: 'frames', label: 'Frames' },
   { id: 'actions', label: 'Actions' }
 ];
+
+/** Live subscriptions under one component, as the streams view lists them. */
+interface ComponentStreams {
+  readonly name: string;
+  /** The component's anchor node, so a row selects the thing it names. */
+  readonly anchorId: string;
+  count: number;
+}
 
 export function mountDevtoolsPanel(
   host: HTMLElement,
@@ -106,8 +115,14 @@ export function mountDevtoolsPanel(
   const inspectBox = doc.createElement('input');
   inspectBox.type = 'checkbox';
   inspectToggle.append(inspectBox, doc.createTextNode(' Inspect layout'));
+  const pickToggle = doc.createElement('label');
+  pickToggle.className = 'toggle';
+  const pickBox = doc.createElement('input');
+  pickBox.type = 'checkbox';
+  pickToggle.append(pickBox, doc.createTextNode(' Pick'));
+  pickToggle.title = 'Click a node on the canvas to select it here. The click does not reach the application.';
   const status = el(doc, 'span', 'status');
-  toolbar.append(picker, tabs, inspectToggle, status);
+  toolbar.append(picker, tabs, inspectToggle, pickToggle, status);
   root.append(toolbar);
 
   // ---- views
@@ -128,10 +143,21 @@ export function mountDevtoolsPanel(
   const actionsView = el(doc, 'div', 'view actions-view');
   const actionsList = el(doc, 'ol', 'log');
   actionsView.append(actionsList);
-  views.append(treeView, consoleView, framesView, actionsView);
+  const streamsView = el(doc, 'div', 'view streams-view');
+  const streamsBar = el(doc, 'div', 'bar');
+  const streamsTotal = el(doc, 'span', 'total');
+  const resetStreams = doc.createElement('button');
+  resetStreams.type = 'button';
+  resetStreams.textContent = 'Mark';
+  resetStreams.title = 'Take the counts as they are now, so what follows reads as a change from here.';
+  streamsBar.append(streamsTotal, resetStreams);
+  const streamsList = el(doc, 'div', 'streams');
+  streamsView.append(streamsBar, streamsList);
+  views.append(treeView, streamsView, consoleView, framesView, actionsView);
   root.append(views);
   const viewFor: Record<Tab, HTMLElement> = {
     tree: treeView,
+    streams: streamsView,
     console: consoleView,
     frames: framesView,
     actions: actionsView
@@ -155,6 +181,17 @@ export function mountDevtoolsPanel(
   const actionEntries: ActionEntry[] = [];
   let actionOrigin: number | null = null;
   let profiler: FrameProfiler | null = null;
+  /**
+   * Counts as of the last "Mark", by component anchor.
+   *
+   * A leak is not a number, it is a number that climbs: forty
+   * subscriptions under a list is either right or wrong depending on
+   * the list, and forty more after navigating away and back is wrong
+   * whatever the list. So the view shows the count and the change
+   * since a moment the person chose.
+   */
+  let streamBaseline = new Map<string, number>();
+  let baselineTotal: number | null = null;
 
   const request = (message: DevtoolsRequest): void => {
     if (current !== null) {
@@ -178,6 +215,9 @@ export function mountDevtoolsPanel(
     request({ kind: 'inspector', enabled: false });
     request({ kind: 'select', id: null });
     request({ kind: 'highlight', id: null });
+    if (current !== null && pickBox.checked) {
+      port.post({ type: 'pick', app: current.id, enabled: false });
+    }
   };
 
   const setStatus = (text: string): void => {
@@ -202,10 +242,13 @@ export function mountDevtoolsPanel(
     consoleEntries.length = 0;
     actionEntries.length = 0;
     actionOrigin = null;
+    streamBaseline = new Map();
+    baselineTotal = null;
     renderTree();
     renderReport();
     renderConsole();
     renderActions();
+    renderStreams();
     if (info === null) {
       setStatus('No Gesso application connected. Call connectDevtools(app) in the page.');
       return;
@@ -327,6 +370,89 @@ export function mountDevtoolsPanel(
     (row as HTMLElement | undefined)?.scrollIntoView?.({ block: 'nearest' });
   };
 
+  // ---- streams
+  /**
+   * Live subscriptions per component, from the tree.
+   *
+   * Aggregated here rather than reported per component by the runtime,
+   * because the tree already says which component a node belongs to
+   * and already arrives whenever the count changes. Nodes above every
+   * component anchor are the runtime's own and are listed under the
+   * root.
+   */
+  const componentStreams = (): ComponentStreams[] => {
+    if (snapshot === null) {
+      return [];
+    }
+    const totals = new Map<string, ComponentStreams>();
+    const visit = (node: UiTreeSnapshot['root'], owner: ComponentStreams): void => {
+      const here =
+        node.component === undefined
+          ? owner
+          : (totals.get(node.id) ?? { name: node.component, anchorId: node.id, count: 0 });
+      if (node.component !== undefined) {
+        totals.set(node.id, here);
+      }
+      here.count += node.subscriptions ?? 0;
+      for (const child of node.children) {
+        visit(child, here);
+      }
+    };
+    const root: ComponentStreams = { name: '(root)', anchorId: snapshot.root.id, count: 0 };
+    totals.set(snapshot.root.id, root);
+    visit(snapshot.root, root);
+    return [...totals.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  };
+
+  const renderStreams = (): void => {
+    streamsList.textContent = '';
+    if (snapshot === null) {
+      streamsTotal.textContent = 'Waiting for a tree.';
+      return;
+    }
+    const change = baselineTotal === null ? '' : ` (${signed(snapshot.subscriptions - baselineTotal)} since the mark)`;
+    streamsTotal.textContent = `${snapshot.subscriptions} live subscriptions in the graph${change}`;
+    const rows = componentStreams();
+    if (rows.length === 0) {
+      const empty = el(doc, 'p', 'empty');
+      empty.textContent = 'Nothing is subscribed.';
+      streamsList.append(empty);
+      return;
+    }
+    const largest = rows[0]?.count ?? 0;
+    for (const entry of rows) {
+      const row = el(doc, 'div', 'stream-row');
+      const name = el(doc, 'span', 'component');
+      name.textContent = entry.name;
+      const bar = el(doc, 'span', 'bar-track');
+      const fill = el(doc, 'span', 'bar-fill');
+      fill.style.width = `${largest === 0 ? 0 : Math.round((entry.count / largest) * 100)}%`;
+      bar.append(fill);
+      const count = el(doc, 'span', 'count');
+      const before = streamBaseline.get(entry.anchorId);
+      const delta = before === undefined || before === entry.count ? '' : ` ${signed(entry.count - before)}`;
+      count.textContent = `${entry.count}${delta}`;
+      if (delta !== '') {
+        count.classList.add('changed');
+      }
+      row.append(name, bar, count);
+      row.title = entry.anchorId;
+      row.addEventListener('mouseenter', () => setHighlight(entry.anchorId));
+      row.addEventListener('click', () => {
+        showTab('tree');
+        reveal(entry.anchorId);
+        select(entry.anchorId);
+      });
+      streamsList.append(row);
+    }
+  };
+  streamsList.addEventListener('mouseleave', () => setHighlight(null));
+  resetStreams.addEventListener('click', () => {
+    streamBaseline = new Map(componentStreams().map(entry => [entry.anchorId, entry.count]));
+    baselineTotal = snapshot?.subscriptions ?? null;
+    renderStreams();
+  });
+
   const renderReport = (): void => {
     reportPane.textContent = '';
     if (report === null) {
@@ -336,7 +462,16 @@ export function mountDevtoolsPanel(
       reportPane.append(empty);
       return;
     }
-    reportPane.append(...renderNodeReport(doc, report));
+    const id = report.id;
+    reportPane.append(
+      ...renderNodeReport(doc, report, {
+        // The write half of the addressed channel: `select` names a
+        // node to read, `setProp` names one to change. The frame the
+        // write dirties sends the report back, so the value shown
+        // afterwards is the value the node holds, not the one typed.
+        onEditProp: (name, value) => request({ kind: 'setProp', id, name, value })
+      })
+    );
   };
 
   // ---- console
@@ -380,6 +515,15 @@ export function mountDevtoolsPanel(
       const time = el(doc, 'span', 'time');
       time.textContent = `+${((entry.at - (actionOrigin ?? entry.at)) / 1000).toFixed(2)}s`;
       item.append(time, badge(doc, entry.kind), doc.createTextNode(describeActionEntry(entry)));
+      if (entry.cause !== undefined) {
+        // The one number that ties a click, the command it sent, the
+        // patches that answered and the frame that drew them. Reading
+        // it is the thing that used to be timestamp arithmetic across
+        // three threads.
+        const cause = el(doc, 'span', 'cause');
+        cause.textContent = ` #${entry.cause.id} ${entry.cause.label}`;
+        item.append(cause);
+      }
       actionsList.append(item);
     }
     actionsList.scrollTop = actionsList.scrollHeight;
@@ -391,6 +535,10 @@ export function mountDevtoolsPanel(
       case 'tree':
         snapshot = event.tree;
         renderTree();
+        renderStreams();
+        break;
+      case 'action':
+        pushAction(event.entry);
         break;
       case 'report':
         if (event.id === selectedId) {
@@ -453,14 +601,25 @@ export function mountDevtoolsPanel(
     }
     if (message.type === 'event') {
       onEvent(message.event);
-    } else {
-      actionOrigin ??= message.entry.at;
-      actionEntries.push(message.entry);
-      if (actionEntries.length > actionLimit) {
-        actionEntries.splice(0, actionEntries.length - actionLimit);
-      }
-      renderActions();
+      return;
     }
+    if (message.type === 'picked') {
+      // The click never reached the application; this is what it meant.
+      reveal(message.id);
+      select(message.id);
+      return;
+    }
+    pushAction(message.entry);
+  };
+
+  /** One action log entry, from either route: the page's log or the render worker's. */
+  const pushAction = (entry: ActionEntry): void => {
+    actionOrigin ??= entry.at;
+    actionEntries.push(entry);
+    if (actionEntries.length > actionLimit) {
+      actionEntries.splice(0, actionEntries.length - actionLimit);
+    }
+    renderActions();
   };
 
   picker.addEventListener('change', () => {
@@ -470,6 +629,17 @@ export function mountDevtoolsPanel(
     }
   });
   inspectBox.addEventListener('change', () => request({ kind: 'inspector', enabled: inspectBox.checked }));
+  // Picking needs the inspector: what a click pins is whatever the
+  // runtime last reported as hovered, and nothing is reported while
+  // the inspector is off. Turning picking on therefore turns it on,
+  // and turning picking off puts it back the way the person left it.
+  pickBox.addEventListener('change', () => {
+    if (current === null) {
+      return;
+    }
+    port.post({ type: 'pick', app: current.id, enabled: pickBox.checked });
+    request({ kind: 'inspector', enabled: pickBox.checked || inspectBox.checked });
+  });
 
   const stop = port.onMessage(onMessage);
   showTab('tree');
@@ -502,6 +672,11 @@ function el(doc: Document, tag: string, className: string): HTMLElement {
   const element = doc.createElement(tag);
   element.className = className;
   return element;
+}
+
+/** A change with its sign, so a rise reads as one at a glance. */
+function signed(delta: number): string {
+  return delta > 0 ? `+${delta}` : String(delta);
 }
 
 function badge(doc: Document, text: string, extra = ''): HTMLElement {
@@ -634,8 +809,26 @@ const STYLES = `
 .badge.render { color: var(--gd-accent); }
 .badge.command { color: var(--gd-purple); }
 .badge.patch { color: var(--gd-accent); }
+.badge.frame { color: var(--gd-green); }
 .badge.source { color: var(--gd-orange); }
 .time { color: var(--gd-faint); margin-right: 6px; }
+.cause { color: var(--gd-orange); }
+.entry.frame { color: var(--gd-muted); }
 .frames-view { padding: 8px; }
+/* Column, so the list inside scrolls itself rather than overflowing
+   the pane: without it the log grew past the bottom of the panel and
+   the newest entries could not be reached. */
+.actions-view { display: flex; flex-direction: column; }
+.streams-view { display: flex; flex-direction: column; }
+.streams-view .bar { display: flex; align-items: center; gap: 8px; }
+.streams-view .total { flex: 1; color: var(--gd-muted); }
+.streams { flex: 1; overflow: auto; padding: 4px 0; }
+.stream-row { display: flex; align-items: center; gap: 8px; padding: 1px 8px; cursor: pointer; }
+.stream-row:hover { background: var(--gd-bg-raised); }
+.stream-row .component { color: var(--gd-purple); white-space: nowrap; }
+.bar-track { flex: 1; height: 6px; border-radius: 3px; background: var(--gd-bg-raised); overflow: hidden; }
+.bar-fill { display: block; height: 100%; background: var(--gd-accent); }
+.stream-row .count { width: 76px; text-align: right; color: var(--gd-muted); white-space: nowrap; }
+.stream-row .count.changed { color: var(--gd-orange); }
 ${NODE_REPORT_STYLES}
 `;

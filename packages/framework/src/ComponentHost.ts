@@ -1,4 +1,5 @@
-import { Subscription } from 'rxjs';
+import { Subscription, type Observable } from 'rxjs';
+import { bounds, type BoundsCell } from './bounds';
 import { ChannelRegistry } from './channel/ChannelRegistry';
 import { ServiceRegistry } from './service/ServiceRegistry';
 import type { ChannelReplica } from './channel/ChannelReplica';
@@ -222,6 +223,21 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       onUnmount: hook => {
         requireRendering('onUnmount');
         this.unmountHooks.push(hook);
+      },
+      effect: <T>(source: Observable<T>, run: (value: T) => void): Subscription => {
+        // Not guarded by `requireRendering`: a teardown may be
+        // registered at any point up to disposal, and adding one to a
+        // Subscription that has already been torn down tears the new
+        // one down at once, which is the right answer for a component
+        // that has gone.
+        const subscription = source.subscribe(value => run(value));
+        this.subscriptions.add(subscription);
+        return subscription;
+      },
+      bounds: (label?: string): BoundsCell => {
+        const cell = bounds(label ?? `${this.element.tag}.bounds`);
+        this.subscriptions.add(() => cell.complete());
+        return cell;
       }
     };
   }

@@ -1,0 +1,30 @@
+{
+  "name": "@gesso/vite-plugin",
+  "version": "0.1.0",
+  "description": "Finds a Gesso application's worker entries, writes the constructions and the hot-replacement wiring, and says when a save will reload the page.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "vite": "^8.0.0"
+  },
+  "devDependencies": {
+    "vite": "^8.2.0"
+  },
+  "scripts": {
+    "build": "tsdown"
+  }
+}

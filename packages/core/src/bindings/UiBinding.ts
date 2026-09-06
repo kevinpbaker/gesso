@@ -32,6 +32,25 @@ export class UiBinding<T> {
   private currentValue!: T;
 
   /**
+   * How many values the source has produced since this binding
+   * connected, and when the last one arrived.
+   *
+   * Kept unconditionally rather than behind a devtools switch, because
+   * the question they answer — "is this prop bound, to what, and is it
+   * still emitting" — is asked *after* something has already gone
+   * wrong, and a counter that only starts when the panel opens would
+   * answer it about a different run. The cost is an increment and one
+   * `performance.now()` per emission, against a write that already
+   * walks the override cascade and marks a node dirty.
+   *
+   * `emittedAt` is on the emitting thread's clock, which is why the
+   * node report sends an age rather than the reading itself: a panel
+   * on another thread cannot subtract it from its own.
+   */
+  private emissions = 0;
+  private lastEmittedAt = 0;
+
+  /**
    * Start listening to the Observable.
    */
   connect(): void {
@@ -41,6 +60,8 @@ export class UiBinding<T> {
     this.subscription = this.observable.subscribe({
       next: value => {
         this.currentValue = value;
+        this.emissions++;
+        this.lastEmittedAt = now();
         this.graph.updateNodeProperty(this.node, this.property, value, this.dirtyFlags);
       },
       error: error => {
@@ -71,4 +92,21 @@ export class UiBinding<T> {
   value(): T {
     return this.currentValue;
   }
+
+  /** How many values the source has produced since `connect`. */
+  emissionCount(): number {
+    return this.emissions;
+  }
+
+  /**
+   * When the last value arrived, on the clock of the thread that owns
+   * the graph, or null before the first one.
+   */
+  emittedAt(): number | null {
+    return this.emissions === 0 ? null : this.lastEmittedAt;
+  }
+}
+
+function now(): number {
+  return typeof performance === 'undefined' ? Date.now() : performance.now();
 }

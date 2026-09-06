@@ -1,5 +1,7 @@
 export * from './EnvironmentNotifier';
 export * from './UiColors';
+export * from './UiContrast';
+export * from './UiDensity';
 export * from './UiEnvironment';
 export * from './UiEnvironmentKey';
 export * from './UiEnvironmentKeys';
@@ -7,5 +9,7 @@ export * from './UiEnvironmentProvider';
 export * from './UiMotion';
 export * from './UiShadows';
 export * from './UiShapes';
+export * from './UiSpacing';
 export * from './UiTheme';
+export * from './UiThemeExtension';
 export * from './UiTypography';

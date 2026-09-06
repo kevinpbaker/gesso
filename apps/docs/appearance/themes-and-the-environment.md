@@ -29,14 +29,20 @@ one is inside the example.
 
 ## What a `UiTheme` holds
 
-Four fields, and they are independent of each other:
+Five scales and two axes, and they are independent of each other:
 
-| Field        | What it is                                               |
-| ------------ | -------------------------------------------------------- |
-| `colors`     | The palette: the names a colour prop may be written as   |
-| `typography` | The type scale, in six named roles                       |
-| `shapes`     | Corner radii by name, from `none` to `full`              |
-| `shadows`    | Layered box shadows by name, from `none` to `extraLarge` |
+| Field        | What it is                                                   |
+| ------------ | ------------------------------------------------------------ |
+| `colors`     | The palette: the names a colour prop may be written as       |
+| `typography` | The type scale, in named roles                               |
+| `shapes`     | Corner radii by name, from `none` to `full`                  |
+| `shadows`    | Layered box shadows by name, from `none` to `extraLarge`     |
+| `spacing`    | Gaps and insets by name, from `none` to `huge`               |
+| `density`    | `compact`, `comfortable` or `spacious`: how tightly it packs |
+| `contrast`   | `standard` or `high`: how far a mark sits from its ground    |
+
+There is also an optional `extensions`, which is where an application's
+own token groups live; the last section of this page is about those.
 
 `colors` is the one with a lookup behind it. A colour prop accepts a
 palette name and the name is resolved against the theme the node
@@ -47,10 +53,43 @@ the array. The scale is worth using anyway, because a screen whose
 radii all come from `theme.shapes` restyles in one place, but it is a
 convention rather than a resolution the engine performs.
 
+`spacing` is read the same way `shapes` is: eight steps on the shape
+scale's own names, plus a `hairline` at the bottom, handed to a prop as
+a number. A screen written from it says `paddingX={theme.spacing.large}`
+rather than `paddingX={16}`, and gets the density axis for free.
+
 `typography` is the subject of [the type scale](/appearance/typography),
 and it matters here for one reason: a theme's palette is not what
 colours your text. Text that names no colour takes it from the
 `textStyle` in the environment, which is why a root provides both.
+
+## The two axes
+
+`density` and `contrast` are axes rather than second themes, because an
+application that has chosen its colours should not have to choose them
+twice.
+
+`withDensity(theme, 'compact')` returns the same theme with its spacing
+scale at three quarters, and records which way it has been turned so
+that asking again does not shrink it twice. Nothing else moves: a
+smaller gap between two rows is a density choice, and a smaller word is
+a typography one.
+
+`withContrast(theme, 'high')` returns the same theme with every
+foreground pushed away from the surface it is drawn on until it clears
+a 7:1 ratio. A control's own text is measured against the control
+rather than against the page, the grounds are left where they were, and
+a name a custom palette added is raised too. There is no way back: the
+raising loses what the palette was, so keep the standard theme and
+derive the high one from it, which is what an application following the
+operating system's setting does anyway.
+
+```ts
+const theme = derive([scheme, wantsContrast], (dark, high) => {
+  const base = dark ? appDarkTheme : appLightTheme;
+  return high ? withContrast(base, 'high') : base;
+});
+```
 
 ## What a colour token resolves against
 
@@ -136,11 +175,59 @@ comparison is worth knowing:
 
 - **The palette is compared over its keys**, so a palette that adds
   names has those names compared too.
-- **The type scale is compared over the six named roles.** A scale
-  carrying a role of its own beyond those six may differ in that role
-  alone and still compare equal, in which case nothing propagates.
-  Provide such a style directly as `textStyle` rather than smuggling it
-  through a theme.
+- **The type scale is compared over its keys too**, so a role an
+  application added to the scale invalidates the subtree that reads it
+  exactly as a shipped role does.
+- **The spacing scale, the density and the contrast** are compared, so
+  turning either axis is a change of theme.
+- **Each extension is compared with the comparison it declared**, which
+  is the reason a token group of your own needs no edit here.
+
+## Token groups of your own
+
+A palette name and a type role cover colour and text. An application
+always has more than that: Segue has the width its content column is
+held to and the height of its now-playing bar, and both used to be
+module level constants, which is a theme no provider can change and no
+appearance toggle can reach.
+
+`defineThemeExtension` turns such a module into part of the theme:
+
+```ts
+export interface SegueMetrics {
+  readonly columnWidth: number;
+  readonly barHeight: number;
+}
+
+export const segueMetrics = defineThemeExtension<SegueMetrics>({
+  name: 'segue.metrics',
+  defaults: { columnWidth: 600, barHeight: 88 }
+});
+
+const theme = withThemeExtension(lightTheme, segueMetrics, {
+  columnWidth: 600,
+  barHeight: 88
+});
+```
+
+Reading one is a property access on the object you declared, so an
+editor completes the token names and `metrics.barHieght` is a compile
+error:
+
+```ts
+const metrics = themeExtension(theme, segueMetrics);
+<box height={metrics.barHeight} />;
+```
+
+Nothing about `UiTheme` or `themesEqual` changes to add a group. The
+values ride in a map keyed by the symbol `defineThemeExtension` minted,
+so two groups called `brand` in two packages do not collide, and each
+is compared with the comparison it declared, which is what makes a
+change to one invalidate the subtree that reads it.
+
+A component library may declare one too. It is how a component that
+needs a token the shared vocabulary does not have gets one without
+adding a colour prop and forking the theme at every call site.
 
 ## The rest of the environment
 

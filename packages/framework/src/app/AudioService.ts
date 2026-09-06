@@ -1,7 +1,8 @@
-import { combineLatest, map, type Observable, Subject } from 'rxjs';
+import { type Observable, Subject } from 'rxjs';
 
 import { linear } from '@gesso/core';
 
+import { computed, type ComputedCell } from '../computed';
 import { internalState } from '../InternalState';
 import type { AnimationService } from './AnimationService';
 import { epochNow } from './worker/RenderWorkerProtocol';
@@ -120,17 +121,17 @@ export class AudioService {
   private readonly position = internalState(0);
   private readonly actionSubject = new Subject<AudioAction>();
 
-  /** The playback, with the position moved to now. */
-  readonly state: Observable<AudioState> = combineLatest([this.sample, this.source, this.position]).pipe(
-    map(([sample, src, position]) => ({
-      status: sample.status,
-      position,
-      duration: sample.duration,
-      buffered: sample.buffered,
-      src,
-      ...(sample.error === undefined ? {} : { error: sample.error })
-    }))
-  );
+  /**
+   * The playback, with the position moved to now.
+   *
+   * A cell rather than a stream, which is what lets a screen write
+   * `computed(() => audio.state.value.status === 'playing')` instead of
+   * listing it as a source of a `derive` (`decisions/0077`). It is the
+   * same expression `current` is, and the same three cells underneath;
+   * being a `computed` is what gives it a current value as well as a
+   * stream, without a second copy of the arithmetic.
+   */
+  readonly state: ComputedCell<AudioState> = computed(() => this.current, { label: 'AudioService.state' });
 
   /** What the platform's media controls asked for. */
   readonly actions: Observable<AudioAction> = this.actionSubject.asObservable();

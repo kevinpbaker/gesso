@@ -160,6 +160,41 @@ describe('the devtools hook', () => {
     expect(getDevtoolsHook(win).apps).toEqual([]);
   });
 
+  it('arms the page to pick a node, and tells the panel what was picked', () => {
+    const hook = getDevtoolsHook(null);
+    const { panel, heard } = attachPanel(hook);
+    const armed: boolean[] = [];
+    const listeners: ((id: string) => void)[] = [];
+    hook.register(fakeApp().app, {
+      name: 'demo',
+      picker: {
+        setEnabled: enabled => armed.push(enabled),
+        enabled: false,
+        onPick: listener => {
+          if (listener !== null) {
+            listeners.push(listener);
+          }
+        },
+        dispose: () => {}
+      }
+    });
+
+    panel.post({ type: 'pick', app: 'app-1', enabled: true });
+    expect(armed).toEqual([true]);
+
+    // The click never reaches the application; the panel hears the id.
+    listeners[0]?.('root:0:1');
+    expect(heard.at(-1)).toEqual({ type: 'picked', app: 'app-1', id: 'root:0:1' });
+  });
+
+  it('lets the panel arm an application with no picker without breaking', () => {
+    const hook = getDevtoolsHook(null);
+    const { panel } = attachPanel(hook);
+    hook.register(fakeApp().app, { name: 'demo' });
+
+    expect(() => panel.post({ type: 'pick', app: 'app-1', enabled: true })).not.toThrow();
+  });
+
   it('names an application `app` when nothing better is known', () => {
     const hook = getDevtoolsHook(null);
     hook.register(fakeApp().app);

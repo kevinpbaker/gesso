@@ -1,7 +1,7 @@
 import { BehaviorSubject, Subject } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { channel } from './ChannelToken';
+import { channel, defineChannel } from './ChannelToken';
 import { createChannelRegistry } from './createChannelRegistry';
 import { serveChannels } from './serveChannels';
 import { workerHandle, type PortHost } from '../worker/WorkerPorts';
@@ -16,6 +16,12 @@ interface CatalogCommands {
 }
 
 const Catalog = channel<CatalogView, CatalogCommands>('catalog', { products: [], status: 'loading' });
+
+/** The same declaration in the newer form: the object is the type. */
+const Moves = defineChannel('moves', {
+  view: { order: [] as string[] },
+  commands: {} as { move(from: number, to: number): void }
+});
 
 async function waitFor(condition: () => boolean, what: string): Promise<void> {
   const deadline = Date.now() + 2000;
@@ -89,28 +95,39 @@ describe('a channel across a real patch stream', () => {
     handle.dispose();
   });
 
-  it('warns once when a command is called with more than one argument, and sends the first', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const app = createCatalogViewModel();
-    const received: unknown[] = [];
+  it('carries every argument of a command, so move(from, to) is written that way', async () => {
+    // A command used to carry one payload: a second argument was
+    // dropped on the floor with a warning, and `move(from, to)` had to
+    // be written `move({ from, to })` and taken apart again.
+    const received: unknown[][] = [];
     const handle = createChannelRegistry([
       {
-        token: Catalog,
+        token: Moves,
         source: {
-          view: { products: app.products, status: app.status },
-          commands: { add: (name: string) => received.push(name) }
+          view: { order: new BehaviorSubject<string[]>(['a', 'b', 'c']) },
+          commands: { move: (from: number, to: number) => received.push([from, to]) }
         }
       }
     ]);
-    const send = handle.registry.get(Catalog).send as unknown as Record<string, (...args: unknown[]) => void>;
-    send.add('apple', 'extra');
-    send.add('pear', 'extra');
-    await waitFor(() => received.length === 2, 'the commands');
+    handle.registry.get(Moves).send.move(0, 2);
+    await waitFor(() => received.length === 1, 'the command');
 
-    expect(received).toEqual(['apple', 'pear']);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain("command 'add' was called with 2 arguments");
-    warn.mockRestore();
+    expect(received).toEqual([[0, 2]]);
+    handle.dispose();
+  });
+
+  it('declares a channel from one object, view keys, initial values and command shapes together', async () => {
+    const order = new BehaviorSubject<string[]>(['a']);
+    const handle = createChannelRegistry([{ token: Moves, source: { view: { order }, commands: { move: () => {} } } }]);
+    const moves = handle.registry.get(Moves);
+
+    // Seeded from the object the token was declared with, which is
+    // also the type of the view: there is no interface to keep in step
+    // with a literal.
+    expect(moves.view.order.value).toEqual([]);
+    await waitFor(() => moves.view.order.value.length === 1, 'the first patch');
+    order.next(['a', 'b']);
+    await waitFor(() => moves.view.order.value.length === 2, 'the order patch');
     handle.dispose();
   });
 

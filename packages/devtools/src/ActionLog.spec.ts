@@ -273,6 +273,49 @@ describe('the action log', () => {
     expect(log.entries.map(entry => entry.kind)).toEqual(['command', 'patch']);
   });
 
+  it('gives everything one input caused the same cause, and mints nothing for an input that caused nothing', () => {
+    const { log, replica } = setup();
+
+    // An input that sends nothing: the label is opened and dropped,
+    // and the next one is still the first cause anybody sees.
+    log.cause('pointerMove (10, 10)')();
+    const close = log.cause('pointerUp (40, 40)');
+    replica.send.step(2);
+    close();
+
+    expect(log.entries.map(entry => entry.cause?.id)).toEqual([1, 1]);
+    expect(log.entries[0]?.cause?.label).toBe('pointerUp (40, 40)');
+  });
+
+  it('stops handing a command out as the cause once a frame has drawn its answer', () => {
+    const { log, replica, ticks } = setup();
+
+    const close = log.cause('pointerUp (40, 40)');
+    replica.send.step(2);
+    close();
+    log.frame(11);
+    // Whatever the channel says next is its own doing: nobody pressed
+    // anything, and the frame that drew the answer closed the click.
+    ticks.next(9);
+
+    const kinds = log.entries.map(entry => `${entry.kind}${entry.cause === undefined ? '' : ` #${entry.cause.id}`}`);
+    expect(kinds).toEqual(['command #1', 'patch #1', 'frame #1', 'patch']);
+  });
+
+  it('records a frame only when there is something for it to close', () => {
+    const { log, replica } = setup();
+
+    log.frame(1);
+    log.frame(2);
+    expect(log.entries).toEqual([]);
+
+    replica.send.step(1);
+    log.frame(3);
+    log.frame(4);
+
+    expect(log.entries.filter(entry => entry.kind === 'frame').map(entry => entry.frame)).toEqual([3]);
+  });
+
   it('records an error the owning thread reported', () => {
     const { log, replica } = setup();
     replica.onError(() => {});

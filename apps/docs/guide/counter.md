@@ -23,11 +23,25 @@ changes the label still reaches this node. And `internalState(0)` is
 state the component owns; writing `count.value++` marks exactly the
 bindings that read it.
 
-Notice what is _not_ in it: no colours. The text takes the theme's, and
-`primary` is a theme token rather than a hex value, so the counter
+Notice what is _not_ in it. There is no colour: not a hex value, not
+even a palette name, because a `Button` reads the theme's control
+tokens and text takes its colour from the type scale, so the counter
 follows this site's light and dark toggle without knowing that either
 exists. [Light and dark](/guide/appearance) shows the root component
 that arranges it.
+
+There is no size either. `textStyle="title"` names a role in the
+theme's [type scale](/appearance/typography) rather than a font size, a
+weight and a line height, and the button's padding comes from the
+theme's spacing scale rather than from four numbers on the element.
+Tokens are the idiom throughout this site: a number or a colour written
+on an element is the exception, and usually means a role is missing
+from the scale.
+
+`<Button label="Add one" />` is one prop for two jobs. It is the words
+on the face of the button and the name an assistive technology reads,
+because in a button that has words on it those are the same thing. The
+[Button page](/components/button) has the rest.
 
 ## Next
 

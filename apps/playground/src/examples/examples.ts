@@ -116,5 +116,18 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'an idle app schedules no frames at all.',
     source: 'apps/playground/src/examples/AnimationExampleApp.tsx',
     tags: ['animation', 'transitions', 'springs', 'layout animation', 'reduced motion', 'JSX', 'render worker']
+  },
+  {
+    route: 'example-paint',
+    title: 'Painting',
+    description:
+      'The part of the framework an application reaches by writing a function rather than setting a property. A ' +
+      'sparkline, a gauge, three vector paths and a frosted mask, all drawn through one surface that names no ' +
+      'renderer: switch between Canvas2D and WebGPU with the button in the header and nothing on the page is ' +
+      'written twice, because the calls are recorded once and rasterised once and both backends draw the result. ' +
+      'Each painter runs when its inputs change and not once per frame, so a still page draws four images and ' +
+      'runs no drawing code at all.',
+    source: 'apps/playground/src/examples/PaintApp.tsx',
+    tags: ['painting', 'vector paths', 'both renderers', 'clip and blur', 'JSX', 'render worker']
   }
 ];

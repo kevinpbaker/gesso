@@ -2273,6 +2273,19 @@ export class LayoutEngine {
       }
       return { width: width + paddingH, height: paragraph.height + paddingV };
     }
+    if (node.type === UiNodeType.Paint) {
+      // A painter may declare the size it wants when nothing else
+      // gives the node one, which is how a sparkline in a row of text
+      // gets a box without the caller restating its dimensions. It is
+      // the leaf equivalent of a paragraph's measured width, and like
+      // one it is only a preference: an explicit width, a flex or a
+      // stretch still wins.
+      const paint = node.properties.get('paint') as { intrinsicWidth?: number; intrinsicHeight?: number } | undefined;
+      const intrinsicWidth = paint?.intrinsicWidth ?? 0;
+      rec.minContentWidth = intrinsicWidth + paddingH;
+      rec.maxContentWidth = intrinsicWidth + paddingH;
+      return { width: intrinsicWidth + paddingH, height: (paint?.intrinsicHeight ?? 0) + paddingV };
+    }
     rec.minContentWidth = paddingH;
     rec.maxContentWidth = paddingH;
     return { width: paddingH, height: paddingV };
@@ -3343,14 +3356,14 @@ export class LayoutEngine {
     rec.minHeight = typeof minHeight === 'number' ? minHeight : 0;
     rec.maxWidth = this.lengthProp(node, 'maxWidth', base.width) ?? Infinity;
     rec.maxHeight = this.lengthProp(node, 'maxHeight', base.height) ?? Infinity;
-    rec.paddingLeft = this.spacingProp(props, 'padding', 'paddingLeft');
-    rec.paddingRight = this.spacingProp(props, 'padding', 'paddingRight');
-    rec.paddingTop = this.spacingProp(props, 'padding', 'paddingTop');
-    rec.paddingBottom = this.spacingProp(props, 'padding', 'paddingBottom');
-    const marginLeft = this.marginProp(props, 'marginLeft');
-    const marginRight = this.marginProp(props, 'marginRight');
-    const marginTop = this.marginProp(props, 'marginTop');
-    const marginBottom = this.marginProp(props, 'marginBottom');
+    rec.paddingLeft = this.spacingProp(props, 'paddingLeft', 'paddingX');
+    rec.paddingRight = this.spacingProp(props, 'paddingRight', 'paddingX');
+    rec.paddingTop = this.spacingProp(props, 'paddingTop', 'paddingY');
+    rec.paddingBottom = this.spacingProp(props, 'paddingBottom', 'paddingY');
+    const marginLeft = this.marginProp(props, 'marginLeft', 'marginX');
+    const marginRight = this.marginProp(props, 'marginRight', 'marginX');
+    const marginTop = this.marginProp(props, 'marginTop', 'marginY');
+    const marginBottom = this.marginProp(props, 'marginBottom', 'marginY');
     rec.marginLeftAuto = marginLeft === 'auto';
     rec.marginRightAuto = marginRight === 'auto';
     rec.marginTopAuto = marginTop === 'auto';
@@ -3691,10 +3704,9 @@ export class LayoutEngine {
     return resolveLength(raw, base, property, true);
   }
 
-  /** A margin side: the side's own value, else the shorthand; may be auto. */
-  private marginProp(props: ReadonlyMap<string, unknown>, side: string): number | 'auto' {
-    const explicit = props.get(side);
-    const value = explicit !== undefined ? explicit : props.get('margin');
+  /** A margin side: the side's own value, else its axis, else the shorthand; may be auto. */
+  private marginProp(props: ReadonlyMap<string, unknown>, side: string, axis: string): number | 'auto' {
+    const value = props.get(side) ?? props.get(axis) ?? props.get('margin');
     if (value === undefined) {
       return 0;
     }
@@ -3720,12 +3732,26 @@ export class LayoutEngine {
     return value === 'ellipsis' ? 'ellipsis' : undefined;
   }
 
-  private spacingProp(props: ReadonlyMap<string, unknown>, base: string, side: string): number {
+  /**
+   * A padding side: the side's own value, else its axis, else the
+   * shorthand.
+   *
+   * Three steps rather than two since `paddingX` and `paddingY`
+   * arrived. Most specific wins, as in CSS, so `padding={8}
+   * paddingX={16} paddingLeft={0}` is 0 left, 16 right, 8 top and
+   * bottom. `props.get` on a name nothing wrote costs a miss on a Map,
+   * which is what the two-step version cost per side already.
+   */
+  private spacingProp(props: ReadonlyMap<string, unknown>, side: string, axis: string): number {
     const explicit = props.get(side);
     if (explicit !== undefined) {
       return this.toNumber(explicit) ?? 0;
     }
-    const shorthand = props.get(base);
+    const onAxis = props.get(axis);
+    if (onAxis !== undefined) {
+      return this.toNumber(onAxis) ?? 0;
+    }
+    const shorthand = props.get('padding');
     if (shorthand !== undefined) {
       return this.toNumber(shorthand) ?? 0;
     }

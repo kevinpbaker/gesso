@@ -11,12 +11,15 @@ import type { UiGradient } from './UiGradient';
 import { gradientsEqual, validateGradient } from './UiGradient';
 import type { UiTransform } from './UiTransform';
 import { transform, transformsEqual } from './UiTransform';
+import type { UiPaint, UiPath } from '../rendering/PaintSurface';
+import { paintValuesEqual, pathValuesEqual } from '../rendering/PaintSurface';
 import type { UiTextStyle } from './UiTextStyle';
 import { defaultTextStyle } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
 import type { UiLength, UiTrackSize } from '../layout/UiLength';
 import type { UiNode } from '../graph/UiNode';
 import type { UiTheme } from '../environment/UiTheme';
+import type { UiTypographyRole } from '../environment/UiTypography';
 import type { UiImage } from './UiImage';
 import type { UiVideoSurface } from './UiVideo';
 import type { UiVirtualWindow } from '../composition/UiVirtualWindow';
@@ -103,8 +106,44 @@ export const UiProperties = {
     affects: L
   }),
 
+  /**
+   * Space inside the box, on all four sides.
+   *
+   * A single number, and deliberately not a tuple or an object: see
+   * `paddingX` below, and `decisions/0079-tokens-a-button-and-variants.md`.
+   */
   padding: defineProperty<number | undefined>({
     name: 'padding',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /**
+   * Space inside the box, left and right.
+   *
+   * The idiom the documentation teaches for a box that is padded more
+   * on one axis than the other, which is nearly every box: a card, a
+   * row, a button, a header. It resolves between `padding` and the
+   * four sides, so `paddingX={16} paddingTop={10}` says what it looks
+   * like it says.
+   *
+   * The four sides stay, because an inset on one edge alone is a thing
+   * boxes really need and no axis can express it. What the docs stop
+   * teaching is the *pair*: `paddingLeft` and `paddingRight` set to the
+   * same number is `paddingX`, and Segue wrote that pair fifty-six
+   * times.
+   */
+  paddingX: defineProperty<number | undefined>({
+    name: 'paddingX',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Space inside the box, top and bottom. See `paddingX`. */
+  paddingY: defineProperty<number | undefined>({
+    name: 'paddingY',
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -140,6 +179,22 @@ export const UiProperties = {
 
   margin: defineProperty<UiLength | undefined>({
     name: 'margin',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Space outside the box, left and right. See `paddingX`. */
+  marginX: defineProperty<UiLength | undefined>({
+    name: 'marginX',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Space outside the box, top and bottom. See `paddingX`. */
+  marginY: defineProperty<UiLength | undefined>({
+    name: 'marginY',
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -1202,7 +1257,17 @@ export const UiProperties = {
     affects: E
   }),
 
-  textStyle: defineProperty<UiTextStyle | undefined>({
+  /**
+   * The type this element and its subtree are written in: a role in
+   * the theme's scale (`textStyle="title"`), or a style of its own.
+   *
+   * A role is looked up in the theme the element is under, so the same
+   * `title` is one size on a phone theme and another on a dense one,
+   * and neither is written on the element. `UiGraph` resolves it while
+   * it builds the environment, which is the same place the theme it
+   * resolves against arrives.
+   */
+  textStyle: defineProperty<UiTextStyle | UiTypographyRole | undefined>({
     name: 'textStyle',
     defaultValue: undefined,
     inherited: false,
@@ -1226,6 +1291,65 @@ export const UiProperties = {
     inherited: false,
     affects: P,
     compare: visualStatesEqual
+  }),
+
+  // -------------------------------------------------------------------------
+  // Painting
+  // -------------------------------------------------------------------------
+
+  /**
+   * What an application draws into a node itself.
+   *
+   * Layout as well as paint, for the reason `text` carries layout: a
+   * painter may declare an intrinsic size, and a node sized by its
+   * content has to be measured again when that content changes. A
+   * painted node with an explicit width and height is a relayout
+   * boundary, so a chart repainting on a stream re-measures one leaf.
+   *
+   * See `rendering/PaintSurface.ts` for the vocabulary and
+   * `decisions/0078` for why it is defined there.
+   */
+  paint: defineProperty<UiPaint | undefined>({
+    name: 'paint',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P,
+    compare: paintValuesEqual
+  }),
+
+  /** A static vector shape: `rendering/PaintSurface.ts`'s `UiPath`. */
+  path: defineProperty<UiPath | undefined>({
+    name: 'path',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P,
+    compare: pathValuesEqual
+  }),
+
+  /**
+   * SVG path data the node's painted content is clipped to, in its own
+   * logical pixels. A rounded mask, without the painter restating it.
+   */
+  clipPath: defineProperty<string | undefined>({
+    name: 'clipPath',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P
+  }),
+
+  /**
+   * Blurs the node's painted content, by a radius in logical pixels.
+   *
+   * The painted content only: blurring a subtree, and blurring what
+   * lies behind one, both need an offscreen pass the WebGPU backend
+   * does not have, and `decisions/0078` says so rather than shipping
+   * the Canvas2D half of it.
+   */
+  blur: defineProperty<number | undefined>({
+    name: 'blur',
+    defaultValue: undefined,
+    inherited: false,
+    affects: P
   })
 } as const;
 

@@ -2,6 +2,8 @@ import type { FrameworkChild } from '../ComponentElement';
 import { ComponentHostResolver } from '../ComponentHostResolver';
 import { getComponentMetadata } from '../metadata';
 import {
+  describeStream,
+  formatNodePath,
   printPropValue,
   type UiEnvironmentReport,
   type UiNodeReport,
@@ -34,6 +36,8 @@ import {
   VIRTUAL_WINDOW_PROP,
   type VirtualItemMeasure,
   DirtyFlags,
+  propertyEffects,
+  setPerformanceMarks,
   resolveCursor,
   type UiNode,
   UiNodeType,
@@ -344,6 +348,15 @@ export class GessoRuntime {
   private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
   /** Whether a panel wants a tree snapshot after every frame that changed the tree. */
   private watchingTree = false;
+  /**
+   * Live subscriptions as of the last snapshot sent.
+   *
+   * A leak that adds no nodes changes nothing `frameChangedTree` looks
+   * at, so a panel watching for one would never be told. This is the
+   * second reason to resend, and it costs a count only while a panel
+   * is attached.
+   */
+  private lastSubscriptions = -1;
   /** Whether a panel wants every frame's metrics. */
   private watchingFrames = false;
   /** The node a panel has selected, whose report is kept fresh; null for none. */
@@ -412,6 +425,18 @@ export class GessoRuntime {
    */
   private semanticsBoxes = new Map<string, LayoutBox>();
   private lastFocusedId: string | null = null;
+  /**
+   * Where the caret was when `reload` replaced the tree, put back on
+   * the frame that lays the new one out, and null when nothing had it.
+   *
+   * Null is restored as well as an id, which is the second half of
+   * `decisions/0049`'s gap: a rebuilt subtree runs `autoFocus` again,
+   * and a dialog's first field taking the caret away from where the
+   * person was is worse than a reload doing nothing at all.
+   */
+  private focusAfterReload: string | null = null;
+  /** Whether `focusAfterReload` is waiting to be applied. */
+  private restoringFocus = false;
   /** A frame changed semantics while nothing was listening; see `semanticsTree`. */
   private semanticsStale = false;
   private lastEditingState: EditingState | null = null;
@@ -752,7 +777,10 @@ export class GessoRuntime {
         ? null
         : (error, node, type) => {
             const message = error instanceof Error ? error.message : String(error);
-            listener(`${message} (listener: ${type} on ${node.id})`, error instanceof Error ? error.stack : undefined);
+            listener(
+              `${message} (listener: ${type} on ${this.pathOf(node)})`,
+              error instanceof Error ? error.stack : undefined
+            );
           }
     );
   }
@@ -925,12 +953,12 @@ export class GessoRuntime {
   handleDevtools(request: DevtoolsRequest): void {
     switch (request.kind) {
       case 'tree':
-        this.devtoolsListener?.({ kind: 'tree', tree: this.snapshotTree() });
+        this.sendTree();
         break;
       case 'watchTree':
         this.watchingTree = request.enabled;
         if (request.enabled) {
-          this.devtoolsListener?.({ kind: 'tree', tree: this.snapshotTree() });
+          this.sendTree();
         }
         break;
       case 'inspect':
@@ -952,9 +980,47 @@ export class GessoRuntime {
       case 'inspector':
         this.setInspectorEnabled(request.enabled);
         break;
+      case 'setProp':
+        this.writeInspectedProperty(request.id, request.name, request.value);
+        break;
+      case 'marks':
+        setPerformanceMarks(request.enabled);
+        break;
       case 'console':
         break;
     }
+  }
+
+  /**
+   * Writes a property from a panel, on a node named by id.
+   *
+   * Through the same call the builder makes, so the write is an
+   * ordinary one: a declared transition animates towards it, the
+   * override cascade decides whether a modifier is already writing
+   * this property, the equality check drops a write that changes
+   * nothing, and the registry says what the property invalidates. A
+   * panel that reached into the node's own map instead would produce a
+   * value the cascade does not know about and a screen that does not
+   * redraw.
+   *
+   * `null` removes the property rather than writing null, which is how
+   * an inherited value is put back; that one goes past the cascade,
+   * because there is no value to cascade.
+   *
+   * The selected node's report is re-sent by the frame this dirties,
+   * so nothing is echoed from here.
+   */
+  private writeInspectedProperty(id: string, name: string, value: unknown): void {
+    const node = this.graph.getNode(id);
+    if (node === undefined) {
+      return;
+    }
+    const effects = propertyEffects(name);
+    if (value === null) {
+      this.graph.applyResolvedProperty(node, name, false, undefined, effects);
+      return;
+    }
+    this.graph.updateNodeProperty(node, name, value, effects);
   }
 
   /**
@@ -976,15 +1042,35 @@ export class GessoRuntime {
       }
       const host = this.resolver.hostFor(node.id);
       const text = treeText(node.getProperty('text'));
+      // Counted per node and added up by the panel towards the nearest
+      // component anchor, because the tree is what knows which
+      // component a node belongs to and the snapshot is already being
+      // walked.
+      const subscriptions = this.graph.subscriptionsForNode(node);
       return {
         id: node.id,
         type: node.type,
         ...(host === undefined ? {} : { component: getComponentMetadata(host.component).tag }),
         ...(text === undefined ? {} : { text }),
+        ...(subscriptions === 0 ? {} : { subscriptions }),
         children
       };
     };
-    return { root: visit(root), nodes: count };
+    return { root: visit(root), nodes: count, subscriptions: this.graph.subscriptionCount };
+  }
+
+  /**
+   * Sends a snapshot, and remembers the subscription count that went
+   * with it.
+   *
+   * Every route to a snapshot goes through here, so the count a later
+   * frame compares against is the one a panel was last told, whichever
+   * request produced it.
+   */
+  private sendTree(): void {
+    const tree = this.snapshotTree();
+    this.lastSubscriptions = tree.subscriptions;
+    this.devtoolsListener?.({ kind: 'tree', tree });
   }
 
   /** `inspectNode` for a node named by id, or null when the tree has no such node. */
@@ -1252,6 +1338,23 @@ export class GessoRuntime {
       });
   }
 
+  /**
+   * A node as a path a person reads, for an error message: `App >
+   * TrackScreen > ActionRow > Button "Like"`.
+   *
+   * The owner chain and the accessible name are both already computed
+   * for the inspector; the only new thing here is that an error is
+   * worth spending them on. See `formatNodePath`.
+   */
+  private pathOf(node: UiNode): string {
+    const label = this.semanticsOf(node)?.label;
+    return formatNodePath(this.ownersOf(node), {
+      type: node.type,
+      id: node.id,
+      ...(label === undefined ? {} : { label })
+    });
+  }
+
   /** The components that rendered a node, nearest first. */
   private ownersOf(node: UiNode): UiOwnerReport[] {
     const owners: UiOwnerReport[] = [];
@@ -1279,11 +1382,18 @@ export class GessoRuntime {
       }
       const binding = this.graph.getBindingForProperty(node, name);
       if (binding !== undefined) {
-        // A labelled cell says where the value comes from: `Card.title`,
-        // `queue.current`. An anonymous pipe only has the binding's id.
-        const label = (binding.observable as { label?: unknown }).label;
-        const from = typeof label === 'string' ? label : binding.id;
-        out.push({ name, value: printPropValue(value), origin: 'binding', source: `bound to ${from}` });
+        // Which stream, what it last said, and how long ago. A yes to
+        // "is this bound" was `decisions/0045`'s answer and is not
+        // enough to debug with: a stream that stopped and one that has
+        // not emitted since the screen was built look the same.
+        const stream = describeStream(binding, timeOrigin());
+        out.push({
+          name,
+          value: printPropValue(value),
+          origin: 'binding',
+          source: `bound to ${stream.source}`,
+          stream
+        });
         continue;
       }
       out.push({ name, value: printPropValue(value), origin: 'element' });
@@ -1447,8 +1557,32 @@ export class GessoRuntime {
     // highlighted one is about to be removed for certain.
     this.inspector.setHovered(null);
     this.inspector.setHighlighted(null);
+    // Read before the rebuild and applied after the frame that lays
+    // the new tree out, because that is the frame `autoFocus` fires
+    // on and this has to be the last word.
+    this.focusAfterReload = this.focusManager.focusedNode?.id ?? null;
+    this.restoringFocus = true;
     this.buildRoot(rootDefinition);
     this.graph.markDirty(this.root, DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Paint);
+  }
+
+  /**
+   * Puts the caret back where it was before a reload.
+   *
+   * A node id is positional and the builder reconciles, so the field
+   * that had focus keeps its id across a replacement of the module
+   * that rendered it, and the same id in the new tree is the same
+   * place on the screen. When it is not there any more — the edit
+   * removed it — the focus is cleared rather than left wherever the
+   * rebuild happened to put it.
+   */
+  private restoreFocusAfterReload(): void {
+    const id = this.focusAfterReload;
+    this.focusAfterReload = null;
+    const node = id === null ? undefined : this.graph.getNode(id);
+    if (node === undefined || !this.focusManager.focus(node)) {
+      this.focusManager.blur();
+    }
   }
 
   dispose(): void {
@@ -2111,6 +2245,15 @@ export class GessoRuntime {
       });
     }
 
+    // After the layout listeners rather than before, because
+    // `autoFocus` is one of them: it takes focus on the first layout
+    // of the node it is attached to, and every node in a subtree a
+    // reload replaced is having its first layout on this frame.
+    if (this.restoringFocus && laidOut) {
+      this.restoringFocus = false;
+      this.restoreFocusAfterReload();
+    }
+
     // Before the semantics phase, not after the frame: the mirror
     // decides whether to move DOM focus from what the editing proxy
     // reports, and a field that gains focus this frame must have been
@@ -2408,8 +2551,8 @@ export class GessoRuntime {
     if (highlighted !== null && this.graph.getNode(highlighted.id) !== highlighted) {
       this.inspector.setHighlighted(null);
     }
-    if (this.watchingTree && frameChangedTree(frame)) {
-      this.devtoolsListener({ kind: 'tree', tree: this.snapshotTree() });
+    if (this.watchingTree && (frameChangedTree(frame) || this.graph.subscriptionCount !== this.lastSubscriptions)) {
+      this.sendTree();
     }
     if (this.selectedId !== null) {
       this.sendSelectedReport();
@@ -2532,7 +2675,15 @@ function now(): number {
  * is an epoch already.
  */
 function epochAt(reading: number): number {
-  return typeof performance !== 'undefined' ? performance.timeOrigin + reading : reading;
+  return timeOrigin() + reading;
+}
+
+/**
+ * What to add to a `now()` reading to get an epoch one: zero when
+ * `now()` was already `Date.now()`.
+ */
+function timeOrigin(): number {
+  return typeof performance !== 'undefined' ? performance.timeOrigin : 0;
 }
 
 function editingStatesEqual(a: EditingState | null, b: EditingState | null): boolean {

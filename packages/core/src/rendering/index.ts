@@ -29,6 +29,25 @@ export {
   DEFAULT_LINE_HEIGHT_FACTOR
 } from './PaintState';
 export type { PaintState, UiImage, TextAlign, VerticalAlign, ObjectFit } from './PaintState';
+export { paintValuesEqual, pathValuesEqual, inputsEqual } from './PaintSurface';
+export type {
+  PaintSurface,
+  PaintBox,
+  PaintFillRule,
+  PaintLineCap,
+  PaintLineJoin,
+  PaintTextAlign,
+  PaintTextStyle,
+  UiPaint,
+  UiPath
+} from './PaintSurface';
+export { PaintRecorder, replayPaint, EMPTY_RECORDING } from './PaintRecording';
+export type { PaintOp, PaintRecording } from './PaintRecording';
+export { tracePathData } from './PaintPathData';
+export { PaintTarget } from './PaintTarget';
+export type { PaintContext2D, PaintGradient, PaintResolver } from './PaintTarget';
+export { PaintPictureCache, paintPictures } from './PaintPicture';
+export type { PaintCanvas, PaintCanvasFactory, PaintStats } from './PaintPicture';
 export { parseTransform } from '../properties/UiTransform';
 export type { UiTransform } from '../properties/UiTransform';
 export type { LayoutReader, RenderContext } from './RenderContext';

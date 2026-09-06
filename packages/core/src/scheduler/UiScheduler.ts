@@ -1,5 +1,6 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { DirtyNodeSet } from '../graph/DirtyNodeSet';
+import { markNow, measureSpan, performanceMarksEnabled } from './PerformanceMarks';
 import { UiFrame } from './UiFrame';
 import type { UiFrameClock, UiFrameClockFactory, UiFrameTime } from './UiFrameClock';
 import type { UiNode } from '../graph/UiNode';
@@ -186,18 +187,51 @@ export class UiScheduler {
     this.handleFrame(time);
   }
 
+  /**
+   * Runs one frame, and names its three parts for the browser's
+   * profiler when anything is recording (`PerformanceMarks`).
+   *
+   * The three are the ones this class owns the boundaries of, and they
+   * are exact rather than reconstructed: the work before the dirty set
+   * is taken (animations, patches, environment, virtualisation), the
+   * taking of it, and everything the frame callback does with it
+   * (layout, semantics, render). The per-phase breakdown inside those
+   * belongs to whoever runs the phases and reaches a panel as
+   * `FrameMetrics.phases`.
+   *
+   * `measuring` is read once and the clock is read only when it is
+   * true, so a frame nobody is profiling pays one boolean read.
+   */
   private handleFrame(time: UiFrameTime): void {
+    const measuring = performanceMarksEnabled();
+    const started = measuring ? markNow() : 0;
     this.pending = false;
     this.collecting = true;
     let frame: UiFrame;
+    let collected = 0;
     try {
       this.beforeCollect?.(time);
+      if (measuring) {
+        collected = markNow();
+        measureSpan('before collect', started, collected);
+      }
       frame = this.collectFrame(time);
     } finally {
       this.collecting = false;
     }
+    let processed = 0;
+    if (measuring) {
+      processed = markNow();
+      measureSpan('collect', collected, processed);
+    }
     if (frame.size > 0) {
       this.onFrame(frame);
+    }
+    if (measuring) {
+      const finished = markNow();
+      const detail = { frame: frame.id, nodes: frame.size };
+      measureSpan('process', processed, finished, detail);
+      measureSpan('frame', started, finished, detail);
     }
     // Work may have arrived while the frame was being processed.
     // The dirty listener also arms a frame, but this covers a

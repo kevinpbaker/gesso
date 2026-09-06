@@ -1,11 +1,28 @@
-import type { UiNodeReport, UiPropReport } from '@gesso/framework';
+import { formatAge, type UiNodeReport, type UiPropReport } from '@gesso/framework';
+
+export interface NodeReportViewOptions {
+  /**
+   * Makes the props editable, calling this with the new value when one
+   * is committed; `null` means "remove it", which puts an inherited
+   * value back.
+   *
+   * Absent for a read-only view. The corner inspector passes nothing,
+   * because it sets `pointer-events: none` and could not be typed into
+   * anyway (`decisions/0045`).
+   */
+  onEditProp?(name: string, value: unknown): void;
+}
 
 /**
  * A `UiNodeReport` as DOM: the node inspector's body, shared with the
  * devtools panel so a node read in a corner of the canvas and a node
  * picked from a tree are described in the same words.
  */
-export function renderNodeReport(doc: Document, report: UiNodeReport): HTMLElement[] {
+export function renderNodeReport(
+  doc: Document,
+  report: UiNodeReport,
+  options: NodeReportViewOptions = {}
+): HTMLElement[] {
   const out: HTMLElement[] = [
     heading(doc, `${report.type} ${report.id}`),
     line(
@@ -52,7 +69,7 @@ export function renderNodeReport(doc: Document, report: UiNodeReport): HTMLEleme
     }
   }
   if (report.props.length > 0) {
-    out.push(section(doc, 'props'), propList(doc, report.props));
+    out.push(section(doc, 'props'), propList(doc, report.props, options));
   }
   if (report.environment.length > 0) {
     const list = doc.createElement('dl');
@@ -113,7 +130,7 @@ function note(doc: Document, text: string): HTMLElement {
  * the one that surprises people: B1's cascade is invisible until
  * something says which of the two is on screen.
  */
-function propList(doc: Document, props: readonly UiPropReport[]): HTMLElement {
+function propList(doc: Document, props: readonly UiPropReport[], options: NodeReportViewOptions): HTMLElement {
   const list = doc.createElement('dl');
   list.className = 'rows';
   for (const prop of props) {
@@ -125,9 +142,87 @@ function propList(doc: Document, props: readonly UiPropReport[]): HTMLElement {
     if (prop.source !== undefined) {
       value.append(note(doc, prop.source));
     }
+    if (prop.stream !== undefined) {
+      // The three things a "bound" mark never said: what the stream
+      // last produced, how many values it has produced, and how long
+      // ago. A prop that is not updating and a prop whose stream has
+      // said nothing since the screen was built look identical
+      // without them.
+      const stream = doc.createElement('span');
+      stream.className = 'stream';
+      const emittedAt = prop.stream.emittedAt;
+      const age = emittedAt === null ? 'no value yet' : `${formatAge(Math.max(0, Date.now() - emittedAt))} ago`;
+      const count = `${prop.stream.emissions}×`;
+      stream.textContent = `${count} · ${age}${prop.stream.connected ? '' : ' · disconnected'}`;
+      stream.title = `${prop.stream.source} last emitted ${prop.stream.value}`;
+      value.append(stream);
+    }
+    if (options.onEditProp !== undefined) {
+      makeEditable(doc, value, prop, options.onEditProp);
+    }
     list.append(term, value);
   }
   return list;
+}
+
+/**
+ * Turns a prop's value into a field on a click, and writes it back on
+ * Enter.
+ *
+ * Typed rather than stepped, because the values are of every kind a
+ * property can hold and a spinner would only serve the numbers. The
+ * text is read as JSON when it parses and as a plain string when it
+ * does not, so `12`, `"#ff0000"`, `#ff0000` and `[8, 4]` all mean what
+ * they look like. Empty removes the property.
+ *
+ * Escape and blur both cancel: this writes into a running application,
+ * and a value committed by looking away is not what anyone meant.
+ */
+function makeEditable(
+  doc: Document,
+  cell: HTMLElement,
+  prop: UiPropReport,
+  commit: (name: string, value: unknown) => void
+): void {
+  cell.classList.add('editable');
+  cell.title = 'Click to edit';
+  cell.addEventListener('click', () => {
+    if (cell.querySelector('input') !== null) {
+      return;
+    }
+    const field = doc.createElement('input');
+    field.type = 'text';
+    field.className = 'edit';
+    field.value = prop.value;
+    cell.textContent = '';
+    cell.append(field);
+    field.focus();
+    field.select();
+    const cancel = (): void => {
+      cell.textContent = prop.value;
+    };
+    field.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        cancel();
+        return;
+      }
+      if (event.key !== 'Enter') {
+        return;
+      }
+      const text = field.value.trim();
+      commit(prop.name, text === '' ? null : parseValue(text));
+    });
+    field.addEventListener('blur', cancel);
+  });
+}
+
+/** JSON where it parses, the text itself where it does not. */
+function parseValue(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 function round(value: number): string {
@@ -159,6 +254,19 @@ dt.modifier { color: var(--gd-purple, #d2a8ff); }
 dt.binding { color: var(--gd-green, #7ee787); }
 dt.provided { color: var(--gd-orange, #ffa657); }
 dd { margin: 0; overflow-wrap: anywhere; }
+dd.editable { cursor: pointer; border-radius: 3px; }
+dd.editable:hover { background: var(--gd-bg-hover, #21262d); }
+.edit {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--gd-accent, #79c0ff);
+  border-radius: 3px;
+  padding: 0 3px;
+  background: var(--gd-bg, #0d1117);
+  color: var(--gd-text, #e6edf3);
+  font: inherit;
+}
 .note { color: var(--gd-faint, #6e7681); }
+.stream { display: block; color: var(--gd-green, #7ee787); }
 .explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--gd-text-strong, #c9d1d9); }
 `;

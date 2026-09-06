@@ -9,10 +9,19 @@ export interface ChannelPort {
   onmessage: ((event: { data: unknown }) => void) | null;
 }
 
-/** Render thread → the thread that owns the channel. */
+/**
+ * Render thread → the thread that owns the channel.
+ *
+ * A command's first argument stayed `payload` when commands learned to
+ * take more than one, and the rest travel beside it. That is not
+ * tidiness: an older view talking to a newer application worker sends
+ * no `rest`, which reads as the one-argument call it is, and an older
+ * application worker ignores the field, which is exactly what it did
+ * before the field existed.
+ */
 export type ChannelClientMessage =
   | { type: 'channel:sync' }
-  | { type: 'channel:command'; command: string; payload: unknown };
+  | { type: 'channel:command'; command: string; payload: unknown; rest?: unknown[] };
 
 /** The owning thread → render thread. */
 export type ChannelHostMessage =

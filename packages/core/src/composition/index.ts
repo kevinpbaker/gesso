@@ -25,6 +25,7 @@ export type {
   EditableTextProps,
   BoxProps,
   StackProps,
+  PaintElementProps,
   ButtonProps,
   RowProps,
   ColumnProps,
@@ -32,7 +33,7 @@ export type {
   GridProps
 } from './UiElementProps';
 export { createElement } from './UiFactory';
-export { Box, Stack, Text, EditableText, Button, Row, Column, ScrollView, Grid } from './UiComponents';
+export { Box, Stack, Text, EditableText, Button, Paint, Row, Column, ScrollView, Grid } from './UiComponents';
 export { UiGraphBuilder } from './UiGraphBuilder';
 export { LazyColumn, LazyGrid, LazyRow, type LazyGridProps, type LazyListProps } from './UiLazyList';
 export {

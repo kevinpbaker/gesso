@@ -5,7 +5,7 @@ description: Building a form from @gesso/components, what each control brings wi
 # Using components
 
 `@gesso/components` is the library you build screens out of: inputs,
-overlays, structure, data and media, twenty-seven components in all.
+overlays, structure, data and media, twenty-eight components in all.
 Every one of them is themed, keyboard operable, and announces itself to
 an assistive technology from the day it was written.
 

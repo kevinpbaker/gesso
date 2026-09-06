@@ -3,11 +3,27 @@ import { equalityOf, type Equality } from './derive';
 import { currentBody, trackRead, withTracking, type ReadableCell } from './Input';
 
 export interface ComputedOptions<T> {
-  /** How a new result is judged unchanged; `reference` by default. See `derive`. */
+  /** How a new result is judged unchanged; `reference` by default. */
   readonly equal?: Equality<T>;
   /** What to call this cell in a warning. */
   readonly label?: string;
 }
+
+/**
+ * Reads a stream that is not a cell, inside a `computed`.
+ *
+ * A cell is read with `.value`; a plain Observable has no current value
+ * to read, so the function is handed this instead:
+ *
+ *   const playing = computed(read => read(audio.actions) === 'play');
+ *
+ * It answers with the stream's latest value and records the stream as a
+ * source, so the computed follows it exactly as it follows a cell. A
+ * cell passed to it is simply read, which means one call site works for
+ * either and a service that later turns a stream into a cell breaks
+ * nothing.
+ */
+export type ReadSource = <V>(source: Observable<V>) => V;
 
 /**
  * A cell whose value is a function of other cells.
@@ -18,13 +34,17 @@ export interface ComputedOptions<T> {
  * is no list to keep in step with the expression; a read the function
  * did not make this time is a source it no longer has.
  *
+ * A stream that is not a cell is read through the `read` the function
+ * is handed: `computed(read => read(stream).status)` follows the stream
+ * as it follows a cell. That is what makes this the only derivation an
+ * application needs, whether or not the thing it derives from happens
+ * to have a current value of its own.
+ *
  * It is a cell and nothing else. Bound to a prop it is an Observable
  * like every other cell, so a component written with it and one written
  * with `pipe` compose without translation. Read in a handler with
  * `.value` it is the current result, computed on the spot if nothing is
- * following it. RxJS is underneath; nothing here replaces it, and
- * `derive` is still what an Observable that is not a cell (a stream, a
- * shell signal) is projected with.
+ * following it. RxJS is underneath and nothing here replaces it.
  *
  * Nothing runs until someone asks. With no subscriber the function runs
  * only when `.value` is read; with one, the cell follows its sources and
@@ -53,7 +73,7 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private staleWatch: Subscription | null = null;
 
   constructor(
-    private readonly compute: () => T,
+    private readonly compute: (read: ReadSource) => T,
     options: ComputedOptions<T> = {}
   ) {
     super(subscriber => {
@@ -137,9 +157,9 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
 
   /** Runs the function, watching what it reads; true when the result changed. */
   private recompute(): boolean {
-    const read = new Set<ReadableCell<unknown>>();
-    const next = withTracking(read, this.compute);
-    this.sources = read;
+    const touched = new Set<ReadableCell<unknown>>();
+    const next = withTracking(touched, () => this.compute(readSource));
+    this.sources = touched;
     const changed = !this.hasValue || !this.equal(this.cached, next);
     this.hasValue = true;
     this.cached = next;
@@ -185,13 +205,107 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
 }
 
 /**
- * A cell computed from the cells its function reads. See `ComputedCell`.
+ * A cell computed from what its function reads. See `ComputedCell`.
  *
  *   const total = computed(() => quantity.value * PRICE * RATES[currency.value]);
  *   <text text={computed(() => String(count.value))} />
+ *
+ * Cells are read with `.value`; anything else is read through the
+ * `read` the function is given, which follows it the same way:
+ *
+ *   const late = computed(read => read(clock) > deadline);
  */
-export function computed<T>(compute: () => T, options: ComputedOptions<T> = {}): ComputedCell<T> {
+export function computed<T>(compute: (read: ReadSource) => T, options: ComputedOptions<T> = {}): ComputedCell<T> {
   return new ComputedCell(compute, options);
+}
+
+/**
+ * The cell standing for a stream, one per stream.
+ *
+ * Anything that already has a current value is its own cell, so a
+ * `read` of an input, an internal state or another computed costs a
+ * property access and nothing more. Everything else gets a `StreamCell`
+ * held against it here, so several computeds reading one stream share a
+ * single subscription to it rather than opening one each.
+ *
+ * Weak on purpose: the entry is reachable only while the stream is, so
+ * a stream made in a component body is collected with the component.
+ */
+const streamCells = new WeakMap<Observable<unknown>, StreamCell<unknown>>();
+
+function cellFor<T>(source: Observable<T>): ReadableCell<T> {
+  if ('value' in source) {
+    return source as ReadableCell<T>;
+  }
+  let cell = streamCells.get(source as Observable<unknown>);
+  if (cell === undefined) {
+    cell = new StreamCell(source as Observable<unknown>);
+    streamCells.set(source as Observable<unknown>, cell);
+  }
+  return cell as ReadableCell<T>;
+}
+
+/** The `read` every computed's function is handed. */
+const readSource: ReadSource = <V>(source: Observable<V>): V => cellFor(source).value;
+
+/**
+ * A plain stream, seen as a cell.
+ *
+ * It holds the last value it saw and hands it to whoever asks, which is
+ * the one thing a cell has and an Observable does not. While something
+ * follows it, it follows the stream; when the last follower leaves it
+ * lets go, so it costs nothing between uses and needs no disposal, on
+ * the same terms as `ComputedCell`.
+ *
+ * A `.value` read with nothing following takes one synchronous
+ * subscription and drops it again, which is how a `BehaviorSubject`
+ * behind an `asObservable()`, or a `combineLatest` over such subjects,
+ * answers with what it already holds. A stream that has nothing to say
+ * synchronously answers `undefined` until its first emission arrives,
+ * which is the honest answer: there is no value yet.
+ */
+class StreamCell<T> extends Observable<T> implements ReadableCell<T> {
+  private last!: T;
+  private followers = 0;
+  private upstream: Subscription | null = null;
+  private readonly changes = new Subject<T>();
+
+  constructor(private readonly stream: Observable<T>) {
+    super(subscriber => {
+      this.followers++;
+      if (this.upstream === null) {
+        this.attach();
+      }
+      subscriber.next(this.last);
+      const following = this.changes.subscribe(subscriber);
+      return () => {
+        following.unsubscribe();
+        this.followers--;
+        if (this.followers === 0) {
+          this.upstream?.unsubscribe();
+          this.upstream = null;
+        }
+      };
+    });
+  }
+
+  get value(): T {
+    trackRead(this);
+    if (this.upstream === null) {
+      const asking = this.stream.subscribe(value => {
+        this.last = value;
+      });
+      asking.unsubscribe();
+    }
+    return this.last;
+  }
+
+  private attach(): void {
+    this.upstream = this.stream.subscribe(value => {
+      this.last = value;
+      this.changes.next(value);
+    });
+  }
 }
 
 function sameSet<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {

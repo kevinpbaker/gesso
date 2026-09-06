@@ -76,8 +76,6 @@ export class ChannelReplica<View extends object, Commands extends object> {
     }
   });
 
-  private readonly warnedArity = new Set<string>();
-
   private createCommandProxy(): Commands {
     return new Proxy({} as Commands, {
       get: (_target, property): unknown => {
@@ -85,18 +83,17 @@ export class ChannelReplica<View extends object, Commands extends object> {
           return undefined;
         }
         return (...args: unknown[]) => {
-          if (args.length > 1 && !this.warnedArity.has(property)) {
-            // A command crosses the barrier as one payload. A second
-            // argument is dropped on the floor, silently, and the handler
-            // sees `undefined` where it expected a count: say so once.
-            this.warnedArity.add(property);
-            console.warn(
-              `Channel '${this.token.name}' command '${property}' was called with ${args.length} arguments, ` +
-                `and a command carries one payload: only the first crossed. Pass one object instead, ` +
-                `\`${property}({ ... })\`, and take it apart on the other side.`
-            );
-          }
-          this.post({ type: 'channel:command', command: property, payload: args[0] });
+          // Every argument crosses. A second one used to be dropped on
+          // the floor with a warning, so `move(from, to)` had to be
+          // written `move({ from, to })` and taken apart again on the
+          // other side; the first still travels as `payload` and the
+          // rest beside it, which is what keeps the two ends able to
+          // be different builds.
+          this.post(
+            args.length > 1
+              ? { type: 'channel:command', command: property, payload: args[0], rest: args.slice(1) }
+              : { type: 'channel:command', command: property, payload: args[0] }
+          );
         };
       }
     }) as Commands;

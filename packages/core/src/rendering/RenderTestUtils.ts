@@ -11,6 +11,9 @@ import { Canvas2DRenderer } from './canvas2d/Canvas2DRenderer';
 import type { Canvas2DContext, Canvas2DGradient } from './canvas2d/Canvas2DContext';
 import { CanvasSurface } from './canvas2d/CanvasSurface';
 import type { CanvasHost } from './canvas2d/CanvasSurface';
+import type { PaintContext2D, PaintGradient } from './PaintTarget';
+import type { PaintCanvasFactory } from './PaintPicture';
+import type { PaintLineCap, PaintLineJoin } from './PaintSurface';
 
 export interface RecordedCall {
   name: string;
@@ -265,6 +268,174 @@ export function savedDepth(context: RecordingCanvasContext): number {
     }
   }
   return depth;
+}
+
+/**
+ * Deterministic `PaintContext2D` spy: the picture rasteriser's
+ * equivalent of `RecordingCanvasContext`, so a spec can assert what a
+ * painter actually drew without a browser.
+ */
+export class RecordingPaintContext implements PaintContext2D {
+  readonly calls: RecordedCall[] = [];
+
+  lineDashOffset = 0;
+  lineWidth = 1;
+  lineCap: PaintLineCap = 'butt';
+  lineJoin: PaintLineJoin = 'miter';
+  miterLimit = 10;
+  globalAlpha = 1;
+  filter = 'none';
+  fillStyle: string | PaintGradient = '#000';
+  strokeStyle: string | PaintGradient = '#000';
+  font = '';
+  textAlign: 'left' | 'center' | 'right' = 'left';
+  textBaseline = 'alphabetic' as const;
+
+  save(): void {
+    this.record('save', []);
+  }
+
+  restore(): void {
+    this.record('restore', []);
+  }
+
+  translate(x: number, y: number): void {
+    this.record('translate', [x, y]);
+  }
+
+  scale(x: number, y: number): void {
+    this.record('scale', [x, y]);
+  }
+
+  rotate(angle: number): void {
+    this.record('rotate', [angle]);
+  }
+
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.record('transform', [a, b, c, d, e, f]);
+  }
+
+  beginPath(): void {
+    this.record('beginPath', []);
+  }
+
+  moveTo(x: number, y: number): void {
+    this.record('moveTo', [x, y]);
+  }
+
+  lineTo(x: number, y: number): void {
+    this.record('lineTo', [x, y]);
+  }
+
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void {
+    this.record('quadraticCurveTo', [cx, cy, x, y]);
+  }
+
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void {
+    this.record('bezierCurveTo', [c1x, c1y, c2x, c2y, x, y]);
+  }
+
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise = false): void {
+    this.record('arc', [x, y, radius, startAngle, endAngle, counterclockwise]);
+  }
+
+  arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void {
+    this.record('arcTo', [x1, y1, x2, y2, radius]);
+  }
+
+  rect(x: number, y: number, width: number, height: number): void {
+    this.record('rect', [x, y, width, height]);
+  }
+
+  closePath(): void {
+    this.record('closePath', []);
+  }
+
+  fill(fillRule?: 'nonzero' | 'evenodd'): void {
+    this.record('fill', [fillRule ?? 'nonzero', this.fillStyle]);
+  }
+
+  stroke(): void {
+    this.record('stroke', [this.strokeStyle, this.lineWidth]);
+  }
+
+  clip(fillRule?: 'nonzero' | 'evenodd'): void {
+    this.record('clip', [fillRule ?? 'nonzero']);
+  }
+
+  fillText(text: string, x: number, y: number): void {
+    this.record('fillText', [text, x, y, this.font, this.textAlign]);
+  }
+
+  drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void {
+    this.record('drawImage', [image, dx, dy, dw, dh]);
+  }
+
+  setLineDash(segments: readonly number[]): void {
+    this.record('setLineDash', [[...segments]]);
+  }
+
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): RecordedGradient {
+    const gradient = new RecordedGradient('linear', [x0, y0, x1, y1]);
+    this.record('createLinearGradient', [x0, y0, x1, y1]);
+    return gradient;
+  }
+
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): RecordedGradient {
+    const gradient = new RecordedGradient('radial', [x0, y0, r0, x1, y1, r1]);
+    this.record('createRadialGradient', [x0, y0, r0, x1, y1, r1]);
+    return gradient;
+  }
+
+  private record(name: string, args: unknown[]): void {
+    this.calls.push({ name, args: args.map(normalizeNumber) });
+  }
+}
+
+/**
+ * A picture that never becomes real pixels.
+ *
+ * `take()` hands back a stand-in for the `ImageBitmap` a browser would
+ * transfer out of an `OffscreenCanvas`, carrying only the size and a
+ * `close`, which is all either renderer reads off one. Every context
+ * the factory hands out is kept, so a spec can assert both what was
+ * drawn and how many times anything was drawn at all.
+ */
+export class FakePaintCanvases {
+  readonly contexts: RecordingPaintContext[] = [];
+  readonly bitmaps: { width: number; height: number; closed: boolean }[] = [];
+
+  readonly create: PaintCanvasFactory = (width, height) => {
+    const context = new RecordingPaintContext();
+    this.contexts.push(context);
+    const bitmap = { width, height, closed: false };
+    this.bitmaps.push(bitmap);
+    return {
+      context: () => context,
+      take: () =>
+        ({
+          width,
+          height,
+          close: () => {
+            bitmap.closed = true;
+          }
+        }) as unknown as ImageBitmap
+    };
+  };
+
+  /** The calls made into the most recent picture. */
+  get last(): RecordingPaintContext {
+    const context = this.contexts.at(-1);
+    if (context === undefined) {
+      throw new Error('No picture has been rasterised.');
+    }
+    return context;
+  }
+
+  reset(): void {
+    this.contexts.length = 0;
+    this.bitmaps.length = 0;
+  }
 }
 
 /**

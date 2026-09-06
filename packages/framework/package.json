@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./worker": "./src/worker/index.ts",
     "./jsx-runtime": "./src/jsx/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx/jsx-dev-runtime.ts",
     "./testing": "./src/testing.ts"
@@ -15,6 +16,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./worker": {
+        "types": "./dist/worker/index.d.ts",
+        "default": "./dist/worker/index.js"
       },
       "./jsx-runtime": {
         "types": "./dist/jsx/jsx-runtime.d.ts",

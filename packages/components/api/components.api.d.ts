@@ -52,6 +52,22 @@ interface ControlLayoutProps {
   selfY?: UiSelfAlignment;
   rootModifiers?: readonly UiModifier[];
 }
+type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'plain';
+type ButtonTone = 'neutral' | 'accent' | 'danger';
+type ButtonSize = 'small' | 'medium' | 'large';
+interface ButtonProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  label?: string;
+  description?: string;
+  variant?: ButtonVariant;
+  tone?: ButtonTone;
+  size?: ButtonSize;
+  disabled?: boolean;
+  busy?: boolean;
+  onClick?: () => void;
+  children?: UiChild;
+}
+declare function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiChild;
 interface CheckboxProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   checked?: boolean;
@@ -421,6 +437,7 @@ interface ControlFocus {
 declare function trackFocus(ctx: ComponentContext, forwarded?: InputCell<UiNodeRef | undefined>): ControlFocus;
 export {
   Accordion,
+  Button,
   Card,
   Checkbox,
   controlled,
@@ -455,6 +472,10 @@ export {
   Tree,
   type AccordionProps,
   type AccordionSection,
+  type ButtonProps,
+  type ButtonSize,
+  type ButtonTone,
+  type ButtonVariant,
   type CardProps,
   type CheckboxProps,
   type ControlFocus,

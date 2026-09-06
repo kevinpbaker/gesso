@@ -14,8 +14,15 @@ export {
   type ReadableCell
 } from './Input';
 export { derive, type DeriveOptions, type Equality } from './derive';
-export { computed, ComputedCell, type ComputedOptions } from './computed';
+export { computed, ComputedCell, type ComputedOptions, type ReadSource } from './computed';
+export { select, type SelectOptions } from './select';
+export { resource, Resource, type ResourceOptions, type ResourceState, type ResourceStatus } from './resource';
+export { mutate, type Mutation, type MutateOptions } from './mutate';
+export { debounced, throttled } from './debounce';
+export { Each, each, type EachKey, type EachProps } from './each';
+export { Show, show, type ShowProps } from './show';
 export { bind } from './bind';
+export { bounds, BoundsCell } from './bounds';
 export { controlled, type ControlledOptions, type ControlledValue } from './controlled';
 export { Define, Input, Output, Inject, Channel } from './decorators';
 export * from './channel';
@@ -49,7 +56,7 @@ export { OverlayLayer } from './overlay/OverlayLayer';
 export { ComponentHostResolver } from './ComponentHostResolver';
 export { ComponentHost } from './ComponentHost';
 export { isComponentElement, type ComponentElement, type FrameworkChild } from './ComponentElement';
-export { createApp } from './app/createApp';
+export { createApp, type CreateAppOptions } from './app/createApp';
 export { GessoAppBuilder } from './app/GessoAppBuilder';
 export { GessoApp, type GessoAppOptions } from './app/GessoApp';
 export {
@@ -63,21 +70,34 @@ export {
   type FramePhaseTimings
 } from './app/GessoRuntime';
 export {
+  describeStream,
+  formatAge,
+  formatNodePath,
   formatNodeReport,
+  formatStream,
   printPropValue,
+  type BoundStream,
+  type NodePathTarget,
   type UiEnvironmentReport,
   type UiNodeReport,
   type UiOwnerReport,
   type UiPropOrigin,
   type UiPropReport,
-  type UiSemanticsReport
+  type UiSemanticsReport,
+  type UiStreamReport
 } from './app/NodeReport';
 export { WorkerApp, type WorkerAppOptions, type AppLogicEndpoint } from './app/worker/WorkerApp';
 export {
   treeText,
+  type ActionCause,
+  type ActionEntry,
+  type ChannelErrorEntry,
+  type CommandEntry,
   type ConsoleEntry,
   type DevtoolsEvent,
   type DevtoolsRequest,
+  type FrameEntry,
+  type PatchEntry,
   type UiTreeNode,
   type UiTreeSnapshot
 } from './app/DevtoolsProtocol';
@@ -99,7 +119,14 @@ export {
   type AudioSinkOutput,
   type MediaSessionLike
 } from './app/AudioSink';
-export { RouterService, type RouteMatch, type RouterHistorySink, type RouterRoutes } from './router/RouterService';
+export {
+  RouterService,
+  type RouteAnswer,
+  type RouteMatch,
+  type RouterHistorySink,
+  type RouterRoutes
+} from './router/RouterService';
+export { RouteState } from './router/RouteState';
 export { RouterOutlet } from './router/RouterOutlet';
 export { Presence, type PresenceProps } from './Presence';
 export {
@@ -144,6 +171,14 @@ export { EditingProxy, writeClipboard, type EditingProxySink } from './app/Editi
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';
 export type { EditingState, UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from '@gesso/core';
 export { UI_ROLES, UI_SEMANTIC_STATES, type UiRole, type UiSemanticState } from '@gesso/core';
+export {
+  markInstant,
+  MARK_PREFIX,
+  markNow,
+  measureSpan,
+  performanceMarksEnabled,
+  setPerformanceMarks
+} from '@gesso/core';
 export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';
 export type {
   ShellToRuntimeMessage,

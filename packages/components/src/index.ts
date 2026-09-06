@@ -11,6 +11,7 @@
  * It may import `@gesso/core` and `@gesso/framework`, never the
  * playground.
  */
+export { Button, type ButtonProps, type ButtonSize, type ButtonTone, type ButtonVariant } from './Button';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Switch, type SwitchProps } from './Switch';
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';

@@ -4,14 +4,14 @@ description: What @gesso/components is, the contract every control in it honours
 
 # Components
 
-`@gesso/components` is the library a screen is built out of: twenty-seven
+`@gesso/components` is the library a screen is built out of: twenty-eight
 controls, from a checkbox to a virtualized table, all of them themed,
 keyboard operable and announced to an assistive technology from the day
 they were written.
 
 They are ordinary components. Each one is a function that runs once and
 returns elements, built from `@gesso/core` and nothing you do not also
-have. What the library adds is that the same twenty-seven answer the
+have. What the library adds is that the same twenty-eight answer the
 same four questions the same way, so learning one control is most of
 learning the rest.
 
@@ -138,6 +138,7 @@ Each control gets one page, in this shape.
 
 The pages, by what they are for:
 
+- **Acting:** [Button](/components/button).
 - **Choosing:** [Checkbox](/components/checkbox),
   [Switch](/components/switch),
   [RadioGroup](/components/radio-group), [Select](/components/select).

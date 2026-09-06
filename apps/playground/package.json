@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@gesso/testing": "workspace:^",
+    "@gesso/vite-plugin": "workspace:^",
     "vite": "^8.2.0"
   }
 }

@@ -91,20 +91,61 @@ value that nothing else determines.
 
 Every cell is an RxJS `Observable`, and every prop accepts one, so a
 value that arrives as a stream rather than a cell binds the same way:
-`text={stream}`. To project such a stream, or several, use `derive`,
-which is `combineLatest` and `map` with a change check:
+`text={stream}`. A stream is not a cell, though: it has no current value
+to read with `.value`, so `computed` hands its function a `read` for
+exactly that case.
 
 ```ts
+const late = computed(read => read(clock) > deadline);
+```
+
+`read` answers with the stream's latest value and follows it as
+`computed` follows a cell, and one subscription is shared by every
+computed reading the same stream. Pass it a cell and it simply reads it,
+so a call site does not have to know which it has, and a service that
+later turns a stream into a cell breaks nothing.
+
+That makes `computed` the one derivation to reach for, whatever the
+sources are. `derive([a, b], fn)` still works and is deprecated: it
+listed its sources beside the expression, which is a second thing to
+keep in step with the expression, and a screen with a `derive` and a
+`computed` in it is written in two dialects.
+
+```ts
+// Before
 const scheme = derive([settings.appearance, shell.colorScheme], (chosen, platform) =>
   chosen === 'auto' ? platform : chosen
 );
+
+// Now
+const scheme = computed(() =>
+  settings.appearance.value === 'auto' ? shell.colorScheme.value : settings.appearance.value
+);
 ```
 
-`computed` and `derive` produce the same thing, an Observable a prop
-takes, and a component written with one composes with a component
-written with the other. Reach for `computed` when the sources are cells,
-which inside a component they nearly always are; for `derive` or a
-`pipe` when they are not.
+`pipe` is still there for everything RxJS is good at, which is streams
+of events rather than values that are: debouncing, retrying, switching.
+A binding that is a value has no reason to use it.
+
+## One field of a cell
+
+`select` is one field, or one projection, of a cell, as a cell:
+
+```ts
+const title = select(inputs.track, 'title');
+const tags = select(inputs.track, entry => entry.tags.slice(0, 8));
+```
+
+It compares structurally by default, so a projection that rebuilds an
+equal array or object does not re-bind everything reading it, which is
+the reason most hand-written comparators exist. Reading four fields of
+one input is four of these.
+
+An optional input that the parent did not pass is a live cell holding
+`undefined`, not a missing one. Binding it straight to a property writes
+`undefined` there, which draws as though the property had never been
+set, so give it a value: `input(inputs.tint, INK)` for a default, or
+`select` for anything else.
 
 ## What a binding costs
 

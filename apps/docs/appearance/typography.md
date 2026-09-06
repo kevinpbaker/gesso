@@ -60,6 +60,38 @@ same way it gets a theme:
 
 <<< @/src/examples/TypographyExample.tsx#role
 
+## Name the role, not the numbers
+
+The idiom to write is a role:
+
+```tsx
+<text textStyle="title">Now playing</text>
+```
+
+`textStyle` takes a role name as well as a style, and a name is looked
+up in the theme the element is under. The line it replaces is this
+one:
+
+```tsx
+<text fontSize={20} fontWeight={500} lineHeight={24}>
+  Now playing
+</text>
+```
+
+Those three numbers are three things to keep in step across a screen
+and eighteen across an application, and none of them follows a theme.
+A role is one word that does, so the same heading is one size under the
+shipped scale and another under a compact one, and the element does not
+change. A role is also legal on a container, where it sets the type for
+everything below it, which is how a card gives its whole body one size
+without a prop on each line.
+
+Set a property beside the role when one value genuinely differs:
+resolution is per field, so `<text textStyle="title" color="primary">`
+takes the size, weight, line height and face of `title` and the palette
+for its colour. A number written on an element should be the exception
+that proves a role is missing from the scale.
+
 ## The scale's roles
 
 A `UiTypography` names six styles. The list is the interface's, so a
@@ -108,13 +140,42 @@ node gets both a larger resolved size and a taller box.
 
 ## Extending it
 
-`UiTypography` is an interface, so a scale of your own may carry more
-than the six roles, and a theme will hold it. One caveat decides how to
-use that: two themes are compared over the six named roles, so a scale
-that differs only in a role of its own compares equal and the change
-does not propagate to the nodes that would have read it. Provide such a
-style directly as `textStyle` on the subtree that wants it, and keep
-the roles that travel inside a theme to the six.
+Six roles cover a document. An application has more to say than that:
+the two built on this framework used seventeen distinct sizes between
+them before they had roles. So a scale of your own may carry more than
+the six, a theme holds it, and `textStyle` resolves a name against
+whatever the scale actually carries.
+
+Declare the names so they type. `UiTypographyExtensions` is an empty
+interface for exactly this, and merging into it adds your names to the
+ones `textStyle` accepts:
+
+```ts
+declare module '@gesso/core' {
+  interface UiTypographyExtensions {
+    readonly strong: unknown;
+    readonly display: unknown;
+  }
+}
+```
+
+The value type is not read; only the key is, because what the theme
+carries is always a `UiTextStyle`. What it buys is completion on
+`textStyle=` and a compile error on `textStyle="stong"`, which is the
+one thing a stringly typed name would otherwise cost you.
+
+Then build the roles into the scale beside the six, and provide it:
+
+```ts
+const scale = {
+  ...lightTheme.typography,
+  strong: { ...lightTheme.typography.body, fontWeight: 700 },
+  display: { ...lightTheme.typography.headline, fontSize: 44, lineHeight: 48 }
+} as UiTypography;
+```
+
+Two scales are compared over the keys they carry, so a role of your own
+invalidates the subtree that reads it exactly as a shipped one does.
 
 ## Fonts, and what is not here
 

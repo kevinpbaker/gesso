@@ -260,6 +260,7 @@ declare enum UiNodeType {
   Text = "text",
   EditableText = "editable-text",
   Button = "button",
+  Paint = "paint",
   ScrollView = "scroll-view",
   Grid = "grid",
   Fragment = "fragment"
@@ -362,11 +363,20 @@ declare class LayoutRecord {
   lastConstraints: Constraints;
   altValid: boolean;
   altConstraints: Constraints;
-  private altOutputs;
+  private altMeasuredWidth;
+  private altMeasuredHeight;
+  private altOuterWidth;
+  private altOuterHeight;
+  private altMinContentWidth;
+  private altMaxContentWidth;
+  private altIntrinsicWidth;
+  private altIntrinsicHeight;
+  private altHasBaseline;
+  private altBaseline;
+  private altContentWidth;
+  private altContentHeight;
   saveAlt(): void;
   swapAlt(): void;
-  private outputs;
-  private restore;
   contentMatters: boolean;
   relayoutBoundary: boolean;
   measureDirty: boolean;
@@ -375,6 +385,7 @@ declare class LayoutRecord {
   propsPass: number;
   propsBaseWidth: number | undefined;
   propsBaseHeight: number | undefined;
+  reset(): void;
 }
 interface UiColors {
   readonly background: UiColor;
@@ -959,6 +970,81 @@ interface GradientPaint {
   }[];
 }
 declare function gradientPaint(gradient: ResolvedGradient, width: number, height: number): GradientPaint;
+type UiImage = ImageBitmap;
+interface PaintSurface {
+  save(): void;
+  restore(): void;
+  translate(x: number, y: number): void;
+  scale(x: number, y: number): void;
+  rotate(angle: number): void;
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise?: boolean): void;
+  rect(x: number, y: number, width: number, height: number): void;
+  roundRect(x: number, y: number, width: number, height: number, radius: number): void;
+  closePath(): void;
+  path(d: string): void;
+  fillColor(color: UiColorValue): void;
+  fillGradient(gradient: UiGradient, x: number, y: number, width: number, height: number): void;
+  strokeColor(color: UiColorValue): void;
+  lineWidth(width: number): void;
+  lineCap(cap: PaintLineCap): void;
+  lineJoin(join: PaintLineJoin): void;
+  miterLimit(limit: number): void;
+  lineDash(segments: readonly number[], offset?: number): void;
+  alpha(value: number): void;
+  blur(radius: number): void;
+  fill(rule?: PaintFillRule): void;
+  stroke(): void;
+  clip(rule?: PaintFillRule): void;
+  text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  image(image: UiImage, x: number, y: number, width: number, height: number): void;
+}
+type PaintFillRule = 'nonzero' | 'evenodd';
+type PaintLineCap = 'butt' | 'round' | 'square';
+type PaintLineJoin = 'miter' | 'round' | 'bevel';
+type PaintTextAlign = 'left' | 'center' | 'right';
+interface PaintTextStyle {
+  readonly fontSize?: number;
+  readonly fontFamily?: string;
+  readonly fontWeight?: number | string;
+  readonly align?: PaintTextAlign;
+}
+interface PaintBox {
+  readonly width: number;
+  readonly height: number;
+  readonly paddingTop: number;
+  readonly paddingRight: number;
+  readonly paddingBottom: number;
+  readonly paddingLeft: number;
+  readonly scale: number;
+}
+interface UiPaint {
+  readonly draw: (surface: PaintSurface, box: PaintBox) => void;
+  readonly inputs?: readonly unknown[];
+  readonly intrinsicWidth?: number;
+  readonly intrinsicHeight?: number;
+}
+interface UiPath {
+  readonly d: string;
+  readonly viewBox?: number;
+  readonly fill?: UiColorValue;
+  readonly fillRule?: PaintFillRule;
+  readonly stroke?: UiColorValue;
+  readonly strokeWidth?: number;
+  readonly lineCap?: PaintLineCap;
+  readonly lineJoin?: PaintLineJoin;
+  readonly miterLimit?: number;
+  readonly dash?: readonly number[];
+  readonly dashOffset?: number;
+}
+declare function paintValuesEqual(a: UiPaint | undefined, b: UiPaint | undefined): boolean;
+declare function inputsEqual(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean;
+declare function pathValuesEqual(a: UiPath | undefined, b: UiPath | undefined): boolean;
 interface UiTextStyle {
   readonly fontFamily: string;
   readonly fontSize: number;
@@ -993,6 +1079,9 @@ interface UiTypography {
   readonly title: UiTextStyle;
   readonly label: UiTextStyle;
 }
+interface UiTypographyExtensions {}
+type UiTypographyRole = keyof UiTypography | (keyof UiTypographyExtensions & string);
+declare function isTypographyRole(value: unknown, scale: UiTypography): value is UiTypographyRole;
 declare const defaultTypography: UiTypography;
 declare function typographyEqual(a: UiTypography, b: UiTypography): boolean;
 interface UiShapes {
@@ -1016,15 +1105,66 @@ interface UiShadows {
 }
 declare const defaultShadows: UiShadows;
 declare function shadowsEqual(a: UiShadows, b: UiShadows): boolean;
+interface UiSpacing {
+  readonly none: number;
+  readonly hairline: number;
+  readonly extraSmall: number;
+  readonly small: number;
+  readonly medium: number;
+  readonly large: number;
+  readonly extraLarge: number;
+  readonly huge: number;
+}
+declare const defaultSpacing: UiSpacing;
+declare const spacingSteps: readonly (keyof UiSpacing)[];
+declare function scaleSpacing(spacing: UiSpacing, factor: number): UiSpacing;
+declare function spacingEqual(a: UiSpacing, b: UiSpacing): boolean;
+type UiDensity = 'compact' | 'comfortable' | 'spacious';
+declare const densityFactors: Readonly<Record<UiDensity, number>>;
+type UiContrast = 'standard' | 'high';
+declare function relativeLuminance(color: UiColor): number;
+declare function contrastRatio(a: UiColor, b: UiColor): number;
+declare function raiseContrast(color: UiColor, against: UiColor, ratio: number): UiColor;
+declare function highContrastColors(colors: UiColors): UiColors;
+interface UiThemeExtension<T extends object> {
+  readonly key: symbol;
+  readonly name: string;
+  readonly defaults: T;
+  readonly equals: (a: T, b: T) => boolean;
+}
+interface UiThemeExtensionOptions<T extends object> {
+  readonly name: string;
+  readonly defaults: T;
+  readonly equals?: (a: T, b: T) => boolean;
+}
+type UiThemeExtensions = ReadonlyMap<symbol, object>;
+declare const noThemeExtensions: UiThemeExtensions;
+declare function defineThemeExtension<T extends object>(options: UiThemeExtensionOptions<T>): UiThemeExtension<T>;
+declare function themeExtension<T extends object>(theme: {
+  readonly extensions?: UiThemeExtensions;
+}, extension: UiThemeExtension<T>): T;
+declare function hasThemeExtension<T extends object>(theme: {
+  readonly extensions?: UiThemeExtensions;
+}, extension: UiThemeExtension<T>): boolean;
+declare function withThemeExtension<Theme extends {
+  readonly extensions?: UiThemeExtensions;
+}, T extends object>(theme: Theme, extension: UiThemeExtension<T>, value: T): Theme;
+declare function themeExtensionsEqual(a: UiThemeExtensions | undefined, b: UiThemeExtensions | undefined): boolean;
 interface UiTheme {
   readonly colors: UiColors;
   readonly typography: UiTypography;
   readonly shapes: UiShapes;
   readonly shadows: UiShadows;
+  readonly spacing: UiSpacing;
+  readonly density: UiDensity;
+  readonly contrast: UiContrast;
+  readonly extensions?: UiThemeExtensions;
 }
 declare const lightTheme: UiTheme;
 declare const darkTheme: UiTheme;
 declare function themesEqual(a: UiTheme, b: UiTheme): boolean;
+declare function withDensity(theme: UiTheme, density: UiDensity): UiTheme;
+declare function withContrast(theme: UiTheme, contrast: UiContrast): UiTheme;
 interface UiVideoSurface {
   readonly frame: VideoFrame | ImageBitmap | null;
   readonly version: number;
@@ -1192,11 +1332,15 @@ declare const UiProperties: {
   readonly minHeight: UiPropertyDefinition<UiLength | undefined>;
   readonly maxHeight: UiPropertyDefinition<UiLength | undefined>;
   readonly padding: UiPropertyDefinition<number | undefined>;
+  readonly paddingX: UiPropertyDefinition<number | undefined>;
+  readonly paddingY: UiPropertyDefinition<number | undefined>;
   readonly paddingTop: UiPropertyDefinition<number | undefined>;
   readonly paddingRight: UiPropertyDefinition<number | undefined>;
   readonly paddingBottom: UiPropertyDefinition<number | undefined>;
   readonly paddingLeft: UiPropertyDefinition<number | undefined>;
   readonly margin: UiPropertyDefinition<UiLength | undefined>;
+  readonly marginX: UiPropertyDefinition<UiLength | undefined>;
+  readonly marginY: UiPropertyDefinition<UiLength | undefined>;
   readonly marginTop: UiPropertyDefinition<UiLength | undefined>;
   readonly marginRight: UiPropertyDefinition<UiLength | undefined>;
   readonly marginBottom: UiPropertyDefinition<UiLength | undefined>;
@@ -1300,9 +1444,13 @@ declare const UiProperties: {
   readonly virtualLead: UiPropertyDefinition<boolean | undefined>;
   readonly virtualWindow: UiPropertyDefinition<UiVirtualWindow | undefined>;
   readonly theme: UiPropertyDefinition<UiTheme | undefined>;
-  readonly textStyle: UiPropertyDefinition<UiTextStyle | undefined>;
+  readonly textStyle: UiPropertyDefinition<UiTextStyle | UiTypographyRole | undefined>;
   readonly contentColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly visualState: UiPropertyDefinition<UiVisualStateSet>;
+  readonly paint: UiPropertyDefinition<UiPaint | undefined>;
+  readonly path: UiPropertyDefinition<UiPath | undefined>;
+  readonly clipPath: UiPropertyDefinition<string | undefined>;
+  readonly blur: UiPropertyDefinition<number | undefined>;
 };
 type UiPropertyName = keyof typeof UiProperties;
 type UiPropertyValueOf<D> = D extends UiPropertyDefinition<infer T> ? T : never;
@@ -1337,7 +1485,7 @@ type IdentityProps = {
   key?: string | number;
   ref?: UiNodeRef;
 };
-type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'margin' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'aspectRatio'>;
+type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'aspectRatio'>;
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
@@ -1360,6 +1508,7 @@ type TextProps = CommonProps & TextContentProps;
 type EditableTextProps = CommonProps & PropsOf<'value' | 'placeholder' | 'multiline' | 'readOnly' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
 type BoxProps = ContainerProps & PropsOf<'x' | 'y' | 'image' | 'objectFit'>;
 type StackProps = BoxProps;
+type PaintElementProps = BoxProps & PropsOf<'paint' | 'path' | 'clipPath' | 'blur'>;
 type ButtonProps = BoxProps & TextContentProps;
 type RowProps = FlexContainerProps;
 type ColumnProps = FlexContainerProps;
@@ -1391,6 +1540,7 @@ declare class UiGraphBuilder {
   private readonly sharedElements;
   private warnedAboutDispatcher;
   private warnedAboutAnimations;
+  private warnedAboutIndexKeys;
   constructor(graph: UiGraph, options?: UiGraphBuilderOptions);
   build(definition: UiChild, parentId?: string): UiNode;
   reconcileChildren(parent: UiNode, definitions: readonly UiChild[]): {
@@ -1415,6 +1565,7 @@ declare class UiGraphBuilder {
   private reconcileEventProp;
   private warnMissingDispatcher;
   private isObservable;
+  private isIndexKeyed;
   private elementKey;
   private collectChildren;
   private createNodeId;
@@ -1475,6 +1626,8 @@ declare class UiGraph {
   handleBindingError(binding: UiBinding<unknown>, error: unknown): void;
   handleModifierError(name: string, node: UiNode, phase: 'attach' | 'update' | 'detach', error: unknown): void;
   getBindingsForNode(node: UiNode): UiBinding<unknown>[];
+  subscriptionsForNode(node: UiNode): number;
+  get subscriptionCount(): number;
   getChildrenBindingForNode(node: UiNode): UiChildrenBinding | undefined;
   bindChildren(fragmentNode: UiNode, binding: UiChildrenBinding): void;
   unbindChildren(node: UiNode): void;
@@ -1519,10 +1672,14 @@ declare class UiBinding<T> {
   get nodeId(): NodeId;
   private subscription;
   private currentValue;
+  private emissions;
+  private lastEmittedAt;
   connect(): void;
   disconnect(): void;
   connected(): boolean;
   value(): T;
+  emissionCount(): number;
+  emittedAt(): number | null;
 }
 type UiDefinition = UiElement;
 declare function createElement(type: UiNodeType, props?: UiProps, children?: readonly UiChild[]): UiElement;
@@ -1531,6 +1688,7 @@ declare function EditableText(props?: EditableTextProps): UiElement;
 declare function Button(props?: ButtonProps, ...children: UiChild[]): UiElement;
 declare function Box(props?: BoxProps, ...children: UiChild[]): UiElement;
 declare function Stack(props?: StackProps, ...children: UiChild[]): UiElement;
+declare function Paint(props?: PaintElementProps, ...children: UiChild[]): UiElement;
 declare function Grid(props?: GridProps, ...children: UiChild[]): UiElement;
 declare function Row(...children: UiChild[]): UiElement;
 declare function Row(props: RowProps, ...children: UiChild[]): UiElement;
@@ -1650,7 +1808,6 @@ declare class CharacterCountTextMeasurer extends ParagraphTextMeasurer {
   measureRunWidth(text: string, request: TextMeasureRequest): number;
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
-type UiImage = ImageBitmap;
 declare const TEXT_SELECTION_PROP = "textSelection";
 interface TextRange {
   readonly start: number;
@@ -2574,7 +2731,8 @@ interface ScrollAdjustment {
   scrollY: number;
 }
 declare class LayoutEngine {
-  private readonly records;
+  private records;
+  private retiredRecords;
   private readonly scrollNodes;
   private readonly textScrollNodes;
   private readonly anchoredNodes;
@@ -2697,13 +2855,14 @@ declare class LayoutEngine {
   private rootPercentBase;
   private definiteAxis;
   private effectiveConstraints;
+  private axisMin;
+  private axisMax;
   private axisConstraints;
   private assignBox;
   private scrollDirection;
   private forEachLayoutChild;
   private forEachAbsoluteChild;
   private forEachChild;
-  private isAbsolute;
   private isFragment;
   private setLifted;
   get lifted(): ReadonlySet<UiNode>;
@@ -2829,6 +2988,9 @@ declare function accumulatedOffsetTo(node: UiNode, records: ReadonlyMap<UiNode, 
   x: number;
   y: number;
 }): void;
+type UiModifierBundle = readonly UiModifier[];
+declare function bundle(...parts: readonly (UiModifier | UiModifierBundle)[]): UiModifierBundle;
+declare const noModifiers: UiModifierBundle;
 interface InteractiveOptions {
   readonly hover: boolean;
   readonly press: boolean;
@@ -3155,6 +3317,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private paintBackground;
   private fillBox;
   private paintImage;
+  private paintPicture;
   private scaledFor;
   private paintBorder;
   private paintDecorations;
@@ -3210,6 +3373,280 @@ declare class LayoutInspector {
   private hoveredShapes;
   private clippedVisibleBox;
 }
+type PaintOp = {
+  readonly op: 'save';
+} | {
+  readonly op: 'restore';
+} | {
+  readonly op: 'translate';
+  readonly x: number;
+  readonly y: number;
+} | {
+  readonly op: 'scale';
+  readonly x: number;
+  readonly y: number;
+} | {
+  readonly op: 'rotate';
+  readonly angle: number;
+} | {
+  readonly op: 'transform';
+  readonly a: number;
+  readonly b: number;
+  readonly c: number;
+  readonly d: number;
+  readonly e: number;
+  readonly f: number;
+} | {
+  readonly op: 'beginPath';
+} | {
+  readonly op: 'moveTo';
+  readonly x: number;
+  readonly y: number;
+} | {
+  readonly op: 'lineTo';
+  readonly x: number;
+  readonly y: number;
+} | {
+  readonly op: 'quadraticCurveTo';
+  readonly cx: number;
+  readonly cy: number;
+  readonly x: number;
+  readonly y: number;
+} | {
+  readonly op: 'bezierCurveTo';
+  readonly c1x: number;
+  readonly c1y: number;
+  readonly c2x: number;
+  readonly c2y: number;
+  readonly x: number;
+  readonly y: number;
+} | {
+  readonly op: 'arc';
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  readonly startAngle: number;
+  readonly endAngle: number;
+  readonly counterclockwise: boolean;
+} | {
+  readonly op: 'rect';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+} | {
+  readonly op: 'roundRect';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly radius: number;
+} | {
+  readonly op: 'closePath';
+} | {
+  readonly op: 'fillColor';
+  readonly color: UiColorValue;
+} | {
+  readonly op: 'fillGradient';
+  readonly gradient: UiGradient;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+} | {
+  readonly op: 'strokeColor';
+  readonly color: UiColorValue;
+} | {
+  readonly op: 'lineWidth';
+  readonly width: number;
+} | {
+  readonly op: 'lineCap';
+  readonly cap: PaintLineCap;
+} | {
+  readonly op: 'lineJoin';
+  readonly join: PaintLineJoin;
+} | {
+  readonly op: 'miterLimit';
+  readonly limit: number;
+} | {
+  readonly op: 'lineDash';
+  readonly segments: readonly number[];
+  readonly offset: number;
+} | {
+  readonly op: 'alpha';
+  readonly value: number;
+} | {
+  readonly op: 'blur';
+  readonly radius: number;
+} | {
+  readonly op: 'fill';
+  readonly rule: PaintFillRule;
+} | {
+  readonly op: 'stroke';
+} | {
+  readonly op: 'clip';
+  readonly rule: PaintFillRule;
+} | {
+  readonly op: 'text';
+  readonly value: string;
+  readonly x: number;
+  readonly y: number;
+  readonly style: PaintTextStyle | undefined;
+} | {
+  readonly op: 'image';
+  readonly image: UiImage;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+interface PaintRecording {
+  readonly ops: readonly PaintOp[];
+}
+declare const EMPTY_RECORDING: PaintRecording;
+declare class PaintRecorder implements PaintSurface {
+  private readonly recorded;
+  finish(): PaintRecording;
+  save(): void;
+  restore(): void;
+  translate(x: number, y: number): void;
+  scale(x: number, y: number): void;
+  rotate(angle: number): void;
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise?: boolean): void;
+  rect(x: number, y: number, width: number, height: number): void;
+  roundRect(x: number, y: number, width: number, height: number, radius: number): void;
+  closePath(): void;
+  path(d: string): void;
+  fillColor(color: UiColorValue): void;
+  fillGradient(gradient: UiGradient, x: number, y: number, width: number, height: number): void;
+  strokeColor(color: UiColorValue): void;
+  lineWidth(width: number): void;
+  lineCap(cap: PaintLineCap): void;
+  lineJoin(join: PaintLineJoin): void;
+  miterLimit(limit: number): void;
+  lineDash(segments: readonly number[], offset?: number): void;
+  alpha(value: number): void;
+  blur(radius: number): void;
+  fill(rule?: PaintFillRule): void;
+  stroke(): void;
+  clip(rule?: PaintFillRule): void;
+  text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  image(image: UiImage, x: number, y: number, width: number, height: number): void;
+}
+declare function replayPaint(recording: PaintRecording, surface: PaintSurface): void;
+declare function tracePathData(surface: PaintSurface, d: string): void;
+interface PaintContext2D {
+  save(): void;
+  restore(): void;
+  translate(x: number, y: number): void;
+  scale(x: number, y: number): void;
+  rotate(angle: number): void;
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise?: boolean): void;
+  arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void;
+  rect(x: number, y: number, width: number, height: number): void;
+  closePath(): void;
+  fill(fillRule?: PaintFillRule): void;
+  stroke(): void;
+  clip(fillRule?: PaintFillRule): void;
+  fillText(text: string, x: number, y: number): void;
+  drawImage(image: UiImage, dx: number, dy: number, dw: number, dh: number): void;
+  setLineDash(segments: readonly number[]): void;
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): PaintGradient;
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): PaintGradient;
+  lineDashOffset: number;
+  lineWidth: number;
+  lineCap: PaintLineCap;
+  lineJoin: PaintLineJoin;
+  miterLimit: number;
+  globalAlpha: number;
+  filter?: string;
+  fillStyle: string | PaintGradient;
+  strokeStyle: string | PaintGradient;
+  font: string;
+  textAlign: 'left' | 'center' | 'right';
+  textBaseline: 'alphabetic';
+}
+interface PaintGradient {
+  addColorStop(offset: number, color: string): void;
+}
+interface PaintResolver {
+  color(value: UiColorValue): UiColor | undefined;
+  gradient(value: UiGradient): ResolvedGradient | undefined;
+}
+declare class PaintTarget implements PaintSurface {
+  private readonly ctx;
+  private readonly resolver;
+  private readonly blurStack;
+  private blurRadius;
+  constructor(ctx: PaintContext2D, resolver: PaintResolver);
+  save(): void;
+  restore(): void;
+  translate(x: number, y: number): void;
+  scale(x: number, y: number): void;
+  rotate(angle: number): void;
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise?: boolean): void;
+  rect(x: number, y: number, width: number, height: number): void;
+  roundRect(x: number, y: number, width: number, height: number, radius: number): void;
+  closePath(): void;
+  path(d: string): void;
+  fillColor(color: UiColorValue): void;
+  fillGradient(gradient: UiGradient, x: number, y: number, width: number, height: number): void;
+  strokeColor(color: UiColorValue): void;
+  lineWidth(width: number): void;
+  lineCap(cap: PaintLineCap): void;
+  lineJoin(join: PaintLineJoin): void;
+  miterLimit(limit: number): void;
+  lineDash(segments: readonly number[], offset?: number): void;
+  alpha(value: number): void;
+  blur(radius: number): void;
+  fill(rule?: PaintFillRule): void;
+  stroke(): void;
+  clip(rule?: PaintFillRule): void;
+  text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  image(image: UiImage, x: number, y: number, width: number, height: number): void;
+}
+interface PaintCanvas {
+  context(): PaintContext2D | null;
+  take(): UiImage;
+}
+type PaintCanvasFactory = (width: number, height: number) => PaintCanvas | null;
+interface PaintStats {
+  recorded: number;
+  rasterized: number;
+  resolved: number;
+}
+declare class PaintPictureCache {
+  private readonly slots;
+  private createCanvas;
+  readonly stats: PaintStats;
+  constructor(createCanvas?: PaintCanvasFactory);
+  setCanvasFactory(factory: PaintCanvasFactory): void;
+  resetStats(): void;
+  static paints(node: UiNode): boolean;
+  pictureFor(node: UiNode, rec: LayoutRecord, scale: number): UiImage | undefined;
+  recordingFor(node: UiNode): PaintRecording;
+  private record;
+  private rasterize;
+}
+declare const paintPictures: PaintPictureCache;
 declare function registerFontStack(family: string, fallback: readonly string[]): void;
 declare function fontStackFor(family: string): string;
 declare function bumpFontStack(family: string): void;
@@ -3587,6 +4024,12 @@ interface Mp4VideoTrack {
   readonly frameDurationUs: number;
 }
 declare function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack;
+declare const MARK_PREFIX = "gesso";
+declare function setPerformanceMarks(enabled: boolean): void;
+declare function performanceMarksEnabled(): boolean;
+declare function measureSpan(what: string, start: number, end: number, detail?: unknown): void;
+declare function markInstant(what: string, detail?: unknown): void;
+declare function markNow(): number;
 type UiFrameCallback = (frame: UiFrame) => void;
 interface UiSchedulerOptions {
   clock: UiFrameClockFactory;
@@ -3710,6 +4153,7 @@ export {
   buildRenderList,
   buildSemanticsTree,
   bumpFontStack,
+  bundle,
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
@@ -3760,6 +4204,7 @@ export {
   constraintsEqual,
   ContainerProps,
   contentOffset,
+  contrastRatio,
   createCanvasSurface,
   createElement,
   createEnvironmentKey,
@@ -3788,6 +4233,7 @@ export {
   defaultMotion,
   defaultShadows,
   defaultShapes,
+  defaultSpacing,
   defaultTextStyle,
   defaultTypography,
   DefaultVideoResolver,
@@ -3795,7 +4241,9 @@ export {
   defaultVisualState,
   defineModifier,
   defineProperty,
+  defineThemeExtension,
   demuxMp4Video,
+  densityFactors,
   describeLength,
   describeOverrides,
   detectEditingPlatform,
@@ -3824,6 +4272,7 @@ export {
   editorOf,
   EditUnit,
   ELLIPSIS,
+  EMPTY_RECORDING,
   EnvironmentNotifier,
   EnvironmentProps,
   fade,
@@ -3846,7 +4295,6 @@ export {
   formatConstraints,
   formatExplanation,
   FrLength,
-  Gc,
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
@@ -3869,7 +4317,9 @@ export {
   GridTrack,
   hasDecorationPhase,
   hasDrawnText,
+  hasThemeExtension,
   hasVisualState,
+  highContrastColors,
   HitTester,
   HitTestLayoutReader,
   HitTestResult,
@@ -3891,6 +4341,7 @@ export {
   inheritedPropertyFlags,
   inheritedPropertyNames,
   initializeWebGPU,
+  inputsEqual,
   INSPECTOR_HEAT_MS,
   InspectorOverlay,
   INSTANCE_STRIDE_BYTES,
@@ -3919,6 +4370,7 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isTypographyRole,
   isUiChild,
   isUiElement,
   isUiModifier,
@@ -3964,9 +4416,13 @@ export {
   lineLimit,
   lineStartAt,
   MainAxisAlignment,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
   matchRangesOf,
   MAX_GRADIENT_STOPS,
   measure,
+  measureSpan,
   minmax,
   MinMaxTrack,
   motion,
@@ -3992,12 +4448,14 @@ export {
   NodeProperty,
   NodeTransitions,
   noKeyModifiers,
+  noModifiers,
   normalizeBorderRadius,
   normalizeColor,
   normalizeStates,
   normalizeTextAlign,
   normalizeTransition,
   normalizeVerticalAlign,
+  noThemeExtensions,
   ObjectFit,
   offsetAtPoint,
   offsetAtPointIn,
@@ -4006,9 +4464,31 @@ export {
   OverlayShape,
   overrideSources,
   OverrideSources,
+  Paint,
+  PaintBox,
+  PaintCanvas,
+  PaintCanvasFactory,
+  PaintContext2D,
+  PaintElementProps,
+  PaintFillRule,
+  PaintGradient,
+  PaintLineCap,
+  PaintLineJoin,
+  PaintOp,
+  PaintPictureCache,
+  paintPictures,
   PaintProps,
+  PaintRecorder,
+  PaintRecording,
+  PaintResolver,
   paintsAfterChildren,
   PaintState,
+  PaintStats,
+  PaintSurface,
+  PaintTarget,
+  PaintTextAlign,
+  PaintTextStyle,
+  paintValuesEqual,
   paragraphGeometry,
   ParagraphGeometry,
   paragraphGeometryFrom,
@@ -4020,8 +4500,10 @@ export {
   parseFlexDirection,
   parseMainAxisAlignment,
   parseTransform,
+  pathValuesEqual,
   percent,
   PercentLength,
+  performanceMarksEnabled,
   PlacedLine,
   placeGridItems,
   PlatformAdapterOptions,
@@ -4045,10 +4527,12 @@ export {
   PropsOf,
   provideEnvironment,
   radialGradient,
+  raiseContrast,
   Reactive,
   readMp3Header,
   recordsEqual,
   registerFontStack,
+  relativeLuminance,
   RelayoutExplanation,
   RenderCommand,
   RenderContext,
@@ -4057,6 +4541,7 @@ export {
   RenderList,
   RenderTextCache,
   repeat,
+  replayPaint,
   resetOverrideWarnings,
   resetTransitionWarnings,
   resolveBoolean,
@@ -4079,6 +4564,7 @@ export {
   RunMeasure,
   sameArgs,
   scaleFrom,
+  scaleSpacing,
   ScissorRect,
   ScrollAdjustment,
   SCROLLBAR_FADE_MS,
@@ -4107,6 +4593,7 @@ export {
   selectionRects,
   selectionRectsIn,
   setMatchRanges,
+  setPerformanceMarks,
   setSelectionRange,
   shadowsEqual,
   shapesEqual,
@@ -4119,6 +4606,8 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  spacingEqual,
+  spacingSteps,
   splitMp3Frames,
   spring,
   Stack,
@@ -4146,16 +4635,20 @@ export {
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
   TextWrap,
+  themeExtension,
+  themeExtensionsEqual,
   themesEqual,
   tightenConstraints,
   TightenOptions,
   touchActionFor,
   TouchScrollerOptions,
+  tracePathData,
   traceRoundedRect,
   transform,
   Transform,
   transformIsIdentity,
   transformsEqual,
+  tu,
   tween,
   typographyEqual,
   TypographyProps,
@@ -4178,8 +4671,10 @@ export {
   UiColors,
   UiColorValue,
   UiContentDistribution,
+  UiContrast,
   UiCursor,
   UiDefinition,
+  UiDensity,
   UiDirection,
   UiDurationToken,
   UiEasing,
@@ -4228,6 +4723,7 @@ export {
   UiLiveRegion,
   UiManualFrameClock,
   UiModifier,
+  UiModifierBundle,
   UiModifierEnvironment,
   UiModifierFocus,
   UiModifierHost,
@@ -4242,6 +4738,8 @@ export {
   UiNodeType,
   UiObjectFit,
   UiOverflow,
+  UiPaint,
+  UiPath,
   UiPlacement,
   UiPlatformAdapter,
   UiPoint,
@@ -4281,6 +4779,7 @@ export {
   UiShadows,
   UiShapes,
   UiSharedElements,
+  UiSpacing,
   UiSpring,
   UiSpringOptions,
   UiSpringSpec,
@@ -4294,6 +4793,9 @@ export {
   UiTextWrapValue,
   UiTheme,
   UiThemeColorName,
+  UiThemeExtension,
+  UiThemeExtensionOptions,
+  UiThemeExtensions,
   UiTimerFrameClock,
   UiTimerFrameClockOptions,
   UiTouchScroller,
@@ -4305,6 +4807,8 @@ export {
   UiTween,
   UiTweenOptions,
   UiTypography,
+  UiTypographyExtensions,
+  UiTypographyRole,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
@@ -4342,7 +4846,10 @@ export {
   WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
+  withContrast,
+  withDensity,
   withOverrideSource,
+  withThemeExtension,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
@@ -4378,6 +4885,7 @@ import {
   buildRenderList,
   buildSemanticsTree,
   bumpFontStack,
+  bundle,
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
@@ -4427,6 +4935,7 @@ import {
   constraintsEqual,
   ContainerProps,
   contentOffset,
+  contrastRatio,
   createCanvasSurface,
   createElement,
   createEnvironmentKey,
@@ -4455,6 +4964,7 @@ import {
   defaultMotion,
   defaultShadows,
   defaultShapes,
+  defaultSpacing,
   defaultTextStyle,
   defaultTypography,
   DefaultVideoResolver,
@@ -4462,7 +4972,9 @@ import {
   defaultVisualState,
   defineModifier,
   defineProperty,
+  defineThemeExtension,
   demuxMp4Video,
+  densityFactors,
   describeLength,
   describeOverrides,
   detectEditingPlatform,
@@ -4491,6 +5003,7 @@ import {
   editorOf,
   EditUnit,
   ELLIPSIS,
+  EMPTY_RECORDING,
   EnvironmentNotifier,
   EnvironmentProps,
   fade,
@@ -4536,7 +5049,9 @@ import {
   GridTrack,
   hasDecorationPhase,
   hasDrawnText,
+  hasThemeExtension,
   hasVisualState,
+  highContrastColors,
   HitTester,
   HitTestLayoutReader,
   HitTestResult,
@@ -4558,6 +5073,7 @@ import {
   inheritedPropertyFlags,
   inheritedPropertyNames,
   initializeWebGPU,
+  inputsEqual,
   INSPECTOR_HEAT_MS,
   InspectorOverlay,
   INSTANCE_STRIDE_BYTES,
@@ -4586,6 +5102,7 @@ import {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isTypographyRole,
   isUiChild,
   isUiElement,
   isUiModifier,
@@ -4631,9 +5148,13 @@ import {
   lineLimit,
   lineStartAt,
   MainAxisAlignment,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
   matchRangesOf,
   MAX_GRADIENT_STOPS,
   measure,
+  measureSpan,
   minmax,
   MinMaxTrack,
   motion,
@@ -4659,12 +5180,14 @@ import {
   NodeProperty,
   NodeTransitions,
   noKeyModifiers,
+  noModifiers,
   normalizeBorderRadius,
   normalizeColor,
   normalizeStates,
   normalizeTextAlign,
   normalizeTransition,
   normalizeVerticalAlign,
+  noThemeExtensions,
   ObjectFit,
   offsetAtPoint,
   offsetAtPointIn,
@@ -4673,9 +5196,31 @@ import {
   OverlayShape,
   overrideSources,
   OverrideSources,
+  Paint,
+  PaintBox,
+  PaintCanvas,
+  PaintCanvasFactory,
+  PaintContext2D,
+  PaintElementProps,
+  PaintFillRule,
+  PaintGradient,
+  PaintLineCap,
+  PaintLineJoin,
+  PaintOp,
+  PaintPictureCache,
+  paintPictures,
   PaintProps,
+  PaintRecorder,
+  PaintRecording,
+  PaintResolver,
   paintsAfterChildren,
   PaintState,
+  PaintStats,
+  PaintSurface,
+  PaintTarget,
+  PaintTextAlign,
+  PaintTextStyle,
+  paintValuesEqual,
   paragraphGeometry,
   ParagraphGeometry,
   paragraphGeometryFrom,
@@ -4687,8 +5232,10 @@ import {
   parseFlexDirection,
   parseMainAxisAlignment,
   parseTransform,
+  pathValuesEqual,
   percent,
   PercentLength,
+  performanceMarksEnabled,
   PlacedLine,
   placeGridItems,
   PlatformAdapterOptions,
@@ -4712,10 +5259,12 @@ import {
   PropsOf,
   provideEnvironment,
   radialGradient,
+  raiseContrast,
   Reactive,
   readMp3Header,
   recordsEqual,
   registerFontStack,
+  relativeLuminance,
   RelayoutExplanation,
   RenderCommand,
   RenderContext,
@@ -4724,6 +5273,7 @@ import {
   RenderList,
   RenderTextCache,
   repeat,
+  replayPaint,
   resetOverrideWarnings,
   resetTransitionWarnings,
   resolveBoolean,
@@ -4746,6 +5296,7 @@ import {
   RunMeasure,
   sameArgs,
   scaleFrom,
+  scaleSpacing,
   ScissorRect,
   ScrollAdjustment,
   SCROLLBAR_FADE_MS,
@@ -4774,6 +5325,7 @@ import {
   selectionRects,
   selectionRectsIn,
   setMatchRanges,
+  setPerformanceMarks,
   setSelectionRange,
   shadowsEqual,
   shapesEqual,
@@ -4786,6 +5338,8 @@ import {
   slideDown,
   slideFrom,
   slideUp,
+  spacingEqual,
+  spacingSteps,
   splitMp3Frames,
   spring,
   Stack,
@@ -4813,11 +5367,14 @@ import {
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
   TextWrap,
+  themeExtension,
+  themeExtensionsEqual,
   themesEqual,
   tightenConstraints,
   TightenOptions,
   touchActionFor,
   TouchScrollerOptions,
+  tracePathData,
   traceRoundedRect,
   transform,
   Transform,
@@ -4845,8 +5402,10 @@ import {
   UiColors,
   UiColorValue,
   UiContentDistribution,
+  UiContrast,
   UiCursor,
   UiDefinition,
+  UiDensity,
   UiDirection,
   UiDurationToken,
   UiEasing,
@@ -4895,6 +5454,7 @@ import {
   UiLiveRegion,
   UiManualFrameClock,
   UiModifier,
+  UiModifierBundle,
   UiModifierEnvironment,
   UiModifierFocus,
   UiModifierHost,
@@ -4909,6 +5469,8 @@ import {
   UiNodeType,
   UiObjectFit,
   UiOverflow,
+  UiPaint,
+  UiPath,
   UiPlacement,
   UiPlatformAdapter,
   UiPoint,
@@ -4948,6 +5510,7 @@ import {
   UiShadows,
   UiShapes,
   UiSharedElements,
+  UiSpacing,
   UiSpring,
   UiSpringOptions,
   UiSpringSpec,
@@ -4961,6 +5524,9 @@ import {
   UiTextWrapValue,
   UiTheme,
   UiThemeColorName,
+  UiThemeExtension,
+  UiThemeExtensionOptions,
+  UiThemeExtensions,
   UiTimerFrameClock,
   UiTimerFrameClockOptions,
   UiTouchScroller,
@@ -4972,6 +5538,8 @@ import {
   UiTween,
   UiTweenOptions,
   UiTypography,
+  UiTypographyExtensions,
+  UiTypographyRole,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
@@ -5009,12 +5577,15 @@ import {
   WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
+  withContrast,
+  withDensity,
   withOverrideSource,
+  withThemeExtension,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty
-} from "./index-DJRJplAI.js";
+} from "./index-BvUyVX7K.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -5036,6 +5607,7 @@ export {
   buildRenderList,
   buildSemanticsTree,
   bumpFontStack,
+  bundle,
   Button,
   BUTTON_INTERACTION,
   canDecodeVideo,
@@ -5071,6 +5643,7 @@ export {
   Constraints,
   constraintsEqual,
   contentOffset,
+  contrastRatio,
   createCanvasSurface,
   createElement,
   createEnvironmentKey,
@@ -5094,13 +5667,16 @@ export {
   defaultMotion,
   defaultShadows,
   defaultShapes,
+  defaultSpacing,
   defaultTextStyle,
   defaultTypography,
   DefaultVideoResolver,
   defaultVisualState,
   defineModifier,
   defineProperty,
+  defineThemeExtension,
   demuxMp4Video,
+  densityFactors,
   describeLength,
   describeOverrides,
   detectEditingPlatform,
@@ -5118,6 +5694,7 @@ export {
   editorFor,
   editorOf,
   ELLIPSIS,
+  EMPTY_RECORDING,
   EnvironmentNotifier,
   fade,
   findEnvironmentKey,
@@ -5141,7 +5718,9 @@ export {
   Grid,
   hasDecorationPhase,
   hasDrawnText,
+  hasThemeExtension,
   hasVisualState,
+  highContrastColors,
   hoverable,
   iconKey,
   IconRasterizer,
@@ -5150,6 +5729,7 @@ export {
   inheritedPropertyFlags,
   inheritedPropertyNames,
   initializeWebGPU,
+  inputsEqual,
   INSPECTOR_HEAT_MS,
   INSTANCE_STRIDE_BYTES,
   INSTANCE_STRIDE_FLOATS,
@@ -5175,6 +5755,7 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isTypographyRole,
   isUiChild,
   isUiElement,
   isUiModifier,
@@ -5205,9 +5786,13 @@ export {
   lineLimit,
   lineStartAt,
   MainAxisAlignment,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
   matchRangesOf,
   MAX_GRADIENT_STOPS,
   measure,
+  measureSpan,
   minmax,
   motion,
   MOTION_CHANNELS,
@@ -5220,18 +5805,26 @@ export {
   NO_CLIP_INDEX,
   NodeTransitions,
   noKeyModifiers,
+  noModifiers,
   normalizeBorderRadius,
   normalizeColor,
   normalizeStates,
   normalizeTextAlign,
   normalizeTransition,
   normalizeVerticalAlign,
+  noThemeExtensions,
   offsetAtPoint,
   offsetAtPointIn,
   offsetAtX,
   offsetForVerticalMove,
   overrideSources,
+  Paint,
+  PaintPictureCache,
+  paintPictures,
+  PaintRecorder,
   paintsAfterChildren,
+  PaintTarget,
+  paintValuesEqual,
   paragraphGeometry,
   paragraphGeometryFrom,
   ParagraphTextMeasurer,
@@ -5241,7 +5834,9 @@ export {
   parseFlexDirection,
   parseMainAxisAlignment,
   parseTransform,
+  pathValuesEqual,
   percent,
+  performanceMarksEnabled,
   placeGridItems,
   pointerDeviceOf,
   pop,
@@ -5257,10 +5852,13 @@ export {
   proportionalFontMetrics,
   provideEnvironment,
   radialGradient,
+  raiseContrast,
   readMp3Header,
   recordsEqual,
   registerFontStack,
+  relativeLuminance,
   repeat,
+  replayPaint,
   resetOverrideWarnings,
   resetTransitionWarnings,
   resolveBoolean,
@@ -5280,6 +5878,7 @@ export {
   Row,
   sameArgs,
   scaleFrom,
+  scaleSpacing,
   SCROLLBAR_FADE_MS,
   SCROLLBAR_HOVER_ZONE,
   SCROLLBAR_INSET,
@@ -5297,6 +5896,7 @@ export {
   selectionRects,
   selectionRectsIn,
   setMatchRanges,
+  setPerformanceMarks,
   setSelectionRange,
   shadowsEqual,
   shapesEqual,
@@ -5305,6 +5905,8 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  spacingEqual,
+  spacingSteps,
   splitMp3Frames,
   spring,
   Stack,
@@ -5318,9 +5920,12 @@ export {
   textStylesEqual,
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
+  themeExtension,
+  themeExtensionsEqual,
   themesEqual,
   tightenConstraints,
   touchActionFor,
+  tracePathData,
   traceRoundedRect,
   transform,
   transformIsIdentity,
@@ -5434,8 +6039,24 @@ export {
   type ObjectFit,
   type OverlayShape,
   type OverrideSources,
+  type PaintBox,
+  type PaintCanvas,
+  type PaintCanvasFactory,
+  type PaintContext2D,
+  type PaintElementProps,
+  type PaintFillRule,
+  type PaintGradient,
+  type PaintLineCap,
+  type PaintLineJoin,
+  type PaintOp,
   type PaintProps,
+  type PaintRecording,
+  type PaintResolver,
   type PaintState,
+  type PaintStats,
+  type PaintSurface,
+  type PaintTextAlign,
+  type PaintTextStyle,
   type ParagraphGeometry,
   type ParagraphLayout,
   type PercentLength,
@@ -5510,6 +6131,7 @@ export {
   type UiLength,
   type UiListenerErrorReporter,
   type UiModifier,
+  type UiModifierBundle,
   type UiModifierEnvironment,
   type UiModifierFocus,
   type UiModifierHost,
@@ -5518,6 +6140,8 @@ export {
   type UiModifierTeardown,
   type UiNodeRef,
   type UiNodeTransitions,
+  type UiPaint,
+  type UiPath,
   type UiPoint,
   type UiPointerDevice,
   type UiPointerKind,
@@ -5570,7 +6194,9 @@ export {
   UiColors,
   UiColorValue,
   UiContentDistribution,
+  UiContrast,
   UiCursor,
+  UiDensity,
   UiDirection,
   UiDurationToken,
   UiEasingToken,
@@ -5630,6 +6256,7 @@ export {
   UiShadows,
   UiShapes,
   UiSharedElements,
+  UiSpacing,
   UiSpring,
   UiSpringSpec,
   UiSpringToken,
@@ -5642,12 +6269,17 @@ export {
   UiTextWrapValue,
   UiTheme,
   UiThemeColorName,
+  UiThemeExtension,
+  UiThemeExtensionOptions,
+  UiThemeExtensions,
   UiTimerFrameClock,
   UiTouchScroller,
   UiTransform,
   UiTransforms,
   UiTween,
   UiTypography,
+  UiTypographyExtensions,
+  UiTypographyRole,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVirtualWindow,
@@ -5675,7 +6307,10 @@ export {
   WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
+  withContrast,
+  withDensity,
   withOverrideSource,
+  withThemeExtension,
   wordRangeAt,
   wordRangeIn,
   writeDeclaredProperty,
@@ -5712,7 +6347,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DJRJplAI.js";
+} from "./index-BvUyVX7K.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

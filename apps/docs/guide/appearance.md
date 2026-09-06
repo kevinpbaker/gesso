@@ -71,6 +71,31 @@ reader did not choose.
 `GessoApp` and `createApp(Root)` take the same option and the same
 method, so the single-thread configuration behaves identically.
 
+## The other two settings
+
+Light and dark is one axis of an appearance. `UiTheme` carries two
+more, and they combine with it rather than forking it:
+
+```ts
+const theme = derive([scheme, settings.density, settings.contrast], (dark, density, contrast) => {
+  const base = dark ? appDarkTheme : appLightTheme;
+  const packed = withDensity(base, density);
+  return contrast === 'high' ? withContrast(packed, 'high') : packed;
+});
+```
+
+`withDensity` scales the spacing scale and nothing else, so a compact
+setting tightens every box on the screen and leaves the type alone.
+`withContrast` raises every foreground until it clears a 7:1 ratio
+against the surface it is drawn on, which is what a person who has
+turned the operating system's high contrast setting on is asking for.
+Both are described in [themes and the
+environment](/appearance/themes-and-the-environment).
+
+Neither is wired to a media query for you, for the reason the section
+below gives: which settings an application offers, and where it
+remembers them, is the application's.
+
 ## An app with its own setting
 
 An application that wants its own light/dark/auto control keeps that

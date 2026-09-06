@@ -87,6 +87,44 @@ describe('inspectNode', () => {
     expect(report.props.find(prop => prop.name === 'width')).toMatchObject({ value: '60', origin: 'binding' });
   });
 
+  it('names the stream feeding a bound property, what it last said and when', () => {
+    // The three things "bound" never said. A prop that stopped
+    // updating and one whose stream has said nothing since the screen
+    // was built are the same picture without them.
+    const width = new BehaviorSubject(60);
+    const labelled = new BehaviorSubject(40) as BehaviorSubject<number> & { label: string };
+    labelled.label = 'card.height';
+    const mounted = mountRuntime(Column({}, Box({ width, height: labelled })));
+    mounted.frame();
+    width.next(80);
+    mounted.frame();
+
+    const report = mounted.runtime.inspectNode(mounted.runtime.debugRoot().firstChild!);
+    const stream = report.props.find(prop => prop.name === 'width')?.stream;
+
+    expect(stream).toMatchObject({ kind: 'observable', value: '80', emissions: 2, connected: true });
+    // An epoch stamp, so a panel a thread away can subtract its own
+    // clock from it.
+    expect(stream?.emittedAt).toBeGreaterThan(Date.now() - 60_000);
+    // A labelled cell says where the value comes from by name.
+    expect(report.props.find(prop => prop.name === 'height')?.stream).toMatchObject({
+      source: 'card.height',
+      kind: 'cell'
+    });
+  });
+
+  it('counts the subscriptions a node holds, so the panel can add them up per component', () => {
+    const width = new BehaviorSubject(60);
+    const mounted = mountRuntime(Column({}, Box({ width, height: 40, onClick: () => {} })));
+    mounted.frame();
+
+    const tree = mounted.runtime.snapshotTree();
+
+    // One bound property and one listener on the box.
+    expect(tree.root.children[0]?.subscriptions).toBe(2);
+    expect(tree.subscriptions).toBeGreaterThanOrEqual(2);
+  });
+
   it('lists the modifiers attached to the node', () => {
     const mounted = mountRuntime(Column({}, Box({ width: 10, height: 10, modifiers: [hoverable()] })));
     mounted.frame();

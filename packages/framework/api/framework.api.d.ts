@@ -224,7 +224,7 @@ import {
   PatchPath,
   ReadableCell,
   viewKeys
-} from "./FunctionComponent-BSsqDvbp.js";
+} from "./FunctionComponent-Dm-wXgRx.js";
 import {
   BehaviorSubject,
   Observable,
@@ -242,9 +242,15 @@ import {
   ImageResolver,
   LayoutExplanation,
   LayoutInspector,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
+  measureSpan,
   MotionStateInput,
   MotionTiming,
+  performanceMarksEnabled,
   RendererBackend,
+  setPerformanceMarks,
   TextMeasurer,
   UI_ROLES,
   UI_SEMANTIC_STATES,
@@ -309,6 +315,7 @@ interface ComputedOptions<T> {
   readonly equal?: Equality<T>;
   readonly label?: string;
 }
+type ReadSource = <V>(source: Observable<V>) => V;
 declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private readonly compute;
   label: string | undefined;
@@ -323,7 +330,7 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private snapshotBy;
   private warnedStale;
   private staleWatch;
-  constructor(compute: () => T, options?: ComputedOptions<T>);
+  constructor(compute: (read: ReadSource) => T, options?: ComputedOptions<T>);
   get value(): T;
   private watchForStaleRead;
   private warnStale;
@@ -333,7 +340,28 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private detach;
   private onSourceChanged;
 }
-declare function computed<T>(compute: () => T, options?: ComputedOptions<T>): ComputedCell<T>;
+declare function computed<T>(compute: (read: ReadSource) => T, options?: ComputedOptions<T>): ComputedCell<T>;
+interface SelectOptions<T> {
+  readonly equal?: Equality<T>;
+  readonly label?: string;
+}
+declare function select<T extends object, K extends keyof T>(source: Observable<T>, key: K, options?: SelectOptions<T[K]>): ComputedCell<T[K]>;
+declare function select<T, R>(source: Observable<T>, project: (value: T) => R, options?: SelectOptions<R>): ComputedCell<R>;
+type EachKey<T> = (keyof T & string) | ((item: T, index: number) => string | number);
+interface EachProps<T> {
+  readonly of: Observable<readonly T[]> | readonly T[];
+  readonly by?: EachKey<T>;
+  readonly children: (item: T, index: number) => UiChild;
+}
+declare function Each<T>(props: EachProps<T>): Observable<readonly UiChild[]>;
+declare function each<T>(source: Observable<readonly T[]> | readonly T[], by: EachKey<T> | undefined, render: (item: T, index: number) => UiChild): Observable<readonly UiChild[]>;
+interface ShowProps {
+  readonly when: Observable<unknown> | unknown;
+  readonly children: () => UiChild;
+  readonly otherwise?: () => UiChild;
+}
+declare function Show(props: ShowProps): Observable<readonly UiChild[]>;
+declare function show(when: Observable<unknown> | unknown, children: () => UiChild, otherwise?: () => UiChild): Observable<readonly UiChild[]>;
 declare function bind<T>(cell: InternalState<T>): {
   value: InternalState<T>;
   onChange: (next: T) => void;
@@ -641,8 +669,8 @@ declare class RouterService {
   forward(): void;
   applyUrl(url: string): void;
   params<Path extends string>(route: RouteDefinition<Path>): RouteParams<Path> | null;
-  observeParams<Path extends string>(route: RouteDefinition<Path>): Observable<RouteParams<Path> | null>;
-  isActive(route: RouteDefinition): Observable<boolean>;
+  observeParams<Path extends string>(route: RouteDefinition<Path>): ComputedCell<RouteParams<Path> | null>;
+  isActive(route: RouteDefinition): ComputedCell<boolean>;
   private resolveInto;
   private publish;
   private resolve;
@@ -713,7 +741,27 @@ interface UiPropReport {
   readonly value: string;
   readonly origin: UiPropOrigin;
   readonly source?: string;
+  readonly stream?: UiStreamReport;
 }
+interface UiStreamReport {
+  readonly source: string;
+  readonly kind: 'cell' | 'observable';
+  readonly value: string;
+  readonly emissions: number;
+  readonly age: number | null;
+  readonly connected: boolean;
+}
+interface BoundStream {
+  readonly id: number;
+  readonly observable: unknown;
+  value(): unknown;
+  emissionCount(): number;
+  emittedAt(): number | null;
+  connected(): boolean;
+}
+declare function describeStream(binding: BoundStream, now: number): UiStreamReport;
+declare function formatStream(stream: UiStreamReport): string;
+declare function formatAge(ms: number): string;
 interface UiEnvironmentReport {
   readonly key: string;
   readonly value: string;
@@ -815,7 +863,7 @@ declare class AudioService {
   private readonly source;
   private readonly position;
   private readonly actionSubject;
-  readonly state: Observable<AudioState>;
+  readonly state: ComputedCell<AudioState>;
   readonly actions: Observable<AudioAction>;
   get current(): AudioState;
   setHandler(handler: ((request: AudioRequest) => void) | null): void;
@@ -1050,12 +1098,45 @@ interface UiTreeNode {
   readonly type: string;
   readonly component?: string;
   readonly text?: string;
+  readonly subscriptions?: number;
   readonly children: readonly UiTreeNode[];
 }
 interface UiTreeSnapshot {
   readonly root: UiTreeNode;
   readonly nodes: number;
+  readonly subscriptions: number;
 }
+interface ActionCause {
+  readonly id: number;
+  readonly label: string;
+}
+interface ActionEntryBase {
+  readonly seq: number;
+  readonly at: number;
+  readonly cause?: ActionCause;
+}
+interface CommandEntry extends ActionEntryBase {
+  readonly kind: 'command';
+  readonly channel: string;
+  readonly command: string;
+  readonly payload: unknown;
+}
+interface PatchEntry extends ActionEntryBase {
+  readonly kind: 'patch';
+  readonly channel: string;
+  readonly patches: readonly Patch[];
+  readonly keys: readonly string[];
+}
+interface ChannelErrorEntry extends ActionEntryBase {
+  readonly kind: 'error';
+  readonly channel: string;
+  readonly message: string;
+}
+interface FrameEntry extends ActionEntryBase {
+  readonly kind: 'frame';
+  readonly frame: number;
+}
+type ActionEntry = CommandEntry | PatchEntry | ChannelErrorEntry | FrameEntry;
 interface ConsoleEntry {
   readonly thread: 'render' | 'app';
   readonly level: 'log' | 'info' | 'warn' | 'error' | 'debug';
@@ -1093,6 +1174,16 @@ type DevtoolsRequest =
 {
   kind: 'inspector';
   enabled: boolean;
+} |
+{
+  kind: 'setProp';
+  id: string;
+  name: string;
+  value: unknown;
+} |
+{
+  kind: 'marks';
+  enabled: boolean;
 };
 type DevtoolsEvent = {
   kind: 'tree';
@@ -1107,6 +1198,10 @@ type DevtoolsEvent = {
 } | {
   kind: 'frame';
   metrics: FrameMetrics;
+} |
+{
+  kind: 'action';
+  entry: ActionEntry;
 } |
 {
   kind: 'hover';
@@ -1283,6 +1378,7 @@ declare class GessoRuntime {
   private lastInspection;
   private devtoolsListener;
   private watchingTree;
+  private lastSubscriptions;
   private watchingFrames;
   private selectedId;
   private lastSelectedReport;
@@ -1335,6 +1431,7 @@ declare class GessoRuntime {
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
   onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
   handleDevtools(request: DevtoolsRequest): void;
+  private writeInspectedProperty;
   snapshotTree(): UiTreeSnapshot;
   inspectNodeById(id: string): UiNodeReport | null;
   setHighlightedNode(id: string | null): void;
@@ -1855,13 +1952,18 @@ export {
   createShellHistory,
   Define,
   derive,
+  describeStream,
   diffProjection,
+  each,
+  Each,
   EditingProxy,
   FindService,
   findUnplainPath,
   FocusService,
   FontService,
+  formatAge,
   formatNodeReport,
+  formatStream,
   formatUrl,
   FrameService,
   GessoApp,
@@ -1882,6 +1984,10 @@ export {
   isOutputTarget,
   isPortErrorMessage,
   isPortHandshake,
+  MARK_PREFIX,
+  markInstant,
+  markNow,
+  measureSpan,
   MediaService,
   observeColorScheme,
   observeMediaQuery,
@@ -1891,6 +1997,7 @@ export {
   OverlayLayer,
   OverlayService,
   parseUrl,
+  performanceMarksEnabled,
   pick,
   pickKeys,
   portHandle,
@@ -1904,14 +2011,20 @@ export {
   route,
   RouterOutlet,
   RouterService,
+  select,
   SemanticsMirror,
   serveChannels,
   servePorts,
   ServiceRegistry,
+  setPerformanceMarks,
   ShellService,
+  show,
+  Show,
   structurallyEqual,
   to,
   treeText,
+  type ActionCause,
+  type ActionEntry,
   type AnimateOptions,
   type AppLogicEndpoint,
   type AudioAction,
@@ -1923,7 +2036,9 @@ export {
   type AudioSinkOutput,
   type AudioState,
   type AudioStatus,
+  type BoundStream,
   type ChannelClientMessage,
+  type ChannelErrorEntry,
   type ChannelHostMessage,
   type ChannelPort,
   type ChannelRegistration,
@@ -1934,6 +2049,7 @@ export {
   type ColorScheme,
   type ColorSchemePreference,
   type Command,
+  type CommandEntry,
   type CommandMap,
   type ComponentContext,
   type ComponentElement,
@@ -1946,6 +2062,8 @@ export {
   type DeriveOptions,
   type DevtoolsEvent,
   type DevtoolsRequest,
+  type EachKey,
+  type EachProps,
   type EditingMirrorTarget,
   type EditingProxySink,
   type EditingState,
@@ -1957,6 +2075,7 @@ export {
   type FontFamilyDeclaration,
   type FontFamilyStatus,
   type FontHost,
+  type FrameEntry,
   type FrameMetrics,
   type FramePhaseTimings,
   type FrameworkChild,
@@ -1973,11 +2092,13 @@ export {
   type OverlayEntry,
   type OverlayPlacement,
   type Patch,
+  type PatchEntry,
   type PatchPath,
   type PortHandshake,
   type PortHost,
   type PresenceProps,
   type ReadableCell,
+  type ReadSource,
   type RendererChoice,
   type RouteContext,
   type RouteDefinition,
@@ -1991,6 +2112,7 @@ export {
   type RuntimeErrorSource,
   type RuntimeInput,
   type RuntimeToShellMessage,
+  type SelectOptions,
   type SemanticsMirrorSink,
   type ServedChannel,
   type ShellHistory,
@@ -1998,6 +2120,7 @@ export {
   type ShellHistoryOptions,
   type ShellRequest,
   type ShellToRuntimeMessage,
+  type ShowProps,
   type SpringOptions,
   type UiDuration,
   type UiEasingChoice,
@@ -2013,6 +2136,7 @@ export {
   type UiSemanticsRecord,
   type UiSemanticsReport,
   type UiSemanticState,
+  type UiStreamReport,
   type UiTreeNode,
   type UiTreeSnapshot,
   type WorkerAppOptions,
@@ -2048,7 +2172,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-BSsqDvbp.js";
+} from "../FunctionComponent-Dm-wXgRx.js";
 import {
   Observable
 } from "rxjs";

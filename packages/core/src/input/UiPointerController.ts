@@ -119,7 +119,14 @@ interface ScrollbarDrag {
  *   - Contacts: a press is owned by the contact that started it, and
  *     the moves and releases of any other contact are ignored until it
  *     ends. A second finger therefore cannot drag a widget the first
- *     one is holding.
+ *     one is holding. Every contact is still *reported* to the gesture
+ *     recognizer, which is what a pinch is made of; being refused the
+ *     press and being unheard are two different things.
+ *   - Context menu: a press of the secondary button alone dispatches
+ *     PointerDown and then ContextMenu at the same point, and
+ *     establishes no press at all, so nothing is dragged, nothing is
+ *     focused and no Click follows the release. A finger asks for the
+ *     same thing by holding, which the gesture recognizer answers.
  *   - Touch hover: a finger's hover is dropped when it lifts, because
  *     the finger is no longer anywhere. A mouse keeps its hover.
  *   - Scrollbars: a press on a scroll container's thumb starts a drag
@@ -214,6 +221,11 @@ export class UiPointerController {
     this.lastPosition = { x, y };
     const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers, pointer);
     if (this.downTarget !== null || this.scrollbarDrag !== null) {
+      // The press stays with the contact that started it. The contact
+      // is still reported, because "a second finger landed" is exactly
+      // what a pinch is made of and dropping it here is what
+      // `decisions/0041` left unfinished.
+      this.gestures?.contactDown?.(pointer, x, y, this.downTarget, modifiers);
       return event;
     }
     const hit = this.hitTester.hitTest(x, y);
@@ -224,6 +236,21 @@ export class UiPointerController {
     }
     const target = hit?.node ?? null;
     this.updateHover(target, x, y, buttons, modifiers, pointer);
+    if (target !== null && isSecondaryButton(buttons)) {
+      // A right press is a question, not a gesture: it asks what can be
+      // done with the node under it. No press is established, so no
+      // drag begins, no Click is synthesized on the release and the
+      // focus a left press would have taken is left where it was.
+      this.dispatcher.dispatch(event, target);
+      if (!event.defaultPrevented) {
+        this.dispatcher.dispatch(
+          new UiPointerEvent(UiEventType.ContextMenu, x, y, buttons, modifiers, pointer),
+          target
+        );
+      }
+      return event;
+    }
+    this.gestures?.contactDown?.(pointer, x, y, target, modifiers);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
       this.gestures?.pointerDown(event, target);
@@ -262,6 +289,7 @@ export class UiPointerController {
     pointer: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent | null {
     this.lastPosition = { x, y };
+    this.gestures?.contactMove?.(pointer, x, y);
     if (!this.ownsPress(pointer)) {
       return null;
     }
@@ -314,6 +342,7 @@ export class UiPointerController {
     modifiers: UiKeyModifiers = noKeyModifiers(),
     pointer: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent | null {
+    this.gestures?.contactUp?.(pointer);
     if (!this.ownsPress(pointer)) {
       return null;
     }
@@ -355,6 +384,7 @@ export class UiPointerController {
    * node and clears press state so no Click is synthesized.
    */
   pointerCancel(pointer: UiPointerDevice = MOUSE_POINTER): void {
+    this.gestures?.contactUp?.(pointer);
     if (!this.ownsPress(pointer)) {
       return;
     }
@@ -556,4 +586,17 @@ export class UiPointerController {
     }
     this.updateHover(null, x, y, 0, modifiers, pointer);
   }
+}
+
+/**
+ * Whether the pressed buttons are the secondary one and nothing else.
+ *
+ * The DOM's `buttons` bitmask, where 2 is the right button. Read as an
+ * exact value rather than a bit test on purpose: a press with the left
+ * and right buttons together is a press, and treating it as a menu
+ * request would take the drag away from anyone whose hand rests on
+ * both.
+ */
+function isSecondaryButton(buttons: number): boolean {
+  return buttons === 2;
 }

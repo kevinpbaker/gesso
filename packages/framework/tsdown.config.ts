@@ -8,9 +8,10 @@ import { defineConfig } from 'tsdown';
  * will import instead.
  */
 export default defineConfig({
-  entry: ['src/index.ts', 'src/jsx/jsx-runtime.ts', 'src/jsx/jsx-dev-runtime.ts'],
+  entry: ['src/index.ts', 'src/worker/index.ts', 'src/jsx/jsx-runtime.ts', 'src/jsx/jsx-dev-runtime.ts'],
   format: 'esm',
   dts: true,
   platform: 'neutral',
+  sourcemap: true,
   clean: true
 });

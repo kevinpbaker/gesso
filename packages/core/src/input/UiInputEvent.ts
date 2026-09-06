@@ -32,7 +32,19 @@ export enum UiEventType {
   DragEnd = 'dragend',
   PanStart = 'panstart',
   PanMove = 'panmove',
-  PanEnd = 'panend'
+  PanEnd = 'panend',
+  /**
+   * A request for the commands that apply to something: the secondary
+   * mouse button, or a finger held on it.
+   *
+   * A gesture like any other, so the component that shows the menu
+   * listens for an event rather than reaching for a browser API it
+   * cannot see from a worker.
+   */
+  ContextMenu = 'contextmenu',
+  PinchStart = 'pinchstart',
+  PinchMove = 'pinchmove',
+  PinchEnd = 'pinchend'
 }
 
 /**
@@ -196,6 +208,72 @@ export class UiPointerEvent extends UiInputEvent {
      * skipping a hover affordance nothing will ever hover.
      */
     readonly pointer: UiPointerDevice = MOUSE_POINTER
+  ) {
+    super(type);
+  }
+}
+
+/**
+ * A synthesized single-contact gesture, with the speed it ended at.
+ *
+ * Every Pan and Drag event is one of these, so a listener never has to
+ * ask which kind of pointer event it was handed. The velocity is zero
+ * everywhere except on `PanEnd` and `DragEnd`, where it is the speed
+ * the contact was travelling at when it left the surface, measured
+ * over the last moments of the gesture rather than over the whole of
+ * it: a long slow drag that ends in a flick averages out to nothing.
+ *
+ * **Pixels per second**, which is what `UiSpringOptions.velocity` is
+ * in. That is the whole point of carrying it: a card thrown across the
+ * screen and released should go on travelling at the speed it was
+ * thrown, and a spring handed a velocity of zero stops dead under the
+ * finger instead. `UiTouchScroller` measures in pixels per millisecond
+ * for its own projection and is not this; the unit is named here so
+ * the two are never confused.
+ */
+export class UiGestureEvent extends UiPointerEvent {
+  constructor(
+    type: UiEventType,
+    x: number,
+    y: number,
+    buttons: number = 0,
+    modifiers: UiKeyModifiers = noKeyModifiers(),
+    pointer: UiPointerDevice = MOUSE_POINTER,
+    readonly velocityX: number = 0,
+    readonly velocityY: number = 0
+  ) {
+    super(type, x, y, buttons, modifiers, pointer);
+  }
+}
+
+/**
+ * Two contacts moving relative to each other.
+ *
+ * `scale` and `rotation` are cumulative from the moment the second
+ * contact landed, so a listener that writes them straight onto a
+ * transform gets the gesture rather than a difference it has to
+ * integrate itself; the `*Delta` pair is the change since the previous
+ * event, for a listener that is integrating something of its own.
+ * `x`/`y` are the midpoint between the contacts, which is the point a
+ * zoom should hold still, and `translateX`/`translateY` are how far
+ * that midpoint moved since the previous event, so a two-finger pan
+ * and a pinch are one gesture rather than two that fight.
+ *
+ * Rotation is in degrees, matching the `rotation` field of the
+ * transform property, so neither end of the handoff converts.
+ */
+export class UiPinchEvent extends UiInputEvent {
+  constructor(
+    type: UiEventType.PinchStart | UiEventType.PinchMove | UiEventType.PinchEnd,
+    readonly x: number,
+    readonly y: number,
+    readonly scale: number,
+    readonly rotation: number,
+    readonly scaleDelta: number,
+    readonly rotationDelta: number,
+    readonly translateX: number,
+    readonly translateY: number,
+    readonly modifiers: UiKeyModifiers = noKeyModifiers()
   ) {
     super(type);
   }

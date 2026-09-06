@@ -9,6 +9,7 @@ import type { UiEventBinding } from '../bindings/UiEventBinding';
 import { UiEnvironment } from '../environment/UiEnvironment';
 import { findEnvironmentKey, type UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
+import { isTypographyRole } from '../environment/UiTypography';
 import { inheritedPropertyFlags } from '../properties/UiPropertyRegistry';
 import type { Observable } from 'rxjs';
 
@@ -340,6 +341,40 @@ export class UiGraph {
   public getBindingsForNode(node: UiNode): UiBinding<unknown>[] {
     const byProperty = this.nodeBindings.get(node);
     return byProperty === undefined ? [] : [...byProperty.values()];
+  }
+
+  /**
+   * How many live subscriptions one node holds: the properties an
+   * Observable drives, its children binding when its children are
+   * reactive, and its declarative event handlers.
+   *
+   * The three are counted together because the question a devtools
+   * subscription view asks is "what is this component still holding
+   * on to", and a leak looks the same whichever of the three it is.
+   */
+  public subscriptionsForNode(node: UiNode): number {
+    return (
+      (this.nodeBindings.get(node)?.size ?? 0) +
+      (this.childrenBindings.has(node) ? 1 : 0) +
+      (this.eventBindings.get(node)?.size ?? 0)
+    );
+  }
+
+  /**
+   * Every live subscription in the graph.
+   *
+   * Counted on demand rather than kept as a running total: a counter
+   * maintained across `unbind`, `unbindNode`, `unbindChildren` and
+   * `unbindEvents` is a counter that drifts, and drift is precisely
+   * the thing a leak hunt cannot tolerate. Nothing calls this unless a
+   * panel is attached.
+   */
+  public get subscriptionCount(): number {
+    let count = this.bindings.size + this.childrenBindings.size;
+    for (const byType of this.eventBindings.values()) {
+      count += byType.size;
+    }
+    return count;
   }
 
   // ---------------------------------------------------------------------------
@@ -678,7 +713,22 @@ export class UiGraph {
 
     const textStyle = node.getProperty<unknown>('textStyle');
     if (textStyle !== undefined) {
-      env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, textStyle);
+      // A role name is looked up in the theme this node is under,
+      // which is the environment built so far and so includes a theme
+      // the same node provides. Resolved here rather than at paint
+      // because the text properties already inherit through this key,
+      // and a role that turned into a style anywhere later would be a
+      // second resolution path for the same six numbers.
+      const scale = env.get(UiEnvironmentKeys.theme).typography;
+      if (isTypographyRole(textStyle, scale)) {
+        const style = (scale as unknown as Record<string, unknown>)[textStyle];
+        env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, style);
+      } else if (typeof textStyle !== 'string') {
+        env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, textStyle);
+      }
+      // A string the scale does not carry provides nothing: the
+      // subtree keeps the type it inherited, which is quieter than
+      // every word under it falling back to a default size.
     }
 
     const contentColor = node.getProperty<unknown>('contentColor');
