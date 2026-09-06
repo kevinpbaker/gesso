@@ -771,6 +771,10 @@ type AudioRequest = {
   readonly type: 'load';
   readonly src: string;
   readonly autoplay: boolean;
+} |
+{
+  readonly type: 'preload';
+  readonly src: string;
 } | {
   readonly type: 'play';
 } | {
@@ -817,6 +821,7 @@ declare class AudioService {
   load(src: string, options?: {
     readonly autoplay?: boolean;
   }): void;
+  preload(src: string): void;
   play(): void;
   pause(): void;
   seek(seconds: number): void;
@@ -1613,7 +1618,9 @@ interface AudioSinkOptions {
 }
 declare class AudioSink {
   private readonly out;
-  private readonly element;
+  private element;
+  private spare;
+  private prepared;
   private readonly session;
   private readonly sampleEveryMs;
   private timer;
@@ -1622,6 +1629,8 @@ declare class AudioSink {
   private readonly onEvent;
   constructor(out: AudioSinkOutput, options?: AudioSinkOptions);
   handle(request: AudioRequest): void;
+  private preload;
+  private swap;
   dispose(): void;
   private play;
   private handleEvent;
