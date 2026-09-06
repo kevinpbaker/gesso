@@ -7,7 +7,7 @@
 // ==== desktop.d.ts ====
 import {
   GessoFrame
-} from "./frames-DsGY7d-I.js";
+} from "./frames-Cb3vUTvQ.js";
 import {
   ChannelToken,
   ServedChannel
@@ -26,6 +26,8 @@ interface DesktopWindowHandle {
 interface DesktopAppOptions {
   channels: readonly ServedChannel[] | ((window: DesktopWindowHandle) => readonly ServedChannel[]);
   open: (receive: (frame: GessoFrame) => void, window: DesktopWindowHandle) => DesktopWindowTransport;
+  onOpenUrl?: (url: string, window: DesktopWindowHandle) => void;
+  colorScheme?: Observable<'light' | 'dark'>;
   onLastWindowClosed?: () => void;
   chunkBytes?: number;
 }
@@ -72,6 +74,11 @@ type GessoFrame = {
 } | {
   readonly kind: 'close';
   readonly stream: number;
+} |
+{
+  readonly kind: 'control';
+  readonly name: string;
+  readonly body: string;
 };
 declare function isGessoFrame(value: unknown): value is GessoFrame;
 declare function frameData(stream: number, value: unknown, chunkBytes?: number): GessoFrame[];
@@ -96,7 +103,7 @@ import {
   frameData,
   GessoFrame,
   isGessoFrame
-} from "./frames-DsGY7d-I.js";
+} from "./frames-Cb3vUTvQ.js";
 export {
   DEFAULT_CHUNK_BYTES,
   FrameAssembler,
@@ -107,16 +114,18 @@ export {
 // ==== main.d.ts ====
 import {
   GessoFrame
-} from "./frames-DsGY7d-I.js";
+} from "./frames-Cb3vUTvQ.js";
 import {
   ServedChannel
 } from "@gesso/framework";
 interface ChannelHostOptions {
   send: (frame: GessoFrame) => void;
   chunkBytes?: number;
+  onOpenUrl?: (url: string) => void;
 }
 interface ChannelHost {
   receive(frame: GessoFrame): void;
+  setColorScheme(scheme: 'light' | 'dark'): void;
   dispose(): void;
 }
 declare function serveChannelsToWindow(channels: readonly ServedChannel[], options: ChannelHostOptions): ChannelHost;
@@ -128,17 +137,19 @@ export {
 // ==== view.d.ts ====
 import {
   GessoFrame
-} from "./frames-DsGY7d-I.js";
+} from "./frames-Cb3vUTvQ.js";
 import {
   AppLogicEndpoint
 } from "@gesso/framework";
 interface ElectrobunBridgeOptions {
   send: (frame: GessoFrame) => void;
   chunkBytes?: number;
+  onColorScheme?: (scheme: 'light' | 'dark') => void;
 }
 interface ElectrobunBridge {
   readonly endpoint: AppLogicEndpoint;
   receive(frame: GessoFrame): void;
+  openUrl(url: string): void;
   dispose(): void;
 }
 declare function createElectrobunBridge(options: ElectrobunBridgeOptions): ElectrobunBridge;

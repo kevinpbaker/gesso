@@ -34,11 +34,24 @@ export type GessoFrame =
       /** Absent unless the message was split; then how many parts to expect. */
       readonly parts?: number;
     }
-  | { readonly kind: 'close'; readonly stream: number };
+  | { readonly kind: 'close'; readonly stream: number }
+  /**
+   * The adapter's own traffic, which is not a channel: the appearance
+   * the platform is in, and a url the application wants opened
+   * outside the window. It carries a name and a serialized payload for
+   * the same reason a `data` frame carries a body, and it is a
+   * separate kind so that nothing has to reserve a stream number.
+   */
+  | { readonly kind: 'control'; readonly name: string; readonly body: string };
 
 export function isGessoFrame(value: unknown): value is GessoFrame {
   const kind = (value as { kind?: unknown } | null)?.kind;
-  return kind === 'open' || kind === 'data' || kind === 'close';
+  return kind === 'open' || kind === 'data' || kind === 'close' || kind === 'control';
+}
+
+/** Wraps one control message. Never split: these are small by construction. */
+export function frameControl(name: string, payload: unknown): GessoFrame {
+  return { kind: 'control', name, body: JSON.stringify(payload ?? null) ?? 'null' };
 }
 
 /**

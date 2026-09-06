@@ -16,7 +16,7 @@
  */
 import { isHubMessage, isPortHandshake, type AppLogicEndpoint } from '@gesso/framework';
 
-import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameData, type GessoFrame } from './frames';
+import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameControl, frameData, type GessoFrame } from './frames';
 
 export interface ElectrobunBridgeOptions {
   /**
@@ -29,6 +29,16 @@ export interface ElectrobunBridgeOptions {
   send: (frame: GessoFrame) => void;
   /** Overrides `DEFAULT_CHUNK_BYTES`. Only a test should need to. */
   chunkBytes?: number;
+  /**
+   * The appearance the platform is in, as the main process reports it.
+   *
+   * Wire it to `app.setColorScheme`. It exists because
+   * `prefers-color-scheme` is not to be trusted in every webview: on
+   * WebKitGTK it reported light on a desktop that was in dark mode
+   * (`decisions/0070-electrobun-spike.md`), and a shell that believes
+   * it is a browser gets the appearance wrong there.
+   */
+  onColorScheme?: (scheme: 'light' | 'dark') => void;
 }
 
 export interface ElectrobunBridge {
@@ -43,6 +53,14 @@ export interface ElectrobunBridge {
   readonly endpoint: AppLogicEndpoint;
   /** Call from the RPC handler that receives frames from the main process. */
   receive(frame: GessoFrame): void;
+  /**
+   * Hands a url to the main process to open outside the window.
+   *
+   * Pass it as `onOpenUrl` to the shell: `window.open` in a webview
+   * opens another webview or nothing at all, and a link in a desktop
+   * application belongs in the person's browser.
+   */
+  openUrl(url: string): void;
   /** Closes every stream and stops pumping. */
   dispose(): void;
 }
@@ -108,8 +126,25 @@ export function createElectrobunBridge(options: ElectrobunBridgeOptions): Electr
 
   return {
     endpoint,
+    openUrl(url: string): void {
+      if (!disposed) {
+        options.send(frameControl('openUrl', { url }));
+      }
+    },
     receive(frame: GessoFrame): void {
       if (disposed) {
+        return;
+      }
+      if (frame.kind === 'control') {
+        if (frame.name === 'colorScheme') {
+          const payload = JSON.parse(frame.body) as { scheme?: 'light' | 'dark' };
+          if (payload.scheme !== undefined) {
+            options.onColorScheme?.(payload.scheme);
+          }
+        }
+        // An unknown control name is ignored rather than thrown on: the
+        // main process may be newer than the window, which is ordinary
+        // during a hot reload.
         return;
       }
       if (frame.kind === 'close') {

@@ -17,6 +17,7 @@ import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChann
 import { createDesktopApp, DesktopWindows, windowsChannel, type DesktopApp, type DesktopWindowHandle } from './desktop';
 import type { GessoFrame } from './frames';
 import { createElectrobunBridge } from './view';
+import type { ChannelHost } from './main';
 
 interface CounterView {
   count: number;
@@ -233,5 +234,130 @@ describe('createDesktopApp', () => {
 
     expect(handle.id).toBe(1);
     expect(early).toBeDefined();
+  });
+});
+
+describe('the shell adaptations a window needs', () => {
+  const bridges: Array<ReturnType<typeof createElectrobunBridge>> = [];
+
+  /** What a window does the moment its page runs: attach a channel. */
+  function speak(bridge: ReturnType<typeof createElectrobunBridge>): void {
+    const hub = new MessageChannel();
+    bridge.endpoint.postMessage({ type: 'gesso:hub' }, [hub.port2]);
+    portHandle(hub.port1).open(Counter.name);
+  }
+
+  it('hands a url from a window to the application, with the window that asked', async () => {
+    const opened: Array<{ url: string; id: number }> = [];
+    const count = new BehaviorSubject(0);
+    let bridge!: ReturnType<typeof createElectrobunBridge>;
+    let host!: ChannelHost;
+    const app = createDesktopApp({
+      channels: [{ token: Counter, source: { view: { count }, commands: { increment: () => {} } } }],
+      open: receive => {
+        host = { receive } as unknown as ChannelHost;
+        bridge = createElectrobunBridge({ send: frame => receive(frame) });
+        return { send: () => {}, close: () => {} };
+      },
+      onOpenUrl: (url, window) => opened.push({ url, id: window.id })
+    });
+    const handle = app.openWindow();
+
+    bridge.openUrl('https://example.test/docs');
+
+    expect(opened).toEqual([{ url: 'https://example.test/docs', id: handle.id }]);
+    expect(host).toBeDefined();
+  });
+
+  it('waits for the window to speak before telling it the appearance', async () => {
+    // A webview's RPC is not listening until its page has loaded, and
+    // the window opens well before that. Anything pushed in between is
+    // lost, which a native window found and a spec whose transport was
+    // live immediately did not. See `decisions/0074-shell-adaptations.md`.
+    const scheme = new BehaviorSubject<'light' | 'dark'>('dark');
+    const seen: string[] = [];
+    const count = new BehaviorSubject(0);
+    let greet!: () => void;
+    const app = createDesktopApp({
+      channels: [{ token: Counter, source: { view: { count }, commands: { increment: () => {} } } }],
+      colorScheme: scheme,
+      open: (receive, handle) => {
+        const bridge = createElectrobunBridge({
+          send: frame => receive(frame),
+          onColorScheme: value => seen.push(value)
+        });
+        // The window is open, but nothing in it is listening yet.
+        greet = () => {
+          const hub = new MessageChannel();
+          bridge.endpoint.postMessage({ type: 'gesso:hub' }, [hub.port2]);
+          portHandle(hub.port1).open(Counter.name);
+        };
+        void handle;
+        return { send: frame => bridge.receive(frame), close: () => {} };
+      }
+    });
+    app.openWindow();
+
+    expect(seen).toEqual([]);
+    scheme.next('light');
+    expect(seen).toEqual([]);
+
+    // The window's first frame is what says it is there. Here it is a
+    // channel handshake, which is what a real window sends first.
+    greet();
+    await settle();
+    expect(seen).toEqual(['light']);
+  });
+
+  it('tells a window the appearance once it has spoken, and again when it changes', async () => {
+    const scheme = new BehaviorSubject<'light' | 'dark'>('dark');
+    const seen: string[] = [];
+    const count = new BehaviorSubject(0);
+    const app = createDesktopApp({
+      channels: [{ token: Counter, source: { view: { count }, commands: { increment: () => {} } } }],
+      colorScheme: scheme,
+      open: receive => {
+        const bridge = createElectrobunBridge({
+          send: frame => receive(frame),
+          onColorScheme: value => seen.push(value)
+        });
+        bridges.push(bridge);
+        return { send: frame => bridge.receive(frame), close: () => {} };
+      }
+    });
+    app.openWindow();
+    // Whatever the window's first frame is; a handshake is what a real
+    // one sends.
+    speak(bridges[bridges.length - 1]);
+    await settle();
+
+    expect(seen).toEqual(['dark']);
+    scheme.next('light');
+    expect(seen).toEqual(['dark', 'light']);
+  });
+
+  it('stops telling a window the appearance once it has closed', async () => {
+    const scheme = new BehaviorSubject<'light' | 'dark'>('dark');
+    const seen: string[] = [];
+    const count = new BehaviorSubject(0);
+    const app = createDesktopApp({
+      channels: [{ token: Counter, source: { view: { count }, commands: { increment: () => {} } } }],
+      colorScheme: scheme,
+      open: receive => {
+        const bridge = createElectrobunBridge({
+          send: frame => receive(frame),
+          onColorScheme: value => seen.push(value)
+        });
+        bridges.push(bridge);
+        return { send: frame => bridge.receive(frame), close: () => {} };
+      }
+    });
+    const handle = app.openWindow();
+    speak(bridges[bridges.length - 1]);
+    await settle();
+    handle.close();
+
+    scheme.next('light');
+    expect(seen).toEqual(['dark']);
   });
 });

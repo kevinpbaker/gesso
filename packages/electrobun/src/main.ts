@@ -13,7 +13,7 @@
  */
 import { serveChannels, type PortHost, type ServedChannel } from '@gesso/framework';
 
-import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameData, type GessoFrame } from './frames';
+import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameControl, frameData, type GessoFrame } from './frames';
 
 export interface ChannelHostOptions {
   /**
@@ -26,11 +26,22 @@ export interface ChannelHostOptions {
   send: (frame: GessoFrame) => void;
   /** Overrides `DEFAULT_CHUNK_BYTES`. Only a test should need to. */
   chunkBytes?: number;
+  /**
+   * A url the window asked to have opened outside itself.
+   *
+   * `Utils.openExternal(url)` is what an Electrobun application passes
+   * here. It is not called for the application: opening something is
+   * an act, and which urls an application is willing to hand to the
+   * operating system is the application's decision.
+   */
+  onOpenUrl?: (url: string) => void;
 }
 
 export interface ChannelHost {
   /** Call from the RPC handler that receives frames from the window. */
   receive(frame: GessoFrame): void;
+  /** Tells the window which appearance the platform is in. */
+  setColorScheme(scheme: 'light' | 'dark'): void;
   /** Stops serving and disposes every channel this host provided. */
   dispose(): void;
 }
@@ -56,7 +67,19 @@ export function serveChannelsToWindow(channels: readonly ServedChannel[], option
   const stop = serveChannels(channels, host);
 
   return {
+    setColorScheme(scheme: 'light' | 'dark'): void {
+      options.send(frameControl('colorScheme', { scheme }));
+    },
     receive(frame: GessoFrame): void {
+      if (frame.kind === 'control') {
+        if (frame.name === 'openUrl') {
+          const payload = JSON.parse(frame.body) as { url?: string };
+          if (typeof payload.url === 'string') {
+            options.onOpenUrl?.(payload.url);
+          }
+        }
+        return;
+      }
       if (frame.kind === 'open') {
         const port = new StreamPort(frame.stream, options.send, chunkBytes);
         ports.set(frame.stream, port);
