@@ -950,10 +950,20 @@ export class UiGraphBuilder {
   }
 
   /**
-   * Determines whether a value is an RxJS Observable.
+   * Determines whether a prop's value is an Observable to bind.
+   *
+   * The shared structural check rather than `instanceof Observable`,
+   * for the reason `isObservable` in `UiElement.ts` already gives for
+   * children: an application whose bundle holds a second copy of rxjs
+   * produces observables that fail an `instanceof` against this one.
+   * Children were structural and props were not, so an app-authored
+   * `combineLatest` reached a child correctly and reached a prop as a
+   * plain object, which is written once and never updates. It fails
+   * silently, which is what makes it worth a named method: nothing
+   * warns, nothing throws, and the element simply has no text.
    */
   private isObservable(value: unknown): value is Observable<unknown> {
-    return value instanceof Observable;
+    return isObservable(value);
   }
 
   /**
