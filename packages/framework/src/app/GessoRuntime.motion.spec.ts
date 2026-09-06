@@ -496,6 +496,45 @@ describe('sharedElement()', () => {
     expect(card!.properties.get('lift')).toBeUndefined();
   });
 
+  it('takes no press while it is in flight, so the press reaches what is under it', () => {
+    // Pressing a second card while the first is still flying home used
+    // to open the first one again: the picture in flight is large, it
+    // is over its neighbours for most of the way, and once lifted it is
+    // over them in the hit test too. An element mid-morph is scenery.
+    const detail = internalState(false);
+    let card: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { width: 400, height: 600 },
+        detail.pipe(
+          map(open =>
+            open
+              ? Box({ key: 'detail', width: 400, height: 400, modifiers: [sharedElement({ name: 'hero' })] })
+              : Box({
+                  key: 'card',
+                  ref: (n: UiNode | null) => n !== null && (card = n),
+                  width: 100,
+                  height: 100,
+                  marginTop: 400,
+                  modifiers: [sharedElement({ name: 'hero', duration: 400, easing: linear })]
+                })
+          )
+        )
+      )
+    );
+    drain(mounted);
+    detail.value = true;
+    drain(mounted);
+    card = null;
+
+    detail.value = false;
+    mounted.frame();
+    expect(card!.properties.get('pointerEvents')).toBe('none');
+    drain(mounted);
+    // And it is a target again the moment it has arrived.
+    expect(card!.properties.get('pointerEvents')).toBeUndefined();
+  });
+
   it('puts a morph down when another element takes the name from under it', () => {
     // Interrupting a morph: press back into a card while it is still on
     // its way home from the last press. The card is asked to yield the

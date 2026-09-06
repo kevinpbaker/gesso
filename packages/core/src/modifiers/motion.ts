@@ -716,6 +716,15 @@ class SharedElementController {
     if (this.args.lift === true) {
       this.host.set('lift', true);
     }
+    // An element in flight is scenery, not a target. It is somewhere it
+    // does not belong, it is there for a few hundred milliseconds, and
+    // for most of that it is larger than its resting self and covering
+    // its neighbours: a press that lands on it was aimed at whatever it
+    // is passing over. Pressing a second card while the first was still
+    // flying home opened the first one again, which is what this stops,
+    // and it is why a browser's view-transition pseudo-elements take no
+    // pointer events either.
+    this.host.set('pointerEvents', 'none');
     this.args.onMorph?.(true);
   }
 
@@ -727,6 +736,7 @@ class SharedElementController {
     if (this.args.lift === true) {
       this.host.clear('lift');
     }
+    this.host.clear('pointerEvents');
     this.args.onMorph?.(false);
   }
 
