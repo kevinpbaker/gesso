@@ -55,6 +55,29 @@ const STATE_ATTRIBUTES: Record<string, [attribute: string, value: string]> = {
   modal: ['aria-modal', 'true']
 };
 
+/**
+ * Roles whose checked state is required rather than optional.
+ *
+ * A component publishes `checked` when it is on and nothing when it is
+ * off, which is the right shape for a state list. ARIA does not agree:
+ * on these roles `aria-checked` is a required attribute, and one that
+ * is absent means "this is not a checkbox after all" rather than "this
+ * checkbox is off". A screen reader then has nothing to announce.
+ *
+ * Filled in here rather than in each component for the reason
+ * `ADOPTION_ROADMAP.md` A3 gives: what an assistive technology needs is
+ * the mirror's business, and a rule in one file cannot be forgotten by
+ * the next control somebody writes. Found on a `RadioGroup` in a native
+ * window, where the unselected radio carried no `aria-checked` at all.
+ */
+const CHECKABLE_ROLES: ReadonlySet<string> = new Set([
+  'checkbox',
+  'radio',
+  'switch',
+  'menuitemcheckbox',
+  'menuitemradio'
+]);
+
 /** Every attribute a record can write, so clearing one is a fixed list. */
 const RECORD_ATTRIBUTES: readonly string[] = [
   'role',
@@ -331,6 +354,10 @@ export class SemanticsMirror {
       if (attribute !== undefined) {
         element.setAttribute(attribute[0], attribute[1]);
       }
+    }
+    const saysChecked = (record.states ?? []).some(state => state === 'checked' || state === 'mixed');
+    if (record.role !== undefined && CHECKABLE_ROLES.has(record.role) && !saysChecked) {
+      element.setAttribute('aria-checked', 'false');
     }
     setNumber(element, 'aria-valuenow', record.valueNow);
     setNumber(element, 'aria-valuemin', record.valueMin);

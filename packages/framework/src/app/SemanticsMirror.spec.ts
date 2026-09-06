@@ -281,13 +281,44 @@ describe('SemanticsMirror', () => {
 
   it('clears an attribute a record stopped saying', () => {
     const { elementFor, apply } = setup();
-    const checked = record('n1', { role: 'checkbox', label: 'Wrap', states: ['checked'] });
-    apply({ patches: [{ op: 'add', node: checked }] });
+    const required = record('n1', { role: 'textbox', label: 'Name', states: ['required'] });
+    apply({ patches: [{ op: 'add', node: required }] });
     apply({
-      patches: [{ op: 'update', node: record('n1', { role: 'checkbox', label: 'Wrap' }) }]
+      patches: [{ op: 'update', node: record('n1', { role: 'textbox', label: 'Name' }) }]
     });
 
-    expect(elementFor('n1').getAttribute('aria-checked')).toBeNull();
+    expect(elementFor('n1').getAttribute('aria-required')).toBeNull();
+  });
+
+  it('says a checkable role is not checked, rather than saying nothing', () => {
+    // A control publishes `checked` when it is on and nothing when it is
+    // off, which is the right shape for a state list and the wrong shape
+    // for ARIA: on these roles the attribute is required, and an absent
+    // one reads as "not a checkbox" rather than "not checked". A
+    // `RadioGroup` in a native window is where this was noticed.
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('n1', { role: 'radio', label: 'Newest first', states: ['checked'] }) },
+        { op: 'add', node: record('n2', { role: 'radio', label: 'Title' }) },
+        { op: 'add', node: record('n3', { role: 'switch', label: 'Wrap lines' }) },
+        { op: 'add', node: record('n4', { role: 'button', label: 'Save' }) }
+      ]
+    });
+
+    expect(elementFor('n1').getAttribute('aria-checked')).toBe('true');
+    expect(elementFor('n2').getAttribute('aria-checked')).toBe('false');
+    expect(elementFor('n3').getAttribute('aria-checked')).toBe('false');
+    // Not every role has a checked state to report.
+    expect(elementFor('n4').getAttribute('aria-checked')).toBeNull();
+  });
+
+  it('turns a checkable role back to false when it stops being checked', () => {
+    const { elementFor, apply } = setup();
+    apply({ patches: [{ op: 'add', node: record('n1', { role: 'checkbox', label: 'Wrap', states: ['checked'] }) }] });
+    apply({ patches: [{ op: 'update', node: record('n1', { role: 'checkbox', label: 'Wrap' }) }] });
+
+    expect(elementFor('n1').getAttribute('aria-checked')).toBe('false');
   });
 
   it('nests records under their parent, in index order', () => {
