@@ -1,4 +1,3 @@
-import type { Subscription } from 'rxjs';
 import { interval } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -39,7 +38,6 @@ export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx:
   const worstMs = internalState(0);
 
   let previous: number | null = null;
-  let ticking: Subscription | undefined;
 
   ctx.onMount(() => {
     if (isStill()) {
@@ -47,7 +45,7 @@ export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx:
       // never catch twice the same way, so it does not start.
       return;
     }
-    ticking = interval(STEP_MS).subscribe(() => {
+    ctx.effect(interval(STEP_MS), () => {
       const now = performance.now();
       if (previous !== null) {
         // A high-water mark, never walked back: the worst thing that
@@ -61,8 +59,6 @@ export function Pulse(inputs: Inputs<{ label?: string; caption?: string }>, ctx:
       ticks.value++;
     });
   });
-
-  ctx.onUnmount(() => ticking?.unsubscribe());
 
   return (
     <column width={percent(100)} height={percent(100)} backgroundColor="surface">
