@@ -17,6 +17,7 @@ export type { IconSpec, IconRasterizerOptions, IconCanvas, IconContext } from '.
 export {
   createPaintState,
   resolvePaintState,
+  isPaintVisible,
   normalizeTextAlign,
   normalizeVerticalAlign,
   computeObjectFitRect,
