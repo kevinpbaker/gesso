@@ -5,7 +5,7 @@ import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { TextMeasurer } from '../../layout/TextMeasurer';
-import { resolvePaintState, createPaintState, computeObjectFitRect } from '../PaintState';
+import { resolvePaintState, createPaintState, computeObjectFitRect, isPaintVisible } from '../PaintState';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { TextureSource } from './WebGPUTextureCache';
 import { colorToCss } from '../PaintState';
@@ -527,8 +527,12 @@ export function buildRenderList(
       return;
     }
 
-    const paint = resolvePaintState(node, paintScratch);
-    if (!paint.visible || paint.opacity === 0) {
+    // Visibility from its own two properties rather than from the paint
+    // state, and the cull test from the record alone, so that a node
+    // this walk is about to discard never pays for the twenty-five or so
+    // property resolutions the full state costs. A long list culls most
+    // of what it walks, which is where that adds up.
+    if (!isPaintVisible(node)) {
       return;
     }
 
@@ -551,6 +555,7 @@ export function buildRenderList(
       return;
     }
 
+    const paint = resolvePaintState(node, paintScratch);
     const effectiveOpacity = state.opacity * paint.opacity;
     // A sticky node (and its children) is shifted to its scroll
     // container's edge; the record keeps the flow position.

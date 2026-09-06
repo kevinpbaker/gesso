@@ -5,7 +5,7 @@ import type { Canvas2DContext, Canvas2DGradient } from './Canvas2DContext';
 import type { CanvasSurface } from './CanvasSurface';
 import type { ResolvedGradient } from '../../properties/UiGradient';
 import { gradientPaint } from '../../properties/UiGradient';
-import { colorToCss, computeObjectFitRect, createPaintState, resolvePaintState } from '../PaintState';
+import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
 import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import { videoFrameSize } from '../../properties/UiVideo';
@@ -153,12 +153,16 @@ export class Canvas2DRenderer implements UiRenderer {
   // -------------------------------------------------------------------------
 
   private renderNode(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean, lifted: boolean): void {
-    const paint = resolvePaintState(node, this.paint);
-    if (!paint.visible || paint.opacity === 0) {
-      return;
-    }
     const rec = context.layout.recordFor(node);
     if (rec === undefined) {
+      return;
+    }
+    // Visibility from its own two properties rather than from the paint
+    // state, and the cull test from the record alone, so that a node
+    // this walk is about to discard never pays for the twenty-five or so
+    // property resolutions the full state costs. A long list culls most
+    // of what it walks, which is where that adds up.
+    if (!isPaintVisible(node)) {
       return;
     }
     if (rec.lifted && !lifted) {
@@ -173,6 +177,8 @@ export class Canvas2DRenderer implements UiRenderer {
     if (cull && !this.intersectsCull(rec.x + rec.stickyOffsetX, rec.y + rec.stickyOffsetY, rec.width, rec.height)) {
       return;
     }
+
+    const paint = resolvePaintState(node, this.paint);
 
     // Captured before children reuse the shared scratch below.
     const hasText = paint.text !== undefined;

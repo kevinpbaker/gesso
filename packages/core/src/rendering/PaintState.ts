@@ -233,6 +233,33 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
 }
 
 /**
+ * Whether a node paints at all, answered from its two cheapest
+ * properties.
+ *
+ * Both renderer walks need to know this before they know anything else:
+ * an invisible node is skipped whether or not it is on screen, and a
+ * lifted one must not join the top layer if it is invisible. Resolving
+ * the whole paint state to learn it costs about twenty-five property
+ * resolutions, which a long list pays for every row it then culls, so
+ * the walks ask this first and resolve the rest only for the nodes that
+ * survive the cull.
+ *
+ * It reads `visible` and `opacity` through the same resolvers
+ * `resolvePaintState` uses, so the two cannot come to different
+ * answers. `resolvePaintState` clamps opacity into [0, 1] and the
+ * renderers then test it against zero, which is the same question as
+ * "is it zero or less" asked of the unclamped value; a non-numeric
+ * opacity fails both comparisons and stays visible either way.
+ */
+export function isPaintVisible(node: UiNode): boolean {
+  if (resolveBoolean(node, 'visible') === false) {
+    return false;
+  }
+  const opacity = resolveNumber(node, 'opacity');
+  return !(opacity !== undefined && opacity <= 0);
+}
+
+/**
  * Resolves the destination rectangle for an object-fit image.
  *
  * Pure geometry so the same semantics can be reused by a future

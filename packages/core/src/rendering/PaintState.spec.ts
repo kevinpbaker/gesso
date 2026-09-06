@@ -10,17 +10,22 @@ import {
   DEFAULT_FONT_SIZE,
   DEFAULT_FONT_WEIGHT,
   DEFAULT_TEXT_COLOR,
+  isPaintVisible,
   normalizeTextAlign,
   normalizeVerticalAlign,
   resolvePaintState
 } from './PaintState';
 
-function resolve(props: Record<string, unknown>) {
+function nodeWith(props: Record<string, unknown>): UiNode {
   const node = new UiNode('node', UiNodeType.Box);
   for (const [key, value] of Object.entries(props)) {
     node.setProperty(key, value);
   }
-  return resolvePaintState(node, createPaintState());
+  return node;
+}
+
+function resolve(props: Record<string, unknown>) {
+  return resolvePaintState(nodeWith(props), createPaintState());
 }
 
 describe('resolvePaintState', () => {
@@ -129,6 +134,34 @@ describe('resolvePaintState', () => {
     expect(resolve({ verticalAlign: 'center' }).verticalAlign).toBe('middle');
     expect(resolve({ verticalAlign: 'bottom' }).verticalAlign).toBe('bottom');
     expect(resolve({ verticalAlign: 'top' }).verticalAlign).toBe('top');
+  });
+});
+
+describe('isPaintVisible', () => {
+  // The renderers ask this before they resolve anything else, and then
+  // draw whatever it lets through, so its only real requirement is that
+  // it agrees with the test it replaced: `!visible || opacity === 0`
+  // read off a fully resolved paint state.
+  function agrees(props: Record<string, unknown>): void {
+    const node = nodeWith(props);
+    const state = resolvePaintState(node, createPaintState());
+    expect(isPaintVisible(node)).toBe(state.visible && state.opacity !== 0);
+  }
+
+  it('agrees with the resolved paint state', () => {
+    agrees({});
+    agrees({ visible: true });
+    agrees({ visible: false });
+    agrees({ opacity: 1 });
+    agrees({ opacity: 0.5 });
+    agrees({ opacity: 0 });
+    // Clamped to zero by resolvePaintState, so invisible either way.
+    agrees({ opacity: -0.2 });
+    agrees({ opacity: 1.5 });
+    // Neither a number nor absent: it survives both comparisons.
+    agrees({ opacity: 'half' });
+    agrees({ visible: false, opacity: 1 });
+    agrees({ visible: true, opacity: 0 });
   });
 });
 
