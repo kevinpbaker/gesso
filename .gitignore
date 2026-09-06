@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secrets: an app's own environment, which is never committed. `.env.example`
+# records the variable names and is.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
