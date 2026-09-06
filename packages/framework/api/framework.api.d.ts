@@ -935,6 +935,11 @@ type ShellToRuntimeMessage = {
 {
   type: 'url';
   url: string;
+} |
+{
+  type: 'popupResult';
+  id: number;
+  opened: boolean;
 } | {
   type: 'inspector';
   enabled: boolean;
@@ -1006,6 +1011,14 @@ type RuntimeToShellMessage = {
 {
   type: 'openUrl';
   url: string;
+} |
+{
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
 } |
 {
   type: 'history';
@@ -1104,6 +1117,13 @@ type ShellRequest = {
   type: 'openUrl';
   url: string;
 } | {
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
+} | {
   type: 'history';
   action: 'push' | 'replace';
   url: string;
@@ -1115,12 +1135,21 @@ type ShellRequest = {
 declare class ShellService {
   private handler;
   private readonly scheme;
+  private readonly popups;
+  private nextPopupId;
   readonly colorScheme: ReadableCell<ColorScheme>;
   get currentColorScheme(): ColorScheme;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
   copyText(text: string): void;
   openUrl(url: string): void;
+  openPopup(request: {
+    readonly url: string;
+    readonly name?: string;
+    readonly width?: number;
+    readonly height?: number;
+  }): Promise<boolean>;
+  settlePopup(id: number, opened: boolean): void;
 }
 interface MediaOptions {
   resolver?: ImageResolver;
@@ -1315,6 +1344,7 @@ declare class GessoRuntime {
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
+  settlePopup(id: number, opened: boolean): void;
   get reducedMotion(): boolean;
   get colorScheme(): ColorScheme;
   get sharedElementNames(): readonly string[];
@@ -1473,6 +1503,7 @@ declare class WorkerApp {
   private readonly handleAppWorkerMessage;
   private readonly handleWorkerMessage;
   private attachHistory;
+  private openPopup;
   private applyHistory;
   private post;
   private observeResize;
