@@ -37,24 +37,44 @@ export interface UiResolvedFont {
  * another, and sat high or low inside it.
  */
 export function resolveFont(node: UiNode): UiResolvedFont {
+  const out = { fontSize: 0, fontFamily: '', fontWeight: 'normal', lineHeight: 0, letterSpacing: 0 };
+  resolveFontInto(node, out);
+  return out as UiResolvedFont;
+}
+
+/**
+ * The five fields a resolved font is, seen as somewhere to put them.
+ *
+ * `PaintState` has all five under the same names, which is what lets
+ * paint resolve a node's font straight into the scratch it already
+ * owns rather than into a record it allocates and copies out of. The
+ * weight is widened to `string | number` because the paint state
+ * carries it that way.
+ */
+export interface UiFontFields {
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: string | number;
+  lineHeight: number;
+  letterSpacing: number;
+}
+
+/** `resolveFont`, writing into a target the caller owns. */
+export function resolveFontInto(node: UiNode, out: UiFontFields): void {
   const fontSize = positive(resolveProperty(node, UiProperties.fontSize)) ?? UiProperties.fontSize.defaultValue;
   const ownFontSize = node.properties.get('fontSize');
   const ownLineHeight = positive(node.properties.get('lineHeight'));
-  let lineHeight: number;
   if (ownLineHeight !== undefined) {
-    lineHeight = ownLineHeight;
+    out.lineHeight = ownLineHeight;
   } else if (ownFontSize !== undefined) {
-    lineHeight = fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
+    out.lineHeight = fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
   } else {
-    lineHeight = positive(resolveProperty(node, UiProperties.lineHeight)) ?? fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
+    out.lineHeight = positive(resolveProperty(node, UiProperties.lineHeight)) ?? fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
   }
-  return {
-    fontSize,
-    fontFamily: nonEmpty(resolveProperty(node, UiProperties.fontFamily)) ?? UiProperties.fontFamily.defaultValue,
-    fontWeight: weight(resolveProperty(node, UiProperties.fontWeight)) ?? UiProperties.fontWeight.defaultValue,
-    lineHeight,
-    letterSpacing: finite(resolveProperty(node, UiProperties.letterSpacing)) ?? 0
-  };
+  out.fontSize = fontSize;
+  out.fontFamily = nonEmpty(resolveProperty(node, UiProperties.fontFamily)) ?? UiProperties.fontFamily.defaultValue;
+  out.fontWeight = weight(resolveProperty(node, UiProperties.fontWeight)) ?? UiProperties.fontWeight.defaultValue;
+  out.letterSpacing = finite(resolveProperty(node, UiProperties.letterSpacing)) ?? 0;
 }
 
 function positive(value: unknown): number | undefined {

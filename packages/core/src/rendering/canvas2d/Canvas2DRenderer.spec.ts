@@ -527,6 +527,38 @@ describe('Canvas2DRenderer text', () => {
     h.render(root);
     expect(callArgs(h.context, 'fillText')).toEqual([['Hello', 10, expect.closeTo(38.8, 6)]]);
   });
+
+  /**
+   * `resolvePaintState` resolves the text half only for a node that has
+   * text, over a scratch every node in the walk shares, so a box walked
+   * after a label is the case where a leaked font or colour would show.
+   * The scratch's own fields are checked in `PaintState.spec`; what
+   * this asks is the question the canvas can answer, which is that a
+   * box between two labels draws nothing of either and leaves neither
+   * of them drawn in the other's style.
+   */
+  it('draws a box between two labels without either label bleeding into it', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const loud = h.createNode('loud', UiNodeType.Text);
+    loud.setProperty('text', 'Loud');
+    loud.setProperty('fontSize', 40);
+    loud.setProperty('fontFamily', 'Georgia');
+    loud.setProperty('fontWeight', 900);
+    loud.setProperty('color', '#ff0000');
+    const swatch = box(h, 'swatch', { width: 20, height: 20, backgroundColor: '#00ff00' });
+    const quiet = h.createNode('quiet', UiNodeType.Text);
+    quiet.setProperty('text', 'Quiet');
+    h.append(root, loud, swatch, quiet);
+    h.layout(root);
+    h.render(root);
+    // Two runs of glyphs and no third: the swatch draws a rectangle.
+    expect(callArgs(h.context, 'fillText').map(args => args[0])).toEqual(['Loud', 'Quiet']);
+    expect(callArgs(h.context, 'set:font')).toEqual(['900 40px Georgia', 'normal 14px sans-serif']);
+    // The swatch's fill is its own, and the label after it is back to
+    // the default colour rather than carrying the first one's red.
+    expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#f00', '#0f0', '#000']);
+  });
 });
 
 describe('Canvas2DRenderer device pixel ratio', () => {
