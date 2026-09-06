@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./view": "./src/view.ts",
-    "./main": "./src/main.ts"
+    "./main": "./src/main.ts",
+    "./desktop": "./src/desktop.ts"
   },
   "publishConfig": {
     "exports": {
@@ -22,6 +23,10 @@
       "./main": {
         "types": "./dist/main.d.ts",
         "default": "./dist/main.js"
+      },
+      "./desktop": {
+        "types": "./dist/desktop.d.ts",
+        "default": "./dist/desktop.js"
       }
     }
   },

@@ -9,7 +9,7 @@ import { defineConfig } from 'tsdown';
  * the wire format they agree on.
  */
 export default defineConfig({
-  entry: ['src/index.ts', 'src/view.ts', 'src/main.ts'],
+  entry: ['src/index.ts', 'src/view.ts', 'src/main.ts', 'src/desktop.ts'],
   format: 'esm',
   dts: true,
   platform: 'neutral',

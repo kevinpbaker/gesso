@@ -4,6 +4,59 @@
 // comments stripped and chunk hashes normalised. Committed so that a change
 // to the public surface is a reviewable diff. Do not edit by hand.
 
+// ==== desktop.d.ts ====
+import {
+  GessoFrame
+} from "./frames-DsGY7d-I.js";
+import {
+  ChannelToken,
+  ServedChannel
+} from "@gesso/framework";
+import {
+  Observable
+} from "rxjs";
+interface DesktopWindowTransport {
+  send: (frame: GessoFrame) => void;
+  close: () => void;
+}
+interface DesktopWindowHandle {
+  readonly id: number;
+  close(): void;
+}
+interface DesktopAppOptions {
+  channels: readonly ServedChannel[] | ((window: DesktopWindowHandle) => readonly ServedChannel[]);
+  open: (receive: (frame: GessoFrame) => void, window: DesktopWindowHandle) => DesktopWindowTransport;
+  onLastWindowClosed?: () => void;
+  chunkBytes?: number;
+}
+interface DesktopApp {
+  openWindow(): DesktopWindowHandle;
+  readonly windows: readonly DesktopWindowHandle[];
+  readonly windowCount: Observable<number>;
+  dispose(): void;
+}
+declare function createDesktopApp(options: DesktopAppOptions): DesktopApp;
+interface DesktopWindowsView {
+  count: number;
+  id: number;
+}
+interface DesktopWindowsCommands {
+  open: () => void;
+  closeThis: () => void;
+}
+declare const DesktopWindows: ChannelToken<DesktopWindowsView, DesktopWindowsCommands>;
+declare function windowsChannel(app: DesktopApp, window: DesktopWindowHandle): ServedChannel;
+export {
+  createDesktopApp,
+  DesktopApp,
+  DesktopAppOptions,
+  DesktopWindowHandle,
+  DesktopWindows,
+  DesktopWindowsCommands,
+  DesktopWindowsView,
+  DesktopWindowTransport,
+  windowsChannel
+};
 // ==== frames.d.ts ====
 declare const DEFAULT_CHUNK_BYTES = 1048576;
 type GessoFrame = {
