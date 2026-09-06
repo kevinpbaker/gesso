@@ -40,7 +40,9 @@
     "check:scaffold": "node scripts/check-scaffold.ts",
     "create:app": "node packages/create-gesso-app/bin/create-gesso-app.ts",
     "screenshots": "node scripts/check-route-screenshots.ts",
-    "screenshots:update": "node scripts/check-route-screenshots.ts --update"
+    "screenshots:update": "node scripts/check-route-screenshots.ts --update",
+    "docs:screenshots": "node scripts/check-docs-screenshots.ts",
+    "docs:screenshots:update": "node scripts/check-docs-screenshots.ts --update"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

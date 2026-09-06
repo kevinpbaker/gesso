@@ -1,16 +1,17 @@
 # Continuous integration (`docs/ROADMAP.md` F8).
 #
 # Before this file there was no CI in the repository at all: every gate
-# the earlier milestones claim — layout conformance, the performance
-# budgets, renderer parity — was a command someone remembered to type.
+# the earlier milestones claim (layout conformance, the performance
+# budgets, renderer parity) was a command someone remembered to type.
 #
 # The jobs are split by what they need. `checks` needs nothing but Node.
 # `install`, `scaffold`, `parity` and `accessibility` need a browser,
 # and the runner images ship Google Chrome. `text` needs a browser and
 # the seven Noto faces the text fixtures were rendered in, which apt
-# provides. `screenshots` needs a browser *and* baselines captured in
-# the same environment, which is why it is the one job here that cannot
-# yet be authoritative; see decisions/0033-packaging.md.
+# provides. `screenshots` and `docs-screenshots` need a browser *and*
+# baselines captured in the same environment, which is why they are the
+# two jobs here that cannot yet be authoritative; see
+# decisions/0033-packaging.md and decisions/0071-a-picture-of-every-page.md.
 #
 # `pnpm check` runs the `checks` job's steps locally in the same order;
 # decisions/0058-release-gate.md is the list of what each gate proves.
@@ -201,7 +202,7 @@ jobs:
     # Not authoritative yet, and deliberately not pretending to be. The
     # baselines committed in apps/playground/screenshots were captured on
     # a developer machine, and canvas text is rasterised with the system's
-    # fonts, so they are not comparable with this runner's output — the
+    # fonts, so they are not comparable with this runner's output. The
     # script says so and fails rather than comparing anyway. To promote
     # this job to a gate: run `pnpm screenshots:update` in this
     # environment, commit the baselines and the manifest, and delete this
@@ -230,4 +231,45 @@ jobs:
         with:
           name: route-screenshots
           path: apps/playground/screenshots/*.actual.png
+          if-no-files-found: ignore
+
+  docs-screenshots:
+    name: docs screenshots (advisory until baselines are captured here)
+    runs-on: ubuntu-latest
+    # Advisory for exactly the reason the route job above is, and no
+    # other. The baselines committed in apps/docs/screenshots were
+    # captured on a developer machine; canvas text is rasterised by the
+    # browser with the system's fonts, so a runner with different faces
+    # draws different pixels and the two sets are not comparable. The
+    # script refuses to compare across that mismatch rather than
+    # reporting a meaningless diff, so this job would fail on its
+    # manifest check every run. To promote it to a gate: run
+    # `pnpm docs:screenshots:update` in this environment, commit
+    # apps/docs/screenshots and its manifest.json, and delete this line.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Builds the docs site, serves it, and opens every page carrying a
+      # live example in still mode. No Vulkan loader: the docs examples
+      # are Canvas2D, which is the framework's default backend, and the
+      # site offers no renderer switch.
+      - name: Docs screenshots
+        run: pnpm docs:screenshots
+        env:
+          CHROME_BIN: google-chrome
+
+      # What a reviewer needs to see when a page's canvas changes.
+      - name: Upload the captures that differed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-screenshots
+          path: apps/docs/screenshots/*.actual.png
           if-no-files-found: ignore
