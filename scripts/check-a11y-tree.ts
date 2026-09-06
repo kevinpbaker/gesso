@@ -250,7 +250,15 @@ const CHECKS: readonly RouteCheck[] = [
       { role: 'list', name: 'Underground' },
       { role: 'button', name: 'Segue, the home screen' },
       { role: 'button', name: 'Search Audius' },
-      { role: 'button', name: 'Sign in to Audius' }
+      { role: 'button', name: 'Sign in to Audius' },
+      // The line that says the shelves are the committed snapshot.
+      // It is the last thing to arrive, because it waits on every
+      // Audius request failing, and this browser has no name
+      // resolution so every one of them will. Expecting it is what
+      // makes the wait cover the whole of the route's settling: without
+      // it the tree was captured with the notice sometimes present and
+      // sometimes not, and the gate failed at random.
+      { role: 'StaticText', name: 'Offline: showing a saved copy of the collections.' }
     ],
     press: {
       role: 'button',
@@ -476,6 +484,13 @@ async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string
     },
     READY_TIMEOUT_MS
   ).catch(() => false);
+  // The expectations say what must be present; they cannot say what has
+  // stopped arriving. A route whose last arrival nobody thought to
+  // expect gets captured mid-flight, and the gate then fails at random
+  // against a report that was generated on a luckier run. So after the
+  // expectations are met the tree is sampled again, and it is believed
+  // only once two samples agree.
+  nodes = await stillTree(devtools, nodes);
   report(check.route, nodes);
   const failures: string[] = [];
   const tabOrder = await tabThrough(devtools, nodes);
@@ -554,6 +569,41 @@ async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string
     }
   }
   return failures;
+}
+
+/**
+ * How long the tree must go unchanged before it is believed, and how
+ * many times to ask.
+ *
+ * Two hundred milliseconds is longer than a frame and longer than the
+ * mirror takes to describe a change, and eight tries is a second and a
+ * half, which is longer than anything in these routes takes to settle
+ * once its data has arrived. A route that never settles is reported as
+ * it last looked rather than hanging the gate: the mismatch that
+ * follows is a truer complaint than a timeout.
+ */
+const STILL_MS = 200;
+const STILL_TRIES = 8;
+
+/** What a report would say, cheaply, so two trees can be compared. */
+function asHeard(nodes: readonly AxNode[]): string {
+  return nodes.map(node => `${node.role?.value ?? ''}\u0000${node.name?.value ?? ''}`).join('\u0001');
+}
+
+/** The tree, once it has stopped changing. */
+async function stillTree(devtools: DevTools, seen: readonly AxNode[]): Promise<AxNode[]> {
+  let nodes = [...seen];
+  let last = asHeard(nodes);
+  for (let tries = 0; tries < STILL_TRIES; tries += 1) {
+    await new Promise(resolve => setTimeout(resolve, STILL_MS));
+    nodes = await mirrorTree(devtools);
+    const now = asHeard(nodes);
+    if (now === last) {
+      return nodes;
+    }
+    last = now;
+  }
+  return nodes;
 }
 
 /** Chrome's computed accessibility nodes for the mirror's subtree. */
