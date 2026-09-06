@@ -7,7 +7,7 @@ import type { UiChild } from '../composition/UiElement';
 import { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
 import { UiInputDispatcher } from '../input/UiInputDispatcher';
-import { UiEventType, UiPointerEvent } from '../input/UiInputEvent';
+import { UiEventType, UiGestureEvent, UiPointerEvent } from '../input/UiInputEvent';
 import { draggable, type DragOffset } from './drag';
 
 /**
@@ -31,7 +31,7 @@ function build(root: UiChild) {
   const rebuild = (next: UiChild): void => {
     builder.reconcileChildren(graph.root, [next]);
   };
-  return { graph, node, send, rebuild };
+  return { graph, dispatcher, node, send, rebuild };
 }
 
 const transform = (node: UiNode): Record<string, number> | undefined =>
@@ -158,7 +158,25 @@ describe('draggable', () => {
       { x: 5, y: 0 },
       { x: 5, y: 12 }
     ]);
-    expect(onEnd).toHaveBeenCalledWith({ x: 5, y: 12 });
+    // The drop carries the speed it ended at as well as where it
+    // ended. Zero here, because the events above are plain pointer
+    // events with no gesture behind them to have measured one.
+    expect(onEnd).toHaveBeenCalledWith({ x: 5, y: 12, velocityX: 0, velocityY: 0 });
+  });
+
+  it('hands the release speed on to whatever catches the node', () => {
+    const onEnd = vi.fn();
+    const options = { onEnd };
+    const { send, dispatcher, node } = build(Box({ width: 100, modifiers: [draggable(options)] }));
+
+    send(UiEventType.PanStart, 0, 0);
+    send(UiEventType.PanMove, 40, 10);
+    // What the recognizer synthesizes at the end of a real gesture: a
+    // UiGestureEvent carrying pixels per second, which is the unit
+    // `UiSpringOptions.velocity` takes.
+    dispatcher.dispatch(new UiGestureEvent(UiEventType.PanEnd, 40, 10, 0, undefined, undefined, 1800, -450), node);
+
+    expect(onEnd).toHaveBeenCalledWith({ x: 40, y: 10, velocityX: 1800, velocityY: -450 });
   });
 
   it('stops the gesture reaching an ancestor that would scroll on it', () => {

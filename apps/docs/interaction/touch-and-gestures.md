@@ -97,6 +97,89 @@ rather than an identity one.
 A gesture a widget owns has to stop propagating. That is not
 bookkeeping: it is the whole opt-out mechanism for the next section.
 
+## Two contacts: pinch and rotate
+
+A second finger landing takes the gesture over. Whatever the first was
+doing is **ended where it stands** rather than abandoned, so a
+`draggable` in mid-drag gets a real `PanEnd` and puts the card down, and
+the press stops synthesizing a `Click`, because a person who has put a
+second finger down is no longer doing the thing they started.
+
+From then until a contact lifts, the pair produces `PinchStart`,
+`PinchMove` and `PinchEnd`, dispatched through the same dispatcher as
+everything else. Each one carries:
+
+| Field                         | What it is                                                  |
+| ----------------------------- | ----------------------------------------------------------- |
+| `scale`, `rotation`           | Cumulative from the moment the second contact landed        |
+| `scaleDelta`, `rotationDelta` | The change since the previous event                         |
+| `x`, `y`                      | The midpoint between the contacts, which a zoom holds still |
+| `translateX`, `translateY`    | How far that midpoint moved since the previous event        |
+
+Rotation is in degrees, which is what the `transform` property takes, so
+neither end of the handoff converts. The gesture is claimed only once
+the contacts have moved five per cent apart or four degrees round: two
+fingers land a few milliseconds apart and never perfectly still, and a
+gesture claimed on the first move reports a scale of 1.02 for what was
+going to be a two-finger pan.
+
+A third contact is ignored until the hand comes off. It is not a second
+pinch, which is what every platform does with it.
+
+The framework itself does nothing with a pinch. There is no
+framework-owned zoom and nothing listening at the root, so a pinch that
+nothing listens for costs one dispatch that returns immediately. The
+zoom lives in [`pinchable`](/interaction/modifiers), a modifier an
+element opts into, on the same terms as every other behaviour:
+
+```ts
+<Image src={photo} rootModifiers={[pinchable({ maxScale: 6 })]} />
+```
+
+It holds the point under the fingers still, which is the difference
+between a photo viewer that feels like one and a viewer that scales
+about its own centre and slides what you were looking at off the edge.
+Ctrl with the wheel zooms it too, because that is what a trackpad pinch
+reaches a browser as and it is the only way a mouse can zoom at all.
+
+## Asking for a menu
+
+A finger has no second button, so a held finger is how a touchscreen
+asks for the commands that apply to something. A `ContextMenu` event
+follows the `LongPress` at the same point, unless a listener called
+`preventDefault()` on the LongPress, which is how a node that means to
+be picked up rather than interrogated says so. A mouse raises nothing on
+a hold: it has a secondary button, and a press of that button alone
+dispatches `ContextMenu` directly and establishes no press at all, so
+nothing is dragged, nothing is focused and no `Click` follows the
+release.
+
+The browser's own menu is suppressed on the canvas for the reason the
+iOS callout is: it would land directly on top of the event the
+application is about to receive.
+
+```ts
+<row modifiers={[contextMenu({ onOpen: at => (menuAt.value = at) })]}>
+```
+
+`Menu` has taken an `at` point and left the trigger to the caller since
+it was written. This is the trigger.
+
+## The end of a gesture carries its speed
+
+`PanEnd` and `DragEnd` are `UiGestureEvent`s, and their `velocityX` and
+`velocityY` are the speed the contact left at, in **pixels per second**,
+which is the unit `UiSpringOptions.velocity` takes. That is the whole reason
+they are there: a spring handed a velocity of zero starts from rest, so
+a card thrown across the screen used to stop dead the instant the finger
+left it. `draggable` passes the same pair to `onEnd`.
+
+The speed is measured over the last 100 ms rather than over the whole
+gesture, because a long slow drag that ends in a flick averages out to
+nothing across the whole of it, and the flick is the part the person
+meant. The samples live in a fixed ring, so a pointer move allocates
+nothing.
+
 ## A finger scrolls, and a mouse does not
 
 <<< @/src/examples/GesturesExample.tsx#list
@@ -142,8 +225,9 @@ it. A mouse keeps its hover, which is what a mouse user expects.
 
 A press belongs to the contact that started it. While one is in flight
 a second finger's moves and releases are ignored, so a second contact
-cannot drag what the first one is holding. That bookkeeping is also what
-a pinch recognizer would need, and there is no pinch recognizer.
+cannot drag what the first one is holding. Being refused the press is
+not the same as being unheard, though: every contact is reported to the
+recognizer, which is what the pinch below is assembled from.
 
 ## What the shell prepares
 
@@ -186,10 +270,11 @@ hover cleared on release. Chrome implements neither `-webkit-` property,
 so the two iOS settings are inert where they were tested, and the soft
 keyboard behaviour is an iOS one that cannot be observed off iOS.
 
-**No pinch, no rotate, no two-finger gesture of any kind.** Nothing
-synthesizes them. An application that needs one listens for raw pointer
-events and tracks the contacts by `pointer.id`, which is the same
-bookkeeping a recognizer would sit on.
+**The pinch was verified in Chrome and not on a hand.** Two synthetic
+`pointerType: 'touch'` contacts spread apart over a real render-worker
+shell reported a scale of exactly 2.00, and Ctrl with the wheel zoomed
+about the point under the cursor. Neither is evidence about how a pinch
+feels between two fingers on glass.
 
 **Hit targets are exact rectangles.** A tap two pixels outside a small
 control does nothing, where a browser would apply touch adjustment. Size

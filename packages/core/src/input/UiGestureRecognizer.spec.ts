@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType, type UiPointerEvent } from './UiInputEvent';
+import { UiEventType, type UiGestureEvent, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import { UiGestureRecognizer } from './UiGestureRecognizer';
 import { UiPointerController } from './UiPointerController';
@@ -288,6 +288,39 @@ describe('UiGestureRecognizer', () => {
       controller.pointerUp(70, 50, 0, noMods, finger);
     });
 
+    it('asks for a context menu when a finger is held, and not when a mouse is', () => {
+      vi.useFakeTimers();
+      const { h, box, controller } = setup();
+      const menu = vi.fn();
+      h.dispatcher.addEventListener(box, UiEventType.ContextMenu, menu);
+
+      controller.pointerDown(50, 50, 1, noMods, finger);
+      vi.advanceTimersByTime(500);
+      expect(menu).toHaveBeenCalledTimes(1);
+      controller.pointerUp(50, 50, 0, noMods, finger);
+
+      // The same hold from a mouse raises nothing: a mouse has a
+      // second button, and the pointer controller answers that.
+      controller.pointerDown(50, 50);
+      vi.advanceTimersByTime(500);
+      expect(menu).toHaveBeenCalledTimes(1);
+      controller.pointerUp(50, 50);
+    });
+
+    it('lets a node that means to be picked up refuse the menu', () => {
+      vi.useFakeTimers();
+      const { h, box, controller } = setup();
+      const menu = vi.fn();
+      h.dispatcher.addEventListener(box, UiEventType.LongPress, event => event.preventDefault());
+      h.dispatcher.addEventListener(box, UiEventType.ContextMenu, menu);
+
+      controller.pointerDown(50, 50, 1, noMods, finger);
+      vi.advanceTimersByTime(500);
+
+      expect(menu).not.toHaveBeenCalled();
+      controller.pointerUp(50, 50, 0, noMods, finger);
+    });
+
     it('carries the device onto the synthesized gesture events', () => {
       const { h, box, controller } = setup();
       const kinds: string[] = [];
@@ -300,6 +333,79 @@ describe('UiGestureRecognizer', () => {
 
       expect(kinds).toEqual(['touch']);
       controller.pointerUp(90, 50, 0, noMods, finger);
+    });
+  });
+
+  /**
+   * The end of a gesture reports how fast it was going, because a
+   * spring handed a velocity of zero stops dead under the finger.
+   *
+   * The clock is supplied so the speed is arithmetic rather than a
+   * measurement of how long the test took to run.
+   */
+  describe('velocity', () => {
+    function timed(): {
+      h: InputTestHarness;
+      box: UiNode;
+      controller: UiPointerController;
+      tick: (ms: number) => void;
+    } {
+      const h = new InputTestHarness();
+      const box = h.node('box', UiNodeType.Box, { width: 100, height: 100 });
+      h.add(h.root, box);
+      h.layoutTree();
+      let clock = 0;
+      const gestures = new UiGestureRecognizer(h.dispatcher, { now: () => clock });
+      const controller = new UiPointerController(h.createHitTester(), h.dispatcher, { gestures });
+      return { h, box, controller, tick: (ms: number) => (clock += ms) };
+    }
+
+    it('reports the release speed in pixels per second', () => {
+      const { h, box, controller, tick } = timed();
+      let ended: UiGestureEvent | null = null;
+      h.dispatcher.addEventListener(box, UiEventType.PanEnd, event => (ended = event as UiGestureEvent));
+
+      controller.pointerDown(10, 10);
+      tick(10);
+      controller.pointerMove(30, 20);
+      tick(10);
+      controller.pointerMove(50, 30);
+      tick(10);
+      controller.pointerUp(70, 40);
+
+      // 60px across and 30px down in 30ms: 2000 and 1000 px/s.
+      expect(ended!.velocityX).toBeCloseTo(2000, 5);
+      expect(ended!.velocityY).toBeCloseTo(1000, 5);
+    });
+
+    it('measures the flick at the end rather than the whole gesture', () => {
+      const { h, box, controller, tick } = timed();
+      let ended: UiGestureEvent | null = null;
+      h.dispatcher.addEventListener(box, UiEventType.PanEnd, event => (ended = event as UiGestureEvent));
+
+      controller.pointerDown(10, 10);
+      // A long dawdle, well outside the 100ms window.
+      tick(400);
+      controller.pointerMove(40, 10);
+      tick(20);
+      controller.pointerMove(80, 10);
+      controller.pointerUp(80, 10);
+
+      // 40px in 20ms, not 70px in 420ms.
+      expect(ended!.velocityX).toBeCloseTo(2000, 5);
+    });
+
+    it('reports no speed for a press that never moved', () => {
+      const { h, box, controller } = timed();
+      const ends = vi.fn();
+      h.dispatcher.addEventListener(box, UiEventType.PanEnd, ends);
+      h.dispatcher.addEventListener(box, UiEventType.DragEnd, ends);
+
+      controller.pointerDown(50, 50);
+      controller.pointerUp(50, 50);
+
+      // No gesture at all, so nothing to report a speed for.
+      expect(ends).not.toHaveBeenCalled();
     });
   });
 });

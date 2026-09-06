@@ -1,6 +1,6 @@
 import type { Subject } from 'rxjs';
 
-import { UiEventType, type UiPointerEvent } from '../input/UiInputEvent';
+import { UiEventType, type UiGestureEvent, type UiPointerEvent } from '../input/UiInputEvent';
 import { defineModifier, type UiModifier } from './UiModifier';
 import type { UiModifierHost } from './UiModifierHost';
 
@@ -8,6 +8,21 @@ import type { UiModifierHost } from './UiModifierHost';
 export interface DragOffset {
   readonly x: number;
   readonly y: number;
+  /**
+   * How fast it was travelling when it was let go, in pixels per
+   * second, along each axis.
+   *
+   * Zero everywhere but the offset handed to `onEnd`, because there is
+   * no honest speed to report for a position half way through a drag
+   * that the next move will replace. The unit is the one
+   * `UiSpringOptions.velocity` takes, which is the whole reason it is
+   * here: a spring given no velocity starts from rest, so a card
+   * thrown across the screen used to stop dead the instant the finger
+   * left it, and there was no way for the application to do better
+   * because the drag never told it how fast the card was going.
+   */
+  readonly velocityX?: number;
+  readonly velocityY?: number;
 }
 
 export interface DraggableOptions {
@@ -187,7 +202,12 @@ class Draggable {
     for (const property of Object.keys(this.options.dragging ?? {})) {
       this.host.clear(property);
     }
-    const dropped = { x: this.offsetX, y: this.offsetY };
+    const dropped: DragOffset = {
+      x: this.offsetX,
+      y: this.offsetY,
+      velocityX: velocityOf(event, 'x'),
+      velocityY: velocityOf(event, 'y')
+    };
     if (this.options.keepOffset === false) {
       this.setOffset(0, 0);
       this.options.offset?.next({ x: 0, y: 0 });
@@ -224,4 +244,17 @@ class Draggable {
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * The release speed the recognizer measured, or none.
+ *
+ * `PanEnd` and `DragEnd` are `UiGestureEvent`s and carry it. The check
+ * is a property test rather than an `instanceof` because a spec that
+ * dispatches a plain `UiPointerEvent` at the modifier is a legitimate
+ * way to drive it, and reporting no speed is the right answer there.
+ */
+function velocityOf(event: UiPointerEvent, axis: 'x' | 'y'): number {
+  const value = (event as Partial<UiGestureEvent>)[axis === 'x' ? 'velocityX' : 'velocityY'];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }

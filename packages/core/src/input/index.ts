@@ -6,8 +6,10 @@ export {
   UiBeforeInputEvent,
   UiEventType,
   UiFocusEvent,
+  UiGestureEvent,
   UiInputEvent,
   UiKeyboardEvent,
+  UiPinchEvent,
   UiPointerEvent,
   UiTextChangeEvent,
   UiWheelDeltaMode,
@@ -26,6 +28,19 @@ export type { KeyboardControllerOptions } from './UiKeyboardController';
 export { isScrollContainer, UiWheelController } from './UiWheelController';
 export type { ScrollContainerState, ScrollSink, UiScrollability, UiScrollBehavior } from './UiWheelController';
 export { UiGestureRecognizer } from './UiGestureRecognizer';
+export { UiPinchRecognizer } from './UiPinchRecognizer';
+export type { PinchRecognizerOptions } from './UiPinchRecognizer';
+export { UiShortcutRegistry, formatShortcut, parseShortcut } from './UiShortcuts';
+export type { ShortcutRegistryOptions, UiShortcut, UiShortcutBinding, UiShortcutStep } from './UiShortcuts';
+export { dragSessionFor, EXTERNAL_FILES, UiDragSession } from './UiDragSession';
+export type {
+  UiDragPayload,
+  UiDragState,
+  UiDropEffect,
+  UiDroppedFile,
+  UiDropZone,
+  UiFileDropMessage
+} from './UiDragSession';
 export { UiTouchScroller } from './UiTouchScroller';
 export type { TouchScrollerOptions } from './UiTouchScroller';
 export type { GestureInput, GestureRecognizerOptions } from './UiGestureRecognizer';
