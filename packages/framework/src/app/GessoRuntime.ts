@@ -2589,8 +2589,7 @@ function emptyPhaseTimings(): FramePhaseTimings {
  * spending an immeasurable amount of time deciding to do nothing.
  */
 function frameNeedsLayout(frame: UiFrame): boolean {
-  const layoutFlags = DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform;
-  return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & layoutFlags) !== 0);
+  return frame.anyFlags(DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform);
 }
 
 /**
@@ -2617,6 +2616,5 @@ function frameChangedTree(frame: UiFrame): boolean {
 }
 
 function frameNeedsSemantics(frame: UiFrame): boolean {
-  const flags = DirtyFlags.Semantics | DirtyFlags.Children;
-  return frame.nodes.some(node => (frame.dirtyFlagsFor(node) & flags) !== 0);
+  return frame.anyFlags(DirtyFlags.Semantics | DirtyFlags.Children);
 }
