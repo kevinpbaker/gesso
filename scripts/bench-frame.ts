@@ -39,6 +39,7 @@ import { UiGraph } from '../packages/core/src/graph/UiGraph.ts';
 import { UiGraphBuilder } from '../packages/core/src/composition/UiGraphBuilder.ts';
 import { UiHitTester } from '../packages/core/src/input/UiHitTester.ts';
 import { UiNodeType } from '../packages/core/src/graph/UiNodeType.ts';
+import { lightTheme } from '../packages/core/src/environment/UiTheme.ts';
 import { createPaintState, resolvePaintState } from '../packages/core/src/rendering/PaintState.ts';
 import type { Canvas2DContext, Canvas2DGradient } from '../packages/core/src/rendering/canvas2d/Canvas2DContext.ts';
 import type { CanvasHost } from '../packages/core/src/rendering/canvas2d/CanvasSurface.ts';
@@ -74,6 +75,17 @@ function buildList(rows: number): List {
   const root = graph.createNode('list', UiNodeType.Column);
   root.setProperty('width', VIEWPORT_WIDTH);
   root.setProperty('height', VIEWPORT_HEIGHT);
+  // A theme at the root, and the environment built from it below,
+  // because every application has one. A node whose `environment` is
+  // null takes the default for each inherited property without looking
+  // at anything, which is a path no real tree is ever on.
+  //
+  // It turned out to cost almost nothing here, which is worth writing
+  // down so nobody re-measures it hoping otherwise: one provider at the
+  // root means every node shares that one environment, and a lookup
+  // finds the theme in the first map it asks. A deep stack of providers
+  // would walk, and this tree does not have one.
+  root.setProperty('theme', lightTheme);
   const nodes: UiNode[] = [root];
   const titles: UiNode[] = [];
   for (let i = 0; i < rows; i++) {
@@ -111,6 +123,7 @@ function buildList(rows: number): List {
     nodes.push(row, artwork, lines, title, artist);
     titles.push(title);
   }
+  graph.propagateEnvironment(root);
   return { graph, root, nodes, titles };
 }
 
