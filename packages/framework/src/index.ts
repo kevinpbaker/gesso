@@ -28,6 +28,7 @@ export {
   APPLICATION_WORKER,
   isPortErrorMessage,
   isPortHandshake,
+  isHubMessage,
   type WorkerHandle,
   type PortHost,
   type PortHandshake,
@@ -71,7 +72,7 @@ export {
   type UiPropReport,
   type UiSemanticsReport
 } from './app/NodeReport';
-export { WorkerApp, type WorkerAppOptions } from './app/worker/WorkerApp';
+export { WorkerApp, type WorkerAppOptions, type AppLogicEndpoint } from './app/worker/WorkerApp';
 export {
   treeText,
   type ConsoleEntry,

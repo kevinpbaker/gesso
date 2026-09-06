@@ -413,6 +413,10 @@ interface TransferTarget {
   postMessage(message: unknown, transfer: Transferable[]): void;
 }
 declare function portHandle(endpoint: TransferTarget): WorkerHandle;
+interface HubMessage {
+  type: 'gesso:hub';
+}
+declare function isHubMessage(value: unknown): value is HubMessage;
 declare function workerHandle(factory: () => Worker): WorkerHandle;
 interface PortHost {
   onmessage: ((event: {
@@ -1460,11 +1464,17 @@ declare class GessoAppBuilder {
   setColorScheme(preference: ColorSchemePreference): this;
   mountSync(host: HTMLElement | string): () => void;
 }
+interface AppLogicEndpoint {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  start?: () => void;
+}
 interface WorkerAppOptions {
   renderWorker: (() => Worker) | URL | string;
   renderer?: RendererChoice;
   onFrame?: (metrics: FrameMetrics) => void;
-  appLogicWorker?: Worker | (() => Worker) | URL | string;
+  appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;
@@ -1867,6 +1877,7 @@ export {
   isChannelHostMessage,
   isClassComponent,
   isComponentElement,
+  isHubMessage,
   isOutputTarget,
   isPortErrorMessage,
   isPortHandshake,
@@ -1901,6 +1912,7 @@ export {
   to,
   treeText,
   type AnimateOptions,
+  type AppLogicEndpoint,
   type AudioAction,
   type AudioElementLike,
   type AudioMetadata,

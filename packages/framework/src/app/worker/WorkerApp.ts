@@ -36,6 +36,27 @@ import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from 
  * the worker entry builds its own and declares it with
  * `renderRoot(AppRoot).useMedia(...)`.
  */
+/**
+ * Somewhere to send the application handshake that is not a `Worker`.
+ *
+ * A `MessagePort` satisfies it, and so does anything else that can
+ * carry a message and a transferred port. It exists because the
+ * application layer does not always live in a worker in this page: in
+ * a desktop window it lives in another process, and what the shell
+ * holds is one end of a bridge to it (`@gesso/electrobun`).
+ *
+ * The shell treats an endpoint exactly as it treats a worker it was
+ * handed rather than one it spawned: it wires it up, and it never
+ * closes it.
+ */
+export interface AppLogicEndpoint {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  /** A `MessagePort` delivers nothing until this is called; a `Worker` has no such method. */
+  start?: () => void;
+}
+
 export interface WorkerAppOptions {
   /**
    * Spawns the render worker: the one that calls renderRoot(), and so
@@ -89,7 +110,7 @@ export interface WorkerAppOptions {
    * application. What this class spawned, it terminates; what it was
    * handed, it leaves alone.
    */
-  appLogicWorker?: Worker | (() => Worker) | URL | string;
+  appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   /**
    * Receives errors thrown inside the render worker: while handling a
    * message, uncaught during a frame, from the renderer, or from a
@@ -164,11 +185,40 @@ export interface WorkerAppOptions {
  * into the worker. No component, node, layout record or render call
  * exists on this thread, so main-thread work cannot delay a frame.
  */
+/**
+ * Which application layer the shell was given, and whether it is the
+ * shell's to close.
+ *
+ * A factory, a URL or a path names a worker this class creates, and
+ * what it creates it terminates. Anything else was handed over
+ * already running: a `Worker` kept across a remount, or an endpoint
+ * that is not a worker at all, which is how a desktop window reaches
+ * an application layer living in another process
+ * (`@gesso/electrobun`). Neither is closed here, because a handle
+ * that could kill something it did not start is the wrong handle.
+ *
+ * Exported for its spec: the ownership half is the part that goes
+ * quietly wrong, by discarding an application the shell had merely
+ * borrowed.
+ */
+export function resolveAppLogic(spec: NonNullable<WorkerAppOptions['appLogicWorker']>): {
+  endpoint: AppLogicEndpoint;
+  owned: boolean;
+} {
+  if (typeof spec === 'function') {
+    return { endpoint: spec(), owned: true };
+  }
+  if (typeof spec === 'string' || spec instanceof URL) {
+    return { endpoint: new Worker(spec, { type: 'module' }), owned: true };
+  }
+  return { endpoint: spec, owned: false };
+}
+
 export class WorkerApp {
   private readonly options: WorkerAppOptions;
 
   private renderWorker: Worker | undefined;
-  private appLogicWorker: Worker | undefined;
+  private appLogicWorker: AppLogicEndpoint | undefined;
   private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
   /** Whether a panel has asked for the workers' consoles, remembered across a remount. */
   private consoleForwarding = false;
@@ -264,12 +314,15 @@ export class WorkerApp {
     const transfer: Transferable[] = [offscreen];
     let appPort: MessagePort | undefined;
     if (this.options.appLogicWorker !== undefined) {
-      const spec = this.options.appLogicWorker;
-      const given = typeof spec === 'object' && spec instanceof Worker;
-      const application = given ? spec : typeof spec === 'function' ? spec() : new Worker(spec, { type: 'module' });
+      const resolved = resolveAppLogic(this.options.appLogicWorker);
+      const application = resolved.endpoint;
       this.appLogicWorker = application;
-      this.ownsAppLogicWorker = !given;
+      this.ownsAppLogicWorker = resolved.owned;
       application.addEventListener('message', this.handleAppWorkerMessage);
+      // A port delivers nothing until it is started, and a worker has
+      // no such method. Calling it here rather than asking the caller
+      // to is what makes a port a drop-in for a worker.
+      application.start?.();
       if (this.consoleForwarding) {
         // A panel asked before the worker existed (a remount), and the
         // new worker has not been told.
@@ -517,7 +570,7 @@ export class WorkerApp {
     }
     this.appLogicWorker?.removeEventListener('message', this.handleAppWorkerMessage);
     if (this.ownsAppLogicWorker) {
-      this.appLogicWorker?.terminate();
+      (this.appLogicWorker as Worker | undefined)?.terminate();
     }
     this.appLogicWorker = undefined;
     this.ownsAppLogicWorker = false;
