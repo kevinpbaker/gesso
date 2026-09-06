@@ -88,11 +88,16 @@ export interface CaseProps {
   paddingRight?: number;
   paddingBottom?: number;
   paddingLeft?: number;
+  /** The horizontal edge the reading starts at; CSS `padding-inline-start`. */
+  paddingStart?: number;
+  paddingEnd?: number;
   margin?: CaseLength;
   marginTop?: CaseLength;
   marginRight?: CaseLength;
   marginBottom?: CaseLength;
   marginLeft?: CaseLength;
+  marginStart?: CaseLength;
+  marginEnd?: CaseLength;
   gap?: number;
   rowGap?: number;
   columnGap?: number;
@@ -737,6 +742,86 @@ export const layoutCases: readonly LayoutCase[] = [
   testCase(
     'reverse/rtl-auto-margin',
     row({ textDirection: 'rtl', y: 'start' }, leaf(40, 20), leaf(40, 20, { marginLeft: autoLength }))
+  ),
+  // A Column's cross axis is the horizontal one, so rtl swaps its
+  // start and end without touching the order the children come in.
+  testCase(
+    'reverse/rtl-column-cross-start',
+    column({ textDirection: 'rtl', width: 200, x: 'start' }, leaf(40, 20), leaf(60, 20))
+  ),
+  testCase(
+    'reverse/rtl-column-cross-end',
+    column({ textDirection: 'rtl', width: 200, x: 'end' }, leaf(40, 20), leaf(60, 20))
+  ),
+  testCase(
+    'reverse/rtl-column-self-start',
+    column({ textDirection: 'rtl', width: 200, x: 'end' }, leaf(40, 20), leaf(60, 20, { selfX: 'start' }))
+  ),
+  testCase(
+    'reverse/rtl-column-wrap-lines',
+    column(
+      { textDirection: 'rtl', width: 200, height: 60, flexWrap: 'wrap', x: 'start' },
+      leaf(40, 30),
+      leaf(60, 30),
+      leaf(50, 30)
+    )
+  ),
+  // A stack overlays its children in one content box; `x: 'start'` is
+  // the edge the reading starts at, which is the right one here.
+  testCase(
+    'reverse/rtl-stack-start',
+    box({ textDirection: 'rtl', width: 200, height: 60, x: 'start', y: 'start' }, leaf(40, 20))
+  ),
+  testCase(
+    'reverse/rtl-stack-end',
+    box({ textDirection: 'rtl', width: 200, height: 60, x: 'end', y: 'start' }, leaf(40, 20))
+  ),
+  // The whole column axis of a grid is reflected: the first track is
+  // the right-hand one, and the alignment inside a cell goes with it.
+  testCase(
+    'reverse/rtl-grid-columns',
+    grid({ textDirection: 'rtl', width: 200, columns: [60, 40, frTrack(1)], gap: 10 }, leaf(20, 20), leaf(20, 20), leaf(20, 20))
+  ),
+  testCase(
+    'reverse/rtl-grid-cell-start',
+    grid({ textDirection: 'rtl', width: 200, columns: [100, 100], x: 'start' }, leaf(20, 20), leaf(30, 20))
+  ),
+
+  // ---------------------------------------------------------------------------
+  // Logical padding and margin
+  // ---------------------------------------------------------------------------
+  testCase(
+    'logical/padding-ltr',
+    row({ paddingStart: 24, paddingEnd: 8, y: 'start' }, leaf(40, 20), leaf(40, 20))
+  ),
+  testCase(
+    'logical/padding-rtl',
+    row({ textDirection: 'rtl', paddingStart: 24, paddingEnd: 8, y: 'start' }, leaf(40, 20), leaf(40, 20))
+  ),
+  // A physical side is the more specific statement of the two and wins.
+  testCase(
+    'logical/physical-side-wins',
+    row({ textDirection: 'rtl', paddingStart: 24, paddingRight: 4, y: 'start' }, leaf(40, 20))
+  ),
+  // The logical pair beats the shorthand, as an axis does.
+  testCase('logical/beats-shorthand', row({ padding: 6, paddingStart: 20, y: 'start' }, leaf(40, 20))),
+  // A margin is the child's own property, so it is the child's own
+  // direction that decides which edge `start` is. The direction is
+  // written on the child here because the conformance trees carry no
+  // scoped environment; in an application it reaches the whole subtree
+  // through the theme's text style. See `decisions/0085`.
+  testCase('logical/margin-ltr', row({ y: 'start' }, leaf(40, 20, { marginStart: 16, marginEnd: 4 }), leaf(40, 20))),
+  testCase(
+    'logical/margin-rtl',
+    row(
+      { textDirection: 'rtl', y: 'start' },
+      leaf(40, 20, { textDirection: 'rtl', marginStart: 16, marginEnd: 4 }),
+      leaf(40, 20)
+    )
+  ),
+  testCase(
+    'logical/padding-on-a-column',
+    column({ textDirection: 'rtl', width: 200, paddingStart: 30, x: 'start' }, leaf(40, 20), leaf(60, 20))
   ),
 
   // ---------------------------------------------------------------------------

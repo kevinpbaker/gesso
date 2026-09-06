@@ -13,6 +13,7 @@ import {
 import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
+import { controlDescription, controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
   borderToken,
@@ -87,9 +88,6 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
     onChange: inputs.onChange
   });
 
-  // The message under the field: the error when there is one, else the
-  // description. One node, so the two can never both be read out.
-  const message = combineLatest([error, description]).pipe(map(([bad, hint]) => (bad.length > 0 ? bad : hint)));
   const submit = keymap({ Enter: () => inputs.onSubmit.value?.() });
 
   return Column(
@@ -118,7 +116,9 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       minHeight: multiline.pipe(map(on => (on ? 72 : 32))),
       role: 'textbox',
       label,
-      description,
+      // The error when there is one, so somebody arriving at a field
+      // already marked wrong hears why rather than only that it is.
+      description: controlDescription(error, description),
       states: states(invalid, required, readOnly),
       onInput: (event: UiTextChangeEvent) => value.change(event.value),
       // Enter belongs to the app in a single-line field; in a
@@ -129,20 +129,7 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
         }
       }
     }),
-    message.pipe(
-      map(text =>
-        text.length === 0
-          ? []
-          : [
-              Text({
-                text,
-                color: error.value.length > 0 ? 'danger' : 'controlForegroundDisabled',
-                fontSize: 12,
-                selectable: false
-              })
-            ]
-      )
-    )
+    controlMessage(error, description)
   );
 }
 

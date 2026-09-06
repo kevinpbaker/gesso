@@ -61,7 +61,10 @@ function thumbFor(rec: LayoutRecord, axis: ScrollbarAxis): ScrollbarThumb | null
   const thumb: LayoutBox =
     axis === 'y'
       ? {
-          x: rec.x + rec.width - SCROLLBAR_INSET - SCROLLBAR_THICKNESS,
+          // The vertical bar hangs on the edge a line of text ends at,
+          // which is the left one when the container reads right to
+          // left. The horizontal bar stays at the bottom either way.
+          x: rec.mirrored ? rec.x + SCROLLBAR_INSET : rec.x + rec.width - SCROLLBAR_INSET - SCROLLBAR_THICKNESS,
           y: rec.y + along,
           width: SCROLLBAR_THICKNESS,
           height: length
@@ -85,7 +88,8 @@ export function scrollbarZoneAt(rec: LayoutRecord, x: number, y: number): Scroll
   if (!inside) {
     return null;
   }
-  if (rec.contentHeight > rec.height && x >= rec.x + rec.width - SCROLLBAR_HOVER_ZONE) {
+  const inVerticalZone = rec.mirrored ? x < rec.x + SCROLLBAR_HOVER_ZONE : x >= rec.x + rec.width - SCROLLBAR_HOVER_ZONE;
+  if (rec.contentHeight > rec.height && inVerticalZone) {
     return 'y';
   }
   if (rec.contentWidth > rec.width && y >= rec.y + rec.height - SCROLLBAR_HOVER_ZONE) {

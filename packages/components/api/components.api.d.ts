@@ -27,7 +27,9 @@ import {
   ControlledValue,
   InputCell,
   Inputs,
-  OverlayPlacement
+  OverlayPlacement,
+  ReadableCell,
+  ResourceStatus
 } from "@gesso/framework";
 type Keymap = Readonly<Record<string, (event: UiKeyboardEvent) => void>>;
 declare function keymap(bindings: Keymap): (event: UiKeyboardEvent) => void;
@@ -76,6 +78,7 @@ interface CheckboxProps extends ControlLayoutProps {
   label?: string;
   disabled?: boolean;
   invalid?: boolean;
+  error?: string;
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
@@ -102,6 +105,7 @@ interface RadioGroupProps extends ControlLayoutProps {
   label?: string;
   disabled?: boolean;
   invalid?: boolean;
+  error?: string;
   required?: boolean;
   direction?: 'row' | 'column';
 }
@@ -278,6 +282,7 @@ interface SelectProps extends ControlLayoutProps {
   placeholder?: string;
   disabled?: boolean;
   invalid?: boolean;
+  error?: string;
   required?: boolean;
   ref?: (node: UiNode | null) => void;
 }
@@ -428,6 +433,112 @@ interface VirtualList {
 }
 declare function virtualList(): VirtualList;
 declare function stepIndex(current: number, by: number, count: number): number;
+interface Validator<T> {
+  (value: T): string | null;
+  readonly requires?: boolean;
+}
+type AsyncValidator<T> = (value: T) => Promise<string | null>;
+interface Problems<V> {
+  readonly fields?: { readonly [K in keyof V]?: string; };
+  readonly form?: string;
+}
+type FormValidator<V> = (values: V) => Problems<V> | null;
+interface Schema<V> {
+  check(values: V): Problems<V> | null;
+}
+declare function required<T>(message?: string): Validator<T>;
+declare function minLength<T extends string | readonly unknown[]>(length: number, message?: string): Validator<T>;
+declare function maxLength<T extends string | readonly unknown[]>(length: number, message?: string): Validator<T>;
+declare function pattern(expression: RegExp, message?: string): Validator<string>;
+declare function email(message?: string): Validator<string>;
+declare function range(min: number, max: number, message?: string): Validator<number>;
+declare function allOf<T>(...checks: readonly Validator<T>[]): Validator<T>;
+declare function matches<V, K extends keyof V>(first: K, second: K, message?: string): FormValidator<V>;
+interface FormMember {
+  readonly valid: ReadableCell<boolean>;
+  readonly dirty: ReadableCell<boolean>;
+  readonly touched: ReadableCell<boolean>;
+  readonly status: ReadableCell<ResourceStatus>;
+}
+interface FieldChecks<T> {
+  readonly validate?: Validator<T> | readonly Validator<T>[];
+  readonly validateAsync?: AsyncValidator<T>;
+}
+interface FieldOptions<T> extends FieldChecks<T> {
+  readonly initial?: T;
+  readonly value?: ReadableCell<T>;
+  readonly onChange?: (next: T) => void;
+  readonly label?: string;
+}
+type FieldBinding<T, V extends string = 'value'> = {
+  readonly ref: UiNodeRef;
+  readonly onChange: (next: T) => void;
+  readonly error: ReadableCell<string>;
+  readonly required: boolean;
+} & { readonly [K in V]: ReadableCell<T>; };
+interface Field<T> extends FormMember {
+  readonly name: string;
+  readonly value: ReadableCell<T>;
+  readonly message: ReadableCell<string>;
+  readonly error: ReadableCell<string>;
+  readonly status: ReadableCell<ResourceStatus>;
+  readonly dirty: ReadableCell<boolean>;
+  readonly touched: ReadableCell<boolean>;
+  readonly valid: ReadableCell<boolean>;
+  readonly required: boolean;
+  bind(): FieldBinding<T, 'value'>;
+  bindAs<V extends string>(value: V): FieldBinding<T, V>;
+  change(next: T): void;
+  touch(): void;
+  focus(): void;
+  reset(): void;
+}
+interface FieldRow<T> {
+  readonly key: string;
+  readonly field: Field<T>;
+}
+interface FieldArrayOptions<T> {
+  readonly initial?: readonly T[];
+  readonly each?: FieldChecks<T>;
+  readonly validate?: Validator<readonly T[]> | readonly Validator<readonly T[]>[];
+}
+interface FieldArray<T> extends FormMember {
+  readonly name: string;
+  readonly value: ReadableCell<readonly T[]>;
+  readonly rows: ReadableCell<readonly FieldRow<T>[]>;
+  readonly error: ReadableCell<string>;
+  add(value: T): Field<T>;
+  remove(key: string): void;
+  move(from: number, to: number): void;
+  touch(): void;
+  reset(): void;
+}
+type FormMembers = Readonly<Record<string, FormMember>>;
+type ValueOf<M> = M extends FieldArray<infer T> ? readonly T[] : M extends Field<infer U> ? U : never;
+type FormValues<M extends FormMembers> = { readonly [K in keyof M]: ValueOf<M[K]>; };
+interface FormOptions<M extends FormMembers> {
+  readonly validate?: FormValidator<FormValues<M>> | readonly FormValidator<FormValues<M>>[];
+  readonly schema?: Schema<FormValues<M>>;
+  readonly onSubmit?: (values: FormValues<M>) => void | Promise<void>;
+}
+interface FormGroup<M extends FormMembers> {
+  readonly fields: M;
+  readonly values: ReadableCell<FormValues<M>>;
+  readonly valid: ReadableCell<boolean>;
+  readonly dirty: ReadableCell<boolean>;
+  readonly touched: ReadableCell<boolean>;
+  readonly submitted: ReadableCell<boolean>;
+  readonly status: ReadableCell<ResourceStatus>;
+  readonly error: ReadableCell<string>;
+  submit(): Promise<boolean>;
+  reset(): void;
+  dispose(): void;
+}
+declare function field<T>(options: FieldOptions<T>): Field<T>;
+declare function fieldArray<T>(options?: FieldArrayOptions<T>): FieldArray<T>;
+declare function form<M extends FormMembers>(ctx: ComponentContext, fields: M, options?: FormOptions<M>): FormGroup<M>;
+declare function controlMessage(error: Observable<string>, description?: Observable<string>): Observable<readonly UiChild[]>;
+declare function controlDescription(error: Observable<string>, description: Observable<string>): Observable<string>;
 interface ControlFocus {
   readonly ref: UiNodeRef;
   readonly focused: Observable<boolean>;
@@ -437,23 +548,36 @@ interface ControlFocus {
 declare function trackFocus(ctx: ComponentContext, forwarded?: InputCell<UiNodeRef | undefined>): ControlFocus;
 export {
   Accordion,
+  allOf,
   Button,
   Card,
   Checkbox,
+  controlDescription,
   controlled,
+  controlMessage,
   DataTable,
   Dialog,
   Divider,
+  email,
+  field,
+  fieldArray,
   FindBar,
+  form,
   Icon,
   Image,
   keymap,
   LazyList,
+  matches,
+  maxLength,
   Menu,
+  minLength,
   NumberInput,
+  pattern,
   ProgressBar,
   quantize,
   RadioGroup,
+  range,
+  required,
   Select,
   Slider,
   Spinner,
@@ -472,6 +596,7 @@ export {
   Tree,
   type AccordionProps,
   type AccordionSection,
+  type AsyncValidator,
   type ButtonProps,
   type ButtonSize,
   type ButtonTone,
@@ -486,7 +611,20 @@ export {
   type DataTableSort,
   type DialogProps,
   type DividerProps,
+  type Field,
+  type FieldArray,
+  type FieldArrayOptions,
+  type FieldBinding,
+  type FieldChecks,
+  type FieldOptions,
+  type FieldRow,
   type FindBarProps,
+  type FormGroup,
+  type FormMember,
+  type FormMembers,
+  type FormOptions,
+  type FormValidator,
+  type FormValues,
   type IconProps,
   type ImageProps,
   type Keymap,
@@ -496,9 +634,11 @@ export {
   type NumberInputProps,
   type OverlayHandle,
   type OverlayOptions,
+  type Problems,
   type ProgressBarProps,
   type RadioGroupProps,
   type RadioOption,
+  type Schema,
   type SelectOption,
   type SelectProps,
   type SliderProps,
@@ -516,6 +656,8 @@ export {
   type TooltipProps,
   type TreeNode,
   type TreeProps,
+  type Validator,
+  type ValueOf,
   type VideoProps,
   type VirtualList,
   useOverlay,

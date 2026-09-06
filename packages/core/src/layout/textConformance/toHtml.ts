@@ -1,5 +1,5 @@
-import type { TextMeasureRequest } from '../TextMeasurer.ts';
-import type { TextCase } from './cases.ts';
+import type { TextMeasureRequest, TextRunSpan } from '../TextMeasurer.ts';
+import type { TextCase, TextCaseSpan } from './cases.ts';
 import { textCaseFontSize, textCaseFonts, textCaseLineHeight } from './cases.ts';
 import type { ConformanceFontId } from './fonts.ts';
 import { conformanceFonts, cssFamilyList } from './fonts.ts';
@@ -80,6 +80,12 @@ export interface GessoRecording {
   widths: Record<string, number>;
   ascent: number;
   descent: number;
+  /**
+   * The same, per run of a case that has runs, keyed by the run's font
+   * signature. Absent for a case in one font, which is every case
+   * written before runs existed.
+   */
+  runs?: Record<string, { widths: Record<string, number>; ascent: number; descent: number }>;
 }
 
 /** The lines `layoutParagraph` produced in the page; the generator checks a replay reproduces them. */
@@ -120,7 +126,24 @@ export function requestFor(textCase: TextCase): TextMeasureRequest {
     maxWidth: textCase.maxWidth,
     wrap: textCase.wrap,
     maxLines: textCase.maxLines,
-    overflow: textCase.overflow
+    overflow: textCase.overflow,
+    spans: textCase.spans === undefined ? undefined : textCase.spans.map(spanRequest)
+  };
+}
+
+/** One case run as the paragraph algorithm takes it: offsets and a font. */
+function spanRequest(span: TextCaseSpan): TextRunSpan {
+  return {
+    start: span.start,
+    end: span.end,
+    fontFamily: span.font === undefined ? undefined : cssFamilyList(typeof span.font === 'string' ? [span.font] : span.font),
+    fontSize: span.fontSize,
+    fontWeight: span.fontWeight,
+    fontStyle: span.fontStyle,
+    fontStretch: span.fontStretch,
+    fontVariant: span.fontVariant,
+    fontKerning: span.fontKerning,
+    letterSpacing: span.letterSpacing
   };
 }
 
@@ -191,11 +214,92 @@ function caseToHtml(textCase: TextCase): string {
   return (
     `<div class="case" data-case="${escapeAttribute(textCase.name)}">` +
     `<div class="row" style="width:${rowWidth}">` +
-    `<div class="para"${langAttribute(textCase)} style="${[font, ...paragraphStyles(textCase)].join(';')}">${escapeText(textCase.text)}</div>` +
+    `<div class="para"${langAttribute(textCase)} style="${[font, ...paragraphStyles(textCase)].join(';')}">${paragraphContent(textCase)}</div>` +
     `</div>` +
-    `<div class="probe" style="${font}">x<span class="bl"></span></div>` +
+    `<div class="probe" style="${font}">x${probeRuns(textCase)}<span class="bl"></span></div>` +
     `</div>`
   );
+}
+
+/**
+ * The paragraph's content: its text, with each run in a `<span>` of
+ * its own where the case has runs.
+ *
+ * A run inherits `line-height` as a length, so its inline box is the
+ * paragraph's line height whatever its font size, which is the rule
+ * `lineBox` in `ParagraphLayout.ts` implements. Nothing else is set on
+ * the span, so a case with runs that change nothing renders as a case
+ * with none.
+ */
+function paragraphContent(textCase: TextCase): string {
+  const spans = textCase.spans;
+  if (spans === undefined || spans.length === 0) {
+    return escapeText(textCase.text);
+  }
+  let html = '';
+  let at = 0;
+  for (const span of spans) {
+    if (span.start > at) {
+      html += escapeText(textCase.text.slice(at, span.start));
+    }
+    html += `<span style="${spanStyles(span).join(';')}">${escapeText(textCase.text.slice(span.start, span.end))}</span>`;
+    at = span.end;
+  }
+  return html + escapeText(textCase.text.slice(at));
+}
+
+/**
+ * One `x` per distinct run style, so the probe's single line box holds
+ * the same set of inline boxes the paragraph's lines do.
+ *
+ * The first baseline is read off this probe rather than off the
+ * paragraph, because the paragraph has no element whose bottom is its
+ * baseline. A probe of the paragraph's font alone would answer for a
+ * paragraph of one font and for no other, which is what it did until
+ * runs existed: the run whose font does not fit the line height is
+ * exactly the run that moves the baseline.
+ */
+function probeRuns(textCase: TextCase): string {
+  const seen = new Set<string>();
+  let html = '';
+  for (const span of textCase.spans ?? []) {
+    const style = spanStyles(span).join(';');
+    if (style.length === 0 || seen.has(style)) {
+      continue;
+    }
+    seen.add(style);
+    html += `<span style="${style}">x</span>`;
+  }
+  return html;
+}
+
+function spanStyles(span: TextCaseSpan): string[] {
+  const styles: string[] = [];
+  if (span.font !== undefined) {
+    styles.push(`font-family:${cssFamilyList(typeof span.font === 'string' ? [span.font] : span.font).replace(/"/g, "'")}`);
+  }
+  if (span.fontSize !== undefined) {
+    styles.push(`font-size:${px(span.fontSize)}`);
+  }
+  if (span.fontWeight !== undefined) {
+    styles.push(`font-weight:${span.fontWeight}`);
+  }
+  if (span.fontStyle !== undefined) {
+    styles.push(`font-style:${span.fontStyle}`);
+  }
+  if (span.fontStretch !== undefined) {
+    styles.push(`font-stretch:${span.fontStretch}`);
+  }
+  if (span.fontVariant !== undefined) {
+    styles.push(`font-variant:${span.fontVariant}`);
+  }
+  if (span.fontKerning !== undefined) {
+    styles.push(`font-kerning:${span.fontKerning}`);
+  }
+  if (span.letterSpacing !== undefined) {
+    styles.push(`letter-spacing:${px(span.letterSpacing)}`);
+  }
+  return styles;
 }
 
 function langAttribute(textCase: TextCase): string {
@@ -265,23 +369,42 @@ function reportScript(families: readonly string[]): string {
     var probeBox = probe.getBoundingClientRect();
     var baseline = round(section.querySelector('.bl').getBoundingClientRect().bottom - probeBox.top);
     var lines = [];
-    var textNode = para.firstChild;
-    if (textNode !== null && textNode.nodeType === 3) {
+    // Every text node in order, with the offset each begins at: a
+    // paragraph of runs is a text node per run, and the offsets a Gesso
+    // line reports are into the paragraph rather than into one of them.
+    var walker = document.createTreeWalker(para, NodeFilter.SHOW_TEXT);
+    var pieces = [];
+    var at = 0;
+    for (var node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      pieces.push({ node: node, base: at });
+      at += node.data.length;
+    }
+    if (pieces.length > 0) {
       var range = document.createRange();
       var current = null;
+      for (var p = 0; p < pieces.length; p++) {
+      var textNode = pieces[p].node;
+      var base = pieces[p].base;
       for (var segment of segmenter.segment(textNode.data)) {
-        var start = segment.index;
+        var start = base + segment.index;
         var end = start + segment.segment.length;
-        range.setStart(textNode, start);
-        range.setEnd(textNode, end);
+        range.setStart(textNode, segment.index);
+        range.setEnd(textNode, segment.index + segment.segment.length);
         var rects = range.getClientRects();
         var rect = rects.length > 0 ? rects[0] : null;
         var top = rect !== null ? round(rect.top - box.top) : null;
-        if (current === null || (top !== null && current.top !== null && Math.abs(top - current.top) > 0.5)) {
+        // Two lines are a line height apart; two runs of different
+        // sizes on one line are a few pixels apart, and their inline
+        // boxes start at different heights. Half a line height
+        // separates the first from the second and tolerates the second.
+        var apart = spec.lineHeight / 2;
+        if (current === null || (top !== null && current.top !== null && Math.abs(top - current.top) > apart)) {
           current = { top: top, start: start, end: start, left: null, right: null, clusters: [] };
           lines.push(current);
         } else if (current.top === null) {
           current.top = top;
+        } else if (top !== null) {
+          current.top = Math.min(current.top, top);
         }
         if (rect !== null && !isBlank(segment.segment)) {
           var left = rect.left - box.left;
@@ -293,6 +416,7 @@ function reportScript(families: readonly string[]): string {
           current.right = current.right === null ? right : Math.max(current.right, right);
           current.end = end;
         }
+      }
       }
     }
     // Lines a clamp hid are laid out but not shown; keep what the box shows.

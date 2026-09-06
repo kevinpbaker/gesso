@@ -312,8 +312,20 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
       styles.push(`align-self:${crossAlignment(parent.type === 'column' && self === 'baseline' ? 'start' : self)}`);
     }
   }
+  // Emitted least specific first, because in an inline style the later
+  // declaration wins and that is how Gesso resolves these: the
+  // shorthand, then the logical pair, then a physical side.
+  if (props.margin !== undefined) {
+    styles.push(`margin:${length(props.margin)}`);
+  }
+  for (const edge of ['Start', 'End'] as const) {
+    const value = props[`margin${edge}`];
+    if (value !== undefined) {
+      styles.push(`margin-inline-${edge.toLowerCase()}:${length(value)}`);
+    }
+  }
   for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
-    const value = props[`margin${side}`] ?? props.margin;
+    const value = props[`margin${side}`];
     if (value !== undefined) {
       styles.push(`margin-${side.toLowerCase()}:${length(value)}`);
     }
@@ -330,6 +342,13 @@ function itemStyles(node: CaseNode, parent: CaseNode | null): string[] {
 function sizeStyles(node: CaseNode, rootCase: LayoutCase | null, layoutCase: LayoutCase): string[] {
   const { props } = node;
   const styles: string[] = [];
+
+  // Every node type, not only the flex containers: a stack and a grid
+  // mirror their inline axis under rtl too, and a logical inset on a
+  // leaf resolves against the leaf's own direction.
+  if (props.textDirection !== undefined) {
+    styles.push(`direction:${props.textDirection}`);
+  }
 
   if (node.type === 'text') {
     styles.push(...(layoutCase.font === 'ahem' ? ahemTextStyles(node) : fixedTextStyles(node)));
@@ -354,8 +373,18 @@ function sizeStyles(node: CaseNode, rootCase: LayoutCase | null, layoutCase: Lay
       styles.push(`${kebab(name)}:${length(value)}`);
     }
   }
+  // Same order as the margins above, and for the same reason.
+  if (props.padding !== undefined) {
+    styles.push(`padding:${px(props.padding)}`);
+  }
+  for (const edge of ['Start', 'End'] as const) {
+    const value = props[`padding${edge}`];
+    if (value !== undefined) {
+      styles.push(`padding-inline-${edge.toLowerCase()}:${px(value)}`);
+    }
+  }
   for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
-    const value = props[`padding${side}`] ?? props.padding;
+    const value = props[`padding${side}`];
     if (value !== undefined) {
       styles.push(`padding-${side.toLowerCase()}:${px(value)}`);
     }
@@ -432,7 +461,7 @@ function gapStyles(node: CaseNode): string[] {
   return styles;
 }
 
-/** Wrapping, line distribution, reversal and writing direction. */
+/** Wrapping, line distribution and flex reversal. */
 function flexContainerStyles(node: CaseNode): string[] {
   const { props } = node;
   const styles: string[] = [];
@@ -444,9 +473,6 @@ function flexContainerStyles(node: CaseNode): string[] {
   }
   if (props.direction !== undefined) {
     styles.push(`flex-direction:${props.direction}`);
-  }
-  if (props.textDirection !== undefined) {
-    styles.push(`direction:${props.textDirection}`);
   }
   return styles;
 }

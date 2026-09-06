@@ -24,6 +24,27 @@ import type { ConformanceFontId } from './fonts.ts';
  */
 export type TextAlignment = 'left' | 'center' | 'right';
 
+/**
+ * One run of a case: a stretch of the text with a font of its own.
+ *
+ * Offsets rather than text, so the case has one source of truth for
+ * what it says and the runs only say where the fonts change. Its
+ * Chrome twin is a `<span>` over the same characters.
+ */
+export interface TextCaseSpan {
+  readonly start: number;
+  readonly end: number;
+  /** The face, or the faces tried in order. The paragraph's when absent. */
+  readonly font?: ConformanceFontId | readonly ConformanceFontId[];
+  readonly fontSize?: number;
+  readonly fontWeight?: string | number;
+  readonly fontStyle?: 'normal' | 'italic' | 'oblique';
+  readonly fontStretch?: string;
+  readonly fontVariant?: 'normal' | 'small-caps';
+  readonly fontKerning?: 'auto' | 'normal' | 'none';
+  readonly letterSpacing?: number;
+}
+
 export interface TextCase {
   /** Unique, slash-grouped: `wrap/greedy-at-spaces`. */
   readonly name: string;
@@ -67,6 +88,12 @@ export interface TextCase {
    * a test that must have its divergence note removed.
    */
   readonly divergence?: string;
+  /**
+   * Stretches of `text` with fonts of their own. The text is still one
+   * string, so every offset in the expectation means what it always
+   * meant; see `ParagraphLayout.ts`.
+   */
+  readonly spans?: readonly TextCaseSpan[];
 }
 
 export const DEFAULT_TEXT_CASE_FONT_SIZE = 16;
@@ -568,6 +595,115 @@ export const textCases: readonly TextCase[] = [
     box: 'fixed',
     divergence:
       'Draws the whole line, 200.16 px in a 200 px box, without an ellipsis; Gesso ellipsises any line wider than its box.'
+  },
+
+  // -------------------------------------------------------------------------
+  // Runs: one paragraph in more than one font
+  //
+  // The Chrome twin is the same paragraph with a `<span>` over each
+  // run, so every one of these asks the same question the cases above
+  // ask, of text whose width changes part way along a line. A run
+  // inherits the paragraph's line height as a length, which is why the
+  // line box only grows where a run's own font does not fit inside it.
+  // -------------------------------------------------------------------------
+  {
+    name: 'runs/bold-in-the-middle',
+    text: 'The quick brown fox jumps',
+    spans: [{ start: 10, end: 15, fontWeight: 700 }]
+  },
+  {
+    name: 'runs/bold-changes-where-the-line-breaks',
+    text: 'The quick brown fox jumps over the lazy dog',
+    maxWidth: 140,
+    spans: [{ start: 4, end: 19, fontWeight: 700 }]
+  },
+  {
+    name: 'runs/italic-in-the-middle',
+    text: 'A word set in italic type here',
+    spans: [{ start: 14, end: 20, fontStyle: 'italic' }]
+  },
+  {
+    name: 'runs/italic-wraps',
+    text: 'A sentence with a phrase set in italic type that has to wrap',
+    maxWidth: 160,
+    spans: [{ start: 25, end: 42, fontStyle: 'italic' }]
+  },
+  {
+    name: 'runs/three-runs-and-the-prose-between-them',
+    text: 'Read the guide, run the code, and then ship it',
+    maxWidth: 180,
+    spans: [
+      { start: 9, end: 14, fontWeight: 700 },
+      { start: 24, end: 28, letterSpacing: 1 },
+      { start: 39, end: 43, fontStyle: 'italic' }
+    ]
+  },
+  {
+    name: 'runs/another-family-inside-the-line',
+    text: 'Call it with code() and see',
+    maxWidth: 200,
+    spans: [{ start: 13, end: 19, font: 'cjk' }]
+  },
+  {
+    name: 'runs/smaller-run-on-one-line',
+    text: 'Normal with smaller inside',
+    spans: [{ start: 12, end: 19, fontSize: 12 }]
+  },
+  {
+    name: 'runs/larger-run-on-one-line',
+    text: 'Normal with larger inside',
+    spans: [{ start: 12, end: 18, fontSize: 24 }]
+  },
+  {
+    name: 'runs/a-taller-run-grows-only-its-own-line',
+    text: 'Larger words up front and then a long tail of ordinary text that wraps',
+    maxWidth: 200,
+    spans: [{ start: 0, end: 12, fontSize: 24 }],
+    divergence:
+      'Sizes each line box separately, so only the line carrying the larger run is taller; Gesso gives every line of a paragraph the tallest line box, because a paragraph is lines times one line height here and both renderers step by it.'
+  },
+  {
+    name: 'runs/tracking-on-one-run-only',
+    text: 'plain tracked plain',
+    spans: [{ start: 6, end: 13, letterSpacing: 2 }]
+  },
+  {
+    name: 'runs/small-caps-on-one-run',
+    text: 'A run in small caps here',
+    spans: [{ start: 9, end: 19, fontVariant: 'small-caps' }]
+  },
+  {
+    name: 'runs/kerning-off-on-one-run',
+    text: 'AV Wa Ta AV Wa Ta',
+    spans: [{ start: 9, end: 17, fontKerning: 'none' }]
+  },
+  {
+    name: 'runs/a-run-that-changes-nothing-is-the-paragraph',
+    text: 'The quick brown fox jumps over the lazy dog',
+    maxWidth: 140,
+    spans: [{ start: 10, end: 15 }]
+  },
+  {
+    name: 'runs/run-boundary-at-a-break',
+    text: 'alpha beta gamma delta',
+    maxWidth: 90,
+    spans: [{ start: 6, end: 10, fontWeight: 700 }]
+  },
+  {
+    name: 'runs/clamped-line-ends-in-the-last-run',
+    text: 'A heading with bold words that does not fit its box',
+    maxWidth: 200,
+    maxLines: 1,
+    overflow: 'ellipsis',
+    box: 'fixed',
+    spans: [{ start: 15, end: 26, fontWeight: 700 }]
+  },
+  {
+    name: 'runs/centred-with-runs',
+    text: 'A centred line with bold in it',
+    maxWidth: 140,
+    align: 'center',
+    spans: [{ start: 20, end: 24, fontWeight: 700 }]
   }
 ];
 

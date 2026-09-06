@@ -13,6 +13,7 @@ import {
 } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
+import { controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
@@ -52,7 +53,16 @@ export interface SelectProps extends ControlLayoutProps {
   label?: string;
   placeholder?: string;
   disabled?: boolean;
+  /** Marks the control as failing validation; `error` implies it. */
   invalid?: boolean;
+  /**
+   * What is wrong with the choice, shown under the control and read
+   * after its name.
+   *
+   * What a form fills in. `invalid` is the same statement without a
+   * message, kept for a caller that has nothing to say.
+   */
+  error?: string;
   required?: boolean;
   ref?: (node: UiNode | null) => void;
 }
@@ -61,7 +71,10 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   const label = input(inputs.label, '');
   const placeholder = input(inputs.placeholder, 'Choose…');
   const disabled = input(inputs.disabled, false);
-  const invalid = input(inputs.invalid, false);
+  const error = input(inputs.error, '');
+  const invalid = combineLatest([input(inputs.invalid, false), error]).pipe(
+    map(([marked, message]) => marked || message.length > 0)
+  );
   const required = input(inputs.required, false);
   const focusStore = ctx.inject(FocusService);
   const focus = trackFocus(ctx, inputs.ref);
@@ -247,6 +260,7 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         borderRadius: 6,
         role: 'combobox',
         label,
+        description: error,
         valueText: value.value.pipe(map(chosen => labelFor(chosen))),
         states: states(overlay.open, invalid, required),
         onClick: () => (overlay.isOpen() ? close() : open()),
@@ -272,7 +286,8 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         selectable: false
       }),
       Text({ text: '▾', color: foregroundToken(disabled), selectable: false })
-    )
+    ),
+    controlMessage(error)
   );
 }
 

@@ -10,7 +10,15 @@ import type { PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { RenderContext } from '../RenderContext';
-import { buildFontString, drawText, drawTextLines, layoutTextLines } from '../TextRenderer';
+import {
+  buildFontString,
+  drawText,
+  drawTextLines,
+  fillTextRects,
+  layoutTextLines,
+  textRunBackgrounds,
+  textRunDecorations
+} from '../TextRenderer';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
 import { CARET_WIDTH, caretVisibleAt } from '../../editing/UiEditable';
@@ -616,6 +624,9 @@ export class Canvas2DRenderer implements UiRenderer {
   private paintHighlightedText(ctx: Canvas2DContext, paint: PaintState, context: RenderContext): void {
     const lines = layoutTextLines(this.contentBox, paint, context.text);
     const geometry = paragraphGeometryFrom(lines, paint.text!, this.contentBox, paint, context.text);
+    // A run's own background is under the highlights, as a CSS inline
+    // background is under a selection.
+    fillTextRects(ctx, textRunBackgrounds(lines, paint));
     if (paint.textMatches !== undefined) {
       ctx.fillStyle = colorToCss(paint.matchColor);
       for (const range of paint.textMatches) {
@@ -630,7 +641,16 @@ export class Canvas2DRenderer implements UiRenderer {
         ctx.fillRect(box.x, box.y, box.width, box.height);
       }
     }
-    drawTextLines(ctx, lines, buildFontString(paint), colorToCss(paint.textColor), paint.letterSpacing, paint.rtl);
+    drawTextLines(
+      ctx,
+      lines,
+      buildFontString(paint),
+      colorToCss(paint.textColor),
+      paint.letterSpacing,
+      paint.rtl,
+      paint
+    );
+    fillTextRects(ctx, textRunDecorations(lines, paint));
   }
 
   /**

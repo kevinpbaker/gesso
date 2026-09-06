@@ -1,6 +1,7 @@
 import type { FontMetrics, TextMeasureRequest } from '../TextMeasurer.ts';
 import { ParagraphTextMeasurer } from '../TextMeasurer.ts';
 import type { GessoRecording } from './toHtml.ts';
+import { runSignature } from './runSignature.ts';
 
 export const REGENERATE_TEXT_FIXTURES =
   'Run `pnpm fixtures:text` to regenerate packages/core/src/layout/textConformance/expected.json.';
@@ -16,15 +17,19 @@ export const REGENERATE_TEXT_FIXTURES =
  * the fixtures exist to check, and the answer is to regenerate them.
  */
 export class RecordedTextMeasurer extends ParagraphTextMeasurer {
+  private readonly base: string;
+
   constructor(
     private readonly recording: GessoRecording,
-    private readonly caseName: string
+    private readonly caseName: string,
+    baseRequest?: TextMeasureRequest
   ) {
     super();
+    this.base = baseRequest === undefined ? '' : runSignature(baseRequest);
   }
 
-  measureRunWidth(text: string, _request: TextMeasureRequest): number {
-    const width = this.recording.widths[text];
+  measureRunWidth(text: string, request: TextMeasureRequest): number {
+    const width = this.recordingFor(request).widths[text];
     if (width === undefined) {
       throw new Error(
         `${this.caseName}: the fixture holds no width for ${JSON.stringify(text)}. ${REGENERATE_TEXT_FIXTURES}`
@@ -33,7 +38,25 @@ export class RecordedTextMeasurer extends ParagraphTextMeasurer {
     return width;
   }
 
-  fontMetrics(_request: TextMeasureRequest): FontMetrics {
-    return { ascent: this.recording.ascent, descent: this.recording.descent };
+  fontMetrics(request: TextMeasureRequest): FontMetrics {
+    const recording = this.recordingFor(request);
+    return { ascent: recording.ascent, descent: recording.descent };
+  }
+
+  /** The paragraph's own recording, or the run's where its font differs. */
+  private recordingFor(request: TextMeasureRequest): { widths: Record<string, number>; ascent: number; descent: number } {
+    const runs = this.recording.runs;
+    if (runs === undefined) {
+      return this.recording;
+    }
+    const signature = runSignature(request);
+    if (signature === this.base) {
+      return this.recording;
+    }
+    const run = runs[signature];
+    if (run === undefined) {
+      throw new Error(`${this.caseName}: the fixture holds no run for ${signature}. ${REGENERATE_TEXT_FIXTURES}`);
+    }
+    return run;
   }
 }

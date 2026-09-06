@@ -2,7 +2,7 @@ import type { FontMetrics, TextMeasureRequest } from '../../layout/TextMeasurer'
 import { ParagraphTextMeasurer } from '../../layout/TextMeasurer';
 import { proportionalFontMetrics } from '../../layout/ParagraphLayout';
 import type { Canvas2DContext } from './Canvas2DContext';
-import { buildFontString } from '../TextRenderer';
+import { applyCanvasTextStyle, createCanvasTextStyle, runCanvasStyleInto } from '../TextRenderer';
 
 const MAX_CACHE_ENTRIES = 8192;
 
@@ -23,20 +23,24 @@ const MAX_CACHE_ENTRIES = 8192;
 export class CanvasTextMeasurer extends ParagraphTextMeasurer {
   private readonly widths = new Map<string, number>();
   private readonly metrics = new Map<string, FontMetrics>();
+  /** One style object per measurer, refilled per call; see `runCanvasStyleInto`. */
+  private readonly style = createCanvasTextStyle();
 
   constructor(private readonly context: Canvas2DContext) {
     super();
   }
 
   measureRunWidth(text: string, request: TextMeasureRequest): number {
-    const font = fontOf(request);
-    const spacing = applySpacing(this.context, request);
-    const key = `${font}\0${spacing}\0${text}`;
+    // The font is built the one way drawing builds it, and its key is
+    // the width cache's. The context is only touched on a miss:
+    // assigning `font` re-parses the string, and this is the hottest
+    // path in text.
+    const key = `${runCanvasStyleInto(request, undefined, this.style)}\0${text}`;
     const cached = this.widths.get(key);
     if (cached !== undefined) {
       return cached;
     }
-    this.context.font = font;
+    applyCanvasTextStyle(this.context, this.style);
     const width = this.context.measureText(text).width;
     if (this.widths.size >= MAX_CACHE_ENTRIES) {
       this.widths.clear();
@@ -53,15 +57,15 @@ export class CanvasTextMeasurer extends ParagraphTextMeasurer {
   }
 
   fontMetrics(request: TextMeasureRequest): FontMetrics {
-    const font = fontOf(request);
     // Metrics are the font's own; tracking moves glyphs apart and does
     // not change how tall they are.
-    applySpacing(this.context, { ...request, letterSpacing: 0 });
+    const font = runCanvasStyleInto(request, undefined, this.style);
+    this.style.letterSpacing = 0;
     const cached = this.metrics.get(font);
     if (cached !== undefined) {
       return cached;
     }
-    this.context.font = font;
+    applyCanvasTextStyle(this.context, this.style);
     const measured = this.context.measureText('Mg') as Partial<TextMetrics>;
     // fontBoundingBox* is the em box the browser lays lines out with.
     // Test doubles and very old engines lack it; fall back to the
@@ -75,29 +79,3 @@ export class CanvasTextMeasurer extends ParagraphTextMeasurer {
   }
 }
 
-function fontOf(request: TextMeasureRequest): string {
-  return buildFontString({
-    fontWeight: request.fontWeight ?? 'normal',
-    fontSize: request.fontSize,
-    fontFamily: request.fontFamily ?? 'sans-serif'
-  });
-}
-
-/**
- * Applies the request's tracking to a context, and says what it is.
- *
- * `letterSpacing` is a context property rather than part of the font
- * shorthand, so it has to be set separately and — because it is
- * *sticky* — cleared again for a run that asks for none. It also has
- * to go into the width cache's key, since two runs of the same text in
- * the same font are different widths at different tracking.
- *
- * Absent on an engine too old for it, in which case the assignment is
- * ignored, measuring and drawing both quietly do without, and the two
- * still agree — which is the only property that matters here.
- */
-function applySpacing(context: Canvas2DContext, request: TextMeasureRequest): number {
-  const spacing = request.letterSpacing ?? 0;
-  (context as { letterSpacing?: string }).letterSpacing = `${spacing}px`;
-  return spacing;
-}

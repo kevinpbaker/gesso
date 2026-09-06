@@ -78,11 +78,21 @@ describe('resolveFont', () => {
   /**
    * Paint resolves into the scratch it already owns rather than into a
    * record it allocates per node per frame, so the two entry points
-   * have to fill the same five fields the same way.
+   * have to fill the same fields the same way.
    */
   it('writes the same font into a caller-owned target', () => {
     const { text } = tree({ textStyle: defaultTypography.headline }, { fontSize: 22, letterSpacing: 1.5 });
-    const target = { fontSize: 0, fontFamily: '', fontWeight: '' as string | number, lineHeight: 0, letterSpacing: 0 };
+    const target = {
+      fontSize: 0,
+      fontFamily: '',
+      fontWeight: '' as string | number,
+      lineHeight: 0,
+      letterSpacing: 0,
+      fontStyle: '',
+      fontStretch: '',
+      fontVariant: '',
+      fontKerning: ''
+    };
     resolveFontInto(text, target);
     expect(target).toEqual({ ...resolveFont(text) });
   });

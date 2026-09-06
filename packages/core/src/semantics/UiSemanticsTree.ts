@@ -2,6 +2,8 @@ import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiRole, UiSemanticState, UiSemanticStates, UiLiveRegion } from '../properties/UiSemantics';
 import { normalizeStates } from '../properties/UiSemantics';
+import type { UiResolvedTextSpan, UiTextLink } from '../properties/UiTextStyle';
+import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
 
 /**
  * One node of the semantics tree, flattened.
@@ -130,7 +132,19 @@ export function buildSemanticsTree(root: UiNode): UiSemanticsMap {
       }
       return;
     }
-    records.set(record.id, record);
+    const runs = linkRunsOf(node);
+    if (runs.length > 0) {
+      // A paragraph with links is mirrored run by run: the prose
+      // between the links and each link itself become records of their
+      // own, in reading order, and the paragraph keeps no name. A
+      // screen reader then reaches the link the way it reaches one in
+      // a page, rather than hearing its words go by inside a sentence
+      // it cannot act on.
+      records.set(record.id, paragraphOf(record));
+      appendTextRuns(node, record.id, runs, records);
+    } else {
+      records.set(record.id, record);
+    }
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
       if (claimedByName(node, child)) {
         continue;
@@ -208,8 +222,8 @@ function accessibleText(node: UiNode): string | undefined {
     return undefined;
   }
   const parts: string[] = [];
-  const own = node.properties.get('text') as string | undefined;
-  if (own !== undefined && own.length > 0) {
+  const own = textContentOf(node);
+  if (own.length > 0) {
     parts.push(own);
   }
   for (let child = node.firstChild; child !== null; child = child.nextSibling) {
@@ -268,4 +282,95 @@ function prune(record: UiSemanticsRecord): UiSemanticsRecord {
     }
   }
   return result as unknown as UiSemanticsRecord;
+}
+
+// ---------------------------------------------------------------------------
+// Runs
+// ---------------------------------------------------------------------------
+
+/**
+ * Separates a run record's id from its node's.
+ *
+ * A run is not a node and has no id of its own, so it borrows its
+ * paragraph's and adds its position. Nothing generates a node id
+ * containing this character, and the shape is what lets the framework
+ * route an action on a run back to the paragraph that owns it.
+ */
+export const TEXT_RUN_ID_SEPARATOR = '#run';
+
+/** The paragraph a run record belongs to, and which run it is; null for any other id. */
+export function textRunOfRecordId(id: string): { nodeId: string; index: number } | null {
+  const at = id.lastIndexOf(TEXT_RUN_ID_SEPARATOR);
+  if (at < 0) {
+    return null;
+  }
+  const index = Number(id.slice(at + TEXT_RUN_ID_SEPARATOR.length));
+  return Number.isInteger(index) && index >= 0 ? { nodeId: id.slice(0, at), index } : null;
+}
+
+/** The runs of a node's paragraph that are links; empty when none are. */
+function linkRunsOf(node: UiNode): readonly UiResolvedTextSpan[] {
+  const spans = resolvedSpansOf(node);
+  for (const span of spans) {
+    if (span.link !== undefined) {
+      return spans;
+    }
+  }
+  return EMPTY_SPANS;
+}
+
+const EMPTY_SPANS: readonly UiResolvedTextSpan[] = [];
+
+/**
+ * The paragraph a run-mirrored node becomes: a `paragraph` unless it
+ * said what it was, and named by what it contains rather than by a
+ * label, so its text is not read twice.
+ */
+function paragraphOf(record: UiSemanticsRecord): UiSemanticsRecord {
+  const { label: _label, ...rest } = record;
+  return { ...rest, role: record.role ?? 'paragraph' };
+}
+
+/**
+ * One record per stretch of the paragraph, in reading order: prose
+ * where no link covers it, a `link` where one does.
+ *
+ * A link's name is its `label` when it has one, because "here" and
+ * "read more" are links a screen reader user cannot tell apart, and
+ * its text otherwise.
+ */
+function appendTextRuns(
+  node: UiNode,
+  parent: string,
+  spans: readonly UiResolvedTextSpan[],
+  records: Map<string, UiSemanticsRecord>
+): void {
+  const text = textContentOf(node);
+  let index = 0;
+  const push = (from: number, to: number, link: UiTextLink | undefined): void => {
+    const value = text.slice(from, to);
+    if (link === undefined && value.trim().length === 0) {
+      // Whitespace between two links is not something to announce.
+      return;
+    }
+    const id = `${node.id}${TEXT_RUN_ID_SEPARATOR}${index}`;
+    records.set(id, {
+      id,
+      parent,
+      index,
+      role: link === undefined ? undefined : 'link',
+      label: link?.label ?? value
+    });
+    index++;
+  };
+  let at = 0;
+  for (const span of spans) {
+    if (span.link === undefined) {
+      continue;
+    }
+    push(at, span.start, undefined);
+    push(span.start, span.end, span.link);
+    at = span.end;
+  }
+  push(at, text.length, undefined);
 }

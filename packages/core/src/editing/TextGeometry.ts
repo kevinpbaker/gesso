@@ -15,8 +15,16 @@ export interface PlacedLine {
   readonly height: number;
 }
 
-/** The advance width of a run in the paragraph's font. */
-export type RunMeasure = (text: string) => number;
+/**
+ * The advance width of a run in the paragraph's font.
+ *
+ * `start` is the run's first character's offset in the source text,
+ * and is what a paragraph with runs of its own needs to know which
+ * font to measure in; a paragraph in one font ignores it. Omitted for
+ * a string that is not in the text at all, such as the space a
+ * selection past the end of a line is widened by.
+ */
+export type RunMeasure = (text: string, start?: number) => number;
 
 export interface CaretRect {
   x: number;
@@ -84,7 +92,10 @@ function advanceTo(line: PlacedLine, offset: number, text: string, measure: RunM
   if (inLine === line.text.length) {
     return line.width;
   }
-  return measure(inLine < line.text.length ? line.text.slice(0, inLine) : text.slice(line.start, offset));
+  return measure(
+    inLine < line.text.length ? line.text.slice(0, inLine) : text.slice(line.start, offset),
+    line.start
+  );
 }
 
 /** Where the caret for `offset` is drawn. */
@@ -147,7 +158,7 @@ export function offsetAtX(
 ): number {
   const line = lines[index];
   const segment = index === lines.length - 1 ? text.slice(line.start, lineLimit(lines, index, text)) : line.text;
-  const segmentWidth = segment.length === line.text.length ? line.width : measure(segment);
+  const segmentWidth = segment.length === line.text.length ? line.width : measure(segment, line.start);
   const distance = rtl ? line.x + line.width - x : x - line.x;
   if (distance <= 0) {
     return line.start;
@@ -156,7 +167,7 @@ export function offsetAtX(
     return line.start + segment.length;
   }
   const boundaries = graphemeBoundaries(segment);
-  const widthAt = (k: number): number => (k === 0 ? 0 : measure(segment.slice(0, boundaries[k])));
+  const widthAt = (k: number): number => (k === 0 ? 0 : measure(segment.slice(0, boundaries[k]), line.start));
   let low = 0;
   let high = boundaries.length - 1;
   // Smallest k whose prefix width reaches the point.

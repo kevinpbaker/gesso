@@ -7,6 +7,7 @@ import { auto, fr } from '../layout/UiLength';
 import { normalizeColor } from '../properties/UiColor';
 import { setSelectionRange } from '../selection/UiSelectable';
 import { setMatchRanges } from '../find/UiTextMatches';
+import { setLinkHover } from '../selection/UiTextLinks';
 import type { DecorationShape } from './Decorations';
 import { linearGradient, radialGradient } from '../properties/UiGradient';
 import { percent } from '../layout/UiLength';
@@ -488,6 +489,40 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     h.append(root, card);
     const draws = expectParity(h, root);
     expect(draws.filter(d => d.kind === 'text').length).toBeGreaterThan(1);
+  });
+
+  it('a paragraph of runs: emphasis, a background, an underline and a hovered link', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('width', 220);
+    const para = box(
+      h,
+      'para',
+      {
+        spans: [
+          { text: 'Read the ' },
+          { text: 'guide', color: '#0a58ca', textDecoration: 'underline', link: { href: '#guide' } },
+          { text: ' or the ' },
+          { text: 'code()', fontFamily: 'monospace', backgroundColor: '#eeeeee' },
+          { text: ' first, ' },
+          { text: 'slowly', fontStyle: 'italic', textDecoration: 'line-through' },
+          { text: '.' }
+        ],
+        fontSize: 12,
+        color: '#111111'
+      },
+      UiNodeType.Text
+    );
+    h.append(root, para);
+    // The link the pointer is on: a wash behind it and an underline
+    // under it, both derived from the run's own colour so the two
+    // appearances follow the toggle without a second palette.
+    setLinkHover(para, 1);
+    const draws = expectParity(h, root);
+    // One text draw per run per line, and the run's background, the
+    // hover wash, the underline and the strikethrough as fills.
+    expect(draws.filter(d => d.kind === 'text').length).toBeGreaterThan(6);
+    expect(draws.filter(d => d.kind === 'fill').length).toBeGreaterThan(3);
   });
 
   it('a selection spanning two wrapped paragraphs', () => {

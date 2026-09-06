@@ -65,3 +65,24 @@ export {
   type PortHost
 } from './WorkerPorts';
 export { captureConsole, type ConsoleEntryBody, type ConsoleLevel } from './captureConsole';
+export { UndoStack, type UndoStackOptions, type UndoTransaction } from '../undo/UndoStack';
+export { undoable, type UndoableOptions } from '../undo/undoable';
+export {
+  MemoryStorage,
+  classifyStorageError,
+  storageErrorMessage,
+  storageReadFailure,
+  storageReadValue,
+  type StorageAdapter,
+  type StorageOutcome,
+  type StorageRead
+} from '../storage/StorageAdapter';
+export {
+  OpfsStorage,
+  type OpfsDirectory,
+  type OpfsFileHandle,
+  type OpfsStorageOptions,
+  type OpfsWritable
+} from '../storage/OpfsStorage';
+export { IndexedDbStorage, type IndexedDbStorageOptions } from '../storage/IndexedDbStorage';
+export { persisted, PersistedState, type PersistedOptions } from '../storage/persisted';

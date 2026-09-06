@@ -33,7 +33,7 @@ export interface GessoParagraph {
 /** Lays the case out with `layoutParagraph` over the recorded widths, and places its lines. */
 export function layoutWithGesso(textCase: TextCase, recording: GessoRecording): GessoParagraph {
   const request = requestFor(textCase);
-  const paragraph = layoutParagraph(request, new RecordedTextMeasurer(recording, textCase.name));
+  const paragraph = layoutParagraph(request, new RecordedTextMeasurer(recording, textCase.name, request));
   // A fixed box is the tight constraint the layout engine would hand a
   // text node: the node is exactly that wide, whatever the paragraph
   // measured, and its lines are aligned within it.

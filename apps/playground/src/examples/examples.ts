@@ -45,6 +45,21 @@ export const EXAMPLES: readonly ExampleMeta[] = [
     ]
   },
   {
+    route: 'example-layout',
+    title: 'Layout an application can shape',
+    description:
+      'A masonry wall arranged by a layout the application wrote itself: each tile is measured once at the column ' +
+      'width and dropped into the shortest column, and the wall decides its own column count, so it goes from three ' +
+      'columns to one as the window narrows without a breakpoint anywhere. Above it, two panels that become one ' +
+      'stack when the column they are in runs out of room, decided by that container width rather than by the ' +
+      "window's. Below it, rows inset from the edge the reading starts at, which move to the other side when Mirror " +
+      'is pressed. And a bar across the bottom that publishes the seventy-two pixels it occupies, so the page keeps ' +
+      'clear of it without knowing it is there. Turn on Inspect layout and hover the wall: the masonry explains its ' +
+      'own arrangement, which the engine cannot, because the engine did not do it.',
+    source: 'apps/playground/src/examples/LayoutExampleApp.tsx',
+    tags: ['custom layout', 'container queries', 'insets', 'right to left', 'JSX', 'render worker']
+  },
+  {
     route: 'example-signin',
     title: 'Sign in with a passcode',
     description:

@@ -81,6 +81,13 @@ export interface PointerControllerOptions {
     pointerMove(x: number, y: number): void;
     pointerUp(): void;
     clear(): void;
+    /**
+     * The pointer moved with nothing pressed. An inline link is a run
+     * of a paragraph rather than a node, so its hover cannot come from
+     * `onHoverChange`, which fires only when the node changes; the
+     * point inside the node is the whole question.
+     */
+    pointerHover?(node: UiNode | null, x: number, y: number): void;
   };
 }
 
@@ -321,6 +328,7 @@ export class UiPointerController {
     }
     const target = this.hitTester.hitTest(x, y)?.node ?? null;
     this.updateHover(target, x, y, buttons, modifiers, pointer);
+    this.selection?.pointerHover?.(target, x, y);
     if (target === null) {
       return null;
     }

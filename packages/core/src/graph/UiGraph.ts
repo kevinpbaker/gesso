@@ -736,6 +736,21 @@ export class UiGraph {
       env = env.set(UiEnvironmentKeys.contentColor as UiEnvironmentKey<unknown>, contentColor);
     }
 
+    // The last two provide a *source* rather than a value: a size that
+    // changes with a drag and a set of insets that changes with a
+    // keyboard would otherwise rebuild the environment of everything
+    // beneath them per frame. The source's identity is what is
+    // provided, so it is set once and never compares unequal again.
+    const containerSize = node.getProperty<unknown>('containerSize');
+    if (containerSize !== undefined) {
+      env = env.set(UiEnvironmentKeys.containerSize as UiEnvironmentKey<unknown>, containerSize);
+    }
+
+    const insets = node.getProperty<unknown>('insets');
+    if (insets !== undefined) {
+      env = env.set(UiEnvironmentKeys.insets as UiEnvironmentKey<unknown>, insets);
+    }
+
     return env;
   }
 

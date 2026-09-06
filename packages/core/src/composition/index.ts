@@ -36,6 +36,7 @@ export { createElement } from './UiFactory';
 export { Box, Stack, Text, EditableText, Button, Paint, Row, Column, ScrollView, Grid } from './UiComponents';
 export { UiGraphBuilder } from './UiGraphBuilder';
 export { LazyColumn, LazyGrid, LazyRow, type LazyGridProps, type LazyListProps } from './UiLazyList';
+export { Responsive, type ResponsiveProps } from './UiResponsive';
 export {
   lazySource,
   UiVirtualWindow,

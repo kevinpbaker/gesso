@@ -96,7 +96,7 @@ import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayService } from '../overlay/OverlayService';
 import type { ColorScheme } from './colorScheme';
-import { ShellService, type ShellRequest } from './ShellService';
+import { ShellService, type ShellRequest, type ShellStorageResult } from './ShellService';
 import { AudioService, type AudioAction, type AudioRequest, type AudioSample } from './AudioService';
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
@@ -1257,6 +1257,17 @@ export class GessoRuntime {
    */
   settlePopup(id: number, opened: boolean): void {
     this.services.get(ShellService).settlePopup(id, opened);
+  }
+
+  /**
+   * Reports what the shell found in `localStorage`, settling the
+   * promise `ShellService.requestStorage` returned.
+   *
+   * The second inbound message that answers an outbound one, and it
+   * carries its request's id for the same reason the first does.
+   */
+  settleStorage(id: number, result: ShellStorageResult): void {
+    this.services.get(ShellService).settleStorage(id, result);
   }
 
   /** Whether the runtime is currently honouring a reduced-motion preference. */

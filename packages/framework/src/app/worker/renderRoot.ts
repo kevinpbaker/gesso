@@ -414,6 +414,9 @@ export class RenderWorkerApp {
       case 'popupResult':
         runtime.settlePopup(message.id, message.opened);
         break;
+      case 'storageResult':
+        runtime.settleStorage(message.id, message.result);
+        break;
       case 'tick':
         this.clock?.tick(message.time);
         break;
@@ -566,6 +569,14 @@ export class RenderWorkerApp {
           name: request.name,
           width: request.width,
           height: request.height
+        });
+      } else if (request.type === 'storage') {
+        this.host.postMessage({
+          type: 'storage',
+          id: request.id,
+          op: request.op,
+          key: request.key,
+          ...(request.value === undefined ? {} : { value: request.value })
         });
       } else {
         this.host.postMessage({ type: 'history', action: request.action, url: request.url });

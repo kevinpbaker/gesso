@@ -9,9 +9,11 @@ overlays, structure, data and media, twenty-eight components in all.
 Every one of them is themed, keyboard operable, and announces itself to
 an assistive technology from the day it was written.
 
-The form below is four of them and one plain button. Tab through it:
-the fields take focus in order, Space toggles the checkbox, and the
-select opens and chooses from the keyboard alone.
+The form below is four of them. Tab through it: the fields take focus
+in order, Space toggles the checkbox, and the select opens and chooses
+from the keyboard alone. Press Continue while it is empty and nothing
+is sent, which is [Forms](/guide/forms) rather than any of the four
+controls.
 
 <LiveExample id="form" height="340" />
 
@@ -19,8 +21,10 @@ select opens and chooses from the keyboard alone.
 
 ## What a control brings with it
 
-The example writes `value` and `onChange` and stops. Everything else
-arrives with the component:
+The example spreads a field's binding onto each control and stops. What
+that binding holds is a `value`, an `onChange` and a message; a control
+given those three by hand behaves the same way. Everything else arrives
+with the component:
 
 - **The label above the field**, positioned and styled, and used as the
   accessible name rather than duplicated into one.
@@ -40,7 +44,7 @@ site are written against:
 ```ts
 expect(ui.getByRole('checkbox')).toHaveSemantics({
   role: 'checkbox',
-  name: 'Send me product updates'
+  name: 'I accept the terms'
 });
 ```
 

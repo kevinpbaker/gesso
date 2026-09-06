@@ -51,9 +51,21 @@ export type { PaintCanvas, PaintCanvasFactory, PaintStats } from './PaintPicture
 export { parseTransform } from '../properties/UiTransform';
 export type { UiTransform } from '../properties/UiTransform';
 export type { LayoutReader, RenderContext } from './RenderContext';
-export { layoutTextLines, drawText, buildFontString } from './TextRenderer';
+export {
+  layoutTextLines,
+  drawText,
+  buildFontString,
+  runFontString,
+  applyCanvasTextStyle,
+  createCanvasTextStyle,
+  runCanvasStyleInto,
+  fillTextRects,
+  textRunBackgrounds,
+  textRunDecorations
+} from './TextRenderer';
 export { registerFontStack, fontStackFor, bumpFontStack, clearFontStacks } from './FontStacks';
-export type { TextLinePlacement } from './TextRenderer';
+export type { TextLinePlacement, PlacedTextRun, TextRunRect, CanvasTextStyle, SpanPaint } from './TextRenderer';
+export type { PaintTextSpan } from './PaintState';
 export type { UiRenderer, RendererBackend } from './UiRenderer';
 export { WebGPURenderer } from './webgpu/WebGPURenderer';
 export type { WebGPURendererOptions, RenderHooks, DrawStats, CapturedFrame } from './webgpu/WebGPURenderer';

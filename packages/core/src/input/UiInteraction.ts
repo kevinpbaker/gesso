@@ -1,4 +1,5 @@
 import { UiNodeType } from '../graph/UiNodeType';
+import { linkHoverOf } from '../selection/UiTextLinks';
 import type { UiNode } from '../graph/UiNode';
 
 /**
@@ -104,6 +105,12 @@ export function isNodeSelectable(node: UiNode): boolean {
  * sets one, which the shell shows as the default arrow.
  */
 export function resolveCursor(node: UiNode | null): string | null {
+  if (node !== null && linkHoverOf(node) >= 0) {
+    // An inline link is a run rather than a node, so it cannot set a
+    // `cursor` property of its own; the run the pointer is on is
+    // written onto the paragraph and read back here.
+    return 'pointer';
+  }
   for (let current = node; current !== null; current = current.parent) {
     const cursor = current.properties.get('cursor');
     if (typeof cursor === 'string' && cursor.length > 0) {

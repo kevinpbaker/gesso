@@ -101,7 +101,31 @@ export {
   type UiTreeNode,
   type UiTreeSnapshot
 } from './app/DevtoolsProtocol';
-export { ShellService, type ShellRequest } from './app/ShellService';
+export { ShellService, type ShellRequest, type ShellStorageOp, type ShellStorageResult } from './app/ShellService';
+export { performShellStorage, shellStorageDenied, type ShellLocalStore } from './app/shellStorage';
+export { UndoStack, type UndoStackOptions, type UndoTransaction } from './undo/UndoStack';
+export { undoable, type UndoableOptions } from './undo/undoable';
+export { registerUndoShortcuts, type UndoShortcutOptions } from './undo/undoShortcuts';
+export {
+  MemoryStorage,
+  classifyStorageError,
+  storageErrorMessage,
+  storageReadFailure,
+  storageReadValue,
+  type StorageAdapter,
+  type StorageOutcome,
+  type StorageRead
+} from './storage/StorageAdapter';
+export {
+  OpfsStorage,
+  type OpfsDirectory,
+  type OpfsFileHandle,
+  type OpfsStorageOptions,
+  type OpfsWritable
+} from './storage/OpfsStorage';
+export { IndexedDbStorage, type IndexedDbStorageOptions } from './storage/IndexedDbStorage';
+export { ShellStorage, type ShellStorageOptions } from './storage/ShellStorage';
+export { persisted, PersistedState, type PersistedOptions } from './storage/persisted';
 export { FrameService } from './app/FrameService';
 export {
   AudioService,

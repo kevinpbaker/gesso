@@ -1,5 +1,6 @@
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { TextMeasurer } from '../layout/TextMeasurer';
+import { spannedRunsFor } from '../layout/TextMeasurer';
 import type { PaintState } from '../rendering/PaintState';
 import { placeLines, textMeasureRequest, type TextLinePlacement } from '../rendering/TextRenderer';
 import { offsetAtPoint, selectionRects, type RunMeasure } from '../editing/TextGeometry';
@@ -74,12 +75,22 @@ function geometryFor(
   measurer: TextMeasurer
 ): ParagraphGeometry {
   const end = lines.length === 0 ? 0 : lines[lines.length - 1].end;
+  // Runs are measured by offset, in the font of the run each piece
+  // falls in, exactly as the paragraph algorithm measured the lines
+  // these came from. Without the offset there is no run to look up,
+  // which is the case for a string that is not in the text.
+  const spanned = spannedRunsFor(request, measurer);
   return {
     lines,
     text: end === text.length ? text : text.slice(0, end),
     start: lines.length === 0 ? 0 : lines[0].start,
     end,
-    measure: run => (run.length === 0 ? 0 : measurer.measureRunWidth(run, request)),
+    measure: (run, from) =>
+      run.length === 0
+        ? 0
+        : spanned === undefined || from === undefined
+          ? measurer.measureRunWidth(run, request)
+          : spanned.width(text, from, from + run.length),
     rtl: state.rtl
   };
 }

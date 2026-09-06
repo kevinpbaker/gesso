@@ -7,6 +7,7 @@ import { mountCompareRoute } from './routes/CompareRoute';
 import { mountExamplesRoute } from './routes/ExamplesRoute';
 import { mountFrameworkRoute, mountFrameworkSyncRoute } from './routes/FrameworkRoute';
 import { mountInputExampleRoute } from './routes/InputExampleRoute';
+import { mountLayoutExampleRoute } from './routes/LayoutExampleRoute';
 import { mountSignInExampleRoute } from './routes/SignInExampleRoute';
 import { mountNotesExampleRoute } from './routes/NotesExampleRoute';
 import { mountPaintRoute } from './routes/PaintRoute';
@@ -50,6 +51,7 @@ const MOUNTS: Record<string, Mount> = {
   'example-animation': mountAnimationExampleRoute,
   'example-paint': mountPaintRoute,
   'example-input': mountInputExampleRoute,
+  'example-layout': mountLayoutExampleRoute,
   'example-transitions': mountTransitionsExampleRoute,
   'transitions-app': mountTransitionsStandaloneRoute
 };

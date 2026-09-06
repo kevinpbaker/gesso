@@ -1,7 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { isNodeInert, isNodeSelectable } from '../input/UiInteraction';
-import { resolveString } from '../properties/UiPropertyResolver';
+import { textContentOf } from '../properties/UiTextStyle';
 
 /**
  * The node property holding the range of a `Text` node's text that is
@@ -63,8 +63,11 @@ export function selectableTextOf(node: UiNode): string | undefined {
   if (node.type !== UiNodeType.Text || !isNodeSelectable(node) || isUnderInert(node)) {
     return undefined;
   }
-  const text = resolveString(node, 'text');
-  return text !== undefined && text.length > 0 ? text : undefined;
+  // A paragraph given runs has its text in them; `textContentOf` is
+  // the one place that difference is known, so selecting, finding and
+  // the semantics mirror all see one string either way.
+  const text = textContentOf(node);
+  return text.length > 0 ? text : undefined;
 }
 
 /**

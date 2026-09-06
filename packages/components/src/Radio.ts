@@ -13,6 +13,7 @@ import {
 import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { controlled, type ControlledValue } from './controlled';
 import { trackFocus } from './focus';
+import { controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
@@ -52,7 +53,10 @@ export interface RadioGroupProps extends ControlLayoutProps {
   options: readonly RadioOption[];
   label?: string;
   disabled?: boolean;
+  /** Marks the group as failing validation; `error` implies it. */
   invalid?: boolean;
+  /** What is wrong with the choice, shown under the options. */
+  error?: string;
   required?: boolean;
   /** How the options stack. Default `column`. */
   direction?: 'row' | 'column';
@@ -61,7 +65,10 @@ export interface RadioGroupProps extends ControlLayoutProps {
 export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const disabled = input(inputs.disabled, false);
-  const invalid = input(inputs.invalid, false);
+  const error = input(inputs.error, '');
+  const invalid = combineLatest([input(inputs.invalid, false), error]).pipe(
+    map(([marked, message]) => marked || message.length > 0)
+  );
   const required = input(inputs.required, false);
   const direction = input(inputs.direction, 'column');
   const focus = trackFocus(ctx, inputs.ref);
@@ -109,7 +116,6 @@ export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContex
   );
 
   const group = {
-    ...layoutOf(inputs),
     ref: focus.ref,
     focusable: true,
     disabled,
@@ -117,6 +123,7 @@ export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContex
     gap: 4,
     role: 'radiogroup' as const,
     label,
+    description: error,
     states: states(invalid, required),
     onKeyDown: keymap({
       ArrowDown: () => step(1),
@@ -128,7 +135,14 @@ export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContex
     })
   };
 
-  return direction.value === 'row' ? Row(group, rows) : Column(group, rows);
+  // The group is the control and the outer column is only the slot the
+  // message goes in, so the layout props place the pair and
+  // `rootModifiers` stays on the element that carries the role.
+  return Column(
+    { ...layoutOf(inputs), gap: 4, x: 'stretch' },
+    direction.value === 'row' ? Row(group, rows) : Column(group, rows),
+    controlMessage(error)
+  );
 }
 
 /**

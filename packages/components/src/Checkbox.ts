@@ -1,9 +1,10 @@
 import { combineLatest, map, type Observable } from 'rxjs';
-import { type UiNodeRef, Box, Row, Text, type UiChild, type UiSemanticState } from '@gesso/core';
+import { type UiNodeRef, Box, Column, Row, Text, type UiChild, type UiSemanticState } from '@gesso/core';
 
 import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
+import { controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
@@ -33,13 +34,24 @@ export interface CheckboxProps extends ControlLayoutProps {
   disabled?: boolean;
   /** Marks the control as failing validation: a red border, `invalid`. */
   invalid?: boolean;
+  /**
+   * What is wrong with it, shown under the box and read after its name.
+   *
+   * What a form fills in, and what `invalid` is without the words. A
+   * box that has to be ticked is the commonest required field there
+   * is, and until now it could say only that it was wrong.
+   */
+  error?: string;
   required?: boolean;
 }
 
 export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const disabled = input(inputs.disabled, false);
-  const invalid = input(inputs.invalid, false);
+  const error = input(inputs.error, '');
+  const invalid = combineLatest([input(inputs.invalid, false), error]).pipe(
+    map(([marked, message]) => marked || message.length > 0)
+  );
   const required = input(inputs.required, false);
   const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<boolean>({
@@ -58,47 +70,54 @@ export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): 
     value.change(!value.current());
   };
 
-  return Row(
-    {
-      ...layoutOf(inputs),
-      ref: focus.ref,
-      focusable: true,
-      disabled,
-      modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
-      gap: 8,
-      y: 'center',
-      padding: 4,
-      borderRadius: 4,
-      role: 'checkbox',
-      label,
-      states: states(value.value, invalid, required),
-      onClick: toggle,
-      onKeyDown: keymap({ ' ': toggle, Enter: toggle })
-    },
-    Box(
+  // The row is the control and the column is only the slot the message
+  // goes in, so the layout props place the pair and `rootModifiers`
+  // stays on the element a `measure` or a `sharedElement` means.
+  return Column(
+    { ...layoutOf(inputs), gap: 4, x: 'stretch' },
+    Row(
       {
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: borderToken(invalid),
-        backgroundColor: fill(value.value, disabled),
-        x: 'center',
+        ref: focus.ref,
+        focusable: true,
+        disabled,
+        modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
+        gap: 8,
         y: 'center',
-        // The row is the control; the glyph must not swallow its clicks.
-        hitTestable: false
+        padding: 4,
+        borderRadius: 4,
+        role: 'checkbox',
+        label,
+        description: error,
+        states: states(value.value, invalid, required),
+        onClick: toggle,
+        onKeyDown: keymap({ ' ': toggle, Enter: toggle })
       },
-      // A drawn tick waits on the Media tier's `Icon`; until then the
-      // glyph is text, which both renderers already draw.
-      Text({
-        text: value.value.pipe(map(on => (on ? '✓' : ''))),
-        color: 'controlBackground',
-        fontSize: 13,
-        fontWeight: 600,
-        selectable: false
-      })
+      Box(
+        {
+          width: 18,
+          height: 18,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: borderToken(invalid),
+          backgroundColor: fill(value.value, disabled),
+          x: 'center',
+          y: 'center',
+          // The row is the control; the glyph must not swallow its clicks.
+          hitTestable: false
+        },
+        // A drawn tick waits on the Media tier's `Icon`; until then the
+        // glyph is text, which both renderers already draw.
+        Text({
+          text: value.value.pipe(map(on => (on ? '✓' : ''))),
+          color: 'controlBackground',
+          fontSize: 13,
+          fontWeight: 600,
+          selectable: false
+        })
+      ),
+      Text({ text: label, color: foregroundToken(disabled), selectable: false })
     ),
-    Text({ text: label, color: foregroundToken(disabled), selectable: false })
+    controlMessage(error)
   );
 }
 

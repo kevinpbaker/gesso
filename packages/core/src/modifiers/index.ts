@@ -17,5 +17,7 @@ export { imageSource, iconSource, type ImageSourceArgs, type IconSourceArgs, typ
 export { motion, sharedElement, type MotionArgs, type SharedElementArgs } from './motion';
 export { videoSource, type VideoSourceArgs } from './video';
 export { scrollPosition, type ScrollOffset, type ScrollPositionArgs } from './scroll';
+export { breakpoint, sizeContainer, type BreakpointArgs, type SizeContainerArgs } from './breakpoints';
+export { insetPadding, publishInset, type InsetPaddingArgs, type PublishInsetArgs } from './insets';
 export type { UiModifierEnvironment, UiModifierFocus, UiModifierLayout } from './UiModifierSet';
 export { sameArgs } from './sameArgs';

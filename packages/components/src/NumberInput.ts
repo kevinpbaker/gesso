@@ -14,6 +14,7 @@ import {
 import { input, type ComponentContext, type Inputs } from '@gesso/framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
+import { controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
   borderToken,
@@ -120,6 +121,9 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
         flexGrow: 1,
         role: 'spinbutton',
         label,
+        // The error when there is one, so somebody arriving at a field
+        // already marked wrong hears why rather than only that it is.
+        description: error,
         valueNow: value.value,
         valueMin: min,
         valueMax: max,
@@ -134,11 +138,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
       stepper('−', () => move(-step.value), disabled),
       stepper('+', () => move(step.value), disabled)
     ),
-    error.pipe(
-      map(message =>
-        message.length === 0 ? [] : [Text({ text: message, color: 'danger', fontSize: 12, selectable: false })]
-      )
-    )
+    controlMessage(error)
   );
 }
 

@@ -344,6 +344,7 @@ declare class LayoutRecord {
   liftBoundary: boolean;
   clips: boolean;
   scrollable: boolean;
+  mirrored: boolean;
   sticky: boolean;
   stickyOffsetX: number;
   stickyOffsetY: number;
@@ -867,6 +868,41 @@ declare class UiModifierSet {
   private detachOne;
 }
 declare function assertModifierList(node: UiNode, value: unknown): readonly UiModifier[];
+interface UiContainerSize {
+  readonly current: Size;
+  readonly changes: Observable<Size>;
+}
+declare const unknownContainerSize: UiContainerSize;
+declare class UiContainerSizeSource implements UiContainerSize {
+  private readonly subject;
+  get current(): Size;
+  get changes(): Observable<Size>;
+  report(width: number, height: number): void;
+}
+declare function bandOf(width: number, breakpoints: readonly number[]): number;
+declare function containerBands(size: UiContainerSize, breakpoints: readonly number[]): Observable<number>;
+interface UiInsets {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+type UiInsetEdge = 'top' | 'right' | 'bottom' | 'left';
+declare const noInsets: UiInsets;
+declare function insetsEqual(a: UiInsets, b: UiInsets): boolean;
+interface UiInsetSource {
+  readonly current: UiInsets;
+  readonly changes: Observable<UiInsets>;
+}
+declare class UiInsetRegistry implements UiInsetSource {
+  private readonly contributions;
+  private readonly subject;
+  get current(): UiInsets;
+  get changes(): Observable<UiInsets>;
+  publish(insets: Partial<UiInsets>): (next?: Partial<UiInsets>) => void;
+  private recompute;
+}
+declare function observeViewportInsets(onChange: (insets: UiInsets) => void): () => void;
 interface UiPropertyDefinition<T> {
   readonly name: string;
   readonly defaultValue: T;
@@ -1075,8 +1111,58 @@ interface UiTextStyle {
   readonly color: UiColor;
   readonly textAlign: UiTextAlign;
   readonly textDirection: UiTextDirection;
+  readonly fontStyle?: UiFontStyle;
+  readonly fontStretch?: UiFontStretch;
+  readonly fontVariant?: UiFontVariant;
+  readonly fontKerning?: UiFontKerning;
+  readonly textDecoration?: UiTextDecoration;
+}
+type UiFontStyle = 'normal' | 'italic' | 'oblique';
+type UiFontStretch = 'ultra-condensed' | 'extra-condensed' | 'condensed' | 'semi-condensed' | 'normal' | 'semi-expanded' | 'expanded' | 'extra-expanded' | 'ultra-expanded';
+type UiFontVariant = 'normal' | 'small-caps';
+type UiFontKerning = 'auto' | 'normal' | 'none';
+type UiTextDecoration = 'none' | 'underline' | 'line-through' | 'underline line-through';
+interface UiTextMetrics {
+  readonly fontFamily?: string;
+  readonly fontSize?: number;
+  readonly fontWeight?: UiFontWeight;
+  readonly fontStyle?: UiFontStyle;
+  readonly fontStretch?: UiFontStretch;
+  readonly fontVariant?: UiFontVariant;
+  readonly fontKerning?: UiFontKerning;
+  readonly letterSpacing?: number;
+}
+interface UiTextLink {
+  readonly onClick?: () => void;
+  readonly label?: string;
+  readonly href?: string;
+}
+interface UiTextSpan extends UiTextMetrics {
+  readonly text: string;
+  readonly color?: UiColorValue;
+  readonly backgroundColor?: UiColorValue;
+  readonly textDecoration?: UiTextDecoration;
+  readonly link?: UiTextLink;
+}
+interface UiResolvedTextSpan extends UiTextMetrics {
+  readonly start: number;
+  readonly end: number;
+  readonly color?: UiColorValue;
+  readonly backgroundColor?: UiColorValue;
+  readonly textDecoration?: UiTextDecoration;
+  readonly link?: UiTextLink;
+}
+interface UiSpannedText {
+  readonly text: string;
+  readonly spans: readonly UiResolvedTextSpan[];
 }
 declare const defaultTextStyle: UiTextStyle;
+declare function flattenTextSpans(spans: readonly UiTextSpan[]): UiSpannedText;
+declare function spannedTextOf(node: UiNode): UiSpannedText | undefined;
+declare function textContentOf(node: UiNode): string;
+declare function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[];
+declare function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined;
+declare function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
 declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
 declare enum UiVisualState {
   Normal = "normal",
@@ -1092,6 +1178,29 @@ declare function visualState(...states: UiVisualState[]): UiVisualStateSet;
 declare const defaultVisualState: UiVisualStateSet;
 declare function hasVisualState(states: UiVisualStateSet, state: UiVisualState): boolean;
 declare function visualStatesEqual(a: UiVisualStateSet, b: UiVisualStateSet): boolean;
+declare const MAX_MEASURES_PER_CHILD = 2;
+interface UiLayoutChild {
+  readonly index: number;
+  readonly data: unknown;
+  measure(constraints: Constraints): Size;
+  readonly size: Size;
+  place(start: number, top: number): void;
+  readonly position: {
+    readonly start: number;
+    readonly top: number;
+  } | null;
+}
+interface UiLayoutContext {
+  readonly direction: 'ltr' | 'rtl';
+  readonly definiteWidth: number | undefined;
+  readonly definiteHeight: number | undefined;
+}
+interface UiLayoutProtocol {
+  readonly name: string;
+  layout(children: readonly UiLayoutChild[], constraints: Constraints, context: UiLayoutContext): Size;
+  explain?(children: readonly UiLayoutChild[], size: Size, context: UiLayoutContext): readonly string[];
+}
+declare function isLayoutProtocol(value: unknown): value is UiLayoutProtocol;
 interface UiTypography {
   readonly body: UiTextStyle;
   readonly bodyLarge: UiTextStyle;
@@ -1359,6 +1468,8 @@ declare const UiProperties: {
   readonly paddingRight: UiPropertyDefinition<number | undefined>;
   readonly paddingBottom: UiPropertyDefinition<number | undefined>;
   readonly paddingLeft: UiPropertyDefinition<number | undefined>;
+  readonly paddingStart: UiPropertyDefinition<number | undefined>;
+  readonly paddingEnd: UiPropertyDefinition<number | undefined>;
   readonly margin: UiPropertyDefinition<UiLength | undefined>;
   readonly marginX: UiPropertyDefinition<UiLength | undefined>;
   readonly marginY: UiPropertyDefinition<UiLength | undefined>;
@@ -1366,6 +1477,8 @@ declare const UiProperties: {
   readonly marginRight: UiPropertyDefinition<UiLength | undefined>;
   readonly marginBottom: UiPropertyDefinition<UiLength | undefined>;
   readonly marginLeft: UiPropertyDefinition<UiLength | undefined>;
+  readonly marginStart: UiPropertyDefinition<UiLength | undefined>;
+  readonly marginEnd: UiPropertyDefinition<UiLength | undefined>;
   readonly gap: UiPropertyDefinition<number | undefined>;
   readonly rowGap: UiPropertyDefinition<number | undefined>;
   readonly columnGap: UiPropertyDefinition<number | undefined>;
@@ -1383,6 +1496,8 @@ declare const UiProperties: {
   readonly columnSpan: UiPropertyDefinition<number | undefined>;
   readonly row: UiPropertyDefinition<number | undefined>;
   readonly rowSpan: UiPropertyDefinition<number | undefined>;
+  readonly layout: UiPropertyDefinition<UiLayoutProtocol | undefined>;
+  readonly layoutData: UiPropertyDefinition<unknown>;
   readonly aspectRatio: UiPropertyDefinition<number | undefined>;
   readonly flexGrow: UiPropertyDefinition<number | undefined>;
   readonly flexShrink: UiPropertyDefinition<number | undefined>;
@@ -1421,6 +1536,12 @@ declare const UiProperties: {
   readonly letterSpacing: UiPropertyDefinition<number>;
   readonly textAlign: UiPropertyDefinition<UiTextAlign>;
   readonly textDirection: UiPropertyDefinition<UiTextDirection>;
+  readonly fontStyle: UiPropertyDefinition<UiFontStyle>;
+  readonly fontStretch: UiPropertyDefinition<UiFontStretch>;
+  readonly fontVariant: UiPropertyDefinition<UiFontVariant>;
+  readonly fontKerning: UiPropertyDefinition<UiFontKerning>;
+  readonly textDecoration: UiPropertyDefinition<UiTextDecoration>;
+  readonly spans: UiPropertyDefinition<readonly UiTextSpan[] | undefined>;
   readonly verticalAlign: UiPropertyDefinition<UiVerticalAlign | undefined>;
   readonly textWrap: UiPropertyDefinition<UiTextWrapValue | undefined>;
   readonly maxLines: UiPropertyDefinition<number | undefined>;
@@ -1467,6 +1588,8 @@ declare const UiProperties: {
   readonly theme: UiPropertyDefinition<UiTheme | undefined>;
   readonly textStyle: UiPropertyDefinition<UiTextStyle | UiTypographyRole | undefined>;
   readonly contentColor: UiPropertyDefinition<UiColorValue | undefined>;
+  readonly containerSize: UiPropertyDefinition<UiContainerSize | undefined>;
+  readonly insets: UiPropertyDefinition<UiInsetSource | undefined>;
   readonly visualState: UiPropertyDefinition<UiVisualStateSet>;
   readonly paint: UiPropertyDefinition<UiPaint | undefined>;
   readonly path: UiPropertyDefinition<UiPath | undefined>;
@@ -1510,15 +1633,15 @@ type IdentityProps = {
   key?: string | number;
   ref?: UiNodeRef;
 };
-type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'aspectRatio'>;
-type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY'>;
+type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'paddingStart' | 'paddingEnd' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'marginStart' | 'marginEnd' | 'aspectRatio'>;
+type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
-type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor'>;
+type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
 };
@@ -1526,7 +1649,7 @@ type TransitionProps = {
   transition?: Partial<Record<UiPropertyName, UiTransitionValue>>;
 };
 type CommonProps = IdentityProps & UiEventProps & BoxModelProps & FlexItemProps & GridItemProps & PositionProps & PaintProps & TypographyProps & InteractionProps & SemanticsProps & ModifierProps & TransitionProps & EnvironmentProps;
-type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior'>;
+type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
@@ -1728,6 +1851,11 @@ declare function LazyColumn(props: LazyListProps, renderItem: LazyItemRenderer):
 declare function LazyRow(props: LazyListProps, renderItem: LazyItemRenderer): UiElement;
 declare function LazyGrid(props: LazyGridProps, renderRow: LazyItemRenderer): UiElement;
 type LazyGridProps = LazyListProps & LazyGridOptions;
+interface ResponsiveProps extends ColumnProps {
+  readonly at: readonly number[];
+  readonly as?: 'column' | 'row' | 'box';
+}
+declare function Responsive(props: ResponsiveProps, build: (size: Size) => UiChild | readonly UiChild[]): UiElement;
 declare function nextGraphemeEnd(text: string, index: number): number;
 declare function previousGraphemeStart(text: string, index: number): number;
 declare function graphemeBoundaries(text: string): number[];
@@ -1748,7 +1876,7 @@ interface PlacedLine {
   readonly width: number;
   readonly height: number;
 }
-type RunMeasure = (text: string) => number;
+type RunMeasure = (text: string, start?: number) => number;
 interface CaretRect {
   x: number;
   y: number;
@@ -1768,6 +1896,20 @@ declare function offsetForVerticalMove(lines: readonly PlacedLine[], text: strin
 declare function selectionRects(lines: readonly PlacedLine[], text: string, start: number, end: number, measure: RunMeasure, rtl: boolean): LayoutBox[];
 type TextWrap = 'word' | 'char' | 'none';
 type TextOverflow = 'clip' | 'ellipsis';
+interface TextRunStyle {
+  fontFamily?: string;
+  fontWeight?: string | number;
+  fontSize?: number;
+  fontStyle?: string;
+  fontStretch?: string;
+  fontVariant?: string;
+  fontKerning?: string;
+  letterSpacing?: number;
+}
+interface TextRunSpan extends TextRunStyle {
+  readonly start: number;
+  readonly end: number;
+}
 interface TextMeasureRequest {
   text: string;
   fontSize: number;
@@ -1776,15 +1918,29 @@ interface TextMeasureRequest {
   fontWeight?: string | number;
   lineHeight?: number;
   letterSpacing?: number;
+  fontStyle?: string;
+  fontStretch?: string;
+  fontVariant?: string;
+  fontKerning?: string;
   wrap?: TextWrap;
   maxLines?: number;
   overflow?: TextOverflow;
+  spans?: readonly TextRunSpan[];
+}
+interface TextLineRun {
+  span: number;
+  start: number;
+  end: number;
+  text: string;
+  x: number;
+  width: number;
 }
 interface TextLine {
   start: number;
   end: number;
   text: string;
   width: number;
+  runs?: readonly TextLineRun[];
 }
 interface FontMetrics {
   ascent: number;
@@ -1811,6 +1967,15 @@ interface TextRunMeasurer {
   measureRunWidth(text: string, request: TextMeasureRequest): number;
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
+interface SpannedRuns {
+  readonly spans: readonly TextRunSpan[];
+  indexAt(offset: number): number;
+  requestAt(offset: number): TextMeasureRequest;
+  width(text: string, start: number, end: number): number;
+  widthOf(run: string, offset: number): number;
+  cut(text: string, start: number, end: number, x: number): TextLineRun[];
+}
+declare function spannedRunsFor(request: TextMeasureRequest, runs: Pick<TextRunMeasurer, 'measureRunWidth'>): SpannedRuns | undefined;
 declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
   private readonly paragraphs;
   abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
@@ -1862,11 +2027,18 @@ interface PaintState {
   hasTransform: boolean;
   transform: UiTransform;
   text: string | undefined;
+  spans: readonly PaintTextSpan[] | undefined;
+  linkHover: number;
   fontSize: number;
   fontFamily: string;
   fontWeight: string | number;
   lineHeight: number;
   letterSpacing: number;
+  fontStyle: UiFontStyle;
+  fontStretch: UiFontStretch;
+  fontVariant: UiFontVariant;
+  fontKerning: UiFontKerning;
+  textDecoration: UiTextDecoration;
   textColor: UiColor;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
@@ -1882,6 +2054,14 @@ interface PaintState {
   selectionColor: UiColor;
   matchColor: UiColor;
   caretColor: UiColor;
+}
+interface PaintTextSpan extends UiTextMetrics {
+  readonly start: number;
+  readonly end: number;
+  readonly color?: UiColor;
+  readonly backgroundColor?: UiColor;
+  readonly textDecoration?: UiTextDecoration;
+  readonly link?: UiTextLink;
 }
 declare const DEFAULT_FONT_SIZE = 14;
 declare const DEFAULT_FONT_FAMILY = "sans-serif";
@@ -1910,6 +2090,8 @@ interface Canvas2DContext {
   rotate(angle: number): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
   letterSpacing?: string;
+  fontStretch?: string;
+  fontKerning?: string;
   direction?: CanvasDirection;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
@@ -1952,10 +2134,41 @@ interface TextLinePlacement {
   baselineY: number;
   width: number;
   height: number;
+  runs?: readonly PlacedTextRun[];
+}
+interface PlacedTextRun {
+  span: number;
+  start: number;
+  end: number;
+  text: string;
+  x: number;
+  width: number;
+}
+interface TextRunRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: UiColor;
 }
 declare function layoutTextLines(box: LayoutBox, state: PaintState, measurer: TextMeasurer): TextLinePlacement[];
-declare function buildFontString(state: Pick<PaintState, 'fontWeight' | 'fontSize' | 'fontFamily'>): string;
+declare function buildFontString(state: Pick<PaintState, 'fontWeight' | 'fontSize' | 'fontFamily'> & {
+  fontStyle?: string;
+  fontVariant?: string;
+}): string;
+declare function runFontString(request: TextRunStyle, style: TextRunStyle | undefined): string;
+declare function applyCanvasTextStyle(context: Canvas2DContext, style: CanvasTextStyle): string;
+interface CanvasTextStyle {
+  font: string;
+  letterSpacing?: number;
+  fontStretch?: string;
+  fontKerning?: string;
+}
 declare function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState, measurer: TextMeasurer): void;
+declare function fillTextRects(ctx: Canvas2DContext, rects: readonly TextRunRect[]): void;
+type SpanPaint = Pick<PaintState, 'spans' | 'textColor' | 'fontSize' | 'fontFamily' | 'fontWeight' | 'letterSpacing' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration' | 'linkHover'>;
+declare function textRunBackgrounds(placements: readonly TextLinePlacement[], state: SpanPaint): readonly TextRunRect[];
+declare function textRunDecorations(placements: readonly TextLinePlacement[], state: SpanPaint): readonly TextRunRect[];
 declare class EditableLayout {
   readonly model: EditableTextModel;
   readonly box: LayoutBox;
@@ -2020,6 +2233,8 @@ declare const UiEnvironmentKeys: {
   readonly theme: UiEnvironmentKey<UiTheme>;
   readonly textStyle: UiEnvironmentKey<UiTextStyle>;
   readonly contentColor: UiEnvironmentKey<UiColor>;
+  readonly containerSize: UiEnvironmentKey<UiContainerSize>;
+  readonly insets: UiEnvironmentKey<UiInsetSource>;
 };
 interface UiEnvironmentProvider {
   readonly environment: UiEnvironment;
@@ -2147,12 +2362,15 @@ declare class UiSelectionController {
   private order;
   private painted;
   private lastPress;
+  private pendingLink;
+  private hoveredLink;
   constructor(host: SelectionHost, hitTester: HitTester, options?: SelectionControllerOptions);
   get hasSelection(): boolean;
   isSelectable(node: UiNode): boolean;
   pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiKeyModifiers): boolean;
   pointerMove(x: number, y: number): void;
   pointerUp(): void;
+  pointerHover(node: UiNode | null, x: number, y: number): void;
   handleKey(key: string, modifiers: UiKeyModifiers): boolean;
   selectAll(): boolean;
   selectRange(node: UiNode, start: number, end: number): boolean;
@@ -2438,6 +2656,7 @@ interface PointerControllerOptions {
     pointerMove(x: number, y: number): void;
     pointerUp(): void;
     clear(): void;
+    pointerHover?(node: UiNode | null, x: number, y: number): void;
   };
 }
 declare class UiPointerController {
@@ -2867,6 +3086,12 @@ interface LayoutExplanation {
     contentHeight: number;
   };
   readonly sources?: OverrideSources;
+  readonly custom?: CustomLayoutExplanation;
+}
+interface CustomLayoutExplanation {
+  readonly name: string;
+  readonly children: number;
+  readonly notes: readonly string[];
 }
 type OverrideSources = Readonly<Record<string, string>>;
 interface Edges {
@@ -2875,7 +3100,8 @@ interface Edges {
   readonly bottom: number;
   readonly left: number;
 }
-type SizeDecision = 'viewport' | 'explicit' | 'flex' | 'stretch' | 'inset' | 'parent' | 'content' | 'min' | 'max' | 'aspect-ratio';
+type SizeDecision = 'viewport' | 'explicit' | 'flex' | 'stretch' | 'inset' | 'parent' | 'content' | 'min' | 'max' | 'aspect-ratio' |
+'custom';
 interface AxisExplanation {
   readonly axis: 'width' | 'height';
   readonly content: number;
@@ -2935,6 +3161,7 @@ declare class LayoutEngine {
   subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined;
   get root(): UiNode | null;
   explain(node: UiNode): LayoutExplanation;
+  private explainCustom;
   private unexplained;
   private explainRelayout;
   private isUnderRoot;
@@ -2998,6 +3225,9 @@ declare class LayoutEngine {
   private measureStack;
   private measureScroll;
   private measureLeaf;
+  private measureCustom;
+  private placeCustom;
+  private customRun;
   private place;
   private updateContentExtent;
   private placeAbsoluteChildren;
@@ -3054,6 +3284,7 @@ declare class LayoutEngine {
   private textWrapProp;
   private textOverflowProp;
   private spacingProp;
+  private startEdge;
   private toNumber;
   private clamp;
 }
@@ -3459,6 +3690,35 @@ interface ScrollPositionArgs {
 }
 declare const scrollPosition: ((args: ScrollPositionArgs, key?: string | number) => UiModifier<ScrollPositionArgs>) & {
   readonly kind: UiModifierKind<ScrollPositionArgs>;
+};
+interface SizeContainerArgs {
+  readonly source: UiContainerSizeSource;
+}
+declare const sizeContainer: ((args: SizeContainerArgs, key?: string | number) => UiModifier<SizeContainerArgs>) & {
+  readonly kind: UiModifierKind<SizeContainerArgs>;
+};
+interface BreakpointArgs {
+  readonly at: readonly number[];
+  readonly props: Readonly<Record<number, Readonly<Record<string, unknown>>>>;
+}
+declare const breakpoint: ((args: BreakpointArgs, key?: string | number) => UiModifier<BreakpointArgs>) & {
+  readonly kind: UiModifierKind<BreakpointArgs>;
+};
+interface PublishInsetArgs {
+  readonly edge: UiInsetEdge;
+  readonly extent?: number;
+}
+declare const publishInset: ((args: PublishInsetArgs, key?: string | number) => UiModifier<PublishInsetArgs>) & {
+  readonly kind: UiModifierKind<PublishInsetArgs>;
+};
+interface InsetPaddingArgs {
+  readonly top?: number;
+  readonly right?: number;
+  readonly bottom?: number;
+  readonly left?: number;
+}
+declare const insetPadding: ((args: InsetPaddingArgs, key?: string | number) => UiModifier<InsetPaddingArgs>) & {
+  readonly kind: UiModifierKind<InsetPaddingArgs>;
 };
 declare function sameArgs(a: unknown, b: unknown, depth?: number): boolean;
 declare function resolveProperty<T>(node: UiNode, definition: UiPropertyDefinition<T>): T;
@@ -4332,6 +4592,12 @@ declare function wordRangeIn(geometry: ParagraphGeometry, offset: number): {
   start: number;
   end: number;
 };
+declare function linkHoverOf(node: UiNode): number;
+declare function setLinkHover(node: UiNode, index: number): boolean;
+declare function clearLinkHover(node: UiNode): boolean;
+declare function hasTextLinks(node: UiNode): boolean;
+declare function linkOf(node: UiNode, index: number): UiTextLink | undefined;
+declare function linkRunAtPointIn(geometry: ParagraphGeometry, x: number, y: number): number;
 interface UiSemanticsRecord {
   readonly id: string;
   readonly parent: string | null;
@@ -4352,6 +4618,11 @@ interface UiSemanticsRecord {
 }
 type UiSemanticsMap = ReadonlyMap<string, UiSemanticsRecord>;
 declare function buildSemanticsTree(root: UiNode): UiSemanticsMap;
+declare const TEXT_RUN_ID_SEPARATOR = "#run";
+declare function textRunOfRecordId(id: string): {
+  nodeId: string;
+  index: number;
+} | null;
 type UiSemanticsPatch = {
   readonly op: 'add';
   readonly node: UiSemanticsRecord;
@@ -4386,6 +4657,7 @@ export {
   animateLayout,
   AnimateLayoutOptions,
   AnimationDriver,
+  applyCanvasTextStyle,
   assertModifierList,
   assertTransitionMap,
   auto,
@@ -4393,6 +4665,7 @@ export {
   AutoLength,
   AutoScrollOptions,
   AxisExplanation,
+  bandOf,
   BindingId,
   borderRadius,
   borderRadiusCorners,
@@ -4404,6 +4677,8 @@ export {
   boxShadow,
   boxShadowArraysEqual,
   boxShadowsEqual,
+  breakpoint,
+  BreakpointArgs,
   buildFontString,
   buildRenderList,
   buildSemanticsTree,
@@ -4421,6 +4696,7 @@ export {
   CanvasPlatformSurface,
   CanvasSurface,
   CanvasTextMeasurer,
+  CanvasTextStyle,
   CapturedFrame,
   capturePointer,
   CARET_BLINK_MS,
@@ -4432,6 +4708,7 @@ export {
   ChildrenBindingId,
   clampSize,
   clearFontStacks,
+  clearLinkHover,
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
@@ -4457,6 +4734,7 @@ export {
   computeObjectFitRect,
   Constraints,
   constraintsEqual,
+  containerBands,
   ContainerProps,
   contentOffset,
   contextMenu,
@@ -4471,6 +4749,7 @@ export {
   createWebGPUSurface,
   CrossAxisAlignment,
   cubicBezier,
+  CustomLayoutExplanation,
   darkColors,
   darkTheme,
   decorated,
@@ -4539,6 +4818,7 @@ export {
   EnvironmentProps,
   EXTERNAL_FILES,
   fade,
+  fillTextRects,
   findEnvironmentKey,
   FindHost,
   FindMatch,
@@ -4546,6 +4826,7 @@ export {
   FindOptions,
   findPropertyDefinition,
   FixedMetricsOptions,
+  flattenTextSpans,
   FlexContainerProps,
   FlexDirection,
   FlexItemProps,
@@ -4559,7 +4840,6 @@ export {
   formatExplanation,
   formatShortcut,
   FrLength,
-  Fu,
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
@@ -4582,6 +4862,7 @@ export {
   GridTrack,
   hasDecorationPhase,
   hasDrawnText,
+  hasTextLinks,
   hasThemeExtension,
   hasVisualState,
   highContrastColors,
@@ -4597,6 +4878,7 @@ export {
   iconSource,
   IconSourceArgs,
   IconSpec,
+  Id,
   IdentityProps,
   ImageCommand,
   ImageResolver,
@@ -4607,6 +4889,9 @@ export {
   inheritedPropertyNames,
   initializeWebGPU,
   inputsEqual,
+  insetPadding,
+  InsetPaddingArgs,
+  insetsEqual,
   INSPECTOR_HEAT_MS,
   InspectorOverlay,
   INSTANCE_STRIDE_BYTES,
@@ -4622,6 +4907,7 @@ export {
   isComponentLikeElement,
   isEditableNode,
   isFrLength,
+  isLayoutProtocol,
   isMinMaxTrack,
   isMotionRest,
   isMultiline,
@@ -4680,12 +4966,16 @@ export {
   lineIndexForOffset,
   lineLimit,
   lineStartAt,
+  linkHoverOf,
+  linkOf,
+  linkRunAtPointIn,
   MainAxisAlignment,
   MARK_PREFIX,
   markInstant,
   markNow,
   matchRangesOf,
   MAX_GRADIENT_STOPS,
+  MAX_MEASURES_PER_CHILD,
   measure,
   measureSpan,
   minmax,
@@ -4712,6 +5002,7 @@ export {
   NodeId,
   NodeProperty,
   NodeTransitions,
+  noInsets,
   noKeyModifiers,
   noModifiers,
   normalizeBorderRadius,
@@ -4722,6 +5013,7 @@ export {
   normalizeVerticalAlign,
   noThemeExtensions,
   ObjectFit,
+  observeViewportInsets,
   offsetAtPoint,
   offsetAtPointIn,
   offsetAtX,
@@ -4752,6 +5044,7 @@ export {
   PaintSurface,
   PaintTarget,
   PaintTextAlign,
+  PaintTextSpan,
   PaintTextStyle,
   paintValuesEqual,
   paragraphGeometry,
@@ -4774,6 +5067,7 @@ export {
   PinchableOptions,
   PinchRecognizerOptions,
   PlacedLine,
+  PlacedTextRun,
   placeGridItems,
   PlatformAdapterOptions,
   PlatformEventTarget,
@@ -4795,6 +5089,8 @@ export {
   proportionalFontMetrics,
   PropsOf,
   provideEnvironment,
+  publishInset,
+  PublishInsetArgs,
   radialGradient,
   raiseContrast,
   Reactive,
@@ -4820,6 +5116,7 @@ export {
   ResolvedGradient,
   ResolvedGradientStop,
   ResolvedMotionState,
+  resolvedSpansOf,
   resolveLength,
   resolveMotionState,
   resolveNumber,
@@ -4827,11 +5124,14 @@ export {
   resolveProperty,
   resolvePropertyByName,
   resolveString,
+  Responsive,
+  ResponsiveProps,
   rgb8,
   rgba,
   rotateFrom,
   Row,
   RowProps,
+  runFontString,
   RunMeasure,
   sameArgs,
   scaleFrom,
@@ -4863,6 +5163,7 @@ export {
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
+  setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
   setSelectionRange,
@@ -4877,6 +5178,8 @@ export {
   shortcuts,
   ShortcutsOptions,
   Size,
+  sizeContainer,
+  SizeContainerArgs,
   SizeDecision,
   sizeGridTracks,
   slideDown,
@@ -4884,6 +5187,11 @@ export {
   slideUp,
   spacingEqual,
   spacingSteps,
+  spanAtOffset,
+  SpannedRuns,
+  spannedRunsFor,
+  spannedTextOf,
+  SpanPaint,
   splitMp3Frames,
   spring,
   Stack,
@@ -4894,19 +5202,29 @@ export {
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
+  TEXT_RUN_ID_SEPARATOR,
   TEXT_SELECTION_PROP,
   TextAlign,
+  textContentOf,
   TextContentProps,
   TextLine,
   TextLinePlacement,
+  TextLineRun,
   TextMeasurer,
   TextMeasureRequest,
   TextOverflow,
   TextProps,
   TextRange,
+  textRunBackgrounds,
+  textRunDecorations,
   TextRunDraw,
   TextRunMeasurer,
+  textRunOfRecordId,
+  TextRunRect,
   textRuns,
+  TextRunSpan,
+  TextRunStyle,
+  textSpansEqual,
   textStylesEqual,
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
@@ -4945,6 +5263,8 @@ export {
   UiColor,
   UiColors,
   UiColorValue,
+  UiContainerSize,
+  UiContainerSizeSource,
   UiContentDistribution,
   UiContrast,
   UiCursor,
@@ -4976,6 +5296,10 @@ export {
   UiFlexWrap,
   UiFocusEvent,
   UiFocusManager,
+  UiFontKerning,
+  UiFontStretch,
+  UiFontStyle,
+  UiFontVariant,
   UiFontWeight,
   UiFrame,
   UiFrameCallback,
@@ -4996,10 +5320,17 @@ export {
   UiImage,
   UiInputDispatcher,
   UiInputEvent,
+  UiInsetEdge,
+  UiInsetRegistry,
+  UiInsets,
+  UiInsetSource,
   UiInterpolator,
   UiKeyboardController,
   UiKeyboardEvent,
   UiKeyModifiers,
+  UiLayoutChild,
+  UiLayoutContext,
+  UiLayoutProtocol,
   UiLength,
   UiLinearGradient,
   UiListenerErrorReporter,
@@ -5046,6 +5377,7 @@ export {
   UiRadialGradient,
   UiReducedMotionPolicy,
   UiRenderer,
+  UiResolvedTextSpan,
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
@@ -5069,6 +5401,7 @@ export {
   UiShortcutRegistry,
   UiShortcutStep,
   UiSpacing,
+  UiSpannedText,
   UiSpring,
   UiSpringOptions,
   UiSpringSpec,
@@ -5076,8 +5409,12 @@ export {
   UiSubgridAxis,
   UiTextAlign,
   UiTextChangeEvent,
+  UiTextDecoration,
   UiTextDirection,
+  UiTextLink,
+  UiTextMetrics,
   UiTextOverflowValue,
+  UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
   UiTheme,
@@ -5108,6 +5445,7 @@ export {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  unknownContainerSize,
   validateGradient,
   validateRole,
   validateStates,
@@ -5154,6 +5492,7 @@ import {
   animateLayout,
   AnimateLayoutOptions,
   AnimationDriver,
+  applyCanvasTextStyle,
   assertModifierList,
   assertTransitionMap,
   auto,
@@ -5161,6 +5500,7 @@ import {
   AutoLength,
   AutoScrollOptions,
   AxisExplanation,
+  bandOf,
   BindingId,
   borderRadius,
   borderRadiusCorners,
@@ -5172,6 +5512,8 @@ import {
   boxShadow,
   boxShadowArraysEqual,
   boxShadowsEqual,
+  breakpoint,
+  BreakpointArgs,
   buildFontString,
   buildRenderList,
   buildSemanticsTree,
@@ -5188,6 +5530,7 @@ import {
   CanvasPlatformSurface,
   CanvasSurface,
   CanvasTextMeasurer,
+  CanvasTextStyle,
   CapturedFrame,
   capturePointer,
   CARET_BLINK_MS,
@@ -5199,6 +5542,7 @@ import {
   ChildrenBindingId,
   clampSize,
   clearFontStacks,
+  clearLinkHover,
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
@@ -5224,6 +5568,7 @@ import {
   computeObjectFitRect,
   Constraints,
   constraintsEqual,
+  containerBands,
   ContainerProps,
   contentOffset,
   contextMenu,
@@ -5238,6 +5583,7 @@ import {
   createWebGPUSurface,
   CrossAxisAlignment,
   cubicBezier,
+  CustomLayoutExplanation,
   darkColors,
   darkTheme,
   decorated,
@@ -5306,6 +5652,7 @@ import {
   EnvironmentProps,
   EXTERNAL_FILES,
   fade,
+  fillTextRects,
   findEnvironmentKey,
   FindHost,
   FindMatch,
@@ -5313,6 +5660,7 @@ import {
   FindOptions,
   findPropertyDefinition,
   FixedMetricsOptions,
+  flattenTextSpans,
   FlexContainerProps,
   FlexDirection,
   FlexItemProps,
@@ -5349,6 +5697,7 @@ import {
   GridTrack,
   hasDecorationPhase,
   hasDrawnText,
+  hasTextLinks,
   hasThemeExtension,
   hasVisualState,
   highContrastColors,
@@ -5374,6 +5723,9 @@ import {
   inheritedPropertyNames,
   initializeWebGPU,
   inputsEqual,
+  insetPadding,
+  InsetPaddingArgs,
+  insetsEqual,
   INSPECTOR_HEAT_MS,
   InspectorOverlay,
   INSTANCE_STRIDE_BYTES,
@@ -5389,6 +5741,7 @@ import {
   isComponentLikeElement,
   isEditableNode,
   isFrLength,
+  isLayoutProtocol,
   isMinMaxTrack,
   isMotionRest,
   isMultiline,
@@ -5447,12 +5800,16 @@ import {
   lineIndexForOffset,
   lineLimit,
   lineStartAt,
+  linkHoverOf,
+  linkOf,
+  linkRunAtPointIn,
   MainAxisAlignment,
   MARK_PREFIX,
   markInstant,
   markNow,
   matchRangesOf,
   MAX_GRADIENT_STOPS,
+  MAX_MEASURES_PER_CHILD,
   measure,
   measureSpan,
   minmax,
@@ -5479,6 +5836,7 @@ import {
   NodeId,
   NodeProperty,
   NodeTransitions,
+  noInsets,
   noKeyModifiers,
   noModifiers,
   normalizeBorderRadius,
@@ -5489,6 +5847,7 @@ import {
   normalizeVerticalAlign,
   noThemeExtensions,
   ObjectFit,
+  observeViewportInsets,
   offsetAtPoint,
   offsetAtPointIn,
   offsetAtX,
@@ -5519,6 +5878,7 @@ import {
   PaintSurface,
   PaintTarget,
   PaintTextAlign,
+  PaintTextSpan,
   PaintTextStyle,
   paintValuesEqual,
   paragraphGeometry,
@@ -5541,6 +5901,7 @@ import {
   PinchableOptions,
   PinchRecognizerOptions,
   PlacedLine,
+  PlacedTextRun,
   placeGridItems,
   PlatformAdapterOptions,
   PlatformEventTarget,
@@ -5562,6 +5923,8 @@ import {
   proportionalFontMetrics,
   PropsOf,
   provideEnvironment,
+  publishInset,
+  PublishInsetArgs,
   radialGradient,
   raiseContrast,
   Reactive,
@@ -5587,6 +5950,7 @@ import {
   ResolvedGradient,
   ResolvedGradientStop,
   ResolvedMotionState,
+  resolvedSpansOf,
   resolveLength,
   resolveMotionState,
   resolveNumber,
@@ -5594,11 +5958,14 @@ import {
   resolveProperty,
   resolvePropertyByName,
   resolveString,
+  Responsive,
+  ResponsiveProps,
   rgb8,
   rgba,
   rotateFrom,
   Row,
   RowProps,
+  runFontString,
   RunMeasure,
   sameArgs,
   scaleFrom,
@@ -5630,6 +5997,7 @@ import {
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
+  setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
   setSelectionRange,
@@ -5644,6 +6012,8 @@ import {
   shortcuts,
   ShortcutsOptions,
   Size,
+  sizeContainer,
+  SizeContainerArgs,
   SizeDecision,
   sizeGridTracks,
   slideDown,
@@ -5651,6 +6021,11 @@ import {
   slideUp,
   spacingEqual,
   spacingSteps,
+  spanAtOffset,
+  SpannedRuns,
+  spannedRunsFor,
+  spannedTextOf,
+  SpanPaint,
   splitMp3Frames,
   spring,
   Stack,
@@ -5661,19 +6036,29 @@ import {
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
+  TEXT_RUN_ID_SEPARATOR,
   TEXT_SELECTION_PROP,
   TextAlign,
+  textContentOf,
   TextContentProps,
   TextLine,
   TextLinePlacement,
+  TextLineRun,
   TextMeasurer,
   TextMeasureRequest,
   TextOverflow,
   TextProps,
   TextRange,
+  textRunBackgrounds,
+  textRunDecorations,
   TextRunDraw,
   TextRunMeasurer,
+  textRunOfRecordId,
+  TextRunRect,
   textRuns,
+  TextRunSpan,
+  TextRunStyle,
+  textSpansEqual,
   textStylesEqual,
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
@@ -5712,6 +6097,8 @@ import {
   UiColor,
   UiColors,
   UiColorValue,
+  UiContainerSize,
+  UiContainerSizeSource,
   UiContentDistribution,
   UiContrast,
   UiCursor,
@@ -5743,6 +6130,10 @@ import {
   UiFlexWrap,
   UiFocusEvent,
   UiFocusManager,
+  UiFontKerning,
+  UiFontStretch,
+  UiFontStyle,
+  UiFontVariant,
   UiFontWeight,
   UiFrame,
   UiFrameCallback,
@@ -5763,10 +6154,17 @@ import {
   UiImage,
   UiInputDispatcher,
   UiInputEvent,
+  UiInsetEdge,
+  UiInsetRegistry,
+  UiInsets,
+  UiInsetSource,
   UiInterpolator,
   UiKeyboardController,
   UiKeyboardEvent,
   UiKeyModifiers,
+  UiLayoutChild,
+  UiLayoutContext,
+  UiLayoutProtocol,
   UiLength,
   UiLinearGradient,
   UiListenerErrorReporter,
@@ -5813,6 +6211,7 @@ import {
   UiRadialGradient,
   UiReducedMotionPolicy,
   UiRenderer,
+  UiResolvedTextSpan,
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
@@ -5836,6 +6235,7 @@ import {
   UiShortcutRegistry,
   UiShortcutStep,
   UiSpacing,
+  UiSpannedText,
   UiSpring,
   UiSpringOptions,
   UiSpringSpec,
@@ -5843,8 +6243,12 @@ import {
   UiSubgridAxis,
   UiTextAlign,
   UiTextChangeEvent,
+  UiTextDecoration,
   UiTextDirection,
+  UiTextLink,
+  UiTextMetrics,
   UiTextOverflowValue,
+  UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
   UiTheme,
@@ -5875,6 +6279,7 @@ import {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  unknownContainerSize,
   validateGradient,
   validateRole,
   validateStates,
@@ -5911,16 +6316,18 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CBIPTJ9u.js";
+} from "./index-Bln5FJTm.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
   animateLayout,
   AnimationDriver,
+  applyCanvasTextStyle,
   assertModifierList,
   assertTransitionMap,
   auto,
   autoFocus,
+  bandOf,
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
@@ -5929,6 +6336,7 @@ export {
   boxShadow,
   boxShadowArraysEqual,
   boxShadowsEqual,
+  breakpoint,
   buildFontString,
   buildRenderList,
   buildSemanticsTree,
@@ -5949,6 +6357,7 @@ export {
   CharacterCountTextMeasurer,
   clampSize,
   clearFontStacks,
+  clearLinkHover,
   clearMatchRanges,
   clearOverrideProperty,
   clearSelectionRange,
@@ -5968,6 +6377,7 @@ export {
   computeObjectFitRect,
   Constraints,
   constraintsEqual,
+  containerBands,
   contentOffset,
   contextMenu,
   contrastRatio,
@@ -6028,9 +6438,11 @@ export {
   EnvironmentNotifier,
   EXTERNAL_FILES,
   fade,
+  fillTextRects,
   findEnvironmentKey,
   findMatchesIn,
   findPropertyDefinition,
+  flattenTextSpans,
   FlexDirection,
   FocusNotifier,
   focusRing,
@@ -6050,6 +6462,7 @@ export {
   Grid,
   hasDecorationPhase,
   hasDrawnText,
+  hasTextLinks,
   hasThemeExtension,
   hasVisualState,
   highContrastColors,
@@ -6062,6 +6475,8 @@ export {
   inheritedPropertyNames,
   initializeWebGPU,
   inputsEqual,
+  insetPadding,
+  insetsEqual,
   INSPECTOR_HEAT_MS,
   INSTANCE_STRIDE_BYTES,
   INSTANCE_STRIDE_FLOATS,
@@ -6074,6 +6489,7 @@ export {
   isComponentLikeElement,
   isEditableNode,
   isFrLength,
+  isLayoutProtocol,
   isMinMaxTrack,
   isMotionRest,
   isMultiline,
@@ -6117,12 +6533,16 @@ export {
   lineIndexForOffset,
   lineLimit,
   lineStartAt,
+  linkHoverOf,
+  linkOf,
+  linkRunAtPointIn,
   MainAxisAlignment,
   MARK_PREFIX,
   markInstant,
   markNow,
   matchRangesOf,
   MAX_GRADIENT_STOPS,
+  MAX_MEASURES_PER_CHILD,
   measure,
   measureSpan,
   minmax,
@@ -6136,6 +6556,7 @@ export {
   nextWordEnd,
   NO_CLIP_INDEX,
   NodeTransitions,
+  noInsets,
   noKeyModifiers,
   noModifiers,
   normalizeBorderRadius,
@@ -6145,6 +6566,7 @@ export {
   normalizeTransition,
   normalizeVerticalAlign,
   noThemeExtensions,
+  observeViewportInsets,
   offsetAtPoint,
   offsetAtPointIn,
   offsetAtX,
@@ -6185,6 +6607,7 @@ export {
   propertyValuesEqualByName,
   proportionalFontMetrics,
   provideEnvironment,
+  publishInset,
   radialGradient,
   raiseContrast,
   readMp3Header,
@@ -6200,6 +6623,7 @@ export {
   resolveCursor,
   ResolvedGradient,
   ResolvedGradientStop,
+  resolvedSpansOf,
   resolveLength,
   resolveMotionState,
   resolveNumber,
@@ -6207,10 +6631,12 @@ export {
   resolveProperty,
   resolvePropertyByName,
   resolveString,
+  Responsive,
   rgb8,
   rgba,
   rotateFrom,
   Row,
+  runFontString,
   sameArgs,
   scaleFrom,
   scaleSpacing,
@@ -6230,6 +6656,7 @@ export {
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
+  setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
   setSelectionRange,
@@ -6238,12 +6665,16 @@ export {
   sharedElement,
   shortcut,
   shortcuts,
+  sizeContainer,
   sizeGridTracks,
   slideDown,
   slideFrom,
   slideUp,
   spacingEqual,
   spacingSteps,
+  spanAtOffset,
+  spannedRunsFor,
+  spannedTextOf,
   splitMp3Frames,
   spring,
   Stack,
@@ -6252,8 +6683,14 @@ export {
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
+  TEXT_RUN_ID_SEPARATOR,
   TEXT_SELECTION_PROP,
+  textContentOf,
+  textRunBackgrounds,
+  textRunDecorations,
+  textRunOfRecordId,
   textRuns,
+  textSpansEqual,
   textStylesEqual,
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
@@ -6277,10 +6714,12 @@ export {
   type BindingId,
   type BoxModelProps,
   type BoxProps,
+  type BreakpointArgs,
   type ButtonProps,
   type Canvas2DContext,
   type Canvas2DRendererOptions,
   type CanvasHost,
+  type CanvasTextStyle,
   type CapturedFrame,
   type CaretRect,
   type ChildrenBindingId,
@@ -6292,6 +6731,7 @@ export {
   type CompositionRange,
   type ContainerProps,
   type ContextMenuOptions,
+  type CustomLayoutExplanation,
   type DecorationFill,
   type DecorationRect,
   type DecorationShape,
@@ -6346,6 +6786,7 @@ export {
   type ImageResolver,
   type ImageSourceArgs,
   type ImageSources,
+  type InsetPaddingArgs,
   type InspectorOverlay,
   type InteractionProps,
   type InteractiveOptions,
@@ -6397,6 +6838,7 @@ export {
   type PaintStats,
   type PaintSurface,
   type PaintTextAlign,
+  type PaintTextSpan,
   type PaintTextStyle,
   type ParagraphGeometry,
   type ParagraphLayout,
@@ -6404,6 +6846,7 @@ export {
   type PinchableOptions,
   type PinchRecognizerOptions,
   type PlacedLine,
+  type PlacedTextRun,
   type PlatformAdapterOptions,
   type PlatformEventTarget,
   type PlatformSurface,
@@ -6411,6 +6854,7 @@ export {
   type PositionProps,
   type PrimitiveCommand,
   type PropsOf,
+  type PublishInsetArgs,
   type Reactive,
   type RelayoutExplanation,
   type RenderCommand,
@@ -6421,6 +6865,7 @@ export {
   type RenderTextCache,
   type ReorderableOptions,
   type ResolvedMotionState,
+  type ResponsiveProps,
   type RowProps,
   type RunMeasure,
   type ScissorRect,
@@ -6440,13 +6885,17 @@ export {
   type ShortcutRegistryOptions,
   type ShortcutsOptions,
   type Size,
+  type SizeContainerArgs,
   type SizeDecision,
+  type SpannedRuns,
+  type SpanPaint,
   type StackProps,
   type SubtreeBounds,
   type TextAlign,
   type TextContentProps,
   type TextLine,
   type TextLinePlacement,
+  type TextLineRun,
   type TextMeasurer,
   type TextMeasureRequest,
   type TextOverflow,
@@ -6454,6 +6903,9 @@ export {
   type TextRange,
   type TextRunDraw,
   type TextRunMeasurer,
+  type TextRunRect,
+  type TextRunSpan,
+  type TextRunStyle,
   type TextWrap,
   type TightenOptions,
   type TouchScrollerOptions,
@@ -6481,6 +6933,9 @@ export {
   type UiImage,
   type UiInterpolator,
   type UiKeyModifiers,
+  type UiLayoutChild,
+  type UiLayoutContext,
+  type UiLayoutProtocol,
   type UiLength,
   type UiListenerErrorReporter,
   type UiModifier,
@@ -6550,6 +7005,8 @@ export {
   UiColor,
   UiColors,
   UiColorValue,
+  UiContainerSize,
+  UiContainerSizeSource,
   UiContentDistribution,
   UiContrast,
   UiCursor,
@@ -6569,6 +7026,10 @@ export {
   UiFlexWrap,
   UiFocusEvent,
   UiFocusManager,
+  UiFontKerning,
+  UiFontStretch,
+  UiFontStyle,
+  UiFontVariant,
   UiFontWeight,
   UiFrame,
   UiGestureEvent,
@@ -6583,6 +7044,10 @@ export {
   UiHostFrameClock,
   UiInputDispatcher,
   UiInputEvent,
+  UiInsetEdge,
+  UiInsetRegistry,
+  UiInsets,
+  UiInsetSource,
   UiKeyboardController,
   UiKeyboardEvent,
   UiLinearGradient,
@@ -6608,6 +7073,7 @@ export {
   UiPropertyValueOf,
   UiPropertyValues,
   UiRadialGradient,
+  UiResolvedTextSpan,
   UiRole,
   UiScheduler,
   UiSelectionController,
@@ -6619,14 +7085,19 @@ export {
   UiSharedElements,
   UiShortcutRegistry,
   UiSpacing,
+  UiSpannedText,
   UiSpring,
   UiSpringSpec,
   UiSpringToken,
   UiSubgridAxis,
   UiTextAlign,
   UiTextChangeEvent,
+  UiTextDecoration,
   UiTextDirection,
+  UiTextLink,
+  UiTextMetrics,
   UiTextOverflowValue,
+  UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
   UiTheme,
@@ -6651,6 +7122,7 @@ export {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  unknownContainerSize,
   validateGradient,
   validateRole,
   validateStates,
@@ -6709,7 +7181,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CBIPTJ9u.js";
+} from "./index-Bln5FJTm.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

@@ -146,6 +146,18 @@ export class LayoutRecord {
   scrollable = false;
 
   /**
+   * A scroll container that reads right to left, so its overlay
+   * scrollbar hangs on the left edge and the band that reveals it is
+   * on the left too.
+   *
+   * Kept on the record because `Scrollbars.ts` is handed a record and
+   * nothing else: the thumb rectangle a renderer draws and the one the
+   * hit tester grabs come from the same function, which is what makes
+   * what is seen the thing that is dragged.
+   */
+  mirrored = false;
+
+  /**
    * position: 'sticky'. The offsets are how far the node is shifted from
    * its flow position to stay at its scroll container's edge; they are
    * recomputed whenever anything scrolls and are part of the node's
@@ -410,6 +422,7 @@ export class LayoutRecord {
     this.liftBoundary = false;
     this.clips = false;
     this.scrollable = false;
+    this.mirrored = false;
     this.sticky = false;
     this.stickyOffsetX = 0;
     this.stickyOffsetY = 0;

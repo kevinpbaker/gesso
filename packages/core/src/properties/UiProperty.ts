@@ -1,5 +1,7 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
+import type { UiContainerSize } from '../environment/UiContainerSize';
+import type { UiInsetSource } from '../environment/UiInsets';
 import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinition';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiBasicColors, colorValuesEqual } from './UiColor';
@@ -13,9 +15,18 @@ import type { UiTransform } from './UiTransform';
 import { transform, transformsEqual } from './UiTransform';
 import type { UiPaint, UiPath } from '../rendering/PaintSurface';
 import { paintValuesEqual, pathValuesEqual } from '../rendering/PaintSurface';
-import type { UiTextStyle } from './UiTextStyle';
-import { defaultTextStyle } from './UiTextStyle';
+import type {
+  UiFontKerning,
+  UiFontStretch,
+  UiFontStyle,
+  UiFontVariant,
+  UiTextDecoration,
+  UiTextSpan,
+  UiTextStyle
+} from './UiTextStyle';
+import { defaultTextStyle, textSpansEqual } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
+import type { UiLayoutProtocol } from '../layout/CustomLayout';
 import type { UiLength, UiTrackSize } from '../layout/UiLength';
 import type { UiNode } from '../graph/UiNode';
 import type { UiTheme } from '../environment/UiTheme';
@@ -177,6 +188,44 @@ export const UiProperties = {
     affects: L
   }),
 
+  /**
+   * Space inside the box on the edge the reading starts at: the left
+   * under `textDirection="ltr"`, the right under `"rtl"`.
+   *
+   * The idiom the documentation teaches for a single horizontal edge,
+   * in place of `paddingLeft` and `paddingRight`. Nearly every inset a
+   * screen names on one edge is logical rather than physical: the space
+   * before a leading icon, the indent of a nested row, the gutter a
+   * list keeps against the side it starts at. Written physically, all
+   * three are wrong the moment the application runs in Arabic, and
+   * `EXCELLENCE_ROADMAP.md` X12's mirroring cannot fix them because
+   * nothing marks them as the edge that should move.
+   *
+   * `paddingLeft` and `paddingRight` stay, and are still the answer for
+   * an edge that is genuinely physical: a gutter kept clear of an
+   * overlay scrollbar sits on the same side in both directions. They
+   * also win over the logical pair when both are given, because a
+   * physical name is the more specific statement of the two. The
+   * resolution order in full is side, then logical side, then axis,
+   * then the shorthand. Same rule as
+   * `decisions/0079-tokens-a-button-and-variants.md` set: most specific
+   * wins, and the docs teach one of them.
+   */
+  paddingStart: defineProperty<number | undefined>({
+    name: 'paddingStart',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Space inside the box on the edge the reading ends at. See `paddingStart`. */
+  paddingEnd: defineProperty<number | undefined>({
+    name: 'paddingEnd',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
   margin: defineProperty<UiLength | undefined>({
     name: 'margin',
     defaultValue: undefined,
@@ -223,6 +272,22 @@ export const UiProperties = {
 
   marginLeft: defineProperty<UiLength | undefined>({
     name: 'marginLeft',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Space outside the box on the edge the reading starts at. See `paddingStart`. */
+  marginStart: defineProperty<UiLength | undefined>({
+    name: 'marginStart',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /** Space outside the box on the edge the reading ends at. See `paddingStart`. */
+  marginEnd: defineProperty<UiLength | undefined>({
+    name: 'marginEnd',
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -374,6 +439,32 @@ export const UiProperties = {
   /** Rows a grid item spans (default 1). */
   rowSpan: defineProperty<number | undefined>({
     name: 'rowSpan',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /**
+   * A layout the application wrote itself, which measures and places
+   * this node's children. See `layout/CustomLayout.ts`.
+   *
+   * Compared with `Object.is` like every other property value, so the
+   * protocol object has to be held still across renders: a fresh one
+   * per frame marks the node dirty per frame.
+   */
+  layout: defineProperty<UiLayoutProtocol | undefined>({
+    name: 'layout',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
+  /**
+   * A value carried to the custom layout that arranges this node: a
+   * weight, a lane, a timestamp. Meaningless to everything else.
+   */
+  layoutData: defineProperty<unknown>({
+    name: 'layoutData',
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -797,6 +888,77 @@ export const UiProperties = {
     affects: P,
     environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
     resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).textDirection
+  }),
+
+  fontStyle: defineProperty<UiFontStyle>({
+    name: 'fontStyle',
+    defaultValue: 'normal',
+    inherited: true,
+    affects: L | P,
+    environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
+    resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).fontStyle ?? 'normal'
+  }),
+
+  /**
+   * The width axis, as CSS names it. A context property rather than
+   * part of the canvas font string, which is why it is set on every
+   * measure and every draw: see `applyCanvasTextStyle`.
+   */
+  fontStretch: defineProperty<UiFontStretch>({
+    name: 'fontStretch',
+    defaultValue: 'normal',
+    inherited: true,
+    affects: L | P,
+    environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
+    resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).fontStretch ?? 'normal'
+  }),
+
+  fontVariant: defineProperty<UiFontVariant>({
+    name: 'fontVariant',
+    defaultValue: 'normal',
+    inherited: true,
+    affects: L | P,
+    environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
+    resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).fontVariant ?? 'normal'
+  }),
+
+  fontKerning: defineProperty<UiFontKerning>({
+    name: 'fontKerning',
+    defaultValue: 'auto',
+    inherited: true,
+    affects: L | P,
+    environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
+    resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).fontKerning ?? 'auto'
+  }),
+
+  /**
+   * Lines drawn with the text. Paint only: an underline is a
+   * rectangle beside the glyphs and moves nothing.
+   */
+  textDecoration: defineProperty<UiTextDecoration>({
+    name: 'textDecoration',
+    defaultValue: 'none',
+    inherited: true,
+    affects: P,
+    environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
+    resolveFromEnvironment: (value: unknown) => (value as UiTextStyle).textDecoration ?? 'none'
+  }),
+
+  /**
+   * The paragraph as runs of `{ text, style }` rather than one string.
+   *
+   * Set instead of `text`, never beside it: the runs' texts
+   * concatenated are the paragraph, so a line's offsets, a selection,
+   * a find match and the semantics mirror all mean the same thing
+   * whichever of the two a node was given. Affects content, layout and
+   * semantics for exactly the reasons `text` does.
+   */
+  spans: defineProperty<readonly UiTextSpan[] | undefined>({
+    name: 'spans',
+    defaultValue: undefined,
+    inherited: false,
+    affects: C | L | S,
+    compare: textSpansEqual
   }),
 
   verticalAlign: defineProperty<UiVerticalAlign | undefined>({
@@ -1276,6 +1438,39 @@ export const UiProperties = {
 
   contentColor: defineProperty<UiColorValue | undefined>({
     name: 'contentColor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: E
+  }),
+
+  /**
+   * Declares this node a size query container: its content size is
+   * published to the subtree through `UiEnvironmentKeys.containerSize`,
+   * so a descendant can lay itself out from the room it has rather
+   * than from the window's width.
+   *
+   * The value is the source object, not the size. `Responsive` builds
+   * one and feeds it; an author who wants the size somewhere the
+   * helper's children cannot reach builds a `UiContainerSizeSource`,
+   * puts it here, and attaches `sizeContainer` with the same object.
+   */
+  containerSize: defineProperty<UiContainerSize | undefined>({
+    name: 'containerSize',
+    defaultValue: undefined,
+    inherited: false,
+    affects: E
+  }),
+
+  /**
+   * What is in the way of the content in this subtree, on each edge.
+   *
+   * A `UiInsetRegistry` an application provides once at its root; a
+   * floating bar publishes into it with `publishInset`, and a scrolling
+   * screen keeps clear of whatever is in it with `insetPadding`. See
+   * `environment/UiInsets.ts`.
+   */
+  insets: defineProperty<UiInsetSource | undefined>({
+    name: 'insets',
     defaultValue: undefined,
     inherited: false,
     affects: E

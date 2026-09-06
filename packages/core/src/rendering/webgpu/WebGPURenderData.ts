@@ -9,9 +9,20 @@ import { resolvePaintState, createPaintState, computeObjectFitRect, isPaintVisib
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { TextureSource } from './WebGPUTextureCache';
 import { colorToCss } from '../PaintState';
-import { layoutTextLines, buildFontString, textMeasureRequest } from '../TextRenderer';
-import type { TextLinePlacement } from '../TextRenderer';
+import {
+  layoutTextLines,
+  buildFontString,
+  runFontString,
+  spanOf,
+  textMeasureRequest,
+  textRunBackgrounds,
+  textRunDecorations
+} from '../TextRenderer';
+import type { SpanPaint, TextLinePlacement, TextRunRect } from '../TextRenderer';
+import { spannedRunsFor } from '../../layout/TextMeasurer';
+import type { TextMeasureRequest } from '../../layout/TextMeasurer';
 import { WebGPUGlyphAtlas, phaseFor } from './WebGPUGlyphAtlas';
+import type { GlyphStyle } from './WebGPUGlyphAtlas';
 import { GlyphShaper } from './WebGPUGlyphShaper';
 import type { MeasureRun } from './WebGPUGlyphShaper';
 import { parseColor } from './WebGPUColor';
@@ -419,33 +430,83 @@ export function buildRenderList(
     opacity: number;
     rounded: number;
     scissor: ScissorRect | null;
+    /** The paragraph's runs and their colours; absent for text in one style. */
+    paint?: SpanPaint;
+    /** The request the lines were measured with, for a run's own font. */
+    request?: TextMeasureRequest;
   }): void {
     const { lines, font, color, fontSize, originX, originY, ctm, scissor, rtl } = options;
     const opacity = options.opacity;
     const rounded = options.rounded;
     const style = atlas.styleFor(font, color, fontSize, dpr, rtl);
+    // A paragraph with runs draws one piece per run, each in its own
+    // font, colour and size, at the x the paragraph measured for it.
+    // The atlas is keyed by font and colour already, so a run is a new
+    // style and nothing else; the rest of this walk is the one it was.
+    const paint = options.paint;
+    const spanned = options.request === undefined ? undefined : spannedRunsFor(options.request, measurer);
+    let runRequest = options.request;
+    const spanMeasure: MeasureRun = run =>
+      run.length === 0 || runRequest === undefined ? 0 : measurer.measureRunWidth(run, runRequest);
     for (const line of lines) {
       if (line.text.length === 0) {
         continue;
       }
       const baseline = originY + line.baselineY;
-      const [runScreenX, runScreenY] = applyTransform(ctm, originX + line.x, baseline);
+      if (line.runs !== undefined && paint !== undefined && spanned !== undefined) {
+        for (const piece of line.runs) {
+          if (piece.text.length === 0) {
+            continue;
+          }
+          const span = spanOf(paint, piece.span);
+          const pieceFont = runFontString(options.request!, span);
+          const pieceColor = colorToCss(span?.color ?? paint.textColor);
+          runRequest = spanned.requestAt(piece.start);
+          pushPiece(
+            piece.text,
+            originX + piece.x,
+            baseline,
+            piece.width,
+            line.height,
+            pieceFont,
+            pieceColor,
+            atlas.styleFor(pieceFont, pieceColor, span?.fontSize ?? fontSize, dpr, rtl),
+            spanMeasure
+          );
+        }
+        continue;
+      }
+      pushPiece(line.text, originX + line.x, baseline, line.width, line.height, font, color, style, options.measureRun);
+    }
+
+    /** One stretch of glyphs in one font and colour: a whole line, or a run of one. */
+    function pushPiece(
+      pieceText: string,
+      lineX: number,
+      baseline: number,
+      width: number,
+      height: number,
+      pieceFont: string,
+      pieceColor: string,
+      pieceStyle: GlyphStyle,
+      measure: MeasureRun
+    ): void {
+      const [runScreenX, runScreenY] = applyTransform(ctm, lineX, baseline);
       const run: TextRunDraw = {
-        text: line.text,
-        font,
-        color,
+        text: pieceText,
+        font: pieceFont,
+        color: pieceColor,
         x: runScreenX,
         y: runScreenY,
-        width: line.width,
-        height: line.height,
+        width,
+        height,
         opacity: options.opacity,
         instance: texturedData.length / TEXTURED_STRIDE_FLOATS,
         glyphs: 0
       };
       textRuns.push(run);
 
-      const lineX = originX + line.x;
-      for (const cluster of shaper.shape(line.text, font, line.width, options.measureRun, rtl)) {
+      for (const cluster of shaper.shape(pieceText, pieceFont, width, measure, rtl)) {
         if (cluster.blank) {
           continue;
         }
@@ -457,7 +518,7 @@ export function buildRenderList(
         const screenY = penX * ctm[1] + baseline * ctm[3] + ctm[5];
         const physicalX = screenX * dpr;
         const wholeX = Math.floor(physicalX);
-        const slot = atlas.slotFor(style, cluster.text, cluster.advance, phaseFor(physicalX - wholeX));
+        const slot = atlas.slotFor(pieceStyle, cluster.text, cluster.advance, phaseFor(physicalX - wholeX));
         if (slot === null) {
           continue;
         }
@@ -911,8 +972,20 @@ export function buildRenderList(
           ctm: nodeCtm,
           opacity: effectiveOpacity,
           rounded: contentRounded,
-          scissor: contentScissor
+          scissor: contentScissor,
+          paint: text.spans === undefined ? undefined : text,
+          request: measureRequest
         });
+      };
+
+      /** The rectangles a paragraph's runs and decorations draw as fills. */
+      const pushTextRects = (rects: readonly TextRunRect[]): void => {
+        for (const rect of rects) {
+          const color = parseColor(rect.color);
+          if (color !== undefined) {
+            pushContentRect(rect, color);
+          }
+        }
       };
 
       /** A plain rectangle in the content box, clipped like the text. */
@@ -973,6 +1046,9 @@ export function buildRenderList(
         }
       } else {
         const lines = layoutTextLines(contentBox, text, measurer);
+        // A run's own background is under the highlights, as a CSS
+        // inline background is under a selection.
+        pushTextRects(textRunBackgrounds(lines, text));
         if (text.textMatches !== undefined || text.textSelection !== undefined) {
           // Static text with part of it highlighted, in the order
           // Canvas2D paints it: find matches, the selection over them,
@@ -994,6 +1070,7 @@ export function buildRenderList(
           }
         }
         pushTextRun(lines, colorToCss(text.textColor));
+        pushTextRects(textRunDecorations(lines, text));
       }
     }
 

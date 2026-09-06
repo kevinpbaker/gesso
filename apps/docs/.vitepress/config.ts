@@ -90,6 +90,7 @@ export default defineConfig({
           { text: 'Layout basics', link: '/guide/layout-basics' },
           { text: 'Text', link: '/guide/text' },
           { text: 'Using components', link: '/guide/using-components' },
+          { text: 'Forms', link: '/guide/forms' },
           { text: 'Light and dark', link: '/guide/appearance' },
           { text: 'State and services', link: '/guide/state-and-services' },
           { text: 'Workers', link: '/guide/workers' },
@@ -147,6 +148,8 @@ export default defineConfig({
           { text: 'Routing', link: '/structure/routing' },
           { text: 'Channels and the barrier', link: '/structure/channels-and-the-barrier' },
           { text: 'Shell services', link: '/structure/shell-services' },
+          { text: 'Undo and redo', link: '/structure/undo' },
+          { text: 'Remembering state', link: '/structure/persistence' },
           { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' }
         ]
       },

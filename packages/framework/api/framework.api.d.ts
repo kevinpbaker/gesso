@@ -299,6 +299,7 @@ import {
   UiSemanticsRecord as UiSemanticsRecord$1,
   UiSemanticState,
   UiSemanticsUpdate,
+  UiShortcutRegistry,
   UiSpringSpec,
   UiSpringToken,
   UiTouchScroller,
@@ -959,6 +960,68 @@ declare class AudioService {
   setVolume(level: number): void;
   setMetadata(metadata: AudioMetadata | null): void;
 }
+type ShellRequest = {
+  type: 'clipboard';
+  text: string;
+} | {
+  type: 'openUrl';
+  url: string;
+} | {
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
+} | {
+  type: 'storage';
+  id: number;
+  op: ShellStorageOp;
+  key: string;
+  value?: string;
+} | {
+  type: 'history';
+  action: 'push' | 'replace';
+  url: string;
+} | {
+  type: 'history';
+  action: 'back' | 'forward';
+  url?: undefined;
+};
+type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
+interface ShellStorageResult {
+  readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
+  readonly value: string | null;
+  readonly keys: readonly string[];
+  readonly error: string | null;
+}
+declare class ShellService {
+  private handler;
+  private readonly scheme;
+  private readonly popups;
+  private nextPopupId;
+  private readonly stores;
+  private nextStorageId;
+  readonly colorScheme: ReadableCell<ColorScheme>;
+  get currentColorScheme(): ColorScheme;
+  setHandler(handler: ((request: ShellRequest) => void) | null): void;
+  applyColorScheme(scheme: ColorScheme): void;
+  copyText(text: string): void;
+  openUrl(url: string): void;
+  openPopup(request: {
+    readonly url: string;
+    readonly name?: string;
+    readonly width?: number;
+    readonly height?: number;
+  }): Promise<boolean>;
+  settlePopup(id: number, opened: boolean): void;
+  requestStorage(request: {
+    readonly op: ShellStorageOp;
+    readonly key: string;
+    readonly value?: string;
+  }): Promise<ShellStorageResult>;
+  settleStorage(id: number, result: ShellStorageResult): void;
+}
 type ShellToRuntimeMessage = {
   type: 'init';
   canvas: OffscreenCanvas;
@@ -1076,6 +1139,11 @@ type ShellToRuntimeMessage = {
   type: 'popupResult';
   id: number;
   opened: boolean;
+} |
+{
+  type: 'storageResult';
+  id: number;
+  result: ShellStorageResult;
 } | {
   type: 'inspector';
   enabled: boolean;
@@ -1155,6 +1223,13 @@ type RuntimeToShellMessage = {
   name: string;
   width: number;
   height: number;
+} |
+{
+  type: 'storage';
+  id: number;
+  op: ShellStorageOp;
+  key: string;
+  value?: string;
 } |
 {
   type: 'history';
@@ -1293,47 +1368,6 @@ type DevtoolsEvent = {
   source: RuntimeErrorSource;
 };
 declare function treeText(text: unknown): string | undefined;
-type ShellRequest = {
-  type: 'clipboard';
-  text: string;
-} | {
-  type: 'openUrl';
-  url: string;
-} | {
-  type: 'popup';
-  id: number;
-  url: string;
-  name: string;
-  width: number;
-  height: number;
-} | {
-  type: 'history';
-  action: 'push' | 'replace';
-  url: string;
-} | {
-  type: 'history';
-  action: 'back' | 'forward';
-  url?: undefined;
-};
-declare class ShellService {
-  private handler;
-  private readonly scheme;
-  private readonly popups;
-  private nextPopupId;
-  readonly colorScheme: ReadableCell<ColorScheme>;
-  get currentColorScheme(): ColorScheme;
-  setHandler(handler: ((request: ShellRequest) => void) | null): void;
-  applyColorScheme(scheme: ColorScheme): void;
-  copyText(text: string): void;
-  openUrl(url: string): void;
-  openPopup(request: {
-    readonly url: string;
-    readonly name?: string;
-    readonly width?: number;
-    readonly height?: number;
-  }): Promise<boolean>;
-  settlePopup(id: number, opened: boolean): void;
-}
 interface MediaOptions {
   resolver?: ImageResolver;
   rasterizer?: IconRasterizer;
@@ -1533,6 +1567,7 @@ declare class GessoRuntime {
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
   settlePopup(id: number, opened: boolean): void;
+  settleStorage(id: number, result: ShellStorageResult): void;
   get reducedMotion(): boolean;
   get colorScheme(): ColorScheme;
   get sharedElementNames(): readonly string[];
@@ -1770,6 +1805,194 @@ declare class GessoApp {
   private handleShellRequest;
   private observeResize;
 }
+interface ShellLocalStore {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  key(index: number): string | null;
+  readonly length: number;
+}
+declare function performShellStorage(request: {
+  readonly op: ShellStorageOp;
+  readonly key: string;
+  readonly value?: string;
+}, open: () => ShellLocalStore | null | undefined): ShellStorageResult;
+declare function shellStorageDenied(): ShellStorageResult;
+interface UndoTransaction {
+  readonly label: string;
+  readonly undo: () => void;
+  readonly redo: () => void;
+  readonly coalesce?: string;
+}
+interface UndoStackOptions {
+  readonly limit?: number;
+  readonly label?: string;
+}
+declare class UndoStack {
+  private readonly entries;
+  private readonly undone;
+  private readonly limit;
+  private running;
+  private sealed;
+  private readonly labels;
+  readonly undoLabel: ComputedCell<string | null>;
+  readonly redoLabel: ComputedCell<string | null>;
+  readonly canUndo: ComputedCell<boolean>;
+  readonly canRedo: ComputedCell<boolean>;
+  constructor(options?: UndoStackOptions);
+  get size(): number;
+  get redoSize(): number;
+  push(transaction: UndoTransaction): void;
+  transact<R>(label: string, body: () => R): R;
+  endRun(): void;
+  undo(): boolean;
+  redo(): boolean;
+  clear(): void;
+  private run;
+  private publish;
+}
+interface UndoableOptions<A> {
+  readonly label: string | ((argument: A) => string);
+  readonly coalesce?: string | ((argument: A) => string);
+}
+declare function undoable<A>(stack: UndoStack, mutation: Mutation<A>, invert: (argument: A) => A, options: UndoableOptions<A>): (argument: A) => Promise<boolean>;
+interface UndoShortcutOptions {
+  readonly registry: UiShortcutRegistry;
+  readonly stack: UndoStack;
+  readonly focused?: () => UiNode | null;
+  readonly group?: string;
+  readonly undoKeys?: string;
+  readonly redoKeys?: readonly string[];
+}
+declare function registerUndoShortcuts(options: UndoShortcutOptions): () => void;
+type StorageOutcome = 'ok' | 'denied' | 'full' | 'failed';
+interface StorageRead {
+  readonly outcome: StorageOutcome;
+  readonly value: string | null;
+  readonly error: string | null;
+}
+interface StorageAdapter {
+  read(key: string): Promise<StorageRead>;
+  write(key: string, value: string): Promise<StorageOutcome>;
+  remove(key: string): Promise<StorageOutcome>;
+  keys(): Promise<readonly string[]>;
+}
+declare function classifyStorageError(error: unknown): StorageOutcome;
+declare function storageErrorMessage(error: unknown): string;
+declare function storageReadFailure(error: unknown): StorageRead;
+declare function storageReadValue(value: string | null): StorageRead;
+declare class MemoryStorage implements StorageAdapter {
+  private readonly records;
+  full: boolean;
+  read(key: string): Promise<StorageRead>;
+  write(key: string, value: string): Promise<StorageOutcome>;
+  remove(key: string): Promise<StorageOutcome>;
+  keys(): Promise<readonly string[]>;
+}
+interface OpfsDirectory {
+  getFileHandle(name: string, options?: {
+    create?: boolean;
+  }): Promise<OpfsFileHandle>;
+  getDirectoryHandle(name: string, options?: {
+    create?: boolean;
+  }): Promise<OpfsDirectory>;
+  removeEntry(name: string): Promise<void>;
+  keys(): AsyncIterable<string>;
+}
+interface OpfsFileHandle {
+  getFile(): Promise<{
+    text(): Promise<string>;
+  }>;
+  createWritable(): Promise<OpfsWritable>;
+}
+interface OpfsWritable {
+  write(data: string): Promise<void>;
+  close(): Promise<void>;
+}
+interface OpfsStorageOptions {
+  readonly directory?: string;
+  readonly root?: () => Promise<OpfsDirectory>;
+}
+declare class OpfsStorage implements StorageAdapter {
+  private readonly folder;
+  private readonly rootOf;
+  private opening;
+  constructor(options?: OpfsStorageOptions);
+  read(key: string): Promise<StorageRead>;
+  write(key: string, value: string): Promise<StorageOutcome>;
+  remove(key: string): Promise<StorageOutcome>;
+  keys(): Promise<readonly string[]>;
+  private open;
+}
+interface IndexedDbStorageOptions {
+  readonly database?: string;
+  readonly store?: string;
+  readonly factory?: IDBFactory;
+}
+declare class IndexedDbStorage implements StorageAdapter {
+  private readonly database;
+  private readonly store;
+  private readonly factory;
+  private connecting;
+  constructor(options?: IndexedDbStorageOptions);
+  read(key: string): Promise<StorageRead>;
+  write(key: string, value: string): Promise<StorageOutcome>;
+  remove(key: string): Promise<StorageOutcome>;
+  keys(): Promise<readonly string[]>;
+  close(): void;
+  private outcomeOf;
+  private transact;
+  private connect;
+  private open;
+}
+interface ShellStorageOptions {
+  readonly prefix?: string;
+}
+declare class ShellStorage implements StorageAdapter {
+  private readonly shell;
+  private readonly prefix;
+  constructor(shell: ShellService, options?: ShellStorageOptions);
+  read(key: string): Promise<StorageRead>;
+  write(key: string, value: string): Promise<StorageOutcome>;
+  remove(key: string): Promise<StorageOutcome>;
+  keys(): Promise<readonly string[]>;
+  private ask;
+}
+interface PersistedOptions<T> {
+  readonly initial: T;
+  readonly revive?: (raw: unknown) => T | null;
+  readonly settle?: number;
+  readonly label?: string;
+}
+declare class PersistedState<T> {
+  private readonly adapter;
+  private readonly key;
+  private readonly held;
+  private readonly saves;
+  private readonly failure;
+  private readonly record;
+  private readonly writing;
+  private touched;
+  private refused;
+  private stored;
+  private readonly initial;
+  readonly status: ReadableCell<ResourceStatus>;
+  readonly error: ReadableCell<string | null>;
+  readonly value: ReadableCell<T>;
+  readonly saving: ReadableCell<number>;
+  readonly saveError: ReadableCell<string | null>;
+  readonly hydrated: Promise<void>;
+  constructor(adapter: StorageAdapter, key: string, options: PersistedOptions<T>);
+  get current(): T;
+  set(value: T): void;
+  save(): Promise<void>;
+  forget(): Promise<void>;
+  dispose(): void;
+  private load;
+  private apply;
+  private flush;
+}
+declare function persisted<T>(adapter: StorageAdapter, key: string, options: PersistedOptions<T>): PersistedState<T>;
 declare class FrameService {
   private readonly subject;
   readonly frames: Observable<FrameMetrics>;
@@ -2042,6 +2265,7 @@ export {
   ChannelRegistry,
   ChannelRegistryHandle,
   ChannelSource,
+  classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
@@ -2100,6 +2324,9 @@ export {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
+  Gn,
+  IndexedDbStorage,
+  IndexedDbStorageOptions,
   Inject,
   Input,
   isComponentElement,
@@ -2113,6 +2340,7 @@ export {
   MediaOptions,
   MediaService,
   MediaSessionLike,
+  MemoryStorage,
   MessageEndpoint,
   mutate,
   MutateOptions,
@@ -2121,6 +2349,11 @@ export {
   observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
+  OpfsDirectory,
+  OpfsFileHandle,
+  OpfsStorage,
+  OpfsStorageOptions,
+  OpfsWritable,
   OutletProps,
   Output,
   OverlayEntry,
@@ -2130,9 +2363,12 @@ export {
   parseUrl,
   PatchEntry,
   performanceMarksEnabled,
+  performShellStorage,
+  persisted,
+  PersistedOptions,
+  PersistedState,
   pick,
   pickKeys,
-  pn,
   portHandle,
   PortHandshake,
   PortHost,
@@ -2142,6 +2378,7 @@ export {
   provide,
   ProvidedChannel,
   ReadSource,
+  registerUndoShortcuts,
   RendererChoice,
   renderRoot,
   RenderWorkerApp,
@@ -2180,13 +2417,25 @@ export {
   ShellHistory,
   ShellHistoryMode,
   ShellHistoryOptions,
+  ShellLocalStore,
   ShellRequest,
   ShellService,
+  ShellStorage,
+  shellStorageDenied,
+  ShellStorageOp,
+  ShellStorageOptions,
+  ShellStorageResult,
   ShellToRuntimeMessage,
   show,
   Show,
   ShowProps,
   SpringOptions,
+  StorageAdapter,
+  storageErrorMessage,
+  StorageOutcome,
+  StorageRead,
+  storageReadFailure,
+  storageReadValue,
   structurallyEqual,
   throttled,
   treeText,
@@ -2210,6 +2459,12 @@ export {
   UiStreamReport,
   UiTreeNode,
   UiTreeSnapshot,
+  undoable,
+  UndoableOptions,
+  UndoShortcutOptions,
+  UndoStack,
+  UndoStackOptions,
+  UndoTransaction,
   WorkerApp,
   WorkerAppOptions,
   workerHandle,
@@ -2288,6 +2543,7 @@ import {
   ChannelRegistry,
   ChannelRegistryHandle,
   ChannelSource,
+  classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
@@ -2346,6 +2602,8 @@ import {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
+  IndexedDbStorage,
+  IndexedDbStorageOptions,
   Inject,
   Input,
   isComponentElement,
@@ -2359,6 +2617,7 @@ import {
   MediaOptions,
   MediaService,
   MediaSessionLike,
+  MemoryStorage,
   MessageEndpoint,
   mutate,
   MutateOptions,
@@ -2367,6 +2626,11 @@ import {
   observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
+  OpfsDirectory,
+  OpfsFileHandle,
+  OpfsStorage,
+  OpfsStorageOptions,
+  OpfsWritable,
   OutletProps,
   Output,
   OverlayEntry,
@@ -2376,6 +2640,10 @@ import {
   parseUrl,
   PatchEntry,
   performanceMarksEnabled,
+  performShellStorage,
+  persisted,
+  PersistedOptions,
+  PersistedState,
   pick,
   pickKeys,
   portHandle,
@@ -2387,6 +2655,7 @@ import {
   provide,
   ProvidedChannel,
   ReadSource,
+  registerUndoShortcuts,
   RendererChoice,
   renderRoot,
   RenderWorkerApp,
@@ -2425,13 +2694,25 @@ import {
   ShellHistory,
   ShellHistoryMode,
   ShellHistoryOptions,
+  ShellLocalStore,
   ShellRequest,
   ShellService,
+  ShellStorage,
+  shellStorageDenied,
+  ShellStorageOp,
+  ShellStorageOptions,
+  ShellStorageResult,
   ShellToRuntimeMessage,
   show,
   Show,
   ShowProps,
   SpringOptions,
+  StorageAdapter,
+  storageErrorMessage,
+  StorageOutcome,
+  StorageRead,
+  storageReadFailure,
+  storageReadValue,
   structurallyEqual,
   throttled,
   to,
@@ -2456,12 +2737,18 @@ import {
   UiStreamReport,
   UiTreeNode,
   UiTreeSnapshot,
+  undoable,
+  UndoableOptions,
+  UndoShortcutOptions,
+  UndoStack,
+  UndoStackOptions,
+  UndoTransaction,
   WorkerApp,
   WorkerAppOptions,
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-DS_EeSdN.js";
+} from "./index-CZwoxsjK.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2477,6 +2764,7 @@ export {
   Channel,
   ChannelRegistry,
   ChannelReplica,
+  classifyStorageError,
   Component,
   ComponentHost,
   ComponentHostResolver,
@@ -2509,6 +2797,7 @@ export {
   GessoApp,
   GessoAppBuilder,
   GessoRuntime,
+  IndexedDbStorage,
   Inject,
   input,
   Input,
@@ -2529,16 +2818,21 @@ export {
   markNow,
   measureSpan,
   MediaService,
+  MemoryStorage,
   mutate,
   observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
+  OpfsStorage,
   output,
   Output,
   OverlayLayer,
   OverlayService,
   parseUrl,
   performanceMarksEnabled,
+  performShellStorage,
+  persisted,
+  PersistedState,
   pick,
   pickKeys,
   portHandle,
@@ -2546,6 +2840,7 @@ export {
   printPropValue,
   provide,
   ProvidedChannel,
+  registerUndoShortcuts,
   renderRoot,
   RenderWorkerApp,
   requirePlainData,
@@ -2562,8 +2857,13 @@ export {
   ServiceRegistry,
   setPerformanceMarks,
   ShellService,
+  ShellStorage,
+  shellStorageDenied,
   show,
   Show,
+  storageErrorMessage,
+  storageReadFailure,
+  storageReadValue,
   structurallyEqual,
   throttled,
   to,
@@ -2630,6 +2930,7 @@ export {
   type FunctionComponent,
   type GessoAppOptions,
   type GessoRuntimeOptions,
+  type IndexedDbStorageOptions,
   type Inputs,
   type MediaOptions,
   type MediaSessionLike,
@@ -2637,6 +2938,10 @@ export {
   type MutateOptions,
   type Mutation,
   type NodePathTarget,
+  type OpfsDirectory,
+  type OpfsFileHandle,
+  type OpfsStorageOptions,
+  type OpfsWritable,
   type OutletProps,
   type OutputCell,
   type OutputTarget,
@@ -2645,6 +2950,7 @@ export {
   type Patch,
   type PatchEntry,
   type PatchPath,
+  type PersistedOptions,
   type PortHandshake,
   type PortHost,
   type PresenceProps,
@@ -2673,10 +2979,17 @@ export {
   type ShellHistory,
   type ShellHistoryMode,
   type ShellHistoryOptions,
+  type ShellLocalStore,
   type ShellRequest,
+  type ShellStorageOp,
+  type ShellStorageOptions,
+  type ShellStorageResult,
   type ShellToRuntimeMessage,
   type ShowProps,
   type SpringOptions,
+  type StorageAdapter,
+  type StorageOutcome,
+  type StorageRead,
   type UiDuration,
   type UiEasingChoice,
   type UiEnvironmentReport,
@@ -2694,12 +3007,18 @@ export {
   type UiStreamReport,
   type UiTreeNode,
   type UiTreeSnapshot,
+  type UndoableOptions,
+  type UndoShortcutOptions,
+  type UndoStackOptions,
+  type UndoTransaction,
   type ViewOf,
   type WorkerAppOptions,
   type WorkerHandle,
   UI_FRAME_PHASES,
   UI_ROLES,
   UI_SEMANTIC_STATES,
+  undoable,
+  UndoStack,
   viewKeys,
   WorkerApp,
   workerHandle,
@@ -2836,6 +3155,7 @@ import {
 import {
   APPLICATION_WORKER,
   ChannelSource,
+  classifyStorageError,
   computed,
   ComputedCell,
   ComputedOptions,
@@ -2845,12 +3165,23 @@ import {
   DeriveOptions,
   Equality,
   findUnplainPath,
+  IndexedDbStorage,
+  IndexedDbStorageOptions,
   isPortErrorMessage,
   isPortHandshake,
+  MemoryStorage,
   MessageEndpoint,
   mutate,
   MutateOptions,
   Mutation,
+  OpfsDirectory,
+  OpfsFileHandle,
+  OpfsStorage,
+  OpfsStorageOptions,
+  OpfsWritable,
+  persisted,
+  PersistedOptions,
+  PersistedState,
   pick,
   pickKeys,
   portHandle,
@@ -2869,9 +3200,20 @@ import {
   serveChannels,
   ServedChannel,
   servePorts,
+  StorageAdapter,
+  storageErrorMessage,
+  StorageOutcome,
+  StorageRead,
+  storageReadFailure,
+  storageReadValue,
   structurallyEqual,
-  throttled
-} from "../index-DS_EeSdN.js";
+  throttled,
+  undoable,
+  UndoableOptions,
+  UndoStack,
+  UndoStackOptions,
+  UndoTransaction
+} from "../index-CZwoxsjK.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
@@ -2879,19 +3221,25 @@ export {
   APPLICATION_WORKER,
   captureConsole,
   channel,
+  classifyStorageError,
   computed,
   ComputedCell,
   debounced,
   defineChannel,
   derive,
   findUnplainPath,
+  IndexedDbStorage,
   internalState,
   InternalState,
   isChannelClientMessage,
   isChannelHostMessage,
   isPortErrorMessage,
   isPortHandshake,
+  MemoryStorage,
   mutate,
+  OpfsStorage,
+  persisted,
+  PersistedState,
   pick,
   pickKeys,
   portHandle,
@@ -2903,6 +3251,9 @@ export {
   select,
   serveChannels,
   servePorts,
+  storageErrorMessage,
+  storageReadFailure,
+  storageReadValue,
   structurallyEqual,
   throttled,
   type ChannelClientMessage,
@@ -2919,9 +3270,15 @@ export {
   type ConsoleLevel,
   type DeriveOptions,
   type Equality,
+  type IndexedDbStorageOptions,
   type MessageEndpoint,
   type MutateOptions,
   type Mutation,
+  type OpfsDirectory,
+  type OpfsFileHandle,
+  type OpfsStorageOptions,
+  type OpfsWritable,
+  type PersistedOptions,
   type PortHost,
   type ReadableCell,
   type ReadSource,
@@ -2930,6 +3287,14 @@ export {
   type ResourceStatus,
   type SelectOptions,
   type ServedChannel,
+  type StorageAdapter,
+  type StorageOutcome,
+  type StorageRead,
+  type UndoableOptions,
+  type UndoStackOptions,
+  type UndoTransaction,
   type ViewOf,
+  undoable,
+  UndoStack,
   viewKeys
 };

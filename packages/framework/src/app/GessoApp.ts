@@ -15,6 +15,7 @@ import type { ShellRequest } from './ShellService';
 import { AudioSink } from './AudioSink';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
+import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
@@ -414,9 +415,12 @@ export class GessoApp {
     if (!isCanvasElement(this.canvas)) {
       // No document to write a clipboard through or open a window from.
       // A popup still has to be answered, because a promise nobody
-      // settles is worse than a popup nobody opened.
+      // settles is worse than a popup nobody opened, and a storage
+      // request is answered for the same reason.
       if (request.type === 'popup') {
         this.runtime.settlePopup(request.id, false);
+      } else if (request.type === 'storage') {
+        this.runtime.settleStorage(request.id, shellStorageDenied());
       }
       return;
     }
@@ -425,6 +429,16 @@ export class GessoApp {
       return;
     }
     const view = this.canvas.ownerDocument.defaultView;
+    if (request.type === 'storage') {
+      // Performed here rather than posted, because in this
+      // configuration the shell and the render side are the same
+      // thread; the answer is the same either way.
+      this.runtime.settleStorage(
+        request.id,
+        performShellStorage(request, () => view?.localStorage)
+      );
+      return;
+    }
     if (request.type === 'popup') {
       // Same shape as `WorkerApp.openPopup`, and `noopener` is absent
       // for the same reason: it would make the answer always `null`.

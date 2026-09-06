@@ -24,12 +24,15 @@ export {
 export type {
   LayoutExplanation,
   AxisExplanation,
+  CustomLayoutExplanation,
   OverrideSources,
   SizeDecision,
   RelayoutExplanation,
   LayoutStateExplanation,
   Edges
 } from './LayoutExplanation';
+export { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
+export type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 export { CharacterCountTextMeasurer, ParagraphTextMeasurer } from './TextMeasurer';
 export type {
   TextMeasurer,
@@ -40,8 +43,13 @@ export type {
   TextOverflow,
   FontMetrics,
   ParagraphLayout,
-  FixedMetricsOptions
+  FixedMetricsOptions,
+  TextRunStyle,
+  TextRunSpan,
+  TextLineRun,
+  SpannedRuns
 } from './TextMeasurer';
+export { spannedRunsFor } from './TextMeasurer';
 export { layoutParagraph, proportionalFontMetrics, DEFAULT_LINE_HEIGHT_FACTOR, ELLIPSIS } from './ParagraphLayout';
 export { Constraints, clampSize, constraintsEqual, tightenConstraints } from './LayoutTypes';
 export type { LayoutBox, LayoutResult, LayoutStats, Size, TightenOptions } from './LayoutTypes';

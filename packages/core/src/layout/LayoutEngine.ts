@@ -2,6 +2,8 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { resolveFont } from '../properties/UiTextFont';
+import type { UiResolvedTextSpan } from '../properties/UiTextStyle';
+import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
 import { CARET_WIDTH, editorFor } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
@@ -18,6 +20,8 @@ import type { UiTrackSize } from './UiLength';
 import { placeGridItems, sizeGridTracks } from './GridLayout';
 import type { GridContribution, GridItemRequest, GridPlacement, GridTrackSizingResult } from './GridLayout';
 import { FlexDirection, parseFlexDirection } from './FlexDirection';
+import { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
+import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 import { LayoutRecord } from './LayoutRecord';
 import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
@@ -27,7 +31,7 @@ import { accumulatedOffsetTo } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
 import { buildAxisExplanation, describeOverrides, labelNode, withOverrideSource } from './LayoutExplanation';
-import type { AxisFacts, FlexFacts, LayoutExplanation } from './LayoutExplanation';
+import type { AxisFacts, CustomLayoutExplanation, FlexFacts, LayoutExplanation } from './LayoutExplanation';
 
 /** How long overlay scrollbars stay after the last scroll change. */
 export const SCROLLBAR_LINGER_MS = 1200;
@@ -41,10 +45,189 @@ export const SCROLLBAR_FADE_MS = 350;
  */
 const ANCHOR_CHAIN_LIMIT = 4;
 
+/** An editable's text is the user's; runs are a property of a `Text` node. */
+const EMPTY_TEXT_SPANS: readonly UiResolvedTextSpan[] = [];
+
 export interface ScrollAdjustment {
   container: UiNode;
   scrollX: number;
   scrollY: number;
+}
+
+/**
+ * Whether a node names any of the four logical horizontal insets, and
+ * so needs its writing direction resolved before its box is worked
+ * out.
+ *
+ * Four misses on a Map, on every measured node. The alternative is
+ * resolving `textDirection` for every node whether or not anything
+ * asked, which walks the environment chain and is what this exists to
+ * avoid; the check is the same shape and price as the one `paddingX`
+ * added to each side.
+ */
+function hasLogicalSpacing(props: ReadonlyMap<string, unknown>): boolean {
+  return props.has('paddingStart') || props.has('paddingEnd') || props.has('marginStart') || props.has('marginEnd');
+}
+
+/** Where a run puts a child, when the run is the placing one. */
+interface CustomPlacement {
+  /** The content box's origin, in layout-root coordinates. */
+  readonly x: number;
+  readonly y: number;
+  /** Its width, for mirroring a start coordinate. */
+  readonly width: number;
+  readonly mirrored: boolean;
+}
+
+/**
+ * One call into a protocol's `layout`, and the fence around it.
+ *
+ * See `measureCustom` for what the fence is for. The two callbacks are
+ * the only way out of it: one measures a child through the engine's
+ * own `measure`, so a memo hit still counts as a memo hit, and one
+ * assigns a box through `assignBox`, so a moved child invalidates
+ * everything a moved child normally invalidates.
+ */
+class CustomLayoutRun {
+  private readonly handles: CustomChildHandle[] = [];
+  private readonly nodes: UiNode[] = [];
+  private live = false;
+  /** The widest any child measured, for the container's min-content width. */
+  widestChild = 0;
+
+  constructor(
+    private readonly protocol: UiLayoutProtocol,
+    private readonly constraints: Constraints,
+    private readonly placement: CustomPlacement | null,
+    private readonly context: UiLayoutContext,
+    private readonly measureChild: (child: UiNode, constraints: Constraints) => Size,
+    private readonly assign: (child: UiNode, x: number, y: number, size: Size) => void
+  ) {}
+
+  add(child: UiNode, data: unknown): void {
+    this.nodes.push(child);
+    this.handles.push(new CustomChildHandle(this.handles.length, data, this));
+  }
+
+  execute(): Size {
+    this.live = true;
+    let size: Size;
+    try {
+      size = this.protocol.layout(this.handles, this.constraints, this.context);
+    } finally {
+      this.live = false;
+    }
+    // Whatever the protocol left alone still has to be measured and
+    // still has to have a box, or it would paint at wherever it was
+    // last frame with whatever size it had then.
+    for (let index = 0; index < this.handles.length; index++) {
+      const handle = this.handles[index];
+      if (handle.measures === 0) {
+        this.live = true;
+        try {
+          // Loosened: a tight content box is the container's size, and
+          // forcing a child the protocol never looked at to fill it
+          // would be an arrangement rather than a fallback.
+          handle.measure(new Constraints(0, this.constraints.maxWidth, 0, this.constraints.maxHeight));
+        } finally {
+          this.live = false;
+        }
+      }
+      if (this.placement !== null && handle.position === null) {
+        this.put(handle, 0, 0);
+      }
+    }
+    if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) {
+      throw new Error(`The '${this.protocol.name}' layout returned ${size.width} × ${size.height}.`);
+    }
+    return { width: Math.max(0, size.width), height: Math.max(0, size.height) };
+  }
+
+  /** Called by a handle; see `UiLayoutChild.measure`. */
+  runMeasure(handle: CustomChildHandle, constraints: Constraints): Size {
+    this.assertLive('measure');
+    if (handle.measures >= MAX_MEASURES_PER_CHILD) {
+      throw new Error(
+        `The '${this.protocol.name}' layout measured child ${handle.index} more than ${MAX_MEASURES_PER_CHILD} times ` +
+          'in one pass. Measuring a child inside a loop over the others is what makes a layout quadratic; ' +
+          'measure each child once, then arrange them from the sizes you have.'
+      );
+    }
+    handle.measures++;
+    const size = this.measureChild(this.nodes[handle.index], constraints);
+    this.widestChild = Math.max(this.widestChild, size.width);
+    return size;
+  }
+
+  /** Called by a handle; see `UiLayoutChild.place`. */
+  runPlace(handle: CustomChildHandle, start: number, top: number): void {
+    this.assertLive('place');
+    if (!Number.isFinite(start) || !Number.isFinite(top)) {
+      throw new Error(`The '${this.protocol.name}' layout placed child ${handle.index} at (${start}, ${top}).`);
+    }
+    if (this.placement !== null) {
+      this.put(handle, start, top);
+    } else {
+      // The measuring run: remember it for `explain`, but assign
+      // nothing. Every box is written by the placing run, which is the
+      // one that knows where the container ended up.
+      handle.position = { start, top };
+    }
+  }
+
+  private put(handle: CustomChildHandle, start: number, top: number): void {
+    const at = this.placement!;
+    handle.position = { start, top };
+    const x = at.mirrored ? at.x + at.width - start - handle.size.width : at.x + start;
+    this.assign(this.nodes[handle.index], x, at.y + top, handle.size);
+  }
+
+  private assertLive(what: string): void {
+    if (!this.live) {
+      throw new Error(
+        `The '${this.protocol.name}' layout tried to ${what} a child outside its own layout call. ` +
+          'A child handle is valid only for the call it was given to.'
+      );
+    }
+  }
+}
+
+/** A `UiLayoutChild`, and the only object a protocol is handed. */
+class CustomChildHandle implements UiLayoutChild {
+  size: Size = { width: 0, height: 0 };
+  position: { start: number; top: number } | null = null;
+  measures = 0;
+
+  constructor(
+    readonly index: number,
+    readonly data: unknown,
+    private readonly run: CustomLayoutRun
+  ) {}
+
+  measure(constraints: Constraints): Size {
+    this.size = this.run.runMeasure(this, constraints);
+    return this.size;
+  }
+
+  place(start: number, top: number): void {
+    this.run.runPlace(this, start, top);
+  }
+}
+
+/**
+ * Swaps start for end, for an axis that runs the other way.
+ *
+ * `center` and `stretch` are symmetric and stay put; `baseline` is
+ * only ever a vertical alignment and never reaches a mirrored axis.
+ */
+function mirrorAlignment(align: CrossAxisAlignment): CrossAxisAlignment {
+  if (align === CrossAxisAlignment.Start) {
+    return CrossAxisAlignment.End;
+  }
+  if (align === CrossAxisAlignment.End) {
+    return CrossAxisAlignment.Start;
+  }
+  return align;
 }
 
 interface FlexItem {
@@ -100,6 +283,8 @@ interface FlexConfig {
   wrap: boolean;
   wrapReverse: boolean;
   mainReversed: boolean;
+  /** A Column's cross axis is horizontal, so rtl swaps its start and end. */
+  crossReversed: boolean;
   mainAlign: MainAxisAlignment;
   crossAlign: CrossAxisAlignment;
   alignContent: AlignContent;
@@ -322,6 +507,8 @@ export class LayoutEngine {
       node.type === UiNodeType.Text || node.type === UiNodeType.Button || node.type === UiNodeType.EditableText;
     let childCount = 0;
     this.forEachLayoutChild(node, () => childCount++);
+    const parentProtocol = parent === null || absolute ? undefined : parent.properties.get('layout');
+    const customParent = isLayoutProtocol(parentProtocol) ? parentProtocol.name : undefined;
     const flexContainer =
       parent !== null &&
       !absolute &&
@@ -378,6 +565,7 @@ export class LayoutEngine {
         stretched: tight && !isRoot && explicit === undefined && flex === undefined && !inset,
         inset,
         gridArea: tight && parent !== null && parent.type === UiNodeType.Grid && explicit === undefined,
+        customParent,
         clipsContent,
         isText,
         childCount
@@ -421,7 +609,65 @@ export class LayoutEngine {
               contentHeight: rec.contentHeight
             }
           : undefined,
-      sources
+      sources,
+      custom: this.explainCustom(node, rec, childCount)
+    };
+  }
+
+  /**
+   * What a node's own layout protocol says about the arrangement.
+   *
+   * The protocol is asked after the pass, over handles that can be
+   * read but neither measured nor placed: `explain` is a question, and
+   * a question that moved boxes would be a second layout nothing
+   * invalidated.
+   */
+  private explainCustom(node: UiNode, rec: LayoutRecord, childCount: number): CustomLayoutExplanation | undefined {
+    const protocol = node.properties.get('layout');
+    if (!isLayoutProtocol(protocol)) {
+      return undefined;
+    }
+    const size = {
+      width: Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight),
+      height: Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom)
+    };
+    if (protocol.explain === undefined) {
+      return { name: protocol.name, children: childCount, notes: [`'${protocol.name}' does not explain itself.`] };
+    }
+    const handles: UiLayoutChild[] = [];
+    let index = 0;
+    this.forEachLayoutChild(node, child => {
+      const cRec = this.records.get(child);
+      handles.push({
+        index: index++,
+        data: child.properties.get('layoutData'),
+        size: { width: cRec?.width ?? 0, height: cRec?.height ?? 0 },
+        position:
+          cRec === undefined
+            ? null
+            : {
+                start:
+                  this.startEdge(node) === 'right'
+                    ? rec.x + rec.paddingLeft + size.width - cRec.x - cRec.width
+                    : cRec.x - rec.x - rec.paddingLeft,
+                top: cRec.y - rec.y - rec.paddingTop
+              },
+        measure() {
+          throw new Error(`'${protocol.name}' cannot measure a child from explain().`);
+        },
+        place() {
+          throw new Error(`'${protocol.name}' cannot place a child from explain().`);
+        }
+      });
+    });
+    return {
+      name: protocol.name,
+      children: childCount,
+      notes: protocol.explain(handles, size, {
+        direction: this.startEdge(node) === 'right' ? 'rtl' : 'ltr',
+        definiteWidth: size.width,
+        definiteHeight: size.height
+      })
     };
   }
 
@@ -1135,6 +1381,13 @@ export class LayoutEngine {
 
   private measureContainer(node: UiNode, rec: LayoutRecord, effective: Constraints): Size {
     const content = this.contentConstraints(rec, effective);
+    // Checked before the node's type is looked at, so a Row or a Grid
+    // carrying a protocol is arranged by it rather than by two
+    // algorithms disagreeing about the same children.
+    const protocol = node.properties.get('layout');
+    if (isLayoutProtocol(protocol)) {
+      return this.measureCustom(node, rec, protocol, content);
+    }
     if (node.type === UiNodeType.ScrollView) {
       return this.measureScroll(node, rec, content);
     }
@@ -1189,14 +1442,24 @@ export class LayoutEngine {
     const grid = this.layoutGrid(node, content, contentWidth, contentHeight);
     const gridX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Stretch;
     const gridY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Stretch;
+    // Under rtl the first column line is the right edge. The tracks are
+    // sized identically either way, so the whole column axis is
+    // mirrored in one place here rather than in the sizing: an area is
+    // reflected across the content box, and the alignment inside it
+    // with it. `justifyContent`'s distribution is already in the track
+    // offsets and reflects with them.
+    const mirrored = this.startEdge(node) === 'right';
     const savedBase = this.percentBase;
     for (const placement of grid.placements) {
       const child = placement.item;
       const cRec = this.record(child);
       const area = this.gridArea(grid, placement);
+      if (mirrored) {
+        area.x = contentWidth - area.x - area.width;
+      }
       this.percentBase = { width: area.width, height: area.height };
       this.resolveLayoutProps(child, cRec);
-      const alignX = this.stackAlignment(child, 'selfX', 'width', gridX);
+      const alignX = this.stackAlignment(child, 'selfX', 'width', gridX, mirrored);
       const alignY = this.stackAlignment(child, 'selfY', 'height', gridY);
       const availableWidth = Math.max(0, area.width - cRec.marginLeft - cRec.marginRight);
       const availableHeight = Math.max(0, area.height - cRec.marginTop - cRec.marginBottom);
@@ -1590,17 +1853,24 @@ export class LayoutEngine {
     const wrap = wrapValue === 'wrap' || wrapValue === 'wrap-reverse';
     const rawDirection = node.properties.get('direction');
     const reversedDirection = typeof rawDirection === 'string' && rawDirection.endsWith('-reverse');
-    // A row's main axis runs right-to-left under rtl; alignment,
-    // ordering and auto margins all mirror with it.
-    const rtl = row && resolveString(node, 'textDirection') === 'rtl';
+    // Under rtl the horizontal axis runs the other way, whichever axis
+    // of the container that is. For a Row it is the main axis, so
+    // alignment, ordering and auto margins all mirror with it; for a
+    // Column it is the cross axis, so `x` and `selfX` swap start for
+    // end and nothing about the order changes.
+    const rtl = resolveString(node, 'textDirection') === 'rtl';
     return {
       row,
       isScroll: node.type === UiNodeType.ScrollView,
       gapMain: row ? columnGap : rowGap,
       gapLine: row ? rowGap : columnGap,
       wrap,
-      wrapReverse: wrapValue === 'wrap-reverse',
-      mainReversed: reversedDirection !== rtl,
+      // A wrapping Column stacks its lines along the horizontal axis,
+      // so rtl mirrors them for the same reason `wrap-reverse` does,
+      // and the two cancel when both apply.
+      wrapReverse: (wrapValue === 'wrap-reverse') !== (!row && rtl),
+      mainReversed: reversedDirection !== (row && rtl),
+      crossReversed: !row && rtl,
       mainAlign: parseMainAxisAlignment(node.properties.get(row ? 'x' : 'y')),
       crossAlign: parseCrossAxisAlignment(node.properties.get(row ? 'y' : 'x')) ?? CrossAxisAlignment.Stretch,
       alignContent: parseAlignContent(node.properties.get('alignContent')),
@@ -1645,6 +1915,12 @@ export class LayoutEngine {
       const explicitCross = this.lengthProp(child, row ? 'height' : 'width', crossBase) !== undefined;
       if (align === CrossAxisAlignment.Stretch && explicitCross) {
         align = CrossAxisAlignment.Start;
+      }
+      // Last, so the two fallbacks above land on the logical start and
+      // are mirrored with it. Margins are not touched: they resolved to
+      // physical sides already, and `crossPlacement` reads them as such.
+      if (config.crossReversed) {
+        align = mirrorAlignment(align);
       }
       // What this container reads from the item beyond its size: its
       // baseline when aligning by baseline, and whatever this container
@@ -2227,7 +2503,16 @@ export class LayoutEngine {
       // An editable's text is the user's, held by its model rather than
       // a property; its placeholder sizes it while it is empty, so an
       // empty field is as wide as the hint it shows.
-      const text = editable ? editorFor(node).text : String(node.properties.get('text') ?? '');
+      // A paragraph given runs has its text in them, and the runs go
+      // into the request so each is measured in its own font. The
+      // request is otherwise the one it always was: the text is one
+      // string either way and the algorithm above it is unchanged.
+      const spans = editable ? EMPTY_TEXT_SPANS : resolvedSpansOf(node);
+      const text = editable
+        ? editorFor(node).text
+        : spans.length > 0
+          ? textContentOf(node)
+          : String(node.properties.get('text') ?? '');
       const placeholderProp = node.properties.get('placeholder');
       const placeholder =
         editable && text.length === 0 && typeof placeholderProp === 'string' ? placeholderProp : undefined;
@@ -2242,10 +2527,15 @@ export class LayoutEngine {
         fontWeight: font.fontWeight,
         lineHeight: font.lineHeight,
         letterSpacing: font.letterSpacing,
+        fontStyle: font.fontStyle,
+        fontStretch: font.fontStretch,
+        fontVariant: font.fontVariant,
+        fontKerning: font.fontKerning,
         maxWidth: isFinite(effective.maxWidth) ? Math.max(0, effective.maxWidth - paddingH) : undefined,
         wrap: this.textWrapProp(node),
         maxLines: maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined,
-        overflow: editable ? ('clip' as const) : this.textOverflowProp(node)
+        overflow: editable ? ('clip' as const) : this.textOverflowProp(node),
+        spans: spans.length > 0 ? spans : undefined
       };
       const paragraph = this.textMeasurer.layout(request);
       let width = paragraph.width;
@@ -2292,6 +2582,120 @@ export class LayoutEngine {
   }
 
   // ---------------------------------------------------------------------------
+  // Custom layout
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Runs an application's own layout over a node's children.
+   *
+   * The whole of the protocol's reach is `CustomLayoutRun`: it hands
+   * out handles that can measure a child, place a child and read what
+   * either of those returned, and it invalidates them the moment the
+   * call is over. That is what stops a custom layout from breaking the
+   * pass rather than a rule the protocol is asked to observe. Three
+   * things in particular cannot happen:
+   *
+   *   - **A quadratic pass.** A handle refuses a third measurement of
+   *     the same child in one call, so the work is at worst twice the
+   *     number of children however the protocol loops.
+   *   - **A box written outside the pass.** A handle held past the call
+   *     throws, so a protocol cannot stash one and place a node from a
+   *     timer, where nothing would have invalidated the record.
+   *   - **Reaching the graph.** A handle carries an index and the value
+   *     the element declared as `layoutData`, and nothing else. There
+   *     is no node on it, so a protocol cannot read another subtree's
+   *     geometry mid-pass or write a property that would dirty one.
+   *
+   * The children the protocol never measured are measured once here
+   * afterwards, under the constraints the container had, so a layout
+   * that only arranges fixed-size boxes need not measure at all and
+   * their records are still valid.
+   */
+  private measureCustom(node: UiNode, rec: LayoutRecord, protocol: UiLayoutProtocol, content: Constraints): Size {
+    const savedBase = this.percentBase;
+    this.percentBase = { width: this.definiteAxis(content, 'width'), height: this.definiteAxis(content, 'height') };
+    const run = this.customRun(node, rec, protocol, content, null);
+    let size: Size;
+    try {
+      size = run.execute();
+    } finally {
+      this.percentBase = savedBase;
+    }
+    const paddingH = rec.paddingLeft + rec.paddingRight;
+    const paddingV = rec.paddingTop + rec.paddingBottom;
+    // A custom layout is free to put its children anywhere, so the
+    // narrowest it can honestly claim to be is the widest child: no
+    // arrangement makes a box that cannot hold its largest item.
+    rec.minContentWidth = paddingH + run.widestChild;
+    rec.maxContentWidth = paddingH + size.width;
+    return { width: paddingH + size.width, height: paddingV + size.height };
+  }
+
+  /**
+   * The same protocol, over a content box that is now decided, with
+   * the `place` calls assigning boxes.
+   *
+   * Called rather than replayed because a memo hit can skip the
+   * measurement entirely, so nothing may be held over from it. The
+   * engine's own flex does the same: `placeFlex` collects its items
+   * again rather than trusting what `measureFlex` left behind.
+   */
+  private placeCustom(node: UiNode, rec: LayoutRecord, protocol: UiLayoutProtocol): void {
+    const contentWidth = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
+    const contentHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
+    const content = new Constraints(contentWidth, contentWidth, contentHeight, contentHeight);
+    const savedBase = this.percentBase;
+    this.percentBase = { width: contentWidth, height: contentHeight };
+    try {
+      this.customRun(node, rec, protocol, content, {
+        x: rec.x + rec.paddingLeft,
+        y: rec.y + rec.paddingTop,
+        width: contentWidth,
+        mirrored: this.startEdge(node) === 'right'
+      }).execute();
+    } finally {
+      this.percentBase = savedBase;
+    }
+  }
+
+  /** Builds one run, with a handle per in-flow child in tree order. */
+  private customRun(
+    node: UiNode,
+    rec: LayoutRecord,
+    protocol: UiLayoutProtocol,
+    content: Constraints,
+    placement: CustomPlacement | null
+  ): CustomLayoutRun {
+    const run = new CustomLayoutRun(
+      protocol,
+      content,
+      placement,
+      {
+        direction: this.startEdge(node) === 'right' ? 'rtl' : 'ltr',
+        definiteWidth: this.definiteAxis(content, 'width'),
+        definiteHeight: this.definiteAxis(content, 'height')
+      },
+      (child, constraints) => {
+        const cRec = this.record(child);
+        this.measure(child, constraints);
+        return { width: cRec.measuredWidth, height: cRec.measuredHeight };
+      },
+      (child, x, y, size) => this.assignBox(child, x, y, size.width, size.height)
+    );
+    this.forEachLayoutChild(node, child => {
+      const cRec = this.record(child);
+      this.resolveLayoutProps(child, cRec);
+      // A child of a custom layout is never a relayout boundary: the
+      // protocol reads every child's size to decide the container's, so
+      // a change inside one can move all the others.
+      cRec.relayoutBoundary = false;
+      cRec.contentMatters = rec.contentMatters;
+      run.add(child, child.properties.get('layoutData'));
+    });
+    return run;
+  }
+
+  // ---------------------------------------------------------------------------
   // Placement
   // ---------------------------------------------------------------------------
 
@@ -2315,7 +2719,10 @@ export class LayoutEngine {
     if (!node.hasChildren()) {
       return;
     }
-    if (node.type === UiNodeType.Row || node.type === UiNodeType.Column) {
+    const protocol = node.properties.get('layout');
+    if (isLayoutProtocol(protocol)) {
+      this.placeCustom(node, rec, protocol);
+    } else if (node.type === UiNodeType.Row || node.type === UiNodeType.Column) {
       this.placeFlex(node, rec, node.type === UiNodeType.Row ? FlexDirection.Row : FlexDirection.Column);
     } else if (node.type === UiNodeType.ScrollView) {
       this.placeFlex(node, rec, this.scrollDirection(node));
@@ -2960,12 +3367,13 @@ export class LayoutEngine {
     const contentHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
     const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Start;
     const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Start;
+    const mirrored = this.startEdge(node) === 'right';
     const savedBase = this.percentBase;
     this.percentBase = { width: contentWidth, height: contentHeight };
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
       this.resolveLayoutProps(child, cRec);
-      const alignX = this.stackAlignment(child, 'selfX', 'width', stackX);
+      const alignX = this.stackAlignment(child, 'selfX', 'width', stackX, mirrored);
       const alignY = this.stackAlignment(child, 'selfY', 'height', stackY);
       const availableWidth = Math.max(0, contentWidth - cRec.marginLeft - cRec.marginRight);
       const availableHeight = Math.max(0, contentHeight - cRec.marginTop - cRec.marginBottom);
@@ -2997,7 +3405,8 @@ export class LayoutEngine {
     child: UiNode,
     selfProp: string,
     sizeProp: string,
-    fallback: CrossAxisAlignment
+    fallback: CrossAxisAlignment,
+    mirrored = false
   ): CrossAxisAlignment {
     let align = parseCrossAxisAlignment(child.properties.get(selfProp)) ?? fallback;
     if (align === CrossAxisAlignment.Baseline) {
@@ -3011,7 +3420,10 @@ export class LayoutEngine {
     ) {
       align = CrossAxisAlignment.Start;
     }
-    return align;
+    // `mirrored` is passed only for the horizontal axis of a container
+    // that reads right to left, and after the two fallbacks so that a
+    // value that fell back to start is mirrored with the rest.
+    return mirrored ? mirrorAlignment(align) : align;
   }
 
   private stackOffset(align: CrossAxisAlignment, available: number, size: number): number {
@@ -3356,14 +3768,20 @@ export class LayoutEngine {
     rec.minHeight = typeof minHeight === 'number' ? minHeight : 0;
     rec.maxWidth = this.lengthProp(node, 'maxWidth', base.width) ?? Infinity;
     rec.maxHeight = this.lengthProp(node, 'maxHeight', base.height) ?? Infinity;
-    rec.paddingLeft = this.spacingProp(props, 'paddingLeft', 'paddingX');
-    rec.paddingRight = this.spacingProp(props, 'paddingRight', 'paddingX');
-    rec.paddingTop = this.spacingProp(props, 'paddingTop', 'paddingY');
-    rec.paddingBottom = this.spacingProp(props, 'paddingBottom', 'paddingY');
-    const marginLeft = this.marginProp(props, 'marginLeft', 'marginX');
-    const marginRight = this.marginProp(props, 'marginRight', 'marginX');
-    const marginTop = this.marginProp(props, 'marginTop', 'marginY');
-    const marginBottom = this.marginProp(props, 'marginBottom', 'marginY');
+    // Which physical edge the logical pair names. Resolved only when
+    // one of the four is present, because it means reading an
+    // inherited property and the overwhelming majority of nodes name
+    // none of them; four misses on a Map is what the check costs, the
+    // same price `paddingX` added to each side.
+    const leftIsStart = !hasLogicalSpacing(props) || this.startEdge(node) === 'left';
+    rec.paddingLeft = this.spacingProp(props, 'paddingLeft', leftIsStart ? 'paddingStart' : 'paddingEnd', 'paddingX');
+    rec.paddingRight = this.spacingProp(props, 'paddingRight', leftIsStart ? 'paddingEnd' : 'paddingStart', 'paddingX');
+    rec.paddingTop = this.spacingProp(props, 'paddingTop', undefined, 'paddingY');
+    rec.paddingBottom = this.spacingProp(props, 'paddingBottom', undefined, 'paddingY');
+    const marginLeft = this.marginProp(props, 'marginLeft', leftIsStart ? 'marginStart' : 'marginEnd', 'marginX');
+    const marginRight = this.marginProp(props, 'marginRight', leftIsStart ? 'marginEnd' : 'marginStart', 'marginX');
+    const marginTop = this.marginProp(props, 'marginTop', undefined, 'marginY');
+    const marginBottom = this.marginProp(props, 'marginBottom', undefined, 'marginY');
     rec.marginLeftAuto = marginLeft === 'auto';
     rec.marginRightAuto = marginRight === 'auto';
     rec.marginTopAuto = marginTop === 'auto';
@@ -3378,6 +3796,9 @@ export class LayoutEngine {
     rec.positioned = rec.absolute || rec.sticky || position === 'relative';
     const overflow = props.get('overflow');
     rec.scrollable = node.type === UiNodeType.ScrollView || overflow === 'scroll' || overflow === 'auto';
+    // Only a scroll container asks, and there are few of them, so this
+    // resolution is not on the path every box takes.
+    rec.mirrored = rec.scrollable && this.startEdge(node) === 'right';
     // An editable clips like a form control: its box is a window on the
     // text, which scrolls behind it (see `measureLeaf`). Without this a
     // field narrower than its line would paint the overflow across
@@ -3704,9 +4125,21 @@ export class LayoutEngine {
     return resolveLength(raw, base, property, true);
   }
 
-  /** A margin side: the side's own value, else its axis, else the shorthand; may be auto. */
-  private marginProp(props: ReadonlyMap<string, unknown>, side: string, axis: string): number | 'auto' {
-    const value = props.get(side) ?? props.get(axis) ?? props.get('margin');
+  /**
+   * A margin side: the side's own value, else the logical side that
+   * resolved to it, else its axis, else the shorthand; may be auto.
+   */
+  private marginProp(
+    props: ReadonlyMap<string, unknown>,
+    side: string,
+    logical: string | undefined,
+    axis: string
+  ): number | 'auto' {
+    const value =
+      props.get(side) ??
+      (logical !== undefined ? props.get(logical) : undefined) ??
+      props.get(axis) ??
+      props.get('margin');
     if (value === undefined) {
       return 0;
     }
@@ -3733,19 +4166,32 @@ export class LayoutEngine {
   }
 
   /**
-   * A padding side: the side's own value, else its axis, else the
-   * shorthand.
+   * A padding side: the side's own value, else the logical side that
+   * resolved to it, else its axis, else the shorthand.
    *
-   * Three steps rather than two since `paddingX` and `paddingY`
-   * arrived. Most specific wins, as in CSS, so `padding={8}
-   * paddingX={16} paddingLeft={0}` is 0 left, 16 right, 8 top and
-   * bottom. `props.get` on a name nothing wrote costs a miss on a Map,
-   * which is what the two-step version cost per side already.
+   * Four steps rather than the two it began with: `paddingX` added
+   * one and `paddingStart` added another. Most specific wins, as in
+   * CSS, so `padding={8} paddingX={16} paddingLeft={0}` is 0 left, 16
+   * right, 8 top and bottom, and a physical side beats the logical one
+   * that landed on the same edge. `props.get` on a name nothing wrote
+   * costs a miss on a Map, and the horizontal sides are the only ones
+   * that pay for the logical step at all.
    */
-  private spacingProp(props: ReadonlyMap<string, unknown>, side: string, axis: string): number {
+  private spacingProp(
+    props: ReadonlyMap<string, unknown>,
+    side: string,
+    logical: string | undefined,
+    axis: string
+  ): number {
     const explicit = props.get(side);
     if (explicit !== undefined) {
       return this.toNumber(explicit) ?? 0;
+    }
+    if (logical !== undefined) {
+      const onEdge = props.get(logical);
+      if (onEdge !== undefined) {
+        return this.toNumber(onEdge) ?? 0;
+      }
     }
     const onAxis = props.get(axis);
     if (onAxis !== undefined) {
@@ -3756,6 +4202,20 @@ export class LayoutEngine {
       return this.toNumber(shorthand) ?? 0;
     }
     return 0;
+  }
+
+  /**
+   * Which physical edge `start` means for a node: the left, unless it
+   * reads right to left.
+   *
+   * `textDirection` is inherited, so a subtree under one `rtl` mirrors
+   * without every box in it repeating the fact. That is the same
+   * property a Row's main axis already reverses on, which is what
+   * makes the mirroring one decision rather than two that can
+   * disagree.
+   */
+  private startEdge(node: UiNode): 'left' | 'right' {
+    return resolveString(node, 'textDirection') === 'rtl' ? 'right' : 'left';
   }
 
   private toNumber(value: unknown): number | undefined {

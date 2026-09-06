@@ -11,13 +11,17 @@ import type { UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
 import type { UiImage } from '../properties/UiImage';
 import { isVideoSurface, type UiVideoSurface } from '../properties/UiVideo';
-import { resolveColor, resolveGradient, themeColor } from '../properties/UiThemeColor';
+import { resolveColor, resolveColorValue, resolveGradient, themeColor } from '../properties/UiThemeColor';
+import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import type { ResolvedGradient } from '../properties/UiGradient';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import { editorFor, isEditableNode } from '../editing/UiEditable';
 import { selectionRangeOf, type TextRange } from '../selection/UiSelectable';
 import { matchRangesOf } from '../find/UiTextMatches';
 import { resolveFontInto } from '../properties/UiTextFont';
+import type { UiFontKerning, UiFontStretch, UiFontStyle, UiFontVariant, UiTextDecoration, UiTextLink, UiTextMetrics, UiResolvedTextSpan } from '../properties/UiTextStyle';
+import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
+import { linkHoverOf } from '../selection/UiTextLinks';
 import { parseTransform } from '../properties/UiTransform';
 
 export type { UiImage } from '../properties/UiImage';
@@ -64,12 +68,29 @@ export interface PaintState {
   hasTransform: boolean;
   transform: UiTransform;
   text: string | undefined;
+  /**
+   * The paragraph's runs, with their colours resolved against the
+   * node's theme; undefined for a paragraph in one style.
+   *
+   * `text` is the runs' text concatenated, so every other field of
+   * this state, and every offset any other layer holds, means what it
+   * always meant.
+   */
+  spans: readonly PaintTextSpan[] | undefined;
+  /** Index into `spans` of the link the pointer is on, or -1. */
+  linkHover: number;
   fontSize: number;
   fontFamily: string;
   fontWeight: string | number;
   lineHeight: number;
   /** Extra space after each character, as CSS `letter-spacing`. */
   letterSpacing: number;
+  fontStyle: UiFontStyle;
+  fontStretch: UiFontStretch;
+  fontVariant: UiFontVariant;
+  fontKerning: UiFontKerning;
+  /** Lines drawn with the whole paragraph; a run may override it. */
+  textDecoration: UiTextDecoration;
   textColor: UiColor;
   textAlign: TextAlign;
   verticalAlign: VerticalAlign;
@@ -102,6 +123,16 @@ export interface PaintState {
   selectionColor: UiColor;
   matchColor: UiColor;
   caretColor: UiColor;
+}
+
+/** A run of a paragraph, ready to paint: metrics, resolved colours, and its link. */
+export interface PaintTextSpan extends UiTextMetrics {
+  readonly start: number;
+  readonly end: number;
+  readonly color?: UiColor;
+  readonly backgroundColor?: UiColor;
+  readonly textDecoration?: UiTextDecoration;
+  readonly link?: UiTextLink;
 }
 
 export const DEFAULT_FONT_SIZE = 14;
@@ -236,9 +267,14 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
     out.textMatches = undefined;
   } else {
     out.editor = undefined;
-    out.text = resolveString(node, 'text');
-    if (out.text === undefined) {
-      warnIfTextIsNotText(node);
+    const spanned = resolvedSpansOf(node);
+    if (spanned.length > 0) {
+      out.text = textContentOf(node);
+    } else {
+      out.text = resolveString(node, 'text');
+      if (out.text === undefined) {
+        warnIfTextIsNotText(node);
+      }
     }
     out.placeholder = undefined;
     // Only a selected paragraph pays for the colour: the scratch is
@@ -262,9 +298,12 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.rtl = resolveProperty(node, UiProperties.textDirection) === 'rtl';
 
   // Resolved the same way layout measured it (see resolveFont), and
-  // straight into the scratch: the state already has the five fields
-  // under those names, so paint has no record to allocate and copy.
+  // straight into the scratch: the state already has the fields under
+  // those names, so paint has no record to allocate and copy.
   resolveFontInto(node, out);
+  out.spans = out.editor === undefined ? resolvePaintSpans(node) : undefined;
+  out.linkHover = out.spans === undefined ? -1 : linkHoverOf(node);
+  out.textDecoration = resolveProperty(node, UiProperties.textDecoration);
   out.textColor = resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
   out.textAlign = normalizeTextAlign(resolveProperty(node, UiProperties.textAlign));
   out.verticalAlign = normalizeVerticalAlign(resolveString(node, 'verticalAlign'));
@@ -306,6 +345,57 @@ function resetTextStyle(out: PaintState): void {
   out.maxLines = undefined;
   out.textOverflow = 'clip';
   out.rtl = false;
+  out.fontStyle = 'normal';
+  out.fontStretch = 'normal';
+  out.fontVariant = 'normal';
+  out.fontKerning = 'auto';
+  out.textDecoration = 'none';
+  out.spans = undefined;
+  out.linkHover = -1;
+}
+
+/**
+ * A node's runs with their colours resolved against its theme,
+ * remembered by the identity of the array they came from and the
+ * theme they were resolved against.
+ *
+ * The memo is what keeps the paint state's promise not to allocate per
+ * frame: a run's colour may be a palette name, so resolving it needs
+ * the theme, and doing that for every run of every paragraph on screen
+ * on every frame would allocate a run record per run per frame. A
+ * theme change is an object change, so it invalidates the memo without
+ * anything having to notice.
+ */
+const paintSpans = new WeakMap<readonly UiResolvedTextSpan[], { theme: unknown; spans: readonly PaintTextSpan[] }>();
+
+function resolvePaintSpans(node: UiNode): readonly PaintTextSpan[] | undefined {
+  const spans = resolvedSpansOf(node);
+  if (spans.length === 0) {
+    return undefined;
+  }
+  const theme = node.environment !== null ? node.environment.get(UiEnvironmentKeys.theme) : undefined;
+  const cached = paintSpans.get(spans);
+  if (cached !== undefined && cached.theme === theme) {
+    return cached.spans;
+  }
+  const resolved: PaintTextSpan[] = spans.map(span => ({
+    start: span.start,
+    end: span.end,
+    fontFamily: span.fontFamily,
+    fontSize: span.fontSize,
+    fontWeight: span.fontWeight,
+    fontStyle: span.fontStyle,
+    fontStretch: span.fontStretch,
+    fontVariant: span.fontVariant,
+    fontKerning: span.fontKerning,
+    letterSpacing: span.letterSpacing,
+    color: resolveColorValue(node, span.color),
+    backgroundColor: resolveColorValue(node, span.backgroundColor),
+    textDecoration: span.textDecoration,
+    link: span.link
+  }));
+  paintSpans.set(spans, { theme, spans: resolved });
+  return resolved;
 }
 
 /**
@@ -412,11 +502,18 @@ export function createPaintState(): PaintState {
     hasTransform: false,
     transform: { x: 0, y: 0, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotation: 0 },
     text: undefined,
+    spans: undefined,
+    linkHover: -1,
     fontSize: DEFAULT_FONT_SIZE,
     fontFamily: DEFAULT_FONT_FAMILY,
     fontWeight: DEFAULT_FONT_WEIGHT,
     lineHeight: 0,
     letterSpacing: 0,
+    fontStyle: 'normal',
+    fontStretch: 'normal',
+    fontVariant: 'normal',
+    fontKerning: 'auto',
+    textDecoration: 'none',
     textColor: DEFAULT_TEXT_COLOR,
     textAlign: 'start',
     verticalAlign: 'top',

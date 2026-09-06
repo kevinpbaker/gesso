@@ -11,6 +11,7 @@ import type {
 } from '@gesso/core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
+import type { ShellStorageOp, ShellStorageResult } from '../ShellService';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
 /**
@@ -181,6 +182,12 @@ export type ShellToRuntimeMessage =
    * its own like the preference messages above it.
    */
   | { type: 'popupResult'; id: number; opened: boolean }
+  /**
+   * What the shell found in `localStorage` for a `storage` request
+   * (ShellStorage). The second reply on this protocol, and it carries
+   * its request's `id` for the same reason `popupResult` does.
+   */
+  | { type: 'storageResult'; id: number; result: ShellStorageResult }
   | { type: 'inspector'; enabled: boolean }
   /**
    * What an assistive technology did to the accessibility mirror: a
@@ -316,6 +323,15 @@ export type RuntimeToShellMessage =
    * worker that resolves a url first will find the window refused.
    */
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
+  /**
+   * Read, write, remove or list in `localStorage`, which lives on the
+   * window and nowhere else (ShellStorage).
+   *
+   * Answered, like `popup`, and `id` pairs the two. The shell performs
+   * exactly the call it is given and decides nothing about the key,
+   * which is what keeps it the dumb half of `decisions/0030`.
+   */
+  | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
   /** The router navigated; the shell owns the address bar (RouterService). */
   | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string }
   /** Load, play, pause, seek, set the volume or the OS metadata (AudioService). */

@@ -95,6 +95,8 @@ export type BoxModelProps = PropsOf<
   | 'paddingRight'
   | 'paddingBottom'
   | 'paddingLeft'
+  | 'paddingStart'
+  | 'paddingEnd'
   | 'margin'
   | 'marginX'
   | 'marginY'
@@ -102,11 +104,15 @@ export type BoxModelProps = PropsOf<
   | 'marginRight'
   | 'marginBottom'
   | 'marginLeft'
+  | 'marginStart'
+  | 'marginEnd'
   | 'aspectRatio'
 >;
 
 /** How an element behaves as a child of a Row, Column or ScrollView. */
-export type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY'>;
+export type FlexItemProps = PropsOf<
+  'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'
+>;
 
 /** Where an element sits in a Grid. */
 export type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
@@ -171,7 +177,7 @@ export type SemanticsProps = PropsOf<
 >;
 
 /** Environment values an element provides to its subtree. */
-export type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor'>;
+export type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 
 /**
  * Behaviour attached to an element without wrapping it: hover and
@@ -212,9 +218,15 @@ export type CommonProps = IdentityProps &
   TransitionProps &
   EnvironmentProps;
 
-/** Props of an element that has children. */
+/**
+ * Props of an element that has children.
+ *
+ * `layout` is here rather than on `BoxProps` alone because a custom
+ * layout replaces whatever the container would have done with its
+ * children, whichever container it is; see `layout/CustomLayout.ts`.
+ */
 export type ContainerProps = CommonProps &
-  PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior'>;
+  PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
 
 /** Props of a flex container: Row, Column, ScrollView. */
 export type FlexContainerProps = ContainerProps &

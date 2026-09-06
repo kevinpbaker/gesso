@@ -17,8 +17,28 @@ export type ShellRequest =
   | { type: 'clipboard'; text: string }
   | { type: 'openUrl'; url: string }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
+  | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
   | { type: 'history'; action: 'push' | 'replace'; url: string }
   | { type: 'history'; action: 'back' | 'forward'; url?: undefined };
+
+/** The four things `localStorage` is asked for; see `ShellStorage`. */
+export type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
+
+/**
+ * What the shell made of a storage request.
+ *
+ * One record with a field per shape of answer, rather than four reply
+ * messages: it is plain data either way, and a single reply keeps the
+ * pairing with `id` in one place. `value` is a read's, `keys` is a
+ * listing's, and both are empty for a write.
+ */
+export interface ShellStorageResult {
+  readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
+  readonly value: string | null;
+  readonly keys: readonly string[];
+  /** Why it did not answer, as a message; null when it did. */
+  readonly error: string | null;
+}
 
 /**
  * The shell's services, as a store components can inject.
@@ -37,6 +57,9 @@ export class ShellService {
   /** Popups asked for and not yet answered, by the id sent with each. */
   private readonly popups = new Map<number, (opened: boolean) => void>();
   private nextPopupId = 1;
+  /** Storage requests asked for and not yet answered, by the id sent with each. */
+  private readonly stores = new Map<number, (result: ShellStorageResult) => void>();
+  private nextStorageId = 1;
 
   /**
    * The appearance the platform is asking for, as the shell reports it:
@@ -176,5 +199,64 @@ export class ShellService {
     }
     this.popups.delete(id);
     resolve(opened);
+  }
+
+  /**
+   * Asks the shell to read, write, remove or list in `localStorage`.
+   *
+   * `localStorage` is on the window and nowhere else: a worker cannot
+   * reach it, so a render thread that wants it has to ask, exactly as
+   * it asks for the clipboard. What comes back is plain data, and the
+   * shell decides nothing beyond performing the call, which is the
+   * rule `decisions/0030` holds it to.
+   *
+   * `ShellStorage` is what an application uses; this is the wire under
+   * it. With no shell installed the answer is `denied`, because a
+   * headless runtime has no window and never will, and a promise left
+   * unsettled would hang whatever was waiting on it.
+   */
+  requestStorage(request: {
+    readonly op: ShellStorageOp;
+    readonly key: string;
+    readonly value?: string;
+  }): Promise<ShellStorageResult> {
+    const handler = this.handler;
+    if (handler === undefined || handler === null) {
+      return Promise.resolve({
+        outcome: 'denied',
+        value: null,
+        keys: [],
+        error: 'There is no shell to store through.'
+      });
+    }
+    const id = this.nextStorageId++;
+    const settled = new Promise<ShellStorageResult>(resolve => {
+      this.stores.set(id, resolve);
+    });
+    handler({
+      type: 'storage',
+      id,
+      op: request.op,
+      key: request.key,
+      ...(request.value === undefined ? {} : { value: request.value })
+    });
+    return settled;
+  }
+
+  /**
+   * Called by the runtime with what the shell found. Not for
+   * applications.
+   *
+   * An id the map does not hold is ignored, on the same terms as
+   * `settlePopup`: a duplicate reply is the shell being noisy rather
+   * than the application being wrong.
+   */
+  settleStorage(id: number, result: ShellStorageResult): void {
+    const resolve = this.stores.get(id);
+    if (resolve === undefined) {
+      return;
+    }
+    this.stores.delete(id);
+    resolve(result);
   }
 }

@@ -15,6 +15,7 @@ import {
   selectionRangeOf,
   setSelectionRange
 } from './UiSelectable';
+import { clearLinkHover, hasTextLinks, linkOf, linkRunAtPointIn, setLinkHover } from './UiTextLinks';
 import {
   hasDrawnText,
   offsetAtPointIn,
@@ -94,6 +95,10 @@ export class UiSelectionController {
   /** The nodes currently carrying a range, so they can be cleared. */
   private painted: UiNode[] = [];
   private lastPress: { node: UiNode; x: number; y: number; at: number; count: number } | null = null;
+  /** The link a press landed on, until it is released or dragged off. */
+  private pendingLink: { node: UiNode; index: number; x: number; y: number } | null = null;
+  /** The node carrying a lit link run, so it can be unlit when the pointer leaves. */
+  private hoveredLink: UiNode | null = null;
 
   constructor(
     private readonly host: SelectionHost,
@@ -127,16 +132,28 @@ export class UiSelectionController {
    * knows the press was consumed.
    */
   pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiKeyModifiers): boolean {
-    if (node === null || !this.isSelectable(node)) {
+    this.pendingLink = null;
+    if (node === null) {
       this.clear();
       return false;
     }
     const geometry = this.geometryOf(node);
-    if (!hasDrawnText(geometry)) {
-      this.clear();
-      return false;
-    }
     const local = this.hitTester.toLocal(node, x, y);
+    if (hasTextLinks(node)) {
+      // A link is remembered rather than followed: a press that goes
+      // on to drag is a selection, and only a press that is released
+      // where it landed is a click. Held here and not in the pointer
+      // controller because this is the one place that turns a point
+      // inside a paragraph into a run.
+      const index = linkRunAtPointIn(geometry, local.x, local.y);
+      if (linkOf(node, index) !== undefined) {
+        this.pendingLink = { node, index, x, y };
+      }
+    }
+    if (!this.isSelectable(node) || !hasDrawnText(geometry)) {
+      this.clear();
+      return this.pendingLink !== null;
+    }
     const offset = offsetAtPointIn(geometry, local.x, local.y);
     const now = this.host.now();
     const last = this.lastPress;
@@ -181,6 +198,12 @@ export class UiSelectionController {
    * is the one gesture that has to leave it.
    */
   pointerMove(x: number, y: number): void {
+    if (
+      this.pendingLink !== null &&
+      (Math.abs(x - this.pendingLink.x) > MULTI_CLICK_SLOP || Math.abs(y - this.pendingLink.y) > MULTI_CLICK_SLOP)
+    ) {
+      this.pendingLink = null;
+    }
     if (!this.dragging || this.anchor === null) {
       return;
     }
@@ -197,6 +220,44 @@ export class UiSelectionController {
 
   pointerUp(): void {
     this.dragging = false;
+    const pending = this.pendingLink;
+    this.pendingLink = null;
+    if (pending === null) {
+      return;
+    }
+    // A press that selected something was a drag, however short.
+    if (this.anchor !== null && this.focus !== null && this.anchor.offset !== this.focus.offset) {
+      return;
+    }
+    linkOf(pending.node, pending.index)?.onClick?.();
+  }
+
+  /**
+   * The pointer moved with nothing pressed.
+   *
+   * Lights the link run under it, which is what draws the wash and the
+   * underline and what `resolveCursor` reads to show a pointer. The
+   * state is written onto the node, as a selection and a find match
+   * are, because paint has the node and nothing else.
+   */
+  pointerHover(node: UiNode | null, x: number, y: number): void {
+    let target: UiNode | null = null;
+    let index = -1;
+    if (node !== null && hasTextLinks(node)) {
+      const local = this.hitTester.toLocal(node, x, y);
+      const at = linkRunAtPointIn(this.geometryOf(node), local.x, local.y);
+      if (linkOf(node, at) !== undefined) {
+        target = node;
+        index = at;
+      }
+    }
+    if (this.hoveredLink !== null && this.hoveredLink !== target && clearLinkHover(this.hoveredLink)) {
+      this.host.markDirty(this.hoveredLink, DirtyFlags.Paint);
+    }
+    this.hoveredLink = target;
+    if (target !== null && setLinkHover(target, index)) {
+      this.host.markDirty(target, DirtyFlags.Paint);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -307,6 +368,12 @@ export class UiSelectionController {
    * changes both take nodes out from under a live selection.
    */
   handleNodeRemoved(node: UiNode): void {
+    if (this.hoveredLink === node) {
+      this.hoveredLink = null;
+    }
+    if (this.pendingLink?.node === node) {
+      this.pendingLink = null;
+    }
     if (this.painted.includes(node) || this.anchor?.node === node || this.focus?.node === node) {
       this.clear();
     }

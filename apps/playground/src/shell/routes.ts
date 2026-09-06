@@ -88,6 +88,12 @@ export const ROUTES: readonly RouteMeta[] = [
     parent: 'examples'
   },
   {
+    id: 'example-layout',
+    label: 'Layout',
+    title: 'Example · a custom layout, container queries and insets',
+    parent: 'examples'
+  },
+  {
     id: 'example-transitions',
     label: 'Transitions',
     title: 'Example · shared elements across a route change, and a video that keeps playing',

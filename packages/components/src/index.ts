@@ -60,5 +60,39 @@ export {
 export { useOverlay, type OverlayHandle, type OverlayOptions } from './overlay';
 export { virtualList, stepIndex, type VirtualList } from './virtual';
 export { controlled, type ControlledValue } from './controlled';
+export {
+  field,
+  fieldArray,
+  form,
+  type Field,
+  type FieldArray,
+  type FieldArrayOptions,
+  type FieldBinding,
+  type FieldChecks,
+  type FieldOptions,
+  type FieldRow,
+  type FormGroup,
+  type FormMember,
+  type FormMembers,
+  type FormOptions,
+  type FormValues,
+  type ValueOf
+} from './form';
+export {
+  allOf,
+  email,
+  matches,
+  maxLength,
+  minLength,
+  pattern,
+  range,
+  required,
+  type AsyncValidator,
+  type FormValidator,
+  type Problems,
+  type Schema,
+  type Validator
+} from './validate';
+export { controlDescription, controlMessage } from './message';
 export { trackFocus, type ControlFocus } from './focus';
 export { keymap, quantize, type ControlLayoutProps, type Keymap } from './internals';

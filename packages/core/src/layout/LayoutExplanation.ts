@@ -49,6 +49,30 @@ export interface LayoutExplanation {
    * colour" has the same answer and no other tool gives it.
    */
   readonly sources?: OverrideSources;
+  /**
+   * The application's own layout, when this node carries one: what it
+   * is called and what it says about the arrangement.
+   *
+   * A custom layout is the one container whose reasoning the engine
+   * cannot describe, because the engine did not do it. `explain` would
+   * otherwise say "content 640 × 420" and stop, which is true and
+   * useless. The protocol's `explain` fills the gap, and this is
+   * where what it said is carried; `formatExplanation` prints the
+   * sentences under the two axes.
+   */
+  readonly custom?: CustomLayoutExplanation;
+}
+
+export interface CustomLayoutExplanation {
+  /** `UiLayoutProtocol.name`. */
+  readonly name: string;
+  /** How many in-flow children it arranged. */
+  readonly children: number;
+  /**
+   * The sentences the protocol's own `explain` returned, or a single
+   * line saying it has none.
+   */
+  readonly notes: readonly string[];
 }
 
 /** Property name to a sentence naming the modifiers that write it. */
@@ -84,7 +108,9 @@ export type SizeDecision =
   | 'content'
   | 'min'
   | 'max'
-  | 'aspect-ratio';
+  | 'aspect-ratio'
+  /** Sized and placed by a layout the application wrote; see `custom`. */
+  | 'custom';
 
 export interface AxisExplanation {
   readonly axis: 'width' | 'height';
@@ -158,6 +184,8 @@ export interface AxisFacts {
   readonly inset: boolean;
   /** A grid item filling its area along this axis. */
   readonly gridArea: boolean;
+  /** The parent carries a custom layout, which sized and placed this node. */
+  readonly customParent: string | undefined;
   /** Content that clips (a scroll container, ellipsised or clamped text) has no automatic minimum. */
   readonly clipsContent: boolean;
   readonly isText: boolean;
@@ -190,6 +218,18 @@ export function buildAxisExplanation(f: AxisFacts): AxisExplanation {
   const minProp = f.axis === 'width' ? 'minWidth' : 'minHeight';
   const maxProp = f.axis === 'width' ? 'maxWidth' : 'maxHeight';
   const parentTight = f.parentMin === f.parentMax && isFinite(f.parentMax);
+
+  if (f.customParent !== undefined && !f.isRoot) {
+    // A custom layout measured this node itself, so none of the rules
+    // below apply: whatever constraints it was measured under were the
+    // protocol's choice, and its box is where the protocol put it.
+    decidedBy = 'custom';
+    reasons.push(`the '${f.customParent}' layout on ${f.parentLabel} measured it at ${px(f.measured)}`);
+    if (Math.abs(f.final - f.measured) > EPSILON) {
+      reasons.push(`and placed it at ${px(f.final)}`);
+    }
+    return { axis: f.axis, content: f.content, measured: f.measured, final: f.final, decidedBy, reasons };
+  }
 
   if (f.isRoot) {
     if (f.explicit !== undefined) {
@@ -485,6 +525,13 @@ export function formatExplanation(explanation: LayoutExplanation): string {
   );
   lines.push(`width  ${formatNumber(width.final).padEnd(7)} ${width.reasons.join('; ')}`);
   lines.push(`height ${formatNumber(height.final).padEnd(7)} ${height.reasons.join('; ')}`);
+  if (explanation.custom !== undefined) {
+    const custom = explanation.custom;
+    lines.push(
+      `layout '${custom.name}' over ${custom.children} ${custom.children === 1 ? 'child' : 'children'}` +
+        custom.notes.map(note => `\n  ${note}`).join('')
+    );
+  }
   const from = explanation.parent === null ? 'the viewport' : labelNode(explanation.parent);
   lines.push(`constraints from ${from}: ${formatConstraints(explanation.constraints)}`);
   if (

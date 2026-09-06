@@ -35,6 +35,18 @@ export interface Canvas2DContext {
    */
   letterSpacing?: string;
   /**
+   * The width axis, as CSS `font-stretch` keywords. Reaches a variable
+   * font's `wdth`, and is the same kind of property `letterSpacing`
+   * is: not in the font shorthand, sticky, and optional.
+   */
+  fontStretch?: string;
+  /**
+   * Whether the shaper applies the font's kerning pairs. The one font
+   * feature a canvas font string can be made to carry; see
+   * `decisions/0085` for the ones it cannot.
+   */
+  fontKerning?: string;
+  /**
    * The base direction bidi resolves against: which side a neutral
    * character at the end of an Arabic line lands on, and which way a
    * mixed line reads. Set per text draw from the paragraph's

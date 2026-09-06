@@ -23,6 +23,7 @@ import { AudioSink } from '../AudioSink';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
+import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeReducedMotion } from '../reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
@@ -687,6 +688,17 @@ export class WorkerApp {
     }
     if (message.type === 'popup') {
       this.openPopup(message);
+      return;
+    }
+    if (message.type === 'storage') {
+      // The one call in this file that reaches a browser API the
+      // render worker cannot: `localStorage` is on the window. What
+      // comes back is plain data, and the shell judges none of it.
+      this.post({
+        type: 'storageResult',
+        id: message.id,
+        result: performShellStorage(message, () => globalThis.localStorage)
+      });
       return;
     }
     if (message.type === 'audio') {

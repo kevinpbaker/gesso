@@ -2,6 +2,7 @@ import type { UiNode } from '../graph/UiNode';
 import { UiProperties } from './UiProperty';
 import { resolveProperty } from './UiPropertyResolver';
 import type { UiFontWeight } from './UiPropertyValues';
+import type { UiFontKerning, UiFontStretch, UiFontStyle, UiFontVariant } from './UiTextStyle';
 
 /**
  * `line-height: normal`: the factor of the font size a line takes when
@@ -16,6 +17,10 @@ export interface UiResolvedFont {
   readonly fontWeight: UiFontWeight;
   readonly lineHeight: number;
   readonly letterSpacing: number;
+  readonly fontStyle: UiFontStyle;
+  readonly fontStretch: UiFontStretch;
+  readonly fontVariant: UiFontVariant;
+  readonly fontKerning: UiFontKerning;
 }
 
 /**
@@ -37,19 +42,30 @@ export interface UiResolvedFont {
  * another, and sat high or low inside it.
  */
 export function resolveFont(node: UiNode): UiResolvedFont {
-  const out = { fontSize: 0, fontFamily: '', fontWeight: 'normal', lineHeight: 0, letterSpacing: 0 };
+  const out: UiFontFields = {
+    fontSize: 0,
+    fontFamily: '',
+    fontWeight: 'normal',
+    lineHeight: 0,
+    letterSpacing: 0,
+    fontStyle: 'normal',
+    fontStretch: 'normal',
+    fontVariant: 'normal',
+    fontKerning: 'auto'
+  };
   resolveFontInto(node, out);
   return out as UiResolvedFont;
 }
 
 /**
- * The five fields a resolved font is, seen as somewhere to put them.
+ * The fields a resolved font is, seen as somewhere to put them.
  *
- * `PaintState` has all five under the same names, which is what lets
- * paint resolve a node's font straight into the scratch it already
- * owns rather than into a record it allocates and copies out of. The
- * weight is widened to `string | number` because the paint state
- * carries it that way.
+ * `PaintState` has all of them under the same names, which is what
+ * lets paint resolve a node's font straight into the scratch it
+ * already owns rather than into a record it allocates and copies out
+ * of. The weight is widened to `string | number`, and the four
+ * keyword fields to `string`, because the paint state carries them
+ * that way.
  */
 export interface UiFontFields {
   fontSize: number;
@@ -57,6 +73,10 @@ export interface UiFontFields {
   fontWeight: string | number;
   lineHeight: number;
   letterSpacing: number;
+  fontStyle: string;
+  fontStretch: string;
+  fontVariant: string;
+  fontKerning: string;
 }
 
 /** `resolveFont`, writing into a target the caller owns. */
@@ -75,6 +95,10 @@ export function resolveFontInto(node: UiNode, out: UiFontFields): void {
   out.fontFamily = nonEmpty(resolveProperty(node, UiProperties.fontFamily)) ?? UiProperties.fontFamily.defaultValue;
   out.fontWeight = weight(resolveProperty(node, UiProperties.fontWeight)) ?? UiProperties.fontWeight.defaultValue;
   out.letterSpacing = finite(resolveProperty(node, UiProperties.letterSpacing)) ?? 0;
+  out.fontStyle = nonEmpty(resolveProperty(node, UiProperties.fontStyle)) ?? 'normal';
+  out.fontStretch = nonEmpty(resolveProperty(node, UiProperties.fontStretch)) ?? 'normal';
+  out.fontVariant = nonEmpty(resolveProperty(node, UiProperties.fontVariant)) ?? 'normal';
+  out.fontKerning = nonEmpty(node.properties.get('fontKerning')) ?? 'auto';
 }
 
 function positive(value: unknown): number | undefined {
