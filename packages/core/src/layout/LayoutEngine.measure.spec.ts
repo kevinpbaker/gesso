@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
+import { percent } from './UiLength';
 
 describe('LayoutEngine measurement', () => {
   function boxHarness(id = 'box') {
@@ -161,6 +162,46 @@ describe('LayoutEngine measurement', () => {
       expect(harness.record(column).measuredWidth).toBe(300);
       expect(harness.record(column).width).toBe(300);
       expect(harness.record(column).height).toBe(200);
+    });
+  });
+
+  describe('resolved properties', () => {
+    it("re-resolves a node's percentages when its container's content box becomes known", () => {
+      // Row 800 > [Box 40, Column { flexGrow: 1 } > Box { position:
+      // relative, left: 20% }]. The inner box is resolved twice in the
+      // one pass: once while the grown column's width is still being
+      // decided, where the percentage has no base and the offset is
+      // nothing, and again once the column is 736 wide, where it is
+      // 147.2 and shifts the box.
+      //
+      // The engine memoizes a node's resolved properties for the length
+      // of a pass, and this is the case that says the percentage base
+      // has to be part of what the memo is keyed on. Keyed on the pass
+      // alone, the second resolution is skipped and the box stays at
+      // its flow position.
+      const harness = new LayoutHarness();
+      const row = harness.createNode('row', UiNodeType.Row);
+      row.setProperty('width', 800);
+      row.setProperty('height', 56);
+      row.setProperty('padding', 8);
+      row.setProperty('gap', 8);
+      const artwork = harness.createNode('artwork', UiNodeType.Box);
+      artwork.setProperty('width', 40);
+      artwork.setProperty('height', 40);
+      const lines = harness.createNode('lines', UiNodeType.Column);
+      lines.setProperty('flexGrow', 1);
+      const target = harness.createNode('target', UiNodeType.Box);
+      target.setProperty('position', 'relative');
+      target.setProperty('left', percent(20));
+      target.setProperty('width', 6);
+      target.setProperty('height', 6);
+      harness.append(lines, target);
+      harness.append(row, artwork, lines);
+      harness.layout(row, Constraints.tight(800, 56));
+
+      expect(harness.record(lines).width).toBe(736);
+      expect(harness.record(target).left).toBe(147.2);
+      expect(harness.boxOf(target).x).toBe(203.2);
     });
   });
 });

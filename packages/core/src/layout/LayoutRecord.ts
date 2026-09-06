@@ -259,4 +259,25 @@ export class LayoutRecord {
   measureDirty = true;
   placeDirty = true;
   transformDirty = false;
+
+  /**
+   * Which layout pass last folded the node's properties onto this
+   * record, and the percentage base they were folded against.
+   *
+   * A pass asks for the same node's properties several times over (the
+   * measure walk, then again from whichever container places it), and
+   * each ask re-reads about thirty properties and re-resolves every
+   * length. `LayoutEngine.resolveLayoutProps` compares these three
+   * against the pass it is in and returns early when they agree, which
+   * is why the base is recorded and not just the pass number: the
+   * engine reassigns the base as it descends, and a node measured
+   * before its container's content box was known is genuinely resolved
+   * twice against two different bases.
+   *
+   * Zero is "never resolved", and pass numbers start at one, so a fresh
+   * record cannot match the pass it is first seen in.
+   */
+  propsPass = 0;
+  propsBaseWidth: number | undefined = undefined;
+  propsBaseHeight: number | undefined = undefined;
 }

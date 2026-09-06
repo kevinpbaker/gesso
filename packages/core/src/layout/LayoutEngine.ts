@@ -183,6 +183,14 @@ export class LayoutEngine {
     width: undefined,
     height: undefined
   };
+  /**
+   * Which layout pass this is, counted from one and bumped by every
+   * `layout` and `layoutForFrame`. Records stamp it when their
+   * properties are folded onto them, which is what lets
+   * `resolveLayoutProps` tell "already done, this pass" from "done
+   * under some earlier state of the tree".
+   */
+  private layoutPass = 0;
   private layoutRoot: UiNode | null = null;
   private rootConstraints: Constraints = Constraints.unbounded();
 
@@ -478,6 +486,7 @@ export class LayoutEngine {
   }
 
   layout(node: UiNode, constraints: Constraints): LayoutResult {
+    this.layoutPass++;
     this.layoutRoot = node;
     this.rootConstraints = constraints;
     this.records.clear();
@@ -522,6 +531,7 @@ export class LayoutEngine {
    * changes skip layout entirely.
    */
   layoutForFrame(frame: UiFrame, constraints: Constraints, root?: UiNode): void {
+    this.layoutPass++;
     if (root !== undefined) {
       this.layoutRoot = root;
       this.rootConstraints = constraints;
@@ -3147,9 +3157,56 @@ export class LayoutEngine {
     return { width, height };
   }
 
+  /**
+   * Folds the node's layout properties onto its record: sizes, minima
+   * and maxima, padding, margins, positioning, the insets, and the
+   * flags the walks read off the record rather than off the property
+   * map.
+   *
+   * Ten places call this, because a node is measured by one container
+   * and then placed by another and each wants the record current
+   * before it reads it. On a list of five thousand nodes that came to
+   * five full re-resolutions per node per pass, each one about thirty
+   * property lookups with a length resolution on most of them, which
+   * was a tenth of the time a full pass took and a good deal of the
+   * garbage it made. So the result is memoized, but only for the
+   * duration of one pass.
+   *
+   * Only for one pass, deliberately. A cache that outlived a pass
+   * would have to be invalidated whenever any layout property changed,
+   * and would be silently wrong the first time some path wrote a
+   * property without marking the node layout-dirty. Within a pass the
+   * question does not arise: nothing writes node properties while a
+   * pass is running, so the second through fifth resolutions provably
+   * produce exactly what the first one did, and the memo cannot be
+   * stale because there is nothing to go stale against. The stamp is
+   * thrown away between frames on purpose; it is not a bug that the
+   * work is done again next frame.
+   *
+   * The percentage base is part of the key rather than assumed
+   * constant, because it is not. The engine reassigns `percentBase` as
+   * it descends, and on the benchmark list two fifths of the nodes
+   * (the text inside each row's column) are first resolved while their
+   * container's content width is still unknown and again once it is
+   * known, against a base of `undefined` and then of a number. Those
+   * must resolve twice or a percentage would keep the answer it got
+   * when there was nothing to be a percentage of.
+   *
+   * `setLifted` is the one thing here that writes engine state rather
+   * than record state, and skipping it on a repeat call is safe for
+   * the same reason the rest is: `lift` cannot change mid-pass, so the
+   * first call already put the node in or out of `liftedNodes` and a
+   * later call would find `rec.lifted` equal and return.
+   */
   private resolveLayoutProps(node: UiNode, rec: LayoutRecord): void {
     const props = node.properties;
     const base = this.percentBase;
+    if (rec.propsPass === this.layoutPass && rec.propsBaseWidth === base.width && rec.propsBaseHeight === base.height) {
+      return;
+    }
+    rec.propsPass = this.layoutPass;
+    rec.propsBaseWidth = base.width;
+    rec.propsBaseHeight = base.height;
     // `flex: n` is CSS's shorthand for grow n, shrink 1, basis 0.
     const flex = this.numberProp(node, 'flex');
     rec.flexGrow = this.numberProp(node, 'flexGrow') ?? flex ?? 0;

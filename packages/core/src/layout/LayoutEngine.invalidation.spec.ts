@@ -198,6 +198,27 @@ describe('LayoutEngine invalidation', () => {
     });
   });
 
+  describe('resolved property memo', () => {
+    it('re-reads a margin the previous frame already resolved', () => {
+      // A node's resolved properties are memoized for the length of one
+      // pass and the stamp is then left on the record, which is only
+      // safe because every pass has a new number. Records survive an
+      // incremental frame (a full `layout` throws them away, so this is
+      // the path where a stamp could be believed twice), so this is
+      // what says the counter is bumped per frame and not per engine.
+      const h = createHarness();
+      const marginLeft$ = new BehaviorSubject(5);
+      h.root = h.builder.build(Column(Text({ text: 'Hello', fontSize: 10, marginLeft: marginLeft$ })));
+      firstFrame(h);
+      const text = h.root.firstChild!;
+      expect(h.engine.recordFor(text)!.x).toBe(5);
+
+      marginLeft$.next(30);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(text)!.x).toBe(30);
+    });
+  });
+
   it('marks the parent dirty when children change via build', () => {
     const h = createHarness();
     h.root = h.builder.build(Column(Text({ text: 'A' })));
