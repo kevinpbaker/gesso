@@ -92,6 +92,9 @@ silent no-op.
 | `params(route)`        | The params of the current match, typed, or null                |
 | `observeParams(route)` | The same as an Observable, for binding a title or a field      |
 | `isActive(route)`      | True while that route is anywhere in the chain, for a nav item |
+| `remember(route, …)`   | A cell a route keeps while its screen does not exist           |
+| `forget(route)`        | Drops what a route remembered                                  |
+| `answerFor(route, …)`  | A shared slot's value, only while it answers this route        |
 
 `go` takes `{ query }` for what follows the `?`, and both `go` and
 `navigate` take `{ replace: true }` to overwrite the current history
@@ -127,6 +130,76 @@ belongs to the record being shown. Read that from the params. This is
 also why params are read from the service rather than handed down as a
 prop: a prop would have had to be rebuilt to deliver them, and rebuilding
 is exactly what did not happen.
+
+## State that outlives a screen
+
+A screen is built when its route matches and destroyed when it stops
+matching, so everything the screen keeps in its body goes with it. That
+is right for almost everything and wrong for the handful of values whose
+whole purpose is to survive the round trip: where the list was scrolled
+to, which row the keyboard was on, the text in a filter field. Coming
+back lands at the top of the list, which is not where the person left.
+
+The router keeps those:
+
+```ts
+const scroll = router.remember(Home, 'scroll', 0);
+
+<scrollview scrollY={scroll} modifiers={[scrollPosition({ onChange: at => (scroll.value = at.y) })]}>
+```
+
+Two halves, and they are deliberately different mechanisms.
+`scrollPosition` **reports** where the list has got to, because the
+runtime moves that offset behind the application's back and nothing else
+could say. `scrollY` **puts it back**, as an ordinary binding, so a
+container built again after Back is laid out where it was left before it
+paints. That last part is what also makes a shared element work in both
+directions: a morph is measured from where an element is seen, and a
+card only morphs back into itself if the list underneath it is where it
+was.
+
+`initial` is used the first time the key is asked for and ignored
+afterwards, and the cell is scoped to the route, so two screens may both
+call their offset `scroll`. `forget(route)` drops what a route
+remembered, for a sign-out or a list whose contents are no longer the
+ones the offset was measured against. A `null` route is the router's own
+scope, for the few values that belong to the navigation rather than to
+one screen.
+
+This is a facility and not an architecture. What belongs here is the
+screen-shaped remainder that exists only to put a screen back where it
+was. Anything that must survive a reload, or that another part of the
+application acts on, is still state on
+[a channel](/structure/channels-and-the-barrier).
+
+## Which page is this
+
+A channel key that holds "the track page" holds whichever track was
+asked for last. A screen arriving during a transition asks for its own
+and is handed the previous one until the answer lands, which is a frame
+or two of the wrong cover, and worse than it looks: an artwork element
+that mounts carrying the previous track's shared name claims that name
+and never claims its own, so a second trip between two pages does not
+animate at all.
+
+`answerFor` is the router filtering a shared slot down to this route's
+own question. Both sides name the same thing in the application's own
+words, and the router compares them:
+
+```ts
+const track = router.answerFor(Track, page.view.track, {
+  asks: params => `/${params.handle}/${params.slug}`.toLowerCase(),
+  answers: entry => entry.path.toLowerCase()
+});
+```
+
+It follows the **current** params, so a walk from one track to another,
+which keeps the same screen mounted because the chain did not change,
+asks the new question rather than the one the body read once. And when
+the route stops matching, the cell keeps what it last held instead of
+emptying: a screen is still on screen while it leaves, and a departing
+page whose artwork blanks for the last frames of its own fade is a
+flicker, not a fix.
 
 ## Guards
 

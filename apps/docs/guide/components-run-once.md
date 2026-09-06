@@ -128,6 +128,50 @@ they are met:
   absolutely positioned control followed by a positioned column is
   painted under the column and cannot be clicked; give it a `zIndex`.
 
+## What the body may ask for
+
+The second argument to a component function is its context: what the
+function may ask of the framework while it runs.
+
+| On `ctx`             | What it does                                                     |
+| -------------------- | ---------------------------------------------------------------- |
+| `inject(Service)`    | The runtime service of this class                                |
+| `channel(token)`     | The replica of a channel: `view` keys to read, `send` to command |
+| `onMount(fn)`        | Runs once after the nodes exist and the bindings are connected   |
+| `onUnmount(fn)`      | Runs once when the component leaves the tree                     |
+| `effect(source, fn)` | Follows a stream for as long as the component is in the tree     |
+| `bounds()`           | A cell holding a node's box, with the modifier that fills it     |
+
+Most values a component reads are bound into the tree, and a binding
+needs no lifecycle: it is torn down with the node it feeds. `effect` is
+for the other kind, a value the component has to **act** on rather than
+draw, such as telling the audio element to load a track or asking a
+channel for the page a url names.
+
+```ts
+ctx.effect(queue.view.current, track => audio.load(track.stream));
+```
+
+The subscription belongs to the host and goes when the component does,
+after `onUnmount` has run. Writing that pair by hand, a `subscribe` in
+the body and an `onUnmount` that unsubscribes, is the same thing with
+two places to forget.
+
+`bounds()` answers the other question a body cannot answer for itself:
+where is this node. Turning a pointer position into a fraction of a
+track needs the track's box, and a canvas has no `getBoundingClientRect`.
+
+```tsx
+const track = ctx.bounds();
+<box modifiers={[track.modifier]} onPanMove={e => seek((e.x - track.value.x) / track.value.width)} />;
+```
+
+It is an ordinary cell: read it in a handler, bind it, derive from it.
+It reports a move and only a move, so a box that has not changed does
+not wake everything reading it; a list notifies its listeners on every
+frame it scrolls, and its viewport is exactly what stays still while it
+does.
+
 ## Where state goes instead
 
 If the body does not re-run, a `useState` equivalent would have nowhere

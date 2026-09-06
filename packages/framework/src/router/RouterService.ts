@@ -80,7 +80,7 @@ const MAX_REDIRECTS = 10;
  * Both sides return a string because both sides are naming the same
  * thing in the application's own words, and a string is the only shape
  * the router can compare without knowing what the thing is. Whatever
- * normalising the comparison needs — a case, a trailing slash — is done
+ * normalising the comparison needs (a case, a trailing slash) is done
  * in these two functions, where the application knows which it wants.
  */
 export interface RouteAnswer<Path extends string, T> {
@@ -224,6 +224,12 @@ export class RouterService {
    * afterwards. The cell is scoped to the route, so two screens may
    * both call their offset `scroll`.
    *
+   * A `null` route is the router's own scope, for the handful of values
+   * that belong to the *navigation* rather than to one screen: which
+   * element the next transition should morph from is the case both
+   * applications have, since the screen that was pressed is destroyed
+   * before the screen that arrives is built.
+   *
    * This is a facility, not an architecture. `decisions/0030` leaves an
    * application's data to the application, and that has not changed:
    * what belongs here is the screen-shaped remainder that exists only
@@ -231,12 +237,12 @@ export class RouterService {
    * reload, or that another part of the application acts on, is still
    * state on a channel.
    */
-  remember<T>(route: RouteDefinition, key: string, initial: T): InternalState<T> {
+  remember<T>(route: RouteDefinition | null, key: string, initial: T): InternalState<T> {
     return this.state.cell(route, key, initial);
   }
 
   /** Drops what a route remembered, so its next screen starts fresh. */
-  forget(route: RouteDefinition): void {
+  forget(route: RouteDefinition | null): void {
     this.state.forget(route);
   }
 
@@ -260,8 +266,8 @@ export class RouterService {
    *
    * Two things about it are the router's to know rather than the
    * screen's. It follows the *current* params, so a navigation from one
-   * track to another — which keeps the same screen mounted, since the
-   * chain did not change — asks the new question rather than staying on
+   * track to another, which keeps the same screen mounted because the
+   * chain did not change, asks the new question rather than staying on
    * the one the body read once. And when the route stops matching the
    * cell **keeps what it last held** instead of emptying: a screen is
    * still on screen while it leaves, and a departing page whose artwork

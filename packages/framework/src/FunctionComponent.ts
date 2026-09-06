@@ -44,10 +44,10 @@ export interface ComponentContext {
   /**
    * Follows a stream for as long as the component is in the tree.
    *
-   * A component that has to *act* on a value rather than draw it —
+   * A component that has to *act* on a value rather than draw it,
    * telling the audio element to load a track, asking a channel for the
-   * page a url names, writing a scroll offset somewhere — subscribes,
-   * and something has to unsubscribe. Every screen in both applications
+   * page a url names, writing a scroll offset somewhere, subscribes, and
+   * something has to unsubscribe. Every screen in both applications
    * wrote that pair by hand, and one of them had grown a `Subscription`
    * bag to hold four of them.
    *

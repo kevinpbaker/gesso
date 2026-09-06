@@ -13,7 +13,7 @@ import type { RouteDefinition } from './RouteDefinition';
  * not where it was left.
  *
  * Both applications solved this by putting those cells in module scope,
- * with the same comment on each explaining why (`decisions/0079`). This
+ * with the same comment on each explaining why (`decisions/0083`). This
  * is that store, with an owner. What it buys over a module:
  *
  *   - **A lifetime that is stated.** A cell here lives as long as the
