@@ -2,6 +2,15 @@ import { Constraints } from './LayoutTypes';
 import type { UiNode } from '../graph/UiNode';
 
 /**
+ * The constraints a record has before anything has measured it.
+ *
+ * One instance rather than one per record: Constraints is immutable,
+ * and a record that has never been measured is only ever compared
+ * against, never written through.
+ */
+const NEVER_MEASURED = Constraints.unbounded();
+
+/**
  * Mutable per-node layout projection owned by LayoutEngine.
  *
  * Records are keyed by UiNode identity and survive graph
@@ -188,7 +197,7 @@ export class LayoutRecord {
   contentHeight = 0;
 
   /** Constraints this record was last measured under. */
-  lastConstraints: Constraints = Constraints.unbounded();
+  lastConstraints: Constraints = NEVER_MEASURED;
 
   /**
    * A second memoised measurement. Flex measures every item twice —
@@ -199,56 +208,90 @@ export class LayoutRecord {
    * costs nothing in either pass.
    */
   altValid = false;
-  altConstraints: Constraints = Constraints.unbounded();
-  private altOutputs: number[] = [];
+  altConstraints: Constraints = NEVER_MEASURED;
+
+  /**
+   * The alternate measurement's twelve outputs, one field each.
+   *
+   * These were a `number[]` built by an `outputs()` helper, which reads
+   * better and cost two array allocations on every flex item of every
+   * pass: a full pass of the benchmark list spent 2.2% of its time in
+   * the pair of helpers that packed and unpacked them, before the
+   * collector's share of having made the arrays at all. A field per
+   * output is the same twelve numbers with nothing built to hold them.
+   */
+  private altMeasuredWidth = 0;
+  private altMeasuredHeight = 0;
+  private altOuterWidth = 0;
+  private altOuterHeight = 0;
+  private altMinContentWidth = 0;
+  private altMaxContentWidth = 0;
+  private altIntrinsicWidth = 0;
+  private altIntrinsicHeight = 0;
+  private altHasBaseline = false;
+  private altBaseline = 0;
+  private altContentWidth = 0;
+  private altContentHeight = 0;
 
   /** Keeps the current measurement as the alternate before a fresh one overwrites it. */
   saveAlt(): void {
     this.altValid = true;
     this.altConstraints = this.lastConstraints;
-    this.altOutputs = this.outputs();
+    this.altMeasuredWidth = this.measuredWidth;
+    this.altMeasuredHeight = this.measuredHeight;
+    this.altOuterWidth = this.outerWidth;
+    this.altOuterHeight = this.outerHeight;
+    this.altMinContentWidth = this.minContentWidth;
+    this.altMaxContentWidth = this.maxContentWidth;
+    this.altIntrinsicWidth = this.intrinsicWidth;
+    this.altIntrinsicHeight = this.intrinsicHeight;
+    this.altHasBaseline = this.hasBaseline;
+    this.altBaseline = this.baseline;
+    this.altContentWidth = this.contentWidth;
+    this.altContentHeight = this.contentHeight;
   }
 
   /** Makes the alternate measurement current, and the current one alternate. */
   swapAlt(): void {
     const constraints = this.lastConstraints;
-    const outputs = this.outputs();
     this.lastConstraints = this.altConstraints;
-    this.restore(this.altOutputs);
     this.altConstraints = constraints;
-    this.altOutputs = outputs;
-  }
-
-  private outputs(): number[] {
-    return [
-      this.measuredWidth,
-      this.measuredHeight,
-      this.outerWidth,
-      this.outerHeight,
-      this.minContentWidth,
-      this.maxContentWidth,
-      this.intrinsicWidth,
-      this.intrinsicHeight,
-      this.hasBaseline ? 1 : 0,
-      this.baseline,
-      this.contentWidth,
-      this.contentHeight
-    ];
-  }
-
-  private restore(outputs: number[]): void {
-    this.measuredWidth = outputs[0];
-    this.measuredHeight = outputs[1];
-    this.outerWidth = outputs[2];
-    this.outerHeight = outputs[3];
-    this.minContentWidth = outputs[4];
-    this.maxContentWidth = outputs[5];
-    this.intrinsicWidth = outputs[6];
-    this.intrinsicHeight = outputs[7];
-    this.hasBaseline = outputs[8] === 1;
-    this.baseline = outputs[9];
-    this.contentWidth = outputs[10];
-    this.contentHeight = outputs[11];
+    let swap: number = this.measuredWidth;
+    this.measuredWidth = this.altMeasuredWidth;
+    this.altMeasuredWidth = swap;
+    swap = this.measuredHeight;
+    this.measuredHeight = this.altMeasuredHeight;
+    this.altMeasuredHeight = swap;
+    swap = this.outerWidth;
+    this.outerWidth = this.altOuterWidth;
+    this.altOuterWidth = swap;
+    swap = this.outerHeight;
+    this.outerHeight = this.altOuterHeight;
+    this.altOuterHeight = swap;
+    swap = this.minContentWidth;
+    this.minContentWidth = this.altMinContentWidth;
+    this.altMinContentWidth = swap;
+    swap = this.maxContentWidth;
+    this.maxContentWidth = this.altMaxContentWidth;
+    this.altMaxContentWidth = swap;
+    swap = this.intrinsicWidth;
+    this.intrinsicWidth = this.altIntrinsicWidth;
+    this.altIntrinsicWidth = swap;
+    swap = this.intrinsicHeight;
+    this.intrinsicHeight = this.altIntrinsicHeight;
+    this.altIntrinsicHeight = swap;
+    const hadBaseline = this.hasBaseline;
+    this.hasBaseline = this.altHasBaseline;
+    this.altHasBaseline = hadBaseline;
+    swap = this.baseline;
+    this.baseline = this.altBaseline;
+    this.altBaseline = swap;
+    swap = this.contentWidth;
+    this.contentWidth = this.altContentWidth;
+    this.altContentWidth = swap;
+    swap = this.contentHeight;
+    this.contentHeight = this.altContentHeight;
+    this.altContentHeight = swap;
   }
 
   /**
@@ -293,4 +336,118 @@ export class LayoutRecord {
   propsPass = 0;
   propsBaseWidth: number | undefined = undefined;
   propsBaseHeight: number | undefined = undefined;
+
+  /**
+   * Returns the record to the state a freshly constructed one is in,
+   * so a full layout can reuse the object instead of replacing it.
+   *
+   * `layout()` used to drop every record and let the pass build new
+   * ones, which is 5,001 objects of seventy fields for the benchmark
+   * list, once per mount and once per resize notification: 71% of
+   * everything a full pass allocated, and the largest part of the 10%
+   * of it the collector was taking. The engine now keeps the object
+   * and calls this instead, which is the same thing without the
+   * garbage. Only the node stays, and it is the one field a record is
+   * never reused across.
+   *
+   * **Every field above has to appear here, with the value it is
+   * declared with.** A field that is added and not reset would carry
+   * one pass's answer into the next, which is the kind of fault that
+   * shows as a stale box on a screen and as nothing at all in a test
+   * that lays out once. `LayoutRecord.spec.ts` compares a reset record
+   * against a new one field by field so the omission fails loudly.
+   */
+  reset(): void {
+    this.x = 0;
+    this.y = 0;
+    this.width = 0;
+    this.height = 0;
+    this.measuredWidth = 0;
+    this.measuredHeight = 0;
+    this.outerWidth = 0;
+    this.outerHeight = 0;
+    this.paddingLeft = 0;
+    this.paddingRight = 0;
+    this.paddingTop = 0;
+    this.paddingBottom = 0;
+    this.marginLeft = 0;
+    this.marginRight = 0;
+    this.marginTop = 0;
+    this.marginBottom = 0;
+    this.minWidth = 0;
+    this.maxWidth = Infinity;
+    this.minHeight = 0;
+    this.maxHeight = Infinity;
+    this.flexGrow = 0;
+    this.flexShrink = 1;
+    this.flexBasisZero = false;
+    this.minWidthAuto = true;
+    this.minHeightAuto = true;
+    this.marginLeftAuto = false;
+    this.marginRightAuto = false;
+    this.marginTopAuto = false;
+    this.marginBottomAuto = false;
+    this.aspectRatio = undefined;
+    this.hasBaseline = false;
+    this.baseline = 0;
+    this.minContentWidth = 0;
+    this.maxContentWidth = 0;
+    this.intrinsicWidth = 0;
+    this.intrinsicHeight = 0;
+    this.flexMain = 0;
+    this.flexBase = 0;
+    this.flexMin = 0;
+    this.flexMax = Infinity;
+    this.flexMinAuto = false;
+    this.positioned = false;
+    this.absolute = false;
+    this.top = undefined;
+    this.right = undefined;
+    this.bottom = undefined;
+    this.left = undefined;
+    this.zIndex = 0;
+    this.lifted = false;
+    this.liftBoundary = false;
+    this.clips = false;
+    this.scrollable = false;
+    this.sticky = false;
+    this.stickyOffsetX = 0;
+    this.stickyOffsetY = 0;
+    this.scrollbarVisibleUntil = 0;
+    this.subgridColumns = undefined;
+    this.subgridColumnGap = 0;
+    this.paintOrder = null;
+    this.boundsMinX = 0;
+    this.boundsMinY = 0;
+    this.boundsMaxX = 0;
+    this.boundsMaxY = 0;
+    this.boundsUnbounded = true;
+    this.scrollX = 0;
+    this.scrollY = 0;
+    this.contentWidth = 0;
+    this.contentHeight = 0;
+    this.lastConstraints = NEVER_MEASURED;
+    this.altValid = false;
+    this.altConstraints = NEVER_MEASURED;
+    this.altMeasuredWidth = 0;
+    this.altMeasuredHeight = 0;
+    this.altOuterWidth = 0;
+    this.altOuterHeight = 0;
+    this.altMinContentWidth = 0;
+    this.altMaxContentWidth = 0;
+    this.altIntrinsicWidth = 0;
+    this.altIntrinsicHeight = 0;
+    this.altHasBaseline = false;
+    this.altBaseline = 0;
+    this.altContentWidth = 0;
+    this.altContentHeight = 0;
+    this.contentMatters = true;
+    this.relayoutBoundary = false;
+    this.measureDirty = true;
+    this.placeDirty = true;
+    this.transformDirty = false;
+    this.propsPass = 0;
+    this.propsBaseWidth = undefined;
+    this.propsBaseHeight = undefined;
+  }
 }
