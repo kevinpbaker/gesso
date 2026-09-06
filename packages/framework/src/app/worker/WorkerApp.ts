@@ -112,6 +112,16 @@ export interface WorkerAppOptions {
    */
   appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   /**
+   * Opens a url the application asked for, in place of a new tab.
+   *
+   * A page wants `window.open`, which is the default. A desktop window
+   * does not: `window.open` in a webview opens another webview or
+   * nothing at all, and a link in a desktop application belongs in the
+   * person's browser, which only the process outside the window can
+   * reach. `@gesso/electrobun`'s bridge is what goes here.
+   */
+  onOpenUrl?: (url: string) => void;
+  /**
    * Receives errors thrown inside the render worker: while handling a
    * message, uncaught during a frame, from the renderer, or from a
    * channel — `source` says which, and `RuntimeErrorSource` says what
@@ -201,6 +211,21 @@ export interface WorkerAppOptions {
  * quietly wrong, by discarding an application the shell had merely
  * borrowed.
  */
+/**
+ * Opens a url through the host's handler, or in a new tab.
+ *
+ * Exported for its spec: the default carries `noopener,noreferrer`,
+ * which is the difference between opening a link and handing the
+ * opener to whatever is on the other end of it.
+ */
+export function openUrlWith(handler: ((url: string) => void) | undefined, url: string): void {
+  if (handler !== undefined) {
+    handler(url);
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export function resolveAppLogic(spec: NonNullable<WorkerAppOptions['appLogicWorker']>): {
   endpoint: AppLogicEndpoint;
   owned: boolean;
@@ -657,7 +682,7 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'openUrl') {
-      window.open(message.url, '_blank', 'noopener,noreferrer');
+      openUrlWith(this.options.onOpenUrl, message.url);
       return;
     }
     if (message.type === 'popup') {

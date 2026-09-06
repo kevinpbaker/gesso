@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveAppLogic } from './WorkerApp';
+import { openUrlWith, resolveAppLogic } from './WorkerApp';
 import type { AppLogicEndpoint } from './WorkerApp';
 
 /**
@@ -95,5 +95,34 @@ describe('resolveAppLogic', () => {
     expect(typeof (resolved.endpoint as { start?: unknown }).start).toBe('function');
     channel.port1.close();
     channel.port2.close();
+  });
+});
+
+describe('openUrlWith', () => {
+  const originalOpen = (globalThis as { window?: unknown }).window;
+
+  afterEach(() => {
+    if (originalOpen === undefined) {
+      delete (globalThis as { window?: unknown }).window;
+    } else {
+      (globalThis as { window?: unknown }).window = originalOpen;
+    }
+  });
+
+  it('hands the url to the host when it has one', () => {
+    const opened: string[] = [];
+
+    openUrlWith(url => opened.push(url), 'https://example.test/a');
+
+    expect(opened).toEqual(['https://example.test/a']);
+  });
+
+  it('opens a new tab when nothing else will, without handing over the opener', () => {
+    const calls: unknown[][] = [];
+    (globalThis as { window?: unknown }).window = { open: (...args: unknown[]) => calls.push(args) };
+
+    openUrlWith(undefined, 'https://example.test/b');
+
+    expect(calls).toEqual([['https://example.test/b', '_blank', 'noopener,noreferrer']]);
   });
 });

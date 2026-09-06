@@ -1475,6 +1475,7 @@ interface WorkerAppOptions {
   renderer?: RendererChoice;
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
+  onOpenUrl?: (url: string) => void;
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;
