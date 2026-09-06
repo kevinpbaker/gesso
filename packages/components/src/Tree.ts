@@ -5,6 +5,7 @@ import { Row, Text, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticSta
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
+  CONTROL_EDGE,
   CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
   keymap,
@@ -229,7 +230,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING, CONTROL_EDGE),
       scrollY: list.scrollY,
       focusable: true,
       count,
@@ -239,8 +240,8 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       role: 'tree',
       label,
       backgroundColor: 'controlBackground',
-      borderWidth: 1,
-      borderColor: 'controlBorder',
+      // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
+      // chosen row's own background would be painted over it.
       borderRadius: 6,
       onKeyDown: keymap({
         ArrowDown: () => step(1),

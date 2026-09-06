@@ -2,9 +2,11 @@ import { map, type Observable } from 'rxjs';
 
 import type { InputCell, Inputs } from '@gesso/framework';
 import {
+  type DecorationShape,
   type UiKeyboardEvent,
   type UiLength,
   type UiSelfAlignment,
+  decorated,
   focusRing,
   interactive,
   type UiModifier
@@ -49,6 +51,35 @@ export const CONTROL_INTERACTION: UiModifier = interactive({
  * item's own selection colour.
  */
 export const CONTROL_FOCUS_RING: UiModifier = focusRing();
+
+/**
+ * The border of a scroller whose rows reach its edges, painted over
+ * them rather than under them.
+ *
+ * `borderWidth` is paint-only: it takes no space, and a node's border
+ * is painted before its children, so a child whose background fills
+ * the container's width covers the two side edges and, when it is
+ * against them, the top and bottom ones too. A table's sticky header
+ * does exactly that, and so does a chosen row in any of these lists,
+ * which is why the border has to be a decoration instead: the shapes
+ * marked `after: 'children'` are painted once the subtree is done,
+ * and outside the node's own clip, so the ring closes all the way
+ * round whatever is drawn inside it.
+ *
+ * A scroller carrying this names no `borderWidth`. Its `borderRadius`
+ * still belongs on the node, because that is what clips the content
+ * and rounds the background; the stroke inherits the same radius, so
+ * the two stay concentric with no number repeated here.
+ *
+ * One shared value, for the reason the two modifiers above are:
+ * arguments are compared by identity, so a list built per render would
+ * detach and re-attach the decoration on every frame.
+ */
+const CONTROL_EDGE_SHAPES: readonly DecorationShape[] = Object.freeze([
+  Object.freeze({ kind: 'stroke', color: 'controlBorder', lineWidth: 1, after: 'children' })
+]) as readonly DecorationShape[];
+
+export const CONTROL_EDGE: UiModifier = decorated(CONTROL_EDGE_SHAPES);
 
 /**
  * The border token a control shows: invalid, or resting.
