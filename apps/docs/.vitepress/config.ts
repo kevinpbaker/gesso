@@ -47,6 +47,24 @@ export default defineConfig({
   ],
   themeConfig: {
     logo: '/gesso-mark.svg',
+    /**
+     * Search, in the browser, over an index built at build time.
+     *
+     * `local` rather than a hosted index because the site has no
+     * hosting and no crawler behind it yet, and because the whole index
+     * is a lazily loaded chunk: nothing is fetched until the reader
+     * opens the box. At eighty-nine pages the index is 834 kB, 214 kB
+     * over the wire, plus 62 kB for the search box itself. That is the
+     * cost of the feature, and only the readers who use it pay it.
+     *
+     * It indexes the rendered prose, so what a reader can find is what
+     * the pages say rather than what the examples do: a `<LiveExample>`
+     * is a canvas, and a snippet quoted from `src/examples` is in the
+     * page and therefore in the index. Searching for a component, a
+     * prop or a phrase from the middle of a guide page returns the page
+     * that owns it, which is the standard this was turned on against.
+     */
+    search: { provider: 'local' },
     nav: [
       { text: 'Guide', link: '/guide/what-is-gesso' },
       { text: 'Layout', link: '/layout/flex' },
