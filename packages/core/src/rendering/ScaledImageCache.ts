@@ -38,14 +38,13 @@
 
 /** What a cached copy is worth having for. */
 interface ScaledImageEntry {
+  /** The source these pixels came from, for eviction to identify. */
+  source: ImageBitmap;
   /** The copy, at exactly `width` x `height` device pixels. */
   bitmap: ImageBitmap | null;
   width: number;
   height: number;
-  /** The size asked for most recently, which may not be `width`/`height` yet. */
-  wantedWidth: number;
-  wantedHeight: number;
-  /** Consecutive resolves that asked for `wantedWidth` x `wantedHeight`. */
+  /** Consecutive resolves that asked for this size. */
   stable: number;
 }
 
@@ -120,7 +119,25 @@ export class ScaledImageCache {
    * and a weak collection cannot be walked. The strong reference to the
    * source is bounded by `MAX_ENTRIES` and released on eviction.
    */
-  private readonly entries = new Map<ImageBitmap, ScaledImageEntry>();
+  private readonly entries = new Map<string, ScaledImageEntry>();
+  /**
+   * A number per source, so an entry can be keyed by picture *and*
+   * size.
+   *
+   * One slot per source was a bug rather than a simplification. A
+   * picture on screen at two sizes at once — Segue's now-playing bar
+   * shows the same cover at 52px that its page shows at 340 — had the
+   * two draws fight over the single slot: each in turn held the size
+   * long enough to earn a copy, made it, and closed the other's. The
+   * smaller one then alternated between a crisp copy and a raw
+   * downsample of the source every few frames, which reads on screen as
+   * the picture shimmering. `ScaledImageCache.spec.ts` pins it.
+   *
+   * `WeakMap`, so a source that goes away takes its id with it; the
+   * entries themselves are still strongly held and evicted by count.
+   */
+  private readonly sourceIds = new WeakMap<ImageBitmap, number>();
+  private nextSourceId = 1;
   private readonly createSurface: ScaledImageSurfaceFactory;
   private readonly enabled: boolean;
 
@@ -153,26 +170,21 @@ export class ScaledImageCache {
     if (source.width === w && source.height === h) {
       return source;
     }
-    const entry = this.entries.get(source);
+    const key = this.keyFor(source, w, h);
+    const entry = this.entries.get(key);
     if (entry === undefined) {
-      this.insert(source, { bitmap: null, width: 0, height: 0, wantedWidth: w, wantedHeight: h, stable: 1 });
+      this.insert(key, { source, bitmap: null, width: w, height: h, stable: 1 });
       return source;
     }
     // Refresh recency whether or not a copy comes of it: an image
     // drawn every frame at a size that keeps changing is still an
     // image this cache should not evict ahead of an idle one.
-    this.entries.delete(source);
-    this.entries.set(source, entry);
-    if (entry.bitmap !== null && entry.width === w && entry.height === h) {
+    this.entries.delete(key);
+    this.entries.set(key, entry);
+    if (entry.bitmap !== null) {
       return entry.bitmap;
     }
-    if (entry.wantedWidth === w && entry.wantedHeight === h) {
-      entry.stable++;
-    } else {
-      entry.wantedWidth = w;
-      entry.wantedHeight = h;
-      entry.stable = 1;
-    }
+    entry.stable++;
     if (entry.stable < FRAMES_BEFORE_COPY) {
       return source;
     }
@@ -180,10 +192,7 @@ export class ScaledImageCache {
     if (copy === null) {
       return source;
     }
-    entry.bitmap?.close();
     entry.bitmap = copy;
-    entry.width = w;
-    entry.height = h;
     return copy;
   }
 
@@ -195,12 +204,28 @@ export class ScaledImageCache {
     this.entries.clear();
   }
 
-  /** How many sources are tracked. For specs and for the inspector. */
+  /** How many picture-and-size pairs are tracked. For specs and the inspector. */
   get size(): number {
     return this.entries.size;
   }
 
-  private insert(source: ImageBitmap, entry: ScaledImageEntry): void {
+  /**
+   * The cache key: this picture, at this size.
+   *
+   * A size that is asked for once and never again makes an entry that
+   * holds no copy and is evicted by count like any other, which is why
+   * a morph scaling every frame costs entries rather than copies.
+   */
+  private keyFor(source: ImageBitmap, width: number, height: number): string {
+    let id = this.sourceIds.get(source);
+    if (id === undefined) {
+      id = this.nextSourceId++;
+      this.sourceIds.set(source, id);
+    }
+    return `${id}:${width}x${height}`;
+  }
+
+  private insert(key: string, entry: ScaledImageEntry): void {
     if (this.entries.size >= MAX_ENTRIES) {
       const oldest = this.entries.keys().next();
       if (!oldest.done) {
@@ -208,7 +233,7 @@ export class ScaledImageCache {
         this.entries.delete(oldest.value);
       }
     }
-    this.entries.set(source, entry);
+    this.entries.set(key, entry);
   }
 
   /**

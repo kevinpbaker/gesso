@@ -81,7 +81,11 @@ describe('ScaledImageCache', () => {
     expect(copies).toHaveLength(0);
   });
 
-  it('replaces the copy, and closes the old one, when a new size settles', () => {
+  it('keeps a copy per settled size rather than replacing the last one', () => {
+    // A second settled size does not evict the first. It used to, and
+    // that is what made a picture drawn at two sizes at once shimmer:
+    // see "one picture at two sizes at once" below. Memory is bounded
+    // by the entry count instead, which is what `MAX_ENTRIES` is for.
     const { create, copies } = factory();
     const cache = new ScaledImageCache(create);
     const source = bitmap(1280, 992);
@@ -94,8 +98,10 @@ describe('ScaledImageCache', () => {
 
     expect(second).not.toBe(first);
     expect(second.width).toBe(800);
-    expect(isClosed(first)).toBe(true);
+    expect(isClosed(first)).toBe(false);
     expect(copies).toHaveLength(2);
+    // And the first size is still answered from its own copy.
+    expect(cache.resolve(source, 400, 310)).toBe(first);
   });
 
   it('copies nothing for an image already drawn at its own size', () => {
@@ -168,5 +174,59 @@ describe('ScaledImageCache', () => {
 
     expect(copies.every(isClosed)).toBe(true);
     expect(cache.size).toBe(0);
+  });
+});
+
+describe('one picture at two sizes at once', () => {
+  /**
+   * Segue's now-playing bar shows the same cover at 52px that its page
+   * shows at 340, and both are drawn every frame. With one slot per
+   * source the two sizes cancelled each other out: neither ever held
+   * the slot for two consecutive resolves, so `stable` never reached
+   * the threshold, no copy was ever made, and the 480px source was
+   * resampled down to 52 on every frame. That resample is a linear
+   * sample with no mip chain under it, which aliases, and on screen it
+   * reads as the small picture shimmering.
+   */
+  it('gives each size its own copy instead of starving both', () => {
+    const made = factory();
+    const cache = new ScaledImageCache(made.create);
+    const source = bitmap(480, 480);
+
+    const barDrew: number[] = [];
+    for (let frame = 0; frame < 20; frame += 1) {
+      barDrew.push(cache.resolve(source, 52, 52).width);
+      cache.resolve(source, 340, 340);
+    }
+
+    // One warm-up frame apiece while the size proves itself, and a copy
+    // from then on rather than the source resampled every frame.
+    expect(barDrew[0]).toBe(480);
+    expect([...new Set(barDrew.slice(2))]).toEqual([52]);
+    expect(made.copies.map(copy => copy.width).sort((a, b) => a - b)).toEqual([52, 340]);
+  });
+
+  it('keeps both copies alive, so neither closes the other', () => {
+    const made = factory();
+    const cache = new ScaledImageCache(made.create);
+    const source = bitmap(480, 480);
+    for (let frame = 0; frame < 6; frame += 1) {
+      cache.resolve(source, 52, 52);
+      cache.resolve(source, 340, 340);
+    }
+    expect(made.copies).toHaveLength(2);
+    expect(made.copies.every(copy => !isClosed(copy))).toBe(true);
+  });
+
+  it('still makes no copy for a size that is never asked for twice', () => {
+    // A morph scales its picture every frame, and a copy per frame
+    // would make the most frame-sensitive case the most expensive.
+    const made = factory();
+    const cache = new ScaledImageCache(made.create);
+    const source = bitmap(480, 480);
+    for (let step = 0; step < 20; step += 1) {
+      cache.resolve(source, 52 + step, 52 + step);
+    }
+    expect(made.copies).toHaveLength(0);
   });
 });
