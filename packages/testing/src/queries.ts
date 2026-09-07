@@ -1,4 +1,5 @@
 import type { UiNode, UiRole, UiSemanticState, UiSemanticsRecord } from '@gesso/core';
+import { textContentOf } from '@gesso/core';
 
 import type { RenderedBase } from './renderTest';
 
@@ -96,10 +97,17 @@ export function nodesUnder(root: UiNode): UiNode[] {
   return out;
 }
 
-/** The text a node draws, if it draws any. */
+/**
+ * The text a node draws, if it draws any.
+ *
+ * A paragraph given runs holds its text in them rather than in a
+ * `text` property, and `getByText` has to find it either way, so this
+ * asks the same question the layout engine, paint, selection, find and
+ * the semantics mirror all ask.
+ */
 export function textProperty(node: UiNode): string | undefined {
-  const text = node.properties.get('text');
-  return typeof text === 'string' && text.length > 0 ? text : undefined;
+  const text = textContentOf(node);
+  return text.length > 0 ? text : undefined;
 }
 
 function recordMatches(record: UiSemanticsRecord, role: UiRole, options: RoleQueryOptions): boolean {

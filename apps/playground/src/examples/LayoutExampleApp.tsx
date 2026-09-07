@@ -13,7 +13,8 @@ import {
   type Size,
   type UiChild,
   type UiSemanticStates,
-  type UiTextStyle
+  type UiTextStyle,
+  type UiTheme
 } from '@gesso/core';
 import type { ComponentContext, Inputs } from '@gesso/framework';
 import { gessoTheme } from './brand';
@@ -335,14 +336,29 @@ function Toggle(inputs: Inputs<{ label: string; on: boolean; onToggle: () => voi
       states={inputs.on.pipe(map((on): UiSemanticStates => (on ? ['checked'] : [])))}
       onClick={onToggle}
       modifiers={[CARD, RING]}>
-      <text
-        textStyle="bodySmall"
-        color={inputs.on.pipe(map(on => (on ? 'background' : 'text')))}
-        selectable={false}>
+      <text textStyle="bodySmall" color={inputs.on.pipe(map(on => (on ? 'background' : 'text')))} selectable={false}>
         {inputs.label}
       </text>
     </row>
   );
+}
+
+/**
+ * The same theme, read the other way round.
+ *
+ * A `UiTheme` carries its direction on each typography role, so
+ * mirroring a page is one derived value rather than a flag threaded
+ * through it. Built once per press and held by the cell, so nothing
+ * below is rebuilt while the direction is unchanged.
+ */
+function readingRightToLeft(theme: UiTheme): UiTheme {
+  const typography = Object.fromEntries(
+    Object.entries(theme.typography).map(([role, style]) => [
+      role,
+      { ...(style as UiTextStyle), textDirection: 'rtl' as const }
+    ])
+  ) as unknown as UiTheme['typography'];
+  return { ...theme, typography };
 }
 
 export function LayoutExampleApp(_inputs: Inputs<Record<string, never>>, _ctx: ComponentContext): UiChild {
@@ -358,21 +374,24 @@ export function LayoutExampleApp(_inputs: Inputs<Record<string, never>>, _ctx: C
   const mirrored = new BehaviorSubject(false);
 
   /**
-   * Right-to-left reaches a subtree through the text style, which is
-   * where the direction already lives. A theme whose typography reads
-   * the other way mirrors every box under it, and no box repeats the
-   * fact.
+   * Right-to-left reaches a subtree through the theme, because the
+   * direction is a field of a text style and a text style is what the
+   * theme's typography is made of.
+   *
+   * Every role, not only the one the root provides: an element that
+   * names a role — `textStyle="headline"` — takes that role's style
+   * whole, direction included, so a theme whose body reads one way and
+   * whose headings read the other would mirror a page in pieces. One
+   * value at the root, and every box under it mirrors.
    */
-  const textStyle = mirrored.pipe(
-    map((rtl): UiTextStyle => ({ ...gessoTheme.typography.body, textDirection: rtl ? 'rtl' : 'ltr' }))
-  );
+  const theme = mirrored.pipe(map(rtl => (rtl ? readingRightToLeft(gessoTheme) : gessoTheme)));
 
   return (
     <box
       width={percent(100)}
       height={percent(100)}
-      theme={gessoTheme}
-      textStyle={textStyle}
+      theme={theme}
+      textStyle={theme.pipe(map(current => current.typography.body))}
       insets={insets}
       backgroundColor="background">
       <scrollview width={percent(100)} height={percent(100)}>

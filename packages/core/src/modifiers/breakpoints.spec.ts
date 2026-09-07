@@ -194,7 +194,10 @@ describe('Responsive', () => {
 
   it('provides its size to the subtree', () => {
     const layout = new Boxes();
-    const { node } = build(Responsive({ at: [900] }, () => Box({ key: 'only' })), layout);
+    const { node } = build(
+      Responsive({ at: [900] }, () => Box({ key: 'only' })),
+      layout
+    );
     layout.place(node, { x: 0, y: 0, width: 640, height: 480 });
     const inside = node.firstChild!;
     expect(inside.environment!.get(UiEnvironmentKeys.containerSize).current).toEqual({ width: 640, height: 480 });

@@ -136,7 +136,8 @@ function spanRequest(span: TextCaseSpan): TextRunSpan {
   return {
     start: span.start,
     end: span.end,
-    fontFamily: span.font === undefined ? undefined : cssFamilyList(typeof span.font === 'string' ? [span.font] : span.font),
+    fontFamily:
+      span.font === undefined ? undefined : cssFamilyList(typeof span.font === 'string' ? [span.font] : span.font),
     fontSize: span.fontSize,
     fontWeight: span.fontWeight,
     fontStyle: span.fontStyle,
@@ -276,7 +277,9 @@ function probeRuns(textCase: TextCase): string {
 function spanStyles(span: TextCaseSpan): string[] {
   const styles: string[] = [];
   if (span.font !== undefined) {
-    styles.push(`font-family:${cssFamilyList(typeof span.font === 'string' ? [span.font] : span.font).replace(/"/g, "'")}`);
+    styles.push(
+      `font-family:${cssFamilyList(typeof span.font === 'string' ? [span.font] : span.font).replace(/"/g, "'")}`
+    );
   }
   if (span.fontSize !== undefined) {
     styles.push(`font-size:${px(span.fontSize)}`);

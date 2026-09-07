@@ -286,7 +286,15 @@ export function applyCanvasTextStyle(context: Canvas2DContext, style: CanvasText
 export function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState, measurer: TextMeasurer): void {
   const placements = layoutTextLines(box, state, measurer);
   fillTextRects(ctx, textRunBackgrounds(placements, state));
-  drawTextLines(ctx, placements, buildFontString(state), colorToCss(state.textColor), state.letterSpacing, state.rtl, state);
+  drawTextLines(
+    ctx,
+    placements,
+    buildFontString(state),
+    colorToCss(state.textColor),
+    state.letterSpacing,
+    state.rtl,
+    state
+  );
   fillTextRects(ctx, textRunDecorations(placements, state));
 }
 
@@ -384,10 +392,7 @@ export type SpanPaint = Pick<
  * inline background does, so two adjacent runs of the same colour read
  * as one band.
  */
-export function textRunBackgrounds(
-  placements: readonly TextLinePlacement[],
-  state: SpanPaint
-): readonly TextRunRect[] {
+export function textRunBackgrounds(placements: readonly TextLinePlacement[], state: SpanPaint): readonly TextRunRect[] {
   if (state.spans === undefined) {
     return EMPTY_RECTS;
   }
@@ -402,7 +407,13 @@ export function textRunBackgrounds(
         continue;
       }
       if (span.backgroundColor !== undefined) {
-        rects.push({ x: run.x, y: placement.y, width: run.width, height: placement.height, color: span.backgroundColor });
+        rects.push({
+          x: run.x,
+          y: placement.y,
+          width: run.width,
+          height: placement.height,
+          color: span.backgroundColor
+        });
       }
       if (run.span === state.linkHover && span.link !== undefined) {
         const color = span.color ?? state.textColor;
@@ -433,10 +444,7 @@ export function textRunBackgrounds(
  * A link the pointer is on is underlined whether or not it asked to
  * be, which is the hover state a link owes the person using it.
  */
-export function textRunDecorations(
-  placements: readonly TextLinePlacement[],
-  state: SpanPaint
-): readonly TextRunRect[] {
+export function textRunDecorations(placements: readonly TextLinePlacement[], state: SpanPaint): readonly TextRunRect[] {
   const paragraphDecoration = state.textDecoration ?? 'none';
   if (paragraphDecoration === 'none' && state.spans === undefined) {
     return EMPTY_RECTS;
@@ -445,7 +453,15 @@ export function textRunDecorations(
   for (const placement of placements) {
     if (placement.runs === undefined) {
       if (paragraphDecoration !== 'none' && placement.text.length > 0) {
-        push(rects, paragraphDecoration, placement.x, placement.width, placement.baselineY, state.fontSize, state.textColor);
+        push(
+          rects,
+          paragraphDecoration,
+          placement.x,
+          placement.width,
+          placement.baselineY,
+          state.fontSize,
+          state.textColor
+        );
       }
       continue;
     }

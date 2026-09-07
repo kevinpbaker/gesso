@@ -89,6 +89,7 @@ export default defineConfig({
           { text: 'Inputs and outputs', link: '/guide/inputs-and-outputs' },
           { text: 'Layout basics', link: '/guide/layout-basics' },
           { text: 'Text', link: '/guide/text' },
+          { text: 'Rich text', link: '/guide/rich-text' },
           { text: 'Using components', link: '/guide/using-components' },
           { text: 'Forms', link: '/guide/forms' },
           { text: 'Light and dark', link: '/guide/appearance' },
@@ -102,6 +103,10 @@ export default defineConfig({
         items: [
           { text: 'Flex in full', link: '/layout/flex' },
           { text: 'Grid', link: '/layout/grid' },
+          { text: 'Custom layouts', link: '/layout/custom-layouts' },
+          { text: 'Layouts that change', link: '/layout/responsive' },
+          { text: 'Insets', link: '/layout/insets' },
+          { text: 'Right to left', link: '/layout/right-to-left' },
           { text: 'Overflow and scrolling', link: '/layout/overflow-and-scrolling' },
           { text: 'Sticky positioning', link: '/layout/sticky' },
           { text: 'Positioning and overlays', link: '/layout/positioning-and-overlays' },

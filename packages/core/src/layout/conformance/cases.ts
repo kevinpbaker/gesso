@@ -757,6 +757,21 @@ export const layoutCases: readonly LayoutCase[] = [
     'reverse/rtl-column-self-start',
     column({ textDirection: 'rtl', width: 200, x: 'end' }, leaf(40, 20), leaf(60, 20, { selfX: 'start' }))
   ),
+  // A stretched child narrowed by its own maximum is the one case
+  // where stretch and start are not the same thing: what is left over
+  // sits at the cross-start, which rtl moves to the other side.
+  testCase(
+    'reverse/rtl-column-stretch-clamped',
+    column({ textDirection: 'rtl', width: 200 }, box({ height: 20, maxWidth: 80 }))
+  ),
+  testCase(
+    'reverse/rtl-stack-stretch-clamped',
+    box({ textDirection: 'rtl', width: 200, height: 40, x: 'stretch', y: 'start' }, box({ height: 20, maxWidth: 80 }))
+  ),
+  testCase(
+    'reverse/rtl-grid-stretch-clamped',
+    grid({ textDirection: 'rtl', width: 200, columns: [frTrack(1)] }, box({ height: 20, maxWidth: 80 }))
+  ),
   testCase(
     'reverse/rtl-column-wrap-lines',
     column(
@@ -780,7 +795,12 @@ export const layoutCases: readonly LayoutCase[] = [
   // the right-hand one, and the alignment inside a cell goes with it.
   testCase(
     'reverse/rtl-grid-columns',
-    grid({ textDirection: 'rtl', width: 200, columns: [60, 40, frTrack(1)], gap: 10 }, leaf(20, 20), leaf(20, 20), leaf(20, 20))
+    grid(
+      { textDirection: 'rtl', width: 200, columns: [60, 40, frTrack(1)], gap: 10 },
+      leaf(20, 20),
+      leaf(20, 20),
+      leaf(20, 20)
+    )
   ),
   testCase(
     'reverse/rtl-grid-cell-start',
@@ -790,10 +810,7 @@ export const layoutCases: readonly LayoutCase[] = [
   // ---------------------------------------------------------------------------
   // Logical padding and margin
   // ---------------------------------------------------------------------------
-  testCase(
-    'logical/padding-ltr',
-    row({ paddingStart: 24, paddingEnd: 8, y: 'start' }, leaf(40, 20), leaf(40, 20))
-  ),
+  testCase('logical/padding-ltr', row({ paddingStart: 24, paddingEnd: 8, y: 'start' }, leaf(40, 20), leaf(40, 20))),
   testCase(
     'logical/padding-rtl',
     row({ textDirection: 'rtl', paddingStart: 24, paddingEnd: 8, y: 'start' }, leaf(40, 20), leaf(40, 20))
@@ -809,7 +826,7 @@ export const layoutCases: readonly LayoutCase[] = [
   // direction that decides which edge `start` is. The direction is
   // written on the child here because the conformance trees carry no
   // scoped environment; in an application it reaches the whole subtree
-  // through the theme's text style. See `decisions/0085`.
+  // through the theme's text style. See `decisions/0088`.
   testCase('logical/margin-ltr', row({ y: 'start' }, leaf(40, 20, { marginStart: 16, marginEnd: 4 }), leaf(40, 20))),
   testCase(
     'logical/margin-rtl',

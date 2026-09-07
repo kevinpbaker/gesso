@@ -1,7 +1,7 @@
 {
   "generator": {
     "chrome": "Google Chrome 152.0.7977.64",
-    "generatedAt": "2026-09-06T21:18:20.840Z"
+    "generatedAt": "2026-09-07T00:55:38.695Z"
   },
   "cases": {
     "root/column-fills-viewport": {
@@ -4730,6 +4730,63 @@
           "x": 140,
           "y": 20,
           "width": 60,
+          "height": 20
+        }
+      ]
+    },
+    "reverse/rtl-column-stretch-clamped": {
+      "fingerprint": "b92f4815",
+      "boxes": [
+        {
+          "path": "root",
+          "x": 0,
+          "y": 0,
+          "width": 200,
+          "height": 200
+        },
+        {
+          "path": "root/0",
+          "x": 120,
+          "y": 0,
+          "width": 80,
+          "height": 20
+        }
+      ]
+    },
+    "reverse/rtl-stack-stretch-clamped": {
+      "fingerprint": "9b58741b",
+      "boxes": [
+        {
+          "path": "root",
+          "x": 0,
+          "y": 0,
+          "width": 200,
+          "height": 40
+        },
+        {
+          "path": "root/0",
+          "x": 120,
+          "y": 0,
+          "width": 80,
+          "height": 20
+        }
+      ]
+    },
+    "reverse/rtl-grid-stretch-clamped": {
+      "fingerprint": "3ce9a3d0",
+      "boxes": [
+        {
+          "path": "root",
+          "x": 0,
+          "y": 0,
+          "width": 200,
+          "height": 200
+        },
+        {
+          "path": "root/0",
+          "x": 120,
+          "y": 0,
+          "width": 80,
           "height": 20
         }
       ]

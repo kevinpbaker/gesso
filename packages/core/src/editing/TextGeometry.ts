@@ -92,10 +92,7 @@ function advanceTo(line: PlacedLine, offset: number, text: string, measure: RunM
   if (inLine === line.text.length) {
     return line.width;
   }
-  return measure(
-    inLine < line.text.length ? line.text.slice(0, inLine) : text.slice(line.start, offset),
-    line.start
-  );
+  return measure(inLine < line.text.length ? line.text.slice(0, inLine) : text.slice(line.start, offset), line.start);
 }
 
 /** Where the caret for `offset` is drawn. */

@@ -320,8 +320,8 @@ describe('custom layout', () => {
     h.layout(root, Constraints.loose(400, 400));
 
     expect(escaped).toBeDefined();
-    expect(() => escaped!.place(10, 10)).toThrow("outside its own layout call");
-    expect(() => escaped!.measure(Constraints.loose(10, 10))).toThrow("outside its own layout call");
+    expect(() => escaped!.place(10, 10)).toThrow('outside its own layout call');
+    expect(() => escaped!.measure(Constraints.loose(10, 10))).toThrow('outside its own layout call');
   });
 
   it('refuses a size that is not a number', () => {
@@ -358,7 +358,7 @@ describe('custom layout', () => {
     tiles(h, wall, [10]);
     h.append(root, wall);
 
-    expect(() => h.layout(root, Constraints.loose(400, 400))).toThrow("placed child 0 at (NaN, 0)");
+    expect(() => h.layout(root, Constraints.loose(400, 400))).toThrow('placed child 0 at (NaN, 0)');
   });
 
   it('cannot measure or place from explain', () => {

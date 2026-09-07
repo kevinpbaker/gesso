@@ -44,7 +44,11 @@ export class RecordedTextMeasurer extends ParagraphTextMeasurer {
   }
 
   /** The paragraph's own recording, or the run's where its font differs. */
-  private recordingFor(request: TextMeasureRequest): { widths: Record<string, number>; ascent: number; descent: number } {
+  private recordingFor(request: TextMeasureRequest): {
+    widths: Record<string, number>;
+    ascent: number;
+    descent: number;
+  } {
     const runs = this.recording.runs;
     if (runs === undefined) {
       return this.recording;

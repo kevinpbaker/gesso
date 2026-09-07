@@ -286,6 +286,34 @@ describe('GessoRuntime semantics', () => {
       expect(runtime.input.focus.focusedNode?.id).toBe(buttons[1].id);
     });
 
+    it('opens an inline link for a press, since a run borrows its paragraph id', () => {
+      const opened: string[] = [];
+      const { runtime, frame } = mountRuntime(
+        Column(
+          Text({
+            spans: [
+              { text: 'Read the ' },
+              { text: 'routing guide', link: { onClick: () => opened.push('routing') } },
+              { text: ' first.' }
+            ]
+          })
+        )
+      );
+      frame(0);
+      const link = [...runtime.semanticsTree().values()].find(node => node.role === 'link')!;
+
+      runtime.applySemanticsAction({ id: link.id, action: 'click' });
+
+      expect(opened).toEqual(['routing']);
+    });
+
+    it('drops a run action whose paragraph has left the tree, rather than reading it as a node', () => {
+      const { runtime, frame } = mountRuntime(Column(Text({ text: 'Nothing here is a link.' })));
+      frame(0);
+
+      expect(() => runtime.applySemanticsAction({ id: 'no-such-node#run0', action: 'click' })).not.toThrow();
+    });
+
     it("sets an editable's value for a setValue action, as an edit the app can see", () => {
       const inputs: string[] = [];
       const { runtime, frame } = mountRuntime(

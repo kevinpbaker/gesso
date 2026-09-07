@@ -17,11 +17,4 @@ export {
   type ParagraphGeometry
 } from './TextSelectionGeometry';
 export { UiSelectionController, type SelectionHost, type SelectionControllerOptions } from './UiSelectionController';
-export {
-  linkHoverOf,
-  setLinkHover,
-  clearLinkHover,
-  hasTextLinks,
-  linkOf,
-  linkRunAtPointIn
-} from './UiTextLinks';
+export { linkHoverOf, setLinkHover, clearLinkHover, hasTextLinks, linkOf, linkRunAtPointIn } from './UiTextLinks';

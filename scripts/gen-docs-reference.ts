@@ -248,7 +248,7 @@ function propertiesPage(): string {
     '',
     '**Default** is what the property resolves to when no ancestor provides it and nothing sets it. `unset` means exactly that: the property holds no value, and whatever reads it decides what to do, which for a length usually means sizing from content. A default printed as plain words rather than in code is one whose real value is an object, described here because printing it would not help.',
     '',
-    `**Inherited** means the value is looked up through the environment rather than stopping at the node. ${inherited} properties inherit, and they are all text style: set \`fontSize\` on a container and every text node below reads it. The three properties in [Environment](#environment) are the other side of that, the ones that provide a value for a subtree.`,
+    `**Inherited** means the value is looked up through the environment rather than stopping at the node. ${inherited} properties inherit, and they are all text style: set \`fontSize\` on a container and every text node below reads it. The properties in [Environment](#environment) are the other side of that, the ones that provide a value for a subtree.`,
     '',
     '**Invalidates** is what changing the value marks dirty, which decides how much work the next frame does. `Paint` repaints the node. `Layout` re-runs layout for the box and whatever depends on it. `Content` remeasures text. `Transform` moves what is already painted. `Semantics` republishes the accessibility record. `Properties` marks the value changed without scheduling any of those, for something the input or paint layer reads on demand. `None` means the runtime does no work at all, and something else reads the value when it needs it.',
     '',

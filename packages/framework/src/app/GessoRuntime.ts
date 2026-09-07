@@ -25,6 +25,8 @@ import {
   describeOverrides,
   formatExplanation,
   isComponentLikeElement,
+  linkOf,
+  textRunOfRecordId,
   type UiEnvironment,
   isObservable,
   type UiElement,
@@ -1881,6 +1883,9 @@ export class GessoRuntime {
    * focus trap any more than Tab can.
    */
   applySemanticsAction(action: UiSemanticsAction): void {
+    if (this.applyTextRunAction(action)) {
+      return;
+    }
     const node = this.graph.getNode(action.id);
     if (node === undefined || !this.semantics.has(action.id)) {
       // A stale id: the mirror acted on a node this frame removed.
@@ -1904,6 +1909,37 @@ export class GessoRuntime {
       new UiPointerEvent(UiEventType.Click, box.x + box.width / 2, box.y + box.height / 2, 1),
       node
     );
+  }
+
+  /**
+   * An action on an inline link, which is a run and not a node.
+   *
+   * A run borrows its paragraph's id and adds its position, so the
+   * lookup above would miss it and the action would be dropped as
+   * stale. Activation calls the run's own `onClick`, which is the same
+   * call a press makes in `UiSelectionController`, so a link opened
+   * from the keyboard and a link opened with the pointer go through one
+   * path rather than two.
+   *
+   * `focus` and `setValue` are not answered. A run cannot hold focus,
+   * because focus is a node in `UiFocusManager`, and a run has no value
+   * to set. Returning true for them anyway is deliberate: the id did
+   * name a run, so falling through to the node lookup would only find
+   * nothing and read as a stale id.
+   */
+  private applyTextRunAction(action: UiSemanticsAction): boolean {
+    const run = textRunOfRecordId(action.id);
+    if (run === null) {
+      return false;
+    }
+    if (action.action === 'focus' || action.action === 'setValue') {
+      return true;
+    }
+    const node = this.graph.getNode(run.nodeId);
+    if (node !== undefined && this.semantics.has(action.id)) {
+      linkOf(node, run.index)?.onClick?.();
+    }
+    return true;
   }
 
   /**

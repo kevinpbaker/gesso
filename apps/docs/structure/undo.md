@@ -120,7 +120,11 @@ follows them:
 ```tsx
 <Menu
   items={[
-    { value: 'undo', label: computed(() => `Undo ${undo.undoLabel.value ?? ''}`), disabled: computed(() => !undo.canUndo.value) }
+    {
+      value: 'undo',
+      label: computed(() => `Undo ${undo.undoLabel.value ?? ''}`),
+      disabled: computed(() => !undo.canUndo.value)
+    }
   ]}
 />
 ```

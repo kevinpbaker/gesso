@@ -152,6 +152,10 @@ function stepper(glyph: string, press: () => void, disabled: Observable<boolean>
     text: glyph,
     width: 28,
     height: 32,
+    // The field beside it grows and these do not shrink. Without this
+    // a number field narrow enough to matter, which is what a form
+    // puts one in, squeezes the two buttons into each other.
+    flexShrink: 0,
     x: 'center',
     y: 'center',
     focusable: false,

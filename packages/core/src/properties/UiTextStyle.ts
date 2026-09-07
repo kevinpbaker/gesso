@@ -242,10 +242,7 @@ export function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[] {
 }
 
 /** The span covering an offset, or undefined where no run does. */
-export function spanAtOffset(
-  spans: readonly UiResolvedTextSpan[],
-  offset: number
-): UiResolvedTextSpan | undefined {
+export function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined {
   for (const span of spans) {
     if (offset >= span.start && offset < span.end) {
       return span;
@@ -262,10 +259,7 @@ export function spanAtOffset(
  * render says the run changed, which costs a paint and no layout,
  * since a handler is not a metric field.
  */
-export function textSpansEqual(
-  a: readonly UiTextSpan[] | undefined,
-  b: readonly UiTextSpan[] | undefined
-): boolean {
+export function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean {
   if (a === b) {
     return true;
   }

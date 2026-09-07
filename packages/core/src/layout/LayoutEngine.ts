@@ -1472,7 +1472,8 @@ export class LayoutEngine {
           availableHeight
         )
       );
-      const x = contentX + area.x + cRec.marginLeft + this.stackOffset(alignX, availableWidth, cRec.measuredWidth);
+      const x =
+        contentX + area.x + cRec.marginLeft + this.stackOffset(alignX, availableWidth, cRec.measuredWidth, mirrored);
       const y = contentY + area.y + cRec.marginTop + this.stackOffset(alignY, availableHeight, cRec.measuredHeight);
       this.assignBox(child, x, y, cRec.measuredWidth, cRec.measuredHeight);
     }
@@ -3203,7 +3204,7 @@ export class LayoutEngine {
           // edge, item order reverses, auto margins push the other way.
           mainPos = contentStart + contentMain - (mainPos - contentStart) - item.finalMain;
         }
-        const { crossPos, crossDim } = this.crossPlacement(item, line, above);
+        const { crossPos, crossDim } = this.crossPlacement(item, line, above, config.crossReversed);
         const x = row ? mainPos : crossPos;
         const y = row ? crossPos : mainPos;
         const width = row ? item.finalMain : crossDim;
@@ -3332,7 +3333,12 @@ export class LayoutEngine {
    * Where an item sits across its line. Cross-axis auto margins take
    * precedence: both centre the item, one pushes it to the other edge.
    */
-  private crossPlacement(item: FlexItem, line: FlexLine, above: number): { crossPos: number; crossDim: number } {
+  private crossPlacement(
+    item: FlexItem,
+    line: FlexLine,
+    above: number,
+    mirrored: boolean
+  ): { crossPos: number; crossDim: number } {
     const crossStart = line.crossStart;
     const marginCross = item.marginCrossStart + item.marginCrossEnd;
     const outerCross = item.cross + marginCross;
@@ -3343,7 +3349,16 @@ export class LayoutEngine {
     }
     switch (item.align) {
       case CrossAxisAlignment.Stretch:
-        return { crossPos: crossStart + item.marginCrossStart, crossDim: item.cross };
+        // A stretched item usually fills the line, and then both edges
+        // are the same edge. It does not when its own maximum cut it
+        // short, and the leftover then sits at the cross-start, which
+        // for a Column that reads right to left is the right-hand side.
+        return {
+          crossPos: mirrored
+            ? crossStart + (line.cross - outerCross) + item.marginCrossStart
+            : crossStart + item.marginCrossStart,
+          crossDim: item.cross
+        };
       case CrossAxisAlignment.Center:
         return { crossPos: crossStart + item.marginCrossStart + (line.cross - outerCross) / 2, crossDim: item.cross };
       case CrossAxisAlignment.End:
@@ -3394,7 +3409,7 @@ export class LayoutEngine {
       }
       const width = cRec.measuredWidth;
       const height = cRec.measuredHeight;
-      const x = contentX + cRec.marginLeft + this.stackOffset(alignX, availableWidth, width);
+      const x = contentX + cRec.marginLeft + this.stackOffset(alignX, availableWidth, width, mirrored);
       const y = contentY + cRec.marginTop + this.stackOffset(alignY, availableHeight, height);
       this.assignBox(child, x, y, width, height);
     });
@@ -3426,13 +3441,26 @@ export class LayoutEngine {
     return mirrored ? mirrorAlignment(align) : align;
   }
 
-  private stackOffset(align: CrossAxisAlignment, available: number, size: number): number {
+  private stackOffset(
+    align: CrossAxisAlignment,
+    available: number,
+    size: number,
+    /** Set for the horizontal axis of a container that reads right to left. */
+    mirrored = false
+  ): number {
     switch (align) {
       case CrossAxisAlignment.Center:
         return (available - size) / 2;
       case CrossAxisAlignment.End:
         return available - size;
+      case CrossAxisAlignment.Stretch:
+        // See `crossPlacement`: stretch is only distinguishable from
+        // start when the child's own maximum stopped it short of the
+        // box, and what is left over is at the start edge.
+        return mirrored ? available - size : 0;
       default:
+        // Start, which `stackAlignment` has already swapped for End
+        // when the axis is mirrored, so this is always the near edge.
         return 0;
     }
   }

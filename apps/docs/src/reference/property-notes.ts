@@ -131,6 +131,14 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   paddingRight: { group: 'Spacing', note: 'Overrides `paddingX` on the right edge. For one edge, not for an axis.' },
   paddingBottom: { group: 'Spacing', note: 'Overrides `paddingY` on the bottom edge. For one edge, not for an axis.' },
   paddingLeft: { group: 'Spacing', note: 'Overrides `paddingX` on the left edge. For one edge, not for an axis.' },
+  paddingStart: {
+    group: 'Spacing',
+    note: 'Space inside the border on the edge the reading starts at. The idiom for one horizontal edge.'
+  },
+  paddingEnd: {
+    group: 'Spacing',
+    note: 'Space inside the border on the edge the reading ends at. The idiom for one horizontal edge.'
+  },
   margin: { group: 'Spacing', note: 'Space outside the box on all four sides. Margins do not collapse.' },
   marginX: { group: 'Spacing', note: 'Space outside the box, left and right. The idiom, over a pair of sides.' },
   marginY: { group: 'Spacing', note: 'Space outside the box, top and bottom. The idiom, over a pair of sides.' },
@@ -138,9 +146,24 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   marginRight: { group: 'Spacing', note: 'Overrides `marginX` on the right edge. For one edge, not for an axis.' },
   marginBottom: { group: 'Spacing', note: 'Overrides `marginY` on the bottom edge. For one edge, not for an axis.' },
   marginLeft: { group: 'Spacing', note: 'Overrides `marginX` on the left edge. For one edge, not for an axis.' },
+  marginStart: {
+    group: 'Spacing',
+    note: 'Space outside the box on the edge the reading starts at. The idiom for one horizontal edge.'
+  },
+  marginEnd: {
+    group: 'Spacing',
+    note: 'Space outside the box on the edge the reading ends at. The idiom for one horizontal edge.'
+  },
   gap: { group: 'Spacing', note: 'Space between children, on both axes.' },
   rowGap: { group: 'Spacing', note: 'Overrides `gap` between rows.' },
   columnGap: { group: 'Spacing', note: 'Overrides `gap` between columns.' },
+
+  // Custom layout
+  layout: {
+    group: 'Flex',
+    note: "A layout the application wrote itself, which measures and places this node's children."
+  },
+  layoutData: { group: 'Flex', note: 'A value carried to the custom layout that arranges this node.' },
 
   // Flex
   flex: { group: 'Flex', note: 'The CSS shorthand: `flex={n}` is grow n, shrink 1, basis 0.' },
@@ -265,6 +288,18 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   maxLines: { group: 'Text', note: 'Lines kept before the rest is dropped. Pairs with `textOverflow`.' },
   textOverflow: { group: 'Text', note: 'What happens to a line that does not fit: `clip` or `ellipsis`.' },
   text: { group: 'Text', note: 'The string a text node draws. Changing it remeasures and relayouts.' },
+  fontStyle: { group: 'Text', note: 'Upright or sloped: `normal`, `italic` or `oblique`.' },
+  fontStretch: { group: 'Text', note: "The width axis, as CSS keywords. Reaches a variable font's `wdth`." },
+  fontVariant: { group: 'Text', note: 'The one variant a canvas font string carries: `normal` or `small-caps`.' },
+  fontKerning: { group: 'Text', note: "Whether the shaper applies the font's kerning pairs." },
+  textDecoration: {
+    group: 'Text',
+    note: 'Lines drawn with the text: `underline`, `line-through`, or both. Paint only.'
+  },
+  spans: {
+    group: 'Text',
+    note: 'The paragraph as runs of `{ text, style }` instead of one string. Set instead of `text`: the runs concatenated are the text, so offsets mean the same thing either way.'
+  },
 
   // Editing
   value: {
@@ -338,5 +373,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   // Environment
   theme: { group: 'Environment', note: 'Provides a palette and a type scale to this subtree.' },
   textStyle: { group: 'Environment', note: 'Provides one step of the type scale as the inherited text style.' },
-  contentColor: { group: 'Environment', note: 'Provides the colour that content on this surface should use.' }
+  contentColor: { group: 'Environment', note: 'Provides the colour that content on this surface should use.' },
+  containerSize: {
+    group: 'Environment',
+    note: 'Declares this node a size query container and provides its content size to the subtree.'
+  },
+  insets: { group: 'Environment', note: 'Provides the registry a floating bar publishes into and a page reads.' }
 } as const;

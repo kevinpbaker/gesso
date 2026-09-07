@@ -19,7 +19,16 @@ import { editorFor, isEditableNode } from '../editing/UiEditable';
 import { selectionRangeOf, type TextRange } from '../selection/UiSelectable';
 import { matchRangesOf } from '../find/UiTextMatches';
 import { resolveFontInto } from '../properties/UiTextFont';
-import type { UiFontKerning, UiFontStretch, UiFontStyle, UiFontVariant, UiTextDecoration, UiTextLink, UiTextMetrics, UiResolvedTextSpan } from '../properties/UiTextStyle';
+import type {
+  UiFontKerning,
+  UiFontStretch,
+  UiFontStyle,
+  UiFontVariant,
+  UiTextDecoration,
+  UiTextLink,
+  UiTextMetrics,
+  UiResolvedTextSpan
+} from '../properties/UiTextStyle';
 import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
 import { linkHoverOf } from '../selection/UiTextLinks';
 import { parseTransform } from '../properties/UiTransform';

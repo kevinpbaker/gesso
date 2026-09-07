@@ -149,7 +149,19 @@ export type PaintProps = PropsOf<
  * they cascade to the text below it.
  */
 export type TypographyProps = PropsOf<
-  'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'
+  | 'color'
+  | 'fontFamily'
+  | 'fontSize'
+  | 'fontWeight'
+  | 'lineHeight'
+  | 'letterSpacing'
+  | 'textAlign'
+  | 'textDirection'
+  | 'fontStyle'
+  | 'fontStretch'
+  | 'fontVariant'
+  | 'fontKerning'
+  | 'textDecoration'
 >;
 
 export type InteractionProps = PropsOf<
@@ -232,9 +244,15 @@ export type ContainerProps = CommonProps &
 export type FlexContainerProps = ContainerProps &
   PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 
-/** The text an element draws and how it wraps. */
+/**
+ * The text an element draws and how it wraps.
+ *
+ * `spans` is `text` in runs: set one or the other, never both. The
+ * runs' texts concatenated are the paragraph, so everything that reads
+ * a paragraph by offset reads either the same way.
+ */
 export type TextContentProps = PropsOf<
-  'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'
+  'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'
 >;
 
 export type TextProps = CommonProps & TextContentProps;

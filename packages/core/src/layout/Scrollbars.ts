@@ -88,7 +88,9 @@ export function scrollbarZoneAt(rec: LayoutRecord, x: number, y: number): Scroll
   if (!inside) {
     return null;
   }
-  const inVerticalZone = rec.mirrored ? x < rec.x + SCROLLBAR_HOVER_ZONE : x >= rec.x + rec.width - SCROLLBAR_HOVER_ZONE;
+  const inVerticalZone = rec.mirrored
+    ? x < rec.x + SCROLLBAR_HOVER_ZONE
+    : x >= rec.x + rec.width - SCROLLBAR_HOVER_ZONE;
   if (rec.contentHeight > rec.height && inVerticalZone) {
     return 'y';
   }

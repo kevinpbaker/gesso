@@ -33,12 +33,12 @@ eviction policy of its own rather than this one.
 
 Nothing rejects. Every method answers with an outcome:
 
-| Outcome  | Means                                                                       |
-| -------- | --------------------------------------------------------------------------- |
-| `ok`     | the store answered; for a read that includes "there is no such record"      |
+| Outcome  | Means                                                                           |
+| -------- | ------------------------------------------------------------------------------- |
+| `ok`     | the store answered; for a read that includes "there is no such record"          |
 | `denied` | the platform will not let this origin store anything, and will not this session |
-| `full`   | the quota is spent, which is worth trying again after something is given back |
-| `failed` | anything else                                                               |
+| `full`   | the quota is spent, which is worth trying again after something is given back   |
+| `failed` | anything else                                                                   |
 
 Three of those are ordinary outcomes an application routes around
 rather than faults it reports, which is why they are values and not

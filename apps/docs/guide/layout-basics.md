@@ -99,6 +99,12 @@ one thing twice, and `paddingX={24}` is that thing.
 `padding` is a number and nothing else. It does not take a tuple or an
 object, deliberately; `decisions/0079` says why.
 
+For a single horizontal edge, reach for `paddingStart` and `paddingEnd`
+rather than `paddingLeft` and `paddingRight`. They name the edge the
+reading starts and ends at, so an indent stays an indent when the
+application runs right to left, and they resolve between the axis and
+the physical sides. See [right to left](/layout/right-to-left).
+
 A row and a column can also space their axes apart independently with
 `rowGap` and `columnGap`. `margin` takes `auto` on either axis, which is
 still the shortest way to push one child to the far end of a row.
