@@ -74,9 +74,25 @@ const VITE_PORT = 5189;
 const DEVTOOLS_PORT = 9339;
 /** Fixed so a baseline means something; DPR is forced to 1 by the launcher. */
 const VIEWPORT: readonly [number, number] = [1280, 900];
-const QUIESCE_MATCHES = 3;
+/**
+ * Captures that must agree before a route counts as still.
+ *
+ * Three quarters of a second was not enough. Two routes reported a size
+ * change on one run and matched on the next, because the preview
+ * container's height was still settling: the pixels inside the crop had
+ * held still for three captures while the box around them had not
+ * finished moving. Both routes build the same tree either way, which
+ * was checked by reading the semantics mirror on each of them, so what
+ * differed was only where the crop stopped.
+ *
+ * A second and a half, with the load wait above, made nineteen routes
+ * agree across three consecutive full runs.
+ */
+const QUIESCE_MATCHES = 6;
 const QUIESCE_INTERVAL_MS = 250;
 const QUIESCE_TIMEOUT_MS = 20_000;
+/** How long a route may take to load its fonts and images. */
+const LOAD_TIMEOUT_MS = 20_000;
 /**
  * Differing pixels allowed, as a percentage of the compared ones.
  *
@@ -158,6 +174,30 @@ const PREVIEW_BOX = `(() => {
   const r = el.getBoundingClientRect();
   const box = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
   return box.width > 0 && box.height > 0 ? box : null;
+})()`;
+
+/**
+ * Whether everything that can change a layout has arrived.
+ *
+ * The quiesce loop below settles as soon as the box and the pixels hold
+ * still for three captures, which a page using a fallback font does
+ * perfectly well. When the real font then arrives, text remeasures and
+ * the container's height moves, and the capture has already been taken
+ * at the old height. That is what made two routes report a size change
+ * on one run and match on the next, with content pixel-identical and
+ * only the crop differing: nothing was flaky about the renderer, the
+ * gate was racing `document.fonts`.
+ *
+ * Images are waited for as well, and for the same reason rather than a
+ * different one: an image that has not decoded contributes no intrinsic
+ * height to the box around it.
+ */
+const PAGE_LOADED = `(() => {
+  if (document.readyState !== 'complete') return false;
+  for (const image of document.images) {
+    if (!image.complete) return false;
+  }
+  return document.fonts.status === 'loaded';
 })()`;
 
 /**
@@ -363,6 +403,13 @@ async function main(): Promise<void> {
 
       const name = `${route.id}.png`;
       const file = join(baselineDir, name);
+      // Before quiescing, not instead of it: a loaded page still has a
+      // first frame to draw and a spring to come to rest.
+      await waitFor(
+        `${name} to finish loading its fonts and images`,
+        async () => (await devtools!.evaluate<boolean>(PAGE_LOADED)) || undefined,
+        LOAD_TIMEOUT_MS
+      );
       const settled = await captureSettled(devtools);
       if (settled === undefined) {
         failures.push(
