@@ -85,15 +85,25 @@ Use npm in the generated project. pnpm resolves the packages' own
 declared dependencies against the registry and gets a 404 for packages
 that are not there.
 
-## No Electrobun template
+## The Electrobun template
 
-`--template electrobun` prints a sentence and creates nothing. The
-adapter it would scaffold against does exist, so what is missing is the
-template and the toolchain wiring around it rather than the code it
-would depend on: an Electrobun project is set up by Electrobun's own
-toolchain, which is not this CLI's to drive.
+`--template electrobun` writes a project that opens in a native window:
+a counter served from the main process, a button that opens a second
+window over the same source, and a switch that changes the appearance
+every window is told about. [Desktop windows](/structure/desktop-windows)
+explains the arrangement.
 
-Use `--template web` and wire the window by hand.
+It needs one thing the web template does not. Electrobun is delivered
+by a launcher called Hutch rather than by a package manager, so the
+generated project is set up with `hutch install` and run with `hutch run
+dev`, and `hutch electrobun prepare` is what puts the SDK inside the
+project. The generated README says how to get `hutch` if it is not on
+your path.
+
+The scaffolded project has been typechecked and built, and its main
+process bundles against the packed packages, but it has not been opened
+in a window from a fresh scaffold. The application code in it is the
+code that [runs in a window](/structure/desktop-windows) elsewhere.
 [Desktop windows](/structure/desktop-windows) is the four files that
 takes, and the application code is the same either way: an Electrobun
 window is a webview, and a Gesso app inside one is the app you already
