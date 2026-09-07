@@ -93,6 +93,15 @@ interface AppUnderTest {
   url(base: string, route: string): string;
   /** Extra flags the browser needs for this application. */
   readonly flags: readonly string[];
+  /**
+   * The appearances to photograph each route in.
+   *
+   * One means the baseline keeps the route's bare name and nothing is
+   * emulated, which is how the playground was photographed before this
+   * existed and how it stays. More than one suffixes the name and asks
+   * for each in turn, because M8 wants Segue seen in both.
+   */
+  readonly appearances: readonly ('light' | 'dark')[];
 }
 
 /**
@@ -113,7 +122,8 @@ const APPS: Record<string, AppUnderTest> = {
     devtoolsPort: 9339,
     baselines: ['apps', 'playground', 'screenshots'],
     url: (base, route) => `${base}?still#${route}`,
-    flags: WEBGPU_FLAGS
+    flags: WEBGPU_FLAGS,
+    appearances: ['dark']
   },
   segue: {
     root: ['apps', 'segue'],
@@ -123,7 +133,8 @@ const APPS: Record<string, AppUnderTest> = {
     // Segue addresses routes off the path, and still mode is a query,
     // so the flag goes on whatever path the route is.
     url: (base, route) => `${base.replace(/\/$/, '')}${route}${route.includes('?') ? '&' : '?'}still`,
-    flags: [...WEBGPU_FLAGS, ...OFFLINE_FLAGS]
+    flags: [...WEBGPU_FLAGS, ...OFFLINE_FLAGS],
+    appearances: ['light', 'dark']
   }
 };
 
@@ -446,7 +457,9 @@ async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[
       mkdirSync(baselineDir, { recursive: true });
     }
 
-    for (const route of routes) {
+    for (const { route, appearance } of routes.flatMap(route =>
+      app.appearances.map(appearance => ({ route, appearance }))
+    )) {
       // Through about:blank, so each route is a real document load and
       // cannot inherit the last one's state. Navigating straight from one
       // hash to another would be a same-document navigation, and a reload
@@ -454,10 +467,20 @@ async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[
       // is how this first hung, with a `Runtime.evaluate` whose context
       // had been torn down never getting a reply.
       await devtools.send('Page.navigate', { url: 'about:blank' });
+      // The appearance the page will read, before it loads. Headless
+      // Chrome answers `dark` for `prefers-color-scheme` whatever the
+      // system is set to, so the light run has to be asked for rather
+      // than assumed, and the flag Chrome documents for it silently
+      // does nothing.
+      if (app.appearances.length > 1) {
+        await devtools.send('Emulation.setEmulatedMedia', {
+          features: [{ name: 'prefers-color-scheme', value: appearance }]
+        });
+      }
       // In still mode, so a route that ticks or plays holds one frame.
       await devtools.send('Page.navigate', { url: app.url(base, route.address) });
 
-      const name = `${route.id}.png`;
+      const name = `${route.id}${app.appearances.length > 1 ? `-${appearance}` : ''}.png`;
       const file = join(baselineDir, name);
       const settled = await captureSettled(devtools);
       if (settled === undefined) {
@@ -553,7 +576,10 @@ async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[
     }
   }
 
-  console.log(`  ${appName}: ${routes.length} routes`);
+  console.log(
+    `  ${appName}: ${routes.length} routes` +
+      (app.appearances.length > 1 ? ` in ${app.appearances.length} appearances` : '')
+  );
   return failures;
 }
 
@@ -587,7 +613,7 @@ async function main(): Promise<void> {
       }
       throw new Error(`No routes to capture for ${name}.`);
     }
-    captured += routes.length;
+    captured += routes.length * app.appearances.length;
     failures.push(...(await shoot(name, app, routes)));
   }
   if (captured === 0) {
