@@ -22,6 +22,32 @@ export interface ServedChannel {
 }
 
 /**
+ * One served channel, with its source checked against its token.
+ *
+ * `ServedChannel` is erased on purpose, so one list can hold channels
+ * of every shape; the cost is that a view key the token declares and
+ * the source forgets is found at startup, by the error `provide`
+ * reports, rather than by the compiler. This is the typed seam: the
+ * source must hold an Observable for every key of the token's view and
+ * a handler for every command, and each handler takes the arguments
+ * the token declares, so none of them needs an annotation.
+ *
+ *   serveChannels([
+ *     serve(Catalog, { view: catalog, commands: { add: name => catalog.add(name) } })
+ *   ]);
+ *
+ * The view may be any object with the right observables on it, which
+ * is often the domain object itself when its properties are named
+ * after the keys. Only the declared keys are read from it.
+ */
+export function serve<View extends object, Commands extends object>(
+  token: ChannelToken<View, Commands>,
+  source: ChannelSource<View, Commands>
+): ServedChannel {
+  return { token, source: source as unknown as ServedChannel['source'] };
+}
+
+/**
  * Publishes channels from an application worker.
  *
  * Call it synchronously at the top level of the worker module, before
@@ -29,7 +55,7 @@ export interface ServedChannel {
  *
  *   const catalog = new CatalogViewModel(new CatalogDomain(new OpfsStore()));
  *   serveChannels([
- *     { token: Catalog, source: { view: { products: catalog.products$ }, commands: { … } } }
+ *     serve(Catalog, { view: { products: catalog.products$ }, commands: { … } })
  *   ]);
  *
  * Everything above this call is the application's own — plain classes,

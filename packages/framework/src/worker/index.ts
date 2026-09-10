@@ -44,7 +44,7 @@ export {
   type ViewOf
 } from '../channel/ChannelToken';
 export { provide, ProvidedChannel, type ChannelSource } from '../channel/provide';
-export { serveChannels, type ServedChannel } from '../channel/serveChannels';
+export { serve, serveChannels, type ServedChannel } from '../channel/serveChannels';
 export { pick, pickKeys } from '../channel/pick';
 export { structurallyEqual } from '../channel/structuralEquals';
 export { findUnplainPath, requirePlainData } from '../channel/plainData';

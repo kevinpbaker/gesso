@@ -21,5 +21,5 @@ export { ChannelReplica } from './ChannelReplica';
 export { ChannelRegistry } from './ChannelRegistry';
 export { findUnplainPath, requirePlainData } from './plainData';
 export { createChannelRegistry, type ChannelRegistration, type ChannelRegistryHandle } from './createChannelRegistry';
-export { serveChannels, type ServedChannel } from './serveChannels';
+export { serve, serveChannels, type ServedChannel } from './serveChannels';
 export { pick, pickKeys } from './pick';
