@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.cottontail-tmp
+*.local
+.DS_Store
+
+# Written by `hutch electrobun prepare`, and rewritten whenever the
+# Electrobun version in hutch.config.ts changes.
+.hutch

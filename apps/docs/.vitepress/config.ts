@@ -155,7 +155,8 @@ export default defineConfig({
           { text: 'Shell services', link: '/structure/shell-services' },
           { text: 'Undo and redo', link: '/structure/undo' },
           { text: 'Remembering state', link: '/structure/persistence' },
-          { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' }
+          { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
+          { text: 'Desktop windows', link: '/structure/desktop-windows' }
         ]
       },
       {

@@ -1597,6 +1597,7 @@ declare class GessoRuntime {
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
   semanticsTree(): UiSemanticsMap;
   applySemanticsAction(action: UiSemanticsAction): void;
+  private applyTextRunAction;
   private updateSemantics;
   private collectSemanticsBoxes;
   private revealBox;
@@ -2748,7 +2749,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-CZwoxsjK.js";
+} from "./index-Dvya7O4F.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3213,7 +3214,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CZwoxsjK.js";
+} from "../index-Dvya7O4F.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

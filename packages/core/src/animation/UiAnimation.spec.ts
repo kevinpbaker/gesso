@@ -428,3 +428,54 @@ describe('reduced motion', () => {
     expect(driver.isRunning).toBe(true);
   });
 });
+
+describe('a hidden document', () => {
+  it('lands a new animation on its target rather than freezing it at the start', () => {
+    const driver = new AnimationDriver();
+    driver.setHidden(true);
+    const target = cell(0);
+    driver.start(new UiTween(target, 100, { duration: 400, easing: linear }, (a, b, t) => a + (b - a) * t));
+    expect(target.value).toBe(100);
+    expect(driver.isRunning).toBe(false);
+    expect(driver.nextTickAt(0)).toBeUndefined();
+  });
+
+  it('finishes what is already in flight when the page goes away', () => {
+    const driver = new AnimationDriver();
+    const target = cell(0);
+    driver.start(new UiTween(target, 100, { duration: 400, easing: linear }, (a, b, t) => a + (b - a) * t));
+    driver.advance(0);
+    driver.advance(100);
+    expect(target.value).toBeCloseTo(25, 6);
+    driver.setHidden(true);
+    expect(target.value).toBe(100);
+    expect(driver.isRunning).toBe(false);
+  });
+
+  it('leaves alone an animation whose movement is the information', () => {
+    const driver = new AnimationDriver();
+    driver.setHidden(true);
+    const target = cell(0);
+    driver.start(
+      new UiTween(
+        target,
+        8,
+        { duration: 880, easing: steps(8), repeat: true, reducedMotion: 'keep' },
+        (a, b, t) => a + (b - a) * t
+      )
+    );
+    // A spinner is still a spinner when the tab comes back.
+    expect(driver.isRunning).toBe(true);
+  });
+
+  it('runs animations again once the page is back', () => {
+    const driver = new AnimationDriver();
+    driver.setHidden(true);
+    driver.setHidden(false);
+    const target = cell(0);
+    driver.start(new UiTween(target, 100, { duration: 400, easing: linear }, (a, b, t) => a + (b - a) * t));
+    driver.advance(0);
+    driver.advance(100);
+    expect(target.value).toBeCloseTo(25, 6);
+  });
+});

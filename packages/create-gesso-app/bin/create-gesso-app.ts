@@ -10,22 +10,26 @@
  * The one thing this CLI does that a public scaffolder would not is
  * vendor its own dependencies. No `@gesso/*` package is on a registry,
  * so a generated `package.json` that named a version would produce a
- * project that cannot install. Instead the CLI packs the packages it
- * needs out of this workspace with `pnpm pack`, drops the tarballs into
- * the new project's `vendor/` directory and writes `file:` specifiers
- * at them. That is the same route `scripts/check-install.ts` takes, and
- * it is the route that exercises each package's `publishConfig`, which
- * is the only thing that rewrites `exports` from `src/*.ts` to `dist`.
- * `ADOPTION_ROADMAP.md` A7 is where that ends; `decisions/0082` says
- * what changes on the day it does.
+ * project that cannot install. Instead the CLI packs the packages a
+ * template needs out of this workspace with `pnpm pack`, drops the
+ * tarballs into the new project's `vendor/` directory and writes
+ * `file:` specifiers at them. That is the same route
+ * `scripts/check-install.ts` takes, and it is the route that exercises
+ * each package's `publishConfig`, which is the only thing that rewrites
+ * `exports` from `src/*.ts` to `dist`. `ADOPTION_ROADMAP.md` A7 is where
+ * that ends; `decisions/0082` says what changes on the day it does.
  *
  *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app
  *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --no-build
+ *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --template electrobun
  *
- * Only the web template exists. `@gesso/electrobun` is `ROADMAP.md` E1
- * and has not been written, so there is nothing an Electrobun template
- * could depend on; asking for one says that rather than producing a
- * project that cannot run.
+ * The two templates differ in what runs beneath the same application.
+ * `web` is a Vite project a browser loads. `electrobun` is a native
+ * window whose application layer is a separate process, and it is set
+ * up by Hutch rather than by npm: the Electrobun SDK is projected into
+ * a project by `hutch electrobun prepare` rather than installed from a
+ * registry, so the generated project depends on the toolchain being
+ * present and says so.
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -41,21 +45,72 @@ import {
 } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 
-/**
- * Packages the generated project depends on, in dependency order.
- *
- * `devtools` and `vite-plugin` joined the first three when the feedback
- * loop was wired in by default (`decisions/0082`): the plugin is what
- * writes the worker construction and the hot-replacement wiring, and it
- * loads the overlay from devtools the first time the worker throws.
- * Both are development dependencies of the generated project and
- * neither is reachable from a production build.
- */
-const VENDORED = ['core', 'framework', 'components', 'devtools', 'vite-plugin'];
 /** Where the packed tarballs land inside the generated project. */
 const VENDOR_DIR = 'vendor';
 /** Template files whose names cannot be checked into this repository as-is. */
 const RENAMED = new Map([['_gitignore', '.gitignore']]);
+
+interface Template {
+  /** Workspace packages to pack into the project, in dependency order. */
+  readonly vendored: readonly string[];
+  /** Files carrying `{{name}}`, relative to the project directory. */
+  readonly substitute: readonly string[];
+  /** What to tell the person once the project is written. */
+  readonly next: (name: string, where: string) => string;
+}
+
+/**
+ * The templates, and the two things that differ between them: what a
+ * project depends on, and how a person starts it.
+ *
+ * `devtools` and `vite-plugin` joined the web template's first three
+ * when the feedback loop was wired in by default (`decisions/0082`):
+ * the plugin is what writes the worker construction and the
+ * hot-replacement wiring, and it loads the overlay from devtools the
+ * first time the worker throws. Both are development dependencies of
+ * the generated project and neither is reachable from a production
+ * build.
+ */
+const TEMPLATES: Record<string, Template> = {
+  web: {
+    vendored: ['core', 'framework', 'components', 'devtools', 'vite-plugin'],
+    substitute: ['index.html', 'README.md'],
+    next: (name, where) => `
+Created ${name} in ${where}.
+
+  cd ${where}
+  pnpm install     # or npm install
+  pnpm dev
+
+Either works. The vendored tarballs ask each other for version ranges no
+registry can answer, so npm is pointed at them by \`overrides\` in
+package.json and pnpm by \`overrides\` in pnpm-workspace.yaml. Both go
+away when the packages are published; the project's README says how.
+`
+  },
+  electrobun: {
+    vendored: ['core', 'framework', 'components', 'electrobun'],
+    substitute: ['electrobun.config.ts', 'src/main/index.ts', 'src/view/index.html', 'README.md'],
+    next: (name, where) => `
+Created ${name} in ${where}.
+
+  cd ${where}
+  hutch install
+  hutch run dev
+
+Hutch rather than npm, and this is the part to read before running it.
+Electrobun 2.x is a toolchain a launcher downloads, not a package a
+registry serves: \`hutch electrobun prepare\` projects the SDK into the
+project's own .hutch/devkit, which is where vite.config.ts and
+tsconfig.json look for it, and every script in hutch.config.ts runs that
+first. If \`hutch\` is not on your path yet, the project's README says how
+to get it.
+
+Nothing in this repository can open a native window, so unlike the web
+template this one is checked by running it rather than by a gate.
+`
+  }
+};
 
 const packageRoot = join(import.meta.dirname, '..');
 const workspaceRoot = join(packageRoot, '..', '..');
@@ -70,13 +125,15 @@ interface Options {
 
 const USAGE = `Usage: create-gesso-app <directory> [options]
 
-Creates a Gesso application in <directory>: a Vite project whose
-interface is built, laid out and painted in a render worker.
+Creates a Gesso application in <directory>: a project whose interface is
+built, laid out and painted in a render worker.
 
 Options:
   --name <name>     Package name for the new project. Defaults to the
                     directory's own name.
-  --template <name> Which template to write. Only "web" exists.
+  --template <name> "web" for a Vite project a browser loads, or
+                    "electrobun" for a native window with its state in a
+                    main process. Defaults to "web".
   --force           Write into a directory that already has files in it.
   --no-build        Pack the workspace packages without rebuilding them
                     first. Only safe when dist/ is already current.
@@ -137,22 +194,13 @@ function parseArgs(argv: readonly string[]): Options {
   return { target: absolute, name: name ?? basename(absolute), template, force, build };
 }
 
-/** Checks the template exists, and explains the one that does not. */
-function templateDir(template: string): string {
-  if (template === 'electrobun') {
-    fail(
-      'There is no Electrobun template yet. `@gesso/electrobun` is ROADMAP.md E1 and has not been\n' +
-        'written, so a template for it would scaffold a project with nothing to depend on. Use\n' +
-        '--template web; the application code is the same either way, because an Electrobun window\n' +
-        'runs the same render worker behind a webview.'
-    );
+/** Looks a template up, and lists the ones that exist when it is not one. */
+function templateOf(name: string): Template {
+  const template = TEMPLATES[name];
+  if (template === undefined || !existsSync(join(packageRoot, 'templates', name))) {
+    fail(`There is no "${name}" template. Available: ${Object.keys(TEMPLATES).join(', ')}.`);
   }
-  const dir = join(packageRoot, 'templates', template);
-  if (!existsSync(dir)) {
-    const available = readdirSync(join(packageRoot, 'templates')).join(', ');
-    fail(`There is no "${template}" template. Available: ${available}.`);
-  }
-  return dir;
+  return template;
 }
 
 function prepareTarget(options: Options): void {
@@ -200,7 +248,7 @@ function newestChange(dir: string): number {
  * The specifiers are relative to the project directory, so the whole
  * directory can be moved or copied and still install.
  */
-function vendorPackages(options: Options): Map<string, string> {
+function vendorPackages(options: Options, template: Template): Map<string, string> {
   if (options.build) {
     // Only the packages that go into the project, and only the ones
     // whose `dist` is older than their `src`. Building the whole
@@ -208,7 +256,7 @@ function vendorPackages(options: Options): Map<string, string> {
     // does not install two of the packages it built, and every second
     // of it was spent between a person typing a command and seeing
     // anything happen.
-    const stale = VENDORED.filter(needsBuild);
+    const stale = template.vendored.filter(needsBuild);
     if (stale.length > 0) {
       console.log(`building ${stale.join(', ')}…`);
       const filters = stale.flatMap(pkg => ['--filter', `./packages/${pkg}`]);
@@ -222,7 +270,7 @@ function vendorPackages(options: Options): Map<string, string> {
 
   console.log('packing them into the new project…');
   const specifiers = new Map<string, string>();
-  for (const pkg of VENDORED) {
+  for (const pkg of template.vendored) {
     const before = new Set(readdirSync(into));
     execFileSync('pnpm', ['pack', '--pack-destination', into], {
       cwd: join(workspaceRoot, 'packages', pkg),
@@ -254,9 +302,10 @@ function copyTemplate(from: string, options: Options): void {
 /**
  * Writes the project's name and its dependency specifiers.
  *
- * `overrides` carries the same specifiers, because `@gesso/framework`
- * and `@gesso/components` declare each other by version range. Without
- * it npm is free to go looking for `@gesso/core@^0.1.0` on a registry
+ * `overrides` carries the same specifiers, because the packages declare
+ * each other by version range: `@gesso/framework` and
+ * `@gesso/components` do, and so does `@gesso/electrobun`. Without it an
+ * installer is free to go looking for `@gesso/core@^0.1.0` on a registry
  * that has never heard of it, and whether it does so depends on what
  * else is in the tree.
  */
@@ -265,18 +314,18 @@ function writeManifest(options: Options, specifiers: ReadonlyMap<string, string>
   const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
     name: string;
     dependencies: Record<string, string>;
-    devDependencies: Record<string, string>;
+    devDependencies?: Record<string, string>;
     overrides?: Record<string, string>;
   };
   manifest.name = options.name;
   for (const [pkg, specifier] of specifiers) {
     // The plugin and the overlay are development dependencies and the
-    // three runtime packages are not, so the specifier goes wherever
-    // the template already declared the package.
+    // runtime packages are not, so the specifier goes wherever the
+    // template already declared the package.
     const where =
       manifest.dependencies[pkg] !== undefined
         ? manifest.dependencies
-        : manifest.devDependencies[pkg] !== undefined
+        : manifest.devDependencies?.[pkg] !== undefined
           ? manifest.devDependencies
           : undefined;
     if (where === undefined) {
@@ -320,12 +369,19 @@ function writePnpmOverrides(options: Options, specifiers: ReadonlyMap<string, st
   writeFileSync(join(options.target, 'pnpm-workspace.yaml'), lines.join('\n'));
 }
 
-/** Substitutes the template's placeholders in the files that carry them. */
-function substitute(options: Options): void {
-  for (const relative of ['index.html', 'README.md']) {
+/**
+ * Substitutes the template's placeholders in the files that carry them.
+ *
+ * The list is the template's rather than a walk of the tree, so that a
+ * placeholder added to a file nobody listed fails visibly in the
+ * generated project instead of being quietly left as `{{name}}`
+ * somewhere it is never read.
+ */
+function substitute(options: Options, template: Template): void {
+  for (const relative of template.substitute) {
     const path = join(options.target, relative);
     if (!existsSync(path)) {
-      continue;
+      fail(`The ${options.template} template says ${relative} carries {{name}}, and it was not written.`);
     }
     writeFileSync(path, readFileSync(path, 'utf8').replaceAll('{{name}}', options.name));
   }
@@ -340,29 +396,18 @@ function main(): void {
     );
   }
 
-  const template = templateDir(options.template);
+  const template = templateOf(options.template);
   prepareTarget(options);
-  copyTemplate(template, options);
-  const specifiers = vendorPackages(options);
+  copyTemplate(join(packageRoot, 'templates', options.template), options);
+  const specifiers = vendorPackages(options, template);
   writeManifest(options, specifiers);
   writePnpmOverrides(options, specifiers);
-  substitute(options);
+  substitute(options, template);
 
   const where = options.target.startsWith(process.cwd())
     ? options.target.slice(process.cwd().length + 1)
     : options.target;
-  console.log(`
-Created ${options.name} in ${where}.
-
-  cd ${where}
-  pnpm install     # or npm install
-  pnpm dev
-
-Either works. The vendored tarballs ask each other for version ranges no
-registry can answer, so npm is pointed at them by \`overrides\` in
-package.json and pnpm by \`overrides\` in pnpm-workspace.yaml. Both go
-away when the packages are published; the project's README says how.
-`);
+  console.log(template.next(options.name, where));
 }
 
 main();

@@ -1,0 +1,28 @@
+{
+  /*
+    Written by `hutch electrobun prepare`. It is what makes
+    `electrobun/main` and `electrobun/view` resolve, so a typecheck run
+    before the first prepare has nothing to resolve them against.
+  */
+  "extends": "./.hutch/devkit/tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["@types/bun"],
+
+    /* The Gesso packages ship `exports` maps, so this is the line that has to be right. */
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+
+    /* The two lines that let you write elements as markup. */
+    "jsx": "react-jsx",
+    "jsxImportSource": "@gesso/framework"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "build"]
+}

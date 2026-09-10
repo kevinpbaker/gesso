@@ -233,3 +233,53 @@ describe('focusRing', () => {
     expect(focused.decorations).toHaveLength(1);
   });
 });
+
+describe('decorations that change while they are on screen', () => {
+  it('follows an Observable of shapes', () => {
+    const shapes = new BehaviorSubject<readonly DecorationShape[]>(RING);
+    const { node } = build(Box({ modifiers: [decorated(shapes)] }));
+    expect(node.decorations).toEqual(RING);
+
+    shapes.next(BADGE);
+    expect(node.decorations).toEqual(BADGE);
+  });
+
+  it('marks the node for repaint on every emission', () => {
+    const shapes = new BehaviorSubject<readonly DecorationShape[]>(RING);
+    const { graph, node } = build(Box({ modifiers: [decorated(shapes)] }));
+    graph.clearDirty(node);
+    expect(node.dirtyFlags & DirtyFlags.Paint).toBe(0);
+
+    shapes.next(BADGE);
+    expect(node.dirtyFlags & DirtyFlags.Paint).not.toBe(0);
+  });
+
+  it('stops drawing from the old Observable when a new one replaces it', () => {
+    const first = new BehaviorSubject<readonly DecorationShape[]>(RING);
+    const second = new BehaviorSubject<readonly DecorationShape[]>(BADGE);
+    const { node, rebuild } = build(Box({ modifiers: [decorated(first)] }));
+    rebuild(Box({ modifiers: [decorated(second)] }));
+    expect(node.decorations).toEqual(BADGE);
+
+    // Two live subscriptions would have the old one paint over the new.
+    first.next(RING);
+    expect(node.decorations).toEqual(BADGE);
+  });
+
+  it('stops drawing once the modifier is gone', () => {
+    const shapes = new BehaviorSubject<readonly DecorationShape[]>(RING);
+    const { node, rebuild } = build(Box({ modifiers: [decorated(shapes)] }));
+    rebuild(Box({}));
+    expect(node.decorations).toBeNull();
+
+    shapes.next(BADGE);
+    expect(node.decorations).toBeNull();
+  });
+
+  it('leaves a plain array alone, which is still the common case', () => {
+    const { node, rebuild } = build(Box({ modifiers: [decorated(RING)] }));
+    expect(node.decorations).toEqual(RING);
+    rebuild(Box({ modifiers: [decorated(BADGE)] }));
+    expect(node.decorations).toEqual(BADGE);
+  });
+});

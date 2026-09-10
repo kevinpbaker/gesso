@@ -227,16 +227,20 @@ declare function assertTransitionMap(nodeId: string, value: unknown, isKnownProp
 declare class AnimationDriver {
   private readonly running;
   private reducedMotion;
+  private hidden;
   private wake;
   setWakeListener(listener: (() => void) | null): void;
   get isRunning(): boolean;
   get size(): number;
   get isReducedMotion(): boolean;
+  private lands;
   start<T>(animation: UiAnimation<T>): Observable<T>;
   animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
   stop<T>(cell: AnimatedCell<T>): boolean;
   stopAll(): void;
   setReducedMotion(reduced: boolean): void;
+  setHidden(hidden: boolean): void;
+  private landRunning;
   nextTickAt(now: number): number | undefined;
   advance(now: number): void;
 }
@@ -1638,7 +1642,7 @@ type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
-type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection'>;
+type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
@@ -1651,7 +1655,7 @@ type TransitionProps = {
 type CommonProps = IdentityProps & UiEventProps & BoxModelProps & FlexItemProps & GridItemProps & PositionProps & PaintProps & TypographyProps & InteractionProps & SemanticsProps & ModifierProps & TransitionProps & EnvironmentProps;
 type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
-type TextContentProps = PropsOf<'text' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
+type TextContentProps = PropsOf<'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
 type EditableTextProps = CommonProps & PropsOf<'value' | 'placeholder' | 'multiline' | 'readOnly' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
 type BoxProps = ContainerProps & PropsOf<'x' | 'y' | 'image' | 'objectFit'>;
@@ -2157,13 +2161,15 @@ declare function buildFontString(state: Pick<PaintState, 'fontWeight' | 'fontSiz
   fontVariant?: string;
 }): string;
 declare function runFontString(request: TextRunStyle, style: TextRunStyle | undefined): string;
-declare function applyCanvasTextStyle(context: Canvas2DContext, style: CanvasTextStyle): string;
 interface CanvasTextStyle {
   font: string;
-  letterSpacing?: number;
-  fontStretch?: string;
-  fontKerning?: string;
+  letterSpacing: number;
+  fontStretch: string;
+  fontKerning: string;
 }
+declare function createCanvasTextStyle(): CanvasTextStyle;
+declare function runCanvasStyleInto(request: TextRunStyle, style: TextRunStyle | undefined, out: CanvasTextStyle): string;
+declare function applyCanvasTextStyle(context: Canvas2DContext, style: CanvasTextStyle): void;
 declare function drawText(ctx: Canvas2DContext, box: LayoutBox, state: PaintState, measurer: TextMeasurer): void;
 declare function fillTextRects(ctx: Canvas2DContext, rects: readonly TextRunRect[]): void;
 type SpanPaint = Pick<PaintState, 'spans' | 'textColor' | 'fontSize' | 'fontFamily' | 'fontWeight' | 'letterSpacing' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration' | 'linkHover'>;
@@ -3416,8 +3422,9 @@ declare const BUTTON_INTERACTION: UiModifier<InteractiveOptions>;
 declare const measure: ((args: Subject<LayoutBox>, key?: string | number) => UiModifier<Subject<LayoutBox>>) & {
   readonly kind: UiModifierKind<Subject<LayoutBox>>;
 };
-declare const decorated: ((args: readonly DecorationShape[], key?: string | number) => UiModifier<readonly DecorationShape[]>) & {
-  readonly kind: UiModifierKind<readonly DecorationShape[]>;
+type Decorations = readonly DecorationShape[] | Observable<readonly DecorationShape[]>;
+declare const decorated: ((args: Decorations, key?: string | number) => UiModifier<Decorations>) & {
+  readonly kind: UiModifierKind<Decorations>;
 };
 interface FocusRingOptions {
   readonly color?: UiColorValue;
@@ -3850,6 +3857,7 @@ declare class CanvasTextMeasurer extends ParagraphTextMeasurer {
   private readonly context;
   private readonly widths;
   private readonly metrics;
+  private readonly style;
   constructor(context: Canvas2DContext);
   measureRunWidth(text: string, request: TextMeasureRequest): number;
   invalidate(): void;
@@ -4741,6 +4749,7 @@ export {
   ContextMenuOptions,
   contrastRatio,
   createCanvasSurface,
+  createCanvasTextStyle,
   createElement,
   createEnvironmentKey,
   createPaintState,
@@ -4757,6 +4766,7 @@ export {
   DecorationFill,
   decorationRect,
   DecorationRect,
+  Decorations,
   DecorationShape,
   DecorationStroke,
   DEFAULT_FONT_FAMILY,
@@ -4878,7 +4888,6 @@ export {
   iconSource,
   IconSourceArgs,
   IconSpec,
-  Id,
   IdentityProps,
   ImageCommand,
   ImageResolver,
@@ -5131,6 +5140,7 @@ export {
   rotateFrom,
   Row,
   RowProps,
+  runCanvasStyleInto,
   runFontString,
   RunMeasure,
   sameArgs,
@@ -5481,6 +5491,7 @@ export {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty,
+  zd,
   ZoomState
 };
 // ==== index.d.ts ====
@@ -5575,6 +5586,7 @@ import {
   ContextMenuOptions,
   contrastRatio,
   createCanvasSurface,
+  createCanvasTextStyle,
   createElement,
   createEnvironmentKey,
   createPaintState,
@@ -5591,6 +5603,7 @@ import {
   DecorationFill,
   decorationRect,
   DecorationRect,
+  Decorations,
   DecorationShape,
   DecorationStroke,
   DEFAULT_FONT_FAMILY,
@@ -5965,6 +5978,7 @@ import {
   rotateFrom,
   Row,
   RowProps,
+  runCanvasStyleInto,
   runFontString,
   RunMeasure,
   sameArgs,
@@ -6316,7 +6330,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-Bln5FJTm.js";
+} from "./index-DDW_S6gE.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6382,6 +6396,7 @@ export {
   contextMenu,
   contrastRatio,
   createCanvasSurface,
+  createCanvasTextStyle,
   createElement,
   createEnvironmentKey,
   createPaintState,
@@ -6636,6 +6651,7 @@ export {
   rgba,
   rotateFrom,
   Row,
+  runCanvasStyleInto,
   runFontString,
   sameArgs,
   scaleFrom,
@@ -6734,6 +6750,7 @@ export {
   type CustomLayoutExplanation,
   type DecorationFill,
   type DecorationRect,
+  type Decorations,
   type DecorationShape,
   type DecorationStroke,
   type DefaultImageResolverOptions,
@@ -7181,7 +7198,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Bln5FJTm.js";
+} from "./index-DDW_S6gE.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

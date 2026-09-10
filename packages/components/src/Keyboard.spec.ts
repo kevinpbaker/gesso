@@ -162,6 +162,28 @@ describe('the keyboard gallery', () => {
       },
       { role: 'slider', name: 'Volume', operate: expectStepsUp('ArrowRight') },
       { role: 'spinbutton', name: 'Guests', operate: expectStepsUp('ArrowUp') },
+      // The two step buttons are tab stops like any other button, and
+      // Enter on each moves the field they belong to.
+      {
+        role: 'button',
+        name: 'Decrease',
+        operate: u => {
+          const before = u.getSemantics(u.getByRole('spinbutton', { name: 'Guests' })).valueNow as number;
+          u.fireEvent.keyDown('Enter');
+          u.frame();
+          expect(u.getSemantics(u.getByRole('spinbutton', { name: 'Guests' })).valueNow).toBe(before - 1);
+        }
+      },
+      {
+        role: 'button',
+        name: 'Increase',
+        operate: u => {
+          const before = u.getSemantics(u.getByRole('spinbutton', { name: 'Guests' })).valueNow as number;
+          u.fireEvent.keyDown('Enter');
+          u.frame();
+          expect(u.getSemantics(u.getByRole('spinbutton', { name: 'Guests' })).valueNow).toBe(before + 1);
+        }
+      },
       {
         role: 'combobox',
         name: 'Payment',

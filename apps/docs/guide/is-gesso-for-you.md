@@ -48,9 +48,9 @@ the platform's, and a sign-up form is better served by the platform's.
 - **Desktop-class tools in a webview.** An Electrobun or Electron-style
   window is a webview, and a Gesso application inside one is the whole
   window: its own layout, its own text, its own controls, with the
-  application logic on a thread the window never waits for. This is the
-  target `docs/ROADMAP.md` names as the endgame and `NATIVE_ROADMAP.md`
-  argues for.
+  application logic in the process that owns the window rather than on
+  a thread inside it. [Desktop windows](/structure/desktop-windows) is
+  that arrangement, and what has and has not been run on it.
 - **Dashboards and consoles over live data.** Tens of events a second
   indexed on the application worker while the render worker scrolls a
   virtualised list and draws a filter narrowing as it is typed. The

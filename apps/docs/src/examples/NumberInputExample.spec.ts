@@ -16,13 +16,13 @@ function numbers() {
 
 /**
  * What the page claims: a spinbutton that announces its value and its
- * range, two step buttons that are not tab stops, arrows that step and
+ * range, two step buttons that are tab stops like any other, arrows that step and
  * clamp, text that is reported only once it parses as a number, a blur
  * that normalises what is left in the field, and the same ownership
  * rule every control in the library follows.
  */
 describe('the docs number input example', () => {
-  it('announces a spinbutton with a range, and two buttons that are not tab stops', () => {
+  it('announces a spinbutton with a range, and two buttons that are tab stops like any other', () => {
     const ui = numbers();
 
     expect(ui.getByRole('spinbutton', { name: 'Guests' })).toHaveSemantics({
@@ -39,9 +39,16 @@ describe('the docs number input example', () => {
     expect(ui.getAllByRole('button', { name: 'Increase' })).toHaveLength(2);
     expect(ui.getAllByRole('button', { name: 'Decrease' })).toHaveLength(2);
 
-    // Tab leaves the field for the next control in the example rather
-    // than walking through the two steppers beside it.
+    // Tab walks through the two steppers on its way out of the field.
+    // They were once skipped, on the grounds that the arrows do the
+    // same thing; the accessibility gate's rule that every control in
+    // the tree is reachable by Tab is the better one, and a person who
+    // does not know the arrows work has no other way to press them.
     ui.fireEvent.focus(ui.getByRole('spinbutton', { name: 'Guests' }));
+    ui.fireEvent.tab();
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getAllByRole('button', { name: 'Decrease' })[0]);
+    ui.fireEvent.tab();
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getAllByRole('button', { name: 'Increase' })[0]);
     ui.fireEvent.tab();
     expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('button', { name: 'Table for eight' }));
   });

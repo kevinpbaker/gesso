@@ -1185,6 +1185,13 @@ export class GessoRuntime {
   /**
    * The page was hidden or shown. A hidden page stops the caret blink,
    * so a background tab with a focused field schedules no frames.
+   *
+   * The driver is told as well, and it is the half that matters to
+   * what the page looks like: a hidden page goes on painting but runs
+   * no animation frames, so anything the driver is holding would be
+   * drawn frozen at whatever value it had reached. See
+   * `AnimationDriver.setHidden` for why an entrance frozen at its
+   * first value is a hole in the page rather than a paused animation.
    */
   setVisible(visible: boolean): void {
     this.input.editing.setVisible(visible);
@@ -1192,6 +1199,7 @@ export class GessoRuntime {
       return;
     }
     this.visible = visible;
+    this.animations.setHidden(!visible);
     if (!visible) {
       return;
     }
@@ -1199,7 +1207,7 @@ export class GessoRuntime {
       return;
     }
     // One frame on the way back, whether or not anything is dirty: an
-    // animation that was frozen while hidden is still in the driver,
+    // animation the driver kept running while hidden is still in it,
     // and `scheduleAnimationTick` only re-arms from inside a frame.
     this.scheduler.wake();
   }

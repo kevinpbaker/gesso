@@ -143,9 +143,14 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
 }
 
 /**
- * A step button. Not a tab stop: the field is, and its arrows do the
- * same thing — a screen reader user should not have to walk past two
- * buttons to leave a number field.
+ * A step button, and a tab stop like any other button.
+ *
+ * It was not one at first: the field's own arrows do the same thing,
+ * and a screen reader user walking past two extra buttons to leave a
+ * number field seemed a cost. The accessibility gate disagreed, and
+ * it is right. A control that is in the tree and cannot be reached by
+ * Tab is a promise the keyboard cannot keep, and a person who does not
+ * know the arrows work has no other way to press it.
  */
 function stepper(glyph: string, press: () => void, disabled: Observable<boolean>) {
   return Button({
@@ -158,7 +163,6 @@ function stepper(glyph: string, press: () => void, disabled: Observable<boolean>
     flexShrink: 0,
     x: 'center',
     y: 'center',
-    focusable: false,
     disabled,
     backgroundColor: 'controlBackground',
     color: 'controlForeground',

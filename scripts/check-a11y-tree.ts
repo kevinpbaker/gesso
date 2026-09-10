@@ -1,8 +1,9 @@
 /**
- * Accessibility mirror check (ROADMAP.md F6b).
+ * Accessibility mirror check (ROADMAP.md F6b, MUSIC_ROADMAP.md M8).
  *
- * Starts the Vite dev server, opens a playground route in headless
- * Chrome, and reads **Chrome's own computed accessibility tree** —
+ * Starts the Vite dev server for each application it covers, opens a
+ * route in headless Chrome, and reads **Chrome's own computed
+ * accessibility tree** —
  * the tree a screen reader consumes, not the DOM the mirror writes.
  * That distinction is the whole value of this gate: an element with
  * the right attributes can still be ignored by the platform (hidden,
@@ -29,6 +30,15 @@
  * They are also the script a screen-reader session follows: each row is
  * a thing to reach and a name to expect to hear.
  *
+ * **The browser is offline.** Every route runs with name resolution
+ * turned off for everything but localhost, so the two applications that
+ * read Audius (the playlists example and Segue) fall back to their
+ * committed snapshots. That is the only way these reports can be
+ * compared byte for byte: a play count on a live shelf moves between
+ * one run and the next, and a report that drifts on its own teaches a
+ * reader to ignore the diff. What is lost is nothing this gate measures:
+ * an accessible name is written by the screen, not by the network.
+ *
  *   pnpm check:a11y            # verify; fails on drift and on an unnamed control
  *   pnpm check:a11y:update     # rewrite the reports
  *   CHROME_BIN=/path/to/chrome pnpm check:a11y
@@ -43,7 +53,44 @@ import { DevTools, findChrome, openPage, waitFor } from './lib/devtools.ts';
 
 const UPDATE = process.argv.includes('--update');
 const REPORT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'accessibility');
-const VITE_PORT = 5189;
+
+/**
+ * The applications this gate covers, and how a route of each becomes a
+ * url.
+ *
+ * Two, and they address a route differently: the playground routes off
+ * the fragment, and Segue routes off the path, because its urls are
+ * Audius's own and have to survive being pasted somewhere. So the app
+ * says how to build the url rather than the check doing it.
+ *
+ * The ports are this script's own, as every script under `scripts/`
+ * takes a pair nothing else uses: a dev server somebody has open, and
+ * the screenshot gate running beside this one, must both be able to
+ * hold theirs at the same time.
+ */
+interface AppUnderTest {
+  /** The Vite root, from the repository root. */
+  readonly root: string;
+  readonly port: number;
+  /** The part of the url after the origin, from what the check names. */
+  url(route: string): string;
+}
+
+const APPS = {
+  playground: { root: 'apps/playground', port: 5192, url: (route: string) => `/#${route}` },
+  segue: { root: 'apps/segue', port: 5193, url: (path: string) => path }
+} as const satisfies Record<string, AppUnderTest>;
+
+type AppName = keyof typeof APPS;
+
+/**
+ * No name resolves but localhost's.
+ *
+ * A browser-wide flag rather than the DevTools network domain, because
+ * the requests to block are made by workers, and a worker is a target
+ * of its own that the page's client never sees.
+ */
+const OFFLINE_FLAGS = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost'];
 
 /**
  * Roles a person operates. A node with one of these and no accessible
@@ -68,7 +115,7 @@ const CONTROL_ROLES = new Set([
   'treeitem',
   'link'
 ]);
-const DEVTOOLS_PORT = 9339;
+const DEVTOOLS_PORT = 9342;
 const READY_TIMEOUT_MS = 45_000;
 
 interface AxNode {
@@ -92,7 +139,16 @@ interface Expectation {
 }
 
 interface RouteCheck {
+  /** Which application serves it. */
+  readonly app: AppName;
+  /** Names the report, `docs/accessibility/<route>.md`, and every message. */
   readonly route: string;
+  /**
+   * What to hand the application's `url`, when that is not the route's
+   * name. Segue's routes are paths and its report names are not, so
+   * every Segue check says both.
+   */
+  readonly path?: string;
   /** Every one of these must appear in the mirror's computed tree. */
   readonly expect: readonly Expectation[];
   /**
@@ -100,10 +156,13 @@ interface RouteCheck {
    * say afterwards.
    */
   readonly press?: { readonly name: string; readonly role: string; readonly after: Expectation };
+  /** Where one Tab from the top of the route must leave the platform's focus. */
+  readonly focusAfterTab?: Expectation;
 }
 
 const CHECKS: readonly RouteCheck[] = [
   {
+    app: 'playground',
     route: 'example-signin',
     expect: [
       { role: 'button', name: '1' },
@@ -131,6 +190,7 @@ const CHECKS: readonly RouteCheck[] = [
     // The list half of F6b's exit criterion, and the one screen where
     // the focused element is the editing proxy rather than a mirrored
     // one — see `SemanticsMirror.applyFocus`.
+    app: 'playground',
     route: 'example-notes',
     expect: [
       { role: 'list', name: 'Notes' },
@@ -150,6 +210,7 @@ const CHECKS: readonly RouteCheck[] = [
   {
     // The playlists app: the third route A3 names, with a list, its
     // player controls and the shared-element transitions behind them.
+    app: 'playground',
     route: 'example-transitions',
     expect: [
       // A card is a group holding its own controls; opening it is the
@@ -161,24 +222,160 @@ const CHECKS: readonly RouteCheck[] = [
       { role: 'button', name: 'Save to your library' },
       { role: 'button', name: 'Like this playlist' }
     ]
+  },
+  /*
+   * Segue, every route it has (`apps/segue/src/screens/routes.ts`).
+   *
+   * The four that need an address to open are given one from the
+   * committed snapshot, so the report is of a real page rather than of
+   * an empty one. With the network off the two pages that are fetched
+   * whole, a track and an artist, can only be the page that says so;
+   * they are covered here for the names on that page, and their loaded
+   * state is walked by `apps/segue/src/screens/Keyboard.spec.tsx`,
+   * which feeds the screens rather than fetching for them.
+   */
+  {
+    app: 'segue',
+    route: 'segue-home',
+    path: '/',
+    expect: [
+      { role: 'group', name: 'Deep House Vol.1' },
+      { role: 'button', name: 'Play' },
+      { role: 'button', name: 'Like this collection' },
+      // The chips, the shelves and the row of the first shelf: a
+      // heading a screen reader can jump between, a list under it, and
+      // an item that names its artist and its length.
+      { role: 'group', name: 'Filter the shelves by genre' },
+      { role: 'heading', name: 'Trending this week' },
+      { role: 'list', name: 'Underground' },
+      { role: 'button', name: 'Segue, the home screen' },
+      { role: 'button', name: 'Search Audius' },
+      { role: 'button', name: 'Sign in to Audius' },
+      // The line that says the shelves are the committed snapshot.
+      // It is the last thing to arrive, because it waits on every
+      // Audius request failing, and this browser has no name
+      // resolution so every one of them will. Expecting it is what
+      // makes the wait cover the whole of the route's settling: without
+      // it the tree was captured with the notice sometimes present and
+      // sometimes not, and the gate failed at random.
+      { role: 'StaticText', name: 'Offline: showing a saved copy of the collections.' }
+    ],
+    press: {
+      role: 'button',
+      name: 'About Segue',
+      after: { role: 'StaticText', name: 'About Segue' }
+    }
+  },
+  {
+    app: 'segue',
+    route: 'segue-about',
+    path: '/about',
+    expect: [
+      { role: 'StaticText', name: 'About Segue' },
+      { role: 'button', name: 'Back to the home screen' },
+      { role: 'button', name: 'Open Audius' }
+    ]
+  },
+  {
+    app: 'segue',
+    route: 'segue-search',
+    path: '/search',
+    expect: [
+      { role: 'textbox', name: 'Search Audius' },
+      // Every filter is a button whose name says what pressing it does,
+      // not the word painted on it: "Electronic" alone would leave a
+      // screen reader to guess whether it is on.
+      { role: 'button', name: 'Verified artists only' },
+      { role: 'button', name: 'Clear filters' }
+    ]
+  },
+  {
+    app: 'segue',
+    route: 'segue-library',
+    path: '/library',
+    expect: [
+      { role: 'textbox', name: 'Filter your library' },
+      { role: 'button', name: 'Tracks, showing' },
+      { role: 'button', name: 'Show Playlists & albums' }
+    ]
+  },
+  {
+    app: 'segue',
+    route: 'segue-now-playing',
+    path: '/now-playing',
+    expect: [
+      { role: 'slider', name: 'Seek' },
+      { role: 'button', name: 'Previous track' },
+      { role: 'button', name: 'Next track' },
+      { role: 'button', name: 'Repeat off' }
+    ]
+  },
+  {
+    // A collection, at the address audius.co gives it. The card on the
+    // home screen morphs into this page, so the two reports share the
+    // names of everything that travels.
+    app: 'segue',
+    route: 'segue-collection',
+    path: '/Dreameaterism/playlist/deep-house-vol1',
+    expect: [
+      { role: 'button', name: 'Back to the home screen' },
+      { role: 'button', name: 'Play' },
+      { role: 'button', name: 'Open on Audius' }
+    ],
+    // Nothing offline can be heard, but the queue is plain code and
+    // does not need the network: pressing Play fills it, and the bar
+    // that only exists once something is queued appears.
+    press: {
+      role: 'button',
+      name: 'Play',
+      after: { role: 'button', name: 'Next track' }
+    }
+  },
+  {
+    app: 'segue',
+    route: 'segue-album',
+    path: '/HEXED/album/alchemy',
+    expect: [{ role: 'button', name: 'Back to the home screen' }]
+  },
+  {
+    app: 'segue',
+    route: 'segue-track',
+    path: '/Hypertraffic/stay-a-little-longer',
+    expect: [{ role: 'button', name: 'Back to the home screen' }]
+  },
+  {
+    app: 'segue',
+    route: 'segue-artist',
+    path: '/Audius',
+    expect: [{ role: 'button', name: 'Back to the home screen' }]
   }
 ];
 
 async function main(): Promise<void> {
   const chrome = findChrome();
   const profiles: string[] = [];
-  let vite: ChildProcess | undefined;
+  const servers: ChildProcess[] = [];
   let browser: ChildProcess | undefined;
   let devtools: DevTools | undefined;
   const failures: string[] = [];
   try {
-    vite = spawn('npx', ['vite', 'apps/playground', '--port', String(VITE_PORT), '--strictPort'], {
-      stdio: 'ignore'
-    });
-    await waitFor('Vite', async () => ((await fetch(`http://localhost:${VITE_PORT}/`)).ok ? true : undefined), 30_000);
+    // One server per application, started up front and left running for
+    // the whole pass: Vite's first request for a route compiles the
+    // application, and starting it again per route would pay for that
+    // once per report.
+    for (const name of new Set(CHECKS.map(check => check.app))) {
+      const app = APPS[name];
+      servers.push(spawn('npx', ['vite', app.root, '--port', String(app.port), '--strictPort'], { stdio: 'ignore' }));
+      await waitFor(
+        `Vite to serve ${name}`,
+        async () => ((await fetch(`http://localhost:${app.port}/`)).ok ? true : undefined),
+        30_000
+      );
+    }
 
     for (const check of CHECKS) {
-      const url = `http://localhost:${VITE_PORT}/#${check.route}`;
+      const app = APPS[check.app];
+      const url = `http://localhost:${app.port}${app.url(check.path ?? check.route)}`;
       // A profile per route: two browsers sharing one directory race
       // on teardown, and the notes example writes to OPFS, which is
       // inside the profile — a shared one would carry a route's data
@@ -189,21 +386,22 @@ async function main(): Promise<void> {
         url,
         devtoolsPort: DEVTOOLS_PORT,
         windowSize: [1400, 900],
-        profileDir: profile
+        profileDir: profile,
+        flags: OFFLINE_FLAGS
       }));
       try {
         failures.push(...(await checkRoute(devtools, check)));
       } finally {
-        devtools.close();
+        await stop(devtools, browser);
         devtools = undefined;
-        browser.kill();
         browser = undefined;
       }
     }
   } finally {
-    devtools?.close();
-    browser?.kill();
-    vite?.kill();
+    await stop(devtools, browser);
+    for (const server of servers) {
+      server.kill();
+    }
     for (const profile of profiles) {
       // Chrome writes as it exits, so a removal racing its teardown
       // fails with ENOTEMPTY on a directory that is about to be empty.
@@ -214,6 +412,49 @@ async function main(): Promise<void> {
   if (failures.length > 0) {
     throw new Error(`Accessibility mirror check failed:\n  ${failures.join('\n  ')}`);
   }
+}
+
+/**
+ * Ends a browser and waits for the debugging port to come free.
+ *
+ * Every route opens its own Chrome on the same port, so the next one
+ * cannot start until this one has let go of it, and killing the process
+ * Node spawned does not do that: Chrome re-executes itself as it
+ * starts, so by the time a route is finished that process has usually
+ * exited already and the browser still holding the port is a grandchild
+ * that outlived it. Asking the browser to close over the protocol is
+ * what actually ends it, and the kill is only there for a browser that
+ * never answered. Before this, one route failing left a headless Chrome
+ * on the machine that failed every later run with nothing but a timeout
+ * to say why.
+ */
+async function stop(devtools: DevTools | undefined, browser: ChildProcess | undefined): Promise<void> {
+  devtools?.close();
+  try {
+    // The browser endpoint, not the page's: `Browser.close` is a
+    // browser-level command and a page's session does not answer it.
+    const version = (await (await fetch(`http://localhost:${DEVTOOLS_PORT}/json/version`)).json()) as {
+      webSocketDebuggerUrl: string;
+    };
+    const client = await DevTools.connect(version.webSocketDebuggerUrl);
+    await client.send('Browser.close', {}, 5_000).catch(() => undefined);
+    client.close();
+  } catch {
+    // No endpoint to ask: the kill below is all there is.
+  }
+  browser?.kill();
+  await waitFor(
+    'the debugging port to come free',
+    async () => {
+      try {
+        await fetch(`http://localhost:${DEVTOOLS_PORT}/json/version`);
+        return undefined;
+      } catch {
+        return true;
+      }
+    },
+    10_000
+  ).catch(() => undefined);
 }
 
 async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string[]> {
@@ -243,10 +484,17 @@ async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string
     },
     READY_TIMEOUT_MS
   ).catch(() => false);
+  // The expectations say what must be present; they cannot say what has
+  // stopped arriving. A route whose last arrival nobody thought to
+  // expect gets captured mid-flight, and the gate then fails at random
+  // against a report that was generated on a luckier run. So after the
+  // expectations are met the tree is sampled again, and it is believed
+  // only once two samples agree.
+  nodes = await stillTree(devtools, nodes);
   report(check.route, nodes);
   const failures: string[] = [];
   const tabOrder = await tabThrough(devtools, nodes);
-  failures.push(...reportFile(check.route, nodes, tabOrder));
+  failures.push(...reportFile(check, nodes, tabOrder));
   if (!settledTree) {
     for (const expectation of check.expect) {
       const failure = missing(nodes, expectation);
@@ -321,6 +569,41 @@ async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string
     }
   }
   return failures;
+}
+
+/**
+ * How long the tree must go unchanged before it is believed, and how
+ * many times to ask.
+ *
+ * Two hundred milliseconds is longer than a frame and longer than the
+ * mirror takes to describe a change, and eight tries is a second and a
+ * half, which is longer than anything in these routes takes to settle
+ * once its data has arrived. A route that never settles is reported as
+ * it last looked rather than hanging the gate: the mismatch that
+ * follows is a truer complaint than a timeout.
+ */
+const STILL_MS = 200;
+const STILL_TRIES = 8;
+
+/** What a report would say, cheaply, so two trees can be compared. */
+function asHeard(nodes: readonly AxNode[]): string {
+  return nodes.map(node => `${node.role?.value ?? ''}\u0000${node.name?.value ?? ''}`).join('\u0001');
+}
+
+/** The tree, once it has stopped changing. */
+async function stillTree(devtools: DevTools, seen: readonly AxNode[]): Promise<AxNode[]> {
+  let nodes = [...seen];
+  let last = asHeard(nodes);
+  for (let tries = 0; tries < STILL_TRIES; tries += 1) {
+    await new Promise(resolve => setTimeout(resolve, STILL_MS));
+    nodes = await mirrorTree(devtools);
+    const now = asHeard(nodes);
+    if (now === last) {
+      return nodes;
+    }
+    last = now;
+  }
+  return nodes;
 }
 
 /** Chrome's computed accessibility nodes for the mirror's subtree. */
@@ -399,11 +682,12 @@ function describe(expectation: Expectation): string {
  * Writes or verifies the route's report, and returns the controls that
  * have no name, which fail the gate whether or not the report matched.
  */
-function reportFile(route: string, nodes: readonly AxNode[], tabOrder: readonly string[]): string[] {
+function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: readonly string[]): string[] {
+  const route = check.route;
   const unnamed = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? '') && (node.name?.value ?? '') === '');
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
   const unreachable = controls.map(describeNode).filter(name => !tabOrder.includes(name));
-  const content = renderReport(route, nodes, unnamed, tabOrder, unreachable);
+  const content = renderReport(APPS[check.app].url(check.path ?? route), nodes, unnamed, tabOrder, unreachable);
   const path = join(REPORT_DIR, `${route}.md`);
   const failures = unnamed.map(node => `${route}: a ${node.role?.value} with no accessible name`);
   for (const name of unreachable) {
@@ -432,7 +716,7 @@ function reportFile(route: string, nodes: readonly AxNode[], tabOrder: readonly 
 
 /** The report: one row per node of the computed tree, in tree order, and a count of controls. */
 function renderReport(
-  route: string,
+  title: string,
   nodes: readonly AxNode[],
   unnamed: readonly AxNode[],
   tabOrder: readonly string[],
@@ -454,12 +738,16 @@ function renderReport(
       return `| ${cell(role)} | ${cell(name)} | ${cell(states)} | ${cell(value)} |`;
     });
   return [
-    `# Accessibility report: \`#${route}\``,
+    `# Accessibility report: \`${title}\``,
     '',
     'Generated by `pnpm check:a11y:update` from the accessibility tree Chrome',
     'computes for the semantics mirror, in tree order. Each row is a thing a',
     'screen reader can reach and the name it will speak. Regenerate after a',
     'change to the route and review the diff.',
+    '',
+    'The browser has no name resolution but localhost, so an application that',
+    'reads Audius shows its committed snapshot. A report of a live shelf could',
+    'not be compared with anything.',
     '',
     '| Role | Name | States | Value |',
     '| --- | --- | --- | --- |',
@@ -488,7 +776,21 @@ function renderReport(
 
 /** A node as the report names it: role and accessible name. */
 function describeNode(node: AxNode): string {
-  return `${node.role?.value ?? '?'} '${node.name?.value ?? ''}'`;
+  return `${node.role?.value ?? '?'} '${spoken(node.name?.value ?? '')}'`;
+}
+
+/**
+ * A name as it is heard rather than as it is written.
+ *
+ * Chrome collapses the whitespace of a computed accessible name and a
+ * screen reader speaks it that way, but the mirror's `aria-label` keeps
+ * the string the application wrote. A track whose title ends in a space
+ * is therefore two different names depending on which side it is read
+ * from, and the tab walk reported a control it had just visited as one
+ * Tab never reached. Both sides go through here.
+ */
+function spoken(name: string): string {
+  return name.replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -563,6 +865,12 @@ const UNNAMED_STOP = 'a focusable node with no semantics';
  * the editing proxy passes through the canvas for an instant before the
  * mirror focuses the next control, and a single read would take that
  * instant for a stop of its own. Null when nothing moved in time.
+ *
+ * A reading of nothing at all is never a stop. The mirror rebuilds its
+ * elements as the frame that moved focus is described, and between the
+ * old element going and the new one taking focus the document has none:
+ * a walk that accepted that took it for the end of the order and
+ * stopped, on a page whose next press was a perfectly ordinary button.
  */
 async function settledFocus(devtools: DevTools, previous: string): Promise<string | null> {
   const deadline = Date.now() + 1_500;
@@ -570,7 +878,10 @@ async function settledFocus(devtools: DevTools, previous: string): Promise<strin
   let held = 0;
   while (Date.now() < deadline) {
     const active = await activeElement(devtools);
-    if (active !== previous && active === candidate) {
+    if (active === '') {
+      candidate = null;
+      held = 0;
+    } else if (active !== previous && active === candidate) {
       held++;
       if (held >= 3) {
         return active;
@@ -594,7 +905,7 @@ async function activeElement(devtools: DevTools): Promise<string> {
        const role = el.getAttribute('role');
        if (role === null) return '';
        const name = el.getAttribute('aria-label') ?? el.textContent ?? '';
-       return role + " '" + name + "'";
+       return role + " '" + name.replace(/\\s+/g, ' ').trim() + "'";
      })()`
   );
 }

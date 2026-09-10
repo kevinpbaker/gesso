@@ -27,6 +27,7 @@ function erase<T>(animation: UiAnimation<T>): AnyAnimation {
 export class AnimationDriver {
   private readonly running = new Map<object, AnyAnimation>();
   private reducedMotion = false;
+  private hidden = false;
   private wake: (() => void) | null = null;
 
   /**
@@ -58,20 +59,34 @@ export class AnimationDriver {
   }
 
   /**
+   * Whether an animation should be put where it is going instead of
+   * being run there.
+   *
+   * Two questions with one answer: a person who has asked for less
+   * motion and a page nobody is looking at both want the end state and
+   * not the journey to it, and in both cases `keep` is the way an
+   * animation says its movement is the information rather than the
+   * decoration.
+   */
+  private lands(policy: AnyAnimation['reducedMotionPolicy']): boolean {
+    return policy === 'snap' && (this.reducedMotion || this.hidden);
+  }
+
+  /**
    * Starts an animation, replacing whatever was driving its cell.
    *
-   * Returns the values it will write. Under reduced motion an
-   * animation whose policy is `snap` never enters the set at all: the
-   * cell takes its target here, in the caller's turn, and the returned
-   * observable has already completed. So a reduced-motion app runs no
-   * animation frames, rather than running them and drawing the same
-   * thing sixty times.
+   * Returns the values it will write. Under reduced motion, or while
+   * the document is hidden, an animation whose policy is `snap` never
+   * enters the set at all: the cell takes its target here, in the
+   * caller's turn, and the returned observable has already completed.
+   * So a reduced-motion app runs no animation frames, rather than
+   * running them and drawing the same thing sixty times.
    */
   start<T>(animation: UiAnimation<T>): Observable<T> {
     const cell = animation.cell as object;
     this.running.get(cell)?.cancel();
     this.running.delete(cell);
-    if (this.reducedMotion && animation.reducedMotionPolicy === 'snap') {
+    if (this.lands(animation.reducedMotionPolicy)) {
       animation.snap();
       return animation.values;
     }
@@ -129,10 +144,56 @@ export class AnimationDriver {
     if (!reduced) {
       return;
     }
+    this.landRunning();
+  }
+
+  /**
+   * The document went out of sight, or came back.
+   *
+   * A hidden page still paints. The runtime deliberately keeps giving
+   * frames to a change that genuinely happened, so the canvas holds a
+   * correct picture rather than whatever was on it when the tab went
+   * away, and a route loaded hidden is drawn once its images have
+   * decoded rather than being left half empty. What it does not do is
+   * advance animations, because frames spent watching something move
+   * that nobody can see are frames spent for nothing.
+   *
+   * Those two together leave an animation frozen at whatever value it
+   * had reached, and painted there. For most animations that is
+   * harmless: a colour halfway between two colours is still a colour.
+   * For an **entrance** it is not, because an entrance begins at
+   * `opacity: 0` and its frozen first value is an element that is not
+   * there. Segue's track page, opened in a background tab, held sixty
+   * two pixels of empty page where its play button belonged, and every
+   * screen built from `motion({ initial })` did the same. It came back
+   * the moment the tab did, which is exactly why it reads as a
+   * rendering bug rather than as a tab that is not being drawn.
+   *
+   * So a hidden page lands its animations instead of freezing them, in
+   * the same way and for the same reason a reduced-motion preference
+   * does: what an animation has to say to nobody is nothing, and the
+   * state it was going to end at is the one the page should be holding
+   * while it waits to be looked at. An animation whose movement is the
+   * information (`keep`) is left alone either way, so a spinner is
+   * still a spinner when the tab comes back.
+   */
+  setHidden(hidden: boolean): void {
+    if (this.hidden === hidden) {
+      return;
+    }
+    this.hidden = hidden;
+    if (!hidden) {
+      return;
+    }
+    this.landRunning();
+  }
+
+  /** Puts everything that may be landed where it was going. */
+  private landRunning(): void {
     // Deleting the current entry while iterating a Map is defined and
     // does not skip the next one.
     for (const [cell, animation] of this.running) {
-      if (animation.reducedMotionPolicy === 'snap') {
+      if (this.lands(animation.reducedMotionPolicy)) {
         this.running.delete(cell);
         animation.snap();
       }

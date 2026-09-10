@@ -1,0 +1,20 @@
+{
+  "name": "gesso-electrobun-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A Gesso application in a native Electrobun window.",
+  "dependencies": {
+    "@gesso/components": "^0.1.0",
+    "@gesso/core": "^0.1.0",
+    "@gesso/electrobun": "^0.1.0",
+    "@gesso/framework": "^0.1.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

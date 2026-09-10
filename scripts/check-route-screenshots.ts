@@ -50,6 +50,8 @@
  *   node scripts/check-route-screenshots.ts             # verify
  *   node scripts/check-route-screenshots.ts --update    # rewrite baselines
  *   node scripts/check-route-screenshots.ts --route framework
+ *   node scripts/check-route-screenshots.ts --route modifiers,compare
+ *   node scripts/check-route-screenshots.ts --app segue
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import {
@@ -70,8 +72,91 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { DevTools, findChrome, openPage, waitFor, WEBGPU_FLAGS } from './lib/devtools.ts';
 import { ROUTES } from '../apps/playground/src/shell/routes.ts';
 
-const VITE_PORT = 5189;
-const DEVTOOLS_PORT = 9339;
+/**
+ * The applications this gate photographs, and how a route in each is
+ * addressed.
+ *
+ * One browser and one preview server per application rather than one of
+ * each for both, because the two need different browser flags: Segue
+ * reads Audius, so it is photographed with no name resolution, and the
+ * playground's baselines were captured without that and should not be
+ * regenerated to accommodate a second app. Separate launches keep each
+ * gate's meaning its own.
+ */
+interface AppUnderTest {
+  readonly root: readonly string[];
+  readonly port: number;
+  readonly devtoolsPort: number;
+  /** Where its baselines live, relative to the repository root. */
+  readonly baselines: readonly string[];
+  /** The url of a route, given the preview server's base. */
+  url(base: string, route: string): string;
+  /** Extra flags the browser needs for this application. */
+  readonly flags: readonly string[];
+  /**
+   * The appearances to photograph each route in.
+   *
+   * One means the baseline keeps the route's bare name and nothing is
+   * emulated, which is how the playground was photographed before this
+   * existed and how it stays. More than one suffixes the name and asks
+   * for each in turn, because M8 wants Segue seen in both.
+   */
+  readonly appearances: readonly ('light' | 'dark')[];
+}
+
+/**
+ * No name resolves but localhost's, so Segue photographs its committed
+ * snapshot rather than whatever Audius is trending this hour.
+ *
+ * A browser-wide flag rather than the DevTools network domain, because
+ * the requests to block are made by workers, and a worker is a target
+ * of its own that the page's client never sees. The same flag, for the
+ * same reason, as `check-a11y-tree.ts`.
+ */
+const OFFLINE_FLAGS = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost'];
+
+const APPS: Record<string, AppUnderTest> = {
+  playground: {
+    root: ['apps', 'playground'],
+    port: 5189,
+    devtoolsPort: 9339,
+    baselines: ['apps', 'playground', 'screenshots'],
+    url: (base, route) => `${base}?still#${route}`,
+    flags: WEBGPU_FLAGS,
+    appearances: ['dark']
+  },
+  segue: {
+    root: ['apps', 'segue'],
+    port: 5190,
+    devtoolsPort: 9351,
+    baselines: ['apps', 'segue', 'screenshots'],
+    // Segue addresses routes off the path, and still mode is a query,
+    // so the flag goes on whatever path the route is.
+    url: (base, route) => `${base.replace(/\/$/, '')}${route}${route.includes('?') ? '&' : '?'}still`,
+    flags: [...WEBGPU_FLAGS, ...OFFLINE_FLAGS],
+    appearances: ['light', 'dark']
+  }
+};
+
+/**
+ * Segue's routes, as concrete addresses.
+ *
+ * Four of its nine take parameters, so they cannot be photographed from
+ * the route table alone. These are the same nine addresses
+ * `check-a11y-tree.ts` walks, so the two gates cover the same screens
+ * and a route added to one is obviously missing from the other.
+ */
+const SEGUE_ROUTES: readonly { readonly id: string; readonly path: string }[] = [
+  { id: 'segue-home', path: '/' },
+  { id: 'segue-about', path: '/about' },
+  { id: 'segue-search', path: '/search' },
+  { id: 'segue-library', path: '/library' },
+  { id: 'segue-now-playing', path: '/now-playing' },
+  { id: 'segue-collection', path: '/Dreameaterism/playlist/deep-house-vol1' },
+  { id: 'segue-album', path: '/HEXED/album/alchemy' },
+  { id: 'segue-track', path: '/Hypertraffic/stay-a-little-longer' },
+  { id: 'segue-artist', path: '/Audius' }
+];
 /** Fixed so a baseline means something; DPR is forced to 1 by the launcher. */
 const VIEWPORT: readonly [number, number] = [1280, 900];
 /**
@@ -123,6 +208,23 @@ const CANNOT_SETTLE: Record<string, string> = {
   benchmark: 'drives a continuous load and reports a moving frame time; it never reaches a still frame'
 };
 
+/**
+ * Known headroom, so the next person to see one of these is not
+ * surprised by it.
+ *
+ * `compare` carries a scrollbar thumb that is sometimes captured
+ * visible and sometimes fully faded into the panel, worth about 381
+ * pixels either way. Quiescence does not catch it, because both states
+ * are still. That is 0.059% against a 0.1% budget, so it passes, and it
+ * eats over half the headroom: a real change to that route of the size
+ * that would normally be caught might not be. The fix, when someone
+ * wants it, is for still mode to settle the thumb rather than for the
+ * threshold to grow.
+ *
+ * `example-transitions` and `transitions-app` sit at 0.076% and 0.077%
+ * of the same budget, with 30 gross pixels each against 129.
+ */
+
 /*
  * Every other route is opened in the playground's "still" mode (`?still`
  * on the URL, `apps/playground/src/shell/still.ts`): the routes name the
@@ -139,12 +241,20 @@ const CANNOT_SETTLE: Record<string, string> = {
  */
 
 const root = join(import.meta.dirname, '..');
-const baselineDir = join(root, 'apps', 'playground', 'screenshots');
-const manifestPath = join(baselineDir, 'manifest.json');
 const update = process.argv.includes('--update');
-const onlyRoute = (() => {
-  const at = process.argv.indexOf('--route');
+const onlyApp = (() => {
+  const at = process.argv.indexOf('--app');
   return at === -1 ? undefined : process.argv[at + 1];
+})();
+/**
+ * `--route a,b` rather than one route, so two routes that need
+ * attributing to the same change can be photographed from one build
+ * instead of two.
+ */
+const onlyRoutes = (() => {
+  const at = process.argv.indexOf('--route');
+  const value = at === -1 ? undefined : process.argv[at + 1];
+  return value === undefined ? undefined : new Set(value.split(',').map(name => name.trim()));
 })();
 
 interface Manifest {
@@ -323,20 +433,16 @@ function chromeVersion(chrome: string): string {
   return execFileSync(chrome, ['--version'], { encoding: 'utf8' }).trim();
 }
 
-async function main(): Promise<void> {
+/** One application's routes, photographed and compared. */
+async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[]): Promise<string[]> {
   const chrome = findChrome();
   const version = chromeVersion(chrome);
   const profile = mkdtempSync(join(tmpdir(), 'gesso-shots-'));
+  const baselineDir = join(root, ...app.baselines);
+  const manifestPath = join(baselineDir, 'manifest.json');
   let vite: ChildProcess | undefined;
   let browser: ChildProcess | undefined;
   let devtools: DevTools | undefined;
-
-  const routes = ROUTES.filter(route => onlyRoute === undefined || route.id === onlyRoute).filter(
-    route => CANNOT_SETTLE[route.id] === undefined
-  );
-  if (routes.length === 0) {
-    throw new Error(`No routes to capture${onlyRoute === undefined ? '' : ` for --route ${onlyRoute}`}.`);
-  }
 
   const manifest: Manifest | undefined = existsSync(manifestPath)
     ? (JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest)
@@ -355,14 +461,14 @@ async function main(): Promise<void> {
   const written: string[] = [];
   try {
     execFileSync('npx', ['vite', 'build', '--logLevel', 'warn'], {
-      cwd: join(root, 'apps', 'playground'),
+      cwd: join(root, ...app.root),
       stdio: 'inherit'
     });
     // The page fetches its own baseline to diff against, and `vite
     // preview` serves only the build output, so the baselines are copied
     // in beside it. `dist/` is ignored by git, so this leaves nothing.
     if (!update && existsSync(baselineDir)) {
-      const served = join(root, 'apps', 'playground', 'dist', 'screenshots');
+      const served = join(root, ...app.root, 'dist', 'screenshots');
       mkdirSync(served, { recursive: true });
       for (const name of readdirSync(baselineDir)) {
         if (name.endsWith('.png') && !name.endsWith('.actual.png')) {
@@ -370,19 +476,20 @@ async function main(): Promise<void> {
         }
       }
     }
-    vite = spawn('npx', ['vite', 'preview', '--port', String(VITE_PORT), '--strictPort'], {
-      cwd: join(root, 'apps', 'playground'),
+    vite = spawn('npx', ['vite', 'preview', '--port', String(app.port), '--strictPort'], {
+      cwd: join(root, ...app.root),
       stdio: 'ignore'
     });
-    const base = `http://localhost:${VITE_PORT}/`;
+    const base = `http://localhost:${app.port}/`;
     await waitFor('the preview server', async () => ((await fetch(base)).ok ? true : undefined), 30_000);
 
     ({ browser, devtools } = await openPage(chrome, {
       url: base,
-      devtoolsPort: DEVTOOLS_PORT,
+      devtoolsPort: app.devtoolsPort,
       windowSize: VIEWPORT,
-      // Some routes are WebGPU; the adapter has to exist for them to paint.
-      flags: WEBGPU_FLAGS,
+      // Some routes are WebGPU; the adapter has to exist for them to
+      // paint. Segue adds the flag that stops names resolving.
+      flags: [...app.flags],
       profileDir: profile
     }));
 
@@ -390,7 +497,9 @@ async function main(): Promise<void> {
       mkdirSync(baselineDir, { recursive: true });
     }
 
-    for (const route of routes) {
+    for (const { route, appearance } of routes.flatMap(route =>
+      app.appearances.map(appearance => ({ route, appearance }))
+    )) {
       // Through about:blank, so each route is a real document load and
       // cannot inherit the last one's state. Navigating straight from one
       // hash to another would be a same-document navigation, and a reload
@@ -398,10 +507,20 @@ async function main(): Promise<void> {
       // is how this first hung, with a `Runtime.evaluate` whose context
       // had been torn down never getting a reply.
       await devtools.send('Page.navigate', { url: 'about:blank' });
+      // The appearance the page will read, before it loads. Headless
+      // Chrome answers `dark` for `prefers-color-scheme` whatever the
+      // system is set to, so the light run has to be asked for rather
+      // than assumed, and the flag Chrome documents for it silently
+      // does nothing.
+      if (app.appearances.length > 1) {
+        await devtools.send('Emulation.setEmulatedMedia', {
+          features: [{ name: 'prefers-color-scheme', value: appearance }]
+        });
+      }
       // In still mode, so a route that ticks or plays holds one frame.
-      await devtools.send('Page.navigate', { url: `${base}?still#${route.id}` });
+      await devtools.send('Page.navigate', { url: app.url(base, route.address) });
 
-      const name = `${route.id}.png`;
+      const name = `${route.id}${app.appearances.length > 1 ? `-${appearance}` : ''}.png`;
       const file = join(baselineDir, name);
       // Before quiescing, not instead of it: a loaded page still has a
       // first frame to draw and a spring to come to rest.
@@ -477,7 +596,7 @@ async function main(): Promise<void> {
       // Anything left over is a baseline for a canvas that no longer
       // exists; leaving it would make the gate quietly cover less.
       for (const name of readdirSync(baselineDir)) {
-        if (name.endsWith('.png') && !written.includes(name) && onlyRoute === undefined) {
+        if (name.endsWith('.png') && !written.includes(name) && onlyRoutes === undefined) {
           unlinkSync(join(baselineDir, name));
           console.log(`  removed ${name}, which nothing captures any more`);
         }
@@ -489,7 +608,9 @@ async function main(): Promise<void> {
         captured: new Date().toISOString()
       };
       writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`);
-      console.log(`\nwrote ${written.length} baselines and the manifest (${version} on ${process.platform}).`);
+      console.log(
+        `\nwrote ${written.length} ${appName} baselines and the manifest (${version} on ${process.platform}).`
+      );
     }
   } finally {
     devtools?.close();
@@ -502,6 +623,52 @@ async function main(): Promise<void> {
     }
   }
 
+  console.log(
+    `  ${appName}: ${routes.length} routes` +
+      (app.appearances.length > 1 ? ` in ${app.appearances.length} appearances` : '')
+  );
+  return failures;
+}
+
+/** A route to photograph: its baseline's name, and where to find it. */
+interface Route {
+  readonly id: string;
+  /** What `AppUnderTest.url` is given: a hash id, or a path. */
+  readonly address: string;
+}
+
+async function main(): Promise<void> {
+  const wanted = Object.entries(APPS).filter(([name]) => onlyApp === undefined || name === onlyApp);
+  if (wanted.length === 0) {
+    throw new Error(`No application called ${onlyApp}. Known: ${Object.keys(APPS).join(', ')}.`);
+  }
+
+  const failures: string[] = [];
+  let captured = 0;
+  for (const [name, app] of wanted) {
+    const all: Route[] =
+      name === 'segue'
+        ? SEGUE_ROUTES.map(route => ({ id: route.id, address: route.path }))
+        : ROUTES.filter(route => CANNOT_SETTLE[route.id] === undefined).map(route => ({
+            id: route.id,
+            address: route.id
+          }));
+    const routes = all.filter(route => onlyRoutes === undefined || onlyRoutes.has(route.id));
+    if (routes.length === 0) {
+      if (onlyRoutes !== undefined) {
+        continue;
+      }
+      throw new Error(`No routes to capture for ${name}.`);
+    }
+    captured += routes.length * app.appearances.length;
+    failures.push(...(await shoot(name, app, routes)));
+  }
+  if (captured === 0) {
+    throw new Error(
+      `No routes to capture${onlyRoutes === undefined ? '' : ` for --route ${[...onlyRoutes].join(',')}`}.`
+    );
+  }
+
   const excluded = Object.entries(CANNOT_SETTLE)
     .map(([id, why]) => `  ${id}: ${why}`)
     .join('\n');
@@ -510,7 +677,7 @@ async function main(): Promise<void> {
     console.error('\nIf the change is intended, run `pnpm screenshots:update` and commit the baselines.');
     process.exit(1);
   }
-  console.log(`\nroute screenshots ok: ${routes.length} routes match their baselines.`);
+  console.log(`\nroute screenshots ok: ${captured} routes match their baselines.`);
   if (excluded.length > 0) {
     console.log(`not covered:\n${excluded}`);
   }
