@@ -84,16 +84,19 @@ because it is the only thing that knows.
 
 The safe area and the soft keyboard come from `visualViewport` and from
 `env(safe-area-inset-*)`, both of which need a window. That makes them
-shell-side, and what crosses the thread boundary is four numbers:
+shell-side, and the framework's shell does the reading for you: on
+mount, `GessoApp` and `WorkerApp` both call `observeViewportInsets`,
+and what crosses the thread boundary is four numbers in a
+`viewportInsets` message. The runtime publishes them into the registry
+the root provides, as one more contributor beside your bars, so the
+`insetPadding` above keeps clear of the keyboard with no further code.
+
+The raw numbers are also on `ShellService`, as a read-only cell for the
+application that provides its registry somewhere other than the root,
+or wants the platform's contribution apart from its own bars':
 
 ```ts
-// On the shell, where there is a window.
-observeViewportInsets(insets => post({ type: 'insets', insets }));
-```
-
-```ts
-// In the render worker, where the decision is taken.
-registry.publish(message.insets);
+const platform = ctx.inject(ShellService).viewportInsets;
 ```
 
 `observeViewportInsets` reports once immediately as well as on change,
@@ -121,7 +124,9 @@ failure.
 Nothing in `observeViewportInsets` reads a Gesso object, which is the
 rule `decisions/0030` states: the shell holds what only it can hold and
 posts plain data, and every decision about the data is taken on the far
-side.
+side. Whether a real notch or a real keyboard reports what the reader
+expects has not been checked on a device; the route is covered by specs
+that drive a fake `visualViewport`.
 
 ## In an application
 
