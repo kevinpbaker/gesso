@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   Button,
+  Paint,
   Row,
   Text,
   focusRing,
@@ -15,7 +16,8 @@ import {
   UiGraph,
   type UiNode,
   UiNodeType,
-  type UiKeyboardEvent
+  type UiKeyboardEvent,
+  type UiPaint
 } from '@gesso/core';
 import { Component } from '../Component';
 import { ComponentHostResolver } from '../ComponentHostResolver';
@@ -90,6 +92,31 @@ describe('jsx runtime', () => {
       children: []
     });
     expect(viaJsx).toEqual(viaFactory);
+  });
+
+  it('makes a <paint> the way the Paint factory does, children stacked over the picture', () => {
+    // The painted node is `decisions/0078`'s: a Box-shaped leaf that
+    // draws through its `paint` or `path` prop. The tag has to reach
+    // the same factory and the same node type, so that a waveform
+    // written as `<paint>` and one written as `Paint(...)` are the
+    // same element, and so that its children (a label over a gauge, a
+    // pin over a waveform) land where the factory puts them.
+    const painter: UiPaint = { inputs: [1], draw: () => {} };
+    const viaJsx = (
+      <paint width={120} height={32} paint={painter} clipPath="M0 0 H120 V32 H0 Z">
+        <text>72%</text>
+      </paint>
+    );
+    const viaFactory = Paint(
+      { width: 120, height: 32, paint: painter, clipPath: 'M0 0 H120 V32 H0 Z' },
+      Text({ text: '72%' })
+    );
+    expect(viaJsx).toEqual(viaFactory);
+    expect((viaJsx as UiElement).type).toBe(UiNodeType.Paint);
+    expect((<paint path={{ d: 'M0 0 L1 1', fill: 'primary' }} />).props.path).toEqual({
+      d: 'M0 0 L1 1',
+      fill: 'primary'
+    });
   });
 
   it('turns a string, number or Observable child of <text> into its text prop', () => {
@@ -249,6 +276,8 @@ describe('jsx runtime', () => {
       <Badge count="three" />;
       // @ts-expect-error 'circle' is not a tag
       <circle r={1} />;
+      // @ts-expect-error a painter is a UiPaint, not a bare function
+      <paint paint={() => {}} />;
     };
     expect(typeof typeChecks).toBe('function');
     // Attribute strings are contextually typed, so vocabularies complete.

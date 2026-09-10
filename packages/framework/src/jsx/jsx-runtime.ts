@@ -6,6 +6,7 @@ import {
   type ColumnProps,
   type EditableTextProps,
   type GridProps,
+  type PaintElementProps,
   type RowProps,
   type ScrollViewProps,
   type StackProps,
@@ -19,6 +20,7 @@ import {
   Column,
   EditableText,
   Grid,
+  Paint,
   Row,
   ScrollView,
   Stack,
@@ -48,9 +50,11 @@ import type { ClassComponent, ComponentContext, ComponentProps, ComponentType } 
  *
  * Intrinsic tags are the element factories in lowercase: `text`,
  * `editabletext`, `button`, `box`, `stack`, `row`, `column`,
- * `scrollview`, `grid`.
+ * `scrollview`, `grid`, `paint`.
  * A `text` or `button` with a string (or Observable string) child
- * takes it as its `text` prop.
+ * takes it as its `text` prop. A `paint` is a box the application
+ * draws into, through its `paint` or `path` prop; its children stack
+ * over the picture. See `rendering/PaintSurface.ts`.
  */
 
 /** What may appear between tags: children, or nothing (for conditionals). */
@@ -71,7 +75,8 @@ const INTRINSIC_TYPES = {
   row: UiNodeType.Row,
   column: UiNodeType.Column,
   scrollview: UiNodeType.ScrollView,
-  grid: UiNodeType.Grid
+  grid: UiNodeType.Grid,
+  paint: UiNodeType.Paint
 } as const satisfies Record<string, UiNodeType>;
 
 export type IntrinsicTag = keyof typeof INTRINSIC_TYPES;
@@ -107,6 +112,8 @@ export namespace JSX {
     column: WithChildren<ColumnProps>;
     scrollview: WithChildren<ScrollViewProps>;
     grid: WithChildren<GridProps>;
+    /** A box the application draws into; see `PaintSurface`. */
+    paint: WithChildren<PaintElementProps>;
   }
 
   /**
@@ -249,7 +256,8 @@ const INTRINSIC_FACTORIES = {
   row: Row,
   column: Column,
   scrollview: ScrollView,
-  grid: Grid
+  grid: Grid,
+  paint: Paint
 } as const satisfies Record<IntrinsicTag, unknown>;
 
 /** Every factory, seen as the one shape this file calls them with. */
