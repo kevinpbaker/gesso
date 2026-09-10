@@ -3082,6 +3082,7 @@ import {
   ComponentLikeElement,
   EditableTextProps,
   GridProps,
+  PaintElementProps,
   RowProps,
   ScrollViewProps,
   StackProps,
@@ -3106,6 +3107,7 @@ declare const INTRINSIC_TYPES: {
   readonly column: UiNodeType.Column;
   readonly scrollview: UiNodeType.ScrollView;
   readonly grid: UiNodeType.Grid;
+  readonly paint: UiNodeType.Paint;
 };
 type IntrinsicTag = keyof typeof INTRINSIC_TYPES;
 declare namespace JSX {
@@ -3132,6 +3134,7 @@ declare namespace JSX {
     column: WithChildren<ColumnProps>;
     scrollview: WithChildren<ScrollViewProps>;
     grid: WithChildren<GridProps>;
+    paint: WithChildren<PaintElementProps>;
   }
   type LibraryManagedAttributes<C, P> = C extends ClassComponent ? ComponentProps<C> : C extends ((props: infer I, ...rest: any[]) => UiChild) ? unknown extends I ? ComponentProps<C> : I extends Record<string, InputCell<any>> ? ComponentProps<C> : P : P;
 }
