@@ -5,7 +5,7 @@ import { Component } from '../../Component';
 import { Define } from '../../decorators';
 import { internalState } from '../../InternalState';
 import { createComponent } from '../../createComponent';
-import { Box, Column, Text, type CanvasHost } from '@gesso/core';
+import { Box, Column, Text, UiInsetRegistry, type CanvasHost } from '@gesso/core';
 import { RenderWorkerApp } from './renderRoot';
 import { channel } from '../../channel/ChannelToken';
 import type { ComponentContext, Inputs } from '../../FunctionComponent';
@@ -385,5 +385,25 @@ describe('RenderWorkerApp colour scheme', () => {
 
     send({ type: 'colorScheme', scheme: 'dark' });
     expect(seen).toEqual(['light', 'dark']);
+  });
+});
+
+describe('RenderWorkerApp viewport insets', () => {
+  it('publishes what the shell reports into the registry the root provides', async () => {
+    const registry = new UiInsetRegistry();
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(Box({ insets: registry }, Text({ text: 'page' })), host);
+    send(initMessage(createMockCanvas()));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+
+    // The application's own bar is already there; the keyboard opens
+    // over it and the two compose by maximum, not by sum.
+    const bar = registry.publish({ bottom: 88 });
+    send({ type: 'viewportInsets', insets: { top: 0, right: 0, bottom: 320, left: 0 } });
+    expect(registry.current.bottom).toBe(320);
+
+    send({ type: 'viewportInsets', insets: { top: 0, right: 0, bottom: 0, left: 0 } });
+    expect(registry.current.bottom).toBe(88);
+    bar();
   });
 });

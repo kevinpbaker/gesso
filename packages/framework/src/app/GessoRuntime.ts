@@ -57,6 +57,11 @@ import {
   UiFocusManager,
   FocusNotifier,
   EnvironmentNotifier,
+  UiEnvironmentKeys,
+  UiInsetRegistry,
+  insetsEqual,
+  noInsets,
+  type UiInsets,
   UiKeyboardController,
   UiEditingController,
   type EditingState,
@@ -337,6 +342,13 @@ export class GessoRuntime {
   private root: UiNode | undefined;
   /** The node the app's root definition produced. */
   private appRoot: UiNode | undefined;
+  /** The platform's insets as the shell last reported them; see `setViewportInsets`. */
+  private viewportInsetValue: UiInsets = noInsets;
+  /** The registry those insets are currently published into, and the handle on them. */
+  private viewportInsetRegistry: UiInsetRegistry | null = null;
+  private viewportInsetWrite: ((next?: Partial<UiInsets>) => void) | null = null;
+  /** Stops watching the app root's environment for a change of registry. */
+  private detachViewportInsetEnvironment: (() => void) | null = null;
   private constraints: Constraints;
   private pixelRatio: number;
   private lastFrameMs = 0;
@@ -1259,6 +1271,74 @@ export class GessoRuntime {
   }
 
   /**
+   * The platform's own insets, as the shell reports them: the safe area
+   * under a notch or a home indicator and the strip a soft keyboard
+   * covers, once at start-up and again whenever they change.
+   *
+   * Two things happen to them, and both are on this side of the
+   * boundary because both are decisions. They reach `ShellService`,
+   * where an application can read the raw numbers as `colorScheme` is
+   * read. And they are published into the inset registry the app root's
+   * environment carries, as one contributor beside the application's
+   * own floating bars, so `insetPadding` on a screen keeps clear of the
+   * keyboard without the application writing a line. The registry
+   * composes by maximum, so a bar drawn across the home indicator and
+   * the home indicator under it cost the content one strip, not two;
+   * see `UiInsetRegistry` for the reasoning.
+   *
+   * The registry is the one at the app root rather than one this
+   * runtime owns because an application provides its own with the
+   * `insets` prop and every screen reads that one. Without a provider
+   * the key's default registry is used, which is what every reader
+   * under such a root resolves too. A registry provided below the root
+   * is not found; the application feeds `ShellService.viewportInsets`
+   * into it, which is why that cell exists.
+   */
+  setViewportInsets(insets: UiInsets): void {
+    if (insetsEqual(this.viewportInsetValue, insets)) {
+      return;
+    }
+    this.viewportInsetValue = insets;
+    this.services.get(ShellService).applyViewportInsets(insets);
+    this.publishViewportInsets();
+  }
+
+  /**
+   * Writes the platform's insets into whichever registry the app root
+   * resolves right now, moving the contribution when that changes.
+   *
+   * Called when the insets change, when the root is built or reloaded,
+   * and when the root's environment is rebuilt, because the registry
+   * is an environment value and a reload may provide a different one.
+   * The old registry gets its room back before the new one is written,
+   * exactly as a retracted bar would.
+   */
+  private publishViewportInsets(): void {
+    const appRoot = this.appRoot;
+    const source =
+      appRoot === undefined
+        ? null
+        : (appRoot.environment ?? this.graph.buildNodeEnvironment(appRoot)).get(UiEnvironmentKeys.insets);
+    const registry = source instanceof UiInsetRegistry ? source : null;
+    if (registry !== this.viewportInsetRegistry) {
+      this.viewportInsetWrite?.();
+      this.viewportInsetWrite = null;
+      this.viewportInsetRegistry = registry;
+    }
+    if (registry === null) {
+      // A source that is not a registry is somebody's read-only view of
+      // one, and there is nothing to publish into; `publishInset` makes
+      // the same call.
+      return;
+    }
+    if (this.viewportInsetWrite === null) {
+      this.viewportInsetWrite = registry.publish(this.viewportInsetValue);
+    } else {
+      this.viewportInsetWrite(this.viewportInsetValue);
+    }
+  }
+
+  /**
    * Reports what became of a popup a component asked for, settling the
    * promise `ShellService.openPopup` returned.
    *
@@ -1288,6 +1368,11 @@ export class GessoRuntime {
   /** The appearance the shell last reported; `light` until it says otherwise. */
   get colorScheme(): ColorScheme {
     return this.services.get(ShellService).currentColorScheme;
+  }
+
+  /** The platform's insets the shell last reported; zeroes until it says otherwise. */
+  get viewportInsets(): UiInsets {
+    return this.viewportInsetValue;
   }
 
   /** Which shared-element names are currently held, for specs and devtools. */
@@ -1611,6 +1696,14 @@ export class GessoRuntime {
       clearTimeout(this.scrollbarTimer);
       this.scrollbarTimer = null;
     }
+    // The room the platform's insets took is given back: the default
+    // registry is shared, and a disposed runtime must not go on
+    // reporting a keyboard into it.
+    this.detachViewportInsetEnvironment?.();
+    this.detachViewportInsetEnvironment = null;
+    this.viewportInsetWrite?.();
+    this.viewportInsetWrite = null;
+    this.viewportInsetRegistry = null;
     if (this.caretTimer !== null) {
       clearTimeout(this.caretTimer);
       this.caretTimer = null;
@@ -1682,6 +1775,12 @@ export class GessoRuntime {
     }
     this.appRoot = appRoot;
     this.graph.propagateEnvironment(this.root);
+    // The registry the platform's insets go into is an environment
+    // value on this node, so a new root, or a root whose environment is
+    // rebuilt, may resolve a different one.
+    this.detachViewportInsetEnvironment?.();
+    this.detachViewportInsetEnvironment = this.environmentNotifier.add(appRoot, () => this.publishViewportInsets());
+    this.publishViewportInsets();
   }
 
   private resolveRootElement(definition: FrameworkChild, depth: number): UiElement {

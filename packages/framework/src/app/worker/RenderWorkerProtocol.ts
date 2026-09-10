@@ -4,6 +4,7 @@ import type {
   UiKeyModifiers,
   EditingState,
   RendererBackend,
+  UiInsets,
   UiPointerDevice,
   UiSemanticsAction,
   UiScrollability,
@@ -160,6 +161,23 @@ export type ShellToRuntimeMessage =
    * host tells a shell, not a thing that crosses.
    */
   | { type: 'colorScheme'; scheme: ColorScheme }
+  /**
+   * What the window's own chrome is covering on each edge: the safe
+   * area a notch or a home indicator takes, and the strip a soft
+   * keyboard covers, read from `visualViewport` and the
+   * `env(safe-area-inset-*)` custom properties. Sent once at start-up
+   * and again whenever they change, which on a phone is every frame of
+   * a keyboard sliding up.
+   *
+   * Inbound for the reason the two above are: `visualViewport` needs a
+   * window. Four plain numbers cross, and nothing else, because what to
+   * do about a keyboard is a layout question and layout is in here.
+   * `GessoRuntime.setViewportInsets` publishes them into the
+   * application's inset registry, where they compose by maximum with
+   * whatever the application's own floating bars publish; see
+   * `UiInsetRegistry` for why by maximum.
+   */
+  | { type: 'viewportInsets'; insets: UiInsets }
   /**
    * Where the window's address is now: once at start-up, and again for
    * every back, forward or typed address afterwards.

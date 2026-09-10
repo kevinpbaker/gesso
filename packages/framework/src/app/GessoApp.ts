@@ -1,6 +1,7 @@
 import type { FrameworkChild } from '../ComponentElement';
 import {
   CanvasPlatformSurface,
+  observeViewportInsets,
   prepareInputSurface,
   UiPlatformAdapter,
   type UiNode,
@@ -113,6 +114,8 @@ export class GessoApp {
   private detachReducedMotion: (() => void) | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
   private detachColorScheme: (() => void) | null = null;
+  /** Stops watching `visualViewport` for the safe area and the keyboard. */
+  private detachViewportInsets: (() => void) | null = null;
   /** The appearance this shell reports; watched or overridden. */
   private colorSchemePreference: ColorSchemePreference = 'auto';
 
@@ -186,6 +189,7 @@ export class GessoApp {
     this.resize(box?.width ?? this.canvas.width ?? 600, box?.height ?? this.canvas.height ?? 600);
     this.attachInput();
     this.attachHistory();
+    this.attachViewportInsets();
     this.runtime.onCursor(cursor => {
       if (isCanvasElement(this.canvas)) {
         this.canvas.style.cursor = cursor ?? '';
@@ -307,6 +311,8 @@ export class GessoApp {
     this.detachReducedMotion = null;
     this.detachColorScheme?.();
     this.detachColorScheme = null;
+    this.detachViewportInsets?.();
+    this.detachViewportInsets = null;
     this.history?.dispose();
     this.history = null;
     this.adapter.detach();
@@ -397,6 +403,20 @@ export class GessoApp {
     this.runtime.onShellRequest(request => this.handleShellRequest(request, history));
     history.onChange(url => this.runtime.setUrl(url));
     this.runtime.setUrl(history.url);
+  }
+
+  /**
+   * Reports the platform's safe area and soft keyboard to the runtime.
+   *
+   * Outside `attachInput` for the reason `attachHistory` is: the insets
+   * are a layout fact, and an app mounted with `input: false` still
+   * lays out. Nothing is decided here. `observeViewportInsets` reads
+   * `visualViewport` and hands over four numbers, and the runtime
+   * publishes them into the application's inset registry, which is the
+   * same route `WorkerApp` takes with a message in the middle.
+   */
+  private attachViewportInsets(): void {
+    this.detachViewportInsets = observeViewportInsets(insets => this.runtime.setViewportInsets(insets));
   }
 
   private handleShellRequest(request: ShellRequest, history: ShellHistory): void {

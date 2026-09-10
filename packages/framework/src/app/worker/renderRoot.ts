@@ -408,6 +408,9 @@ export class RenderWorkerApp {
       case 'colorScheme':
         runtime.setColorScheme(message.scheme);
         break;
+      case 'viewportInsets':
+        runtime.setViewportInsets(message.insets);
+        break;
       case 'url':
         runtime.setUrl(message.url);
         break;

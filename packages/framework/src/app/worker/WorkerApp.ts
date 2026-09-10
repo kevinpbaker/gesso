@@ -13,6 +13,7 @@ import {
 } from './RenderWorkerProtocol';
 import {
   capturePointer,
+  observeViewportInsets,
   pointerDeviceOf,
   prepareInputSurface,
   touchActionFor,
@@ -276,6 +277,8 @@ export class WorkerApp {
   private frameHandle: number | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
   private detachColorScheme: (() => void) | null = null;
+  /** Stops watching `visualViewport` for the safe area and the keyboard. */
+  private detachViewportInsets: (() => void) | null = null;
   /** The appearance this shell reports, remembered across a remount. */
   private colorSchemePreference: ColorSchemePreference = 'auto';
 
@@ -388,6 +391,12 @@ export class WorkerApp {
       action: action => this.post({ type: 'audioAction', action })
     });
     this.setColorScheme(this.colorSchemePreference);
+    // The safe area and the soft keyboard, as four numbers. Read here
+    // because `visualViewport` is the window's; what to do about them
+    // is layout, and layout is in the worker. Reported once immediately
+    // as well as on change, so a phone whose notch has been there all
+    // along starts with the right numbers.
+    this.detachViewportInsets = observeViewportInsets(insets => this.post({ type: 'viewportInsets', insets }));
     // The hidden textarea that turns keystrokes into text for the
     // worker. It has DOM focus while the worker reports a focused
     // editable, so its key events are forwarded like the canvas's.
@@ -575,6 +584,8 @@ export class WorkerApp {
     this.setFrameLoop(false);
     this.detachColorScheme?.();
     this.detachColorScheme = null;
+    this.detachViewportInsets?.();
+    this.detachViewportInsets = null;
     this.proxy?.dispose();
     this.proxy = null;
     this.mirror?.dispose();

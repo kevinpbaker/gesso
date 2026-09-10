@@ -1,3 +1,5 @@
+import { insetsEqual, noInsets, type UiInsets } from '@gesso/core';
+
 import { internalState } from '../InternalState';
 import type { ColorScheme } from './colorScheme';
 import type { ReadableCell } from '../Input';
@@ -54,6 +56,7 @@ export interface ShellStorageResult {
 export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
+  private readonly insets = internalState<UiInsets>(noInsets);
   /** Popups asked for and not yet answered, by the id sent with each. */
   private readonly popups = new Map<number, (opened: boolean) => void>();
   private nextPopupId = 1;
@@ -96,6 +99,30 @@ export class ShellService {
     return this.scheme.value;
   }
 
+  /**
+   * What the platform itself is covering on each edge, as the shell
+   * reports it: the safe area under a notch or a home indicator, and
+   * the strip a soft keyboard has slid over. Zeroes on a desktop window
+   * with neither, and zeroes until a shell has said otherwise.
+   *
+   * Read-only to the application for the same reason `colorScheme` is:
+   * the shell is the only thing that knows, and a cell an application
+   * could also write is a cell the next keyboard event overwrites.
+   *
+   * Most applications never read this. The runtime publishes the same
+   * four numbers into the inset registry the root provides, so a
+   * screen that keeps clear of the bars with `insetPadding` keeps
+   * clear of the keyboard too without naming it. This is for the
+   * application that provides its registry somewhere other than the
+   * root, or wants the platform's numbers apart from its own bars'.
+   */
+  readonly viewportInsets: ReadableCell<UiInsets> = this.insets;
+
+  /** The platform's current insets, for code that needs them without subscribing. */
+  get currentViewportInsets(): UiInsets {
+    return this.insets.value;
+  }
+
   /** Installed by the runtime; a request with no handler is dropped. */
   setHandler(handler: ((request: ShellRequest) => void) | null): void {
     this.handler = handler;
@@ -110,6 +137,19 @@ export class ShellService {
   applyColorScheme(scheme: ColorScheme): void {
     if (this.scheme.value !== scheme) {
       this.scheme.value = scheme;
+    }
+  }
+
+  /**
+   * Called by the runtime when the shell reports the platform's insets.
+   *
+   * Not for applications, on the terms `applyColorScheme` sets. A
+   * report that changes nothing is dropped here, so a `visualViewport`
+   * scroll event that moved no edge does not wake every subscriber.
+   */
+  applyViewportInsets(insets: UiInsets): void {
+    if (!insetsEqual(this.insets.value, insets)) {
+      this.insets.value = insets;
     }
   }
 
