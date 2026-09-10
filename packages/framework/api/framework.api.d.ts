@@ -544,6 +544,7 @@ interface ServedChannel {
     commands?: Record<string, Command>;
   };
 }
+declare function serve<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>): ServedChannel;
 declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
 declare function pick<T, K extends keyof T>(source: Observable<T>, key: K): Observable<T[K]>;
 declare function pickKeys<T extends object, K extends keyof T>(source: Observable<T>, keys: readonly K[]): { readonly [P in K]: Observable<T[P]>; };
@@ -2429,6 +2430,7 @@ export {
   SelectOptions,
   SemanticsMirror,
   SemanticsMirrorSink,
+  serve,
   serveChannels,
   ServedChannel,
   servePorts,
@@ -2706,6 +2708,7 @@ import {
   SelectOptions,
   SemanticsMirror,
   SemanticsMirrorSink,
+  serve,
   serveChannels,
   ServedChannel,
   servePorts,
@@ -2768,7 +2771,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-CVg7MX8G.js";
+} from "./index-BLrmp9sL.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2872,6 +2875,7 @@ export {
   RouteState,
   select,
   SemanticsMirror,
+  serve,
   serveChannels,
   servePorts,
   ServiceRegistry,
@@ -3217,6 +3221,7 @@ import {
   ResourceStatus,
   select,
   SelectOptions,
+  serve,
   serveChannels,
   ServedChannel,
   servePorts,
@@ -3233,7 +3238,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CVg7MX8G.js";
+} from "../index-BLrmp9sL.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
@@ -3269,6 +3274,7 @@ export {
   resource,
   Resource,
   select,
+  serve,
   serveChannels,
   servePorts,
   storageErrorMessage,
