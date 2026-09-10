@@ -279,6 +279,7 @@ import {
   UiFocusManager,
   UiFrameClockFactory,
   UiInputDispatcher,
+  UiInsets,
   UiKeyboardController,
   UiKeyModifiers,
   UiLength,
@@ -998,14 +999,18 @@ interface ShellStorageResult {
 declare class ShellService {
   private handler;
   private readonly scheme;
+  private readonly insets;
   private readonly popups;
   private nextPopupId;
   private readonly stores;
   private nextStorageId;
   readonly colorScheme: ReadableCell<ColorScheme>;
   get currentColorScheme(): ColorScheme;
+  readonly viewportInsets: ReadableCell<UiInsets>;
+  get currentViewportInsets(): UiInsets;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
+  applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): void;
   openUrl(url: string): void;
   openPopup(request: {
@@ -1130,6 +1135,10 @@ type ShellToRuntimeMessage = {
 {
   type: 'colorScheme';
   scheme: ColorScheme;
+} |
+{
+  type: 'viewportInsets';
+  insets: UiInsets;
 } |
 {
   type: 'url';
@@ -1481,6 +1490,10 @@ declare class GessoRuntime {
   private height;
   private root;
   private appRoot;
+  private viewportInsetValue;
+  private viewportInsetRegistry;
+  private viewportInsetWrite;
+  private detachViewportInsetEnvironment;
   private constraints;
   private pixelRatio;
   private lastFrameMs;
@@ -1566,10 +1579,13 @@ declare class GessoRuntime {
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
+  setViewportInsets(insets: UiInsets): void;
+  private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
   settleStorage(id: number, result: ShellStorageResult): void;
   get reducedMotion(): boolean;
   get colorScheme(): ColorScheme;
+  get viewportInsets(): UiInsets;
   get sharedElementNames(): readonly string[];
   explain(node: UiNode): LayoutExplanation;
   inspectNode(node: UiNode): UiNodeReport;
@@ -1719,6 +1735,7 @@ declare class WorkerApp {
   private ready;
   private frameHandle;
   private detachColorScheme;
+  private detachViewportInsets;
   private colorSchemePreference;
   constructor(options: WorkerAppOptions);
   get appLogic(): WorkerHandle | undefined;
@@ -1782,6 +1799,7 @@ declare class GessoApp {
   private detachVisibility;
   private detachReducedMotion;
   private detachColorScheme;
+  private detachViewportInsets;
   private colorSchemePreference;
   constructor(options: GessoAppOptions);
   get services(): ServiceRegistry;
@@ -1803,6 +1821,7 @@ declare class GessoApp {
   private attachInput;
   private attachSemanticsMirror;
   private attachHistory;
+  private attachViewportInsets;
   private handleShellRequest;
   private observeResize;
 }
@@ -2749,7 +2768,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-Dvya7O4F.js";
+} from "./index-CVg7MX8G.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3214,7 +3233,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-Dvya7O4F.js";
+} from "../index-CVg7MX8G.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
