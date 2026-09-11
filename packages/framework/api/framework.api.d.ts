@@ -2206,6 +2206,7 @@ declare class SemanticsMirror {
   private createElement;
   private describe;
   private place;
+  private position;
   private remove;
   private applyFocus;
   private listen;
@@ -2771,7 +2772,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-BLrmp9sL.js";
+} from "./index-D_Dr9pje.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3241,7 +3242,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-BLrmp9sL.js";
+} from "../index-D_Dr9pje.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
