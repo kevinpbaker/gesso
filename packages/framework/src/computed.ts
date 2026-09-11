@@ -233,8 +233,34 @@ export function computed<T>(compute: (read: ReadSource) => T, options: ComputedO
  */
 const streamCells = new WeakMap<Observable<unknown>, StreamCell<unknown>>();
 
+/**
+ * Whether a source's `.value` announces itself to the running computed,
+ * decided once per source and remembered.
+ *
+ * Having a `value` is not enough. A framework cell records its reads
+ * through `trackRead`, which is what lets a computed learn what it
+ * depends on; a plain `BehaviorSubject` has a `value` too and records
+ * nothing, so a computed that trusted the property would read it once
+ * and never hear it change. That is exactly what happened to three
+ * data-layer specs that fed a raw subject where the application feeds
+ * a channel view. The probe reads `.value` once under a tracking set
+ * of its own and asks whether the source turned up in it.
+ */
+const tracksReads = new WeakMap<Observable<unknown>, boolean>();
+
+function announcesItsReads(source: ReadableCell<unknown>): boolean {
+  let known = tracksReads.get(source);
+  if (known === undefined) {
+    const seen = new Set<ReadableCell<unknown>>();
+    withTracking(seen, () => void source.value);
+    known = seen.has(source);
+    tracksReads.set(source, known);
+  }
+  return known;
+}
+
 function cellFor<T>(source: Observable<T>): ReadableCell<T> {
-  if ('value' in source) {
+  if ('value' in source && announcesItsReads(source as ReadableCell<T>)) {
     return source as ReadableCell<T>;
   }
   let cell = streamCells.get(source as Observable<unknown>);

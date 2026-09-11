@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BehaviorSubject } from 'rxjs';
 import { Column, Text, UiManualFrameClock, UiNodeType, type UiNode } from '@gesso/core';
 
 import { GessoRuntime } from './app/GessoRuntime';
 import { mockCanvas } from './app/RuntimeTestUtils';
 import type { FrameworkChild } from './ComponentElement';
+import { select } from './select';
 import { computed } from './computed';
 import { createComponent } from './createComponent';
 import type { Inputs } from './FunctionComponent';
@@ -127,6 +129,26 @@ describe('computed', () => {
     count.value = 3;
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("Component 'Counter' read `Counter.label` with .value while its body ran");
+  });
+
+  it('follows a plain BehaviorSubject, whose value announces nothing', () => {
+    // A raw subject has a `value` and records no reads, so trusting the
+    // property left a computed stuck on the first value it saw. Three
+    // data-layer specs found it by feeding a subject where the
+    // application feeds a channel view.
+    const subject = new BehaviorSubject(1);
+    const doubled = computed(read => read(subject) * 2);
+    const picked = select(subject, value => value + 1);
+    const seen: number[] = [];
+    const chosen: number[] = [];
+    const following = doubled.subscribe(value => seen.push(value));
+    const choosing = picked.subscribe(value => chosen.push(value));
+    subject.next(2);
+    subject.next(3);
+    following.unsubscribe();
+    choosing.unsubscribe();
+    expect(seen).toEqual([2, 4, 6]);
+    expect(chosen).toEqual([2, 3, 4]);
   });
 
   it('reads an input cell like any other source', () => {
