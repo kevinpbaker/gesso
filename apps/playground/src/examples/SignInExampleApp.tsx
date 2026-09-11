@@ -377,7 +377,7 @@ interface Movement {
 }
 
 const MOVEMENTS: readonly Movement[] = [
-  { id: 'm1', title: 'Grassland Ventures payroll', when: 'Today, 09:12', amount: 4200 },
+  { id: 'm1', title: 'Payroll', when: 'Today, 09:12', amount: 4200 },
   { id: 'm2', title: 'Hydro One', when: 'Yesterday', amount: -132.4 },
   { id: 'm3', title: 'Transfer to savings', when: 'Mon', amount: -800 },
   { id: 'm4', title: 'Refund · Lee Valley Tools', when: 'Sun', amount: 89.99 },
