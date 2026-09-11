@@ -558,7 +558,7 @@ export class LayoutEngine {
         content: horizontal ? rec.intrinsicWidth : rec.intrinsicHeight,
         measured: horizontal ? rec.measuredWidth : rec.measuredHeight,
         final: horizontal ? rec.width : rec.height,
-        contentMin: horizontal ? rec.minContentWidth : rec.intrinsicHeight,
+        contentMin: horizontal ? rec.minContentWidth : rec.minContentHeight,
         padding: horizontal ? rec.paddingLeft + rec.paddingRight : rec.paddingTop + rec.paddingBottom,
         aspectRatio: rec.aspectRatio,
         flex,
@@ -1342,6 +1342,11 @@ export class LayoutEngine {
     rec.lastConstraints = constraints;
     this.resolveLayoutProps(node, rec);
     rec.hasBaseline = false;
+    // Containers that know their min-content height set it as they
+    // measure; everything else gets the content height below. A
+    // negative value is "not set", so a measurer cannot leave a stale
+    // one behind from the last constraints.
+    rec.minContentHeight = -1;
     const effective = this.effectiveConstraints(node, constraints, rec);
     let size: Size;
     if (
@@ -1362,6 +1367,9 @@ export class LayoutEngine {
     // and what explain() reports the content asked for.
     rec.intrinsicWidth = size.width;
     rec.intrinsicHeight = size.height;
+    if (rec.minContentHeight < 0) {
+      rec.minContentHeight = size.height;
+    }
     // A tight axis is the parent's decision (a flexed main size, a
     // stretched cross size, the viewport) and wins outright. A loose
     // axis only set the available space: content that cannot fit it
@@ -1792,6 +1800,7 @@ export class LayoutEngine {
     const items = this.collectFlexItems(node, content, direction, config, crossDefinite && !config.wrap);
     if (items.length === 0) {
       rec.minContentWidth = rec.paddingLeft + rec.paddingRight;
+      rec.minContentHeight = rec.paddingTop + rec.paddingBottom;
       return { width: paddingMain, height: paddingCross };
     }
     const lines = this.breakLines(items, config, mainBounded ? mainMax : Infinity);
@@ -1836,6 +1845,7 @@ export class LayoutEngine {
 
     this.setFlexBaseline(rec, lines[0].items, row);
     rec.minContentWidth = this.flexMinContentWidth(rec, items, row, config);
+    rec.minContentHeight = this.flexMinContentHeight(rec, items, row, config);
     return {
       width: row ? paddingMain + contentMain : paddingCross + contentCross,
       height: row ? paddingCross + contentCross : paddingMain + contentMain
@@ -1949,7 +1959,7 @@ export class LayoutEngine {
           child.type === UiNodeType.EditableText ||
           child.properties.get('textOverflow') === 'ellipsis' ||
           this.numberProp(child, 'maxLines') !== undefined;
-        const contentSuggestion = clips ? 0 : row ? cRec.minContentWidth : cRec.intrinsicHeight;
+        const contentSuggestion = clips ? 0 : row ? cRec.minContentWidth : cRec.minContentHeight;
         minMain = Math.min(contentSuggestion, explicitMain ?? Infinity, maxMain);
         minFromContent = !clips && explicitMain === undefined;
       } else {
@@ -2343,6 +2353,20 @@ export class LayoutEngine {
     return total + rec.paddingLeft + rec.paddingRight;
   }
 
+  /** `flexMinContentWidth` for the other axis: a column sums its items, a row takes the tallest. */
+  private flexMinContentHeight(rec: LayoutRecord, items: FlexItem[], row: boolean, config: FlexConfig): number {
+    let total = 0;
+    for (const item of items) {
+      const contribution =
+        this.minContentHeightContribution(item.child, item.rec) + item.rec.marginTop + item.rec.marginBottom;
+      total = !row && !config.wrap ? total + contribution : Math.max(total, contribution);
+    }
+    if (!row && !config.wrap) {
+      total += config.gapMain * (items.length - 1);
+    }
+    return total + rec.paddingTop + rec.paddingBottom;
+  }
+
   /**
    * What a child contributes to its parent's min-content width: its
    * explicit width when it has one, else its own min-content width,
@@ -2364,10 +2388,25 @@ export class LayoutEngine {
     return this.clamp(explicit ?? cRec.minContentWidth, cRec.minWidth, cRec.maxWidth);
   }
 
+  /**
+   * A child's min-content height, as its parent's automatic minimum
+   * counts it: the counterpart of `minContentContribution`, with the
+   * same exception for a scroll container, whose content is its own
+   * business and pushes on nothing outside it.
+   */
+  private minContentHeightContribution(child: UiNode, cRec: LayoutRecord): number {
+    if (child.type === UiNodeType.ScrollView || child.type === UiNodeType.EditableText) {
+      return this.lengthProp(child, 'height', undefined) ?? 0;
+    }
+    const explicit = this.lengthProp(child, 'height', undefined);
+    return this.clamp(explicit ?? cRec.minContentHeight, cRec.minHeight, cRec.maxHeight);
+  }
+
   private measureStack(node: UiNode, rec: LayoutRecord, content: Constraints): Size {
     let maxWidth = 0;
     let maxHeight = 0;
     let minContent = 0;
+    let minContentHeight = 0;
     let first = true;
     const savedBase = this.percentBase;
     const definiteWidth = this.definiteAxis(content, 'width');
@@ -2412,6 +2451,10 @@ export class LayoutEngine {
       maxWidth = Math.max(maxWidth, cRec.outerWidth);
       maxHeight = Math.max(maxHeight, cRec.outerHeight);
       minContent = Math.max(minContent, this.minContentContribution(child, cRec) + cRec.marginLeft + cRec.marginRight);
+      minContentHeight = Math.max(
+        minContentHeight,
+        this.minContentHeightContribution(child, cRec) + cRec.marginTop + cRec.marginBottom
+      );
       if (first) {
         first = false;
         rec.hasBaseline = true;
@@ -2420,6 +2463,7 @@ export class LayoutEngine {
     });
     this.percentBase = savedBase;
     rec.minContentWidth = rec.paddingLeft + rec.paddingRight + minContent;
+    rec.minContentHeight = rec.paddingTop + rec.paddingBottom + minContentHeight;
     return {
       width: rec.paddingLeft + rec.paddingRight + maxWidth,
       height: rec.paddingTop + rec.paddingBottom + maxHeight
@@ -2478,6 +2522,7 @@ export class LayoutEngine {
     this.percentBase = savedBase;
     // Scrollable content does not push on the outside world.
     rec.minContentWidth = rec.paddingLeft + rec.paddingRight;
+    rec.minContentHeight = rec.paddingTop + rec.paddingBottom;
     mainTotal += gap * Math.max(0, childCount - 1);
     const contentMain = mainTotal + paddingMain;
     const contentCross = crossMax + paddingCross;

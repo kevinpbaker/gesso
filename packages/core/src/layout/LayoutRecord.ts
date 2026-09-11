@@ -82,11 +82,18 @@ export class LayoutRecord {
 
   /**
    * Intrinsic sizes. `minContentWidth` is the narrowest the content can
-   * be (a text's longest word, a row's summed items); `intrinsicHeight`
+   * be (a text's longest word, a row's summed items) and
+   * `minContentHeight` the shortest, on the same terms; `intrinsicHeight`
    * is the content's height before explicit or parent sizes. Flex uses
-   * both for the automatic minimum size of items.
+   * the min-content sizes for the automatic minimum size of items.
+   *
+   * The two min-content sizes leave a scroll container out: scrollable
+   * content pushes on nothing outside the scroller, so a box holding a
+   * list is as small as the box, not as tall as the list. The intrinsic
+   * sizes count it, which is why they are not the minimums.
    */
   minContentWidth = 0;
+  minContentHeight = 0;
   maxContentWidth = 0;
   intrinsicWidth = 0;
   intrinsicHeight = 0;
@@ -237,6 +244,7 @@ export class LayoutRecord {
   private altOuterWidth = 0;
   private altOuterHeight = 0;
   private altMinContentWidth = 0;
+  private altMinContentHeight = 0;
   private altMaxContentWidth = 0;
   private altIntrinsicWidth = 0;
   private altIntrinsicHeight = 0;
@@ -254,6 +262,7 @@ export class LayoutRecord {
     this.altOuterWidth = this.outerWidth;
     this.altOuterHeight = this.outerHeight;
     this.altMinContentWidth = this.minContentWidth;
+    this.altMinContentHeight = this.minContentHeight;
     this.altMaxContentWidth = this.maxContentWidth;
     this.altIntrinsicWidth = this.intrinsicWidth;
     this.altIntrinsicHeight = this.intrinsicHeight;
@@ -283,6 +292,9 @@ export class LayoutRecord {
     swap = this.minContentWidth;
     this.minContentWidth = this.altMinContentWidth;
     this.altMinContentWidth = swap;
+    swap = this.minContentHeight;
+    this.minContentHeight = this.altMinContentHeight;
+    this.altMinContentHeight = swap;
     swap = this.maxContentWidth;
     this.maxContentWidth = this.altMaxContentWidth;
     this.altMaxContentWidth = swap;
@@ -403,6 +415,7 @@ export class LayoutRecord {
     this.hasBaseline = false;
     this.baseline = 0;
     this.minContentWidth = 0;
+    this.minContentHeight = 0;
     this.maxContentWidth = 0;
     this.intrinsicWidth = 0;
     this.intrinsicHeight = 0;
@@ -447,6 +460,7 @@ export class LayoutRecord {
     this.altOuterWidth = 0;
     this.altOuterHeight = 0;
     this.altMinContentWidth = 0;
+    this.altMinContentHeight = 0;
     this.altMaxContentWidth = 0;
     this.altIntrinsicWidth = 0;
     this.altIntrinsicHeight = 0;
