@@ -19,6 +19,7 @@ import {
   UiNodeRef,
   UiSelfAlignment,
   UiTrackSize,
+  UiTypographyRole,
   UiVirtualWindow
 } from "@gesso/core";
 import {
@@ -82,6 +83,24 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+type ChipVariant = 'filled' | 'outlined';
+type ChipSize = 'small' | 'medium';
+interface ChipProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  label?: string;
+  name?: string;
+  description?: string;
+  selected?: boolean;
+  defaultSelected?: boolean;
+  count?: number | string;
+  icon?: string;
+  variant?: ChipVariant;
+  size?: ChipSize;
+  textStyle?: UiTypographyRole;
+  disabled?: boolean;
+  onPress?: (selected: boolean) => void;
+}
+declare function Chip(inputs: Inputs<ChipProps>, ctx: ComponentContext): UiChild;
 interface SwitchProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   checked?: boolean;
@@ -552,6 +571,7 @@ export {
   Button,
   Card,
   Checkbox,
+  Chip,
   controlDescription,
   controlled,
   controlMessage,
@@ -603,6 +623,9 @@ export {
   type ButtonVariant,
   type CardProps,
   type CheckboxProps,
+  type ChipProps,
+  type ChipSize,
+  type ChipVariant,
   type ControlFocus,
   type ControlLayoutProps,
   type ControlledValue,
