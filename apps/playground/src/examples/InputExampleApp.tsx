@@ -409,7 +409,12 @@ function BoardPane(inputs: Inputs<BoardProps>, _ctx: ComponentContext): UiChild 
       backgroundColor="controlBackground"
       cursor="grab"
       modifiers={[
-        draggable({ keepOffset: false, dragging: { opacity: 0.7, zIndex: 10 } }),
+        // `lift`, not `zIndex`: zIndex reorders a node among its siblings,
+        // and the chip's siblings are the other chips in its own tray. The
+        // tray it is being carried into is painted after the one it left,
+        // so a chip raised only by zIndex went behind it. Lifted, the chip
+        // is drawn after everything on the screen.
+        draggable({ keepOffset: false, dragging: { opacity: 0.7, lift: true } }),
         dragSource({ payload: { type: CHIP, data: name }, dragging: { borderColor: 'controlAccent' } })
       ]}>
       <text text={name} fontSize={12} color="text" selectable={false} />

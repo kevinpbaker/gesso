@@ -49,7 +49,16 @@ export interface DraggableOptions {
   /**
    * Properties to write while the drag runs, in the shape
    * `interactive` uses for hover and press: `{ opacity: 0.8, zIndex: 10 }`
-   * lifts the node off the page and puts it over its neighbours.
+   * puts the node over its siblings while it is carried.
+   *
+   * `zIndex` reaches no further than that, because it reorders the
+   * children of one parent. A node carried out of its container and
+   * over another one, a chip dragged from one tray into the next, is
+   * still painted inside the container it left, and the container it
+   * is over paints after that one and covers it. `{ lift: true }` is
+   * the property for that case: the node is drawn after everything
+   * else up to the nearest `liftBoundary`, and outside its ancestors'
+   * clips, for as long as the drag runs.
    */
   readonly dragging?: Readonly<Record<string, unknown>>;
   /**
