@@ -363,6 +363,30 @@ describe('SemanticsMirror', () => {
     expect(container.style.top).toBe('16px');
   });
 
+  it('offsets a nested element from its parent, so its rectangle stands where the box is', () => {
+    // Every element is absolutely positioned inside its parent, so a
+    // child written in canvas coordinates stood a parent's offset too
+    // low: the bar's slider measured at y=1496 on an 813px page.
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('bar', { role: 'region', label: 'Now playing' }) },
+        { op: 'add', node: record('seek', { parent: 'bar', index: 0, role: 'slider', label: 'Seek' }) }
+      ],
+      boxes: [
+        { id: 'bar', box: { x: 0, y: 700, width: 1280, height: 88 } },
+        { id: 'seek', box: { x: 300, y: 740, width: 400, height: 26 } }
+      ]
+    });
+    expect(elementFor('bar').style.top).toBe('700px');
+    expect(elementFor('seek').style.left).toBe('300px');
+    expect(elementFor('seek').style.top).toBe('40px');
+
+    // The parent moves and the child's box does not: its offset follows.
+    apply({ boxes: [{ id: 'bar', box: { x: 0, y: 600, width: 1280, height: 88 } }] });
+    expect(elementFor('seek').style.top).toBe('140px');
+  });
+
   it('moves DOM focus to follow the app, and back to the canvas when nothing has it', () => {
     const { elementFor, doc, canvas, actions, apply } = setup();
     apply({

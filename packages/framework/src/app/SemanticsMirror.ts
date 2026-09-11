@@ -129,7 +129,11 @@ const VALUE_IN_CONTENT: ReadonlySet<string> = new Set(['textbox', 'searchbox']);
 interface MirrorEntry {
   readonly element: HTMLElement;
   record: UiSemanticsRecord;
+  /** The node's box in canvas coordinates, once one has been sent. */
+  box?: MirrorBox;
 }
+
+type MirrorBox = UiSemanticsUpdate['boxes'][number]['box'];
 
 /**
  * The off-screen DOM an assistive technology reads (roadmap F6b).
@@ -238,17 +242,22 @@ export class SemanticsMirror {
       }
     }
     for (const { id, box } of update.boxes) {
-      const element = this.entries.get(id)?.element;
-      if (element === undefined) {
+      const entry = this.entries.get(id);
+      if (entry === undefined) {
         continue;
       }
-      // Rounded, because a subpixel box would make the style string
-      // differ on frames where nothing an assistive technology can
-      // perceive has changed.
-      element.style.left = `${Math.round(box.x)}px`;
-      element.style.top = `${Math.round(box.y)}px`;
-      element.style.width = `${Math.round(box.width)}px`;
-      element.style.height = `${Math.round(box.height)}px`;
+      entry.box = box;
+      this.position(entry);
+      // The children sit inside this element, so their offsets are
+      // measured from it: a parent that moved carries them with it in
+      // the DOM, and their own left and top have to give that back.
+      for (const child of Array.from(entry.element.children)) {
+        const childId = this.ids.get(child as HTMLElement);
+        const childEntry = childId === undefined ? undefined : this.entries.get(childId);
+        if (childEntry?.box !== undefined) {
+          this.position(childEntry);
+        }
+      }
     }
     if (update.focused !== undefined) {
       this.applyFocus(update.focused);
@@ -281,6 +290,10 @@ export class SemanticsMirror {
     }
     this.describe(element, record);
     this.place(element, record);
+    if (existing?.box !== undefined) {
+      // Under a different parent, the same box is a different offset.
+      this.position(existing);
+    }
     if (record.id === this.focusedId) {
       // A record that changed while focused: the proxy's copy of it
       // has to change too, or a screen reader reads the old value.
@@ -388,6 +401,35 @@ export class SemanticsMirror {
       return;
     }
     parent.insertBefore(element, at ?? null);
+  }
+
+  /**
+   * Writes an element's box as an offset from its parent's.
+   *
+   * Every element is absolutely positioned and nested under its parent,
+   * so a child's `left` and `top` are read from the parent's padding
+   * box, not from the canvas. Writing canvas coordinates into a nested
+   * element added the parent's offset twice, and the rectangle an
+   * assistive technology measured for a control inside a region stood
+   * well below where the control was drawn. A parent whose box has not
+   * arrived yet counts as sitting at the origin; the box loop above
+   * repositions the children when it does.
+   *
+   * Rounded, because a subpixel box would make the style string differ
+   * on frames where nothing an assistive technology can perceive has
+   * changed.
+   */
+  private position(entry: MirrorEntry): void {
+    const box = entry.box;
+    if (box === undefined) {
+      return;
+    }
+    const parent = entry.record.parent === null ? undefined : this.entries.get(entry.record.parent)?.box;
+    const { element } = entry;
+    element.style.left = `${Math.round(box.x - (parent?.x ?? 0))}px`;
+    element.style.top = `${Math.round(box.y - (parent?.y ?? 0))}px`;
+    element.style.width = `${Math.round(box.width)}px`;
+    element.style.height = `${Math.round(box.height)}px`;
   }
 
   private remove(id: string): void {
