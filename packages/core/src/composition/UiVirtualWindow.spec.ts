@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from './UiComponents';
 import type { UiElement } from './UiElement';
@@ -119,5 +119,55 @@ describe('UiVirtualWindow', () => {
     expect(() => new UiVirtualWindow('column', { count: 1, estimatedExtent: 0 }, renderItem)).toThrow(
       /estimatedExtent/
     );
+  });
+  describe('a viewport that is the content', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('warns once when the viewport keeps landing on the content extent, and not for a bounded list', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const window = new UiVirtualWindow(
+        'column',
+        { count: 10, estimatedExtent: 20, overscan: 1, initialViewportExtent: 500 },
+        renderItem
+      );
+      // Bounded: the content grows past the viewport and the viewport stays put.
+      window.setCount(20);
+      window.update({ scroll: 0, extent: 500 }, []);
+      window.setCount(30);
+      window.update({ scroll: 0, extent: 500 }, []);
+      expect(warn).not.toHaveBeenCalled();
+
+      // Unbounded: the host lays the list out at its rows' height and reports
+      // that back as the viewport, one frame behind the count.
+      window.setCount(40);
+      window.update({ scroll: 0, extent: 30 * 20 }, []);
+      expect(warn).not.toHaveBeenCalled();
+      window.setCount(50);
+      window.update({ scroll: 0, extent: 40 * 20 }, []);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('LazyColumn of 50 items');
+      expect(warn.mock.calls[0][0]).toContain('minHeight: 0');
+
+      window.setCount(60);
+      window.update({ scroll: 0, extent: 50 * 20 }, []);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not warn for a viewport that changes once, even onto a content extent', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const window = new UiVirtualWindow(
+        'row',
+        { count: 10, estimatedExtent: 20, overscan: 1, initialViewportExtent: 500 },
+        renderItem
+      );
+      window.setCount(30);
+      // A resize that happens to land on the previous content extent.
+      window.update({ scroll: 0, extent: 200 }, []);
+      window.setCount(40);
+      window.update({ scroll: 0, extent: 200 }, []);
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 });

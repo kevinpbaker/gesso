@@ -157,6 +157,11 @@ export class UiVirtualWindow {
    * list actually is rather than against the top of it.
    */
   private viewport: VirtualViewport;
+  /** The last few content extents, and the viewport extent last seen; see `checkViewport`. */
+  private readonly recentContentExtents: number[] = [];
+  private lastViewportExtent = -1;
+  private viewportLandedOnContent = 0;
+  private warnedAboutViewport = false;
 
   constructor(axis: LazyAxis, options: LazyListOptions, renderItem: LazyItemRenderer) {
     const count = typeof options.count === 'number' ? options.count : 0;
@@ -287,6 +292,7 @@ export class UiVirtualWindow {
 
     const total = this.totalExtent();
     const header = viewport.lead ?? 0;
+    this.checkViewport(viewport.extent, total + header);
     const scrolled = clamp(viewport.scroll + scrollAdjust, 0, Math.max(0, total + header - viewport.extent));
     // Offsets are measured from the first item, so a header above them
     // shifts what the viewport is looking at by its own extent.
@@ -307,6 +313,51 @@ export class UiVirtualWindow {
       this.children$.next(this.buildChildren());
     }
     return { scrollAdjust };
+  }
+
+  /**
+   * Warns, once, when the viewport is the content.
+   *
+   * A lazy list bounded by nothing takes the extent of its rows, and its
+   * host then reports that extent back as the viewport: every row is in
+   * view, every row is mounted, and nothing is virtualised. The list
+   * looks right the whole time, because whatever holds it clips it; it
+   * only gets slower with every row it gains. Found in Sluice, where a
+   * wrapper box gave the feed's list the height of its rows and forty
+   * posts a second re-laid and re-mirrored a thousand of them.
+   *
+   * The tell is the viewport moving with the content. The host reports
+   * the extent it laid out last frame, so a viewport that is the content
+   * lands on a content extent this window computed an update or two ago,
+   * and lands on the next one when the content grows again. Two landings
+   * are the signal: a viewport that changes for a real reason, a window
+   * resized, hits one of those numbers only by coincidence, and not twice.
+   */
+  private checkViewport(extent: number, content: number): void {
+    if (!this.warnedAboutViewport && extent !== this.lastViewportExtent) {
+      if (this.recentContentExtents.some(recent => Math.abs(recent - extent) < 0.5)) {
+        this.viewportLandedOnContent++;
+        if (this.viewportLandedOnContent >= 2) {
+          this.warnedAboutViewport = true;
+          const name = this.grid !== undefined ? 'LazyGrid' : this.axis === 'column' ? 'LazyColumn' : 'LazyRow';
+          const size = this.axis === 'column' ? 'height' : 'width';
+          const minimum = this.axis === 'column' ? 'minHeight' : 'minWidth';
+          console.warn(
+            `A ${name} of ${this.count} items has a viewport the size of its content (${Math.round(extent)}px), ` +
+              `so every item is mounted and nothing is virtualised. The list is taking its items' ${size} ` +
+              `rather than being bounded by what holds it: give it a definite ${size}, or, when a wrapper ` +
+              `between it and a flex parent is the one growing, put ${minimum}: 0 on that wrapper.`
+          );
+        }
+      }
+      this.lastViewportExtent = extent;
+    }
+    if (this.recentContentExtents[this.recentContentExtents.length - 1] !== content) {
+      this.recentContentExtents.push(content);
+      if (this.recentContentExtents.length > 4) {
+        this.recentContentExtents.shift();
+      }
+    }
   }
 
   /**
