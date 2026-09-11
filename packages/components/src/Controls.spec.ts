@@ -127,6 +127,26 @@ describe('Switch', () => {
     expect(changes).toEqual([true]);
     expect(ui.getByRole('switch')).toHaveSemantics({ role: 'switch', name: 'Notifications' });
   });
+
+  it('draws the thumb in a colour other than its track, off as well as on', () => {
+    const ui = mount(createComponent(Switch, { label: 'Notifications' }));
+    const track = ui.getByRole('switch').firstChild;
+    const thumb = track?.firstChild;
+    if (track === null || track === undefined || thumb === null || thumb === undefined) {
+      throw new Error('the switch has no track or no thumb');
+    }
+
+    // Off: the track is the control's empty white, so the thumb cannot be.
+    expect(track.properties.get('backgroundColor')).toBe('controlBackground');
+    expect(thumb.properties.get('backgroundColor')).toBe('controlBorder');
+
+    ui.fireEvent.click(ui.getByRole('switch'));
+    ui.frame();
+
+    // On: the track fills with the accent and the thumb goes white on it.
+    expect(track.properties.get('backgroundColor')).toBe('controlAccent');
+    expect(thumb.properties.get('backgroundColor')).toBe('controlBackground');
+  });
 });
 
 describe('RadioGroup', () => {

@@ -70,7 +70,11 @@ export function Switch(inputs: Inputs<SwitchProps>, ctx: ComponentContext): UiCh
       onKeyDown: keymap({ ' ': toggle, Enter: toggle })
     },
     // The track aligns its thumb, so the thumb's position is layout
-    // rather than a computed offset.
+    // rather than a computed offset. The thumb is drawn in whichever
+    // token contrasts with the track it sits on: the control's white on
+    // the accent when on, the control's outline colour on the empty
+    // track when off, since an off track is the same white as the thumb
+    // would otherwise be.
     Box(
       {
         width: 40,
@@ -84,16 +88,20 @@ export function Switch(inputs: Inputs<SwitchProps>, ctx: ComponentContext): UiCh
         y: 'center',
         hitTestable: false
       },
-      Box({ width: 16, height: 16, borderRadius: 8, backgroundColor: 'controlBackground' })
+      Box({ width: 16, height: 16, borderRadius: 8, backgroundColor: thumb(value.value) })
     ),
     Text({ text: label, color: foregroundToken(disabled), selectable: false })
   );
 }
 
-/** A switch cannot fail validation, so its border is only ever focused or not. */
-
+/** The track behind the thumb: empty when off, filled with the accent when on. */
 function track(checked: Observable<boolean>, disabled: Observable<boolean>): Observable<string> {
   return combineLatest([checked, disabled]).pipe(
     map(([on, off]) => (!on ? 'controlBackground' : off ? 'controlForegroundDisabled' : 'controlAccent'))
   );
+}
+
+/** The thumb on the track: the control's outline colour on an empty track, white on the accent. */
+function thumb(checked: Observable<boolean>): Observable<string> {
+  return checked.pipe(map(on => (on ? 'controlBackground' : 'controlBorder')));
 }
