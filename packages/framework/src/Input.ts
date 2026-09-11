@@ -61,7 +61,12 @@ export class InputCell<T> extends BehaviorSubject<T> {
 
   override get value(): T {
     trackRead(this);
-    if (bodyOf !== null && this.snapshotBy === null) {
+    // A read a `computed` is collecting is not the body's snapshot: the
+    // computed follows this cell from here on and carries the change,
+    // and a body that read the computed itself is the computed's own
+    // stale watch to report. Recording it here as well warned, wrongly,
+    // for a screen row whose `computed` input had let go with the row.
+    if (bodyOf !== null && tracking === null && this.snapshotBy === null) {
       this.snapshotBy = bodyOf;
     }
     return super.getValue();

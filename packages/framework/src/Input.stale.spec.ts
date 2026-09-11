@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
 
 import { Column, Text, type UiChild } from '@gesso/core';
+import { computed } from './computed';
 import { createComponent } from './createComponent';
 import type { ComponentContext } from './FunctionComponent';
 import type { Inputs } from './FunctionComponent';
 import { input } from './Input';
+import { internalState } from './InternalState';
+import { show } from './show';
 import { mountRuntime } from './app/RuntimeTestUtils';
 
 /** Reads its label once, the way a body should not. */
@@ -30,6 +33,10 @@ function InHandler(
   _ctx: ComponentContext
 ): UiChild {
   return Text({ text: 'Press', onClick: () => inputs.onRead.emit(inputs.label.value) });
+}
+
+function FirstRow(inputs: Inputs<{ first: string }>, _ctx: ComponentContext): UiChild {
+  return Text({ text: inputs.first });
 }
 
 describe('the stale-read warning', () => {
@@ -93,6 +100,40 @@ describe('the stale-read warning', () => {
     track.next({ id: 't1', title: 'One', art: 'b.jpg' });
 
     expect(String(warn.mock.calls[0][0])).toContain('at .art, from "a.jpg" to "b.jpg"');
+  });
+
+  it('does not blame a body for a read a computed made on its behalf, even once that computed has let go', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // A cell that outlives any component, as a channel key does.
+    const windows = input<{ rows: readonly string[] }>({ rows: ['a'] });
+    windows.label = 'rows.windows';
+    // Hands a child a `computed` over that cell. The computed first runs
+    // when the child's input subscribes to it, which is inside the
+    // child's body, so the cell is read while a body is on record and
+    // while a computed is collecting the read.
+    function Window(_inputs: Inputs<{}>, _ctx: ComponentContext): UiChild {
+      const first = computed(() => windows.value.rows[0] ?? '');
+      return createComponent(FirstRow, { first });
+    }
+    const shown = internalState(true);
+    const mounted = mountRuntime(
+      Column(
+        {},
+        show(shown, () => createComponent(Window, {}))
+      )
+    );
+
+    // Followed by the computed while the row is up: nothing to say.
+    windows.next({ rows: ['b'] });
+    // The row leaves, its computed lets go of the cell, and the cell
+    // changes with nothing following it. That was the false positive: a
+    // screen row whose input was a computed over a channel key was
+    // reported as a stale body read after it had been unmounted.
+    shown.value = false;
+    mounted.frame();
+    windows.next({ rows: ['c'] });
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('says nothing when the value does not actually change', () => {
