@@ -13,6 +13,7 @@
  */
 export { Button, type ButtonProps, type ButtonSize, type ButtonTone, type ButtonVariant } from './Button';
 export { Checkbox, type CheckboxProps } from './Checkbox';
+export { Chip, type ChipProps, type ChipSize, type ChipVariant } from './Chip';
 export { Switch, type SwitchProps } from './Switch';
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';
 export { TextInput, TextArea, type TextInputProps, type TextAreaProps } from './TextInput';

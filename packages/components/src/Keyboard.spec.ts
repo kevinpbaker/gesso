@@ -3,6 +3,7 @@ import { createComponent } from '@gesso/framework';
 import { renderTest, type Rendered } from '@gesso/testing';
 import { Box, Button, Column, Text, fr, type UiNode, type UiSemanticsRecord } from '@gesso/core';
 import { Checkbox } from './Checkbox';
+import { Chip } from './Chip';
 import { DataTable } from './DataTable';
 import { LazyList } from './LazyList';
 import { NumberInput } from './NumberInput';
@@ -67,6 +68,7 @@ describe('the keyboard gallery', () => {
         createComponent(TextInput, { label: 'Email' }),
         createComponent(Checkbox, { label: 'Remember me' }),
         createComponent(Switch, { label: 'Notifications' }),
+        createComponent(Chip, { label: 'Metal', defaultSelected: false }),
         createComponent(RadioGroup, {
           label: 'Plan',
           options: [
@@ -150,6 +152,17 @@ describe('the keyboard gallery', () => {
       },
       { role: 'checkbox', name: 'Remember me', operate: expectToggle },
       { role: 'switch', name: 'Notifications', operate: expectToggle },
+      // A chip is a toggle button: Space turns it on, and it says so as
+      // `pressed` rather than `checked`.
+      {
+        role: 'button',
+        name: 'Metal',
+        operate: (u, node) => {
+          u.fireEvent.keyDown(' ');
+          u.frame();
+          expect(u.getSemantics(node).states).toContain('pressed');
+        }
+      },
       {
         // One tab stop for the group; the arrows move the choice.
         role: 'radiogroup',
