@@ -140,7 +140,7 @@ The pages, by what they are for:
 
 - **Acting:** [Button](/components/button).
 - **Choosing:** [Checkbox](/components/checkbox),
-  [Switch](/components/switch),
+  [Chip](/components/chip), [Switch](/components/switch),
   [RadioGroup](/components/radio-group), [Select](/components/select).
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
   [Slider](/components/slider), [NumberInput](/components/number-input).

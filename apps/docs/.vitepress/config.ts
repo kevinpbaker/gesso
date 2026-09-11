@@ -198,6 +198,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/components/' },
           { text: 'Button', link: '/components/button' },
+          { text: 'Chip', link: '/components/chip' },
           { text: 'Checkbox', link: '/components/checkbox' },
           { text: 'Switch', link: '/components/switch' },
           { text: 'RadioGroup', link: '/components/radio-group' },

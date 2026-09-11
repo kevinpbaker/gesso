@@ -1077,6 +1077,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/checkbox'
   },
   {
+    name: 'Chip',
+    package: 'components',
+    group: 'Components',
+    what: 'A pill that is on or off, for a row of filters; a toggle button that reports pressed.',
+    page: '/components/chip'
+  },
+  {
     name: 'DataTable',
     package: 'components',
     group: 'Components',
