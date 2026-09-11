@@ -295,6 +295,56 @@ describe('reorderable', () => {
     ]);
   });
 
+  it('does not undo a move when the list re-renders inside onMove', () => {
+    // An application's `onMove` writes the new order and the list
+    // re-renders on the spot, so every row has its new index before the
+    // call returns. The payload has to have been pointed at the carried
+    // row's new place before that, or it points at the row that took
+    // its old one and the next crossing swaps them straight back.
+    const layout = new Boxes();
+    let order = [0, 1, 2];
+    const onMove = vi.fn((from: number, to: number) => {
+      const next = [...order];
+      const [row] = next.splice(from, 1);
+      next.splice(to, 0, row);
+      order = next;
+      rebuild(render());
+    });
+    const render = (): UiChild =>
+      Column(
+        {},
+        ...order.map((key, index) =>
+          Box({ key, width: 200, height: ROW, modifiers: [reorderable({ list: 'queue', index, onMove })] })
+        )
+      );
+    const { send, rebuild, graph } = build(render(), layout);
+    const column = graph.root.firstChild!;
+    const place = (): void => {
+      layout.place(column, { x: 0, y: 0, width: 200, height: 120 });
+      childrenOf(column).forEach((node, index) =>
+        layout.place(node, { x: 0, y: index * ROW, width: 200, height: ROW })
+      );
+    };
+    place();
+    const [first] = childrenOf(column);
+
+    send(first, UiEventType.PanStart, 100, 20);
+    send(first, UiEventType.PanMove, 100, 50);
+    expect(order).toEqual([1, 0, 2]);
+    // The layout catches up with the new order, and the pointer moves
+    // a little further inside the carried row's new place.
+    place();
+    send(first, UiEventType.PanMove, 100, 55);
+    expect(order).toEqual([1, 0, 2]);
+
+    send(first, UiEventType.PanMove, 100, 90);
+    expect(order).toEqual([1, 2, 0]);
+    expect(onMove.mock.calls).toEqual([
+      [0, 1],
+      [1, 2]
+    ]);
+  });
+
   it('keeps the carried row under the pointer across a reorder', () => {
     const { send, nodes, layout } = list(() => {});
 

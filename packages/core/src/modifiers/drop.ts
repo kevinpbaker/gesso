@@ -570,12 +570,20 @@ class Reorderable implements UiDropZone {
     if (data.index === this.options.index || data.settling) {
       return;
     }
-    this.options.onMove(data.index, this.options.index);
+    const from = data.index;
+    const to = this.options.index;
     // The payload follows the row it belongs to, so the next crossing
     // is measured from where the row now is rather than from where it
-    // started.
-    data.index = this.options.index;
+    // started. Written *before* `onMove` is called, and from a copy of
+    // the index, because an application that re-renders its list
+    // synchronously inside `onMove` has already given this row its new
+    // index by the time the call returns: read afterwards, `options.index`
+    // is where this row went, which is where the carried row came from,
+    // and the next crossing undoes the move. The two rows then swap on
+    // every pointer move, which is the flicker that looked like one.
+    data.index = to;
     data.settling = true;
+    this.options.onMove(from, to);
   }
 
   over(): void {
