@@ -15,7 +15,7 @@ that a control taken from the library rather than built by hand is
 already the obvious move, and [cells and bindings](/guide/cells-and-bindings)
 for what an `internalState` costs per frame.
 
-<LiveExample id="recipesettings" height="560" />
+<LiveExample id="recipesettings" height="620" />
 
 Turn `Email digest` off and watch `Digest frequency` go with it. Move
 the slider, type in the name, then press Reset: one write puts every

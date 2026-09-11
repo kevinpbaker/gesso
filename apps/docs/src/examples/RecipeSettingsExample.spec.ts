@@ -6,7 +6,7 @@ import '@gesso/testing/matchers';
 
 import { SettingsScreen } from './RecipeSettingsExample';
 
-const SIZE = { width: 480, height: 560 };
+const SIZE = { width: 480, height: 620 };
 
 const screen = () => renderTest(createComponent(SettingsScreen, {}), SIZE);
 
@@ -140,5 +140,26 @@ describe('the docs settings recipe', () => {
     expect(ui.getByText('Sam, 14 px, weekly digest, wrapping')).toBeDefined();
     expect(ui.getSemantics(ui.getByRole('switch', { name: 'Email digest' })).states).toEqual(['checked']);
     expect(ui.getSemantics(ui.getByRole('combobox', { name: 'Digest frequency' })).disabled).toBeUndefined();
+  });
+
+  it('keeps the note under the name field, even in a host too short for the screen', () => {
+    // The page gives the example room; a shorter host shrinks the
+    // columns, and the field's minimum height has to be counted when
+    // they do, or the note is drawn across the field.
+    for (const height of [SIZE.height, 480]) {
+      const ui = renderTest(createComponent(SettingsScreen, {}), { width: SIZE.width, height });
+      ui.frame();
+      const field = ui.getLayout(ui.getByRole('textbox', { name: 'Display name' }));
+      const note = ui.getLayout(ui.getByText('Shown beside anything you publish.'));
+      expect(field.height).toBeGreaterThanOrEqual(32);
+      expect(note.y).toBeGreaterThanOrEqual(field.y + field.height);
+    }
+  });
+
+  it('fits the whole screen in the room the page gives it', () => {
+    const ui = screen();
+    ui.frame();
+    const reset = ui.getLayout(ui.getByRole('button', { name: 'Reset to defaults' }));
+    expect(reset.y + reset.height).toBeLessThanOrEqual(SIZE.height);
   });
 });
