@@ -17,6 +17,11 @@ export default defineConfig({
     // workspace package, so its imports of `@gesso/*` resolve to nothing
     // here — they are meant to resolve to installed tarballs, which is
     // exactly what `pnpm check:install` sets up and runs them in.
-    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', 'examples/**']
+    //
+    // `.hutch/` is the Electrobun devkit Hutch projects into `apps/desk`
+    // on a machine that has it installed, tests included; those are the
+    // devkit's own and fail outside its harness, so a checkout with the
+    // desk app set up must not run them as ours.
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', 'examples/**', '**/.hutch/**']
   }
 });
