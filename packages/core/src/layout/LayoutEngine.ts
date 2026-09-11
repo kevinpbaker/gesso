@@ -2379,10 +2379,14 @@ export class LayoutEngine {
    * Without that, an unwrapped field's whole line would become its
    * parent's minimum, and a row would push its siblings narrower with
    * every character typed.
+   *
+   * A minimum the box declares is different: the box will be at least
+   * that size whatever it is given, so a parent that did not count it
+   * would allocate less and lay the next sibling over the difference.
    */
   private minContentContribution(child: UiNode, cRec: LayoutRecord): number {
     if (child.type === UiNodeType.ScrollView || child.type === UiNodeType.EditableText) {
-      return this.lengthProp(child, 'width', undefined) ?? 0;
+      return this.lengthProp(child, 'width', undefined) ?? cRec.minWidth;
     }
     const explicit = this.lengthProp(child, 'width', undefined);
     return this.clamp(explicit ?? cRec.minContentWidth, cRec.minWidth, cRec.maxWidth);
@@ -2392,11 +2396,12 @@ export class LayoutEngine {
    * A child's min-content height, as its parent's automatic minimum
    * counts it: the counterpart of `minContentContribution`, with the
    * same exception for a scroll container, whose content is its own
-   * business and pushes on nothing outside it.
+   * business and pushes on nothing outside it, and the same rule for
+   * a declared minimum, which the parent must make room for.
    */
   private minContentHeightContribution(child: UiNode, cRec: LayoutRecord): number {
     if (child.type === UiNodeType.ScrollView || child.type === UiNodeType.EditableText) {
-      return this.lengthProp(child, 'height', undefined) ?? 0;
+      return this.lengthProp(child, 'height', undefined) ?? cRec.minHeight;
     }
     const explicit = this.lengthProp(child, 'height', undefined);
     return this.clamp(explicit ?? cRec.minContentHeight, cRec.minHeight, cRec.maxHeight);

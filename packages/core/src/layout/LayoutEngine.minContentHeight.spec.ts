@@ -66,3 +66,55 @@ describe('LayoutEngine min-content height', () => {
     expect(harness.box(wrapper).height).toBe(400);
   });
 });
+
+/**
+ * An editable contributes no content to its parent's minimum, but a
+ * minimum it declares it will keep however little it is given, so the
+ * parent has to count it or the next sibling lands on top of the
+ * field. A settings screen taller than its host found this: the column
+ * holding a labelled field was shrunk to its label, and the note under
+ * the field was drawn across it.
+ */
+describe('LayoutEngine min-content size of a box holding an editable with a minimum', () => {
+  it('counts the editable height minimum, so a shrunk column still makes room for the field', () => {
+    const harness = new LayoutHarness();
+    const root = harness.createNode('outer', UiNodeType.Column);
+    const field = harness.createNode('field', UiNodeType.Column);
+    const label = harness.createNode('label', UiNodeType.Box);
+    label.setProperty('height', 14);
+    const editable = harness.createNode('editable', UiNodeType.EditableText);
+    editable.setProperty('minHeight', 32);
+    const note = harness.createNode('note', UiNodeType.Box);
+    note.setProperty('height', 14);
+    const filler = harness.createNode('filler', UiNodeType.Box);
+    filler.setProperty('height', 40);
+    harness.append(field, label, editable);
+    harness.append(root, field, note, filler);
+    // 14 + 32 + 14 + 40 = 100 asked of 60: something has to give, and
+    // it must not be the field's declared minimum.
+    harness.layout(root, Constraints.tight(200, 60));
+
+    expect(harness.box(editable).height).toBe(32);
+    expect(harness.box(field).height).toBe(46);
+    expect(harness.box(note).y).toBeGreaterThanOrEqual(harness.box(editable).y + 32);
+  });
+
+  it('counts the editable width minimum the same way along a row', () => {
+    const harness = new LayoutHarness();
+    const root = harness.createNode('outer', UiNodeType.Row);
+    const field = harness.createNode('field', UiNodeType.Row);
+    const label = harness.createNode('label', UiNodeType.Box);
+    label.setProperty('width', 14);
+    const editable = harness.createNode('editable', UiNodeType.EditableText);
+    editable.setProperty('minWidth', 32);
+    const filler = harness.createNode('filler', UiNodeType.Box);
+    filler.setProperty('width', 40);
+    harness.append(field, label, editable);
+    harness.append(root, field, filler);
+    harness.layout(root, Constraints.tight(60, 40));
+
+    expect(harness.box(editable).width).toBe(32);
+    expect(harness.box(field).width).toBe(46);
+    expect(harness.box(filler).x).toBeGreaterThanOrEqual(harness.box(editable).x + 32);
+  });
+});
