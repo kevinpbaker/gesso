@@ -329,6 +329,7 @@ declare class LayoutRecord {
   hasBaseline: boolean;
   baseline: number;
   minContentWidth: number;
+  minContentHeight: number;
   maxContentWidth: number;
   intrinsicWidth: number;
   intrinsicHeight: number;
@@ -373,6 +374,7 @@ declare class LayoutRecord {
   private altOuterWidth;
   private altOuterHeight;
   private altMinContentWidth;
+  private altMinContentHeight;
   private altMaxContentWidth;
   private altIntrinsicWidth;
   private altIntrinsicHeight;
@@ -1358,6 +1360,10 @@ declare class UiVirtualWindow {
   private corrections;
   private readonly mountedItems;
   private viewport;
+  private readonly recentContentExtents;
+  private lastViewportExtent;
+  private viewportLandedOnContent;
+  private warnedAboutViewport;
   constructor(axis: LazyAxis, options: LazyListOptions, renderItem: LazyItemRenderer);
   get length(): number;
   setCount(count: number): void;
@@ -1371,6 +1377,7 @@ declare class UiVirtualWindow {
   extentOf(index: number): number;
   indexAt(offset: number): number;
   update(viewport: VirtualViewport, measures: Iterable<VirtualItemMeasure>): VirtualUpdate;
+  private checkViewport;
   private refresh;
   private record;
   private buildChildren;
@@ -3227,7 +3234,9 @@ declare class LayoutEngine {
   private itemBaseline;
   private setFlexBaseline;
   private flexMinContentWidth;
+  private flexMinContentHeight;
   private minContentContribution;
+  private minContentHeightContribution;
   private measureStack;
   private measureScroll;
   private measureLeaf;
@@ -6330,7 +6339,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DDW_S6gE.js";
+} from "./index-B8pzUKDv.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7198,7 +7207,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DDW_S6gE.js";
+} from "./index-B8pzUKDv.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
