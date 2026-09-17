@@ -32,6 +32,7 @@
     "parity:webgpu": "node scripts/check-webgpu-parity.ts",
     "check:a11y": "node scripts/check-a11y-tree.ts",
     "check:a11y:update": "node scripts/check-a11y-tree.ts --update",
+    "check:rest": "node scripts/check-rest-across-worker.ts",
     "bench:graph": "vite-node scripts/bench-graph.ts",
     "bench:frame": "vite-node scripts/bench-frame.ts",
     "bench:rewrap": "vite-node scripts/bench-rewrap.ts",
