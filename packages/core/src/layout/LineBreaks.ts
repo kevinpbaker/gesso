@@ -421,7 +421,15 @@ function hasComplexContext(paragraph: string): boolean {
  */
 function clusterBoundaries(paragraph: string): number[] {
   if (isAscii(paragraph)) {
-    return Array.from({ length: paragraph.length + 1 }, (_, i) => i);
+    // A counted loop rather than `Array.from` with a mapper: the
+    // mapper form goes through the generic iteration protocol and was
+    // a tenth of a resize sweep's whole profile (`decisions/0090`),
+    // because every paragraph is segmented again at every width.
+    const boundaries: number[] = [];
+    for (let i = 0; i <= paragraph.length; i++) {
+      boundaries.push(i);
+    }
+    return boundaries;
   }
   return graphemeBoundaries(paragraph);
 }

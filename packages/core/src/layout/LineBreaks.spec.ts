@@ -27,6 +27,21 @@ describe('segmentParagraph', () => {
     expect(segments('(re-) x')).toEqual(['(re-)', 'x']);
   });
 
+  it('segments ASCII on its fast path exactly as the grapheme segmenter would', () => {
+    // Every ASCII code unit is one cluster, so `clusterBoundaries` builds
+    // an ASCII paragraph's boundaries with a counted loop instead of
+    // asking the segmenter (`decisions/0090`). A non-ASCII tail sends the
+    // same prose down the segmenter's path, and the prose must segment
+    // the same either way, or the fast path has stopped being a shortcut.
+    const prose = 'Over-the-counter remedies, 10-15 of them: (numero)).jpg $100 a+b path/to/file.txt';
+    for (const wrap of ['word', 'char'] as const) {
+      const fast = segments(prose, wrap);
+      const viaSegmenter = segments(`${prose} \u00e9`, wrap);
+      expect(viaSegmenter.length, wrap).toBe(fast.length + 1);
+      expect(viaSegmenter.slice(0, fast.length), wrap).toEqual(fast);
+    }
+  });
+
   it('breaks after a slash only before a character outside ASCII, as Chrome does', () => {
     expect(segments('path/to/file.txt')).toEqual(['path/to/file.txt']);
     expect(segments('fantastique/Évaluation/Index/7')).toEqual(['fantastique/', 'Évaluation/Index/7']);
