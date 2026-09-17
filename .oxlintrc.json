@@ -1,4 +1,28 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["packages/*/api/", "**/dist/"]
+  "ignorePatterns": ["packages/*/api/", "**/dist/"],
+  "overrides": [
+    {
+      "files": ["apps/playground/src/modifiers/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["./**", "../**", "**/src/**", "@gesso/*/**"],
+                "message": "A modifier written from outside the framework imports package entry points only (MODIFIERS_ROADMAP.md B6): @gesso/core, never a path inside it."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/playground/src/modifiers/*.spec.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

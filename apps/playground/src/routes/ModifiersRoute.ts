@@ -49,7 +49,8 @@ export function mountModifiersRoute(host: HTMLElement): () => void {
     });
     shell.setStatus('Source: apps/playground/src/examples/ModifiersApp.tsx. Each card says what to try.');
     shell.setDetail(
-      'Hover, press, Tab, drag and rest the pointer: seven modifiers, and no wrapper component around any of them.'
+      'Hover, press, Tab, drag, rest and hold the pointer: eight modifiers, one of them written outside the ' +
+        'framework, and no wrapper component around any of them.'
     );
     const dispose = app.mount(shell.preview);
     const disconnectDevtools = connectRouteDevtools(app, 'modifiers');

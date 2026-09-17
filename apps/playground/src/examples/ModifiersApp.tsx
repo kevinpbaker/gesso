@@ -11,6 +11,7 @@ import {
   measure,
   percent,
   transform,
+  withThemeExtension,
   type DragOffset,
   type DraggableOptions,
   type LayoutBox,
@@ -20,6 +21,8 @@ import {
 } from '@gesso/core';
 import { Card, Checkbox, Slider, SplitPane, Switch, TextInput, tooltip } from '@gesso/components';
 import { createComponent, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+
+import { holdToConfirm, holdToConfirmTokens, type HoldToConfirmArgs } from '../modifiers/holdToConfirm';
 
 /**
  * Every modifier the library ships, one card each.
@@ -666,6 +669,97 @@ function BottomEdgeTooltip(_inputs: Inputs<{}>, ctx: ComponentContext) {
 }
 
 // ---------------------------------------------------------------------------
+// 8. holdToConfirm, from outside
+// ---------------------------------------------------------------------------
+
+/**
+ * A theme with the modifier's tokens changed, for the second tile.
+ *
+ * This is the environment route for configuring a modifier from
+ * outside the framework: no new property, no registry change. The
+ * tokens ride on the theme, so everything under this box holds for
+ * a quarter of a second and fills in the accent.
+ */
+const QUICK_HOLD_THEME = withThemeExtension(darkTheme, holdToConfirmTokens, {
+  duration: 250,
+  fill: 'controlAccent'
+});
+
+/**
+ * `holdToConfirm`, the one modifier on this page that is not the
+ * library's.
+ *
+ * `MODIFIERS_ROADMAP.md` B6: written in `../modifiers/holdToConfirm.ts`
+ * against `@gesso/core`'s entry point alone, and held to that by the
+ * lint configuration. The card is the browser check that a modifier
+ * from outside runs in the same host as the seven above it.
+ *
+ * The modifier sits after `interactive` in the list on purpose: both
+ * write `borderColor`, and later in the list wins, so the hold's fill
+ * colour takes the border over the hover's while the pointer is down
+ * and hands it back to the hover on release.
+ */
+function HoldToConfirmCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+  const deleted = internalState(0);
+  const note = internalState('nothing deleted yet');
+
+  // Built once, in the component body, which runs once.
+  const holdArgs: HoldToConfirmArgs = {
+    onConfirm: () => {
+      deleted.value++;
+      note.value = `deleted ${deleted.value} ${deleted.value === 1 ? 'time' : 'times'}`;
+    },
+    onCancel: () => (note.value = 'let go early, nothing deleted')
+  };
+  const holds: readonly UiModifier[] = [
+    interactive({
+      hover: true,
+      press: false,
+      hovered: { backgroundColor: 'controlBackgroundHovered', borderColor: 'controlAccent' }
+    }),
+    holdToConfirm(holdArgs)
+  ];
+
+  return card(
+    '8 · holdToConfirm, from outside',
+    <column gap={10}>
+      <text fontSize={12} color="textMuted">
+        Hold the pointer down on a tile until it fills: the first takes 600 ms and fills in the danger colour, the
+        second sits under a theme that says 250 ms and the accent. Let go early and nothing happens.
+      </text>
+      <row gap={8} y="center">
+        {holdTile('Hold to delete', holds)}
+        <box theme={QUICK_HOLD_THEME}>{holdTile('Quick hold', holds)}</box>
+      </row>
+      <text fontSize={11} color="textMuted">
+        {note}
+      </text>
+    </column>
+  );
+}
+
+function holdTile(label: string, modifiers: readonly UiModifier[]) {
+  return (
+    <box
+      modifiers={modifiers}
+      width={132}
+      height={44}
+      flexShrink={0}
+      x="center"
+      y="center"
+      cursor="pointer"
+      backgroundColor="controlBackground"
+      borderColor="controlBorder"
+      borderWidth={1}
+      borderRadius={6}>
+      <text fontSize={11} color="controlForeground" textAlign="center" selectable={false}>
+        {label}
+      </text>
+    </box>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The page
 // ---------------------------------------------------------------------------
 
@@ -678,7 +772,7 @@ export function ModifiersApp(_inputs: Inputs<{}>, _ctx: ComponentContext) {
         </text>
         <text fontSize={12} color="textMuted">
           Behaviour attached to an element without wrapping it. Every card below is one modifier and the smallest thing
-          that shows it working.
+          that shows it working; the last is written outside the framework, against its public exports alone.
         </text>
         <row flexWrap="wrap" gap={12} y="start" alignContent="start">
           <HoverPressCard />
@@ -688,6 +782,7 @@ export function ModifiersApp(_inputs: Inputs<{}>, _ctx: ComponentContext) {
           <DraggableCard />
           <ClickOutsideCard />
           <TooltipCard />
+          <HoldToConfirmCard />
         </row>
       </scrollview>
       <BottomEdgeTooltip />
