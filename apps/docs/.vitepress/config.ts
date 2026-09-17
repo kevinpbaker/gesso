@@ -125,7 +125,8 @@ export default defineConfig({
           { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' },
           { text: 'Selection', link: '/interaction/selection' },
           { text: 'Find', link: '/interaction/find' },
-          { text: 'Modifiers', link: '/interaction/modifiers' }
+          { text: 'Modifiers', link: '/interaction/modifiers' },
+          { text: 'Writing a modifier', link: '/interaction/writing-a-modifier' }
         ]
       },
       {

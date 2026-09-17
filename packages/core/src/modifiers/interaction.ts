@@ -42,6 +42,7 @@ const BOTH: InteractiveOptions = Object.freeze({ hover: true, press: true });
 const HOVER_ONLY: InteractiveOptions = Object.freeze({ hover: true, press: false });
 const PRESS_ONLY: InteractiveOptions = Object.freeze({ hover: false, press: true });
 
+// #region kind
 const kind = defineModifier<InteractiveOptions>({
   name: 'interactive',
   attach(host, options) {
@@ -106,6 +107,7 @@ const kind = defineModifier<InteractiveOptions>({
   // No detach: the host restores every property this modifier wrote
   // and removes its listeners. There is nothing else it holds.
 });
+// #endregion kind
 
 /** Hover and press. */
 export function interactive(options: InteractiveOptions = BOTH): UiModifier<InteractiveOptions> {
