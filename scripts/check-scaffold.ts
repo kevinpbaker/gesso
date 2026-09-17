@@ -30,14 +30,25 @@
  * itself is read from a screenshot rather than from the mirror, because
  * the mirror does not carry it; see the comment on that comparison.
  *
+ * The Electrobun template is checked as far as a headless machine can
+ * follow it, which is everything short of the window: the same scaffold,
+ * `hutch install`, `hutch run typecheck`, a development bundle whose
+ * loose files are inspected (the page, the render worker's chunk, and a
+ * main-process bundle that carries the RPC handler), and the
+ * distributable build. Nothing here opens a window and nothing here can;
+ * `decisions/0092` records the day the window was opened and what it
+ * showed. This mode needs Hutch, which is found through `HUTCH`,
+ * the path, or where the Electrobun npm bootstrap leaves it.
+ *
  *   node scripts/check-scaffold.ts           # scaffold, install, build, run
  *   node scripts/check-scaffold.ts --keep    # leave the project behind
  *   node scripts/check-scaffold.ts --no-build  # trust the built dist
+ *   node scripts/check-scaffold.ts --template electrobun  # no window
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 
 import { DevTools, findChrome, openPage, waitFor } from './lib/devtools.ts';
 
@@ -47,6 +58,13 @@ const DEVTOOLS_PORT = 9336;
 const root = join(import.meta.dirname, '..');
 const keep = process.argv.includes('--keep');
 const build = !process.argv.includes('--no-build');
+const template = process.argv[process.argv.indexOf('--template') + 1] ?? 'web';
+if (!process.argv.includes('--template')) {
+  // `indexOf` is -1 when the flag is absent, and argv[0] is node.
+} else if (template !== 'web' && template !== 'electrobun') {
+  console.error(`There is no "${template}" template to check. Pass web or electrobun.`);
+  process.exit(1);
+}
 
 /**
  * Whether the page has given its canvas away.
@@ -120,6 +138,163 @@ function checkTemplateShape(app: string): void {
 }
 
 /**
+ * The names the Electrobun template has to keep, whatever else it grows.
+ *
+ * Three of them are the shape of the window: the worker construction
+ * written out where a bundler can see it (this template has no Vite
+ * plugin to write it), the Vite config aliasing the projected SDK, and
+ * the two JSX lines. Two are the fixes a fresh scaffold needed on the
+ * day it was first opened (`decisions/0092`): npm underneath `hutch
+ * install`, because Hutch's own resolver cannot follow the relative
+ * `file:` overrides the vendored packages rely on, and the Hutch pin on
+ * the first line, because a newer launcher failed the distributable
+ * build. A template that lost either would install or build for whoever
+ * edited it and fail for the next person.
+ */
+function checkElectrobunTemplateShape(app: string): void {
+  const main = readFileSync(join(app, 'src', 'view', 'main.ts'), 'utf8');
+  if (!main.includes("new Worker(new URL('./render.worker.ts', import.meta.url), { type: 'module' })")) {
+    throw new Error(
+      'src/view/main.ts no longer constructs the render worker literally, so no chunk will be emitted for it.'
+    );
+  }
+  const config = readFileSync(join(app, 'vite.config.ts'), 'utf8');
+  if (!config.includes('electrobunViteAliases')) {
+    throw new Error("vite.config.ts no longer aliases the projected SDK, so 'electrobun/view' will not resolve.");
+  }
+  const tsconfig = readFileSync(join(app, 'tsconfig.json'), 'utf8');
+  for (const line of ['"jsx": "react-jsx"', '"jsxImportSource": "@gesso/framework"']) {
+    if (!tsconfig.includes(line)) {
+      throw new Error(`tsconfig.json is missing ${line}, so the template's markup will not compile.`);
+    }
+  }
+  if (!existsSync(join(app, 'src', 'render', 'App.tsx'))) {
+    throw new Error('The template stopped being JSX; the documentation teaches JSX.');
+  }
+  const hutch = readFileSync(join(app, 'hutch.config.ts'), 'utf8');
+  if (!/^\/\/ @hutch cli=\d+\.\d+\.\d+/.test(hutch)) {
+    throw new Error(
+      'hutch.config.ts no longer begins with the `// @hutch cli=` pin, so `hutch run` will fetch whatever launcher is newest.'
+    );
+  }
+  if (!hutch.includes("packageManager: 'npm'")) {
+    throw new Error(
+      "hutch.config.ts no longer selects npm, so `hutch install` will fail on the vendored packages' overrides."
+    );
+  }
+}
+
+/**
+ * Where Hutch is.
+ *
+ * `HUTCH` names the binary outright. Failing that, the path; failing
+ * that, the place the Electrobun npm bootstrap caches the launcher,
+ * under `HUTCH_HOME` or `~/.hutch`, for any Electrobun version. Nothing
+ * is downloaded here: the toolchain is a few hundred megabytes and
+ * fetching it is a decision for whoever runs this, not for the gate.
+ */
+function findHutch(): string {
+  if (process.env.HUTCH !== undefined && existsSync(process.env.HUTCH)) {
+    return process.env.HUTCH;
+  }
+  const binary = process.platform === 'win32' ? 'hutch.exe' : 'hutch';
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (dir !== '' && existsSync(join(dir, binary))) {
+      return join(dir, binary);
+    }
+  }
+  const platform = `${process.platform === 'darwin' ? 'darwin' : process.platform}-${process.arch}`;
+  const homes = [process.env.HUTCH_HOME, join(homedir(), '.hutch')].filter(
+    (home): home is string => home !== undefined
+  );
+  for (const home of homes) {
+    const bootstrap = join(home, 'npm', 'electrobun');
+    if (!existsSync(bootstrap)) {
+      continue;
+    }
+    for (const version of readdirSync(bootstrap).sort().reverse()) {
+      const candidate = join(bootstrap, version, platform, 'bin', binary);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  throw new Error(
+    'hutch was not found. Set HUTCH to the binary, put it on the path, or run\n' +
+      '`npx electrobun@2.0.1 --help` once, which caches the launcher under ~/.hutch/npm.'
+  );
+}
+
+/** The one directory matching a prefix, or an error naming what was there. */
+function onlyChild(dir: string, prefix: string): string {
+  const matches = existsSync(dir) ? readdirSync(dir).filter(entry => entry.startsWith(prefix)) : [];
+  if (matches.length !== 1) {
+    throw new Error(`Expected one ${prefix}* under ${dir}, found ${matches.length ? matches.join(', ') : 'nothing'}.`);
+  }
+  return join(dir, matches[0]);
+}
+
+/**
+ * Scaffolds the Electrobun template and takes it as far as a build.
+ *
+ * The development bundle is built and read before the distributable
+ * one, because only the former leaves its files loose: the page, the
+ * render worker's chunk under `assets` (which is what lets the window
+ * start a worker at all), and the main-process bundle, which has to
+ * carry the RPC handler for the scaffold's `src/main` to have been
+ * bundled with the vendored adapter. The distributable build compresses
+ * all of that into an archive, so for it the assertion is that the
+ * launcher and the archive exist.
+ */
+async function checkElectrobun(app: string): Promise<void> {
+  const hutch = findHutch();
+  console.log(`  using ${hutch}`);
+  checkElectrobunTemplateShape(app);
+
+  console.log('installing it (hutch install, npm underneath)…');
+  run(hutch, ['install'], app);
+  if (!existsSync(join(app, 'node_modules', '@gesso', 'electrobun', 'package.json'))) {
+    throw new Error('hutch install finished without @gesso/electrobun in node_modules.');
+  }
+
+  console.log('typechecking it…');
+  run(hutch, ['run', 'typecheck'], app);
+
+  console.log('building the window and a development bundle…');
+  run(hutch, ['electrobun', 'prepare'], app);
+  run(hutch, ['pm', 'exec', '--', 'vite', 'build', '--logLevel', 'warn'], app);
+  run(hutch, ['electrobun', 'build'], app);
+  const dev = onlyChild(onlyChild(join(app, 'build'), 'dev-'), 'my-app');
+  const views = join(dev, 'Resources', 'app', 'views', 'mainview');
+  if (!existsSync(join(views, 'index.html'))) {
+    throw new Error(`The bundle has no page at ${join(views, 'index.html')}.`);
+  }
+  const assets = existsSync(join(views, 'assets')) ? readdirSync(join(views, 'assets')) : [];
+  if (!assets.some(asset => asset.startsWith('render.worker-') && asset.endsWith('.js'))) {
+    throw new Error(`The bundle carries no render worker chunk. Assets: ${assets.join(', ') || 'none'}.`);
+  }
+  const mainBundle = join(dev, 'Resources', 'app', 'bun', 'index.js');
+  if (!existsSync(mainBundle) || !readFileSync(mainBundle, 'utf8').includes('gessoFrame')) {
+    throw new Error(`The main process bundle at ${mainBundle} is missing, or does not carry the gessoFrame handler.`);
+  }
+  console.log(`  the page, the render worker chunk and the main process bundle are all in ${dev}`);
+
+  console.log('building the distributable…');
+  run(hutch, ['electrobun', 'build', '--env=stable'], app);
+  const stable = onlyChild(onlyChild(join(app, 'build'), 'stable-'), 'my-app');
+  const launcher = join(stable, 'bin', process.platform === 'win32' ? 'launcher.exe' : 'launcher');
+  const archives = readdirSync(join(stable, 'Resources')).filter(entry => entry.endsWith('.tar.zst'));
+  if (!existsSync(launcher) || archives.length === 0) {
+    throw new Error(`The distributable at ${stable} has no launcher or no archive.`);
+  }
+  console.log(`  ${stable} has a launcher and ${archives[0]}`);
+  console.log(
+    '\nscaffold check ok: create-gesso-app --template electrobun produces a project that installs, typechecks and builds.\n' +
+      'No window was opened, because nothing headless can; decisions/0092 is the last time one was.'
+  );
+}
+
+/**
  * Waits for a dedicated worker to exist in the browser.
  *
  * The target's `url` is reported empty for a module worker, so there is
@@ -145,7 +320,9 @@ async function screenshot(devtools: DevTools): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const chrome = findChrome();
+  // Found before anything is scaffolded, so a machine without a browser
+  // fails in a sentence rather than after an install.
+  const chrome = template === 'web' ? findChrome() : undefined;
   const work = mkdtempSync(join(tmpdir(), 'gesso-scaffold-'));
   const app = join(work, 'my-app');
   const profile = join(work, 'chrome-profile');
@@ -154,7 +331,7 @@ async function main(): Promise<void> {
   let devtools: DevTools | undefined;
 
   try {
-    console.log('scaffolding…');
+    console.log(`scaffolding the ${template} template…`);
     run(
       'node',
       [
@@ -162,10 +339,16 @@ async function main(): Promise<void> {
         app,
         '--name',
         'my-app',
+        '--template',
+        template,
         ...(build ? [] : ['--no-build'])
       ],
       root
     );
+    if (template === 'electrobun') {
+      await checkElectrobun(app);
+      return;
+    }
     checkTemplateShape(app);
 
     // npm, not pnpm, and for the reason the generated README gives: the
@@ -192,7 +375,7 @@ async function main(): Promise<void> {
     const pageUrl = `http://localhost:${DEV_PORT}/`;
     await waitFor('the dev server', async () => ((await fetch(pageUrl)).ok ? true : undefined), 60_000);
 
-    ({ browser, devtools } = await openPage(chrome, {
+    ({ browser, devtools } = await openPage(chrome!, {
       url: pageUrl,
       devtoolsPort: DEVTOOLS_PORT,
       windowSize: [800, 600],
