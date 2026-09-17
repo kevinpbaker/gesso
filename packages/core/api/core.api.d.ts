@@ -3549,6 +3549,7 @@ declare const animateLayout: ((args: AnimateLayoutOptions | undefined, key?: str
 };
 interface ImageResolver {
   resolve(source: string): Promise<UiImage>;
+  peek?(source: string): UiImage | null;
   release(source: string): void;
   dispose(): void;
 }
@@ -3567,6 +3568,7 @@ declare class DefaultImageResolver implements ImageResolver {
   constructor(options?: DefaultImageResolverOptions);
   get size(): number;
   resolve(source: string): Promise<UiImage>;
+  peek(source: string): UiImage | null;
   release(source: string): void;
   dispose(): void;
 }
@@ -6339,7 +6341,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DugMGr8w.js";
+} from "./index-Bb5GIdWv.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7207,7 +7209,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DugMGr8w.js";
+} from "./index-Bb5GIdWv.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
