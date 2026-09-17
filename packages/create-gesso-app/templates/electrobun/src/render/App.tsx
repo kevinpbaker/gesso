@@ -1,9 +1,9 @@
 import { map } from 'rxjs/operators';
 
 import { Switch } from '@gesso/components';
-import { percent } from '@gesso/core';
+import { darkTheme, lightTheme, percent } from '@gesso/core';
 import { DesktopWindows } from '@gesso/electrobun/desktop';
-import type { ComponentContext, Inputs } from '@gesso/framework';
+import { ShellService, type ComponentContext, type Inputs } from '@gesso/framework';
 
 import { Counter } from '../shared/Counter';
 
@@ -24,8 +24,12 @@ import { Counter } from '../shared/Counter';
  *     one node is written and the next frame is drawn from it.
  *   - No colour here is a hex value. `background`, `primary` and
  *     `textMuted` are names looked up on whichever theme the node
- *     inherits, which is what makes the appearance switch below change
- *     anything at all.
+ *     inherits, and the root below provides that theme from the
+ *     appearance the shell reports. The framework carries the
+ *     appearance and has no opinion about what dark looks like, so
+ *     without the `theme` line the switch would replicate a value that
+ *     changed nothing on screen. `lightTheme` and `darkTheme` are a
+ *     starting point; a palette of your own answers the same names.
  *   - The elements are lowercase because they are intrinsic, resolved
  *     by `jsxImportSource` in `tsconfig.json` the way `<div>` needs no
  *     import in React. `Switch` is capitalised because it is a
@@ -34,9 +38,20 @@ import { Counter } from '../shared/Counter';
 export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const counter = ctx.channel(Counter);
   const windows = ctx.channel(DesktopWindows);
+  // The scheme is what the main process told this window (see
+  // `src/view/main.ts`), so every window is in the same appearance.
+  const theme = ctx.inject(ShellService).colorScheme.pipe(map(scheme => (scheme === 'dark' ? darkTheme : lightTheme)));
 
   return (
-    <column gap={16} x="center" y="center" width={percent(100)} height={percent(100)} backgroundColor="background">
+    <column
+      theme={theme}
+      textStyle={theme.pipe(map(value => value.typography.body))}
+      gap={16}
+      x="center"
+      y="center"
+      width={percent(100)}
+      height={percent(100)}
+      backgroundColor="background">
       <text text={counter.view.count.pipe(map(String))} fontSize={56} />
 
       <row gap={10} y="center">

@@ -103,11 +103,13 @@ Electrobun 2.x is a toolchain a launcher downloads, not a package a
 registry serves: \`hutch electrobun prepare\` projects the SDK into the
 project's own .hutch/devkit, which is where vite.config.ts and
 tsconfig.json look for it, and every script in hutch.config.ts runs that
-first. If \`hutch\` is not on your path yet, the project's README says how
+first. \`hutch install\` runs npm underneath, for the vendored packages'
+sake. If \`hutch\` is not on your path yet, the project's README says how
 to get it.
 
-Nothing in this repository can open a native window, so unlike the web
-template this one is checked by running it rather than by a gate.
+\`pnpm check:scaffold:electrobun\` installs, typechecks and builds a
+project like this one without opening it. The window itself is checked
+by running it; the README records the last time that was done.
 `
   }
 };

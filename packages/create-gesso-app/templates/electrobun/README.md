@@ -23,14 +23,19 @@ package manager. `hutch electrobun prepare` projects the SDK into
 the npm package of that name is only a bootstrap that downloads the
 toolchain.
 
-If `hutch` is not on your path yet, the bootstrap is what puts it there:
+If `hutch` is not on your path yet, the bootstrap is what fetches it.
+Any command will do; this one only prints Hutch's help:
 
 ```sh
-npx electrobun@2.0.1 init --template=vanilla-vite   # in a scratch directory
+npx electrobun@2.0.1 --help
 ```
 
-`HUTCH_HOME` can point somewhere disposable to keep the downloaded
-toolchain out of `~/.hutch`.
+That leaves the launcher at
+`~/.hutch/npm/electrobun/2.0.1/<platform>/bin/hutch` (for example
+`linux-x64` or `darwin-arm64`). Put that directory on your path, or call
+the binary by its full path. `HUTCH_HOME` can point somewhere disposable
+to keep the downloaded toolchain out of `~/.hutch`; the launcher then
+lands under that directory instead.
 
 ## Running it
 
@@ -39,17 +44,73 @@ hutch install       # dependencies, including the vendored Gesso packages
 hutch run dev       # prepare, build the window's assets, open the window
 ```
 
-`hutch run build` makes a distributable build, and `hutch run typecheck`
-checks the types without building. Every script runs
-`hutch electrobun prepare` first, because both `vite.config.ts` and
-`tsconfig.json` read the SDK out of `.hutch/devkit` and neither can be
-loaded before it exists.
+`hutch install` runs npm underneath, because `hutch.config.ts` says
+`packageManager: 'npm'`: Hutch's own resolver reads a relative `file:`
+override against the package that asked for it rather than against this
+directory, and stops with `FileNotFound` on the second vendored package.
+npm reads `overrides` from here, which is what the tarballs in `vendor/`
+need. You will see a `package-lock.json`, and no `hutch.lock`.
+
+`hutch run build` makes a distributable build under `build/stable-*`,
+and `hutch run typecheck` checks the types without building. Every
+script runs `hutch electrobun prepare` first, because both
+`vite.config.ts` and `tsconfig.json` read the SDK out of `.hutch/devkit`
+and neither can be loaded before it exists.
+
+The first line of `hutch.config.ts` pins the Hutch that runs these
+scripts to 0.24.3, the one the bootstrap above installs. The comment
+under it says why: the newer launcher fails the distributable build.
+Leave the line first in the file.
+
+In a development build, what the window logs to its console is printed
+by the main process, prefixed `[webview:1]`, so `console.log` in a
+component or in `src/view/main.ts` lands in the terminal you ran
+`hutch run dev` from.
+
+### Linux, on a Wayland desktop
+
+Electrobun opens its window as an X11 client, so under a Wayland
+compositor it runs through XWayland. On the machine this template was
+checked on (Hyprland, an NVIDIA GPU, WebKitGTK 2.52) the window came up
+as a blank surface: the log said `Failed to create GBM buffer` twice,
+the page had loaded, and nothing was ever composited. Putting
+
+```sh
+WEBKIT_DISABLE_DMABUF_RENDERER=1 hutch run dev
+```
+
+in the environment made it paint. It has to be in the environment of
+the launch; setting it from `src/main/index.ts` is too late, because
+the webview reads it as it starts. Nothing about this is Gesso's, and a
+desktop where the log has no GBM line does not need it.
+
+## What has been checked
+
+On 2026-09-16, on Linux x64 with WebKitGTK 2.52.6 and Electrobun 2.0.1,
+a project written by this template was installed by `hutch install`,
+typechecked by `hutch run typecheck`, built by `hutch run build` to
+`build/stable-linux-x64`, and opened by `hutch run start` with the
+variable above set. The window painted in the dark appearance with the
+counter at `0`. A press on **Count** reached the main process, which
+logged the increment, and the window painted `1`. A press on **Dark**
+turned the window light. A press on **New window** opened a second
+window already reading `1`, `2 windows, one source`, and light. The
+presses were dispatched to the canvas from inside the page, because
+that desktop had no way to inject a pointer into an X11 window; the
+path from the canvas inward is the one a real pointer takes, and the
+path from a real pointer to the canvas is the platform's.
+
+Nothing has been run on macOS or Windows, so on WKWebView and WebView2
+this project is a build and a first window away from being known to
+work. `hutch run dev` was not used for the check, only `hutch run
+start`, which is the same command without `--watch`.
 
 Press **Count** and the number changes. Press **New window** and a
 second window opens already showing the current value, because it
 replicates the same source rather than being handed a copy. Flip
 **Dark** and every open window changes appearance, because the
-appearance is the main process's setting and not the window's.
+appearance is the main process's setting and not the window's, and
+because `App.tsx` binds its theme to what the shell reports.
 
 ## What is where
 
