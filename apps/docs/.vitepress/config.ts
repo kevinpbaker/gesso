@@ -157,7 +157,8 @@ export default defineConfig({
           { text: 'Undo and redo', link: '/structure/undo' },
           { text: 'Remembering state', link: '/structure/persistence' },
           { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
-          { text: 'Desktop windows', link: '/structure/desktop-windows' }
+          { text: 'Desktop windows', link: '/structure/desktop-windows' },
+          { text: 'Gesso on Electrobun', link: '/structure/gesso-on-electrobun' }
         ]
       },
       {

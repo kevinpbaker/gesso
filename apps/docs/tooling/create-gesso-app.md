@@ -17,7 +17,7 @@ pnpm create:app ../my-app
 | Option              | What it does                                                      |
 | ------------------- | ----------------------------------------------------------------- |
 | `--name <name>`     | Package name for the new project; defaults to the directory's own |
-| `--template <name>` | Which template to write. Only `web` exists                        |
+| `--template <name>` | Which template to write: `web` (the default) or `electrobun`      |
 | `--force`           | Write into a directory that already has files in it               |
 | `--no-build`        | Pack without rebuilding the packages first                        |
 
@@ -109,14 +109,18 @@ dev`, and `hutch electrobun prepare` is what puts the SDK inside the
 project. The generated README says how to get `hutch` if it is not on
 your path.
 
-The scaffolded project has been typechecked and built, and its main
-process bundles against the packed packages, but it has not been opened
-in a window from a fresh scaffold. The application code in it is the
-code that [runs in a window](/structure/desktop-windows) elsewhere.
-[Desktop windows](/structure/desktop-windows) is the four files that
-takes, and the application code is the same either way: an Electrobun
-window is a webview, and a Gesso app inside one is the app you already
-have.
+On 2026-09-16 a project written by this template was installed,
+typechecked, built and opened in a native window on Linux with
+WebKitGTK: the counter painted `0` in the dark appearance, a press on
+**Count** crossed to the main process and the window painted `1`, the
+**Dark** switch turned the window light, and **New window** opened a
+second window already reading `1`. Nothing has been run on WKWebView or
+WebView2. [Gesso on Electrobun](/structure/gesso-on-electrobun) is the
+guide from scaffold to window, and says what was and was not checked;
+[Desktop windows](/structure/desktop-windows) is the four files the
+arrangement takes. The application code is the same either way: an
+Electrobun window is a webview, and a Gesso app inside one is the app
+you already have.
 
 ## Checking it still works
 
@@ -127,3 +131,11 @@ headless Chrome. It asserts that the canvas was transferred to the
 worker and that a click repaints, that the plugin is still in the
 config and `main.ts` still names no worker, and that the two `jsx` lines
 survived into the generated files.
+
+`pnpm check:scaffold:electrobun` does the same for the Electrobun
+template as far as a machine without a display can: scaffold, `hutch
+install`, `hutch run typecheck`, a development bundle whose page, render
+worker chunk and main process bundle are inspected, and the
+distributable build. It needs Hutch, found through `HUTCH`, the path, or
+where the Electrobun npm bootstrap caches it, and it downloads nothing
+itself. No gate opens the window; the guide records the day one was.
