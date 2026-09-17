@@ -127,6 +127,30 @@ describe('DefaultImageResolver', () => {
     expect((bitmaps[1] as unknown as { close: () => void }).close).not.toHaveBeenCalled();
   });
 
+  it('answers a decoded source at once from peek, holding it, and has nothing to say about one in flight', async () => {
+    const bitmap = fakeBitmap();
+    const resolver = new DefaultImageResolver({
+      capacity: 0,
+      fetch: () => Promise.resolve(new Blob()),
+      decode: () => Promise.resolve(bitmap)
+    });
+    expect(resolver.peek('a.png')).toBeNull();
+    const pending = resolver.resolve('a.png');
+    expect(resolver.peek('a.png'), 'in flight is not decoded').toBeNull();
+    await pending;
+
+    expect(resolver.peek('a.png')).toBe(bitmap);
+    // Two holders now: the resolve and the peek. One release keeps it.
+    resolver.release('a.png');
+    expect(resolver.peek('a.png')).toBe(bitmap);
+    // The peek held it again, so two releases are needed before a
+    // capacity of nothing can evict it.
+    resolver.release('a.png');
+    resolver.release('a.png');
+    expect(resolver.peek('a.png')).toBeNull();
+    expect(bitmap.close).toHaveBeenCalled();
+  });
+
   it('does not cache a failure, so the next caller tries again', async () => {
     let attempts = 0;
     const resolver = new DefaultImageResolver({
@@ -230,6 +254,33 @@ describe('Image', () => {
 
     expect(node!.properties.get('image')).toBe(mounted.bitmap);
     expect(semanticsOf(node!)).toMatchObject({ role: 'image', label: 'A photograph' });
+  });
+
+  it('draws a picture the resolver already holds on the frame that builds the node', async () => {
+    // The bar's cover and the sheet's cover are one url: when the sheet
+    // opens, its picture is decoded already. A promise would still put
+    // it on the node a microtask after the first frame painted, and
+    // that frame is the first of a shared-element morph, so the
+    // placeholder would be a blank tile where the picture was.
+    const bitmap = fakeBitmap(40, 20);
+    const resolver = new DefaultImageResolver({
+      fetch: () => Promise.resolve(new Blob()),
+      decode: () => Promise.resolve(bitmap)
+    });
+    await resolver.resolve('photo.png');
+    resolver.release('photo.png');
+
+    let node: UiNode | null = null;
+    renderTest(
+      Column(
+        {},
+        createComponent(Image, { src: 'photo.png', ref: (n: UiNode | null) => (node = n), width: 40, height: 20 })
+      ),
+      { media: { resolver } }
+    );
+
+    // No settle: the bitmap is there when renderTest returns from the first frame.
+    expect(node!.properties.get('image')).toBe(bitmap);
   });
 
   it('is decorative without an alt: no role, so it is not in the semantics tree', () => {

@@ -84,6 +84,16 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
       return;
     }
     held = source;
+    // Already decoded: on the node in this frame, so a picture the
+    // cache holds never paints as its placeholder first. Matters most
+    // under a shared-element morph, where that placeholder would be a
+    // blank tile where the same picture stood a frame ago.
+    const ready = args.resolver.peek?.(source) ?? null;
+    if (ready !== null) {
+      host.set('image', ready);
+      args.onState?.('loaded');
+      return;
+    }
     args.resolver
       .resolve(source)
       .then((bitmap: UiImage) => {

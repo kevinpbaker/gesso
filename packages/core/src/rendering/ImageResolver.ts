@@ -24,6 +24,19 @@ export interface ImageResolver {
    */
   resolve(source: string): Promise<UiImage>;
   /**
+   * The bitmap for a source that is already decoded, held exactly as
+   * `resolve` would hold it, or null when it is not decoded yet, in
+   * which case nothing is held and the caller resolves as usual.
+   *
+   * Optional, because a resolver that decodes elsewhere may have no
+   * synchronous answer. It exists for the frame that builds a node: a
+   * promise settles a microtask after that frame has painted, so
+   * without this a picture the cache already holds is drawn as its
+   * placeholder for one frame, which under a shared-element morph is a
+   * blank tile where the picture was a frame ago.
+   */
+  peek?(source: string): UiImage | null;
+  /**
    * Says the caller no longer needs the source. The bitmap may be kept
    * (it is likely to be wanted again) but a resolver that closes
    * bitmaps must not close one another caller still holds.
@@ -159,6 +172,24 @@ export class DefaultImageResolver implements ImageResolver {
     entry.bitmap.catch(() => {});
     this.entries.set(source, entry);
     return entry.bitmap;
+  }
+
+  peek(source: string): UiImage | null {
+    if (this.disposed) {
+      return null;
+    }
+    const existing = this.entries.get(source);
+    if (existing === undefined || existing.settled === null) {
+      return null;
+    }
+    // A hold, exactly as `resolve` takes one, so the caller's `release`
+    // balances it and the bitmap stays live while it is on screen.
+    existing.holders++;
+    const index = this.evictable.indexOf(source);
+    if (index !== -1) {
+      this.evictable.splice(index, 1);
+    }
+    return existing.settled;
   }
 
   release(source: string): void {
