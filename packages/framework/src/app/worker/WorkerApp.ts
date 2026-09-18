@@ -281,6 +281,26 @@ export class WorkerApp {
   private detachViewportInsets: (() => void) | null = null;
   /** The appearance this shell reports, remembered across a remount. */
   private colorSchemePreference: ColorSchemePreference = 'auto';
+  /**
+   * Whether the render worker still owes an answer to a `resize`, and
+   * the newest size that has gone unsent because it does.
+   *
+   * A resize is the one shell message whose handling costs the worker
+   * a full layout and a paint, and `ResizeObserver` delivers one per
+   * refresh while a window edge is dragged. A worker slower than the
+   * display therefore accumulated a queue of sizes, every one of them
+   * already wrong by the time it was laid out, and the lag grew for
+   * the length of the drag instead of settling. So the shell keeps one
+   * resize in flight and remembers only the latest size it has not
+   * sent. Nothing anyone can see is dropped: the size held back is the
+   * newest one, and it goes out as soon as the worker says it has
+   * drained the last.
+   *
+   * The initial size travels in `init` rather than as a resize, so
+   * nothing is in flight until the first notification arrives.
+   */
+  private resizeInFlight = false;
+  private heldResize: { width: number; height: number; dpr: number } | null = null;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -598,6 +618,11 @@ export class WorkerApp {
     this.audio = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    // A remount starts from nothing in flight. The new worker is told
+    // its size in `init`, and an acknowledgement from the old one
+    // would be about a canvas that no longer exists.
+    this.resizeInFlight = false;
+    this.heldResize = null;
     if (this.renderWorker !== undefined) {
       this.renderWorker.postMessage({ type: 'dispose' } as ShellToRuntimeMessage);
       this.renderWorker.removeEventListener('message', this.handleWorkerMessage);
@@ -673,6 +698,10 @@ export class WorkerApp {
       if (this.canvas !== undefined) {
         this.canvas.style.cursor = message.cursor ?? '';
       }
+      return;
+    }
+    if (message.type === 'resized') {
+      this.handleResized(message);
       return;
     }
     if (message.type === 'scrollability') {
@@ -806,10 +835,65 @@ export class WorkerApp {
       }
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
-        this.post({ type: 'resize', width, height, dpr: window.devicePixelRatio || 1 });
+        this.requestResize({ width, height, dpr: window.devicePixelRatio || 1 });
       }
     });
     this.resizeObserver.observe(element);
+  }
+
+  /**
+   * Sends a size to the worker, or holds it back until the worker has
+   * caught up with the last one.
+   *
+   * At most one resize is in flight, for the reason `resizeInFlight`
+   * gives: the alternative is a queue of sizes that are all wrong,
+   * each bought with a layout and a paint. Overwriting the held size
+   * rather than queueing it is the whole trick — a drag of any length
+   * costs the worker one layout per acknowledgement rather than one
+   * per refresh, and the size that eventually arrives is the size the
+   * window ended at.
+   */
+  private requestResize(size: { width: number; height: number; dpr: number }): void {
+    if (this.resizeInFlight) {
+      this.heldResize = size;
+      return;
+    }
+    this.resizeInFlight = true;
+    this.post({ type: 'resize', ...size });
+  }
+
+  /**
+   * The worker has applied a resize, so the one being held can go.
+   *
+   * The dimensions are compared against what is held because the
+   * drag usually ends on the size that was already in flight: the
+   * worker has it, and posting it again would buy a layout that
+   * changes nothing. A held size that differs is the last one the
+   * observer reported, and it becomes the resize in flight.
+   *
+   * There is no timer behind this. The worker acknowledges every
+   * `resize` it is sent, including one it decides to drop, so an
+   * acknowledgement is owed for as long as the worker lives — and a
+   * worker that has stopped answering has stopped painting too, which
+   * is not a wrong canvas size but a dead renderer, and is reported
+   * as one. A genuinely lost acknowledgement would leave the canvas at
+   * the last size the worker applied until the shell is remounted;
+   * that is a trade this takes knowingly, in exchange for not having
+   * a heuristic timeout re-sending sizes at a worker that is merely
+   * slow.
+   */
+  private handleResized(applied: { width: number; height: number; dpr: number }): void {
+    this.resizeInFlight = false;
+    const held = this.heldResize;
+    this.heldResize = null;
+    if (held === null) {
+      return;
+    }
+    if (held.width === applied.width && held.height === applied.height && held.dpr === applied.dpr) {
+      return;
+    }
+    this.resizeInFlight = true;
+    this.post({ type: 'resize', ...held });
   }
 
   /**
