@@ -241,6 +241,12 @@ export function resolveAppLogic(spec: NonNullable<WorkerAppOptions['appLogicWork
   return { endpoint: spec, owned: false };
 }
 
+/**
+ * The one message this shell ever holds on to rather than posting the
+ * moment it has it. See `flushPendingMove`.
+ */
+type PointerMoveMessage = Extract<ShellToRuntimeMessage, { type: 'pointerMove' }>;
+
 export class WorkerApp {
   private readonly options: WorkerAppOptions;
 
@@ -307,6 +313,12 @@ export class WorkerApp {
    * what the cache costs.
    */
   private canvasOrigin: { left: number; top: number } | null = null;
+  /**
+   * The hover move being held for this frame, and the frame holding
+   * it. See `flushPendingMove`.
+   */
+  private pendingMove: PointerMoveMessage | null = null;
+  private moveFrame: number | null = null;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -491,6 +503,11 @@ export class WorkerApp {
   }
 
   private forwardKeyDown(event: KeyboardEvent): void {
+    // Whatever hover the shell is holding happened before this key
+    // and has to be posted before it; see `flushPendingMove`. Keys
+    // reach here from the canvas, the editing proxy and the semantics
+    // mirror, so the flush belongs here rather than in one listener.
+    this.flushPendingMove();
     if (this.options.interceptFind === true && isFind(event)) {
       event.preventDefault();
     }
@@ -506,6 +523,7 @@ export class WorkerApp {
   }
 
   private forwardKeyUp(event: KeyboardEvent): void {
+    this.flushPendingMove();
     this.post({ type: 'keyUp', key: event.key, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
   }
 
@@ -630,6 +648,7 @@ export class WorkerApp {
     this.resizeInFlight = false;
     this.heldResize = null;
     this.canvasOrigin = null;
+    this.dropPendingMove();
     if (this.renderWorker !== undefined) {
       this.renderWorker.postMessage({ type: 'dispose' } as ShellToRuntimeMessage);
       this.renderWorker.removeEventListener('message', this.handleWorkerMessage);
@@ -707,10 +726,6 @@ export class WorkerApp {
       }
       return;
     }
-    if (message.type === 'resized') {
-      this.handleResized(message);
-      return;
-    }
     if (message.type === 'scrollability') {
       // Cached, not acted on: the wheel handler reads it synchronously
       // when an event arrives, which is the whole reason the worker
@@ -719,6 +734,10 @@ export class WorkerApp {
       if (this.canvas !== undefined) {
         this.canvas.style.touchAction = touchActionFor(message.scrollsAnything);
       }
+      return;
+    }
+    if (message.type === 'resized') {
+      this.handleResized(message);
       return;
     }
     if (message.type === 'editing') {
@@ -959,6 +978,40 @@ export class WorkerApp {
     return origin;
   }
 
+  /**
+   * Posts the hover move being held for this frame, if there is one.
+   *
+   * Every other input this shell sends calls this first, and the
+   * ordering is the whole reason it is one function rather than a flag
+   * each listener consults. A held move that went out *after* the
+   * press, release or wheel that superseded it would leave the worker
+   * hovering a position the pointer had already left, and the hover
+   * state of a widget is exactly what decides how the next event is
+   * drawn.
+   *
+   * Only hover moves are ever held; see `onPointerMove`.
+   */
+  private flushPendingMove(): void {
+    const move = this.pendingMove;
+    this.dropPendingMove();
+    if (move !== null) {
+      this.post(move);
+    }
+  }
+
+  /**
+   * Forgets a held hover move and the frame that was to send it,
+   * posting nothing. For a detach or a dispose, where the surface the
+   * move was measured against is going away.
+   */
+  private dropPendingMove(): void {
+    if (this.moveFrame !== null) {
+      cancelAnimationFrame(this.moveFrame);
+      this.moveFrame = null;
+    }
+    this.pendingMove = null;
+  }
+
   private attachInput(canvas: HTMLCanvasElement): () => void {
     /**
      * Where a pointer is, in the canvas's own coordinates.
@@ -997,6 +1050,7 @@ export class WorkerApp {
       // chance to notice that something moved the canvas without
       // telling anyone.
       this.canvasOrigin = null;
+      this.flushPendingMove();
       const { x, y } = toLocal(event.clientX, event.clientY);
       editingAtPress = this.proxy?.active ?? false;
       // While an editable has focus the proxy's textarea holds DOM
@@ -1043,7 +1097,7 @@ export class WorkerApp {
     });
     const onPointerMove = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
-      this.post({
+      const move: PointerMoveMessage = {
         type: 'pointerMove',
         x,
         y,
@@ -1051,9 +1105,32 @@ export class WorkerApp {
         modifiers: modifiersFrom(event),
         pointer: pointerDeviceOf(event),
         at: epochFromEvent(event)
+      };
+      if (event.buttons !== 0) {
+        // Something is pressed, so every point is forwarded. A drag, a
+        // text selection, a scrollbar thumb and the touch scroller's
+        // fling velocity are all computed from the stream itself, and
+        // thinning it would quietly change what they do rather than
+        // save work. Coalescing is only ever right for hover, where
+        // the newest position is the whole of the information.
+        this.flushPendingMove();
+        this.post(move);
+        return;
+      }
+      this.pendingMove = move;
+      // One frame, one hover hit-test. A high-rate mouse reports
+      // hundreds of moves a second and the worker answers each with a
+      // hit-test whose result the next one discards, so the held move
+      // is overwritten and a single frame sends the last of them. The
+      // timestamp posted is that newest event's, not the frame's, so
+      // the latency reading still measures from the input.
+      this.moveFrame ??= requestAnimationFrame(() => {
+        this.moveFrame = null;
+        this.flushPendingMove();
       });
     };
     const onPointerUp = (event: PointerEvent): void => {
+      this.flushPendingMove();
       const { x, y } = toLocal(event.clientX, event.clientY);
       this.post({
         type: 'pointerUp',
@@ -1074,9 +1151,11 @@ export class WorkerApp {
       }
     };
     const onPointerCancel = (event: PointerEvent): void => {
+      this.flushPendingMove();
       this.post({ type: 'pointerCancel', pointer: pointerDeviceOf(event) });
     };
     const onWheel = (event: WheelEvent): void => {
+      this.flushPendingMove();
       if (this.wouldConsumeWheel(event)) {
         event.preventDefault();
       }
@@ -1142,6 +1221,10 @@ export class WorkerApp {
       canvas.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('scroll', onCanvasMayHaveMoved, { capture: true });
       window.removeEventListener('resize', onCanvasMayHaveMoved);
+      // A frame still holding a hover move would post it against a
+      // surface that is no longer listening, so it is dropped rather
+      // than flushed.
+      this.dropPendingMove();
       this.canvasOrigin = null;
     };
   }

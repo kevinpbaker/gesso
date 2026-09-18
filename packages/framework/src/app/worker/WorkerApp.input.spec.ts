@@ -183,6 +183,35 @@ function pointer(options: { x: number; y: number; buttons?: number; at?: number 
   } as unknown as PointerEvent;
 }
 
+function wheel(): WheelEvent {
+  return {
+    clientX: 100,
+    clientY: 100,
+    deltaX: 0,
+    deltaY: 10,
+    deltaMode: 0,
+    wheelDeltaY: -120,
+    shiftKey: false,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    timeStamp: 5,
+    preventDefault: () => {}
+  } as unknown as WheelEvent;
+}
+
+function key(): KeyboardEvent {
+  return {
+    key: 'a',
+    shiftKey: false,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    timeStamp: 6,
+    preventDefault: () => {}
+  } as unknown as KeyboardEvent;
+}
+
 let active: Harness | undefined;
 
 function setup(): Harness {
@@ -337,5 +366,98 @@ describe('pointer coordinates', () => {
 
     expect(shell.canvas.rectReads).toBe(2);
     expect(shell.posts.filter(message => message.type === 'pointerDown').at(-1)).toMatchObject({ x: 80 });
+  });
+});
+
+/**
+ * Hover moves coalesced to one a frame, and never left behind the
+ * event that superseded them.
+ */
+describe('hover coalescing', () => {
+  it('posts the newest hover once a frame and nothing before it', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200, at: 1 }));
+    shell.canvas.dispatch('pointermove', pointer({ x: 140, y: 200, at: 2 }));
+    shell.canvas.dispatch('pointermove', pointer({ x: 180, y: 240, at: 3 }));
+
+    expect(shell.posts.filter(message => message.type === 'pointerMove')).toEqual([]);
+
+    shell.frame();
+
+    const moves = shell.posts.filter(message => message.type === 'pointerMove');
+    expect(moves).toHaveLength(1);
+    // The newest event's position and its own timestamp, not the
+    // frame's: the latency reading still measures from the input.
+    expect(moves[0]).toMatchObject({ x: 160, y: 230, at: performance.timeOrigin + 3 });
+  });
+
+  it('forwards every point while a button is down', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    // A drag, a text selection, a scrollbar thumb and the touch
+    // scroller's fling velocity are all computed from the stream, so
+    // thinning it would change behaviour rather than save work.
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200, buttons: 1, at: 1 }));
+    shell.canvas.dispatch('pointermove', pointer({ x: 140, y: 200, buttons: 1, at: 2 }));
+    shell.canvas.dispatch('pointermove', pointer({ x: 180, y: 200, buttons: 1, at: 3 }));
+
+    expect(shell.posts.filter(message => message.type === 'pointerMove')).toHaveLength(3);
+  });
+
+  it('flushes a held hover before the press that supersedes it', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200, at: 1 }));
+    shell.canvas.dispatch('pointerdown', pointer({ x: 100, y: 200, buttons: 1, at: 2 }));
+    // The frame the hover was waiting for, had it still been waiting.
+    shell.frame();
+
+    expect(
+      shell.posts
+        .filter(message => message.type === 'pointerMove' || message.type === 'pointerDown')
+        .map(message => message.type)
+    ).toEqual(['pointerMove', 'pointerDown']);
+  });
+
+  it('flushes a held hover before a release, a wheel and a key', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    const order = (): string[] =>
+      shell.posts
+        .filter(
+          message =>
+            message.type === 'pointerMove' ||
+            message.type === 'pointerUp' ||
+            message.type === 'wheel' ||
+            message.type === 'keyDown'
+        )
+        .map(message => message.type);
+
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200, at: 1 }));
+    shell.canvas.dispatch('pointerup', pointer({ x: 100, y: 200, at: 2 }));
+    shell.canvas.dispatch('pointermove', pointer({ x: 110, y: 200, at: 3 }));
+    shell.canvas.dispatch('wheel', wheel());
+    shell.canvas.dispatch('pointermove', pointer({ x: 120, y: 200, at: 5 }));
+    shell.canvas.dispatch('keydown', key());
+    shell.frame();
+
+    expect(order()).toEqual(['pointerMove', 'pointerUp', 'pointerMove', 'wheel', 'pointerMove', 'keyDown']);
+  });
+
+  it('drops a held hover when the input is detached', () => {
+    const shell = setup();
+    const detach = shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200, at: 1 }));
+    detach();
+    shell.frame();
+
+    // The surface it was measured against has gone; posting it would
+    // hover a canvas the shell no longer owns.
+    expect(shell.posts.filter(message => message.type === 'pointerMove')).toEqual([]);
   });
 });

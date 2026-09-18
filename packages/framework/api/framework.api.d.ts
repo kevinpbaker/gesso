@@ -1253,6 +1253,12 @@ type RuntimeToShellMessage = {
 {
   type: 'frameLoop';
   running: boolean;
+} |
+{
+  type: 'resized';
+  width: number;
+  height: number;
+  dpr: number;
 } | {
   type: 'semantics';
   update: UiSemanticsUpdate;
@@ -1738,6 +1744,11 @@ declare class WorkerApp {
   private detachColorScheme;
   private detachViewportInsets;
   private colorSchemePreference;
+  private resizeInFlight;
+  private heldResize;
+  private canvasOrigin;
+  private pendingMove;
+  private moveFrame;
   constructor(options: WorkerAppOptions);
   get appLogic(): WorkerHandle | undefined;
   mount(host: HTMLElement | string): () => void;
@@ -1758,7 +1769,12 @@ declare class WorkerApp {
   private applyHistory;
   private post;
   private observeResize;
+  private requestResize;
+  private handleResized;
   private wouldConsumeWheel;
+  private readCanvasOrigin;
+  private flushPendingMove;
+  private dropPendingMove;
   private attachInput;
 }
 interface CreateAppOptions extends Omit<WorkerAppOptions, 'renderWorker'> {
@@ -2772,7 +2788,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-D_Dr9pje.js";
+} from "./index-CHnW7N05.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3242,7 +3258,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-D_Dr9pje.js";
+} from "../index-CHnW7N05.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
