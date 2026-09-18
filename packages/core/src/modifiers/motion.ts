@@ -568,9 +568,25 @@ export interface SharedElementArgs extends MotionTiming {
    * offset and opacity, and loses their clipping and its place in
    * paint order. See the `lift` property.
    *
-   * Not the default, because most morphs do not need it and one that
-   * does not is better off drawn where it belongs: a lifted element is
-   * over *everything*, a header and a now-playing bar included.
+   * **On by default**, which it was not at first. The argument for
+   * leaving it off was that most morphs do not need it and one that
+   * does not is better off drawn where it belongs, since a lifted
+   * element is over everything, a header and a now-playing bar
+   * included. What that argument missed is who pays when it is wrong.
+   * A morph that needed lifting and did not get it is not a little
+   * worse, it is visibly broken — clipped in half, or drawn under the
+   * thing it is travelling over — and the author cannot tell which
+   * morphs need it by looking at the component, because the answer
+   * lives in an ancestor's `overflow` three files away and changes
+   * when a screen is relaid out. Segue found this twice: once when a
+   * shelf's artwork flew home into a scrolling row, and again when the
+   * Featured cards became a row and every one of their elements needed
+   * the same flag.
+   *
+   * A browser lifts every named element for exactly this reason, and
+   * nobody writing a view transition has to think about it. So the
+   * default is the safe answer, and `lift: false` is there for the
+   * morph that genuinely wants to stay in its layer.
    */
   readonly lift?: boolean;
   /**
@@ -713,7 +729,7 @@ class SharedElementController {
     // Written here, at the claim, for the reason `onMorph` is told
     // here: `lift` is read while the tree is laid out, and this frame's
     // layout is the one the morph's first frame is drawn from.
-    if (this.args.lift === true) {
+    if (this.args.lift !== false) {
       this.host.set('lift', true);
     }
     // An element in flight is scenery, not a target. It is somewhere it
@@ -733,7 +749,7 @@ class SharedElementController {
       return;
     }
     this.morphing = false;
-    if (this.args.lift === true) {
+    if (this.args.lift !== false) {
       this.host.clear('lift');
     }
     this.host.clear('pointerEvents');
