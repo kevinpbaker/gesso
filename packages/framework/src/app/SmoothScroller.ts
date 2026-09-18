@@ -54,19 +54,27 @@ interface Axes {
  * The page starts late and glides on after the hand has stopped, which
  * reads as an application that is behind rather than as smoothing.
  *
- * What a browser does with the same notch is the target, because it is
- * what everyone's hand is calibrated to: a fast start and a short
- * decay, the whole thing over in about a seventh of a second. Chrome
- * animates a wheel on its compositor with an impulse curve of roughly
- * that length.
- *
  * So scrolling gets a spring of its own, critically damped so it never
- * overshoots the place the wheel asked for, and stiff enough to match:
- * half the distance by 33ms, nine tenths by 83ms, done by 150ms. The
- * numbers here are `UiSpring` sampled at 60Hz, in
- * `GessoRuntime.smoothScroll.spec.ts`'s units rather than a browser's,
- * because Chrome will not animate a wheel event the DevTools protocol
- * synthesises and its own curve could not be measured from here.
+ * overshoots the place the wheel asked for. What is left is how long it
+ * should take, and that was found by being wrong in both directions.
+ * Sampled at 60Hz, one 120px notch travels:
+ *
+ *     220/24   a tenth by  50ms   half by 117ms   nine tenths by 217ms
+ *     900/60   a tenth by  33ms   half by  67ms   nine tenths by 150ms
+ *     2500/100 a tenth by  17ms   half by  50ms   nine tenths by  83ms
+ *
+ * The first is `snappy` and read as the page lagging behind the wheel.
+ * The last was an attempt to match the length a browser's own wheel
+ * animation is documented to have, and read as a jump: nine tenths of
+ * the way in five frames is not a scroll anybody can see happening.
+ * The middle one is what shipped. It starts in two frames and is over
+ * in a quarter of a second, which is long enough to be motion and short
+ * enough that nothing is waited for.
+ *
+ * Chrome's own curve is not in that table because it could not be
+ * measured here: Chrome applies a wheel event the DevTools protocol
+ * synthesises straight to the offset, with no animation, however it is
+ * dispatched and with smooth scrolling explicitly on.
  *
  * A container that wants none of this still says `scrollBehavior:
  * 'instant'`, and a precision device never reaches this code at all —
@@ -77,7 +85,7 @@ interface Axes {
  * and this is the runtime's scrolling rather than an application's
  * motion.
  */
-const SCROLL_SPRING = { stiffness: 2500, damping: 100, mass: 1 } as const;
+const SCROLL_SPRING = { stiffness: 900, damping: 60, mass: 1 } as const;
 
 export class SmoothScroller {
   /** One cell per (node, axis), kept for the node's life. */
