@@ -11,7 +11,28 @@ import { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } f
  * the same approach `EditingProxy.spec` takes.
  */
 class FakeElement {
-  readonly style: Record<string, string> = {};
+  /**
+   * Every style property this element has ever been assigned, in order,
+   * as `name:value`.
+   *
+   * A style write is the cost these specs are about, and it is a cost
+   * whether or not the value changed: assigning the same string still
+   * invalidates the element's style. So counting assignments is the
+   * only measurement that can tell the fix from the bug — reading
+   * `style.left` afterwards looks identical either way. Hence the proxy
+   * rather than a plain object: `Object.assign`, which is how the
+   * mirror sets up an element, goes through the set trap too.
+   */
+  readonly styleWrites: string[] = [];
+
+  readonly style: Record<string, string> = new Proxy({} as Record<string, string>, {
+    set: (target, property, value: string) => {
+      this.styleWrites.push(`${String(property)}:${value}`);
+      target[property as string] = value;
+      return true;
+    }
+  });
+
   readonly attributes = new Map<string, string>();
   readonly listeners = new Map<string, Set<(event: FakeEvent) => void>>();
   readonly children: FakeElement[] = [];
@@ -511,5 +532,148 @@ describe('a labelled container and its children', () => {
     const panel = elementFor('panel');
     expect(panel.getAttribute('aria-label')).toBe('Albums');
     expect(panel.children.map(child => child.getAttribute('aria-label'))).toEqual(['A track']);
+  });
+});
+
+/**
+ * What a scroll costs the main thread.
+ *
+ * A scroll marks the scroll container's transform, which counts as a
+ * laid-out frame, so the render worker sends every moved box on every
+ * scroll frame. Whatever `apply` does per box it therefore does sixty
+ * times a second on the one thread the worker configuration exists to
+ * keep idle, and a style write is not free even when the value is
+ * unchanged: it invalidates that element's style either way.
+ *
+ * These specs count assignments rather than read values back, because
+ * the end state was already correct before the fix — what was wrong was
+ * how much work it took to get there.
+ */
+describe('the cost of a frame', () => {
+  /** A list of rows, positioned, with the setup writes forgotten. */
+  function scrollingList() {
+    const harness = setup();
+    harness.apply({
+      patches: [
+        { op: 'add', node: record('list', { role: 'list', label: 'Notes' }) },
+        { op: 'add', node: record('r0', { parent: 'list', index: 0, role: 'listitem', label: 'Row 0' }) },
+        { op: 'add', node: record('r1', { parent: 'list', index: 1, role: 'listitem', label: 'Row 1' }) },
+        { op: 'add', node: record('r2', { parent: 'list', index: 2, role: 'listitem', label: 'Row 2' }) }
+      ],
+      boxes: [
+        { id: 'list', box: { x: 0, y: 100, width: 300, height: 400 } },
+        { id: 'r0', box: { x: 8, y: 108, width: 284, height: 40 } },
+        { id: 'r1', box: { x: 8, y: 152, width: 284, height: 40 } },
+        { id: 'r2', box: { x: 8, y: 196, width: 284, height: 40 } }
+      ]
+    });
+    const rows = ['r0', 'r1', 'r2'].map(harness.elementFor);
+    const list = harness.elementFor('list');
+    for (const element of [list, ...rows]) {
+      element.styleWrites.length = 0;
+    }
+    return { ...harness, list, rows };
+  }
+
+  it('writes nothing the second time the same boxes arrive', () => {
+    const { list, rows, apply } = scrollingList();
+
+    apply({
+      boxes: [
+        { id: 'list', box: { x: 0, y: 100, width: 300, height: 400 } },
+        { id: 'r0', box: { x: 8, y: 108, width: 284, height: 40 } },
+        { id: 'r1', box: { x: 8, y: 152, width: 284, height: 40 } },
+        { id: 'r2', box: { x: 8, y: 196, width: 284, height: 40 } }
+      ]
+    });
+
+    expect(list.styleWrites).toEqual([]);
+    expect(rows.map(row => row.styleWrites)).toEqual([[], [], []]);
+  });
+
+  it('writes nothing for the rows of a list that scrolled with its container', () => {
+    // The shape a scroll actually has: the container and everything
+    // inside it move by one identical delta. Each row's offset *from
+    // its parent* is therefore exactly what it was, and the row is
+    // carried along by the DOM without being told anything.
+    const { list, rows, apply } = scrollingList();
+
+    apply({
+      boxes: [
+        { id: 'list', box: { x: 0, y: 80, width: 300, height: 400 } },
+        { id: 'r0', box: { x: 8, y: 88, width: 284, height: 40 } },
+        { id: 'r1', box: { x: 8, y: 132, width: 284, height: 40 } },
+        { id: 'r2', box: { x: 8, y: 176, width: 284, height: 40 } }
+      ]
+    });
+
+    expect(rows.map(row => row.styleWrites)).toEqual([[], [], []]);
+    // The container itself moved, and that it is told about.
+    expect(list.styleWrites).toEqual(['left:0px', 'top:80px', 'width:300px', 'height:400px']);
+    expect(rows[1].style.top).toBe('52px');
+  });
+
+  it('ignores a subpixel change that rounds to the pixel already written', () => {
+    // The worker compares boxes exactly, so a third of a pixel of drift
+    // arrives here as a change. Rounded, it is the string that is
+    // already on the element.
+    const { list, apply } = scrollingList();
+
+    apply({ boxes: [{ id: 'list', box: { x: 0.2, y: 100.1, width: 300.4, height: 399.9 } }] });
+
+    expect(list.styleWrites).toEqual([]);
+    expect(list.style.top).toBe('100px');
+  });
+
+  it('still repositions a child when only its parent moved', () => {
+    // The correctness property none of the skipping may cost: after
+    // `apply` returns, every element's offset is right relative to its
+    // parent. A row whose own box did not change still has to give back
+    // the distance its parent travelled.
+    const { rows, apply } = scrollingList();
+
+    apply({ boxes: [{ id: 'list', box: { x: 0, y: 300, width: 300, height: 400 } }] });
+
+    expect(rows.map(row => row.style.top)).toEqual(['-192px', '-148px', '-104px']);
+  });
+
+  it('positions a child once when parent and child both moved, whichever order they arrive in', () => {
+    // Two different deltas, so the row genuinely needs a write. It
+    // needs exactly one: repositioning it for its parent as well wrote
+    // an offset computed from the parent's new box and the row's old
+    // one, which was a value the row was never meant to have.
+    for (const reversed of [false, true]) {
+      const { rows, apply } = scrollingList();
+      const boxes = [
+        { id: 'list', box: { x: 0, y: 60, width: 300, height: 400 } },
+        { id: 'r1', box: { x: 8, y: 132, width: 284, height: 40 } }
+      ];
+
+      apply({ boxes: reversed ? [...boxes].reverse() : boxes });
+
+      expect(rows[1].styleWrites).toEqual(['left:8px', 'top:72px', 'width:284px', 'height:40px']);
+      // The rows this update said nothing about are repositioned for
+      // the parent that moved under them, once each.
+      expect(rows[0].styleWrites).toEqual(['left:8px', 'top:48px', 'width:284px', 'height:40px']);
+      expect(rows[2].styleWrites).toEqual(['left:8px', 'top:136px', 'width:284px', 'height:40px']);
+    }
+  });
+
+  it('keeps the offset of a reparented element right, cache and all', () => {
+    // The cache holds what was written, not the box it came from, so
+    // the offset is recomputed against whichever parent the record
+    // names now. Moving the row to a container at a different origin
+    // changes that offset, and the write happens.
+    const { rows, apply } = scrollingList();
+    apply({
+      patches: [{ op: 'add', node: record('other', { index: 1, role: 'list', label: 'Archive' }) }],
+      boxes: [{ id: 'other', box: { x: 0, y: 500, width: 300, height: 200 } }]
+    });
+
+    apply({
+      patches: [{ op: 'update', node: record('r1', { parent: 'other', index: 0, role: 'listitem', label: 'Row 1' }) }]
+    });
+
+    expect(rows[1].style.top).toBe('-348px');
   });
 });

@@ -131,6 +131,31 @@ interface MirrorEntry {
   record: UiSemanticsRecord;
   /** The node's box in canvas coordinates, once one has been sent. */
   box?: MirrorBox;
+  /**
+   * What `position` last wrote into this element's style, so a frame
+   * that recomputes the same four numbers can leave the style alone.
+   * Absent until the first write, which is also why the zeroes
+   * `createElement` sets do not count as written: they belong to an
+   * element that has no box yet, and the first real box must land.
+   */
+  written?: WrittenOffset;
+}
+
+/**
+ * The rounded offset an element's style already carries.
+ *
+ * Deliberately the *written* value rather than the box it came from:
+ * that is what makes the comparison safe across a reparent. `position`
+ * recomputes the offset from whatever parent the record names now, so
+ * the cache is only ever asked whether the style string it is about to
+ * write is the one already there — a question whose answer cannot go
+ * stale while `position` is the only writer of these four properties.
+ */
+interface WrittenOffset {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 type MirrorBox = UiSemanticsUpdate['boxes'][number]['box'];
@@ -241,20 +266,44 @@ export class SemanticsMirror {
         this.upsert(patch.node);
       }
     }
+    // Every box lands before any style is written, in two passes over
+    // the update. The second pass then sees final boxes whichever order
+    // the worker sent them in, where a single pass positioned a child
+    // against its parent's *new* box and its own *old* one whenever the
+    // parent came first — a wrong offset that the child's own turn
+    // happened to correct a moment later.
+    const moved = new Set<MirrorEntry>();
     for (const { id, box } of update.boxes) {
       const entry = this.entries.get(id);
       if (entry === undefined) {
         continue;
       }
       entry.box = box;
+      moved.add(entry);
+    }
+    for (const entry of moved) {
       this.position(entry);
       // The children sit inside this element, so their offsets are
       // measured from it: a parent that moved carries them with it in
-      // the DOM, and their own left and top have to give that back.
-      for (const child of Array.from(entry.element.children)) {
-        const childId = this.ids.get(child as HTMLElement);
+      // the DOM, and their own left and top have to give that back. Only
+      // the children this update left alone need that, though — a child
+      // with a box of its own in here is positioned by its own turn in
+      // this same loop, and repositioning it here as well is the work a
+      // scroll does twice over, since a scroll moves a parent and all of
+      // its children together.
+      //
+      // Indexed over the live `children` collection rather than a copy:
+      // `position` writes four style properties and nothing else, so no
+      // node is inserted, removed or reordered while this runs, and the
+      // collection cannot shift under the index. (`place` is the one
+      // thing that moves elements, and it has already finished above.)
+      // The copy `Array.from` made was an allocation per moved parent,
+      // which on a scrolling list is one per visible row.
+      const children = entry.element.children;
+      for (let index = 0; index < children.length; index += 1) {
+        const childId = this.ids.get(children[index] as HTMLElement);
         const childEntry = childId === undefined ? undefined : this.entries.get(childId);
-        if (childEntry?.box !== undefined) {
+        if (childEntry !== undefined && childEntry.box !== undefined && !moved.has(childEntry)) {
           this.position(childEntry);
         }
       }
@@ -291,7 +340,13 @@ export class SemanticsMirror {
     this.describe(element, record);
     this.place(element, record);
     if (existing?.box !== undefined) {
-      // Under a different parent, the same box is a different offset.
+      // Under a different parent, the same box is a different offset —
+      // and `existing.record` is the new record by now, so the offset
+      // `position` recomputes is measured from the new parent. That is
+      // what keeps the written-offset cache honest here: it is compared
+      // against a value that already accounts for the move, so a
+      // reparent that changes the offset writes, and one that does not
+      // needs no write because `place` has already moved the element.
       this.position(existing);
     }
     if (record.id === this.focusedId) {
@@ -418,6 +473,27 @@ export class SemanticsMirror {
    * Rounded, because a subpixel box would make the style string differ
    * on frames where nothing an assistive technology can perceive has
    * changed.
+   *
+   * And rounding is why the four values are remembered and compared
+   * before they are written. A scroll marks the container's transform,
+   * which is a laid-out frame, so the worker sends every moved box every
+   * scroll frame — and a style write invalidates style for that element
+   * whether or not the value changed, on the one thread this whole
+   * architecture exists to keep idle. The comparison has to be against
+   * the rounded numbers rather than against the box: a subpixel change
+   * survives the worker's exact comparison and still rounds to the pixel
+   * that is already there. The win it buys is bigger than it looks,
+   * because during a scroll a parent and its children move by the same
+   * delta, so every child's offset *from its parent* is unchanged and a
+   * scrolling list writes nothing at all for its rows.
+   *
+   * It is a claim about the style, not about the box, so a reparent
+   * cannot make it lie: the offset is recomputed from the parent the
+   * record names now, and if that offset is the same then the string
+   * already on the element is still the right one — the element moving
+   * in the DOM is what changes where it lands, not a style write. This
+   * holds exactly as long as `position` is the only thing writing
+   * `left`, `top`, `width` and `height` on a mirrored element.
    */
   private position(entry: MirrorEntry): void {
     const box = entry.box;
@@ -425,11 +501,36 @@ export class SemanticsMirror {
       return;
     }
     const parent = entry.record.parent === null ? undefined : this.entries.get(entry.record.parent)?.box;
+    const left = Math.round(box.x - (parent?.x ?? 0));
+    const top = Math.round(box.y - (parent?.y ?? 0));
+    const width = Math.round(box.width);
+    const height = Math.round(box.height);
+    const written = entry.written;
+    if (
+      written !== undefined &&
+      written.left === left &&
+      written.top === top &&
+      written.width === width &&
+      written.height === height
+    ) {
+      return;
+    }
+    if (written === undefined) {
+      entry.written = { left, top, width, height };
+    } else {
+      // Overwritten in place rather than replaced: the elements that do
+      // move, move every frame of a drag or a scroll, and this is the
+      // one allocation on that path.
+      written.left = left;
+      written.top = top;
+      written.width = width;
+      written.height = height;
+    }
     const { element } = entry;
-    element.style.left = `${Math.round(box.x - (parent?.x ?? 0))}px`;
-    element.style.top = `${Math.round(box.y - (parent?.y ?? 0))}px`;
-    element.style.width = `${Math.round(box.width)}px`;
-    element.style.height = `${Math.round(box.height)}px`;
+    element.style.left = `${left}px`;
+    element.style.top = `${top}px`;
+    element.style.width = `${width}px`;
+    element.style.height = `${height}px`;
   }
 
   private remove(id: string): void {
