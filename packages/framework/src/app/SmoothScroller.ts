@@ -43,6 +43,26 @@ interface Axes {
  * So under reduced motion a wheel behaves exactly as it did before any
  * of this existed.
  */
+/**
+ * The spring a scroll travels on, and why it is not one of the three in
+ * the motion vocabulary.
+ *
+ * `snappy` (220/24) is the vocabulary's default and was what this used.
+ * Measured in Chrome on 2026-09-17, one 120px wheel notch on it moved
+ * 10px in its first 84ms and did not finish until 344ms: the page
+ * visibly trails the wheel, starts late and glides on after the hand
+ * has stopped, which reads as an application that is behind rather than
+ * as smoothing. A browser's own wheel animation is over in about a
+ * seventh of a second.
+ *
+ * So scrolling gets a spring of its own: critically damped, so it never
+ * overshoots the place the wheel asked for, and stiff enough to be done
+ * in about that seventh of a second. The vocabulary is left alone
+ * because it is an application's to set and this is the runtime's
+ * scrolling, not an application's motion.
+ */
+const SCROLL_SPRING = { stiffness: 1600, damping: 80, mass: 1 } as const;
+
 export class SmoothScroller {
   /** One cell per (node, axis), kept for the node's life. */
   private readonly cells = new Map<UiNode, Axes>();
@@ -73,7 +93,7 @@ export class SmoothScroller {
     if (pending !== undefined && target === pending) {
       return;
     }
-    this.animations.spring(cell, target, { spring: 'snappy' });
+    this.animations.spring(cell, target, { spring: SCROLL_SPRING });
   }
 
   /**
@@ -106,7 +126,7 @@ export class SmoothScroller {
     // property, so adopt it as ours rather than reading it as someone
     // else's write and standing down.
     state.lastWritten = state.cell.value;
-    this.animations.spring(state.cell, pending + delta, { spring: 'snappy' });
+    this.animations.spring(state.cell, pending + delta, { spring: SCROLL_SPRING });
   }
 
   /** Whether this container is being animated right now. */
