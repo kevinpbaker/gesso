@@ -375,6 +375,26 @@ export type RuntimeToShellMessage =
    * halves.
    */
   | { type: 'frameLoop'; running: boolean }
+  /**
+   * One `resize` has been applied, and the shell may send the next.
+   *
+   * A resize is the one shell message whose handling costs a full
+   * layout, and `ResizeObserver` delivers one per refresh while a
+   * window edge is dragged. A worker slower than the display therefore
+   * accumulates a queue of sizes it must lay out and paint in turn,
+   * every one of them already wrong, and the lag grows for as long as
+   * the drag lasts rather than settling.
+   *
+   * So the shell keeps at most one resize in flight and remembers only
+   * the latest size it has not sent. This message is what lets it: the
+   * worker has drained the previous one, so the current size can go
+   * now. Nothing is dropped that anyone can see — the last size always
+   * gets sent, because it is the one held back.
+   *
+   * The dimensions ride along so the shell can tell an acknowledgement
+   * of the size it is holding from one it has already superseded.
+   */
+  | { type: 'resized'; width: number; height: number; dpr: number }
   | { type: 'semantics'; update: UiSemanticsUpdate };
 
 /**

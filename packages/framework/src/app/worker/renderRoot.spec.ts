@@ -189,6 +189,72 @@ describe('RenderWorkerApp', () => {
     });
   });
 
+  it('acknowledges a handled resize with the size it handled', async () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+    send(initMessage(createMockCanvas()));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+
+    send({ type: 'resize', width: 500, height: 400, dpr: 1 });
+
+    // The dimensions are the shell's way of telling an ack of the size
+    // it is holding from one it has already superseded, so they have
+    // to be the ones that came in, not the runtime's current state.
+    expect(sent.filter(m => m.type === 'resized')).toEqual([{ type: 'resized', width: 500, height: 400, dpr: 1 }]);
+  });
+
+  it('acknowledges a resize that outran init and reached no runtime', () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+
+    send({ type: 'resize', width: 640, height: 480, dpr: 2 });
+
+    // Dropping the resize is fine; dropping the acknowledgement is
+    // not. The shell would hold the size it never sent forever, and
+    // the canvas would stay the wrong size for the life of the app.
+    expect(sent.filter(m => m.type === 'resized')).toEqual([{ type: 'resized', width: 640, height: 480, dpr: 2 }]);
+    expect(sent.filter(m => m.type === 'error')).toHaveLength(0);
+  });
+
+  it('acknowledges a zero-sized resize the runtime ignores by design', () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+    send(initMessage(createMockCanvas()));
+
+    // The shell does not send these today, but the backpressure must
+    // not depend on it never starting to.
+    send({ type: 'resize', width: 0, height: 0, dpr: 1 });
+
+    expect(sent.filter(m => m.type === 'resized')).toEqual([{ type: 'resized', width: 0, height: 0, dpr: 1 }]);
+  });
+
+  it('acknowledges only once the resize has been applied', async () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    const canvas = createMockCanvas();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+    send(initMessage(canvas));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+
+    // The ack means the layout for that size is done, so the backing
+    // store must already have been resized when it goes out. An ack
+    // sent first would let the shell push the next size into a worker
+    // still laying out the last one, which is the queue this exists to
+    // prevent.
+    const widthWhenAcknowledged: number[] = [];
+    const postMessage = host.postMessage;
+    host.postMessage = (message: RuntimeToShellMessage) => {
+      if (message.type === 'resized') {
+        widthWhenAcknowledged.push(canvas.width);
+      }
+      return postMessage(message);
+    };
+
+    send({ type: 'resize', width: 500, height: 400, dpr: 1 });
+
+    expect(widthWhenAcknowledged).toEqual([500]);
+    expect(sent.at(-1)?.type).toBe('resized');
+  });
+
   it('reports errors to the shell instead of throwing into the void', () => {
     const { host, sent, send } = createFakeWorkerGlobal();
     new RenderWorkerApp(createComponent(BrokenRoot), host);

@@ -344,6 +344,37 @@ export class RenderWorkerApp {
       return;
     }
 
+    if (message.type === 'resize') {
+      // Answered ahead of the runtime guard, and answered from a
+      // `finally`, because the shell's resize backpressure is held
+      // open by this one message: it keeps a single resize in flight
+      // and sits on the latest size it has not sent until the worker
+      // says the last one has drained. An unacknowledged resize is
+      // therefore not a late frame but a canvas that stays the wrong
+      // size for good, so every resize is acknowledged — the one that
+      // outran `init` and reached no tree, the zero-sized one the
+      // runtime ignores by design, and the one whose layout threw,
+      // which `receive` reports separately and which is no reason to
+      // strand the shell. `RuntimeToShellMessage` says why the
+      // dimensions ride along.
+      //
+      // It promises only that the layout for that size has been done.
+      // It is not a paint confirmation: nothing here can vouch for
+      // what the compositor has actually shown, and the queue this
+      // exists to bound is a queue of layouts.
+      try {
+        this.runtime?.resize(message.width, message.height, message.dpr);
+      } finally {
+        this.host.postMessage({
+          type: 'resized',
+          width: message.width,
+          height: message.height,
+          dpr: message.dpr
+        });
+      }
+      return;
+    }
+
     const runtime = this.runtime;
     if (runtime === undefined) {
       // Events can outrun init; dropping them is correct, since there
@@ -352,9 +383,6 @@ export class RenderWorkerApp {
     }
 
     switch (message.type) {
-      case 'resize':
-        runtime.resize(message.width, message.height, message.dpr);
-        break;
       case 'pointerDown':
         runtime.input.pointer.pointerDown(message.x, message.y, message.buttons, message.modifiers, message.pointer);
         break;
