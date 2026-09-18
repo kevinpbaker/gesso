@@ -58,10 +58,9 @@ const DEVTOOLS_PORT = 9336;
 const root = join(import.meta.dirname, '..');
 const keep = process.argv.includes('--keep');
 const build = !process.argv.includes('--no-build');
-const template = process.argv[process.argv.indexOf('--template') + 1] ?? 'web';
-if (!process.argv.includes('--template')) {
-  // `indexOf` is -1 when the flag is absent, and argv[0] is node.
-} else if (template !== 'web' && template !== 'electrobun') {
+const templateFlag = process.argv.indexOf('--template');
+const template = templateFlag === -1 ? 'web' : process.argv[templateFlag + 1];
+if (template !== 'web' && template !== 'electrobun') {
   console.error(`There is no "${template}" template to check. Pass web or electrobun.`);
   process.exit(1);
 }

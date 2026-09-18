@@ -47,7 +47,7 @@ describe('keyed children under churn', () => {
     ];
     const langs = new BehaviorSubject<string[]>(['en', 'ja']);
     const random = rng(7);
-    let reentrant = process.env.REENTRANT === '0' ? 1000 : 0;
+    let reentrant = import.meta.env.REENTRANT === '0' ? 1000 : 0;
     const history: string[] = [];
     function Chip(inputs: Inputs<{ label: string }>, _ctx: ComponentContext) {
       if (random() < 0.15 && reentrant < 400) {
