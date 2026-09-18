@@ -2944,6 +2944,7 @@ interface PlatformSurface {
     y: number;
   };
   setTouchAction?(value: string): void;
+  dispose?(): void;
 }
 interface PlatformAdapterOptions {
   pointerController: UiPointerController;
@@ -2974,6 +2975,10 @@ declare function prepareInputSurface(element: HTMLElement): void;
 declare class CanvasPlatformSurface implements PlatformSurface {
   private readonly element;
   private readonly keyboardRoot;
+  private rect;
+  private viewportRoot;
+  private resizeObserver;
+  private readonly invalidateRect;
   constructor(element: HTMLElement, keyboardRoot?: PlatformEventTarget);
   get pointerTarget(): PlatformEventTarget;
   get keyboardTarget(): PlatformEventTarget;
@@ -2982,6 +2987,8 @@ declare class CanvasPlatformSurface implements PlatformSurface {
     y: number;
   };
   setTouchAction(value: string): void;
+  dispose(): void;
+  private readRect;
 }
 declare function touchActionFor(scrollsAnything: boolean): string;
 declare function isNodeInert(node: UiNode): boolean;
@@ -6341,7 +6348,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-Bb5GIdWv.js";
+} from "./index-DV7LHt4N.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7209,7 +7216,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Bb5GIdWv.js";
+} from "./index-DV7LHt4N.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

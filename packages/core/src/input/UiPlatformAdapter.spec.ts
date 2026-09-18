@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import { UiEventType, type UiPointerEvent } from './UiInputEvent';
-import { prepareInputSurface } from './UiPlatformAdapter';
+import { CanvasPlatformSurface, prepareInputSurface } from './UiPlatformAdapter';
 import { InputTestHarness, FakePlatformSurface } from './UiInputTestUtils';
 
 function pointerEvent(props: {
@@ -382,5 +382,233 @@ describe('prepareInputSurface', () => {
     // The platform menu would otherwise land on top of the
     // `ContextMenu` event the runtime dispatches for the same press.
     expect(listeners).toContain('contextmenu');
+  });
+});
+
+describe('CanvasPlatformSurface', () => {
+  /**
+   * The suite runs in node, so there is neither a window nor a
+   * `ResizeObserver` unless a test puts one there — which is the point
+   * of the doubles below rather than an inconvenience of them. Every
+   * global the surface reaches for is guarded, and these tests are how
+   * both sides of each guard get exercised: a test that installs
+   * nothing is the headless host, and a test that installs a window is
+   * the browser.
+   */
+  function elementDouble(left = 10, top = 20) {
+    const box = { left, top };
+    let reads = 0;
+    const element = {
+      style: {} as CSSStyleDeclaration,
+      getBoundingClientRect: () => {
+        reads += 1;
+        return box as DOMRect;
+      }
+    } as unknown as HTMLElement;
+    return {
+      element,
+      box,
+      reads: () => reads
+    };
+  }
+
+  interface Registration {
+    type: string;
+    listener: (event: Event) => void;
+    options?: AddEventListenerOptions | boolean;
+  }
+
+  function windowDouble() {
+    const listeners: Registration[] = [];
+    const target = {
+      addEventListener(type: string, listener: (event: Event) => void, options?: AddEventListenerOptions | boolean) {
+        listeners.push({ type, listener, options });
+      },
+      removeEventListener(type: string, listener: (event: Event) => void) {
+        const index = listeners.findIndex(entry => entry.type === type && entry.listener === listener);
+        if (index !== -1) {
+          listeners.splice(index, 1);
+        }
+      }
+    };
+    (globalThis as { window?: unknown }).window = target;
+    return {
+      target,
+      listeners,
+      emit(type: string) {
+        for (const entry of listeners) {
+          if (entry.type === type) {
+            entry.listener({ type } as Event);
+          }
+        }
+      }
+    };
+  }
+
+  function installResizeObserver() {
+    let callback: (() => void) | null = null;
+    const observed: unknown[] = [];
+    let disconnects = 0;
+    class Stub {
+      constructor(cb: () => void) {
+        callback = cb;
+      }
+      observe(target: unknown) {
+        observed.push(target);
+      }
+      unobserve() {}
+      disconnect() {
+        disconnects += 1;
+      }
+    }
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = Stub;
+    return {
+      observed,
+      resize: () => callback?.(),
+      disconnects: () => disconnects
+    };
+  }
+
+  afterEach(() => {
+    delete (globalThis as { window?: unknown }).window;
+    delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  });
+
+  it('measures the element once for a burst of pointer moves', () => {
+    // The whole point of the cache: a drag is hundreds of these, and
+    // each `getBoundingClientRect` against a dirty document is a
+    // forced style and layout flush on the main thread.
+    windowDouble();
+    const { element, reads } = elementDouble(10, 20);
+    const surface = new CanvasPlatformSurface(element);
+
+    const points = [0, 1, 2, 3, 4].map(i => surface.clientToLocal(100 + i, 200 + i));
+
+    expect(reads()).toBe(1);
+    expect(points[0]).toEqual({ x: 90, y: 180 });
+    expect(points[4]).toEqual({ x: 94, y: 184 });
+  });
+
+  it('measures again after a scroll anywhere in the ancestor chain', () => {
+    const win = windowDouble();
+    const { element, box, reads } = elementDouble(10, 20);
+    const surface = new CanvasPlatformSurface(element);
+    surface.clientToLocal(100, 200);
+
+    box.left = 30;
+    box.top = 40;
+    win.emit('scroll');
+
+    expect(surface.clientToLocal(100, 200)).toEqual({ x: 70, y: 160 });
+    expect(reads()).toBe(2);
+    // Captured, because a scroll on an inner container does not bubble
+    // to window even though it moves the element just the same.
+    expect(win.listeners.find(entry => entry.type === 'scroll')?.options).toEqual({
+      capture: true,
+      passive: true
+    });
+  });
+
+  it('measures again after a window resize', () => {
+    const win = windowDouble();
+    const { element, box, reads } = elementDouble(10, 20);
+    const surface = new CanvasPlatformSurface(element);
+    surface.clientToLocal(0, 0);
+
+    box.left = 11;
+    win.emit('resize');
+    surface.clientToLocal(0, 0);
+
+    expect(reads()).toBe(2);
+  });
+
+  it('starts every gesture from a fresh measurement', () => {
+    // A CSS transition can move the element with no event of its own,
+    // and then the cache is stale with nothing to say so. The press is
+    // the moment that matters, so the press re-reads.
+    const win = windowDouble();
+    const { element, box, reads } = elementDouble(10, 20);
+    const surface = new CanvasPlatformSurface(element);
+    surface.clientToLocal(100, 200);
+
+    box.left = 60;
+    box.top = 70;
+    win.emit('pointerdown');
+
+    expect(surface.clientToLocal(100, 200)).toEqual({ x: 40, y: 130 });
+    expect(reads()).toBe(2);
+  });
+
+  it('measures again when the element itself resizes', () => {
+    windowDouble();
+    const observer = installResizeObserver();
+    const { element, reads } = elementDouble();
+    const surface = new CanvasPlatformSurface(element);
+    surface.clientToLocal(0, 0);
+
+    expect(observer.observed).toEqual([element]);
+    observer.resize();
+    surface.clientToLocal(0, 0);
+
+    expect(reads()).toBe(2);
+  });
+
+  it('releases its listeners and stops caching on dispose', () => {
+    const win = windowDouble();
+    const observer = installResizeObserver();
+    const { element, reads } = elementDouble();
+    const surface = new CanvasPlatformSurface(element);
+    surface.clientToLocal(0, 0);
+
+    surface.dispose();
+
+    expect(win.listeners).toEqual([]);
+    expect(observer.disconnects()).toBe(1);
+    // Nothing is left that could report a move, so a surface still in
+    // use after its teardown answers from a fresh measurement every
+    // time rather than from a rect nothing can correct.
+    surface.clientToLocal(0, 0);
+    surface.clientToLocal(0, 0);
+    expect(reads()).toBe(3);
+    expect(() => surface.dispose()).not.toThrow();
+  });
+
+  it('measures every call where nothing could invalidate a cache', () => {
+    // No window, no ResizeObserver: a worker, a node host, a test.
+    // Construction must not throw, and the surface must not pretend to
+    // hold a measurement it can never be told is wrong.
+    const { element, reads } = elementDouble();
+    const surface = new CanvasPlatformSurface(element);
+
+    surface.clientToLocal(0, 0);
+    surface.clientToLocal(0, 0);
+
+    expect(reads()).toBe(2);
+    // The keyboard target stands in for the window that isn't there,
+    // so a caller that attaches to it does not have to branch.
+    expect(() => surface.keyboardTarget.addEventListener('keydown', () => {})).not.toThrow();
+  });
+
+  it('survives an element with no box to measure', () => {
+    const element = { style: {} } as unknown as HTMLElement;
+    const surface = new CanvasPlatformSurface(element);
+
+    expect(surface.clientToLocal(5, 6)).toEqual({ x: 5, y: 6 });
+  });
+});
+
+describe('UiPlatformAdapter teardown', () => {
+  it('disposes the surface it detaches', () => {
+    // The hosts construct the surface inline in `attach` and keep no
+    // reference, so `detach` is the only hand that can reach it.
+    const h = new InputTestHarness();
+    const adapter = h.createPlatformAdapter();
+    const surface = new FakePlatformSurface();
+    const dispose = vi.fn();
+    adapter.attach(Object.assign(surface, { dispose }));
+
+    adapter.detach();
+
+    expect(dispose).toHaveBeenCalledTimes(1);
   });
 });

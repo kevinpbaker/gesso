@@ -45,6 +45,20 @@ export interface PlatformSurface {
    * element, has nothing to set.
    */
   setTouchAction?(value: string): void;
+  /**
+   * Releases whatever the surface holds outside the adapter's own
+   * listeners — a cached measurement's invalidation listeners, an
+   * observer.
+   *
+   * Called from `detach`, so a surface with a lifetime of its own does
+   * not need its host to know that: both hosts construct the surface
+   * inline in the `attach` call and keep no reference to it, and
+   * asking them to start keeping one would have been a change to
+   * every host rather than to the one class that grew the listeners.
+   * Optional, since a fake or a surface that holds nothing has nothing
+   * to release.
+   */
+  dispose?(): void;
 }
 
 export interface PlatformAdapterOptions {
@@ -205,6 +219,11 @@ export class UiPlatformAdapter {
     if (this.keyUpHandler !== null) {
       surface.keyboardTarget.removeEventListener('keyup', this.keyUpHandler);
     }
+    // After the adapter's own listeners, and before the field is
+    // cleared: a surface that caches anything about the element keeps
+    // the listeners that invalidate it, and this is the only moment
+    // either host tells anybody that the surface is finished with.
+    surface.dispose?.();
     this.surface = null;
     this.pointerDownHandler = null;
     this.pointerMoveHandler = null;
@@ -339,12 +358,78 @@ function suppressContextMenu(event: Event): void {
  * `window` by default so Tab/keys work even when the canvas is not
  * focused. `clientToLocal` subtracts the element's bounding client
  * rect, producing layout-logical coordinates.
+ *
+ * That rect is cached, because reading it is not free. A
+ * `getBoundingClientRect` against a dirty document forces the browser
+ * to flush style and layout synchronously, and `clientToLocal` ran
+ * once per pointer event on the main thread — so a pointermove burst
+ * through a drag was a burst of forced layouts, which is the single
+ * largest piece of frame time this shell was giving away. The
+ * worker-backed shell caches the same two numbers for the same
+ * reason; neither path is worth fixing alone.
+ *
+ * What drops the cache is everything that can move or resize the
+ * element and says so: a scroll anywhere in the ancestor chain, a
+ * window resize, and a ResizeObserver on the element where the
+ * environment has one. Scroll is listened for on `window` in the
+ * capture phase because a scroll event on some inner container does
+ * not bubble, and the element's offset moves whichever ancestor
+ * scrolled. A pointerdown drops it too, so every gesture starts from
+ * a rect read after the press.
+ *
+ * What that gives up is exactness while a press is already down and
+ * something moves the element with no event at all — a CSS
+ * transition on the canvas's own position, a frame callback writing
+ * `style.left`. A drag in flight then tracks against where the
+ * element was when the finger landed. The pointerdown read is what
+ * bounds the error: it cannot outlive one press. The alternative was
+ * to re-read once per animation frame instead, which costs a forced
+ * layout per frame in exchange for being wrong for less of a frame —
+ * the same defect, priced higher.
+ *
+ * Every global here is reached for through a guard, because this is
+ * `@gesso/core` and core does not get to assume a browser. With no
+ * `window` and no `ResizeObserver` nothing is observed, and then
+ * nothing is cached either: `clientToLocal` reads the rect on every
+ * call, exactly as it did before. A cache that no event can
+ * invalidate is a wrong answer waiting to be handed out, and a
+ * headless or test host pays nothing for the listeners it cannot
+ * have. For the same reason the element is only measured when a
+ * coordinate is actually asked for, never in the constructor: the
+ * element handed to a test is not always one with a box.
  */
 export class CanvasPlatformSurface implements PlatformSurface {
+  /** The element's viewport offset, or null when it must be re-read. */
+  private rect: { left: number; top: number } | null = null;
+  /** Null where the environment has no window to listen on. */
+  private viewportRoot: PlatformEventTarget | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private readonly invalidateRect = (): void => {
+    this.rect = null;
+  };
+
   constructor(
     private readonly element: HTMLElement,
-    private readonly keyboardRoot: PlatformEventTarget = window
-  ) {}
+    // Guarded rather than `= window`, which is a ReferenceError and
+    // not merely undefined on a thread that has no window — and a
+    // surface that throws on construction is no use to the headless
+    // host this package is also built for. With no window there is
+    // nothing to hear keys on, so the target is inert and says so by
+    // accepting listeners it will never call.
+    private readonly keyboardRoot: PlatformEventTarget = browserWindow() ?? inertEventTarget
+  ) {
+    const root = browserWindow();
+    if (root !== null) {
+      // `passive`, because none of the three is ever preventDefaulted
+      // here, and a non-passive scroll listener on window is its own
+      // scrolling jank.
+      root.addEventListener('scroll', this.invalidateRect, { capture: true, passive: true });
+      root.addEventListener('resize', this.invalidateRect, { passive: true });
+      root.addEventListener('pointerdown', this.invalidateRect, { capture: true, passive: true });
+      this.viewportRoot = root;
+    }
+    this.resizeObserver = observeElementBox(element, this.invalidateRect);
+  }
 
   get pointerTarget(): PlatformEventTarget {
     return this.element;
@@ -355,7 +440,7 @@ export class CanvasPlatformSurface implements PlatformSurface {
   }
 
   clientToLocal(clientX: number, clientY: number): { x: number; y: number } {
-    const rect = this.element.getBoundingClientRect();
+    const rect = this.rect ?? this.readRect();
     return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
@@ -363,6 +448,85 @@ export class CanvasPlatformSurface implements PlatformSurface {
     if (this.element.style.touchAction !== value) {
       this.element.style.touchAction = value;
     }
+  }
+
+  /**
+   * Removes the listeners and the observer the constructor added.
+   *
+   * `UiPlatformAdapter.detach` calls this for whatever surface it
+   * holds, which is how the two existing hosts — `GessoApp.dispose`
+   * and the playground — get the teardown without either of them
+   * learning that the surface now has one. Safe to call twice, and
+   * safe to keep using afterwards: a disposed surface has nothing
+   * left that could tell it the element moved, so it stops caching
+   * and goes back to measuring on every call rather than answering
+   * from a rect nothing can correct.
+   */
+  dispose(): void {
+    const root = this.viewportRoot;
+    if (root !== null) {
+      root.removeEventListener('scroll', this.invalidateRect, { capture: true });
+      root.removeEventListener('resize', this.invalidateRect);
+      root.removeEventListener('pointerdown', this.invalidateRect, { capture: true });
+      this.viewportRoot = null;
+    }
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.rect = null;
+  }
+
+  /**
+   * Measures the element, and keeps the answer only if something is
+   * watching for it to go stale.
+   *
+   * An element with no `getBoundingClientRect` reads as sitting at the
+   * viewport origin, for the reason `capturePointer` ignores a target
+   * with no `setPointerCapture`: a test double or a non-element event
+   * target is not a reason to fail a press.
+   */
+  private readRect(): { left: number; top: number } {
+    const box =
+      typeof this.element.getBoundingClientRect === 'function'
+        ? this.element.getBoundingClientRect()
+        : { left: 0, top: 0 };
+    const rect = { left: box.left, top: box.top };
+    if (this.viewportRoot !== null || this.resizeObserver !== null) {
+      this.rect = rect;
+    }
+    return rect;
+  }
+}
+
+/** The window, on a thread that has one. */
+function browserWindow(): PlatformEventTarget | null {
+  return typeof window === 'undefined' ? null : window;
+}
+
+/** Stands in for a window that isn't there, so nothing has to branch. */
+const inertEventTarget: PlatformEventTarget = {
+  addEventListener(): void {},
+  removeEventListener(): void {}
+};
+
+/**
+ * Watches an element's box, where the environment can.
+ *
+ * Two things can go wrong and neither is fatal: there may be no
+ * `ResizeObserver` at all (a worker, Node, an older engine), and the
+ * "element" may be a double that `observe` refuses. Both mean the
+ * caller simply learns nothing about resizes, which it is written to
+ * survive.
+ */
+function observeElementBox(element: HTMLElement, onResize: () => void): ResizeObserver | null {
+  if (typeof ResizeObserver === 'undefined') {
+    return null;
+  }
+  try {
+    const observer = new ResizeObserver(onResize);
+    observer.observe(element);
+    return observer;
+  } catch {
+    return null;
   }
 }
 
