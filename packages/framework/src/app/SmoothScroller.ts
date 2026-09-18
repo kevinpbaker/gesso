@@ -48,20 +48,36 @@ interface Axes {
  * the motion vocabulary.
  *
  * `snappy` (220/24) is the vocabulary's default and was what this used.
- * Measured in Chrome on 2026-09-17, one 120px wheel notch on it moved
- * 10px in its first 84ms and did not finish until 344ms: the page
- * visibly trails the wheel, starts late and glides on after the hand
- * has stopped, which reads as an application that is behind rather than
- * as smoothing. A browser's own wheel animation is over in about a
- * seventh of a second.
+ * A spring starts from rest, and that one is slack enough that the rest
+ * shows: sampled at 60Hz, one 120px notch on it had travelled a tenth
+ * of the way after 50ms, half after 117ms and was not done until 283ms.
+ * The page starts late and glides on after the hand has stopped, which
+ * reads as an application that is behind rather than as smoothing.
  *
- * So scrolling gets a spring of its own: critically damped, so it never
- * overshoots the place the wheel asked for, and stiff enough to be done
- * in about that seventh of a second. The vocabulary is left alone
- * because it is an application's to set and this is the runtime's
- * scrolling, not an application's motion.
+ * What a browser does with the same notch is the target, because it is
+ * what everyone's hand is calibrated to: a fast start and a short
+ * decay, the whole thing over in about a seventh of a second. Chrome
+ * animates a wheel on its compositor with an impulse curve of roughly
+ * that length.
+ *
+ * So scrolling gets a spring of its own, critically damped so it never
+ * overshoots the place the wheel asked for, and stiff enough to match:
+ * half the distance by 33ms, nine tenths by 83ms, done by 150ms. The
+ * numbers here are `UiSpring` sampled at 60Hz, in
+ * `GessoRuntime.smoothScroll.spec.ts`'s units rather than a browser's,
+ * because Chrome will not animate a wheel event the DevTools protocol
+ * synthesises and its own curve could not be measured from here.
+ *
+ * A container that wants none of this still says `scrollBehavior:
+ * 'instant'`, and a precision device never reaches this code at all —
+ * `isNotchedWheel` sends a trackpad's already-smooth stream straight
+ * through.
+ *
+ * The vocabulary is left alone because it is an application's to set,
+ * and this is the runtime's scrolling rather than an application's
+ * motion.
  */
-const SCROLL_SPRING = { stiffness: 1600, damping: 80, mass: 1 } as const;
+const SCROLL_SPRING = { stiffness: 2500, damping: 100, mass: 1 } as const;
 
 export class SmoothScroller {
   /** One cell per (node, axis), kept for the node's life. */
