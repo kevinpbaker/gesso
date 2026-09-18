@@ -282,11 +282,12 @@ const CHECKS: readonly RouteCheck[] = [
     path: '/search',
     expect: [
       { role: 'textbox', name: 'Search Audius' },
-      // Every filter is a button whose name says what pressing it does,
-      // not the word painted on it: "Electronic" alone would leave a
-      // screen reader to guess whether it is on.
-      { role: 'button', name: 'Verified artists only' },
-      { role: 'button', name: 'Clear filters' }
+      // The filters are folded behind one chip, so that chip is what
+      // the screen offers until somebody opens them. Its name says what
+      // pressing it does and how many are narrowing the search, which
+      // is the rule every filter here follows: "Electronic" alone would
+      // leave a screen reader to guess whether it is on.
+      { role: 'button', name: 'Show filters' }
     ]
   },
   {
