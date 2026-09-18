@@ -301,6 +301,12 @@ export class WorkerApp {
    */
   private resizeInFlight = false;
   private heldResize: { width: number; height: number; dpr: number } | null = null;
+  /**
+   * Where the canvas sits on the page, or null when that has to be
+   * read from the DOM again. `attachInput` says why it is cached and
+   * what the cache costs.
+   */
+  private canvasOrigin: { left: number; top: number } | null = null;
 
   constructor(options: WorkerAppOptions) {
     this.options = options;
@@ -623,6 +629,7 @@ export class WorkerApp {
     // would be about a canvas that no longer exists.
     this.resizeInFlight = false;
     this.heldResize = null;
+    this.canvasOrigin = null;
     if (this.renderWorker !== undefined) {
       this.renderWorker.postMessage({ type: 'dispose' } as ShellToRuntimeMessage);
       this.renderWorker.removeEventListener('message', this.handleWorkerMessage);
@@ -833,6 +840,10 @@ export class WorkerApp {
       if (entry === undefined) {
         return;
       }
+      // The host has changed shape, so the canvas inside it has very
+      // likely moved on the page as well as grown; whatever
+      // `attachInput` cached about where it is cannot be trusted.
+      this.canvasOrigin = null;
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
         this.requestResize({ width, height, dpr: window.devicePixelRatio || 1 });
@@ -934,10 +945,45 @@ export class WorkerApp {
     return wheelConsumedBy(this.scrollability, event.deltaX, event.deltaY);
   }
 
+  /**
+   * Reads where the canvas is and remembers it.
+   *
+   * Only left and top are kept. The size is the ResizeObserver's
+   * business and is already reported as a resize; what an input needs
+   * from this rect is the origin to subtract.
+   */
+  private readCanvasOrigin(canvas: HTMLCanvasElement): { left: number; top: number } {
+    const box = canvas.getBoundingClientRect();
+    const origin = { left: box.left, top: box.top };
+    this.canvasOrigin = origin;
+    return origin;
+  }
+
   private attachInput(canvas: HTMLCanvasElement): () => void {
+    /**
+     * Where a pointer is, in the canvas's own coordinates.
+     *
+     * The origin is cached rather than measured per event.
+     * `getBoundingClientRect` is a synchronous style and layout flush
+     * whenever the document is dirty, and this ran one on every
+     * pointermove, pointerdown, pointerup and wheel — on the one
+     * thread this whole architecture exists to keep free. The cache is
+     * dropped whenever something the shell can hear says the canvas
+     * may have moved: the ResizeObserver fires, an ancestor scrolls,
+     * or the window resizes.
+     *
+     * What that trades away is exactness under movement nothing
+     * announces — a CSS transition on an ancestor, an element
+     * animated by a library that touches no scroll position — where
+     * coordinates come out shifted by however far the canvas went.
+     * `pointerdown` therefore takes a fresh reading, so every gesture
+     * starts from the truth and a single press re-syncs a stale
+     * cache. A hover in the meantime can land in the wrong place; a
+     * press, and the drag and click that follow it, cannot.
+     */
     const toLocal = (clientX: number, clientY: number) => {
-      const rect = canvas.getBoundingClientRect();
-      return { x: clientX - rect.left, y: clientY - rect.top };
+      const origin = this.canvasOrigin ?? this.readCanvasOrigin(canvas);
+      return { x: clientX - origin.left, y: clientY - origin.top };
     };
 
     // Whether an editable already had focus when the press began. A
@@ -946,6 +992,11 @@ export class WorkerApp {
     // not, since the keyboard is up and re-taking focus makes it blink.
     let editingAtPress = false;
     const onPointerDown = (event: PointerEvent): void => {
+      // A press is the one event worth a layout flush: it starts a
+      // gesture, it is rare next to a move, and it is the shell's only
+      // chance to notice that something moved the canvas without
+      // telling anyone.
+      this.canvasOrigin = null;
       const { x, y } = toLocal(event.clientX, event.clientY);
       editingAtPress = this.proxy?.active ?? false;
       // While an editable has focus the proxy's textarea holds DOM
@@ -1046,6 +1097,19 @@ export class WorkerApp {
     };
     const onKeyDown = (event: KeyboardEvent): void => this.forwardKeyDown(event);
     const onKeyUp = (event: KeyboardEvent): void => this.forwardKeyUp(event);
+    /**
+     * The canvas has moved on the page without necessarily changing
+     * size: an ancestor scrolled, or the window resized and the page
+     * reflowed around it.
+     *
+     * The cached origin is dropped rather than re-read, so the cost is
+     * paid by the next event that actually needs a position and not by
+     * the scroll — and a scroll that nothing is pointing at costs
+     * nothing at all.
+     */
+    const onCanvasMayHaveMoved = (): void => {
+      this.canvasOrigin = null;
+    };
 
     canvas.addEventListener('mousedown', onMouseDown);
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -1056,6 +1120,14 @@ export class WorkerApp {
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('keydown', onKeyDown);
     canvas.addEventListener('keyup', onKeyUp);
+    // Capturing, because a scroll only reaches the scrolled element
+    // and its ancestors otherwise, and it is an *ancestor* of the
+    // canvas scrolling that moves the canvas. Passive, because this
+    // never prevents one and a non-passive scroll listener on the
+    // window is exactly the thing that keeps a browser from scrolling
+    // off the main thread.
+    window.addEventListener('scroll', onCanvasMayHaveMoved, { capture: true, passive: true });
+    window.addEventListener('resize', onCanvasMayHaveMoved);
 
     return () => {
       detachReducedMotion();
@@ -1068,6 +1140,9 @@ export class WorkerApp {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('keydown', onKeyDown);
       canvas.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('scroll', onCanvasMayHaveMoved, { capture: true });
+      window.removeEventListener('resize', onCanvasMayHaveMoved);
+      this.canvasOrigin = null;
     };
   }
 }

@@ -167,6 +167,22 @@ function harness(): Harness {
   };
 }
 
+function pointer(options: { x: number; y: number; buttons?: number; at?: number }): PointerEvent {
+  return {
+    clientX: options.x,
+    clientY: options.y,
+    buttons: options.buttons ?? 0,
+    pointerId: 1,
+    pointerType: 'mouse',
+    shiftKey: false,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    timeStamp: options.at ?? 0,
+    preventDefault: () => {}
+  } as unknown as PointerEvent;
+}
+
 let active: Harness | undefined;
 
 function setup(): Harness {
@@ -257,5 +273,69 @@ describe('resize backpressure', () => {
       { type: 'resize', width: 100, height: 100, dpr: 2 },
       { type: 'resize', width: 200, height: 100, dpr: 2 }
     ]);
+  });
+});
+
+/**
+ * The canvas's position, read once instead of per event.
+ *
+ * `getBoundingClientRect` forces a synchronous style and layout flush
+ * whenever the document is dirty, and `toLocal` ran one for every
+ * pointermove, pointerup and wheel.
+ */
+describe('pointer coordinates', () => {
+  it('reads the canvas position once for a run of moves', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    for (let step = 0; step < 6; step += 1) {
+      shell.canvas.dispatch('pointermove', pointer({ x: 100 + step, y: 200 }));
+      shell.frame();
+    }
+
+    expect(shell.canvas.rectReads).toBe(1);
+    const moves = shell.posts.filter(message => message.type === 'pointerMove');
+    expect(moves.at(-1)).toMatchObject({ x: 105 - 20, y: 200 - 10 });
+  });
+
+  it('forgets the position when something says the canvas may have moved', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200 }));
+    shell.frame();
+    expect(shell.canvas.rectReads).toBe(1);
+
+    // An ancestor scrolled; the canvas is somewhere else now.
+    shell.canvas.left = 60;
+    shell.fireWindow('scroll');
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200 }));
+    shell.frame();
+
+    expect(shell.canvas.rectReads).toBe(2);
+    expect(shell.posts.filter(message => message.type === 'pointerMove').at(-1)).toMatchObject({ x: 40 });
+
+    // And the window resized, which reflows the page around it.
+    shell.fireWindow('resize');
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200 }));
+    shell.frame();
+    expect(shell.canvas.rectReads).toBe(3);
+  });
+
+  it('re-reads on every press, so a gesture starts from the truth', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+
+    shell.canvas.dispatch('pointermove', pointer({ x: 100, y: 200 }));
+    shell.frame();
+
+    // Something moved the canvas with no event behind it — a CSS
+    // transition on an ancestor is the honest case — so the cache is
+    // stale and nothing has said so.
+    shell.canvas.left = 120;
+    shell.canvas.dispatch('pointerdown', pointer({ x: 200, y: 200, buttons: 1 }));
+
+    expect(shell.canvas.rectReads).toBe(2);
+    expect(shell.posts.filter(message => message.type === 'pointerDown').at(-1)).toMatchObject({ x: 80 });
   });
 });
