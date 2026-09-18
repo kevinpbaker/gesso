@@ -94,6 +94,27 @@ jobs:
       - name: Noto faces
         run: sudo apt-get update && sudo apt-get install -y fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
 
+      # Ubuntu's fonts-noto-core carries an older Noto Sans Devanagari
+      # than the fixtures were rendered in, and its advances differ by up
+      # to 1.4px across four Hindi cases, which is more than the 0.1px
+      # tolerance. Rather than loosen the cases, the check gets the
+      # exact release the fixtures record: the hinted 2.006 build,
+      # verified against the sha256 in expected.json's generator block
+      # so a moved or re-cut upstream asset fails here and not as a
+      # confusing layout diff. The other six apt faces agree within
+      # tolerance, so they stay as they are.
+      - name: Noto Sans Devanagari 2.006, the release the fixtures were rendered in
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/noto-devanagari"
+          mkdir -p "$dir"
+          curl -sSL -o "$dir/release.zip" \
+            https://github.com/notofonts/devanagari/releases/download/NotoSansDevanagari-v2.006/NotoSansDevanagari-v2.006.zip
+          unzip -qo "$dir/release.zip" 'NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf' -d "$dir"
+          file="$dir/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf"
+          echo "306b53ecfb182a504dd8a7446093c316387d2fd8dc350d0792ed1753fe0996cd  $file" | sha256sum -c -
+          echo "GESSO_FONT_DEVANAGARI=$file" >> "$GITHUB_ENV"
+
       # Renders every paragraph the way `pnpm fixtures:text` does and
       # fails if Chrome's lines, box or baseline for any case have moved
       # from the committed expectations by more than the case's
