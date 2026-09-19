@@ -306,6 +306,7 @@ export function buildTheme(spec: ThemeSpec): UiTheme {
     positive: hex(palette.positive),
     negative: hex(palette.negative),
     shadow: withAlpha(hex('#000000'), palette.shadowAlpha),
+    placeholder: mix(hex(palette.surface), text, palette.dark ? 0.16 : 0.1),
     // The control tokens the component library reads, derived from the
     // same four choices, so a checkbox in this preview follows the
     // palette without naming a colour of its own.

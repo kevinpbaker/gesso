@@ -17,6 +17,17 @@ export interface UiColors {
   readonly textMuted: UiColor;
   readonly border: UiColor;
   readonly shadow: UiColor;
+  /**
+   * The ground of something standing in for content that has not
+   * arrived: a skeleton's bars, an avatar with no picture yet.
+   *
+   * Its own token rather than a borrowed one because it is a role no
+   * other token plays. Borrowing `border` would tie a filled block to
+   * the colour of a rule, and borrowing `controlBackgroundPressed`
+   * would move every skeleton on the screen when a theme adjusted how
+   * a button looks while held.
+   */
+  readonly placeholder: UiColor;
 
   // Control tokens. Named for the role a control plays, not for the
   // widget: one set serves the checkbox, the switch, the radio, the
@@ -64,6 +75,7 @@ export const lightColors: UiColors = {
   textMuted: { r: 0.4, g: 0.4, b: 0.4, a: 1 },
   border: { r: 0.85, g: 0.85, b: 0.85, a: 1 },
   shadow: { r: 0, g: 0, b: 0, a: 0.2 },
+  placeholder: { r: 0.91, g: 0.91, b: 0.92, a: 1 },
   controlBackground: UiBasicColors.white,
   controlBackgroundHovered: { r: 0.95, g: 0.95, b: 0.96, a: 1 },
   controlBackgroundPressed: { r: 0.9, g: 0.9, b: 0.92, a: 1 },
@@ -86,6 +98,7 @@ export const darkColors: UiColors = {
   textMuted: { r: 0.6, g: 0.6, b: 0.6, a: 1 },
   border: { r: 0.3, g: 0.3, b: 0.3, a: 1 },
   shadow: { r: 0, g: 0, b: 0, a: 0.5 },
+  placeholder: { r: 0.26, g: 0.26, b: 0.27, a: 1 },
   controlBackground: { r: 0.16, g: 0.17, b: 0.2, a: 1 },
   controlBackgroundHovered: { r: 0.21, g: 0.23, b: 0.27, a: 1 },
   controlBackgroundPressed: { r: 0.26, g: 0.28, b: 0.33, a: 1 },

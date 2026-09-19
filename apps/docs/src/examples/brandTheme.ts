@@ -198,6 +198,7 @@ const lightColors: BrandColors = {
   borderSubtle: LINEN[200],
   borderStrong: LINEN[600],
   shadow: rgb8(22, 24, 29, 41),
+  placeholder: LINEN[200],
   scrim: rgb8(22, 24, 29, 140),
 
   controlBackground: LINEN[50],
@@ -238,6 +239,7 @@ const darkColors: BrandColors = {
   borderSubtle: INK[700],
   borderStrong: INK[300],
   shadow: rgb8(0, 0, 0, 128),
+  placeholder: INK[700],
   scrim: rgb8(15, 17, 21, 166),
 
   controlBackground: INK[800],

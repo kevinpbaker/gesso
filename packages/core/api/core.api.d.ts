@@ -403,6 +403,7 @@ interface UiColors {
   readonly textMuted: UiColor;
   readonly border: UiColor;
   readonly shadow: UiColor;
+  readonly placeholder: UiColor;
   readonly controlBackground: UiColor;
   readonly controlBackgroundHovered: UiColor;
   readonly controlBackgroundPressed: UiColor;
@@ -6375,7 +6376,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DPJZvUlF.js";
+} from "./index-DG_U335Z.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7250,7 +7251,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DPJZvUlF.js";
+} from "./index-DG_U335Z.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
