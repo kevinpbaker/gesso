@@ -92,3 +92,27 @@ export function normalizeBorderRadius(value: unknown): UiBorderRadius {
   }
   return UiBorderRadiuses.none;
 }
+
+/**
+ * Equality for border radius property values, used by the registry to
+ * decide whether a change repaints.
+ *
+ * Two literal radii compare corner by corner; a scale name compares by
+ * name, because what it draws depends on a theme this comparison
+ * cannot see. That is the same rule and the same reason as
+ * `colorValuesEqual`, and without it every name would normalize to
+ * `none` and `'small'` changing to `'large'` would look like no change
+ * at all.
+ */
+export function borderRadiusValuesEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+  // One name and one literal are never the same value, and two
+  // different names are two different lookups. Either way the answer
+  // is no, and normalizing first would wrongly say yes.
+  if (typeof a === 'string' || typeof b === 'string') {
+    return false;
+  }
+  return borderRadiusEqual(normalizeBorderRadius(a), normalizeBorderRadius(b));
+}

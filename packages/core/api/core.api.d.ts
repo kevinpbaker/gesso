@@ -418,6 +418,41 @@ interface UiColors {
 declare const lightColors: UiColors;
 declare const darkColors: UiColors;
 declare function colorsEqualPalette(a: UiColors, b: UiColors): boolean;
+interface UiShapes {
+  readonly none: number;
+  readonly extraSmall: number;
+  readonly small: number;
+  readonly medium: number;
+  readonly large: number;
+  readonly extraLarge: number;
+  readonly full: number;
+}
+declare const defaultShapes: UiShapes;
+declare function shapesEqual(a: UiShapes, b: UiShapes): boolean;
+interface UiShapeExtensions {}
+type UiShapeName = keyof UiShapes | (keyof UiShapeExtensions & string);
+declare function isShapeName(value: unknown, scale: UiShapes): value is UiShapeName;
+interface UiBorderRadius {
+  readonly topLeft: number;
+  readonly topRight: number;
+  readonly bottomRight: number;
+  readonly bottomLeft: number;
+}
+declare const UiBorderRadiuses: {
+  readonly none: {
+    readonly topLeft: 0;
+    readonly topRight: 0;
+    readonly bottomRight: 0;
+    readonly bottomLeft: 0;
+  };
+};
+declare function borderRadius(radius: number): UiBorderRadius;
+declare function borderRadiusCorners(topLeft: number, topRight: number, bottomRight: number, bottomLeft: number): UiBorderRadius;
+declare function borderRadiusEqual(a: UiBorderRadius, b: UiBorderRadius): boolean;
+declare function borderRadiusIsZero(radius: UiBorderRadius): boolean;
+declare function uniformBorderRadius(radius: UiBorderRadius): number;
+declare function normalizeBorderRadius(value: unknown): UiBorderRadius;
+declare function borderRadiusValuesEqual(a: unknown, b: unknown): boolean;
 type UiAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline' | 'space-between' | 'space-around' | 'space-evenly';
 type UiSelfAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline';
 type UiContentDistribution = 'stretch' | 'start' | 'center' | 'end' | 'space-between' | 'space-around' | 'space-evenly';
@@ -441,6 +476,7 @@ type UiFontWeight = number | `${number}` | 'normal' | 'bold' | 'lighter' | 'bold
 type UiCursor = 'default' | 'pointer' | 'text' | 'move' | 'grab' | 'grabbing' | 'crosshair' | 'not-allowed' | 'wait' | 'progress' | 'help' | 'none' | 'col-resize' | 'row-resize' | 'ew-resize' | 'ns-resize' | 'nesw-resize' | 'nwse-resize' | 'zoom-in' | 'zoom-out';
 type UiThemeColorName = keyof UiColors;
 type UiColorValue = UiColor | UiThemeColorName | (string & {});
+type UiBorderRadiusValue = UiBorderRadius | number | UiShapeName;
 type DecorationShape = DecorationFill | DecorationStroke;
 interface DecorationBox {
   readonly x?: number;
@@ -923,26 +959,6 @@ declare function defineProperty<T>(options: Omit<UiPropertyDefinition<T>, 'name'
   name: string;
 }): UiPropertyDefinition<T>;
 declare function propertyValuesEqual<T>(definition: UiPropertyDefinition<T>, a: T, b: T): boolean;
-interface UiBorderRadius {
-  readonly topLeft: number;
-  readonly topRight: number;
-  readonly bottomRight: number;
-  readonly bottomLeft: number;
-}
-declare const UiBorderRadiuses: {
-  readonly none: {
-    readonly topLeft: 0;
-    readonly topRight: 0;
-    readonly bottomRight: 0;
-    readonly bottomLeft: 0;
-  };
-};
-declare function borderRadius(radius: number): UiBorderRadius;
-declare function borderRadiusCorners(topLeft: number, topRight: number, bottomRight: number, bottomLeft: number): UiBorderRadius;
-declare function borderRadiusEqual(a: UiBorderRadius, b: UiBorderRadius): boolean;
-declare function borderRadiusIsZero(radius: UiBorderRadius): boolean;
-declare function uniformBorderRadius(radius: UiBorderRadius): number;
-declare function normalizeBorderRadius(value: unknown): UiBorderRadius;
 interface UiBoxShadow {
   readonly offsetX: number;
   readonly offsetY: number;
@@ -1220,17 +1236,6 @@ type UiTypographyRole = keyof UiTypography | (keyof UiTypographyExtensions & str
 declare function isTypographyRole(value: unknown, scale: UiTypography): value is UiTypographyRole;
 declare const defaultTypography: UiTypography;
 declare function typographyEqual(a: UiTypography, b: UiTypography): boolean;
-interface UiShapes {
-  readonly none: number;
-  readonly extraSmall: number;
-  readonly small: number;
-  readonly medium: number;
-  readonly large: number;
-  readonly extraLarge: number;
-  readonly full: number;
-}
-declare const defaultShapes: UiShapes;
-declare function shapesEqual(a: UiShapes, b: UiShapes): boolean;
 interface UiShadows {
   readonly none: readonly UiBoxShadow[];
   readonly extraSmall: readonly UiBoxShadow[];
@@ -1536,7 +1541,7 @@ declare const UiProperties: {
   readonly color: UiPropertyDefinition<UiColorValue>;
   readonly borderColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly borderWidth: UiPropertyDefinition<number | undefined>;
-  readonly borderRadius: UiPropertyDefinition<number | UiBorderRadius>;
+  readonly borderRadius: UiPropertyDefinition<UiBorderRadiusValue>;
   readonly opacity: UiPropertyDefinition<number>;
   readonly boxShadows: UiPropertyDefinition<readonly UiBoxShadow[]>;
   readonly visible: UiPropertyDefinition<boolean>;
@@ -4697,6 +4702,7 @@ export {
   borderRadiusCorners,
   borderRadiusEqual,
   borderRadiusIsZero,
+  borderRadiusValuesEqual,
   Box,
   BoxModelProps,
   BoxProps,
@@ -4906,6 +4912,7 @@ export {
   iconSource,
   IconSourceArgs,
   IconSpec,
+  Id,
   IdentityProps,
   ImageCommand,
   ImageResolver,
@@ -4948,6 +4955,7 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isShapeName,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -5285,6 +5293,7 @@ export {
   UiBinding,
   UiBorderRadius,
   UiBorderRadiuses,
+  UiBorderRadiusValue,
   UiBoxShadow,
   UiChild,
   UiChildrenBinding,
@@ -5422,6 +5431,8 @@ export {
   UiSemanticStates,
   UiSemanticsUpdate,
   UiShadows,
+  UiShapeExtensions,
+  UiShapeName,
   UiShapes,
   UiSharedElements,
   UiShortcut,
@@ -5509,7 +5520,6 @@ export {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty,
-  zd,
   ZoomState
 };
 // ==== index.d.ts ====
@@ -5535,6 +5545,7 @@ import {
   borderRadiusCorners,
   borderRadiusEqual,
   borderRadiusIsZero,
+  borderRadiusValuesEqual,
   Box,
   BoxModelProps,
   BoxProps,
@@ -5786,6 +5797,7 @@ import {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isShapeName,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -6123,6 +6135,7 @@ import {
   UiBinding,
   UiBorderRadius,
   UiBorderRadiuses,
+  UiBorderRadiusValue,
   UiBoxShadow,
   UiChild,
   UiChildrenBinding,
@@ -6260,6 +6273,8 @@ import {
   UiSemanticStates,
   UiSemanticsUpdate,
   UiShadows,
+  UiShapeExtensions,
+  UiShapeName,
   UiShapes,
   UiSharedElements,
   UiShortcut,
@@ -6348,7 +6363,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DV7LHt4N.js";
+} from "./index-DNBjkGHR.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6364,6 +6379,7 @@ export {
   borderRadiusCorners,
   borderRadiusEqual,
   borderRadiusIsZero,
+  borderRadiusValuesEqual,
   Box,
   boxShadow,
   boxShadowArraysEqual,
@@ -6536,6 +6552,7 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isShapeName,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -7035,6 +7052,7 @@ export {
   UiBinding,
   UiBorderRadius,
   UiBorderRadiuses,
+  UiBorderRadiusValue,
   UiBoxShadow,
   UiChildrenBinding,
   UiColor,
@@ -7116,6 +7134,8 @@ export {
   UiSemanticState,
   UiSemanticStates,
   UiShadows,
+  UiShapeExtensions,
+  UiShapeName,
   UiShapes,
   UiSharedElements,
   UiShortcutRegistry,
@@ -7216,7 +7236,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DV7LHt4N.js";
+} from "./index-DNBjkGHR.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

@@ -6,7 +6,7 @@ import { UiProperties } from '../properties/UiProperty';
 import type { UiColor } from '../properties/UiColor';
 import { UiBasicColors, colorToHex, colorToRgba } from '../properties/UiColor';
 import type { UiBorderRadius } from '../properties/UiBorderRadius';
-import { normalizeBorderRadius } from '../properties/UiBorderRadius';
+import { resolveBorderRadiusValue } from '../properties/UiThemeShape';
 import type { UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
 import type { UiImage } from '../properties/UiImage';
@@ -244,7 +244,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.backgroundGradient = resolveGradient(node, resolveProperty(node, UiProperties.backgroundGradient));
   out.borderColor = resolveColor(node, UiProperties.borderColor);
   out.borderWidth = resolveNumber(node, 'borderWidth') ?? 0;
-  out.borderRadius = normalizeBorderRadius(resolveProperty(node, UiProperties.borderRadius));
+  out.borderRadius = resolveBorderRadiusValue(node, resolveProperty(node, UiProperties.borderRadius));
   out.boxShadows = resolveProperty(node, UiProperties.boxShadows);
   out.image = parseImage(node.properties.get('image'));
   out.video = parseVideo(node.properties.get('video'));

@@ -139,7 +139,7 @@ Fills, borders, shadows and everything else that changes pixels without changing
 | `backgroundGradient` | `unset` | no | Paint | A gradient over the background colour and under the image. Built with `linearGradient` or `radialGradient`. |
 | `borderColor` | black | no | Paint | Colour of the border, drawn inside the box. |
 | `borderWidth` | `unset` | no | Paint | Thickness of that border, in pixels. |
-| `borderRadius` | no rounding | no | Paint | Corner rounding, one number or four. Clips the background, the image and `overflow: hidden`. |
+| `borderRadius` | no rounding | no | Paint | Corner rounding: one number, four, or a name in the theme's shape scale (`borderRadius="medium"`), resolved at paint against the theme the element is under. Clips the background, the image and `overflow: hidden`. |
 | `opacity` | `1` | no | Paint | Applies to the whole subtree, not just this node. |
 | `boxShadows` | none | no | Paint | Shadows behind the box, painted in order. |
 | `visible` | `true` | no | Paint, Semantics | Hides the box and its subtree without taking it out of layout. |

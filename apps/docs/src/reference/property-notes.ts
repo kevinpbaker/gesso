@@ -255,7 +255,7 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   borderWidth: { group: 'Paint', note: 'Thickness of that border, in pixels.' },
   borderRadius: {
     group: 'Paint',
-    note: 'Corner rounding, one number or four. Clips the background, the image and `overflow: hidden`.',
+    note: 'Corner rounding: one number, four, or a name in the theme\'s shape scale (`borderRadius="medium"`), resolved at paint against the theme the element is under. Clips the background, the image and `overflow: hidden`.',
     defaultValue: 'no rounding'
   },
   boxShadows: { group: 'Paint', note: 'Shadows behind the box, painted in order.', defaultValue: 'none' },

@@ -5,8 +5,7 @@ import type { UiInsetSource } from '../environment/UiInsets';
 import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinition';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiBasicColors, colorValuesEqual } from './UiColor';
-import type { UiBorderRadius } from './UiBorderRadius';
-import { UiBorderRadiuses, borderRadiusEqual, normalizeBorderRadius } from './UiBorderRadius';
+import { UiBorderRadiuses, borderRadiusValuesEqual } from './UiBorderRadius';
 import type { UiBoxShadow } from './UiBoxShadow';
 import { boxShadowArraysEqual } from './UiBoxShadow';
 import type { UiGradient } from './UiGradient';
@@ -37,6 +36,7 @@ import type { UiVirtualWindow } from '../composition/UiVirtualWindow';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import type {
   UiAlignment,
+  UiBorderRadiusValue,
   UiColorValue,
   UiContentDistribution,
   UiCursor,
@@ -791,12 +791,24 @@ export const UiProperties = {
     affects: P
   }),
 
-  borderRadius: defineProperty<UiBorderRadius | number>({
+  /**
+   * The corner radius: a number, a per-corner object, or a name in the
+   * theme's shape scale (`borderRadius="medium"`).
+   *
+   * A name is resolved at paint against the theme the element is
+   * under, exactly as a palette name in `backgroundColor` is, so a
+   * radius follows an appearance toggle or a nested theme provider
+   * with nothing on the element knowing. This is the one metric
+   * property that can take a name: a radius is read at paint, where
+   * the theme is already being consulted for every colour, and not in
+   * the layout pass that `decisions/0079` was protecting.
+   */
+  borderRadius: defineProperty<UiBorderRadiusValue>({
     name: 'borderRadius',
     defaultValue: UiBorderRadiuses.none,
     inherited: false,
     affects: P,
-    compare: (a, b) => borderRadiusEqual(normalizeBorderRadius(a), normalizeBorderRadius(b))
+    compare: borderRadiusValuesEqual
   }),
 
   opacity: defineProperty<number>({

@@ -44,19 +44,31 @@ Five scales and two axes, and they are independent of each other:
 There is also an optional `extensions`, which is where an application's
 own token groups live; the last section of this page is about those.
 
-`colors` is the one with a lookup behind it. A colour prop accepts a
-palette name and the name is resolved against the theme the node
-inherits, so nothing in a component has to hold a colour. `shapes` and
-`shadows` are read from the theme and passed as values instead:
-`borderRadius` takes a number, not a shape name, and `boxShadows` takes
-the array. The scale is worth using anyway, because a screen whose
-radii all come from `theme.shapes` restyles in one place, but it is a
-convention rather than a resolution the engine performs.
+`colors` and `shapes` are the two with a lookup behind them. A colour
+prop accepts a palette name, and `borderRadius` accepts a name in the
+shape scale; either is resolved against the theme the node inherits, so
+nothing in a component has to hold a colour or a radius.
 
-`spacing` is read the same way `shapes` is: eight steps on the shape
-scale's own names, plus a `hairline` at the bottom, handed to a prop as
-a number. A screen written from it says `paddingX={theme.spacing.large}`
-rather than `paddingX={16}`, and gets the density axis for free.
+```tsx
+<box backgroundColor="surface" borderRadius="medium" />
+```
+
+Both names are resolved at paint, which is why a radius can be one at
+all: `borderRadius` affects paint and nothing else, so the lookup
+happens where the theme is already being consulted for every colour. A
+box that names a number never reaches the lookup.
+
+A name the scale does not carry draws square, the same quiet failure a
+colour name nothing matches already had. That is a theme missing a
+step rather than a typo: a misspelling does not compile, because the
+names are a closed union.
+
+`shadows` and `spacing` are read from the theme and passed as values
+instead: `boxShadows` takes the array, and a padding takes a number.
+A screen written from the scale says `paddingX={theme.spacing.large}`
+rather than `paddingX={16}`, and gets the density axis for free. There
+is no by-name resolution for a length, because a length is read in the
+layout pass and a radius is not; `decisions/0079` has the reasoning.
 
 `typography` is the subject of [the type scale](/appearance/typography),
 and it matters here for one reason: a theme's palette is not what
@@ -161,6 +173,24 @@ An application that wants light and dark of its own builds two of these
 and maps the shell's appearance onto them, exactly as
 [light and dark](/guide/appearance) shows for the shipped pair.
 
+`UiShapes` works the same way, and for the same reason: seven steps
+cover a document and not an application. A theme may carry radii of its
+own, and declaring them is what makes them type:
+
+```ts
+declare module '@gesso/core' {
+  interface UiShapeExtensions {
+    readonly control: unknown;
+  }
+}
+```
+
+The value type is not used, only the key, because what the theme
+carries is always a number. After that `borderRadius="control"` is
+legal and `borderRadius="contorl"` is a compile error. It is the same
+mechanism as `UiTypographyExtensions`, which
+[the type scale](/appearance/typography) covers for roles.
+
 ## What changing it costs
 
 Providing a new theme writes a property. The runtime rebuilds the
@@ -178,6 +208,9 @@ comparison is worth knowing:
 - **The type scale is compared over its keys too**, so a role an
   application added to the scale invalidates the subtree that reads it
   exactly as a shipped role does.
+- **The shape scale is compared over its keys as well**, for the same
+  reason, so a step added through `UiShapeExtensions` repaints what
+  names it.
 - **The spacing scale, the density and the contrast** are compared, so
   turning either axis is a change of theme.
 - **Each extension is compared with the comparison it declared**, which

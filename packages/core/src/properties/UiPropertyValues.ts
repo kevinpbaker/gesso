@@ -1,5 +1,7 @@
 import type { UiColors } from '../environment/UiColors';
+import type { UiShapeName } from '../environment/UiShapes';
 import type { UiColor } from './UiColor';
+import type { UiBorderRadius } from './UiBorderRadius';
 
 /**
  * Value vocabularies for the string-valued properties.
@@ -149,3 +151,17 @@ export type UiThemeColorName = keyof UiColors;
  * and named CSS colors legal.
  */
 export type UiColorValue = UiColor | UiThemeColorName | (string & {});
+
+/**
+ * What a border radius property accepts: a number, a per-corner
+ * `UiBorderRadius`, or a name in the theme's shape scale
+ * (`'medium'`), resolved at paint.
+ *
+ * Unlike `UiColorValue` this is *not* widened with `(string & {})`. A
+ * colour has to stay open because hex and CSS names are legal values;
+ * a radius has no such literal spelling, so every string here is meant
+ * to be a scale name and one that is not should not compile. An
+ * application with its own steps declares them through
+ * `UiShapeExtensions`.
+ */
+export type UiBorderRadiusValue = UiBorderRadius | number | UiShapeName;
