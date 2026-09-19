@@ -43,6 +43,7 @@ export function Card(inputs: Inputs<CardProps>, _ctx: ComponentContext): UiChild
   return Column(
     {
       ...layoutOf(inputs),
+      modifiers: modifiersOf(inputs),
       padding: padding.value,
       gap: 12,
       backgroundColor: 'surface',
@@ -71,6 +72,7 @@ export function Divider(inputs: Inputs<DividerProps>, _ctx: ComponentContext): U
   const horizontal = direction.value === 'row';
   return Box({
     ...layoutOf(inputs),
+    modifiers: modifiersOf(inputs),
     width: horizontal ? undefined : 1,
     height: horizontal ? 1 : undefined,
     flexGrow: horizontal ? 1 : undefined,
@@ -103,6 +105,7 @@ export function Toolbar(inputs: Inputs<ToolbarProps>, _ctx: ComponentContext): U
   return Row(
     {
       ...layoutOf(inputs),
+      modifiers: modifiersOf(inputs),
       gap: 6,
       y: 'center',
       padding: 6,
@@ -288,7 +291,7 @@ export function Accordion(inputs: Inputs<AccordionProps>, _ctx: ComponentContext
   };
 
   return Column(
-    { ...layoutOf(inputs), gap: 4 },
+    { ...layoutOf(inputs), modifiers: modifiersOf(inputs), gap: 4 },
     inputs.sections.pipe(map(sections => sections.map(section => panel(section, open.value, toggle))))
   );
 }

@@ -3,7 +3,16 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from '@gesso/framework';
 import { renderTest } from '@gesso/testing';
-import { Box, Text, type UiNode, type UiRole, type UiSemanticsRecord } from '@gesso/core';
+import {
+  Box,
+  Column,
+  Text,
+  UiNodeType,
+  defineModifier,
+  type UiNode,
+  type UiRole,
+  type UiSemanticsRecord
+} from '@gesso/core';
 import { Accordion, Card, Divider, Tabs, Toolbar } from './Structure';
 import { SplitPane } from './SplitPane';
 
@@ -247,5 +256,69 @@ describe('SplitPane', () => {
     expect(record.valueNow).toBe(35);
     expect(record.valueMin).toBe(10);
     expect(record.valueMax).toBe(90);
+  });
+});
+
+/**
+ * A modifier that does nothing but say where it landed, as
+ * `Media.spec` uses: `rootModifiers` is a promise about *which
+ * element* a caller's modifier reaches, so the assertion has to be
+ * about the node rather than about a property.
+ */
+const attachedTo: UiNode[] = [];
+const mark = defineModifier<void>({
+  name: 'mark',
+  attach(host) {
+    attachedTo.push(host.node);
+  }
+});
+
+function firstElement(node: UiNode): UiNode {
+  let child = node.firstChild;
+  while (child !== null && child.type === UiNodeType.Fragment) {
+    child = child.firstChild;
+  }
+  if (child === null) {
+    throw new Error(`No element under '${node.id}'.`);
+  }
+  return child;
+}
+
+describe('rootModifiers', () => {
+  // Every one of these dropped a caller's `rootModifiers` on the floor
+  // until this test existed: they spread `layoutOf(inputs)`, which
+  // deliberately excludes the prop, and never called `modifiersOf`.
+  // Silent, and the prop's own docblock names this as the failure that
+  // does not announce itself: a `sharedElement` on a Card went on
+  // claiming nothing and the morph simply did not happen.
+  it('reach the element each of these components draws', () => {
+    attachedTo.length = 0;
+    const hosts: Record<string, UiNode | null> = { card: null, divider: null, toolbar: null, accordion: null };
+    const mounted = renderTest(
+      Column(
+        {},
+        Column(
+          { ref: (n: UiNode | null) => (hosts.card = n) },
+          createComponent(Card, { rootModifiers: [mark(undefined)] })
+        ),
+        Column(
+          { ref: (n: UiNode | null) => (hosts.divider = n) },
+          createComponent(Divider, { rootModifiers: [mark(undefined)] })
+        ),
+        Column(
+          { ref: (n: UiNode | null) => (hosts.toolbar = n) },
+          createComponent(Toolbar, { rootModifiers: [mark(undefined)] })
+        ),
+        Column(
+          { ref: (n: UiNode | null) => (hosts.accordion = n) },
+          createComponent(Accordion, { sections: [], rootModifiers: [mark(undefined)] })
+        )
+      )
+    );
+    mounted.frame();
+
+    for (const [name, host] of Object.entries(hosts)) {
+      expect(attachedTo, name).toContain(firstElement(host!));
+    }
   });
 });
