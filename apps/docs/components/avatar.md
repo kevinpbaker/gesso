@@ -27,16 +27,16 @@ beside each one, and the four below stand alone and are announced.
 
 ## Props
 
-| Prop       | Type                     | Default    | What it does                                                                     |
-| ---------- | ------------------------ | ---------- | -------------------------------------------------------------------------------- |
-| `src`      | `string`                 | none       | The picture. Absent or empty falls through to the initials.                      |
-| `name`     | `string`                 | none       | The person or entity. The initials come from it, and so does the accessible name |
-| `initials` | `string`                 | derived    | The initials to draw, when the derived ones are wrong. Empty is the same as none |
-| `icon`     | `string`                 | a person   | SVG path data for the last-resort glyph, on the usual 24 grid                    |
-| `size`     | `AvatarSize` or `number` | `'medium'` | A named step, or the side in logical pixels                                      |
-| `shape`    | `AvatarShape`            | `'circle'` | `circle`, or a rounded `square`                                                  |
-| `label`    | `string`                 | `name`     | The accessible name. `''` declares the avatar decorative                         |
-| `ref`      | `UiNodeRef`              | none       | Receives the node that is the avatar, for anchoring a menu to it                 |
+| Prop       | Type                     | Default    | What it does                                                                                                  |
+| ---------- | ------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------- |
+| `src`      | `string` or `string[]`   | none       | The picture, or several urls for the same face tried in order. Absent or empty falls through to the initials. |
+| `name`     | `string`                 | none       | The person or entity. The initials come from it, and so does the accessible name                              |
+| `initials` | `string`                 | derived    | The initials to draw, when the derived ones are wrong. Empty is the same as none                              |
+| `icon`     | `string`                 | a person   | SVG path data for the last-resort glyph, on the usual 24 grid                                                 |
+| `size`     | `AvatarSize` or `number` | `'medium'` | A named step, or the side in logical pixels                                                                   |
+| `shape`    | `AvatarShape`            | `'circle'` | `circle`, or a rounded `square`                                                                               |
+| `label`    | `string`                 | `name`     | The accessible name. `''` declares the avatar decorative                                                      |
+| `ref`      | `UiNodeRef`              | none       | Receives the node that is the avatar, for anchoring a menu to it                                              |
 
 Every prop takes a plain value or an Observable of one, and the layout
 props on [the library page](/components/) apply here too. There is no
@@ -47,6 +47,13 @@ colour prop, here or anywhere else in the library.
 ```tsx
 <Avatar src={account.avatar} name={account.name} />
 ```
+
+`src` takes a list as well as a string, because that is the shape an
+account usually arrives in: Audius returns several sizes of the same
+face, and Segue's header held exactly that list with an emptiness check
+written around it by hand. A list is tried in order, as
+[Image](/components/image) tries one, and a list of nothing but blanks
+counts as no picture rather than as a fetch that can only fail.
 
 That single line is the whole of it. `src` empty or absent moves to the
 initials, and no initials moves to the glyph. Empty counts as absent on

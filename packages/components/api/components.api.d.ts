@@ -486,7 +486,7 @@ type AvatarShape = 'circle' | 'square';
 type AvatarSize = 'small' | 'medium' | 'large';
 interface AvatarProps extends ControlLayoutProps {
   ref?: UiNodeRef;
-  src?: string;
+  src?: string | readonly string[];
   name?: string;
   initials?: string;
   icon?: string;

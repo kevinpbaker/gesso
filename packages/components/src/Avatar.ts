@@ -61,14 +61,18 @@ export interface AvatarProps extends ControlLayoutProps {
   /** Receives the node that *is* the avatar, for anchoring a menu to it. */
   ref?: UiNodeRef;
   /**
-   * The picture. Absent or empty falls through to the initials.
+   * The picture: a url, or several for the same face tried in order
+   * until one resolves, as `Image` takes them. Absent or empty falls
+   * through to the initials.
    *
    * Empty rather than merely absent, because the shape an application
-   * actually holds is `account.avatar`, a string that is sometimes
-   * `''`; making the caller turn that into `undefined` is the guard
-   * this component exists to absorb.
+   * actually holds is `account.avatar`, which is sometimes `''` and
+   * sometimes an empty list; making the caller turn either into
+   * `undefined` is the guard this component exists to absorb. Segue's
+   * header held exactly that list, with a `show()` around it doing the
+   * emptiness check by hand.
    */
-  src?: string;
+  src?: string | readonly string[];
   /**
    * The person or entity. The initials are derived from it, and it is
    * the accessible name unless `label` says otherwise.
@@ -181,7 +185,13 @@ const PERSON =
   'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z';
 
 export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiChild {
-  const source = input(inputs.src, '').pipe(map(url => url.trim()));
+  // Normalised to a candidate list, so the two places that ask
+  // "is there a picture?" and the one that hands it to `Image` all
+  // read the same shape, and a list of nothing but blanks counts as
+  // no picture rather than as a fetch that can only fail.
+  const source = input(inputs.src, '' as string | readonly string[]).pipe(
+    map(value => (typeof value === 'string' ? [value] : value).map(url => url.trim()).filter(url => url.length > 0))
+  );
   const name = input(inputs.name, '').pipe(map(person => person.trim()));
   const given = input(inputs.initials, '').pipe(map(text => text.trim()));
 
@@ -203,7 +213,7 @@ export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiC
   );
 
   const layer: Observable<AvatarLayer> = combineLatest([source, initials]).pipe(
-    map(([url, text]) => (url.length > 0 ? 'picture' : text.length > 0 ? 'initials' : 'glyph'))
+    map(([candidates, text]) => (candidates.length > 0 ? 'picture' : text.length > 0 ? 'initials' : 'glyph'))
   );
   const showing = (which: AvatarLayer): Observable<boolean> => layer.pipe(map(current => current === which));
 
@@ -250,7 +260,7 @@ export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiC
       createComponent(Image, {
         // Never the empty string: an `Image` given one asks the
         // resolver to fetch it, which is a request that can only fail.
-        src: source.pipe(filter(url => url.length > 0)),
+        src: source.pipe(filter(candidates => candidates.length > 0)),
         width: side,
         height: side,
         borderRadius: radius,

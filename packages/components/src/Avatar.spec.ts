@@ -285,3 +285,23 @@ describe('Avatar: colour', () => {
     expect(node().properties.get('backgroundColor')).toBe('placeholder');
   });
 });
+
+describe('a candidate list', () => {
+  // Segue's header holds `account.avatar`, which Audius returns as
+  // several urls for the same face. Before this the component took a
+  // single string, so the first application to reach for it could not
+  // express what it actually had.
+  it('draws the picture when any candidate is a url, and falls through when none is', () => {
+    const withList = mount(
+      createComponent(Avatar, { src: ['https://a/150.jpg', 'https://a/480.jpg'], name: 'Ada Lovelace' })
+    );
+    expect(withList.queryByRole('image')).not.toBeNull();
+    expect(withList.queryByText('AL')).toBeNull();
+
+    const empty = mount(createComponent(Avatar, { src: [], name: 'Ada Lovelace' }));
+    expect(empty.queryByText('AL')).not.toBeNull();
+
+    const blanks = mount(createComponent(Avatar, { src: ['', '   '], name: 'Ada Lovelace' }));
+    expect(blanks.queryByText('AL')).not.toBeNull();
+  });
+});
