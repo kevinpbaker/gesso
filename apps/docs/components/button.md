@@ -120,7 +120,7 @@ same one the inputs tier draws. Neither is optional: a clickable thing
 says so under the pointer, and a control the keyboard can reach shows
 where the keyboard is.
 
-## Colours
+## Colours, and everything else about how it looks
 
 None of them are props. `Button` reads the control tokens from whatever
 theme it inherits, like everything else in the library. Restyling one
@@ -136,6 +136,13 @@ That is the mechanism [themes and the
 environment](/appearance/themes-and-the-environment) describes, and it
 is why no page here has a `backgroundColor` on a control.
 
+Its metrics work the same way. The padding, the radius and the type
+role of each size, which palette tokens each variant and tone use, and
+how far a filled button dims under the pointer are all tokens in the
+`controlTokens` group, so a theme can change any of them without the
+component growing a prop. [Restyling the
+controls](/components/restyling) is that group in full.
+
 ## What this page was checked against
 
 `Button.spec.ts` mounts the component with `@gesso/testing` and asserts
@@ -145,6 +152,10 @@ tone pairs names a palette entry rather than a colour, that the cursor
 is `pointer`, that hovering writes the hover token on a surfaced
 variant and the dimmed opacity on a filled one, that the size changes
 the padding, and that the words carry a type role rather than a size.
+`themeTokens.spec.ts` asserts the restyling above: a provider moving
+the padding, the radius and the type role, a variant remapped onto
+different palette tokens, a theme naming how far a filled button dims,
+and a button under no provider drawing exactly the stock values.
 The component has no live example on this site yet, so nothing on this
 page was watched in a browser; Segue's sign-in dialog is where it was
 first used.

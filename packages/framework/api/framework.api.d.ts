@@ -283,6 +283,7 @@ import {
   UiKeyboardController,
   UiKeyModifiers,
   UiLength,
+  UiModifier,
   UiMotion,
   UiNode,
   UiPlatformAdapter,
@@ -303,6 +304,7 @@ import {
   UiShortcutRegistry,
   UiSpringSpec,
   UiSpringToken,
+  UiThemeExtension,
   UiTouchScroller,
   UiWheelController,
   VideoResolver
@@ -427,6 +429,12 @@ declare function bind<T>(cell: ReadableCell<T>, write: (next: T) => void): {
   onChange: (next: T) => void;
 };
 declare function bind<T, V extends string, E extends string = 'onChange'>(cell: ReadableCell<T>, write: (next: T) => void, value: V, onChange?: E): { [K in V]: ReadableCell<T>; } & { [K in E]: (next: T) => void; };
+declare class ThemeTokenCell<T extends object> extends InternalState<T> {
+  readonly modifier: UiModifier;
+  constructor(extension: UiThemeExtension<T>);
+  select<R>(pick: (tokens: T) => R): Observable<R>;
+}
+declare function themeTokenCell<T extends object>(extension: UiThemeExtension<T>, label?: string): ThemeTokenCell<T>;
 interface ControlledValue<T> {
   readonly value: Observable<T>;
   current(): T;
@@ -2476,6 +2484,8 @@ export {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  themeTokenCell,
+  ThemeTokenCell,
   throttled,
   treeText,
   UI_FRAME_PHASES,
@@ -2754,6 +2764,8 @@ import {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  themeTokenCell,
+  ThemeTokenCell,
   throttled,
   to,
   treeText,
@@ -2788,7 +2800,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-CHnW7N05.js";
+} from "./index-CXW5DVhn.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2906,6 +2918,8 @@ export {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  themeTokenCell,
+  ThemeTokenCell,
   throttled,
   to,
   treeText,
@@ -3258,7 +3272,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CHnW7N05.js";
+} from "../index-CXW5DVhn.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

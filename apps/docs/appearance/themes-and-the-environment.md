@@ -261,6 +261,38 @@ change to one invalidate the subtree that reads it.
 A component library may declare one too. It is how a component that
 needs a token the shared vocabulary does not have gets one without
 adding a colour prop and forking the theme at every call site.
+`@gesso/components` declares `controlTokens`, which is what
+[restyling the controls](/components/restyling) is written against.
+
+### Reading a group from inside a component
+
+`themeExtension(theme, group)` above reads a theme you are holding. A
+component is not holding one: its body runs once, before its node is in
+a tree, so there is no environment to read and anything it computes
+from the theme is frozen at the defaults.
+
+`themeTokenCell` is the way in. It is the shape `ctx.bounds()` already
+has, a cell plus the modifier that fills it:
+
+```tsx
+const tokens = themeTokenCell(segueMetrics);
+
+<box modifiers={[tokens.modifier]} height={tokens.select(m => m.barHeight)} />;
+```
+
+The cell starts at the group's declared defaults and the modifier
+replaces them at attach, before the first frame is drawn, so nothing
+flickers through a default it was never going to keep. Bind with
+`select` rather than off the cell directly: the cell publishes the
+whole group, and `select` projects one token and drops a repeat, so a
+theme change that moved a colour does not rewrite every padding on the
+element.
+
+Because the cell is an ordinary Observable it reaches a child, which is
+the case a modifier writing properties on its own node cannot serve. A
+control is usually a box with something inside it, and `color` does not
+cascade from a parent node the way it does in CSS, so a button's label
+binds its own colour to the same cell its box binds its padding to.
 
 ## The rest of the environment
 

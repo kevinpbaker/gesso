@@ -11,9 +11,10 @@ import {
   type UiSemanticState
 } from '@gesso/core';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from '@gesso/framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
+import { controlTokens, type ControlTokens } from './tokens';
 import { controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
@@ -59,6 +60,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
   const step = input(inputs.step, 1);
   const invalid = error.pipe(map(text => text.length > 0));
   const focus = trackFocus(ctx, inputs.ref);
+  const tokens = themeTokenCell(controlTokens);
   const value = controlled<number>({
     component: 'NumberInput',
     name: 'value',
@@ -107,7 +109,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
       { gap: 4, y: 'center' },
       EditableText({
         ref: focus.ref,
-        modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
+        modifiers: modifiersOf(inputs, tokens.modifier, CONTROL_FOCUS_RING),
         value: text,
         disabled,
         textWrap: 'none',
@@ -115,7 +117,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
         color: 'controlForeground',
         borderWidth: 1,
         borderColor: borderToken(invalid),
-        borderRadius: 6,
+        borderRadius: tokens.select(t => t.radius.field),
         padding: 8,
         minWidth: 80,
         flexGrow: 1,
@@ -135,8 +137,8 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
           ArrowDown: () => move(-step.value)
         })
       }),
-      stepper('−', () => move(-step.value), disabled),
-      stepper('+', () => move(step.value), disabled)
+      stepper('−', () => move(-step.value), disabled, tokens),
+      stepper('+', () => move(step.value), disabled, tokens)
     ),
     controlMessage(error)
   );
@@ -152,7 +154,12 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
  * Tab is a promise the keyboard cannot keep, and a person who does not
  * know the arrows work has no other way to press it.
  */
-function stepper(glyph: string, press: () => void, disabled: Observable<boolean>) {
+function stepper(
+  glyph: string,
+  press: () => void,
+  disabled: Observable<boolean>,
+  tokens: ThemeTokenCell<ControlTokens>
+) {
   return Button({
     text: glyph,
     width: 28,
@@ -168,7 +175,7 @@ function stepper(glyph: string, press: () => void, disabled: Observable<boolean>
     color: 'controlForeground',
     borderWidth: 1,
     borderColor: 'controlBorder',
-    borderRadius: 6,
+    borderRadius: tokens.select(t => t.radius.field),
     role: 'button',
     label: glyph === '+' ? 'Increase' : 'Decrease',
     onClick: press

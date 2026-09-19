@@ -1,21 +1,26 @@
-import { map, type Observable } from 'rxjs';
+import { combineLatest, map, type Observable } from 'rxjs';
 import {
   Button as ButtonElement,
   Text,
-  bundle,
-  defaultSpacing,
   interactive,
   type UiChild,
   type UiModifier,
-  type UiModifierBundle,
   type UiNodeRef,
-  type UiSemanticState,
-  type UiTypographyRole
+  type UiSemanticState
 } from '@gesso/core';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from '@gesso/framework';
 import { trackFocus } from './focus';
 import { CONTROL_FOCUS_RING, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
+import {
+  controlTokens,
+  type ButtonPaint,
+  type ButtonSize,
+  type ButtonSizeTokens,
+  type ButtonTone,
+  type ButtonVariant,
+  type ControlTokens
+} from './tokens';
 
 /**
  * A button, themed.
@@ -45,9 +50,7 @@ import { CONTROL_FOCUS_RING, layoutOf, type ControlLayoutProps, modifiersOf } fr
  * a theme provider around it, as it is for every other component
  * (`COMPONENTS_ROADMAP.md` §2.3).
  */
-export type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'plain';
-export type ButtonTone = 'neutral' | 'accent' | 'danger';
-export type ButtonSize = 'small' | 'medium' | 'large';
+export type { ButtonSize, ButtonTone, ButtonVariant } from './tokens';
 
 export interface ButtonProps extends ControlLayoutProps {
   /** Receives the node that *is* the button, for focus and anchoring. */
@@ -93,8 +96,16 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
   const variant = input(inputs.variant, 'filled').value ?? 'filled';
   const tone = input(inputs.tone, 'neutral').value ?? 'neutral';
   const size = input(inputs.size, 'medium').value ?? 'medium';
-  const metrics = SIZES[size];
-  const paint = PAINT[variant][tone];
+
+  // Every metric, every palette name and the dim a filled button
+  // answers the pointer with come from here, resolved against the
+  // theme this button turns out to be under rather than at the moment
+  // this function runs. See `tokens.ts`.
+  const tokens = themeTokenCell(controlTokens);
+  const metrics = (read: (size: ButtonSizeTokens) => number): Observable<number> =>
+    tokens.select(t => read(t.button.sizes[size]));
+  const paint = <R>(read: (paint: ButtonPaint) => R): Observable<R> =>
+    tokens.select(t => read(t.button.paint[variant][tone]));
 
   const press = (): void => {
     if (disabled.value || busy.value) {
@@ -107,15 +118,15 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
     {
       ...layoutOf(inputs),
       ref: focus.ref,
-      modifiers: modifiersOf(inputs, ...BUTTON_MODIFIERS[variant]),
-      paddingX: metrics.paddingX,
-      paddingY: metrics.paddingY,
+      modifiers: modifiersOf(inputs, tokens.modifier, ...buttonModifiers(variant, tokens)),
+      paddingX: metrics(size => size.paddingX),
+      paddingY: metrics(size => size.paddingY),
       x: 'center',
       y: 'center',
-      borderRadius: metrics.radius,
-      borderWidth: paint.border === undefined ? 0 : 1,
-      borderColor: paint.border,
-      backgroundColor: paint.background,
+      borderRadius: metrics(size => size.radius),
+      borderWidth: paint(p => (p.border === undefined ? 0 : 1)),
+      borderColor: paint(p => p.border),
+      backgroundColor: paint(p => p.background),
       // The standing rule, and the reason a wrapper exists at all: a
       // clickable thing says so under the pointer.
       cursor: 'pointer',
@@ -132,9 +143,16 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
         // A role rather than a size and a weight, so the words on a
         // button are the same type as the words beside it and both
         // follow the theme. `decisions/0079` is why this is the idiom.
-        textStyle: metrics.textStyle,
+        textStyle: tokens.select(t => t.button.sizes[size].textStyle),
         fontWeight: 600,
-        color: foreground(paint.foreground, disabled),
+        // Bound on the label, not provided from the root: `color` does
+        // not cascade from a parent node the way it does in CSS, so a
+        // token that reached only the root would leave the words at
+        // the theme's default ink.
+        color: foreground(
+          paint(p => p.foreground),
+          disabled
+        ),
         selectable: false
       })
   );
@@ -152,121 +170,45 @@ function states(busy: Observable<boolean>): Observable<UiSemanticState[]> {
 }
 
 /** The label's colour: the variant's, or the disabled token. */
-function foreground(resting: string, disabled: Observable<boolean>): Observable<string> {
-  return disabled.pipe(map(off => (off ? 'controlForegroundDisabled' : resting)));
+function foreground(resting: Observable<string>, disabled: Observable<boolean>): Observable<string> {
+  return combineLatest([resting, disabled]).pipe(map(([token, off]) => (off ? 'controlForegroundDisabled' : token)));
 }
-
-interface ButtonMetrics {
-  readonly paddingX: number;
-  readonly paddingY: number;
-  readonly radius: number;
-  readonly textStyle: UiTypographyRole;
-}
-
-/**
- * The three sizes, from the spacing scale rather than from numbers
- * chosen here.
- *
- * They are the *default* scale's values and not the inherited theme's,
- * because a component has no way to read the environment while its
- * body runs; `Card`'s padding and `Toolbar`'s gap have the same
- * limitation. A theme that changes its spacing changes what an
- * application's own boxes measure, not what a library control does.
- */
-const SIZES: Readonly<Record<ButtonSize, ButtonMetrics>> = {
-  small: {
-    paddingX: defaultSpacing.small,
-    paddingY: defaultSpacing.extraSmall,
-    radius: 6,
-    textStyle: 'bodySmall'
-  },
-  medium: {
-    paddingX: defaultSpacing.medium,
-    paddingY: defaultSpacing.small,
-    radius: 8,
-    textStyle: 'body'
-  },
-  large: {
-    paddingX: defaultSpacing.large,
-    paddingY: defaultSpacing.medium,
-    radius: 10,
-    textStyle: 'bodyLarge'
-  }
-} as const;
-
-interface ButtonPaint {
-  readonly background: string;
-  readonly foreground: string;
-  readonly border?: string;
-}
-
-/**
- * Twelve combinations, written out.
- *
- * Every value is a palette name, so the table says nothing about
- * light and dark: `controlForeground` on `controlBackground` is ink on
- * chalk in one appearance and chalk on ink in the other, and a filled
- * neutral button inverts with the toggle without a branch anywhere.
- * A generated table would be shorter and would hide exactly the two
- * places the pattern breaks: `tonal` uses the selection pair for an
- * accent, and `plain` has no ground at all.
- */
-const PAINT: Readonly<Record<ButtonVariant, Readonly<Record<ButtonTone, ButtonPaint>>>> = {
-  filled: {
-    neutral: { background: 'controlForeground', foreground: 'controlBackground' },
-    accent: { background: 'controlAccent', foreground: 'controlBackground' },
-    danger: { background: 'danger', foreground: 'controlBackground' }
-  },
-  tonal: {
-    neutral: { background: 'controlBackground', foreground: 'controlForeground' },
-    accent: { background: 'selectionBackground', foreground: 'selectionForeground' },
-    danger: { background: 'controlBackground', foreground: 'danger' }
-  },
-  outlined: {
-    neutral: { background: 'transparent', foreground: 'controlForeground', border: 'controlBorder' },
-    accent: { background: 'transparent', foreground: 'controlAccent', border: 'controlAccent' },
-    danger: { background: 'transparent', foreground: 'danger', border: 'danger' }
-  },
-  plain: {
-    neutral: { background: 'transparent', foreground: 'controlForeground' },
-    accent: { background: 'transparent', foreground: 'controlAccent' },
-    danger: { background: 'transparent', foreground: 'danger' }
-  }
-} as const;
 
 /**
  * How each variant answers the pointer.
  *
  * A filled button has no token to move to: its ground is already the
  * accent or the ink, and there is no `controlAccentHovered`. So it
- * dims instead, which is one value that works on every tone and in
- * both appearances, and which the eye reads as a press for the same
- * reason a physical key darkens under a finger. The three variants
- * with no ground of their own gain one, from the control tokens that
- * every other component in the library hovers with.
+ * dims instead, by an amount the theme now names, and which the eye
+ * reads as a press for the same reason a physical key darkens under a
+ * finger. The three variants with no ground of their own gain one,
+ * from the control tokens that every other component in the library
+ * hovers with; those are palette names and were already themed.
  *
- * One shared bundle per variant, built at module level: a modifier's
- * arguments are compared by identity, so a list built per render would
- * detach and re-attach the ring and lose the hover state with it
- * (`decisions/0022-modifiers.md`).
+ * Built per button rather than shared at module level, which
+ * `decisions/0022-modifiers.md` has to be read carefully about. What
+ * that record forbids is a modifier list built **per render**, whose
+ * arguments compare unequal each time and so detach and re-attach the
+ * ring, losing the hover state with it. A component body runs once per
+ * instance, so these are built once per button and are stable for its
+ * life — the same reason `tokens.modifier` itself is safe here. The
+ * surface variants could still share one value; they do not, so that
+ * all four read the same way and none of them is a special case.
  */
-const FILLED_INTERACTION: UiModifier = interactive({
-  hover: true,
-  press: true,
-  hovered: { opacity: 0.88 },
-  pressed: { opacity: 0.76 }
-});
-
-const SURFACE_INTERACTION: UiModifier = interactive({
-  hover: true,
-  press: true,
-  hovered: { backgroundColor: 'controlBackgroundHovered' },
-  pressed: { backgroundColor: 'controlBackgroundPressed' }
-});
-
-const BUTTON_MODIFIERS: Readonly<Record<ButtonVariant, UiModifierBundle>> = {
-  filled: bundle(FILLED_INTERACTION, CONTROL_FOCUS_RING),
-  tonal: bundle(SURFACE_INTERACTION, CONTROL_FOCUS_RING),
-  outlined: bundle(SURFACE_INTERACTION, CONTROL_FOCUS_RING),
-  plain: bundle(SURFACE_INTERACTION, CONTROL_FOCUS_RING)
-} as const;
+function buttonModifiers(variant: ButtonVariant, tokens: ThemeTokenCell<ControlTokens>): readonly UiModifier[] {
+  const interaction =
+    variant === 'filled'
+      ? interactive({
+          hover: true,
+          press: true,
+          hovered: { opacity: tokens.select(t => t.button.hoveredOpacity) },
+          pressed: { opacity: tokens.select(t => t.button.pressedOpacity) }
+        })
+      : interactive({
+          hover: true,
+          press: true,
+          hovered: { backgroundColor: 'controlBackgroundHovered' },
+          pressed: { backgroundColor: 'controlBackgroundPressed' }
+        });
+  return [interaction, CONTROL_FOCUS_RING];
+}

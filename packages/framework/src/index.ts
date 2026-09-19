@@ -23,6 +23,7 @@ export { Each, each, type EachKey, type EachProps } from './each';
 export { Show, show, type ShowProps } from './show';
 export { bind } from './bind';
 export { bounds, BoundsCell } from './bounds';
+export { themeTokenCell, ThemeTokenCell } from './themeTokenCell';
 export { controlled, type ControlledOptions, type ControlledValue } from './controlled';
 export { Define, Input, Output, Inject, Channel } from './decorators';
 export * from './channel';

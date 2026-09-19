@@ -3751,6 +3751,14 @@ declare const insetPadding: ((args: InsetPaddingArgs, key?: string | number) => 
   readonly kind: UiModifierKind<InsetPaddingArgs>;
 };
 declare function sameArgs(a: unknown, b: unknown, depth?: number): boolean;
+interface ThemeTokenTarget<T extends object> {
+  readonly extension: UiThemeExtension<T>;
+  readonly sink: Subject<T>;
+}
+declare function themeTokens<T extends object>(target: ThemeTokenTarget<T>): UiModifier<ThemeTokenTarget<T>>;
+declare namespace themeTokens {
+  var kind: UiModifierKind<ThemeTokenTarget<object>>;
+}
 declare function resolveProperty<T>(node: UiNode, definition: UiPropertyDefinition<T>): T;
 declare function resolvePropertyByName<T>(node: UiNode, name: string): T | undefined;
 declare function resolveNumber(node: UiNode, name: string): number | undefined;
@@ -4912,7 +4920,6 @@ export {
   iconSource,
   IconSourceArgs,
   IconSpec,
-  Id,
   IdentityProps,
   ImageCommand,
   ImageResolver,
@@ -5128,6 +5135,7 @@ export {
   PublishInsetArgs,
   radialGradient,
   raiseContrast,
+  Rd,
   Reactive,
   readMp3Header,
   recordsEqual,
@@ -5268,6 +5276,8 @@ export {
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
+  themeTokens,
+  ThemeTokenTarget,
   tightenConstraints,
   TightenOptions,
   touchActionFor,
@@ -6110,6 +6120,8 @@ import {
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
+  themeTokens,
+  ThemeTokenTarget,
   tightenConstraints,
   TightenOptions,
   touchActionFor,
@@ -6363,7 +6375,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DNBjkGHR.js";
+} from "./index-DPJZvUlF.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6748,6 +6760,7 @@ export {
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
+  themeTokens,
   tightenConstraints,
   touchActionFor,
   tracePathData,
@@ -6959,6 +6972,7 @@ export {
   type TextRunSpan,
   type TextRunStyle,
   type TextWrap,
+  type ThemeTokenTarget,
   type TightenOptions,
   type TouchScrollerOptions,
   type Transform,
@@ -7236,7 +7250,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DNBjkGHR.js";
+} from "./index-DPJZvUlF.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

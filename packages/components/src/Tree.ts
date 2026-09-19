@@ -1,6 +1,7 @@
 import { combineLatest, map } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
+import { controlTokens } from './tokens';
 import { Row, Text, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
@@ -71,6 +72,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
   const rowHeight = input(inputs.rowHeight, 24);
   const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
+  const tokens = themeTokenCell(controlTokens);
   const expanded = controlled<readonly string[]>({
     component: 'Tree',
     name: 'expanded',
@@ -230,7 +232,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, CONTROL_EDGE),
       scrollY: list.scrollY,
       focusable: true,
       count,
@@ -242,7 +244,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       backgroundColor: 'controlBackground',
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
       // chosen row's own background would be painted over it.
-      borderRadius: 6,
+      borderRadius: tokens.select(t => t.radius.scroller),
       onKeyDown: keymap({
         ArrowDown: () => step(1),
         ArrowUp: () => step(-1),

@@ -12,6 +12,14 @@
  * playground.
  */
 export { Button, type ButtonProps, type ButtonSize, type ButtonTone, type ButtonVariant } from './Button';
+export {
+  controlTokens,
+  type ButtonPaint,
+  type ButtonSizeTokens,
+  type ButtonTokens,
+  type ControlRadiusTokens,
+  type ControlTokens
+} from './tokens';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps, type ChipSize, type ChipVariant } from './Chip';
 export { Switch, type SwitchProps } from './Switch';

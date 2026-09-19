@@ -10,8 +10,9 @@ import {
   type UiSemanticState
 } from '@gesso/core';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
 import { controlled } from './controlled';
+import { controlTokens } from './tokens';
 import { trackFocus } from './focus';
 import { controlDescription, controlMessage } from './message';
 import {
@@ -89,6 +90,9 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
   });
 
   const submit = keymap({ Enter: () => inputs.onSubmit.value?.() });
+  // One `field` radius serves this, the number field and a select's
+  // trigger, so a theme that squares off its inputs squares all three.
+  const tokens = themeTokenCell(controlTokens);
 
   return Column(
     { ...layoutOf(inputs), gap: 4 },
@@ -99,7 +103,7 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
     ),
     EditableText({
       ref: focus.ref,
-      modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
+      modifiers: modifiersOf(inputs, tokens.modifier, CONTROL_FOCUS_RING),
       value: value.value,
       placeholder: inputs.placeholder,
       disabled,
@@ -111,7 +115,7 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       color: 'controlForeground',
       borderWidth: 1,
       borderColor: borderToken(invalid),
-      borderRadius: 6,
+      borderRadius: tokens.select(t => t.radius.field),
       padding: 8,
       minHeight: multiline.pipe(map(on => (on ? 72 : 32))),
       role: 'textbox',

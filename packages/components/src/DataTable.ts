@@ -1,6 +1,7 @@
 import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
+import { controlTokens } from './tokens';
 import {
   Box,
   Grid,
@@ -101,6 +102,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
   const columnGap = input(inputs.columnGap, 0);
   const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
+  const tokens = themeTokenCell(controlTokens);
   const headerBox = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   headerBox.subscribe(box => list.setLead(box.height));
 
@@ -253,7 +255,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, CONTROL_EDGE),
       scrollY: list.scrollY,
       focusable: true,
       count,
@@ -267,7 +269,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
       backgroundColor: 'controlBackground',
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: the
       // sticky header's own background would be painted over it.
-      borderRadius: 6,
+      borderRadius: tokens.select(t => t.radius.scroller),
       onKeyDown: keymap({
         ArrowDown: () => step(1),
         ArrowUp: () => step(-1),

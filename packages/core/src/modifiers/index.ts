@@ -21,3 +21,4 @@ export { breakpoint, sizeContainer, type BreakpointArgs, type SizeContainerArgs 
 export { insetPadding, publishInset, type InsetPaddingArgs, type PublishInsetArgs } from './insets';
 export type { UiModifierEnvironment, UiModifierFocus, UiModifierLayout } from './UiModifierSet';
 export { sameArgs } from './sameArgs';
+export { themeTokens, type ThemeTokenTarget } from './themeTokens';

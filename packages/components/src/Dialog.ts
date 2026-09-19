@@ -2,6 +2,7 @@ import { map } from 'rxjs';
 
 import {
   input,
+  themeTokenCell,
   type ComponentContext,
   type Inputs,
   AnimationService,
@@ -10,6 +11,7 @@ import {
 } from '@gesso/framework';
 import { Box, Column, Row, Text, type UiChild, type UiNode } from '@gesso/core';
 import { keymap } from './internals';
+import { controlTokens } from './tokens';
 import { useOverlay } from './overlay';
 
 /**
@@ -45,6 +47,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
   const focus = ctx.inject(FocusService);
   const animations = ctx.inject(AnimationService);
   const overlay = useOverlay(ctx, 'dialog');
+  const tokens = themeTokenCell(controlTokens);
   let trapped = false;
   let placeholder: UiNode | null = null;
   /**
@@ -84,6 +87,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         // Taking the trap from the ref means it applies as soon as the
         // dialog is in the tree; the runtime settles focus into it once
         // its children exist (see decisions/0020-focus-scopes.md).
+        modifiers: [tokens.modifier],
         ref: (node: UiNode | null) => {
           if (node !== null && !trapped) {
             trapped = true;
@@ -110,7 +114,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         backgroundColor: 'surface',
         borderColor: 'border',
         borderWidth: 1,
-        borderRadius: 12,
+        borderRadius: tokens.select(t => t.radius.sheet),
         role: 'dialog',
         label: title,
         description,

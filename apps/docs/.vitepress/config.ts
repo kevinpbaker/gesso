@@ -199,6 +199,7 @@ export default defineConfig({
         text: 'Components',
         items: [
           { text: 'Overview', link: '/components/' },
+          { text: 'Restyling the controls', link: '/components/restyling' },
           { text: 'Button', link: '/components/button' },
           { text: 'Chip', link: '/components/chip' },
           { text: 'Checkbox', link: '/components/checkbox' },

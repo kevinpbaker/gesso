@@ -1,6 +1,7 @@
 import { map } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
+import { controlTokens } from './tokens';
 import { Box, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from '@gesso/core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
@@ -54,6 +55,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
   const estimated = input(inputs.estimatedItemExtent, 28);
   const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
+  const tokens = themeTokenCell(controlTokens);
   const selected = controlled<number>({
     component: 'LazyList',
     name: 'selectedIndex',
@@ -102,7 +104,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, CONTROL_EDGE),
       scrollY: list.scrollY,
       focusable: true,
       count: inputs.count,
@@ -115,7 +117,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
       backgroundColor: 'controlBackground',
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
       // chosen row's own background would be painted over it.
-      borderRadius: 6,
+      borderRadius: tokens.select(t => t.radius.scroller),
       onKeyDown: keymap({
         ArrowDown: () => step(1),
         ArrowUp: () => step(-1),

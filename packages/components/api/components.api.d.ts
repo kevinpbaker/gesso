@@ -18,6 +18,7 @@ import {
   UiNode,
   UiNodeRef,
   UiSelfAlignment,
+  UiThemeExtension,
   UiTrackSize,
   UiTypographyRole,
   UiVirtualWindow
@@ -58,6 +59,34 @@ interface ControlLayoutProps {
 type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'plain';
 type ButtonTone = 'neutral' | 'accent' | 'danger';
 type ButtonSize = 'small' | 'medium' | 'large';
+interface ButtonPaint {
+  readonly background: string;
+  readonly foreground: string;
+  readonly border?: string;
+}
+interface ButtonSizeTokens {
+  readonly paddingX: number;
+  readonly paddingY: number;
+  readonly radius: number;
+  readonly textStyle: UiTypographyRole;
+}
+interface ControlRadiusTokens {
+  readonly field: number;
+  readonly checkbox: number;
+  readonly scroller: number;
+  readonly sheet: number;
+}
+interface ButtonTokens {
+  readonly sizes: Readonly<Record<ButtonSize, ButtonSizeTokens>>;
+  readonly paint: Readonly<Record<ButtonVariant, Readonly<Record<ButtonTone, ButtonPaint>>>>;
+  readonly hoveredOpacity: number;
+  readonly pressedOpacity: number;
+}
+interface ControlTokens {
+  readonly radius: ControlRadiusTokens;
+  readonly button: ButtonTokens;
+}
+declare const controlTokens: UiThemeExtension<ControlTokens>;
 interface ButtonProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   label?: string;
@@ -575,6 +604,7 @@ export {
   controlDescription,
   controlled,
   controlMessage,
+  controlTokens,
   DataTable,
   Dialog,
   Divider,
@@ -617,8 +647,11 @@ export {
   type AccordionProps,
   type AccordionSection,
   type AsyncValidator,
+  type ButtonPaint,
   type ButtonProps,
   type ButtonSize,
+  type ButtonSizeTokens,
+  type ButtonTokens,
   type ButtonTone,
   type ButtonVariant,
   type CardProps,
@@ -629,6 +662,8 @@ export {
   type ControlFocus,
   type ControlLayoutProps,
   type ControlledValue,
+  type ControlRadiusTokens,
+  type ControlTokens,
   type DataColumn,
   type DataTableProps,
   type DataTableSort,

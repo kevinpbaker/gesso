@@ -1,9 +1,10 @@
 import { combineLatest, map, type Observable } from 'rxjs';
 import { type UiNodeRef, Box, Column, Row, Text, type UiChild, type UiSemanticState } from '@gesso/core';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
+import { controlTokens } from './tokens';
 import { controlMessage } from './message';
 import {
   CONTROL_FOCUS_RING,
@@ -54,6 +55,7 @@ export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): 
   );
   const required = input(inputs.required, false);
   const focus = trackFocus(ctx, inputs.ref);
+  const tokens = themeTokenCell(controlTokens);
   const value = controlled<boolean>({
     component: 'Checkbox',
     name: 'checked',
@@ -80,11 +82,11 @@ export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): 
         ref: focus.ref,
         focusable: true,
         disabled,
-        modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
+        modifiers: modifiersOf(inputs, tokens.modifier, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
         gap: 8,
         y: 'center',
         padding: 4,
-        borderRadius: 4,
+        borderRadius: tokens.select(t => t.radius.checkbox),
         role: 'checkbox',
         label,
         description: error,
@@ -96,7 +98,7 @@ export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): 
         {
           width: 18,
           height: 18,
-          borderRadius: 4,
+          borderRadius: tokens.select(t => t.radius.checkbox),
           borderWidth: 1,
           borderColor: borderToken(invalid),
           backgroundColor: fill(value.value, disabled),
