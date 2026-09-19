@@ -471,6 +471,48 @@ interface ProgressBarProps extends ControlLayoutProps {
   thickness?: number;
 }
 declare function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentContext): UiChild;
+type BadgeTone = 'neutral' | 'accent' | 'danger';
+interface BadgeProps extends ControlLayoutProps {
+  label?: string;
+  count?: number;
+  max?: number;
+  tone?: BadgeTone;
+  dot?: boolean;
+  name?: string;
+  live?: boolean;
+}
+declare function Badge(inputs: Inputs<BadgeProps>, _ctx: ComponentContext): UiChild;
+type AvatarShape = 'circle' | 'square';
+type AvatarSize = 'small' | 'medium' | 'large';
+interface AvatarProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  src?: string;
+  name?: string;
+  initials?: string;
+  icon?: string;
+  size?: AvatarSize | number;
+  shape?: AvatarShape;
+  label?: string;
+}
+declare function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiChild;
+interface SkeletonProps extends ControlLayoutProps {
+  radius?: number;
+  shimmer?: boolean;
+  circle?: boolean;
+  label?: string;
+  announce?: boolean;
+}
+declare function Skeleton(inputs: Inputs<SkeletonProps>, ctx: ComponentContext): UiChild;
+interface SkeletonTextProps extends ControlLayoutProps {
+  lines?: number;
+  widths?: readonly UiLength[];
+  lineHeight?: number;
+  gap?: number;
+  shimmer?: boolean;
+  label?: string;
+  announce?: boolean;
+}
+declare function SkeletonText(inputs: Inputs<SkeletonTextProps>, ctx: ComponentContext): UiChild;
 interface VirtualList {
   readonly windowRef: (window: UiVirtualWindow) => void;
   readonly ref: UiNodeRef;
@@ -597,6 +639,8 @@ declare function trackFocus(ctx: ComponentContext, forwarded?: InputCell<UiNodeR
 export {
   Accordion,
   allOf,
+  Avatar,
+  Badge,
   Button,
   Card,
   Checkbox,
@@ -629,6 +673,8 @@ export {
   range,
   required,
   Select,
+  Skeleton,
+  SkeletonText,
   Slider,
   Spinner,
   SplitPane,
@@ -647,6 +693,11 @@ export {
   type AccordionProps,
   type AccordionSection,
   type AsyncValidator,
+  type AvatarProps,
+  type AvatarShape,
+  type AvatarSize,
+  type BadgeProps,
+  type BadgeTone,
   type ButtonPaint,
   type ButtonProps,
   type ButtonSize,
@@ -699,6 +750,8 @@ export {
   type Schema,
   type SelectOption,
   type SelectProps,
+  type SkeletonProps,
+  type SkeletonTextProps,
   type SliderProps,
   type SpinnerProps,
   type SplitPaneProps,

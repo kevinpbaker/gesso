@@ -66,6 +66,9 @@ export {
   type SpinnerProps,
   type ProgressBarProps
 } from './Media';
+export { Badge, type BadgeProps, type BadgeTone } from './Badge';
+export { Avatar, type AvatarProps, type AvatarShape, type AvatarSize } from './Avatar';
+export { Skeleton, SkeletonText, type SkeletonProps, type SkeletonTextProps } from './Skeleton';
 export { useOverlay, type OverlayHandle, type OverlayOptions } from './overlay';
 export { virtualList, stepIndex, type VirtualList } from './virtual';
 export { controlled, type ControlledValue } from './controlled';
