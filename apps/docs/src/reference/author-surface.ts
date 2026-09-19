@@ -1063,6 +1063,20 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/accordion'
   },
   {
+    name: 'Avatar',
+    package: 'components',
+    group: 'Components',
+    what: 'A face, falling back to initials and then to a glyph.',
+    page: '/components/avatar'
+  },
+  {
+    name: 'Badge',
+    package: 'components',
+    group: 'Components',
+    what: 'A count or a short marker on something else, silent unless it is named.',
+    page: '/components/badge'
+  },
+  {
     name: 'Card',
     package: 'components',
     group: 'Components',
@@ -1201,6 +1215,20 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     group: 'Components',
     what: 'One option in that list.',
     page: '/components/select'
+  },
+  {
+    name: 'Skeleton',
+    package: 'components',
+    group: 'Components',
+    what: 'A stand-in holding the box of content that has not arrived, shimmering if asked.',
+    page: '/components/skeleton'
+  },
+  {
+    name: 'SkeletonText',
+    package: 'components',
+    group: 'Components',
+    what: 'A run of stand-in lines, the last one short, for a paragraph still loading.',
+    page: '/components/skeleton'
   },
   {
     name: 'Slider',

@@ -202,6 +202,7 @@ export default defineConfig({
           { text: 'Restyling the controls', link: '/components/restyling' },
           { text: 'Button', link: '/components/button' },
           { text: 'Chip', link: '/components/chip' },
+          { text: 'Badge', link: '/components/badge' },
           { text: 'Checkbox', link: '/components/checkbox' },
           { text: 'Switch', link: '/components/switch' },
           { text: 'RadioGroup', link: '/components/radio-group' },
@@ -224,10 +225,12 @@ export default defineConfig({
           { text: 'SplitPane', link: '/components/split-pane' },
           { text: 'FindBar', link: '/components/find-bar' },
           { text: 'Image', link: '/components/image' },
+          { text: 'Avatar', link: '/components/avatar' },
           { text: 'Video', link: '/components/video' },
           { text: 'Icon', link: '/components/icon' },
           { text: 'Spinner', link: '/components/spinner' },
-          { text: 'ProgressBar', link: '/components/progress-bar' }
+          { text: 'ProgressBar', link: '/components/progress-bar' },
+          { text: 'Skeleton', link: '/components/skeleton' }
         ]
       },
       {

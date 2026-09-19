@@ -154,9 +154,12 @@ The pages, by what they are for:
   [Menu](/components/menu), [Tooltip](/components/tooltip),
   [Toast](/components/toast).
 - **Showing media:** [Image](/components/image),
-  [Video](/components/video), [Icon](/components/icon).
+  [Avatar](/components/avatar), [Video](/components/video),
+  [Icon](/components/icon).
+- **Marking:** [Badge](/components/badge).
 - **Reporting progress:** [Spinner](/components/spinner),
-  [ProgressBar](/components/progress-bar).
+  [ProgressBar](/components/progress-bar),
+  [Skeleton](/components/skeleton).
 
 For a tour of the library rather than a reference,
 [using components](/guide/using-components) builds the form above.
