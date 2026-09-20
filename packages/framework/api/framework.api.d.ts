@@ -1777,6 +1777,7 @@ declare class WorkerApp {
   private resizeInFlight;
   private heldResize;
   private canvasOrigin;
+  private fullscreen;
   private pendingMove;
   private moveFrame;
   constructor(options: WorkerAppOptions);
@@ -1845,6 +1846,7 @@ declare class GessoApp {
   private history;
   private detachVisibility;
   private detachFullscreen;
+  private fullscreen;
   private detachReducedMotion;
   private detachColorScheme;
   private detachViewportInsets;
@@ -2826,7 +2828,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-D_T1BQOv.js";
+} from "./index-C8yYHFKz.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3299,7 +3301,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-D_T1BQOv.js";
+} from "../index-C8yYHFKz.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

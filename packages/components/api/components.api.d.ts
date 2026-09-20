@@ -267,6 +267,7 @@ interface SliderProps extends ControlLayoutProps {
   format?: (value: number) => string;
   labelHidden?: boolean;
   trackAlign?: 'center' | 'start';
+  thumb?: boolean;
 }
 declare function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
 interface NumberInputProps extends ControlLayoutProps {
@@ -509,6 +510,7 @@ interface VideoControlsOptions {
   time?: boolean;
   volume?: boolean;
   fullscreen?: boolean;
+  thumb?: boolean;
   alwaysVisible?: boolean;
 }
 interface VideoReadout {
