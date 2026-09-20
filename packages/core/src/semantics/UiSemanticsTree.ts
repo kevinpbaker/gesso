@@ -110,7 +110,47 @@ const PRESENTATIONAL_CHILDREN: ReadonlySet<UiRole> = new Set<UiRole>([
  *      is, carrying `disabled` — unavailable is a thing to announce,
  *      hidden is not.
  */
-export function buildSemanticsTree(root: UiNode): UiSemanticsMap {
+export function buildSemanticsTree(root: UiNode): Map<string, UiSemanticsRecord> {
+  return walk(root, null, false);
+}
+
+/**
+ * The records one subtree contributes, as if walked in place.
+ *
+ * For re-describing what changed without rebuilding the whole tree.
+ * `node` keeps the `parent` and `index` its existing record has, and
+ * everything below it is walked exactly as `buildSemanticsTree` would:
+ * a descendant's index is counted among the semantic children of
+ * whatever inside this subtree claims it, so the numbering is the same
+ * one a full walk produces.
+ *
+ * **That only holds when `node` itself carries a record.** A
+ * transparent node's children attach to its nearest semantic ancestor
+ * and are numbered among that ancestor's *other* children too — nodes
+ * outside this subtree — so a walk that started here would number them
+ * from zero and disagree with the tree. Null says so, and the caller
+ * has to rebuild the whole tree instead.
+ *
+ * `inert` is whether an ancestor above this subtree is disabled, which
+ * only the caller can know.
+ */
+export function buildSemanticsSubtree(
+  node: UiNode,
+  parent: string | null,
+  index: number,
+  inert: boolean
+): Map<string, UiSemanticsRecord> | null {
+  const records = walk(node, parent, inert);
+  const own = records.get(node.id);
+  if (own === undefined) {
+    return null;
+  }
+  // The walk numbered it from zero, knowing nothing of its siblings.
+  records.set(node.id, { ...own, index });
+  return records;
+}
+
+function walk(root: UiNode, rootParent: string | null, rootInert: boolean): Map<string, UiSemanticsRecord> {
   const records = new Map<string, UiSemanticsRecord>();
   const childCounts = new Map<string | null, number>();
 
@@ -153,8 +193,23 @@ export function buildSemanticsTree(root: UiNode): UiSemanticsMap {
     }
   };
 
-  visit(root, null, false);
+  visit(root, rootParent, rootInert);
   return records;
+}
+
+/**
+ * Whether an ancestor of `node` is disabled, which every record in its
+ * subtree inherits.
+ *
+ * A full walk carries this down; a subtree walk has to look it up.
+ */
+export function semanticsInertAbove(node: UiNode): boolean {
+  for (let current = node.parent; current !== null; current = current.parent) {
+    if (current.properties.get('disabled') === true) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -168,11 +223,31 @@ function describe(
 ): UiSemanticsRecord | null {
   const role = (node.properties.get('role') as UiRole | undefined) ?? IMPLICIT_ROLES[node.type as UiNodeType];
   const declaredLabel = node.properties.get('label') as string | undefined;
-  const name = declaredLabel ?? accessibleText(node);
   const isText = node.type === UiNodeType.Text;
+  // Decided before the name is gathered, and that order is the whole
+  // cost of this walk.
+  //
+  // `accessibleText` recurses through every descendant that names its
+  // parent and joins what it finds, so on a plain container it reads
+  // the entire subtree and allocates the joined string. A node with no
+  // role, no label and no text of its own is transparent *whatever*
+  // that string says — so computing it first meant every box in the
+  // tree gathered the text of everything beneath it and then threw the
+  // answer away. On the benchmark list that was the root joining two
+  // thousand titles, each row joining its own, and so on down: the
+  // walk was quadratic in the depth of transparent wrappers, and
+  // rebuilding the tree for one changed label cost 3.2 ms.
+  //
+  // Asking the cheap question first — three property reads and a type
+  // check — leaves the name to the nodes that can actually carry one.
+  if (role === undefined && declaredLabel === undefined && !isText) {
+    return null;
+  }
+  const name = declaredLabel ?? accessibleText(node);
   // Prose with nothing else to say is still a record: a screen reader
-  // has to be able to read the page, not only operate it.
-  if (role === undefined && declaredLabel === undefined && !(isText && name !== undefined)) {
+  // has to be able to read the page, not only operate it. A Text node
+  // with no text left is not prose, and says nothing.
+  if (role === undefined && declaredLabel === undefined && name === undefined) {
     return null;
   }
   const states = node.properties.get('states') as UiSemanticStates | undefined;

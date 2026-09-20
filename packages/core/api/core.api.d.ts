@@ -3849,6 +3849,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private disposed;
   private readonly contentBox;
   private readonly paint;
+  private paintOwner;
   private cullX;
   private cullY;
   private cullWidth;
@@ -3863,6 +3864,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   resize(width: number, height: number, dpr: number): void;
   dispose(): void;
   render(root: UiNode, context: RenderContext): void;
+  private resolvePaint;
   private beginFrame;
   private renderNode;
   private renderChildren;
@@ -4657,7 +4659,9 @@ interface UiSemanticsRecord {
   readonly level?: number;
 }
 type UiSemanticsMap = ReadonlyMap<string, UiSemanticsRecord>;
-declare function buildSemanticsTree(root: UiNode): UiSemanticsMap;
+declare function buildSemanticsTree(root: UiNode): Map<string, UiSemanticsRecord>;
+declare function buildSemanticsSubtree(node: UiNode, parent: string | null, index: number, inert: boolean): Map<string, UiSemanticsRecord> | null;
+declare function semanticsInertAbove(node: UiNode): boolean;
 declare const TEXT_RUN_ID_SEPARATOR = "#run";
 declare function textRunOfRecordId(id: string): {
   nodeId: string;
@@ -4706,6 +4710,7 @@ export {
   AutoScrollOptions,
   AxisExplanation,
   bandOf,
+  Bd,
   BindingId,
   borderRadius,
   borderRadiusCorners,
@@ -4722,6 +4727,7 @@ export {
   BreakpointArgs,
   buildFontString,
   buildRenderList,
+  buildSemanticsSubtree,
   buildSemanticsTree,
   bumpFontStack,
   bundle,
@@ -5136,7 +5142,6 @@ export {
   PublishInsetArgs,
   radialGradient,
   raiseContrast,
-  Rd,
   Reactive,
   readMp3Header,
   recordsEqual,
@@ -5208,6 +5213,7 @@ export {
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
+  semanticsInertAbove,
   setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
@@ -5567,6 +5573,7 @@ import {
   BreakpointArgs,
   buildFontString,
   buildRenderList,
+  buildSemanticsSubtree,
   buildSemanticsTree,
   bumpFontStack,
   bundle,
@@ -6052,6 +6059,7 @@ import {
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
+  semanticsInertAbove,
   setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
@@ -6376,7 +6384,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DuZEAhyZ.js";
+} from "./index-CTFOLuiM.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6400,6 +6408,7 @@ export {
   breakpoint,
   buildFontString,
   buildRenderList,
+  buildSemanticsSubtree,
   buildSemanticsTree,
   bumpFontStack,
   bundle,
@@ -6720,6 +6729,7 @@ export {
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
+  semanticsInertAbove,
   setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
@@ -7251,7 +7261,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DuZEAhyZ.js";
+} from "./index-CTFOLuiM.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

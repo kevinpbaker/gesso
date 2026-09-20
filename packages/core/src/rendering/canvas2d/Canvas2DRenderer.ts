@@ -83,6 +83,26 @@ export class Canvas2DRenderer implements UiRenderer {
   /** Scratch for the padded box text is drawn in; reused across nodes. */
   private readonly contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
   private readonly paint = createPaintState();
+  /**
+   * Whose style the shared paint scratch currently holds.
+   *
+   * `resolvePaintState` folds about thirty properties — several of
+   * them inherited, so each is an ancestor walk — into one reused
+   * object. A node that paints text resolved twice: once for its own
+   * box, and again after the walk into its children, because a child
+   * overwrites the scratch before the text is drawn.
+   *
+   * Only the second one is conditional. A leaf never had a child to
+   * clobber it, and neither did a node whose children turned out to be
+   * every one of them invisible, culled or lifted — and leaves are
+   * most of the text in an application. Recording the owner answers
+   * "is the scratch still mine" exactly, for one reference compare,
+   * where asking `node.firstChild === null` would only approximate it
+   * and would go quietly wrong as the early-outs in `renderNode`
+   * change. Every write goes through `resolvePaint`, so the answer
+   * cannot drift from the truth.
+   */
+  private paintOwner: UiNode | null = null;
   private cullX = 0;
   private cullY = 0;
   private cullWidth = 0;
@@ -137,11 +157,26 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullWidth = this.surface.logicalWidth;
     this.cullHeight = this.surface.logicalHeight;
     this.liftedPass.length = 0;
+    // A property the scratch folded last frame may have changed since,
+    // so ownership does not carry across frames. Nothing observes it
+    // today — every check follows an unconditional resolve of the same
+    // node within one `renderNode` — but the field would otherwise be
+    // a true statement about the wrong frame.
+    this.paintOwner = null;
     this.renderNode(root, context, ctx, true, false);
     this.renderLifted(context, ctx);
     if (context.overlay !== undefined && context.overlay.length > 0) {
       drawOverlayShapes(ctx, context.overlay);
     }
+  }
+
+  /**
+   * Folds a node's style into the shared scratch and records that it
+   * is now that node's. The one writer; see `paintOwner`.
+   */
+  private resolvePaint(node: UiNode): PaintState {
+    this.paintOwner = node;
+    return resolvePaintState(node, this.paint);
   }
 
   // -------------------------------------------------------------------------
@@ -188,7 +223,7 @@ export class Canvas2DRenderer implements UiRenderer {
       return;
     }
 
-    const paint = resolvePaintState(node, this.paint);
+    const paint = this.resolvePaint(node);
 
     // Captured before children reuse the shared scratch below.
     const hasText = paint.text !== undefined;
@@ -259,10 +294,15 @@ export class Canvas2DRenderer implements UiRenderer {
 
     if (hasText) {
       // Foreground text is painted after children, inside the node's
-      // own clip and in its own (unscrolled) space. Children have
-      // reused the shared PaintState scratch, so re-resolve this node's
-      // style so the text renders with its own color/size/alignment.
-      resolvePaintState(node, this.paint);
+      // own clip and in its own (unscrolled) space. If the walk below
+      // wrote the shared scratch, it now holds some descendant's style
+      // and this node's has to be folded again before the text is
+      // drawn with it; if nothing wrote, the scratch is still this
+      // node's and re-resolving would only spend the thirty property
+      // lookups over.
+      if (this.paintOwner !== node) {
+        this.resolvePaint(node);
+      }
       this.paintContent(ctx, rec, this.paint, context);
     }
     if (rec.liftBoundary && this.liftedPass.length > liftedBefore) {
@@ -278,7 +318,16 @@ export class Canvas2DRenderer implements UiRenderer {
       ctx.restore();
     }
     if (decorations !== null && hasDecorationPhase(decorations, true)) {
-      this.paintDecorations(ctx, node, rec, resolvePaintState(node, this.paint), decorations, true);
+      // Same argument as the text pass above: the lifted pass and the
+      // child walk may both have left, or may both have left alone.
+      this.paintDecorations(
+        ctx,
+        node,
+        rec,
+        this.paintOwner === node ? this.paint : this.resolvePaint(node),
+        decorations,
+        true
+      );
     }
     if (rec.scrollable) {
       this.paintScrollbars(ctx, rec, context.now ?? performance.now());
@@ -372,7 +421,10 @@ export class Canvas2DRenderer implements UiRenderer {
         // A fragment: no box, no transform, nothing to apply.
         continue;
       }
-      const paint = resolvePaintState(ancestor, this.paint);
+      // Through the helper, like every other write: this leaves an
+      // *ancestor's* style in the scratch, and a check further up the
+      // walk that believed otherwise would paint text in it.
+      const paint = this.resolvePaint(ancestor);
       if (rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0) {
         ctx.translate(rec.stickyOffsetX, rec.stickyOffsetY);
       }

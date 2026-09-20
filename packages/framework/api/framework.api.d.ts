@@ -1557,6 +1557,7 @@ declare class GessoRuntime {
   private replicas;
   private phaseTimings;
   private started;
+  private laidOutOnce;
   constructor(options: GessoRuntimeOptions);
   deferPatchesFrom(sources: readonly PatchSource[]): void;
   start(): void;
@@ -1630,7 +1631,12 @@ declare class GessoRuntime {
   applySemanticsAction(action: UiSemanticsAction): void;
   private applyTextRunAction;
   private updateSemantics;
+  private rebuildSemantics;
+  private rescopeSemantics;
+  private semanticsOwnerOf;
+  private semanticIdsUnder;
   private collectSemanticsBoxes;
+  private onScreen;
   private revealBox;
   private handleHoverChange;
   private createScrollSink;
@@ -2800,7 +2806,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-BkYPVXSJ.js";
+} from "./index-Cf_jEFA8.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3272,7 +3278,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-BkYPVXSJ.js";
+} from "../index-Cf_jEFA8.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

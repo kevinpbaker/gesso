@@ -70,12 +70,17 @@ import {
   AnimationDriver,
   UiSharedElements,
   buildSemanticsTree,
+  buildSemanticsSubtree,
+  semanticsInertAbove,
+  recordsEqual,
+  TEXT_RUN_ID_SEPARATOR,
   diffSemantics,
   LayoutNotifier,
   type UiSemanticsAction,
   type UiSemanticsBox,
   type UiSemanticsMap,
   type UiSemanticsPatch,
+  type UiSemanticsRecord,
   type UiSemanticsUpdate,
   type LayoutBox,
   LayoutEngine,
@@ -430,7 +435,7 @@ export class GessoRuntime {
   private readonly sharedElements = new UiSharedElements();
   private readonly focusNotifier = new FocusNotifier();
   private readonly environmentNotifier = new EnvironmentNotifier();
-  private semantics: UiSemanticsMap = new Map();
+  private semantics = new Map<string, UiSemanticsRecord>();
   private semanticsListener: ((update: UiSemanticsUpdate) => void) | null = null;
   /**
    * The box last reported for each mirrored node, so a frame that
@@ -464,6 +469,12 @@ export class GessoRuntime {
   private replicas: readonly PatchSource[] = [];
   private phaseTimings: FramePhaseTimings = emptyPhaseTimings();
   private started = false;
+  /**
+   * Whether the engine holds a laid-out tree, so `resize` knows which
+   * path it is on. Set by the first resize and by the first frame that
+   * lays out, whichever comes first; see `resize`.
+   */
+  private laidOutOnce = false;
 
   constructor(options: GessoRuntimeOptions) {
     this.services = options.services ?? new ServiceRegistry();
@@ -868,11 +879,37 @@ export class GessoRuntime {
     if (this.root === undefined) {
       return;
     }
-    this.engine.layout(this.root, this.constraints);
-    // Resizing the backing store clears whatever was drawn, and layout
-    // marks nothing dirty on its own, so without this the canvas stays
-    // blank until some unrelated change happens to schedule a frame.
-    this.graph.markDirty(this.root, DirtyFlags.Paint);
+    if (this.laidOutOnce) {
+      // Marked, not laid out here. `engine.layout()` is the *mount*
+      // path: it retires every record and hands each one back through
+      // `LayoutRecord.reset()`, which restores `measureDirty` and
+      // clears `lastConstraints` — so it discards the measure memo for
+      // the whole tree and pays a cold pass. A resize does not change
+      // the tree, and the memo is exactly what makes the new size
+      // cheap: the frame below reaches `fullLayout` through
+      // `markLayoutDirty`, which dirties the root and nothing beneath
+      // it, so a subtree whose constraints came out unchanged returns
+      // at the memo instead of measuring again.
+      //
+      // On the benchmark list (5,001 nodes) that is 28.5 ms and 11,001
+      // nodes measured, against 1.8 ms and *one* node measured for a
+      // height-only drag. A width drag still re-measures what genuinely
+      // re-wraps; it does not re-measure everything else as well.
+      this.graph.markDirty(this.root, DirtyFlags.Layout | DirtyFlags.Paint);
+    } else {
+      // The first size the runtime is given, before any frame has run.
+      // The mount path is the right one exactly once: there is no memo
+      // to preserve, and a host that resizes before `start()` must
+      // still end with a laid-out tree, since nothing else will lay one
+      // out until the scheduler runs.
+      this.laidOutOnce = true;
+      this.engine.layout(this.root, this.constraints);
+      // Resizing the backing store clears whatever was drawn, and
+      // layout marks nothing dirty on its own, so without this the
+      // canvas stays blank until some unrelated change happens to
+      // schedule a frame.
+      this.graph.markDirty(this.root, DirtyFlags.Paint);
+    }
     // Drawn here, in the task that cleared the surface, rather than on
     // the next tick: a cleared canvas is committed to the compositor at
     // the end of this task, so a deferred repaint shows one blank frame
@@ -2057,7 +2094,7 @@ export class GessoRuntime {
    * to say. `UiSemanticsUpdate` explains why they travel together
    * anyway.
    */
-  private updateSemantics(rebuild: boolean, moved: boolean): void {
+  private updateSemantics(frame: UiFrame, rebuild: boolean, moved: boolean): void {
     let patches: readonly UiSemanticsPatch[] = EMPTY_PATCHES;
     const listener = this.semanticsListener;
     if (rebuild) {
@@ -2068,10 +2105,7 @@ export class GessoRuntime {
         // any bound label does this. The work moves to whoever asks.
         this.semanticsStale = true;
       } else {
-        const next = buildSemanticsTree(this.layoutRoot());
-        patches = diffSemantics(this.semantics, next);
-        this.semantics = next;
-        this.semanticsStale = false;
+        patches = this.rescopeSemantics(frame) ?? this.rebuildSemantics();
       }
     }
     if (listener === null) {
@@ -2087,17 +2121,192 @@ export class GessoRuntime {
     listener(focusMoved ? { patches, boxes, focused } : { patches, boxes });
   }
 
+  /** Walks the whole tree and diffs it against the last one. */
+  private rebuildSemantics(): readonly UiSemanticsPatch[] {
+    const next = buildSemanticsTree(this.layoutRoot());
+    const patches = diffSemantics(this.semantics, next);
+    this.semantics = next;
+    this.semanticsStale = false;
+    return patches;
+  }
+
   /**
-   * The mirrored nodes whose box differs from the one last sent.
+   * The patches for a frame that changed what some nodes *mean*
+   * without changing which nodes there are — or null when that cannot
+   * be established cheaply, and the whole tree has to be walked.
    *
-   * Bounded by the semantics tree, which is bounded by the *mounted*
-   * nodes — so a 100k-row list costs the fifteen rows it has mounted,
-   * the same bound the semantics tree walk has.
+   * This is the common case and it used to cost the uncommon one. A
+   * bound label is `text`, `text` marks semantics dirty, and the phase
+   * answered every one of them by rebuilding the tree from the root
+   * and diffing two maps: on the benchmark list, 2 ms on any frame a
+   * clock ticked, next to 0.03 ms for the layout of the same change.
+   *
+   * So the walk is rooted at what actually changed. For each dirty
+   * node the nearest ancestor *carrying a record* is found — a
+   * `Button`'s label lives on the button, not on the `Text` inside it
+   * that a parent claimed — and only that node's subtree is walked.
+   * `buildSemanticsSubtree` explains why the owner has to be a record
+   * holder for the indices to come out the same.
+   *
+   * It gives up, and says so with null, whenever the *shape* of the
+   * tree could have moved:
+   *
+   *   - a frame that changed the tree's children, which is a structural
+   *     change by definition;
+   *   - a dirty node with no record-holding ancestor, whose records sit
+   *     at the top level and are numbered among everything else there;
+   *   - an owner that is no longer describable, whose children would
+   *     reattach further up;
+   *   - a subtree that gained or lost a record, because `this.semantics`
+   *     is insertion-ordered and the diff promises adds in document
+   *     order — splicing one into the middle of a Map cannot preserve
+   *     that, and a mirror appending a child before its parent is a
+   *     worse bug than a slow frame.
+   *
+   * Each of those falls back to the full rebuild, which is correct by
+   * construction. Nothing here decides what a record says; it only
+   * decides how much of the tree has to be asked.
+   */
+  private rescopeSemantics(frame: UiFrame): readonly UiSemanticsPatch[] | null {
+    if (this.semantics.size === 0 || this.semanticsStale) {
+      // No previous tree to scope against, or one already owed in full.
+      return null;
+    }
+    const owners = new Set<UiNode>();
+    for (const [node, flags] of frame.entries()) {
+      if ((flags & DirtyFlags.Children) !== 0) {
+        return null;
+      }
+      if ((flags & DirtyFlags.Semantics) === 0) {
+        continue;
+      }
+      const owner = this.semanticsOwnerOf(node);
+      if (owner === null) {
+        return null;
+      }
+      owners.add(owner);
+      if (owners.size > SCOPED_SEMANTICS_OWNERS) {
+        // Enough of the tree is moving that one walk of all of it beats
+        // this many walks of parts, and the parts may overlap besides.
+        return null;
+      }
+    }
+    if (owners.size === 0) {
+      return null;
+    }
+
+    // Built completely before anything is committed, so a give-up part
+    // way through leaves `this.semantics` as it was.
+    const updates: UiSemanticsRecord[] = [];
+    for (const owner of owners) {
+      const previous = this.semantics.get(owner.id)!;
+      const subtree = buildSemanticsSubtree(owner, previous.parent, previous.index, semanticsInertAbove(owner));
+      if (subtree === null) {
+        return null;
+      }
+      let covered = 0;
+      for (const id of this.semanticIdsUnder(owner)) {
+        const next = subtree.get(id);
+        if (next === undefined) {
+          return null;
+        }
+        covered++;
+        const before = this.semantics.get(id)!;
+        if (!recordsEqual(before, next)) {
+          updates.push(next);
+        }
+      }
+      if (covered !== subtree.size) {
+        // The subtree gained a record; see the note about ordering.
+        return null;
+      }
+    }
+
+    const patches: UiSemanticsPatch[] = [];
+    for (const record of updates) {
+      // Same key, so the map keeps the position — and therefore the
+      // document order — it already had.
+      this.semantics.set(record.id, record);
+      patches.push({ op: 'update', node: record });
+    }
+    return patches;
+  }
+
+  /**
+   * The nearest node at or above `node` that holds a semantics record,
+   * or null when nothing above it does.
+   */
+  private semanticsOwnerOf(node: UiNode): UiNode | null {
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      if (this.semantics.has(current.id)) {
+        return current;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The ids in the current tree that belong to `node`'s subtree.
+   *
+   * Read off the graph rather than remembered, which is sound here
+   * precisely because the caller has established that no node's
+   * children changed this frame.
+   *
+   * A text run is not a node and has no id of its own: it borrows its
+   * paragraph's and adds its position, numbered from zero without
+   * gaps. So the runs of a node are found by counting up until one is
+   * missing, rather than by scanning every key for the prefix.
+   */
+  private semanticIdsUnder(node: UiNode): string[] {
+    const ids: string[] = [];
+    const stack: UiNode[] = [node];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (this.semantics.has(current.id)) {
+        ids.push(current.id);
+        for (let run = 0; ; run++) {
+          const id = `${current.id}${TEXT_RUN_ID_SEPARATOR}${run}`;
+          if (!this.semantics.has(id)) {
+            break;
+          }
+          ids.push(id);
+        }
+      }
+      for (let child = current.firstChild; child !== null; child = child.nextSibling) {
+        stack.push(child);
+      }
+    }
+    return ids;
+  }
+
+  /**
+   * The mirrored nodes whose box differs from the one last sent, and
+   * which are on screen.
+   *
+   * This runs on every frame that laid out, and `frameNeedsLayout`
+   * counts a transform — so it runs on every scrolled frame, where
+   * every box beneath the scroll container has moved. Whatever it
+   * returns crosses to the shell and is written as four inline styles
+   * per element, on the main thread, before the next paint. That is
+   * the one per-frame cost this architecture puts back on the thread
+   * it exists to keep free, and it was proportional to the whole
+   * mounted tree.
+   *
+   * So it is bounded by the viewport instead. A node scrolled out of
+   * sight keeps the last box the mirror was told about; there is
+   * nothing on screen for it to be wrong about, and the sweep picks it
+   * up again on the frame it comes back, because the box it is
+   * compared against is still the stale one. The focused node is
+   * always included whether or not it is on screen: the focus ring is
+   * drawn from its rectangle, and focus moving to something off screen
+   * is answered by `scrollIntoView`, whose own frame reports it.
+   *
    * Ids that have left the tree are dropped here rather than tracked,
    * since a removal patch has already told the mirror about them.
    */
   private collectSemanticsBoxes(): UiSemanticsBox[] {
     const changed: UiSemanticsBox[] = [];
+    const focused = this.focusManager.focusedNode?.id;
     for (const id of this.semantics.keys()) {
       const node = this.graph.getNode(id);
       if (node === undefined || this.engine.recordFor(node) === undefined) {
@@ -2106,6 +2315,12 @@ export class GessoRuntime {
       const box = this.engine.visibleBox(node);
       const last = this.semanticsBoxes.get(id);
       if (last !== undefined && boxesEqual(last, box)) {
+        continue;
+      }
+      if (id !== focused && !this.onScreen(box)) {
+        // Left where it was, deliberately: `semanticsBoxes` is what the
+        // mirror has been told, and leaving the two in step is what
+        // makes the box arrive on the frame this node returns.
         continue;
       }
       this.semanticsBoxes.set(id, box);
@@ -2119,6 +2334,21 @@ export class GessoRuntime {
       }
     }
     return changed;
+  }
+
+  /**
+   * Whether a box in viewport coordinates overlaps the canvas at all.
+   *
+   * Generous by a margin, so that something a scroll is about to bring
+   * in has its rectangle before it arrives rather than one frame after.
+   */
+  private onScreen(box: LayoutBox): boolean {
+    return (
+      box.x < this.width + SEMANTICS_VIEWPORT_MARGIN &&
+      box.y < this.height + SEMANTICS_VIEWPORT_MARGIN &&
+      box.x + box.width > -SEMANTICS_VIEWPORT_MARGIN &&
+      box.y + box.height > -SEMANTICS_VIEWPORT_MARGIN
+    );
   }
 
   /** Scrolls every scroll container above `node` so a node-local box is visible. */
@@ -2381,6 +2611,7 @@ export class GessoRuntime {
       () => this.engine.layoutForFrame(frame, this.constraints, root)
     );
     if (laidOut) {
+      this.laidOutOnce = true;
       this.inspector.recordLayout(started);
     }
     // A modifier that follows its node's box hears about it here, after
@@ -2426,7 +2657,7 @@ export class GessoRuntime {
       () =>
         rebuildSemantics ||
         (this.semanticsListener !== null && (laidOut || this.focusManager.focusedNode?.id !== this.lastFocusedId)),
-      () => this.updateSemantics(rebuildSemantics, laidOut)
+      () => this.updateSemantics(frame, rebuildSemantics, laidOut)
     );
 
     // Render is unconditional once the backend is ready: both backends
@@ -2901,6 +3132,26 @@ function frameNeedsLayout(frame: UiFrame): boolean {
  * a closed dialog leaves the tree.
  */
 /** Shared empties, so a frame that changed nothing allocates nothing. */
+/**
+ * How many separate subtrees a scoped semantics update will walk
+ * before it gives up and walks the whole tree once.
+ *
+ * A frame that re-meant a handful of nodes is the case this exists
+ * for — a clock, a counter, a row whose label changed. A frame that
+ * re-meant a hundred has almost certainly re-meant a shared ancestor's
+ * worth of them, and the subtrees start to overlap, so one walk of
+ * everything is both cheaper and simpler than many walks of parts.
+ */
+const SCOPED_SEMANTICS_OWNERS = 32;
+
+/**
+ * How far outside the canvas a mirrored box is still worth reporting.
+ *
+ * One screenful of slack, so a fling that covers a lot of ground in
+ * one frame still hands the mirror the rows it is about to show.
+ */
+const SEMANTICS_VIEWPORT_MARGIN = 400;
+
 const EMPTY_PATCHES: readonly UiSemanticsPatch[] = [];
 const EMPTY_BOXES: readonly UiSemanticsBox[] = [];
 

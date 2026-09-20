@@ -1,5 +1,7 @@
 export {
   buildSemanticsTree,
+  buildSemanticsSubtree,
+  semanticsInertAbove,
   textRunOfRecordId,
   TEXT_RUN_ID_SEPARATOR,
   type UiSemanticsMap,

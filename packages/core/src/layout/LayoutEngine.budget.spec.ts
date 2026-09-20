@@ -81,6 +81,27 @@ describe('LayoutEngine budgets', () => {
     expect(ms).toBeLessThan(2000);
   });
 
+  it('re-measures almost nothing when only the viewport height changes', () => {
+    const h = new LayoutHarness();
+    const { root } = buildTree(h);
+    h.layout(root, VIEWPORT);
+    // What a window drag does, once the runtime stopped routing it
+    // through the mount path: the root is marked dirty and the frame
+    // reaches `fullLayout` with every record's memo still on it. The
+    // rows are fixed-height and full-width, so a taller viewport
+    // changes no child's constraints and no child is measured again.
+    const taller = Constraints.loose(1200, 900);
+    const { ms } = timed('height-only resize', () =>
+      h.engine.layoutForFrame(new UiFrame(2, 0, new Map([[root, DirtyFlags.Layout]])), taller, root)
+    );
+    const { measured, fullLayout } = h.engine.stats;
+    // eslint-disable-next-line no-console
+    console.info(`[layout budget] height-only resize: measured ${measured}`);
+    expect(fullLayout).toBe(true);
+    expect(measured).toBeLessThan(20);
+    expect(ms).toBeLessThan(50);
+  });
+
   it('re-measures fewer than 20 nodes for a text change deep in the tree', () => {
     const h = new LayoutHarness();
     const { root, texts } = buildTree(h);
