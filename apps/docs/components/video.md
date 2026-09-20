@@ -38,7 +38,7 @@ refuses. A real MP4 needs a browser: see the limits below.
 | `loop`             | `boolean`                                  | `true`              | Start again at the beginning when the clip ends.                                     |
 | `autoplay`         | `boolean`                                  | `true`              | Start playing as soon as the clip is ready. `false` shows one frame and stays on it. |
 | `rate`             | `number`                                   | `1`                 | How fast to play. Clamped to between a sixteenth and four times.                     |
-| `controls`         | `boolean \| VideoControlsOptions`          | off                 | Draw a transport over the bottom of the picture.                                     |
+| `controls`         | `boolean \| VideoControlsOptions`          | off                 | Draw a transport over the bottom of the picture. `hideAfterMs` sets the idle delay.  |
 | `volume`           | `number`                                   | `1`                 | The starting level, 0 to 1, for the control and for `onVolume`.                      |
 | `muted`            | `boolean`                                  | `false`             | Whether it starts silenced.                                                          |
 | `onVolume`         | `(volume, muted) => void`                  | none                | Told when the level changed. Supplying it is what makes a volume control honest.     |

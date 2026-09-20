@@ -87,6 +87,16 @@ export interface VideoControlsOptions {
    */
   thumb?: boolean;
   /**
+   * How long the pointer must be still before the bar goes away, in
+   * milliseconds. Zero keeps it up until the pointer leaves.
+   *
+   * A second by default. Long enough that crossing the picture towards
+   * a control does not take the control away, and short enough that
+   * the chrome is not sitting over the clip a beat after you stopped
+   * asking for it. Resting on the bar suspends it entirely.
+   */
+  hideAfterMs?: number;
+  /**
    * Keep the bar up instead of revealing it on hover.
    *
    * The default is the behaviour every player has: the bar is out of
@@ -172,6 +182,14 @@ export interface VideoControlsProps {
   options?: VideoControlsOptions;
   /** Whether the bar should be on screen; see `alwaysVisible`. */
   visible?: boolean;
+  /**
+   * Told when the pointer comes to rest on the bar and when it leaves.
+   *
+   * What keeps a bar from disappearing under a hand that is holding
+   * still over a scrubber it is about to press, which is the stillest
+   * the pointer ever is and exactly when an idle timer would fire.
+   */
+  onPointerWithin?: (within: boolean) => void;
   /**
    * Whether the application wired the level to anything that makes a
    * noise. See `VideoControlsOptions.volume` for why the control is
@@ -399,6 +417,8 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
     {
       ref: (node: UiNode | null) => (plate = node),
       width: percent(100),
+      onPointerEnter: () => inputs.onPointerWithin.value?.(true),
+      onPointerLeave: () => inputs.onPointerWithin.value?.(false),
       // Painted rather than themed: this sits over a picture whose
       // colours the theme cannot know, so it brings its own plate.
       // **No padding of its own**: the scrubber is flush to this

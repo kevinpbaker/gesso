@@ -48,6 +48,17 @@ import { VideoControls, type VideoControlsOptions } from './VideoControls';
  */
 
 /**
+ * How long the pointer must be still before the controls go away.
+ *
+ * A second. Long enough that crossing the picture towards a control
+ * does not take the control away, and short enough that the chrome is
+ * not sitting over the clip a beat after you stopped asking for it.
+ * Resting on the bar itself suspends it entirely, so the short window
+ * costs nothing to somebody actually reaching for a button.
+ */
+const DEFAULT_HIDE_AFTER_MS = 1000;
+
+/**
  * The colour a media box carries before there is a picture on it.
  *
  * Shared by `Image` and `Video` because to an application they are one
@@ -314,9 +325,54 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
   // The transport arrives long after this body has run, so the bar is
   // built against a cell it fills in rather than against a value.
   const held = internalState<VideoTransport | null>(null, 'Video.transport');
-  // Hover is the whole of the reveal rule that this box can answer;
-  // the bar itself adds "and whenever it is paused".
-  const hovered = internalState(false, 'Video.hovered');
+  /**
+   * Whether the pointer has been doing something here lately.
+   *
+   * Not "is the pointer inside the box", which is what this used to
+   * be and is the wrong question in two directions. A pointer that
+   * entered and then stopped is not using the controls, and every
+   * player takes the bar away again after a few seconds of that. A
+   * pointer that has just left is very often coming straight back,
+   * and taking the bar away the instant it crosses the edge makes it
+   * flicker on the way to a control.
+   *
+   * So: any movement here rouses it, and stillness for
+   * `hideAfterMs` puts it away again, whether the pointer is still
+   * inside or long gone. Resting *on* the bar is the exception, and
+   * has to be, because a pointer held steady over a scrubber it is
+   * about to press is the stillest the pointer ever is.
+   */
+  const roused = internalState(false, 'Video.roused');
+  /** Whether the pointer is resting on the controls themselves. */
+  let onBar = false;
+  let idle: ReturnType<typeof setTimeout> | null = null;
+
+  const restIdle = (): void => {
+    if (idle !== null) {
+      clearTimeout(idle);
+      idle = null;
+    }
+  };
+
+  const rouse = (): void => {
+    if (!roused.value) {
+      roused.value = true;
+    }
+    restIdle();
+    const after = wanted?.hideAfterMs ?? DEFAULT_HIDE_AFTER_MS;
+    if (after <= 0) {
+      return;
+    }
+    idle = setTimeout(() => {
+      idle = null;
+      // A pointer parked on the bar is using it, however still it is.
+      if (!onBar) {
+        roused.value = false;
+      }
+    }, after);
+  };
+
+  ctx.onUnmount(restIdle);
 
   /**
    * Fullscreen is two things, and doing only the first is the bug this
@@ -367,12 +423,18 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
       transport: held,
       options: wanted ?? {},
       visible,
+      onPointerWithin: (within: boolean) => {
+        onBar = within;
+        if (within) {
+          rouse();
+        }
+      },
       volumeWired: inputs.onVolume.value !== undefined,
       fullscreenActive: active,
       onFullscreen: requestFullscreen
     });
 
-  const bar = wanted === null ? null : barFor(hovered, shell.fullscreen);
+  const bar = wanted === null ? null : barFor(roused, shell.fullscreen);
 
   if (wanted !== null) {
     const stop = shell.fullscreen.subscribe(active => {
@@ -442,8 +504,12 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
             // is present and not a function is rejected outright, and
             // a `Video` with no controls must not register listeners
             // it has no use for.
-            onPointerEnter: () => (hovered.value = true),
-            onPointerLeave: () => (hovered.value = false)
+            onPointerEnter: rouse,
+            onPointerMove: rouse,
+            // Leaving does not hide it; it lets the countdown that is
+            // already running finish, which is what makes a pointer
+            // that leaves and comes straight back not flicker.
+            onPointerLeave: rouse
           }),
       // The same tint `Image` draws, from the same prop: a clip waiting
       // on a fetch, a demux and a decoder configuration has nothing to

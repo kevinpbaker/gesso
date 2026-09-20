@@ -511,6 +511,7 @@ interface VideoControlsOptions {
   volume?: boolean;
   fullscreen?: boolean;
   thumb?: boolean;
+  hideAfterMs?: number;
   alwaysVisible?: boolean;
 }
 interface VideoReadout {
@@ -525,6 +526,7 @@ interface VideoControlsProps {
   transport: VideoTransport | null;
   options?: VideoControlsOptions;
   visible?: boolean;
+  onPointerWithin?: (within: boolean) => void;
   volumeWired?: boolean;
   fullscreenActive?: boolean;
   onFullscreen?: (enter: boolean) => void;

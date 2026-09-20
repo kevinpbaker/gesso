@@ -1164,7 +1164,12 @@ describe('Video', () => {
     }
   });
 
-  it('keeps the bar hidden until the pointer is over the clip', async () => {
+  /**
+   * A clip with controls whose idle window is stated rather than
+   * inherited, so a spec about timing does not silently depend on the
+   * default changing.
+   */
+  function withControls(hideAfterMs: number) {
     let node: UiNode | null = null;
     const mounted = mountVideo(
       Column(
@@ -1172,11 +1177,7 @@ describe('Video', () => {
         createComponent(Video, {
           src: 'clip.mp4',
           alt: 'A clip',
-          controls: true,
-          // Paused, which used to be enough to keep the bar up on its
-          // own: every clip that had not been started yet wore its
-          // chrome permanently, which is not what a bar that hides
-          // itself is for.
+          controls: { hideAfterMs },
           autoplay: false,
           ref: (n: UiNode | null) => (node = n),
           width: 360,
@@ -1184,19 +1185,119 @@ describe('Video', () => {
         })
       )
     );
-    await mounted.settle();
+    let at = 0;
+    /**
+     * Runs frames so the opacity transition can finish.
+     *
+     * The bar fades over 160ms rather than switching, so asserting on
+     * the frame after a pointer move reads whatever the transition had
+     * reached by then, which is nearly zero.
+     */
+    const settleFade = async (): Promise<void> => {
+      for (let step = 0; step < 8; step++) {
+        await vi.advanceTimersByTimeAsync(30);
+        at += 30;
+        mounted.frame(at);
+      }
+    };
+    const wait = async (ms: number): Promise<void> => {
+      await vi.advanceTimersByTimeAsync(ms);
+      at += ms;
+      mounted.frame(at);
+    };
+    return { mounted, node: () => node!, settleFade, wait };
+  }
 
-    const bar = mounted.getByRole('toolbar');
-    expect(bar.properties.get('opacity')).toBe(0);
+  it('keeps the bar hidden until the pointer does something over the clip', async () => {
+    vi.useFakeTimers();
+    try {
+      const ui = withControls(2000);
+      await vi.advanceTimersByTimeAsync(0);
+      const bar = ui.mounted.getByRole('toolbar');
+      expect(bar.properties.get('opacity')).toBe(0);
 
-    const box = mounted.getLayout(node!);
-    mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
-    await mounted.settle();
-    expect(bar.properties.get('opacity')).toBe(1);
+      const box = ui.mounted.getLayout(ui.node());
+      ui.mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + 10);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
-    mounted.fireEvent.pointerMove(box.x + box.width + 40, box.y + box.height + 40);
-    await mounted.settle();
-    expect(bar.properties.get('opacity')).toBe(0);
+  it('takes the bar away again once the pointer has been still for a while', async () => {
+    vi.useFakeTimers();
+    try {
+      const ui = withControls(2000);
+      await vi.advanceTimersByTimeAsync(0);
+      const bar = ui.mounted.getByRole('toolbar');
+      const box = ui.mounted.getLayout(ui.node());
+
+      ui.mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + 10);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(1);
+
+      // Still inside the clip, and not moving. A pointer that entered
+      // and then stopped is not using the controls, and every player
+      // takes the bar away after a few seconds of that.
+      await ui.wait(2100);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not take it away the instant the pointer crosses the edge', async () => {
+    vi.useFakeTimers();
+    try {
+      const ui = withControls(2000);
+      await vi.advanceTimersByTimeAsync(0);
+      const bar = ui.mounted.getByRole('toolbar');
+      const box = ui.mounted.getLayout(ui.node());
+
+      ui.mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + 10);
+      await ui.settleFade();
+      ui.mounted.fireEvent.pointerMove(box.x + box.width + 80, box.y + box.height + 80);
+      await ui.wait(50);
+
+      // A pointer that has just left is very often coming straight
+      // back, and hiding on the way to a control makes it flicker.
+      expect(bar.properties.get('opacity')).toBe(1);
+
+      await ui.wait(2100);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('holds the bar up while the pointer rests on it', async () => {
+    vi.useFakeTimers();
+    try {
+      const ui = withControls(2000);
+      await vi.advanceTimersByTimeAsync(0);
+      const bar = ui.mounted.getByRole('toolbar');
+      const barBox = ui.mounted.getLayout(bar);
+      const box = ui.mounted.getLayout(ui.node());
+
+      // Across the picture and then down onto the bar, which is the
+      // only way a real pointer arrives there: the enter that sets
+      // "the pointer is on the controls" is a transition, so a spec
+      // that starts the pointer already on the bar never fires one.
+      ui.mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + 10);
+      await ui.settleFade();
+      ui.mounted.fireEvent.pointerMove(barBox.x + barBox.width / 2, barBox.y + barBox.height - 4);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(1);
+
+      await ui.wait(5000);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the bar up while something inside it has the keyboard', async () => {
