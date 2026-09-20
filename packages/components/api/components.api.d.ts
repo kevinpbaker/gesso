@@ -112,6 +112,18 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+interface BreadcrumbItem {
+  readonly value: string;
+  readonly label: string;
+}
+interface BreadcrumbProps extends ControlLayoutProps {
+  items: readonly BreadcrumbItem[];
+  onSelect?: (value: string) => void;
+  label?: string;
+  separator?: string;
+  maxItems?: number;
+}
+declare function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContext): UiChild;
 interface SegmentedOption {
   readonly value: string;
   readonly label: string;
@@ -691,6 +703,7 @@ export {
   allOf,
   Avatar,
   Badge,
+  Breadcrumb,
   Button,
   Card,
   Checkbox,
@@ -753,6 +766,8 @@ export {
   type AvatarSize,
   type BadgeProps,
   type BadgeTone,
+  type BreadcrumbItem,
+  type BreadcrumbProps,
   type ButtonPaint,
   type ButtonProps,
   type ButtonSize,

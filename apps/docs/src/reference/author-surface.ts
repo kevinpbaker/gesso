@@ -1083,6 +1083,20 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/badge'
   },
   {
+    name: 'Breadcrumb',
+    package: 'components',
+    group: 'Components',
+    what: 'The trail to where you are, whose last crumb is not a link.',
+    page: '/components/breadcrumb'
+  },
+  {
+    name: 'BreadcrumbItem',
+    package: 'components',
+    group: 'Components',
+    what: 'One crumb: its value and the word on it.',
+    page: '/components/breadcrumb'
+  },
+  {
     name: 'Card',
     package: 'components',
     group: 'Components',
