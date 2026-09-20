@@ -29,6 +29,6 @@ Inputs, overlays, structure, data and media: `Button`, `Checkbox`, `Chip`, `Dial
 
 ## Documentation
 
-[Components](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/components/index.md) | [Forms](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/guide/forms.md) | [Themes and the environment](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/appearance/themes-and-the-environment.md)
+[Components](https://gesso-docs.vercel.app/components) | [Forms](https://gesso-docs.vercel.app/guide/forms) | [Themes and the environment](https://gesso-docs.vercel.app/appearance/themes-and-the-environment)
 
 MIT (c) Kevin Baker

@@ -34,27 +34,29 @@ it is packed.
 
 ## The release
 
+Write the changelog notes as you go, one `pnpm changeset` per change
+worth telling somebody about. Then:
+
 ```bash
 pnpm changeset:version        # consumes the notes, moves the versions, writes the changelogs
 ```
 
 Read what it wrote before going on: the version it chose, and every
 changelog entry, which is the only account of this release most people
-will ever read. Commit that.
+will ever read. Commit that, push it, and tag it `v<version>`.
 
-```bash
-pnpm changeset:publish        # builds the packages, then publishes what is not already up
-```
+Pushing the tag runs `.github/workflows/release.yml`, which reruns the
+whole gate suite against the tagged commit, packs, proves each tarball
+was rewritten, and publishes. `workflow_dispatch` runs the same thing
+with a dry run by default, which packs and verifies and uploads nothing.
 
-It is safe to re-run. `changeset publish` asks the registry about each
-package and skips the versions that are already there, so a run that
-half-failed is fixed by running it again.
+Publishing by hand still works and is the fallback if Actions is down:
+`pnpm changeset:publish`. It builds, then publishes what is not already
+on the registry, and it is safe to re-run.
 
-Then tag it and push the tag.
+## Why the workflow packs with one tool and publishes with another
 
-## Publish with pnpm. Never with npm
-
-This is the one thing in this file that will silently ruin a release.
+This is the one thing here that will silently ruin a release.
 
 Each package's `exports` points at `./src/*.ts`, so that the workspace
 and the documentation site resolve the framework from source. What
@@ -67,16 +69,26 @@ npm pack   ->  "exports": { ".": "./src/index.ts" }
 pnpm pack  ->  "exports": { ".": { "default": "./dist/index.js" } }
 ```
 
-An npm publish uploads a manifest pointing at a path that is not in the
-tarball, because `files` is the built output. Nothing fails at publish
-time. It fails for the first person who installs it, on every import.
+An npm publish from a package directory uploads a manifest pointing at
+a path that is not in the tarball, because `files` is the built output.
+Nothing fails at publish time. It fails for the first person who
+installs it, on every import.
 
-`changeset publish` reads the workspace's package manager and uses pnpm,
-so the path above is correct. For the path somebody takes at two in the
-morning, every package runs `scripts/guard-publish.ts` from
-`prepublishOnly`: it refuses a publish whose user agent is not pnpm's,
-and refuses one with no `dist/index.js`, since `changeset publish` does
-not build.
+But npm's trusted publishing and provenance are npm CLI features, and
+pnpm implements neither (pnpm/pnpm#9812). Publishing entirely with
+either tool gives up something worth having.
+
+So each half does what only it can. **pnpm packs**, which is where the
+rewrite happens, and **npm publishes the tarball**, which reads the
+manifest from inside it rather than from the working tree. The workflow
+then checks every tarball's entry begins `./dist/` and refuses to
+upload anything if one does not.
+
+For the path somebody takes at two in the morning, every package runs
+`scripts/guard-publish.ts` from `prepublishOnly`: it refuses a publish
+whose user agent is not pnpm's, and refuses one with no
+`dist/index.js`. It does not fire when a tarball is published, which is
+correct, because by then the manifest is already right.
 
 ## Credentials
 
@@ -109,17 +121,19 @@ it works and the entire reason not to keep it.
 Never a token in this repository, in an environment file beside it, or
 in a shell history you have not thought about.
 
-## What should replace all of this
+## Retiring the token
 
-npm trusted publishing: the registry accepts a short-lived OIDC token
-from a named GitHub Actions workflow in a named repository, and no
-long-lived credential exists anywhere. It cannot create a package, only
-publish to one that exists, which is why the first release was a manual
-one and this section is still a plan.
+`.github/workflows/release.yml` asks for `id-token: write` and publishes
+with `--provenance`, so the pieces are in place. What is not done yet is
+the registry side: until a trusted publisher is configured, the workflow
+authenticates with the `NPM_TOKEN` secret.
 
-To finish it: configure a trusted publisher on each of the seven
-packages at npmjs.com pointing at this repository and the release
-workflow, add the workflow with `id-token: write` and `--provenance`,
-and revoke whatever token the first release used. After that a release
-is a tag, and each package carries a provenance badge tying it to the
-commit that built it.
+To finish it, for each of the seven packages on npmjs.com, add a trusted
+publisher pointing at `kevinpbaker/gesso` and `release.yml`. Then delete
+the `NPM_TOKEN` secret and revoke the token. After that no long-lived
+credential exists anywhere: the registry accepts a short-lived OIDC
+token from this repository's workflow and nothing else, and each package
+carries a provenance badge tying it to the commit that built it.
+
+Trusted publishing cannot create a package, only publish to one that
+exists, which is why the first release was done by hand.

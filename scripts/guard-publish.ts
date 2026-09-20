@@ -27,7 +27,7 @@ if (!agent.startsWith('pnpm/')) {
       `  pnpm applies publishConfig.exports; npm does not. Publishing here\n` +
       `  with npm uploads a manifest whose exports point at ./src/*.ts,\n` +
       `  which is not in the tarball, and every import of it fails.\n\n` +
-      `  Use \`pnpm changeset:publish\`, or \`pnpm publish\` in this directory.\n`
+      `  Use \`pnpm changeset:publish\`, or \`pnpm publish\` in this directory.\n  CI packs with pnpm and uploads the tarball with npm; see RELEASING.md.\n`
   );
   process.exit(1);
 }

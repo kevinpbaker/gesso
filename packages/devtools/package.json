@@ -4,7 +4,7 @@
   "description": "See what a Gesso application is doing, and what it threw: an error overlay with source-mapped stacks, drawn over the app that failed.",
   "license": "MIT",
   "author": "Kevin Baker",
-  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "homepage": "https://gesso-docs.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kevinpbaker/gesso.git",

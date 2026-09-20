@@ -35,6 +35,6 @@ One failure looks exactly like a bug in the framework: a save that reloads the w
 
 ## Documentation
 
-[The Vite plugin](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/tooling/vite-plugin.md)
+[The Vite plugin](https://gesso-docs.vercel.app/tooling/vite-plugin)
 
 MIT (c) Kevin Baker

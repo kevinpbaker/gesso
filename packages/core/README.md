@@ -38,6 +38,6 @@ engine.explain(node);
 
 ## Documentation
 
-[Layout](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/layout/flex.md) | [Text](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/guide/text.md) | [Canvas2D and WebGPU](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/rendering/canvas2d-and-webgpu.md) | [Asking the engine why](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/layout/explain.md)
+[Layout](https://gesso-docs.vercel.app/layout/flex) | [Text](https://gesso-docs.vercel.app/guide/text) | [Canvas2D and WebGPU](https://gesso-docs.vercel.app/rendering/canvas2d-and-webgpu) | [Asking the engine why](https://gesso-docs.vercel.app/layout/explain)
 
 MIT (c) Kevin Baker

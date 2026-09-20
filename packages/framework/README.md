@@ -81,6 +81,6 @@ Single-thread mode exists for tests, headless rendering and environments without
 
 ## Documentation
 
-[Your first component](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/guide/counter.md) | [Components run once](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/guide/components-run-once.md) | [Cells and bindings](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/guide/cells-and-bindings.md) | [Channels and the barrier](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/structure/channels-and-the-barrier.md) | [Routing](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/structure/routing.md)
+[Your first component](https://gesso-docs.vercel.app/guide/counter) | [Components run once](https://gesso-docs.vercel.app/guide/components-run-once) | [Cells and bindings](https://gesso-docs.vercel.app/guide/cells-and-bindings) | [Channels and the barrier](https://gesso-docs.vercel.app/structure/channels-and-the-barrier) | [Routing](https://gesso-docs.vercel.app/structure/routing)
 
 MIT (c) Kevin Baker

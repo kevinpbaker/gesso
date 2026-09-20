@@ -40,6 +40,6 @@ A `toHaveBox` that misses prints `explain`'s answer underneath it, so a failed a
 
 ## Documentation
 
-[Testing](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/guide/testing.md)
+[Testing](https://gesso-docs.vercel.app/guide/testing)
 
 MIT (c) Kevin Baker

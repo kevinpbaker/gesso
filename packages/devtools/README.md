@@ -29,6 +29,6 @@ createApp({ onError: mountErrorOverlay(document.body) }).mount('#app');
 
 ## Documentation
 
-[Devtools](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/tooling/devtools.md) | [Errors and the overlay](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/structure/errors-and-the-overlay.md) | [Frames and phases](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/tooling/frames-and-phases.md)
+[Devtools](https://gesso-docs.vercel.app/tooling/devtools) | [Errors and the overlay](https://gesso-docs.vercel.app/structure/errors-and-the-overlay) | [Frames and phases](https://gesso-docs.vercel.app/tooling/frames-and-phases)
 
 MIT (c) Kevin Baker

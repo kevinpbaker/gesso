@@ -4,7 +4,7 @@
   "description": "The retained UI graph, the layout engine, the two renderers and input \u2014 everything below a component.",
   "license": "MIT",
   "author": "Kevin Baker",
-  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "homepage": "https://gesso-docs.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kevinpbaker/gesso.git",

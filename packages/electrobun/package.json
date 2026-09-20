@@ -4,7 +4,7 @@
   "description": "Run a Gesso application in an Electrobun window, with its stores in the main process.",
   "license": "MIT",
   "author": "Kevin Baker",
-  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "homepage": "https://gesso-docs.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kevinpbaker/gesso.git",

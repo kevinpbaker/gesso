@@ -4,7 +4,7 @@
   "description": "Components, stores, the frame runtime and the worker barrier over gesso-core.",
   "license": "MIT",
   "author": "Kevin Baker",
-  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "homepage": "https://gesso-docs.vercel.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kevinpbaker/gesso.git",

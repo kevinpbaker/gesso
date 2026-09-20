@@ -38,6 +38,6 @@ A window has been opened from a fresh scaffold on **WebKitGTK**, with the counte
 
 ## Documentation
 
-[Gesso on Electrobun](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/structure/gesso-on-electrobun.md) | [Desktop windows](https://github.com/kevinpbaker/gesso/blob/main/apps/docs/structure/desktop-windows.md)
+[Gesso on Electrobun](https://gesso-docs.vercel.app/structure/gesso-on-electrobun) | [Desktop windows](https://gesso-docs.vercel.app/structure/desktop-windows)
 
 MIT (c) Kevin Baker

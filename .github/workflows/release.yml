@@ -1,0 +1,155 @@
+# Publishing the seven packages.
+#
+# The shape of this file is decided by one conflict. The packages'
+# `exports` point at `src/*.ts` so the workspace and the documentation
+# site resolve the framework from source, and `publishConfig.exports` is
+# what rewrites them to `dist` at publish time: a pnpm feature that npm
+# does not implement. But npm's trusted publishing and provenance are
+# npm CLI features that pnpm does not implement
+# (https://github.com/pnpm/pnpm/issues/9812). Publishing with either one
+# alone gives up something that matters.
+#
+# So each half does what only it can: **pnpm packs**, applying the
+# rewrite, and **npm publishes the tarball**, which reads the manifest
+# from inside it. Provenance and OIDC come from the npm side; the
+# correct manifest comes from the pnpm side.
+#
+# See RELEASING.md for the version policy and for publishing by hand.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Pack and check, but do not publish'
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Trusted publishing needs npm >= 11.5.1, which wants a recent Node.
+  NODE_VERSION: '24'
+
+jobs:
+  # Everything CI runs on a pull request, again, against the exact commit
+  # being published. A release is the one moment where "it passed on main"
+  # is not good enough: the tag may not be what main is.
+  gates:
+    name: the full gate suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+
+  # Packs with pnpm, installs the tarballs into a fresh project with npm,
+  # typechecks that project against the published declarations, runs a
+  # component test through the packed testing package, builds it and
+  # drives it in Chrome. It is the publish path end to end minus the
+  # upload, and the only gate that catches a package that is wrong only
+  # once packed.
+  packed:
+    name: the packed packages install and run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:install
+        env:
+          CHROME_BIN: google-chrome
+
+  publish:
+    name: publish to npm
+    needs: [gates, packed]
+    runs-on: ubuntu-latest
+    permissions:
+      # The OIDC token npm exchanges for a short-lived publish credential,
+      # and the same token provenance is attested with. Without this line
+      # the publish falls back to NPM_TOKEN and ships no provenance.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      # Trusted publishing is refused by older clients with a message that
+      # does not say so. Pin the floor rather than trust the image.
+      - name: npm new enough for trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: pnpm --filter './packages/*' build
+
+      # pnpm's half: `publishConfig.exports` is applied here and nowhere
+      # else. Every tarball is verified to declare `dist` before anything
+      # is uploaded, because the failure this catches is invisible until
+      # somebody installs the package.
+      - name: Pack, and prove the manifests were rewritten
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tarballs"
+          for dir in packages/*/; do
+            name=$(node -p "require('./$dir/package.json').name")
+            private=$(node -p "require('./$dir/package.json').private === true")
+            [ "$private" = "true" ] && { echo "skipping $name (private)"; continue; }
+
+            (cd "$dir" && pnpm pack --out "$RUNNER_TEMP/tarballs/$name.tgz")
+
+            entry=$(tar -xzOf "$RUNNER_TEMP/tarballs/$name.tgz" package/package.json \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                  const e=JSON.parse(s).exports['.'];
+                  process.stdout.write(typeof e==='string'?e:e.default);
+                })")
+            case "$entry" in
+              ./dist/*) echo "ok   $name -> $entry" ;;
+              *) echo "REFUSING: $name packed with exports '$entry', not ./dist/*." >&2
+                 echo "publishConfig.exports was not applied. Do not publish this." >&2
+                 exit 1 ;;
+            esac
+          done
+
+      # npm's half: the upload, the OIDC exchange and the provenance
+      # attestation. Publishing a tarball reads the manifest from inside
+      # it, so what pnpm rewrote is what the registry receives.
+      - name: Publish
+        if: github.event_name == 'push' || inputs.dry-run == false
+        run: |
+          set -euo pipefail
+          for tgz in "$RUNNER_TEMP"/tarballs/*.tgz; do
+            echo "publishing $(basename "$tgz")"
+            npm publish "$tgz" --provenance --access public
+          done
+        env:
+          # Only used until a trusted publisher is configured for each
+          # package on npmjs.com. Once that is done this secret can be
+          # deleted and the token revoked: OIDC needs no stored
+          # credential. RELEASING.md has the steps.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: What a dry run would have sent
+        if: github.event_name == 'workflow_dispatch' && inputs.dry-run
+        run: ls -la "$RUNNER_TEMP/tarballs"
