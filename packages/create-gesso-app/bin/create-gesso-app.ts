@@ -50,6 +50,8 @@ import {
 } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 
+import { displayPath } from './displayPath.ts';
+
 /** Where the packed tarballs land inside the generated project. */
 const VENDOR_DIR = 'vendor';
 /** Template files whose names cannot be checked into this repository as-is. */
@@ -478,10 +480,7 @@ function main(): void {
   }
   substitute(options, template);
 
-  const where = options.target.startsWith(process.cwd())
-    ? options.target.slice(process.cwd().length + 1)
-    : options.target;
-  console.log(template.next(options.name, where, options.local));
+  console.log(template.next(options.name, displayPath(process.cwd(), options.target), options.local));
 }
 
 main();
