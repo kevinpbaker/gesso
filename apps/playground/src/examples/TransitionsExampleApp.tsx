@@ -865,7 +865,7 @@ function HomeScreen(_inputs: Inputs<OutletProps>, ctx: ComponentContext): UiChil
             and the playlists are read from Audius on the application worker.
           </text>
           <text color={FAINT} fontSize={12} textAlign="center" textWrap="word" maxWidth={480}>
-            Original concept by Ehsan Rahimi. Photographs by Atikh Bana and Te NGuyen; video by Anna Shvets. Music from
+            Original concept by Ehsan Rahimi. The cover art and the video are generated for this example. Music from
             Audius, where every track belongs to the artist who uploaded it.
           </text>
           {offline}

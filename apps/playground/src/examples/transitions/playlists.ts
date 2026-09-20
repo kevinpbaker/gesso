@@ -31,25 +31,32 @@ export interface CardDesign {
 
 export const CARDS: readonly CardDesign[] = [
   {
+    // The sunset sleeve's own sky, lifted a little so the artwork still
+    // reads as a panel on the card rather than bleeding into it.
     id: '1',
-    background: '#000000',
-    text: '#ffffff',
-    secondaryText: '#c3c3c3',
+    background: '#1b1630',
+    text: '#ffeede',
+    secondaryText: '#bfa189',
     media: { kind: 'image', url: '/transitions/portrait-tall.webp', width: 275, height: 360 }
   },
   {
+    // Near enough to the video's own ground that the frame stops being
+    // a rectangle sitting on a card and starts being part of it. The
+    // rings and the coral diagonal are what should carry this one.
     id: '2',
-    background: '#fadff3',
+    background: '#16242c',
     backgroundImage: '/transitions/card-texture.png',
-    text: '#8b689c',
-    secondaryText: '#ab91b8',
+    text: '#eef6f5',
+    secondaryText: '#8fb0b4',
     media: { kind: 'video', url: '/transitions/motion-loop.mp4', width: 1280, height: 992 }
   },
   {
+    // Deeper than the artwork's own teal, so the coral diagonal in it
+    // has something to be bright against.
     id: '3',
-    background: '#6d75ff',
-    text: '#ffffff',
-    secondaryText: '#e1e1e1',
+    background: '#1f4a56',
+    text: '#f2fbf9',
+    secondaryText: '#a4c5c0',
     media: { kind: 'image', url: '/transitions/portrait-wide.webp', width: 414, height: 360 }
   }
 ];
