@@ -36,7 +36,7 @@
     "api:check": "node scripts/check-api.ts",
     "api:update": "node scripts/check-api.ts --update",
     "changeset": "changeset",
-    "changeset:version": "changeset version",
+    "changeset:version": "changeset version && node scripts/sync-template-ranges.ts",
     "changeset:publish": "pnpm --filter './packages/*' build && changeset publish",
     "check:install": "node scripts/check-install.ts",
     "check:scaffold": "node scripts/check-scaffold.ts",

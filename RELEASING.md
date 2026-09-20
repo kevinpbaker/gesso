@@ -46,9 +46,20 @@ worth telling somebody about. Then:
 pnpm changeset:version        # consumes the notes, moves the versions, writes the changelogs
 ```
 
-Read what it wrote before going on: the version it chose, and every
-changelog entry, which is the only account of this release most people
-will ever read. Commit that, push it, and tag it `v<version>`.
+That also runs `scripts/sync-template-ranges.ts`, which points the
+scaffold templates at the versions the packages just moved to. The
+templates are the one manifest a release would otherwise miss, because
+they are data the CLI copies rather than workspace members changesets
+knows about — 0.2.0 went out with both of them still asking for
+`^0.1.0`, which is a scaffold built on the previous framework for
+anyone installing from the registry. `pnpm check:scaffold` refuses a
+drifted template, but it runs after the release commit is written, and
+on 0.2.0 it was talked past.
+
+Read what it wrote before going on: the version it chose, the template
+ranges it moved, and every changelog entry, which is the only account
+of this release most people will ever read. Commit that, push it, and
+tag it `v<version>`.
 
 Pushing the tag runs `.github/workflows/release.yml`, which reruns the
 whole gate suite against the tagged commit, packs, proves each tarball
