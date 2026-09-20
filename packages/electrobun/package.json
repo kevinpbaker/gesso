@@ -3,6 +3,27 @@
   "version": "0.1.0",
   "description": "Run a Gesso application in an Electrobun window, with its stores in the main process.",
   "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/electrobun"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "canvas",
+    "ui",
+    "typescript",
+    "electrobun",
+    "desktop",
+    "webview",
+    "native",
+    "cross-platform"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -29,9 +50,11 @@
         "types": "./dist/desktop.d.ts",
         "default": "./dist/desktop.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],

@@ -3,6 +3,30 @@
   "version": "0.1.0",
   "description": "Components, stores, the frame runtime and the worker barrier over @gesso/core.",
   "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/framework"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "canvas",
+    "ui",
+    "typescript",
+    "framework",
+    "components",
+    "reactive",
+    "rxjs",
+    "web-worker",
+    "offscreencanvas",
+    "jsx",
+    "state-management"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -30,9 +54,11 @@
         "types": "./dist/jsx/jsx-dev-runtime.d.ts",
         "default": "./dist/jsx/jsx-dev-runtime.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],

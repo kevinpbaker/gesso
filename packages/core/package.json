@@ -3,6 +3,30 @@
   "version": "0.1.0",
   "description": "The retained UI graph, the layout engine, the two renderers and input \u2014 everything below a component.",
   "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "canvas",
+    "ui",
+    "typescript",
+    "retained-mode",
+    "layout",
+    "flexbox",
+    "css-grid",
+    "canvas2d",
+    "webgpu",
+    "text-layout",
+    "renderer"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -19,9 +43,11 @@
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],

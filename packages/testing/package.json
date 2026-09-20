@@ -3,6 +3,27 @@
   "version": "0.1.0",
   "description": "Mount a component without a browser, query it the way a screen reader would, and read back why a box is the size it is.",
   "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/testing"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "canvas",
+    "ui",
+    "typescript",
+    "testing",
+    "vitest",
+    "component-testing",
+    "accessibility",
+    "test-utils"
+  ],
   "type": "module",
   "sideEffects": [
     "./src/matchers.ts",
@@ -22,9 +43,11 @@
         "types": "./dist/matchers.d.ts",
         "default": "./dist/matchers.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],

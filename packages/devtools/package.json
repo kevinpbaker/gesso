@@ -3,6 +3,27 @@
   "version": "0.1.0",
   "description": "See what a Gesso application is doing, and what it threw: an error overlay with source-mapped stacks, drawn over the app that failed.",
   "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://github.com/kevinpbaker/gesso#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/devtools"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "canvas",
+    "ui",
+    "typescript",
+    "devtools",
+    "debugging",
+    "error-overlay",
+    "profiler",
+    "inspector"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -13,9 +34,11 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       }
-    }
+    },
+    "access": "public"
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],
