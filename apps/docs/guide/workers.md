@@ -134,18 +134,18 @@ fail at some awkward later moment; it would fail there.
 
 That leaves the shell with this, and nothing else:
 
-| The shell does                                    | Because                                                                                       |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Creates the canvas and transfers it               | An `OffscreenCanvas` has to come from an element, and only the page has elements              |
-| Forwards pointer, wheel and key events            | The listeners are on a DOM element; every event is stamped with the browser's own `timeStamp` |
-| Holds a hidden textarea                           | Composition, dead keys and a soft keyboard are a DOM input's, and the caret is in the worker  |
-| Mirrors the semantics tree into off-screen DOM    | The platform's accessibility layer reads elements, and a canvas is one element                |
-| Observes the host's size and the pixel ratio      | `ResizeObserver` and `devicePixelRatio` are the window's                                      |
-| Runs `requestAnimationFrame` and forwards ticks   | A worker has no frame callback tied to the compositor, so the display's refresh is passed on  |
-| Watches `prefers-color-scheme` and reduced motion | A media query needs a window; each is reported once at start and again on every change        |
-| Sets the cursor and `touch-action` on the canvas  | The worker decides what the pointer is over; only the DOM can show it                         |
-| Writes the clipboard and opens urls               | `ShellService` requests them, and the request is answered on the thread that can perform it   |
-| Reports the url and performs history moves        | The address bar is the window's; the routes never leave the worker                            |
+| The shell does                                    | Because                                                                                               |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Creates the canvas and transfers it               | An `OffscreenCanvas` has to come from an element, and only the page has elements                      |
+| Forwards pointer, wheel and key events            | The listeners are on a DOM element; every event is stamped with the browser's own `timeStamp`         |
+| Holds a hidden textarea                           | Composition, dead keys and a soft keyboard are a DOM input's, and the caret is in the worker          |
+| Mirrors the semantics tree into off-screen DOM    | The platform's accessibility layer reads elements, and a canvas is one element                        |
+| Observes the host's size and the pixel ratio      | `ResizeObserver` and `devicePixelRatio` are the window's                                              |
+| Forwards display refreshes, where it must         | A dedicated worker has its own frame callback and uses it; this is the fallback for where it does not |
+| Watches `prefers-color-scheme` and reduced motion | A media query needs a window; each is reported once at start and again on every change                |
+| Sets the cursor and `touch-action` on the canvas  | The worker decides what the pointer is over; only the DOM can show it                                 |
+| Writes the clipboard and opens urls               | `ShellService` requests them, and the request is answered on the thread that can perform it           |
+| Reports the url and performs history moves        | The address bar is the window's; the routes never leave the worker                                    |
 
 Two defaults are cancelled by the shell without asking, because the
 worker's answer could not come back in time to cancel anything: Tab,

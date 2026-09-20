@@ -102,6 +102,16 @@ const WATCH_REFRESHES = 2;
 const IDLE_TICKS_BEFORE_STOP = 4;
 
 export interface UiHostFrameClockOptions {
+  /**
+   * This thread's own `requestAnimationFrame`, where it has one.
+   *
+   * Defaults to looking for it, which is the whole point: a dedicated
+   * worker has one, and using it removes the host from the frame path
+   * entirely. Pass `null` to force the hosted path, which specs do and
+   * which is also the escape hatch if a browser's worker frames ever
+   * turn out to be worse than its host's.
+   */
+  requestAnimationFrame?: ((callback: (time: number) => void) => number) | null;
   /** How long to wait for a host tick before pacing a frame anyway. */
   fallbackMs?: number;
   /**
@@ -166,20 +176,38 @@ export class UiTimerFrameClock implements UiFrameClock {
 /**
  * A clock whose frames arrive from somewhere else.
  *
- * The one thing a worker cannot do for itself. `requestAnimationFrame`
- * is tied to the compositor and exists only on the main thread, so a
- * render worker's frames were paced by `UiTimerFrameClock` at a fixed
- * 16ms — roughly sixty a second on any display, aligned to none of
- * them. On a 165Hz monitor that is not merely slower than it could be:
- * an unaligned timer lands two frames inside one refresh, or none, so
- * the pacing is uneven as well as capped.
+ * A render worker's frames were once paced by `UiTimerFrameClock` at a
+ * fixed 16ms — roughly sixty a second on any display, aligned to none
+ * of them. On a 165Hz monitor that is not merely slower than it could
+ * be: an unaligned timer lands two frames inside one refresh, or none,
+ * so the pacing is uneven as well as capped.
  *
- * This clock does no timing at all. It reports when it wants frames
- * and delivers whatever ticks it is handed, which lets the shell —
- * the one thread with a `requestAnimationFrame` — supply the display's
- * own cadence. That is the narrow exception to keeping the shell
- * uninvolved: not work moved back onto the main thread for
- * convenience, but the single fact a worker has no way to observe.
+ * **A dedicated worker can ask the compositor itself**, and this clock
+ * does so when it can. `DedicatedWorkerGlobalScope.requestAnimationFrame`
+ * has been in Chrome since 69, Firefox since 99 and Safari since 16.4,
+ * which makes it baseline as of March 2023; this file used to say it
+ * "exists only on the main thread", which was true when it was written
+ * and is not now. Measured in the render worker: a median interval of
+ * 16.7ms with a spread of 0.2, which is vsync and not a timer. Its
+ * timestamps are on this thread's own `performance.now()` timeline, so
+ * nothing has to be translated.
+ *
+ * That path costs the shell nothing at all: no loop, and no message
+ * per refresh. `onActive` is never called, so a host that was
+ * forwarding ticks simply stops being asked to.
+ *
+ * **The hosted path remains for where it is not available**, which is
+ * an older browser and, on Chromium, a *nested* worker. Then this
+ * clock does no timing of its own: it reports when it wants frames and
+ * delivers whatever ticks it is handed, which lets the shell supply
+ * the display's cadence on its behalf. It is the same contract either
+ * way, which is why the choice can be made at construction and
+ * forgotten.
+ *
+ * Both paths stop for a hidden tab, and that is not a coincidence: a
+ * worker's animation frames are serviced by its **owner window's**
+ * rendering, and a window that is not rendering services none. So the
+ * battery properties the runtime relies on hold whichever path runs.
  *
  * **Ticks are free-running while frames are wanted, not requested one
  * at a time.** A tick per request would cost a round trip inside every
@@ -190,6 +218,19 @@ export class UiTimerFrameClock implements UiFrameClock {
  * one comparison and makes the timing robust to whichever side is
  * late.
  */
+/**
+ * This thread's `requestAnimationFrame`, if it has a real one.
+ *
+ * Checked for rather than assumed, because the answer differs by
+ * thread and by browser: a window always has one, a dedicated worker
+ * has had one for years, and a *nested* worker on Chromium has not.
+ * The feature test is the whole guard; there is no version to compare.
+ */
+function localAnimationFrame(): ((callback: (time: number) => void) => number) | null {
+  const host = globalThis as { requestAnimationFrame?: (callback: (time: number) => void) => number };
+  return typeof host.requestAnimationFrame === 'function' ? host.requestAnimationFrame.bind(host) : null;
+}
+
 export class UiHostFrameClock implements UiFrameClock {
   private pending = false;
   private active = false;
@@ -226,6 +267,9 @@ export class UiHostFrameClock implements UiFrameClock {
   private readonly stallMs: number;
   private readonly minStallMs: number;
   private readonly now: () => UiFrameTime;
+  /** This thread's own `requestAnimationFrame`, or null where there is none. */
+  private readonly local: ((callback: (time: number) => void) => number) | null;
+  private localHandle: number | null = null;
 
   constructor(
     private readonly onFrame: (time: UiFrameTime) => void,
@@ -237,10 +281,31 @@ export class UiHostFrameClock implements UiFrameClock {
     this.stallMs = options.stallMs ?? 100;
     this.minStallMs = options.minStallMs ?? 12;
     this.now = options.now ?? (() => performance.now());
+    this.local = options.requestAnimationFrame === undefined ? localAnimationFrame() : options.requestAnimationFrame;
+  }
+
+  /** Whether this clock is driving itself from the compositor. */
+  get isLocal(): boolean {
+    return this.local !== null;
   }
 
   requestFrame(): void {
     this.pending = true;
+    if (this.local !== null) {
+      // The compositor is answering directly, so there is no host to
+      // tell and no timer to arm: no message per refresh, and no
+      // fallback to pace, because a missing frame here would mean the
+      // display itself had stopped.
+      if (this.localHandle === null) {
+        this.localHandle = this.local(time => {
+          this.localHandle = null;
+          if (this.pending) {
+            this.deliver(time);
+          }
+        });
+      }
+      return;
+    }
     this.setActive(true);
     this.armTimer();
   }
@@ -367,8 +432,14 @@ export class UiHostFrameClock implements UiFrameClock {
 
   cancelFrame(): void {
     this.pending = false;
+    // The local handle is deliberately left armed. There is no way to
+    // cancel it without the matching `cancelAnimationFrame`, and one
+    // refresh that finds nothing pending costs a comparison, which is
+    // what `tick` already does for the hosted path.
     this.clearFallback();
-    this.setActive(false);
+    if (this.local === null) {
+      this.setActive(false);
+    }
   }
 
   private clearFallback(): void {

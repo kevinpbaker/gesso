@@ -191,6 +191,92 @@ describe('UiHostFrameClock', () => {
     return { clock, frames, active };
   }
 
+  /** A clock with a compositor of its own, as a dedicated worker has. */
+  function local(): {
+    clock: UiHostFrameClock;
+    frames: number[];
+    active: boolean[];
+    refresh: (time: number) => void;
+    armed: () => number;
+  } {
+    const frames: number[] = [];
+    const active: boolean[] = [];
+    const callbacks: ((time: number) => void)[] = [];
+    const clock = new UiHostFrameClock(
+      time => frames.push(time),
+      running => active.push(running),
+      {
+        fallbackMs: 100000,
+        requestAnimationFrame: callback => {
+          callbacks.push(callback);
+          return callbacks.length;
+        }
+      }
+    );
+    return {
+      clock,
+      frames,
+      active,
+      refresh: time => callbacks.shift()?.(time),
+      armed: () => callbacks.length
+    };
+  }
+
+  it('drives itself from the compositor where the thread has one', () => {
+    // A dedicated worker has had `requestAnimationFrame` since Chrome
+    // 69, Firefox 99 and Safari 16.4. Where it does, the host is not
+    // in the frame path at all.
+    const { clock, frames, refresh } = local();
+    clock.requestFrame();
+    refresh(1234.5);
+    expect(frames).toEqual([1234.5]);
+    expect(clock.isLocal).toBe(true);
+  });
+
+  it('never asks the host for ticks when it has its own', () => {
+    // The saving is a whole message per refresh, which at 60Hz is the
+    // difference between the shell running a loop for the worker and
+    // the shell doing nothing at all.
+    const { clock, active, refresh } = local();
+    clock.requestFrame();
+    refresh(16);
+    clock.requestFrame();
+    refresh(32);
+    clock.cancelFrame();
+    expect(active).toEqual([]);
+  });
+
+  it('drops a refresh that finds nothing pending', () => {
+    const { clock, frames, refresh } = local();
+    clock.requestFrame();
+    refresh(16);
+    clock.cancelFrame();
+    // The armed callback cannot be cancelled without the matching
+    // `cancelAnimationFrame`, so it fires and finds nothing to do.
+    refresh(32);
+    expect(frames).toEqual([16]);
+  });
+
+  it('arms one callback per frame, not one per request', () => {
+    const { clock, refresh, armed } = local();
+    clock.requestFrame();
+    clock.requestFrame();
+    clock.requestFrame();
+    expect(armed()).toBe(1);
+    refresh(16);
+    expect(armed()).toBe(0);
+  });
+
+  it('falls back to the host where the thread has no compositor of its own', () => {
+    // An older browser, or a nested worker on Chromium.
+    const { clock, frames, active } = hosted();
+    expect(clock.isLocal).toBe(false);
+    clock.requestFrame();
+    expect(active).toEqual([true]);
+    clock.tick(1234.5);
+    expect(frames).toEqual([1234.5]);
+  });
+
   it('delivers the host tick, on the host clock', () => {
     // The timestamp matters as much as the beat: a forwarded rAF time
     // keeps the runtime's frame times on the same clock the display
