@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://gesso-docs.vercel.app
+    about: The guide, the component reference, and every API with a live example.
+  - name: Is Gesso for your project?
+    url: https://gesso-docs.vercel.app/guide/is-gesso-for-you
+    about: What it is for, what it is not for, and what to use instead.
+  - name: Security vulnerability
+    url: https://github.com/kevinpbaker/gesso/security/advisories/new
+    about: Report privately. Please do not open a public issue.

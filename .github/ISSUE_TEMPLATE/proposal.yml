@@ -1,0 +1,49 @@
+name: Proposal
+description: An API, a component, or a change to how something works
+labels: [proposal]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The surface is deliberately small, and every export is reviewed
+        as a line in a committed API report. A proposal is welcome; a
+        proposal that says what it would cost is better.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to build, and where the framework got in the way.
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today instead
+      description: |
+        Almost everything can be done already, more awkwardly. Showing
+        the awkward version is the strongest argument for the good one,
+        and sometimes it turns out the awkward version is fine.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: The shape you have in mind
+      description: Optional. Code that does not exist yet, as you would want to write it.
+      render: typescript
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Where it would live
+      options:
+        - gesso-core (elements, layout, rendering, input)
+        - gesso-framework (components, cells, channels, routing)
+        - gesso-components (the component library)
+        - Tooling (testing, devtools, the Vite plugin, the scaffold)
+        - Do not know
+    validations:
+      required: true
