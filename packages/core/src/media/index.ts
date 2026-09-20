@@ -8,11 +8,14 @@
  * decoded continuously and cached by its surface.
  */
 export { Mp3Frames, readMp3Header, splitMp3Frames, type Mp3Format, type Mp3Frame, type Mp3Header } from './Mp3Frames';
-export { demuxMp4Video, type Mp4Sample, type Mp4VideoTrack } from './Mp4Demuxer';
+export { demuxMp4Video, demuxMp4Audio, type Mp4Sample, type Mp4VideoTrack, type Mp4AudioTrack } from './Mp4Demuxer';
+export { bufferSource, rangeSource, DEFAULT_BLOCK_SIZE, type ByteSource, type RangeSourceOptions } from './ByteSource';
 export {
   DefaultVideoResolver,
   canDecodeVideo,
   type DefaultVideoResolverOptions,
+  type RangeResponse,
   type VideoPlayback,
   type VideoResolver
 } from './VideoResolver';
+export { parseWebVtt, cueAt, type VttCue, type VttTrack } from './WebVtt';

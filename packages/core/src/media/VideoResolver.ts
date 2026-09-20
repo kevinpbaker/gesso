@@ -1,4 +1,5 @@
 import type { UiVideoSurface } from '../properties/UiVideo';
+import { bufferSource, DEFAULT_BLOCK_SIZE, rangeSource, type ByteSource } from './ByteSource';
 import { demuxMp4Video, type Mp4Sample, type Mp4VideoTrack } from './Mp4Demuxer';
 
 /**
@@ -49,8 +50,47 @@ export interface VideoPlayback {
    * zero is what looping is.
    */
   present(positionMs: number): boolean;
+  /**
+   * Whether the decoder is still working towards the position it was
+   * last given.
+   *
+   * A seek lands on the sync sample *before* where it was aimed, and
+   * everything between the two has to be decoded and thrown away
+   * before the wanted picture exists. On a two-second GOP that is a
+   * handful of frames and invisible; on a long one it is long enough
+   * that an interface wanting to say so — a scrubber that dims, a
+   * spinner over the poster — needs to be told. False while playing
+   * forwards, because then every decoded frame is one that will be
+   * shown.
+   *
+   * Optional, and absent means false. A playback that produces its
+   * pictures on demand — the generated ones the documentation is built
+   * on, a canvas, a stream of bitmaps — never waits for a keyframe it
+   * has no concept of, and should not have to say so.
+   */
+  readonly seeking?: boolean;
   /** Called when the video fails, with what went wrong. */
   onError(listener: (error: unknown) => void): () => void;
+  /**
+   * Called when a decoded frame arrived and changed the picture
+   * without anyone having asked for it.
+   *
+   * Which sounds like a contradiction of everything `present` says
+   * about who owns time, and is not: the position is still driven from
+   * outside, and this fires only for a position that has *already*
+   * been asked for and could not be answered yet. A seek is the case.
+   * `present(3.5s)` resets the decoder and returns with nothing to
+   * show, because the frame for 3.5s will not exist for another few
+   * milliseconds; when it lands, the driver is not going to call again
+   * — a paused clip has no next frame — so the picture would stay on
+   * whatever was there before the seek, forever.
+   *
+   * So the playback presents it and says so, and a caller repaints.
+   * Optional for the same reason `seeking` is: a playback that
+   * produces its pictures on demand answers every `present` on the
+   * spot and has nothing to announce.
+   */
+  onFrame?(listener: () => void): () => void;
 }
 
 /**
@@ -72,11 +112,38 @@ export interface VideoResolver {
   dispose(): void;
 }
 
+/** Part of a file, and how long the whole of it is. */
+export interface RangeResponse {
+  readonly data: ArrayBuffer;
+  /**
+   * The file's total length in bytes.
+   *
+   * Asked for alongside the bytes because an HTTP range response
+   * already carries it, in `Content-Range`, and a separate `HEAD`
+   * request to learn the same thing is a round trip for nothing.
+   */
+  readonly total: number;
+}
+
 export interface DefaultVideoResolverOptions {
   /** How many finished playbacks to keep after their last holder let go. */
   capacity?: number;
   /** Injectable for specs, and for an app that fetches through its own stack. */
   fetch?: (source: string) => Promise<ArrayBuffer>;
+  /**
+   * Fetches `[start, end)` of a file, for playing one without holding
+   * all of it.
+   *
+   * Given this, the resolver finds the `moov` with a few small
+   * requests and then reads media as the decoder asks for it, which is
+   * what makes an hour of video possible; given only `fetch`, it reads
+   * the whole file at once, which is right for the looping clips this
+   * framework is usually asked for and is what it has always done.
+   * Neither is a default the other should be silently upgraded to — a
+   * ranged read of a two megabyte loop is three round trips where one
+   * would do — so an application says which it wants.
+   */
+  fetchRange?: (source: string, start: number, end: number) => Promise<RangeResponse>;
 }
 
 /** Whether this thread can decode video at all. */
@@ -147,11 +214,13 @@ export class DefaultVideoResolver implements VideoResolver {
   private readonly evictable: string[] = [];
   private readonly capacity: number;
   private readonly fetchBuffer: (source: string) => Promise<ArrayBuffer>;
+  private readonly fetchRange: DefaultVideoResolverOptions['fetchRange'];
   private disposed = false;
 
   constructor(options: DefaultVideoResolverOptions = {}) {
     this.capacity = options.capacity ?? DEFAULT_CAPACITY;
     this.fetchBuffer = options.fetch ?? defaultFetch;
+    this.fetchRange = options.fetchRange;
   }
 
   /** Live or in-flight sources, for specs and the inspector. */
@@ -236,12 +305,125 @@ export class DefaultVideoResolver implements VideoResolver {
           'It is available in Chrome 94+ and in a worker; Safari and Firefox support varies.'
       );
     }
-    const data = await this.fetchBuffer(source);
-    const track = demuxMp4Video(data);
-    const playback = new Mp4Playback(track, data);
+    const bytes = this.fetchRange === undefined ? await this.openWhole(source) : await this.openRanged(source);
+    const playback = new Mp4Playback(bytes.track, bytes.data);
     await playback.start();
     return playback;
   }
+
+  private async openWhole(source: string): Promise<{ track: Mp4VideoTrack; data: ByteSource }> {
+    const data = await this.fetchBuffer(source);
+    return { track: demuxMp4Video(data), data: bufferSource(data) };
+  }
+
+  /**
+   * Finds the `moov`, reads it, and leaves the media where it is.
+   *
+   * The top-level structure of an MP4 is a flat list of boxes, each of
+   * which states its own length, so the whole of it can be walked by
+   * reading eight bytes at a time and jumping — which means finding
+   * the `moov` costs a couple of small requests whether it is at the
+   * front of the file (`-movflags +faststart`, and every file served
+   * for streaming) or at the back (the default, and every file written
+   * by a camera).
+   *
+   * The `moov` is then demuxed *on its own*, which works because the
+   * offsets in a sample table are absolute positions in the file
+   * rather than relative to anything: the tables are as correct read
+   * out of a two hundred kilobyte buffer as out of a gigabyte one.
+   */
+  private async openRanged(source: string): Promise<{ track: Mp4VideoTrack; data: ByteSource }> {
+    const fetchRange = this.fetchRange!;
+    const first = await fetchRange(source, 0, HEADER_PROBE_BYTES);
+    const total = first.total;
+    if (!Number.isFinite(total) || total <= 0) {
+      throw new Error(`Fetching a range of '${source}' did not report how long the file is.`);
+    }
+    const plain = (start: number, end: number): Promise<ArrayBuffer> =>
+      fetchRange(source, start, end).then(response => response.data);
+    const bytes = rangeSource(source, {
+      fetchRange: (_source, start, end) => plain(start, end),
+      size: total,
+      // The probe is not thrown away. Without this the front of the
+      // file is fetched twice -- once to find the `moov` and once
+      // again as the first block -- which on a short file is most of
+      // the transfer, and makes a ranged read cost more than simply
+      // fetching the whole thing.
+      prefetched: { start: 0, data: first.data }
+    });
+    const moov = await findTopLevelBox(bytes, 'moov', total);
+    if (moov === null) {
+      throw new Error(
+        `'${source}' has no moov box, so there is no sample table to read. ` +
+          'A ranged read walks the top-level boxes; a file this cannot walk is not an MP4.'
+      );
+    }
+    // Already here, for a faststart file whose `moov` fits in the
+    // probe, which is most of them. Copied rather than viewed because
+    // the block it sits in can be evicted.
+    const held = bytes.read(moov.start, moov.end - moov.start);
+    const header = held === null ? await plain(moov.start, moov.end) : held.slice().buffer;
+    return { track: demuxMp4Video(header), data: bytes };
+  }
+}
+
+/**
+ * How much of the front of the file to ask for first.
+ *
+ * Exactly one block, and that is the whole point of the constant
+ * rather than a number here: a probe that does not land on a block
+ * boundary cannot be kept, so the front of the file would be fetched
+ * once to find the header and again as the first block. It is also
+ * enough to hold the `ftyp` and, in a faststart file, the whole `moov`
+ * for a clip of ordinary length, so the common case is a single
+ * request for the whole header.
+ */
+const HEADER_PROBE_BYTES = DEFAULT_BLOCK_SIZE;
+
+/**
+ * Walks the top-level boxes looking for one, reading only their
+ * headers.
+ *
+ * A box states its own length, so the walk is a jump per box and the
+ * bytes it touches are sixteen at a time. `size === 1` means the real
+ * length is a 64-bit number after the type, and `size === 0` means the
+ * box runs to the end of the file — both of which `mdat` is written
+ * with often enough to matter.
+ */
+async function findTopLevelBox(
+  bytes: ByteSource,
+  wanted: string,
+  total: number
+): Promise<{ start: number; end: number } | null> {
+  let at = 0;
+  while (at + 8 <= total) {
+    await bytes.request(at, 16);
+    const header = bytes.read(at, Math.min(16, total - at));
+    if (header === null || header.length < 8) {
+      return null;
+    }
+    const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
+    let size = view.getUint32(0);
+    let payload = at + 8;
+    if (size === 1) {
+      if (header.length < 16) {
+        return null;
+      }
+      size = view.getUint32(8) * 0x1_0000_0000 + view.getUint32(12);
+      payload = at + 16;
+    } else if (size === 0) {
+      size = total - at;
+    }
+    if (size < 8 || at + size > total) {
+      return null;
+    }
+    const type = String.fromCharCode(header[4]!, header[5]!, header[6]!, header[7]!);
+    if (type === wanted) {
+      return { start: payload - 8, end: at + size };
+    }
+    at += size;
+  }
+  return null;
 }
 
 /**
@@ -266,12 +448,44 @@ class Mp4Playback implements VideoPlayback {
   private positionUs = 0;
   private closed = false;
   private readonly errorListeners = new Set<(error: unknown) => void>();
+  private readonly frameListeners = new Set<() => void>();
+  /**
+   * The sync samples, by presentation time, so a seek can find where
+   * to start decoding with a binary search rather than a scan.
+   *
+   * Built once, because `samples` never changes and a scrub drags
+   * across it many times a second. Sorted by `timestampUs` rather than
+   * left in decode order: a keyframe carries a composition offset like
+   * any other sample, so the order they are *shown* in is the order a
+   * seek searches, and it is not quite the order they are decoded in.
+   */
+  private readonly syncPoints: readonly SyncPoint[];
+  /**
+   * Where a seek is aiming, in microseconds, or null when playing
+   * forwards.
+   *
+   * Frames that arrive before this are decoded only because the
+   * pictures after them refer to them, and are closed on arrival
+   * instead of being queued — see `receive`. Cleared as soon as a
+   * frame at or past it has been decoded.
+   */
+  private seekTargetUs: number | null = null;
+  /** Whether a fetch for missing bytes is already out; see `await`. */
+  private pendingBytes = false;
 
   constructor(
     private readonly track: Mp4VideoTrack,
-    private readonly data: ArrayBuffer
+    private readonly data: ByteSource
   ) {
-    this.surface = new MutableVideoSurface(track.codedWidth, track.codedHeight);
+    // The surface tells us when a picture actually reaches it, which
+    // is not the same moment as presenting one: converting a decoded
+    // frame to a bitmap is asynchronous, so `present` can return
+    // having chosen a frame that is not drawable yet. A playing clip
+    // never notices, because the next tick repaints anyway. A paused
+    // one has no next tick, so without this its first frame is chosen,
+    // converted, and never drawn.
+    this.surface = new MutableVideoSurface(track.codedWidth, track.codedHeight, () => this.announcePicture());
+    this.syncPoints = buildSyncPoints(track.samples);
     this.decoder = new VideoDecoder({
       output: frame => this.receive(frame),
       error: error => this.fail(error)
@@ -296,6 +510,10 @@ class Mp4Playback implements VideoPlayback {
 
   get positionMs(): number {
     return this.positionUs / 1000;
+  }
+
+  get seeking(): boolean {
+    return this.seekTargetUs !== null;
   }
 
   async start(): Promise<void> {
@@ -345,10 +563,8 @@ class Mp4Playback implements VideoPlayback {
       // `fill()` and a second walk of the frame queue per frame.
       return false;
     }
-    if (wanted + SEEK_BACK_TOLERANCE_US < this.positionUs) {
-      // Backwards: a loop wrapping, or a deliberate seek. Either way
-      // every frame in flight belongs to where we no longer are.
-      this.rewind();
+    if (this.needsSeek(wanted)) {
+      this.seekTo(wanted);
     }
     this.positionUs = wanted;
     const changed = this.presentDue();
@@ -359,6 +575,11 @@ class Mp4Playback implements VideoPlayback {
   onError(listener: (error: unknown) => void): () => void {
     this.errorListeners.add(listener);
     return () => this.errorListeners.delete(listener);
+  }
+
+  onFrame(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
   }
 
   /** Frees the decoder and every frame still queued. */
@@ -376,6 +597,8 @@ class Mp4Playback implements VideoPlayback {
       this.decoder.close();
     }
     this.errorListeners.clear();
+    this.frameListeners.clear();
+    this.data.close();
   }
 
   private presentDue(): boolean {
@@ -399,7 +622,18 @@ class Mp4Playback implements VideoPlayback {
     return shown;
   }
 
-  /** Keeps the decoder a few frames ahead, and no further. */
+  /**
+   * Keeps the decoder a few frames ahead, and no further.
+   *
+   * **Stops at the first sample whose bytes are not here yet**, which
+   * is the whole of what a ranged source costs this loop. `read`
+   * answers synchronously or not at all — see `ByteSource` for why it
+   * must — so a sample that is still on the wire ends the fill, a
+   * request goes out for the region around it, and that request
+   * calls `fill` again when it lands. In the ordinary case, a file
+   * already in memory, `read` never answers null and none of this
+   * runs.
+   */
   private fill(): void {
     if (this.closed || this.decoder.state !== 'configured') {
       return;
@@ -409,9 +643,14 @@ class Mp4Playback implements VideoPlayback {
       this.queue.length + this.decoder.decodeQueueSize < FRAME_QUEUE_LIMIT
     ) {
       const sample = this.track.samples[this.nextSample]!;
+      const bytes = this.data.read(sample.offset, sample.size);
+      if (bytes === null) {
+        this.await(sample);
+        return;
+      }
       this.nextSample++;
       try {
-        this.decoder.decode(new EncodedVideoChunk(chunkOf(sample, this.data)));
+        this.decoder.decode(new EncodedVideoChunk(chunkOf(sample, bytes)));
       } catch (error) {
         this.fail(error);
         return;
@@ -420,23 +659,96 @@ class Mp4Playback implements VideoPlayback {
   }
 
   /**
-   * Back to the start of the stream.
+   * Asks for the bytes around a sample, and resumes when they arrive.
+   *
+   * The window is deliberately wider than the one sample: a request
+   * per frame would be a request every sixteen milliseconds, and the
+   * point of reading a file in pieces is to read it in *few* pieces.
+   * So it asks for everything from this sample to the end of the
+   * decoder's lookahead, which the block size below it will round up
+   * to something worth a round trip anyway.
+   */
+  private await(sample: Mp4Sample): void {
+    if (this.pendingBytes) {
+      return;
+    }
+    const last = this.track.samples[Math.min(this.nextSample + FRAME_QUEUE_LIMIT, this.track.samples.length - 1)];
+    const through = last === undefined ? sample.offset + sample.size : last.offset + last.size;
+    this.pendingBytes = true;
+    this.data
+      .request(sample.offset, Math.max(sample.size, through - sample.offset))
+      .then(() => {
+        this.pendingBytes = false;
+        if (this.closed) {
+          return;
+        }
+        this.fill();
+        // The position has not moved, but a frame that was missing
+        // may now exist — a clip that stalled mid-seek, most of all.
+        this.announceFrame();
+      })
+      .catch((error: unknown) => {
+        this.pendingBytes = false;
+        this.fail(error);
+      });
+  }
+
+  /**
+   * Whether reaching `wanted` means starting the decoder somewhere
+   * else.
+   *
+   * Two cases, and they are not symmetric. **Backwards** past the
+   * tolerance is always a seek: a decoder cannot run in reverse, so
+   * every frame in flight belongs to where we no longer are. It is
+   * also what a loop is, which is why looping costs a keyframe.
+   *
+   * **Forwards** is a seek only when the jump clears the samples
+   * already submitted. During ordinary playback the decoder runs a few
+   * frames ahead of the picture, so the keyframe covering the position
+   * is always one it has long since passed — `sample <= nextSample`,
+   * and nothing happens. A jump far enough ahead to land beyond the
+   * decoder's own head is the only forward case worth a reset, and
+   * without this test it would instead decode every frame in between
+   * at playback speed, which is a scrub that crawls.
+   */
+  private needsSeek(wanted: number): boolean {
+    if (wanted + SEEK_BACK_TOLERANCE_US < this.positionUs) {
+      return true;
+    }
+    if (wanted <= this.positionUs) {
+      return false;
+    }
+    return syncSampleFor(this.syncPoints, wanted) > this.nextSample;
+  }
+
+  /**
+   * Starts the decoder again at the sync sample covering `wanted`.
    *
    * The decoder is reset and reconfigured rather than merely refilled,
    * because a decoder mid-GOP holds reference frames for where it was
-   * and the first sample of the file is a keyframe for where it is
-   * going. That costs one keyframe decode at the loop point — a
-   * measurable hitch on a long GOP, invisible on the two-second ones
-   * a looping clip is usually encoded with — and it is the honest
-   * price of looping a progressive file rather than a fragmented one.
+   * and the sample it is about to be given is a keyframe for where it
+   * is going.
+   *
+   * What lands is the keyframe *at or before* the wanted position,
+   * never after: a seek that jumped forward to the next keyframe would
+   * show a picture from later than the moment asked for, and a scrubber
+   * that overshoots its own thumb is worse than one that is coarse.
+   * The frames between the keyframe and the target are decoded — the
+   * ones after it refer to them — and closed on arrival rather than
+   * queued, which is what `seekTargetUs` is for. So the cost of a seek
+   * is the GOP length, paid in decodes nobody sees, and the reason a
+   * clip encoded with two-second keyframes scrubs well and one encoded
+   * with ten-second keyframes does not.
    */
-  private rewind(): void {
+  private seekTo(wanted: number): void {
     for (const frame of this.queue) {
       frame.close();
     }
     this.queue.length = 0;
-    this.nextSample = 0;
-    this.positionUs = 0;
+    this.nextSample = syncSampleFor(this.syncPoints, wanted);
+    // Nothing to throw away when the seek lands on its own keyframe,
+    // which is what a loop back to the start always does.
+    this.seekTargetUs = wanted > 0 ? wanted : null;
     if (this.config !== null && this.decoder.state !== 'closed') {
       this.decoder.reset();
       this.decoder.configure(this.config);
@@ -448,12 +760,65 @@ class Mp4Playback implements VideoPlayback {
       frame.close();
       return;
     }
+    const target = this.seekTargetUs;
+    if (target !== null) {
+      if (frame.timestamp + this.track.frameDurationUs < target) {
+        // Decoded only because the pictures after it refer to it.
+        // Closing it here rather than queueing it is what keeps the
+        // queue free for `fill` to keep submitting, so the gap between
+        // the keyframe and the target is crossed as fast as the
+        // decoder will go instead of one frame per presentation.
+        frame.close();
+        this.fill();
+        return;
+      }
+      this.enqueue(frame);
+      // Held, not shown. The frame *before* the target is kept because
+      // it may well be the one the target position wants — a seek to
+      // 3.45s is answered by the frame at 3.4s — but showing it the
+      // moment it arrives would put the wrong picture up for a
+      // millisecond and then correct it. So nothing is presented until
+      // a frame at or past the target lands, or until the file runs
+      // out, and `presentDue` then picks whichever of them is right.
+      const arrived = frame.timestamp >= target || this.nextSample >= this.track.samples.length;
+      if (!arrived) {
+        this.fill();
+        return;
+      }
+      this.seekTargetUs = null;
+      this.announceFrame();
+      return;
+    }
+    this.enqueue(frame);
+    // Due already, which means the position asked for it before it
+    // existed. During ordinary playback every frame here is ahead of
+    // the position and this does nothing.
+    this.announceFrame();
+  }
+
+  /** Queued in presentation order; see `presentDue` for why that matters. */
+  private enqueue(frame: VideoFrame): void {
     this.queue.push(frame);
     // The decoder emits in presentation order within a run, but a
     // frame may arrive after the position has already moved past it;
     // keeping the queue sorted means `presentDue` can stop at the
     // first frame that is not due yet.
     this.queue.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  /**
+   * Presents whatever is due, and lets the surface say if that put a
+   * picture up: see the constructor for why the two are not the same
+   * moment.
+   */
+  private announceFrame(): void {
+    this.presentDue();
+  }
+
+  private announcePicture(): void {
+    for (const listener of this.frameListeners) {
+      listener();
+    }
   }
 
   private fail(error: unknown): void {
@@ -464,12 +829,64 @@ class Mp4Playback implements VideoPlayback {
   }
 }
 
-function chunkOf(sample: Mp4Sample, data: ArrayBuffer): EncodedVideoChunkInit {
+/** A sync sample: when it is shown, and where in the decode order it sits. */
+interface SyncPoint {
+  readonly timestampUs: number;
+  /** Its index in the track's decode-ordered samples, which is where `fill` resumes. */
+  readonly sample: number;
+}
+
+/**
+ * The track's sync samples, in the order they are shown.
+ *
+ * `samples` is in decode order and stays that way — feeding a decoder
+ * anything else is how you submit a frame before the one it refers to
+ * — so the search a seek does needs its own view. Only the sync
+ * samples are in it, which for a two-second GOP is one entry per two
+ * seconds: a fifteen-minute film indexes in a few hundred numbers.
+ */
+function buildSyncPoints(samples: readonly Mp4Sample[]): readonly SyncPoint[] {
+  const points: SyncPoint[] = [];
+  for (const [sample, entry] of samples.entries()) {
+    if (entry.isKey) {
+      points.push({ timestampUs: entry.timestampUs, sample });
+    }
+  }
+  points.sort((a, b) => a.timestampUs - b.timestampUs);
+  return points;
+}
+
+/**
+ * Which sample to start decoding at to have a picture for `wanted`.
+ *
+ * The last sync sample at or before the position, by binary search.
+ * Zero when the position is before the first one, or when the track
+ * declared no sync samples at all — an all-intra track, where every
+ * sample is one and `buildSyncPoints` returned all of them anyway.
+ */
+function syncSampleFor(points: readonly SyncPoint[], wantedUs: number): number {
+  let low = 0;
+  let high = points.length - 1;
+  let found = 0;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const point = points[middle]!;
+    if (point.timestampUs <= wantedUs) {
+      found = point.sample;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return found;
+}
+
+function chunkOf(sample: Mp4Sample, bytes: Uint8Array): EncodedVideoChunkInit {
   return {
     type: sample.isKey ? 'key' : 'delta',
     timestamp: sample.timestampUs,
     duration: sample.durationUs,
-    data: new Uint8Array(data, sample.offset, sample.size)
+    data: bytes
   };
 }
 
@@ -486,7 +903,9 @@ class MutableVideoSurface implements UiVideoSurface {
 
   constructor(
     readonly width: number,
-    readonly height: number
+    readonly height: number,
+    /** Called once a picture is actually on the surface and drawable. */
+    private readonly onPicture: () => void = () => {}
   ) {}
 
   /**
@@ -555,6 +974,7 @@ class MutableVideoSurface implements UiVideoSurface {
     (this.frame as { close?: () => void } | null)?.close?.();
     this.frame = frame;
     this.version++;
+    this.onPicture();
   }
 
   clear(): void {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { demuxMp4Video } from './Mp4Demuxer';
+import { demuxMp4Audio, demuxMp4Video } from './Mp4Demuxer';
+import {
+  buildFragmentedMp4,
+  buildMp4,
+  mdatStart,
+  type AudioTrackSpec,
+  type FragmentedSpec,
+  type TrackSpec
+} from './Mp4TestUtils';
 
 /**
  * The demuxer, against files built here byte by byte.
@@ -15,159 +23,10 @@ import { demuxMp4Video } from './Mp4Demuxer';
  * What this cannot check is that the byte layout matches what encoders
  * actually write. That is checked against a real file, in a browser,
  * by the transitions example playing.
+ *
+ * The writer itself lives in `Mp4TestUtils`, because the resolver's
+ * spec plays the files this one reads.
  */
-
-// ---------------------------------------------------------------------------
-// A very small MP4 writer
-// ---------------------------------------------------------------------------
-
-function u32(value: number): number[] {
-  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
-}
-
-function u16(value: number): number[] {
-  return [(value >>> 8) & 0xff, value & 0xff];
-}
-
-function ascii(text: string): number[] {
-  return [...text].map(character => character.charCodeAt(0));
-}
-
-/** `size type payload`, which is every box in the format. */
-function box(type: string, ...payload: number[][]): number[] {
-  const body = payload.flat();
-  return [...u32(body.length + 8), ...ascii(type), ...body];
-}
-
-/** A full box: a version and three flag bytes before the payload. */
-function fullBox(type: string, version: number, ...payload: number[][]): number[] {
-  return box(type, [version, 0, 0, 0], ...payload);
-}
-
-interface TrackSpec {
-  timescale: number;
-  /** One `stts` run per entry. */
-  deltas: { count: number; delta: number }[];
-  compositionOffsets?: { count: number; offset: number }[];
-  sizes: number[];
-  chunkOffsets: number[];
-  chunkRuns: { firstChunk: number; samplesPerChunk: number }[];
-  /** Omitted means no `stss` at all, which means every sample is a sync sample. */
-  syncSamples?: number[];
-  width: number;
-  height: number;
-  handler?: string;
-}
-
-function visualSampleEntry(spec: TrackSpec): number[] {
-  return box(
-    'avc1',
-    [0, 0, 0, 0, 0, 0], // reserved
-    u16(1), // data_reference_index
-    Array.from({ length: 16 }, () => 0), // pre_defined + reserved
-    u16(spec.width),
-    u16(spec.height),
-    u32(0x0048_0000), // horizresolution
-    u32(0x0048_0000), // vertresolution
-    u32(0), // reserved
-    u16(1), // frame_count
-    Array.from({ length: 32 }, () => 0), // compressorname
-    u16(24), // depth
-    [0xff, 0xff], // pre_defined = -1
-    // The configuration record: length, profile, compat, level, then
-    // whatever the codec puts after them.
-    box('avcC', [1, 0x64, 0x00, 0x1f, 0xff, 0xe1])
-  );
-}
-
-function sampleTable(spec: TrackSpec): number[] {
-  const boxes: number[][] = [
-    fullBox('stsd', 0, u32(1), visualSampleEntry(spec)),
-    fullBox('stts', 0, u32(spec.deltas.length), ...spec.deltas.map(run => [...u32(run.count), ...u32(run.delta)])),
-    fullBox(
-      'stsc',
-      0,
-      u32(spec.chunkRuns.length),
-      ...spec.chunkRuns.map(run => [...u32(run.firstChunk), ...u32(run.samplesPerChunk), ...u32(1)])
-    ),
-    fullBox('stsz', 0, u32(0), u32(spec.sizes.length), ...spec.sizes.map(size => u32(size))),
-    fullBox('stco', 0, u32(spec.chunkOffsets.length), ...spec.chunkOffsets.map(offset => u32(offset)))
-  ];
-  if (spec.compositionOffsets !== undefined) {
-    boxes.splice(
-      2,
-      0,
-      fullBox(
-        'ctts',
-        0,
-        u32(spec.compositionOffsets.length),
-        ...spec.compositionOffsets.map(run => [...u32(run.count), ...u32(run.offset)])
-      )
-    );
-  }
-  if (spec.syncSamples !== undefined) {
-    boxes.push(fullBox('stss', 0, u32(spec.syncSamples.length), ...spec.syncSamples.map(number => u32(number))));
-  }
-  return box('stbl', ...boxes);
-}
-
-function buildMp4(spec: TrackSpec, options: { fragmented?: boolean } = {}): ArrayBuffer {
-  const trak = box(
-    'trak',
-    box(
-      'mdia',
-      fullBox('mdhd', 0, u32(0), u32(0), u32(spec.timescale), u32(1000)),
-      fullBox(
-        'hdlr',
-        0,
-        u32(0),
-        ascii(spec.handler ?? 'vide'),
-        Array.from({ length: 12 }, () => 0),
-        [0]
-      ),
-      box('minf', sampleTable(spec))
-    )
-  );
-  const bytes = [
-    ...box('ftyp', ascii('isom'), u32(512), ascii('isomiso2avc1mp41')),
-    ...box(
-      'moov',
-      fullBox(
-        'mvhd',
-        0,
-        Array.from({ length: 100 }, () => 0)
-      ),
-      trak
-    ),
-    ...(options.fragmented === true ? box('moof', box('mfhd', u32(1))) : []),
-    // A `mdat` big enough for every offset the tables name.
-    ...box(
-      'mdat',
-      Array.from({ length: 512 }, () => 0x41)
-    )
-  ];
-  return new Uint8Array(bytes).buffer;
-}
-
-/** The offset `mdat`'s payload lands at, for a table that must point into it. */
-function mdatStart(data: ArrayBuffer): number {
-  const view = new DataView(data);
-  let at = 0;
-  while (at + 8 <= data.byteLength) {
-    const size = view.getUint32(at);
-    const type = String.fromCharCode(
-      view.getUint8(at + 4),
-      view.getUint8(at + 5),
-      view.getUint8(at + 6),
-      view.getUint8(at + 7)
-    );
-    if (type === 'mdat') {
-      return at + 8;
-    }
-    at += size;
-  }
-  throw new Error('no mdat');
-}
 
 const BASE: TrackSpec = {
   timescale: 1000,
@@ -289,10 +148,12 @@ describe('demuxMp4Video', () => {
     expect(demuxMp4Video(data).samples.map(sample => sample.isKey)).toEqual([true, false, true, false]);
   });
 
-  it('names a fragmented file rather than returning nothing', () => {
+  it('names a fragmented file with no fragments in it rather than returning nothing', () => {
     // The failure worth designing for: a file the browser plays
     // perfectly, that this returns zero samples for. Saying which kind
-    // of file it is turns an afternoon into a minute.
+    // of file it is turns an afternoon into a minute. It is a much
+    // narrower case than it used to be — fragments are read now — and
+    // what is left is a file whose fragments live in other requests.
     const spec: TrackSpec = { ...BASE, sizes: [], chunkOffsets: [], chunkRuns: [], deltas: [] };
     const probe = buildMp4(spec, { fragmented: true });
     expect(() => demuxMp4Video(probe)).toThrow(/fragmented/i);
@@ -305,5 +166,243 @@ describe('demuxMp4Video', () => {
 
   it('rejects something that is not an MP4 at all', () => {
     expect(() => demuxMp4Video(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer)).toThrow(/Not an MP4/i);
+  });
+});
+
+describe('demuxMp4Audio', () => {
+  const AUDIO: AudioTrackSpec = {
+    timescale: 44100,
+    deltas: [{ count: 4, delta: 1024 }],
+    sizes: [100, 100, 100, 100],
+    chunkOffsets: [0],
+    chunkRuns: [{ firstChunk: 1, samplesPerChunk: 4 }],
+    channels: 2,
+    sampleRate: 44100
+  };
+
+  it('answers nothing for a file with no sound, which is not an error', () => {
+    // The ordinary case for the clips this framework plays: a looping
+    // background has no audio track and nothing has gone wrong.
+    expect(demuxMp4Audio(buildMp4(BASE))).toBeNull();
+  });
+
+  it('reads the track beside the video', () => {
+    const data = buildMp4(BASE, { audio: AUDIO });
+    const track = demuxMp4Audio(data);
+    expect(track?.sampleRate).toBe(44100);
+    expect(track?.channels).toBe(2);
+    expect(track?.samples).toHaveLength(4);
+  });
+
+  it('assembles the codec string out of the esds', () => {
+    // `40` is MPEG-4 audio, from the DecoderConfigDescriptor; `2` is
+    // AAC-LC, from the top five bits of the AudioSpecificConfig. A
+    // player that got either wrong would configure a decoder that
+    // refuses the stream.
+    expect(demuxMp4Audio(buildMp4(BASE, { audio: AUDIO }))?.codec).toBe('mp4a.40.2');
+  });
+
+  it('keeps the AudioSpecificConfig for the decoder to be configured with', () => {
+    const track = demuxMp4Audio(buildMp4(BASE, { audio: AUDIO }));
+    expect(Array.from(track?.description ?? [])).toEqual([0x12, 0x10]);
+  });
+
+  it('reads an object type that is not AAC-LC', () => {
+    // 0x28 >> 3 is 5: HE-AAC.
+    const config = [0x28, 0x10];
+    expect(demuxMp4Audio(buildMp4(BASE, { audio: { ...AUDIO, config } }))?.codec).toBe('mp4a.40.5');
+  });
+
+  it('reads the audio track of a file whose video track comes first', () => {
+    // The walk must not stop at the first `trak` it sees just because
+    // that one is the wrong kind.
+    const track = demuxMp4Audio(buildMp4(BASE, { audio: AUDIO }));
+    expect(track).not.toBeNull();
+  });
+
+  it('still reads the video track of a file that has both', () => {
+    const video = demuxMp4Video(buildMp4(BASE, { audio: AUDIO }));
+    expect(video.codedWidth).toBe(640);
+    expect(video.samples).toHaveLength(4);
+  });
+});
+
+describe('codec strings', () => {
+  it('assembles an AV1 string rather than claiming the bare format', () => {
+    // `av01` alone is not a codec string: `VideoDecoder` answers
+    // `supported: false` for it, so a file reported that way never
+    // played at all. Profile 0, level 4, main tier, 8-bit.
+    const data = buildMp4({ ...BASE, codec: 'av01', configBytes: [0x04, 0x00] });
+    expect(demuxMp4Video(data).codec).toBe('av01.0.04M.08');
+  });
+
+  it('reads an AV1 high tier and ten-bit depth', () => {
+    // seq_profile 0, seq_level_idx 8; then tier high and high_bitdepth.
+    const data = buildMp4({ ...BASE, codec: 'av01', configBytes: [0x08, 0xc0] });
+    expect(demuxMp4Video(data).codec).toBe('av01.0.08H.10');
+  });
+
+  it('does not hand AV1 a description it carries in band', () => {
+    // AV1 keeps its sequence header in the stream, and `configure`
+    // rejects a config that supplies one as well.
+    const data = buildMp4({ ...BASE, codec: 'av01', configBytes: [0x04, 0x00] });
+    expect(demuxMp4Video(data).description).toBeUndefined();
+  });
+
+  it('assembles a VP9 string out of the vpcC', () => {
+    // Profile 0, level 31, 8-bit.
+    const data = buildMp4({ ...BASE, codec: 'vp09', configBytes: [0x00, 0x1f, 0x80] });
+    expect(demuxMp4Video(data).codec).toBe('vp09.00.31.08');
+  });
+
+  it('falls back to the format for a record too short to read', () => {
+    // Claiming a precise string from bytes that are not there is worse
+    // than claiming none: `isConfigSupported` is the right judge.
+    const data = buildMp4({ ...BASE, codec: 'av01', configBytes: [] });
+    expect(demuxMp4Video(data).codec).toBe('av01');
+  });
+});
+
+describe('fragmented MP4', () => {
+  const FRAGMENTED: FragmentedSpec = {
+    trackId: 1,
+    timescale: 1000,
+    width: 320,
+    height: 240,
+    fragments: [
+      {
+        baseMediaDecodeTime: 0,
+        samples: [
+          { duration: 100, size: 40, isKey: true },
+          { duration: 100, size: 10, isKey: false }
+        ]
+      },
+      {
+        baseMediaDecodeTime: 200,
+        samples: [
+          { duration: 100, size: 30, isKey: true },
+          { duration: 100, size: 12, isKey: false }
+        ]
+      }
+    ]
+  };
+
+  it('reads samples out of the fragments', () => {
+    // What DASH and HLS segments are, and what this used to refuse.
+    const track = demuxMp4Video(buildFragmentedMp4(FRAGMENTED));
+    expect(track.samples).toHaveLength(4);
+    expect(track.codedWidth).toBe(320);
+  });
+
+  it('accumulates times across fragments', () => {
+    const track = demuxMp4Video(buildFragmentedMp4(FRAGMENTED));
+    expect(track.samples.map(sample => sample.timestampUs)).toEqual([0, 100_000, 200_000, 300_000]);
+    expect(track.durationUs).toBe(400_000);
+  });
+
+  it('reads the sync flag out of each sample', () => {
+    const track = demuxMp4Video(buildFragmentedMp4(FRAGMENTED));
+    // Bit 16 of the sample flags is `sample_is_non_sync_sample`, so a
+    // keyframe is the one with it clear — reading it the other way up
+    // makes every seek land on a frame the decoder cannot start at.
+    expect(track.samples.map(sample => sample.isKey)).toEqual([true, false, true, false]);
+  });
+
+  it('places each fragment against its own moof rather than the first', () => {
+    const data = buildFragmentedMp4(FRAGMENTED);
+    const track = demuxMp4Video(data);
+    const [first, second, third] = track.samples;
+
+    // `default-base-is-moof` is what every fragmenter writes, and it
+    // makes a fragment self-contained. Taking the older first-traf
+    // rule as the general one puts every fragment after the first at
+    // the wrong offset, which decodes as noise rather than as an error.
+    expect(second!.offset).toBe(first!.offset + first!.size);
+    expect(third!.offset).toBeGreaterThan(second!.offset + second!.size);
+    // And every sample has to land inside the file it came from.
+    for (const sample of track.samples) {
+      expect(sample.offset + sample.size).toBeLessThanOrEqual(data.byteLength);
+    }
+  });
+
+  it('falls back to the trex defaults for a field the trun leaves out', () => {
+    // The whole economy of the format: a run of constant-bitrate
+    // samples can be a header and nothing else.
+    const track = demuxMp4Video(
+      buildFragmentedMp4({
+        ...FRAGMENTED,
+        defaultSampleDuration: 250,
+        defaultSampleSize: 20,
+        omit: { duration: true, size: true }
+      })
+    );
+    expect(track.samples[0]?.durationUs).toBe(250_000);
+    expect(track.samples[0]?.size).toBe(20);
+  });
+
+  it('carries on from the last fragment when one states no decode time', () => {
+    const track = demuxMp4Video(
+      buildFragmentedMp4({
+        ...FRAGMENTED,
+        fragments: [
+          { baseMediaDecodeTime: 0, samples: [{ duration: 100, size: 10, isKey: true }] },
+          { samples: [{ duration: 100, size: 10, isKey: false }] }
+        ]
+      })
+    );
+    expect(track.samples.map(sample => sample.timestampUs)).toEqual([0, 100_000]);
+  });
+
+  it('paces a fragmented clip from its samples like any other', () => {
+    expect(demuxMp4Video(buildFragmentedMp4(FRAGMENTED)).frameDurationUs).toBe(100_000);
+  });
+});
+
+describe('presentation times that do not start at zero', () => {
+  it('rebases a track whose composition offsets shift its first picture', () => {
+    // What every clip encoded with B-frames looks like: `ctts` shifts
+    // each sample forward of its decode time, so the earliest picture
+    // is the reorder depth into the file rather than at zero.
+    const { data } = withMdatOffsets({
+      ...BASE,
+      compositionOffsets: [{ count: 4, offset: 200 }]
+    });
+    const track = demuxMp4Video(data);
+
+    // Without rebasing the first picture would be at 200ms, position
+    // zero would have nothing due, and a paused clip would show
+    // nothing at all, forever.
+    expect(track.samples[0]?.timestampUs).toBe(0);
+    expect(track.samples.map(sample => sample.timestampUs)).toEqual([0, 100_000, 200_000, 300_000]);
+  });
+
+  it('reports the length of the pictures rather than of the offset plus them', () => {
+    const { data } = withMdatOffsets({
+      ...BASE,
+      compositionOffsets: [{ count: 4, offset: 200 }]
+    });
+    // Four samples of 100ms is 400ms of video however far into the
+    // file the first one is shown.
+    expect(demuxMp4Video(data).durationUs).toBe(400_000);
+  });
+
+  it('keeps the gaps between samples exactly as they were', () => {
+    const { data } = withMdatOffsets({
+      ...BASE,
+      // An uneven shift, which is what a real reorder produces.
+      compositionOffsets: [
+        { count: 1, offset: 200 },
+        { count: 1, offset: 300 },
+        { count: 2, offset: 200 }
+      ]
+    });
+    const track = demuxMp4Video(data);
+    // Subtracting a constant moves the clock and nothing else.
+    expect(track.samples.map(sample => sample.timestampUs)).toEqual([0, 200_000, 200_000, 300_000]);
+  });
+
+  it('leaves a track that already starts at zero alone', () => {
+    const { data } = withMdatOffsets(BASE);
+    expect(demuxMp4Video(data).samples[0]?.timestampUs).toBe(0);
   });
 });

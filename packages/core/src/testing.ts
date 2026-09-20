@@ -22,3 +22,16 @@ export {
   savedDepth
 } from './rendering/RenderTestUtils';
 export type { RecordedCall } from './rendering/RenderTestUtils';
+export {
+  box,
+  buildMp4,
+  buildFragmentedMp4,
+  fullBox,
+  mdatStart,
+  FakeVideoDecoder,
+  type DecodedChunk,
+  type TrackSpec,
+  type AudioTrackSpec,
+  type FragmentedSpec,
+  type FragmentSpec
+} from './media/Mp4TestUtils';

@@ -835,6 +835,7 @@ interface UiModifierHost {
   own(teardown: UiModifierTeardown): void;
   layoutBox(): LayoutBox | null;
   flowBox(): LayoutBox | null;
+  viewportBox(): LayoutBox | null;
   scrollOffset(): {
     x: number;
     y: number;
@@ -877,6 +878,7 @@ interface UiModifierLayout {
     x: number;
     y: number;
   } | null;
+  viewport?(): LayoutBox | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 interface UiModifierFocus {
@@ -3676,16 +3678,23 @@ interface VideoPlayback {
   readonly frameDurationMs: number;
   readonly positionMs: number;
   present(positionMs: number): boolean;
+  readonly seeking?: boolean;
   onError(listener: (error: unknown) => void): () => void;
+  onFrame?(listener: () => void): () => void;
 }
 interface VideoResolver {
   resolve(source: string): Promise<VideoPlayback>;
   release(source: string): void;
   dispose(): void;
 }
+interface RangeResponse {
+  readonly data: ArrayBuffer;
+  readonly total: number;
+}
 interface DefaultVideoResolverOptions {
   capacity?: number;
   fetch?: (source: string) => Promise<ArrayBuffer>;
+  fetchRange?: (source: string, start: number, end: number) => Promise<RangeResponse>;
 }
 declare function canDecodeVideo(): boolean;
 declare class DefaultVideoResolver implements VideoResolver {
@@ -3693,6 +3702,7 @@ declare class DefaultVideoResolver implements VideoResolver {
   private readonly evictable;
   private readonly capacity;
   private readonly fetchBuffer;
+  private readonly fetchRange;
   private disposed;
   constructor(options?: DefaultVideoResolverOptions);
   get size(): number;
@@ -3700,13 +3710,46 @@ declare class DefaultVideoResolver implements VideoResolver {
   release(source: string): void;
   dispose(): void;
   private open;
+  private openWhole;
+  private openRanged;
+}
+type VideoState = 'loading' | 'playing' | 'failed';
+interface VideoClock {
+  positionSeconds(): number;
+  readonly running: boolean;
+  onChange(listener: () => void): () => void;
+}
+interface VideoTransport {
+  readonly duration: number;
+  readonly position: number;
+  readonly paused: boolean;
+  readonly rate: number;
+  readonly volume: number;
+  readonly muted: boolean;
+  readonly seeking: boolean;
+  readonly state: VideoState;
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  setRate(rate: number): void;
+  setVolume(volume: number): void;
+  setMuted(muted: boolean): void;
+  retry(): void;
+  onChange(listener: () => void): () => void;
 }
 interface VideoSourceArgs {
   readonly resolver: VideoResolver;
   readonly source: string;
   readonly loop?: boolean;
   readonly autoplay?: boolean;
-  readonly onState?: (state: 'loading' | 'playing' | 'failed', error?: unknown) => void;
+  readonly rate?: number;
+  readonly pauseWhenHidden?: boolean;
+  readonly clock?: VideoClock;
+  readonly volume?: number;
+  readonly muted?: boolean;
+  readonly onVolume?: (volume: number, muted: boolean) => void;
+  readonly onState?: (state: VideoState, error?: unknown) => void;
+  readonly onReady?: (transport: VideoTransport) => void;
 }
 declare const videoSource: ((args: VideoSourceArgs, key?: string | number) => UiModifier<VideoSourceArgs>) & {
   readonly kind: UiModifierKind<VideoSourceArgs>;
@@ -4579,7 +4622,53 @@ interface Mp4VideoTrack {
   readonly durationUs: number;
   readonly frameDurationUs: number;
 }
+interface Mp4AudioTrack {
+  readonly codec: string;
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly sampleSize: number;
+  readonly description?: Uint8Array;
+  readonly samples: readonly Mp4Sample[];
+  readonly durationUs: number;
+}
 declare function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack;
+declare function demuxMp4Audio(data: ArrayBuffer): Mp4AudioTrack | null;
+interface ByteSource {
+  readonly size: number;
+  read(offset: number, size: number): Uint8Array | null;
+  request(offset: number, size: number): Promise<void>;
+  close(): void;
+}
+declare function bufferSource(data: ArrayBuffer): ByteSource;
+declare const DEFAULT_BLOCK_SIZE: number;
+interface RangeSourceOptions {
+  readonly fetchRange: (source: string, start: number, end: number) => Promise<ArrayBuffer>;
+  readonly size: number;
+  readonly blockSize?: number;
+  readonly capacity?: number;
+  readonly prefetched?: {
+    readonly start: number;
+    readonly data: ArrayBuffer;
+  };
+}
+declare function rangeSource(source: string, options: RangeSourceOptions): ByteSource;
+interface VttCue {
+  readonly id?: string;
+  readonly start: number;
+  readonly end: number;
+  readonly text: string;
+  readonly settings: Readonly<Record<string, string>>;
+}
+interface VttTrack {
+  readonly cues: readonly VttCue[];
+  readonly header: string;
+  readonly skipped: number;
+}
+declare function parseWebVtt(source: string): VttTrack;
+declare function cueAt(cues: readonly VttCue[], seconds: number, from?: number): {
+  cue: VttCue | null;
+  index: number;
+};
 declare const MARK_PREFIX = "gesso";
 declare function setPerformanceMarks(enabled: boolean): void;
 declare function performanceMarksEnabled(): boolean;
@@ -4710,7 +4799,6 @@ export {
   AutoScrollOptions,
   AxisExplanation,
   bandOf,
-  Bd,
   BindingId,
   borderRadius,
   borderRadiusCorners,
@@ -4725,6 +4813,7 @@ export {
   boxShadowsEqual,
   breakpoint,
   BreakpointArgs,
+  bufferSource,
   buildFontString,
   buildRenderList,
   buildSemanticsSubtree,
@@ -4734,6 +4823,7 @@ export {
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
+  ByteSource,
   canDecodeVideo,
   Canvas2DContext,
   Canvas2DGradient,
@@ -4797,6 +4887,7 @@ export {
   createWebGPUSurface,
   CrossAxisAlignment,
   cubicBezier,
+  cueAt,
   CustomLayoutExplanation,
   darkColors,
   darkTheme,
@@ -4808,6 +4899,7 @@ export {
   Decorations,
   DecorationShape,
   DecorationStroke,
+  DEFAULT_BLOCK_SIZE,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
   DEFAULT_FONT_WEIGHT,
@@ -4827,6 +4919,7 @@ export {
   defineModifier,
   defineProperty,
   defineThemeExtension,
+  demuxMp4Audio,
   demuxMp4Video,
   densityFactors,
   describeLength,
@@ -5042,6 +5135,7 @@ export {
   Mp3Frame,
   Mp3Frames,
   Mp3Header,
+  Mp4AudioTrack,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -5108,6 +5202,7 @@ export {
   parseMainAxisAlignment,
   parseShortcut,
   parseTransform,
+  parseWebVtt,
   pathValuesEqual,
   percent,
   PercentLength,
@@ -5142,6 +5237,9 @@ export {
   PublishInsetArgs,
   radialGradient,
   raiseContrast,
+  RangeResponse,
+  rangeSource,
+  RangeSourceOptions,
   Reactive,
   readMp3Header,
   recordsEqual,
@@ -5280,6 +5378,7 @@ export {
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
   TextWrap,
+  tf,
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
@@ -5507,11 +5606,14 @@ export {
   validateStates,
   validateSubgrid,
   VerticalAlign,
+  VideoClock,
   videoFrameSize,
   VideoPlayback,
   VideoResolver,
   videoSource,
   VideoSourceArgs,
+  VideoState,
+  VideoTransport,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
@@ -5520,6 +5622,8 @@ export {
   VirtualViewport,
   visualState,
   visualStatesEqual,
+  VttCue,
+  VttTrack,
   WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
@@ -5571,6 +5675,7 @@ import {
   boxShadowsEqual,
   breakpoint,
   BreakpointArgs,
+  bufferSource,
   buildFontString,
   buildRenderList,
   buildSemanticsSubtree,
@@ -5580,6 +5685,7 @@ import {
   Button,
   BUTTON_INTERACTION,
   ButtonProps,
+  ByteSource,
   canDecodeVideo,
   Canvas2DContext,
   Canvas2DRenderer,
@@ -5642,6 +5748,7 @@ import {
   createWebGPUSurface,
   CrossAxisAlignment,
   cubicBezier,
+  cueAt,
   CustomLayoutExplanation,
   darkColors,
   darkTheme,
@@ -5653,6 +5760,7 @@ import {
   Decorations,
   DecorationShape,
   DecorationStroke,
+  DEFAULT_BLOCK_SIZE,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
   DEFAULT_FONT_WEIGHT,
@@ -5672,6 +5780,7 @@ import {
   defineModifier,
   defineProperty,
   defineThemeExtension,
+  demuxMp4Audio,
   demuxMp4Video,
   densityFactors,
   describeLength,
@@ -5888,6 +5997,7 @@ import {
   Mp3Frame,
   Mp3Frames,
   Mp3Header,
+  Mp4AudioTrack,
   Mp4Sample,
   Mp4VideoTrack,
   nextCaretToggle,
@@ -5954,6 +6064,7 @@ import {
   parseMainAxisAlignment,
   parseShortcut,
   parseTransform,
+  parseWebVtt,
   pathValuesEqual,
   percent,
   PercentLength,
@@ -5988,6 +6099,9 @@ import {
   PublishInsetArgs,
   radialGradient,
   raiseContrast,
+  RangeResponse,
+  rangeSource,
+  RangeSourceOptions,
   Reactive,
   readMp3Header,
   recordsEqual,
@@ -6353,11 +6467,14 @@ import {
   validateStates,
   validateSubgrid,
   VerticalAlign,
+  VideoClock,
   videoFrameSize,
   VideoPlayback,
   VideoResolver,
   videoSource,
   VideoSourceArgs,
+  VideoState,
+  VideoTransport,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
   VIRTUAL_WINDOW_PROP,
@@ -6366,6 +6483,8 @@ import {
   VirtualViewport,
   visualState,
   visualStatesEqual,
+  VttCue,
+  VttTrack,
   WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
@@ -6384,7 +6503,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CTFOLuiM.js";
+} from "./index-DBoi1_8P.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6406,6 +6525,7 @@ export {
   boxShadowArraysEqual,
   boxShadowsEqual,
   breakpoint,
+  bufferSource,
   buildFontString,
   buildRenderList,
   buildSemanticsSubtree,
@@ -6461,11 +6581,13 @@ export {
   createWebGPUSurface,
   CrossAxisAlignment,
   cubicBezier,
+  cueAt,
   darkColors,
   darkTheme,
   decorated,
   decorationColor,
   decorationRect,
+  DEFAULT_BLOCK_SIZE,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
   DEFAULT_FONT_WEIGHT,
@@ -6483,6 +6605,7 @@ export {
   defineModifier,
   defineProperty,
   defineThemeExtension,
+  demuxMp4Audio,
   demuxMp4Video,
   densityFactors,
   describeLength,
@@ -6661,6 +6784,7 @@ export {
   parseMainAxisAlignment,
   parseShortcut,
   parseTransform,
+  parseWebVtt,
   pathValuesEqual,
   percent,
   performanceMarksEnabled,
@@ -6682,6 +6806,7 @@ export {
   publishInset,
   radialGradient,
   raiseContrast,
+  rangeSource,
   readMp3Header,
   recordsEqual,
   registerFontStack,
@@ -6791,6 +6916,7 @@ export {
   type BoxProps,
   type BreakpointArgs,
   type ButtonProps,
+  type ByteSource,
   type Canvas2DContext,
   type Canvas2DRendererOptions,
   type CanvasHost,
@@ -6890,6 +7016,7 @@ export {
   type Mp3Format,
   type Mp3Frame,
   type Mp3Header,
+  type Mp4AudioTrack,
   type Mp4Sample,
   type Mp4VideoTrack,
   type NodeId,
@@ -6931,6 +7058,8 @@ export {
   type PrimitiveCommand,
   type PropsOf,
   type PublishInsetArgs,
+  type RangeResponse,
+  type RangeSourceOptions,
   type Reactive,
   type RelayoutExplanation,
   type RenderCommand,
@@ -7056,12 +7185,17 @@ export {
   type UiTweenOptions,
   type UiVideoSurface,
   type VerticalAlign,
+  type VideoClock,
   type VideoPlayback,
   type VideoResolver,
   type VideoSourceArgs,
+  type VideoState,
+  type VideoTransport,
   type VirtualItemMeasure,
   type VirtualUpdate,
   type VirtualViewport,
+  type VttCue,
+  type VttTrack,
   type WebGPUCanvasHost,
   type WebGPURendererOptions,
   type ZoomState,
@@ -7261,7 +7395,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CTFOLuiM.js";
+} from "./index-DBoi1_8P.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -7427,16 +7561,125 @@ declare class RenderHarness {
   record(node: UiNode): LayoutRecord;
   box(node: UiNode): LayoutBox;
 }
+declare function box(type: string, ...payload: number[][]): number[];
+declare function fullBox(type: string, version: number, ...payload: number[][]): number[];
+interface AudioTrackSpec {
+  timescale: number;
+  deltas: {
+    count: number;
+    delta: number;
+  }[];
+  sizes: number[];
+  chunkOffsets: number[];
+  chunkRuns: {
+    firstChunk: number;
+    samplesPerChunk: number;
+  }[];
+  channels: number;
+  sampleRate: number;
+  config?: number[];
+}
+interface TrackSpec {
+  timescale: number;
+  deltas: {
+    count: number;
+    delta: number;
+  }[];
+  compositionOffsets?: {
+    count: number;
+    offset: number;
+  }[];
+  sizes: number[];
+  chunkOffsets: number[];
+  chunkRuns: {
+    firstChunk: number;
+    samplesPerChunk: number;
+  }[];
+  syncSamples?: number[];
+  width: number;
+  height: number;
+  handler?: string;
+  codec?: 'avc1' | 'av01' | 'vp09';
+  configBytes?: number[];
+}
+declare function buildMp4(spec: TrackSpec, options?: {
+  fragmented?: boolean;
+  audio?: AudioTrackSpec;
+}): ArrayBuffer;
+interface FragmentSpec {
+  baseMediaDecodeTime?: number;
+  samples: {
+    duration: number;
+    size: number;
+    isKey: boolean;
+  }[];
+}
+interface FragmentedSpec {
+  trackId: number;
+  timescale: number;
+  width: number;
+  height: number;
+  fragments: FragmentSpec[];
+  defaultSampleDuration?: number;
+  defaultSampleSize?: number;
+  omit?: {
+    duration?: boolean;
+    size?: boolean;
+  };
+}
+declare function buildFragmentedMp4(spec: FragmentedSpec): ArrayBuffer;
+declare function mdatStart(data: ArrayBuffer): number;
+interface DecodedChunk {
+  readonly timestamp: number;
+  readonly type: 'key' | 'delta';
+}
+declare class FakeVideoDecoder {
+  static readonly submitted: DecodedChunk[];
+  static configures: number;
+  static resets: number;
+  static emit: boolean;
+  static install(): () => void;
+  static reset(): void;
+  static get sinceConfigure(): number[];
+  static isConfigSupported(): Promise<{
+    supported: boolean;
+  }>;
+  state: 'unconfigured' | 'configured' | 'closed';
+  decodeQueueSize: number;
+  private readonly output;
+  constructor(init: {
+    output: (frame: {
+      timestamp: number;
+      close(): void;
+    }) => void;
+    error: (e: unknown) => void;
+  });
+  configure(): void;
+  decode(chunk: DecodedChunk): void;
+  reset(): void;
+  close(): void;
+}
 export {
+  box,
+  buildFragmentedMp4,
+  buildMp4,
   callArgs,
   callNames,
   callsOf,
   FakeCanvasHost,
   FakeEventTarget,
   FakePlatformSurface,
+  FakeVideoDecoder,
+  fullBox,
   InputTestHarness,
+  mdatStart,
   RecordingCanvasContext,
   RenderHarness,
   savedDepth,
-  type RecordedCall
+  type AudioTrackSpec,
+  type DecodedChunk,
+  type FragmentedSpec,
+  type FragmentSpec,
+  type RecordedCall,
+  type TrackSpec
 };
