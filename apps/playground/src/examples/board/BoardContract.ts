@@ -1,4 +1,4 @@
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 import type { BoardView, LaneOrder } from '../AnimationExampleApp';
 
 export interface BoardCommands {

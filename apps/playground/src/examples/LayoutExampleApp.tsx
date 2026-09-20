@@ -15,8 +15,8 @@ import {
   type UiSemanticStates,
   type UiTextStyle,
   type UiTheme
-} from '@gesso/core';
-import type { ComponentContext, Inputs } from '@gesso/framework';
+} from 'gesso-core';
+import type { ComponentContext, Inputs } from 'gesso-framework';
 import { gessoTheme } from './brand';
 import { masonry } from './layout/masonry';
 

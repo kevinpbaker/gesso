@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { autoFocus, focusRing, percent, type UiChild } from '@gesso/core';
-import { Dialog, keymap, Toast } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { autoFocus, focusRing, percent, type UiChild } from 'gesso-core';
+import { Dialog, keymap, Toast } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 

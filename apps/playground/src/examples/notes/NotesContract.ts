@@ -1,4 +1,4 @@
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 
 /**
  * The barrier for the notes example.

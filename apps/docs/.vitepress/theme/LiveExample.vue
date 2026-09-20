@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
-import { createApp, type WorkerApp } from '@gesso/framework';
+import { createApp, type WorkerApp } from 'gesso-framework';
 import { workerName } from '../../src/still';
 import { embeddedAppOptions } from './embeddedApp';
 

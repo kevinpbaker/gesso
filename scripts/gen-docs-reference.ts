@@ -348,14 +348,14 @@ function apiPage(): string {
   for (const entry of AUTHOR_SURFACE) {
     const key = `${entry.package}:${entry.name}`;
     if (seen.has(key)) {
-      fail(`\`${entry.name}\` is listed twice for @gesso/${entry.package}.`);
+      fail(`\`${entry.name}\` is listed twice for gesso-${entry.package}.`);
     }
     seen.add(key);
     if (!titles.has(entry.group)) {
       fail(`\`${entry.name}\` names group "${entry.group}", which is not in AUTHOR_SURFACE_GROUPS.`);
     }
     if (exported.get(entry.package)?.has(entry.name) !== true) {
-      fail(`\`${entry.name}\` is not exported by @gesso/${entry.package}; the API report does not list it.`);
+      fail(`\`${entry.name}\` is not exported by gesso-${entry.package}; the API report does not list it.`);
     }
     if (entry.page !== undefined && !existsSync(join(root, 'apps/docs', `${entry.page}.md`))) {
       fail(`\`${entry.name}\` links to ${entry.page}, which is not a page on this site.`);
@@ -393,11 +393,11 @@ function apiPage(): string {
       const report = reports.get(entry.package);
       const kind = report === undefined ? undefined : declarationKind(report, entry.name);
       if (kind === undefined) {
-        fail(`\`${entry.name}\` is exported by @gesso/${entry.package} but its declaration was not found.`);
+        fail(`\`${entry.name}\` is exported by gesso-${entry.package} but its declaration was not found.`);
       }
       const label = `\`${entry.name}\``;
       const name = entry.page === undefined ? label : `[${label}](${entry.page})`;
-      lines.push(`| ${name} | ${kind ?? 'unknown'} | \`@gesso/${entry.package}\` | ${entry.what} |`);
+      lines.push(`| ${name} | ${kind ?? 'unknown'} | \`gesso-${entry.package}\` | ${entry.what} |`);
     }
     lines.push('');
   }

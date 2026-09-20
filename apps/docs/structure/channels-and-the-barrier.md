@@ -93,7 +93,7 @@ In the application worker, one call publishes everything it offers:
 
 ```ts
 // tasks.worker.ts
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { Tasks } from './tasks.contract';
 import { createTaskStore, taskSource } from './tasks';
 

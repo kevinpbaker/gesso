@@ -45,7 +45,7 @@ skip.
 
 The consequence for an application author is short. A control built out
 of intrinsics is not keyboard-operable until you bind the keys.
-A control taken from `@gesso/components` already is.
+A control taken from `gesso-components` already is.
 
 ## A keymap is data
 
@@ -56,7 +56,7 @@ binds them in one `onKeyDown`:
 onKeyDown={keymap({ ' ': toggle, Enter: toggle })}
 ```
 
-`keymap` is exported from `@gesso/components`. A key that is bound runs
+`keymap` is exported from `gesso-components`. A key that is bound runs
 its handler and consumes the event, both `preventDefault` and
 `stopPropagation`, so nothing above the control sees it. A key that is
 not bound is left alone for whatever is listening further up.
@@ -138,7 +138,7 @@ the keyboard from what a person was doing is a bug, so `Tooltip` and
 
 ## A control you cannot query is a control nobody can reach
 
-`@gesso/testing` queries the semantics tree, not the node tree: `getByRole`,
+`gesso-testing` queries the semantics tree, not the node tree: `getByRole`,
 `getByLabel`, and events that go through the same controllers a real
 pointer and a real keyboard go through. That makes the two problems at
 the top of this page one problem. A control with no record cannot be

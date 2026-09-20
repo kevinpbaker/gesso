@@ -1,6 +1,6 @@
 import { Observable, defer, distinctUntilChanged, map, of } from 'rxjs';
 
-import { isComponentLikeElement, isObservable, type UiChild, type UiElement } from '@gesso/core';
+import { isComponentLikeElement, isObservable, type UiChild, type UiElement } from 'gesso-core';
 
 export interface ShowProps {
   /** The condition: a cell, any Observable, or a plain value. */

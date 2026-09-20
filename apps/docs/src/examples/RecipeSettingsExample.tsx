@@ -1,9 +1,9 @@
 import type { Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-import { percent, type UiChild } from '@gesso/core';
-import { keymap, Select, Slider, Switch, TextInput, type SelectOption } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiChild } from 'gesso-core';
+import { keymap, Select, Slider, Switch, TextInput, type SelectOption } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 
@@ -125,7 +125,7 @@ const asPixels = (value: number) => `${value} px`;
  * A settings screen: three groups, one cell, and one rule between two
  * controls.
  *
- * Every control here is `@gesso/components`, so the label, the focus
+ * Every control here is `gesso-components`, so the label, the focus
  * ring, the hover and press states, the keyboard map and the role,
  * name and states an assistive technology reads all arrive with it.
  * What the screen supplies is the state and the rules.

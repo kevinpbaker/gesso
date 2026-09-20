@@ -1,7 +1,7 @@
-import { defaultSpacing, defineThemeExtension, type UiThemeExtension, type UiTypographyRole } from '@gesso/core';
+import { defaultSpacing, defineThemeExtension, type UiThemeExtension, type UiTypographyRole } from 'gesso-core';
 
 /**
- * The tokens `@gesso/components` reads, as a theme extension.
+ * The tokens `gesso-components` reads, as a theme extension.
  *
  * How a library component is
  * restyled: through the theme, never through a colour prop. The

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
-import { Column, Row, Text, type UiNode } from '@gesso/core';
+import { Column, Row, Text, type UiNode } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import type { ComponentContext, Inputs } from '../FunctionComponent';
 import { mountRuntime } from './RuntimeTestUtils';

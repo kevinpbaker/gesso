@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent, type ShellRequest } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createComponent, type ShellRequest } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { ShellSignals } from './ShellServicesExample';
 

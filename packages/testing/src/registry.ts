@@ -1,4 +1,4 @@
-import type { UiNode } from '@gesso/core';
+import type { UiNode } from 'gesso-core';
 
 import type { Rendered } from './renderTest';
 

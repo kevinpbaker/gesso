@@ -13,7 +13,7 @@ import {
   UiNodeType,
   noKeyModifiers,
   UiManualFrameClock
-} from '@gesso/core';
+} from 'gesso-core';
 
 function countNodes(root: UiNode, type: UiNodeType): number {
   let count = root.type === type ? 1 : 0;

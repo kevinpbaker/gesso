@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { darkTheme, lightTheme } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { darkTheme, lightTheme } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { AppearanceSetting } from './RecipeAppearanceExample';
 

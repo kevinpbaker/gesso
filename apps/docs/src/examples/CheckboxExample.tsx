@@ -1,9 +1,9 @@
 import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
-import { Checkbox } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Checkbox } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region checkbox
 /**

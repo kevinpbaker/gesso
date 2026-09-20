@@ -1,5 +1,5 @@
 /**
- * `@gesso/components` — the component library.
+ * `gesso-components` — the component library.
  *
  * Every control here follows one contract:
  * controlled by default with an optional `defaultX` that makes it
@@ -8,7 +8,7 @@
  * data, and emitting `role`, `label`, `value` and `states` from the day
  * it was written.
  *
- * It may import `@gesso/core` and `@gesso/framework`, never the
+ * It may import `gesso-core` and `gesso-framework`, never the
  * playground.
  */
 export { Button, type ButtonProps, type ButtonSize, type ButtonTone, type ButtonVariant } from './Button';

@@ -1,4 +1,4 @@
-import type { EditingState, UiSemanticsRecord } from '@gesso/core';
+import type { EditingState, UiSemanticsRecord } from 'gesso-core';
 
 /**
  * Where the proxy sends what it hears. `WorkerApp` posts each call to

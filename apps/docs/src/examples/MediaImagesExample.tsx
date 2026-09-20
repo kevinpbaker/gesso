@@ -1,6 +1,6 @@
-import { percent, type ObjectFit } from '@gesso/core';
-import { Image } from '@gesso/components';
-import type { ComponentContext, Inputs } from '@gesso/framework';
+import { percent, type ObjectFit } from 'gesso-core';
+import { Image } from 'gesso-components';
+import type { ComponentContext, Inputs } from 'gesso-framework';
 
 /**
  * The picture every box on this page shows.

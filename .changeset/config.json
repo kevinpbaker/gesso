@@ -4,18 +4,18 @@
   "commit": false,
   "fixed": [
     [
-      "@gesso/core",
-      "@gesso/framework",
-      "@gesso/components",
-      "@gesso/testing",
-      "@gesso/devtools",
-      "@gesso/vite-plugin",
-      "@gesso/electrobun"
+      "gesso-core",
+      "gesso-framework",
+      "gesso-components",
+      "gesso-testing",
+      "gesso-devtools",
+      "gesso-vite-plugin",
+      "gesso-electrobun"
     ]
   ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@gesso/playground"]
+  "ignore": ["gesso-playground"]
 }

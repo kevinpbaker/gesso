@@ -172,7 +172,7 @@ the whole of it, including the one case that deliberately keeps moving.
 
 ## What this page was checked against
 
-The spec beside the example mounts it with `@gesso/testing` and drives
+The spec beside the example mounts it with `gesso-testing` and drives
 frames on a manual clock. It asserts the claim this page rests on: that
 after a dismissal the notice's node is still in the tree, is the same
 node rather than a copy, and is being scaled down, that it is gone once

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Button, Column, Row, Text, UiNodeType } from '@gesso/core';
-import { createComponent, type ComponentContext, type Inputs } from '@gesso/framework';
+import { Box, Button, Column, Row, Text, UiNodeType } from 'gesso-core';
+import { createComponent, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { renderTest } from './renderTest';
 

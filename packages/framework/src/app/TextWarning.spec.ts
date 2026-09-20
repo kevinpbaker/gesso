@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Button, Column, Text } from '@gesso/core';
+import { Box, Button, Column, Text } from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
 
 describe('a text that is not text', () => {

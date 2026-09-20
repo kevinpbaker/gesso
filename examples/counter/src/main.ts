@@ -2,7 +2,7 @@
  * The counter from the README, in a project that installs the packages
  * the way anybody else would.
  *
- * the exit criterion is that `npm install @gesso/framework`
+ * the exit criterion is that `npm install gesso-framework`
  * in a fresh Vite project runs this, and `scripts/check-install.ts` is
  * what runs it: it packs the workspace into tarballs, installs them here,
  * typechecks, builds, and drives the result in headless Chrome. So this
@@ -13,8 +13,8 @@
  * what is under test is that the published packages resolve, typecheck
  * and paint, not the worker plumbing the playground already exercises.
  */
-import { Button, Row, Text } from '@gesso/core';
-import { createApp, createComponent, input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { Button, Row, Text } from 'gesso-core';
+import { createApp, createComponent, input, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { combineLatest, map } from 'rxjs';
 
 function Counter(inputs: Inputs<{ label?: string }>, _ctx: ComponentContext) {

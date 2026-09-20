@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { EditingState } from '@gesso/core';
+import type { EditingState } from 'gesso-core';
 import { EditingProxy, type EditingProxySink } from './EditingProxy';
 
 /**

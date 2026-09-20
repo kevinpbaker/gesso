@@ -25,7 +25,7 @@ export default defineConfig({
     // somewhere obvious to go.
     alias: [...electrobunViteAliases(resolve(__dirname, '.hutch/devkit'))]
   },
-  esbuild: { jsx: 'automatic', jsxImportSource: '@gesso/framework' },
+  esbuild: { jsx: 'automatic', jsxImportSource: 'gesso-framework' },
   root: 'src/view',
   build: { outDir: '../../dist', emptyOutDir: true },
   server: { port: 5173, strictPort: true }

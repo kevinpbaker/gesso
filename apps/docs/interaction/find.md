@@ -17,7 +17,7 @@ component library provides.
 
 ## The bar
 
-`FindBar` from `@gesso/components` is the whole user interface. It
+`FindBar` from `gesso-components` is the whole user interface. It
 takes no wiring: it injects the session, shows itself while one is
 open, searches on every keystroke, and steps through the matches.
 

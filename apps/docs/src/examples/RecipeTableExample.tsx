@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { fr, percent } from '@gesso/core';
-import { DataTable, type DataColumn } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { fr, percent } from 'gesso-core';
+import { DataTable, type DataColumn } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region data
 /** One request. A hundred thousand of these is the whole screen's data. */

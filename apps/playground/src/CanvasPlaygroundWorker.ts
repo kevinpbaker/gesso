@@ -14,7 +14,7 @@ import {
   UiFocusManager,
   UiKeyboardController,
   UiTimerFrameClock
-} from '@gesso/core';
+} from 'gesso-core';
 import { CanvasPreview } from './CanvasPreview';
 import { LayoutPlayground } from './LayoutPlayground';
 import { scrollStatsText } from './scrollStats';

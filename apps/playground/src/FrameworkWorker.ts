@@ -1,5 +1,5 @@
-import { renderRoot } from '@gesso/framework';
-import { createActionLog, tapRenderWorker } from '@gesso/devtools';
+import { renderRoot } from 'gesso-framework';
+import { createActionLog, tapRenderWorker } from 'gesso-devtools';
 import { DemoCounter, FrameworkDemoRoot } from './FrameworkPlayground';
 import { Heavy } from './HeavyWork';
 import { Ticker } from './TickerChannel';

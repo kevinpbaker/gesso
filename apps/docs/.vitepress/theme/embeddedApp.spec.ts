@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createShellHistory } from '@gesso/framework';
+import { createShellHistory } from 'gesso-framework';
 
 import { embeddedAppOptions } from './embeddedApp';
 

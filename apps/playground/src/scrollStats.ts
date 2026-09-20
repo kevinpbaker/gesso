@@ -1,4 +1,4 @@
-import { UiNodeType } from '@gesso/core';
+import { UiNodeType } from 'gesso-core';
 import type { PlaygroundNodeInfo } from './LayoutPlayground';
 
 /**

@@ -135,8 +135,8 @@ describe('shortenPath', () => {
   });
 
   it('collapses node_modules to the package that owns the file', () => {
-    expect(shortenPath('http://host/node_modules/@gesso/core/dist/index.js', 'http://host')).toBe(
-      '@gesso/core/dist/index.js'
+    expect(shortenPath('http://host/node_modules/gesso-core/dist/index.js', 'http://host')).toBe(
+      'gesso-core/dist/index.js'
     );
   });
 

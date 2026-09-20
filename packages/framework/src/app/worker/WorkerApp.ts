@@ -19,7 +19,7 @@ import {
   touchActionFor,
   wheelDeltaYOf,
   type UiScrollability
-} from '@gesso/core';
+} from 'gesso-core';
 import { AudioSink } from '../AudioSink';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
@@ -45,7 +45,7 @@ import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from 
  * carry a message and a transferred port. It exists because the
  * application layer does not always live in a worker in this page: in
  * a desktop window it lives in another process, and what the shell
- * holds is one end of a bridge to it (`@gesso/electrobun`).
+ * holds is one end of a bridge to it (`gesso-electrobun`).
  *
  * The shell treats an endpoint exactly as it treats a worker it was
  * handed rather than one it spawned: it wires it up, and it never
@@ -120,7 +120,7 @@ export interface WorkerAppOptions {
    * does not: `window.open` in a webview opens another webview or
    * nothing at all, and a link in a desktop application belongs in the
    * person's browser, which only the process outside the window can
-   * reach. `@gesso/electrobun`'s bridge is what goes here.
+   * reach. `gesso-electrobun`'s bridge is what goes here.
    */
   onOpenUrl?: (url: string) => void;
   /**
@@ -130,7 +130,7 @@ export interface WorkerAppOptions {
    * each one costs the running application.
    *
    * Defaults to `console.error`, which is a developer reading the
-   * right thread in devtools at the right moment. `@gesso/devtools`'s
+   * right thread in devtools at the right moment. `gesso-devtools`'s
    * error overlay is the same callback, drawn where the app is.
    */
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
@@ -206,7 +206,7 @@ export interface WorkerAppOptions {
  * already running: a `Worker` kept across a remount, or an endpoint
  * that is not a worker at all, which is how a desktop window reaches
  * an application layer living in another process
- * (`@gesso/electrobun`). Neither is closed here, because a handle
+ * (`gesso-electrobun`). Neither is closed here, because a handle
  * that could kill something it did not start is the wrong handle.
  *
  * Exported for its spec: the ownership half is the part that goes

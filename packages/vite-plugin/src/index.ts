@@ -14,7 +14,7 @@ export {
 export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, type CallSite } from './source.ts';
 
 /**
- * `@gesso/vite-plugin` — the plumbing between saving a file and seeing
+ * `gesso-vite-plugin` — the plumbing between saving a file and seeing
  * the result.
  *
  * A Gesso application is three files either side of a thread barrier
@@ -35,7 +35,7 @@ export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, t
  * working.
  *
  *   // vite.config.ts
- *   import { gesso } from '@gesso/vite-plugin';
+ *   import { gesso } from 'gesso-vite-plugin';
  *   export default defineConfig({ plugins: [gesso()] });
  *
  *   // main.ts
@@ -61,7 +61,7 @@ export interface GessoPluginOptions {
    */
   readonly appLogicWorker?: string | false;
   /**
-   * Wire `@gesso/devtools`'s error overlay into `onError` (default
+   * Wire `gesso-devtools`'s error overlay into `onError` (default
    * true). Only ever in a dev server: a build carries no reference to
    * the package.
    */
@@ -222,7 +222,7 @@ async function resolveEntries(context: Resolver, id: string, options: GessoPlugi
   );
   if (renderWorker === null) {
     throw new Error(
-      `@gesso/vite-plugin found no render worker beside ${id}. It looked for ${RENDER_WORKER_NAMES.join(', ')}. ` +
+      `gesso-vite-plugin found no render worker beside ${id}. It looked for ${RENDER_WORKER_NAMES.join(', ')}. ` +
         "Name it with the plugin's `renderWorker` option, or write `renderWorker` in createApp() yourself."
     );
   }

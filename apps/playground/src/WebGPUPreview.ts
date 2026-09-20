@@ -6,7 +6,7 @@ import {
   type WebGPUCanvasHost,
   type LayoutReader,
   type Canvas2DContext
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * WebGPU rendering pipeline for the playground.

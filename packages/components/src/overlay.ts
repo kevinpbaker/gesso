@@ -1,7 +1,7 @@
 import { distinctUntilChanged, map, type Observable } from 'rxjs';
 
-import { type ComponentContext, OverlayService, type OverlayEntry, type OverlayPlacement } from '@gesso/framework';
-import type { UiChild, UiNode } from '@gesso/core';
+import { type ComponentContext, OverlayService, type OverlayEntry, type OverlayPlacement } from 'gesso-framework';
+import type { UiChild, UiNode } from 'gesso-core';
 
 /**
  * One component's entry in the overlay layer.

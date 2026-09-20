@@ -15,7 +15,7 @@ import type { AppLogicEndpoint } from './WorkerApp';
  *
  * The endpoint case is what a desktop window uses: the application
  * lives in another process and the shell holds one end of a bridge to
- * it, which it must never close (`@gesso/electrobun`).
+ * it, which it must never close (`gesso-electrobun`).
  */
 function endpoint(): AppLogicEndpoint {
   return {

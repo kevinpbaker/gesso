@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Button, Column, Text, type UiChild, autoFocus } from '@gesso/core';
+import { Box, Button, Column, Text, type UiChild, autoFocus } from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
 import { FocusService } from './FocusService';
 

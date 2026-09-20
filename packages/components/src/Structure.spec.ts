@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
 import {
   Box,
   Column,
@@ -12,7 +12,7 @@ import {
   type UiNode,
   type UiRole,
   type UiSemanticsRecord
-} from '@gesso/core';
+} from 'gesso-core';
 import { Accordion, Card, Divider, Tabs, Toolbar } from './Structure';
 import { SplitPane } from './SplitPane';
 

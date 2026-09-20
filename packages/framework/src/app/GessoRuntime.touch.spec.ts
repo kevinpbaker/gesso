@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
-import { Box, Column, noKeyModifiers, UiManualFrameClock, type UiPointerDevice } from '@gesso/core';
+import { Box, Column, noKeyModifiers, UiManualFrameClock, type UiPointerDevice } from 'gesso-core';
 
 const FINGER: UiPointerDevice = { id: 5, kind: 'touch' };
 

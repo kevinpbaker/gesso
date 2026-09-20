@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown';
 
 /**
- * One entry. Unlike `@gesso/testing`, nothing here reaches for a test
+ * One entry. Unlike `gesso-testing`, nothing here reaches for a test
  * runner, so there is no second surface to keep out of the first.
  *
  * `platform: 'neutral'` for the same reason the other packages use it:

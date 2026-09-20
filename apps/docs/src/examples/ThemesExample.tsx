@@ -10,8 +10,8 @@ import {
   type UiTextStyle,
   type UiTheme,
   type UiTypography
-} from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+} from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 /** A hex string as the `UiColor` a palette holds. */

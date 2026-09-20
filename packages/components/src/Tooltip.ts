@@ -1,5 +1,5 @@
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
-import { Box, Text, UiEventType, defineModifier, type UiChild, type UiModifier, type UiNode } from '@gesso/core';
+import { input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { Box, Text, UiEventType, defineModifier, type UiChild, type UiModifier, type UiNode } from 'gesso-core';
 import { useOverlay, type OverlayHandle, type OverlayPlacement } from './overlay';
 
 /**

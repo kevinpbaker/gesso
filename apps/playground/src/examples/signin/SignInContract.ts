@@ -1,4 +1,4 @@
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 import type { AuthView } from '../SignInExampleApp';
 
 /**

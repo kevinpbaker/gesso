@@ -10,7 +10,7 @@ import {
   Text,
   type UiSemanticsPatch,
   type UiSemanticsUpdate
-} from '@gesso/core';
+} from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /** The records a run of patches leaves behind, by label. */

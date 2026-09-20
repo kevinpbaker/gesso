@@ -159,7 +159,7 @@ jobs:
       # Packs the four packages, installs the tarballs into a fresh Vite
       # project with npm, typechecks it against the published
       # declarations, runs a component test through the published
-      # `@gesso/testing`, builds it and drives it in Chrome. Compares no
+      # `gesso-testing`, builds it and drives it in Chrome. Compares no
       # pixels, so it is environment-independent.
       - name: Install check
         run: pnpm check:install

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Box, Column, Text, type CanvasHost, UiManualFrameClock, type UiFrameClockFactory } from '@gesso/core';
+import { Box, Column, Text, type CanvasHost, UiManualFrameClock, type UiFrameClockFactory } from 'gesso-core';
 import { GessoRuntime, type FrameMetrics } from './GessoRuntime';
 
 /**

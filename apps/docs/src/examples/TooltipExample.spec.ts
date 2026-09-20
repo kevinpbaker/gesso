@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { UiNode } from '@gesso/core';
-import { createComponent, OverlayService } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import type { UiNode } from 'gesso-core';
+import { createComponent, OverlayService } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Actions } from './TooltipExample';
 

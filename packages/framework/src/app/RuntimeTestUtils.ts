@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 
 import type { FrameworkChild } from '../ComponentElement';
-import { type CanvasHost, UiManualFrameClock } from '@gesso/core';
+import { type CanvasHost, UiManualFrameClock } from 'gesso-core';
 import { GessoRuntime, type FrameMetrics, type GessoRuntimeOptions } from './GessoRuntime';
 
 /**
@@ -11,7 +11,7 @@ import { GessoRuntime, type FrameMetrics, type GessoRuntimeOptions } from './Ges
  * canvas mock — eight near-identical copies of the same 7px-per-
  * character `measureText` — and its own mount helper. A component
  * library is another two dozen specs that would each need one, so the
- * harness lives here instead. `@gesso/testing` is this
+ * harness lives here instead. `gesso-testing` is this
  * file's public successor: what is awkward to express here is the
  * feedback that shapes it.
  *

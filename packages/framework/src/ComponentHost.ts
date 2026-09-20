@@ -5,7 +5,7 @@ import { ServiceRegistry } from './service/ServiceRegistry';
 import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
-import { isObservable, type UiChild } from '@gesso/core';
+import { isObservable, type UiChild } from 'gesso-core';
 import { InputCell, isOutputTarget, outputTargetOf, withBodyOf } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';

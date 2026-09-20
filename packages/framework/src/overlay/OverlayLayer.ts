@@ -1,6 +1,6 @@
 import { map } from 'rxjs';
 
-import { Box, UiEnvironmentKeys, type UiNode, type UiChild, type UiElement } from '@gesso/core';
+import { Box, UiEnvironmentKeys, type UiNode, type UiChild, type UiElement } from 'gesso-core';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { OverlayService, type OverlayEntry } from './OverlayService';

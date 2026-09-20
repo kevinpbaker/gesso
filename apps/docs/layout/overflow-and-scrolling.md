@@ -216,7 +216,7 @@ person can already see what they pressed and moving it would pull it
 out from under the pointer resting on it.
 
 A component that owns a list of rows maps the keys itself.
-`LazyList` and `DataTable` in `@gesso/components` answer to the arrows,
+`LazyList` and `DataTable` in `gesso-components` answer to the arrows,
 `PageUp` and `PageDown`, `Home` and `End` by moving the selection,
 which then reveals itself through the same mechanism. See
 [using components](/guide/using-components).

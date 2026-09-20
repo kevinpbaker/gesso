@@ -22,7 +22,7 @@ export default {
     mainProcess: 'cottontail',
     cottontail: {
       // A TypeScript entrypoint, which Electrobun bundles for itself.
-      // It reaches `@gesso/electrobun` through `node_modules` like any
+      // It reaches `gesso-electrobun` through `node_modules` like any
       // other dependency, which is why this project vendors the
       // packages rather than linking them: the Gesso repository's own
       // Electrobun applications have to pre-bundle their main process

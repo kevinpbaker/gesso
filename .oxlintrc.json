@@ -10,8 +10,8 @@
           {
             "patterns": [
               {
-                "group": ["./**", "../**", "**/src/**", "@gesso/*/**"],
-                "message": "A modifier written from outside the framework imports package entry points only: @gesso/core, never a path inside it."
+                "group": ["./**", "../**", "**/src/**", "gesso-*/**"],
+                "message": "A modifier written from outside the framework imports package entry points only: gesso-core, never a path inside it."
               }
             ]
           }

@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/testing",
+  "name": "gesso-testing",
   "version": "0.1.0",
   "description": "Mount a component without a browser, query it the way a screen reader would, and read back why a box is the size it is.",
   "license": "MIT",
@@ -53,8 +53,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@gesso/core": "workspace:^",
-    "@gesso/framework": "workspace:^"
+    "gesso-core": "workspace:^",
+    "gesso-framework": "workspace:^"
   },
   "peerDependencies": {
     "rxjs": "^7.8.2",

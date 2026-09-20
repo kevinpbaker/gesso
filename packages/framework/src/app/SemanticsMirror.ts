@@ -1,4 +1,4 @@
-import type { UiSemanticsAction, UiSemanticsRecord, UiSemanticsUpdate } from '@gesso/core';
+import type { UiSemanticsAction, UiSemanticsRecord, UiSemanticsUpdate } from 'gesso-core';
 
 /**
  * Where the mirror sends what it hears.

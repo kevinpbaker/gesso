@@ -1,4 +1,4 @@
-import { UiNodeType, type UiNode, type LayoutRecord } from '@gesso/core';
+import { UiNodeType, type UiNode, type LayoutRecord } from 'gesso-core';
 import type { PlaygroundNodeInfo } from './LayoutPlayground';
 
 const TYPE_CLASS: Record<string, string> = {

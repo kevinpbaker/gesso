@@ -1,4 +1,4 @@
-import { Box, Column, type UiElement, UiAnimationFrameClock } from '@gesso/core';
+import { Box, Column, type UiElement, UiAnimationFrameClock } from 'gesso-core';
 import { LayoutPlayground } from '../LayoutPlayground';
 import { WebGPUPreview } from '../WebGPUPreview';
 import { mountShell } from '../shell/AppShell';

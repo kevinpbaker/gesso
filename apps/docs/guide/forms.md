@@ -11,7 +11,7 @@ go to when the button is pressed. The third is saying all of that out
 loud, so a person who cannot see the red border still learns what
 happened.
 
-`@gesso/components` answers the first with its controls and the other
+`gesso-components` answers the first with its controls and the other
 two with `form`.
 
 <LiveExample id="form" height="340" />

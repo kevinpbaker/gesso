@@ -6,8 +6,8 @@ import {
   UiManualFrameClock,
   clearFontStacks,
   fontStackFor
-} from '@gesso/core';
-import type { TextMeasureRequest } from '@gesso/core';
+} from 'gesso-core';
+import type { TextMeasureRequest } from 'gesso-core';
 
 import { ServiceRegistry } from '../service/ServiceRegistry';
 import { FontService, type FontFaceLike, type FontHost } from './FontService';

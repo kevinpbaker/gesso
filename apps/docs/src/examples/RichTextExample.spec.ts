@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { UiNodeType, selectableTextOf, textContentOf } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { UiNodeType, selectableTextOf, textContentOf } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { markdownBlocks, RichText } from './RichTextExample';
 

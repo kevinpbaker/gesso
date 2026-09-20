@@ -169,7 +169,7 @@ positioned box covering the viewport at `zIndex` 1000, and it is
 `hitTestable: false`, so with nothing open it is invisible to input.
 
 The service is injected and called; components do not build overlay
-nodes themselves. `useOverlay` from `@gesso/components` is the
+nodes themselves. `useOverlay` from `gesso-components` is the
 per-instance handle around it: an id of its own, an `open` Observable
 to bind to, and a close on unmount, so an overlay cannot outlive the
 component that opened it.
@@ -216,7 +216,7 @@ not: focus discipline, dismissal, and a keyboard.
 | You want                  | Use                                                      |
 | ------------------------- | -------------------------------------------------------- |
 | A badge on a corner       | `position: 'absolute'` inside a relative box             |
-| A menu from a button      | `Menu` from `@gesso/components`                          |
+| A menu from a button      | `Menu` from `gesso-components`                           |
 | A context menu            | `Menu` with `at={{ x, y }}` instead of an anchor         |
 | A choice from a long list | `Select`                                                 |
 | A modal                   | `Dialog`, which traps focus and returns it to the opener |

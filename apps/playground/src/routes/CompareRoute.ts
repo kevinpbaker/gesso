@@ -1,6 +1,6 @@
 import type { Observable } from 'rxjs';
 
-import { UiAnimationFrameClock } from '@gesso/core';
+import { UiAnimationFrameClock } from 'gesso-core';
 import { CanvasPreview } from '../CanvasPreview';
 import { LayoutPlayground } from '../LayoutPlayground';
 import { mountPlaygroundPanel } from '../PlaygroundPanel';

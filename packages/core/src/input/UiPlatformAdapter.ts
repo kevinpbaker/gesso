@@ -388,7 +388,7 @@ function suppressContextMenu(event: Event): void {
  * the same defect, priced higher.
  *
  * Every global here is reached for through a guard, because this is
- * `@gesso/core` and core does not get to assume a browser. With no
+ * `gesso-core` and core does not get to assume a browser. With no
  * `window` and no `ResizeObserver` nothing is observed, and then
  * nothing is cached either: `clientToLocal` reads the rect on every
  * call, exactly as it did before. A cache that no event can

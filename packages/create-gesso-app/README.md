@@ -50,8 +50,8 @@ Either way it has to run from inside this workspace, because of
 
 ## Why it vendors its dependencies
 
-`@gesso/core`, `@gesso/framework`, `@gesso/components` and
-`@gesso/electrobun` are not published. A generated `package.json` naming
+`gesso-core`, `gesso-framework`, `gesso-components` and
+`gesso-electrobun` are not published. A generated `package.json` naming
 a version of any of them would produce a project that cannot install, so
 the CLI packs the ones a template needs out of the workspace with
 `pnpm pack`, writes the tarballs into the new project and points

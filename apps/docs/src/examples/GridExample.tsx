@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { auto, fr, percent } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { auto, fr, percent } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 const LABELS = ['Text', 'Text measurement'] as const;

@@ -1,4 +1,4 @@
-import { createApp, type RendererChoice } from '@gesso/framework';
+import { createApp, type RendererChoice } from 'gesso-framework';
 import { mountShell, type AppShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';

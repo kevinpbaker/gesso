@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, Text, type UiNode, UiNodeType } from '@gesso/core';
+import { Box, Column, Text, type UiNode, UiNodeType } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import type { ComponentContext, Inputs } from '../FunctionComponent';
 import { route, to, type OutletProps } from '../router/RouteDefinition';

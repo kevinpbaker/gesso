@@ -9,7 +9,7 @@ import type {
   UiSemanticsAction,
   UiScrollability,
   UiSemanticsUpdate
-} from '@gesso/core';
+} from 'gesso-core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
 import type { ShellStorageOp, ShellStorageResult } from '../ShellService';

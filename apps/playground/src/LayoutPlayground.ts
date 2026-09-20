@@ -12,7 +12,7 @@ import {
   UiScheduler,
   UiFrame,
   type UiFrameClockFactory
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * Dirty flags that mean the layout pipeline must run for a frame.

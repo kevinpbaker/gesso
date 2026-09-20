@@ -1,9 +1,9 @@
 import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { fr, percent } from '@gesso/core';
-import { DataTable, type DataColumn, type DataTableSort } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { fr, percent } from 'gesso-core';
+import { DataTable, type DataColumn, type DataTableSort } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

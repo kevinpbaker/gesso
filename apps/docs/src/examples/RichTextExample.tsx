@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent, type UiTextSpan } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiTextSpan } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 /**
  * A markdown document drawn as one paragraph node per block.

@@ -1,6 +1,6 @@
-import { Row, Text, defaultSpacing, type UiChild, type UiLiveRegion, type UiRole } from '@gesso/core';
+import { Row, Text, defaultSpacing, type UiChild, type UiLiveRegion, type UiRole } from 'gesso-core';
 
-import { computed, input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { computed, input, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 

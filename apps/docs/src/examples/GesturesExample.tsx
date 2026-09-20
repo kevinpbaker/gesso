@@ -1,8 +1,8 @@
 import { Subject } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
 
-import { draggable, percent, scrollPosition, type DragOffset } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { draggable, percent, scrollPosition, type DragOffset } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

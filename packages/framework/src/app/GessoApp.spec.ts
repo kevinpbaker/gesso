@@ -17,8 +17,8 @@ import {
   UiManualFrameClock,
   UiTimerFrameClock,
   type CanvasHost
-} from '@gesso/core';
-import { FakePlatformSurface } from '@gesso/core/testing';
+} from 'gesso-core';
+import { FakePlatformSurface } from 'gesso-core/testing';
 import { internalState as cell } from '../InternalState';
 import { input } from '../Input';
 import { Input } from '../decorators';

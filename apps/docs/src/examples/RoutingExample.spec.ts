@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent, createShellHistory, RouterService } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createComponent, createShellHistory, RouterService } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { EXAMPLE_ROUTES, RoutingExample } from './RoutingExample';
 

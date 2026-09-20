@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { createPaintState, lightTheme, resolvePaintState, type UiNode } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createPaintState, lightTheme, resolvePaintState, type UiNode } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { SCALES, TypeScale } from './TypographyExample';
 

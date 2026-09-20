@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent, type UiFlexWrap } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiFlexWrap } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 const WIDTHS = [520, 400, 300] as const;

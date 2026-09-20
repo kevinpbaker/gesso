@@ -2,7 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { Text } from '@gesso/core';
+import { Text } from 'gesso-core';
 import { Component } from './Component';
 import { createComponent } from './createComponent';
 import { Define, Input } from './decorators';

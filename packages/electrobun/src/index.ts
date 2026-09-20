@@ -1,5 +1,5 @@
 /**
- * `@gesso/electrobun`: a Gesso application in a native window.
+ * `gesso-electrobun`: a Gesso application in a native window.
  *
  * The root entry is the wire format both halves share. The halves
  * themselves are separate entries, `./view` and `./main`, because they

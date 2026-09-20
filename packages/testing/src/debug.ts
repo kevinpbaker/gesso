@@ -1,5 +1,5 @@
-import type { LayoutBox, UiNode } from '@gesso/core';
-import type { GessoRuntime } from '@gesso/framework';
+import type { LayoutBox, UiNode } from 'gesso-core';
+import type { GessoRuntime } from 'gesso-framework';
 
 /** `12,8 64×32`, rounded, because a test reader wants the shape not the sixteenths. */
 function formatBox(box: LayoutBox): string {

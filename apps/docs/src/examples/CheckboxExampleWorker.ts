@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Preferences } from './CheckboxExample';
 import { exampleRoot } from './ExampleRoot';
 

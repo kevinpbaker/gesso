@@ -1,5 +1,5 @@
 /**
- * `@gesso/devtools` — what a Gesso application will not tell you by
+ * `gesso-devtools` — what a Gesso application will not tell you by
  * itself.
  *
  * A canvas application hides its failures twice over: there is no DOM

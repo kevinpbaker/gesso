@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { channel, ChannelReplica, provide, type ChannelPort } from '@gesso/framework';
+import { channel, ChannelReplica, provide, type ChannelPort } from 'gesso-framework';
 import { createActionLog, type ActionLog } from './ActionLog';
 
 interface TickerView {

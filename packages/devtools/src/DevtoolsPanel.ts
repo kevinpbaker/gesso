@@ -1,4 +1,4 @@
-import type { ConsoleEntry, DevtoolsEvent, DevtoolsRequest, UiNodeReport, UiTreeSnapshot } from '@gesso/framework';
+import type { ConsoleEntry, DevtoolsEvent, DevtoolsRequest, UiNodeReport, UiTreeSnapshot } from 'gesso-framework';
 import type { ActionEntry } from './ActionLog';
 import { describeActionEntry } from './ActionLogPanel';
 import { mountFrameProfiler, type FrameProfiler } from './FrameProfiler';

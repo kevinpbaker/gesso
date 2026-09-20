@@ -12,7 +12,7 @@ import {
   type UiNode,
   UiNodeType,
   UiManualFrameClock
-} from '@gesso/core';
+} from 'gesso-core';
 import { FindService } from './FindService';
 import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';

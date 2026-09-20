@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent, OverlayService } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import { Button, Column, Row, type UiRole, type UiSemanticsRecord } from '@gesso/core';
+import { createComponent, OverlayService } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import { Button, Column, Row, type UiRole, type UiSemanticsRecord } from 'gesso-core';
 import { Dialog } from './Dialog';
 import { Menu } from './Menu';
 import { Select } from './Select';

@@ -8,14 +8,14 @@ import {
   type DecorationShape,
   type UiColorValue,
   type UiModifierHost
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * A modifier written from outside the framework.
  *
  * the exit criterion: a modifier in its own
  * file, against the package entry points and nothing else, running in
- * the playground. This file imports `@gesso/core` and no path inside
+ * the playground. This file imports `gesso-core` and no path inside
  * it; the lint configuration at the repository root holds it to that,
  * so a deep import here fails `pnpm lint` rather than passing quietly.
  *

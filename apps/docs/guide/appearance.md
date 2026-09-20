@@ -33,7 +33,7 @@ appearance writes new colours onto the nodes that are already there. No
 component function runs again and nothing is rebuilt, which is why a
 large screen changes appearance in one frame.
 
-`lightTheme` and `darkTheme` ship with `@gesso/core`. They are a
+`lightTheme` and `darkTheme` ship with `gesso-core`. They are a
 starting point, not a policy: the framework reports which of the two
 appearances the platform is in and has no opinion beyond that, so an
 application with its own palette maps the same signal onto that

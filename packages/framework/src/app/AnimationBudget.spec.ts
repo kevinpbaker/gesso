@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, Row, Text, animateLayout } from '@gesso/core';
+import { Box, Column, Row, Text, animateLayout } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';

@@ -1,11 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Slider } from '@gesso/components';
-import type { UiNode } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Slider } from 'gesso-components';
+import type { UiNode } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Sliders } from './SliderExample';
 

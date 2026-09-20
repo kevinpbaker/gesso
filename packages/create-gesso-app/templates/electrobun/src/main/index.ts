@@ -14,8 +14,8 @@
 import { BrowserView, BrowserWindow, Utils } from 'electrobun/main';
 import { BehaviorSubject, map } from 'rxjs';
 
-import type { GessoFrame } from '@gesso/electrobun';
-import { createDesktopApp, windowsChannel } from '@gesso/electrobun/desktop';
+import type { GessoFrame } from 'gesso-electrobun';
+import { createDesktopApp, windowsChannel } from 'gesso-electrobun/desktop';
 
 import { Counter } from '../shared/Counter';
 import type { GessoWindowRPC } from '../shared/rpc';

@@ -1,4 +1,4 @@
-import type { UiNode, UiFindController } from '@gesso/core';
+import type { UiNode, UiFindController } from 'gesso-core';
 import { internalState } from '../InternalState';
 
 /**

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createChannelRegistry, createComponent, diffProjection } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createChannelRegistry, createComponent, diffProjection } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { BarrierScreen, createTaskStore, tapChannel, taskSource, Tasks, type TaskStore } from './BarrierExample';
 

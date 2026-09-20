@@ -6,7 +6,7 @@ import {
   type ChannelPort,
   type ShellToRuntimeMessage,
   type WorkerHandle
-} from '@gesso/framework';
+} from 'gesso-framework';
 import { forwardNewEntries, type ActionLog, type ActionLogToken } from './ActionLog';
 
 /**

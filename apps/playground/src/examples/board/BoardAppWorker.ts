@@ -1,4 +1,4 @@
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { BoardModel } from '../AnimationExampleApp';
 import { Board } from './BoardContract';
 

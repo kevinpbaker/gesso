@@ -6,7 +6,7 @@ import {
   type ComponentContext,
   type InternalState,
   type Inputs
-} from '@gesso/framework';
+} from 'gesso-framework';
 import {
   Box,
   Column,
@@ -16,7 +16,7 @@ import {
   type UiElement,
   type UiLength,
   type UiSemanticState
-} from '@gesso/core';
+} from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 
 /**

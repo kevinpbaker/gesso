@@ -1,4 +1,4 @@
-# @gesso/vite-plugin
+# gesso-vite-plugin
 
 ## 0.1.0
 
@@ -7,7 +7,7 @@ First public release.
 `gesso()` finds an application's worker entries, writes the constructions and
 the hot-replacement wiring, and mounts the development error overlay.
 
-It is optional by design: nothing in `@gesso/core` or `@gesso/framework`
+It is optional by design: nothing in `gesso-core` or `gesso-framework`
 mentions Vite, and the literal `new Worker(new URL(...))` construction stays
 the documented fallback. The plugin's factories go in first, so your own
 options spread over them.

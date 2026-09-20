@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DefaultImageResolver, IconRasterizer, type ImageResolver, type VideoResolver } from '@gesso/core';
+import { DefaultImageResolver, IconRasterizer, type ImageResolver, type VideoResolver } from 'gesso-core';
 
 import { MediaService } from './MediaService';
 

@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { FindBar } from '@gesso/components';
-import { FindService, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { FindBar } from 'gesso-components';
+import { FindService, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 /**

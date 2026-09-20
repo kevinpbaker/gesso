@@ -1,5 +1,5 @@
-import { createApp } from '@gesso/framework';
-import { mountNodeInspector } from '@gesso/devtools';
+import { createApp } from 'gesso-framework';
+import { mountNodeInspector } from 'gesso-devtools';
 import { mountShell } from '../shell/AppShell';
 import { mountRouteErrors } from '../shell/errors';
 import { addInspectAction } from '../shell/InspectorPanel';

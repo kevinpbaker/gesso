@@ -7,7 +7,7 @@
  * answer and a command expects no answer, and a request would put a
  * timeout on a stream that runs for the life of the window.
  */
-import type { GessoFrame } from '@gesso/electrobun';
+import type { GessoFrame } from 'gesso-electrobun';
 import type { RPCSchema } from 'electrobun/view';
 
 export type GessoWindowRPC = {

@@ -8,7 +8,7 @@ import {
   type Inputs,
   MediaService,
   AnimationService
-} from '@gesso/framework';
+} from 'gesso-framework';
 import {
   steps,
   Box,
@@ -22,7 +22,7 @@ import {
   iconSource,
   imageSource,
   videoSource
-} from '@gesso/core';
+} from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 
 /**

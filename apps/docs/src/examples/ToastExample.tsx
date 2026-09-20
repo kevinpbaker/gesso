@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Toast } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Toast } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 // #region toast

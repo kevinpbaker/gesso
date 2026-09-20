@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
 import {
   Box,
   Text,
@@ -13,7 +13,7 @@ import {
   type UiRole,
   type UiSemanticsRecord,
   fr
-} from '@gesso/core';
+} from 'gesso-core';
 import { DataTable } from './DataTable';
 import { LazyList } from './LazyList';
 import { Tree, type TreeNode } from './Tree';

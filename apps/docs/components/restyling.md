@@ -4,7 +4,7 @@ description: 'Restyling the library: the control token group on the theme, what 
 
 # Restyling the controls
 
-No component in `@gesso/components` takes a colour prop, a padding prop
+No component in `gesso-components` takes a colour prop, a padding prop
 or a radius prop. Restyling one is a theme, and it always reaches every
 control of that kind at once rather than the one call site you happened
 to be editing.
@@ -43,7 +43,7 @@ uses, how far a filled one dims under the pointer. Those are one group
 on the theme, declared by the library:
 
 ```ts
-import { controlTokens } from '@gesso/components';
+import { controlTokens } from 'gesso-components';
 
 const theme = withThemeExtension(lightTheme, controlTokens, {
   ...controlTokens.defaults,

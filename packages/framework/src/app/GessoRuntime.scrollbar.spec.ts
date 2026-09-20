@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
-import { Box, Column, noKeyModifiers, scrollbarThumb, SCROLLBAR_THICKNESS, UiManualFrameClock } from '@gesso/core';
+import { Box, Column, noKeyModifiers, scrollbarThumb, SCROLLBAR_THICKNESS, UiManualFrameClock } from 'gesso-core';
 
 /**
  * Scrollbars are grabbable: dragging the thumb scrolls the content in

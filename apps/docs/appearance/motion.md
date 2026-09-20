@@ -21,7 +21,7 @@ either away and both still work; they simply jump.
 | Form                         | Where it lives                | Reach for it when                                                     |
 | ---------------------------- | ----------------------------- | --------------------------------------------------------------------- |
 | `transition` on an element   | A reserved prop, beside `key` | A property already has the right value and you want it to travel      |
-| `animateLayout()`            | A modifier from `@gesso/core` | Layout decides where something moves, so nothing can declare it       |
+| `animateLayout()`            | A modifier from `gesso-core`  | Layout decides where something moves, so nothing can declare it       |
 | `animate(cell, to, options)` | `AnimationService`            | A sequence you are driving yourself, and want to know when it is over |
 | `spring(cell, to, options)`  | `AnimationService`            | A movement that follows a gesture and has a real velocity             |
 
@@ -228,7 +228,7 @@ priority between the platform's answer and the app's.
 
 ## What this page was checked against
 
-The spec beside the example mounts it with `@gesso/testing`, which needs
+The spec beside the example mounts it with `gesso-testing`, which needs
 no browser, and drives frames on a manual clock. It asserts what a jump
 would fail: that the card's `height` and the detail's `opacity` take
 values on the way that nothing ever wrote, that arriving takes more than

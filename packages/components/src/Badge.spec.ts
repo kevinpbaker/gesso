@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
-import { Column, type UiChild, type UiNode } from '@gesso/core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
+import { Column, type UiChild, type UiNode } from 'gesso-core';
 import { Badge, type BadgeProps } from './Badge';
 
 /**

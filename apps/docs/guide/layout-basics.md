@@ -56,7 +56,7 @@ example is built to show it.
 A number is pixels. Anything else is a tagged value you import:
 
 ```tsx
-import { auto, percent } from '@gesso/core';
+import { auto, percent } from 'gesso-core';
 
 <box width={240} />            // 240 px
 <box width={percent(50)} />    // half the parent's content box
@@ -143,7 +143,7 @@ formatExplanation(runtime.explain(node));
 //  a scroll container or clipped text has none"
 ```
 
-The same explanation is what `@gesso/testing`'s `toHaveBox` prints when
+The same explanation is what `gesso-testing`'s `toHaveBox` prints when
 an assertion misses, so a failing layout test tells you why rather than
 only what.
 

@@ -1,9 +1,9 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-import { darkTheme, lightTheme, percent } from '@gesso/core';
-import { RadioGroup, type RadioOption } from '@gesso/components';
-import { ShellService, internalState, type ColorScheme, type ComponentContext, type Inputs } from '@gesso/framework';
+import { darkTheme, lightTheme, percent } from 'gesso-core';
+import { RadioGroup, type RadioOption } from 'gesso-components';
+import { ShellService, internalState, type ColorScheme, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region choice
 /**

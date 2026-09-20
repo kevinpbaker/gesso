@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import { Box, Button, Column, Text, fr, type UiNode, type UiSemanticsRecord } from '@gesso/core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import { Box, Button, Column, Text, fr, type UiNode, type UiSemanticsRecord } from 'gesso-core';
 import { Checkbox } from './Checkbox';
 import { Chip } from './Chip';
 import { DataTable } from './DataTable';

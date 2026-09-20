@@ -1,4 +1,4 @@
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { Heavy, HeavyWork } from './HeavyWork';
 import { Ticker } from './TickerChannel';
 import { TickerViewModel } from './TickerViewModel';

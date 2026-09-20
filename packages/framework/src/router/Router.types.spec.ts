@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { Text } from '@gesso/core';
+import { Text } from 'gesso-core';
 import { route, to } from './RouteDefinition';
 import type { RouteParams } from './RoutePath';
 import { RouterService } from './RouterService';

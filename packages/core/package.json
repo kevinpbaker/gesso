@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/core",
+  "name": "gesso-core",
   "version": "0.1.0",
   "description": "The retained UI graph, the layout engine, the two renderers and input \u2014 everything below a component.",
   "license": "MIT",

@@ -1,4 +1,4 @@
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { Notes } from './NotesContract';
 import { NotesDomain } from './NotesDomain';
 import { OpfsNotesRepository } from './OpfsNotesRepository';

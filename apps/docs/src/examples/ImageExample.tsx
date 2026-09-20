@@ -1,6 +1,6 @@
-import { percent, DefaultImageResolver, type ImageResolver, type UiImage } from '@gesso/core';
-import { Image } from '@gesso/components';
-import type { ComponentContext, Inputs } from '@gesso/framework';
+import { percent, DefaultImageResolver, type ImageResolver, type UiImage } from 'gesso-core';
+import { Image } from 'gesso-components';
+import type { ComponentContext, Inputs } from 'gesso-framework';
 
 // #region resolver
 /**

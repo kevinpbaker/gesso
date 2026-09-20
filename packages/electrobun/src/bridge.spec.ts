@@ -12,7 +12,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from '@gesso/framework';
+import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from 'gesso-framework';
 
 import type { GessoFrame } from './frames';
 import { serveChannelsToWindow, type ChannelHost } from './main';

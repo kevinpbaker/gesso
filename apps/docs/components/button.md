@@ -145,7 +145,7 @@ controls](/components/restyling) is that group in full.
 
 ## What this page was checked against
 
-`Button.spec.ts` mounts the component with `@gesso/testing` and asserts
+`Button.spec.ts` mounts the component with `gesso-testing` and asserts
 the label as both the words and the name, that a press calls back and a
 disabled or busy one does not, that every one of the twelve variant and
 tone pairs names a palette entry rather than a colour, that the cursor

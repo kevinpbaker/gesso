@@ -1,5 +1,5 @@
-import { noKeyModifiers, UiEventType, UiPointerEvent, type UiKeyModifiers, type UiNode } from '@gesso/core';
-import type { GessoRuntime } from '@gesso/framework';
+import { noKeyModifiers, UiEventType, UiPointerEvent, type UiKeyModifiers, type UiNode } from 'gesso-core';
+import type { GessoRuntime } from 'gesso-framework';
 
 export interface PointAt {
   x?: number;

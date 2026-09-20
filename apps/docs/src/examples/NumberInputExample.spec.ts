@@ -1,10 +1,10 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { NumberInput } from '@gesso/components';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { NumberInput } from 'gesso-components';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Numbers } from './NumberInputExample';
 

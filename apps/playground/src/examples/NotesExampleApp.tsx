@@ -1,7 +1,7 @@
 import { combineLatest } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-import { type ComponentContext, type Inputs, ShellService, internalState } from '@gesso/framework';
+import { type ComponentContext, type Inputs, ShellService, internalState } from 'gesso-framework';
 import { Notes, type NoteRow as NoteRowData } from './notes/NotesContract';
 import {
   ACCENT_WASH,

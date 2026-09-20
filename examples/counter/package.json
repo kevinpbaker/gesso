@@ -11,13 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@gesso/core": "^0.1.0",
-    "@gesso/framework": "^0.1.0",
+    "gesso-core": "^0.1.0",
+    "gesso-framework": "^0.1.0",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@gesso/devtools": "^0.1.0",
-    "@gesso/testing": "^0.1.0",
+    "gesso-devtools": "^0.1.0",
+    "gesso-testing": "^0.1.0",
     "typescript": "~7.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"

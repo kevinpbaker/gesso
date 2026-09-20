@@ -1,11 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Tabs, type TabDefinition } from '@gesso/components';
-import { Text } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Tabs, type TabDefinition } from 'gesso-components';
+import { Text } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Views } from './TabsExample';
 

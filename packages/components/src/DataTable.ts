@@ -1,6 +1,6 @@
 import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
 
-import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
 import {
   Box,
@@ -16,7 +16,7 @@ import {
   measure,
   type LayoutBox,
   type UiSemanticState
-} from '@gesso/core';
+} from 'gesso-core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {

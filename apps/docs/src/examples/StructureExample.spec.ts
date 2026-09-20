@@ -1,11 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Card, Divider, Toolbar } from '@gesso/components';
-import { Box, Column, Row, Text } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Card, Divider, Toolbar } from 'gesso-components';
+import { Box, Column, Row, Text } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Shipment } from './StructureExample';
 

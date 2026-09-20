@@ -98,7 +98,7 @@ import {
   UiTimerFrameClock,
   type UiFrame,
   type UiFrameClockFactory
-} from '@gesso/core';
+} from 'gesso-core';
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayService } from '../overlay/OverlayService';
@@ -235,7 +235,7 @@ export interface GessoRuntimeOptions {
    * everywhere a canvas is real, but a test double's `measureText`
    * answers the same width for every font size, so text laid out
    * against one is not text: a heading and its caption come out the
-   * same height. `@gesso/testing` passes `CharacterCountTextMeasurer`
+   * same height. `gesso-testing` passes `CharacterCountTextMeasurer`
    * instead, which is proportional to the font size and identical on
    * every machine.
    */
@@ -1389,7 +1389,7 @@ export class GessoRuntime {
    * Everything the inspector shows about one node, as plain data
    *.
    *
-   * Built here rather than in `@gesso/devtools` because every source
+   * Built here rather than in `gesso-devtools` because every source
    * it reads is private to the render thread and most of it cannot
    * cross a thread boundary at all: the graph's bindings, the
    * builder's modifier sets, the resolver's component hosts. The

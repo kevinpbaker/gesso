@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 /**
  * A bare `<editabletext>`, one level below the component library.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { noKeyModifiers, UiGraph, UiNodeType, UiShortcutRegistry, type UiKeyModifiers, type UiNode } from '@gesso/core';
+import { noKeyModifiers, UiGraph, UiNodeType, UiShortcutRegistry, type UiKeyModifiers, type UiNode } from 'gesso-core';
 
 import { registerUndoShortcuts } from './undoShortcuts';
 import { UndoStack } from './UndoStack';

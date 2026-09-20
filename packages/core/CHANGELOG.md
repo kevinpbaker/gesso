@@ -1,4 +1,4 @@
-# @gesso/core
+# gesso-core
 
 ## 0.1.0
 

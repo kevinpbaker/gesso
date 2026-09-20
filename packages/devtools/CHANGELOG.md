@@ -1,4 +1,4 @@
-# @gesso/devtools
+# gesso-devtools
 
 ## 0.1.0
 

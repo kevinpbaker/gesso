@@ -1,13 +1,13 @@
-# @gesso/components
+# gesso-components
 
 The component library: five tiers, one contract.
 
 ```bash
-npm install @gesso/core @gesso/framework @gesso/components rxjs
+npm install gesso-core gesso-framework gesso-components rxjs
 ```
 
 ```tsx
-import { Button } from '@gesso/components';
+import { Button } from 'gesso-components';
 
 <Button label="Sign in" onClick={() => session.signIn()} />;
 ```

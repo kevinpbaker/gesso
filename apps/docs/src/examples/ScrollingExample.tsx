@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent, scrollPosition } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, scrollPosition } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 /** Ten rows, which is more than the list is tall. */

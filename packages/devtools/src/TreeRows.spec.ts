@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { UiTreeNode } from '@gesso/framework';
+import type { UiTreeNode } from 'gesso-framework';
 import { idsToDepth, pathTo, rowLabel, treeRows } from './TreeRows';
 
 const leaf = (id: string, text?: string): UiTreeNode => ({

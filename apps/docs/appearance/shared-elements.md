@@ -213,7 +213,7 @@ under them.
 **A component needs `rootModifiers`.** A `modifiers` prop on a component
 is refused, and correctly: a component's node is an anchor fragment with
 no box and no paint, so there is nothing to attach to. The components in
-`@gesso/components` take `rootModifiers` instead, which is the component
+`gesso-components` take `rootModifiers` instead, which is the component
 answering the question for itself.
 
 **Two elements with the same box do not always mean two identical
@@ -247,7 +247,7 @@ point. [Motion](/appearance/motion#reduced-motion) has the detail.
 
 ## What this page was checked against
 
-The spec beside the example mounts it with `@gesso/testing` and drives
+The spec beside the example mounts it with `gesso-testing` and drives
 frames on a manual clock. It computes the box the cover is actually
 painted in, which is its layout box scaled about its centre and
 translated, and asserts what a cut would fail: that on the first frame

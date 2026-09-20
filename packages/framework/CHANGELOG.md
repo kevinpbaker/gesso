@@ -1,4 +1,4 @@
-# @gesso/framework
+# gesso-framework
 
 ## 0.1.0
 

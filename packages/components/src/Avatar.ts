@@ -1,7 +1,7 @@
 import { combineLatest, filter, map, type Observable } from 'rxjs';
 
-import { computed, createComponent, input, show, type ComponentContext, type Inputs } from '@gesso/framework';
-import { Box, nextGraphemeEnd, Text, type UiChild, type UiNodeRef } from '@gesso/core';
+import { computed, createComponent, input, show, type ComponentContext, type Inputs } from 'gesso-framework';
+import { Box, nextGraphemeEnd, Text, type UiChild, type UiNodeRef } from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import { Icon, Image } from './Media';
 

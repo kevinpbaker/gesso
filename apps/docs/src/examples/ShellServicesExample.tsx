@@ -1,7 +1,7 @@
 import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
+import { percent } from 'gesso-core';
 import {
   AnimationService,
   ShellService,
@@ -9,7 +9,7 @@ import {
   type ColorScheme,
   type ComponentContext,
   type Inputs
-} from '@gesso/framework';
+} from 'gesso-framework';
 
 import { HOVER_ACCENT } from './interaction';
 

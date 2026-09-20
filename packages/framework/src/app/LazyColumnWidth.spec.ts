@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, LazyColumn, Row, Text, type UiNode } from '@gesso/core';
+import { Box, LazyColumn, Row, Text, type UiNode } from 'gesso-core';
 
 import { mountRuntime } from './RuntimeTestUtils';
 

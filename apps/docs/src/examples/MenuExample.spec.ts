@@ -1,10 +1,10 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Menu, type MenuItem } from '@gesso/components';
-import { OverlayService, createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Menu, type MenuItem } from 'gesso-components';
+import { OverlayService, createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Commands } from './MenuExample';
 

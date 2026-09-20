@@ -1,4 +1,4 @@
-import { insetsEqual, noInsets, type UiInsets } from '@gesso/core';
+import { insetsEqual, noInsets, type UiInsets } from 'gesso-core';
 
 import { internalState } from '../InternalState';
 import type { ColorScheme } from './colorScheme';

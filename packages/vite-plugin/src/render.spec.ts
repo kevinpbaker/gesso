@@ -4,7 +4,7 @@ import { transformRenderWorker } from './render.ts';
 
 /** Sluice's render worker entry, near enough. */
 const ENTRY = [
-  "import { renderRoot } from '@gesso/framework';",
+  "import { renderRoot } from 'gesso-framework';",
   '',
   "import { ROUTES, SluiceApp } from './SluiceApp';",
   '',
@@ -14,7 +14,7 @@ const ENTRY = [
 
 describe('transformRenderWorker', () => {
   it('leaves a module that does not render a root alone', () => {
-    expect(transformRenderWorker("import { serveChannels } from '@gesso/framework';\n").code).toBeNull();
+    expect(transformRenderWorker("import { serveChannels } from 'gesso-framework';\n").code).toBeNull();
   });
 
   it('accepts the module the root came from', () => {
@@ -34,7 +34,7 @@ describe('transformRenderWorker', () => {
 
   it('hands the replaced services over, from whichever module they came from', () => {
     const entry = [
-      "import { renderRoot } from '@gesso/framework';",
+      "import { renderRoot } from 'gesso-framework';",
       "import { LiveApp, LiveFeed } from './LiveApp';",
       "import { Clock } from './Clock';",
       'renderRoot(LiveApp).useService(LiveFeed).useService(Clock);'
@@ -46,7 +46,7 @@ describe('transformRenderWorker', () => {
 
   it('says why it could not wire an entry, rather than wiring the wrong thing', () => {
     const inline = [
-      "import { renderRoot } from '@gesso/framework';",
+      "import { renderRoot } from 'gesso-framework';",
       'const App = () => null;',
       'renderRoot(App);'
     ].join('\n');

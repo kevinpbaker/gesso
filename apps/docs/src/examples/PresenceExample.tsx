@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { fade, percent, scaleFrom, slideUp, type UiChild } from '@gesso/core';
-import { internalState, Presence, type ComponentContext, type Inputs } from '@gesso/framework';
+import { fade, percent, scaleFrom, slideUp, type UiChild } from 'gesso-core';
+import { internalState, Presence, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 export const NOTES = {

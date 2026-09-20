@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { AnimationService, createComponent, internalState, show } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import { Column, percent, type AnimatedCell, type UiChild, type UiNode } from '@gesso/core';
+import { AnimationService, createComponent, internalState, show } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import { Column, percent, type AnimatedCell, type UiChild, type UiNode } from 'gesso-core';
 import { Skeleton, SkeletonText } from './Skeleton';
 
 /**

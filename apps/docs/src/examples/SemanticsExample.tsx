@@ -1,8 +1,8 @@
 import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { percent, type UiSemanticState } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiSemanticState } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

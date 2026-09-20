@@ -194,8 +194,8 @@ export {
 export { FocusService } from './app/FocusService';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';
-export type { EditingState, UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from '@gesso/core';
-export { UI_ROLES, UI_SEMANTIC_STATES, type UiRole, type UiSemanticState } from '@gesso/core';
+export type { EditingState, UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from 'gesso-core';
+export { UI_ROLES, UI_SEMANTIC_STATES, type UiRole, type UiSemanticState } from 'gesso-core';
 export {
   markInstant,
   MARK_PREFIX,
@@ -203,7 +203,7 @@ export {
   measureSpan,
   performanceMarksEnabled,
   setPerformanceMarks
-} from '@gesso/core';
+} from 'gesso-core';
 export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';
 export type {
   ShellToRuntimeMessage,

@@ -1,4 +1,4 @@
-import type { UiKeyModifiers } from '@gesso/core';
+import type { UiKeyModifiers } from 'gesso-core';
 import type { PlaygroundMetrics } from './LayoutPlayground';
 
 /**

@@ -1,12 +1,12 @@
-import { gesso } from '@gesso/vite-plugin';
+import { gesso } from 'gesso-vite-plugin';
 import { defineConfig } from 'vite';
 
 /**
  * The playground's dev server and build.
  *
- * No aliases: `@gesso/core`, `@gesso/framework` and `@gesso/components`
+ * No aliases: `gesso-core`, `gesso-framework` and `gesso-components`
  * resolve through the workspace links, and `jsxImportSource` in
- * `tsconfig.base.json` points at `@gesso/framework`, whose `exports` map
+ * `tsconfig.base.json` points at `gesso-framework`, whose `exports` map
  * carries `./jsx-runtime`.
  *
  * The plugin is here for the two halves that suit a page hosting many

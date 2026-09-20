@@ -12,11 +12,11 @@ import {
   type Patch,
   type PatchEntry,
   type WorkerHandle
-} from '@gesso/framework';
+} from 'gesso-framework';
 
 /**
  * The entries are declared with the rest of the devtools vocabulary in
- * `@gesso/framework`, for the reason `ConsoleEntry` is: they are plain
+ * `gesso-framework`, for the reason `ConsoleEntry` is: they are plain
  * data that crosses a thread to reach a panel, and in the worker
  * configuration they cross on the framework's own devtools channel.
  * They are re-exported here because this is where a reader looks for

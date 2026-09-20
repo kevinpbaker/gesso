@@ -12,7 +12,7 @@ export interface RenderWiring {
   readonly skipped: string | null;
 }
 
-const MARKER = '/* @gesso/vite-plugin: hot replacement */';
+const MARKER = '/* gesso-vite-plugin: hot replacement */';
 
 /**
  * Writes the two lines an author would otherwise write by hand.
@@ -46,7 +46,7 @@ export function transformRenderWorker(code: string): RenderWiring {
   }
   const blank = blankLiterals(code);
   const imports = importSources(code, blank);
-  if (imports.get('renderRoot') !== '@gesso/framework') {
+  if (imports.get('renderRoot') !== 'gesso-framework') {
     return { code: null, skipped: null };
   }
   const call = findCall(code, 'renderRoot', blank);

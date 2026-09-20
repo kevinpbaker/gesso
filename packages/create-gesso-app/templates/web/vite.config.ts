@@ -1,4 +1,4 @@
-import { gesso } from '@gesso/vite-plugin';
+import { gesso } from 'gesso-vite-plugin';
 import { defineConfig } from 'vite';
 
 /**
@@ -11,7 +11,7 @@ import { defineConfig } from 'vite';
  * page, and the error overlay that draws what the worker threw over
  * the application that was running when it threw it. The last two are
  * development only; a production build carries no reference to
- * `@gesso/devtools` at all.
+ * `gesso-devtools` at all.
  *
  * None of it is required. Write `renderWorker` in `createApp` yourself
  * and the plugin leaves the construction alone; take the plugin out

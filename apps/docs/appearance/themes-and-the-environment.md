@@ -124,7 +124,7 @@ The names in the shipped palette, in the three groups they fall into:
 - **Selection**, for a row that is chosen rather than operated:
   `selectionBackground`, `selectionForeground`.
 
-The `UiColors` interface in `@gesso/core` is the source of truth for
+The `UiColors` interface in `gesso-core` is the source of truth for
 that list, and `lightTheme` and `darkTheme` show what each name is set
 to.
 
@@ -166,7 +166,7 @@ its own and write them in a prop exactly like the shipped ones:
 Spreading a shipped palette first is the honest way to start: the shape
 stays complete, and the tokens you have not thought about yet are still
 answered. Deriving the control tokens from the same few colours is what
-makes `@gesso/components` follow the palette, since those components
+makes `gesso-components` follow the palette, since those components
 read the control tokens instead of taking colour props.
 
 An application that wants light and dark of its own builds two of these
@@ -178,7 +178,7 @@ cover a document and not an application. A theme may carry radii of its
 own, and declaring them is what makes them type:
 
 ```ts
-declare module '@gesso/core' {
+declare module 'gesso-core' {
   interface UiShapeExtensions {
     readonly control: unknown;
   }
@@ -261,7 +261,7 @@ change to one invalidate the subtree that reads it.
 A component library may declare one too. It is how a component that
 needs a token the shared vocabulary does not have gets one without
 adding a colour prop and forking the theme at every call site.
-`@gesso/components` declares `controlTokens`, which is what
+`gesso-components` declares `controlTokens`, which is what
 [restyling the controls](/components/restyling) is written against.
 
 ### Reading a group from inside a component
@@ -316,7 +316,7 @@ cell, which has no node.
 
 ## What this page was checked against
 
-The spec beside the example mounts it with `@gesso/testing`, which
+The spec beside the example mounts it with `gesso-testing`, which
 needs no browser, and asserts the theme each node inherits and the
 colours the renderer would resolve from it, before and after the swap.
 The canvas itself was watched in Chrome on the Canvas2D renderer: the

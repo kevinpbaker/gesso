@@ -11,7 +11,7 @@ import {
   DirtyFlags,
   UiEnvironmentKeys,
   UiManualFrameClock
-} from '@gesso/core';
+} from 'gesso-core';
 import { ChannelReplica } from '../channel/ChannelReplica';
 import { channel } from '../channel/ChannelToken';
 import type { ChannelPort } from '../channel/ChannelProtocol';

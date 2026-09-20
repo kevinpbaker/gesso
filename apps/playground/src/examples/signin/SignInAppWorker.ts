@@ -1,4 +1,4 @@
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { AuthApp } from '../SignInExampleApp';
 import { SignIn } from './SignInContract';
 

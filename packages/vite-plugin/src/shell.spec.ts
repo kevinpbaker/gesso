@@ -6,7 +6,7 @@ const ENTRIES: WorkerEntries = { renderWorker: './RenderWorker.ts', appLogicWork
 
 /** The shell a scaffolded application writes, once the plugin is in the config. */
 const SHELL = [
-  "import { createApp } from '@gesso/framework';",
+  "import { createApp } from 'gesso-framework';",
   '',
   "const host = document.getElementById('app');",
   "const app = createApp({ history: { mode: 'path' } });",
@@ -22,7 +22,7 @@ function build(code: string, overlay = false): string {
 
 describe('transformShell', () => {
   it('leaves a module that does not create an app alone', () => {
-    const code = "import { renderRoot } from '@gesso/framework';\n";
+    const code = "import { renderRoot } from 'gesso-framework';\n";
     expect(transformShell(code, { entries: ENTRIES, overlay: false })).toBeNull();
   });
 
@@ -55,7 +55,7 @@ describe('transformShell', () => {
   });
 
   it('supplies an object when the call had no arguments at all', () => {
-    const out = build("import { createApp } from '@gesso/framework';\ncreateApp().mount('#app');\n");
+    const out = build("import { createApp } from 'gesso-framework';\ncreateApp().mount('#app');\n");
     expect(out).toContain('createApp(__gessoOptions({}))');
   });
 
@@ -65,10 +65,10 @@ describe('transformShell', () => {
   });
 
   it('wires the overlay only when asked', () => {
-    expect(build(SHELL, false)).not.toContain('@gesso/devtools');
+    expect(build(SHELL, false)).not.toContain('gesso-devtools');
     const dev = build(SHELL, true);
     expect(dev).toContain('onError: __gessoReportError');
-    expect(dev).toContain("import('@gesso/devtools')");
+    expect(dev).toContain("import('gesso-devtools')");
   });
 
   it('does not rewrite a module it has already rewritten', () => {

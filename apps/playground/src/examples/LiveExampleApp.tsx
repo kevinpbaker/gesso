@@ -1,7 +1,7 @@
 import { BehaviorSubject, combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
+import { type ComponentContext, type Inputs, internalState } from 'gesso-framework';
 import {
   ACCENT as BRAND_ACCENT,
   BORDER as BRAND_BORDER,

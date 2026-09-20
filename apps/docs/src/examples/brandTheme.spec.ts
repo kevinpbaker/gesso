@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { UiColor } from '@gesso/core';
+import type { UiColor } from 'gesso-core';
 import { brandDarkTheme, brandLightTheme, type BrandColors } from './brandTheme';
 
 /**

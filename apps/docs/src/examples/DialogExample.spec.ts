@@ -1,11 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Button } from '@gesso/core';
-import { Dialog } from '@gesso/components';
-import { OverlayService, createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Button } from 'gesso-core';
+import { Dialog } from 'gesso-components';
+import { OverlayService, createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Notes } from './DialogExample';
 

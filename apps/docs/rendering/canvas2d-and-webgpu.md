@@ -11,7 +11,7 @@ there to be asked for by name.
 
 Which one drew is an implementation detail of a frame, not of your code.
 Elements, layout, text, input, themes and components are the same either
-way, and nothing in `@gesso/components` asks which backend it is on.
+way, and nothing in `gesso-components` asks which backend it is on.
 
 ## Choosing one
 

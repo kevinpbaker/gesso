@@ -22,7 +22,7 @@ import {
   Tree,
   type DataTableSort,
   type TreeNode
-} from '@gesso/components';
+} from 'gesso-components';
 import {
   FocusService,
   AnimationService,
@@ -36,7 +36,7 @@ import {
   internalState,
   input,
   type ChannelReplica
-} from '@gesso/framework';
+} from 'gesso-framework';
 import {
   darkTheme,
   lightTheme,
@@ -60,7 +60,7 @@ import {
   repeat,
   type UiNode,
   type UiElement
-} from '@gesso/core';
+} from 'gesso-core';
 
 import { createDemoBitmap } from './demoBitmap';
 import { Heavy } from './HeavyWork';
@@ -664,7 +664,7 @@ function ringButton(text: string, key?: string): UiElement {
 
 /**
  * The Inputs tier: a sign-in form built from
- * `@gesso/components` with no hand-rolled widget and no colour in it.
+ * `gesso-components` with no hand-rolled widget and no colour in it.
  *
  * Every control is themed through the control tokens, carries its own
  * role, name and states, and is operable from the keyboard. Submitting
@@ -711,7 +711,7 @@ export class SignInFormDemo extends Component {
         borderWidth: 1,
         borderColor: 'border'
       },
-      Text({ text: 'Sign in (C3 · @gesso/components)', color: 'text', fontSize: 16, fontWeight: 600 }),
+      Text({ text: 'Sign in (C3 · gesso-components)', color: 'text', fontSize: 16, fontWeight: 600 }),
       createComponent(TextInput, {
         label: 'Email',
         placeholder: 'you@example.com',
@@ -1625,7 +1625,7 @@ export class BrokenChild extends Component {
 
 /**
  * Two ways to break this app, for looking at what happens when one
- * does, with `@gesso/devtools`.
+ * does, with `gesso-devtools`.
  *
  * The two buttons are the two halves of `RuntimeErrorSource` a person
  * can reach from here: a handler throws inside the message the shell

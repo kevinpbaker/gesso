@@ -1,4 +1,4 @@
-import type { PageMessage, PanelMessage } from '@gesso/devtools';
+import type { PageMessage, PanelMessage } from 'gesso-devtools';
 
 /**
  * The background service worker's one job: joining a tab's content

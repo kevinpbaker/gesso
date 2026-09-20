@@ -1,4 +1,4 @@
-# @gesso/components
+# gesso-components
 
 ## 0.1.0
 

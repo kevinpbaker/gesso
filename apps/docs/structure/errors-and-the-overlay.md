@@ -131,7 +131,7 @@ worth checking the worker's console for.
 
 ## Seeing them
 
-`@gesso/devtools` mounts an error overlay over the application: the
+`gesso-devtools` mounts an error overlay over the application: the
 message, a sentence saying which of the five sources it came from and
 what that costs, the original source line with a caret under the column,
 and every stack frame mapped back through the source maps. The node is
@@ -139,7 +139,7 @@ named as a path through your own components, `App > TrackScreen >
 ActionRow > Button "Like"` rather than an id nothing else will ever
 mention.
 
-With [`@gesso/vite-plugin`](/tooling/vite-plugin) in the config there is
+With [`gesso-vite-plugin`](/tooling/vite-plugin) in the config there is
 no wiring at all: `onError` is connected while the dev server is
 running, and the package is fetched the first time something throws.
 Mounting it by hand is two lines and is on the

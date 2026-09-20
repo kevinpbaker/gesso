@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Badge, Button } from '@gesso/components';
-import { computed, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Badge, Button } from 'gesso-components';
+import { computed, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region badge
 /** The folders down the side of a mail client, with what is waiting in each. */

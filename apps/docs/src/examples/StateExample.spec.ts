@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createChannelRegistry, createComponent, ServiceRegistry } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createChannelRegistry, createComponent, ServiceRegistry } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Basket, basketSource, Highlight, StateScreen } from './StateExample';
 

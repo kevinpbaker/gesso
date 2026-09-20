@@ -1,4 +1,4 @@
-import { interactive, type UiModifier } from '@gesso/core';
+import { interactive, type UiModifier } from 'gesso-core';
 
 /**
  * Hover and press, for anything on this site a reader can click.

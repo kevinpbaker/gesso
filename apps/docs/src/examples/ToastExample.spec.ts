@@ -1,10 +1,10 @@
 import { BehaviorSubject } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Toast } from '@gesso/components';
-import { createComponent, OverlayService } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Toast } from 'gesso-components';
+import { createComponent, OverlayService } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Notices } from './ToastExample';
 

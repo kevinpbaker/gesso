@@ -1,4 +1,4 @@
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 import { SNAPSHOT } from './snapshot';
 
 /**

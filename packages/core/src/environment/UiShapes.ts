@@ -58,7 +58,7 @@ export function shapesEqual(a: UiShapes, b: UiShapes): boolean {
  * grow `UiShapes` for everyone, a theme's shape scale may carry names
  * of its own, and an application declares them so they type:
  *
- *   declare module '@gesso/core' {
+ *   declare module 'gesso-core' {
  *     interface UiShapeExtensions {
  *       readonly control: unknown;
  *       readonly sheet: unknown;

@@ -1,11 +1,11 @@
-# @gesso/core
+# gesso-core
 
 The engine under a Gesso application: the retained UI graph, the layout engine, the two renderers, input, text and theming. Everything below a component.
 
-You do not usually install this directly. [`@gesso/framework`](https://github.com/kevinpbaker/gesso/tree/main/packages/framework) depends on it and re-exports what an application author needs. Reach for `@gesso/core` when you are writing a modifier, a custom layout, or anything else that works against elements rather than components.
+You do not usually install this directly. [`gesso-framework`](https://github.com/kevinpbaker/gesso/tree/main/packages/framework) depends on it and re-exports what an application author needs. Reach for `gesso-core` when you are writing a modifier, a custom layout, or anything else that works against elements rather than components.
 
 ```bash
-npm install @gesso/core rxjs
+npm install gesso-core rxjs
 ```
 
 ## What is in it
@@ -33,8 +33,8 @@ engine.explain(node);
 
 ## Entry points
 
-- `@gesso/core` -- the engine
-- `@gesso/core/testing` -- the canvas doubles its own suite uses
+- `gesso-core` -- the engine
+- `gesso-core/testing` -- the canvas doubles its own suite uses
 
 ## Documentation
 

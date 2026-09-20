@@ -1,5 +1,5 @@
 /**
- * `@gesso/core` — the retained UI graph, the layout engine, the two
+ * `gesso-core` — the retained UI graph, the layout engine, the two
  * renderers, input, and everything else that does not know what a
  * component is.
  *
@@ -11,7 +11,7 @@
  * next to the code, and the rolled-up `.d.ts` is where the total is
  * read.
  *
- * Test doubles are deliberately not here; they are `@gesso/core/testing`.
+ * Test doubles are deliberately not here; they are `gesso-core/testing`.
  */
 export * from './animation';
 export * from './bindings';

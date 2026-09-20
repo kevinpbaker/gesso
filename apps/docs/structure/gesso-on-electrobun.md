@@ -38,15 +38,15 @@ it held from the first window of the scaffold.
 
 ## The adapter
 
-`@gesso/electrobun` is four entries, split so that the two processes
+`gesso-electrobun` is four entries, split so that the two processes
 cannot import each other's half:
 
-| Import                      | Runs where              | Holds                                           |
-| --------------------------- | ----------------------- | ----------------------------------------------- |
-| `@gesso/electrobun`         | both                    | `GessoFrame`, the wire format, and nothing else |
-| `@gesso/electrobun/view`    | a webview's main thread | `createElectrobunBridge`                        |
-| `@gesso/electrobun/main`    | the main process        | `serveChannelsToWindow`                         |
-| `@gesso/electrobun/desktop` | the main process        | `createDesktopApp`, `windowsChannel`            |
+| Import                     | Runs where              | Holds                                           |
+| -------------------------- | ----------------------- | ----------------------------------------------- |
+| `gesso-electrobun`         | both                    | `GessoFrame`, the wire format, and nothing else |
+| `gesso-electrobun/view`    | a webview's main thread | `createElectrobunBridge`                        |
+| `gesso-electrobun/main`    | the main process        | `serveChannelsToWindow`                         |
+| `gesso-electrobun/desktop` | the main process        | `createDesktopApp`, `windowsChannel`            |
 
 The package imports nothing from Electrobun. Its toolchain projects the
 SDK into a project rather than installing it, so the adapter cannot
@@ -64,8 +64,8 @@ From inside the Gesso workspace:
 pnpm create:app ../my-app --template electrobun
 ```
 
-The CLI packs `@gesso/core`, `@gesso/framework`, `@gesso/components`
-and `@gesso/electrobun` into the project's `vendor/`, because none of
+The CLI packs `gesso-core`, `gesso-framework`, `gesso-components`
+and `gesso-electrobun` into the project's `vendor/`, because none of
 them is on a registry yet, and writes `file:` specifiers and
 `overrides` pointing at the tarballs. What it writes:
 

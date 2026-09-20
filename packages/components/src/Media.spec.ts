@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
 import {
   Box,
   Column,
@@ -22,7 +22,7 @@ import {
   type UiVideoSurface,
   type VideoPlayback,
   type VideoResolver
-} from '@gesso/core';
+} from 'gesso-core';
 import { Icon, Image, ProgressBar, Spinner, Video } from './Media';
 
 /**

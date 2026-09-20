@@ -1,4 +1,4 @@
-import { UiNodeType, type UiNode, type UiShortcutRegistry } from '@gesso/core';
+import { UiNodeType, type UiNode, type UiShortcutRegistry } from 'gesso-core';
 
 import type { UndoStack } from './UndoStack';
 

@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Chip } from '@gesso/components';
-import { computed, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Chip } from 'gesso-components';
+import { computed, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region chip
 /** The genres, with how many tracks each has, as a catalogue would give them. */

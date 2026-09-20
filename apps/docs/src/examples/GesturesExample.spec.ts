@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { noKeyModifiers, type LayoutBox, type UiNode, type UiPointerDevice } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { noKeyModifiers, type LayoutBox, type UiNode, type UiPointerDevice } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { GestureSurface } from './GesturesExample';
 

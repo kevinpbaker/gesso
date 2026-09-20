@@ -151,7 +151,7 @@ interface for exactly this, and merging into it adds your names to the
 ones `textStyle` accepts:
 
 ```ts
-declare module '@gesso/core' {
+declare module 'gesso-core' {
   interface UiTypographyExtensions {
     readonly strong: unknown;
     readonly display: unknown;
@@ -193,7 +193,7 @@ subject rather than the scale's.
 
 ## What this page was checked against
 
-The spec mounts the example with `@gesso/testing` and asserts resolved
+The spec mounts the example with `gesso-testing` and asserts resolved
 values: the size, line height, face and colour a sample takes from the
 provided style, that they move when the scale is swapped, that the box
 grows with them, and that a size named on the node survives the swap.

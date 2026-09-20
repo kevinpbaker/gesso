@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { fade, percent, sharedElement, type UiChild } from '@gesso/core';
-import { internalState, Presence, type ComponentContext, type Inputs } from '@gesso/framework';
+import { fade, percent, sharedElement, type UiChild } from 'gesso-core';
+import { internalState, Presence, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 /** The name both covers answer to. It names a thing, not a place. */

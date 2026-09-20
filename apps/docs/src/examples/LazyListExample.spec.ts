@@ -1,11 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Box, Text, type UiSemanticsRecord } from '@gesso/core';
-import { LazyList } from '@gesso/components';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Box, Text, type UiSemanticsRecord } from 'gesso-core';
+import { LazyList } from 'gesso-components';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Events } from './LazyListExample';
 

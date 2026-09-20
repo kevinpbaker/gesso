@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/components",
+  "name": "gesso-components",
   "version": "0.1.0",
   "description": "The component library \u2014 five tiers, one contract.",
   "license": "MIT",
@@ -45,14 +45,14 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@gesso/core": "workspace:^",
-    "@gesso/framework": "workspace:^"
+    "gesso-core": "workspace:^",
+    "gesso-framework": "workspace:^"
   },
   "peerDependencies": {
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@gesso/testing": "workspace:^",
+    "gesso-testing": "workspace:^",
     "rxjs": "^7.8.2"
   },
   "scripts": {

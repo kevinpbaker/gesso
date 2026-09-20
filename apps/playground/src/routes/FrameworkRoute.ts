@@ -1,4 +1,4 @@
-import { createApp, type RendererChoice, workerHandle } from '@gesso/framework';
+import { createApp, type RendererChoice, workerHandle } from 'gesso-framework';
 import { DemoCounter, FrameworkDemoRoot } from '../FrameworkPlayground';
 import { Heavy } from '../HeavyWork';
 import { Ticker } from '../TickerChannel';
@@ -10,7 +10,7 @@ import {
   mountActionLogPanel,
   mountFrameProfiler,
   mountNodeInspector
-} from '@gesso/devtools';
+} from 'gesso-devtools';
 import { addInspectAction, addProfileAction, addToggleAction } from '../shell/InspectorPanel';
 import { addDevtoolsAction, connectRouteDevtools } from '../shell/devtools';
 import { workerName } from '../shell/still';

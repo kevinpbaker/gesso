@@ -24,7 +24,7 @@ There are three rather than two because a component cannot cross
 `postMessage`, so the root has to be named on the worker's side of the
 barrier.
 
-`main.ts` names no worker, and that is `@gesso/vite-plugin` in
+`main.ts` names no worker, and that is `gesso-vite-plugin` in
 `vite.config.ts`. It finds `worker.ts` beside `main.ts` and writes the
 construction, which has to be written out as a literal because a bundler
 emits a chunk for a worker it can see constructed and cannot see through
@@ -50,7 +50,7 @@ createApp({
 
 ```json
 "jsx": "react-jsx",
-"jsxImportSource": "@gesso/framework"
+"jsxImportSource": "gesso-framework"
 ```
 
 Those two lines in `tsconfig.json` are the whole of what makes `<row>`
@@ -82,16 +82,16 @@ view has stopped arriving.
 ## Why `vendor/` exists, and how to remove it
 
 Gesso is not published to a registry yet. A `package.json` naming a
-version of `@gesso/core` would produce a project that cannot install, so
+version of `gesso-core` would produce a project that cannot install, so
 `create-gesso-app` packed the packages out of its own workspace, put the
 tarballs in `vendor/` and pointed the manifest at them:
 
 ```json
-"@gesso/core": "file:vendor/gesso-core-0.1.0.tgz"
+"gesso-core": "file:vendor/gesso-core-0.1.0.tgz"
 ```
 
 The packed packages declare each other by version range, so without help
-a package manager is free to go looking for `@gesso/core@^0.1.0` on a
+a package manager is free to go looking for `gesso-core@^0.1.0` on a
 registry that has never heard of it. `overrides` in `package.json` is
 what tells npm; `overrides` in `pnpm-workspace.yaml` is what tells pnpm,
 which reads it nowhere else. Both files say the same thing twice for
@@ -112,7 +112,7 @@ back in `dependencies`.
 ## Where to go next
 
 - `App.tsx` is commented with what each part of it is doing.
-- `@gesso/components` has the controls: inputs, overlays, structure,
+- `gesso-components` has the controls: inputs, overlays, structure,
   data and media. `Switch` in `App.tsx` is one of them.
 - Every prop takes a value or an Observable of that value. That is the
   whole binding model, and it is why the component body runs once.

@@ -1,4 +1,4 @@
-import type { RuntimeErrorSource, WorkerAppOptions } from '@gesso/framework';
+import type { RuntimeErrorSource, WorkerAppOptions } from 'gesso-framework';
 
 /** What a page knows about the application it is embedding. */
 export interface EmbeddedExample {

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { IconRasterizer, type IconCanvas, type IconContext, type UiImage } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { IconRasterizer, type IconCanvas, type IconContext, type UiImage } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { People, portraitResolver } from './AvatarExample';
 

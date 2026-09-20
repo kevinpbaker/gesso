@@ -26,11 +26,11 @@ import.meta.hot?.accept('./AppRoot', module => {
 Not one of those is a decision. Every application writes them the same
 way, each of them fails silently when it is wrong, and the second pair
 is written from scratch every time because there is nothing to copy from
-except another application. `@gesso/vite-plugin` writes all of them.
+except another application. `gesso-vite-plugin` writes all of them.
 
 ```ts
 // vite.config.ts
-import { gesso } from '@gesso/vite-plugin';
+import { gesso } from 'gesso-vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -56,7 +56,7 @@ ceremony around that fact.
 ## How it finds the entries
 
 The shell is the module that calls `createApp` imported from
-`@gesso/framework`. Beside it, the plugin asks the bundler's own
+`gesso-framework`. Beside it, the plugin asks the bundler's own
 resolver for the first of these that resolves:
 
 | Entry              | Names tried, in order                                                                          |
@@ -151,7 +151,7 @@ up by name in the module that changed.
 ## The error overlay, by default
 
 While the dev server is running, `onError` is wired to a reporter that
-loads `@gesso/devtools` the first time something throws and draws the
+loads `gesso-devtools` the first time something throws and draws the
 [overlay](/structure/errors-and-the-overlay) over the application. It is
 lazy in both directions: a page that never throws never fetches the
 package, and a production build contains no reference to it, because
@@ -202,7 +202,7 @@ diagnostics: false })` turns it off.
 
 ## Is it required?
 
-No, and that is deliberate. The framework imports no bundler, and nothing in `@gesso/core` or `@gesso/framework`
+No, and that is deliberate. The framework imports no bundler, and nothing in `gesso-core` or `gesso-framework`
 mentions Vite. The plugin is the supported path for development because
 it is the one that gets the wiring right on your behalf; the literal
 construction is the documented fallback, it is what the plugin emits,

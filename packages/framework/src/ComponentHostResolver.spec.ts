@@ -12,7 +12,7 @@ import {
   Text,
   type UiChild,
   type UiElement
-} from '@gesso/core';
+} from 'gesso-core';
 import { Component } from './Component';
 import { Define, Input } from './decorators';
 import { createComponent } from './createComponent';

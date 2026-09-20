@@ -8,7 +8,7 @@ import {
   UiWheelDeltaMode,
   noKeyModifiers,
   scrollbarThumb
-} from '@gesso/core';
+} from 'gesso-core';
 import { GessoRuntime } from './GessoRuntime';
 import { mockCanvas } from './RuntimeTestUtils';
 

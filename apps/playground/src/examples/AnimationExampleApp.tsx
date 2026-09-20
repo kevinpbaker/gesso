@@ -1,7 +1,7 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { type ComponentContext, type Inputs, internalState, AnimationService } from '@gesso/framework';
+import { type ComponentContext, type Inputs, internalState, AnimationService } from 'gesso-framework';
 import {
   type UiChild,
   spring,
@@ -11,7 +11,7 @@ import {
   type UiColor,
   parseColor,
   animateLayout
-} from '@gesso/core';
+} from 'gesso-core';
 import { Board } from './board/BoardContract';
 import { BORDER, gessoColors, gessoTheme, LINEN, POSITIVE, SURFACE, SURFACE_RAISED } from './brand';
 

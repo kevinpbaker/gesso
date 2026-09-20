@@ -1,7 +1,7 @@
 import { BehaviorSubject, type Observable } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Text, type UiChild, type UiElement } from '@gesso/core';
+import { Text, type UiChild, type UiElement } from 'gesso-core';
 
 import { internalState } from './InternalState';
 import { show } from './show';

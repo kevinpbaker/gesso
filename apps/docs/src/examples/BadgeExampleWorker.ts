@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Mailbox } from './BadgeExample';
 import { exampleRoot } from './ExampleRoot';
 

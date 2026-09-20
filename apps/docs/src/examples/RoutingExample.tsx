@@ -1,6 +1,6 @@
 import { map } from 'rxjs/operators';
 
-import { percent, type UiChild } from '@gesso/core';
+import { percent, type UiChild } from 'gesso-core';
 import {
   internalState,
   route,
@@ -9,7 +9,7 @@ import {
   type ComponentContext,
   type Inputs,
   type OutletProps
-} from '@gesso/framework';
+} from 'gesso-framework';
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 
 const NOTES = [

@@ -1,9 +1,9 @@
-# @gesso/framework
+# gesso-framework
 
-Components, cells, the frame runtime, channels, routing and the worker barrier, over [`@gesso/core`](https://github.com/kevinpbaker/gesso/tree/main/packages/core).
+Components, cells, the frame runtime, channels, routing and the worker barrier, over [`gesso-core`](https://github.com/kevinpbaker/gesso/tree/main/packages/core).
 
 ```bash
-npm install @gesso/core @gesso/framework rxjs
+npm install gesso-core gesso-framework rxjs
 ```
 
 ## An application is three files
@@ -12,7 +12,7 @@ One shared module holds names and shapes and no implementation:
 
 ```ts
 // notes.contract.ts
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 
 export const Notes = channel<NotesView, NotesCommands>('notes', { rows: [], open: null });
 ```
@@ -21,7 +21,7 @@ Your application, on its own worker. Below `serveChannels` there is no framework
 
 ```ts
 // notes.app.worker.ts
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 
 serveChannels([
   {
@@ -38,7 +38,7 @@ Everything the person sees, on the render worker:
 
 ```tsx
 // notes.render.worker.ts
-import { renderRoot } from '@gesso/framework';
+import { renderRoot } from 'gesso-framework';
 
 function NotesApp(inputs, ctx) {
   const notes = ctx.channel(Notes);
@@ -74,10 +74,10 @@ Single-thread mode exists for tests, headless rendering and environments without
 
 ## Entry points
 
-- `@gesso/framework` -- components, cells, the runtime, routing, channels
-- `@gesso/framework/worker` -- what a render or application worker imports
-- `@gesso/framework/jsx-runtime`, `/jsx-dev-runtime` -- set `jsxImportSource` to `@gesso/framework`
-- `@gesso/framework/testing` -- the doubles its own suite uses
+- `gesso-framework` -- components, cells, the runtime, routing, channels
+- `gesso-framework/worker` -- what a render or application worker imports
+- `gesso-framework/jsx-runtime`, `/jsx-dev-runtime` -- set `jsxImportSource` to `gesso-framework`
+- `gesso-framework/testing` -- the doubles its own suite uses
 
 ## Documentation
 

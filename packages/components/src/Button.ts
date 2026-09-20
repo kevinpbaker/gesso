@@ -7,9 +7,9 @@ import {
   type UiModifier,
   type UiNodeRef,
   type UiSemanticState
-} from '@gesso/core';
+} from 'gesso-core';
 
-import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from 'gesso-framework';
 import { trackFocus } from './focus';
 import { CONTROL_FOCUS_RING, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import {

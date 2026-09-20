@@ -181,7 +181,7 @@ the environment](/appearance/themes-and-the-environment) describes.
 
 ## What this page was checked against
 
-`Chip.spec.ts` mounts the component with `@gesso/testing` and asserts
+`Chip.spec.ts` mounts the component with `gesso-testing` and asserts
 the label as the word and the name, `pressed` following `selected`,
 that a controlled chip reports a press and does not move until the
 application writes back, that `defaultSelected` makes it self-managing

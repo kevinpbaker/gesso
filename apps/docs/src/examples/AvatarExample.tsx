@@ -1,6 +1,6 @@
-import { percent, DefaultImageResolver, type ImageResolver, type UiImage } from '@gesso/core';
-import { Avatar, Chip } from '@gesso/components';
-import { computed, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, DefaultImageResolver, type ImageResolver, type UiImage } from 'gesso-core';
+import { Avatar, Chip } from 'gesso-components';
+import { computed, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region resolver
 /**

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, type UiSemanticsPatch } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Box, type UiSemanticsPatch } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Preferences } from './SemanticsExample';
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
 
-import { Column, Text, type UiChild } from '@gesso/core';
+import { Column, Text, type UiChild } from 'gesso-core';
 import { computed } from './computed';
 import { createComponent } from './createComponent';
 import type { ComponentContext } from './FunctionComponent';

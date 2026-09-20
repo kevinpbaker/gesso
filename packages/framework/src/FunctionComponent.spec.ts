@@ -3,7 +3,7 @@ import { map } from 'rxjs/operators';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { Column, Row, Text, UiGraphBuilder, UiGraph, type UiNode, UiNodeType } from '@gesso/core';
+import { Column, Row, Text, UiGraphBuilder, UiGraph, type UiNode, UiNodeType } from 'gesso-core';
 import { ComponentHostResolver } from './ComponentHostResolver';
 import { createComponent } from './createComponent';
 import type { ComponentContext, Inputs } from './FunctionComponent';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Button, Column, Row, Text } from '@gesso/core';
+import { Button, Column, Row, Text } from 'gesso-core';
 
 import './matchers';
 import { renderTest } from './renderTest';

@@ -1,5 +1,5 @@
-import type { UiChild } from '@gesso/core';
-import { internalState, type ComponentContext } from '@gesso/framework';
+import type { UiChild } from 'gesso-core';
+import { internalState, type ComponentContext } from 'gesso-framework';
 import { map } from 'rxjs';
 
 /**

@@ -14,8 +14,8 @@ import {
   RouterOutlet,
   RouterService,
   ShellService
-} from '@gesso/framework';
-import { Icon, Image, Menu, Video } from '@gesso/components';
+} from 'gesso-framework';
+import { Icon, Image, Menu, Video } from 'gesso-components';
 import {
   fade,
   motion,
@@ -35,7 +35,7 @@ import {
   type UiModifier,
   type UiNode,
   type UiPointerEvent
-} from '@gesso/core';
+} from 'gesso-core';
 
 import { CARDS, cardById, ICONS, type CardDesign } from './transitions/playlists';
 import { Catalogue, Queue, type PlaylistView, type TrackView } from './transitions/TransitionsContract';

@@ -1,5 +1,5 @@
 import { combineLatest, map, of, type Observable } from 'rxjs';
-import { Text, type UiChild, type UiLiveRegion } from '@gesso/core';
+import { Text, type UiChild, type UiLiveRegion } from 'gesso-core';
 
 /**
  * The line under a control: its error, or its description.

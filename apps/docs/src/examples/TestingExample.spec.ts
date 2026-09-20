@@ -1,9 +1,9 @@
 // #region imports
 import { describe, expect, it } from 'vitest';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { TicketRow } from './TestingExample';
 // #endregion imports

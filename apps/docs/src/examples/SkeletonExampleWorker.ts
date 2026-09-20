@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { LoadingList } from './SkeletonExample';
 import { exampleRoot } from './ExampleRoot';
 

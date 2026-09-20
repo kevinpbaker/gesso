@@ -2,7 +2,7 @@
  * The other half of what a consumer installs.
  *
  * `main.ts` proves the published packages paint in a browser. This
- * proves the published `@gesso/testing` lets someone test a component
+ * proves the published `gesso-testing` lets someone test a component
  * without one — mounted from the tarball, typechecked against the
  * rolled-up declarations, with no workspace link anywhere in the
  * resolution.
@@ -14,10 +14,10 @@
 import { describe, expect, it } from 'vitest';
 import { map } from 'rxjs';
 
-import { Button, Column, Text } from '@gesso/core';
-import { createComponent, input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Button, Column, Text } from 'gesso-core';
+import { createComponent, input, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 function Stepper(inputs: Inputs<{ label?: string }>, _context: ComponentContext) {
   const label = input(inputs.label, 'Count');

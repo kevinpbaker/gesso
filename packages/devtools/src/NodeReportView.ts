@@ -1,4 +1,4 @@
-import { formatAge, type UiNodeReport, type UiPropReport } from '@gesso/framework';
+import { formatAge, type UiNodeReport, type UiPropReport } from 'gesso-framework';
 
 export interface NodeReportViewOptions {
   /**

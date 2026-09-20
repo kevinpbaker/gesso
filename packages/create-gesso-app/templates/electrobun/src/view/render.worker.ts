@@ -6,8 +6,8 @@
  * application says the same thing; only what is behind the channel
  * changes.
  */
-import { DesktopWindows } from '@gesso/electrobun/desktop';
-import { renderRoot } from '@gesso/framework';
+import { DesktopWindows } from 'gesso-electrobun/desktop';
+import { renderRoot } from 'gesso-framework';
 
 import { App } from '../render/App';
 import { Counter } from '../shared/Counter';

@@ -14,7 +14,7 @@
  * side of the bridge, and if that ever changes here, the wrong thing
  * is happening on the thread that must stay free for input.
  */
-import { isHubMessage, isPortHandshake, type AppLogicEndpoint } from '@gesso/framework';
+import { isHubMessage, isPortHandshake, type AppLogicEndpoint } from 'gesso-framework';
 
 import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameControl, frameData, type GessoFrame } from './frames';
 

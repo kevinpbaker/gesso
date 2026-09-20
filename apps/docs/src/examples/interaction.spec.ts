@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { Button, Text } from '@gesso/core';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Button, Text } from 'gesso-core';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 

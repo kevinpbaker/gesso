@@ -6,7 +6,7 @@ import {
   createCanvasSurface,
   type CanvasHost,
   type LayoutReader
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * The real rendering pipeline for the playground, exposed so the

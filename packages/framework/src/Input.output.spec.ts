@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Subject } from 'rxjs';
 
-import { Button, Column, UiEventType, UiPointerEvent, type UiChild, type UiElement, type UiNode } from '@gesso/core';
+import { Button, Column, UiEventType, UiPointerEvent, type UiChild, type UiElement, type UiNode } from 'gesso-core';
 import { Component } from './Component';
 import { createComponent } from './createComponent';
 import { Define, Input, Output } from './decorators';

@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { darkTheme, lightTheme, percent, type UiTheme } from '@gesso/core';
-import { Icon } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { darkTheme, lightTheme, percent, type UiTheme } from 'gesso-core';
+import { Icon } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

@@ -21,7 +21,7 @@ when you know what sends it.
 
 ## It is internal, and you do not speak it
 
-Three types are exported from `@gesso/framework`:
+Three types are exported from `gesso-framework`:
 `ShellToRuntimeMessage`, `RuntimeToShellMessage` and
 `RuntimeErrorSource`. Nothing else in the module is. The helpers beside
 them (`isInputMessage`, `epochNow`, `epochFromEvent`, `modifiersFrom`)

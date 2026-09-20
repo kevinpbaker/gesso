@@ -1,4 +1,4 @@
-import { renderRoot } from '@gesso/framework';
+import { renderRoot } from 'gesso-framework';
 import { LiveApp, LiveFeed } from './LiveExampleApp';
 
 /**

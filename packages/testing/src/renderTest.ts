@@ -9,9 +9,9 @@ import {
   type UiNode,
   type UiSemanticsMap,
   type UiSemanticsRecord
-} from '@gesso/core';
-import { FakeCanvasHost, RecordingCanvasContext, type RecordedCall } from '@gesso/core/testing';
-import { GessoRuntime, type FrameMetrics, type FrameworkChild, type GessoRuntimeOptions } from '@gesso/framework';
+} from 'gesso-core';
+import { FakeCanvasHost, RecordingCanvasContext, type RecordedCall } from 'gesso-core/testing';
+import { GessoRuntime, type FrameMetrics, type FrameworkChild, type GessoRuntimeOptions } from 'gesso-framework';
 
 import { createFireEvent, type FireEvent } from './fireEvent';
 import { formatTree } from './debug';

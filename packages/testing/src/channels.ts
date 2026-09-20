@@ -1,4 +1,4 @@
-import { createChannelRegistry, type ChannelReplica, type ChannelToken, type ServedChannel } from '@gesso/framework';
+import { createChannelRegistry, type ChannelReplica, type ChannelToken, type ServedChannel } from 'gesso-framework';
 
 /** What `serveForTest` hands back: the replicas a screen would bind to, and a way to wait for patches. */
 export interface ServedForTest {

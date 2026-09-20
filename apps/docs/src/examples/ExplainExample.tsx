@@ -1,8 +1,8 @@
 import { BehaviorSubject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { measure, percent, type LayoutBox } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { measure, percent, type LayoutBox } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

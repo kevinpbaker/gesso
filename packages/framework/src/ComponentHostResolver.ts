@@ -1,4 +1,4 @@
-import type { ComponentResolver, ComponentLikeElement, UiChild } from '@gesso/core';
+import type { ComponentResolver, ComponentLikeElement, UiChild } from 'gesso-core';
 import type { ComponentElement } from './ComponentElement';
 import { ComponentHost } from './ComponentHost';
 import { ChannelRegistry } from './channel/ChannelRegistry';

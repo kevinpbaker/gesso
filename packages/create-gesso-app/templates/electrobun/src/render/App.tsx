@@ -1,9 +1,9 @@
 import { map } from 'rxjs/operators';
 
-import { Switch } from '@gesso/components';
-import { darkTheme, lightTheme, percent } from '@gesso/core';
-import { DesktopWindows } from '@gesso/electrobun/desktop';
-import { ShellService, type ComponentContext, type Inputs } from '@gesso/framework';
+import { Switch } from 'gesso-components';
+import { darkTheme, lightTheme, percent } from 'gesso-core';
+import { DesktopWindows } from 'gesso-electrobun/desktop';
+import { ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { Counter } from '../shared/Counter';
 
@@ -33,7 +33,7 @@ import { Counter } from '../shared/Counter';
  *   - The elements are lowercase because they are intrinsic, resolved
  *     by `jsxImportSource` in `tsconfig.json` the way `<div>` needs no
  *     import in React. `Switch` is capitalised because it is a
- *     component from `@gesso/components`, imported like any value.
+ *     component from `gesso-components`, imported like any value.
  */
 export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
   const counter = ctx.channel(Counter);

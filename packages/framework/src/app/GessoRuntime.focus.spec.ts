@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
-import { Box, Button, Column, type UiElement, type UiNode } from '@gesso/core';
+import { Box, Button, Column, type UiElement, type UiNode } from 'gesso-core';
 import { OverlayService } from '../overlay/OverlayService';
 import { FocusService } from './FocusService';
 import { mountRuntime } from './RuntimeTestUtils';

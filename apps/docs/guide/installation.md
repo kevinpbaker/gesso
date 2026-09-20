@@ -7,7 +7,7 @@ description: Set up a project against the Gesso packages, and choose between the
 Gesso is four packages and a bundler that understands workers. A Gesso
 project is an ordinary Vite project that happens to draw its interface
 into a canvas, with no build step of its own and one optional plugin:
-[`@gesso/vite-plugin`](/tooling/vite-plugin) writes the worker
+[`gesso-vite-plugin`](/tooling/vite-plugin) writes the worker
 construction, the hot-replacement wiring and the development error
 overlay, all of which you can also write yourself.
 
@@ -18,14 +18,14 @@ and why, or to set a project up by hand.
 
 ## The packages
 
-| Package             | What it is                                                                   |
-| ------------------- | ---------------------------------------------------------------------------- |
-| `@gesso/core`       | The engine: elements, layout, the two renderers, input, text, theming        |
-| `@gesso/framework`  | Components, cells, the runtime, the shells, channels, routing                |
-| `@gesso/components` | The component library: inputs, overlays, structure, data, media              |
-| `@gesso/testing`    | `renderTest` and its queries, for testing a component with no browser at all |
+| Package            | What it is                                                                   |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `gesso-core`       | The engine: elements, layout, the two renderers, input, text, theming        |
+| `gesso-framework`  | Components, cells, the runtime, the shells, channels, routing                |
+| `gesso-components` | The component library: inputs, overlays, structure, data, media              |
+| `gesso-testing`    | `renderTest` and its queries, for testing a component with no browser at all |
 
-`@gesso/core` and `@gesso/framework` are what an application always
+`gesso-core` and `gesso-framework` are what an application always
 needs. `rxjs` is a peer of both: an Observable is the binding, so it is
 your dependency as much as theirs.
 
@@ -39,13 +39,13 @@ them.
 ```json
 {
   "dependencies": {
-    "@gesso/core": "^0.1.0",
-    "@gesso/framework": "^0.1.0",
-    "@gesso/components": "^0.1.0",
+    "gesso-core": "^0.1.0",
+    "gesso-framework": "^0.1.0",
+    "gesso-components": "^0.1.0",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@gesso/testing": "^0.1.0",
+    "gesso-testing": "^0.1.0",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
   }
@@ -71,7 +71,7 @@ written.
     "noEmit": true,
 
     "jsx": "react-jsx",
-    "jsxImportSource": "@gesso/framework"
+    "jsxImportSource": "gesso-framework"
   },
   "include": ["src"]
 }
@@ -135,7 +135,7 @@ cannot delay a frame.
 
 ```ts
 // main.ts: the main thread's entire job
-import { createApp } from '@gesso/framework';
+import { createApp } from 'gesso-framework';
 
 createApp({
   // Written out literally: a bundler only emits a chunk for a worker it
@@ -146,7 +146,7 @@ createApp({
 
 ```ts
 // app.render.worker.ts: everything the person sees
-import { renderRoot } from '@gesso/framework';
+import { renderRoot } from 'gesso-framework';
 import { App } from './App';
 
 renderRoot(App);
@@ -159,7 +159,7 @@ reason for the second file.
 **Single-thread** mounts the same tree on the calling thread:
 
 ```ts
-import { createApp } from '@gesso/framework';
+import { createApp } from 'gesso-framework';
 import { App } from './App';
 
 createApp(App).mountSync('#app');

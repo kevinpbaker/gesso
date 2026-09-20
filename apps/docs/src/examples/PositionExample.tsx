@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { percent, scrollPosition, type UiNode } from '@gesso/core';
-import { useOverlay } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, scrollPosition, type UiNode } from 'gesso-core';
+import { useOverlay } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

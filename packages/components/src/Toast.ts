@@ -1,5 +1,5 @@
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
-import { Button, Row, Text, type UiChild, type UiNode } from '@gesso/core';
+import { input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { Button, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { useOverlay } from './overlay';
 
 /**

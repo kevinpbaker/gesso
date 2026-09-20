@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PageMessage } from '@gesso/devtools';
+import type { PageMessage } from 'gesso-devtools';
 import { extensionPanelPort, type RuntimePort } from './extensionPort';
 
 function fakeRuntime() {

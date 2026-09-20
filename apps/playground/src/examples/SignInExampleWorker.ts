@@ -1,4 +1,4 @@
-import { renderRoot } from '@gesso/framework';
+import { renderRoot } from 'gesso-framework';
 import { SignInApp } from './SignInExampleApp';
 import { SignIn } from './signin/SignInContract';
 

@@ -6,16 +6,7 @@ import { createComponent } from '../createComponent';
 import { GessoRuntime } from '../app/GessoRuntime';
 import { mockCanvas } from '../app/RuntimeTestUtils';
 import { OverlayService } from './OverlayService';
-import {
-  Box,
-  Button,
-  Column,
-  Text,
-  type UiElement,
-  type UiNode,
-  noKeyModifiers,
-  UiManualFrameClock
-} from '@gesso/core';
+import { Box, Button, Column, Text, type UiElement, type UiNode, noKeyModifiers, UiManualFrameClock } from 'gesso-core';
 
 const pressed: string[] = [];
 

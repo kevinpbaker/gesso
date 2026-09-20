@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
 import {
   Column,
   DefaultImageResolver,
@@ -11,7 +11,7 @@ import {
   type UiChild,
   type UiImage,
   type UiNode
-} from '@gesso/core';
+} from 'gesso-core';
 import { Avatar, deriveInitials } from './Avatar';
 
 /**

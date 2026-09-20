@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { UiSemanticsUpdate } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import type { UiSemanticsUpdate } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Note } from './MirrorExample';
 

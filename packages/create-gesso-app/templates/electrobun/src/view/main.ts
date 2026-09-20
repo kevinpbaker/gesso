@@ -7,9 +7,9 @@
  * carries and never reads, which is what keeps a webview's main thread
  * a transport rather than a router.
  */
-import type { GessoFrame } from '@gesso/electrobun';
-import { createElectrobunBridge } from '@gesso/electrobun/view';
-import { createApp } from '@gesso/framework';
+import type { GessoFrame } from 'gesso-electrobun';
+import { createElectrobunBridge } from 'gesso-electrobun/view';
+import { createApp } from 'gesso-framework';
 import { Electroview } from 'electrobun/view';
 
 import type { GessoWindowRPC } from '../shared/rpc';

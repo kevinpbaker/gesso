@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { Button, Column, Text, selectableTextNodes, selectionRangeOf, type UiNode } from '@gesso/core';
-import { createComponent, type ShellRequest } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Button, Column, Text, selectableTextNodes, selectionRangeOf, type UiNode } from 'gesso-core';
+import { createComponent, type ShellRequest } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { ARTICLE, SelectableArticle } from './SelectionExample';
 

@@ -15,7 +15,7 @@ import {
   UiKeyboardController,
   UiPlatformAdapter,
   CanvasPlatformSurface
-} from '@gesso/core';
+} from 'gesso-core';
 import type { LayoutPlayground } from './LayoutPlayground';
 import type { PlaygroundState } from './PlaygroundState';
 

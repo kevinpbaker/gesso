@@ -1,4 +1,4 @@
-import type { UiNodeReport } from '@gesso/framework';
+import type { UiNodeReport } from 'gesso-framework';
 import { NODE_REPORT_STYLES, renderNodeReport } from './NodeReportView';
 
 /**

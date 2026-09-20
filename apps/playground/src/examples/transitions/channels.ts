@@ -1,4 +1,4 @@
-import { pickKeys, type ServedChannel } from '@gesso/framework';
+import { pickKeys, type ServedChannel } from 'gesso-framework';
 
 import type { Catalogue } from './Catalogue';
 import type { Queue } from './Queue';

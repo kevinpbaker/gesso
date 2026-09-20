@@ -4,7 +4,7 @@ import { GessoAppBuilder } from './GessoAppBuilder';
 import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
 
 /**
- * What a shell passes when `@gesso/vite-plugin` supplies the workers.
+ * What a shell passes when `gesso-vite-plugin` supplies the workers.
  *
  * The only difference from `WorkerAppOptions` is that `renderWorker` is
  * optional, because the plugin writes it: it rewrites `createApp(...)`
@@ -40,7 +40,7 @@ export interface CreateAppOptions extends Omit<WorkerAppOptions, 'renderWorker'>
  * that renders it.
  *
  * Worker-hosted (the default for an interactive app) — all UI work
- * happens off the main thread. With `@gesso/vite-plugin` in the Vite
+ * happens off the main thread. With `gesso-vite-plugin` in the Vite
  * config, the shell names no worker at all:
  *
  *   // main.ts
@@ -67,7 +67,7 @@ export function createApp(arg?: CreateAppOptions | FrameworkChild | ComponentTyp
   if (isWorkerAppOptions(arg)) {
     if (arg?.renderWorker === undefined) {
       throw new Error(
-        'createApp() was given no render worker. Add `gesso()` from @gesso/vite-plugin to the Vite config, which ' +
+        'createApp() was given no render worker. Add `gesso()` from gesso-vite-plugin to the Vite config, which ' +
           "writes the construction, or pass one: renderWorker: () => new Worker(new URL('./worker.ts', " +
           "import.meta.url), { type: 'module' })."
       );

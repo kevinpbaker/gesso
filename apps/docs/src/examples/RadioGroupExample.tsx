@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
-import { RadioGroup, type RadioOption } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { RadioGroup, type RadioOption } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region radiogroup
 /**

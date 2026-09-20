@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { DevtoolsEvent, DevtoolsRequest } from '@gesso/framework';
+import type { DevtoolsEvent, DevtoolsRequest } from 'gesso-framework';
 import { BehaviorSubject } from 'rxjs';
-import { channel, ChannelReplica, provide, type ChannelPort } from '@gesso/framework';
+import { channel, ChannelReplica, provide, type ChannelPort } from 'gesso-framework';
 import { createActionLog, type ActionLog } from './ActionLog';
 import { connectDevtools, getDevtoolsHook, HOOK_PROPERTY, type DevtoolsApp, type HookHost } from './DevtoolsHook';
 import { createDirectPorts, type PageMessage, type WindowLike } from './PanelProtocol';

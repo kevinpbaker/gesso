@@ -15,7 +15,7 @@ import {
   type UiMotion,
   type UiSpringSpec,
   type UiSpringToken
-} from '@gesso/core';
+} from 'gesso-core';
 import { internalState } from '../InternalState';
 
 /** A duration named from the motion vocabulary, or milliseconds outright. */

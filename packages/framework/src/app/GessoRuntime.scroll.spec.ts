@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Button, Column, ScrollView, noKeyModifiers, scrollPosition, type ScrollOffset } from '@gesso/core';
+import { Box, Button, Column, ScrollView, noKeyModifiers, scrollPosition, type ScrollOffset } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 

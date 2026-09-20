@@ -10,9 +10,9 @@ import {
   type LayoutBox,
   percent,
   measure
-} from '@gesso/core';
+} from 'gesso-core';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {

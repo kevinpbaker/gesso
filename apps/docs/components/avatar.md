@@ -181,7 +181,7 @@ describes.
 
 ## What this page was checked against
 
-`Avatar.spec.ts` mounts the component with `@gesso/testing` and asserts
+`Avatar.spec.ts` mounts the component with `gesso-testing` and asserts
 each link of the chain and that only one of them is in the tree at a
 time, that an arriving `src` swaps the layer without rebuilding the node
 that is the avatar, that explicit initials win over the derived ones,

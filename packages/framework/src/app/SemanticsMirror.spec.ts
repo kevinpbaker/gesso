@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { UiSemanticsRecord, UiSemanticsUpdate } from '@gesso/core';
+import type { UiSemanticsRecord, UiSemanticsUpdate } from 'gesso-core';
 import { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './SemanticsMirror';
 
 /**

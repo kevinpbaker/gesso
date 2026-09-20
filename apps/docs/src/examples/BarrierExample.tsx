@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
+import { percent } from 'gesso-core';
 import {
   channel,
   isChannelClientMessage,
@@ -13,7 +13,7 @@ import {
   type Inputs,
   type Patch,
   type WorkerHandle
-} from '@gesso/framework';
+} from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 // #region contract
@@ -121,7 +121,7 @@ export interface ChannelTap {
  * so anything port-shaped can sit in the middle of one: this relays
  * both directions and writes down what went past. It is the whole
  * reason the seam is the port rather than a callback, and it is what
- * `@gesso/devtools`' action log does properly, with a timeline and
+ * `gesso-devtools`' action log does properly, with a timeline and
  * time travel. Twenty lines is enough to make the traffic visible.
  *
  * The provider is created here, on the far side of the relay, so the

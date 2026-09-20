@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent, type UiChild } from '@gesso/core';
-import { createComponent, ShellService, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiChild } from 'gesso-core';
+import { createComponent, ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { brandDarkTheme, brandLightTheme } from './brandTheme';
 
@@ -18,7 +18,7 @@ import { brandDarkTheme, brandLightTheme } from './brandTheme';
  * `theme` is an environment value: provided here, inherited by
  * everything below, and, because it is an ordinary prop that accepts an
  * Observable, rebound rather than rebuilt when the appearance changes.
- * `lightTheme` and `darkTheme` ship with `@gesso/core`; this site maps
+ * `lightTheme` and `darkTheme` ship with `gesso-core`; this site maps
  * the signal onto a palette of its own instead, which is what any
  * application with a brand does. See `brandTheme.ts`.
  *

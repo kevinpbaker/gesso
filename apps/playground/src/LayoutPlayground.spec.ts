@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, Constraints, type LayoutRecord, UiManualFrameClock } from '@gesso/core';
+import { Box, Column, Constraints, type LayoutRecord, UiManualFrameClock } from 'gesso-core';
 import { LayoutPlayground } from './LayoutPlayground';
 import { createDefinition } from './PlaygroundDefinition';
 import { PlaygroundState } from './PlaygroundState';

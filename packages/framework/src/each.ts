@@ -1,6 +1,6 @@
 import { Observable, defer, distinctUntilChanged, map, of } from 'rxjs';
 
-import { isComponentLikeElement, isObservable, type UiChild, type UiElement } from '@gesso/core';
+import { isComponentLikeElement, isObservable, type UiChild, type UiElement } from 'gesso-core';
 
 /**
  * What gives a row its identity: the name of a field holding it, or a

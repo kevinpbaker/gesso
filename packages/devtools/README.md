@@ -1,9 +1,9 @@
-# @gesso/devtools
+# gesso-devtools
 
 See what a Gesso application is doing, and what it threw.
 
 ```bash
-npm install --save-dev @gesso/devtools
+npm install --save-dev gesso-devtools
 ```
 
 ## The error overlay
@@ -11,7 +11,7 @@ npm install --save-dev @gesso/devtools
 A canvas application that throws leaves its last good frame on screen, looking exactly like one that works. This draws the failure over it:
 
 ```ts
-import { mountErrorOverlay } from '@gesso/devtools';
+import { mountErrorOverlay } from 'gesso-devtools';
 
 createApp({ onError: mountErrorOverlay(document.body) }).mount('#app');
 ```

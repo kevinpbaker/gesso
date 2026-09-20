@@ -136,7 +136,7 @@ the bundle, which is how the worker loads from a `views://` url.
 
 ```json
 "jsx": "react-jsx",
-"jsxImportSource": "@gesso/framework"
+"jsxImportSource": "gesso-framework"
 ```
 
 Those two lines in `tsconfig.json` are the whole of what makes `<row>`
@@ -163,7 +163,7 @@ workspace rather than out of `node_modules`, and a bundler cannot
 resolve a package that was never installed. Here the packages are
 installed, in `vendor/`, so the ordinary arrangement is the right one.
 
-If a future toolchain ever fails to resolve `@gesso/electrobun` from the
+If a future toolchain ever fails to resolve `gesso-electrobun` from the
 main process, that is the escape hatch: bundle `src/main/index.ts` to a
 plain `.js` file with `electrobun/main` left external, and point the
 `cottontail.entrypoint` at the bundle instead.
@@ -171,18 +171,18 @@ plain `.js` file with `electrobun/main` left external, and point the
 ## Why `vendor/` exists, and how to remove it
 
 Gesso is not published to a registry yet. A `package.json` naming a
-version of `@gesso/core` would produce a project that cannot install, so
+version of `gesso-core` would produce a project that cannot install, so
 `create-gesso-app` packed the packages out of its own workspace, put the
 tarballs in `vendor/` and pointed `dependencies` and `overrides` at
 them:
 
 ```json
-"@gesso/core": "file:vendor/gesso-core-0.1.0.tgz"
+"gesso-core": "file:vendor/gesso-core-0.1.0.tgz"
 ```
 
 `overrides` is there because the packages declare each other by version
 range, and without it an installer is free to go looking for
-`@gesso/core@^0.1.0` on a registry that has never heard of it.
+`gesso-core@^0.1.0` on a registry that has never heard of it.
 
 To pick up a change made in the Gesso workspace, run `create-gesso-app`
 again over this directory with `--force`, or repack by hand:
@@ -205,5 +205,5 @@ delete `overrides`, and put version ranges back in `dependencies`.
   half, because every message is serialised, encrypted and sent over a
   socket. Patches are one way and pipelined, so they do not pay it;
   anything that waits for an answer does.
-- `@gesso/components` has the controls: inputs, overlays, structure,
+- `gesso-components` has the controls: inputs, overlays, structure,
   data and media. `Switch` in `App.tsx` is one of them.

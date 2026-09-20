@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
-import { createApp, createComponent, type WorkerApp } from '@gesso/framework';
+import { createApp, createComponent, type WorkerApp } from 'gesso-framework';
 
 import { exampleRoot } from '../../src/examples/ExampleRoot';
 import { Pulse } from '../../src/examples/PulseExample';

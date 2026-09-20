@@ -9,7 +9,7 @@ import {
   type UiChild,
   type UiElement,
   type UiLength
-} from '@gesso/core';
+} from 'gesso-core';
 import type { ComponentContext, Inputs } from './FunctionComponent';
 
 /**

@@ -1,4 +1,4 @@
-import type { UiNodeRef } from '@gesso/core';
+import type { UiNodeRef } from 'gesso-core';
 
 import {
   computed,
@@ -11,7 +11,7 @@ import {
   type ReadableCell,
   type Resource,
   type ResourceStatus
-} from '@gesso/framework';
+} from 'gesso-framework';
 
 import { trackFocus, type ControlFocus } from './focus';
 import {

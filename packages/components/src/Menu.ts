@@ -1,7 +1,7 @@
 import { BehaviorSubject, map, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FocusService } from '@gesso/framework';
-import { Column, Row, Text, type UiChild, type UiElement, type UiNode } from '@gesso/core';
+import { input, type ComponentContext, type Inputs, FocusService } from 'gesso-framework';
+import { Column, Row, Text, type UiChild, type UiElement, type UiNode } from 'gesso-core';
 import { CONTROL_INTERACTION, keymap } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
 

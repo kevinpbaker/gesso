@@ -5,7 +5,7 @@ description: Mount a component with no browser, query it the way an assistive te
 # Testing
 
 A Gesso component is a function that returns a tree, and the tree is not
-the DOM, so there is nothing here for jsdom to do. `@gesso/testing`
+the DOM, so there is nothing here for jsdom to do. `gesso-testing`
 mounts the real runtime over a recording canvas and hands back queries,
 events and layout answers. No browser, no canvas double to write, no
 headless Chrome to start, and no setup file: vitest's default node
@@ -51,7 +51,7 @@ Pass `textMeasurer` if you want different metrics, and `autoFrame:
 false` if the spec needs to be holding the result when the first frame
 happens.
 
-`@gesso/testing` imports no test runner, so `renderTest` works under
+`gesso-testing` imports no test runner, so `renderTest` works under
 vitest, under `node:test`, or in a plain script. The matchers are the
 exception: `expect.extend` is a side effect on a global, so they live
 behind their own entry and importing them is a decision you make.
@@ -276,7 +276,7 @@ lines between the classes and the barrier. It takes the same data
 worker, handing back the replicas a screen would bind to.
 
 ```ts
-import { serveForTest } from '@gesso/testing';
+import { serveForTest } from 'gesso-testing';
 
 const catalogue = new Catalogue(offlineApi());
 const queue = new Queue(catalogue);

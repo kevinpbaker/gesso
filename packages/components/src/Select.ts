@@ -1,6 +1,6 @@
 import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FocusService } from '@gesso/framework';
+import { input, type ComponentContext, type Inputs, FocusService } from 'gesso-framework';
 import {
   Column,
   Row,
@@ -10,7 +10,7 @@ import {
   type UiNode,
   type UiKeyboardEvent,
   type UiSemanticState
-} from '@gesso/core';
+} from 'gesso-core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import { controlMessage } from './message';

@@ -97,7 +97,7 @@ marking anything.
 
 ## In a test
 
-`@gesso/testing` exposes both forms on a mounted tree:
+`gesso-testing` exposes both forms on a mounted tree:
 
 ```ts
 const ui = renderTest(createComponent(Card, {}));
@@ -121,7 +121,7 @@ That is the whole explanation, not a summary of it, and the spec beside
 the example asserts as much. Import the matchers to get it:
 
 ```ts
-import '@gesso/testing/matchers';
+import 'gesso-testing/matchers';
 ```
 
 ## Under the pointer

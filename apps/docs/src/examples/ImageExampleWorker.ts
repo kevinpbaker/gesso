@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Gallery, swatchResolver } from './ImageExample';
 import { exampleRoot } from './ExampleRoot';
 

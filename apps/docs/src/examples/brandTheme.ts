@@ -1,9 +1,9 @@
-import { darkTheme, lightTheme, rgb8, type UiColor, type UiColors, type UiTextStyle, type UiTheme } from '@gesso/core';
+import { darkTheme, lightTheme, rgb8, type UiColor, type UiColors, type UiTextStyle, type UiTheme } from 'gesso-core';
 
 /**
  * Gesso's own palette, for the examples on this site.
  *
- * `lightTheme` and `darkTheme` in `@gesso/core` are a starting point
+ * `lightTheme` and `darkTheme` in `gesso-core` are a starting point
  * rather than a policy, and this file is what taking them up on that
  * looks like: the same token names, answered in Gesso's colours, so a
  * canvas on this site is painted out of the same palette as the prose

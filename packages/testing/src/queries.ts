@@ -1,5 +1,5 @@
-import type { UiNode, UiRole, UiSemanticState, UiSemanticsRecord } from '@gesso/core';
-import { textContentOf } from '@gesso/core';
+import type { UiNode, UiRole, UiSemanticState, UiSemanticsRecord } from 'gesso-core';
+import { textContentOf } from 'gesso-core';
 
 import type { RenderedBase } from './renderTest';
 

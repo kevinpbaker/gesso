@@ -1,8 +1,8 @@
 import { map } from 'rxjs';
 
-import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
-import { Box, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from '@gesso/core';
+import { Box, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from 'gesso-core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import { CONTROL_EDGE, CONTROL_FOCUS_RING, keymap, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';

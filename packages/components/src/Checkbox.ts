@@ -1,7 +1,7 @@
 import { combineLatest, map, type Observable } from 'rxjs';
-import { type UiNodeRef, Box, Column, Row, Text, type UiChild, type UiSemanticState } from '@gesso/core';
+import { type UiNodeRef, Box, Column, Row, Text, type UiChild, type UiSemanticState } from 'gesso-core';
 
-import { input, themeTokenCell, type ComponentContext, type Inputs } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import { controlTokens } from './tokens';

@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Button } from '@gesso/components';
-import { type ComponentContext, type Inputs, computed, input, internalState } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Button } from 'gesso-components';
+import { type ComponentContext, type Inputs, computed, input, internalState } from 'gesso-framework';
 
 export function Counter(inputs: Inputs<{ label?: string }>, _context: ComponentContext) {
   const label = input(inputs.label, 'Count'); // inputs are cells; this one has a default

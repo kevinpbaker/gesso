@@ -11,7 +11,7 @@
  * this. That is the point of the seam: the application layer does not
  * learn it is talking to a window instead of a page.
  */
-import { serveChannels, type PortHost, type ServedChannel } from '@gesso/framework';
+import { serveChannels, type PortHost, type ServedChannel } from 'gesso-framework';
 
 import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameControl, frameData, type GessoFrame } from './frames';
 

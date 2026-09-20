@@ -18,15 +18,15 @@ import {
   type UiFocusEvent,
   type UiNode,
   type ZoomState
-} from '@gesso/core';
-import { Card, Image, Menu } from '@gesso/components';
+} from 'gesso-core';
+import { Card, Image, Menu } from 'gesso-components';
 import {
   createComponent,
   internalState,
   type ComponentContext,
   type Inputs,
   type InternalState
-} from '@gesso/framework';
+} from 'gesso-framework';
 
 /**
  * The four gestures the applications were missing, on one page.

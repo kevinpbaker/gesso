@@ -8,7 +8,7 @@ import {
   type CanvasHost,
   UiAnimationFrameClock,
   type UiFrameClockFactory
-} from '@gesso/core';
+} from 'gesso-core';
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import type { UiNodeReport } from './NodeReport';
 import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';

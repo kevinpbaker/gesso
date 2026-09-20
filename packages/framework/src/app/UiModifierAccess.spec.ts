@@ -13,7 +13,7 @@ import {
   type UiTheme,
   type UiNode,
   defineModifier
-} from '@gesso/core';
+} from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
 import { FocusService } from './FocusService';
 

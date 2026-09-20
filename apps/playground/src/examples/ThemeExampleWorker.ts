@@ -1,4 +1,4 @@
-import { renderRoot } from '@gesso/framework';
+import { renderRoot } from 'gesso-framework';
 import { ThemeApp } from './ThemeExampleApp';
 import { AppearanceChannel } from './theme/ThemeContract';
 

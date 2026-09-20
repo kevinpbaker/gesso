@@ -318,7 +318,7 @@ const PAGE_LOADED = `(() => {
  * overlay as the baseline. That has happened: a route whose whole page
  * threw was baselined and the gate went green on it forever after.
  *
- * The overlay is `@gesso/devtools`', in a shadow root under the element
+ * The overlay is `gesso-devtools`', in a shadow root under the element
  * the app was mounted in, so this looks for that rather than for
  * anything the application draws.
  */

@@ -1,5 +1,5 @@
-import { connectDevtools, createDirectPorts, getDevtoolsHook, mountDevtoolsPanel } from '@gesso/devtools';
-import type { ActionLog, DevtoolsApp, DevtoolsPicker } from '@gesso/devtools';
+import { connectDevtools, createDirectPorts, getDevtoolsHook, mountDevtoolsPanel } from 'gesso-devtools';
+import type { ActionLog, DevtoolsApp, DevtoolsPicker } from 'gesso-devtools';
 import type { AppShell } from './AppShell';
 import { addToggleAction } from './InspectorPanel';
 import { findRoute } from './routes';

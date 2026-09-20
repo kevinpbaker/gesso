@@ -1,4 +1,4 @@
-import { darkTheme, parseColor, type UiColors, type UiTheme } from '@gesso/core';
+import { darkTheme, parseColor, type UiColors, type UiTheme } from 'gesso-core';
 
 /**
  * The Gesso palette, for the example applications.
@@ -19,7 +19,7 @@ import { darkTheme, parseColor, type UiColors, type UiTheme } from '@gesso/core'
  * `src/shell/theme.css` role for role, so a route's rendered output
  * and the chrome around it read as one product.
  *
- * Nothing here touches `@gesso/core`'s own `lightColors` / `darkColors`.
+ * Nothing here touches `gesso-core`'s own `lightColors` / `darkColors`.
  * The framework ships a neutral starter palette on purpose; branding
  * belongs to the application, and this is the application.
  */

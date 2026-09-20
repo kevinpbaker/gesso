@@ -1,5 +1,5 @@
 /**
- * The documented wiring for `@gesso/devtools`' error overlay, in a
+ * The documented wiring for `gesso-devtools`' error overlay, in a
  * project that installs the packages the way anybody else would.
  *
  * Nothing imports this and nothing runs it. It exists to be
@@ -8,14 +8,14 @@
  * `skipLibCheck: false`, so a broken `exports` map, or a type that only
  * resolves through a workspace link, fails here — from a consumer's
  * position rather than from inside the workspace. `counter.spec.ts`
- * does the same job for `@gesso/testing` and can go further, because a
+ * does the same job for `gesso-testing` and can go further, because a
  * test needs no browser; an overlay does, so this stops at the types
  * and says so.
  *
  * Both configurations are here because they report different things.
  */
-import { mountErrorOverlay } from '@gesso/devtools';
-import { createApp, type FrameworkChild } from '@gesso/framework';
+import { mountErrorOverlay } from 'gesso-devtools';
+import { createApp, type FrameworkChild } from 'gesso-framework';
 
 /**
  * Worker-hosted: the overlay *is* the `onError` callback.

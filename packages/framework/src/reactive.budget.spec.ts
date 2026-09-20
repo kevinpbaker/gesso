@@ -1,7 +1,7 @@
 import { Observable, Subject, type Subscriber } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Text, type UiChild } from '@gesso/core';
+import { Text, type UiChild } from 'gesso-core';
 
 import { computed } from './computed';
 import { each } from './each';

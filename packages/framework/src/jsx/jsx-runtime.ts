@@ -26,7 +26,7 @@ import {
   Stack,
   Text,
   UiNodeType
-} from '@gesso/core';
+} from 'gesso-core';
 import type { Component } from '../Component';
 import type { InputCell } from '../Input';
 import { createComponent } from '../createComponent';

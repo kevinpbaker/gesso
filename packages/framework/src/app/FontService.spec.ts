@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { clearFontStacks, fontStackFor } from '@gesso/core';
+import { clearFontStacks, fontStackFor } from 'gesso-core';
 
 import { FontService, type FontFaceLike, type FontHost } from './FontService';
 

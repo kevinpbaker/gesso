@@ -19,12 +19,12 @@ The two ends of the barrier: what the page calls, and what the worker calls back
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`createApp`](/guide/workers) | function | `@gesso/framework` | Starts a render worker against a canvas, from the shell thread. |
-| [`renderRoot`](/guide/workers) | function | `@gesso/framework` | Mounts a tree inside the render worker. The last line of every worker entry file. |
-| [`WorkerApp`](/guide/workers) | class | `@gesso/framework` | What `createApp` returns: mount it on an element, dispose it when the page leaves. |
-| [`WorkerAppOptions`](/guide/workers) | interface | `@gesso/framework` | Everything the shell side is configured with: the worker, the renderer, the callbacks. |
-| [`WorkerHandle`](/structure/channels-and-the-barrier) | interface | `@gesso/framework` | A worker a channel can open a port on, so several channels can share one. |
-| [`ShellRequest`](/structure/shell-services) | type | `@gesso/framework` | A request the worker sends across the barrier for the shell to carry out. |
+| [`createApp`](/guide/workers) | function | `gesso-framework` | Starts a render worker against a canvas, from the shell thread. |
+| [`renderRoot`](/guide/workers) | function | `gesso-framework` | Mounts a tree inside the render worker. The last line of every worker entry file. |
+| [`WorkerApp`](/guide/workers) | class | `gesso-framework` | What `createApp` returns: mount it on an element, dispose it when the page leaves. |
+| [`WorkerAppOptions`](/guide/workers) | interface | `gesso-framework` | Everything the shell side is configured with: the worker, the renderer, the callbacks. |
+| [`WorkerHandle`](/structure/channels-and-the-barrier) | interface | `gesso-framework` | A worker a channel can open a port on, so several channels can share one. |
+| [`ShellRequest`](/structure/shell-services) | type | `gesso-framework` | A request the worker sends across the barrier for the shell to carry out. |
 
 ## Components and state
 
@@ -32,22 +32,22 @@ A component runs once. These are the pieces that let it change afterwards.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`createComponent`](/guide/components-run-once) | function | `@gesso/framework` | Instantiates a component with its props. What JSX compiles to for a component tag. |
-| [`ComponentContext`](/guide/components-run-once) | interface | `@gesso/framework` | The second argument to a component: injection, lifetime, and the node it is mounted on. |
-| [`Inputs`](/guide/components-run-once) | type | `@gesso/framework` | Wraps a props type so every prop arrives as a cell rather than a value. |
-| [`input`](/guide/cells-and-bindings) | function | `@gesso/framework` | Creates a single input cell, mostly for a test that drives a component by hand. |
-| [`internalState`](/guide/cells-and-bindings) | function | `@gesso/framework` | State a component owns. Read it, write it, bind it into the tree. |
-| [`InternalState`](/guide/cells-and-bindings) | class | `@gesso/framework` | The type `internalState` returns: a BehaviorSubject with a current value. |
-| [`computed`](/guide/cells-and-bindings) | function | `@gesso/framework` | A cell that is a function of what it reads. The one derivation to reach for. |
-| [`select`](/guide/lists-and-conditionals) | function | `@gesso/framework` | One field, or one projection, of a cell, as a cell. Structural by default. |
-| [`Each`](/guide/lists-and-conditionals) | function | `@gesso/framework` | A keyed list: `<Each of={rows} by="id">{row => ...}</Each>`. |
-| [`Show`](/guide/lists-and-conditionals) | function | `@gesso/framework` | One child while a condition holds, with a stable key and no node of its own. |
-| [`resource`](/recipes/loading-and-saving) | function | `@gesso/framework` | A keyed request with a status, a value, an error and a retry. A stale answer cannot win. |
-| [`mutate`](/recipes/loading-and-saving) | function | `@gesso/framework` | An optimistic change to a cell, with a rollback that does not clobber a newer one. |
-| [`debounced`](/recipes/loading-and-saving) | function | `@gesso/framework` | A cell that follows its source once it has stopped moving. |
-| [`throttled`](/recipes/loading-and-saving) | function | `@gesso/framework` | A cell that follows its source at most once every so often, leading and trailing. |
-| [`UiChild`](/guide/cells-and-bindings) | type | `@gesso/core` | Anything that can be a child: an element, a component, or an Observable of either. |
-| [`Presence`](/appearance/enter-and-exit) | function | `@gesso/framework` | Keeps a child mounted while it plays its exit, then removes it. |
+| [`createComponent`](/guide/components-run-once) | function | `gesso-framework` | Instantiates a component with its props. What JSX compiles to for a component tag. |
+| [`ComponentContext`](/guide/components-run-once) | interface | `gesso-framework` | The second argument to a component: injection, lifetime, and the node it is mounted on. |
+| [`Inputs`](/guide/components-run-once) | type | `gesso-framework` | Wraps a props type so every prop arrives as a cell rather than a value. |
+| [`input`](/guide/cells-and-bindings) | function | `gesso-framework` | Creates a single input cell, mostly for a test that drives a component by hand. |
+| [`internalState`](/guide/cells-and-bindings) | function | `gesso-framework` | State a component owns. Read it, write it, bind it into the tree. |
+| [`InternalState`](/guide/cells-and-bindings) | class | `gesso-framework` | The type `internalState` returns: a BehaviorSubject with a current value. |
+| [`computed`](/guide/cells-and-bindings) | function | `gesso-framework` | A cell that is a function of what it reads. The one derivation to reach for. |
+| [`select`](/guide/lists-and-conditionals) | function | `gesso-framework` | One field, or one projection, of a cell, as a cell. Structural by default. |
+| [`Each`](/guide/lists-and-conditionals) | function | `gesso-framework` | A keyed list: `<Each of={rows} by="id">{row => ...}</Each>`. |
+| [`Show`](/guide/lists-and-conditionals) | function | `gesso-framework` | One child while a condition holds, with a stable key and no node of its own. |
+| [`resource`](/recipes/loading-and-saving) | function | `gesso-framework` | A keyed request with a status, a value, an error and a retry. A stale answer cannot win. |
+| [`mutate`](/recipes/loading-and-saving) | function | `gesso-framework` | An optimistic change to a cell, with a rollback that does not clobber a newer one. |
+| [`debounced`](/recipes/loading-and-saving) | function | `gesso-framework` | A cell that follows its source once it has stopped moving. |
+| [`throttled`](/recipes/loading-and-saving) | function | `gesso-framework` | A cell that follows its source at most once every so often, leading and trailing. |
+| [`UiChild`](/guide/cells-and-bindings) | type | `gesso-core` | Anything that can be a child: an element, a component, or an Observable of either. |
+| [`Presence`](/appearance/enter-and-exit) | function | `gesso-framework` | Keeps a child mounted while it plays its exit, then removes it. |
 
 ## Elements
 
@@ -55,12 +55,12 @@ The element factories. In a `.tsx` file the intrinsics compile to these, so a pa
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`Box`](/guide/layout-basics) | function | `@gesso/core` | A rectangle with properties and children. The `<box>` intrinsic. |
-| [`Row`](/guide/layout-basics) | function | `@gesso/core` | A box laid out along the x axis. The `<row>` intrinsic. |
-| [`Column`](/guide/layout-basics) | function | `@gesso/core` | A box laid out along the y axis. The `<column>` intrinsic. |
-| [`Text`](/guide/text) | function | `@gesso/core` | A run of text, measured and broken into lines. The `<text>` intrinsic. |
-| [`Button`](/interaction/pointer-and-keyboard) | function | `@gesso/core` | A box that is focusable and hit-testable by default. The `<button>` intrinsic. |
-| [`LazyColumn`](/layout/virtualization) | function | `@gesso/core` | A column that builds only the rows inside the window it is asked for. |
+| [`Box`](/guide/layout-basics) | function | `gesso-core` | A rectangle with properties and children. The `<box>` intrinsic. |
+| [`Row`](/guide/layout-basics) | function | `gesso-core` | A box laid out along the x axis. The `<row>` intrinsic. |
+| [`Column`](/guide/layout-basics) | function | `gesso-core` | A box laid out along the y axis. The `<column>` intrinsic. |
+| [`Text`](/guide/text) | function | `gesso-core` | A run of text, measured and broken into lines. The `<text>` intrinsic. |
+| [`Button`](/interaction/pointer-and-keyboard) | function | `gesso-core` | A box that is focusable and hit-testable by default. The `<button>` intrinsic. |
+| [`LazyColumn`](/layout/virtualization) | function | `gesso-core` | A column that builds only the rows inside the window it is asked for. |
 
 ## Modifiers
 
@@ -68,21 +68,21 @@ Behaviour attached to an element rather than written into it.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`UiModifier`](/interaction/modifiers) | interface | `@gesso/core` | A behaviour attached to an element, keyed so it survives a rebind. |
-| [`defineModifier`](/interaction/modifiers) | function | `@gesso/core` | Declares a modifier kind, with the attach and detach it runs. |
-| [`interactive`](/interaction/modifiers) | function | `@gesso/core` | Hover, press and disabled visual states, plus the cursor that goes with them. |
-| [`bundle`](/interaction/modifiers) | function | `@gesso/core` | A set of modifiers named once and attached as one, built at module level. |
-| [`focusRing`](/interaction/focus-and-traps) | function | `@gesso/core` | Paints a ring while the element holds focus. |
-| [`autoFocus`](/interaction/focus-and-traps) | function | `@gesso/core` | Takes focus once, when the element mounts. |
-| [`draggable`](/interaction/touch-and-gestures) | function | `@gesso/core` | Turns pointer drags on the element into an offset stream. |
-| [`DragOffset`](/interaction/touch-and-gestures) | interface | `@gesso/core` | What `draggable` reports: the offset from where the drag began. |
-| [`measure`](/layout/explain) | const | `@gesso/core` | Pushes the laid-out box of the element into a Subject after every layout. |
-| [`LayoutBox`](/layout/explain) | interface | `@gesso/core` | The box `measure` reports: position and size in coordinates of the layout root. |
-| [`scrollPosition`](/layout/overflow-and-scrolling) | const | `@gesso/core` | Reads and writes the offset of a scroll container without a relayout. |
-| [`animateLayout`](/appearance/motion) | const | `@gesso/core` | Animates the element from its previous box to its new one after a layout change. |
-| [`sharedElement`](/appearance/shared-elements) | const | `@gesso/core` | Matches an element across two trees by name, so it moves rather than swaps. |
-| [`videoSource`](/media/video) | const | `@gesso/core` | Binds a video source to the element and hands back its playback state. |
-| [`tooltip`](/components/tooltip) | function | `@gesso/components` | Attaches a tooltip to any element, positioned by the overlay service. |
+| [`UiModifier`](/interaction/modifiers) | interface | `gesso-core` | A behaviour attached to an element, keyed so it survives a rebind. |
+| [`defineModifier`](/interaction/modifiers) | function | `gesso-core` | Declares a modifier kind, with the attach and detach it runs. |
+| [`interactive`](/interaction/modifiers) | function | `gesso-core` | Hover, press and disabled visual states, plus the cursor that goes with them. |
+| [`bundle`](/interaction/modifiers) | function | `gesso-core` | A set of modifiers named once and attached as one, built at module level. |
+| [`focusRing`](/interaction/focus-and-traps) | function | `gesso-core` | Paints a ring while the element holds focus. |
+| [`autoFocus`](/interaction/focus-and-traps) | function | `gesso-core` | Takes focus once, when the element mounts. |
+| [`draggable`](/interaction/touch-and-gestures) | function | `gesso-core` | Turns pointer drags on the element into an offset stream. |
+| [`DragOffset`](/interaction/touch-and-gestures) | interface | `gesso-core` | What `draggable` reports: the offset from where the drag began. |
+| [`measure`](/layout/explain) | const | `gesso-core` | Pushes the laid-out box of the element into a Subject after every layout. |
+| [`LayoutBox`](/layout/explain) | interface | `gesso-core` | The box `measure` reports: position and size in coordinates of the layout root. |
+| [`scrollPosition`](/layout/overflow-and-scrolling) | const | `gesso-core` | Reads and writes the offset of a scroll container without a relayout. |
+| [`animateLayout`](/appearance/motion) | const | `gesso-core` | Animates the element from its previous box to its new one after a layout change. |
+| [`sharedElement`](/appearance/shared-elements) | const | `gesso-core` | Matches an element across two trees by name, so it moves rather than swaps. |
+| [`videoSource`](/media/video) | const | `gesso-core` | Binds a video source to the element and hands back its playback state. |
+| [`tooltip`](/components/tooltip) | function | `gesso-components` | Attaches a tooltip to any element, positioned by the overlay service. |
 
 ## Layout values
 
@@ -90,14 +90,14 @@ The lengths and track sizes a layout property accepts.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`auto`](/guide/layout-basics) | const | `@gesso/core` | Size from content. The default for a track and for a box that sets no size. |
-| [`percent`](/guide/layout-basics) | function | `@gesso/core` | A length relative to the containing block, as `percent(100)`. |
-| [`fr`](/layout/grid) | function | `@gesso/core` | A grid track that takes a share of the space left over. |
-| [`minmax`](/layout/grid) | function | `@gesso/core` | A grid track with a floor and a ceiling. |
-| [`repeat`](/layout/grid) | function | `@gesso/core` | Repeats a run of track sizes a fixed number of times. |
-| [`UiAlignment`](/layout/flex) | type | `@gesso/core` | What the `x`, `y`, `selfX` and `selfY` alignment properties accept. |
-| [`UiFlexWrap`](/layout/flex) | type | `@gesso/core` | What `flexWrap` accepts: `nowrap`, `wrap`, `wrap-reverse`. |
-| [`ObjectFit`](/media/images-and-the-resolver) | type | `@gesso/core` | How an image or video fills its box: `fill`, `cover`, `contain`, `none`. |
+| [`auto`](/guide/layout-basics) | const | `gesso-core` | Size from content. The default for a track and for a box that sets no size. |
+| [`percent`](/guide/layout-basics) | function | `gesso-core` | A length relative to the containing block, as `percent(100)`. |
+| [`fr`](/layout/grid) | function | `gesso-core` | A grid track that takes a share of the space left over. |
+| [`minmax`](/layout/grid) | function | `gesso-core` | A grid track with a floor and a ceiling. |
+| [`repeat`](/layout/grid) | function | `gesso-core` | Repeats a run of track sizes a fixed number of times. |
+| [`UiAlignment`](/layout/flex) | type | `gesso-core` | What the `x`, `y`, `selfX` and `selfY` alignment properties accept. |
+| [`UiFlexWrap`](/layout/flex) | type | `gesso-core` | What `flexWrap` accepts: `nowrap`, `wrap`, `wrap-reverse`. |
+| [`ObjectFit`](/media/images-and-the-resolver) | type | `gesso-core` | How an image or video fills its box: `fill`, `cover`, `contain`, `none`. |
 
 ## Colour, theme and type
 
@@ -105,24 +105,24 @@ The environment values every element inherits, and the tokens that name them.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`UiTheme`](/appearance/themes-and-the-environment) | interface | `@gesso/core` | A palette and a type scale, provided once and inherited by everything below. |
-| [`lightTheme`](/guide/appearance) | const | `@gesso/core` | The light theme that ships with the framework. |
-| [`defaultSpacing`](/appearance/themes-and-the-environment) | const | `@gesso/core` | The spacing scale a theme carries: eight steps, from `none` to `huge`. |
-| [`withDensity`](/appearance/themes-and-the-environment) | function | `@gesso/core` | The same theme at another density. Scales the spacing scale and nothing else. |
-| [`withContrast`](/appearance/themes-and-the-environment) | function | `@gesso/core` | The same theme with every foreground raised to a 7:1 ratio against its ground. |
-| [`defineThemeExtension`](/appearance/themes-and-the-environment) | function | `@gesso/core` | A token group of your own on a theme, typed, with no change to `UiTheme`. |
-| [`withThemeExtension`](/appearance/themes-and-the-environment) | function | `@gesso/core` | The same theme carrying one extension’s tokens. |
-| [`themeExtension`](/appearance/themes-and-the-environment) | function | `@gesso/core` | Reads a token group back off a theme, completing on its names. |
-| [`darkTheme`](/guide/appearance) | const | `@gesso/core` | The dark theme that ships with the framework. |
-| [`lightColors`](/appearance/themes-and-the-environment) | const | `@gesso/core` | The light palette on its own, for a theme that keeps the colours and changes the type. |
-| [`UiColors`](/appearance/themes-and-the-environment) | interface | `@gesso/core` | The token set a palette has to fill: `surface`, `text`, `accent`, and the rest. |
-| [`UiColor`](/appearance/themes-and-the-environment) | interface | `@gesso/core` | A resolved colour: red, green, blue, alpha. |
-| [`parseColor`](/appearance/themes-and-the-environment) | function | `@gesso/core` | Parses a CSS colour string into a `UiColor`. |
-| [`UiTypography`](/appearance/typography) | interface | `@gesso/core` | The type scale in a theme: body, heading, caption and their siblings. |
-| [`UiTextStyle`](/appearance/typography) | interface | `@gesso/core` | One step of the scale: family, size, weight, line height, spacing, alignment. |
-| [`UiFontWeight`](/appearance/typography) | type | `@gesso/core` | What `fontWeight` accepts: a number, a numeric string, or a CSS keyword. |
-| [`UiEnvironmentKeys`](/appearance/themes-and-the-environment) | const | `@gesso/core` | The keys a scoped environment value can be provided under. |
-| [`ColorScheme`](/guide/appearance) | type | `@gesso/framework` | The appearance signal the shell reports: `light` or `dark`. |
+| [`UiTheme`](/appearance/themes-and-the-environment) | interface | `gesso-core` | A palette and a type scale, provided once and inherited by everything below. |
+| [`lightTheme`](/guide/appearance) | const | `gesso-core` | The light theme that ships with the framework. |
+| [`defaultSpacing`](/appearance/themes-and-the-environment) | const | `gesso-core` | The spacing scale a theme carries: eight steps, from `none` to `huge`. |
+| [`withDensity`](/appearance/themes-and-the-environment) | function | `gesso-core` | The same theme at another density. Scales the spacing scale and nothing else. |
+| [`withContrast`](/appearance/themes-and-the-environment) | function | `gesso-core` | The same theme with every foreground raised to a 7:1 ratio against its ground. |
+| [`defineThemeExtension`](/appearance/themes-and-the-environment) | function | `gesso-core` | A token group of your own on a theme, typed, with no change to `UiTheme`. |
+| [`withThemeExtension`](/appearance/themes-and-the-environment) | function | `gesso-core` | The same theme carrying one extension’s tokens. |
+| [`themeExtension`](/appearance/themes-and-the-environment) | function | `gesso-core` | Reads a token group back off a theme, completing on its names. |
+| [`darkTheme`](/guide/appearance) | const | `gesso-core` | The dark theme that ships with the framework. |
+| [`lightColors`](/appearance/themes-and-the-environment) | const | `gesso-core` | The light palette on its own, for a theme that keeps the colours and changes the type. |
+| [`UiColors`](/appearance/themes-and-the-environment) | interface | `gesso-core` | The token set a palette has to fill: `surface`, `text`, `accent`, and the rest. |
+| [`UiColor`](/appearance/themes-and-the-environment) | interface | `gesso-core` | A resolved colour: red, green, blue, alpha. |
+| [`parseColor`](/appearance/themes-and-the-environment) | function | `gesso-core` | Parses a CSS colour string into a `UiColor`. |
+| [`UiTypography`](/appearance/typography) | interface | `gesso-core` | The type scale in a theme: body, heading, caption and their siblings. |
+| [`UiTextStyle`](/appearance/typography) | interface | `gesso-core` | One step of the scale: family, size, weight, line height, spacing, alignment. |
+| [`UiFontWeight`](/appearance/typography) | type | `gesso-core` | What `fontWeight` accepts: a number, a numeric string, or a CSS keyword. |
+| [`UiEnvironmentKeys`](/appearance/themes-and-the-environment) | const | `gesso-core` | The keys a scoped environment value can be provided under. |
+| [`ColorScheme`](/guide/appearance) | type | `gesso-framework` | The appearance signal the shell reports: `light` or `dark`. |
 
 ## Motion
 
@@ -130,11 +130,11 @@ Enter and exit states, springs, and the service that runs them.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`fade`](/appearance/enter-and-exit) | const | `@gesso/core` | An enter or exit state that animates opacity. |
-| [`scaleFrom`](/appearance/enter-and-exit) | function | `@gesso/core` | An enter or exit state that animates scale. |
-| [`slideUp`](/appearance/enter-and-exit) | function | `@gesso/core` | An enter or exit state that animates a vertical offset. |
-| [`spring`](/appearance/motion) | function | `@gesso/core` | A spring transition, by token or by stiffness and damping. |
-| [`AnimationService`](/appearance/motion) | class | `@gesso/framework` | Runs the animations on the frame clock, and honours reduced motion. |
+| [`fade`](/appearance/enter-and-exit) | const | `gesso-core` | An enter or exit state that animates opacity. |
+| [`scaleFrom`](/appearance/enter-and-exit) | function | `gesso-core` | An enter or exit state that animates scale. |
+| [`slideUp`](/appearance/enter-and-exit) | function | `gesso-core` | An enter or exit state that animates a vertical offset. |
+| [`spring`](/appearance/motion) | function | `gesso-core` | A spring transition, by token or by stiffness and damping. |
+| [`AnimationService`](/appearance/motion) | class | `gesso-framework` | Runs the animations on the frame clock, and honours reduced motion. |
 
 ## Services
 
@@ -142,14 +142,14 @@ Injected with `ctx.inject`. Each one owns a capability the worker cannot reach d
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`ServiceRegistry`](/guide/state-and-services) | class | `@gesso/framework` | What `ctx.inject` looks in. One instance per app, populated at start. |
-| [`ShellService`](/structure/shell-services) | class | `@gesso/framework` | What the worker knows of the page: viewport size, appearance, and requests it can send. |
-| [`OverlayService`](/layout/positioning-and-overlays) | class | `@gesso/framework` | Mounts a layer above the app: dialogs, menus, tooltips and toasts. |
-| [`useOverlay`](/layout/positioning-and-overlays) | function | `@gesso/components` | The hook the shipped components use to open and close an overlay. |
-| [`FocusService`](/interaction/focus-and-traps) | class | `@gesso/framework` | Owns focus: where it is, where tab sends it, and which trap holds it. |
-| [`FindService`](/interaction/find) | class | `@gesso/framework` | Searches the text in the tree, because browser find cannot see a canvas. |
-| [`MediaService`](/media/images-and-the-resolver) | class | `@gesso/framework` | Asks the shell to decode an image or open a video, and hands back the result. |
-| [`RouterService`](/structure/routing) | class | `@gesso/framework` | The current route, and the navigation the app performs on it. |
+| [`ServiceRegistry`](/guide/state-and-services) | class | `gesso-framework` | What `ctx.inject` looks in. One instance per app, populated at start. |
+| [`ShellService`](/structure/shell-services) | class | `gesso-framework` | What the worker knows of the page: viewport size, appearance, and requests it can send. |
+| [`OverlayService`](/layout/positioning-and-overlays) | class | `gesso-framework` | Mounts a layer above the app: dialogs, menus, tooltips and toasts. |
+| [`useOverlay`](/layout/positioning-and-overlays) | function | `gesso-components` | The hook the shipped components use to open and close an overlay. |
+| [`FocusService`](/interaction/focus-and-traps) | class | `gesso-framework` | Owns focus: where it is, where tab sends it, and which trap holds it. |
+| [`FindService`](/interaction/find) | class | `gesso-framework` | Searches the text in the tree, because browser find cannot see a canvas. |
+| [`MediaService`](/media/images-and-the-resolver) | class | `gesso-framework` | Asks the shell to decode an image or open a video, and hands back the result. |
+| [`RouterService`](/structure/routing) | class | `gesso-framework` | The current route, and the navigation the app performs on it. |
 
 ## Routing
 
@@ -157,12 +157,12 @@ Typed routes, and the outlet that renders whichever one matched.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`route`](/structure/routing) | function | `@gesso/framework` | Declares one route, with its path parameters typed from the path string. |
-| [`RouteDefinition`](/structure/routing) | interface | `@gesso/framework` | What `route` returns, and what a router is configured with. |
-| [`to`](/structure/routing) | function | `@gesso/framework` | Builds a target for a route, refusing a missing or misspelt parameter. |
-| [`RouterOutlet`](/structure/routing) | class | `@gesso/framework` | Renders whichever route matched, and swaps the tree when it changes. |
-| [`OutletProps`](/structure/routing) | interface | `@gesso/framework` | What an outlet takes, including the transition between routes. |
-| [`createShellHistory`](/structure/routing) | function | `@gesso/framework` | Binds the router to browser history, on the shell thread. |
+| [`route`](/structure/routing) | function | `gesso-framework` | Declares one route, with its path parameters typed from the path string. |
+| [`RouteDefinition`](/structure/routing) | interface | `gesso-framework` | What `route` returns, and what a router is configured with. |
+| [`to`](/structure/routing) | function | `gesso-framework` | Builds a target for a route, refusing a missing or misspelt parameter. |
+| [`RouterOutlet`](/structure/routing) | class | `gesso-framework` | Renders whichever route matched, and swaps the tree when it changes. |
+| [`OutletProps`](/structure/routing) | interface | `gesso-framework` | What an outlet takes, including the transition between routes. |
+| [`createShellHistory`](/structure/routing) | function | `gesso-framework` | Binds the router to browser history, on the shell thread. |
 
 ## Channels and the barrier
 
@@ -170,18 +170,18 @@ The typed message path between the shell thread and the render worker.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`channel`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Declares a typed channel: a view the worker reads, and commands it sends. |
-| [`defineChannel`](/recipes/loading-and-saving) | function | `@gesso/framework` | The same token from one object, so the view keys and their initial values are written once. |
-| [`ViewOf`](/recipes/loading-and-saving) | type | `@gesso/framework` | The view type of a token declared with `defineChannel`. |
-| [`provide`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Serves a channel from the shell thread, over a port. |
-| [`ChannelSource`](/structure/channels-and-the-barrier) | interface | `@gesso/framework` | What a provider implements: the current view, and a handler per command. |
-| [`ChannelPort`](/structure/channels-and-the-barrier) | interface | `@gesso/framework` | The message port a channel runs over. A `MessagePort` satisfies it. |
-| [`createChannelRegistry`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Collects several channels behind one port, and reports which one failed. |
-| [`serveChannels`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Starts serving a set of channels from the shell, and returns the teardown. |
-| [`Patch`](/structure/channels-and-the-barrier) | type | `@gesso/framework` | One change to a projected view, as it crosses the barrier. |
-| [`diffProjection`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Turns an old and a new view into the patches between them. |
-| [`isChannelHostMessage`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Narrows a `message` event to something the host sent. |
-| [`isChannelClientMessage`](/structure/channels-and-the-barrier) | function | `@gesso/framework` | Narrows a `message` event to something the client sent. |
+| [`channel`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Declares a typed channel: a view the worker reads, and commands it sends. |
+| [`defineChannel`](/recipes/loading-and-saving) | function | `gesso-framework` | The same token from one object, so the view keys and their initial values are written once. |
+| [`ViewOf`](/recipes/loading-and-saving) | type | `gesso-framework` | The view type of a token declared with `defineChannel`. |
+| [`provide`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Serves a channel from the shell thread, over a port. |
+| [`ChannelSource`](/structure/channels-and-the-barrier) | interface | `gesso-framework` | What a provider implements: the current view, and a handler per command. |
+| [`ChannelPort`](/structure/channels-and-the-barrier) | interface | `gesso-framework` | The message port a channel runs over. A `MessagePort` satisfies it. |
+| [`createChannelRegistry`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Collects several channels behind one port, and reports which one failed. |
+| [`serveChannels`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Starts serving a set of channels from the shell, and returns the teardown. |
+| [`Patch`](/structure/channels-and-the-barrier) | type | `gesso-framework` | One change to a projected view, as it crosses the barrier. |
+| [`diffProjection`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Turns an old and a new view into the patches between them. |
+| [`isChannelHostMessage`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Narrows a `message` event to something the host sent. |
+| [`isChannelClientMessage`](/structure/channels-and-the-barrier) | function | `gesso-framework` | Narrows a `message` event to something the client sent. |
 
 ## The node graph
 
@@ -189,13 +189,13 @@ What an element becomes once it is mounted. Reached from a test or a devtool, no
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`UiNode`](/tooling/inspecting-a-node) | class | `@gesso/core` | A mounted element: its properties, its layout record, and its children. |
-| [`UiNodeType`](/tooling/inspecting-a-node) | enum | `@gesso/core` | Which kind of element a node is. |
-| [`resolvePropertyByName`](/tooling/inspecting-a-node) | function | `@gesso/core` | Reads one resolved property off a node, inheritance and defaults applied. |
-| [`createPaintState`](/tooling/inspecting-a-node) | function | `@gesso/core` | Allocates the scratch record `resolvePaintState` fills. |
-| [`resolvePaintState`](/tooling/inspecting-a-node) | function | `@gesso/core` | Resolves everything the painter needs for one node, into that record. |
-| [`UiVisualState`](/interaction/modifiers) | enum | `@gesso/core` | Hover, press, focus, disabled: what `interactive` sets and paint reads. |
-| [`UiVisualStateSet`](/interaction/modifiers) | type | `@gesso/core` | The set of visual states a node currently holds. |
+| [`UiNode`](/tooling/inspecting-a-node) | class | `gesso-core` | A mounted element: its properties, its layout record, and its children. |
+| [`UiNodeType`](/tooling/inspecting-a-node) | enum | `gesso-core` | Which kind of element a node is. |
+| [`resolvePropertyByName`](/tooling/inspecting-a-node) | function | `gesso-core` | Reads one resolved property off a node, inheritance and defaults applied. |
+| [`createPaintState`](/tooling/inspecting-a-node) | function | `gesso-core` | Allocates the scratch record `resolvePaintState` fills. |
+| [`resolvePaintState`](/tooling/inspecting-a-node) | function | `gesso-core` | Resolves everything the painter needs for one node, into that record. |
+| [`UiVisualState`](/interaction/modifiers) | enum | `gesso-core` | Hover, press, focus, disabled: what `interactive` sets and paint reads. |
+| [`UiVisualStateSet`](/interaction/modifiers) | type | `gesso-core` | The set of visual states a node currently holds. |
 
 ## Semantics
 
@@ -203,10 +203,10 @@ The accessibility record a node publishes, and the shapes it is patched with.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`UiSemanticsRecord`](/access/semantics) | interface | `@gesso/core` | What one node publishes to the accessibility mirror. |
-| [`UiSemanticsUpdate`](/access/the-mirror) | interface | `@gesso/core` | A batch of semantics changes crossing to the shell in one message. |
-| [`UiSemanticsPatch`](/access/the-mirror) | type | `@gesso/core` | The change to one record inside that batch. |
-| [`UiSemanticState`](/access/semantics) | type | `@gesso/core` | What the `states` property accepts: `checked`, `expanded`, `busy`, and the rest. |
+| [`UiSemanticsRecord`](/access/semantics) | interface | `gesso-core` | What one node publishes to the accessibility mirror. |
+| [`UiSemanticsUpdate`](/access/the-mirror) | interface | `gesso-core` | A batch of semantics changes crossing to the shell in one message. |
+| [`UiSemanticsPatch`](/access/the-mirror) | type | `gesso-core` | The change to one record inside that batch. |
+| [`UiSemanticState`](/access/semantics) | type | `gesso-core` | What the `states` property accepts: `checked`, `expanded`, `busy`, and the rest. |
 
 ## Input, selection and find
 
@@ -214,12 +214,12 @@ Pointer events, and the text ranges selection and find leave behind on a node.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`UiPointerEvent`](/interaction/pointer-and-keyboard) | class | `@gesso/core` | A pointer event as it reaches a node, in coordinates local to the node. |
-| [`UiPointerDevice`](/interaction/touch-and-gestures) | interface | `@gesso/core` | What kind of pointer it was, and what it can do. |
-| [`noKeyModifiers`](/interaction/pointer-and-keyboard) | function | `@gesso/core` | An empty modifier set, for a test or a synthesised key event. |
-| [`selectableTextNodes`](/interaction/selection) | function | `@gesso/core` | The text nodes under a root, in the order a selection walks them. |
-| [`selectionRangeOf`](/interaction/selection) | function | `@gesso/core` | The selected range on a node, if any of it is selected. |
-| [`matchRangesOf`](/interaction/find) | function | `@gesso/core` | The ranges find has highlighted on a node. |
+| [`UiPointerEvent`](/interaction/pointer-and-keyboard) | class | `gesso-core` | A pointer event as it reaches a node, in coordinates local to the node. |
+| [`UiPointerDevice`](/interaction/touch-and-gestures) | interface | `gesso-core` | What kind of pointer it was, and what it can do. |
+| [`noKeyModifiers`](/interaction/pointer-and-keyboard) | function | `gesso-core` | An empty modifier set, for a test or a synthesised key event. |
+| [`selectableTextNodes`](/interaction/selection) | function | `gesso-core` | The text nodes under a root, in the order a selection walks them. |
+| [`selectionRangeOf`](/interaction/selection) | function | `gesso-core` | The selected range on a node, if any of it is selected. |
+| [`matchRangesOf`](/interaction/find) | function | `gesso-core` | The ranges find has highlighted on a node. |
 
 ## Media
 
@@ -227,63 +227,63 @@ Images, video and icons, all of which resolve on the shell thread and arrive as 
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`UiImage`](/media/images-and-the-resolver) | type | `@gesso/core` | What the `image` property holds: a decoded `ImageBitmap`. |
-| [`ImageResolver`](/media/images-and-the-resolver) | interface | `@gesso/core` | The contract an application implements to turn a source into a bitmap. |
-| [`DefaultImageResolver`](/media/images-and-the-resolver) | class | `@gesso/core` | The resolver that ships: fetch, decode, cache, and share in-flight requests. |
-| [`UiVideoSurface`](/media/video) | interface | `@gesso/core` | A frame source the painter can draw, backed by a video on the shell thread. |
-| [`isVideoSurface`](/media/video) | function | `@gesso/core` | Narrows a value to a video surface. |
-| [`VideoPlayback`](/media/video) | interface | `@gesso/core` | The playback state a video reports back: time, duration, paused, ended. |
-| [`VideoResolver`](/media/video) | interface | `@gesso/core` | The contract for opening a video source and driving it. |
-| [`IconRasterizer`](/media/icons) | class | `@gesso/core` | Turns icon path data into a bitmap at the size and scale it will be drawn. |
-| [`IconCanvas`](/media/icons) | interface | `@gesso/core` | The drawing surface a rasterizer needs, so it can run in a worker. |
-| [`IconContext`](/media/icons) | interface | `@gesso/core` | The 2D context of that surface, narrowed to what rasterizing uses. |
+| [`UiImage`](/media/images-and-the-resolver) | type | `gesso-core` | What the `image` property holds: a decoded `ImageBitmap`. |
+| [`ImageResolver`](/media/images-and-the-resolver) | interface | `gesso-core` | The contract an application implements to turn a source into a bitmap. |
+| [`DefaultImageResolver`](/media/images-and-the-resolver) | class | `gesso-core` | The resolver that ships: fetch, decode, cache, and share in-flight requests. |
+| [`UiVideoSurface`](/media/video) | interface | `gesso-core` | A frame source the painter can draw, backed by a video on the shell thread. |
+| [`isVideoSurface`](/media/video) | function | `gesso-core` | Narrows a value to a video surface. |
+| [`VideoPlayback`](/media/video) | interface | `gesso-core` | The playback state a video reports back: time, duration, paused, ended. |
+| [`VideoResolver`](/media/video) | interface | `gesso-core` | The contract for opening a video source and driving it. |
+| [`IconRasterizer`](/media/icons) | class | `gesso-core` | Turns icon path data into a bitmap at the size and scale it will be drawn. |
+| [`IconCanvas`](/media/icons) | interface | `gesso-core` | The drawing surface a rasterizer needs, so it can run in a worker. |
+| [`IconContext`](/media/icons) | interface | `gesso-core` | The 2D context of that surface, narrowed to what rasterizing uses. |
 
 ## Components
 
-Everything `@gesso/components` exports that a page documents, with the option types they take.
+Everything `gesso-components` exports that a page documents, with the option types they take.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`Accordion`](/components/accordion) | function | `@gesso/components` | Sections that expand one at a time, or several. |
-| [`AccordionSection`](/components/accordion) | interface | `@gesso/components` | One section: its id, its header, its content. |
-| [`Avatar`](/components/avatar) | function | `@gesso/components` | A face, falling back to initials and then to a glyph. |
-| [`Badge`](/components/badge) | function | `@gesso/components` | A count or a short marker on something else, silent unless it is named. |
-| [`Card`](/components/card) | function | `@gesso/components` | A surface with padding, a radius and an elevation. |
-| [`Checkbox`](/components/checkbox) | function | `@gesso/components` | A tri-state box: checked, unchecked, mixed. |
-| [`Chip`](/components/chip) | function | `@gesso/components` | A pill that is on or off, for a row of filters; a toggle button that reports pressed. |
-| [`DataTable`](/components/data-table) | function | `@gesso/components` | A sortable table over a row array, virtualized down the column. |
-| [`DataColumn`](/components/data-table) | interface | `@gesso/components` | One column: its header, its width, and how it reads a row. |
-| [`DataTableSort`](/components/data-table) | interface | `@gesso/components` | Which column the table is sorted by, and in which direction. |
-| [`Dialog`](/components/dialog) | function | `@gesso/components` | A modal surface in the overlay layer, with focus held inside it. |
-| [`Divider`](/components/divider) | function | `@gesso/components` | A rule between things, horizontal or vertical. |
-| [`FindBar`](/components/find-bar) | function | `@gesso/components` | The search bar over `FindService`, with match count and stepping. |
-| [`Icon`](/components/icon) | function | `@gesso/components` | One icon from the registry, rasterized at the size it is drawn. |
-| [`Image`](/components/image) | function | `@gesso/components` | An image with a fit, a placeholder, and an error state. |
-| [`LazyList`](/components/lazy-list) | function | `@gesso/components` | A virtualized list that builds only the rows in the window. |
-| [`Menu`](/components/menu) | function | `@gesso/components` | A menu in the overlay layer, with roving focus and type-ahead. |
-| [`MenuItem`](/components/menu) | interface | `@gesso/components` | One item: its label, its shortcut, whether it is enabled. |
-| [`NumberInput`](/components/number-input) | function | `@gesso/components` | A numeric field with steppers, a range, and keyboard stepping. |
-| [`ProgressBar`](/components/progress-bar) | function | `@gesso/components` | Determinate or indeterminate progress. |
-| [`RadioGroup`](/components/radio-group) | function | `@gesso/components` | One choice from several, with arrow keys moving the selection. |
-| [`RadioOption`](/components/radio-group) | interface | `@gesso/components` | One option: its value, its label, whether it is enabled. |
-| [`Select`](/components/select) | function | `@gesso/components` | A listbox in the overlay layer, opened from a closed control. |
-| [`SelectOption`](/components/select) | interface | `@gesso/components` | One option in that list. |
-| [`Skeleton`](/components/skeleton) | function | `@gesso/components` | A stand-in holding the box of content that has not arrived, shimmering if asked. |
-| [`SkeletonText`](/components/skeleton) | function | `@gesso/components` | A run of stand-in lines, the last one short, for a paragraph still loading. |
-| [`Slider`](/components/slider) | function | `@gesso/components` | A value in a range, dragged or stepped. |
-| [`Spinner`](/components/spinner) | function | `@gesso/components` | A busy indicator, driven by the frame clock. |
-| [`SplitPane`](/components/split-pane) | function | `@gesso/components` | Two panes and a draggable divider between them. |
-| [`Switch`](/components/switch) | function | `@gesso/components` | An on or off control, with the thumb animated between. |
-| [`Tabs`](/components/tabs) | function | `@gesso/components` | A tab strip and its panel, with arrow keys moving between tabs. |
-| [`TabDefinition`](/components/tabs) | interface | `@gesso/components` | One tab: its id, its label, its panel. |
-| [`TextInput`](/components/text-input) | function | `@gesso/components` | A single-line field with selection, an IME path, and a caret. |
-| [`TextArea`](/components/text-input) | function | `@gesso/components` | The same field over several lines. |
-| [`Toast`](/components/toast) | function | `@gesso/components` | A transient message in the overlay layer, announced to the mirror. |
-| [`Toolbar`](/components/toolbar) | function | `@gesso/components` | A row of controls with one tab stop and roving focus inside. |
-| [`Tooltip`](/components/tooltip) | function | `@gesso/components` | The tooltip surface itself, for a layout that places its own. |
-| [`Tree`](/components/tree) | function | `@gesso/components` | A disclosure tree with levels, expansion and typed selection. |
-| [`TreeNode`](/components/tree) | interface | `@gesso/components` | One node: its id, its label, its children. |
-| [`Video`](/components/video) | function | `@gesso/components` | A video surface with controls, drawn into the canvas like anything else. |
+| [`Accordion`](/components/accordion) | function | `gesso-components` | Sections that expand one at a time, or several. |
+| [`AccordionSection`](/components/accordion) | interface | `gesso-components` | One section: its id, its header, its content. |
+| [`Avatar`](/components/avatar) | function | `gesso-components` | A face, falling back to initials and then to a glyph. |
+| [`Badge`](/components/badge) | function | `gesso-components` | A count or a short marker on something else, silent unless it is named. |
+| [`Card`](/components/card) | function | `gesso-components` | A surface with padding, a radius and an elevation. |
+| [`Checkbox`](/components/checkbox) | function | `gesso-components` | A tri-state box: checked, unchecked, mixed. |
+| [`Chip`](/components/chip) | function | `gesso-components` | A pill that is on or off, for a row of filters; a toggle button that reports pressed. |
+| [`DataTable`](/components/data-table) | function | `gesso-components` | A sortable table over a row array, virtualized down the column. |
+| [`DataColumn`](/components/data-table) | interface | `gesso-components` | One column: its header, its width, and how it reads a row. |
+| [`DataTableSort`](/components/data-table) | interface | `gesso-components` | Which column the table is sorted by, and in which direction. |
+| [`Dialog`](/components/dialog) | function | `gesso-components` | A modal surface in the overlay layer, with focus held inside it. |
+| [`Divider`](/components/divider) | function | `gesso-components` | A rule between things, horizontal or vertical. |
+| [`FindBar`](/components/find-bar) | function | `gesso-components` | The search bar over `FindService`, with match count and stepping. |
+| [`Icon`](/components/icon) | function | `gesso-components` | One icon from the registry, rasterized at the size it is drawn. |
+| [`Image`](/components/image) | function | `gesso-components` | An image with a fit, a placeholder, and an error state. |
+| [`LazyList`](/components/lazy-list) | function | `gesso-components` | A virtualized list that builds only the rows in the window. |
+| [`Menu`](/components/menu) | function | `gesso-components` | A menu in the overlay layer, with roving focus and type-ahead. |
+| [`MenuItem`](/components/menu) | interface | `gesso-components` | One item: its label, its shortcut, whether it is enabled. |
+| [`NumberInput`](/components/number-input) | function | `gesso-components` | A numeric field with steppers, a range, and keyboard stepping. |
+| [`ProgressBar`](/components/progress-bar) | function | `gesso-components` | Determinate or indeterminate progress. |
+| [`RadioGroup`](/components/radio-group) | function | `gesso-components` | One choice from several, with arrow keys moving the selection. |
+| [`RadioOption`](/components/radio-group) | interface | `gesso-components` | One option: its value, its label, whether it is enabled. |
+| [`Select`](/components/select) | function | `gesso-components` | A listbox in the overlay layer, opened from a closed control. |
+| [`SelectOption`](/components/select) | interface | `gesso-components` | One option in that list. |
+| [`Skeleton`](/components/skeleton) | function | `gesso-components` | A stand-in holding the box of content that has not arrived, shimmering if asked. |
+| [`SkeletonText`](/components/skeleton) | function | `gesso-components` | A run of stand-in lines, the last one short, for a paragraph still loading. |
+| [`Slider`](/components/slider) | function | `gesso-components` | A value in a range, dragged or stepped. |
+| [`Spinner`](/components/spinner) | function | `gesso-components` | A busy indicator, driven by the frame clock. |
+| [`SplitPane`](/components/split-pane) | function | `gesso-components` | Two panes and a draggable divider between them. |
+| [`Switch`](/components/switch) | function | `gesso-components` | An on or off control, with the thumb animated between. |
+| [`Tabs`](/components/tabs) | function | `gesso-components` | A tab strip and its panel, with arrow keys moving between tabs. |
+| [`TabDefinition`](/components/tabs) | interface | `gesso-components` | One tab: its id, its label, its panel. |
+| [`TextInput`](/components/text-input) | function | `gesso-components` | A single-line field with selection, an IME path, and a caret. |
+| [`TextArea`](/components/text-input) | function | `gesso-components` | The same field over several lines. |
+| [`Toast`](/components/toast) | function | `gesso-components` | A transient message in the overlay layer, announced to the mirror. |
+| [`Toolbar`](/components/toolbar) | function | `gesso-components` | A row of controls with one tab stop and roving focus inside. |
+| [`Tooltip`](/components/tooltip) | function | `gesso-components` | The tooltip surface itself, for a layout that places its own. |
+| [`Tree`](/components/tree) | function | `gesso-components` | A disclosure tree with levels, expansion and typed selection. |
+| [`TreeNode`](/components/tree) | interface | `gesso-components` | One node: its id, its label, its children. |
+| [`Video`](/components/video) | function | `gesso-components` | A video surface with controls, drawn into the canvas like anything else. |
 
 ## Testing
 
@@ -291,8 +291,8 @@ Rendering a tree in node and querying it through the semantics it publishes.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`renderTest`](/guide/testing) | function | `@gesso/testing` | Renders a tree in node, with a canvas double, and returns queries over it. |
-| [`Rendered`](/guide/testing) | type | `@gesso/testing` | What `renderTest` returns: the queries, the root, and the frame control. |
+| [`renderTest`](/guide/testing) | function | `gesso-testing` | Renders a tree in node, with a canvas double, and returns queries over it. |
+| [`Rendered`](/guide/testing) | type | `gesso-testing` | What `renderTest` returns: the queries, the root, and the frame control. |
 
 ## Devtools
 
@@ -300,13 +300,13 @@ Panels mounted on the shell thread, beside the canvas rather than inside it.
 
 | Name | Kind | Package | What it is |
 | ---- | ---- | ------- | ---------- |
-| [`createActionLog`](/tooling/the-action-log) | function | `@gesso/devtools` | Records what the app did, frame by frame, for the panel to show. |
-| [`mountActionLogPanel`](/tooling/the-action-log) | function | `@gesso/devtools` | Mounts that log as a panel beside the canvas. |
-| [`mountNodeInspector`](/tooling/inspecting-a-node) | function | `@gesso/devtools` | Mounts the inspector: pick a node, read its resolved properties. |
-| [`mountFrameProfiler`](/tooling/frames-and-phases) | function | `@gesso/devtools` | Mounts the frame timeline, phase by phase. |
-| [`mountErrorOverlay`](/structure/errors-and-the-overlay) | function | `@gesso/devtools` | Shows an error from the worker over the canvas, with its stack. |
-| [`connectDevtools`](/tooling/the-devtools-panel) | function | `@gesso/devtools` | Registers the app with the page so the devtools panel, or the Chrome extension, finds it. |
-| [`mountDevtoolsPanel`](/tooling/the-devtools-panel) | function | `@gesso/devtools` | Mounts the panel itself, over a port, anywhere in a page. |
+| [`createActionLog`](/tooling/the-action-log) | function | `gesso-devtools` | Records what the app did, frame by frame, for the panel to show. |
+| [`mountActionLogPanel`](/tooling/the-action-log) | function | `gesso-devtools` | Mounts that log as a panel beside the canvas. |
+| [`mountNodeInspector`](/tooling/inspecting-a-node) | function | `gesso-devtools` | Mounts the inspector: pick a node, read its resolved properties. |
+| [`mountFrameProfiler`](/tooling/frames-and-phases) | function | `gesso-devtools` | Mounts the frame timeline, phase by phase. |
+| [`mountErrorOverlay`](/structure/errors-and-the-overlay) | function | `gesso-devtools` | Shows an error from the worker over the canvas, with its stack. |
+| [`connectDevtools`](/tooling/the-devtools-panel) | function | `gesso-devtools` | Registers the app with the page so the devtools panel, or the Chrome extension, finds it. |
+| [`mountDevtoolsPanel`](/tooling/the-devtools-panel) | function | `gesso-devtools` | Mounts the panel itself, over a port, anywhere in a page. |
 
 ## Next
 

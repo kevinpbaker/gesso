@@ -1,4 +1,4 @@
-import type { DevtoolsEvent, DevtoolsRequest } from '@gesso/framework';
+import type { DevtoolsEvent, DevtoolsRequest } from 'gesso-framework';
 import type { ActionEntry } from './ActionLog';
 
 /**

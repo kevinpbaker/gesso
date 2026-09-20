@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Button, Column, UiEventType, UiPointerEvent, type UiElement, type UiNode } from '@gesso/core';
+import { Button, Column, UiEventType, UiPointerEvent, type UiElement, type UiNode } from 'gesso-core';
 import { Component } from '../Component';
 import { Define } from '../decorators';
 import { createComponent } from '../createComponent';

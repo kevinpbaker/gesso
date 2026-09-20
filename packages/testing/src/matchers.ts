@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 
-import type { LayoutBox, UiNode, UiRole, UiSemanticState } from '@gesso/core';
+import type { LayoutBox, UiNode, UiRole, UiSemanticState } from 'gesso-core';
 
 import { textProperty } from './queries';
 import { renderedFor } from './registry';
@@ -23,7 +23,7 @@ import { renderedFor } from './registry';
  * Importing this module registers them:
  *
  * ```ts
- * import '@gesso/testing/matchers';
+ * import 'gesso-testing/matchers';
  * ```
  *
  * A separate entry rather than the root barrel, because `expect.extend`

@@ -1,7 +1,7 @@
 import { Observable, Subject, type Subscriber } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Column, measure, Text, UiGraph, UiGraphBuilder, type LayoutBox } from '@gesso/core';
+import { Column, measure, Text, UiGraph, UiGraphBuilder, type LayoutBox } from 'gesso-core';
 
 import { bounds } from './bounds';
 import { ComponentHostResolver } from './ComponentHostResolver';

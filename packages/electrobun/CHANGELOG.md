@@ -1,4 +1,4 @@
-# @gesso/electrobun
+# gesso-electrobun
 
 ## 0.1.0
 

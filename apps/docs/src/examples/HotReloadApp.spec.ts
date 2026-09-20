@@ -1,16 +1,16 @@
 import { map } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Column, Text, type UiChild } from '@gesso/core';
+import { Column, Text, type UiChild } from 'gesso-core';
 import {
   createComponent,
   internalState,
   ServiceRegistry,
   type ComponentContext,
   type InternalState
-} from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+} from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { CounterApp, CounterFeed } from './HotReloadApp';
 

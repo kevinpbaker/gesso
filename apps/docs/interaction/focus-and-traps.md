@@ -60,7 +60,7 @@ const self = new BehaviorSubject<UiNode | null>(null);
 const isFocused = combineLatest([focus.focused, self]).pipe(map(([held, mine]) => mine !== null && held === mine));
 ```
 
-Every control in `@gesso/components` does exactly this, and forwards a
+Every control in `gesso-components` does exactly this, and forwards a
 `ref` prop to the element that _is_ the control rather than to its
 outermost box. That is what makes the next section possible from
 outside the component.
@@ -209,7 +209,7 @@ Options of your own are compared by what they hold, so a ring declared
 inline survives a re-render as long as its options are plain data. See
 [modifiers](/interaction/modifiers).
 
-Every control in `@gesso/components` already carries it. An element of
+Every control in `gesso-components` already carries it. An element of
 your own carries it by name.
 
 ## Limits

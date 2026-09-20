@@ -9,8 +9,8 @@ import {
   type OutletProps,
   RouterOutlet,
   RouterService
-} from '@gesso/framework';
-import type { UiChild } from '@gesso/core';
+} from 'gesso-framework';
+import type { UiChild } from 'gesso-core';
 import { gessoTheme } from './brand';
 import { stillNow } from '../shell/still';
 

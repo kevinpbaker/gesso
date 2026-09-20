@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
-import { TextInput } from '@gesso/components';
-import { internalState, ShellService, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { TextInput } from 'gesso-components';
+import { internalState, ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

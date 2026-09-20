@@ -15,7 +15,7 @@ import {
   sharedElement,
   slideUp,
   type UiNode
-} from '@gesso/core';
+} from 'gesso-core';
 import { internalState } from '../InternalState';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 

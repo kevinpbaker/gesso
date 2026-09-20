@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LayoutBox, UiNode } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import type { LayoutBox, UiNode } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { BANNER_HEIGHT, COVER_SIZE, SharedElementStage } from './SharedElementExample';
 

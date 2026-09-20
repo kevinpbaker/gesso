@@ -9,7 +9,7 @@ import {
   UiInsetRegistry,
   UiManualFrameClock,
   type UiInsets
-} from '@gesso/core';
+} from 'gesso-core';
 
 import { GessoApp } from './GessoApp';
 import { mockCanvas, mountRuntime } from './RuntimeTestUtils';

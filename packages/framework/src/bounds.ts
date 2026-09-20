@@ -1,6 +1,6 @@
 import type { Subject } from 'rxjs';
 
-import { measure, type LayoutBox, type UiModifier } from '@gesso/core';
+import { measure, type LayoutBox, type UiModifier } from 'gesso-core';
 import { InternalState } from './InternalState';
 
 /** A box that has not been laid out yet: the value before the first frame. */

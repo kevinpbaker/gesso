@@ -13,7 +13,7 @@ import {
   type ChannelReplica,
   type RuntimeToShellMessage,
   type ShellToRuntimeMessage
-} from '@gesso/framework';
+} from 'gesso-framework';
 import { createActionLog } from './ActionLog';
 import { inputLabel, tapRenderWorker, type RenderWorkerHost } from './RenderWorkerTap';
 
@@ -28,9 +28,9 @@ interface TickerCommands {
 const Ticker = channel<TickerView, TickerCommands>('ticker', { ticks: 0 });
 
 /**
- * A box, without importing `@gesso/core`.
+ * A box, without importing `gesso-core`.
  *
- * `@gesso/devtools` depends on the framework alone, and a `UiElement`
+ * `gesso-devtools` depends on the framework alone, and a `UiElement`
  * is plain data: core's `Box` builds exactly this object. One element
  * with a listener on it is all the tree this spec needs, and the
  * listener is the point — a command sent from it is sent inside the

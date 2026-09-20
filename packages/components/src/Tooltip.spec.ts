@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createComponent, OverlayService, type ComponentContext } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import { Box, Button, Column, Text, type UiChild } from '@gesso/core';
+import { createComponent, OverlayService, type ComponentContext } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import { Box, Button, Column, Text, type UiChild } from 'gesso-core';
 import { Tooltip, tooltip } from './Tooltip';
 
 /**

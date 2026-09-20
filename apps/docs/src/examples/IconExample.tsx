@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Icon } from '@gesso/components';
-import { type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Icon } from 'gesso-components';
+import { type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region paths
 /**

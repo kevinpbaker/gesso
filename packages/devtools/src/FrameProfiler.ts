@@ -1,4 +1,4 @@
-import { UI_FRAME_PHASES, type FrameMetrics, type UiFramePhase } from '@gesso/framework';
+import { UI_FRAME_PHASES, type FrameMetrics, type UiFramePhase } from 'gesso-framework';
 
 /**
  * The frame profiler: where a frame's time went, over

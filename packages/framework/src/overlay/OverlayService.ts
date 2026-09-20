@@ -1,4 +1,4 @@
-import type { UiChild, UiNode } from '@gesso/core';
+import type { UiChild, UiNode } from 'gesso-core';
 import { internalState } from '../InternalState';
 
 export type OverlayPlacement =

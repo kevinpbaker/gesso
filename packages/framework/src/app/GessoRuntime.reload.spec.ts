@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Column, ScrollView, Text, type UiElement, type UiNode } from '@gesso/core';
+import { Box, Column, ScrollView, Text, type UiElement, type UiNode } from 'gesso-core';
 import { Component } from '../Component';
 import { Define } from '../decorators';
 import { createComponent } from '../createComponent';

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolvePropertyByName, type UiColor } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { resolvePropertyByName, type UiColor } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Counter } from './CounterExample';
 import { exampleRoot } from './ExampleRoot';

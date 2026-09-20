@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { exampleRoot } from './ExampleRoot';
 import { Basket, basketSource, Highlight, StateScreen } from './StateExample';
 

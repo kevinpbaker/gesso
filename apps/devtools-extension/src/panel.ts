@@ -1,4 +1,4 @@
-import { mountDevtoolsPanel } from '@gesso/devtools';
+import { mountDevtoolsPanel } from 'gesso-devtools';
 import { extensionPanelPort } from './extensionPort';
 
 /**

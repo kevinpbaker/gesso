@@ -1,4 +1,4 @@
-import { bumpFontStack, registerFontStack } from '@gesso/core';
+import { bumpFontStack, registerFontStack } from 'gesso-core';
 
 /**
  * One face of a family: where its bytes come from and what it covers.
@@ -53,7 +53,7 @@ export interface FontHost {
  * arrives so that every measurement made with the fallback is thrown
  * away and the tree is laid out again in the face that was meant.
  *
- * The fallback stack is registered with `@gesso/core` at declaration,
+ * The fallback stack is registered with `gesso-core` at declaration,
  * before any face loads, so text names the family alone and draws in
  * the fallback meanwhile, as `font-display: swap` would. When a face
  * arrives the stack is bumped, which changes every font string built

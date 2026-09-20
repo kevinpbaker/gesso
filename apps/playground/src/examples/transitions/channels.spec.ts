@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { serveForTest, type ServedForTest } from '@gesso/testing';
+import { serveForTest, type ServedForTest } from 'gesso-testing';
 
 import type { AudiusApi, AudiusPlaylistResult } from './AudiusApi';
 import { Catalogue } from './Catalogue';

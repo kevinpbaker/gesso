@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/docs",
+  "name": "gesso-docs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,14 +9,14 @@
     "preview": "vitepress preview"
   },
   "dependencies": {
-    "@gesso/components": "workspace:^",
-    "@gesso/core": "workspace:^",
-    "@gesso/framework": "workspace:^",
+    "gesso-components": "workspace:^",
+    "gesso-core": "workspace:^",
+    "gesso-framework": "workspace:^",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@gesso/devtools": "workspace:^",
-    "@gesso/testing": "workspace:^",
+    "gesso-devtools": "workspace:^",
+    "gesso-testing": "workspace:^",
     "vitepress": "2.0.0-alpha.19",
     "vue": "^3.5.42"
   }

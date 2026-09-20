@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/playground",
+  "name": "gesso-playground",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,15 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@gesso/components": "workspace:^",
-    "@gesso/core": "workspace:^",
-    "@gesso/devtools": "workspace:^",
-    "@gesso/framework": "workspace:^",
+    "gesso-components": "workspace:^",
+    "gesso-core": "workspace:^",
+    "gesso-devtools": "workspace:^",
+    "gesso-framework": "workspace:^",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@gesso/testing": "workspace:^",
-    "@gesso/vite-plugin": "workspace:^",
+    "gesso-testing": "workspace:^",
+    "gesso-vite-plugin": "workspace:^",
     "vite": "^8.2.0"
   }
 }

@@ -1,7 +1,7 @@
 import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
 
-import { type InputCell, type ComponentContext, FocusService } from '@gesso/framework';
-import type { UiNode, UiNodeRef } from '@gesso/core';
+import { type InputCell, type ComponentContext, FocusService } from 'gesso-framework';
+import type { UiNode, UiNodeRef } from 'gesso-core';
 
 /**
  * A control's own focus, and a handle on its node.

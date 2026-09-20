@@ -5,7 +5,7 @@ import { Component } from '../../Component';
 import { Define } from '../../decorators';
 import { internalState } from '../../InternalState';
 import { createComponent } from '../../createComponent';
-import { Box, Column, Text, UiInsetRegistry, type CanvasHost } from '@gesso/core';
+import { Box, Column, Text, UiInsetRegistry, type CanvasHost } from 'gesso-core';
 import { RenderWorkerApp } from './renderRoot';
 import { channel } from '../../channel/ChannelToken';
 import type { ComponentContext, Inputs } from '../../FunctionComponent';

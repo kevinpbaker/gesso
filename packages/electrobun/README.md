@@ -1,9 +1,9 @@
-# @gesso/electrobun
+# gesso-electrobun
 
 Run a Gesso application in an [Electrobun](https://electrobun.dev) window, with its stores in the main process.
 
 ```bash
-npm install @gesso/core @gesso/framework @gesso/electrobun rxjs
+npm install gesso-core gesso-framework gesso-electrobun rxjs
 ```
 
 The scaffold writes a working project for you:
@@ -18,17 +18,17 @@ The application layer is a **process** rather than a worker. State lives in the 
 
 ```ts
 // the main process
-import { createDesktopApp } from '@gesso/electrobun/desktop';
+import { createDesktopApp } from 'gesso-electrobun/desktop';
 
 createDesktopApp({ channels: [{ token: Notes, source }] }).open('/');
 ```
 
 ## Entry points
 
-- `@gesso/electrobun` -- the shared vocabulary, including the frame protocol
-- `@gesso/electrobun/main` -- the main process side
-- `@gesso/electrobun/view` -- inside a window
-- `@gesso/electrobun/desktop` -- `createDesktopApp` and `windowsChannel`
+- `gesso-electrobun` -- the shared vocabulary, including the frame protocol
+- `gesso-electrobun/main` -- the main process side
+- `gesso-electrobun/view` -- inside a window
+- `gesso-electrobun/desktop` -- `createDesktopApp` and `windowsChannel`
 
 ## What is checked, and what is not
 

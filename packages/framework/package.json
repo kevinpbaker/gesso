@@ -1,7 +1,7 @@
 {
-  "name": "@gesso/framework",
+  "name": "gesso-framework",
   "version": "0.1.0",
-  "description": "Components, stores, the frame runtime and the worker barrier over @gesso/core.",
+  "description": "Components, stores, the frame runtime and the worker barrier over gesso-core.",
   "license": "MIT",
   "author": "Kevin Baker",
   "homepage": "https://github.com/kevinpbaker/gesso#readme",
@@ -64,7 +64,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@gesso/core": "workspace:^"
+    "gesso-core": "workspace:^"
   },
   "peerDependencies": {
     "rxjs": "^7.8.2"

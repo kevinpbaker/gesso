@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Text } from '@gesso/core';
+import { Text } from 'gesso-core';
 
 import { createComponent } from '../createComponent';
 import type { ComponentContext } from '../FunctionComponent';

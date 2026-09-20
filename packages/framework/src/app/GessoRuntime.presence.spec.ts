@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, Text, fade, linear, percent, sharedElement, slideUp, type UiNode } from '@gesso/core';
+import { Box, Column, Text, fade, linear, percent, sharedElement, slideUp, type UiNode } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import { internalState } from '../InternalState';
 import { Presence } from '../Presence';

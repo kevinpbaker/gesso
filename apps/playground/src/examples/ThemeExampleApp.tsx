@@ -1,7 +1,7 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
+import { type ComponentContext, type Inputs, internalState } from 'gesso-framework';
 import { AppearanceChannel, type AppearanceCommands } from './theme/ThemeContract';
 import {
   type UiChild,
@@ -17,7 +17,7 @@ import {
   parseColor,
   type UiColor,
   type UiTextStyle
-} from '@gesso/core';
+} from 'gesso-core';
 import { stillNow } from '../shell/still';
 
 /**

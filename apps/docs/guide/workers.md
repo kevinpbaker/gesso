@@ -219,7 +219,7 @@ application layer costs the thread it runs on is a different question,
 and it is the one that would decide where to put yours.
 
 **The example above is checked without a browser.** Its spec mounts the
-same component with `@gesso/testing`, in a runtime with no DOM, and
+same component with `gesso-testing`, in a runtime with no DOM, and
 asserts the four claims the page makes about it: that the component runs
 where there is no `document`, that typed text reaches it through the
 editing path a shell forwards on, that the copy button issues a

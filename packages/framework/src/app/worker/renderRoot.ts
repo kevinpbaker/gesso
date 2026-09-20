@@ -10,7 +10,7 @@ import {
 } from '../../channel/createChannelRegistry';
 import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
-import { UiHostFrameClock } from '@gesso/core';
+import { UiHostFrameClock } from 'gesso-core';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { MediaOptions } from '../MediaService';

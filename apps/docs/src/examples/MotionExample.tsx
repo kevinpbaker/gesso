@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { animateLayout, percent, spring, type UiChild } from '@gesso/core';
-import { AnimationService, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { animateLayout, percent, spring, type UiChild } from 'gesso-core';
+import { AnimationService, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 const FOLDERS = ['Inbox', 'Drafts', 'Sent', 'Archive'] as const;

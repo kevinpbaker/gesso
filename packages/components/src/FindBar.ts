@@ -1,6 +1,6 @@
 import { combineLatest, map } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FindService, internalState } from '@gesso/framework';
+import { input, type ComponentContext, type Inputs, FindService, internalState } from 'gesso-framework';
 import {
   Button,
   EditableText,
@@ -10,7 +10,7 @@ import {
   type UiNode,
   type UiKeyboardEvent,
   type UiTextChangeEvent
-} from '@gesso/core';
+} from 'gesso-core';
 import { CONTROL_FOCUS_RING, keymap } from './internals';
 import { trackFocus } from './focus';
 

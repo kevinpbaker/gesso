@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { createPaintState, resolvePaintState, UiEnvironmentKeys, type UiNode } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createPaintState, resolvePaintState, UiEnvironmentKeys, type UiNode } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { APP_THEMES, SCOPED_THEME, Themes, type DocsColors } from './ThemesExample';
 

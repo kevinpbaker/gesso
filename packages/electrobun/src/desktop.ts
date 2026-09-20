@@ -32,7 +32,7 @@
  * window is a replica of the same channels, so two windows agree by
  * construction rather than by synchronisation.
  */
-import { channel, type ChannelToken, type ServedChannel } from '@gesso/framework';
+import { channel, type ChannelToken, type ServedChannel } from 'gesso-framework';
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 
 import type { GessoFrame } from './frames';

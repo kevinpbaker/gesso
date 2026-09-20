@@ -17,7 +17,7 @@ import {
   type EditingState,
   type CanvasHost,
   UiManualFrameClock
-} from '@gesso/core';
+} from 'gesso-core';
 import { GessoRuntime } from './GessoRuntime';
 
 /** 7px per character, so caret x is 7 × offset in the default 14px font. */

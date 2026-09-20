@@ -1,10 +1,10 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Select, type SelectOption } from '@gesso/components';
-import { OverlayService, createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { Select, type SelectOption } from 'gesso-components';
+import { OverlayService, createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Checkout } from './SelectExample';
 

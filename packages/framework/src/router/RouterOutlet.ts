@@ -1,6 +1,6 @@
 import { distinctUntilChanged, map, type Observable } from 'rxjs';
 
-import type { MotionStateInput, MotionTiming, UiChild } from '@gesso/core';
+import type { MotionStateInput, MotionTiming, UiChild } from 'gesso-core';
 import { Component } from '../Component';
 import { createComponent } from '../createComponent';
 import { Define, Inject, Input } from '../decorators';
@@ -82,7 +82,7 @@ export interface RouteTransition {
  * `Presence`, which keeps the departing screen mounted until its exit
  * animation is over. That is the only reason a screen transition needs
  * anything from the router at all — the animation itself is
- * `@gesso/core`'s `motion`, and a shared-element morph across the
+ * `gesso-core`'s `motion`, and a shared-element morph across the
  * change is `sharedElement`, which the outlet knows nothing about.
  */
 @Define('gesso-router-outlet')

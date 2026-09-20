@@ -9,7 +9,7 @@ import {
   type UiNodeRef,
   type UiSemanticState,
   type UiTypographyRole
-} from '@gesso/core';
+} from 'gesso-core';
 
 import { of } from 'rxjs';
 
@@ -21,7 +21,7 @@ import {
   type ComponentContext,
   type ControlledValue,
   type Inputs
-} from '@gesso/framework';
+} from 'gesso-framework';
 import { trackFocus } from './focus';
 import { CONTROL_FOCUS_RING, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import { Icon } from './Media';

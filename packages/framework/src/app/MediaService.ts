@@ -4,7 +4,7 @@ import {
   type ImageResolver,
   type VideoResolver,
   IconRasterizer
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * What an application hands a runtime so its pictures come from

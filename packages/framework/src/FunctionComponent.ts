@@ -1,6 +1,6 @@
 import type { Observable, Subscription } from 'rxjs';
 
-import type { Reactive, UiChild } from '@gesso/core';
+import type { Reactive, UiChild } from 'gesso-core';
 import type { BoundsCell } from './bounds';
 import { Component } from './Component';
 import type { InputCell, OutputTarget } from './Input';

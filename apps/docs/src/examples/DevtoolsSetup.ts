@@ -1,4 +1,4 @@
-import { createApp } from '@gesso/framework';
+import { createApp } from 'gesso-framework';
 import {
   connectDevtools,
   createActionLog,
@@ -6,10 +6,10 @@ import {
   mountErrorOverlay,
   mountFrameProfiler,
   mountNodeInspector
-} from '@gesso/devtools';
+} from 'gesso-devtools';
 
 /**
- * Every tool in `@gesso/devtools`, wired to one application.
+ * Every tool in `gesso-devtools`, wired to one application.
  *
  * The docs quote this file rather than retyping it, so the calls on
  * this page cannot drift from the ones that compile.

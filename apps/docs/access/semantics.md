@@ -69,7 +69,7 @@ Two element types carry a role without being asked: a `<button>` is a
 `button` and an `<editabletext>` is a `textbox`. That is what makes
 "every component emits semantics" achievable rather than aspirational,
 and it is why the Save button in the example declares nothing at all.
-Everything from `@gesso/components` declares its own, so a screen built
+Everything from `gesso-components` declares its own, so a screen built
 from the library is described before you write a line: see the
 [Semantics](/components/checkbox#semantics) section on any component
 page for what each one emits.

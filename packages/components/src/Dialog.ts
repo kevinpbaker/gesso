@@ -8,8 +8,8 @@ import {
   AnimationService,
   FocusService,
   internalState
-} from '@gesso/framework';
-import { Box, Column, Row, Text, type UiChild, type UiNode } from '@gesso/core';
+} from 'gesso-framework';
+import { Box, Column, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { keymap } from './internals';
 import { controlTokens } from './tokens';
 import { useOverlay } from './overlay';

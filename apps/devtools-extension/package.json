@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/devtools-extension",
+  "name": "gesso-devtools-extension",
   "version": "0.0.0",
   "private": true,
   "description": "The Gesso panel in Chrome devtools: the tree, a node's report, the workers' consoles, the frame profiler and the action log of the Gesso application in the inspected page.",
@@ -8,8 +8,8 @@
     "build": "tsdown"
   },
   "dependencies": {
-    "@gesso/devtools": "workspace:^",
-    "@gesso/framework": "workspace:^"
+    "gesso-devtools": "workspace:^",
+    "gesso-framework": "workspace:^"
   },
   "devDependencies": {
     "@types/chrome": "^0.2.8"

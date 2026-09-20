@@ -1,4 +1,4 @@
-import type { RuntimeErrorSource } from '@gesso/framework';
+import type { RuntimeErrorSource } from 'gesso-framework';
 import { codeFrame, type CodeFrame } from './codeFrame';
 import { SourceMapStore } from './sourceMap';
 import { formatFrame, mapStack, parseStack, primaryFrame, type StackFrame } from './stackTrace';

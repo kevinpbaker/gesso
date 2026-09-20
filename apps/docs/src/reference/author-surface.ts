@@ -2,7 +2,7 @@
  * The author-facing slice of the public API, curated by hand.
  *
  * `packages/*\/api/*.api.d.ts` is the honest record of what each package
- * exports, but it is the whole surface: 883 names for `@gesso/core`
+ * exports, but it is the whole surface: 883 names for `gesso-core`
  * alone, most of them internal machinery an application never types.
  * An index a reader can use needs a shorter list, and something has to
  * decide what belongs on it.
@@ -14,7 +14,7 @@
  * author-facing entry point, this file becomes its test rather than its
  * replacement.
  *
- * The seed was mechanical: every name imported from `@gesso/*` anywhere
+ * The seed was mechanical: every name imported from a `gesso-*` package anywhere
  * under `apps/docs`, in a page, an example, or the site's own theme
  * components. That is 151 names. One more was added by hand,
  * `WorkerAppOptions`, because it is the argument `createApp` takes and
@@ -116,7 +116,7 @@ export const AUTHOR_SURFACE_GROUPS: readonly AuthorSurfaceGroup[] = [
   },
   {
     title: 'Components',
-    blurb: 'Everything `@gesso/components` exports that a page documents, with the option types they take.'
+    blurb: 'Everything `gesso-components` exports that a page documents, with the option types they take.'
   },
   {
     title: 'Testing',

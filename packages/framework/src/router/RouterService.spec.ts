@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Text } from '@gesso/core';
+import { Text } from 'gesso-core';
 import { createShellHistory } from '../app/shellHistory';
 import { route, to, type RouteDefinition } from './RouteDefinition';
 import { RouterService } from './RouterService';

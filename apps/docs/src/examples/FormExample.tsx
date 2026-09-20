@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Button, Checkbox, email, field, form, required, Select, TextInput } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Button, Checkbox, email, field, form, required, Select, TextInput } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 const PLANS = [
   { value: 'free', label: 'Free' },

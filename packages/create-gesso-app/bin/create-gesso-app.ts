@@ -8,7 +8,7 @@
  * whole of the main thread's job.
  *
  * The one thing this CLI does that a public scaffolder would not is
- * vendor its own dependencies. No `@gesso/*` package is on a registry,
+ * vendor its own dependencies. No `gesso-*` package is on a registry,
  * so a generated `package.json` that named a version would produce a
  * project that cannot install. Instead the CLI packs the packages a
  * template needs out of this workspace with `pnpm pack`, drops the
@@ -282,7 +282,7 @@ function vendorPackages(options: Options, template: Template): Map<string, strin
     if (created.length !== 1) {
       fail(`pnpm pack in packages/${pkg} produced ${created.length} tarballs, expected 1.`);
     }
-    specifiers.set(`@gesso/${pkg}`, `file:${VENDOR_DIR}/${created[0]}`);
+    specifiers.set(`gesso-${pkg}`, `file:${VENDOR_DIR}/${created[0]}`);
   }
   return specifiers;
 }
@@ -305,9 +305,9 @@ function copyTemplate(from: string, options: Options): void {
  * Writes the project's name and its dependency specifiers.
  *
  * `overrides` carries the same specifiers, because the packages declare
- * each other by version range: `@gesso/framework` and
- * `@gesso/components` do, and so does `@gesso/electrobun`. Without it an
- * installer is free to go looking for `@gesso/core@^0.1.0` on a registry
+ * each other by version range: `gesso-framework` and
+ * `gesso-components` do, and so does `gesso-electrobun`. Without it an
+ * installer is free to go looking for `gesso-core@^0.1.0` on a registry
  * that has never heard of it, and whether it does so depends on what
  * else is in the tree.
  */
@@ -344,8 +344,8 @@ function writeManifest(options: Options, specifiers: ReadonlyMap<string, string>
  *
  * npm was chosen because pnpm did not work, and the reason is still
  * exactly right: `pnpm pack` rewrites `workspace:^`
- * into `^0.1.0`, so the packed `@gesso/framework` asks for
- * `@gesso/core@^0.1.0` and pnpm 11 goes to a registry that has never
+ * into `^0.1.0`, so the packed `gesso-framework` asks for
+ * `gesso-core@^0.1.0` and pnpm 11 goes to a registry that has never
  * heard of it. What that record then rejected was shipping a
  * `pnpm-workspace.yaml` in a project that is not a workspace.
  *
@@ -359,7 +359,7 @@ function writePnpmOverrides(options: Options, specifiers: ReadonlyMap<string, st
   const lines = [
     '# The tarballs in vendor/ again, for pnpm.',
     '#',
-    '# Gesso is not published, so the packed @gesso/* packages ask each',
+    '# Gesso is not published, so the packed gesso-* packages ask each',
     '# other for version ranges no registry can answer. npm reads the',
     '# `overrides` in package.json; pnpm 11 reads only this file. Both',
     '# go away when the packages are on a registry: delete vendor/, this',

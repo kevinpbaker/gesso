@@ -1,5 +1,5 @@
-import { mountErrorOverlay } from '@gesso/devtools';
-import { createApp } from '@gesso/framework';
+import { mountErrorOverlay } from 'gesso-devtools';
+import { createApp } from 'gesso-framework';
 import { createElement } from '../shell/dom';
 import { connectRouteDevtools } from '../shell/devtools';
 import { workerName } from '../shell/still';

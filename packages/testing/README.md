@@ -1,15 +1,15 @@
-# @gesso/testing
+# gesso-testing
 
 Mount a component with no browser, query it the way a screen reader would, and read back why a box is the size it is.
 
 ```bash
-npm install --save-dev @gesso/testing
+npm install --save-dev gesso-testing
 ```
 
 ```ts
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 it('calls back on a press, and not while disabled', () => {
   const presses: number[] = [];
@@ -33,8 +33,8 @@ A `toHaveBox` that misses prints `explain`'s answer underneath it, so a failed a
 
 ## Entry points
 
-- `@gesso/testing` -- `renderTest` and its queries
-- `@gesso/testing/matchers` -- registers the matchers with Vitest
+- `gesso-testing` -- `renderTest` and its queries
+- `gesso-testing/matchers` -- registers the matchers with Vitest
 
 `vitest` is an optional peer: the matchers need it, the renderer does not.
 

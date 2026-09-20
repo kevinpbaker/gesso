@@ -27,7 +27,7 @@ import { trackRead } from './Input';
  * It is not only for components. The thread that owns a channel's data
  * writes cells too, and wrote them as a `BehaviorSubject` mirrored
  * into an `asObservable()` because this was reachable only through the
- * framework's main entry. `@gesso/framework/worker` is the same cell
+ * framework's main entry. `gesso-framework/worker` is the same cell
  * with none of the renderer behind it, so an application worker holds
  * one cell rather than a subject and a copy of it, and reads it with
  * `.value` in a `computed` rather than listing it in a

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { UiNodeType, type LayoutBox, type UiNode } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { UiNodeType, type LayoutBox, type UiNode } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Anchored } from './PositionExample';
 

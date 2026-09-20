@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { ClipResolver, Player } from './VideoExample';
 import { exampleRoot } from './ExampleRoot';
 

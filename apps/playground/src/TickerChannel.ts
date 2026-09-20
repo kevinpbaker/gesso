@@ -1,4 +1,4 @@
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 
 /**
  * The barrier contract for the playground's ticker.

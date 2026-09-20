@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
-import { Column, Text, UiManualFrameClock, UiNodeType, type UiNode } from '@gesso/core';
+import { Column, Text, UiManualFrameClock, UiNodeType, type UiNode } from 'gesso-core';
 
 import { GessoRuntime } from './app/GessoRuntime';
 import { mockCanvas } from './app/RuntimeTestUtils';

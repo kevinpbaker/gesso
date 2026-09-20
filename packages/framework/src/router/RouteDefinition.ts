@@ -1,4 +1,4 @@
-import type { UiChild } from '@gesso/core';
+import type { UiChild } from 'gesso-core';
 import type { ComponentType } from '../FunctionComponent';
 import { parsePattern, type HasNoParams, type PatternSegment, type RouteParams } from './RoutePath';
 

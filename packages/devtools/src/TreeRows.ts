@@ -1,4 +1,4 @@
-import type { UiTreeNode } from '@gesso/framework';
+import type { UiTreeNode } from 'gesso-framework';
 
 /**
  * A tree snapshot as the rows a panel draws.

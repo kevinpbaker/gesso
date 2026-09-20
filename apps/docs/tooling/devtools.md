@@ -1,5 +1,5 @@
 ---
-description: What @gesso/devtools gives you, how each tool is mounted, and why they are DOM over the canvas rather than drawn inside it.
+description: What gesso-devtools gives you, how each tool is mounted, and why they are DOM over the canvas rather than drawn inside it.
 ---
 
 # Devtools
@@ -7,7 +7,7 @@ description: What @gesso/devtools gives you, how each tool is mounted, and why t
 A canvas application is opaque to the browser. The elements panel shows
 one `<canvas>`, breakpoints land in a worker whose console the page
 cannot read, and an exception leaves the last good frame on screen
-looking like nothing happened. `@gesso/devtools` is four tools that
+looking like nothing happened. `gesso-devtools` is four tools that
 answer the questions the browser's own would have answered, and a fifth
 that puts the answers where a developer already looks.
 
@@ -99,14 +99,14 @@ The honest arrangement is the one every bundler already supports:
 
 ```ts
 if (import.meta.env.DEV) {
-  const { mountErrorOverlay } = await import('@gesso/devtools');
+  const { mountErrorOverlay } = await import('gesso-devtools');
   // ...
 }
 ```
 
 A dynamic import inside a `DEV` branch leaves the package out of the
 production bundle entirely, and it is what
-[`@gesso/vite-plugin`](/tooling/vite-plugin) emits for the overlay if
+[`gesso-vite-plugin`](/tooling/vite-plugin) emits for the overlay if
 you let it. What a shipped build should do with the reports instead is
 [reporting errors](/tooling/reporting-errors).
 

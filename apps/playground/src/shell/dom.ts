@@ -8,7 +8,7 @@
  * document when the incoming one looks up its own elements.
  */
 
-import { prepareInputSurface } from '@gesso/core';
+import { prepareInputSurface } from 'gesso-core';
 
 /**
  * Finds a required descendant, throwing a located error if it is

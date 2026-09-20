@@ -26,7 +26,7 @@ pnpm create:app ../my-app
 ```text
 index.html          a host element with a size, and nothing else
 tsconfig.json       bundler resolution, and the two lines that buy JSX
-vite.config.ts      one plugin: @gesso/vite-plugin
+vite.config.ts      one plugin: gesso-vite-plugin
 pnpm-workspace.yaml the vendored tarballs again, for pnpm
 src/main.ts         the main thread: create the app, mount into #app
 src/worker.ts       the render worker: name the root component
@@ -43,7 +43,7 @@ const app = createApp();
 app.mount(document.querySelector('#app')!);
 ```
 
-[`@gesso/vite-plugin`](/tooling/vite-plugin) finds `worker.ts` beside
+[`gesso-vite-plugin`](/tooling/vite-plugin) finds `worker.ts` beside
 it and writes the construction, which has to appear literally as `new
 Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })`: a
 bundler recognises that shape statically and emits a chunk for it, and
@@ -65,7 +65,7 @@ zero-height element paints nothing, and there is no error for it.
 **`tsconfig.json` carries the two lines that buy JSX:**
 
 ```json
-{ "jsx": "react-jsx", "jsxImportSource": "@gesso/framework" }
+{ "jsx": "react-jsx", "jsxImportSource": "gesso-framework" }
 ```
 
 JSX compiles onto `createElement` and adds nothing at run time, so
@@ -75,9 +75,9 @@ site are written in.
 ## Why the packages are vendored
 
 Gesso is not published. A template with a version range would scaffold
-a project that cannot install, so the CLI packs `@gesso/core`,
-`@gesso/framework`, `@gesso/components`, `@gesso/devtools` and
-`@gesso/vite-plugin` into the project's `vendor/` and writes `file:`
+a project that cannot install, so the CLI packs `gesso-core`,
+`gesso-framework`, `gesso-components`, `gesso-devtools` and
+`gesso-vite-plugin` into the project's `vendor/` and writes `file:`
 specifiers pointing at them. The last two are development dependencies:
 the plugin writes the wiring, and it loads the overlay from devtools the
 first time the render worker throws.

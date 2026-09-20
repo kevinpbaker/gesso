@@ -10,7 +10,7 @@ hand on each one. Two helpers cover it: `resource` for a request, and
 `mutate` for a write. Neither is required, and the last section says
 what an application that wants none of it keeps.
 
-Both live in `@gesso/framework/worker`, the entry an application
+Both live in `gesso-framework/worker`, the entry an application
 worker imports. It carries the cells, the barrier and these two
 helpers, and none of the runtime, the components or the renderers, so
 importing it in a data layer costs nothing and leaves that layer
@@ -44,7 +44,7 @@ screen that cares makes it.
 ## The request
 
 ```ts
-import { internalState, resource } from '@gesso/framework/worker';
+import { internalState, resource } from 'gesso-framework/worker';
 
 export class Pages {
   private readonly ref = internalState<PageRef | null>(null);
@@ -115,7 +115,7 @@ a message is what a screen shows and what crosses the barrier.
 ## An optimistic like
 
 ```ts
-import { internalState, mutate } from '@gesso/framework/worker';
+import { internalState, mutate } from 'gesso-framework/worker';
 
 const toggled = (list: readonly string[], id: string): readonly string[] =>
   list.includes(id) ? list.filter(entry => entry !== id) : [...list, id];

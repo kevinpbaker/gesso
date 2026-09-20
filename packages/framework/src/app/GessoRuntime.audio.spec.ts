@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Box, Column } from '@gesso/core';
+import { Box, Column } from 'gesso-core';
 import { AudioService, type AudioRequest, type AudioSample, type AudioState } from './AudioService';
 import { mountRuntime } from './RuntimeTestUtils';
 import { epochNow } from './worker/RenderWorkerProtocol';

@@ -7,7 +7,7 @@ description: What a shipped Gesso application does with a failure the overlay wo
 The [error overlay](/structure/errors-and-the-overlay) is a development
 tool, and [the plugin](/tooling/vite-plugin) wires it in only while the
 dev server is running. A production build contains no reference to
-`@gesso/devtools` at all.
+`gesso-devtools` at all.
 
 That leaves a question a shipped application has to answer, and the
 answer is one function. `onError` is the whole of it, in both
@@ -54,7 +54,7 @@ true. A `listener` report is a bug like any other.
 
 A stack from a production bundle names a minified chunk with a
 five-figure line number, and it is useless without the map. Every
-`@gesso/*` package ships one beside its `dist`, and your own build
+`gesso-*` package ships one beside its `dist`, and your own build
 should too:
 
 ```ts
@@ -69,7 +69,7 @@ your reports is your call; what matters is that they exist, because they
 cannot be reconstructed afterwards.
 
 Bear one thing in mind when you look at a mapped frame: it may be two
-maps deep. A frame inside `@gesso/framework` maps first into the
+maps deep. A frame inside `gesso-framework` maps first into the
 package's own `dist/index.js`, and only then into the TypeScript
 somebody wrote, because a bundler's map of a dependency does not chain
 to the map that dependency shipped. The overlay follows the chain;

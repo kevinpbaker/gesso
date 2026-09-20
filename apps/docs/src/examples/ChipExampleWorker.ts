@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Filters } from './ChipExample';
 import { exampleRoot } from './ExampleRoot';
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
-import { Text, type UiNode } from '@gesso/core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
+import { Text, type UiNode } from 'gesso-core';
 import { Button } from './Button';
 
 function mount(root: Parameters<typeof renderTest>[0]) {

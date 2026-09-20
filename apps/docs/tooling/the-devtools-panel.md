@@ -64,7 +64,7 @@ shows it in a pane under the preview, and how a page without the
 extension can still have it:
 
 ```ts
-import { createDirectPorts, getDevtoolsHook, mountDevtoolsPanel } from '@gesso/devtools';
+import { createDirectPorts, getDevtoolsHook, mountDevtoolsPanel } from 'gesso-devtools';
 
 const { page, panel } = createDirectPorts();
 const detach = getDevtoolsHook().attach(page);
@@ -83,7 +83,7 @@ guarantees they show the same thing.
 
 Everything the panel shows is built where the tree is, in the render
 worker, and crosses as plain data. `DevtoolsRequest` and `DevtoolsEvent`
-in `@gesso/framework` are the vocabulary: a panel asks for the tree, a
+in `gesso-framework` are the vocabulary: a panel asks for the tree, a
 node's report, an outline, frames or the consoles, and the runtime
 answers and keeps answering while something is watched. A worker shell
 carries them over the render worker protocol; a same-thread shell

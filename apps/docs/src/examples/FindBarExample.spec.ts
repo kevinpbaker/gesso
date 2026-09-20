@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent, FindService } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createComponent, FindService } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Searchable } from './FindBarExample';
 

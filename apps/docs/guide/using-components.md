@@ -1,10 +1,10 @@
 ---
-description: Building a form from @gesso/components, what each control brings with it, and what stays your job.
+description: Building a form from gesso-components, what each control brings with it, and what stays your job.
 ---
 
 # Using components
 
-`@gesso/components` is the library you build screens out of: inputs,
+`gesso-components` is the library you build screens out of: inputs,
 overlays, structure, data and media, twenty-eight components in all.
 Every one of them is themed, keyboard operable, and announces itself to
 an assistive technology from the day it was written.
@@ -110,7 +110,7 @@ a colour prop on the control.
 
 The library is not a wall. A component is an ordinary function returning
 elements, so anything the library does you can do with the same
-materials: `interactive()` and `focusRing()` come from `@gesso/core`,
+materials: `interactive()` and `focusRing()` come from `gesso-core`,
 and the library's own controls are built out of exactly those two.
 
 The rule worth keeping is the one the library follows: emit `role`,

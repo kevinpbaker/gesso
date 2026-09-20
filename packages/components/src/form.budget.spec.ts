@@ -1,7 +1,7 @@
 import { Subscription } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { FocusService, type ComponentContext } from '@gesso/framework';
+import { FocusService, type ComponentContext } from 'gesso-framework';
 
 import { field, fieldArray, form } from './form';
 import { required, type Validator } from './validate';

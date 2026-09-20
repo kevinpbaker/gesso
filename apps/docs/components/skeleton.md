@@ -207,7 +207,7 @@ environment](/appearance/themes-and-the-environment) describes.
 
 ## What this page was checked against
 
-`Skeleton.spec.ts` mounts both components with `@gesso/testing` and
+`Skeleton.spec.ts` mounts both components with `gesso-testing` and
 asserts that the default starts no animation at all and writes no
 opacity, that a caller's width and height reach the box, that a circle
 given one measurement is square, that `shimmer` moves the opacity

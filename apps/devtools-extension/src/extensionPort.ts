@@ -1,4 +1,4 @@
-import type { PageMessage, PanelMessage, PanelPort } from '@gesso/devtools';
+import type { PageMessage, PanelMessage, PanelPort } from 'gesso-devtools';
 import { PANEL_PORT, type FromPanel, type ToPanel } from './relay';
 
 /**

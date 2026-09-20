@@ -180,7 +180,7 @@ canvas.
 
 **The specs on this page stand at the seam**, driving the update a
 mirror is handed and the action it sends back. The DOM writing itself
-is covered by `SemanticsMirror.spec.ts` in `@gesso/framework`, against
+is covered by `SemanticsMirror.spec.ts` in `gesso-framework`, against
 a DOM double, because the test suite runs in Node with no document in
 it.
 

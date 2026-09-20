@@ -7,10 +7,10 @@ import {
   type ComponentContext,
   type Inputs,
   type ReadableCell
-} from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
-import { Column, type UiChild } from '@gesso/core';
+} from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
+import { Column, type UiChild } from 'gesso-core';
 
 import { Button } from './Button';
 import { Checkbox } from './Checkbox';

@@ -32,7 +32,7 @@ An application is three files across three threads, joined by one shared module 
 
 ```ts
 // notes.contract.ts: the only module both workers import
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 
 export interface NotesView {
   readonly rows: readonly NoteRow[];
@@ -51,7 +51,7 @@ export const Notes = channel<NotesView, NotesCommands>('notes', { rows: [], open
 
 ```ts
 // notes.app.worker.ts: your application. Plain classes, plain RxJS.
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 
 const repository = new OpfsNotesRepository(SEED_NOTES);
 const domain = new NotesDomain(repository);
@@ -76,7 +76,7 @@ Above `serveChannels` there is no framework import in that file's dependency gra
 
 ```tsx
 // notes.render.worker.ts: everything the user sees
-import { renderRoot, internalState } from '@gesso/framework';
+import { renderRoot, internalState } from 'gesso-framework';
 
 function NotesApp(props, ctx) {
   const notes = ctx.channel(Notes);
@@ -136,7 +136,7 @@ The documentation site under [`apps/docs`](apps/docs) is the reference. This is 
 | **Typed authoring**          | Every factory is typed from the property registry, so a prop's type is by construction the type layout and paint read. `Row({ y: 'middle' })` is a compile error. Components are classes or functions; JSX is optional and compiles to the same calls with the same types.                                                                                                                                                                  | [Your first component](apps/docs/guide/counter.md) · [Components run once](apps/docs/guide/components-run-once.md) · [Cells and bindings](apps/docs/guide/cells-and-bindings.md)            |
 | **Components**               | Five tiers, one contract: controlled by default with an optional `defaultX`, themed through `UiTheme` tokens with no colour props, keyboard operable from a keymap that is data, and emitting semantics from the day it was written. Inputs, overlays, structure, data and media.                                                                                                                                                           | [Components](apps/docs/components/index.md) · [Forms](apps/docs/guide/forms.md)                                                                                                             |
 | **Semantics**                | Nodes carry `role`, `label`, `value` and `states`, or inherit them from the component that built them. The runtime diffs a semantics tree per frame and mirrors it to the platform's accessibility API. An unknown `role` fails the build.                                                                                                                                                                                                  | [Semantics](apps/docs/access/semantics.md) · [The mirror](apps/docs/access/the-mirror.md) · [Keyboard](apps/docs/access/keyboard.md)                                                        |
-| **Testing**                  | `@gesso/testing` mounts a tree on a manual clock over a canvas double and queries it through the same semantics tree a screen reader gets. A `toHaveBox` that misses prints `explain`'s answer under it.                                                                                                                                                                                                                                    | [Testing](apps/docs/guide/testing.md)                                                                                                                                                       |
+| **Testing**                  | `gesso-testing` mounts a tree on a manual clock over a canvas double and queries it through the same semantics tree a screen reader gets. A `toHaveBox` that misses prints `explain`'s answer under it.                                                                                                                                                                                                                                     | [Testing](apps/docs/guide/testing.md)                                                                                                                                                       |
 | **Routing**                  | Routes declare full paths and a `parent`, so params are typed from the path and a misspelled one is a compile error. One outlet renders the matched chain; guards run outermost first; the only thing on the wire is a url.                                                                                                                                                                                                                 | [Routing](apps/docs/structure/routing.md)                                                                                                                                                   |
 | **Modifiers**                | Extend what an element _does_ (hover, press, focus rings, tooltips, drag, measurement) without wrapping it in a component. The analogue is Compose's `Modifier.Node` or Svelte's `use:action`.                                                                                                                                                                                                                                              | [Modifiers](apps/docs/interaction/modifiers.md) · [Writing a modifier](apps/docs/interaction/writing-a-modifier.md)                                                                         |
 | **Animation & transitions**  | `animate` and `spring` on cells, declarative `transition` on elements, FLIP between boxes on reorder, enter and exit, and shared elements that morph across routes. An idle app reports `ticks 0.00`. Reduced motion arrives from the shell and everything but spinners snaps under it.                                                                                                                                                     | [Motion](apps/docs/appearance/motion.md) · [Enter and exit](apps/docs/appearance/enter-and-exit.md) · [Shared elements](apps/docs/appearance/shared-elements.md)                            |
@@ -144,8 +144,8 @@ The documentation site under [`apps/docs`](apps/docs) is the reference. This is 
 | **Input**                    | Pointer, wheel, keyboard, focus, gestures and hit-testing run in the render worker against the painted boxes. Event props are declarative and reconciled with the node, so a handler can never outlive its element.                                                                                                                                                                                                                         | [Pointer and keyboard](apps/docs/interaction/pointer-and-keyboard.md) · [Gestures](apps/docs/interaction/touch-and-gestures.md) · [Drag and drop](apps/docs/interaction/drag-and-drop.md)   |
 | **Two renderers**            | `Canvas2DRenderer` and `WebGPURenderer` implement one `UiRenderer` interface. The WebGPU backend builds a single ordered command list in Canvas2D's exact sequence. The framework picks at runtime; nothing above the renderer knows which one it got.                                                                                                                                                                                      | [Canvas2D and WebGPU](apps/docs/rendering/canvas2d-and-webgpu.md)                                                                                                                           |
 | **Themes**                   | `UiEnvironment` carries typed, scoped, reactive values down the tree, and a theme change dirties exactly the nodes that read it. A motion vocabulary sits beside the theme rather than inside it.                                                                                                                                                                                                                                           | [Themes and the environment](apps/docs/appearance/themes-and-the-environment.md) · [Light and dark](apps/docs/guide/appearance.md)                                                          |
-| **Devtools**                 | A canvas app that throws leaves its last good frame on screen, looking exactly like one that works. `@gesso/devtools` draws the error over the app with source-mapped stacks, and a Chrome devtools panel shows the tree, a node's report, the workers' consoles, the frame profiler and the action log.                                                                                                                                    | [Devtools](apps/docs/tooling/devtools.md) · [Errors and the overlay](apps/docs/structure/errors-and-the-overlay.md) · [Frames and phases](apps/docs/tooling/frames-and-phases.md)           |
-| **Desktop**                  | `@gesso/electrobun` runs an application in a native window with its stores in the main process. The scaffold has a template for it.                                                                                                                                                                                                                                                                                                         | [Gesso on Electrobun](apps/docs/structure/gesso-on-electrobun.md) · [Desktop windows](apps/docs/structure/desktop-windows.md)                                                               |
+| **Devtools**                 | A canvas app that throws leaves its last good frame on screen, looking exactly like one that works. `gesso-devtools` draws the error over the app with source-mapped stacks, and a Chrome devtools panel shows the tree, a node's report, the workers' consoles, the frame profiler and the action log.                                                                                                                                     | [Devtools](apps/docs/tooling/devtools.md) · [Errors and the overlay](apps/docs/structure/errors-and-the-overlay.md) · [Frames and phases](apps/docs/tooling/frames-and-phases.md)           |
+| **Desktop**                  | `gesso-electrobun` runs an application in a native window with its stores in the main process. The scaffold has a template for it.                                                                                                                                                                                                                                                                                                          | [Gesso on Electrobun](apps/docs/structure/gesso-on-electrobun.md) · [Desktop windows](apps/docs/structure/desktop-windows.md)                                                               |
 
 ## Proof, not promises
 
@@ -162,7 +162,7 @@ The documentation site under [`apps/docs`](apps/docs) is the reference. This is 
 | The published packages work             | Every package is packed to a tarball, installed with npm into a fresh Vite project, typechecked against the rolled-up declarations with `skipLibCheck: false`, built, and clicked in Chrome                                                                    | `pnpm check:install`                                     |
 | The scaffold produces a working app     | `create-gesso-app` runs into a temporary directory; the result is installed, typechecked, built, and its dev server is driven in headless Chrome until the counter counts. Both templates                                                                      | `pnpm check:scaffold` · `pnpm check:scaffold:electrobun` |
 | The public surface is reviewed          | Each package's exported declarations are committed as `packages/*/api/*.api.d.ts`; an added export fails the check as an added line                                                                                                                            | `pnpm api:check`                                         |
-| Every control works from the keyboard   | One form holding every control in the library, tabbed through from nothing, each control operated by its role's key with the result read from the semantics tree                                                                                               | `Keyboard.spec.ts` in `@gesso/components`                |
+| Every control works from the keyboard   | One form holding every control in the library, tabbed through from nothing, each control operated by its role's key with the result read from the semantics tree                                                                                               | `Keyboard.spec.ts` in `gesso-components`                 |
 | A screen reader has something to read   | Chrome's own computed accessibility tree for the example routes, written to committed reports in `apps/playground/accessibility/`: every node's role, name, states and value, and the order the Tab key reaches them in                                        | `pnpm check:a11y`                                        |
 | A route cannot change silently          | Covered playground routes are captured in headless Chrome and diffed against committed baselines                                                                                                                                                               | `pnpm screenshots`                                       |
 | The docs do not lie                     | Every live example on the site has a worker and a spec behind it, every quoted code region exists, and every page carries a description                                                                                                                        | `pnpm docs:check`                                        |
@@ -253,26 +253,26 @@ Animations advance, channel patches land, theme and environment values propagate
 
 ### Packages
 
-| Package              | Directory                   | What it is                                                                                               |
-| -------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `@gesso/core`        | `packages/core`             | The retained graph, layout, text, the two renderers, input, theming. Knows nothing about components.     |
-| `@gesso/framework`   | `packages/framework`        | Components, cells, the frame runtime, channels, routing, the worker barrier.                             |
-| `@gesso/components`  | `packages/components`       | The component library: five tiers, one contract.                                                         |
-| `@gesso/testing`     | `packages/testing`          | `renderTest`: mount a component with no browser and query it as a screen reader would.                   |
-| `@gesso/devtools`    | `packages/devtools`         | The error overlay, node inspector, frame profiler and action log.                                        |
-| `@gesso/vite-plugin` | `packages/vite-plugin`      | Finds an application's worker entries and writes the constructions and hot-replacement wiring. Optional. |
-| `@gesso/electrobun`  | `packages/electrobun`       | Runs an application in an Electrobun window, with its stores in the main process.                        |
-| `create-gesso-app`   | `packages/create-gesso-app` | The scaffold. Two templates: a browser project and a native window.                                      |
+| Package             | Directory                   | What it is                                                                                               |
+| ------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `gesso-core`        | `packages/core`             | The retained graph, layout, text, the two renderers, input, theming. Knows nothing about components.     |
+| `gesso-framework`   | `packages/framework`        | Components, cells, the frame runtime, channels, routing, the worker barrier.                             |
+| `gesso-components`  | `packages/components`       | The component library: five tiers, one contract.                                                         |
+| `gesso-testing`     | `packages/testing`          | `renderTest`: mount a component with no browser and query it as a screen reader would.                   |
+| `gesso-devtools`    | `packages/devtools`         | The error overlay, node inspector, frame profiler and action log.                                        |
+| `gesso-vite-plugin` | `packages/vite-plugin`      | Finds an application's worker entries and writes the constructions and hot-replacement wiring. Optional. |
+| `gesso-electrobun`  | `packages/electrobun`       | Runs an application in an Electrobun window, with its stores in the main process.                        |
+| `create-gesso-app`  | `packages/create-gesso-app` | The scaffold. Two templates: a browser project and a native window.                                      |
 
-`@gesso/core` and `@gesso/framework` each carry a second entry, `./testing`, holding the doubles their own suites use; nothing an application builds against reaches through it. Cross-package imports go through a package's root entry, never a deep path, so the committed API reports review the whole surface.
+`gesso-core` and `gesso-framework` each carry a second entry, `./testing`, holding the doubles their own suites use; nothing an application builds against reaches through it. Cross-package imports go through a package's root entry, never a deep path, so the committed API reports review the whole surface.
 
 ### Applications
 
-| App                         | Directory                 | What it is                                                                 |
-| --------------------------- | ------------------------- | -------------------------------------------------------------------------- |
-| `@gesso/playground`         | `apps/playground`         | The demo harness: the routes above, and one shell.                         |
-| `@gesso/docs`               | `apps/docs`               | The documentation site, VitePress, with live examples that are also specs. |
-| `@gesso/devtools-extension` | `apps/devtools-extension` | The Gesso panel in Chrome devtools.                                        |
+| App                        | Directory                 | What it is                                                                 |
+| -------------------------- | ------------------------- | -------------------------------------------------------------------------- |
+| `gesso-playground`         | `apps/playground`         | The demo harness: the routes above, and one shell.                         |
+| `gesso-docs`               | `apps/docs`               | The documentation site, VitePress, with live examples that are also specs. |
+| `gesso-devtools-extension` | `apps/devtools-extension` | The Gesso panel in Chrome devtools.                                        |
 
 ## Scripts
 

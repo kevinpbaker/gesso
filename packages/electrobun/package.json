@@ -1,5 +1,5 @@
 {
-  "name": "@gesso/electrobun",
+  "name": "gesso-electrobun",
   "version": "0.1.0",
   "description": "Run a Gesso application in an Electrobun window, with its stores in the main process.",
   "license": "MIT",
@@ -60,7 +60,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@gesso/framework": "workspace:^"
+    "gesso-framework": "workspace:^"
   },
   "peerDependencies": {
     "rxjs": "^7.8.2"

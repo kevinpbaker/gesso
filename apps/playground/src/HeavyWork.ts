@@ -1,4 +1,4 @@
-import { channel, internalState } from '@gesso/framework';
+import { channel, internalState } from 'gesso-framework';
 
 const SPIN_MS = 1500;
 

@@ -54,7 +54,7 @@ remembered. It is asynchronous throughout, so nothing it does blocks a
 frame. One file per key, named by the key.
 
 ```ts
-import { OpfsStorage, persisted } from '@gesso/framework/worker';
+import { OpfsStorage, persisted } from 'gesso-framework/worker';
 
 const memory = persisted(new OpfsStorage({ directory: 'segue' }), 'queue', { initial: NOTHING });
 ```

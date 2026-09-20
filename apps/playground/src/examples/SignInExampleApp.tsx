@@ -1,8 +1,8 @@
 import { combineLatest, type Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-import type { UiKeyboardEvent, UiSemanticState } from '@gesso/core';
-import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
+import type { UiKeyboardEvent, UiSemanticState } from 'gesso-core';
+import { type ComponentContext, type Inputs, internalState } from 'gesso-framework';
 import { SignIn } from './signin/SignInContract';
 import {
   BORDER,

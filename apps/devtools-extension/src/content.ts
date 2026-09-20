@@ -1,4 +1,4 @@
-import { windowPanelPort } from '@gesso/devtools';
+import { windowPanelPort } from 'gesso-devtools';
 import { PAGE_PORT } from './relay';
 
 /**

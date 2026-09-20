@@ -18,7 +18,7 @@ import {
   UiNodeType,
   type UiKeyboardEvent,
   type UiPaint
-} from '@gesso/core';
+} from 'gesso-core';
 import { Component } from '../Component';
 import { ComponentHostResolver } from '../ComponentHostResolver';
 import { Define, Input } from '../decorators';

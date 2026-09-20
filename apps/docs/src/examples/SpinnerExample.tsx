@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Spinner } from '@gesso/components';
-import { type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Spinner } from 'gesso-components';
+import { type ComponentContext, type Inputs } from 'gesso-framework';
 
 // #region spinner
 /**

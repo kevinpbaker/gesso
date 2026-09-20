@@ -108,7 +108,7 @@ const MODIFIER_KEYS: ReadonlySet<string> = new Set(['Shift', 'Control', 'Alt', '
  * without modifiers can call `handleKey` from its own listener. Keeping
  * the listening out means the registry is a plain object a spec can
  * drive directly, and means it does not need the dispatcher, the focus
- * manager, or anything else a `@gesso/framework` service would have had
+ * manager, or anything else a `gesso-framework` service would have had
  * to inject.
  *
  * ## Typing is not a shortcut

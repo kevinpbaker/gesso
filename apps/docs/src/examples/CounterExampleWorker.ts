@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Counter } from './CounterExample';
 import { exampleRoot } from './ExampleRoot';
 

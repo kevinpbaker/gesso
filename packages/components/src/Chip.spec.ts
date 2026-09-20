@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent, internalState } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
-import { Column, type UiChild, type UiNode } from '@gesso/core';
+import { createComponent, internalState } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
+import { Column, type UiChild, type UiNode } from 'gesso-core';
 import { Chip } from './Chip';
 
 function mount(root: Parameters<typeof renderTest>[0]) {

@@ -1,6 +1,6 @@
-import { percent, type UiVideoSurface, type VideoPlayback, type VideoResolver } from '@gesso/core';
-import { Video } from '@gesso/components';
-import type { ComponentContext, Inputs } from '@gesso/framework';
+import { percent, type UiVideoSurface, type VideoPlayback, type VideoResolver } from 'gesso-core';
+import { Video } from 'gesso-components';
+import type { ComponentContext, Inputs } from 'gesso-framework';
 
 import { isStill } from '../still';
 

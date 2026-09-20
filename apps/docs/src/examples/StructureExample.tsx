@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { percent, type UiChild } from '@gesso/core';
-import { Card, Divider, Toolbar } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs, type InternalState } from '@gesso/framework';
+import { percent, type UiChild } from 'gesso-core';
+import { Card, Divider, Toolbar } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs, type InternalState } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

@@ -1,4 +1,4 @@
-# @gesso/testing
+# gesso-testing
 
 ## 0.1.0
 
@@ -16,6 +16,6 @@ through the real controllers), `getLayout`, `explainText`, `settle` and a
 
 The root entry imports no test runner, so it works under Vitest, under
 `node:test`, or in a plain script. The matchers -- `toHaveBox`, `toHaveText`,
-`toHaveSemantics`, `toHaveFocus` -- are behind `@gesso/testing/matchers`,
+`toHaveSemantics`, `toHaveFocus` -- are behind `gesso-testing/matchers`,
 because `expect.extend` is a side effect on a global. A `toHaveBox` that
 misses prints the node's layout explanation beneath it.

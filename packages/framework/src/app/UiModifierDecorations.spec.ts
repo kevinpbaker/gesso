@@ -20,7 +20,7 @@ import {
   decorated,
   focusRing,
   noKeyModifiers
-} from '@gesso/core';
+} from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
 import { FocusService } from './FocusService';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { colorToHex } from '@gesso/core';
+import { colorToHex } from 'gesso-core';
 import { AppearanceApp, buildTheme, isDark, specOf, type ThemeSpec } from './ThemeExampleApp';
 
 const BASE: ThemeSpec = { palette: 'daylight', accent: 'ultramarine', corners: 'soft', textSize: 'regular' };

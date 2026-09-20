@@ -7,7 +7,7 @@ import {
   type LayoutBox,
   measure,
   type UiModifier
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * What the three virtualized components share: the ability to put a row

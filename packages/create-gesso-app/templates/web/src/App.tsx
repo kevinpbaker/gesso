@@ -1,8 +1,8 @@
 import { map } from 'rxjs/operators';
 
-import { percent } from '@gesso/core';
-import { Switch } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Switch } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 /**
  * The screen.
@@ -27,7 +27,7 @@ import { internalState, type ComponentContext, type Inputs } from '@gesso/framew
  * The elements are lowercase because they are intrinsic, resolved by
  * `jsxImportSource` in `tsconfig.json`, the same way `<div>` needs no
  * import in React. `Switch` is capitalised because it is a component
- * from `@gesso/components`, so it is imported like any other value.
+ * from `gesso-components`, so it is imported like any other value.
  */
 export function App(_inputs: Inputs<{}>, _context: ComponentContext) {
   const count = internalState(0);

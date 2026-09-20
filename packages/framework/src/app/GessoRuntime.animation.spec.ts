@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, ScrollView, type UiNode, linear, spring, tween, animateLayout } from '@gesso/core';
+import { Box, Column, ScrollView, type UiNode, linear, spring, tween, animateLayout } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';

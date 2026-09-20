@@ -25,7 +25,7 @@ passing `modifiers` to a component throws rather than attaching
 something to a node that cannot use it. Components that expect to be
 animated or measured from outside offer `rootModifiers` instead, which
 puts them on the element the component itself renders. The controls in
-`@gesso/components` take it.
+`gesso-components` take it.
 
 ## What a modifier writes
 
@@ -212,20 +212,20 @@ listeners walked per scrolled frame.
 
 ## The rest of them
 
-| Modifier                                      | Where               | What it does                                                             |
-| --------------------------------------------- | ------------------- | ------------------------------------------------------------------------ |
-| `interactive()`, `hoverable()`, `pressable()` | `@gesso/core`       | Hover and press state, and the property writes that follow               |
-| `focusRing(options?)`                         | `@gesso/core`       | A ring around the node while it holds focus                              |
-| `autoFocus()`                                 | `@gesso/core`       | Takes focus on the node's first layout, once                             |
-| `measure(subject)`                            | `@gesso/core`       | Reports the node's box whenever it moves                                 |
-| `scrollPosition(args)`                        | `@gesso/core`       | Reports a scroll container's offset when it changes, and when it settles |
-| `draggable(options)`                          | `@gesso/core`       | Moves the node with the pointer, as a transform                          |
-| `clickOutside(options)`                       | `@gesso/core`       | Calls back when a press lands outside the node                           |
-| `decorated(shapes)`                           | `@gesso/core`       | Draws shapes on the node for as long as it is attached                   |
-| `animateLayout(options?)`                     | `@gesso/core`       | Animates a node from where it was to where layout has put it             |
-| `motion(args)`, `sharedElement(args)`         | `@gesso/core`       | Entrances and exits, and an element that continues across a change       |
-| `imageSource`, `iconSource`, `videoSource`    | `@gesso/core`       | Resolve media for a node that paints it                                  |
-| `tooltip(ctx, options)`                       | `@gesso/components` | A tooltip on the element, with no wrapper node                           |
+| Modifier                                      | Where              | What it does                                                             |
+| --------------------------------------------- | ------------------ | ------------------------------------------------------------------------ |
+| `interactive()`, `hoverable()`, `pressable()` | `gesso-core`       | Hover and press state, and the property writes that follow               |
+| `focusRing(options?)`                         | `gesso-core`       | A ring around the node while it holds focus                              |
+| `autoFocus()`                                 | `gesso-core`       | Takes focus on the node's first layout, once                             |
+| `measure(subject)`                            | `gesso-core`       | Reports the node's box whenever it moves                                 |
+| `scrollPosition(args)`                        | `gesso-core`       | Reports a scroll container's offset when it changes, and when it settles |
+| `draggable(options)`                          | `gesso-core`       | Moves the node with the pointer, as a transform                          |
+| `clickOutside(options)`                       | `gesso-core`       | Calls back when a press lands outside the node                           |
+| `decorated(shapes)`                           | `gesso-core`       | Draws shapes on the node for as long as it is attached                   |
+| `animateLayout(options?)`                     | `gesso-core`       | Animates a node from where it was to where layout has put it             |
+| `motion(args)`, `sharedElement(args)`         | `gesso-core`       | Entrances and exits, and an element that continues across a change       |
+| `imageSource`, `iconSource`, `videoSource`    | `gesso-core`       | Resolve media for a node that paints it                                  |
+| `tooltip(ctx, options)`                       | `gesso-components` | A tooltip on the element, with no wrapper node                           |
 
 Three of those are worth a sentence more.
 

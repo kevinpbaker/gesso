@@ -1,6 +1,6 @@
 import { map, type Observable } from 'rxjs';
 
-import type { InputCell, Inputs } from '@gesso/framework';
+import type { InputCell, Inputs } from 'gesso-framework';
 import {
   type DecorationShape,
   type UiKeyboardEvent,
@@ -10,7 +10,7 @@ import {
   focusRing,
   interactive,
   type UiModifier
-} from '@gesso/core';
+} from 'gesso-core';
 
 /**
  * What every control in this tier shares.

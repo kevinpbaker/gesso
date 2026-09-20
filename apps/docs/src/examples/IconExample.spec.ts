@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from '@gesso/framework';
+import { createComponent } from 'gesso-framework';
 import {
   Column,
   darkTheme,
@@ -11,9 +11,9 @@ import {
   type IconContext,
   type UiImage,
   type UiTheme
-} from '@gesso/core';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+} from 'gesso-core';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Glyphs } from './IconExample';
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Button, Column, Text, darkTheme, defineModifier, hoverable, noKeyModifiers } from '@gesso/core';
+import { Box, Button, Column, Text, darkTheme, defineModifier, hoverable, noKeyModifiers } from 'gesso-core';
 import { Component } from '../Component';
 import { Define } from '../decorators';
 import { createComponent } from '../createComponent';
-import type { UiElement } from '@gesso/core';
+import type { UiElement } from 'gesso-core';
 import { formatNodeReport, printPropValue } from './NodeReport';
 import { mountRuntime } from './RuntimeTestUtils';
 

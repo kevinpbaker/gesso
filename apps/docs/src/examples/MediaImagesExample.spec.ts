@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DefaultImageResolver, type UiImage } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { DefaultImageResolver, type UiImage } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { BOX, MediaImages, SAMPLE_HEIGHT, SAMPLE_WIDTH } from './MediaImagesExample';
 

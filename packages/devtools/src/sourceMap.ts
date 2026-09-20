@@ -285,7 +285,7 @@ export class SourceMapStore {
    * maps as far as it goes.
    *
    * One lookup is not enough, and the reason took a browser to find. A
-   * frame inside `@gesso/framework` names Vite's optimised dependency
+   * frame inside `gesso-framework` names Vite's optimised dependency
    * bundle; that bundle's map points at the package's own
    * `dist/index.js`, because the optimiser does not chain to the map
    * the package ships; and it is the package's map that knows about

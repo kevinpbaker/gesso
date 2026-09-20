@@ -1,8 +1,8 @@
 import { Subject } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
 
-import { defineModifier, focusRing, interactive, measure, percent, type LayoutBox, type UiModifier } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { defineModifier, focusRing, interactive, measure, percent, type LayoutBox, type UiModifier } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

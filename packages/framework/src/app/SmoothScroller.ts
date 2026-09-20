@@ -1,4 +1,4 @@
-import { DirtyFlags, UiSpring, type AnimatedCell, type UiGraph, type UiNode } from '@gesso/core';
+import { DirtyFlags, UiSpring, type AnimatedCell, type UiGraph, type UiNode } from 'gesso-core';
 import type { AnimationService } from './AnimationService';
 
 /** Which offset is moving. */

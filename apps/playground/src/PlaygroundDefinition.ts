@@ -15,7 +15,7 @@ import {
   type DecorationShape,
   type UiPaint,
   type UiPath
-} from '@gesso/core';
+} from 'gesso-core';
 import type { PlaygroundState } from './PlaygroundState';
 
 const SCROLL_ITEM_COUNT = 100;

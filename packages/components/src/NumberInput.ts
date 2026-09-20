@@ -9,9 +9,9 @@ import {
   type UiChild,
   type UiTextChangeEvent,
   type UiSemanticState
-} from '@gesso/core';
+} from 'gesso-core';
 
-import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from '@gesso/framework';
+import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from 'gesso-framework';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import { controlTokens, type ControlTokens } from './tokens';

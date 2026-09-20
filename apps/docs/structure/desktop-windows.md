@@ -7,7 +7,7 @@ description: 'Running a Gesso application in an Electrobun window: the state in 
 A Gesso application in a desktop window is the same application.
 Components, layout, hit-testing and paint are in a render worker,
 exactly as they are on the web. What changes is where the other half
-lives: `@gesso/electrobun` puts the application layer in the native
+lives: `gesso-electrobun` puts the application layer in the native
 main process, so an application's data, its files and its background
 work run in the process that owns the windows rather than inside one
 of them.
@@ -49,12 +49,12 @@ main thread a transport rather than the application's router.
 
 ## The package, in four entries
 
-| Import                      | Runs where              | Holds                                           |
-| --------------------------- | ----------------------- | ----------------------------------------------- |
-| `@gesso/electrobun`         | both                    | `GessoFrame`, the wire format, and nothing else |
-| `@gesso/electrobun/view`    | a webview's main thread | `createElectrobunBridge`                        |
-| `@gesso/electrobun/main`    | the main process        | `serveChannelsToWindow`                         |
-| `@gesso/electrobun/desktop` | the main process        | `createDesktopApp`, `windowsChannel`            |
+| Import                     | Runs where              | Holds                                           |
+| -------------------------- | ----------------------- | ----------------------------------------------- |
+| `gesso-electrobun`         | both                    | `GessoFrame`, the wire format, and nothing else |
+| `gesso-electrobun/view`    | a webview's main thread | `createElectrobunBridge`                        |
+| `gesso-electrobun/main`    | the main process        | `serveChannelsToWindow`                         |
+| `gesso-electrobun/desktop` | the main process        | `createDesktopApp`, `windowsChannel`            |
 
 They are separate entries because the halves have opposite dependencies
 and neither should be able to import the other's. Four frame kinds
@@ -78,7 +78,7 @@ has, plus one both processes import.
 
 ```ts
 // notes.contract.ts
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 
 export interface NoteSummary {
   id: string;
@@ -111,7 +111,7 @@ Gesso's. The RPC is declared against a schema both sides name:
 ```ts
 // rpc.ts
 import type { RPCSchema } from 'electrobun/view';
-import type { GessoFrame } from '@gesso/electrobun';
+import type { GessoFrame } from 'gesso-electrobun';
 
 export type GessoWindowRPC = {
   bun: RPCSchema<{
@@ -135,8 +135,8 @@ the window.
 ```ts
 // main/index.ts
 import { BrowserView, BrowserWindow, Utils } from 'electrobun/main';
-import type { GessoFrame } from '@gesso/electrobun';
-import { createDesktopApp, windowsChannel } from '@gesso/electrobun/desktop';
+import type { GessoFrame } from 'gesso-electrobun';
+import { createDesktopApp, windowsChannel } from 'gesso-electrobun/desktop';
 
 import { Notes } from '../shared/notes.contract';
 import type { GessoWindowRPC } from '../shared/rpc';
@@ -200,9 +200,9 @@ window and never reused, and a `close()`.
 
 ```ts
 // view/main.ts
-import type { GessoFrame } from '@gesso/electrobun';
-import { createElectrobunBridge } from '@gesso/electrobun/view';
-import { createApp } from '@gesso/framework';
+import type { GessoFrame } from 'gesso-electrobun';
+import { createElectrobunBridge } from 'gesso-electrobun/view';
+import { createApp } from 'gesso-framework';
 import { Electroview } from 'electrobun/view';
 
 import type { GessoWindowRPC } from '../shared/rpc';
@@ -244,8 +244,8 @@ the window. `dispose()` closes every stream.
 
 ```ts
 // app.render.worker.ts
-import { DesktopWindows } from '@gesso/electrobun/desktop';
-import { renderRoot } from '@gesso/framework';
+import { DesktopWindows } from 'gesso-electrobun/desktop';
+import { renderRoot } from 'gesso-framework';
 
 import { Notes } from '../shared/notes.contract';
 import { App } from './App';
@@ -302,7 +302,7 @@ one. `serveChannelsToWindow` serves a set of channels to one window and
 knows nothing about opening or closing any:
 
 ```ts
-import { serveChannelsToWindow } from '@gesso/electrobun/main';
+import { serveChannelsToWindow } from 'gesso-electrobun/main';
 
 const host = serveChannelsToWindow([{ token: Notes, source: notesSource(store) }], {
   send: frame => window.webview.rpc?.send.gessoFrame(frame),

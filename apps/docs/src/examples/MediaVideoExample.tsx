@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent, videoSource, type UiVideoSurface, type VideoPlayback, type VideoResolver } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, videoSource, type UiVideoSurface, type VideoPlayback, type VideoResolver } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { isStill } from '../still';
 import { HOVER_CONTROL } from './interaction';

@@ -1,8 +1,8 @@
 import { BehaviorSubject, type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { Paint, type PaintSurface, type UiChild, type UiPaint, type UiPath } from '@gesso/core';
-import { type ComponentContext, type Inputs, internalState } from '@gesso/framework';
+import { Paint, type PaintSurface, type UiChild, type UiPaint, type UiPath } from 'gesso-core';
+import { type ComponentContext, type Inputs, internalState } from 'gesso-framework';
 import {
   ACCENT,
   BORDER,

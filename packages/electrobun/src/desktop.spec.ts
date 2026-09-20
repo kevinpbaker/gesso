@@ -12,7 +12,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from '@gesso/framework';
+import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from 'gesso-framework';
 
 import { createDesktopApp, DesktopWindows, windowsChannel, type DesktopApp, type DesktopWindowHandle } from './desktop';
 import type { GessoFrame } from './frames';
@@ -44,7 +44,7 @@ function fakeWindow(receive: (frame: GessoFrame) => void): {
   send: (frame: GessoFrame) => void;
   close: () => void;
   attach: <View extends object, Commands extends object>(
-    token: import('@gesso/framework').ChannelToken<View, Commands>
+    token: import('gesso-framework').ChannelToken<View, Commands>
   ) => ChannelReplica<View, Commands>;
   closed: () => boolean;
 } {

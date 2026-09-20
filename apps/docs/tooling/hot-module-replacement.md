@@ -18,7 +18,7 @@ is the one part that is cheap to lose.
 
 ## The plugin writes it for you
 
-With [`@gesso/vite-plugin`](/tooling/vite-plugin) in the config, the
+With [`gesso-vite-plugin`](/tooling/vite-plugin) in the config, the
 render worker entry stays as it was written and the wiring is emitted
 into it:
 

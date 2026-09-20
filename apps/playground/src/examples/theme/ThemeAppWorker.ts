@@ -1,4 +1,4 @@
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { AppearanceApp } from '../ThemeExampleApp';
 import { AppearanceChannel } from './ThemeContract';
 

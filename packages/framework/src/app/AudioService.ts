@@ -1,6 +1,6 @@
 import { type Observable, Subject } from 'rxjs';
 
-import { linear } from '@gesso/core';
+import { linear } from 'gesso-core';
 
 import { computed, type ComputedCell } from '../computed';
 import { internalState } from '../InternalState';

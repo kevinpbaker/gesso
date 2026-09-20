@@ -1,6 +1,6 @@
-import { percent, type UiNode, type UiPointerEvent } from '@gesso/core';
-import { Menu, type MenuItem } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiNode, type UiPointerEvent } from 'gesso-core';
+import { Menu, type MenuItem } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

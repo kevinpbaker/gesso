@@ -39,7 +39,7 @@ in one, and each answers a different question:
 | `minmax(100, fr(1))` | A share, but never less than 100 px                                   |
 
 ```tsx
-import { auto, fr, minmax, percent, repeat } from '@gesso/core';
+import { auto, fr, minmax, percent, repeat } from 'gesso-core';
 
 <grid columns={[auto, fr(1), fr(2)]} rows={[40, auto]} gap={12}>
 ```

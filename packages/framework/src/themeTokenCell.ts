@@ -1,6 +1,6 @@
 import { distinctUntilChanged, map, type Observable } from 'rxjs';
 
-import { themeTokens, type UiModifier, type UiThemeExtension } from '@gesso/core';
+import { themeTokens, type UiModifier, type UiThemeExtension } from 'gesso-core';
 import { InternalState } from './InternalState';
 
 /**

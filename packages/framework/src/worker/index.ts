@@ -1,7 +1,7 @@
 /**
  * What an application worker imports: the barrier, and the cells.
  *
- * `@gesso/framework` is the render thread's entry. It carries the
+ * `gesso-framework` is the render thread's entry. It carries the
  * runtime, the component host, the router and the renderers, none of
  * which an application worker has any use for, so the two real
  * applications avoided importing the framework in their data layer at
@@ -14,7 +14,7 @@
  * so it costs an application worker nothing to import and a data layer
  * that imports it is still specified in bare vitest.
  *
- *   import { computed, internalState, resource, serveChannels } from '@gesso/framework/worker';
+ *   import { computed, internalState, resource, serveChannels } from 'gesso-framework/worker';
  *
  * Nothing here is required. A channel is reached exactly as it always
  * was, `serveChannels` takes plain Observables from wherever they came

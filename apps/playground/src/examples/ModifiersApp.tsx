@@ -18,9 +18,9 @@ import {
   type UiChild,
   type UiModifier,
   type UiNode
-} from '@gesso/core';
-import { Card, Checkbox, Slider, SplitPane, Switch, TextInput, tooltip } from '@gesso/components';
-import { createComponent, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+} from 'gesso-core';
+import { Card, Checkbox, Slider, SplitPane, Switch, TextInput, tooltip } from 'gesso-components';
+import { createComponent, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { holdToConfirm, holdToConfirmTokens, type HoldToConfirmArgs } from '../modifiers/holdToConfirm';
 
@@ -51,7 +51,7 @@ import { holdToConfirm, holdToConfirmTokens, type HoldToConfirmArgs } from '../m
  *
  * The page is written in JSX, like the rest of the examples. Intrinsic
  * tags are the core elements in lowercase; the capitalised tags are
- * `@gesso/components`.
+ * `gesso-components`.
  */
 
 /** Wide enough for a caption at 12px without a card being a column of single words. */
@@ -553,7 +553,7 @@ function ClickOutsideCard(_inputs: Inputs<{}>, _ctx: ComponentContext) {
 // ---------------------------------------------------------------------------
 
 /**
- * `tooltip`, the one modifier that is not in `@gesso/core`.
+ * `tooltip`, the one modifier that is not in `gesso-core`.
  *
  * A modifier has no component of its own to inject into and the
  * overlay service is per runtime, so the component that renders the
@@ -690,7 +690,7 @@ const QUICK_HOLD_THEME = withThemeExtension(darkTheme, holdToConfirmTokens, {
  * library's.
  *
  * written in `../modifiers/holdToConfirm.ts`
- * against `@gesso/core`'s entry point alone, and held to that by the
+ * against `gesso-core`'s entry point alone, and held to that by the
  * lint configuration. The card is the browser check that a modifier
  * from outside runs in the same host as the seven above it.
  *

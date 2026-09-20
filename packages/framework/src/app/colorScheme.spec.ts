@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { map } from 'rxjs/operators';
 
-import { Text, UiNodeType, type UiNode } from '@gesso/core';
+import { Text, UiNodeType, type UiNode } from 'gesso-core';
 
 import { createComponent } from '../createComponent';
 import type { ComponentContext, Inputs } from '../FunctionComponent';

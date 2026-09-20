@@ -1,7 +1,7 @@
 /**
  * Install check (the first exit criterion).
  *
- * "`npm install @gesso/framework` in a fresh Vite project runs the
+ * "`npm install gesso-framework` in a fresh Vite project runs the
  * counter example." This script is that sentence, executed: it packs the
  * publishable packages into tarballs, installs them into a copy of
  * `examples/counter` with npm, typechecks that project against the
@@ -22,7 +22,7 @@
  *     and a checksum over the pixels is the honest way to say "this
  *     repainted after a key".
  *   - `vitest run` in the example is F7's half of the same idea: the
- *     point of `@gesso/testing` is that somebody outside this workspace
+ *     point of `gesso-testing` is that somebody outside this workspace
  *     can test a component with it, and only an install proves that.
  *     Nothing else here resolves it any way but through a workspace
  *     link.
@@ -97,7 +97,7 @@ function packPackages(into: string): Map<string, string> {
     if (created.length !== 1) {
       throw new Error(`pnpm pack in packages/${pkg} produced ${created.length} tarballs, expected 1.`);
     }
-    tarballs.set(`@gesso/${pkg}`, join(into, created[0]));
+    tarballs.set(`gesso-${pkg}`, join(into, created[0]));
   }
   return tarballs;
 }
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
       dependencies: Record<string, string>;
       devDependencies: Record<string, string>;
     };
-    // Both lists: `@gesso/testing` is a dev dependency of a consumer, as
+    // Both lists: `gesso-testing` is a dev dependency of a consumer, as
     // it is of anyone who tests components rather than shipping them.
     for (const list of [manifest.dependencies, manifest.devDependencies]) {
       for (const [name, tarball] of tarballs) {
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
     console.log('typechecking the example against the published types…');
     run('npx', ['tsc', '--noEmit'], app);
 
-    console.log("running the example's component tests through @gesso/testing…");
+    console.log("running the example's component tests through gesso-testing…");
     run('npx', ['vitest', 'run'], app);
 
     console.log('building the example…');
@@ -204,7 +204,7 @@ async function main(): Promise<void> {
     // arithmetic over the font: the button is the last thing in the row, so
     // the rightmost painted pixels are its label, and both cells are
     // vertically centred on the same line. A core `Button` is
-    // pointer-activated — Enter-to-click belongs to `@gesso/components`'
+    // pointer-activated — Enter-to-click belongs to `gesso-components`'
     // Inputs tier, not to the primitive — so a click is what there is.
     const x = first.maxX - 3;
     const y = Math.round((first.minY + first.maxY) / 2);

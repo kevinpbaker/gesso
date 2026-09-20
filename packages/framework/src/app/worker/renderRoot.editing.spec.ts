@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { Component } from '../../Component';
 import { Define, Inject } from '../../decorators';
-import { Button, Column, EditableText, type CanvasHost } from '@gesso/core';
+import { Button, Column, EditableText, type CanvasHost } from 'gesso-core';
 import { ShellService } from '../ShellService';
 import { RenderWorkerApp } from './renderRoot';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';

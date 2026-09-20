@@ -26,7 +26,7 @@ export interface UiTypography {
  * to writing numbers on elements, a theme's typography may carry names
  * of its own, and an application declares them so they type:
  *
- *   declare module '@gesso/core' {
+ *   declare module 'gesso-core' {
  *     interface UiTypographyExtensions {
  *       readonly cardTitle: unknown;
  *       readonly display: unknown;

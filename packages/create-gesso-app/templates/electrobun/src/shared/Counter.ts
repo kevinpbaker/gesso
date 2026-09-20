@@ -6,7 +6,7 @@
  * send, and no framework type above it. Nothing in here is anything
  * but plain data, because plain data is all that crosses a channel.
  */
-import { channel } from '@gesso/framework';
+import { channel } from 'gesso-framework';
 
 export interface CounterView {
   /** The application's whole state, and it lives in the main process. */

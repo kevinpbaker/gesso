@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Waiting } from './SpinnerExample';
 import { exampleRoot } from './ExampleRoot';
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { UiVisualState, type LayoutBox, type UiNode, type UiVisualStateSet } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { UiVisualState, type LayoutBox, type UiNode, type UiVisualStateSet } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { ModifierSurface } from './ModifiersExample';
 

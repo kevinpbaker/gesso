@@ -8,7 +8,7 @@ import {
   type ImageResolver,
   type UiChild,
   type VideoResolver
-} from '@gesso/core';
+} from 'gesso-core';
 
 import { Component } from '../../Component';
 import { Define, Inject } from '../../decorators';

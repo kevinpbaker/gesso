@@ -1,4 +1,4 @@
-import { createComponent, renderRoot } from '@gesso/framework';
+import { createComponent, renderRoot } from 'gesso-framework';
 import { Uploads } from './ProgressBarExample';
 import { exampleRoot } from './ExampleRoot';
 

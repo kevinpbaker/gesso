@@ -11,7 +11,7 @@ describe('blankLiterals', () => {
   });
 
   it('blanks a string but keeps its quotes, so a specifier can still be found', () => {
-    expect(blankLiterals("from '@gesso/framework';")).toBe("from '                ';");
+    expect(blankLiterals("from 'gesso-framework';")).toBe("from '               ';");
   });
 
   it('hides a brace inside a string from a bracket match', () => {
@@ -78,13 +78,13 @@ describe('firstArgumentName', () => {
 describe('importSources', () => {
   it('maps named, aliased, default and namespace imports', () => {
     const code = [
-      "import { renderRoot } from '@gesso/framework';",
+      "import { renderRoot } from 'gesso-framework';",
       "import { ROUTES, SegueApp as Root } from './SegueApp';",
       "import Feed from './Feed';",
       "import * as data from './data/Contract';"
     ].join('\n');
     const sources = importSources(code);
-    expect(sources.get('renderRoot')).toBe('@gesso/framework');
+    expect(sources.get('renderRoot')).toBe('gesso-framework');
     expect(sources.get('ROUTES')).toBe('./SegueApp');
     expect(sources.get('Root')).toBe('./SegueApp');
     expect(sources.get('Feed')).toBe('./Feed');
@@ -92,8 +92,8 @@ describe('importSources', () => {
   });
 
   it('reads a multi-line import clause', () => {
-    const code = "import {\n  createApp,\n  type RendererChoice\n} from '@gesso/framework';";
-    expect(importSources(code).get('createApp')).toBe('@gesso/framework');
+    const code = "import {\n  createApp,\n  type RendererChoice\n} from 'gesso-framework';";
+    expect(importSources(code).get('createApp')).toBe('gesso-framework');
   });
 
   it('is not fooled by the word import inside a comment or a string', () => {

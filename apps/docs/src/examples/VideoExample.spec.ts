@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createComponent } from '@gesso/framework';
-import { isVideoSurface, type UiNode, type UiVideoSurface } from '@gesso/core';
-import { renderTest } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { createComponent } from 'gesso-framework';
+import { isVideoSurface, type UiNode, type UiVideoSurface } from 'gesso-core';
+import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { ClipResolver, Player } from './VideoExample';
 

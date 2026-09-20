@@ -2,10 +2,10 @@ import { BehaviorSubject } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { describe, expect, it } from 'vitest';
 
-import { darkTheme, interactive, withThemeExtension, type UiModifier, type UiNode, type UiTheme } from '@gesso/core';
-import { createComponent, type ComponentContext, type Inputs } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import { darkTheme, interactive, withThemeExtension, type UiModifier, type UiNode, type UiTheme } from 'gesso-core';
+import { createComponent, type ComponentContext, type Inputs } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { holdToConfirm, holdToConfirmTokens, type HoldToConfirmArgs } from './holdToConfirm';
 // The file as text, for the test about what it imports.
@@ -264,7 +264,7 @@ describe('holdToConfirm, a modifier written against public exports', () => {
     expect(specifiers.length).toBeGreaterThan(0);
     for (const specifier of specifiers) {
       // A bare package name, or a scoped one: no relative path and no
-      // path into a package. `@gesso/core`, never `@gesso/core/src/…`.
+      // path into a package. `gesso-core`, never `gesso-core/src/…`.
       expect(specifier, `${specifier} is not a package entry point`).toMatch(/^(@[\w-]+\/)?[\w.-]+$/);
     }
   });

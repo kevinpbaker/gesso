@@ -1,7 +1,7 @@
-import { Constraints, type Size, type UiLayoutChild, type UiLayoutProtocol } from '@gesso/core';
+import { Constraints, type Size, type UiLayoutChild, type UiLayoutProtocol } from 'gesso-core';
 
 /**
- * A masonry wall, written against `@gesso/core`'s public exports and
+ * A masonry wall, written against `gesso-core`'s public exports and
  * nothing else.
  *
  * This is the file custom layout is really about. A

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { Constraints, UiManualFrameClock } from '@gesso/core';
-import { callArgs, callNames, callsOf, FakeCanvasHost, RecordingCanvasContext } from '@gesso/core/testing';
+import { Constraints, UiManualFrameClock } from 'gesso-core';
+import { callArgs, callNames, callsOf, FakeCanvasHost, RecordingCanvasContext } from 'gesso-core/testing';
 import { CanvasPreview } from './CanvasPreview';
 import { LayoutPlayground } from './LayoutPlayground';
 import { createDefinition } from './PlaygroundDefinition';

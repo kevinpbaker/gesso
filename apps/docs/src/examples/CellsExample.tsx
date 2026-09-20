@@ -1,5 +1,5 @@
-import { percent } from '@gesso/core';
-import { computed, input, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { computed, input, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 
 const PRICE_USD = 12.5;

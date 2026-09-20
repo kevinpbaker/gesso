@@ -176,7 +176,7 @@ and taking the application down over it would be worse than the defect.
 
 ## What this page was checked against
 
-`Badge.spec.ts` mounts the component with `@gesso/testing` and asserts
+`Badge.spec.ts` mounts the component with `gesso-testing` and asserts
 that the three tones resolve to three different grounds and that only
 the neutral one has an edge, that the words on a loud ground are the
 sheet's colour, that a count draws as itself until it passes `max` and

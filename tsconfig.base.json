@@ -16,7 +16,7 @@
 
     /* JSX — optional surface over the factory API; see packages/framework/src/jsx */
     "jsx": "react-jsx",
-    "jsxImportSource": "@gesso/framework",
+    "jsxImportSource": "gesso-framework",
 
     /* Decorators */
     "experimentalDecorators": true,

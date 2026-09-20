@@ -1,7 +1,7 @@
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Text, type UiChild, type UiElement } from '@gesso/core';
+import { Text, type UiChild, type UiElement } from 'gesso-core';
 
 import { createComponent } from './createComponent';
 import { each } from './each';

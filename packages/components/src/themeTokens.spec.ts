@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Text, defineThemeExtension, lightTheme, withThemeExtension, type UiChild } from '@gesso/core';
-import { renderTest } from '@gesso/testing';
-import { createComponent, themeTokenCell } from '@gesso/framework';
+import { Box, Text, defineThemeExtension, lightTheme, withThemeExtension, type UiChild } from 'gesso-core';
+import { renderTest } from 'gesso-testing';
+import { createComponent, themeTokenCell } from 'gesso-framework';
 
 import { Button } from './Button';
 import { NumberInput } from './NumberInput';

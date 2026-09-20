@@ -1,4 +1,4 @@
-import type { UiNode, UiFocusManager } from '@gesso/core';
+import type { UiNode, UiFocusManager } from 'gesso-core';
 import { internalState } from '../InternalState';
 
 /**

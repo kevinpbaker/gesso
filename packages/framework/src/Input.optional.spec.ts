@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { Text, type UiChild } from '@gesso/core';
+import { Text, type UiChild } from 'gesso-core';
 
 import { ComponentHost } from './ComponentHost';
 import type { ComponentElement } from './ComponentElement';

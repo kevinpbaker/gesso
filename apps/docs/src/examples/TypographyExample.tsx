@@ -1,8 +1,8 @@
 import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { darkTheme, lightTheme, percent, type UiFontWeight, type UiTextStyle, type UiTypography } from '@gesso/core';
-import { internalState, ShellService, type ComponentContext, type Inputs } from '@gesso/framework';
+import { darkTheme, lightTheme, percent, type UiFontWeight, type UiTextStyle, type UiTypography } from 'gesso-core';
+import { internalState, ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 // #region roles

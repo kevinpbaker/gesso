@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Component } from '../Component';
 import { Channel, Define } from '../decorators';
-import { Column, Text } from '@gesso/core';
+import { Column, Text } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import { mountRuntime } from '../app/RuntimeTestUtils';
 import { channel } from './ChannelToken';

@@ -6,7 +6,7 @@
  * the page forwards input events and does nothing else, so work on this
  * thread cannot delay a frame.
  *
- * The worker is not named here. `@gesso/vite-plugin`, in
+ * The worker is not named here. `gesso-vite-plugin`, in
  * `vite.config.ts`, finds `worker.ts` beside this file and writes the
  * `new Worker(new URL(...))` construction, which is the only form a
  * bundler emits a chunk for. It also draws the error overlay over the
@@ -19,7 +19,7 @@
  *     renderWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
  *   });
  */
-import { createApp } from '@gesso/framework';
+import { createApp } from 'gesso-framework';
 
 const host = document.querySelector<HTMLElement>('#app');
 if (host === null) {

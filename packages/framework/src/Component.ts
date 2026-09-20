@@ -1,4 +1,4 @@
-import type { UiChild } from '@gesso/core';
+import type { UiChild } from 'gesso-core';
 
 /**
  * Base class for all Gesso framework components.

@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { percent, type UiAlignment } from '@gesso/core';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiAlignment } from 'gesso-core';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import { HOVER_CONTROL } from './interaction';
 
 const MAIN: readonly UiAlignment[] = ['start', 'center', 'end', 'space-between'];

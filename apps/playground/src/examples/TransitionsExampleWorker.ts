@@ -1,4 +1,4 @@
-import { renderRoot } from '@gesso/framework';
+import { renderRoot } from 'gesso-framework';
 import { ROUTES, TransitionsExampleApp } from './TransitionsExampleApp';
 import { Catalogue, Queue } from './transitions/TransitionsContract';
 

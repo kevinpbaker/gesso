@@ -1,6 +1,6 @@
 import { Subject, map, merge } from 'rxjs';
 
-import { derive, input, into, type Inputs } from '@gesso/framework';
+import { derive, input, into, type Inputs } from 'gesso-framework';
 
 // #region declare
 interface RowInputs {

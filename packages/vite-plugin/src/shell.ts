@@ -25,13 +25,13 @@ export interface ShellTransformOptions {
   /**
    * Whether to wire the error overlay in as well. True while the dev
    * server is running and never in a build, so a production bundle
-   * carries no reference to `@gesso/devtools`.
+   * carries no reference to `gesso-devtools`.
    */
   readonly overlay: boolean;
 }
 
 /** Marks a module the plugin has already rewritten, so it is not done twice. */
-const MARKER = '/* @gesso/vite-plugin */';
+const MARKER = '/* gesso-vite-plugin */';
 
 /**
  * The `createApp` call in a module, when the module has one that came
@@ -46,7 +46,7 @@ export function findShellCall(code: string, blank = blankLiterals(code)): ShellC
   if (code.includes(MARKER)) {
     return null;
   }
-  if (importSources(code, blank).get('createApp') !== '@gesso/framework') {
+  if (importSources(code, blank).get('createApp') !== 'gesso-framework') {
     return null;
   }
   const call = findCall(code, 'createApp', blank);
@@ -129,7 +129,7 @@ function prelude(options: ShellTransformOptions): string {
  * throws and not before.
  *
  * Lazy because it costs nothing until it is needed: a page that never
- * throws never fetches `@gesso/devtools`, and a page that does gets
+ * throws never fetches `gesso-devtools`, and a page that does gets
  * the overlay within a network round trip of the error rather than
  * paying for the package on every start.
  *
@@ -155,7 +155,7 @@ const OVERLAY = `function __gessoReportError(message, stack, source) {
     return;
   }
   state.loading = true;
-  void import('@gesso/devtools').then(({ mountErrorOverlay }) => {
+  void import('gesso-devtools').then(({ mountErrorOverlay }) => {
     const canvas = document.querySelector('canvas');
     state.overlay = mountErrorOverlay(canvas?.parentElement ?? document.body);
     __gessoFlushErrors();

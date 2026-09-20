@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
-import { autoFocus, focusRing, percent, type UiNode } from '@gesso/core';
-import { FocusService, internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { autoFocus, focusRing, percent, type UiNode } from 'gesso-core';
+import { FocusService, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_CONTROL } from './interaction';
 

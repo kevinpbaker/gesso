@@ -1,6 +1,6 @@
-import { percent } from '@gesso/core';
-import { Dialog } from '@gesso/components';
-import { internalState, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent } from 'gesso-core';
+import { Dialog } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
 

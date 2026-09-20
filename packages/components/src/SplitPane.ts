@@ -1,7 +1,7 @@
 import { BehaviorSubject, map } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs } from '@gesso/framework';
-import { Box, Column, Row, type UiChild, type UiPointerEvent, type LayoutBox, percent, measure } from '@gesso/core';
+import { input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { Box, Column, Row, type UiChild, type UiPointerEvent, type LayoutBox, percent, measure } from 'gesso-core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {

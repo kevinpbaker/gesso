@@ -5,7 +5,7 @@
  * `EncodedVideoChunk`s and a `VideoDecoderConfig`, and getting those
  * out of an `.mp4` means walking the sample tables yourself. That is
  * what this does, and the reason it is here rather than a dependency
- * is that `@gesso/core`'s only dependency is `@webgpu/types`: a
+ * is that `gesso-core`'s only dependency is `@webgpu/types`: a
  * renderer that pulls in a general-purpose container parser to play a
  * demo video has bought a great deal it does not use.
  *

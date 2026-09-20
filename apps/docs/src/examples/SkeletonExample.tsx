@@ -1,6 +1,6 @@
-import { percent, type UiChild, type UiSemanticState } from '@gesso/core';
-import { Button, Skeleton, SkeletonText } from '@gesso/components';
-import { computed, internalState, show, type ComponentContext, type Inputs } from '@gesso/framework';
+import { percent, type UiChild, type UiSemanticState } from 'gesso-core';
+import { Button, Skeleton, SkeletonText } from 'gesso-components';
+import { computed, internalState, show, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { isStill } from '../still';
 

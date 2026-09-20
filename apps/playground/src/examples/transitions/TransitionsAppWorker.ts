@@ -1,4 +1,4 @@
-import { serveChannels } from '@gesso/framework';
+import { serveChannels } from 'gesso-framework';
 import { AudiusApi } from './AudiusApi';
 import { Catalogue } from './Catalogue';
 import { Queue } from './Queue';

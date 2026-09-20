@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
-import { Column, type UiNode, type UiRole, type UiSemanticsRecord, UiEventType, UiPointerEvent } from '@gesso/core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
+import { Column, type UiNode, type UiRole, type UiSemanticsRecord, UiEventType, UiPointerEvent } from 'gesso-core';
 import { Checkbox } from './Checkbox';
 import { NumberInput } from './NumberInput';
 import { RadioGroup } from './Radio';

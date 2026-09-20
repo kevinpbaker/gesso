@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { UiSemanticsRecord } from '@gesso/core';
-import { createComponent } from '@gesso/framework';
-import { renderTest, type Rendered } from '@gesso/testing';
-import '@gesso/testing/matchers';
+import type { UiSemanticsRecord } from 'gesso-core';
+import { createComponent } from 'gesso-framework';
+import { renderTest, type Rendered } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Files } from './TreeExample';
 

@@ -1,4 +1,4 @@
-import { mountErrorOverlay, type ErrorOrigin } from '@gesso/devtools';
+import { mountErrorOverlay, type ErrorOrigin } from 'gesso-devtools';
 import type { AppShell } from './AppShell';
 
 export interface RouteErrors {

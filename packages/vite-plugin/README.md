@@ -1,14 +1,14 @@
-# @gesso/vite-plugin
+# gesso-vite-plugin
 
 Finds a Gesso application's worker entries, writes the constructions and the hot-replacement wiring, and says when a save will reload the page.
 
 ```bash
-npm install --save-dev @gesso/vite-plugin
+npm install --save-dev gesso-vite-plugin
 ```
 
 ```ts
 // vite.config.ts
-import { gesso } from '@gesso/vite-plugin';
+import { gesso } from 'gesso-vite-plugin';
 
 export default defineConfig({
   plugins: [gesso()]
@@ -27,7 +27,7 @@ renderRoot(AppRoot).useService(Feed);
 
 ## It is optional, deliberately
 
-Nothing in `@gesso/core` or `@gesso/framework` mentions Vite, and no bundler is imported into the framework. Everything this plugin writes, you can write by hand: the literal `new Worker(new URL(...))` construction stays the documented fallback, and the plugin's factories go in first so your own options spread over them.
+Nothing in `gesso-core` or `gesso-framework` mentions Vite, and no bundler is imported into the framework. Everything this plugin writes, you can write by hand: the literal `new Worker(new URL(...))` construction stays the documented fallback, and the plugin's factories go in first so your own options spread over them.
 
 ## The diagnostic that is worth the install
 

@@ -5,13 +5,13 @@ import { defineConfig } from 'tsdown';
  *
  * The content script is a classic script (Chrome injects it with no
  * module wrapper), so it is an IIFE; the other three run as modules.
- * Everything is bundled in, `@gesso/*` and rxjs included: an extension
+ * Everything is bundled in, the `gesso-*` packages and rxjs included: an extension
  * has no `node_modules` to resolve against at runtime.
  */
 const shared = {
   platform: 'browser',
   dts: false,
-  deps: { alwaysBundle: [/^@gesso\//, 'rxjs'] },
+  deps: { alwaysBundle: [/^gesso-/, 'rxjs'] },
   outDir: 'dist'
 } as const;
 

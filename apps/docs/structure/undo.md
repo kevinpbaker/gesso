@@ -9,7 +9,7 @@ it did and how to unmake it; a menu item, a button or a keyboard
 shortcut drives the stack.
 
 ```ts
-import { UndoStack } from '@gesso/framework';
+import { UndoStack } from 'gesso-framework';
 
 const undo = ctx.inject(UndoStack);
 

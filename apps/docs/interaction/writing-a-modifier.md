@@ -1,12 +1,12 @@
 ---
-description: 'Writing a modifier of your own against @gesso/core alone: defineModifier and typed arguments, the host API, the three ordering rules, configuration through the theme rather than a new property, and a worked example that runs in the playground.'
+description: 'Writing a modifier of your own against gesso-core alone: defineModifier and typed arguments, the host API, the three ordering rules, configuration through the theme rather than a new property, and a worked example that runs in the playground.'
 ---
 
 # Writing a modifier
 
 [Modifiers](/interaction/modifiers) says what a modifier is and what
 the ones in the box do. This page is for writing one, in your own
-file or your own package, against `@gesso/core` and nothing inside it.
+file or your own package, against `gesso-core` and nothing inside it.
 
 Two worked examples run through it. `hoverable()` is the library's
 smallest real modifier and shows the shape. `holdToConfirm()` is a
@@ -226,12 +226,12 @@ function DeleteTile(_inputs: Inputs<{}>, _ctx: ComponentContext) {
 
 ## Keeping it outside
 
-A modifier package depends on `@gesso/core` as a peer and imports from
+A modifier package depends on `gesso-core` as a peer and imports from
 its entry point. In this repository that rule is mechanical: the
 playground's `src/modifiers/` directory is covered by a
 `no-restricted-imports` override in the root lint configuration that
 refuses relative imports, any path containing `/src/`, and any
-`@gesso/*` subpath, and the modifier's spec asserts the same thing from
+`gesso-*` subpath, and the modifier's spec asserts the same thing from
 the file's text. The spec drives the modifier through a real runtime,
 the pointer, the clock and the theme, and asserts the cascade, the
 decoration, the theme extension, the per-element override, rule 3 and
@@ -248,7 +248,7 @@ nothing yet needs it.
 
 **Components take `rootModifiers`, not `modifiers`.** A component's
 node is a fragment with no box, so `modifiers` on a component tag
-throws. The controls in `@gesso/components` forward `rootModifiers` to
+throws. The controls in `gesso-components` forward `rootModifiers` to
 the element they render; a component of your own that wants to accept
 a modifier from outside does the same.
 

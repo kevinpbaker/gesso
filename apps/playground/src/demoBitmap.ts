@@ -1,4 +1,4 @@
-import { IconRasterizer, type IconSpec } from '@gesso/core';
+import { IconRasterizer, type IconSpec } from 'gesso-core';
 
 /**
  * A 200×100 test card — a gradient, a circle and a frame — so that
