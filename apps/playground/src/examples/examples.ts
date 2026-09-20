@@ -16,6 +16,33 @@ export interface ExampleMeta {
 
 export const EXAMPLES: readonly ExampleMeta[] = [
   {
+    route: 'example-video',
+    title: 'Video, every way it arrives',
+    description:
+      'One page, sixteen cards, each making a single claim about the video pipeline checkable by looking at it. ' +
+      'The same six seconds of test pattern arrives as a url, as a blob, as a data URL and as a series of range ' +
+      'requests, and should be indistinguishable all four ways. Beside them: a fragmented MP4, which is what a ' +
+      'DASH or HLS segment is; a file with its moov at the end, which is what a camera writes; VP9 and AV1, which ' +
+      'the platform decodes or refuses by name; a file with sound, whose audio track is read but not played, ' +
+      'because AudioContext does not exist on a worker; a poster; a still; half speed; two elements sharing one ' +
+      'decode; a transport with a scrubber and captions; and a source that is not there. The clips draw their own ' +
+      'frame counter, so a seek landing on the wrong frame is visible rather than something to take on trust. The ' +
+      'last card is a long way down the page and is not decoding until you reach it.',
+    source: 'apps/playground/src/examples/VideoExampleApp.tsx',
+    tags: [
+      'video',
+      'WebCodecs',
+      'MP4',
+      'fragmented MP4',
+      'range requests',
+      'captions',
+      'WebVTT',
+      'codecs',
+      'JSX',
+      'render worker'
+    ]
+  },
+  {
     route: 'example-transitions',
     title: 'Playlists, and the transition between them',
     description:

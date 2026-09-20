@@ -1,0 +1,17 @@
+WEBVTT - Captions for the six second test clip
+
+1
+00:00.000 --> 00:01.500
+The counter in the corner is the frame number.
+
+2
+00:01.500 --> 00:03.000
+Drag the scrubber: the number should land where you left it.
+
+3
+00:03.000 --> 00:04.500
+A seek starts at the keyframe before the target,
+
+4
+00:04.500 --> 00:06.000
+and decodes forward without showing the gap.

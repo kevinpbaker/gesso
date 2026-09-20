@@ -17,6 +17,7 @@ import { mountModifiersRoute } from './routes/ModifiersRoute';
 import { mountRouterExampleRoute } from './routes/RouterExampleRoute';
 import { mountThemeExampleRoute } from './routes/ThemeExampleRoute';
 import { mountTransitionsExampleRoute } from './routes/TransitionsExampleRoute';
+import { mountVideoExampleRoute } from './routes/VideoExampleRoute';
 import { mountTransitionsStandaloneRoute } from './routes/TransitionsStandaloneRoute';
 import { mountWebGPURoute } from './routes/WebGPURoute';
 import { DEFAULT_ROUTE_ID, findRoute, routeIdFromHash, ROUTES } from './shell/routes';
@@ -52,6 +53,7 @@ const MOUNTS: Record<string, Mount> = {
   'example-paint': mountPaintRoute,
   'example-input': mountInputExampleRoute,
   'example-layout': mountLayoutExampleRoute,
+  'example-video': mountVideoExampleRoute,
   'example-transitions': mountTransitionsExampleRoute,
   'transitions-app': mountTransitionsStandaloneRoute
 };

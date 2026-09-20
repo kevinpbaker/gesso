@@ -94,6 +94,12 @@ export const ROUTES: readonly RouteMeta[] = [
     parent: 'examples'
   },
   {
+    id: 'example-video',
+    label: 'Video',
+    title: 'Example · every way a clip arrives, decoded in the render worker',
+    parent: 'examples'
+  },
+  {
     id: 'example-transitions',
     label: 'Transitions',
     title: 'Example · shared elements across a route change, and a video that keeps playing',
