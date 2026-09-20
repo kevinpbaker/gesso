@@ -112,30 +112,40 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
-interface PaginationProps extends ControlLayoutProps {
-  page?: number;
-  defaultPage?: number;
-  onChange?: (page: number) => void;
-  pageCount: number;
-  siblings?: number;
-  boundaries?: boolean;
+type LinkUnderline = 'always' | 'hover' | 'none';
+interface LinkProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
   label?: string;
+  href?: string;
+  onPress?: () => void;
   disabled?: boolean;
-  size?: ButtonSize;
+  underline?: LinkUnderline;
+  children?: UiChild;
 }
-declare function Pagination(inputs: Inputs<PaginationProps>, _ctx: ComponentContext): UiChild;
-interface BreadcrumbItem {
-  readonly value: string;
-  readonly label: string;
+declare function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild;
+type AlertTone = 'neutral' | 'accent' | 'danger';
+interface AlertProps extends ControlLayoutProps {
+  title?: string;
+  message?: string;
+  tone?: AlertTone;
+  live?: boolean;
+  onDismiss?: () => void;
+  children?: UiChild;
 }
-interface BreadcrumbProps extends ControlLayoutProps {
-  items: readonly BreadcrumbItem[];
-  onSelect?: (value: string) => void;
+declare function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChild;
+type MeterOptimum = 'low' | 'high';
+interface MeterProps extends ControlLayoutProps {
+  value: number;
+  min?: number;
+  max?: number;
   label?: string;
-  separator?: string;
-  maxItems?: number;
+  low?: number;
+  high?: number;
+  optimum?: MeterOptimum;
+  showValue?: boolean;
+  format?: (value: number) => string;
 }
-declare function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContext): UiChild;
+declare function Meter(inputs: Inputs<MeterProps>, _ctx: ComponentContext): UiChild;
 interface SegmentedOption {
   readonly value: string;
   readonly label: string;
@@ -151,40 +161,30 @@ interface SegmentedControlProps extends ControlLayoutProps {
   size?: ButtonSize;
 }
 declare function SegmentedControl(inputs: Inputs<SegmentedControlProps>, ctx: ComponentContext): UiChild;
-type MeterOptimum = 'low' | 'high';
-interface MeterProps extends ControlLayoutProps {
-  value: number;
-  min?: number;
-  max?: number;
-  label?: string;
-  low?: number;
-  high?: number;
-  optimum?: MeterOptimum;
-  showValue?: boolean;
-  format?: (value: number) => string;
+interface BreadcrumbItem {
+  readonly value: string;
+  readonly label: string;
 }
-declare function Meter(inputs: Inputs<MeterProps>, _ctx: ComponentContext): UiChild;
-type AlertTone = 'neutral' | 'accent' | 'danger';
-interface AlertProps extends ControlLayoutProps {
-  title?: string;
-  message?: string;
-  tone?: AlertTone;
-  live?: boolean;
-  onDismiss?: () => void;
-  children?: UiChild;
-}
-declare function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChild;
-type LinkUnderline = 'always' | 'hover' | 'none';
-interface LinkProps extends ControlLayoutProps {
-  ref?: UiNodeRef;
+interface BreadcrumbProps extends ControlLayoutProps {
+  items: readonly BreadcrumbItem[];
+  onSelect?: (value: string) => void;
   label?: string;
-  href?: string;
-  onPress?: () => void;
+  separator?: string;
+  maxItems?: number;
+}
+declare function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContext): UiChild;
+interface PaginationProps extends ControlLayoutProps {
+  page?: number;
+  defaultPage?: number;
+  onChange?: (page: number) => void;
+  pageCount: number;
+  siblings?: number;
+  boundaries?: boolean;
+  label?: string;
   disabled?: boolean;
-  underline?: LinkUnderline;
-  children?: UiChild;
+  size?: ButtonSize;
 }
-declare function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild;
+declare function Pagination(inputs: Inputs<PaginationProps>, _ctx: ComponentContext): UiChild;
 type ChipVariant = 'filled' | 'outlined';
 type ChipSize = 'small' | 'medium';
 interface ChipProps extends ControlLayoutProps {

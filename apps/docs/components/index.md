@@ -4,14 +4,14 @@ description: What gesso-components is, the contract every control in it honours,
 
 # Components
 
-`gesso-components` is the library a screen is built out of: twenty-eight
+`gesso-components` is the library a screen is built out of: thirty-nine
 controls, from a checkbox to a virtualized table, all of them themed,
 keyboard operable and announced to an assistive technology from the day
 they were written.
 
 They are ordinary components. Each one is a function that runs once and
 returns elements, built from `gesso-core` and nothing you do not also
-have. What the library adds is that the same twenty-eight answer the
+have. What the library adds is that the same thirty-nine answer the
 same four questions the same way, so learning one control is most of
 learning the rest.
 
@@ -138,10 +138,12 @@ Each control gets one page, in this shape.
 
 The pages, by what they are for:
 
-- **Acting:** [Button](/components/button).
+- **Acting:** [Button](/components/button), [Link](/components/link).
 - **Choosing:** [Checkbox](/components/checkbox),
   [Chip](/components/chip), [Switch](/components/switch),
-  [RadioGroup](/components/radio-group), [Select](/components/select).
+  [RadioGroup](/components/radio-group),
+  [SegmentedControl](/components/segmented-control),
+  [Select](/components/select).
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
   [Slider](/components/slider), [NumberInput](/components/number-input).
 - **Showing data:** [DataTable](/components/data-table),
@@ -150,16 +152,20 @@ The pages, by what they are for:
   [Accordion](/components/accordion), [Card](/components/card),
   [Divider](/components/divider), [Toolbar](/components/toolbar),
   [SplitPane](/components/split-pane), [FindBar](/components/find-bar).
+- **Finding the way around one:** [Breadcrumb](/components/breadcrumb),
+  [Pagination](/components/pagination).
 - **Layering over a screen:** [Dialog](/components/dialog),
   [Menu](/components/menu), [Tooltip](/components/tooltip),
   [Toast](/components/toast).
 - **Showing media:** [Image](/components/image),
   [Avatar](/components/avatar), [Video](/components/video),
   [Icon](/components/icon).
-- **Marking:** [Badge](/components/badge).
+- **Marking, and saying so:** [Badge](/components/badge),
+  [Alert](/components/alert).
 - **Reporting progress:** [Spinner](/components/spinner),
   [ProgressBar](/components/progress-bar),
   [Skeleton](/components/skeleton).
+- **Reporting a measurement:** [Meter](/components/meter).
 
 For a tour of the library rather than a reference,
 [using components](/guide/using-components) builds the form above.

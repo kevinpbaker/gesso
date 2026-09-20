@@ -21,12 +21,12 @@ export {
   type ControlTokens
 } from './tokens';
 export { Checkbox, type CheckboxProps } from './Checkbox';
-export { Pagination, type PaginationProps } from './Pagination';
-export { Breadcrumb, type BreadcrumbProps, type BreadcrumbItem } from './Breadcrumb';
-export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './SegmentedControl';
-export { Meter, type MeterProps, type MeterOptimum } from './Meter';
-export { Alert, type AlertProps, type AlertTone } from './Alert';
 export { Link, type LinkProps, type LinkUnderline } from './Link';
+export { Alert, type AlertProps, type AlertTone } from './Alert';
+export { Meter, type MeterProps, type MeterOptimum } from './Meter';
+export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './SegmentedControl';
+export { Breadcrumb, type BreadcrumbProps, type BreadcrumbItem } from './Breadcrumb';
+export { Pagination, type PaginationProps } from './Pagination';
 export { Chip, type ChipProps, type ChipSize, type ChipVariant } from './Chip';
 export { Switch, type SwitchProps } from './Switch';
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';
