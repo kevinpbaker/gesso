@@ -3025,6 +3025,7 @@ interface UiTimerFrameClockOptions {
   now?: () => UiFrameTime;
 }
 interface UiHostFrameClockOptions {
+  requestAnimationFrame?: ((callback: (time: number) => void) => number) | null;
   fallbackMs?: number;
   stallMs?: number;
   minStallMs?: number;
@@ -3055,8 +3056,11 @@ declare class UiHostFrameClock implements UiFrameClock {
   private readonly stallMs;
   private readonly minStallMs;
   private readonly now;
+  private readonly local;
+  private localHandle;
   constructor(onFrame: (time: UiFrameTime) => void,
   onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
+  get isLocal(): boolean;
   requestFrame(): void;
   private armTimer;
   private watchMs;
@@ -6504,7 +6508,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CRBbATa_.js";
+} from "./index-DAdauEn9.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7396,7 +7400,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CRBbATa_.js";
+} from "./index-DAdauEn9.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

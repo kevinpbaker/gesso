@@ -1,6 +1,6 @@
 {
   "name": "gesso-electrobun",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Run a Gesso application in an Electrobun window, with its stores in the main process.",
   "license": "MIT",
   "author": "Kevin Baker",

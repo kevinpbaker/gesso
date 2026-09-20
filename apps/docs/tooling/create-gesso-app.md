@@ -97,7 +97,8 @@ forward.
 **pnpm and npm both work.** `pnpm pack` rewrites `workspace:^` into
 `^0.1.0`, so the packed `gesso-framework` asks for `gesso-core@^0.1.0`
 and an installer left alone resolves that off the registry rather than
-from the tarball beside it — a different copy than the one you packed.
+from the tarball beside it, which is a different copy than the one you
+packed.
 Each package manager has to be pointed at the tarballs instead:
 `overrides` in `package.json` is what npm reads, and `overrides` in
 `pnpm-workspace.yaml` is the only place pnpm 11 reads them from. The CLI writes both, and the generated README says

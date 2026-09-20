@@ -1,5 +1,12 @@
 # gesso-devtools
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies [be07839]
+  - gesso-framework@0.2.0
+
 ## 0.1.0
 
 First public release.
