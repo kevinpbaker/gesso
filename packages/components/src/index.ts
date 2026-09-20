@@ -114,3 +114,11 @@ export {
 export { controlDescription, controlMessage } from './message';
 export { trackFocus, type ControlFocus } from './focus';
 export { keymap, quantize, type ControlLayoutProps, type Keymap } from './internals';
+export { VideoPlayer, Captions, clockTime, type VideoPlayerProps, type CaptionsProps } from './VideoPlayer';
+export {
+  VideoControls,
+  followTransport,
+  type VideoControlsOptions,
+  type VideoControlsProps,
+  type VideoReadout
+} from './VideoControls';

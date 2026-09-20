@@ -21,7 +21,11 @@ import {
   UiThemeExtension,
   UiTrackSize,
   UiTypographyRole,
-  UiVirtualWindow
+  UiVirtualWindow,
+  VideoClock,
+  VideoState,
+  VideoTransport,
+  VttCue
 } from "gesso-core";
 import {
   ComponentContext,
@@ -29,6 +33,7 @@ import {
   ControlledValue,
   InputCell,
   Inputs,
+  InternalState,
   OverlayPlacement,
   ReadableCell,
   ResourceStatus
@@ -261,6 +266,7 @@ interface SliderProps extends ControlLayoutProps {
   disabled?: boolean;
   format?: (value: number) => string;
   labelHidden?: boolean;
+  trackAlign?: 'center' | 'start';
 }
 declare function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
 interface NumberInputProps extends ControlLayoutProps {
@@ -497,6 +503,34 @@ interface TreeProps extends ControlLayoutProps {
   label?: string;
 }
 declare function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
+interface VideoControlsOptions {
+  playPause?: boolean;
+  scrubber?: boolean;
+  time?: boolean;
+  volume?: boolean;
+  fullscreen?: boolean;
+  alwaysVisible?: boolean;
+}
+interface VideoReadout {
+  readonly position: InternalState<number>;
+  readonly duration: InternalState<number>;
+  readonly paused: InternalState<boolean>;
+  readonly volume: InternalState<number>;
+  readonly muted: InternalState<boolean>;
+}
+declare function followTransport(ctx: ComponentContext, transport: Observable<VideoTransport | null>): VideoReadout;
+interface VideoControlsProps {
+  transport: VideoTransport | null;
+  options?: VideoControlsOptions;
+  visible?: boolean;
+  volumeWired?: boolean;
+  fullscreenActive?: boolean;
+  onFullscreen?: (enter: boolean) => void;
+  background?: UiColorValue;
+  color?: UiColorValue;
+}
+declare function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: ComponentContext): UiChild;
+declare function clockTime(seconds: number): string;
 interface MediaPlaceholderProps {
   placeholderColor?: UiColorValue;
 }
@@ -516,6 +550,16 @@ interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
   borderRadius?: number;
   loop?: boolean;
   autoplay?: boolean;
+  rate?: number;
+  volume?: number;
+  muted?: boolean;
+  poster?: string;
+  pauseWhenHidden?: boolean;
+  clock?: VideoClock;
+  controls?: boolean | VideoControlsOptions;
+  onTransport?: (transport: VideoTransport) => void;
+  onVolume?: (volume: number, muted: boolean) => void;
+  onState?: (state: VideoState, error?: unknown) => void;
 }
 declare function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChild;
 interface IconProps extends ControlLayoutProps {
@@ -709,6 +753,25 @@ interface ControlFocus {
   focus(): void;
 }
 declare function trackFocus(ctx: ComponentContext, forwarded?: InputCell<UiNodeRef | undefined>): ControlFocus;
+interface CaptionsProps extends ControlLayoutProps {
+  cues: readonly VttCue[];
+  position: number;
+  background?: UiColorValue;
+  color?: UiColorValue;
+}
+declare function Captions(inputs: Inputs<CaptionsProps>, _ctx: ComponentContext): UiChild;
+interface VideoPlayerProps extends ControlLayoutProps {
+  src: string;
+  alt?: string;
+  captions?: readonly VttCue[];
+  autoplay?: boolean;
+  loop?: boolean;
+  objectFit?: ObjectFit;
+  borderRadius?: number;
+  onTransport?: (transport: VideoTransport) => void;
+  onVolume?: (volume: number, muted: boolean) => void;
+}
+declare function VideoPlayer(inputs: Inputs<VideoPlayerProps>, ctx: ComponentContext): UiChild;
 export {
   Accordion,
   Alert,
@@ -717,9 +780,11 @@ export {
   Badge,
   Breadcrumb,
   Button,
+  Captions,
   Card,
   Checkbox,
   Chip,
+  clockTime,
   controlDescription,
   controlled,
   controlMessage,
@@ -731,6 +796,7 @@ export {
   field,
   fieldArray,
   FindBar,
+  followTransport,
   form,
   Icon,
   Image,
@@ -788,6 +854,7 @@ export {
   type ButtonTokens,
   type ButtonTone,
   type ButtonVariant,
+  type CaptionsProps,
   type CardProps,
   type CheckboxProps,
   type ChipProps,
@@ -859,9 +926,15 @@ export {
   type TreeProps,
   type Validator,
   type ValueOf,
+  type VideoControlsOptions,
+  type VideoControlsProps,
+  type VideoPlayerProps,
   type VideoProps,
+  type VideoReadout,
   type VirtualList,
   useOverlay,
   Video,
+  VideoControls,
+  VideoPlayer,
   virtualList
 };

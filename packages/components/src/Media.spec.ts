@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from 'gesso-framework';
+import { createComponent, FocusService, ShellService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import {
   Box,
@@ -21,7 +21,8 @@ import {
   type UiColorValue,
   type UiVideoSurface,
   type VideoPlayback,
-  type VideoResolver
+  type VideoResolver,
+  type VideoTransport
 } from 'gesso-core';
 import { Icon, Image, ProgressBar, Spinner, Video } from './Media';
 
@@ -448,10 +449,13 @@ class FakePlayback implements VideoPlayback {
   readonly duration = 4;
   readonly frameDurationMs = 100;
   positionMs = 0;
+  /** Every position it was asked for, which is how the specs below read time. */
+  readonly presented: number[] = [];
   private readonly listeners = new Set<(error: unknown) => void>();
 
   present(positionMs: number): boolean {
     this.positionMs = positionMs;
+    this.presented.push(positionMs);
     return true;
   }
 
@@ -482,7 +486,13 @@ function mountVideo(root: UiChild, options: { fails?: boolean } = {}) {
     release: () => {},
     dispose: () => {}
   };
-  const mounted = renderTest(root, { media: { videoResolver: resolver } });
+  // An image resolver as well, for the poster: a `Video` given one
+  // carries both, and the default resolver has no network here.
+  const images = new DefaultImageResolver({
+    fetch: () => Promise.resolve(new Blob()),
+    decode: () => Promise.resolve(fakeBitmap(40, 20))
+  });
+  const mounted = renderTest(root, { media: { videoResolver: resolver, resolver: images } });
   return { ...mounted, playback };
 }
 
@@ -542,6 +552,775 @@ describe('Video', () => {
     // like.
     expect(node!.properties.get('video')).toBeUndefined();
     expect(node!.properties.get('backgroundColor')).toBe('danger');
+  });
+
+  it('hands out a transport once there is a playback to drive', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          onTransport: (next: VideoTransport) => (transport = next),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+
+    // Not before: a playback does not exist until a file has been
+    // fetched and a decoder configured.
+    expect(transport).toBeNull();
+    await mounted.settle();
+
+    expect(transport).not.toBeNull();
+    expect(transport!.duration).toBe(4);
+    expect(transport!.paused).toBe(false);
+    expect(transport!.rate).toBe(1);
+  });
+
+  it('starts paused when it was told not to autoplay, and plays when asked', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          autoplay: false,
+          onTransport: (next: VideoTransport) => (transport = next),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+    await mounted.settle();
+    expect(transport!.paused).toBe(true);
+
+    mounted.playback.presented.length = 0;
+    mounted.frame(100);
+    mounted.frame(200);
+    // Time is not moving, so nothing is asked for.
+    expect(mounted.playback.presented).toEqual([]);
+
+    transport!.play();
+    expect(transport!.paused).toBe(false);
+    mounted.frame(300);
+    mounted.frame(400);
+    expect(mounted.playback.presented.length).toBeGreaterThan(0);
+  });
+
+  it('stops asking for pictures once it is paused, and starts again on play', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          onTransport: (next: VideoTransport) => (transport = next),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+    await mounted.settle();
+
+    mounted.frame(100);
+    mounted.frame(200);
+    transport!.pause();
+    mounted.playback.presented.length = 0;
+
+    mounted.frame(300);
+    mounted.frame(400);
+    expect(mounted.playback.presented).toEqual([]);
+
+    transport!.play();
+    mounted.frame(500);
+    mounted.frame(600);
+    expect(mounted.playback.presented.length).toBeGreaterThan(0);
+  });
+
+  it('moves the picture on a seek even while paused', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          autoplay: false,
+          onTransport: (next: VideoTransport) => (transport = next),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+    await mounted.settle();
+    mounted.playback.presented.length = 0;
+
+    transport!.seek(2.5);
+
+    // Written straight through rather than waiting for a frame the
+    // tween is never going to sample: a scrubber dragged on a paused
+    // clip is the whole reason `seek` exists.
+    expect(mounted.playback.presented).toEqual([2500]);
+    expect(transport!.position).toBe(2.5);
+    expect(transport!.paused).toBe(true);
+  });
+
+  it('clamps a seek to the clip rather than running off either end', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          // Paused, so the clamp is the only thing moving the
+          // position: a *playing* clip seeked to its own end has
+          // reached the end, and the test below is about that.
+          autoplay: false,
+          onTransport: (n: VideoTransport) => (transport = n)
+        })
+      )
+    );
+    await mounted.settle();
+
+    transport!.seek(-10);
+    expect(transport!.position).toBe(0);
+    transport!.seek(9999);
+    expect(transport!.position).toBe(4);
+  });
+
+  it('wraps to the start when a looping clip is seeked to its end', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', onTransport: (n: VideoTransport) => (transport = n) }))
+    );
+    await mounted.settle();
+
+    transport!.seek(4);
+
+    // The end of a loop is the start of it, and a clip that stopped
+    // dead on its last frame having been dragged there would be a
+    // looping clip that had stopped looping.
+    expect(transport!.position).toBe(0);
+    expect(transport!.paused).toBe(false);
+  });
+
+  it('stops on the last frame when a clip that does not loop reaches the end', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, { src: 'clip.mp4', loop: false, onTransport: (n: VideoTransport) => (transport = n) })
+      )
+    );
+    await mounted.settle();
+
+    transport!.seek(4);
+    expect(transport!.position).toBe(4);
+    expect(transport!.paused).toBe(true);
+
+    // And playing it again starts it over, which is what every player
+    // does and what showing the last frame forever would not.
+    transport!.play();
+    expect(transport!.position).toBe(0);
+    expect(transport!.paused).toBe(false);
+  });
+
+  it('clamps a rate to something a decoder can keep up with', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', onTransport: (n: VideoTransport) => (transport = n) }))
+    );
+    await mounted.settle();
+
+    transport!.setRate(100);
+    expect(transport!.rate).toBe(4);
+    transport!.setRate(0);
+    expect(transport!.rate).toBe(0.0625);
+    transport!.setRate(Number.NaN);
+    expect(transport!.rate).toBe(1);
+  });
+
+  it('runs at the rate it was given', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', onTransport: (n: VideoTransport) => (transport = n) }))
+    );
+    await mounted.settle();
+
+    mounted.frame(0);
+    mounted.frame(1000);
+    const atNormalRate = transport!.position;
+
+    transport!.seek(0);
+    transport!.setRate(2);
+    mounted.frame(2000);
+    mounted.frame(3000);
+
+    // A second of frames at double speed covers twice the clip.
+    expect(transport!.position).toBeCloseTo(atNormalRate * 2, 5);
+  });
+
+  it('tells a listener when the clip is acted on, and not on every frame', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', onTransport: (n: VideoTransport) => (transport = n) }))
+    );
+    await mounted.settle();
+
+    let changes = 0;
+    const stop = transport!.onChange(() => changes++);
+
+    mounted.frame(100);
+    mounted.frame(200);
+    // Position moves every frame and is deliberately not a change: a
+    // listener woken sixty times a second to move a scrubber by a
+    // pixel is how a video costs an application its frame budget.
+    expect(changes).toBe(0);
+
+    transport!.pause();
+    transport!.play();
+    expect(changes).toBe(2);
+
+    stop();
+    transport!.pause();
+    expect(changes).toBe(2);
+  });
+
+  /**
+   * Drives a clip that is simply playing, which `frame()` alone cannot.
+   *
+   * A video declares its own frame interval, so between pictures the
+   * runtime is asleep on a timer rather than asking for frames it
+   * would draw nothing on — `clock.isPending` is false and `frame()`
+   * is a no-op. So the timers have to be fake from the start, and the
+   * clip is advanced by letting its interval elapse before each frame.
+   * `VideoExample.spec` drives the documentation's clips the same way
+   * and says the same thing about why.
+   */
+  async function play(mounted: ReturnType<typeof mountVideo>, frames: number): Promise<number[]> {
+    await vi.advanceTimersByTimeAsync(0);
+    mounted.playback.presented.length = 0;
+    for (let index = 1; index <= frames; index++) {
+      await vi.advanceTimersByTimeAsync(100);
+      mounted.frame(index * 100);
+    }
+    return mounted.playback.presented;
+  }
+
+  it('does not decode for a clip scrolled past the bottom of the page', async () => {
+    vi.useFakeTimers();
+    try {
+      const mounted = mountVideo(
+        Column(
+          {},
+          // Taller than the 600 the test surface is, and refusing to
+          // shrink to it, so the clip below is laid out somewhere
+          // nobody can see. Without `flexShrink: 0` the column fits
+          // the spacer to the surface and the clip stays in view,
+          // which is a test that passes for the wrong reason.
+          Box({ height: 900, flexShrink: 0 }),
+          // The clip refuses to shrink too: an over-full column
+          // squeezes its last child to nothing, and a clip laid out to
+          // zero height is one this modifier deliberately treats as
+          // unmeasured rather than as hidden.
+          createComponent(Video, { src: 'clip.mp4', width: 40, height: 20, flexShrink: 0 })
+        )
+      );
+
+      // A page of clips used to cost the sum of all of them however
+      // few were on screen. The position is left exactly where it
+      // stopped, so coming back into view resumes rather than reloads.
+      expect(await play(mounted, 3)).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('decodes for a clip that is on screen', async () => {
+    vi.useFakeTimers();
+    try {
+      const mounted = mountVideo(
+        Column({}, Box({ height: 100 }), createComponent(Video, { src: 'clip.mp4', width: 40, height: 20 }))
+      );
+
+      expect((await play(mounted, 3)).length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps decoding off screen when it was told to', async () => {
+    vi.useFakeTimers();
+    try {
+      const mounted = mountVideo(
+        Column(
+          {},
+          Box({ height: 900, flexShrink: 0 }),
+          createComponent(Video, { src: 'clip.mp4', pauseWhenHidden: false, width: 40, height: 20, flexShrink: 0 })
+        )
+      );
+
+      // For a clip being drawn somewhere the layout cannot account
+      // for: into a shared element mid-flight, or off screen on
+      // purpose so it is warm when it arrives.
+      expect((await play(mounted, 3)).length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('draws a poster under the clip until there is a frame', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          poster: 'still.png',
+          ref: (n: UiNode | null) => (node = n),
+          width: 40,
+          height: 20
+        })
+      )
+    );
+    await mounted.settle();
+
+    // Both sit on the node: a renderer draws the video's frame where
+    // there is one and falls back to the image where there is not, so
+    // the poster is also what a clip that failed mid-stream shows.
+    expect(node!.properties.get('image')).toBeDefined();
+    expect(node!.properties.get('video')).toBe(mounted.playback.surface);
+  });
+
+  it('draws no controls unless it is asked for them', async () => {
+    const mounted = mountVideo(Column({}, createComponent(Video, { src: 'clip.mp4', width: 40, height: 20 })));
+    await mounted.settle();
+
+    // A `Video` is as often a background or a texture as it is
+    // something to watch, and chrome over one of those is noise.
+    expect(mounted.queryByRole('toolbar')).toBeNull();
+    expect(mounted.queryByRole('button', { name: 'Play' })).toBeNull();
+  });
+
+  it('draws a transport over the picture when it is', async () => {
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, width: 360, height: 200 }))
+    );
+    await mounted.settle();
+
+    // `Video` autoplays, so the button offers the action that is
+    // available rather than the one already taken.
+    expect(mounted.getByRole('toolbar', { name: 'Video controls' })).toBeTruthy();
+    expect(mounted.getByRole('button', { name: 'Pause' })).toBeTruthy();
+    expect(mounted.getByRole('slider', { name: 'Seek' })).toBeTruthy();
+  });
+
+  it('becomes a group rather than an image once it carries controls', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          ref: (n: UiNode | null) => (node = n),
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    // A rectangle showing a picture is an image. One that also carries
+    // a toolbar is not: announcing it as an image would hide the
+    // controls behind a leaf.
+    expect(mounted.getSemantics(node!).role).toBe('group');
+    expect(mounted.getByRole('group', { name: 'A clip' })).toBe(node);
+    expect(mounted.queryByRole('image')).toBeNull();
+  });
+
+  it('runs the scrubber along the top edge of the bar, the whole width of it', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          ref: (n: UiNode | null) => (node = n),
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    const video = mounted.getLayout(node!);
+    const bar = mounted.getLayout(mounted.getByRole('toolbar'));
+    const seek = mounted.getLayout(mounted.getByRole('slider', { name: 'Seek' }));
+
+    // Edge to edge, and sitting on the boundary between the picture
+    // and the controls under it: the line is where the clip stops
+    // and the chrome starts, so any inset would read as a mistake.
+    expect(bar.width).toBe(video.width);
+    expect(seek.width).toBe(bar.width);
+    expect(seek.x).toBe(bar.x);
+    expect(seek.y).toBe(bar.y);
+  });
+
+  it('plays and pauses from the bar', async () => {
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          autoplay: false,
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Play' }));
+    await mounted.settle();
+    expect(mounted.getByRole('button', { name: 'Pause' })).toBeTruthy();
+
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Pause' }));
+    await mounted.settle();
+    expect(mounted.getByRole('button', { name: 'Play' })).toBeTruthy();
+  });
+
+  it('changes the play glyph and not just its name', async () => {
+    (globalThis as { Path2D?: unknown }).Path2D = class {
+      constructor(readonly d: string) {}
+    };
+    try {
+      const { rasterizer } = recordingRasterizer();
+      const playback = new FakePlayback();
+      const videoResolver: VideoResolver = {
+        resolve: () => Promise.resolve(playback),
+        release: () => {},
+        dispose: () => {}
+      };
+      const mounted = renderTest(
+        Column(
+          {},
+          createComponent(Video, {
+            src: 'clip.mp4',
+            alt: 'A clip',
+            controls: true,
+            autoplay: false,
+            width: 360,
+            height: 200
+          })
+        ),
+        { media: { videoResolver, rasterizer } }
+      );
+      await mounted.settle();
+
+      // The rasteriser caches one entry per distinct glyph, so a new
+      // entry is a new picture actually drawn. `Button` reads
+      // `children` once by value, so an observable of elements is
+      // sampled when the button is built and never again: the name
+      // changed and the glyph did not.
+      const drawn = rasterizer.size;
+      expect(drawn).toBeGreaterThan(0);
+
+      mounted.fireEvent.click(mounted.getByRole('button', { name: 'Play' }));
+      await mounted.settle();
+
+      expect(mounted.getByRole('button', { name: 'Pause' })).toBeTruthy();
+      expect(rasterizer.size).toBeGreaterThan(drawn);
+    } finally {
+      delete (globalThis as { Path2D?: unknown }).Path2D;
+    }
+  });
+
+  it('fills the screen with the clip, not merely with the application', async () => {
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          autoplay: false,
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    const shell = mounted.runtime.services.get(ShellService);
+    const asked: boolean[] = [];
+    mounted.runtime.onShellRequest(request => {
+      if (request.type === 'fullscreen') {
+        asked.push(request.enter);
+      }
+    });
+
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Fullscreen' }));
+    await mounted.settle();
+
+    // The shell is asked, because the canvas is the only real element
+    // there is and something has to fill the screen.
+    expect(asked).toEqual([true]);
+    // But asking is only half of it: until the shell says it happened,
+    // nothing is drawn over anything.
+    expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(1);
+
+    shell.applyFullscreen(true);
+    await mounted.settle();
+
+    // Now there are two: the clip in place, and a copy pinned to every
+    // edge of the viewport. They share one playback, because playback
+    // is reference counted by source.
+    expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(2);
+
+    shell.applyFullscreen(false);
+    await mounted.settle();
+    expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(1);
+  });
+
+  it('takes the copy away when the person leaves fullscreen by some other means', async () => {
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, width: 360, height: 200 }))
+    );
+    await mounted.settle();
+    const shell = mounted.runtime.services.get(ShellService);
+
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Fullscreen' }));
+    shell.applyFullscreen(true);
+    await mounted.settle();
+    expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(2);
+
+    // Escape leaves fullscreen without telling anyone who asked, and a
+    // copy left on the overlay would then cover an application that is
+    // no longer filling the screen.
+    shell.applyFullscreen(false);
+    await mounted.settle();
+    expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(1);
+  });
+
+  it('does not put a clip on the overlay because some other thing went fullscreen', async () => {
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, width: 360, height: 200 }))
+    );
+    await mounted.settle();
+
+    // The shell's flag is the whole application's, and this clip did
+    // not ask.
+    mounted.runtime.services.get(ShellService).applyFullscreen(true);
+    await mounted.settle();
+
+    expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(1);
+  });
+
+  it('draws its glyphs in its own ink rather than the theme control colour', async () => {
+    (globalThis as { Path2D?: unknown }).Path2D = class {
+      constructor(readonly d: string) {}
+    };
+    try {
+      const { rasterizer, fills } = recordingRasterizer();
+      const playback = new FakePlayback();
+      const videoResolver: VideoResolver = {
+        resolve: () => Promise.resolve(playback),
+        release: () => {},
+        dispose: () => {}
+      };
+      const mounted = renderTest(
+        Column(
+          {},
+          createComponent(Video, {
+            src: 'clip.mp4',
+            alt: 'A clip',
+            controls: true,
+            onVolume: () => {},
+            width: 360,
+            height: 200
+          })
+        ),
+        { media: { videoResolver, rasterizer } }
+      );
+      await mounted.settle();
+
+      // The bar sits on a plate over a picture, and the theme cannot
+      // know what is behind it. `Icon` defaults to `controlForeground`,
+      // which took the theme's control ink and disappeared wherever
+      // that was dark: in fullscreen it vanished outright, because the
+      // overlay layer inherits no theme and falls back to the light
+      // one.
+      expect(fills.length).toBeGreaterThan(0);
+      expect(fills.every(fill => fill === '#fff')).toBe(true);
+    } finally {
+      delete (globalThis as { Path2D?: unknown }).Path2D;
+    }
+  });
+
+  it('keeps the bar hidden until the pointer is over the clip', async () => {
+    let node: UiNode | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          // Paused, which used to be enough to keep the bar up on its
+          // own: every clip that had not been started yet wore its
+          // chrome permanently, which is not what a bar that hides
+          // itself is for.
+          autoplay: false,
+          ref: (n: UiNode | null) => (node = n),
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    const bar = mounted.getByRole('toolbar');
+    expect(bar.properties.get('opacity')).toBe(0);
+
+    const box = mounted.getLayout(node!);
+    mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
+    await mounted.settle();
+    expect(bar.properties.get('opacity')).toBe(1);
+
+    mounted.fireEvent.pointerMove(box.x + box.width + 40, box.y + box.height + 40);
+    await mounted.settle();
+    expect(bar.properties.get('opacity')).toBe(0);
+  });
+
+  it('keeps the bar up while something inside it has the keyboard', async () => {
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, width: 360, height: 200 }))
+    );
+    await mounted.settle();
+
+    const bar = mounted.getByRole('toolbar');
+    expect(bar.properties.get('opacity')).toBe(0);
+
+    // Tabbing into a bar that then hid itself would move focus
+    // somewhere nobody can see, which is the one thing the hover rule
+    // on its own gets wrong.
+    mounted.runtime.services.get(FocusService).focus(mounted.getByRole('slider', { name: 'Seek' }));
+    await mounted.settle();
+    expect(bar.properties.get('opacity')).toBe(1);
+  });
+
+  it('leaves out the parts it was told to leave out', async () => {
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: { scrubber: false, time: false },
+          autoplay: false,
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    expect(mounted.getByRole('button', { name: 'Play' })).toBeTruthy();
+    expect(mounted.queryByRole('slider', { name: 'Seek' })).toBeNull();
+  });
+
+  it('draws no volume control for a clip whose sound is not wired', async () => {
+    const mounted = mountVideo(
+      Column({}, createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, width: 360, height: 200 }))
+    );
+    await mounted.settle();
+
+    // Nothing here plays a clip's sound, so a level slider over
+    // silence would be a lie.
+    expect(mounted.queryByRole('slider', { name: 'Volume' })).toBeNull();
+    expect(mounted.queryByRole('button', { name: 'Mute' })).toBeNull();
+  });
+
+  it('draws one, and reports it, for a clip whose sound is', async () => {
+    const levels: [number, boolean][] = [];
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          onVolume: (volume: number, muted: boolean) => levels.push([volume, muted]),
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+
+    expect(mounted.getByRole('slider', { name: 'Volume' })).toBeTruthy();
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Mute' }));
+    await mounted.settle();
+
+    expect(levels).toEqual([[1, true]]);
+    expect(mounted.getByRole('button', { name: 'Unmute' })).toBeTruthy();
+  });
+
+  it('keeps the level behind a mute so unmuting returns to it', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          controls: true,
+          volume: 0.4,
+          onVolume: () => {},
+          onTransport: (next: VideoTransport) => (transport = next)
+        })
+      )
+    );
+    await mounted.settle();
+
+    transport!.setMuted(true);
+    // A mute that wrote zero would have thrown the level away.
+    expect(transport!.volume).toBe(0.4);
+    transport!.setMuted(false);
+    expect(transport!.volume).toBe(0.4);
+  });
+
+  it('unmutes when the level is dragged up, and does not mute when it is dragged to zero', async () => {
+    let transport: VideoTransport | null = null;
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          controls: true,
+          onVolume: () => {},
+          onTransport: (next: VideoTransport) => (transport = next)
+        })
+      )
+    );
+    await mounted.settle();
+
+    transport!.setMuted(true);
+    transport!.setVolume(0.7);
+    // Dragging a slider up from zero is a request to hear it.
+    expect(transport!.muted).toBe(false);
+
+    transport!.setVolume(0);
+    // And dragging to zero is not a mute: that is what the button is
+    // for, and conflating them loses the level.
+    expect(transport!.muted).toBe(false);
+    expect(transport!.volume).toBe(0);
   });
 
   it('puts the tint back when the decoder gives up, behind the surface it keeps', async () => {

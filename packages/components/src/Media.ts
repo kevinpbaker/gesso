@@ -1,19 +1,22 @@
 import { map, type Observable } from 'rxjs';
 
 import {
+  createComponent,
   input,
   internalState,
   type ComponentContext,
   type InputCell,
   type Inputs,
   MediaService,
-  AnimationService
+  AnimationService,
+  ShellService
 } from 'gesso-framework';
 import {
   steps,
   Box,
   type UiChild,
   type UiElement,
+  type UiNode,
   percent,
   type UiNodeRef,
   type ObjectFit,
@@ -21,9 +24,14 @@ import {
   type UiSemanticState,
   iconSource,
   imageSource,
-  videoSource
+  videoSource,
+  type VideoClock,
+  type VideoState,
+  type VideoTransport
 } from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
+import { useOverlay } from './overlay';
+import { VideoControls, type VideoControlsOptions } from './VideoControls';
 
 /**
  * The Media tier.
@@ -168,6 +176,89 @@ export interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
   loop?: boolean;
   /** Start playing as soon as it is decoded. Defaults to true. */
   autoplay?: boolean;
+  /** How fast to play: 1 is the clip's own rate. Read once, like `src`. */
+  rate?: number;
+  /** Starting level, 0 to 1, for the control and for `onVolume`. Defaults to 1. */
+  volume?: number;
+  muted?: boolean;
+  /**
+   * A still to show until there is a frame to show instead.
+   *
+   * A clip carries its own poster — the first decoded frame is
+   * presented the moment the decoder is configured, playing or not —
+   * so this is for the window *before* that: a file being fetched,
+   * demuxed and configured has nothing to draw for longer than a
+   * picture does, and `placeholderColor` alone is a coloured
+   * rectangle. Point it at something small.
+   *
+   * It stays on the node rather than being cleared, and costs nothing
+   * to: a renderer draws the video's frame where there is one and
+   * falls back to the image where there is not, so the poster is also
+   * what a clip that failed mid-stream comes back to.
+   */
+  poster?: string;
+  /**
+   * Stop decoding while the clip is scrolled out of view. Defaults to
+   * true, and there is very rarely a reason to say otherwise: a clip
+   * nobody can see that keeps decoding costs a frame budget and a
+   * battery for nothing. Pass `false` where the clip is being drawn
+   * somewhere the layout cannot account for — into a shared element
+   * mid-flight, or off screen on purpose so it is warm when it
+   * arrives.
+   */
+  pauseWhenHidden?: boolean;
+  /**
+   * Where the clip's position comes from, when something other than
+   * this clip owns time — sound being played by the shell, most of
+   * all. See `VideoClock`.
+   */
+  clock?: VideoClock;
+  /**
+   * Draw a transport over the bottom of the picture.
+   *
+   * `true` takes the lot: play and pause, a scrubber, the elapsed and
+   * total time, a mute and level where sound is wired, and a
+   * fullscreen button. An object turns individual parts off, or makes
+   * the bar permanent rather than revealing it on hover.
+   *
+   * **The bar is the same components anyone else would use.** It is
+   * `Button`, `Slider` and `Icon` driven through the public
+   * `VideoTransport`, with no privileged access to the decoder, so an
+   * application that wants a different bar builds one the same way and
+   * loses nothing. What this prop buys is not capability but the
+   * default: a clip that behaves the way people expect a clip to
+   * behave, without assembling it.
+   *
+   * Off by default, because a `Video` is as often a background or a
+   * texture as it is something to watch, and chrome over one of those
+   * is noise.
+   */
+  controls?: boolean | VideoControlsOptions;
+  /**
+   * Handed the transport once the clip has a playback to control.
+   *
+   * How a `Video` is driven from outside without `controls`: the
+   * rectangle stays a rectangle and whatever a reader presses is built
+   * beside it.
+   */
+  onTransport?: (transport: VideoTransport) => void;
+  /**
+   * Told when the volume or the mute changed.
+   *
+   * Nothing here plays sound, so this is the wiring an application
+   * supplies to make the level mean something. Supplying it is also
+   * what makes `controls` draw a volume control at all.
+   */
+  onVolume?: (volume: number, muted: boolean) => void;
+  /**
+   * Told when the clip starts loading, gets a picture, or fails.
+   *
+   * The failure carries what went wrong, which is the only place an
+   * application can see it: nothing is drawn for a clip that will not
+   * play beyond the placeholder tint, deliberately, because what to
+   * say about it belongs to the interface and not to a rectangle.
+   */
+  onState?: (state: VideoState, error?: unknown) => void;
 }
 
 /**
@@ -186,10 +277,11 @@ export interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
  */
 export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChild {
   const store = ctx.inject(MediaService);
+  const shell = ctx.inject(ShellService);
   const alt = input(inputs.alt, undefined);
   const objectFit = input(inputs.objectFit, 'cover' as ObjectFit);
   const radius = input(inputs.borderRadius, 0);
-  const status = internalState<'loading' | 'playing' | 'failed'>('loading');
+  const status = internalState<VideoState>('loading');
 
   // Built once, in the body, for the reason `Image`'s source is: the
   // component's body runs once, and a `Video` whose src changes is a
@@ -199,24 +291,178 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
     source: inputs.src.value,
     loop: inputs.loop.value,
     autoplay: inputs.autoplay.value,
-    onState: (next: 'loading' | 'playing' | 'failed') => (status.value = next)
+    rate: inputs.rate.value,
+    pauseWhenHidden: inputs.pauseWhenHidden.value,
+    clock: inputs.clock.value,
+    onState: (next: VideoState, error?: unknown) => {
+      status.value = next;
+      inputs.onState.value?.(next, error);
+    },
+    volume: inputs.volume.value,
+    muted: inputs.muted.value,
+    onVolume: (level: number, silent: boolean) => inputs.onVolume.value?.(level, silent),
+    onReady: (transport: VideoTransport) => {
+      held.value = transport;
+      inputs.onTransport.value?.(transport);
+    }
   };
 
-  return Box({
-    ...layoutOf(inputs),
-    ref: inputs.ref?.value,
-    modifiers: modifiersOf(inputs, videoSource(source)),
-    objectFit,
-    borderRadius: radius,
-    // The same tint `Image` draws, from the same prop: a clip waiting
-    // on a fetch, a demux and a decoder configuration has nothing to
-    // show for longer than a picture does, and a clip that never
-    // resolves has this box and nothing else.
-    backgroundColor: placeholderTint(inputs.placeholderColor, status, 'playing'),
-    role: alt.pipe(map(text => (text === undefined ? undefined : ('image' as const)))),
-    label: alt,
-    selectable: false
-  });
+  const poster = inputs.poster.value;
+  const controls = inputs.controls.value;
+  const wanted: VideoControlsOptions | null =
+    controls === undefined || controls === false ? null : controls === true ? {} : controls;
+  // The transport arrives long after this body has run, so the bar is
+  // built against a cell it fills in rather than against a value.
+  const held = internalState<VideoTransport | null>(null, 'Video.transport');
+  // Hover is the whole of the reveal rule that this box can answer;
+  // the bar itself adds "and whenever it is paused".
+  const hovered = internalState(false, 'Video.hovered');
+
+  /**
+   * Fullscreen is two things, and doing only the first is the bug this
+   * exists to fix.
+   *
+   * The shell can put the **canvas** into fullscreen, because that is
+   * the only real element there is: a clip here is pixels on a surface
+   * shared with the rest of the application, not an element of its
+   * own. So asking the shell and stopping there fills the screen with
+   * the *app*, with the clip still its original size somewhere inside
+   * it, which is not what anybody means by making a video fullscreen.
+   *
+   * The second half is this: while the shell reports fullscreen, the
+   * clip is also drawn into the overlay layer with all four edges
+   * pinned, so it covers the viewport. It is a second `Video` on the
+   * same source, which costs nothing and needs no new machinery,
+   * because playback is reference counted by source: the copy resolves
+   * the playback the inline one is holding and picks it up exactly
+   * where it is. That is the same trick that carries a clip through a
+   * route change.
+   */
+  const overlay = useOverlay(ctx, 'video-fullscreen');
+  /** Whether *this* clip asked. The shell's flag is the whole application's. */
+  let asked = false;
+  /**
+   * This clip's node, so the copy on the overlay can be given the
+   * theme it is standing in.
+   *
+   * The overlay layer re-provides theme, text style and content colour
+   * from whatever node an entry names, and an entry that names none
+   * inherits the root's: a dark application's controls came out of the
+   * default light theme, which is the sort of thing that only shows up
+   * once something is actually drawn over a picture.
+   */
+  let own: UiNode | null = null;
+  const takeRef = (node: UiNode | null): void => {
+    own = node;
+    inputs.ref?.value?.(node);
+  };
+
+  const requestFullscreen = (enter: boolean): void => {
+    asked = enter;
+    shell.requestFullscreen(enter);
+  };
+
+  const barFor = (visible: Observable<boolean> | boolean, active: Observable<boolean>): UiChild =>
+    createComponent(VideoControls, {
+      transport: held,
+      options: wanted ?? {},
+      visible,
+      volumeWired: inputs.onVolume.value !== undefined,
+      fullscreenActive: active,
+      onFullscreen: requestFullscreen
+    });
+
+  const bar = wanted === null ? null : barFor(hovered, shell.fullscreen);
+
+  if (wanted !== null) {
+    const stop = shell.fullscreen.subscribe(active => {
+      if (!active) {
+        // Cleared whether this clip asked or not: Escape leaves
+        // fullscreen without telling anyone, and a copy left on the
+        // overlay would then cover an application that is no longer
+        // filling the screen.
+        asked = false;
+        overlay.hide();
+        return;
+      }
+      if (!asked || overlay.isOpen()) {
+        return;
+      }
+      overlay.show(
+        Box(
+          {
+            width: percent(100),
+            height: percent(100),
+            // The letterbox. A clip fitted to a screen of a different
+            // shape has to sit on something, and black is what every
+            // player puts there.
+            backgroundColor: '#000000',
+            y: 'end'
+          },
+          createComponent(Video, {
+            src: inputs.src.value,
+            alt: inputs.alt.value,
+            // `contain` rather than whatever the inline one was given:
+            // a clip filling the screen should be all of the clip.
+            objectFit: 'contain',
+            // Whatever the inline one is doing right now. It shares the
+            // playback, so starting it here would start it there too.
+            autoplay: held.value?.paused !== true,
+            loop: inputs.loop.value,
+            rate: inputs.rate.value,
+            controls: wanted,
+            onVolume: inputs.onVolume.value,
+            width: percent(100),
+            height: percent(100)
+          })
+        ),
+        { top: 0, right: 0, bottom: 0, left: 0, environment: own }
+      );
+    });
+    ctx.onUnmount(() => stop.unsubscribe());
+  }
+
+  return Box(
+    {
+      ...layoutOf(inputs),
+      ref: takeRef,
+      modifiers:
+        poster === undefined
+          ? modifiersOf(inputs, videoSource(source))
+          : modifiersOf(inputs, imageSource({ resolver: store.images, source: poster }), videoSource(source)),
+      objectFit,
+      borderRadius: radius,
+      // The bar is the only child, and it belongs at the bottom.
+      ...(bar === null
+        ? {}
+        : {
+            y: 'end' as const,
+            overflow: 'hidden' as const,
+            // Spread rather than set to undefined: an event prop that
+            // is present and not a function is rejected outright, and
+            // a `Video` with no controls must not register listeners
+            // it has no use for.
+            onPointerEnter: () => (hovered.value = true),
+            onPointerLeave: () => (hovered.value = false)
+          }),
+      // The same tint `Image` draws, from the same prop: a clip waiting
+      // on a fetch, a demux and a decoder configuration has nothing to
+      // show for longer than a picture does, and a clip that never
+      // resolves has this box and nothing else.
+      backgroundColor: placeholderTint(inputs.placeholderColor, status, 'playing'),
+      // A rectangle showing a picture is an `image`. A rectangle
+      // showing a picture *and carrying controls* is not: it is a
+      // group of things, one of which is a toolbar, and announcing it
+      // as an image would hide them behind a leaf.
+      role:
+        bar === null
+          ? alt.pipe(map(text => (text === undefined ? undefined : ('image' as const))))
+          : ('group' as const),
+      label: alt,
+      selectable: false
+    },
+    ...(bar === null ? [] : [bar])
+  );
 }
 
 export interface IconProps extends ControlLayoutProps {
@@ -483,6 +729,6 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
       valueMax: indeterminate ? undefined : max,
       states: (indeterminate ? ['busy'] : []) as UiSemanticState[]
     },
-    bar
+    ...(bar === null ? [] : [bar])
   );
 }
