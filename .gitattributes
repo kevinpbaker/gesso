@@ -1,15 +1,5 @@
-# Video is kept in Git LFS.
-#
-# It is the only kind of file here big enough to be worth it: the
-# transitions example's clip is 2.6 MB, where every other binary in the
-# repository — icons, avatars, album art, the route screenshot
-# baselines — is under 80 KB. Those stay ordinary blobs, because LFS on
-# a favicon buys nothing and costs every contributor a working `git lfs`
-# before they can see one.
-#
-# A checkout without LFS gets a pointer file rather than a video, and
-# the transitions example will report that its video failed to load.
-# `git lfs install` once, then `git lfs pull`.
-*.mp4 filter=lfs diff=lfs merge=lfs -text
-*.mov filter=lfs diff=lfs merge=lfs -text
-*.webm filter=lfs diff=lfs merge=lfs -text
+# No Git LFS. The one video here is a generated gradient loop of about
+# half a megabyte, and LFS on a file that size buys nothing while
+# costing every contributor a working `git lfs` and every CI job and
+# host an extra fetch step that silently yields a pointer file when it
+# is missing. If a real video ever lands here, reconsider it then.
