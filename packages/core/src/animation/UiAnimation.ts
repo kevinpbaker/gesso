@@ -95,7 +95,29 @@ export abstract class UiAnimation<T> {
   protected startedAt = 0;
   private begun = false;
   private readonly subject = new Subject<T>();
-  private lastSampledAt: number | null = null;
+  /**
+   * When this animation next *wants* a sample, on the ideal timeline.
+   *
+   * The ideal one, and that word is carrying the whole fix. This used
+   * to be derived at the point of asking, as `lastSampledAt + stepMs`,
+   * which sounds equivalent and is not: frames arrive on the display's
+   * refreshes, so a sample is nearly always served a little after it
+   * was due, and measuring the next step from when it was *served*
+   * rounds the period up to a whole refresh and keeps the rounding.
+   *
+   * The arithmetic is unforgiving. A 24fps clip wants 41.67ms; on a
+   * 60Hz display the refresh at 33.3ms is too early and the one at
+   * 50ms serves it, so the next step is measured from 50, wants 91.67,
+   * and is served at 100. The period is not 41.67ms but 50ms, which is
+   * 20fps: one frame in six dropped, for ever, on the commonest clip
+   * rate there is. Measured, not reasoned about; see the spec beside
+   * this file.
+   *
+   * Advancing the ideal time by exactly `stepMs` instead lets the
+   * served times alternate between 33.3 and 50 and average out to the
+   * rate that was asked for.
+   */
+  private nextDueAt: number | null = null;
   private lastWritten: T | undefined;
   private finished = false;
 
@@ -147,7 +169,7 @@ export abstract class UiAnimation<T> {
     if (this.begun && now - this.startedAt < this.delayMs) {
       return this.startedAt + this.delayMs;
     }
-    return this.lastSampledAt === null ? now : this.lastSampledAt + this.stepMs;
+    return this.nextDueAt ?? now;
   }
 
   /** Where it is at `now`, and whether that is the end of it. */
@@ -187,12 +209,13 @@ export abstract class UiAnimation<T> {
     if (elapsed < this.delayMs) {
       // Waiting. The cell is deliberately not written: whoever asked
       // for the delay has already put the cell where it wants it, and
-      // writing it again would dirty a node for nothing.
-      this.lastSampledAt = now;
+      // writing it again would dirty a node for nothing. The timeline
+      // is left unanchored so that the first sample after the delay
+      // starts it, rather than it starting somewhere inside the wait.
       return;
     }
     const { value, done } = this.sample(now, elapsed - this.delayMs);
-    this.lastSampledAt = now;
+    this.scheduleNext(now);
     // A stepped easing holds one value across many frames, and a
     // spring at rest holds its target: writing an unchanged value
     // would emit through the cell and dirty a node for nothing.
@@ -204,6 +227,27 @@ export abstract class UiAnimation<T> {
     if (done) {
       this.finish();
     }
+  }
+
+  /**
+   * Moves the ideal timeline on by one step.
+   *
+   * Resynchronised rather than caught up when a whole step has already
+   * gone by: that means the application stalled, or the tab was
+   * hidden, and the samples that were missed are not worth taking now.
+   * For a video they are frames already past, and presenting is a pure
+   * function of a position, so chasing the backlog would sample
+   * several times in a row to arrive exactly where a single sample
+   * arrives anyway.
+   */
+  private scheduleNext(now: number): void {
+    if (this.stepMs <= 0) {
+      // Every frame. There is no timeline to keep.
+      this.nextDueAt = now;
+      return;
+    }
+    const next = (this.nextDueAt ?? now) + this.stepMs;
+    this.nextDueAt = next > now ? next : now + this.stepMs;
   }
 
   /** Writes the target and completes, for reduced motion and for `duration: 0`. */

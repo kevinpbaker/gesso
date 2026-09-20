@@ -79,7 +79,14 @@ describe('AudioService', () => {
     expect(mounted.clock.isPending).toBe(true);
 
     advance(1000);
-    expect(audio.current.position).toBeGreaterThan(10.9);
+    // A second of playing, read out at ten a second: the position is
+    // the one written by the last sample due before now, so it may
+    // trail real time by up to one step. The bound used to be 10.9,
+    // which is tighter than the step allows and passed only because
+    // the driver's cadence drifted into landing near the end of the
+    // second; it now samples on an even timeline and lands at 10.9
+    // exactly as often as it lands just short of it.
+    expect(audio.current.position).toBeGreaterThan(10.85);
     expect(audio.current.position).toBeLessThan(11.2);
 
     mounted.runtime.applyAudioSample(sample({ status: 'paused', position: 30, duration: 100 }));

@@ -139,6 +139,25 @@ sample without touching the cell, which is where staggering comes from:
 `delay: index * 40` is forty milliseconds of offset per row and no
 orchestration mechanism at all.
 
+`stepMs` is a **rate, not a gap between samples**, and the difference
+is the whole of why a video plays at the speed it was shot at. Frames
+arrive on the display's refreshes, so a sample is nearly always served
+a little after it was due; measuring the next step from when the last
+one was _served_ rounds the period up to a whole refresh and keeps the
+rounding. A 24fps clip wants 41.67ms, and on a 60Hz display the
+refresh at 33.3ms is too early and the one at 50ms serves it, so the
+next step is measured from 50, wants 91.67, and is served at 100. The
+period is not 41.67ms but 50ms, which is 20fps: one frame in six
+dropped, for ever. Advancing an ideal timeline by exactly `stepMs`
+instead lets the served times alternate between 33.3 and 50 and
+average out to the rate that was asked for.
+
+A rate that does not divide the refresh cannot have evenly spaced
+samples, and no amount of scheduling changes that: 24 frames a second
+on a 60Hz display is 33.3ms, 50ms, 33.3ms, which is the same judder
+every player has and the reason a rate-matched display exists. What
+scheduling decides is whether the average comes out right.
+
 ## FLIP on reorder
 
 Nothing declares where a reordered row animates from, because the

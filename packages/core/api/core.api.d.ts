@@ -143,7 +143,7 @@ declare abstract class UiAnimation<T> {
   protected startedAt: number;
   private begun;
   private readonly subject;
-  private lastSampledAt;
+  private nextDueAt;
   private lastWritten;
   private finished;
   protected constructor(cell: AnimatedCell<T>, stepMs: number, reducedMotionPolicy: UiReducedMotionPolicy, delayMs?: number);
@@ -159,6 +159,7 @@ declare abstract class UiAnimation<T> {
   get hasBegun(): boolean;
   protected onBegin(): void;
   advance(now: number): void;
+  private scheduleNext;
   snap(): void;
   cancel(): void;
   protected abstract get target(): T;
@@ -6503,7 +6504,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DBoi1_8P.js";
+} from "./index-CRBbATa_.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7395,7 +7396,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DBoi1_8P.js";
+} from "./index-CRBbATa_.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
