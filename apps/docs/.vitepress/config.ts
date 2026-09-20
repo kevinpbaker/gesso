@@ -208,6 +208,7 @@ export default defineConfig({
           { text: 'Checkbox', link: '/components/checkbox' },
           { text: 'Switch', link: '/components/switch' },
           { text: 'RadioGroup', link: '/components/radio-group' },
+          { text: 'SegmentedControl', link: '/components/segmented-control' },
           { text: 'TextInput and TextArea', link: '/components/text-input' },
           { text: 'Slider', link: '/components/slider' },
           { text: 'NumberInput', link: '/components/number-input' },

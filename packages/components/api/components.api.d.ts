@@ -112,6 +112,21 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+interface SegmentedOption {
+  readonly value: string;
+  readonly label: string;
+  readonly disabled?: boolean;
+}
+interface SegmentedControlProps extends ControlLayoutProps {
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
+  options: readonly SegmentedOption[];
+  label?: string;
+  disabled?: boolean;
+  size?: ButtonSize;
+}
+declare function SegmentedControl(inputs: Inputs<SegmentedControlProps>, ctx: ComponentContext): UiChild;
 type MeterOptimum = 'low' | 'high';
 interface MeterProps extends ControlLayoutProps {
   value: number;
@@ -709,6 +724,7 @@ export {
   RadioGroup,
   range,
   required,
+  SegmentedControl,
   Select,
   Skeleton,
   SkeletonText,
@@ -791,6 +807,8 @@ export {
   type RadioGroupProps,
   type RadioOption,
   type Schema,
+  type SegmentedControlProps,
+  type SegmentedOption,
   type SelectOption,
   type SelectProps,
   type SkeletonProps,

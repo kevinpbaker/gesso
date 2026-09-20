@@ -1237,6 +1237,20 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/select'
   },
   {
+    name: 'SegmentedControl',
+    package: 'components',
+    group: 'Components',
+    what: 'One value chosen from a few, laid out as one track of segments.',
+    page: '/components/segmented-control'
+  },
+  {
+    name: 'SegmentedOption',
+    package: 'components',
+    group: 'Components',
+    what: 'One segment: its value, its label and whether it can be chosen.',
+    page: '/components/segmented-control'
+  },
+  {
     name: 'Skeleton',
     package: 'components',
     group: 'Components',
