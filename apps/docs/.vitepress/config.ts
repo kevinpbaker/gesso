@@ -204,6 +204,7 @@ export default defineConfig({
           { text: 'Link', link: '/components/link' },
           { text: 'Chip', link: '/components/chip' },
           { text: 'Badge', link: '/components/badge' },
+          { text: 'Alert', link: '/components/alert' },
           { text: 'Checkbox', link: '/components/checkbox' },
           { text: 'Switch', link: '/components/switch' },
           { text: 'RadioGroup', link: '/components/radio-group' },

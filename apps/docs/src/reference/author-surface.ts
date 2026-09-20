@@ -1062,6 +1062,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/accordion'
   },
   {
+    name: 'Alert',
+    package: 'components',
+    group: 'Components',
+    what: 'A banner that stays on the screen, in one of the three tones.',
+    page: '/components/alert'
+  },
+  {
     name: 'Avatar',
     package: 'components',
     group: 'Components',

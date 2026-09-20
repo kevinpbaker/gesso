@@ -112,6 +112,16 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+type AlertTone = 'neutral' | 'accent' | 'danger';
+interface AlertProps extends ControlLayoutProps {
+  title?: string;
+  message?: string;
+  tone?: AlertTone;
+  live?: boolean;
+  onDismiss?: () => void;
+  children?: UiChild;
+}
+declare function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChild;
 type LinkUnderline = 'always' | 'hover' | 'none';
 interface LinkProps extends ControlLayoutProps {
   ref?: UiNodeRef;
@@ -649,6 +659,7 @@ interface ControlFocus {
 declare function trackFocus(ctx: ComponentContext, forwarded?: InputCell<UiNodeRef | undefined>): ControlFocus;
 export {
   Accordion,
+  Alert,
   allOf,
   Avatar,
   Badge,
@@ -704,6 +715,8 @@ export {
   Tree,
   type AccordionProps,
   type AccordionSection,
+  type AlertProps,
+  type AlertTone,
   type AsyncValidator,
   type AvatarProps,
   type AvatarShape,
