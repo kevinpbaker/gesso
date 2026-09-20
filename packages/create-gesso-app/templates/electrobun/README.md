@@ -40,16 +40,17 @@ lands under that directory instead.
 ## Running it
 
 ```sh
-hutch install       # dependencies, including the vendored Gesso packages
+hutch install       # dependencies
 hutch run dev       # prepare, build the window's assets, open the window
 ```
 
 `hutch install` runs npm underneath, because `hutch.config.ts` says
-`packageManager: 'npm'`: Hutch's own resolver reads a relative `file:`
-override against the package that asked for it rather than against this
-directory, and stops with `FileNotFound` on the second vendored package.
-npm reads `overrides` from here, which is what the tarballs in `vendor/`
-need. You will see a `package-lock.json`, and no `hutch.lock`.
+`packageManager: 'npm'`. That matters if this project was scaffolded
+with `--local`: Hutch's own resolver reads a relative `file:` override
+against the package that asked for it rather than against this
+directory, and stops with `FileNotFound` on the second packed package,
+while npm reads `overrides` from here, which is what tarballs in
+`vendor/` need. You will see a `package-lock.json`, and no `hutch.lock`.
 
 `hutch run build` makes a distributable build under `build/stable-*`,
 and `hutch run typecheck` checks the types without building. Every
@@ -160,40 +161,14 @@ Electrobun bundle it, which is the ordinary arrangement. Gesso's own
 Electrobun applications do not do this: they pre-bundle their main
 process with esbuild first, because they import the framework out of a
 workspace rather than out of `node_modules`, and a bundler cannot
-resolve a package that was never installed. Here the packages are
-installed, in `vendor/`, so the ordinary arrangement is the right one.
+resolve a package that was never installed. Here they are installed
+into `node_modules` like anything else, so the ordinary arrangement is
+the right one.
 
 If a future toolchain ever fails to resolve `gesso-electrobun` from the
 main process, that is the escape hatch: bundle `src/main/index.ts` to a
 plain `.js` file with `electrobun/main` left external, and point the
 `cottontail.entrypoint` at the bundle instead.
-
-## Why `vendor/` exists, and how to remove it
-
-Gesso is not published to a registry yet. A `package.json` naming a
-version of `gesso-core` would produce a project that cannot install, so
-`create-gesso-app` packed the packages out of its own workspace, put the
-tarballs in `vendor/` and pointed `dependencies` and `overrides` at
-them:
-
-```json
-"gesso-core": "file:vendor/gesso-core-0.1.0.tgz"
-```
-
-`overrides` is there because the packages declare each other by version
-range, and without it an installer is free to go looking for
-`gesso-core@^0.1.0` on a registry that has never heard of it.
-
-To pick up a change made in the Gesso workspace, run `create-gesso-app`
-again over this directory with `--force`, or repack by hand:
-
-```sh
-cd path/to/gesso && pnpm --filter './packages/*' build
-cd packages/core && pnpm pack --pack-destination path/to/this/project/vendor
-```
-
-When the packages are published this all goes away: delete `vendor/`,
-delete `overrides`, and put version ranges back in `dependencies`.
 
 ## Where to go next
 

@@ -179,10 +179,10 @@ Every claim of doneness in this project has an exit criterion observable in a br
 pnpm install
 pnpm dev                      # the playground; open the URL Vite prints
 pnpm docs:dev                 # the documentation site
-pnpm create:app ../my-app     # scaffold a project; add --template electrobun for a native window
+pnpm create:app ../my-app --local   # scaffold a project against this working tree
 ```
 
-The packages are not on a registry yet. The scaffold packs them out of this workspace and points the new project at the tarballs, so it has to run from inside the checkout. [Installation](apps/docs/guide/installation.md) covers setting a project up by hand.
+The packages are on npm, so `pnpm create gesso-app my-app` scaffolds a project anywhere, and `--template electrobun` makes it a native window. `--local` packs them out of this checkout and points the new project at the tarballs instead, which is what you want while you are changing them. [Installation](apps/docs/guide/installation.md) covers setting a project up by hand.
 
 ### The playground
 
@@ -301,6 +301,6 @@ Every Chrome-driven script runs with no browser-automation dependency: `--dump-d
 
 ## Status & license
 
-Gesso is an active research project: a serious attempt at building a small, deterministic UI runtime from first principles. The runtime is functional and heavily tested; the API will move, and the packages are not yet on a registry.
+Gesso is an active research project: a serious attempt at building a small, deterministic UI runtime from first principles. The runtime is functional and heavily tested; the API will move, and the packages are on npm at 0.1.0.
 
 Private and unlicensed.

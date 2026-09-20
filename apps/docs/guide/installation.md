@@ -13,8 +13,14 @@ overlay, all of which you can also write yourself.
 
 The quickest way to get one is the scaffold,
 [create-gesso-app](/tooling/create-gesso-app), which writes every file
-on this page for you. Read on if you want to know what those files are
-and why, or to set a project up by hand.
+on this page for you:
+
+```bash
+pnpm create gesso-app my-app
+```
+
+Read on if you want to know what those files are and why, or to set a
+project up by hand.
 
 ## The packages
 
@@ -28,13 +34,6 @@ and why, or to set a project up by hand.
 `gesso-core` and `gesso-framework` are what an application always
 needs. `rxjs` is a peer of both: an Observable is the binding, so it is
 your dependency as much as theirs.
-
-::: warning Not on a registry yet
-These packages are not published. A project consumes them from tarballs
-today: run `pnpm pack` in each package directory and install the files.
-The scaffold does this for you and writes `file:` specifiers pointing at
-them.
-:::
 
 ```json
 {

@@ -8,20 +8,24 @@
  * the app, hands it a worker constructor and mounts it, and that is the
  * whole of the main thread's job.
  *
- * The one thing this CLI does that a public scaffolder would not is
- * vendor its own dependencies. No `gesso-*` package is on a registry,
- * so a generated `package.json` that named a version would produce a
- * project that cannot install. Instead the CLI packs the packages a
- * template needs out of this workspace with `pnpm pack`, drops the
- * tarballs into the new project's `vendor/` directory and writes
- * `file:` specifiers at them. That is the same route
- * `scripts/check-install.ts` takes, and it is the route that exercises
- * each package's `publishConfig`, which is the only thing that rewrites
- * `exports` from `src/*.ts` to `dist`. This ends the day the packages
- * are published to a registry.
+ * By default the generated `package.json` names the published
+ * `gesso-*` packages by version range and an install goes to the
+ * registry, which is what a scaffold anywhere else does.
+ *
+ * `--local` is the other route, and the one this CLI keeps that a
+ * public scaffolder would not: it packs the packages a template needs
+ * out of this workspace with `pnpm pack`, drops the tarballs into the
+ * new project's `vendor/` directory and writes `file:` specifiers at
+ * them. That is the only way to scaffold against changes that are not
+ * released yet, it is the same route `scripts/check-install.ts` takes,
+ * and it is the route that exercises each package's `publishConfig`,
+ * which is the only thing that rewrites `exports` from `src/*.ts` to
+ * `dist`. `pnpm check:scaffold` runs this way, so the gate tests the
+ * working tree rather than the last release.
  *
  *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app
- *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --no-build
+ *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --local
+ *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --local --no-build
  *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --template electrobun
  *
  * The two templates differ in what runs beneath the same application.
@@ -327,9 +331,10 @@ function copyTemplate(from: string, options: Options): void {
  * `overrides` carries the same specifiers, because the packages declare
  * each other by version range: `gesso-framework` and
  * `gesso-components` do, and so does `gesso-electrobun`. Without it an
- * installer is free to go looking for `gesso-core@^0.1.0` on a registry
- * that has never heard of it, and whether it does so depends on what
- * else is in the tree.
+ * installer scaffolded with `--local` is free to resolve
+ * `gesso-core@^0.1.0` off the registry rather than from the tarball
+ * beside it, and whether it does so depends on what else is in the
+ * tree. Without `--local` there are no specifiers and no `overrides`.
  */
 function writeManifest(options: Options, specifiers: ReadonlyMap<string, string>): void {
   const path = join(options.target, 'package.json');
@@ -367,27 +372,28 @@ function writeManifest(options: Options, specifiers: ReadonlyMap<string, string>
  * Says the same thing to pnpm that `overrides` says to npm.
  *
  * npm was chosen because pnpm did not work, and the reason is still
- * exactly right: `pnpm pack` rewrites `workspace:^`
- * into `^0.1.0`, so the packed `gesso-framework` asks for
- * `gesso-core@^0.1.0` and pnpm 11 goes to a registry that has never
- * heard of it. What that record then rejected was shipping a
+ * exactly right: `pnpm pack` rewrites `workspace:^` into `^0.1.0`, so
+ * the packed `gesso-framework` asks for `gesso-core@^0.1.0` and pnpm 11
+ * resolves it off the registry rather than from the tarball beside it,
+ * which is a different copy of the package than the one this project
+ * was told to use. What that record then rejected was shipping a
  * `pnpm-workspace.yaml` in a project that is not a workspace.
  *
  * That trade has moved. The file is five lines, it is the only place
  * pnpm 11 reads `overrides` from, and the alternative is a scaffold
  * that fails for the package manager this repository itself uses. It
- * says what it is for and it is deleted along with `vendor/` the day
- * the packages are published.
+ * says what it is for, and it is written only under `--local`.
  */
 function writePnpmOverrides(options: Options, specifiers: ReadonlyMap<string, string>): void {
   const lines = [
     '# The tarballs in vendor/ again, for pnpm.',
     '#',
-    '# Gesso is not published, so the packed gesso-* packages ask each',
-    '# other for version ranges no registry can answer. npm reads the',
-    '# `overrides` in package.json; pnpm 11 reads only this file. Both',
-    '# go away when the packages are on a registry: delete vendor/, this',
-    '# file and `overrides`, and put version ranges back.',
+    '# This project was scaffolded with --local, so the packed gesso-*',
+    '# packages ask each other for version ranges the registry would',
+    '# answer with a different copy. npm reads the `overrides` in',
+    '# package.json; pnpm 11 reads only this file. To move to the',
+    '# published packages: delete vendor/, this file and `overrides`,',
+    '# and put version ranges back.',
     'overrides:',
     ...[...specifiers].map(([pkg, specifier]) => `  '${pkg}': '${specifier}'`),
     ''

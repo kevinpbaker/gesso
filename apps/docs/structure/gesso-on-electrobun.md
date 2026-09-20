@@ -58,16 +58,15 @@ adapter's.
 
 ## Scaffolding
 
-From inside the Gesso workspace:
-
 ```bash
-pnpm create:app ../my-app --template electrobun
+pnpm create gesso-app my-app --template electrobun
 ```
 
-The CLI packs `gesso-core`, `gesso-framework`, `gesso-components`
-and `gesso-electrobun` into the project's `vendor/`, because none of
-them is on a registry yet, and writes `file:` specifiers and
-`overrides` pointing at the tarballs. What it writes:
+The project depends on `gesso-core`, `gesso-framework`,
+`gesso-components` and `gesso-electrobun` by version range and installs
+them from the registry. Run it from inside a Gesso checkout with
+`--local` to pack those four out of the working tree instead, into the
+project's `vendor/`. What it writes:
 
 ```text
 electrobun.config.ts     what Electrobun builds: the main process entry, the assets to copy
@@ -80,7 +79,7 @@ src/main/index.ts        the main process: the state, the windows
 src/view/main.ts         a window's main thread: the bridge, then mount
 src/view/render.worker.ts  the render worker: the root component and its channels
 src/render/App.tsx       the screen
-vendor/                  the Gesso packages, packed
+vendor/                  the packed packages, with --local only
 ```
 
 The screen is an ordinary component. It reads the counter's replica

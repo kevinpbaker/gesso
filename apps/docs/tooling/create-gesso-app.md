@@ -11,15 +11,20 @@ configuration has four files that have to agree with each other, and
 getting them wrong produces a blank canvas rather than an error.
 
 ```bash
-pnpm create:app ../my-app
+pnpm create gesso-app my-app
 ```
 
-| Option              | What it does                                                      |
-| ------------------- | ----------------------------------------------------------------- |
-| `--name <name>`     | Package name for the new project; defaults to the directory's own |
-| `--template <name>` | Which template to write: `web` (the default) or `electrobun`      |
-| `--force`           | Write into a directory that already has files in it               |
-| `--no-build`        | Pack without rebuilding the packages first                        |
+`npm create gesso-app@latest my-app` does the same thing. The project it
+writes depends on the published `gesso-*` packages by version range and
+installs them from the registry like any other dependency.
+
+| Option              | What it does                                                          |
+| ------------------- | --------------------------------------------------------------------- |
+| `--name <name>`     | Package name for the new project; defaults to the directory's own     |
+| `--template <name>` | Which template to write: `web` (the default) or `electrobun`          |
+| `--force`           | Write into a directory that already has files in it                   |
+| `--local`           | Install the packages out of a Gesso checkout rather than the registry |
+| `--no-build`        | With `--local`, pack without rebuilding the packages first            |
 
 ## What it writes
 
@@ -27,11 +32,9 @@ pnpm create:app ../my-app
 index.html          a host element with a size, and nothing else
 tsconfig.json       bundler resolution, and the two lines that buy JSX
 vite.config.ts      one plugin: gesso-vite-plugin
-pnpm-workspace.yaml the vendored tarballs again, for pnpm
 src/main.ts         the main thread: create the app, mount into #app
 src/worker.ts       the render worker: name the root component
 src/App.tsx         the screen
-vendor/             the Gesso packages, packed
 ```
 
 Four of those are worth knowing about even if you write them yourself.
@@ -72,27 +75,36 @@ JSX compiles onto `createElement` and adds nothing at run time, so
 nothing in the framework requires it. It is what the examples and this
 site are written in.
 
-## Why the packages are vendored
+## Scaffolding against unreleased packages
 
-Gesso is not published. A template with a version range would scaffold
-a project that cannot install, so the CLI packs `gesso-core`,
-`gesso-framework`, `gesso-components`, `gesso-devtools` and
-`gesso-vite-plugin` into the project's `vendor/` and writes `file:`
-specifiers pointing at them. The last two are development dependencies:
-the plugin writes the wiring, and it loads the overlay from devtools the
-first time the render worker throws.
+`--local` installs the `gesso-*` packages out of a Gesso checkout rather
+than from the registry: the CLI packs each one with `pnpm pack`, drops
+the tarballs into the project's `vendor/` and writes `file:` specifiers
+pointing at them.
 
-The consequence is that the scaffold has to run from inside this
-workspace, and that a scaffolded project is pinned to the packages as
-they were when you ran it. Rerun the scaffold, or repack by hand, to
-move it forward. When there is a registry this goes away.
+```bash
+pnpm create:app ../my-app --local
+```
 
-**pnpm and npm both work.** The packed packages ask each other for
-version ranges no registry can answer, so each package manager has to be
-pointed at the tarballs: `overrides` in `package.json` is what npm
-reads, and `overrides` in `pnpm-workspace.yaml` is the only place pnpm
-11 reads them from. The CLI writes both. They are deleted together with
-`vendor/` the day the packages are published.
+It is the only way to scaffold a project against changes that are not
+released yet, which is why `pnpm check:scaffold` runs this way: the gate
+tests the working tree rather than the last release. It has to run from
+inside the workspace, because otherwise there is nothing to pack, and
+the project it writes is pinned to the packages as they were when you
+ran it. Rerun the scaffold over it, or repack by hand, to move it
+forward.
+
+**pnpm and npm both work.** `pnpm pack` rewrites `workspace:^` into
+`^0.1.0`, so the packed `gesso-framework` asks for `gesso-core@^0.1.0`
+and an installer left alone resolves that off the registry rather than
+from the tarball beside it — a different copy than the one you packed.
+Each package manager has to be pointed at the tarballs instead:
+`overrides` in `package.json` is what npm reads, and `overrides` in
+`pnpm-workspace.yaml` is the only place pnpm 11 reads them from. The CLI writes both, and the generated README says
+how to delete them and go back to the published packages.
+
+None of this happens without `--local`. A project scaffolded the usual
+way has no `vendor/`, no `overrides` and no `pnpm-workspace.yaml`.
 
 ## The Electrobun template
 
