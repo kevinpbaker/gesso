@@ -117,6 +117,17 @@ jobs:
             private=$(node -p "require('./$dir/package.json').private === true")
             [ "$private" = "true" ] && { echo "skipping $name (private)"; continue; }
 
+            # The seven libraries declare `publishConfig.exports`, which is
+            # the rewrite this step exists to prove happened. A package
+            # without one has no rewrite to verify and is not part of a
+            # release here: `create-gesso-app` is a CLI with a `bin` and no
+            # `exports` at all, and RELEASING.md publishes it by hand and
+            # afterwards, because it vendors packages it cannot name before
+            # they exist. Reading its missing `exports` is what failed the
+            # first 0.2.0 release.
+            rewrites=$(node -p "Boolean(require('./$dir/package.json').publishConfig?.exports)")
+            [ "$rewrites" = "true" ] || { echo "skipping $name (no publishConfig.exports; not a library)"; continue; }
+
             (cd "$dir" && pnpm pack --out "$RUNNER_TEMP/tarballs/$name.tgz")
 
             entry=$(tar -xzOf "$RUNNER_TEMP/tarballs/$name.tgz" package/package.json \

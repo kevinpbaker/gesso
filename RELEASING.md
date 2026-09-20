@@ -15,7 +15,12 @@ breaking change bumps the minor, everything else the patch.
 
 `create-gesso-app` is published by hand and on its own, because it
 vendors the packages it scaffolds with and cannot name a version of them
-that does not exist yet.
+that does not exist yet. It is in the `fixed` group all the same, so
+`changeset version` moves it with the others and only the publish is
+separate. The release workflow skips it by looking for
+`publishConfig.exports`, which the seven libraries have and a CLI with
+a `bin` does not; the first attempt at 0.2.0 failed because that check
+read an `exports` field it does not have.
 
 ## Before
 
