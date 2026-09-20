@@ -21,18 +21,21 @@ and try Page Up, Home and End.
 
 ## Props
 
-| Prop           | Type                        | Default | What it does                                                                                                                                               |
-| -------------- | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `value`        | `number`                    | none    | The value to show. Supplying it makes the slider controlled.                                                                                               |
-| `defaultValue` | `number`                    | `0`     | The value to start at, for a slider that owns its own. Supplying both throws, naming the component.                                                        |
-| `onChange`     | `(value: number) => void`   | none    | Called with a value already clamped to the range and snapped to the step.                                                                                  |
-| `min`          | `number`                    | `0`     | The bottom of the range, and what Home goes to.                                                                                                            |
-| `max`          | `number`                    | `100`   | The top of the range, and what End goes to.                                                                                                                |
-| `step`         | `number`                    | `1`     | What an arrow key moves by, and the grid every value is snapped to, counted from `min`.                                                                    |
-| `label`        | `string`                    | `''`    | Drawn to the left of the value and used as the accessible name.                                                                                            |
-| `disabled`     | `boolean`                   | `false` | Refuses focus, ignores the keys and the drag, and fills the track in the disabled foreground token.                                                        |
-| `format`       | `(value: number) => string` | none    | How the value is drawn beside the label and how it is spoken, for when the bare number is not the value: `"40%"`. Without it the number is shown as it is. |
-| `ref`          | `UiNodeRef`                 | none    | Receives the node that _is_ the slider, which is what a form focuses and an overlay anchors to.                                                            |
+| Prop           | Type                        | Default    | What it does                                                                                                                                               |
+| -------------- | --------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`        | `number`                    | none       | The value to show. Supplying it makes the slider controlled.                                                                                               |
+| `defaultValue` | `number`                    | `0`        | The value to start at, for a slider that owns its own. Supplying both throws, naming the component.                                                        |
+| `onChange`     | `(value: number) => void`   | none       | Called with a value already clamped to the range and snapped to the step.                                                                                  |
+| `min`          | `number`                    | `0`        | The bottom of the range, and what Home goes to.                                                                                                            |
+| `max`          | `number`                    | `100`      | The top of the range, and what End goes to.                                                                                                                |
+| `step`         | `number`                    | `1`        | What an arrow key moves by, and the grid every value is snapped to, counted from `min`.                                                                    |
+| `label`        | `string`                    | `''`       | Drawn to the left of the value and used as the accessible name.                                                                                            |
+| `disabled`     | `boolean`                   | `false`    | Refuses focus, ignores the keys and the drag, and fills the track in the disabled foreground token.                                                        |
+| `format`       | `(value: number) => string` | none       | How the value is drawn beside the label and how it is spoken, for when the bare number is not the value: `"40%"`. Without it the number is shown as it is. |
+| `labelHidden`  | `boolean`                   | `false`    | Draws the track alone. The label still names the control for an assistive technology, and the space it would have taken is gone rather than blank.         |
+| `trackAlign`   | `'center' \| 'start'`       | `'center'` | Where the track sits inside the control's hit area. `start` is for a slider docked to an edge, such as a media scrubber.                                   |
+| `thumb`        | `boolean`                   | `false`    | Draw a round handle at the filled end of the track.                                                                                                        |
+| `ref`          | `UiNodeRef`                 | none       | Receives the node that _is_ the slider, which is what a form focuses and an overlay anchors to.                                                            |
 
 Snapping goes through one function for the whole range tier: clamp to
 `[min, max]`, round to the nearest multiple of `step` counted from
@@ -66,6 +69,32 @@ every control in the library has.
 An uncontrolled slider keeps one cell of its own and reports through
 `onChange` as well, so a value you only want to observe still needs no
 state at the call site.
+
+## Docked to an edge
+
+`labelHidden` draws the track alone, and `trackAlign: 'start'` puts it
+at the top of the control's box rather than centred in it. The two
+together are what a media scrubber is: a line on the boundary between
+a picture and the controls under it, with the rest of the strip below
+it as the part a pointer is allowed to be imprecise about.
+
+`thumb` belongs to the same kind of slider. The track's fill already
+says where the value is, so a handle is a second thing to keep in step
+and is off by default; it earns its place where the value is something
+a person aims at and **drags** rather than reads, because a handle is
+the affordance that says so and is a far bigger target than a six
+pixel line. It is drawn as a layer over the track rather than inside
+the fill, because it is four times the fill's height: inside it the
+handle would either be clipped or stretch the track it is meant to sit
+on. It overhangs the track vertically, so nothing between the slider
+and its own box may clip.
+
+`labelHidden` removes the label's space as well as its paint, which is
+worth saying because it did not always. `visible` affects paint and
+semantics and deliberately not layout, so hiding the row left its
+height and the gap above it behind, and a `labelHidden` slider was a
+track with twenty empty pixels over it. The label is collapsed now,
+and the name it carries is unaffected either way.
 
 ## Keyboard
 

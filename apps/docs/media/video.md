@@ -126,33 +126,141 @@ WebCodecs decodes; it does not demux. Getting `EncodedVideoChunk`s out
 of a file means walking MP4's sample tables, which `Mp4Demuxer` does in
 about 500 lines rather than through a dependency.
 
-| Reads                                                                                                       | Does not read                                                                  |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Progressive MP4: `stsd` with `avcC` or `hvcC`, `stts`, `ctts`, `stsc`, `stsz`/`stz2`, `stco`/`co64`, `stss` | Fragmented MP4 (`moof`/`traf`/`trun`), which is what DASH and HLS segments are |
-| Samples in decode order, which `VideoDecoder` reorders on the way out                                       | Audio, because nothing on this side of the framework could play it             |
+| Reads                                                                                                                       | Does not read                                                      |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Progressive MP4: `stsd` with `avcC`, `hvcC`, `av1C` or `vpcC`, `stts`, `ctts`, `stsc`, `stsz`/`stz2`, `stco`/`co64`, `stss` | Any container that is not MP4                                      |
+| Fragmented MP4: `mvex`/`trex` defaults, then `moof`/`traf`/`tfhd`/`tfdt`/`trun`                                             | A manifest. It reads the fragments it is given, not a segment list |
+| Audio tracks, through `demuxMp4Audio`: `mp4a` with its `esds`, and the configuration boxes Opus, ALAC and FLAC keep         | Free-format and other exotica                                      |
+| Samples in decode order, which `VideoDecoder` reorders on the way out                                                       |                                                                    |
 
-A fragmented file is detected and named, with a message saying how to
-remux, rather than parsed into silence: a demuxer returning zero samples
-for a file the browser plays perfectly is a bug that costs an afternoon.
-The whole file is parsed from one `ArrayBuffer`, so there are no byte
-ranges; that is pure cost for a looping clip and would be the thing to
-change for an hour of video, which is what the resolver seam is for.
+**Fragmented files are read.** A fragmented MP4 says nothing up front
+about where its samples are: there is no `stco`, no `stsz` and no
+`stts`, and the `stbl` in the `moov` is a shell holding only the
+`stsd`. Each `moof` instead carries a `traf` per track describing its
+samples inline, with anything omitted falling back to a default from
+`tfhd` and failing that from `trex`. So it is a walk rather than a
+table lookup, which is why the two shapes cannot share a code path.
 
-## Controls, and what there are not
+The part that goes wrong is offsets. A sample's position is
+`base_data_offset` plus the run's own `data_offset` plus the sizes
+before it, and `base_data_offset` is one of three things: written into
+the `tfhd`, the start of the enclosing `moof` when `default-base-is-moof`
+is set, or the `moof` again by the specification's older first-`traf`
+rule. The second is what every fragmenter writes today. Taking the
+first-`traf` rule as the general one puts every fragment after the
+first at the wrong offset, which decodes as noise rather than as an
+error.
 
-`loop` and `autoplay` are decided when the element is built, and they
-default to true. There is no pause, no seek, no rate and no volume: the
-position belongs to the tween inside the modifier, and no component prop
-reaches it.
+**Presentation times are rebased to zero.** A file's earliest
+presentation timestamp is not required to be zero, and for anything
+encoded with B-frames it is not: `ctts` shifts each sample forward of
+its decode time, and the shift on the first sample is the reorder
+depth. So a plain six second clip at 24 frames a second has its first
+picture at 83 ms and its last ending at 6.083 s. A player that
+believed those numbers would report a duration 83 ms too long and,
+much worse, have no picture at all to show for position zero, which is
+exactly what a paused clip looked like: `present(0)` found nothing due
+because nothing was due, and a paused clip never asks again. The
+earliest time is subtracted from every sample, which moves the clock
+and changes nothing else.
 
-Two consequences worth knowing before you plan a player around this.
+**A codec string is assembled, not guessed.** `av01` on its own is not
+a codec string: `VideoDecoder.isConfigSupported` answers false for it,
+so a file reported that way never plays. The profile, level, tier and
+bit depth come out of the `av1C` record and the string is built from
+them, `vp09.00.31.08` likewise out of the `vpcC`. Where the record is
+too short to read, the bare format is reported and
+`isConfigSupported` is left to judge, because claiming a precise
+string from bytes that are not there is worse than claiming none.
+
+**Audio is read but not played**, which is a smaller gap than it
+sounds and a platform constraint rather than a decision. See below.
+
+## Reading a file in pieces
+
+`DefaultVideoResolver` takes either a `fetch` or a `fetchRange`, and
+they are two different products rather than a fast path and a slow one.
+A fifteen-second loop is a few megabytes, is wanted in its entirety
+within a second of starting, and is simplest held in one
+`ArrayBuffer`. An hour of video is none of those: it is a gigabyte, a
+viewer will watch four minutes of it, and holding it in memory to do so
+is not a trade-off but a mistake. Neither should be silently upgraded
+to the other, so an application says which it wants.
+
+Given a `fetchRange`, the resolver walks the file's top-level boxes by
+reading their headers and jumping, which finds the `moov` whether it is
+at the front of the file (`-movflags +faststart`, and every file served
+for streaming) or at the back (the default, and every file written by a
+camera). The `moov` is then demuxed on its own, which works because the
+offsets in a sample table are absolute positions in the file: the
+tables are as correct read out of a small buffer as out of a large one.
+
+Media then follows the decoder. `ByteSource.read` is **synchronous and
+may answer null**, which is the whole design: the decoder is fed from
+inside a presentation, on the frame clock, and a fill that awaited
+anything would turn every frame into a microtask and every stall into a
+dropped frame. So a sample whose bytes are not here ends the fill, a
+request goes out for the window around it, and that request resumes the
+fill when it lands.
+
+Blocks are fetched aligned, a quarter of a megabyte at a time, and
+evicted by last use rather than by position, because a viewer who seeks
+back into what they just watched should find it still there. The header
+probe is exactly one block, which is not a coincidence: a probe that
+did not land on a block boundary could not be kept, and the front of
+the file would be fetched once to find the header and again as the
+first block.
+
+Two things an application serving files itself has to get right, both
+of which this framework can only report rather than fix:
+
+- **The server must answer 206.** A `blob:` URL does not: it ignores
+  the header and answers 200 with the whole body. A reader that took
+  that response for the range it asked for would index into the wrong
+  bytes, so check before reaching for `fetchRange`.
+- **Cross-origin needs `Access-Control-Expose-Headers: Content-Range`.**
+  Without it, `headers.get('Content-Range')` answers null, the reader
+  takes the length of the piece it was handed for the length of the
+  whole file, and every offset past the first block is wrong. The clip
+  still opens, because the header is in that first block, which is
+  exactly what makes it such a good trap.
+
+## Controls
+
+The position belongs to a tween inside the modifier, and
+`VideoTransport` is the handle on it: `play`, `pause`,
+`seek(seconds)`, `setRate`, `retry`, and the position, duration and
+state to read back. It arrives through `onReady`, because a playback
+does not exist until a file has been fetched and a decoder configured,
+and a modifier attaches long before either.
+
+A seek is a real seek. `needsSeek` asks two questions that are not
+symmetric. **Backwards** past the tolerance is always a seek: a decoder
+cannot run in reverse, so every frame in flight belongs to where we no
+longer are, which is also why looping costs a keyframe. **Forwards** is
+a seek only when the jump clears the samples already submitted, because
+during ordinary playback the decoder runs a few frames ahead and the
+keyframe covering the position is one it passed long ago. Without that
+second test a scrub forwards would decode every frame in between at
+playback speed, which is a scrub that crawls.
+
+Having found the sync sample at or before the target, the playback
+resets the decoder there and decodes forward. The frames in between are
+decoded, because the pictures after them refer to them, and closed on
+arrival rather than queued: that keeps the queue free so the gap is
+crossed as fast as the decoder will go instead of one frame per
+presentation. Nothing is presented until a frame at or past the target
+lands, so a seek shows one picture rather than a rewind.
+
+The answer comes late, and a paused clip has no next frame to deliver
+it on, which is what `onFrame` is for: the playback presents the frame
+it was waiting for and says so, and whoever is drawing repaints. Without
+it a scrub while paused moved the scrubber and left the picture where
+it was.
+
 `autoplay: false` presents one frame and does not drive the position,
-but the surface is shared by source, so another element playing the same
-clip goes on moving the picture both of them are drawing. And an
-application that genuinely needs a transport has a seam rather than an
-API: `VideoPlayback.present` is a pure function of a position, so a
-resolver of your own can hand back a playback you drive yourself, which
-is what the example on this page does.
+but the surface is shared by source, so another element playing the
+same clip goes on moving the picture both of them are drawing.
 
 Playback **keeps moving under reduced motion**, deliberately. The rule
 this framework applies is to stop only where standing still would not
@@ -175,18 +283,29 @@ that has failed to load. An app that wants a still passes
   false wherever there is no hardware decoder for the codec, which on a
   Linux box without VA-API is every codec, and the video then silently
   never plays. The field is left unset, which means `no-preference`.
-- **The loop point costs a keyframe.** Going back to the start resets
-  and reconfigures the decoder, because a decoder mid-GOP holds
-  reference frames for where it was. That is a measurable hitch on a
-  long GOP and invisible on the two-second ones a looping clip is
-  usually encoded with. It has not been measured here.
+- **A seek costs a group of pictures.** Going anywhere resets and
+  reconfigures the decoder at the preceding sync sample, because a
+  decoder mid-GOP holds reference frames for where it was, and then
+  decodes forward through the gap without showing it. That is why a
+  clip encoded with two-second keyframes scrubs well and one encoded
+  with ten-second keyframes does not, and it is the honest price of
+  seeking a progressive file. Measured in a browser at 13 to 22 ms for
+  a 1280x992 H.264 clip on a software decoder; see below.
 - **Autoplay policies do not apply, as far as this goes.** A browser's
   media autoplay policy gates media elements, and there is no media
   element here: frames come from `VideoDecoder` and are drawn on a
   canvas, and no audio is decoded at all. That rests on what the
   pipeline is rather than on a survey of browser policies, which has not
   been done.
-- **No audio, at all.** A file's audio track is skipped by the demuxer.
+- **Sound is the shell's.** `AudioContext` does not exist on a worker,
+  which is where this decodes and draws, so nothing here plays a
+  file's audio track. `demuxMp4Audio` reads it, which is how a player
+  knows whether to offer a mute button, and `VideoClock` is the seam
+  that keeps a picture in step with sound played elsewhere. That seam
+  inverts which of the two owns time, and it has to: video drops
+  frames and nobody can tell, audio can neither drop nor resample
+  without being heard, so the sound leads and the picture follows.
+  `audioClock(audio, src)` is the adapter over `AudioService`.
 
 ## What this page was checked against
 
@@ -198,12 +317,47 @@ four, and that removing the second view releases its hold while the
 remaining view goes on advancing.
 
 Nothing in that touches a decoder, because node has neither
-`VideoDecoder` nor `OffscreenCanvas`. What has been checked in a browser
-is the real path, and it was checked elsewhere: the playground's
-transitions route plays an H.264 clip in the render worker on both
-backends, and the demuxer was run against that file and agreed with
-`ffprobe` on its 240 samples, its duration and its keyframes. What
-remains unverified there is a WebGPU parity fixture for a video frame
+`VideoDecoder` nor `OffscreenCanvas`. `VideoResolver.spec.ts` covers
+the part that does, against a decoder that records what it was handed
+and decodes nothing, and that is deliberate rather than a compromise: a
+seek that starts at the wrong keyframe is a mistake in a sample table
+index, and asserting it against pixels would be slower and vaguer.
+
+The rest is a browser's answer, and `pnpm check:video` is where it is
+asked. It opens a page that fetches a real 1280x992 H.264 clip, 120
+frames over five seconds, demuxes it with the real demuxer and decodes
+it with the platform's own `VideoDecoder`, then asserts four things per
+source: the container was read, a picture decoded, _new_ pictures kept
+arriving rather than one being presented over and over, and a seek to
+four fifths in changed the picture within a budget.
+
+It is a matrix over where the bytes came from, because that is the axis
+an application actually varies and the one nothing else covers: the
+same clip as a path on the server, as a `blob:` URL, as a `data:` URL,
+and across an origin with CORS. All four decode. What differs is
+whether the transport honours a `Range` request, which the script
+reports rather than asserts, because it is a fact about the platform:
+
+```
+  ✓ local asset on the server
+      1280x992, 5.00s, 41.7ms per frame; 24 pictures in the first second; seek 19ms
+      ranges: honoured. Drew a picture after 1 requests (62% of the file)
+  ✓ blob: URL
+      1280x992, 5.00s, 41.7ms per frame; 24 pictures in the first second; seek 17ms
+      ranges: honoured. Drew a picture after 1 requests (62% of the file)
+  ✓ data: URL
+      1280x992, 5.00s, 41.7ms per frame; 24 pictures in the first second; seek 22ms
+      ranges: not honoured. The server answered 200 rather than 206, so ranges are not honoured here.
+  ✓ cross-origin URL with CORS
+      1280x992, 5.00s, 41.7ms per frame; 24 pictures in the first second; seek 15ms
+      ranges: honoured. Drew a picture after 1 requests (62% of the file)
+```
+
+It is not part of `pnpm check`, for the reason the screenshot gates are
+not: it needs Chrome with H.264, which a Chromium build without
+proprietary codecs does not have.
+
+What remains unverified is a WebGPU parity fixture for a video frame
 and a budget spec for the per-frame upload; neither exists.
 
 ## Next
@@ -211,3 +365,5 @@ and a budget spec for the per-frame upload; neither exists.
 The props, semantics and defaults of the four Media components are on
 their own pages: [Image](/components/image), [Icon](/components/icon)
 and [Video](/components/video).
+[VideoPlayer](/components/video-player) is the transport above,
+assembled out of ordinary controls.

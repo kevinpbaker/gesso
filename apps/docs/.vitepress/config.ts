@@ -232,6 +232,7 @@ export default defineConfig({
           { text: 'Image', link: '/components/image' },
           { text: 'Avatar', link: '/components/avatar' },
           { text: 'Video', link: '/components/video' },
+          { text: 'VideoPlayer', link: '/components/video-player' },
           { text: 'Icon', link: '/components/icon' },
           { text: 'Spinner', link: '/components/spinner' },
           { text: 'ProgressBar', link: '/components/progress-bar' },

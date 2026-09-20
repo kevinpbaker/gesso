@@ -94,12 +94,13 @@ describe('the docs video example', () => {
       const playing = surfaceOf(ui.getByRole('image', { name: PLAYING }));
       const still = surfaceOf(ui.getByRole('image', { name: STILL }));
 
-      // The still one presented as it resolved: a paused video showing
-      // nothing looks like one that failed.
+      // Both presented as they resolved, playing or not: a video
+      // showing nothing looks like one that failed, and the first
+      // frame is there to be shown the moment the decoder is ready.
+      // That is the whole of what a poster is for a clip that has one
+      // of its own.
       expect(still.version).toBe(1);
-      // The playing one presents from the frame clock, so it has shown
-      // nothing until a frame runs.
-      expect(playing.version).toBe(0);
+      expect(playing.version).toBe(1);
 
       for (let time = 100; time <= 500; time += 100) {
         await vi.advanceTimersByTimeAsync(100);
@@ -107,7 +108,10 @@ describe('the docs video example', () => {
       }
 
       // One new picture per clip frame over half a second, and the
-      // still one has not moved.
+      // still one has not moved. Five rather than six, because the
+      // first of those frames is the one the tween *begins* on: it
+      // starts at zero, which is the picture already on the surface,
+      // so the clip shows its first frame once rather than twice.
       expect(playing.version).toBe(5);
       expect(still.version).toBe(1);
 
