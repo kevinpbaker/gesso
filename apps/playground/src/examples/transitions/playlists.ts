@@ -22,7 +22,7 @@ export interface CardDesign {
   /** Matches `PlaylistView.id` and `CuratedCard.id`. */
   readonly id: string;
   readonly background: string;
-  /** A repeating texture over the background, as the pink card has. */
+  /** A repeating texture tiled over the background. */
   readonly backgroundImage?: string;
   readonly text: string;
   readonly secondaryText: string;
@@ -35,22 +35,22 @@ export const CARDS: readonly CardDesign[] = [
     background: '#000000',
     text: '#ffffff',
     secondaryText: '#c3c3c3',
-    media: { kind: 'image', url: '/transitions/sax-player.webp', width: 275, height: 360 }
+    media: { kind: 'image', url: '/transitions/portrait-tall.webp', width: 275, height: 360 }
   },
   {
     id: '2',
     background: '#fadff3',
-    backgroundImage: '/transitions/pink-card-bg.png',
+    backgroundImage: '/transitions/card-texture.png',
     text: '#8b689c',
     secondaryText: '#ab91b8',
-    media: { kind: 'video', url: '/transitions/dancing-woman.mp4', width: 1280, height: 992 }
+    media: { kind: 'video', url: '/transitions/motion-loop.mp4', width: 1280, height: 992 }
   },
   {
     id: '3',
     background: '#6d75ff',
     text: '#ffffff',
     secondaryText: '#e1e1e1',
-    media: { kind: 'image', url: '/transitions/guitar-player.webp', width: 414, height: 360 }
+    media: { kind: 'image', url: '/transitions/portrait-wide.webp', width: 414, height: 360 }
   }
 ];
 

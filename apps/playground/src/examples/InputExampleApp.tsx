@@ -230,7 +230,7 @@ function PhotoPane(inputs: Inputs<PaneProps>, _ctx: ComponentContext): UiChild {
   const photo = (turning: boolean): UiChild => (
     <Image
       key={turning ? 'rotating' : 'plain'}
-      src="/transitions/guitar-player.webp"
+      src="/transitions/portrait-wide.webp"
       alt="A guitarist mid-phrase"
       width={percent(100)}
       height={percent(100)}
