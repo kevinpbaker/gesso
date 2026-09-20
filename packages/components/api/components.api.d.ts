@@ -112,6 +112,18 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+interface PaginationProps extends ControlLayoutProps {
+  page?: number;
+  defaultPage?: number;
+  onChange?: (page: number) => void;
+  pageCount: number;
+  siblings?: number;
+  boundaries?: boolean;
+  label?: string;
+  disabled?: boolean;
+  size?: ButtonSize;
+}
+declare function Pagination(inputs: Inputs<PaginationProps>, _ctx: ComponentContext): UiChild;
 interface BreadcrumbItem {
   readonly value: string;
   readonly label: string;
@@ -731,6 +743,7 @@ export {
   Meter,
   minLength,
   NumberInput,
+  Pagination,
   pattern,
   ProgressBar,
   quantize,
@@ -817,6 +830,7 @@ export {
   type NumberInputProps,
   type OverlayHandle,
   type OverlayOptions,
+  type PaginationProps,
   type Problems,
   type ProgressBarProps,
   type RadioGroupProps,

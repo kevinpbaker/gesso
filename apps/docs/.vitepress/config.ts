@@ -228,6 +228,7 @@ export default defineConfig({
           { text: 'SplitPane', link: '/components/split-pane' },
           { text: 'FindBar', link: '/components/find-bar' },
           { text: 'Breadcrumb', link: '/components/breadcrumb' },
+          { text: 'Pagination', link: '/components/pagination' },
           { text: 'Image', link: '/components/image' },
           { text: 'Avatar', link: '/components/avatar' },
           { text: 'Video', link: '/components/video' },

@@ -1216,6 +1216,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/number-input'
   },
   {
+    name: 'Pagination',
+    package: 'components',
+    group: 'Components',
+    what: 'The strip of page numbers under a paged list.',
+    page: '/components/pagination'
+  },
+  {
     name: 'ProgressBar',
     package: 'components',
     group: 'Components',

@@ -21,6 +21,7 @@ export {
   type ControlTokens
 } from './tokens';
 export { Checkbox, type CheckboxProps } from './Checkbox';
+export { Pagination, type PaginationProps } from './Pagination';
 export { Breadcrumb, type BreadcrumbProps, type BreadcrumbItem } from './Breadcrumb';
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './SegmentedControl';
 export { Meter, type MeterProps, type MeterOptimum } from './Meter';
