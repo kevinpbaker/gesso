@@ -1,5 +1,11 @@
 # gesso-framework
 
+## 0.2.1
+
+### Patch Changes
+
+- gesso-core@0.2.1
+
 ## 0.2.0
 
 ### Patch Changes

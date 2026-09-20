@@ -1,5 +1,46 @@
 # create-gesso-app
 
+## 0.2.1
+
+### Patch Changes
+
+- 53f5703: **A scaffolded sibling keeps its whole name.** `create-gesso-app
+../gessosheet`, run from inside a checkout called `gesso`, finished by
+  announcing `Created gessosheet in heet.`
+
+  The closing message worked out where the project had landed by testing
+  whether the target path started with the current directory and slicing
+  that many characters off the front. That is a string test standing in
+  for a path one, and `/work/gessosheet` starts with `/work/gesso`
+  without ever having been inside it, so the name lost its first four
+  characters and the `cd` line underneath told the reader to go
+  somewhere that does not exist.
+
+  It is `relative` now, which answers the question that was being asked.
+  Which of the two paths to print is then readability rather than
+  correctness: a child or a sibling is shorter said relatively, and is
+  what the caller typed, while a target on the far side of the tree is a
+  run of `..` segments the absolute path beats. The files were always
+  written to the right place; only the message was wrong.
+
+- b2840a2: **A scaffold installs the framework it was released beside.** Both
+  templates still asked for `gesso-core@^0.1.0` and its siblings after
+  the packages moved to 0.2.0, so `npm create gesso-app` against the
+  registry resolved a scaffold onto the previous framework.
+
+  The ranges are current again, and they are no longer maintained by
+  remembering. `pnpm changeset:version` now runs
+  `scripts/sync-template-ranges.ts` after it moves the packages, which
+  points every `gesso-*` range in the templates at the version that
+  package is actually at. The templates are the one manifest a release
+  would otherwise miss: they are data the CLI copies rather than
+  workspace members, so changesets does not know they exist.
+
+  `pnpm check:scaffold` already refused a drifted template and still
+  does. It kept its job; it simply is not the only thing standing
+  between a release and a stale scaffold any more, having fired on 0.2.0
+  and been talked past.
+
 ## 0.2.0
 
 ### Patch Changes
