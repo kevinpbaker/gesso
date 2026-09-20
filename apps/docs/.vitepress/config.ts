@@ -232,6 +232,7 @@ export default defineConfig({
           { text: 'Icon', link: '/components/icon' },
           { text: 'Spinner', link: '/components/spinner' },
           { text: 'ProgressBar', link: '/components/progress-bar' },
+          { text: 'Meter', link: '/components/meter' },
           { text: 'Skeleton', link: '/components/skeleton' }
         ]
       },

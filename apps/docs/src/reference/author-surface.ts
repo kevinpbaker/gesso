@@ -1188,6 +1188,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/menu'
   },
   {
+    name: 'Meter',
+    package: 'components',
+    group: 'Components',
+    what: 'A measurement inside a known range, with bands that decide its tone.',
+    page: '/components/meter'
+  },
+  {
     name: 'NumberInput',
     package: 'components',
     group: 'Components',

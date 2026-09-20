@@ -21,6 +21,7 @@ export {
   type ControlTokens
 } from './tokens';
 export { Checkbox, type CheckboxProps } from './Checkbox';
+export { Meter, type MeterProps, type MeterOptimum } from './Meter';
 export { Alert, type AlertProps, type AlertTone } from './Alert';
 export { Link, type LinkProps, type LinkUnderline } from './Link';
 export { Chip, type ChipProps, type ChipSize, type ChipVariant } from './Chip';

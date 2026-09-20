@@ -112,6 +112,19 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+type MeterOptimum = 'low' | 'high';
+interface MeterProps extends ControlLayoutProps {
+  value: number;
+  min?: number;
+  max?: number;
+  label?: string;
+  low?: number;
+  high?: number;
+  optimum?: MeterOptimum;
+  showValue?: boolean;
+  format?: (value: number) => string;
+}
+declare function Meter(inputs: Inputs<MeterProps>, _ctx: ComponentContext): UiChild;
 type AlertTone = 'neutral' | 'accent' | 'danger';
 interface AlertProps extends ControlLayoutProps {
   title?: string;
@@ -687,6 +700,7 @@ export {
   matches,
   maxLength,
   Menu,
+  Meter,
   minLength,
   NumberInput,
   pattern,
@@ -767,6 +781,8 @@ export {
   type LinkUnderline,
   type MenuItem,
   type MenuProps,
+  type MeterOptimum,
+  type MeterProps,
   type NumberInputProps,
   type OverlayHandle,
   type OverlayOptions,
