@@ -52,6 +52,16 @@ export interface UiModifierLayout {
   flowBox(node: UiNode): LayoutBox | null;
   /** The node's own scroll offset; see `UiModifierHost.scrollOffset`. */
   scroll(node: UiNode): { x: number; y: number } | null;
+  /**
+   * The drawn surface, in the same coordinates `box` answers in; see
+   * `UiModifierHost.viewportBox`.
+   *
+   * Optional, and absent means unknown. A layout double in a spec, and
+   * a headless graph, have no surface to report — and a modifier that
+   * gets null must carry on as though its node were visible, because
+   * "nobody is drawing" and "off screen" are not the same answer.
+   */
+  viewport?(): LayoutBox | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 
@@ -380,6 +390,10 @@ class Host implements UiModifierHost {
 
   flowBox(): LayoutBox | null {
     return this.services.layout?.flowBox(this.node) ?? null;
+  }
+
+  viewportBox(): LayoutBox | null {
+    return this.services.layout?.viewport?.() ?? null;
   }
 
   onLayout(listener: (box: LayoutBox) => void): void {

@@ -15,7 +15,7 @@ export type { ContextMenuOptions, ShortcutOptions, ShortcutsOptions } from './sh
 export { animateLayout, type AnimateLayoutOptions } from './animation';
 export { imageSource, iconSource, type ImageSourceArgs, type IconSourceArgs, type ImageSources } from './media';
 export { motion, sharedElement, type MotionArgs, type SharedElementArgs } from './motion';
-export { videoSource, type VideoSourceArgs } from './video';
+export { videoSource, type VideoSourceArgs, type VideoTransport, type VideoClock, type VideoState } from './video';
 export { scrollPosition, type ScrollOffset, type ScrollPositionArgs } from './scroll';
 export { breakpoint, sizeContainer, type BreakpointArgs, type SizeContainerArgs } from './breakpoints';
 export { insetPadding, publishInset, type InsetPaddingArgs, type PublishInsetArgs } from './insets';

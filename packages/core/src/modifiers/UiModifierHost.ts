@@ -85,6 +85,28 @@ export interface UiModifierHost {
    */
   flowBox(): LayoutBox | null;
   /**
+   * The whole surface the application is drawn on, in the same
+   * coordinates `layoutBox` answers in.
+   *
+   * Here so that a modifier can tell whether its node is somewhere a
+   * reader could see it, which is a question only the expensive
+   * modifiers ask and the reason this is in the budget at all: a
+   * decoder, a poller or anything else that costs whether or not it is
+   * looked at has no business running for a node scrolled a thousand
+   * pixels off the bottom. `videoSource` is the case that earned it —
+   * a page of clips used to cost the sum of all of them however few
+   * were on screen.
+   *
+   * It is the *root's* box and not the window's, so it is right for an
+   * application that does not fill its page and correct under the same
+   * scrolling `layoutBox` already accounts for. Null wherever
+   * `layoutBox` is: before the first layout, and in a headless graph
+   * with no layout at all — and a modifier that gets null must carry
+   * on as though the node were visible, because "no measurement yet"
+   * and "off screen" are not the same answer.
+   */
+  viewportBox(): LayoutBox | null;
+  /**
    * How far this node is scrolled, or null for one that is not a
    * scroll container.
    *
