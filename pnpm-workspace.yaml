@@ -1,9 +1,3 @@
 packages:
   - 'packages/*'
   - 'apps/*'
-  # `create-gesso-app` is a tool this repository runs, not a package it
-  # links: it has no dependencies, nothing imports it, and it is invoked
-  # with `node` from a root script the way everything in `scripts/` is.
-  # Listing it as an importer would put an entry in the lockfile that
-  # buys nothing, and CI installs with `--frozen-lockfile`.
-  - '!packages/create-gesso-app'

@@ -317,7 +317,48 @@ async function screenshot(devtools: DevTools): Promise<string> {
   return reply.data;
 }
 
+/**
+ * The templates name version ranges for the packages they install, and
+ * nothing else in the repository would notice them going stale. A
+ * release that moves the packages to 0.2.0 and leaves a template asking
+ * for ^0.1.0 produces scaffolds on the previous framework.
+ */
+function checkTemplateRanges(): void {
+  const templatesDir = join(root, 'packages', 'create-gesso-app', 'templates');
+  const wrong: string[] = [];
+  for (const template of readdirSync(templatesDir)) {
+    const manifestPath = join(templatesDir, template, 'package.json');
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    for (const deps of [manifest.dependencies ?? {}, manifest.devDependencies ?? {}]) {
+      for (const [name, range] of Object.entries(deps)) {
+        if (!name.startsWith('gesso-')) {
+          continue;
+        }
+        const own = join(root, 'packages', name.slice('gesso-'.length), 'package.json');
+        if (!existsSync(own)) {
+          continue;
+        }
+        const version = (JSON.parse(readFileSync(own, 'utf8')) as { version: string }).version;
+        if (range !== `^${version}`) {
+          wrong.push(`  ${template}/package.json asks for ${name}@${range}, but it is at ${version}`);
+        }
+      }
+    }
+  }
+  if (wrong.length > 0) {
+    console.error(`\nThe scaffold templates are behind the packages:\n${wrong.join('\n')}\n`);
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
+  checkTemplateRanges();
   // Found before anything is scaffolded, so a machine without a browser
   // fails in a sentence rather than after an install.
   const chrome = template === 'web' ? findChrome() : undefined;
@@ -339,6 +380,10 @@ async function main(): Promise<void> {
         'my-app',
         '--template',
         template,
+        // The point of this gate is the code in this checkout. Without
+        // --local the scaffold installs the last published version and
+        // the gate stops saying anything about the working tree.
+        '--local',
         ...(build ? [] : ['--no-build'])
       ],
       root

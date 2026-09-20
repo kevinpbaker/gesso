@@ -1,21 +1,17 @@
 # create-gesso-app
 
-Scaffolds a Gesso application: a project whose interface is built, laid
-out, painted and hit-tested in a render worker. Two templates, one for a
-browser and one for a native window.
+Scaffolds a Gesso application: a Vite project whose interface is built,
+laid out and painted in a render worker.
 
 ```bash
-pnpm create:app ../my-app                            # from the workspace root
-node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app
-node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --template electrobun
+npm create gesso-app my-app
+npm create gesso-app my-app -- --template electrobun   # a native window
 ```
 
-| Option              | What it does                                                      |
-| ------------------- | ----------------------------------------------------------------- |
-| `--name <name>`     | Package name for the new project; defaults to the directory's own |
-| `--template <name>` | `web` or `electrobun`; defaults to `web`                          |
-| `--force`           | Write into a directory that already has files in it               |
-| `--no-build`        | Pack without rebuilding the packages first                        |
+The packages come from the registry. `--local` packs them out of a
+Gesso checkout instead, for scaffolding against changes that are not
+released yet; that is the mode `pnpm check:scaffold` uses, so the gate
+tests the working tree and not the last release.
 
 ## What the `web` template writes
 
@@ -26,7 +22,6 @@ vite.config.ts    empty, because Gesso needs no plugin
 src/main.ts       the main thread: name the worker, mount into #app
 src/worker.ts     the render worker: name the root component
 src/App.tsx       the screen
-vendor/           the three Gesso packages, packed
 ```
 
 ## What the `electrobun` template writes
@@ -42,26 +37,30 @@ src/main/index.ts      the main process: the state, and the windows
 src/view/main.ts       a window's main thread: build the bridge, mount
 src/view/render.worker.ts  the render worker, and the channels it attaches
 src/render/App.tsx     the screen
-vendor/                the four Gesso packages, packed
 ```
 
-Either way it has to run from inside this workspace, because of
-`vendor/`.
+Each template's `package.json` names version ranges, and an ordinary
+install fetches them.
 
-## Why it vendors its dependencies
+## What `--local` does, and why it exists
 
-`gesso-core`, `gesso-framework`, `gesso-components` and
-`gesso-electrobun` are not published. A generated `package.json` naming
-a version of any of them would produce a project that cannot install, so
-the CLI packs the ones a template needs out of the workspace with
-`pnpm pack`, writes the tarballs into the new project and points
-`dependencies` and `overrides` at them with `file:` specifiers.
+`--local` packs the packages a template needs out of a Gesso checkout
+with `pnpm pack`, writes the tarballs into the new project's `vendor/`
+and points `dependencies` and `overrides` at them with `file:`
+specifiers. It only works from inside the workspace, and it says so
+rather than failing obscurely.
 
-That is the same route `scripts/check-install.ts` takes, and the reason
-is the same: `pnpm pack` is the only thing that applies each package's
-`publishConfig`, which rewrites `exports` from `src/*.ts` to `dist`. A
-workspace link never goes through it, so a project that linked instead
-would be testing a resolution no consumer ever gets.
+It exists so a scaffold can be made against changes that are not
+released. `pnpm check:scaffold` runs this way for exactly that reason:
+a gate that installed the last release would pass no matter what the
+working tree did.
+
+`pnpm pack` and not a workspace link, because packing is the only thing
+that applies each package's `publishConfig`, which rewrites `exports`
+from `src/*.ts` to `dist`. A link never goes through it, so a project
+that linked would be testing a resolution no consumer ever gets. That
+is the same route `scripts/check-install.ts` takes and for the same
+reason.
 
 A `web` project installs with **npm**. npm satisfies the packages'
 declarations of each other from the tarballs already in its tree; pnpm 11

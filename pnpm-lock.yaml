@@ -44,10 +44,10 @@ importers:
 
   apps/devtools-extension:
     dependencies:
-      'gesso-devtools':
+      gesso-devtools:
         specifier: workspace:^
         version: link:../../packages/devtools
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../../packages/framework
     devDependencies:
@@ -57,23 +57,23 @@ importers:
 
   apps/docs:
     dependencies:
-      'gesso-components':
+      gesso-components:
         specifier: workspace:^
         version: link:../../packages/components
-      'gesso-core':
+      gesso-core:
         specifier: workspace:^
         version: link:../../packages/core
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../../packages/framework
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
     devDependencies:
-      'gesso-devtools':
+      gesso-devtools:
         specifier: workspace:^
         version: link:../../packages/devtools
-      'gesso-testing':
+      gesso-testing:
         specifier: workspace:^
         version: link:../../packages/testing
       vitepress:
@@ -85,26 +85,26 @@ importers:
 
   apps/playground:
     dependencies:
-      'gesso-components':
+      gesso-components:
         specifier: workspace:^
         version: link:../../packages/components
-      'gesso-core':
+      gesso-core:
         specifier: workspace:^
         version: link:../../packages/core
-      'gesso-devtools':
+      gesso-devtools:
         specifier: workspace:^
         version: link:../../packages/devtools
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../../packages/framework
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
     devDependencies:
-      'gesso-testing':
+      gesso-testing:
         specifier: workspace:^
         version: link:../../packages/testing
-      'gesso-vite-plugin':
+      gesso-vite-plugin:
         specifier: workspace:^
         version: link:../../packages/vite-plugin
       vite:
@@ -113,14 +113,14 @@ importers:
 
   packages/components:
     dependencies:
-      'gesso-core':
+      gesso-core:
         specifier: workspace:^
         version: link:../core
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../framework
     devDependencies:
-      'gesso-testing':
+      gesso-testing:
         specifier: workspace:^
         version: link:../testing
       rxjs:
@@ -137,15 +137,21 @@ importers:
         specifier: ^7.8.2
         version: 7.8.2
 
+  packages/create-gesso-app:
+    devDependencies:
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(typescript@7.0.2)
+
   packages/devtools:
     dependencies:
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../framework
 
   packages/electrobun:
     dependencies:
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../framework
     devDependencies:
@@ -155,7 +161,7 @@ importers:
 
   packages/framework:
     dependencies:
-      'gesso-core':
+      gesso-core:
         specifier: workspace:^
         version: link:../core
     devDependencies:
@@ -165,10 +171,10 @@ importers:
 
   packages/testing:
     dependencies:
-      'gesso-core':
+      gesso-core:
         specifier: workspace:^
         version: link:../core
-      'gesso-framework':
+      gesso-framework:
         specifier: workspace:^
         version: link:../framework
       vitest:

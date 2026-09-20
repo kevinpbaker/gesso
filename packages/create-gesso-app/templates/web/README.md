@@ -79,36 +79,6 @@ one handler did not run, a `renderer` error means the surface stopped
 being updated, and a `channel` error means the data behind an intact
 view has stopped arriving.
 
-## Why `vendor/` exists, and how to remove it
-
-Gesso is not published to a registry yet. A `package.json` naming a
-version of `gesso-core` would produce a project that cannot install, so
-`create-gesso-app` packed the packages out of its own workspace, put the
-tarballs in `vendor/` and pointed the manifest at them:
-
-```json
-"gesso-core": "file:vendor/gesso-core-0.1.0.tgz"
-```
-
-The packed packages declare each other by version range, so without help
-a package manager is free to go looking for `gesso-core@^0.1.0` on a
-registry that has never heard of it. `overrides` in `package.json` is
-what tells npm; `overrides` in `pnpm-workspace.yaml` is what tells pnpm,
-which reads it nowhere else. Both files say the same thing twice for
-that reason.
-
-To pick up a change made in the Gesso workspace, run `create-gesso-app`
-again over this directory with `--force`, or repack by hand:
-
-```bash
-cd path/to/gesso/packages/core && pnpm build
-pnpm pack --pack-destination path/to/this/project/vendor
-```
-
-When the packages are published, this all goes away: delete `vendor/`,
-delete `pnpm-workspace.yaml`, delete `overrides`, and put version ranges
-back in `dependencies`.
-
 ## Where to go next
 
 - `App.tsx` is commented with what each part of it is doing.

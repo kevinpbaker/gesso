@@ -26,13 +26,22 @@
   ],
   "type": "module",
   "bin": {
-    "create-gesso-app": "./bin/create-gesso-app.ts"
+    "create-gesso-app": "./dist/create-gesso-app.mjs"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   },
   "files": [
     "README.md",
-    "bin",
+    "CHANGELOG.md",
+    "dist",
     "LICENSE",
     "templates"
   ],
-  "private": true
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.14"
+  }
 }

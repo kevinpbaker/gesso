@@ -10,7 +10,8 @@
       "gesso-testing",
       "gesso-devtools",
       "gesso-vite-plugin",
-      "gesso-electrobun"
+      "gesso-electrobun",
+      "create-gesso-app"
     ]
   ],
   "linked": [],

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * `create-gesso-app`: scaffolds a Gesso application (the
  * last item).
@@ -56,7 +57,7 @@ interface Template {
   /** Files carrying `{{name}}`, relative to the project directory. */
   readonly substitute: readonly string[];
   /** What to tell the person once the project is written. */
-  readonly next: (name: string, where: string) => string;
+  readonly next: (name: string, where: string, local: boolean) => string;
 }
 
 /**
@@ -75,18 +76,22 @@ const TEMPLATES: Record<string, Template> = {
   web: {
     vendored: ['core', 'framework', 'components', 'devtools', 'vite-plugin'],
     substitute: ['index.html', 'README.md'],
-    next: (name, where) => `
-Created ${name} in ${where}.
-
-  cd ${where}
-  pnpm install     # or npm install
-  pnpm dev
-
-Either works. The vendored tarballs ask each other for version ranges no
-registry can answer, so npm is pointed at them by \`overrides\` in
-package.json and pnpm by \`overrides\` in pnpm-workspace.yaml. Both go
-away when the packages are published; the project's README says how.
-`
+    next: (name, where, local) =>
+      [
+        `\nCreated ${name} in ${where}.\n`,
+        `  cd ${where}`,
+        '  pnpm install     # or npm install',
+        '  pnpm dev\n',
+        ...(local
+          ? [
+              'Gesso came from this workspace rather than the registry, packed into',
+              'vendor/. The packed packages ask each other for version ranges, so npm',
+              'is pointed at the tarballs by `overrides` in package.json and pnpm by',
+              "`overrides` in pnpm-workspace.yaml. The project's README says how to",
+              'move to the published packages.\n'
+            ]
+          : [])
+      ].join('\n')
   },
   electrobun: {
     vendored: ['core', 'framework', 'components', 'electrobun'],
@@ -103,9 +108,8 @@ Electrobun 2.x is a toolchain a launcher downloads, not a package a
 registry serves: \`hutch electrobun prepare\` projects the SDK into the
 project's own .hutch/devkit, which is where vite.config.ts and
 tsconfig.json look for it, and every script in hutch.config.ts runs that
-first. \`hutch install\` runs npm underneath, for the vendored packages'
-sake. If \`hutch\` is not on your path yet, the project's README says how
-to get it.
+first. \`hutch install\` runs npm underneath. If \`hutch\` is not on your
+path yet, the project's README says how to get it.
 
 \`pnpm check:scaffold:electrobun\` installs, typechecks and builds a
 project like this one without opening it. The window itself is checked
@@ -123,6 +127,15 @@ interface Options {
   readonly template: string;
   readonly force: boolean;
   readonly build: boolean;
+  /**
+   * Install the packages out of this workspace instead of the registry.
+   *
+   * What every scaffold did before the packages were published, kept
+   * because it is the only way to scaffold a project against changes
+   * that are not released yet. `pnpm check:scaffold` runs this way, so
+   * the gate tests the working tree rather than the last release.
+   */
+  readonly local: boolean;
 }
 
 const USAGE = `Usage: create-gesso-app <directory> [options]
@@ -137,8 +150,11 @@ Options:
                     "electrobun" for a native window with its state in a
                     main process. Defaults to "web".
   --force           Write into a directory that already has files in it.
-  --no-build        Pack the workspace packages without rebuilding them
-                    first. Only safe when dist/ is already current.
+  --local           Install the Gesso packages from this workspace, packed
+                    into the project, instead of from the registry. Only
+                    works inside a Gesso checkout.
+  --no-build        With --local, pack without rebuilding first. Only safe
+                    when dist/ is already current.
   -h, --help        Print this.
 `;
 
@@ -153,6 +169,7 @@ function parseArgs(argv: readonly string[]): Options {
   let template = 'web';
   let force = false;
   let build = true;
+  let local = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -164,6 +181,9 @@ function parseArgs(argv: readonly string[]): Options {
         break;
       case '--force':
         force = true;
+        break;
+      case '--local':
+        local = true;
         break;
       case '--no-build':
         build = false;
@@ -193,7 +213,7 @@ function parseArgs(argv: readonly string[]): Options {
   }
 
   const absolute = isAbsolute(target) ? target : resolve(process.cwd(), target);
-  return { target: absolute, name: name ?? basename(absolute), template, force, build };
+  return { target: absolute, name: name ?? basename(absolute), template, force, build, local };
 }
 
 /** Looks a template up, and lists the ones that exist when it is not one. */
@@ -335,7 +355,11 @@ function writeManifest(options: Options, specifiers: ReadonlyMap<string, string>
     }
     where[pkg] = specifier;
   }
-  manifest.overrides = Object.fromEntries(specifiers);
+  if (specifiers.size > 0) {
+    manifest.overrides = Object.fromEntries(specifiers);
+  } else {
+    delete manifest.overrides;
+  }
   writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
@@ -389,27 +413,69 @@ function substitute(options: Options, template: Template): void {
   }
 }
 
+/**
+ * Appends the `vendor/` explanation to the generated README.
+ *
+ * It lives here rather than in the template because a project made
+ * without `--local` has no `vendor/`, and a README explaining a
+ * directory that is not there is worse than one that says nothing.
+ */
+function explainVendoring(options: Options): void {
+  const path = join(options.target, 'README.md');
+  if (!existsSync(path)) {
+    return;
+  }
+  const section = [
+    '',
+    '## Why `vendor/` exists, and how to remove it',
+    '',
+    'This project was scaffolded with `--local`, so it installs Gesso from',
+    'a checkout rather than from the registry: the packages were packed',
+    'into `vendor/` and the manifest points at the tarballs.',
+    '',
+    'The packed packages declare each other by version range, so without',
+    'help a package manager is free to go looking for `gesso-core@^0.1.0`',
+    'on the registry and get a different copy than the one beside it.',
+    '`overrides` in `package.json` is what tells npm; `overrides` in',
+    '`pnpm-workspace.yaml` is what tells pnpm, which reads it nowhere else.',
+    '',
+    'To pick up a further change, run `create-gesso-app --local` over this',
+    'directory again with `--force`.',
+    '',
+    'To move to the published packages: delete `vendor/`, delete',
+    '`pnpm-workspace.yaml`, delete `overrides`, and put version ranges back',
+    'in `dependencies`.',
+    ''
+  ].join('\n');
+  writeFileSync(path, readFileSync(path, 'utf8').trimEnd() + '\n' + section);
+}
+
 function main(): void {
   const options = parseArgs(process.argv.slice(2));
-  if (!existsSync(join(workspaceRoot, 'packages', 'core', 'package.json'))) {
+  if (options.local && !existsSync(join(workspaceRoot, 'packages', 'core', 'package.json'))) {
     fail(
-      'create-gesso-app has to run from inside the Gesso workspace: it packs the packages it\n' +
-        'installs, because they are not published anywhere it could fetch them from.'
+      '--local packs the packages out of the Gesso workspace, and this is not one.\n' +
+        'Run it from inside a checkout, or drop --local to install from the registry.'
     );
   }
 
   const template = templateOf(options.template);
   prepareTarget(options);
   copyTemplate(join(packageRoot, 'templates', options.template), options);
-  const specifiers = vendorPackages(options, template);
+  // Without --local the template's own version ranges are the answer,
+  // and the manifest needs nothing but its name.
+  const specifiers = options.local ? vendorPackages(options, template) : new Map<string, string>();
   writeManifest(options, specifiers);
-  writePnpmOverrides(options, specifiers);
+  if (options.local) {
+    writePnpmOverrides(options, specifiers);
+    explainVendoring(options);
+  }
   substitute(options, template);
 
   const where = options.target.startsWith(process.cwd())
     ? options.target.slice(process.cwd().length + 1)
     : options.target;
-  console.log(template.next(options.name, where));
+  console.log(template.next(options.name, where, options.local));
 }
 
 main();
