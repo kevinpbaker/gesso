@@ -21,6 +21,7 @@ export {
   type ControlTokens
 } from './tokens';
 export { Checkbox, type CheckboxProps } from './Checkbox';
+export { Link, type LinkProps, type LinkUnderline } from './Link';
 export { Chip, type ChipProps, type ChipSize, type ChipVariant } from './Chip';
 export { Switch, type SwitchProps } from './Switch';
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';

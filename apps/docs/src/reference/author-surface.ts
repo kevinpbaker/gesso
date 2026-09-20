@@ -1160,6 +1160,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/components/lazy-list'
   },
   {
+    name: 'Link',
+    package: 'components',
+    group: 'Components',
+    what: 'Words that go somewhere, announced as a link rather than a button.',
+    page: '/components/link'
+  },
+  {
     name: 'Menu',
     package: 'components',
     group: 'Components',

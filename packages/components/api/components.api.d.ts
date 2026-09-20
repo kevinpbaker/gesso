@@ -112,6 +112,17 @@ interface CheckboxProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): UiChild;
+type LinkUnderline = 'always' | 'hover' | 'none';
+interface LinkProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  label?: string;
+  href?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  underline?: LinkUnderline;
+  children?: UiChild;
+}
+declare function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild;
 type ChipVariant = 'filled' | 'outlined';
 type ChipSize = 'small' | 'medium';
 interface ChipProps extends ControlLayoutProps {
@@ -661,6 +672,7 @@ export {
   Image,
   keymap,
   LazyList,
+  Link,
   matches,
   maxLength,
   Menu,
@@ -738,6 +750,8 @@ export {
   type ImageProps,
   type Keymap,
   type LazyListProps,
+  type LinkProps,
+  type LinkUnderline,
   type MenuItem,
   type MenuProps,
   type NumberInputProps,
