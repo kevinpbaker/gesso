@@ -39,6 +39,7 @@
   },
   "files": [
     "README.md",
+    "CHANGELOG.md",
     "dist",
     "LICENSE"
   ],
@@ -46,6 +47,7 @@
     "@gesso/framework": "workspace:^"
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown",
+    "prepublishOnly": "node ../../scripts/guard-publish.ts"
   }
 }

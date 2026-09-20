@@ -37,6 +37,7 @@
     "api:update": "node scripts/check-api.ts --update",
     "changeset": "changeset",
     "changeset:version": "changeset version",
+    "changeset:publish": "pnpm --filter './packages/*' build && changeset publish",
     "check:install": "node scripts/check-install.ts",
     "check:scaffold": "node scripts/check-scaffold.ts",
     "check:scaffold:electrobun": "node scripts/check-scaffold.ts --template electrobun",

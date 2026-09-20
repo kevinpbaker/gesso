@@ -59,6 +59,7 @@
   },
   "files": [
     "README.md",
+    "CHANGELOG.md",
     "dist",
     "LICENSE"
   ],
@@ -72,6 +73,7 @@
     "rxjs": "^7.8.2"
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown",
+    "prepublishOnly": "node ../../scripts/guard-publish.ts"
   }
 }
