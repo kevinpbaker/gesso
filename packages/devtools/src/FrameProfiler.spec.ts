@@ -5,7 +5,7 @@ import { summarize, type FrameSample } from './FrameProfiler';
 /**
  * The profiler's arithmetic, which is the half worth asserting on.
  * What the strip looks like is a browser's question, not a spec's, for
- * the reason `decisions/0036` gives about the error overlay.
+ * the same reason the error overlay's appearance is.
  */
 interface SampleOverrides {
   phases?: Partial<FrameSample['phases']>;

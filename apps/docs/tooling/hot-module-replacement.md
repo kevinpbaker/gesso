@@ -123,7 +123,7 @@ says which file and why, once per file, in the dev server's own output:
 [gesso] src/App.tsx is imported by the main thread as well as by the
 render worker, so saving it reloads the page instead of replacing the
 tree. Reach it only from the render worker's own graph to get hot
-replacement back; see decisions/0049.
+replacement back.
 ```
 
 The other thing that reloads rather than replaces is a change to a route

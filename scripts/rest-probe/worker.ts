@@ -7,7 +7,7 @@ import { Probe, type Wire } from './Probe.ts';
  * every command that reaches it.
  *
  * `calls` is what the handler was called with, which is the claim
- * `decisions/0080` makes about `move(from, to)`: the arguments are
+ * made about `move(from, to)`: the arguments are
  * spread back out on this side. `wire` is the message as it arrived on
  * the port, before `provide` took it apart, which is the claim about
  * the transport: the first argument travels as `payload` and the

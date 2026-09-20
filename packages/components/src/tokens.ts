@@ -3,11 +3,11 @@ import { defaultSpacing, defineThemeExtension, type UiThemeExtension, type UiTyp
 /**
  * The tokens `@gesso/components` reads, as a theme extension.
  *
- * `COMPONENTS_ROADMAP.md` §2.3 settled how a library component is
+ * How a library component is
  * restyled: through the theme, never through a colour prop. The
  * palette answered most of it — every control already names
  * `controlBackground`, `controlAccent` and the rest, resolved at
- * paint — and `decisions/0096` answered radii on an element. What was
+ * paint — answered radii on an element. What was
  * left is everything a palette cannot say:
  *
  *   - **Metrics.** A control's padding and radius were literals in the

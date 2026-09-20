@@ -1,5 +1,5 @@
 /**
- * WebGPU parity check (WEBGPU_ROADMAP.md G0, browser layer).
+ * WebGPU parity check (browser layer).
  *
  * Starts the Vite dev server, opens the playground's compare route in
  * headless Chrome with WebGPU enabled, and reads the pixel diff the
@@ -35,8 +35,8 @@ const PAGE_URL = `http://localhost:${VITE_PORT}/#compare`;
  * stroke costs about a pixel per corner whichever backend is right,
  * because one rasterises a path and the other evaluates an SDF. It was
  * 0.03 when the fixture ended at the scrolled sticky list; the
- * decorated card of `MODIFIERS_ROADMAP.md` B3 and the rasterised icon
- * of `COMPONENTS_ROADMAP.md` C7 added about thirty antialiased corners
+ * decorated card and the rasterised icon added about thirty
+ * antialiased corners
  * between them and took the reading from 0.013% to 0.029%, which left
  * a pixel of headroom and would have failed the next rounded box
  * somebody added.
@@ -46,7 +46,7 @@ const PAGE_URL = `http://localhost:${VITE_PORT}/#compare`;
  * the number that catches a backend actually being wrong; this one
  * catches a fixture growing.
  *
- * `EXCELLENCE_ROADMAP.md` X5's painted node and vector path took the
+ * the painted node and vector path took the
  * reading from 0.032% to 0.051%, and grew the compared area by 2,752
  * pixels while doing it. The extra pixels are the edges of a curve, an
  * arc and a dashed ring, which is what a paint hook is for. They are

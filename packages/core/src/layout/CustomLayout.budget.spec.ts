@@ -15,7 +15,7 @@ import type { Size } from './LayoutTypes';
  * `LayoutEngine.budget.spec.ts` set: counts, not wall time.
  *
  * Both are budgets rather than behaviour tests because both are the
- * "sugar that hides cost" risk in `EXCELLENCE_ROADMAP.md` §5. A custom
+ * "sugar that hides cost" risk. A custom
  * layout is application code inside the measure phase, and a container
  * query is a layout that can ask for another layout, which is the one
  * thing in this workstream that could cost a second pass over a

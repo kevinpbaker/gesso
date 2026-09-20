@@ -55,7 +55,7 @@ interface FrameMetrics {
  * the shell holds neither end. What changed is that the log now runs
  * where those ports are. `FrameworkWorker.ts` taps them there and
  * posts what it records to the panel, so the shell is no more in the
- * way of a patch than it was. See `decisions/0047-store-action-log.md`
+ * way of a patch than it was.md`
  * and the record for X15.
  */
 export function mountFrameworkRoute(host: HTMLElement): () => void {

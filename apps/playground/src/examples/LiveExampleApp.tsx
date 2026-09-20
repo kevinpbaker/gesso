@@ -452,8 +452,8 @@ export interface StreamView {
  *
  * Deliberately *not* behind a channel. It is a synthetic generator for
  * a rendering stress test: it invents its own data, nothing else reads
- * it, and it does not survive a reload — so by the rule in
- * `decisions/0030-thread-model.md` §4.2 it is not application state.
+ * it, and it does not survive a reload — so by the thread
+ * model's rule it is not application state.
  * Putting it across the barrier would measure the patch stream at
  * 60Hz, which is worth measuring but is not what this route exists to
  * show; the route is here to stress bindings and the renderer.

@@ -26,7 +26,7 @@ import {
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 
 /**
- * The Media tier (`COMPONENTS_ROADMAP.md` C7).
+ * The Media tier.
  *
  * All four are the same shape as the rest of the library: semantics
  * from the first line, layout props passed through, and a colour prop
@@ -241,7 +241,7 @@ export interface IconProps extends ControlLayoutProps {
 /**
  * A glyph drawn from a path.
  *
- * `COMPONENTS_ROADMAP.md` C7 says the atlas is F9's and the first cut
+ * The atlas comes later and the first cut
  * rasterises per icon, replaced later without an API change. This is
  * that first cut: the props below are what an atlas-backed version
  * would take too, because what changes is where the pixels live, not
@@ -300,7 +300,7 @@ const SPINNER_BLADES = 8;
  * Eight blades of fixed, decreasing opacity sit in a container, and
  * the **container's rotation** is the only thing that changes — so a
  * turn is one property write eight times a second, not eight writes
- * sixty times a second. `decisions/0028` promised the F4 version would
+ * sixty times a second. The media tier promised that this version would
  * replace the interval with a subscription and change nothing else,
  * and this is that: a repeating tween whose easing has eight steps and
  * whose `stepMs` is one step long, so the runtime wakes eight times a

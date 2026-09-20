@@ -16,7 +16,7 @@ import { defineConfig } from 'vite';
  * what it adds is the `import.meta.hot.accept` wiring for the render
  * worker entries, and the warning when a save is about to reload the
  * page instead. That warning was written for exactly this application:
- * `decisions/0049` found the caveat here, in `FrameworkPlayground.ts`,
+ * The caveat was found here, in `FrameworkPlayground.ts`,
  * which the single-thread route imports on the main thread as well.
  *
  * `overlay: false` because the overlay covers the element the app was

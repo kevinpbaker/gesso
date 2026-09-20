@@ -8,7 +8,7 @@ import type { UiNode, UiNodeRef } from '@gesso/core';
  *
  * Focus lives in the runtime, so a control learns about its own by
  * comparing the focused node with the one its `ref` handed it. Until
- * B3 of `MODIFIERS_ROADMAP.md` draws a focus ring, this is how a
+ * a decoration draws a focus ring, this is how a
  * control shows focus at all: it binds `borderColor` to `focused`.
  *
  * `node()` is what a form hands to `FocusService.focus` to put the caret

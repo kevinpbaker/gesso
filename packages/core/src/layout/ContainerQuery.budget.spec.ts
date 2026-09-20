@@ -13,7 +13,7 @@ import type { LayoutBox } from './LayoutTypes';
 import { Constraints } from './LayoutTypes';
 
 /**
- * The budget behind container queries (roadmap X7), in the shape
+ * The budget behind container queries, in the shape
  * `LayoutEngine.budget.spec.ts` set: counts, not wall time.
  *
  * The risk this pins is specific. A container query is a layout that

@@ -107,7 +107,7 @@ export class AnimationDriver {
    * Stops whatever is driving a cell, leaving it where it stands.
    *
    * This is how a node leaving the tree releases its animations, which
-   * is the leak `decisions/0028` names for image bitmaps and which
+   * is the leak the media tier names for image bitmaps and which
    * matters here too: a driver holding a cell holds every closure the
    * component that made it captured.
    */

@@ -8,7 +8,7 @@ import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
 
 /**
- * Layout budgets (roadmap L7). A synthetic application tree — a page
+ * Layout budgets. A synthetic application tree — a page
  * column, a scroller, hundreds of fixed-height rows each holding a few
  * columns of text — is laid out once in full and then edited in the
  * small ways applications edit it. The counts are hard budgets: they

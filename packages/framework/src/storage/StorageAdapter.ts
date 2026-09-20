@@ -42,7 +42,7 @@ export interface StorageRead {
  * in it: `localStorage` cannot hold them, so an interface that
  * promised them would be one the shell route could not implement, and
  * an application storing pictures wants a store of its own with an
- * eviction policy rather than this. `docs/MUSIC_ROADMAP.md` M7's
+ * eviction policy rather than this. the
  * artwork cache is that other thing.
  *
  * Nothing rejects. Every method answers with an outcome, and the
@@ -110,7 +110,7 @@ export function storageReadValue(value: string | null): StorageRead {
  * passing one of these; one that would rather tell the person its
  * settings will not be kept reads the `denied` outcome and says so.
  * Choosing between those two on an application's behalf is exactly the
- * kind of decision `decisions/0030` keeps out of the framework.
+ * kind of decision the thread model keeps out of the framework.
  */
 export class MemoryStorage implements StorageAdapter {
   private readonly records = new Map<string, string>();

@@ -17,7 +17,7 @@ const RENDERER_STORAGE_KEY = 'gesso.playground.renderer';
 /**
  * The paint hook and vector paths, in a render worker.
  *
- * `EXCELLENCE_ROADMAP.md` X5's browser check. The renderer toggle is
+ * the browser check. The renderer toggle is
  * the point of the page rather than a convenience on it: a painted
  * node is the one thing in the framework an application draws for
  * itself, and the risk the workstream was written against is that it

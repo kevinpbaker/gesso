@@ -189,8 +189,8 @@ scoped values of the tree that opened it, and it would come out light
 inside a dark-themed panel. `Select` needs no placeholder for this: the
 entry is anchored to the trigger, and the layer falls back to the anchor
 for the theme, the text style and the content colour. That is the same
-defect `decisions/0024-overlays-tier.md` records, found by opening the
-page rather than by any spec.
+defect the overlay tier hit, found by opening the page rather than by
+any spec.
 
 ## What has been checked
 

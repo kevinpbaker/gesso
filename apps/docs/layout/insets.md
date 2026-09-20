@@ -122,7 +122,7 @@ An application that has not declared them gets zeroes rather than a
 failure.
 
 Nothing in `observeViewportInsets` reads a Gesso object, which is the
-rule `decisions/0030` states: the shell holds what only it can hold and
+thread model's rule: the shell holds what only it can hold and
 posts plain data, and every decision about the data is taken on the far
 side. Whether a real notch or a real keyboard reports what the reader
 expects has not been checked on a device; the route is covered by specs

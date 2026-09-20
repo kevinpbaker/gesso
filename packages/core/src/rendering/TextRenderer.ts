@@ -191,7 +191,7 @@ export function placeLines(
  * font string can say. A variable font's `wght` is reached through a
  * numeric weight, `wdth` through `fontStretch` — a context property,
  * not part of this string — and `tnum` and `liga` are not reachable at
- * all; `decisions/0085` records the measurement that says so.
+ * all.
  */
 export function buildFontString(
   state: Pick<PaintState, 'fontWeight' | 'fontSize' | 'fontFamily'> & { fontStyle?: string; fontVariant?: string }

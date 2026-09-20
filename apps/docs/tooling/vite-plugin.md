@@ -184,7 +184,7 @@ knows both ends of that graph, so it walks the importers and says so:
 [gesso] src/App.tsx is imported by the main thread as well as by the
 render worker, so saving it reloads the page instead of replacing the
 tree. Reach it only from the render worker's own graph to get hot
-replacement back; see decisions/0049.
+replacement back.
 ```
 
 Once per file per session, in the dev server's own output. `gesso({
@@ -202,8 +202,7 @@ diagnostics: false })` turns it off.
 
 ## Is it required?
 
-No, and that is deliberate. `decisions/0048` chose to import no bundler
-into the framework, and nothing in `@gesso/core` or `@gesso/framework`
+No, and that is deliberate. The framework imports no bundler, and nothing in `@gesso/core` or `@gesso/framework`
 mentions Vite. The plugin is the supported path for development because
 it is the one that gets the wiring right on your behalf; the literal
 construction is the documented fallback, it is what the plugin emits,

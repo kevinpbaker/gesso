@@ -8,7 +8,7 @@ import { formatNodePath } from './NodeReport';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
- * `EXCELLENCE_ROADMAP.md` X3: `(listener: click on node-4821)` becomes
+ * `(listener: click on node-4821)` becomes
  * a path through the components somebody wrote.
  *
  * An id is a handle beside the tree it came from, and a fact about

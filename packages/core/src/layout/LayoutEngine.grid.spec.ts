@@ -8,7 +8,7 @@ import { Constraints } from './LayoutTypes';
 import { auto, fr, minmax, percent, repeat } from './UiLength';
 
 /**
- * Grid (roadmap L6): tracks of px / percent / auto / fr / minmax, gaps,
+ * Grid: tracks of px / percent / auto / fr / minmax, gaps,
  * auto-flow and explicit placement with spans, item alignment in cells
  * and track distribution, driven through real nodes.
  */

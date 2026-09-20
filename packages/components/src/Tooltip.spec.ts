@@ -6,7 +6,7 @@ import { Box, Button, Column, Text, type UiChild } from '@gesso/core';
 import { Tooltip, tooltip } from './Tooltip';
 
 /**
- * `MODIFIERS_ROADMAP.md` B4's `tooltip()` and the component it shares
+ * the `tooltip()` and the component it shares
  * its implementation with. The component had no spec of its own; it
  * has one now, because the two are one implementation and a change to
  * `tooltipContent` has to be caught in both.

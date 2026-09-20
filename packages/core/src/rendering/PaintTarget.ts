@@ -86,7 +86,7 @@ export interface PaintResolver {
  * context by `PaintPicture.ts`, and the bitmap that comes out is what
  * both renderers draw. So there is one implementation of an even-odd
  * fill and one of a dash pattern in the tree, which is the property
- * `EXCELLENCE_ROADMAP.md` §5 asks for and the reason the paint hook
+ * the paint hook asks for, and the reason it
  * cannot fork the renderers.
  *
  * Colour values are resolved here rather than at record time, so a

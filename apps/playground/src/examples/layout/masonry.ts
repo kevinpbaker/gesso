@@ -4,7 +4,7 @@ import { Constraints, type Size, type UiLayoutChild, type UiLayoutProtocol } fro
  * A masonry wall, written against `@gesso/core`'s public exports and
  * nothing else.
  *
- * This is the file `EXCELLENCE_ROADMAP.md` X7 is really about. A
+ * This is the file custom layout is really about. A
  * masonry is the smallest arrangement that neither flex nor grid can
  * express: items keep their own heights, the columns are equal in
  * width and unequal in length, and where an item goes depends on the

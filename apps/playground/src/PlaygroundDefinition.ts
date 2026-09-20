@@ -63,13 +63,12 @@ function stressSubtree(count: number): UiElement | undefined {
 }
 
 /**
- * The renderer-parity section (WEBGPU_ROADMAP.md G0): everything the
+ * The renderer-parity section: everything the
  * two backends once disagreed on, in one row the compare route diffs
  * pixel by pixel — a rounded clipped card with rotated children and
  * text, an image under `objectFit: cover` in a rounded box, bordered
  * boxes with and without radii, and a scrolled list with a sticky
- * header, and a decorated card — the modifier decorations of
- * `MODIFIERS_ROADMAP.md` B3, which are the one thing a modifier may
+ * header, and a decorated card — the modifier decorations, which are the one thing a modifier may
  * put on screen and therefore the one thing that has to be identical
  * on both backends.
  */
@@ -95,7 +94,7 @@ const CARD_DECORATION: readonly DecorationShape[] = [
 const ROW_DECORATION: readonly DecorationShape[] = [{ kind: 'stroke', color: '#facc15', lineWidth: 2, outset: 3 }];
 
 /**
- * A painted node for the pixel gate: `EXCELLENCE_ROADMAP.md` X5's
+ * A painted node for the pixel gate: the
  * paint hook, exercising a cubic curve, an arc, a dash pattern and an
  * even-odd fill, none of which either backend can draw as a rectangle.
  *
@@ -157,7 +156,7 @@ function paritySection(state: PlaygroundState): UiElement {
         overflow: 'hidden',
         borderRadius: 14,
         backgroundColor: '#1e293b',
-        // The gradient of `ROADMAP.md` F9, on a box that already has a
+        // A gradient on a box that already has a
         // radius and a clip, so the pixel gate sees a gradient follow a
         // rounded corner without a single new antialiased edge to
         // account for. It paints over the colour, as CSS paints a

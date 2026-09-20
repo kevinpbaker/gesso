@@ -8,8 +8,7 @@ import { FocusService } from './FocusService';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
- * The two gaps `decisions/0049` recorded, closed
- * (`EXCELLENCE_ROADMAP.md` X3).
+ * The two gaps hot replacement left, closed.
  *
  * A reload throws the tree away and builds a new one, and the record
  * was explicit that focus did not survive it: "a focused node in a

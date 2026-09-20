@@ -1,7 +1,7 @@
 /**
  * `@gesso/components` — the component library.
  *
- * Every control here follows one contract (`COMPONENTS_ROADMAP.md` §2):
+ * Every control here follows one contract:
  * controlled by default with an optional `defaultX` that makes it
  * self-managing, themed through `UiTheme`'s control tokens with no
  * colour props of its own, keyboard operable from a keymap that is

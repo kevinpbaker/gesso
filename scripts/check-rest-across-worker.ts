@@ -1,7 +1,7 @@
 /**
  * A command's extra arguments, watched crossing a real Worker.
  *
- * `decisions/0080` made a channel command carry every argument: the
+ * A channel command carries every argument: the
  * first as `payload`, the others in `rest`, spread back out for the
  * handler on the far side. That was specified over a `MessageChannel`
  * in `Channel.spec.ts` and again in Segue's wiring spec, and the record

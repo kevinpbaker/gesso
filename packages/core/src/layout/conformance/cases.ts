@@ -17,7 +17,7 @@
  * `toHtml.ts` is short. Where Gesso's *defaults* differ from CSS
  * (cross-axis `start`, minimum size 0) the translator encodes Gesso's
  * current behaviour explicitly; those deltas are listed there and are
- * what roadmap item L3 removes.
+ * what the engine removes.
  */
 
 export type CaseNodeType = 'row' | 'column' | 'box' | 'text' | 'grid';
@@ -826,7 +826,7 @@ export const layoutCases: readonly LayoutCase[] = [
   // direction that decides which edge `start` is. The direction is
   // written on the child here because the conformance trees carry no
   // scoped environment; in an application it reaches the whole subtree
-  // through the theme's text style. See `decisions/0088`.
+  // through the theme's text style.
   testCase('logical/margin-ltr', row({ y: 'start' }, leaf(40, 20, { marginStart: 16, marginEnd: 4 }), leaf(40, 20))),
   testCase(
     'logical/margin-rtl',

@@ -13,7 +13,7 @@ import type { RouteDefinition } from './RouteDefinition';
  * not where it was left.
  *
  * Both applications solved this by putting those cells in module scope,
- * with the same comment on each explaining why (`decisions/0083`). This
+ * with the same comment on each explaining why. This
  * is that store, with an owner. What it buys over a module:
  *
  *   - **A lifetime that is stated.** A cell here lives as long as the
@@ -26,7 +26,7 @@ import type { RouteDefinition } from './RouteDefinition';
  *     screens may both remember `scroll` and mean different lists.
  *
  * It is a facility and not an architecture. The framework does not own
- * an application's data (`decisions/0030`): anything that matters after
+ * an application's data: anything that matters after
  * a reload, or that another part of the application acts on, is still
  * application state on a channel. What belongs here is the small,
  * screen-shaped remainder that only exists to put a screen back where it

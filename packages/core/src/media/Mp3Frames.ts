@@ -13,7 +13,6 @@
  * at once because a fifteen-second loop is small and its sample tables
  * live at the end. An `.mp3` is the opposite on both counts: a track
  * is megabytes, every frame describes itself, and
- * `docs/decisions/0073-the-waveform-is-network-bound.md` measured that
  * the bytes take longer to arrive than anything done with them takes
  * to run. So `push` takes whatever a stream reader just handed you,
  * returns the whole frames it can make from that and what it was

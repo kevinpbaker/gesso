@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "Scaffolds a Gesso application: a Vite project whose interface runs in a render worker.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "create-gesso-app": "./bin/create-gesso-app.ts"
   },
   "files": [
     "bin",
+    "LICENSE",
     "templates"
   ]
 }

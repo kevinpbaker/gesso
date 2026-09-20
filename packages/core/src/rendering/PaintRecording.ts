@@ -111,9 +111,9 @@ export type PaintOp =
  * a drawing, once, when its inputs change. The description is then
  * turned into pixels in exactly one place, so there is no second
  * implementation of `arc`, of the even-odd rule or of a dash pattern
- * for a backend to get subtly wrong. `decisions/0078` is the argument
- * for that shape over the obvious alternative, which is for each
- * renderer to replay the recording in its own vocabulary.
+ * for a backend to get subtly wrong. The obvious alternative, for each
+ * renderer to replay the recording in its own vocabulary, would mean a
+ * second rasteriser to keep in agreement.
  */
 export interface PaintRecording {
   readonly ops: readonly PaintOp[];

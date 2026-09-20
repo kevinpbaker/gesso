@@ -74,9 +74,8 @@ const DEFAULT_CAPACITY = 32;
 /**
  * Fetch, decode, cache, evict.
  *
- * **Where the decode happens.** `MODIFIERS_ROADMAP`'s sibling
- * `COMPONENTS_ROADMAP.md` C7 asks for the decode to be in a worker
- * with the bitmap transferred back. This resolver does not spawn one,
+ * **Where the decode happens.** The decode belongs in a worker with
+ * the bitmap transferred back. This resolver does not spawn one,
  * for two reasons that are worth stating rather than discovering
  * later. A Gesso runtime normally *is* a worker — the render worker of
  * `WorkerApp` — so a resolver constructed by it already fetches and

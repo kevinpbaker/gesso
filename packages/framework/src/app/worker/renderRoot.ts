@@ -104,8 +104,7 @@ export class RenderWorkerApp {
     // is blocked. Their only witness is the worker's own console,
     // which a page cannot read and a person only finds by opening the
     // right thread in devtools. These two listeners are what make a
-    // render worker's failures reach the shell at all. See
-    // `decisions/0036-error-overlay.md`, amended by 0039.
+    // render worker's failures reach the shell at all.
     this.host.addEventListener('error', event => {
       // The location only when the engine kept no Error: with one, the
       // stack says where it was in more detail and the event's
@@ -143,7 +142,7 @@ export class RenderWorkerApp {
 
   /**
    * Replaces the application's root and rebuilds its tree, for hot
-   * module replacement (`ROADMAP.md` F7).
+   * module replacement.
    *
    * The framework knows nothing about any bundler. An entry module
    * that wants this asks its own HMR client for the new module and

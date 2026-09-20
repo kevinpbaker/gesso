@@ -147,8 +147,8 @@ export interface IconSourceArgs {
  * names a palette entry and lets it resolve at paint, but a raster has
  * its colour baked in, so the icon has to be re-rasterised when the
  * theme under it changes. That is what `host.environment` and
- * `host.onEnvironment` — the half of `MODIFIERS_ROADMAP.md` B2 that
- * had no consumer until now — are for: the modifier reads the theme
+ * `host.onEnvironment` — the half that had no consumer until now —
+ * are for: the modifier reads the theme
  * the node inherits, and re-reads it when a provider above swaps it,
  * so an icon inside a card that turns dark turns with it.
  */

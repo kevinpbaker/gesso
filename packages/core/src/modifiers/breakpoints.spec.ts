@@ -14,7 +14,7 @@ import type { UiModifierLayout } from './UiModifierSet';
 import { breakpoint, sizeContainer } from './breakpoints';
 
 /**
- * Container queries (roadmap X7): a layout that branches on the room
+ * Container queries: a layout that branches on the room
  * it has rather than on the size of the window.
  *
  * Layout is supplied by hand here, the way `drop.spec.ts` does it: a

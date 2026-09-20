@@ -110,8 +110,7 @@ to exist.
 
 ## What it costs
 
-Not measured by this page. The figures recorded in
-`decisions/0026-data-tier.md`, sampled from the playground's frame
+Not measured by this page. The figures recorded for the data tier, sampled from the playground's frame
 readout over 40 wheel events at about 40 Hz on a 100,000 row table, are
 a median frame of 1.2 ms, a p90 of 1.8 ms and a worst of 2.6 ms, with
 the profiler reporting 80 laid-out nodes for the whole page. That was

@@ -14,15 +14,14 @@
  * `engine.layout(root, Constraints.loose(width, height))`. The sweep
  * runs the width up and back down, and then repeats the whole sweep,
  * because a return leg and a second pass are where a cache keyed on
- * the request (see `decisions/0065`) could answer from memory. What is
+ * the request () could answer from memory. What is
  * reported for each sweep is the distribution of the step times, the
  * share of each step spent inside the text measurer (which is the
  * re-wrap itself, key build and cache lookup included), how many
  * paragraph layouts the cache answered, and how many steps went over
  * the budget.
  *
- * The budget is 16 ms a step, the frame the profiler in
- * `decisions/0046` scales to. L7's budgets are counts with a timing
+ * The budget is 16 ms a step, the frame the profiler scales to. L7's budgets are counts with a timing
  * ceiling an order of magnitude over the reading, and none of them
  * resizes a paragraph, so there is no closer convention to borrow.
  *

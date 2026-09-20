@@ -18,7 +18,7 @@
  *   for a static host that will not rewrite unknown paths onto the
  *   app.
  * - `memory` — no window involvement at all. What a desktop window
- *   (roadmap E1) wants, since it has no address bar to sync with, and
+ * wants, since it has no address bar to sync with, and
  *   what a test wants.
  */
 export type ShellHistoryMode = 'path' | 'hash' | 'memory';

@@ -1,5 +1,5 @@
 /**
- * API report (`ROADMAP.md` F8).
+ * API report.
  *
  * Each publishable package's public surface is committed as
  * `packages/<name>/api/<name>.api.d.ts`, and this script regenerates it

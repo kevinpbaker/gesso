@@ -52,7 +52,7 @@ export interface LazyListOptions {
 /**
  * The tracks a lazy grid's rows share, and the header that shares them.
  *
- * `decisions/0010-grid.md` left this here: a table whose virtualized
+ * The grid work left this here: a table whose virtualized
  * rows line up with its header needs the rows to be items of one grid,
  * because tracks cannot be sized across grids that cannot see each
  * other. So the scroll container holds a single Grid, and every row is
@@ -513,7 +513,7 @@ export interface LazySourceArgs {
 /**
  * The tracks a lazy grid's rows share, and the header that shares them.
  *
- * `decisions/0010-grid.md` left this here: a table whose virtualized
+ * The grid work left this here: a table whose virtualized
  * rows line up with its header needs the rows to be items of one grid,
  * because tracks cannot be sized across grids that cannot see each
  * other. So the scroll container holds a single Grid, and every row is

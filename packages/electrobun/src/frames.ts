@@ -7,7 +7,7 @@
  * Nothing here knows what a channel is, what a patch is, or what a
  * command is: a frame's `body` is a string this module produced by
  * serializing a value it never looked inside. That restraint is the
- * rule `ELECTROBUN_ROADMAP.md` §2 states, and it is what keeps the
+ * rule the adapter states, and it is what keeps the
  * webview's main thread a transport rather than a router.
  */
 
@@ -18,8 +18,7 @@
  * message, and it fails badly: the main process throws while draining
  * and the sender sees only a timeout, so the real error is in a log
  * nobody is reading. A megabyte leaves eight times the headroom and
- * costs nothing at the measured rates. See
- * `docs/decisions/0070-electrobun-spike.md`.
+ * costs nothing at the measured rates.
  */
 export const DEFAULT_CHUNK_BYTES = 1_048_576;
 

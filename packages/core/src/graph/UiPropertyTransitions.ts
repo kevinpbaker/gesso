@@ -9,7 +9,7 @@ import type { NodeProperty, UiNode, UiNodeTransitions } from './UiNode';
  * currently running.
  *
  * This is the same shape as the override cascade and for the same
- * reason `decisions/0022` gives for putting that on the node: **both
+ * reason that lives on the node: **both
  * the builder's static writes and a binding's emissions funnel through
  * `updateNodeProperty`**, so interposing there is the only place that
  * catches both. `node.transitions` is null until an element declares

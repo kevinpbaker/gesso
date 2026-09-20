@@ -7,8 +7,8 @@ import { AnimationService } from './AnimationService';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
- * What F4 costs per frame, because `ROADMAP.md` §F4's exit criterion
- * asks for a number and an adjective would not do.
+ * What animation costs per frame, because the exit criterion asks for
+ * a number and an adjective would not do.
  *
  * Two questions, and they are different. **A tick** is arithmetic and
  * a property write, and the answer should be that a hundred of them

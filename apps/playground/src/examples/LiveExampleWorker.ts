@@ -8,7 +8,7 @@ import { LiveApp, LiveFeed } from './LiveExampleApp';
 const app = renderRoot(LiveApp).useService(LiveFeed);
 
 /**
- * Hot module replacement (`ROADMAP.md` F7).
+ * Hot module replacement.
  *
  * The clearest demonstration in the repository, because everything
  * worth keeping across a reload is here: `LiveFeed` is a service, so

@@ -11,7 +11,7 @@ import { buildRenderList, CommandKind } from './webgpu/WebGPURenderData';
 /**
  * Paint budgets, in the shape `LayoutEngine.budget.spec.ts` set.
  *
- * The whole risk `EXCELLENCE_ROADMAP.md` §5 names for this workstream
+ * The whole risk here
  * is a drawing hook that quietly repaints every frame and undoes what
  * the scheduler earned. The numbers here are the hard budget for that:
  * counts of painter runs, rasterisations and draw calls, not wall

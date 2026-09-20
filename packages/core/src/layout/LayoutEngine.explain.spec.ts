@@ -10,7 +10,7 @@ import { Constraints } from './LayoutTypes';
 import { percent } from './UiLength';
 
 /**
- * `engine.explain(node)` (roadmap L8): the answer to "why is this box
+ * `engine.explain(node)`: the answer to "why is this box
  * this size" as data and as text. Each case builds a small tree, lays
  * it out, and checks that the rule the engine reports is the rule that
  * actually decided the size — and that the printed text says so in

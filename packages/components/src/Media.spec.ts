@@ -26,7 +26,7 @@ import {
 import { Icon, Image, ProgressBar, Spinner, Video } from './Media';
 
 /**
- * The Media tier (`COMPONENTS_ROADMAP.md` C7).
+ * The Media tier.
  *
  * The renderers are not exercised here — `UiImage` and `objectFit`
  * have been on both backends since the parity milestone and

@@ -72,7 +72,7 @@ const SAMPLED_EVENTS = [
  * a decision is not here. The sink loads what it is told, plays and
  * pauses when told, and reports what the element is doing; which track
  * that is, and what comes next, is the render thread's `AudioService`
- * and the application above it. `decisions/0030` holds the shell to
+ * and the application above it. The thread model holds the shell to
  * "what genuinely cannot run anywhere else", and this is the audio
  * equivalent of forwarding a pointer event.
  *

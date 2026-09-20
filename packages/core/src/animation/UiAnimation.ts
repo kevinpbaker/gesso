@@ -38,7 +38,7 @@ export interface UiAnimationOptions {
    * Sample this animation at most this often, in milliseconds. Zero,
    * the default, means every frame.
    *
-   * This is what keeps `decisions/0028`'s promise about the `Spinner`:
+   * This is what keeps the media tier's promise about the `Spinner`:
    * eight blades have eight positions, so with `stepMs` at an eighth
    * of the turn the runtime wakes eight times a second rather than
    * sixty, and the driver reports it through `nextTickAt` so the

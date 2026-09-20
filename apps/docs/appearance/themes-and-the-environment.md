@@ -68,7 +68,7 @@ instead: `boxShadows` takes the array, and a padding takes a number.
 A screen written from the scale says `paddingX={theme.spacing.large}`
 rather than `paddingX={16}`, and gets the density axis for free. There
 is no by-name resolution for a length, because a length is read in the
-layout pass and a radius is not; `decisions/0079` has the reasoning.
+layout pass and a radius is not.
 
 `typography` is the subject of [the type scale](/appearance/typography),
 and it matters here for one reason: a theme's palette is not what

@@ -4,8 +4,7 @@ import { Box, Column, Text, type CanvasHost, UiManualFrameClock, type UiFrameClo
 import { GessoRuntime, type FrameMetrics } from './GessoRuntime';
 
 /**
- * The renderer option (WebGPU roadmap G2, redecided in
- * `decisions/0066-webgpu-by-default.md`): the default is `auto`, which
+ * The renderer option: the default is `auto`, which
  * draws with WebGPU once the device is up and with Canvas2D, on the
  * same canvas, when there is no WebGPU to be had. Either way the
  * metrics say which backend painted.

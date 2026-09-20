@@ -2,7 +2,7 @@
  * The counter from the README, in a project that installs the packages
  * the way anybody else would.
  *
- * `ROADMAP.md` F8's exit criterion is that `npm install @gesso/framework`
+ * the exit criterion is that `npm install @gesso/framework`
  * in a fresh Vite project runs this, and `scripts/check-install.ts` is
  * what runs it: it packs the workspace into tarballs, installs them here,
  * typechecks, builds, and drives the result in headless Chrome. So this

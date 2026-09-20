@@ -4,7 +4,7 @@ import { WebGPUGlyphAtlas, phaseFor, GLYPH_SUBPIXEL_PHASES } from './WebGPUGlyph
 import { GlyphShaper } from './WebGPUGlyphShaper';
 
 /**
- * The glyph atlas and the line shaper (ROADMAP.md F9).
+ * The glyph atlas and the line shaper.
  *
  * Both are pure CPU: the atlas decides where a cell goes and the
  * shaper decides where a cluster sits on its line, and neither needs a

@@ -33,8 +33,8 @@ interface Contact {
 /**
  * Turns two contacts into a scale, a rotation and a translation.
  *
- * `decisions/0041` left this out and gave two reasons. Both are
- * answered here rather than waved past.
+ * Touch input left this out for two reasons. Both are answered here
+ * rather than waved past.
  *
  * The first was that a pinch "would have to undo the rule that a press
  * ignores every other contact". It does not. That rule is about who
@@ -53,7 +53,7 @@ interface Contact {
  * `UiTouchScroller` equivalent listening at the root, and a pinch that
  * nothing listens for costs one dispatch that returns immediately.
  * The zoom lives in `pinchable`, a modifier an element opts into, on
- * the same terms as every other behaviour in `MODIFIERS_ROADMAP.md`.
+ * the same terms as every other behaviour a modifier carries.
  *
  * What a pinch does take is the press. When the second contact lands,
  * whatever single-contact gesture was in flight is ended where it

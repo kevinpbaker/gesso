@@ -271,8 +271,7 @@ worker construction written out where Vite can see it, the SDK alias in
 the Vite config, the two JSX lines, the Hutch pin and the npm selection.
 It needs Hutch, found through `HUTCH`, the path, or where the bootstrap
 above caches it, and it downloads nothing itself. It cannot open a
-window, and nothing headless can; the record of the day one was opened
-is `docs/decisions/0092`.
+window, and nothing headless can.
 
 ## Next
 

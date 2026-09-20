@@ -7,7 +7,7 @@ import { RenderHarness } from '../RenderTestUtils';
 import { buildRenderList, createTextCache, glyphCount, CommandKind } from './WebGPURenderData';
 
 /**
- * Render-list budgets (WebGPU roadmap G7).
+ * Render-list budgets.
  *
  * The render-list builder is the one WebGPU stage vitest can reach, so
  * it is the one CI pins. The tree is the L7 layout budget's: a page, a

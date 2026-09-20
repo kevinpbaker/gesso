@@ -9,7 +9,7 @@ import { ShellService, type ShellRequest } from './ShellService';
  * window.
  *
  * The browser rules behind the contract were measured in Chrome rather
- * than assumed, and are recorded in `docs/decisions/0069-a-window-the-shell-opens.md`.
+ * than assumed.
  */
 describe('ShellService.openPopup', () => {
   const collect = (): { service: ShellService; requests: ShellRequest[] } => {

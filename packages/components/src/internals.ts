@@ -15,7 +15,7 @@ import {
 /**
  * What every control in this tier shares.
  *
- * The rules these encode are `COMPONENTS_ROADMAP.md` §2: a control is
+ * The rules these encode: a control is
  * themed through `UiTheme` and takes no colour props, and its keyboard
  * behaviour is data rather than a `switch` buried in a handler.
  */
@@ -24,8 +24,7 @@ import {
  * Hover and press for a control, in theme tokens.
  *
  * One shared value, so its arguments keep their identity across
- * renders and the modifier is never re-attached (see
- * `decisions/0022-modifiers.md`). Colour props accept a palette name,
+ * renders and the modifier is never re-attached. Colour props accept a palette name,
  * resolved at paint against whatever theme the node inherits, so this
  * is themed without resolving anything here.
  */
@@ -84,7 +83,7 @@ export const CONTROL_EDGE: UiModifier = decorated(CONTROL_EDGE_SHAPES);
 /**
  * The border token a control shows: invalid, or resting.
  *
- * It used to take focus too, because before `MODIFIERS_ROADMAP.md` B3
+ * It used to take focus too, because before the focus decoration
  * a bound `borderColor` was the only way a control could show focus at
  * all. Now `CONTROL_FOCUS_RING` does it, once, for controls that have
  * no border to recolour as much as for the ones that do — and a
@@ -145,7 +144,7 @@ function precisionOf(step: number): number {
  * The layout props every control passes through to its own root.
  *
  * A component must be placeable by its caller, which is the one place
- * the library is a leaky abstraction on purpose (`COMPONENTS_ROADMAP.md`
+ * the library is a leaky abstraction on purpose
  * §2.3). Declared as plain values: a caller may still pass an
  * Observable for any of them, because `ComponentProps` widens every
  * prop to `Reactive<T>`.

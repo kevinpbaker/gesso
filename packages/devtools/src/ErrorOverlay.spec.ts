@@ -216,7 +216,7 @@ describe('ErrorOverlay', () => {
 
     // What `uncaught` means is the narrow set a forwarded tick cannot
     // reach, since the usual frame arrives as a message and is caught
-    // there: see `decisions/0036-error-overlay.md`, amended by 0039.
+    // there:, amended by 0039.
     overlay.report('boom', undefined, 'uncaught');
     expect(panel().text()).toContain('the clock paced itself');
 

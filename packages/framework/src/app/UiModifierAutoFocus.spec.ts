@@ -6,7 +6,7 @@ import { mountRuntime } from './RuntimeTestUtils';
 import { FocusService } from './FocusService';
 
 /**
- * `MODIFIERS_ROADMAP.md` B4's `autoFocus()`. It runs against a real
+ * the `autoFocus()`. It runs against a real
  * runtime because both halves of it are the runtime's: a modifier
  * cannot be laid out or focused by the builder alone.
  */

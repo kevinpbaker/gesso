@@ -1,5 +1,5 @@
 /**
- * What a node is, as plain data (`ROADMAP.md` F7's inspector).
+ * What a node is, as plain data (the inspector).
  *
  * The inspector shows a node's props, its resolved environment, its
  * bindings and their sources, its layout explanation and which
@@ -121,9 +121,9 @@ export interface UiPropReport {
 
 /**
  * The stream behind a bound property: which one, what it last said,
- * and when (`EXCELLENCE_ROADMAP.md` X15).
+ * and when.
  *
- * "Is this value bound" was the third question `decisions/0045` set
+ * "Is this value bound" was the third question the inspector set
  * out to answer, and the report answered it with a yes. A yes is not
  * enough to debug with: a prop that is not updating and a prop whose
  * stream has not emitted since the screen was built look identical on

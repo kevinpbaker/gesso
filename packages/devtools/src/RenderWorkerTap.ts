@@ -11,9 +11,9 @@ import { forwardNewEntries, type ActionLog, type ActionLogToken } from './Action
 
 /**
  * The action log in the worker configuration, and the click at the
- * head of every chain it records (`EXCELLENCE_ROADMAP.md` X15).
+ * head of every chain it records.
  *
- * `decisions/0047` recorded the gap and the reason for it. A channel's
+ * The action log recorded the gap and the reason for it. A channel's
  * ports are made where the replicas are, which in the worker
  * configuration is the render worker; the shell holds neither end and
  * never sees a patch, deliberately. So the recorder was written to run

@@ -18,17 +18,5 @@
    * above walks: without them the result of a typecheck would depend on
    * whether somebody had built the site.
    */
-  "exclude": [
-    "**/node_modules",
-    "apps/docs/.vitepress/dist",
-    "apps/docs/.vitepress/cache",
-    /*
-     * Desk is an Electrobun application with a toolchain of its own:
-     * Hutch projects the SDK into it, and its main process runs on a
-     * runtime with node's APIs rather than in a browser. It carries its
-     * own tsconfig for that, and typechecking it from here would ask
-     * this configuration to describe two platforms at once.
-     */
-    "apps/desk"
-  ]
+  "exclude": ["**/node_modules", "apps/docs/.vitepress/dist", "apps/docs/.vitepress/cache"]
 }

@@ -8,9 +8,9 @@ import { mutate } from './mutate';
 import { resource } from './resource';
 
 /**
- * Budgets for the async helpers (roadmap X4).
+ * Budgets for the async helpers.
  *
- * The risk §5 of the roadmap names is sugar that hides cost, and the
+ * The risk here is sugar that hides cost, and the
  * shape it would take here is a resource that re-subscribes upstream
  * per emission: one request re-opening the key source, or a status
  * cell opening its own subscription to the record it projects. A

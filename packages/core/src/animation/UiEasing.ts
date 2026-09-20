@@ -74,7 +74,7 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): UiE
  * An easing that only takes `count` distinct values.
  *
  * The reason it exists is the `Spinner`: eight blades have eight
- * positions, and `decisions/0028` promised the F4 version would keep a
+ * positions promised the F4 version would keep a
  * turn at eight writes a second rather than sixty. Paired with an
  * animation's `stepMs`, this is how that promise is kept — the value
  * is stepped and the frames are too.

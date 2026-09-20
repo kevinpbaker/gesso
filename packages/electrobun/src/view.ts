@@ -35,7 +35,7 @@ export interface ElectrobunBridgeOptions {
    * Wire it to `app.setColorScheme`. It exists because
    * `prefers-color-scheme` is not to be trusted in every webview: on
    * WebKitGTK it reported light on a desktop that was in dark mode
-   * (`decisions/0070-electrobun-spike.md`), and a shell that believes
+   *, and a shell that believes
    * it is a browser gets the appearance wrong there.
    */
   onColorScheme?: (scheme: 'light' | 'dark') => void;

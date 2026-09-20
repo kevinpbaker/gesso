@@ -29,8 +29,8 @@ export interface UiTransform {
    * The field a motion system moves things with. It is paint-only —
    * the layout record does not change, so a node sliding across the
    * screen marks Paint and never Layout — which is the whole reason it
-   * exists: `decisions/0029` accepted a relative `left`/`top` offset
-   * for `animateLayout` precisely because this was missing, and paid
+   * exists: `animateLayout` accepted a relative `left`/`top` offset
+   * precisely because this was missing, and paid
    * for it with a relayout per tick.
    */
   readonly translateX: number;

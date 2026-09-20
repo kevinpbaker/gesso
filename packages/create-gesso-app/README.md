@@ -93,10 +93,10 @@ template ships a channel, a two-line RPC schema, and a main process that
 serves one and opens windows over the other.
 
 **The main process is not pre-bundled, and this is the one judgement
-call in the template.** `spikes/electrobun-two-windows` and `apps/desk`
-both bundle their main process with esbuild before Electrobun sees it,
-because they import the framework out of this workspace and a bundler
-cannot resolve a package that was never installed. A scaffolded project
+call in the template.** An application that imports the framework
+out of this workspace has to bundle its main process with esbuild before
+Electrobun sees it, because a bundler cannot resolve a package that was
+never installed. A scaffolded project
 installs them, so `electrobun.config.ts` points Cottontail at
 `src/main/index.ts` and lets Electrobun bundle it, which is the ordinary
 arrangement. The generated README records the escape hatch in case a
@@ -110,8 +110,7 @@ person to start, and drives it in headless Chrome until the counter
 counts. **It covers the `web` template only.** Run it after changing
 anything under `templates/web/`.
 
-Nothing in this repository can open a native window
-(`decisions/0075-the-electrobun-adapter.md`), and standing a Hutch
+Nothing in this repository can open a native window, and standing a Hutch
 project up in a gate would mean downloading a native toolchain to check
 an import, so the `electrobun` template has no automated gate at all. It
 is checked by scaffolding it and running it on a machine with the

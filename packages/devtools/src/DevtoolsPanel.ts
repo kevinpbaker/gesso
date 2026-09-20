@@ -7,7 +7,7 @@ import type { DevtoolsAppInfo, PageMessage, PanelPort } from './PanelProtocol';
 import { idsToDepth, pathTo, rowLabel, treeRows } from './TreeRows';
 
 /**
- * The devtools panel (`ADOPTION_ROADMAP.md` A4): the tree, a node's
+ * The devtools panel: the tree, a node's
  * report, the workers' consoles, the frame profiler and the action log,
  * in one place, docked outside the canvas.
  *

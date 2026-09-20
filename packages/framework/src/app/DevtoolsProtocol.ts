@@ -5,7 +5,7 @@ import type { RuntimeErrorSource } from './worker/RenderWorkerProtocol';
 
 /**
  * What a devtools panel says to a running application and what it
- * hears back, as plain data (`ADOPTION_ROADMAP.md` A4).
+ * hears back, as plain data.
  *
  * The node inspector answered "what is the thing under the pointer";
  * a panel docked outside the page asks the questions a DOM inspector
@@ -68,7 +68,7 @@ export interface UiTreeSnapshot {
 
 /**
  * What was being answered when an action was recorded
- * (`EXCELLENCE_ROADMAP.md` X15).
+ *.
  *
  * The barrier carries no request id: a command goes up, patches come
  * down, and nothing in the protocol ties the second to the first. So
@@ -187,7 +187,7 @@ export type DevtoolsRequest =
   | { kind: 'inspector'; enabled: boolean }
   /**
    * Writes a property on a node the panel picked, which is the half of
-   * the addressed channel `decisions/0045` deferred: `select` names a
+   * the addressed channel the inspector deferred: `select` names a
    * node to read, this one names a node to change.
    *
    * The write goes through the graph like any other, so the override
@@ -217,7 +217,7 @@ export type DevtoolsEvent =
    * A log in the page reaches a panel through the devtools hook, which
    * has the log itself to read. A log in the render worker has no such
    * route: the shell holds neither end of a channel there, by design
-   * (`decisions/0047`), so the entries come out the way every other
+   *, so the entries come out the way every other
    * answer from that thread does, as plain data on the devtools
    * channel.
    */

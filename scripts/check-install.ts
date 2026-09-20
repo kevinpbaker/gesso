@@ -1,5 +1,5 @@
 /**
- * Install check (`ROADMAP.md` F8's first exit criterion).
+ * Install check (the first exit criterion).
  *
  * "`npm install @gesso/framework` in a fresh Vite project runs the
  * counter example." This script is that sentence, executed: it packs the

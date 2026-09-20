@@ -33,7 +33,7 @@ import {
 } from './webgpu/WebGPURenderData';
 
 /**
- * Renderer parity (WebGPU roadmap G0).
+ * Renderer parity.
  *
  * The two backends share PaintState, layoutTextLines, the scrollbar
  * geometry and paintOrder; what they do not share is the traversal
@@ -617,7 +617,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   /**
-   * Decorations (MODIFIERS_ROADMAP.md B3) are the only pixels a
+   * Decorations are the only pixels a
    * modifier may put on screen, and the reason they are a shared input
    * rather than a canvas callback is exactly this: the two backends
    * place them from one piece of arithmetic, under one set of clips.
@@ -707,7 +707,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   /**
-   * Gradients (`ROADMAP.md` F9). The two backends could not be further
+   * Gradients. The two backends could not be further
    * apart in how they hold one: Canvas2D asks the platform for a
    * `CanvasGradient` and WebGPU evaluates a ramp per pixel out of a
    * storage buffer. So what is compared is the gradient itself: its
@@ -969,8 +969,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
    * paint order among the node's own background, border and children,
    * the clip in force, and the opacity it inherited.
    *
-   * See `decisions/0078` for why the picture is shared rather than
-   * replayed twice, and `PaintPicture.budget.spec.ts` for the assertion
+   * See `PaintPicture.budget.spec.ts` for the assertion
    * that the second backend repaints nothing.
    */
   const SPARKLINE: UiPaint = {

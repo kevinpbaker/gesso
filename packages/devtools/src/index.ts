@@ -16,7 +16,7 @@
  * `connectDevtools(app)` is what a page does to be found by it.
  *
  * Two of them answer "why did that change" rather than "what is there"
- * (`EXCELLENCE_ROADMAP.md` X15): `tapRenderWorker` puts the action log
+ *: `tapRenderWorker` puts the action log
  * in the render worker, where the ports are in the worker
  * configuration, and gives every command the input that caused it; and
  * `createNodePicker` lets a click on the canvas pin a node in the

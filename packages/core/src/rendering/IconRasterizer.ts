@@ -33,8 +33,7 @@ export interface IconSpec {
 /**
  * Draws an icon path into a bitmap, once per distinct icon.
  *
- * `COMPONENTS_ROADMAP.md` C7 says the icon atlas is F9's and that the
- * first cut rasterises per icon, replaced later without an API change.
+ * The icon atlas comes later; the first cut rasterises per icon, replaced later without an API change.
  * This is that first cut, and the API it fixes is `IconSpec` in and a
  * `UiImage` out — which is what an atlas would also produce, with a
  * sub-rectangle of one texture instead of a bitmap of its own.

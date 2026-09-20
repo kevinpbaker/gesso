@@ -14,8 +14,8 @@ import { Mp3Frames, readMp3Header, splitMp3Frames } from './Mp3Frames';
  * hunted for.
  *
  * What this cannot check is that real encoders write what it expects.
- * That was checked against a live Audius track in a browser, and the
- * numbers are in `docs/decisions/0073-the-waveform-is-network-bound.md`.
+ * That was checked against a live track in a browser, and the bytes take
+ * longer to arrive than anything done with them takes to run.
  */
 
 // ---------------------------------------------------------------------------

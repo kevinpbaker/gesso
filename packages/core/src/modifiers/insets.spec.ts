@@ -11,7 +11,7 @@ import type { UiModifierEnvironment, UiModifierLayout } from './UiModifierSet';
 import { insetPadding, publishInset } from './insets';
 
 /**
- * Insets (roadmap X7): a floating bar publishes the room it takes and
+ * Insets: a floating bar publishes the room it takes and
  * the screens behind it keep clear of it, without either knowing about
  * the other.
  *

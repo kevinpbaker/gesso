@@ -32,7 +32,7 @@ import { layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
  * button's words it has done for the badge's too. Every value here is a
  * palette name resolved at paint against the inherited theme, so the
  * table says nothing about light and dark and nothing about a
- * particular application (`COMPONENTS_ROADMAP.md` §2.3). There is no
+ * particular application. There is no
  * colour prop and there will not be one; restyling a badge is a theme
  * provider around it.
  *

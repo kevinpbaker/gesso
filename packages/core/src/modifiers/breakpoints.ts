@@ -13,7 +13,7 @@ export interface SizeContainerArgs {
 /**
  * Reports a node's content size to the source its subtree reads.
  *
- * The container-query half of `EXCELLENCE_ROADMAP.md` X7, and built on
+ * The container-query half of custom layout, and built on
  * `host.onLayout` for the same reason `scrollPosition` is: "this
  * node's box changed on this frame" already has exactly one mechanism,
  * and a second one carrying the same fact would be a second thing to

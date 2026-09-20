@@ -16,8 +16,7 @@ thousand rows and a filter that narrows them as you type. On the web all
 of that shares one thread with layout and paint, and the person watches
 them take turns. Gesso puts the interface on a render worker and the
 application on a worker of its own, so nothing you compute can delay a
-frame or a keystroke. That is measured, not claimed: in
-`decisions/0030-thread-model.md` the main thread was busy-looped for five
+frame or a keystroke. That is measured, not claimed: the main thread was busy-looped for five
 seconds with a click delivered during it, and the render worker's worst
 frame gap did not move.
 

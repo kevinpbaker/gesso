@@ -230,8 +230,8 @@ export class UiPointerController {
     if (this.downTarget !== null || this.scrollbarDrag !== null) {
       // The press stays with the contact that started it. The contact
       // is still reported, because "a second finger landed" is exactly
-      // what a pinch is made of and dropping it here is what
-      // `decisions/0041` left unfinished.
+      // what a pinch is made of, and dropping it here is what
+      // left touch input unfinished.
       this.gestures?.contactDown?.(pointer, x, y, this.downTarget, modifiers);
       return event;
     }

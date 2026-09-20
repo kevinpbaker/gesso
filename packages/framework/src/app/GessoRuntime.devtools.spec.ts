@@ -11,7 +11,7 @@ import { treeText } from './DevtoolsProtocol';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 
 /**
- * `ADOPTION_ROADMAP.md` A4: what a devtools panel outside the page can
+ * what a devtools panel outside the page can
  * ask a running application, and what it hears back.
  *
  * Through a real runtime, as the inspector's spec is, because the tree
@@ -157,7 +157,7 @@ describe('devtools requests', () => {
   });
 
   it('writes a property on a node the panel named, and puts an inherited one back', () => {
-    // The write half of the addressed channel `decisions/0045`
+    // The write half of the addressed channel the inspector
     // deferred: `select` names a node to read, `setProp` names one to
     // change. Through the graph, so the frame that follows is an
     // ordinary frame.

@@ -25,7 +25,7 @@ import {
 export type { ActionCause, ActionEntry, ChannelErrorEntry, CommandEntry, FrameEntry, PatchEntry };
 
 /**
- * The store action log (`ROADMAP.md` F7): every command a view sent
+ * The store action log: every command a view sent
  * across the barrier, every patch that came back, on one timeline,
  * with the view rewindable to any point on it.
  *
@@ -74,7 +74,7 @@ export interface ActionLog {
   /**
    * Names what is being answered for as long as the returned function
    * has not been called, so everything recorded meanwhile carries the
-   * same `ActionCause` (`EXCELLENCE_ROADMAP.md` X15).
+   * same `ActionCause`.
    *
    * Called around the dispatch of one input, which is the only moment
    * where a cause is known rather than guessed: the command a click's

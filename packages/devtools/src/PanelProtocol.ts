@@ -3,7 +3,7 @@ import type { ActionEntry } from './ActionLog';
 
 /**
  * What a devtools panel and the page it inspects say to each other
- * (`ADOPTION_ROADMAP.md` A4).
+ *.
  *
  * The framework's `DevtoolsRequest` and `DevtoolsEvent` are one
  * application's vocabulary. A page may run several (a documentation

@@ -51,7 +51,7 @@ export enum UiEventType {
  * Keyboard modifier state attached to events that carry one.
  *
  * Named `UiKeyModifiers`, not `UiModifiers`: a modifier in
- * `MODIFIERS_ROADMAP.md` is a behaviour attached to an element, and one
+ * A modifier is a behaviour attached to an element, and one
  * word meaning two things in one package is a permanent tax.
  */
 export interface UiKeyModifiers {

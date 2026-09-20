@@ -34,8 +34,7 @@ import { isStill } from '../shell/still';
  *     Switch the renderer with the button in the header: the sparkline
  *     and the gauge are drawn by the same code on Canvas2D and on
  *     WebGPU, because the calls are recorded once and rasterised once
- *     and both backends draw the result. `decisions/0078` is the
- *     argument for that shape.
+ *     and both backends draw the result.
  *   - **The painter runs when its inputs change, and not per frame.**
  *     `UiPaint.inputs` is what says so. The sparkline's painter is
  *     rebuilt when a sample arrives, four times a second; the gauge's

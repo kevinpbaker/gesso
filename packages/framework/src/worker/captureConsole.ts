@@ -2,7 +2,7 @@ import { printPropValue } from '../app/NodeReport';
 import type { ConsoleEntry } from '../app/DevtoolsProtocol';
 
 /**
- * Forwarding a worker's `console.*` (`ADOPTION_ROADMAP.md` A4).
+ * Forwarding a worker's `console.*`.
  *
  * A worker's console is real, but it is in devtools' worker target,
  * which a developer has to know to select and cannot read alongside

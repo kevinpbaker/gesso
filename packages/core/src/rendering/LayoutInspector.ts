@@ -37,7 +37,7 @@ export interface InspectorOverlay {
 }
 
 /**
- * The layout inspector (roadmap L8): what a developer sees when they
+ * The layout inspector: what a developer sees when they
  * hover a node with inspection on.
  *
  * It keeps two things and paints them over a finished frame, on the

@@ -273,7 +273,7 @@ describe('the shell adaptations a window needs', () => {
     // A webview's RPC is not listening until its page has loaded, and
     // the window opens well before that. Anything pushed in between is
     // lost, which a native window found and a spec whose transport was
-    // live immediately did not. See `decisions/0074-shell-adaptations.md`.
+    // live immediately did not.
     const scheme = new BehaviorSubject<'light' | 'dark'>('dark');
     const seen: string[] = [];
     const count = new BehaviorSubject(0);

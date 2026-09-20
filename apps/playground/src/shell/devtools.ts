@@ -5,8 +5,8 @@ import { addToggleAction } from './InspectorPanel';
 import { findRoute } from './routes';
 
 /**
- * The devtools panel as a pane in the playground (`ADOPTION_ROADMAP.md`
- * A4's answer to "extension or overlay": both, behind one port).
+ * The devtools panel as a pane in the playground: the answer to
+ * "extension or overlay" is both, behind one port.
  *
  * The Chrome extension is where a developer expects the panel; this is
  * the same panel for a page where no extension is installed, and for a

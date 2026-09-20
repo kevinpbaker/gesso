@@ -36,7 +36,7 @@ import {
  * `controlled()` stays first class, a field can be backed by a channel
  * key instead of by anything the form owns, and nothing in the
  * framework requires a form group to exist
- * (`decisions/0030-thread-model.md`).
+ *.
  *
  * A form is written as its fields:
  *
@@ -142,7 +142,7 @@ export interface Field<T> extends FormMember {
   readonly error: ReadableCell<string>;
   /**
    * Where its asynchronous check has got to, in `resource`'s five
-   * words (`decisions/0080`).
+   * words.
    *
    * `idle` when the field has no asynchronous check, or when its own
    * checks fail and there is nothing worth asking about. `loading`

@@ -560,7 +560,7 @@ export class UiGraph {
   ): boolean {
     // A declared transition turns this write into a target rather than
     // a value. It sits here, above the cascade, for the reason the
-    // cascade sits here at all (decisions/0022): the builder's static
+    // cascade sits here at all: the builder's static
     // writes and a binding's emissions both funnel through this one
     // method, so it is the only place that catches both. One field
     // read for every node that declares no transition.

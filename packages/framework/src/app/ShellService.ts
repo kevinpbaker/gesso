@@ -51,7 +51,7 @@ export interface ShellStorageResult {
  * main thread, `GessoApp` performs it directly. Every runtime registers
  * one, like `OverlayService`; being a store keeps the rule that
  * components reach the outside world through actions only, and gives a
- * desktop shell (roadmap E1) one place to bind native equivalents.
+ * desktop shell one place to bind native equivalents.
  */
 export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
@@ -248,7 +248,7 @@ export class ShellService {
    * reach it, so a render thread that wants it has to ask, exactly as
    * it asks for the clipboard. What comes back is plain data, and the
    * shell decides nothing beyond performing the call, which is the
-   * rule `decisions/0030` holds it to.
+   * rule the thread model holds it to.
    *
    * `ShellStorage` is what an application uses; this is the wire under
    * it. With no shell installed the answer is `denied`, because a

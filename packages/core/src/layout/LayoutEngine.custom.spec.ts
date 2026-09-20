@@ -10,7 +10,7 @@ import { Constraints } from './LayoutTypes';
 import type { Size } from './LayoutTypes';
 
 /**
- * The custom layout protocol (roadmap X7): a node whose author
+ * The custom layout protocol: a node whose author
  * measures and places its own children, in the engine's own
  * constraints vocabulary.
  *

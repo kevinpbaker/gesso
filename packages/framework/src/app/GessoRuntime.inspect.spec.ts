@@ -10,7 +10,7 @@ import { formatNodeReport, printPropValue } from './NodeReport';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
- * `ROADMAP.md` F7's inspector: what a node is, as plain data.
+ * the inspector: what a node is, as plain data.
  *
  * Driven through a real runtime because every source the report reads
  * belongs to one: the graph's bindings, the builder's modifier sets and

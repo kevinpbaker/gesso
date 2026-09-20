@@ -1,5 +1,5 @@
 /**
- * Accessibility mirror check (ROADMAP.md F6b, MUSIC_ROADMAP.md M8).
+ * Accessibility mirror check.
  *
  * Starts the Vite dev server for each application it covers, opens a
  * route in headless Chrome, and reads **Chrome's own computed
@@ -24,7 +24,7 @@
  * It also writes, per route, an **accessibility report**: every node of
  * the computed tree with its role, name, states and value, and a count
  * of the controls, with any control that has no accessible name listed
- * as a failure. The reports live in `docs/accessibility/` and are
+ * as a failure. The reports live in `apps/playground/accessibility/` and are
  * compared with the committed copy on every run, like the API reports,
  * so a change to what a screen reader would hear shows up as a diff.
  * They are also the script a screen-reader session follows: each row is
@@ -52,7 +52,7 @@ import { fileURLToPath } from 'node:url';
 import { DevTools, findChrome, openPage, waitFor } from './lib/devtools.ts';
 
 const UPDATE = process.argv.includes('--update');
-const REPORT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'accessibility');
+const REPORT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'playground', 'accessibility');
 
 /**
  * The applications this gate covers, and how a route of each becomes a
@@ -77,8 +77,7 @@ interface AppUnderTest {
 }
 
 const APPS = {
-  playground: { root: 'apps/playground', port: 5192, url: (route: string) => `/#${route}` },
-  segue: { root: 'apps/segue', port: 5193, url: (path: string) => path }
+  playground: { root: 'apps/playground', port: 5192, url: (route: string) => `/#${route}` }
 } as const satisfies Record<string, AppUnderTest>;
 
 type AppName = keyof typeof APPS;
@@ -141,7 +140,7 @@ interface Expectation {
 interface RouteCheck {
   /** Which application serves it. */
   readonly app: AppName;
-  /** Names the report, `docs/accessibility/<route>.md`, and every message. */
+  /** Names the report, `apps/playground/accessibility/<route>.md`, and every message. */
   readonly route: string;
   /**
    * What to hand the application's `url`, when that is not the route's
@@ -222,133 +221,6 @@ const CHECKS: readonly RouteCheck[] = [
       { role: 'button', name: 'Save to your library' },
       { role: 'button', name: 'Like this playlist' }
     ]
-  },
-  /*
-   * Segue, every route it has (`apps/segue/src/screens/routes.ts`).
-   *
-   * The four that need an address to open are given one from the
-   * committed snapshot, so the report is of a real page rather than of
-   * an empty one. With the network off the two pages that are fetched
-   * whole, a track and an artist, can only be the page that says so;
-   * they are covered here for the names on that page, and their loaded
-   * state is walked by `apps/segue/src/screens/Keyboard.spec.tsx`,
-   * which feeds the screens rather than fetching for them.
-   */
-  {
-    app: 'segue',
-    route: 'segue-home',
-    path: '/',
-    expect: [
-      { role: 'group', name: 'Deep House Vol.1' },
-      { role: 'button', name: 'Play' },
-      { role: 'button', name: 'Like this collection' },
-      // The chips, the shelves and the row of the first shelf: a
-      // heading a screen reader can jump between, a list under it, and
-      // an item that names its artist and its length.
-      { role: 'group', name: 'Filter the shelves by genre' },
-      { role: 'heading', name: 'Trending this week' },
-      { role: 'list', name: 'Underground' },
-      { role: 'button', name: 'Segue, the home screen' },
-      { role: 'button', name: 'Search Audius' },
-      { role: 'button', name: 'Sign in to Audius' },
-      // The line that says the shelves are the committed snapshot.
-      // It is the last thing to arrive, because it waits on every
-      // Audius request failing, and this browser has no name
-      // resolution so every one of them will. Expecting it is what
-      // makes the wait cover the whole of the route's settling: without
-      // it the tree was captured with the notice sometimes present and
-      // sometimes not, and the gate failed at random.
-      { role: 'StaticText', name: 'Offline: showing a saved copy of the collections.' }
-    ],
-    press: {
-      role: 'button',
-      name: 'About Segue',
-      after: { role: 'StaticText', name: 'About Segue' }
-    }
-  },
-  {
-    app: 'segue',
-    route: 'segue-about',
-    path: '/about',
-    expect: [
-      { role: 'StaticText', name: 'About Segue' },
-      { role: 'button', name: 'Back to the home screen' },
-      { role: 'button', name: 'Open Audius' }
-    ]
-  },
-  {
-    app: 'segue',
-    route: 'segue-search',
-    path: '/search',
-    expect: [
-      { role: 'textbox', name: 'Search Audius' },
-      // The filters are folded behind one chip, so that chip is what
-      // the screen offers until somebody opens them. Its name says what
-      // pressing it does and how many are narrowing the search, which
-      // is the rule every filter here follows: "Electronic" alone would
-      // leave a screen reader to guess whether it is on.
-      { role: 'button', name: 'Show filters' }
-    ]
-  },
-  {
-    app: 'segue',
-    route: 'segue-library',
-    path: '/library',
-    expect: [
-      { role: 'textbox', name: 'Filter your library' },
-      { role: 'button', name: 'Tracks, showing' },
-      { role: 'button', name: 'Show Playlists & albums' }
-    ]
-  },
-  {
-    app: 'segue',
-    route: 'segue-now-playing',
-    path: '/now-playing',
-    expect: [
-      { role: 'slider', name: 'Seek' },
-      { role: 'button', name: 'Previous track' },
-      { role: 'button', name: 'Next track' },
-      { role: 'button', name: 'Repeat off' }
-    ]
-  },
-  {
-    // A collection, at the address audius.co gives it. The card on the
-    // home screen morphs into this page, so the two reports share the
-    // names of everything that travels.
-    app: 'segue',
-    route: 'segue-collection',
-    path: '/Dreameaterism/playlist/deep-house-vol1',
-    expect: [
-      { role: 'button', name: 'Back to the home screen' },
-      { role: 'button', name: 'Play' },
-      { role: 'button', name: 'Open on Audius' }
-    ],
-    // Nothing offline can be heard, but the queue is plain code and
-    // does not need the network: pressing Play fills it, and the bar
-    // that only exists once something is queued appears.
-    press: {
-      role: 'button',
-      name: 'Play',
-      after: { role: 'button', name: 'Next track' }
-    }
-  },
-  {
-    app: 'segue',
-    route: 'segue-album',
-    path: '/HEXED/album/alchemy',
-    expect: [{ role: 'button', name: 'Back to the home screen' }]
-  },
-  {
-    app: 'segue',
-    route: 'segue-track',
-    path: '/Hypertraffic/stay-a-little-longer',
-    expect: [{ role: 'button', name: 'Back to the home screen' }]
-  },
-  {
-    app: 'segue',
-    route: 'segue-artist',
-    path: '/Audius',
-    expect: [{ role: 'button', name: 'Back to the home screen' }]
   }
 ];
 

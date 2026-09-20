@@ -17,7 +17,7 @@ import { TextInput } from './TextInput';
 import { Tree } from './Tree';
 
 /**
- * The keyboard gallery (`ADOPTION_ROADMAP.md` A3).
+ * The keyboard gallery.
  *
  * Every control in the library on one form, reached by Tab alone and
  * operated by the keys its role promises. Each component's own spec

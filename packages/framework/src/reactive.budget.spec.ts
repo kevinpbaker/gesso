@@ -10,9 +10,9 @@ import { select } from './select';
 import { show } from './show';
 
 /**
- * Budgets for the reactive helpers (roadmap X1, `decisions/0077`).
+ * Budgets for the reactive helpers.
  *
- * The risk these guard is the one §5 of the roadmap names: sugar that
+ * The risk these guard: sugar that
  * hides cost. A helper an author reaches for on every screen must do
  * work proportional to the change and not to the size of the list, and
  * it must not re-enter the builder when nothing changed. So each helper

@@ -38,7 +38,7 @@ export interface VideoSourceArgs {
  * The rule this framework applies (`UiReducedMotionPolicy`) is to stop
  * only when standing still would not state something false, and a
  * video that has frozen on its first frame is a video that has
- * finished loading badly. `decisions/0028` makes the same call for the
+ * finished loading badly. The media tier makes the same call for the
  * `Spinner`. An app that wants a still under reduced motion passes
  * `autoplay: false` and decides for itself.
  *

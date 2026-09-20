@@ -46,8 +46,7 @@ afterEach(() => {
  * coordinate, so the hit tester, the recognizer and the touch scroller
  * are all in the path. A test that dispatched a `DragMove` directly
  * would assert the arithmetic of a gesture the example never receives,
- * which is exactly the defect `decisions/0025-structure-tier.md`
- * records.
+ * which is exactly the defect this spec exists to avoid.
  */
 describe('the docs touch and gestures example', () => {
   it('reads a press and a release with no movement as a tap', () => {

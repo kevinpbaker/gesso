@@ -9,7 +9,7 @@ import { internalState, type InternalState } from '../InternalState';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
- * `ROADMAP.md` F7's HMR item, as the runtime sees it.
+ * the HMR item, as the runtime sees it.
  *
  * A component renders once, so nothing can push new code into a
  * mounted one. What a reload does is rebuild the tree while the

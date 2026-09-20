@@ -10,7 +10,7 @@ import { Constraints } from './LayoutTypes';
 import { scrollbarThumb, scrollbarZoneAt } from './Scrollbars';
 
 /**
- * Logical insets and the mirroring around them (roadmap X7, the box
+ * Logical insets and the mirroring around them (the box
  * half of X12).
  *
  * The conformance suite grades the boxes against Chrome, case by case,

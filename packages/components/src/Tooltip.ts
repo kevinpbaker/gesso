@@ -6,7 +6,7 @@ import { useOverlay, type OverlayHandle, type OverlayPlacement } from './overlay
  * The box a tooltip is, wherever it is opened from.
  *
  * The component below and `tooltip()`, the modifier in `tooltip.ts`,
- * both open this. `COMPONENTS_ROADMAP.md` §6 settled that they are one
+ * both open this. They are one
  * implementation with two surfaces, and this function is the seam that
  * keeps them from drifting into two tooltips that look different.
  */
@@ -34,7 +34,7 @@ export function tooltipContent(text: string): UiChild {
  * listen to that element's pointer and focus, and a component cannot
  * add listeners to a node it does not render. `tooltip()`, below,
  * is the modifier that does, and the two share `tooltipContent` rather
- * than growing a second implementation (`COMPONENTS_ROADMAP.md` §6).
+ * than growing a second implementation.
  * Prefer the modifier; this remains for a trigger that is a plain
  * child rather than an element the caller controls.
  *
@@ -106,7 +106,7 @@ export interface TooltipModifierOptions {
  * The same tooltip, attached to an element instead of wrapped around
  * one.
  *
- * `MODIFIERS_ROADMAP.md` B4. It exists because the component above has
+ * The modifier form. It exists because the component above has
  * to wrap its trigger in a `Box` to listen to it, and a wrapper is a
  * node: it takes part in layout, it can stretch where the trigger
  * would not, and it is one more box in the tree for every label in the

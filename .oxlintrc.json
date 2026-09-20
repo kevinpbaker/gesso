@@ -11,7 +11,7 @@
             "patterns": [
               {
                 "group": ["./**", "../**", "**/src/**", "@gesso/*/**"],
-                "message": "A modifier written from outside the framework imports package entry points only (MODIFIERS_ROADMAP.md B6): @gesso/core, never a path inside it."
+                "message": "A modifier written from outside the framework imports package entry points only: @gesso/core, never a path inside it."
               }
             ]
           }

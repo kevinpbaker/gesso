@@ -347,7 +347,7 @@ export type RuntimeToShellMessage =
    *
    * Answered, like `popup`, and `id` pairs the two. The shell performs
    * exactly the call it is given and decides nothing about the key,
-   * which is what keeps it the dumb half of `decisions/0030`.
+   * which is what keeps it the dumb half of the thread model.
    */
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
   /** The router navigated; the shell owns the address bar (RouterService). */

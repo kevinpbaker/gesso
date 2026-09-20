@@ -24,7 +24,7 @@ const NO_MODS = noKeyModifiers();
  *
  * Everything goes in through `UiPointerController` rather than at the
  * recognizer directly, because the contact bookkeeping is the half of
- * this that `decisions/0041` said was missing: a spec that fed the
+ * this that was missing: a spec that fed the
  * recognizer both contacts by hand would pass whether or not the
  * controller ever reported the second one.
  */
@@ -180,7 +180,7 @@ describe('UiPinchRecognizer', () => {
     controller.pointerDown(120, 100, 1, NO_MODS, SECOND);
     controller.pointerMove(130, 100, 1, NO_MODS, SECOND);
 
-    // The rule `decisions/0041` §5 established is unchanged: the second
+    // The established rule is unchanged: the second
     // contact's moves are not routed to the pressed node.
     expect(moves).toEqual([]);
     expect(controller.pressedNode).toBe(box);

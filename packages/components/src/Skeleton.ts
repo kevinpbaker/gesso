@@ -45,7 +45,7 @@ import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
  * at paint from whatever theme the node inherits. It is not a prop and
  * it is not borrowed from `border`: see `UiColors.placeholder` for why
  * it is its own token. Restyling is a theme provider, as everywhere
- * else in the library (`COMPONENTS_ROADMAP.md` §2.3).
+ * else in the library.
  */
 
 /** One breath, out and back, in milliseconds. */

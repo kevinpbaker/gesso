@@ -1,6 +1,6 @@
 /**
  * Gesso's work, in the browser's own profiler
- * (`EXCELLENCE_ROADMAP.md` X15).
+ *.
  *
  * A performance recording of a Gesso application shows one long task
  * per frame and nothing inside it, because everything the framework

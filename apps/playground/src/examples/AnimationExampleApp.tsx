@@ -477,7 +477,7 @@ function LaneColumn(inputs: Inputs<{ lane: Lane }>, ctx: ComponentContext) {
  * `top` and `opacity`. Sliding out is an `animate()` whose returned
  * Observable completes when the movement is over, and *that* is when
  * the store is told to forget the move. Nothing in the framework keeps
- * a node that has logically left — `decisions/0029` says why — so an
+ * a node that has logically left, so an
  * app that wants an exit owns the node until the animation is done.
  */
 function UndoBar(_inputs: Inputs<{}>, ctx: ComponentContext) {

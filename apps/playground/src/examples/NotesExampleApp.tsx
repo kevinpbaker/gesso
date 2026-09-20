@@ -22,9 +22,8 @@ import {
  * A notes app: a list of notes on the left, the selected note's title
  * and body on the right, both typed into directly.
  *
- * This is the roadmap F2 exit screen, and since A4 it is also the
- * first screen built the way `decisions/0030-thread-model.md`
- * describes. Nothing in this file holds application state or knows
+ * This is the editing exit screen, and also the first screen built
+ * the way the thread model describes. Nothing in this file holds application state or knows
  * where it comes from: it reads view keys off the `Notes` channel and
  * sends commands back. The notebook itself — a repository, the rules,
  * the shaping — is plain code in `notes/`, running on the application

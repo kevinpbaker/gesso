@@ -63,7 +63,7 @@ const MODIFIERS_PROP = 'modifiers';
  * `transition`; `propertyEffects('transition')` would have no meaning,
  * and registering it would make it bindable and overridable, which is
  * nonsense for a description of how other properties are written.
- * `MODIFIERS_ROADMAP.md` §4's rule that the registry's closedness is
+ * the rule that the registry's closedness is
  * load-bearing is exactly the argument for keeping it out.
  */
 const TRANSITION_PROP = 'transition';

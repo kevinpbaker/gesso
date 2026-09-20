@@ -10,7 +10,7 @@ import { INSPECTOR_HEAT_MS, INSPECTOR_HOT_MS, LayoutInspector } from './LayoutIn
 import { RecordingCanvasContext } from './RenderTestUtils';
 
 /**
- * The layout inspector (roadmap L8) paints two things over a frame: the
+ * The layout inspector paints two things over a frame: the
  * hovered node's boxes and a heatmap of what the recent layout passes
  * measured. These specs drive it against the real engine and a
  * recording context, and check that it draws where the records say.

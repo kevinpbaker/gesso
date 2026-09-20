@@ -143,8 +143,7 @@ interface Sample {
  * lands, whatever gesture the first was performing is **ended where it
  * stands** and the press stops synthesizing a Click, because the
  * person is no longer doing the thing they started. See
- * `UiPinchRecognizer` for how that answers what `decisions/0041`
- * deferred.
+ * `UiPinchRecognizer` for how that is answered.
  */
 export class UiGestureRecognizer implements GestureInput {
   private readonly slop: number;

@@ -20,7 +20,7 @@
  * Two examples cannot be frozen from their own source, because their
  * motion belongs to a component rather than to the example: `spinner`,
  * and the indeterminate bar on `progressbar`. Both turn under reduced
- * motion by design (`decisions/0028`), so a still of either is a
+ * motion by design, so a still of either is a
  * picture of something the library will not do.
  */
 export const STILL = 'still';

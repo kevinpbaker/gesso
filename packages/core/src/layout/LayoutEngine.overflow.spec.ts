@@ -10,7 +10,7 @@ import { Constraints } from './LayoutTypes';
 import { SCROLLBAR_FADE_MS, SCROLLBAR_LINGER_MS } from './LayoutEngine';
 
 /**
- * Overflow, scrolling and sticky (roadmap L4): any container can clip
+ * Overflow, scrolling and sticky: any container can clip
  * or scroll, sticky nodes hold at the scrollport edge, visible boxes
  * account for both, and reveal adjustments bring a node on screen.
  */

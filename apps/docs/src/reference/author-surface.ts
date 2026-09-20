@@ -8,8 +8,7 @@
  * decide what belongs on it.
  *
  * That list lives here, in the docs, rather than as an `exports` split
- * in the packages. `DOCS_ROADMAP.md` section 8 leaves the choice open;
- * this is the cheaper half of it. A file here can be edited by whoever
+ * in the packages, which is the cheaper half of the choice. A file here can be edited by whoever
  * writes a page, costs the packages nothing, and cannot change what is
  * published by accident. If the packages later grow a deliberate
  * author-facing entry point, this file becomes its test rather than its

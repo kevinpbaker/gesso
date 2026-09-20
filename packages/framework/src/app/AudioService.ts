@@ -14,8 +14,7 @@ import { epochNow } from './worker/RenderWorkerProtocol';
  * changes state and otherwise about once a second, and `AudioService`
  * moves `position` forward between samples on the animation driver.
  * That keeps the message rate at one a second while a seek bar moves
- * every frame, the same arrangement `decisions/0038` uses for video
- * time.
+ * every frame, the same arrangement video time uses.
  */
 export interface AudioSample {
   readonly status: AudioStatus;
@@ -126,7 +125,7 @@ export class AudioService {
    *
    * A cell rather than a stream, which is what lets a screen write
    * `computed(() => audio.state.value.status === 'playing')` instead of
-   * listing it as a source of a `derive` (`decisions/0077`). It is the
+   * listing it as a source of a `derive`. It is the
    * same expression `current` is, and the same three cells underneath;
    * being a `computed` is what gives it a current value as well as a
    * stream, without a second copy of the arithmetic.

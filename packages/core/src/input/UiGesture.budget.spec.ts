@@ -10,7 +10,7 @@ import { UiShortcutRegistry } from './UiShortcuts';
 import { UiDragSession, type UiDropZone } from './UiDragSession';
 
 /**
- * Input budgets (`EXCELLENCE_ROADMAP.md` §5 Risks, in the shape of
+ * Input budgets (in the shape of
  * `LayoutEngine.budget.spec.ts`).
  *
  * The counts are hard budgets and none of them is a time. A pointer

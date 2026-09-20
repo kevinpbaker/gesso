@@ -7,7 +7,7 @@ import { UiNodeType } from './UiNodeType';
 
 /**
  * What a leak looks like from outside, and what a bound prop can say
- * about itself (`EXCELLENCE_ROADMAP.md` X15).
+ * about itself.
  *
  * Both are read by the node report and the devtools panel, and neither
  * was answerable before: the graph knew what it held and nothing asked

@@ -165,7 +165,7 @@ const GLYPH_RATIO = 0.6;
  *
  * Proportional for the reason the type is: one number would be a blob
  * at 24 and a sharp corner at 128. It is not a step of the shape scale
- * on purpose, for the reason `decisions/0096` gives: the shared scale
+ * on purpose: the shared scale
  * has no name for a radius that is a function of a box, and inventing
  * one for a library's sake puts the library's taste in everyone's
  * vocabulary.

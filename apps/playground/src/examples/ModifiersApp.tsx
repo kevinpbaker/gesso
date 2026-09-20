@@ -27,8 +27,8 @@ import { holdToConfirm, holdToConfirmTokens, type HoldToConfirmArgs } from '../m
 /**
  * Every modifier the library ships, one card each.
  *
- * `MODIFIERS_ROADMAP.md` B4 asks for a single page that answers "does
- * the modifier system work", so the browser check is one route rather
+ * A single page answers "does the modifier system work", so the
+ * browser check is one route rather
  * than seven hunts through the framework playground. Each card holds
  * the smallest thing that shows its modifier doing its job, and a
  * caption saying what to try.
@@ -689,7 +689,7 @@ const QUICK_HOLD_THEME = withThemeExtension(darkTheme, holdToConfirmTokens, {
  * `holdToConfirm`, the one modifier on this page that is not the
  * library's.
  *
- * `MODIFIERS_ROADMAP.md` B6: written in `../modifiers/holdToConfirm.ts`
+ * written in `../modifiers/holdToConfirm.ts`
  * against `@gesso/core`'s entry point alone, and held to that by the
  * lint configuration. The card is the browser check that a modifier
  * from outside runs in the same host as the seven above it.

@@ -379,7 +379,7 @@ function paragraphKey(request: TextMeasureRequest): string {
  *
  * Every field of every run would otherwise be spelt out on every
  * paint of every spanned paragraph on screen, which is the one way
- * spans could quietly undo `decisions/0065`. A span array held still
+ * spans could quietly undo the paragraph cache. A span array held still
  * by a bound cell is spelt out once and looked up thereafter.
  */
 const spanKeys = new WeakMap<readonly TextRunSpan[], string>();

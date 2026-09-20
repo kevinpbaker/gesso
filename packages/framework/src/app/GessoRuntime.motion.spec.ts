@@ -776,8 +776,8 @@ describe('sharedElement() and a virtualised shelf', () => {
    * A shelf of cards that mounts only what is in view, and a page that
    * opens from one of them.
    *
-   * This is the arrangement `docs/MUSIC_ROADMAP.md` M1 asks to check
-   * before it builds eight of them: a shelf item scrolled out of a
+   * This is the arrangement worth checking
+   * before building eight of them: a shelf item scrolled out of a
    * `LazyRow` has no node left to morph from, and the wrong answer
    * would be to morph the page in from whatever box the registry
    * happened to be holding. Named per item, so the page claims the name

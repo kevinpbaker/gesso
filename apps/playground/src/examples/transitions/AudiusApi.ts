@@ -15,8 +15,7 @@ export { formatClock };
  * is how an app without an API key does it; everything here is a GET
  * and every response probed for this example carried
  * `access-control-allow-origin: *`, including the redirect a stream
- * request answers with and the mp3 host it points at
- * (`docs/TRANSITIONS_ROADMAP.md` §3 D1).
+ * request answers with and the mp3 host it points at.
  */
 
 export const AUDIUS_APP_NAME = 'gesso-playground';

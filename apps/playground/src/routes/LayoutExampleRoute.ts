@@ -9,7 +9,7 @@ import { workerName } from '../shell/still';
 /**
  * Layout an application can shape, in a render worker.
  *
- * `EXCELLENCE_ROADMAP.md` X7's browser check. The inspector toggle is
+ * the browser check. The inspector toggle is
  * part of the page rather than a convenience on it: the exit criterion
  * for the custom layout protocol is an `explain` that reads sensibly,
  * and this is where you read it. Turn it on and hover the wall.

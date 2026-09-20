@@ -15,7 +15,7 @@ import type { ComponentContext, Inputs } from './FunctionComponent';
 /**
  * Keeps a child on screen while it leaves.
  *
- * `ROADMAP.md` §F4 closed with one thing deliberately open: *"No exit
+ * Animation closed with one thing deliberately open: *"No exit
  * animation. A dialog still leaves on the frame it closes. An exit
  * needs the tree to keep a node that has logically left, which is a
  * component-lifetime question F4 does not settle."* This settles it,

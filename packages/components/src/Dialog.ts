@@ -86,7 +86,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
       {
         // Taking the trap from the ref means it applies as soon as the
         // dialog is in the tree; the runtime settles focus into it once
-        // its children exist (see decisions/0020-focus-scopes.md).
+        // its children exist ().
         modifiers: [tokens.modifier],
         ref: (node: UiNode | null) => {
           if (node !== null && !trapped) {

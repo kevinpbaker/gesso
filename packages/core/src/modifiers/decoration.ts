@@ -67,14 +67,14 @@ function draw(host: UiModifierHost, shapes: Decorations): void {
 /**
  * A ring outside whatever holds keyboard focus.
  *
- * Visible focus is an `ROADMAP.md` F6 requirement and, until this
+ * Visible focus is an accessibility requirement and, until this
  * existed, the library had no way to meet it: a control could only
  * bind its own `borderColor` to a focus observable, which recolours
  * the control rather than marking it, and which every one of
  * twenty-odd components had to repeat.
  *
  * Two things make this a decoration rather than an overlay, and they
- * are the reasons `MODIFIERS_ROADMAP.md` B3 exists at all:
+ * are the reasons decorations exist at all:
  *
  * - **It is clipped with the node.** A ring on a row scrolled half out
  *   of a `ScrollView` is cut off at the same edge the row is, because

@@ -20,10 +20,10 @@ const app = renderRoot(FrameworkDemoRoot).useService(DemoCounter);
 
 /**
  * The action log, here in the render worker, which is where the ports
- * are (`EXCELLENCE_ROADMAP.md` X15).
+ * are.
  *
- * `decisions/0047` wrote the recorder to run in a worker and then did
- * not run it in one, because the only two ways to wire it up at the
+ * The recorder was written to run in a worker and then did
+ * not run in one, because the only two ways to wire it up at the
  * time were a line in this file, which that change did not own, or
  * routing every patch through the shell, which would have falsified
  * the one thing this route exists to show. This is that line. The
@@ -47,11 +47,11 @@ if (import.meta.env.DEV) {
 }
 
 /**
- * Hot module replacement (`ROADMAP.md` F7).
+ * Hot module replacement.
  *
  * The framework knows nothing about Vite: it offers `reload(root)`,
  * and an entry that has an HMR client asks it for the new module and
- * hands the root over. Two lines, which is what the roadmap promised.
+ * hands the root over. Two lines, and no more.
  *
  * The channels are not re-registered and must not be. `Heavy` and
  * `Ticker` are served by another worker that this replacement does not

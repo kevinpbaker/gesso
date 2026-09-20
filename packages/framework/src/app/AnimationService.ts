@@ -60,7 +60,7 @@ export interface SpringOptions {
  * reason: the running set has to be **per runtime**. The playground
  * runs several runtimes in one worker, and a module-level driver would
  * tick a disposed runtime's cells — which is why `animate(cell, to)`
- * is a method here rather than the free function `ROADMAP.md` §F4
+ * is a method here rather than the free function first
  * sketched. A free function has nowhere to find its driver, and the
  * framework's answer to "where does a component reach the world" has
  * been an injected store since `ShellService`.

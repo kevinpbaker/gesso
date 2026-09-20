@@ -32,7 +32,7 @@ export interface DraggableOptions {
    * Whether the drag begins on a press and a move, or only after a
    * long press. Default `'press'`.
    *
-   * The roadmap wrote this modifier as the `DragStart` gesture, and
+   * This modifier was first written as the `DragStart` gesture, and
    * `DragStart` is the long-press one: the recognizer resolves a press
    * to a Pan when it moves before the hold time and to a Drag only
    * after a LongPress. C5 found the same thing from the other side,
@@ -90,7 +90,7 @@ export interface DraggableOptions {
  * reason.
  *
  * Nothing here changes the cursor. That is a message to the shell
- * (`decisions/0016-cursor.md`), and a node's `cursor` property already
+ *, and a node's `cursor` property already
  * sends it, so an application says `cursor: 'grab'` on the element and
  * this modifier stays inside the render thread.
  */

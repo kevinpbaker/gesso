@@ -1,5 +1,5 @@
 /**
- * Route screenshot gate (`ROADMAP.md` F8's second exit criterion).
+ * Route screenshot gate (the second exit criterion).
  *
  * Opens every playground route in headless Chrome, waits for it to stop
  * moving, captures each canvas, and compares the bytes against a
@@ -44,7 +44,7 @@
  *     is only meaningful in the environment that produced it.
  *     `screenshots/manifest.json` records the Chrome version and the
  *     platform, and a mismatch is reported as a failure rather than
- *     quietly compared — see `decisions/0033-packaging.md` for what this
+ *     quietly compared — for what this
  *     costs in CI.
  *
  *   node scripts/check-route-screenshots.ts             # verify

@@ -55,7 +55,7 @@ export interface Mutation<A> {
  * opposite of the last thing anyone did, which is the guard every
  * optimistic screen writes by hand and half of them get wrong.
  *
- * The cell is named first, and not because the roadmap wrote
+ * The cell is named first, and not because it was first written
  * `mutate(apply, commit)`: the cell is what makes the guard possible.
  * A mutation handed only two functions can undo its own change but
  * cannot tell whether undoing it is still the right thing to do.

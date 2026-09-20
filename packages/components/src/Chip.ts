@@ -33,8 +33,7 @@ import { Icon } from './Media';
  * mood, a language or a switch, and a press turns it on or off; the
  * chips that are on say what the list below them is showing. Segue and
  * Sluice had written three of their own before this one existed, and
- * `EXCELLENCE_ROADMAP.md` X14 made their removal the interim gate for
- * the component library.
+ * Their removal was the interim gate for the component library.
  *
  * It is a toggle, and it says so the way a toggle should: the role is
  * `button` and the `pressed` state follows `selected`, which is what
@@ -55,7 +54,7 @@ import { Icon } from './Media';
  * Nothing about its colours is a prop. Every one is a palette name
  * resolved at paint against the theme the chip inherits, so it follows
  * the appearance toggle and a nested theme provider alike, as every
- * other control in the library does (`COMPONENTS_ROADMAP.md` §2.3).
+ * other control in the library does.
  *
  * Controlled by default: `selected` is the application's and the chip
  * draws it, reporting a press through `onPress` with the value it would
@@ -386,7 +385,7 @@ const DIM_PRESSED = 0.76;
  * bound one, so a chosen chip under the pointer went light while its
  * words stayed white, and the one chip the person was pointing at was
  * the one they could not read. They fell back to tracking the pointer
- * by hand, which is the pattern `decisions/0022` made the modifier to
+ * by hand, which is the pattern the modifier exists to
  * remove.
  *
  * The modifier host subscribes an Observable written as an override

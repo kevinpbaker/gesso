@@ -36,7 +36,7 @@ import type { UiModifierHost } from './UiModifierHost';
  * resolves in `PaintState`, so an element moving through them marks
  * Paint and the layout engine never runs for it. That is the whole
  * reason `UiTransform` gained `translateX`/`translateY`:
- * `decisions/0029` moved a node with a relative `left`/`top` because
+ * animation used to move a node with a relative `left`/`top` because
  * there was no translation to use, and paid a relayout per tick for
  * it. The one exception is `morph: 'geometry'`, which asks for a
  * relayout deliberately and says why.

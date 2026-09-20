@@ -106,8 +106,8 @@ Escape closes the topmost dialog and no other, and there is no overlay
 stack anywhere in the framework making that true. The key is bound on
 the dialog's own content, and focus is inside the innermost trap, so
 the event never reaches a dialog underneath: nothing underneath is
-focusable. `decisions/0024-overlays-tier.md` records that choice and the
-registry it avoided.
+focusable. That is what let the overlay tier do without a registry of
+open dialogs.
 
 ## The overlay layer
 

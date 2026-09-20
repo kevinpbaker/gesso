@@ -6,9 +6,9 @@ import { flattenTextSpans } from '../properties/UiTextStyle';
 import type { UiTextSpan } from '../properties/UiTextStyle';
 
 /**
- * Paragraph budgets for runs (roadmap X6).
+ * Paragraph budgets for runs.
  *
- * `decisions/0065` bought the frame rate back by laying a paragraph
+ * The paragraph cache bought the frame rate back by laying a paragraph
  * out once per distinct request, and runs are the one change that
  * could quietly spend it again: a per-run measurement on every paint
  * would be a line break on every paint, which is exactly what that

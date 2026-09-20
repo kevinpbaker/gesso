@@ -7,7 +7,7 @@ import type { UiImage } from '../properties/UiImage';
  * something the property set has no name for: a sparkline, a gauge, a
  * waveform, a chart axis.
  *
- * It sits beside `UiRenderer` on purpose, and `decisions/0078` argues
+ * It sits beside `UiRenderer` on purpose argues
  * the placement at length. The short version is the risk it exists to
  * avoid: a paint hook handed a `CanvasRenderingContext2D` would be a
  * Canvas2D-only capability with a WebGPU backend that could never

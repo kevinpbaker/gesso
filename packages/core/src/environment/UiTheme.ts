@@ -171,7 +171,7 @@ export const darkTheme: UiTheme = {
  * The extensions are compared with each extension's own comparison, so
  * an application that adds a token group gets invalidation on a change
  * to it without editing this function. That was the point of the
- * mechanism: `COMPONENTS_ROADMAP.md` §2.3 warned that a theme layer
+ * mechanism: a theme layer
  * added without extending `themesEqual` is a theme change that does
  * not repaint, and it is easy to forget.
  */

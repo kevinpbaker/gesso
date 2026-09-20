@@ -217,7 +217,7 @@ the component's own.
 
 The framework does not own your data architecture and these helpers do
 not change that ([channels and the barrier](/structure/channels-and-the-barrier)
-is the contract, and `decisions/0030` is why). `serveChannels` takes
+is the contract is why). `serveChannels` takes
 plain Observables from wherever they came from. A resource is one way
 to produce one, a subject is another, and the barrier cannot tell the
 difference.

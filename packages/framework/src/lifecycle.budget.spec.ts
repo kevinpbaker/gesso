@@ -12,9 +12,9 @@ import { RouterService } from './router/RouterService';
 import { ServiceRegistry } from './service/ServiceRegistry';
 
 /**
- * Budgets for the lifecycle helpers (roadmap X8, `decisions/0083`).
+ * Budgets for the lifecycle helpers.
  *
- * The risk §5 of the roadmap names is sugar that hides cost, and each
+ * The risk here is sugar that hides cost, and each
  * of these three has a shape it could take. `ctx.effect` could leave a
  * subscription open past the component, which is the leak the twelve
  * hand-written `onUnmount` pairs existed to prevent. A bounds cell

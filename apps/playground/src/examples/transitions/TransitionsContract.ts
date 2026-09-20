@@ -13,7 +13,7 @@ import { SNAPSHOT } from './snapshot';
  * with its thousands separators, a duration as "1h 50m", a date as a
  * month and a year. Formatting is presentation, and the view model on
  * the application side is the last place allowed to do it with the raw
- * number in hand; see `decisions/0030-thread-model.md` §3.
+ * number in hand.
  */
 
 /** Who made the playlist, as the card header shows them. */

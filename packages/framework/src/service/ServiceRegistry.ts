@@ -28,7 +28,7 @@ export class ServiceRegistry {
 
   /**
    * Points an existing service at a replacement class of the same
-   * name, keeping the instance (`ROADMAP.md` F7's HMR).
+   * name, keeping the instance (the HMR).
    *
    * A registry is keyed by the class object, which is the right key
    * for every purpose but one: replacing a module produces a new class

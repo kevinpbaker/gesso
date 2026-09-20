@@ -55,8 +55,7 @@ export type UiFontStretch =
  * The one font-variant value the CSS font shorthand carries, and so
  * the one a canvas font string carries. `font-feature-settings` is not
  * part of the shorthand and the context has no property for it, which
- * is why `tnum` and `liga` are not here; `decisions/0085` records the
- * measurement.
+ * is why `tnum` and `liga` are not here.
  */
 export type UiFontVariant = 'normal' | 'small-caps';
 

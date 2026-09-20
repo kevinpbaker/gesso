@@ -1,5 +1,5 @@
 /**
- * The docs site gate (`DOCS_ROADMAP.md` section 6).
+ * The docs site gate.
  *
  * `pnpm docs:build` already catches a dead link and a snippet path that
  * points at nothing. What it does not catch is everything below, each

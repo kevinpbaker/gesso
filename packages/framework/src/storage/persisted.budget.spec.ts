@@ -4,9 +4,9 @@ import { persisted } from './persisted';
 import type { StorageAdapter, StorageOutcome, StorageRead } from './StorageAdapter';
 
 /**
- * Budgets for persistence (roadmap X13).
+ * Budgets for persistence.
  *
- * The risk §5 of the roadmap names is sugar that hides cost. The shape
+ * The risk here is sugar that hides cost. The shape
  * it takes here is a write per change: a value that moves with a drag
  * or a keystroke would reach the disk sixty times a second, and on
  * `localStorage` that is sixty synchronous writes on the shell's

@@ -29,8 +29,8 @@ export const defaultShapes: UiShapes = {
  * Compares two shape scales for equality.
  *
  * Over the scale's own keys rather than the seven written out, for the
- * reason `typographyEqual` was rewritten the same way in
- * `decisions/0079`: a theme may carry steps of its own (see
+ * reason `typographyEqual` was rewritten the same way: a theme may
+ * carry steps of its own (see
  * `UiShapeExtensions`), and a written-out list would let a change to
  * one of those pass as no change at all, so nothing would repaint.
  */

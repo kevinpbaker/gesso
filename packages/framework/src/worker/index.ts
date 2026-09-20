@@ -19,7 +19,7 @@
  * Nothing here is required. A channel is reached exactly as it always
  * was, `serveChannels` takes plain Observables from wherever they came
  * from, and an application that prefers its own subjects is writing
- * against the same barrier. `decisions/0030` declined to own an
+ * against the same barrier. The thread model declined to own an
  * application's data architecture and this does not reopen it: these
  * are helpers an author may use, in the way `derive` is.
  */

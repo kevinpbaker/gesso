@@ -7,7 +7,7 @@ import { Constraints } from './LayoutTypes';
 import { auto, percent } from './UiLength';
 
 /**
- * Flex completeness (roadmap L3): redistribution, stretch by default,
+ * Flex completeness: redistribution, stretch by default,
  * automatic minimum size, wrapping, reversal, auto margins, the flex
  * shorthand, percentages and aspect ratio. The Chrome fixtures pin the
  * pixels; these pin the intent, in isolation, with readable numbers.

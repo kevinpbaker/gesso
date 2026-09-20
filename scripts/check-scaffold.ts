@@ -1,5 +1,5 @@
 /**
- * Scaffold check (`ROADMAP.md` F7's last item).
+ * Scaffold check (the last item).
  *
  * "Someone runs the CLI, gets a directory, runs the commands it prints,
  * and sees a working Gesso app in a browser." This script is that
@@ -35,9 +35,8 @@
  * `hutch install`, `hutch run typecheck`, a development bundle whose
  * loose files are inspected (the page, the render worker's chunk, and a
  * main-process bundle that carries the RPC handler), and the
- * distributable build. Nothing here opens a window and nothing here can;
- * `decisions/0092` records the day the window was opened and what it
- * showed. This mode needs Hutch, which is found through `HUTCH`,
+ * distributable build. Nothing here opens a window and nothing here can.
+ * This mode needs Hutch, which is found through `HUTCH`,
  * the path, or where the Electrobun npm bootstrap leaves it.
  *
  *   node scripts/check-scaffold.ts           # scaffold, install, build, run
@@ -112,7 +111,7 @@ function checkTemplateShape(app: string): void {
   // The literal `new Worker(new URL(...))` used to be asserted here,
   // because a refactor into a variable would leave the template looking
   // fine and emitting no worker chunk. It is now written by
-  // `@gesso/vite-plugin` instead of by the template (`decisions/0082`),
+  // `@gesso/vite-plugin` instead of by the template,
   // so what has to be true has moved: the config has to carry the
   // plugin, and `main.ts` has to be free of the incantation the plugin
   // exists to remove. The chunk itself is still checked, harder than a
@@ -143,7 +142,7 @@ function checkTemplateShape(app: string): void {
  * written out where a bundler can see it (this template has no Vite
  * plugin to write it), the Vite config aliasing the projected SDK, and
  * the two JSX lines. Two are the fixes a fresh scaffold needed on the
- * day it was first opened (`decisions/0092`): npm underneath `hutch
+ * day it was first opened: npm underneath `hutch
  * install`, because Hutch's own resolver cannot follow the relative
  * `file:` overrides the vendored packages rely on, and the Hutch pin on
  * the first line, because a newer launcher failed the distributable
@@ -289,7 +288,7 @@ async function checkElectrobun(app: string): Promise<void> {
   console.log(`  ${stable} has a launcher and ${archives[0]}`);
   console.log(
     '\nscaffold check ok: create-gesso-app --template electrobun produces a project that installs, typechecks and builds.\n' +
-      'No window was opened, because nothing headless can; decisions/0092 is the last time one was.'
+      'No window was opened, because nothing headless can.'
   );
 }
 
@@ -446,8 +445,7 @@ async function main(): Promise<void> {
     // moved. A bound `text` change repaints but is not re-emitted as a
     // semantics patch, so the mirror still reads `Clicks: 0` after a
     // click that plainly painted `Clicks: 1`. That is a defect in
-    // `@gesso/framework`, recorded in `decisions/0048-create-gesso-app.md`
-    // and not a thing this scaffold can work around; when it is fixed,
+    // `@gesso/framework` and not a thing this scaffold can work around; when it is fixed,
     // this can assert on the text instead, which would be the better
     // check.
     const after = await waitFor(

@@ -7,7 +7,7 @@
 // ==== desktop.d.ts ====
 import {
   GessoFrame
-} from "./frames-Cb3vUTvQ.js";
+} from "./frames-BrrAFMqE.js";
 import {
   ChannelToken,
   ServedChannel
@@ -103,7 +103,7 @@ import {
   frameData,
   GessoFrame,
   isGessoFrame
-} from "./frames-Cb3vUTvQ.js";
+} from "./frames-BrrAFMqE.js";
 export {
   DEFAULT_CHUNK_BYTES,
   FrameAssembler,
@@ -114,7 +114,7 @@ export {
 // ==== main.d.ts ====
 import {
   GessoFrame
-} from "./frames-Cb3vUTvQ.js";
+} from "./frames-BrrAFMqE.js";
 import {
   ServedChannel
 } from "@gesso/framework";
@@ -137,7 +137,7 @@ export {
 // ==== view.d.ts ====
 import {
   GessoFrame
-} from "./frames-Cb3vUTvQ.js";
+} from "./frames-BrrAFMqE.js";
 import {
   AppLogicEndpoint
 } from "@gesso/framework";

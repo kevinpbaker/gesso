@@ -65,7 +65,7 @@ export function findShellCall(code: string, blank = blankLiterals(code)): ShellC
  * Everything else is appended below, as function declarations, which
  * hoist and are therefore usable from the line above them.
  *
- * The merge order is what keeps `decisions/0048`'s promise that the
+ * The merge order is what keeps the promise that the
  * literal construction stays the documented fallback: the plugin's
  * factories go in first and the author's options spread over them, so
  * a `renderWorker` written by hand still wins.

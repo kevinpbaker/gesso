@@ -22,7 +22,7 @@ export interface AnimateLayoutOptions {
  * is where each half comes from, because both were already here.
  *
  * **The old box comes from `LayoutNotifier`, not from L7's slab
- * records.** `ROADMAP.md` §F4 names those as the prerequisite and they
+ * records.** Those are the prerequisite and they
  * do not exist — `LayoutRecord.ts` mentions slabs only in a comment
  * about a future Worker transfer. B2 built the thing this actually
  * needs: a per-node, opt-in notification after any frame that moved a
@@ -32,7 +32,7 @@ export interface AnimateLayoutOptions {
  *
  * **The offset is the transform's translation.** It used to be a
  * relative `left`/`top` on a `position: relative` node, and
- * `decisions/0029` §4 explains why: `UiTransform.x`/`.y` are the
+ * the reason is this: `UiTransform.x`/`.y` are the
  * transform's *pivot*, both renderers compose `T(pivot)·R·S·T(-pivot)`,
  * and there was no translation field to use. The cost it recorded was
  * that a tick marked Layout rather than Paint, so the animating

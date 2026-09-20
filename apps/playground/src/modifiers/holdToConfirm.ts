@@ -13,7 +13,7 @@ import {
 /**
  * A modifier written from outside the framework.
  *
- * `MODIFIERS_ROADMAP.md` B6's exit criterion: a modifier in its own
+ * the exit criterion: a modifier in its own
  * file, against the package entry points and nothing else, running in
  * the playground. This file imports `@gesso/core` and no path inside
  * it; the lint configuration at the repository root holds it to that,

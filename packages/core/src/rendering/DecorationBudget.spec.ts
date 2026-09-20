@@ -8,11 +8,11 @@ import { buildRenderList } from './webgpu/WebGPURenderData';
 import type { DecorationShape } from './Decorations';
 
 /**
- * What the decoration branch costs (MODIFIERS_ROADMAP.md §6's risk).
+ * What the decoration branch costs (the risk).
  *
  * The L7 budget tree: 10,502 nodes, a 1200x800 viewport showing about
  * twenty rows. Every node in both backends now reads
- * `node.decorations` and compares it with null, and the roadmap asks
+ * `node.decorations` and compares it with null, and the budget asks
  * what that costs before it is accepted.
  */
 describe('decoration cost on the L7 budget tree', () => {

@@ -9,7 +9,7 @@ import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
 
 /**
- * Positioning (roadmap L2): absolute children against their containing
+ * Positioning: absolute children against their containing
  * block, relative offsets, stack alignment, zIndex paint order, and
  * anchored placement that flips, shifts and follows scrolling.
  */

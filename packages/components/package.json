@@ -2,6 +2,7 @@
   "name": "@gesso/components",
   "version": "0.1.0",
   "description": "The component library \u2014 five tiers, one contract.",
+  "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -16,7 +17,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "dependencies": {
     "@gesso/core": "workspace:^",

@@ -17,8 +17,7 @@ import { UiGraphBuilder } from './UiGraphBuilder';
  * The failure has no symptom at the point of the mistake: nothing
  * warns, nothing throws, and an element simply has no text. It was
  * found in a native window, where the application and the framework
- * genuinely did resolve different copies. See
- * `docs/decisions/0072-a-second-copy-of-rxjs.md`.
+ * genuinely did resolve different copies.
  */
 function foreignObservable<T>(initial: T): { emit(value: T): void; observable: unknown } {
   const listeners = new Set<(value: T) => void>();

@@ -567,7 +567,7 @@ export const textCases: readonly TextCase[] = [
   { name: 'align/center-in-fixed-box', text: 'centre', maxWidth: 200, align: 'center', box: 'fixed' },
 
   // Found by scripts/wring-titles.ts in live Wikipedia titles; see
-  // docs/FIREHOSE_ROADMAP.md S4.
+  // the live-stream corpus.
   {
     name: 'cjk/ko-slash-after-hangul',
     text: '위키백과:미번역 문서/핀란드',

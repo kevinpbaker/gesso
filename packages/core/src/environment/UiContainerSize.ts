@@ -74,7 +74,7 @@ export class UiContainerSizeSource implements UiContainerSize {
  *
  * The number the layout should be *built* from, rather than the width
  * itself: children rebuilt on every pixel of a resize would allocate a
- * subtree per frame of a drag, which is `EXCELLENCE_ROADMAP.md` §5's
+ * subtree per frame of a drag, which is the
  * "sugar that hides cost" in the one place it would be most expensive.
  * A width of 900 against `[600, 1200]` gives 600, and every width from
  * 600 to 1199 gives the same 600, so the children are built once for

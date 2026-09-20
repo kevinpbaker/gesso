@@ -18,7 +18,7 @@ import { mountRuntime } from './RuntimeTestUtils';
 import { FocusService } from './FocusService';
 
 /**
- * The rest of `MODIFIERS_ROADMAP.md` B2: what a modifier may read out
+ * What a modifier may read out
  * of the environment and out of the focus manager. The layout half
  * landed with C5; these two waited for a consumer, and B3 is it.
  *
@@ -77,7 +77,7 @@ describe("a modifier's environment access", () => {
   });
 
   it('re-fires for a node mounted into a tree that already provides one', () => {
-    // The bug `decisions/0026` fixed in its general form: a node built
+    // The bug the data tier fixed in its general form: a node built
     // after the first frame inherits at attach, and a modifier that
     // read a value out of the environment has to hear about it.
     const seen = fresh();

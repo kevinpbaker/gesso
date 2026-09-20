@@ -10,7 +10,7 @@ import { mountRuntime } from './RuntimeTestUtils';
  * F4's `ticks` phase, and the one claim a spec of an animation can
  * usefully make.
  *
- * `decisions/0025` recorded the shape of the bug a spec cannot catch:
+ * The structure tier recorded the shape of the bug a spec cannot catch:
  * one that synthesises the event a component asks for cannot tell you
  * the component asks for the wrong event. The animation analogue is a
  * spec that advances a clock by exactly the duration and asserts the
@@ -247,7 +247,7 @@ describe('a declared transition', () => {
 
     shown.value = false;
     // The animation is gone with its node: nothing keeps asking for
-    // frames, which is the leak `decisions/0026` and `0028` name.
+    // frames, which is the leak a held animation causes.
     let frames = 0;
     while (mounted.clock.isPending && frames < 10) {
       time += 16;

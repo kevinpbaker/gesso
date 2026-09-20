@@ -1,5 +1,5 @@
 /**
- * "Still" mode (`ADOPTION_ROADMAP.md` A4): the playground with nothing
+ * "Still" mode: the playground with nothing
  * moving, so the screenshot gate can cover the routes that never
  * otherwise reach a still frame.
  *

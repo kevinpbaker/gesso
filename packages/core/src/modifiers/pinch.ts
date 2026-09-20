@@ -44,13 +44,13 @@ export interface PinchableOptions {
 /**
  * Makes a node zoomable by two fingers, or by Ctrl and the wheel.
  *
- * `decisions/0041` deferred pinch partly on the ground that "what a
+ * Pinch was deferred partly on the ground that "what a
  * framework should do with a pinch when it owns no zoom is a design
  * question this work did not need to answer". This is the answer: the
  * framework owns no zoom, and this modifier does. Nothing listens for a
  * pinch unless an element asks for it, exactly as nothing hovers unless
  * an element asks for it, which is the whole shape of
- * `MODIFIERS_ROADMAP.md`.
+ * the modifier contract.
  *
  * ## It zooms about the gesture, not about the middle
  *

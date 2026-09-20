@@ -3,7 +3,7 @@ import { UiNodeType, type UiNode, type UiShortcutRegistry } from '@gesso/core';
 import type { UndoStack } from './UndoStack';
 
 export interface UndoShortcutOptions {
-  /** The registry the `shortcuts` modifier feeds; see `decisions/0084`. */
+  /** The registry the `shortcuts` modifier feeds. */
   readonly registry: UiShortcutRegistry;
   readonly stack: UndoStack;
   /**
@@ -28,8 +28,8 @@ export interface UndoShortcutOptions {
 /**
  * Registers undo and redo on the application's shortcut registry.
  *
- * One key path rather than two: `decisions/0084` made the registry the
- * place a command's keys are declared, so that a palette listing the
+ * One key path rather than two: the registry is the place a command's
+ * keys are declared, so that a palette listing the
  * available commands and the handler that fires them ask the same
  * question. Undo is exactly the command that would otherwise grow a
  * second path, because every application reaches for a root

@@ -163,7 +163,7 @@ The documentation site under [`apps/docs`](apps/docs) is the reference. This is 
 | The scaffold produces a working app     | `create-gesso-app` runs into a temporary directory; the result is installed, typechecked, built, and its dev server is driven in headless Chrome until the counter counts. Both templates                                                                      | `pnpm check:scaffold` · `pnpm check:scaffold:electrobun` |
 | The public surface is reviewed          | Each package's exported declarations are committed as `packages/*/api/*.api.d.ts`; an added export fails the check as an added line                                                                                                                            | `pnpm api:check`                                         |
 | Every control works from the keyboard   | One form holding every control in the library, tabbed through from nothing, each control operated by its role's key with the result read from the semantics tree                                                                                               | `Keyboard.spec.ts` in `@gesso/components`                |
-| A screen reader has something to read   | Chrome's own computed accessibility tree for the example routes, written to committed reports in `docs/accessibility/`: every node's role, name, states and value, and the order the Tab key reaches them in                                                   | `pnpm check:a11y`                                        |
+| A screen reader has something to read   | Chrome's own computed accessibility tree for the example routes, written to committed reports in `apps/playground/accessibility/`: every node's role, name, states and value, and the order the Tab key reaches them in                                        | `pnpm check:a11y`                                        |
 | A route cannot change silently          | Covered playground routes are captured in headless Chrome and diffed against committed baselines                                                                                                                                                               | `pnpm screenshots`                                       |
 | The docs do not lie                     | Every live example on the site has a worker and a spec behind it, every quoted code region exists, and every page carries a description                                                                                                                        | `pnpm docs:check`                                        |
 
@@ -268,14 +268,11 @@ Animations advance, channel patches land, theme and environment values propagate
 
 ### Applications
 
-| App                         | Directory                 | What it is                                                                     |
-| --------------------------- | ------------------------- | ------------------------------------------------------------------------------ |
-| `@gesso/playground`         | `apps/playground`         | The demo harness: the routes above, and one shell.                             |
-| `@gesso/docs`               | `apps/docs`               | The documentation site, VitePress, with live examples that are also specs.     |
-| `@gesso/devtools-extension` | `apps/devtools-extension` | The Gesso panel in Chrome devtools.                                            |
-| `desk`                      | `apps/desk`               | A notes application in a native window. The framework's reference desktop app. |
-| `@gesso/sluice`             | `apps/sluice`             | A reader for public real-time streams.                                         |
-| `@gesso/segue`              | `apps/segue`              | A listener's client for Audius.                                                |
+| App                         | Directory                 | What it is                                                                 |
+| --------------------------- | ------------------------- | -------------------------------------------------------------------------- |
+| `@gesso/playground`         | `apps/playground`         | The demo harness: the routes above, and one shell.                         |
+| `@gesso/docs`               | `apps/docs`               | The documentation site, VitePress, with live examples that are also specs. |
+| `@gesso/devtools-extension` | `apps/devtools-extension` | The Gesso panel in Chrome devtools.                                        |
 
 ## Scripts
 

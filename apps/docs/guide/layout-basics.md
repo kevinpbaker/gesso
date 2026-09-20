@@ -97,7 +97,7 @@ What has gone is the pair: `paddingLeft={24} paddingRight={24}` says
 one thing twice, and `paddingX={24}` is that thing.
 
 `padding` is a number and nothing else. It does not take a tuple or an
-object, deliberately; `decisions/0079` says why.
+object, deliberately.
 
 For a single horizontal edge, reach for `paddingStart` and `paddingEnd`
 rather than `paddingLeft` and `paddingRight`. They name the edge the

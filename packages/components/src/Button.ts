@@ -25,7 +25,7 @@ import {
 /**
  * A button, themed.
  *
- * `COMPONENTS_ROADMAP.md` promised this: the element stays a
+ * The element stays a
  * `UiNodeType`, because moving it would touch the hit tester, the
  * focus manager and both renderers to gain nothing, and the library
  * exports a wrapper over it. What the wrapper adds is everything an
@@ -48,7 +48,7 @@ import {
  * button restyles with the appearance toggle and a button inside a
  * nested theme provider follows that theme instead. Restyling one is
  * a theme provider around it, as it is for every other component
- * (`COMPONENTS_ROADMAP.md` §2.3).
+ *.
  */
 export type { ButtonSize, ButtonTone, ButtonVariant } from './tokens';
 
@@ -142,7 +142,7 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
         text: label,
         // A role rather than a size and a weight, so the words on a
         // button are the same type as the words beside it and both
-        // follow the theme. `decisions/0079` is why this is the idiom.
+        // follow the theme, which is why this is the idiom.
         textStyle: tokens.select(t => t.button.sizes[size].textStyle),
         fontWeight: 600,
         // Bound on the label, not provided from the root: `color` does
@@ -185,9 +185,9 @@ function foreground(resting: Observable<string>, disabled: Observable<boolean>):
  * from the control tokens that every other component in the library
  * hovers with; those are palette names and were already themed.
  *
- * Built per button rather than shared at module level, which
- * `decisions/0022-modifiers.md` has to be read carefully about. What
- * that record forbids is a modifier list built **per render**, whose
+ * Built per button rather than shared at module level, which is a
+ * distinction worth reading carefully. What the modifier contract
+ * forbids is a modifier list built **per render**, whose
  * arguments compare unequal each time and so detach and re-attach the
  * ring, losing the hover state with it. A component body runs once per
  * instance, so these are built once per button and are stable for its

@@ -103,8 +103,8 @@ export interface RouteAnswer<Path extends string, T> {
  * worker boundary. What *can* cross — a url — is what the shell
  * exchanges with it, and that is the entire wire surface of routing.
  *
- * Named `RouterService` rather than the roadmap's `RouterStore`
- * because the store/service split of `decisions/0030` renamed all six
+ * Named `RouterService` rather than `RouterStore`
+ * because the store/service split of the thread model renamed all six
  * of its siblings; a `Store` here would be the only one left.
  */
 export class RouterService {
@@ -230,7 +230,7 @@ export class RouterService {
    * applications have, since the screen that was pressed is destroyed
    * before the screen that arrives is built.
    *
-   * This is a facility, not an architecture. `decisions/0030` leaves an
+   * This is a facility, not an architecture. The thread model leaves an
    * application's data to the application, and that has not changed:
    * what belongs here is the screen-shaped remainder that exists only
    * to put a screen back where it was. Anything that must survive a

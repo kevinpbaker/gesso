@@ -13,7 +13,7 @@ import type { OutletProps } from '../router/RouteDefinition';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 
 /**
- * The exit animation `ROADMAP.md` §F4 left open, and the route
+ * The exit animation that was left open, and the route
  * transition built on it.
  *
  * What is worth asserting is not the arithmetic — `UiAnimation.spec`

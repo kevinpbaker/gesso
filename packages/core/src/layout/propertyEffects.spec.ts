@@ -36,8 +36,7 @@ describe('propertyEffects', () => {
   it('classifies text as content, layout and semantics', () => {
     // Semantics because a node's accessible name is its text when it
     // has no `label`. Without it a bound string repainted and the
-    // accessibility mirror kept the value it was built with; see the
-    // amendment in `decisions/0034-accessibility-mirror.md`.
+    // accessibility mirror kept the value it was built with.
     expect(propertyEffects('text')).toBe(DirtyFlags.Content | DirtyFlags.Layout | DirtyFlags.Semantics);
   });
 

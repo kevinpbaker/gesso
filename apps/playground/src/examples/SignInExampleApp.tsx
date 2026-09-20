@@ -27,7 +27,7 @@ import {
  * text field, a keypad, six dots, and unambiguous states — checking,
  * wrong code, locked out, signed in. It is written entirely in JSX as
  * functional components over one store, and runs in the render worker
- * like any other Gesso app. There is no text input yet (roadmap F2),
+ * like any other Gesso app. There is no text input yet,
  * which is also why a passcode rather than a password: everything here
  * is pointer-operable today.
  *
@@ -59,9 +59,8 @@ export interface AuthView {
  * asks only for observables of plain data; how many layers produce
  * them is the application's business. A keypad needs none.
  *
- * A single `view` key rather than one per field: §3.2 of
- * `decisions/0030-thread-model.md` says to split finely, and the
- * reason is diff cost over large values. Six scalars are not that.
+ * A single `view` key rather than one per field: the thread model
+ * says to split finely, and the reason is diff cost over large values. Six scalars are not that.
  */
 export class AuthApp {
   readonly digits = internalState('');

@@ -36,7 +36,7 @@ the more specific statement of the two. So
 
 is four on the left whichever way it reads. See
 [layout basics](/guide/layout-basics) for `paddingX` and the rest of the
-box model, and `decisions/0079` for why `padding` is a single number.
+box model for why `padding` is a single number.
 
 There is no `paddingBlockStart`. The vertical axis does not reverse in
 any writing mode Gesso supports, so `paddingTop` says what it means.

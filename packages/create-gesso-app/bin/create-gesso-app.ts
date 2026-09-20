@@ -1,5 +1,5 @@
 /**
- * `create-gesso-app`: scaffolds a Gesso application (`ROADMAP.md` F7's
+ * `create-gesso-app`: scaffolds a Gesso application (the
  * last item).
  *
  * What it writes is the configuration this framework is for. The
@@ -16,8 +16,8 @@
  * `file:` specifiers at them. That is the same route
  * `scripts/check-install.ts` takes, and it is the route that exercises
  * each package's `publishConfig`, which is the only thing that rewrites
- * `exports` from `src/*.ts` to `dist`. `ADOPTION_ROADMAP.md` A7 is where
- * that ends; `decisions/0082` says what changes on the day it does.
+ * `exports` from `src/*.ts` to `dist`. This ends the day the packages
+ * are published to a registry.
  *
  *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app
  *   node packages/create-gesso-app/bin/create-gesso-app.ts ../my-app --no-build
@@ -64,7 +64,7 @@ interface Template {
  * project depends on, and how a person starts it.
  *
  * `devtools` and `vite-plugin` joined the web template's first three
- * when the feedback loop was wired in by default (`decisions/0082`):
+ * when the feedback loop was wired in by default:
  * the plugin is what writes the worker construction and the
  * hot-replacement wiring, and it loads the overlay from devtools the
  * first time the worker throws. Both are development dependencies of
@@ -342,8 +342,8 @@ function writeManifest(options: Options, specifiers: ReadonlyMap<string, string>
 /**
  * Says the same thing to pnpm that `overrides` says to npm.
  *
- * `decisions/0048` chose npm and said pnpm did not work, and the reason
- * it gave is still exactly right: `pnpm pack` rewrites `workspace:^`
+ * npm was chosen because pnpm did not work, and the reason is still
+ * exactly right: `pnpm pack` rewrites `workspace:^`
  * into `^0.1.0`, so the packed `@gesso/framework` asks for
  * `@gesso/core@^0.1.0` and pnpm 11 goes to a registry that has never
  * heard of it. What that record then rejected was shipping a

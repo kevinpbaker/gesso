@@ -9,7 +9,7 @@ import { InputCell, input } from './Input';
 import { select } from './select';
 
 /**
- * An optional input the parent did not pass (roadmap X1, `decisions/0077`).
+ * An optional input the parent did not pass.
  *
  * `TrackScreen.tsx` carried a nine-line comment saying such an input
  * "has no cell to read", and that piping one drew a hole where a

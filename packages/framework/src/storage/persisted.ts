@@ -104,7 +104,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
  * through it. A channel is served from plain Observables as it always
  * was, and an application that would rather read and write a store
  * itself is writing against the same `StorageAdapter` this is written
- * against. `decisions/0030` declined to own an application's data
+ * against. The thread model declined to own an application's data
  * architecture, and remembering a value is not the exception to that.
  */
 export class PersistedState<T> {

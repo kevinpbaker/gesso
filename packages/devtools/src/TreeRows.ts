@@ -1,7 +1,7 @@
 import type { UiTreeNode } from '@gesso/framework';
 
 /**
- * A tree snapshot as the rows a panel draws (`ADOPTION_ROADMAP.md` A4).
+ * A tree snapshot as the rows a panel draws.
  *
  * The panel keeps a set of expanded ids and asks for the rows; the
  * tree can be replaced by a new snapshot every frame while the set

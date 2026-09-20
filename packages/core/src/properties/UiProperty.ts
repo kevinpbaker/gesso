@@ -121,7 +121,7 @@ export const UiProperties = {
    * Space inside the box, on all four sides.
    *
    * A single number, and deliberately not a tuple or an object: see
-   * `paddingX` below, and `decisions/0079-tokens-a-button-and-variants.md`.
+   * `paddingX` below.
    */
   padding: defineProperty<number | undefined>({
     name: 'padding',
@@ -198,7 +198,7 @@ export const UiProperties = {
    * before a leading icon, the indent of a nested row, the gutter a
    * list keeps against the side it starts at. Written physically, all
    * three are wrong the moment the application runs in Arabic, and
-   * `EXCELLENCE_ROADMAP.md` X12's mirroring cannot fix them because
+   * the mirroring cannot fix them because
    * nothing marks them as the edge that should move.
    *
    * `paddingLeft` and `paddingRight` stay, and are still the answer for
@@ -207,9 +207,8 @@ export const UiProperties = {
    * also win over the logical pair when both are given, because a
    * physical name is the more specific statement of the two. The
    * resolution order in full is side, then logical side, then axis,
-   * then the shorthand. Same rule as
-   * `decisions/0079-tokens-a-button-and-variants.md` set: most specific
-   * wins, and the docs teach one of them.
+   * then the shorthand. Same rule as the token layer
+   * sets: most specific wins, and the docs teach one of them.
    */
   paddingStart: defineProperty<number | undefined>({
     name: 'paddingStart',
@@ -801,7 +800,7 @@ export const UiProperties = {
    * with nothing on the element knowing. This is the one metric
    * property that can take a name: a radius is read at paint, where
    * the theme is already being consulted for every colour, and not in
-   * the layout pass that `decisions/0079` was protecting.
+   * the layout pass that the token layer was protecting.
    */
   borderRadius: defineProperty<UiBorderRadiusValue>({
     name: 'borderRadius',
@@ -1513,8 +1512,7 @@ export const UiProperties = {
    * painted node with an explicit width and height is a relayout
    * boundary, so a chart repainting on a stream re-measures one leaf.
    *
-   * See `rendering/PaintSurface.ts` for the vocabulary and
-   * `decisions/0078` for why it is defined there.
+   * See `rendering/PaintSurface.ts` for the vocabulary.
    */
   paint: defineProperty<UiPaint | undefined>({
     name: 'paint',
@@ -1549,7 +1547,7 @@ export const UiProperties = {
    *
    * The painted content only: blurring a subtree, and blurring what
    * lies behind one, both need an offscreen pass the WebGPU backend
-   * does not have, and `decisions/0078` says so rather than shipping
+   * does not have says so rather than shipping
    * the Canvas2D half of it.
    */
   blur: defineProperty<number | undefined>({

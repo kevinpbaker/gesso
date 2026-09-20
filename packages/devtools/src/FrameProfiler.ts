@@ -1,7 +1,7 @@
 import { UI_FRAME_PHASES, type FrameMetrics, type UiFramePhase } from '@gesso/framework';
 
 /**
- * The frame profiler (`ROADMAP.md` F7): where a frame's time went, over
+ * The frame profiler: where a frame's time went, over
  * the last few seconds, as a picture.
  *
  * The timings have existed since L7 and the playground has been showing

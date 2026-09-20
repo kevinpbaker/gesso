@@ -444,7 +444,7 @@ export class GessoRuntime {
    * the frame that lays the new one out, and null when nothing had it.
    *
    * Null is restored as well as an id, which is the second half of
-   * `decisions/0049`'s gap: a rebuilt subtree runs `autoFocus` again,
+   * the hot-replacement gap: a rebuilt subtree runs `autoFocus` again,
    * and a dialog's first field taking the caret away from where the
    * person was is worse than a reload doing nothing at all.
    */
@@ -1387,7 +1387,7 @@ export class GessoRuntime {
 
   /**
    * Everything the inspector shows about one node, as plain data
-   * (`ROADMAP.md` F7).
+   *.
    *
    * Built here rather than in `@gesso/devtools` because every source
    * it reads is private to the render thread and most of it cannot
@@ -1489,8 +1489,7 @@ export class GessoRuntime {
       const binding = this.graph.getBindingForProperty(node, name);
       if (binding !== undefined) {
         // Which stream, what it last said, and how long ago. A yes to
-        // "is this bound" was `decisions/0045`'s answer and is not
-        // enough to debug with: a stream that stopped and one that has
+        // "is this bound" is not enough to debug with: a stream that stopped and one that has
         // not emitted since the screen was built look the same.
         const stream = describeStream(binding, timeOrigin());
         out.push({
@@ -1609,7 +1608,7 @@ export class GessoRuntime {
   /**
    * Rebuilds the application's tree from a new root definition,
    * keeping the runtime and everything that is not the tree
-   * (`ROADMAP.md` F7's HMR item).
+   * (the HMR item).
    *
    * **Why a rebuild is the only story.** A Gesso component's `render`
    * runs once; there is no re-render pass to push new code through, so
@@ -1621,7 +1620,7 @@ export class GessoRuntime {
    * held by the runtime rather than by any component, so a freshly
    * built tree binds to values that are already there.
    *
-   * That is why the roadmap's "snapshot projections as patches, replay
+   * That is why the "snapshot projections as patches, replay
    * after mount" is not here. It describes rebuilding a replica from
    * scratch, and nothing rebuilds one: the replica, the services, the
    * renderer, the canvas, the focus manager and the scheduler all
@@ -1935,8 +1934,7 @@ export class GessoRuntime {
    * focused node when focus moved.
    *
    * The consumer is `SemanticsMirror` — an off-screen DOM tree over the
-   * canvas that the platform's assistive technology reads (roadmap
-   * F6b). Attaching one is what turns the geometry sweep on; without a
+   * canvas that the platform's assistive technology reads . Attaching one is what turns the geometry sweep on; without a
    * listener the runtime keeps the tree and diffs it, and looks at no
    * boxes at all.
    */
@@ -2094,7 +2092,7 @@ export class GessoRuntime {
    *
    * Bounded by the semantics tree, which is bounded by the *mounted*
    * nodes — so a 100k-row list costs the fifteen rows it has mounted,
-   * the same bound `decisions/0021` gives for the tree walk itself.
+   * the same bound the semantics tree walk has.
    * Ids that have left the tree are dropped here rather than tracked,
    * since a removal patch has already told the mirror about them.
    */
@@ -2516,7 +2514,7 @@ export class GessoRuntime {
    *   `requestAnimationFrame` that is the display's cadence; a timer
    *   clock gets its own interval, which is what a render worker has.
    * - **later** — nobody wants a frame until then, so one timer waits.
-   *   This is what keeps `decisions/0028`'s promise about the
+   *   This is what keeps the media tier's promise about the
    *   `Spinner`: eight positions means eight wake-ups a second, not
    *   sixty frames drawing seven identical pictures.
    */

@@ -7,9 +7,9 @@ import { field, fieldArray, form } from './form';
 import { required, type Validator } from './validate';
 
 /**
- * Budgets for the form group (roadmap X9, `decisions/0085`).
+ * Budgets for the form group.
  *
- * The risk §5 of the roadmap names is sugar that hides cost, and a form
+ * The risk here is sugar that hides cost, and a form
  * is where it would hide: a helper that re-checked every field on every
  * keystroke, or rebuilt the values record for anything reading it,
  * would cost proportionally to the size of the form rather than to the

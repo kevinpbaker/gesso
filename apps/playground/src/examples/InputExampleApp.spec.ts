@@ -43,7 +43,7 @@ function press(ui: Rendered, key: string, modifiers: Partial<ReturnType<typeof n
  * keyboard controller, the dispatcher, the modifier hosts and the
  * registry are all in the path. A spec that called `registry.handleKey`
  * would be asserting the registry twice and the wiring never, which is
- * the defect `decisions/0025-structure-tier.md` records.
+ * the defect this spec exists to avoid.
  */
 describe('the gestures example', () => {
   it('opens the palette on the application shortcut', () => {

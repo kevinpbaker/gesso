@@ -478,7 +478,7 @@ export class Canvas2DRenderer implements UiRenderer {
    *
    * The WebGPU backend draws the same bitmap in the same box, because
    * it asks the same cache for it. That is the whole of the parity
-   * story for a painted node; `decisions/0078` is the argument.
+   * story for a painted node.
    */
   private paintPicture(ctx: Canvas2DContext, node: UiNode, rec: LayoutRecord): void {
     const picture = paintPictures.pictureFor(node, rec, this.surface.dpr);

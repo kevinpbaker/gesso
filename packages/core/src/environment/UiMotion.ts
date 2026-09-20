@@ -5,7 +5,7 @@ import { easings, type UiEasing } from '../animation/UiEasing';
  *
  * Named rather than numeric for the reason a colour is named: a
  * library whose components each pick their own 180 or 240 has no feel,
- * it has forty opinions. `COMPONENTS_ROADMAP.md`'s rule for colour —
+ * it has forty opinions. the rule for colour —
  * tokens only, never a literal in a component — applies to time.
  */
 export type UiDurationToken = 'instant' | 'fast' | 'normal' | 'slow' | 'deliberate';
@@ -39,7 +39,7 @@ export interface UiSpringSpec {
  * resolved per node — `resolveColorValue` asks what the node inherits
  * — and an animation drives a *cell*, which has no node, so a motion
  * token on the theme would be a token nothing could resolve. That is
- * the mistake `decisions/0022` recorded about `visualState`: a value
+ * the mistake `visualState` made: a value
  * shipped where nothing reads it. An application that wants a
  * different feel installs one with `AnimationService.setMotion`, which
  * is per runtime, as everything else in front of the graph is.

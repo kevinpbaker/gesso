@@ -31,7 +31,7 @@ import {
 /**
  * The four gestures the applications were missing, on one page.
  *
- * `EXCELLENCE_ROADMAP.md` X11 names them: somewhere to put a drag down,
+ * The four of them: somewhere to put a drag down,
  * a pinch, a registry of shortcuts something can list, and a context
  * menu the framework raises rather than the application guessing at.
  * Each pane is the smallest thing that shows one of them working, and
@@ -40,7 +40,7 @@ import {
  *
  * Every one of them is a modifier. There is no `<DropZone>` and no
  * `<Pinchable>` on this page, because a gesture is behaviour attached
- * to an element and that is exactly what `MODIFIERS_ROADMAP.md` says a
+ * to an element and that is exactly what a
  * modifier is for. The only component here that is not the library's is
  * the palette, which is a list of what the registry says is live.
  */

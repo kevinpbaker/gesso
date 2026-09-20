@@ -32,7 +32,7 @@ function themeRadiusFor(node: UiNode, value: string): number | undefined {
  * afford it. `borderRadius` affects paint and nothing else, so the
  * lookup happens exactly where `backgroundColor`'s does and costs what
  * that costs: a node that names a number never reaches the string
- * branch at all. `decisions/0079` ruled out by-name lengths because a
+ * branch at all. By-name lengths are ruled out because a
  * length is read in the layout pass — a radius is not, which is why
  * this one is free and `padding` is a separate question.
  *

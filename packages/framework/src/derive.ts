@@ -33,7 +33,7 @@ type Values<S extends readonly Observable<unknown>[]> = {
  *   );
  *
  * @deprecated Write it as a `computed`, which is the one derivation the
- * documentation teaches (`decisions/0077`). A cell is read with
+ * documentation teaches. A cell is read with
  * `.value` and anything else through the `read` the function is handed,
  * so the sources are the reads themselves and there is no list beside
  * the expression to keep in step with it:

@@ -30,7 +30,7 @@ describe('segmentParagraph', () => {
   it('segments ASCII on its fast path exactly as the grapheme segmenter would', () => {
     // Every ASCII code unit is one cluster, so `clusterBoundaries` builds
     // an ASCII paragraph's boundaries with a counted loop instead of
-    // asking the segmenter (`decisions/0090`). A non-ASCII tail sends the
+    // asking the segmenter. A non-ASCII tail sends the
     // same prose down the segmenter's path, and the prose must segment
     // the same either way, or the fast path has stopped being a shortcut.
     const prose = 'Over-the-counter remedies, 10-15 of them: (numero)).jpg $100 a+b path/to/file.txt';

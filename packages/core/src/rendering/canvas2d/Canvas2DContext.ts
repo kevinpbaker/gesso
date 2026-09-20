@@ -42,8 +42,7 @@ export interface Canvas2DContext {
   fontStretch?: string;
   /**
    * Whether the shaper applies the font's kerning pairs. The one font
-   * feature a canvas font string can be made to carry; see
-   * `decisions/0085` for the ones it cannot.
+   * feature a canvas font string can be made to carry.
    */
   fontKerning?: string;
   /**

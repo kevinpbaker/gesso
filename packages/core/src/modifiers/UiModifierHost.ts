@@ -15,7 +15,7 @@ export type UiModifierTeardown = (() => void) | { unsubscribe(): void };
  * Everything a modifier may touch.
  *
  * Deliberately narrow, and the whole budget: a capability that is not
- * here is a proposal against `MODIFIERS_ROADMAP.md`, not a parameter
+ * here is a proposal against the modifier contract, not a parameter
  * added in passing. A modifier cannot reach a renderer or a canvas
  * context (that would undo the backends' shared inputs), and it cannot
  * add or remove children (a behaviour that needs children is a
@@ -153,9 +153,8 @@ export interface UiModifierHost {
    *
    * Here rather than through the `AnimationService` because a modifier
    * is `@gesso/core` and a store is the framework's: the same line
-   * `layoutBox` and `isFocused` are on. The detach half is the point —
-   * `decisions/0026` and `0028` both argue that a modifier's lifetime
-   * is exactly its node's, and an animation that outlives its node
+   * `layoutBox` and `isFocused` are on. The detach half is the point:
+   * a modifier's lifetime is exactly its node's, and an animation that outlives its node
    * holds the node, its cell and everything the cell captured.
    */
   animate<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): Observable<T>;
@@ -181,7 +180,7 @@ export interface UiModifierHost {
    * does without layout access.
    *
    * This is one capability rather than three methods because the
-   * registry *is* the contract — `MODIFIERS_ROADMAP.md` §4's budget is
+   * registry *is* the contract — the budget is
    * about what a modifier may reach, and what it reaches here is a
    * name-to-box map that holds no nodes it did not put there itself.
    */

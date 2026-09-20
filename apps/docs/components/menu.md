@@ -74,8 +74,7 @@ corrects it, and a menu with no anchor falls back to the edge offsets:
 it opens in the top-left corner of the window whatever button you meant
 it to hang off. The rule generalises past this component. An anchor
 handed across a component boundary must be a cell, or be read at open
-time. `decisions/0024-overlays-tier.md` records it as a rule for exactly
-that reason.
+time, for exactly that reason.
 
 `Select` and `Tooltip` need no cell, because each reads its own `ref`
 inside the call that opens the entry.

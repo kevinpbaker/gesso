@@ -34,9 +34,9 @@ import { stepIndex, virtualList } from './virtual';
  * A table of any length whose rows share their columns with the header.
  *
  * This is the component two engine deferrals were waiting for.
- * `decisions/0010-grid.md` left "a table whose virtualized rows share
- * the header's tracks" to it, and `ROADMAP.md` L5 left an observable
- * count to it — because a table that sorts a hundred thousand rows has
+ * The grid work left "a table whose virtualized rows share
+ * the header's tracks" to it, and an observable
+ * count was left to it — because a table that sorts a hundred thousand rows has
  * to tell its window that what index 5 means has changed. Both landed
  * in the engine: `subgrid: 'columns'` and `LazyGrid` for the first,
  * `count` as an Observable and `revision` for the second.

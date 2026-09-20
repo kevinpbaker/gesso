@@ -15,9 +15,9 @@ export interface RenderWiring {
 const MARKER = '/* @gesso/vite-plugin: hot replacement */';
 
 /**
- * Writes the two lines `decisions/0049` asked an author to write.
+ * Writes the two lines an author would otherwise write by hand.
  *
- * The record's own example is the specification:
+ * The example below is the specification:
  *
  *   const app = renderRoot(LiveApp).useService(LiveFeed);
  *   import.meta.hot?.accept('./LiveExampleApp', module => {

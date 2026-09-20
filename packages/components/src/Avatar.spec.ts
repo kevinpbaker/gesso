@@ -15,7 +15,7 @@ import {
 import { Avatar, deriveInitials } from './Avatar';
 
 /**
- * `Avatar` (`COMPONENTS_ROADMAP.md` C7's media tier, the account
+ * `Avatar` (the media tier, the account
  * shaped hole in it).
  *
  * The three things worth pinning are the fallback chain, the initials

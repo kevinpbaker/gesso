@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { UiInsetRegistry, insetsEqual, noInsets, observeViewportInsets } from './UiInsets';
 
 /**
- * The inset registry and the shell-side reader behind it (roadmap X7).
+ * The inset registry and the shell-side reader behind it.
  *
  * The registry is where a floating bar and a soft keyboard meet, and
  * the rule that matters is that they compose by maximum: a keyboard

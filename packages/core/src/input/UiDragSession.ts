@@ -69,7 +69,7 @@ export interface UiDragResult {
  * One file that arrived from outside the application.
  *
  * Plain data, every field of it, because this crosses the barrier:
- * `decisions/0030` puts recognition in the render worker and leaves the
+ * recognition runs in the render worker, which leaves the
  * shell holding a `File` object it cannot send. The bytes are an
  * `ArrayBuffer` so a large file is transferred rather than copied, and
  * they are optional because the shell reads them only for a drop that
@@ -129,7 +129,7 @@ export const EXTERNAL_FILES = 'gesso/files';
  * a drag and moves it, and the session's whole job is to work out which
  * registered zone is under the point and to tell it so. Both halves are
  * modifiers because both are behaviour attached to an element, which is
- * `MODIFIERS_ROADMAP.md`'s test for what belongs here.
+ * the test for what belongs here.
  *
  * There is one session per graph root rather than one per process, so
  * two applications in one worker, and a test suite renders dozens,

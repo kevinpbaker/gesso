@@ -21,8 +21,7 @@ import { gessoTheme } from './brand';
 import { masonry } from './layout/masonry';
 
 /**
- * Layout an application can shape: the four things `EXCELLENCE_ROADMAP.md`
- * X7 asked for, on one page.
+ * Layout an application can shape: four things on one page.
  *
  * Each panel is the smallest thing that shows one of them working, and
  * the four are on one page because they are one workstream: the wall

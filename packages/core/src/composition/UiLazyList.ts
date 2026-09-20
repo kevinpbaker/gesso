@@ -64,7 +64,7 @@ export function LazyRow(props: LazyListProps, renderItem: LazyItemRenderer): UiE
  * The renderer returns the row itself, not its content: a row's cells
  * have to be items of the one grid that owns the tracks, so a row is a
  * `Grid` with `subgrid: 'columns'` and the window writes the index onto
- * it. `decisions/0010-grid.md` left this to F3's `DataTable`, and this
+ * it. The grid work left this to `DataTable`, and this
  * is it — the engine half, with the component built on top.
  */
 export function LazyGrid(props: LazyGridProps, renderRow: LazyItemRenderer): UiElement {

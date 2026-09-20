@@ -23,9 +23,9 @@ interface Axes {
  * it.
  *
  * One wheel notch is one large step and nothing in between, which is
- * the whole of what this smooths. `decisions/0008-overflow-scrolling`
- * deferred it in as many words — "momentum for discrete wheel ticks
- * needs the animation clock" — and that clock has existed since F4.
+ * the whole of what this smooths. Overflow scrolling deferred it in as
+ * many words — "momentum for discrete wheel ticks needs the animation
+ * clock" — and that clock now exists.
  *
  * **It owns no time.** Every offset is an ordinary `AnimatedCell`
  * driven by the runtime's `AnimationDriver` through `AnimationService`,

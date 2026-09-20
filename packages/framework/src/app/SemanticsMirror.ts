@@ -65,7 +65,7 @@ const STATE_ATTRIBUTES: Record<string, [attribute: string, value: string]> = {
  * checkbox is off". A screen reader then has nothing to announce.
  *
  * Filled in here rather than in each component for the reason
- * `ADOPTION_ROADMAP.md` A3 gives: what an assistive technology needs is
+ * The reason: what an assistive technology needs is
  * the mirror's business, and a rule in one file cannot be forgotten by
  * the next control somebody writes. Found on a `RadioGroup` in a native
  * window, where the unselected radio carried no `aria-checked` at all.
@@ -161,7 +161,7 @@ interface WrittenOffset {
 type MirrorBox = UiSemanticsUpdate['boxes'][number]['box'];
 
 /**
- * The off-screen DOM an assistive technology reads (roadmap F6b).
+ * The off-screen DOM an assistive technology reads.
  *
  * A canvas has no accessibility tree of its own: a screen reader, an
  * OS accessibility API and an automated testing tool all see one empty

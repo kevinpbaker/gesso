@@ -4,7 +4,7 @@
  *
  * Nothing here imports Electrobun, and that is not fastidiousness. The
  * SDK is projected into a project by Hutch rather than installed from
- * a registry (`decisions/0070-electrobun-spike.md`), so a package in
+ * a registry, so a package in
  * this workspace could not import it even if it wanted to. What the
  * application supplies instead is one function that opens a window,
  * which is the only Electrobun-shaped thing this needs, and which is
@@ -28,7 +28,7 @@
  *   });
  *   app.openWindow();
  *
- * The arrangement it buys is the one `ROADMAP.md` §4 promises: every
+ * The arrangement it buys: every
  * window is a replica of the same channels, so two windows agree by
  * construction rather than by synchronisation.
  */
@@ -87,7 +87,7 @@ export interface DesktopAppOptions {
    * The application supplies it because Electrobun does not: its SDK
    * has no appearance API at all, and the webview's own
    * `prefers-color-scheme` is wrong on WebKitGTK
-   * (`decisions/0070-electrobun-spike.md`). On a platform that has a
+   *. On a platform that has a
    * signal, this is where it goes; on one that does not, an
    * application setting is a perfectly good source.
    */
@@ -241,7 +241,7 @@ export interface DesktopWindowsCommands {
  *
  * It exists because opening a window is the one native act a screen
  * genuinely needs, and going through a channel keeps the view layer
- * from importing an adapter. `ROADMAP.md` §4's "native menus bound to
+ * from importing an adapter. the "native menus bound to
  * store actions" is the same idea from the other end, and on Linux it
  * is the only end: the runtime has no application menus there, so a
  * menu is a component and this is what it calls.

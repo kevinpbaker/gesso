@@ -15,7 +15,7 @@ import { hoverable } from './interaction';
 import { focusRing } from './decoration';
 
 /**
- * `MODIFIERS_ROADMAP.md` B5: L8 made layout explain itself, and B1 then
+ * L8 made layout explain itself, and B1 then
  * let a modifier change the numbers it explains. These are the specs
  * that stop the explanation lying by omission, and the ones that stop a
  * throwing modifier taking the tree with it.

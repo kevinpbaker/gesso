@@ -67,8 +67,7 @@ export interface PaintStats {
  *
  * **One cache, shared by both backends, and that is the design.** The
  * obvious alternative is for each renderer to replay the recording in
- * its own vocabulary, which is what `EXCELLENCE_ROADMAP.md` §6 item 4
- * proposes and what `decisions/0078` declines: WebGPU has no path
+ * its own vocabulary, which this declines: WebGPU has no path
  * pipeline, so a native replay there would mean tessellation, a second
  * rasteriser and two implementations of every fill rule to keep in
  * step. Rasterising once and handing the same bitmap to both means the

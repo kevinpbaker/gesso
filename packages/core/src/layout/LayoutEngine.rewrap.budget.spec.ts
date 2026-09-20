@@ -8,7 +8,7 @@ import { CharacterCountTextMeasurer } from './TextMeasurer';
 import type { FontMetrics, TextMeasureRequest } from './TextMeasurer';
 
 /**
- * Re-wrap budgets (roadmap L1; `decisions/0090-what-a-resize-costs.md`).
+ * Re-wrap budgets.
  *
  * `scripts/bench-rewrap.ts` times a resize sweep over a screen of
  * paragraphs and reads the paragraph cache's hit rate off a counting
@@ -17,7 +17,7 @@ import type { FontMetrics, TextMeasureRequest } from './TextMeasurer';
  *
  *   1. A new width lays every wrapping paragraph out again, exactly
  *      once. The cache is keyed on the request and the width is in the
- *      request (`decisions/0065`), so it cannot answer a width it has
+ *      request, so it cannot answer a width it has
  *      not seen; and the engine's several asks for one node in one
  *      pass are answered from the cache after the first.
  *   2. Text measured at its own width, a caption in a row, is the same

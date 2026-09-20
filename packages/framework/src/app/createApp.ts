@@ -11,7 +11,7 @@ import { WorkerApp, type WorkerAppOptions } from './worker/WorkerApp';
  * so that its own factories are merged under whatever the author wrote,
  * and the literal `new Worker(new URL(...))` it emits is the same
  * expression an author would have written by hand. Writing it by hand
- * is still supported and still documented (`decisions/0082`); what the
+ * is still supported and still documented; what the
  * plugin removes is the obligation to.
  *
  * Without the plugin and without a `renderWorker`, this throws with the

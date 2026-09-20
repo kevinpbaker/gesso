@@ -34,7 +34,7 @@ export async function createDemoBitmap(): Promise<ImageBitmap | undefined> {
  * The icon the parity section draws, rasterised through the Media
  * tier's own `IconRasterizer`.
  *
- * `COMPONENTS_ROADMAP.md` C7's exit criterion is that the compare
+ * the exit criterion is that the compare
  * route contains an `Image` and an `Icon`. The compare route builds a
  * raw element tree with no store registry, so it cannot mount the
  * components — but what has to be identical on the two backends is the

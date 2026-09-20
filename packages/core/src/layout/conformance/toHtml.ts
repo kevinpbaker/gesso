@@ -7,7 +7,7 @@ import { TEXT_GLYPH_WIDTH_FACTOR, TEXT_LINE_HEIGHT_FACTOR, DEFAULT_CASE_FONT_SIZ
  * case's viewport.
  *
  * The mapping is deliberately literal — Gesso borrowed CSS names, so
- * `flexGrow` is `flex-grow` and `gap` is `gap`, and since roadmap item
+ * `flexGrow` is `flex-grow` and `gap` is `gap`, and since item
  * L3 the defaults match too: cross-axis `stretch`, automatic minimum
  * size. The one deliberate difference left is that a stack (grid here)
  * aligns its children `start` by default.

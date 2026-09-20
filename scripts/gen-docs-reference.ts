@@ -1,5 +1,5 @@
 /**
- * The generated reference pages (`DOCS_ROADMAP.md` D4).
+ * The generated reference pages.
  *
  * Two pages on the docs site are not written by hand:
  *
@@ -25,8 +25,8 @@
  *     reports, which are the honest record of the public surface, and
  *     narrows them to the names an application actually types.
  *
- * That narrowing needs a list, and `DOCS_ROADMAP.md` section 8 leaves
- * open where the list should live: a file in the docs, or an `exports`
+ * That narrowing needs a list, and where the list should live is an
+ * open question: a file in the docs, or an `exports`
  * split in the packages. This script takes the first, and the list is
  * `apps/docs/src/reference/author-surface.ts`. Nothing under
  * `packages/` is restructured, the packages keep exporting what they

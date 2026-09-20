@@ -7,7 +7,7 @@ import { Constraints } from './LayoutTypes';
 
 /**
  * The axis properties, and the order they resolve in: a side beats its
- * axis, and an axis beats the shorthand. `decisions/0079` is why
+ * axis, and an axis beats the shorthand, which is why
  * `padding` stayed a single number rather than growing a tuple.
  */
 describe('paddingX and paddingY', () => {

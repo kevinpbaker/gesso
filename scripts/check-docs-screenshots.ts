@@ -1,5 +1,5 @@
 /**
- * Docs screenshot gate (`DOCS_ROADMAP.md` section 6's last row).
+ * Docs screenshot gate.
  *
  * Opens every documentation page that carries a `<LiveExample>`, waits
  * for the example to stop moving, captures the canvas it mounted, and
@@ -125,7 +125,7 @@ const MAX_GROSS_PERCENT = Number(process.env.DOCS_SCREENSHOT_MAX_GROSS_PERCENT ?
 const CANNOT_SETTLE: Record<string, string> = {
   'components/spinner':
     "the motion is inside `Spinner`: a repeating stepped tween with `reducedMotion: 'keep'`, and no prop turns it off. " +
-    'A spinner that stopped would say work had stopped, which `decisions/0028-media-tier.md` decided against.',
+    'A spinner that stopped would say work had stopped, which the media tier decided against.',
   'components/progress-bar':
     'the page ends with the indeterminate bar, which sweeps on the same repeating tween and for the same stated ' +
     'reason. The two determinate bars above it are still, but they share a page with it.'
@@ -481,9 +481,8 @@ async function captureSettled(devtools: DevTools, count: number): Promise<Settle
  * `JSON.stringify(_, null, 2)` puts each number of the viewport on a
  * line of its own and oxfmt puts them back on one, so writing it that
  * way would leave the tree unformatted after every regeneration. That
- * is not hypothetical either: `decisions/0058-release-gate.md` records
- * CI going red for several pushes because the playground's manifest had
- * been committed unformatted, which skipped every check behind it.
+ * is not hypothetical either: CI went red for several pushes because
+ * the playground's manifest had been committed unformatted, which skipped every check behind it.
  */
 function manifestJson(manifest: Manifest): string {
   return (

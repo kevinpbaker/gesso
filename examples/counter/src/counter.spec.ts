@@ -1,5 +1,5 @@
 /**
- * The other half of what a consumer installs (`ROADMAP.md` F7).
+ * The other half of what a consumer installs.
  *
  * `main.ts` proves the published packages paint in a browser. This
  * proves the published `@gesso/testing` lets someone test a component

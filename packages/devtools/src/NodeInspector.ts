@@ -2,7 +2,7 @@ import type { UiNodeReport } from '@gesso/framework';
 import { NODE_REPORT_STYLES, renderNodeReport } from './NodeReportView';
 
 /**
- * The node inspector (`ROADMAP.md` F7): what the thing under the
+ * The node inspector: what the thing under the
  * pointer is, and where every part of it came from.
  *
  * L8 already answered "why is this box that size" and printed it as

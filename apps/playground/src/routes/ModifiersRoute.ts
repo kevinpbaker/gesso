@@ -19,7 +19,7 @@ const RENDERER_STORAGE_KEY = 'gesso.playground.renderer';
 /**
  * Every modifier the library ships, one card each, in a render worker.
  *
- * `MODIFIERS_ROADMAP.md` B4's second half: the browser check for the
+ * the second half: the browser check for the
  * whole modifier system is one page rather than seven hunts through
  * the framework playground. The page itself is
  * `examples/ModifiersApp.tsx`; this file is only the chrome around it.

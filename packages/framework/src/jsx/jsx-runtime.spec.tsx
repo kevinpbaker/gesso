@@ -95,7 +95,7 @@ describe('jsx runtime', () => {
   });
 
   it('makes a <paint> the way the Paint factory does, children stacked over the picture', () => {
-    // The painted node is `decisions/0078`'s: a Box-shaped leaf that
+    // The painted node is a Box-shaped leaf that
     // draws through its `paint` or `path` prop. The tag has to reach
     // the same factory and the same node type, so that a waveform
     // written as `<paint>` and one written as `Paint(...)` are the

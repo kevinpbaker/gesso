@@ -195,7 +195,7 @@ whose data is replaced hands the name from the card that held the item
 to the card that holds it now, and reconciliation builds the new node
 before it drops the old one, so the new one claims a name the old one
 still owns. Name a card for its place instead, and let the page it
-opens adopt the name of the card that was pressed. `apps/segue`'s
+opens adopt the name of the card that was pressed. the music example's
 `hero.ts` is that pattern in about thirty lines.
 
 **The arriving screen may not fade.** A screen's opacity is inherited by

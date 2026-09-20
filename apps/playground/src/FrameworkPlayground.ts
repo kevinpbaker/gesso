@@ -237,7 +237,7 @@ export class Heartbeat extends Component {
 }
 
 /**
- * The barrier contract, live (roadmap A2).
+ * The barrier contract, live.
  *
  * Nothing here knows where the data comes from: `Ticker` is a name and
  * a shape, and its view keys arrive as input cells exactly as props
@@ -324,7 +324,7 @@ export class HeavyPanel extends Component {
 @Define('text-showcase')
 export class TextShowcase extends Component {
   /**
-   * Text as a layout citizen (roadmap L1), in one card: a title clamped
+   * Text as a layout citizen, in one card: a title clamped
    * to two lines with an ellipsis, a paragraph that wraps at the card's
    * content width, and a label/value row whose different font sizes
    * share a baseline.
@@ -364,7 +364,7 @@ export class TextShowcase extends Component {
 }
 
 /**
- * Text editing (roadmap F2): a single-line field and a multi-line one.
+ * Text editing: a single-line field and a multi-line one.
  * Both are `EditableText` nodes; the runtime owns the caret, selection,
  * composition and undo, and reports every change through `onInput`.
  * The fields here are controlled — the value written back is the value
@@ -424,7 +424,7 @@ export class TextFieldDemo extends Component {
 }
 
 /**
- * Overlays (roadmap L2): a menu anchored to a button through a `ref`,
+ * Overlays: a menu anchored to a button through a `ref`,
  * opened through the OverlayService. The button sits inside a short
  * scroll view near the bottom of the page, so the menu flips upward
  * when there is no room below and follows the button as the list
@@ -545,12 +545,12 @@ export class MenuDemo extends Component {
  * renderer all work together in a single-thread app.
  */
 /**
- * Overflow (roadmap L4): a rounded card clips a box that spills past
+ * Overflow: a rounded card clips a box that spills past
  * it, and a list with a sticky header scrolls under it while Tab moves
  * focus through rows that scroll themselves into view.
  */
 /**
- * Modifiers (roadmap B1 and B3): behaviour attached to an element, and
+ * Modifiers: behaviour attached to an element, and
  * the one thing a modifier may put on screen.
  *
  * The options are module constants because a modifier's arguments are
@@ -663,7 +663,7 @@ function ringButton(text: string, key?: string): UiElement {
 }
 
 /**
- * The Inputs tier (roadmap C3): a sign-in form built from
+ * The Inputs tier: a sign-in form built from
  * `@gesso/components` with no hand-rolled widget and no colour in it.
  *
  * Every control is themed through the control tokens, carries its own
@@ -762,7 +762,7 @@ export class SignInFormDemo extends Component {
 }
 
 /**
- * The Overlays tier (roadmap C4): everything that floats.
+ * The Overlays tier: everything that floats.
  *
  * A dialog that traps the keyboard and hands it back, a select
  * operable without a pointer, and a menu — all placed by L2's engine,
@@ -886,7 +886,7 @@ export class OverlayTierDemo extends Component {
 }
 
 /**
- * The Structure tier (roadmap C5): the chrome a screen is made of.
+ * The Structure tier: the chrome a screen is made of.
  *
  * Tabs choose what the split pane shows, the toolbar groups its
  * buttons under one name, and the divider between the panes is
@@ -992,7 +992,7 @@ function toolButton(label: string): UiElement {
 }
 
 /**
- * The Data tier (roadmap C6): a hundred thousand rows, sorted, with the
+ * The Data tier: a hundred thousand rows, sorted, with the
  * header and every row sharing one set of column tracks.
  *
  * This is the card the tier's two engine deferrals were for. The rows
@@ -1224,7 +1224,7 @@ export class ScrollDemo extends Component {
 }
 
 /**
- * The Media tier (roadmap C7): a picture, icons, a spinner and two
+ * The Media tier: a picture, icons, a spinner and two
  * progress bars.
  *
  * The picture is fetched and decoded by the `ImageResolver` the
@@ -1327,7 +1327,7 @@ export class MediaTierDemo extends Component {
 }
 
 /**
- * Images (WebGPU roadmap G5): a bitmap decoded on the rendering thread
+ * Images: a bitmap decoded on the rendering thread
  * — drawn here with OffscreenCanvas, in an application it would come
  * from `createImageBitmap(blob)` — shown under every `objectFit`
  * inside rounded, clipping boxes.
@@ -1372,7 +1372,7 @@ export class ImageDemo extends Component {
 }
 
 /**
- * Grid (roadmap L6): the two layouts every application needs and flex
+ * Grid: the two layouts every application needs and flex
  * cannot express without hand-aligned widths — a settings form whose
  * label column is as wide as its widest label, and a table whose header
  * and body share one set of tracks — plus a tile board with spans.
@@ -1463,7 +1463,7 @@ export class GridDemo extends Component {
 }
 
 /**
- * Virtualization (roadmap L5): a hundred thousand rows, of which only
+ * Virtualization: a hundred thousand rows, of which only
  * the visible ones plus an overscan band exist as nodes. The status bar
  * shows layout cost staying flat while it scrolls.
  */
@@ -1489,7 +1489,7 @@ export class LazyListDemo extends Component {
 }
 
 /**
- * Animation (roadmap F4): the three things §F4 says it is done when.
+ * Animation: the three things §F4 says it is done when.
  *
  * A **reorder** whose rows animate to their new places — keyed
  * children, so the nodes survive the shuffle, and `animateLayout` on
@@ -1625,7 +1625,7 @@ export class BrokenChild extends Component {
 
 /**
  * Two ways to break this app, for looking at what happens when one
- * does (`@gesso/devtools`, ROADMAP F7).
+ * does, with `@gesso/devtools`.
  *
  * The two buttons are the two halves of `RuntimeErrorSource` a person
  * can reach from here: a handler throws inside the message the shell

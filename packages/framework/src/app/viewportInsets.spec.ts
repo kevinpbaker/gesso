@@ -16,7 +16,7 @@ import { mockCanvas, mountRuntime } from './RuntimeTestUtils';
 import { ShellService } from './ShellService';
 
 /**
- * The platform's insets, from the shell to a screen (roadmap X7).
+ * The platform's insets, from the shell to a screen.
  *
  * `observeViewportInsets` reads `visualViewport` on the thread that
  * has a window; the runtime publishes what it hears into the inset

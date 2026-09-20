@@ -64,7 +64,7 @@ const NOTHING: UndoLabels = { undo: null, redo: null };
  * listens to anything or knows what an application's state is: the two
  * functions in a transaction are the whole of the coupling, which is
  * why this can sit on either thread and why it does not become a data
- * layer (`decisions/0030`).
+ * layer.
  *
  *   const undo = ctx.inject(UndoStack);
  *

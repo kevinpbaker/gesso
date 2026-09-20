@@ -8,7 +8,7 @@ export interface NodeReportViewOptions {
    *
    * Absent for a read-only view. The corner inspector passes nothing,
    * because it sets `pointer-events: none` and could not be typed into
-   * anyway (`decisions/0045`).
+   * anyway.
    */
   onEditProp?(name: string, value: unknown): void;
 }

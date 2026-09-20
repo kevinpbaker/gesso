@@ -1,7 +1,7 @@
 /**
  * `@gesso/testing` — mount a component without a browser.
  *
- * `ROADMAP.md` F7. Three things a component author needs and could not
+ * Three things a component author needs and could not
  * have before this package existed:
  *
  *  - **A mount that is not a copy of a mount.** Every spec that drove a

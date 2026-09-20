@@ -18,7 +18,7 @@ export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, t
  * the result.
  *
  * A Gesso application is three files either side of a thread barrier
- * (`decisions/0030`), and until now the barrier cost the author four
+ *, and until now the barrier cost the author four
  * incantations: `new Worker(new URL('./RenderWorker.ts',
  * import.meta.url), { type: 'module' })` twice, because only a literal
  * gets a chunk; `import.meta.hot.accept` with the root module named by
@@ -30,7 +30,7 @@ export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, t
  * The three-file shape stays. What this removes is the incantations,
  * and what it adds is the one diagnostic that cannot be read off the
  * screen: a save that reloads the page rather than replacing a module,
- * which `decisions/0049` traced to the root module having a
+ * which traces to the root module having a
  * main-thread importer and which otherwise looks like HMR simply not
  * working.
  *
@@ -44,7 +44,7 @@ export { blankLiterals, findCall, findCalls, firstArgumentName, importSources, t
  * The literal construction stays supported and stays documented: the
  * plugin merges its factories *under* the options the author wrote, so
  * a hand-written `renderWorker` wins and an application that would
- * rather say it out loud can. See `decisions/0082`.
+ * rather say it out loud can.
  */
 export interface GessoPluginOptions {
   /**
@@ -147,7 +147,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     /**
      * The failure that looks like a bug in the framework.
      *
-     * `decisions/0049`: a module reached from the main thread as well
+     * A module reached from the main thread as well
      * as from the render worker cannot be hot-replaced, because Vite
      * propagates the invalidation to a main-thread importer that does
      * not accept and reloads the page. The screen blinks, the app
@@ -170,7 +170,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         server.config.logger.warn(
           `[gesso] ${short(module.id, server.config.root)} is imported by the main thread as well as by the render ` +
             'worker, so saving it reloads the page instead of replacing the tree. Reach it only from the render ' +
-            "worker's own graph to get hot replacement back; see decisions/0049."
+            "worker's own graph to get hot replacement back."
         );
       }
     }

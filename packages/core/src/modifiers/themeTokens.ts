@@ -22,12 +22,12 @@ export interface ThemeTokenTarget<T extends object> {
  * Publishes a theme extension's tokens into a cell, and keeps
  * publishing them as the theme above the element changes.
  *
- * This is the answer to the thing `Button`'s docstring has said since
- * `decisions/0079`: a component's body runs once, before its node is
+ * This is the answer to the thing `Button`'s docstring has said all
+ * along: a component's body runs once, before its node is
  * in a tree, so it cannot read the environment and anything it
  * computes from the theme is frozen at the default. A colour escapes
  * that by being a name resolved at paint, and a radius now does too
- * (`decisions/0096`) — but a padding, a gap, a variant's choice of
+ * — but a padding, a gap, a variant's choice of
  * token and an interaction's opacity have nowhere to be resolved late.
  *
  * A modifier does have the environment, so it reads the group there

@@ -121,7 +121,7 @@ describe('theme shape tokens', () => {
   describe('shapesEqual, over the scale keys', () => {
     it('sees a change to a step a custom scale added', () => {
       // Written-out key comparison was the bug `typographyEqual` had to
-      // be rewritten to fix in `decisions/0079`; a theme whose extra
+      // be rewritten to fix; a theme whose extra
       // step changed would otherwise never invalidate.
       const before = { ...lightTheme, shapes: { ...defaultShapes, control: 7 } as unknown as typeof defaultShapes };
       const after = { ...lightTheme, shapes: { ...defaultShapes, control: 9 } as unknown as typeof defaultShapes };

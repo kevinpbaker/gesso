@@ -26,7 +26,7 @@ export type UiTransitionSpec =
  *
  * A bare number is a duration in milliseconds, which is what makes
  * `transition: { opacity: 200, transform: spring() }` read the way
- * `ROADMAP.md` §F4 wrote it.
+ * That is how it was written.
  */
 export type UiTransitionValue = number | UiTransitionSpec;
 

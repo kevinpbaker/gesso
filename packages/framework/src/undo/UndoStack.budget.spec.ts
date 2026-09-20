@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { UndoStack } from './UndoStack';
 
 /**
- * Budgets for the undo stack (roadmap X13).
+ * Budgets for the undo stack.
  *
- * The risk §5 of the roadmap names is sugar that hides cost, and the
+ * The risk here is sugar that hides cost, and the
  * shape it takes here is an undo stack that keeps every intermediate
  * value of a gesture. A drag across a list reports a crossing per row,
  * and a stack that pushed one entry per crossing would hold a hundred

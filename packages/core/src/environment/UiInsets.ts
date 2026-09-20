@@ -119,7 +119,7 @@ export class UiInsetRegistry implements UiInsetSource {
  * **Shell side, and only shell side.** `visualViewport` needs a
  * window, and the runtime that decides what to do about a keyboard is
  * usually in a worker. What crosses the boundary is these four
- * numbers, which is the rule `decisions/0030-thread-model.md` states:
+ * numbers, which is the thread model's rule:
  * the shell holds what only it can hold and posts plain data, and
  * every decision about the data is taken on the far side. Nothing
  * here reads a Gesso object, and the caller passes what it hears to

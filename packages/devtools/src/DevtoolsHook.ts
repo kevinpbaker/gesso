@@ -10,7 +10,7 @@ import {
 } from './PanelProtocol';
 
 /**
- * The page's side of the devtools panel (`ADOPTION_ROADMAP.md` A4).
+ * The page's side of the devtools panel.
  *
  * One object per page, kept on the window under a well-known name the
  * way React's devtools hook is, so that several bundles (a docs site's

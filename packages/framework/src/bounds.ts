@@ -21,7 +21,7 @@ const NOWHERE: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
  * **It reports a move, and only a move.** `measure` is built on
  * `LayoutNotifier`, which fires for every layout fact a node's listeners
  * could care about, and one of those is a scroll offset that changed
- * while the box stayed exactly where it was (`decisions/0037` §6). A
+ * while the box stayed exactly where it was. A
  * cell that emitted for those would wake everything derived from it on
  * every frame of every scroll, for a box that did not move, which is
  * the defect this exists to avoid. So an equal box is dropped here,
