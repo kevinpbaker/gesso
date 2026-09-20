@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="275" height="360" viewBox="0 0 275 360">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#171a2e"/>
+      <stop offset="60%" stop-color="#241a33"/>
+      <stop offset="100%" stop-color="#3a1f34"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffd07a"/>
+      <stop offset="55%" stop-color="#f4913f"/>
+      <stop offset="100%" stop-color="#e2563f"/>
+    </linearGradient>
+    <clipPath id="frame"><rect width="275" height="360"/></clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <rect width="275" height="360" fill="url(#sky)"/>
+    <circle cx="137" cy="163" r="96" fill="url(#sun)"/>
+    <!-- slices across the disc, the classic sleeve device -->
+    <g fill="#171a2e">
+      <rect x="0" y="196" width="275" height="5"/>
+      <rect x="0" y="209" width="275" height="7"/>
+      <rect x="0" y="224" width="275" height="9"/>
+      <rect x="0" y="241" width="275" height="11"/>
+    </g>
+    <!-- horizon, and the ground below it -->
+    <rect x="0" y="258" width="275" height="102" fill="#120f1d"/>
+    <rect x="0" y="256" width="275" height="2" fill="#e2563f"/>
+    <!-- a ridge line -->
+    <path d="M0 300 L64 272 L118 296 L176 266 L232 292 L275 274 L275 360 L0 360 Z" fill="#0b0914"/>
+    <!-- three marks, top left, for asymmetry -->
+    <g fill="#ffd07a" opacity="0.85">
+      <rect x="24" y="28" width="26" height="3"/>
+      <rect x="24" y="38" width="16" height="3"/>
+      <rect x="24" y="48" width="9"  height="3"/>
+    </g>
+  </g>
+</svg>
