@@ -598,6 +598,15 @@ export class GessoRuntime {
           const record = this.engine.recordFor(node);
           return record === undefined ? null : { x: record.scrollX, y: record.scrollY };
         },
+        // The canvas, which is what `box` and `flowBox` are measured
+        // against. Not the graph root's record — the root has none —
+        // and not the window's, which in an application that does not
+        // fill its page is a different rectangle. It is the same
+        // answer `onScreen` culls the semantics tree with, without
+        // that one's margin: a rectangle a scroll is *about* to bring
+        // in wants its accessibility record early, and wants its
+        // decoder started when it actually arrives.
+        viewport: () => ({ x: 0, y: 0, width: this.width, height: this.height }),
         onLayout: (node, listener) => this.layoutNotifier.add(node, listener)
       },
       animations: this.animations,
@@ -1242,6 +1251,18 @@ export class GessoRuntime {
    * `AnimationDriver.setHidden` for why an entrance frozen at its
    * first value is a hole in the page rather than a paused animation.
    */
+  /**
+   * The shell says the surface entered or left fullscreen.
+   *
+   * Reported rather than inferred from the request that asked for it,
+   * because the person can leave with Escape and a browser can refuse
+   * to enter at all; a control that tracked its own last press would
+   * then point the wrong way.
+   */
+  setFullscreen(active: boolean): void {
+    this.services.get(ShellService).applyFullscreen(active);
+  }
+
   setVisible(visible: boolean): void {
     this.input.editing.setVisible(visible);
     if (visible === this.visible) {

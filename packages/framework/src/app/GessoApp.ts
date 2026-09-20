@@ -19,6 +19,7 @@ import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
+import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from './fullscreen';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
@@ -111,6 +112,8 @@ export class GessoApp {
   private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
+  private detachFullscreen: (() => void) | null = null;
+  private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
   private detachColorScheme: (() => void) | null = null;
@@ -307,6 +310,8 @@ export class GessoApp {
     this.mirror = null;
     this.detachVisibility?.();
     this.detachVisibility = null;
+    this.detachFullscreen?.();
+    this.detachFullscreen = null;
     this.detachReducedMotion?.();
     this.detachReducedMotion = null;
     this.detachColorScheme?.();
@@ -362,6 +367,22 @@ export class GessoApp {
       const onVisibility = (): void => this.runtime.setVisible(document.visibilityState !== 'hidden');
       document.addEventListener('visibilitychange', onVisibility);
       this.detachVisibility = () => document.removeEventListener('visibilitychange', onVisibility);
+      this.detachFullscreen = observeFullscreen(canvas, active => {
+        // The host's `ResizeObserver` does not see this; see
+        // `surfaceBox` for why, and for why the size comes from the
+        // canvas going in and from the host coming out.
+        this.fullscreen = active;
+        this.runtime.setFullscreen(active);
+        afterLayout(() => {
+          const box = surfaceBox(canvas, this.host, active);
+          if (box !== null) {
+            this.resize(box.width, box.height);
+          }
+        });
+      });
+      // Once at startup as well as on change: a canvas mounted into a
+      // document that is already fullscreen never fires the event.
+      this.runtime.setFullscreen(isDocumentFullscreen(canvas));
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
     this.setColorScheme(this.colorSchemePreference);
@@ -448,6 +469,14 @@ export class GessoApp {
       writeClipboard(request.text, this.canvas.ownerDocument);
       return;
     }
+    if (request.type === 'fullscreen') {
+      // The canvas rather than the document body: what the application
+      // draws on is what should fill the screen, and a host page with
+      // chrome of its own around the canvas does not want that chrome
+      // blown up with it.
+      setElementFullscreen(this.canvas, request.enter);
+      return;
+    }
     const view = this.canvas.ownerDocument.defaultView;
     if (request.type === 'storage') {
       // Performed here rather than posted, because in this
@@ -488,6 +517,11 @@ export class GessoApp {
       // backing store, so the canvas attributes are never written here:
       // round-tripping the size through them once meant the second
       // resize read device pixels back as logical pixels.
+      if (this.fullscreen) {
+        // The canvas is filling the screen and is no longer in the
+        // host's flow; see the fullscreen listener above.
+        return;
+      }
       this.resize(entry.contentRect.width, entry.contentRect.height);
     });
     this.resizeObserver.observe(this.host);

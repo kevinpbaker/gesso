@@ -137,6 +137,7 @@ export {
   type AudioState,
   type AudioStatus
 } from './app/AudioService';
+export { audioClock } from './app/videoClock';
 export {
   AudioSink,
   type AudioElementLike,

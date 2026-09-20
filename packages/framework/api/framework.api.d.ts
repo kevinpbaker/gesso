@@ -307,6 +307,7 @@ import {
   UiThemeExtension,
   UiTouchScroller,
   UiWheelController,
+  VideoClock,
   VideoResolver
 } from "gesso-core";
 declare class ServiceRegistry {
@@ -977,6 +978,9 @@ type ShellRequest = {
   type: 'openUrl';
   url: string;
 } | {
+  type: 'fullscreen';
+  enter: boolean;
+} | {
   type: 'popup';
   id: number;
   url: string;
@@ -1009,6 +1013,7 @@ declare class ShellService {
   private handler;
   private readonly scheme;
   private readonly insets;
+  private readonly isFullscreen;
   private readonly popups;
   private nextPopupId;
   private readonly stores;
@@ -1022,6 +1027,9 @@ declare class ShellService {
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): void;
   openUrl(url: string): void;
+  readonly fullscreen: ReadableCell<boolean>;
+  requestFullscreen(enter: boolean): void;
+  applyFullscreen(active: boolean): void;
   openPopup(request: {
     readonly url: string;
     readonly name?: string;
@@ -1138,6 +1146,10 @@ type ShellToRuntimeMessage = {
   visible: boolean;
 } |
 {
+  type: 'fullscreenChanged';
+  active: boolean;
+} |
+{
   type: 'reducedMotion';
   reduced: boolean;
 } |
@@ -1233,6 +1245,9 @@ type RuntimeToShellMessage = {
 {
   type: 'openUrl';
   url: string;
+} | {
+  type: 'fullscreen';
+  enter: boolean;
 } |
 {
   type: 'popup';
@@ -1591,6 +1606,7 @@ declare class GessoRuntime {
   applyAudioSample(sample: AudioSample): void;
   applyAudioAction(action: AudioAction): void;
   setTextInputSource(source: 'proxy' | 'keys'): void;
+  setFullscreen(active: boolean): void;
   setVisible(visible: boolean): void;
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
@@ -1828,6 +1844,7 @@ declare class GessoApp {
   private mirror;
   private history;
   private detachVisibility;
+  private detachFullscreen;
   private detachReducedMotion;
   private detachColorScheme;
   private detachViewportInsets;
@@ -2049,6 +2066,7 @@ declare class FrameService {
   readonly frames: Observable<FrameMetrics>;
   publish(metrics: FrameMetrics): void;
 }
+declare function audioClock(audio: AudioService, source: string): VideoClock;
 interface AudioElementLike extends EventTarget {
   src: string;
   currentTime: number;
@@ -2298,6 +2316,7 @@ export {
   APPLICATION_WORKER,
   AppLogicEndpoint,
   AudioAction,
+  audioClock,
   AudioElementLike,
   AudioMetadata,
   AudioRequest,
@@ -2376,7 +2395,6 @@ export {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
-  Gn,
   IndexedDbStorage,
   IndexedDbStorageOptions,
   Inject,
@@ -2385,6 +2403,7 @@ export {
   isHubMessage,
   isPortErrorMessage,
   isPortHandshake,
+  Kn,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -2579,6 +2598,7 @@ import {
   APPLICATION_WORKER,
   AppLogicEndpoint,
   AudioAction,
+  audioClock,
   AudioElementLike,
   AudioMetadata,
   AudioRequest,
@@ -2806,12 +2826,13 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-Cf_jEFA8.js";
+} from "./index-D_T1BQOv.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
   applyPatch,
   applyPatches,
+  audioClock,
   AudioService,
   AudioSink,
   bind,
@@ -3278,7 +3299,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-Cf_jEFA8.js";
+} from "../index-D_T1BQOv.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

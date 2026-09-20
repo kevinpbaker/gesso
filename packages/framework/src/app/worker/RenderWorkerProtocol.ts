@@ -134,6 +134,8 @@ export type ShellToRuntimeMessage =
   | { type: 'blur' }
   /** The page was hidden or shown (document.visibilityState). */
   | { type: 'visibility'; visible: boolean }
+  /** The surface entered or left fullscreen, however that happened. */
+  | { type: 'fullscreenChanged'; active: boolean }
   /**
    * The person's motion preference (`prefers-reduced-motion`), sent
    * once at start-up and again whenever it changes.
@@ -328,6 +330,7 @@ export type RuntimeToShellMessage =
   | { type: 'clipboard'; text: string }
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
+  | { type: 'fullscreen'; enter: boolean }
   /**
    * Open a sized, named window and report back whether the browser
    * allowed it (ShellService.openPopup).

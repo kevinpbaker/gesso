@@ -18,6 +18,7 @@ import type { ReadableCell } from '../Input';
 export type ShellRequest =
   | { type: 'clipboard'; text: string }
   | { type: 'openUrl'; url: string }
+  | { type: 'fullscreen'; enter: boolean }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
   | { type: 'history'; action: 'push' | 'replace'; url: string }
@@ -57,6 +58,7 @@ export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
   private readonly insets = internalState<UiInsets>(noInsets);
+  private readonly isFullscreen = internalState<boolean>(false);
   /** Popups asked for and not yet answered, by the id sent with each. */
   private readonly popups = new Map<number, (opened: boolean) => void>();
   private nextPopupId = 1;
@@ -161,6 +163,37 @@ export class ShellService {
   /** Opens a URL in the user's browser, in a new tab or window. */
   openUrl(url: string): void {
     this.handler?.({ type: 'openUrl', url });
+  }
+
+  /**
+   * Whether the application's surface is filling the screen.
+   *
+   * Read rather than assumed: the person can leave fullscreen with
+   * Escape, which no request here hears about, and a button that
+   * tracked its own last press would then point the wrong way. The
+   * shell reports the real state and this follows it.
+   */
+  readonly fullscreen: ReadableCell<boolean> = this.isFullscreen;
+
+  /**
+   * Asks the shell to fill the screen, or to stop.
+   *
+   * A request rather than a call, for the reason the clipboard is one:
+   * the Fullscreen API is the document's, and the thread this runs on
+   * may not have a document. It can also be refused outright, because
+   * browsers only grant it during a gesture, which is why nothing here
+   * returns a promise pretending otherwise. Watch `fullscreen` for what
+   * actually happened.
+   */
+  requestFullscreen(enter: boolean): void {
+    this.handler?.({ type: 'fullscreen', enter });
+  }
+
+  /** Called by the runtime when the shell reports the state. Not for applications. */
+  applyFullscreen(active: boolean): void {
+    if (this.isFullscreen.value !== active) {
+      this.isFullscreen.value = active;
+    }
   }
 
   /**

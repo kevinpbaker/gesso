@@ -28,6 +28,7 @@ import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeReducedMotion } from '../reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
+import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
 
 /**
  * What the shell needs to spawn and drive a render worker.
@@ -313,6 +314,8 @@ export class WorkerApp {
    * what the cache costs.
    */
   private canvasOrigin: { left: number; top: number } | null = null;
+  /** Whether the canvas is filling the screen; see the resize observer. */
+  private fullscreen = false;
   /**
    * The hover move being held for this frame, and the frame holding
    * it. See `flushPendingMove`.
@@ -752,6 +755,14 @@ export class WorkerApp {
       openUrlWith(this.options.onOpenUrl, message.url);
       return;
     }
+    if (message.type === 'fullscreen') {
+      // The canvas rather than the document body: what the application
+      // draws on is what should fill the screen.
+      if (this.canvas !== undefined) {
+        setElementFullscreen(this.canvas, message.enter);
+      }
+      return;
+    }
     if (message.type === 'popup') {
       this.openPopup(message);
       return;
@@ -863,6 +874,15 @@ export class WorkerApp {
       // likely moved on the page as well as grown; whatever
       // `attachInput` cached about where it is cannot be trusted.
       this.canvasOrigin = null;
+      if (this.fullscreen) {
+        // The canvas has been lifted out of the host and is filling
+        // the screen, so the host's shape says nothing about how big
+        // the surface should be. It reflows *because* the canvas
+        // left, and taking that size would shrink the surface behind
+        // a screen-sized canvas and have the browser stretch it back
+        // up, which is what put every coordinate out.
+        return;
+      }
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
         this.requestResize({ width, height, dpr: window.devicePixelRatio || 1 });
@@ -1083,6 +1103,27 @@ export class WorkerApp {
     const onVisibilityChange = (): void => {
       this.post({ type: 'visibility', visible: document.visibilityState !== 'hidden' });
     };
+    const detachFullscreen = observeFullscreen(canvas, active => {
+      // Entering or leaving fullscreen moves the canvas and changes
+      // its size without the host's `ResizeObserver` hearing anything;
+      // see `surfaceBox`. Both halves matter: the cached origin makes
+      // a hover land in the wrong place, and the stale size makes
+      // every coordinate wrong by the ratio between the two.
+      this.canvasOrigin = null;
+      this.fullscreen = active;
+      this.post({ type: 'fullscreenChanged', active });
+      afterLayout(() => {
+        this.canvasOrigin = null;
+        const box = this.host === undefined ? null : surfaceBox(canvas, this.host, active);
+        if (box !== null) {
+          this.requestResize({ ...box, dpr: window.devicePixelRatio || 1 });
+        }
+      });
+    });
+    // Once here as well as on change, for the reason visibility is
+    // sent once: a canvas mounted into a document that is already
+    // fullscreen never fires the event.
+    this.post({ type: 'fullscreenChanged', active: isDocumentFullscreen(canvas) });
     // Sent once here as well as on change, for the reason the reduced
     // motion listener below gives for itself: a tab that is *already*
     // hidden when it starts never fires `visibilitychange`, so without
@@ -1210,6 +1251,7 @@ export class WorkerApp {
 
     return () => {
       detachReducedMotion();
+      detachFullscreen();
       canvas.removeEventListener('mousedown', onMouseDown);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       canvas.removeEventListener('pointerdown', onPointerDown);

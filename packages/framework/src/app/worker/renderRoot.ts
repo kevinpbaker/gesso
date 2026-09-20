@@ -450,6 +450,9 @@ export class RenderWorkerApp {
       case 'tick':
         this.clock?.tick(message.time);
         break;
+      case 'fullscreenChanged':
+        runtime.setFullscreen(message.active);
+        return;
       case 'visibility':
         runtime.setVisible(message.visible);
         break;
@@ -591,6 +594,8 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'clipboard', text: request.text });
       } else if (request.type === 'openUrl') {
         this.host.postMessage({ type: 'openUrl', url: request.url });
+      } else if (request.type === 'fullscreen') {
+        this.host.postMessage({ type: 'fullscreen', enter: request.enter });
       } else if (request.type === 'popup') {
         this.host.postMessage({
           type: 'popup',
