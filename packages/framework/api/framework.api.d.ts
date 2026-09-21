@@ -1659,6 +1659,7 @@ declare class GessoRuntime {
   private runPreCollectPhases;
   private hasVirtualWindows;
   private updateVirtualWindows;
+  private updateVirtualSheet;
   private collectVirtualMeasures;
   private extentOf;
   private handleFrame;
@@ -2828,7 +2829,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-C8yYHFKz.js";
+} from "./index-CBEywPmg.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3301,7 +3302,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-C8yYHFKz.js";
+} from "../index-CBEywPmg.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

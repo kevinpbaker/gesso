@@ -33,6 +33,7 @@ import type { UiTypographyRole } from '../environment/UiTypography';
 import type { UiImage } from './UiImage';
 import type { UiVideoSurface } from './UiVideo';
 import type { UiVirtualWindow } from '../composition/UiVirtualWindow';
+import type { UiVirtualSheet } from '../composition/UiVirtualSheet';
 import type { EditableTextModel } from '../editing/EditableTextModel';
 import type {
   UiAlignment,
@@ -1414,6 +1415,14 @@ export const UiProperties = {
   /** Set by LazyColumn/LazyRow on the scroll container: its UiVirtualWindow. */
   virtualWindow: defineProperty<UiVirtualWindow | undefined>({
     name: 'virtualWindow',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /** Set by LazySheet on the scroll container: its UiVirtualSheet. */
+  virtualSheet: defineProperty<UiVirtualSheet | undefined>({
+    name: 'virtualSheet',
     defaultValue: undefined,
     inherited: false,
     affects: DirtyFlags.Properties

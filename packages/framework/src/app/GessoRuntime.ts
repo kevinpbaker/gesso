@@ -33,8 +33,10 @@ import {
   Stack,
   scrollbarThumb,
   UiVirtualWindow,
+  UiVirtualSheet,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
+  VIRTUAL_SHEET_PROP,
   VIRTUAL_WINDOW_PROP,
   type VirtualItemMeasure,
   DirtyFlags,
@@ -2527,6 +2529,9 @@ export class GessoRuntime {
       if (node.properties.get(VIRTUAL_WINDOW_PROP) instanceof UiVirtualWindow) {
         return true;
       }
+      if (node.properties.get(VIRTUAL_SHEET_PROP) instanceof UiVirtualSheet) {
+        return true;
+      }
     }
     return false;
   }
@@ -2539,6 +2544,7 @@ export class GessoRuntime {
    */
   private updateVirtualWindows(): void {
     for (const node of this.engine.scrollContainers()) {
+      this.updateVirtualSheet(node);
       const window = node.properties.get(VIRTUAL_WINDOW_PROP);
       if (!(window instanceof UiVirtualWindow)) {
         continue;
@@ -2568,6 +2574,36 @@ export class GessoRuntime {
         this.smoothScroller.adjust(node, axis, result.scrollAdjust);
       }
     }
+  }
+
+  /**
+   * Advances a two-axis window, which needs both scroll offsets and
+   * neither a measurement nor an anchor.
+   *
+   * A `LazySheet` is told its row height and column width, so the
+   * offset of every cell is exact and the window is arithmetic. There
+   * is nothing here to correct and so nothing to adjust the scroll by:
+   * the rows and columns a scroll reveals are placed correctly on the
+   * frame that reveals them.
+   */
+  private updateVirtualSheet(node: UiNode): void {
+    const sheet = node.properties.get(VIRTUAL_SHEET_PROP);
+    if (!(sheet instanceof UiVirtualSheet)) {
+      return;
+    }
+    const rec = this.engine.recordFor(node);
+    if (rec === undefined) {
+      return;
+    }
+    // A wheel may have written newer offsets than the record holds.
+    const x = node.properties.get('scrollX');
+    const y = node.properties.get('scrollY');
+    sheet.update({
+      scrollX: typeof x === 'number' ? x : rec.scrollX,
+      scrollY: typeof y === 'number' ? y : rec.scrollY,
+      width: rec.width,
+      height: rec.height
+    });
   }
 
   /**

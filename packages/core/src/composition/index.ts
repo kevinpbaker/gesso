@@ -52,3 +52,15 @@ export {
   type VirtualItemMeasure,
   type VirtualUpdate
 } from './UiVirtualWindow';
+export {
+  LazySheet,
+  sheetSource,
+  UiVirtualSheet,
+  VIRTUAL_SHEET_PROP,
+  type LazySheetProps,
+  type SheetRange,
+  type SheetRowRenderer,
+  type SheetSourceArgs,
+  type SheetViewport,
+  type UiVirtualSheetOptions
+} from './UiVirtualSheet';

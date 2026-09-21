@@ -1407,6 +1407,74 @@ interface LazyGridOptions {
 declare const lazySource: ((args: LazySourceArgs, key?: string | number) => UiModifier<LazySourceArgs>) & {
   readonly kind: UiModifierKind<LazySourceArgs>;
 };
+interface SheetViewport {
+  scrollX: number;
+  scrollY: number;
+  width: number;
+  height: number;
+}
+interface SheetRange {
+  readonly firstRow: number;
+  readonly lastRow: number;
+  readonly firstColumn: number;
+  readonly lastColumn: number;
+}
+type SheetRowRenderer = (row: number, firstColumn: number, lastColumn: number) => UiChild;
+interface UiVirtualSheetOptions {
+  readonly rowCount: Reactive<number>;
+  readonly columnCount: Reactive<number>;
+  readonly rowHeight: number;
+  readonly columnWidth: number;
+  readonly rowOverscan?: Reactive<number>;
+  readonly columnOverscan?: Reactive<number>;
+  readonly initialViewport?: {
+    readonly width: number;
+    readonly height: number;
+  };
+}
+declare const VIRTUAL_SHEET_PROP = "virtualSheet";
+declare class UiVirtualSheet {
+  readonly children$: BehaviorSubject<UiElement[]>;
+  readonly range$: BehaviorSubject<SheetRange>;
+  private rowCount;
+  private columnCount;
+  private rowOverscan;
+  private columnOverscan;
+  private readonly rowHeight;
+  private readonly columnWidth;
+  private readonly renderRow;
+  private range;
+  private viewport;
+  private readonly mountedRows;
+  constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer);
+  get contentWidth(): number;
+  get contentHeight(): number;
+  rowAt(offset: number): number;
+  columnAt(offset: number): number;
+  setRowCount(count: number): void;
+  setColumnCount(count: number): void;
+  setOverscan(rows: number, columns: number): void;
+  invalidate(): void;
+  update(viewport: SheetViewport): void;
+  private recompute;
+  private windowFor;
+  private buildChildren;
+  private wrap;
+}
+interface SheetSourceArgs {
+  readonly sheet: UiVirtualSheet;
+  readonly rowCount: Reactive<number>;
+  readonly columnCount: Reactive<number>;
+  readonly rowOverscan?: Reactive<number>;
+  readonly columnOverscan?: Reactive<number>;
+}
+declare const sheetSource: ((args: SheetSourceArgs, key?: string | number) => UiModifier<SheetSourceArgs>) & {
+  readonly kind: UiModifierKind<SheetSourceArgs>;
+};
+type LazySheetProps = ScrollViewProps & Omit<UiVirtualSheetOptions, 'initialViewport'> & {
+  sheetRef?: (sheet: UiVirtualSheet) => void;
+};
+declare function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): UiElement;
 type EditUnit = 'grapheme' | 'word' | 'line' | 'document';
 interface CompositionRange {
   readonly start: number;
@@ -1605,6 +1673,7 @@ declare const UiProperties: {
   readonly virtualIndex: UiPropertyDefinition<number | undefined>;
   readonly virtualLead: UiPropertyDefinition<boolean | undefined>;
   readonly virtualWindow: UiPropertyDefinition<UiVirtualWindow | undefined>;
+  readonly virtualSheet: UiPropertyDefinition<UiVirtualSheet | undefined>;
   readonly theme: UiPropertyDefinition<UiTheme | undefined>;
   readonly textStyle: UiPropertyDefinition<UiTextStyle | UiTypographyRole | undefined>;
   readonly contentColor: UiPropertyDefinition<UiColorValue | undefined>;
@@ -4930,6 +4999,7 @@ export {
   describeLength,
   describeOverrides,
   detectEditingPlatform,
+  df,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
@@ -5102,6 +5172,8 @@ export {
   LazyListOptions,
   LazyListProps,
   LazyRow,
+  LazySheet,
+  LazySheetProps,
   lazySource,
   LazySourceArgs,
   lightColors,
@@ -5326,6 +5398,11 @@ export {
   SharedClaim,
   sharedElement,
   SharedElementArgs,
+  SheetRange,
+  SheetRowRenderer,
+  sheetSource,
+  SheetSourceArgs,
+  SheetViewport,
   shortcut,
   ShortcutOptions,
   ShortcutRegistryOptions,
@@ -5383,7 +5460,6 @@ export {
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
   TextWrap,
-  tf,
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
@@ -5598,6 +5674,8 @@ export {
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
+  UiVirtualSheet,
+  UiVirtualSheetOptions,
   UiVirtualWindow,
   UiVisualState,
   UiVisualStateSet,
@@ -5621,6 +5699,7 @@ export {
   VideoTransport,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
+  VIRTUAL_SHEET_PROP,
   VIRTUAL_WINDOW_PROP,
   VirtualItemMeasure,
   VirtualUpdate,
@@ -5964,6 +6043,8 @@ import {
   LazyListOptions,
   LazyListProps,
   LazyRow,
+  LazySheet,
+  LazySheetProps,
   lazySource,
   LazySourceArgs,
   lightColors,
@@ -6188,6 +6269,11 @@ import {
   SharedClaim,
   sharedElement,
   SharedElementArgs,
+  SheetRange,
+  SheetRowRenderer,
+  sheetSource,
+  SheetSourceArgs,
+  SheetViewport,
   shortcut,
   ShortcutOptions,
   ShortcutRegistryOptions,
@@ -6459,6 +6545,8 @@ import {
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
+  UiVirtualSheet,
+  UiVirtualSheetOptions,
   UiVirtualWindow,
   UiVisualState,
   UiVisualStateSet,
@@ -6482,6 +6570,7 @@ import {
   VideoTransport,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
+  VIRTUAL_SHEET_PROP,
   VIRTUAL_WINDOW_PROP,
   VirtualItemMeasure,
   VirtualUpdate,
@@ -6508,7 +6597,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DAdauEn9.js";
+} from "./index-Cy8g5GB9.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6723,6 +6812,7 @@ export {
   LazyColumn,
   LazyGrid,
   LazyRow,
+  LazySheet,
   lazySource,
   lightColors,
   lightTheme,
@@ -6867,6 +6957,7 @@ export {
   shadowsEqual,
   shapesEqual,
   sharedElement,
+  sheetSource,
   shortcut,
   shortcuts,
   sizeContainer,
@@ -7011,6 +7102,7 @@ export {
   type LazyItemRenderer,
   type LazyListOptions,
   type LazyListProps,
+  type LazySheetProps,
   type LazySourceArgs,
   type MinMaxTrack,
   type MotionArgs,
@@ -7091,6 +7183,10 @@ export {
   type SelectionHost,
   type SharedClaim,
   type SharedElementArgs,
+  type SheetRange,
+  type SheetRowRenderer,
+  type SheetSourceArgs,
+  type SheetViewport,
   type ShortcutOptions,
   type ShortcutRegistryOptions,
   type ShortcutsOptions,
@@ -7189,6 +7285,7 @@ export {
   type UiTransitionValue,
   type UiTweenOptions,
   type UiVideoSurface,
+  type UiVirtualSheetOptions,
   type VerticalAlign,
   type VideoClock,
   type VideoPlayback,
@@ -7334,6 +7431,7 @@ export {
   UiTypographyRole,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
+  UiVirtualSheet,
   UiVirtualWindow,
   UiVisualState,
   UiVisualStateSet,
@@ -7350,6 +7448,7 @@ export {
   videoSource,
   VIRTUAL_INDEX_PROP,
   VIRTUAL_LEAD_PROP,
+  VIRTUAL_SHEET_PROP,
   VIRTUAL_WINDOW_PROP,
   visualState,
   visualStatesEqual,
@@ -7400,7 +7499,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DAdauEn9.js";
+} from "./index-Cy8g5GB9.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
