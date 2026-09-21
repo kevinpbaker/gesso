@@ -15,7 +15,15 @@ export interface ScrollContainerState {
   scrollY: number;
   maxScrollX: number;
   maxScrollY: number;
-  /** True when the container scrolls horizontally (row layout). */
+  /**
+   * True when the container lays its children out in a row.
+   *
+   * The wheel no longer reads this: it asks each axis whether it has
+   * room, so a container that overflows both ways takes both deltas.
+   * `UiTouchScroller` still reads it to pick the axis a drag and its
+   * inertia run along, which is a single-axis model — a two-axis
+   * container is panned on whichever axis this names.
+   */
   horizontal: boolean;
   /**
    * The visible extent, which is what a page-mode wheel delta means.
@@ -310,13 +318,10 @@ export class UiWheelController {
       if (state === undefined) {
         continue;
       }
-      if (state.horizontal) {
-        left ||= hasRoom(state.scrollX, state.maxScrollX, -1);
-        right ||= hasRoom(state.scrollX, state.maxScrollX, 1);
-      } else {
-        up ||= hasRoom(state.scrollY, state.maxScrollY, -1);
-        down ||= hasRoom(state.scrollY, state.maxScrollY, 1);
-      }
+      left ||= hasRoom(state.scrollX, state.maxScrollX, -1);
+      right ||= hasRoom(state.scrollX, state.maxScrollX, 1);
+      up ||= hasRoom(state.scrollY, state.maxScrollY, -1);
+      down ||= hasRoom(state.scrollY, state.maxScrollY, 1);
       if (containsOverscroll(node)) {
         // Nothing past here can be reached by chaining, so nothing
         // past here is worth reporting — and the contained node keeps
@@ -350,7 +355,7 @@ export class UiWheelController {
       if (state === undefined) {
         continue;
       }
-      if (state.horizontal ? state.maxScrollX > SCROLL_EPSILON : state.maxScrollY > SCROLL_EPSILON) {
+      if (state.maxScrollX > SCROLL_EPSILON || state.maxScrollY > SCROLL_EPSILON) {
         return true;
       }
     }
@@ -382,11 +387,25 @@ export class UiWheelController {
       if (state === undefined) {
         continue;
       }
-      const delta = state.horizontal ? deltaX : deltaY;
-      const offset = state.horizontal ? state.scrollX : state.scrollY;
-      const max = state.horizontal ? state.maxScrollX : state.maxScrollY;
-      if (delta !== 0 && hasRoom(offset, max, delta)) {
-        this.applyDelta(node, state, deltaX, deltaY, deltaMode, behaviorFor(node, deltaMode, wheelDeltaY));
+      // Each axis is asked for separately, because a container may
+      // scroll on both. A spreadsheet is the case that found this: its
+      // viewport is one ScrollView whose content overflows in both
+      // directions, and a container classified as one or the other
+      // dropped every horizontal delta on the floor and then found no
+      // horizontal container to chain to either. A container that
+      // overflows on one axis only is unaffected — the axis it does
+      // not scroll has no room, so it is not taken.
+      const takesX = deltaX !== 0 && hasRoom(state.scrollX, state.maxScrollX, deltaX);
+      const takesY = deltaY !== 0 && hasRoom(state.scrollY, state.maxScrollY, deltaY);
+      if (takesX || takesY) {
+        this.applyDelta(
+          node,
+          state,
+          takesX ? deltaX : 0,
+          takesY ? deltaY : 0,
+          deltaMode,
+          behaviorFor(node, deltaMode, wheelDeltaY)
+        );
         event.markConsumed();
         return;
       }
@@ -411,11 +430,15 @@ export class UiWheelController {
     deltaMode: UiWheelDeltaMode,
     behavior: UiScrollBehavior
   ): void {
-    if (state.horizontal) {
-      this.scrollSink.scrollBy(container, this.toPixels(deltaX, deltaMode, state.viewportWidth), 0, behavior);
-    } else {
-      this.scrollSink.scrollBy(container, 0, this.toPixels(deltaY, deltaMode, state.viewportHeight), behavior);
-    }
+    // A page-mode delta means a screenful, and a screenful is a
+    // different number on each axis, so each is converted in its own
+    // viewport extent rather than one of them borrowing the other's.
+    this.scrollSink.scrollBy(
+      container,
+      deltaX === 0 ? 0 : this.toPixels(deltaX, deltaMode, state.viewportWidth),
+      deltaY === 0 ? 0 : this.toPixels(deltaY, deltaMode, state.viewportHeight),
+      behavior
+    );
   }
 
   /**

@@ -51,6 +51,28 @@ function setupHorizontal(): {
   return { h, scroll, controller: h.createWheelController() };
 }
 
+/**
+ * A 300x200 ScrollView whose 600x600 content overflows both ways, so
+ * scrollX and scrollY both have range [0, 300] and [0, 400].
+ *
+ * This is the sheet's shape, and the one that found the bug: a
+ * container used to be classified as horizontal *or* vertical from its
+ * flex direction, so one of its two axes silently took no wheel at all.
+ */
+function setupBothAxes(): {
+  h: InputTestHarness;
+  scroll: UiNode;
+  controller: UiWheelController;
+} {
+  const h = new InputTestHarness();
+  const scroll = h.node('scroll', UiNodeType.ScrollView, { width: 300, height: 200 });
+  const content = h.node('content', UiNodeType.Box, { width: 600, height: 600 });
+  h.add(h.root, scroll);
+  h.add(scroll, content);
+  h.layoutTree();
+  return { h, scroll, controller: h.createWheelController() };
+}
+
 function scrollY(h: InputTestHarness, node: UiNode): number {
   return h.layout.engine.recordFor(node)!.scrollY;
 }
@@ -76,6 +98,56 @@ describe('UiWheelController', () => {
     expect(event.deltaY).toBe(100);
     expect(target).toHaveBeenCalledTimes(1);
     expect(ancestor).toHaveBeenCalledTimes(1);
+  });
+
+  describe('a container that overflows on both axes', () => {
+    it('takes a horizontal wheel, which a column-laid-out one used to drop', () => {
+      const { h, scroll, controller } = setupBothAxes();
+
+      const event = controller.wheel(50, 50, 80, 0);
+
+      expect(scrollX(h, scroll)).toBe(80);
+      expect(scrollY(h, scroll)).toBe(0);
+      expect(event.consumed).toBe(true);
+    });
+
+    it('takes both axes of one diagonal wheel', () => {
+      const { h, scroll, controller } = setupBothAxes();
+
+      controller.wheel(50, 50, 40, 70);
+
+      expect(scrollX(h, scroll)).toBe(40);
+      expect(scrollY(h, scroll)).toBe(70);
+    });
+
+    it('takes the axis with room and leaves the one without', () => {
+      const { h, scroll, controller } = setupBothAxes();
+      controller.wheel(50, 50, 1000, 0);
+      expect(scrollX(h, scroll)).toBe(300);
+
+      // Hard against the right edge, a further rightward delta has
+      // nowhere to go — but the downward half must still land.
+      controller.wheel(50, 50, 50, 60);
+
+      expect(scrollX(h, scroll)).toBe(300);
+      expect(scrollY(h, scroll)).toBe(60);
+    });
+
+    it('converts a page delta in each axis own extent', () => {
+      const { h, scroll, controller } = setupBothAxes();
+
+      controller.wheel(50, 50, 1, 1, noKeyModifiers(), UiWheelDeltaMode.Page);
+
+      // One screenful is 300 across and 200 down, not one of them twice.
+      expect(scrollX(h, scroll)).toBe(300);
+      expect(scrollY(h, scroll)).toBe(200);
+    });
+
+    it('reports both axes as scrollable', () => {
+      const { controller } = setupBothAxes();
+
+      expect(controller.scrollabilityAt(50, 50)).toEqual({ up: false, down: true, left: false, right: true });
+    });
   });
 
   it('reads a line delta as lines, not as pixels', () => {

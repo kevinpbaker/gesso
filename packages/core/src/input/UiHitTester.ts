@@ -3,7 +3,13 @@ import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import type { SubtreeBounds } from '../layout/SubtreeBounds';
 import { isNodeHitTestable, isNodeInert } from './UiInteraction';
-import { pointInBox, scrollbarThumb, scrollbarZoneAt, type ScrollbarAxis } from '../layout/Scrollbars';
+import {
+  pointInBox,
+  scrollbarGrabBox,
+  scrollbarThumb,
+  scrollbarZoneAt,
+  type ScrollbarAxis
+} from '../layout/Scrollbars';
 
 /**
  * Read access to layout records for hit testing.
@@ -523,15 +529,30 @@ export class UiHitTester implements HitTester {
    * only while the bar is showing (or when asked for the band alone).
    */
   private hitScrollbar(node: UiNode, rec: LayoutRecord, px: number, py: number): boolean {
-    const axis = scrollbarZoneAt(rec, px, py);
-    if (axis === null) {
+    const zone = scrollbarZoneAt(rec, px, py);
+    if (zone === null) {
       return false;
     }
-    const bar = scrollbarThumb(rec, axis);
+    let axis = zone;
+    let bar = scrollbarThumb(rec, axis);
+    let onThumb = bar !== null && pointInBox(scrollbarGrabBox(rec, bar), px, py);
+    if (!onThumb) {
+      // The corner where the two bars meet is in both bands, and
+      // `scrollbarZoneAt` has to answer with one of them. A press that
+      // is on the *other* axis's thumb belongs to that axis whatever
+      // the precedence says — otherwise a grab aimed at the horizontal
+      // thumb, down in the corner, pages the vertical bar instead.
+      const other: ScrollbarAxis = axis === 'y' ? 'x' : 'y';
+      const otherBar = scrollbarThumb(rec, other);
+      if (otherBar !== null && pointInBox(scrollbarGrabBox(rec, otherBar), px, py)) {
+        axis = other;
+        bar = otherBar;
+        onThumb = true;
+      }
+    }
     if (bar === null) {
       return false;
     }
-    const onThumb = pointInBox(bar.thumb, px, py);
     const visible = rec.scrollbarVisibleUntil > (typeof performance !== 'undefined' ? performance.now() : Date.now());
     if (!onThumb && !visible && !this.zoneOnly) {
       return false;

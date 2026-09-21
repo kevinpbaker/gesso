@@ -100,6 +100,34 @@ export function scrollbarZoneAt(rec: LayoutRecord, x: number, y: number): Scroll
   return null;
 }
 
+/**
+ * The rectangle a press grabs a thumb by.
+ *
+ * The painted thumb is six pixels thick. Six pixels at the very edge
+ * of a window is a hard thing to hit, and missing it is not a near
+ * miss — the press lands on the track instead and pages a whole
+ * screenful, which reads as the bar refusing to be dragged. So the
+ * grab target is the thumb's length by the whole band that reveals it:
+ * as easy to catch as it is to summon, which is what an overlay
+ * scrollbar is expected to be. What is drawn is unchanged.
+ */
+export function scrollbarGrabBox(rec: LayoutRecord, bar: ScrollbarThumb): LayoutBox {
+  if (bar.axis === 'y') {
+    return {
+      x: rec.mirrored ? rec.x : rec.x + rec.width - SCROLLBAR_HOVER_ZONE,
+      y: bar.thumb.y,
+      width: SCROLLBAR_HOVER_ZONE,
+      height: bar.thumb.height
+    };
+  }
+  return {
+    x: bar.thumb.x,
+    y: rec.y + rec.height - SCROLLBAR_HOVER_ZONE,
+    width: bar.thumb.width,
+    height: SCROLLBAR_HOVER_ZONE
+  };
+}
+
 export function pointInBox(box: LayoutBox, x: number, y: number): boolean {
   return x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height;
 }

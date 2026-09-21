@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DirtyFlags } from '../graph/DirtyFlags';
+import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { Constraints } from '../layout/LayoutTypes';
 import { UiFrame } from '../scheduler/UiFrame';
@@ -734,6 +735,61 @@ describe('UiHitTester', () => {
       // box, which is what a clipping node's bounds are.
       expect(tester.scrollbarZoneAt(196, 50)).toEqual({ node: list, axis: 'y' });
       expect(tester.scrollbarZoneAt(100, 50)).toBeNull();
+    });
+
+    /**
+     * A 200x100 viewport over 600x600 of content, so both bars show.
+     * The horizontal thumb is drawn in the bottom six pixels and the
+     * vertical one in the rightmost six.
+     */
+    function bothBars(): {
+      h: InputTestHarness;
+      sheet: UiNode;
+      tester: ReturnType<InputTestHarness['createHitTester']>;
+    } {
+      const h = new InputTestHarness();
+      const sheet = h.node('sheet', UiNodeType.ScrollView, { width: 200, height: 100 });
+      const big = h.node('big', UiNodeType.Box, { width: 600, height: 600, flexShrink: 0 });
+      h.add(sheet, big);
+      h.add(h.root, sheet);
+      h.layoutTree();
+      return { h, sheet, tester: h.createHitTester() };
+    }
+
+    it('grabs a thumb from anywhere in its band, not only the six pixels drawn', () => {
+      // Missing a six-pixel target is not a near miss: the press lands
+      // on the track and pages a whole screenful instead, which reads
+      // as the bar refusing to be dragged.
+      const { tester } = bothBars();
+
+      // Ten pixels above the painted horizontal thumb, still in its band.
+      const hit = tester.hitTest(20, 90);
+
+      expect(hit?.scrollbar).toEqual({ axis: 'x', onThumb: true });
+    });
+
+    it('still calls the track the track, well away from the thumb', () => {
+      const { h, sheet, tester } = bothBars();
+      // The track takes a press only while the bar is showing, which is
+      // what hovering near it does.
+      h.layout.engine.recordFor(sheet)!.scrollbarVisibleUntil = performance.now() + 1000;
+
+      // The horizontal thumb starts at the left; this is past its end.
+      expect(tester.hitTest(180, 96)?.scrollbar).toEqual({ axis: 'x', onThumb: false });
+    });
+
+    it('gives the corner to whichever thumb is actually under the point', () => {
+      // The bottom-right corner is in both bands, and precedence has to
+      // answer with one of them. A press on the horizontal thumb there
+      // used to page the vertical bar.
+      const { h, sheet, tester } = bothBars();
+      // Scroll right, so the horizontal thumb reaches the corner and the
+      // vertical one stays at the top.
+      h.layout.engine.recordFor(sheet)!.scrollX = 400;
+
+      const hit = tester.hitTest(196, 96);
+
+      expect(hit?.scrollbar).toEqual({ axis: 'x', onThumb: true });
     });
   });
 });
