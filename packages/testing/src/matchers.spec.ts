@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Button, Column, Row, ScrollView, Text } from 'gesso-core';
+import { Box, Button, Column, EditableText, Row, ScrollView, Text } from 'gesso-core';
 
 import './matchers';
 import { renderTest } from './renderTest';
@@ -121,5 +121,29 @@ describe('toHaveVisibleBox', () => {
     const ui = renderTest(Box({ width: 10, height: 10, role: 'banner' }));
     await ui.settle();
     expect(() => expect(ui.getByRole('banner')).toHaveVisibleBox({ x: 99 })).toThrow(/seen at/);
+  });
+});
+
+describe('toHaveText on a field', () => {
+  /**
+   * An `EditableText` keeps what it shows in `value`. Until this
+   * worked, nothing in a spec could read what a field was displaying:
+   * `toHaveText` reported that a field full of text had none, and
+   * `getByText` skipped every input on the page. The library's own
+   * specs did not notice because they assert the form model, which is
+   * the one thing the user cannot see.
+   */
+  it('reads what a field is showing', async () => {
+    const ui = renderTest(EditableText({ value: 'hello', role: 'textbox', label: 'Greeting', width: 100 }));
+    await ui.settle();
+
+    expect(ui.getByRole('textbox', { name: 'Greeting' })).toHaveText('hello');
+    expect(ui.getByText('hello')).toBeDefined();
+  });
+
+  it('says a field is empty when it is', async () => {
+    const ui = renderTest(EditableText({ value: '', role: 'textbox', label: 'Greeting', width: 100 }));
+    await ui.settle();
+    expect(() => expect(ui.getByRole('textbox')).toHaveText('hello')).toThrow(/has none/);
   });
 });

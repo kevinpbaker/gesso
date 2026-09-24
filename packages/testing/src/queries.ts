@@ -107,7 +107,17 @@ export function nodesUnder(root: UiNode): UiNode[] {
  */
 export function textProperty(node: UiNode): string | undefined {
   const text = textContentOf(node);
-  return text.length > 0 ? text : undefined;
+  if (text.length > 0) {
+    return text;
+  }
+  // An `EditableText` keeps what it shows in `value`, not in `text`.
+  // Without this nothing in a spec can read what a field is
+  // displaying — `getByText` skips every input on the page and
+  // `toHaveText` reports that a field full of text has none. The
+  // library's own specs never noticed because they assert the form
+  // model instead, which is the one thing a user cannot see.
+  const value = node.properties.get('value');
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function recordMatches(record: UiSemanticsRecord, role: UiRole, options: RoleQueryOptions): boolean {
