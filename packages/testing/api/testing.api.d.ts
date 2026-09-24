@@ -20,6 +20,7 @@ import {
   RecordedCall
 } from "gesso-core/testing";
 import {
+  ChannelRegistry,
   ChannelReplica,
   ChannelToken,
   FrameMetrics,
@@ -109,6 +110,7 @@ interface RenderedBase {
     maxFrames?: number;
   }): Promise<void>;
   getLayout(node: UiNode): LayoutBox;
+  getVisibleBox(node: UiNode): LayoutBox;
   explain(node: UiNode): LayoutExplanation;
   explainText(node: UiNode): string;
   getSemantics(node: UiNode): UiSemanticsRecord;
@@ -128,6 +130,7 @@ declare function formatTree(runtime: GessoRuntime, root: UiNode): string;
 declare function renderedFor(node: UiNode): Rendered | null;
 interface ServedForTest {
   get<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
+  readonly registry: ChannelRegistry;
   settle(until?: () => boolean, timeoutMs?: number): Promise<void>;
   readonly errors: readonly string[];
   dispose(): void;
@@ -171,12 +174,14 @@ interface ExpectedSemantics {
 }
 declare const matchers: {
   toHaveBox(received: UiNode, expected: Partial<LayoutBox>): MatcherResult;
+  toHaveVisibleBox(received: UiNode, expected: Partial<LayoutBox>): MatcherResult;
   toHaveText(received: UiNode, expected: string): MatcherResult;
   toHaveSemantics(received: UiNode, expected: ExpectedSemantics): MatcherResult;
   toHaveFocus(received: UiNode): MatcherResult;
 };
 interface GessoMatchers<R = unknown> {
   toHaveBox: (expected: Partial<LayoutBox>) => R;
+  toHaveVisibleBox: (expected: Partial<LayoutBox>) => R;
   toHaveText: (expected: string) => R;
   toHaveSemantics: (expected: ExpectedSemantics) => R;
   toHaveFocus: () => R;

@@ -177,3 +177,185 @@ describe('UiVirtualSheet', () => {
     ).toThrow(/must be a Row/);
   });
 });
+
+/**
+ * A sheet with the two frozen strips a spreadsheet has: a header row
+ * above the rows and a gutter at the start of every row. Both are
+ * *content* — they take space in the scrollable extent — and keeping
+ * them visible is `position: 'sticky'` on what the renderer returns,
+ * which is the renderer's business and not the window's.
+ */
+describe('UiVirtualSheet with a header and a gutter', () => {
+  const GUTTER = 48;
+  const HEADER = 22;
+
+  const renderGutterRow = (row: number, first: number, last: number) => {
+    const cells = [Text({ key: 'gutter', text: String(row + 1) })];
+    for (let column = first; column <= last; column++) {
+      cells.push(Text({ key: column, text: `${row}:${column}` }));
+    }
+    return Row({}, ...cells);
+  };
+
+  const renderHeader = (first: number, last: number) => {
+    const cells = [Text({ key: 'corner', text: '' })];
+    for (let column = first; column <= last; column++) {
+      cells.push(Text({ key: column, text: `H${column}` }));
+    }
+    return Row({}, ...cells);
+  };
+
+  function sheetWith(options: Record<string, unknown> = {}): UiVirtualSheet {
+    return new UiVirtualSheet(
+      {
+        rowCount: 1_000,
+        columnCount: 50,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        rowOverscan: 0,
+        columnOverscan: 0,
+        gutterWidth: GUTTER,
+        headerHeight: HEADER,
+        initialViewport: { width: 500, height: 240 },
+        ...options
+      },
+      renderGutterRow,
+      renderHeader
+    );
+  }
+
+  it('counts both strips in the scrollable extent', () => {
+    const sheet = sheetWith();
+    expect(sheet.contentHeight).toBe(HEADER + 1_000 * ROW);
+    expect(sheet.contentWidth).toBe(GUTTER + 50 * COLUMN);
+  });
+
+  it('puts the header first, once, and before the leading spacer', () => {
+    const sheet = sheetWith();
+    const children = sheet.children$.value;
+    expect(children[0].props.key).toBe('sheet:header');
+    expect(children[0].props.height).toBe(HEADER);
+    expect(children.filter(child => child.props.key === 'sheet:header')).toHaveLength(1);
+  });
+
+  /**
+   * The gutter is at content x 0 and the columns begin past it, so the
+   * spacer for the columns scrolled out of view goes *after* the
+   * gutter rather than before it. Getting this the wrong way round
+   * pushes the gutter off screen and lines every cell up one column
+   * out.
+   */
+  it('puts the leading spacer after the gutter, not before it', () => {
+    const sheet = sheetWith();
+    sheet.update({ scrollX: GUTTER + COLUMN * 4, scrollY: 0, width: 500, height: 240 });
+    const row = sheet.children$.value.find(child => String(child.props.key).startsWith('sheet:row:')) as UiElement;
+    const [first, second] = row.children as UiElement[];
+    expect(first.props.key).toBe('gutter');
+    expect(second.props.key).toBe('sheet:lead');
+    expect(second.props.width).toBe(4 * COLUMN);
+  });
+
+  it('lays the header out in the same places as a row', () => {
+    const sheet = sheetWith();
+    sheet.update({ scrollX: GUTTER + COLUMN * 3, scrollY: 0, width: 500, height: 240 });
+    const children = sheet.children$.value;
+    const header = children[0] as UiElement;
+    const row = children.find(child => String(child.props.key).startsWith('sheet:row:')) as UiElement;
+    expect(header.props.width).toBe(row.props.width);
+    expect((header.children[1] as UiElement).props.width).toBe((row.children[1] as UiElement).props.width);
+  });
+
+  it('measures rows from under the header, not from the top of the content', () => {
+    const sheet = sheetWith();
+    // Scrolled by the header's height exactly: row 0 is at the top.
+    sheet.update({ scrollX: 0, scrollY: HEADER, width: 500, height: 240 });
+    expect(sheet.rowAt(HEADER)).toBe(0);
+    expect(sheet.rowAt(HEADER + ROW)).toBe(1);
+  });
+
+  it('measures columns from past the gutter', () => {
+    const sheet = sheetWith();
+    expect(sheet.columnAt(0)).toBe(0);
+    expect(sheet.columnAt(GUTTER)).toBe(0);
+    expect(sheet.columnAt(GUTTER + COLUMN)).toBe(1);
+    expect(sheet.columnAt(GUTTER + COLUMN * 2.5)).toBe(2);
+  });
+});
+
+/**
+ * Columns a person can drag. The offsets become a prefix sum, which is
+ * why they are stored rather than multiplied.
+ */
+describe('UiVirtualSheet with columns of different widths', () => {
+  const WIDTHS = [60, 200, 40, 120, 80];
+
+  function sheetWith(widths: number | readonly number[] = WIDTHS): UiVirtualSheet {
+    return new UiVirtualSheet(
+      {
+        rowCount: 100,
+        columnCount: 5,
+        rowHeight: ROW,
+        columnWidth: widths,
+        rowOverscan: 0,
+        columnOverscan: 0,
+        initialViewport: { width: 200, height: 240 }
+      },
+      renderRow
+    );
+  }
+
+  it('offsets each column by the ones before it', () => {
+    const sheet = sheetWith();
+    expect(sheet.offsetOf(0)).toBe(0);
+    expect(sheet.offsetOf(1)).toBe(60);
+    expect(sheet.offsetOf(2)).toBe(260);
+    expect(sheet.offsetOf(4)).toBe(420);
+    expect(sheet.contentWidth).toBe(500);
+  });
+
+  it('reports each column its own width', () => {
+    const sheet = sheetWith();
+    expect(sheet.widthOf(1)).toBe(200);
+    expect(sheet.widthOf(2)).toBe(40);
+  });
+
+  it('finds the column at an offset by searching, not by dividing', () => {
+    const sheet = sheetWith();
+    expect(sheet.columnAt(0)).toBe(0);
+    expect(sheet.columnAt(59)).toBe(0);
+    expect(sheet.columnAt(60)).toBe(1);
+    expect(sheet.columnAt(259)).toBe(1);
+    expect(sheet.columnAt(260)).toBe(2);
+    expect(sheet.columnAt(499)).toBe(4);
+    expect(sheet.columnAt(10_000)).toBe(4);
+  });
+
+  it('windows on the real widths, so a wide column is one column', () => {
+    const sheet = sheetWith();
+    // 200 across, starting at 0: columns 0 and 1 cover it.
+    sheet.update({ scrollX: 0, scrollY: 0, width: 200, height: 240 });
+    expect(sheet.range$.value.lastColumn).toBe(1);
+  });
+
+  it('moves every offset after the column that was dragged', () => {
+    const sheet = sheetWith();
+    sheet.setColumnWidths([60, 300, 40, 120, 80]);
+    expect(sheet.offsetOf(1)).toBe(60);
+    expect(sheet.offsetOf(2)).toBe(360);
+    expect(sheet.contentWidth).toBe(600);
+  });
+
+  it('rebuilds the rows when a width changes, since the spacer moved', () => {
+    const sheet = sheetWith();
+    sheet.update({ scrollX: 100, scrollY: 0, width: 200, height: 240 });
+    const before = sheet.children$.value.find(child => String(child.props.key).startsWith('sheet:row:'));
+    sheet.setColumnWidths([60, 300, 40, 120, 80]);
+    expect(sheet.children$.value.find(child => String(child.props.key).startsWith('sheet:row:'))).not.toBe(before);
+  });
+
+  it('still takes one width for every column', () => {
+    const sheet = sheetWith(100);
+    expect(sheet.offsetOf(3)).toBe(300);
+    expect(sheet.columnAt(250)).toBe(2);
+  });
+});

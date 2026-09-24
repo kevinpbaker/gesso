@@ -72,15 +72,45 @@ export interface UiVirtualSheetOptions {
   readonly columnCount: Reactive<number>;
   /** Height of every row. */
   readonly rowHeight: number;
-  /** Width of every column. */
-  readonly columnWidth: number;
+  /**
+   * One width for every column, or a width per column.
+   *
+   * An array is what makes a column resizable, and it is the reason
+   * the offsets below are a prefix sum rather than a multiplication.
+   * A sheet of a few hundred columns keeps the sum and searches it;
+   * that is two orders of magnitude cheaper than measuring, which is
+   * the thing this class exists not to do.
+   */
+  readonly columnWidth: number | readonly number[];
   /** Rows mounted beyond each edge of the viewport. Default 3. */
   readonly rowOverscan?: Reactive<number>;
   /** Columns mounted beyond each edge of the viewport. Default 2. */
   readonly columnOverscan?: Reactive<number>;
+  /**
+   * A frozen strip at the start of every row — a sheet's row numbers.
+   *
+   * The window needs its width because it is content: it shifts every
+   * column along by that much and it is part of the scrollable extent.
+   * Keeping it *visible* while the sheet scrolls sideways is the
+   * renderer's business, with `position: 'sticky'` on whatever the row
+   * renderer puts there.
+   */
+  readonly gutterWidth?: number;
+  /** Height of the header row above the rows, when there is one. */
+  readonly headerHeight?: number;
   /** Viewport assumed before the first layout. */
   readonly initialViewport?: { readonly width: number; readonly height: number };
 }
+
+/**
+ * Builds the row above the rows, for the columns now in the window.
+ *
+ * Rendered once per column window rather than once per frame, and
+ * placed before the leading spacer, so a header that is
+ * `position: 'sticky'` with `top: 0` stays put while the rows scroll
+ * under it and moves with them when they scroll sideways.
+ */
+export type SheetHeaderRenderer = (firstColumn: number, lastColumn: number) => UiChild;
 
 /** The sheet sits on its scroll container under this property. */
 export const VIRTUAL_SHEET_PROP = 'virtualSheet';
@@ -105,22 +135,34 @@ export class UiVirtualSheet {
   private rowOverscan: number;
   private columnOverscan: number;
   private readonly rowHeight: number;
-  private readonly columnWidth: number;
+  private readonly gutterWidth: number;
+  private readonly headerHeight: number;
   private readonly renderRow: SheetRowRenderer;
+  private renderHeader: SheetHeaderRenderer | undefined;
+
+  /** One width per column, or undefined when every column is the same. */
+  private widths: number[] | undefined;
+  /** `offsets[c]` is where column `c` starts, measured past the gutter. */
+  private offsets: number[] = [];
+  private uniformWidth = 0;
 
   private range: SheetRange = EMPTY_RANGE;
   private viewport: SheetViewport;
   /** Rows built for the current column range, so a vertical scroll rebuilds one row. */
   private readonly mountedRows = new Map<number, UiElement>();
+  private mountedHeader: UiElement | undefined;
 
-  constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer) {
+  constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer, renderHeader?: SheetHeaderRenderer) {
     this.rowCount = typeof options.rowCount === 'number' ? options.rowCount : 0;
     this.columnCount = typeof options.columnCount === 'number' ? options.columnCount : 0;
     this.rowHeight = positive('rowHeight', options.rowHeight);
-    this.columnWidth = positive('columnWidth', options.columnWidth);
+    this.gutterWidth = Math.max(0, options.gutterWidth ?? 0);
+    this.headerHeight = Math.max(0, options.headerHeight ?? 0);
     this.rowOverscan = typeof options.rowOverscan === 'number' ? options.rowOverscan : 3;
     this.columnOverscan = typeof options.columnOverscan === 'number' ? options.columnOverscan : 2;
     this.renderRow = renderRow;
+    this.renderHeader = renderHeader;
+    this.adoptWidths(options.columnWidth);
     this.viewport = {
       scrollX: 0,
       scrollY: 0,
@@ -130,22 +172,107 @@ export class UiVirtualSheet {
     this.recompute();
   }
 
+  /**
+   * New column widths, as a drag on a header edge produces.
+   *
+   * The prefix sum is rebuilt whole. It is one pass over the columns
+   * and it happens once per frame of a drag at most, against a
+   * per-column offset that would otherwise have to be corrected
+   * everywhere downstream of the column that moved.
+   */
+  setColumnWidths(widths: number | readonly number[]): void {
+    this.adoptWidths(widths);
+    this.invalidate();
+  }
+
+  private adoptWidths(widths: number | readonly number[]): void {
+    if (typeof widths === 'number') {
+      this.uniformWidth = positive('columnWidth', widths);
+      this.widths = undefined;
+      this.offsets = [];
+      return;
+    }
+    const owned = widths.slice();
+    for (const width of owned) {
+      if (!(width >= 0)) {
+        throw new Error(`LazySheet column widths must not be negative, got ${String(width)}.`);
+      }
+    }
+    this.widths = owned;
+    this.offsets = Array.from({ length: owned.length + 1 });
+    let running = 0;
+    for (let column = 0; column < owned.length; column++) {
+      this.offsets[column] = running;
+      running += owned[column];
+    }
+    this.offsets[owned.length] = running;
+  }
+
+  /** The width of one column. */
+  widthOf(column: number): number {
+    if (this.widths === undefined) {
+      return this.uniformWidth;
+    }
+    return this.widths[column] ?? 0;
+  }
+
+  /** Where a column starts, measured past the gutter. */
+  offsetOf(column: number): number {
+    if (this.widths === undefined) {
+      return column * this.uniformWidth;
+    }
+    const clamped = clamp(column, 0, this.offsets.length - 1);
+    return this.offsets[clamped] ?? 0;
+  }
+
+  /** Total width of the columns, not counting the gutter. */
+  private get columnsWidth(): number {
+    return this.widths === undefined ? this.columnCount * this.uniformWidth : (this.offsets[this.widths.length] ?? 0);
+  }
+
   get contentWidth(): number {
-    return this.columnCount * this.columnWidth;
+    return this.gutterWidth + this.columnsWidth;
   }
 
   get contentHeight(): number {
-    return this.rowCount * this.rowHeight;
+    return this.headerHeight + this.rowCount * this.rowHeight;
   }
 
   /** The row at a content offset, clamped to the sheet. */
   rowAt(offset: number): number {
-    return clamp(Math.floor(offset / this.rowHeight), 0, Math.max(0, this.rowCount - 1));
+    return clamp(Math.floor((offset - this.headerHeight) / this.rowHeight), 0, Math.max(0, this.rowCount - 1));
   }
 
-  /** The column at a content offset, clamped to the sheet. */
+  /**
+   * The column at a content offset, clamped to the sheet.
+   *
+   * A binary search over the prefix sum when the columns differ, and
+   * a division when they do not — the uniform case is the common one
+   * and should not pay for the general one.
+   */
   columnAt(offset: number): number {
-    return clamp(Math.floor(offset / this.columnWidth), 0, Math.max(0, this.columnCount - 1));
+    const last = Math.max(0, this.columnCount - 1);
+    const past = offset - this.gutterWidth;
+    if (this.widths === undefined) {
+      return clamp(Math.floor(past / this.uniformWidth), 0, last);
+    }
+    if (past <= 0) {
+      return 0;
+    }
+    if (past >= this.columnsWidth) {
+      return last;
+    }
+    let low = 0;
+    let high = last;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (this.offsets[mid] <= past) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return low;
   }
 
   setRowCount(count: number): void {
@@ -187,6 +314,7 @@ export class UiVirtualSheet {
   /** Drops every mounted row and rebuilds against the last viewport. */
   invalidate(): void {
     this.mountedRows.clear();
+    this.mountedHeader = undefined;
     this.range = EMPTY_RANGE;
     this.recompute();
   }
@@ -212,12 +340,24 @@ export class UiVirtualSheet {
     // survives a vertical scroll and nothing else.
     if (next.firstColumn !== this.range.firstColumn || next.lastColumn !== this.range.lastColumn) {
       this.mountedRows.clear();
+      this.mountedHeader = undefined;
     }
     this.range = next;
     this.children$.next(this.buildChildren());
     this.range$.next(next);
   }
 
+  /**
+   * The window, in content coordinates.
+   *
+   * The header and the gutter are *content*: they occupy the first
+   * `headerHeight` pixels and the first `gutterWidth`, and `rowAt` and
+   * `columnAt` already subtract them. So the range comes out slightly
+   * generous at the near edges — the rows a header is covering are
+   * mounted, and the columns behind the gutter are too — which is
+   * correct rather than wasteful, since a sticky strip is drawn over
+   * cells that are really there.
+   */
   private windowFor(viewport: SheetViewport): SheetRange {
     if (this.rowCount === 0 || this.columnCount === 0) {
       return EMPTY_RANGE;
@@ -236,13 +376,20 @@ export class UiVirtualSheet {
   }
 
   private buildChildren(): UiElement[] {
-    const { firstRow, lastRow, firstColumn } = this.range;
+    const { firstRow, lastRow, firstColumn, lastColumn } = this.range;
     if (lastRow < firstRow) {
       return [];
     }
     const width = this.contentWidth;
-    const lead = firstColumn * this.columnWidth;
-    const children: UiElement[] = [spacer('sheet:top', firstRow * this.rowHeight)];
+    const lead = this.offsetOf(firstColumn);
+    const children: UiElement[] = [];
+
+    if (this.renderHeader !== undefined) {
+      this.mountedHeader ??= this.wrapHeader(this.renderHeader(firstColumn, lastColumn), width, lead);
+      children.push(this.mountedHeader);
+    }
+
+    children.push(spacer('sheet:top', firstRow * this.rowHeight));
     for (const row of this.mountedRows.keys()) {
       if (row < firstRow || row > lastRow) {
         this.mountedRows.delete(row);
@@ -258,6 +405,42 @@ export class UiVirtualSheet {
     }
     children.push(spacer('sheet:bottom', (this.rowCount - lastRow - 1) * this.rowHeight));
     return children;
+  }
+
+  /**
+   * The header, given the same geometry a row gets.
+   *
+   * Its own children are laid out exactly like a row's, so that a
+   * column header lines up with the column under it without either
+   * being told where the other is: the same leading spacer, the same
+   * gutter-sized first cell, the same widths.
+   */
+  private wrapHeader(built: UiChild, width: number, lead: number): UiElement {
+    if (!isRowElement(built)) {
+      throw new Error("A sheet's header must be a Row element, laid out like the rows it labels.");
+    }
+    return {
+      ...built,
+      props: { ...built.props, key: 'sheet:header', width, height: this.headerHeight, flexShrink: 0 },
+      children: this.withLead(built.children, lead)
+    };
+  }
+
+  /**
+   * A row's children with the leading spacer in the right place.
+   *
+   * With a gutter, the renderer's first child *is* the gutter: it sits
+   * at content x 0 and the columns begin past it, so the spacer for
+   * the columns scrolled out of view goes after it. Without one the
+   * spacer goes first. Either way the renderer is handed a range of
+   * columns and never has to know where the window is.
+   */
+  private withLead(children: readonly UiChild[], lead: number): UiChild[] {
+    const pad = spacer('sheet:lead', undefined, lead);
+    if (this.gutterWidth <= 0) {
+      return [pad, ...children];
+    }
+    return [...children.slice(0, 1), pad, ...children.slice(1)];
   }
 
   /**
@@ -285,7 +468,7 @@ export class UiVirtualSheet {
         height: this.rowHeight,
         flexShrink: 0
       },
-      children: [spacer('sheet:lead', undefined, lead), ...built.children]
+      children: this.withLead(built.children, lead)
     };
   }
 }
@@ -384,6 +567,8 @@ export type LazySheetProps = ScrollViewProps &
   Omit<UiVirtualSheetOptions, 'initialViewport'> & {
     /** Hands the window to the caller, once, as the element is built. */
     sheetRef?: (sheet: UiVirtualSheet) => void;
+    /** The row above the rows, sized by `headerHeight`. */
+    header?: SheetHeaderRenderer;
   };
 
 /**
@@ -400,11 +585,24 @@ export type LazySheetProps = ScrollViewProps &
  * than an estimate that settles.
  */
 export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): UiElement {
-  const { rowCount, columnCount, rowHeight, columnWidth, rowOverscan, columnOverscan, modifiers, sheetRef, ...rest } =
-    props;
+  const {
+    rowCount,
+    columnCount,
+    rowHeight,
+    columnWidth,
+    rowOverscan,
+    columnOverscan,
+    gutterWidth,
+    headerHeight,
+    header,
+    modifiers,
+    sheetRef,
+    ...rest
+  } = props;
   const sheet = new UiVirtualSheet(
-    { rowCount, columnCount, rowHeight, columnWidth, rowOverscan, columnOverscan },
-    renderRow
+    { rowCount, columnCount, rowHeight, columnWidth, rowOverscan, columnOverscan, gutterWidth, headerHeight },
+    renderRow,
+    header
   );
   sheetRef?.(sheet);
   return createElement(

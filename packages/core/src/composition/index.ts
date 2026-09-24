@@ -58,6 +58,7 @@ export {
   UiVirtualSheet,
   VIRTUAL_SHEET_PROP,
   type LazySheetProps,
+  type SheetHeaderRenderer,
   type SheetRange,
   type SheetRowRenderer,
   type SheetSourceArgs,

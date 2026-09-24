@@ -1424,14 +1424,17 @@ interface UiVirtualSheetOptions {
   readonly rowCount: Reactive<number>;
   readonly columnCount: Reactive<number>;
   readonly rowHeight: number;
-  readonly columnWidth: number;
+  readonly columnWidth: number | readonly number[];
   readonly rowOverscan?: Reactive<number>;
   readonly columnOverscan?: Reactive<number>;
+  readonly gutterWidth?: number;
+  readonly headerHeight?: number;
   readonly initialViewport?: {
     readonly width: number;
     readonly height: number;
   };
 }
+type SheetHeaderRenderer = (firstColumn: number, lastColumn: number) => UiChild;
 declare const VIRTUAL_SHEET_PROP = "virtualSheet";
 declare class UiVirtualSheet {
   readonly children$: BehaviorSubject<UiElement[]>;
@@ -1441,12 +1444,23 @@ declare class UiVirtualSheet {
   private rowOverscan;
   private columnOverscan;
   private readonly rowHeight;
-  private readonly columnWidth;
+  private readonly gutterWidth;
+  private readonly headerHeight;
   private readonly renderRow;
+  private renderHeader;
+  private widths;
+  private offsets;
+  private uniformWidth;
   private range;
   private viewport;
   private readonly mountedRows;
-  constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer);
+  private mountedHeader;
+  constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer, renderHeader?: SheetHeaderRenderer);
+  setColumnWidths(widths: number | readonly number[]): void;
+  private adoptWidths;
+  widthOf(column: number): number;
+  offsetOf(column: number): number;
+  private get columnsWidth();
   get contentWidth(): number;
   get contentHeight(): number;
   rowAt(offset: number): number;
@@ -1459,6 +1473,8 @@ declare class UiVirtualSheet {
   private recompute;
   private windowFor;
   private buildChildren;
+  private wrapHeader;
+  private withLead;
   private wrap;
 }
 interface SheetSourceArgs {
@@ -1473,6 +1489,7 @@ declare const sheetSource: ((args: SheetSourceArgs, key?: string | number) => Ui
 };
 type LazySheetProps = ScrollViewProps & Omit<UiVirtualSheetOptions, 'initialViewport'> & {
   sheetRef?: (sheet: UiVirtualSheet) => void;
+  header?: SheetHeaderRenderer;
 };
 declare function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): UiElement;
 type EditUnit = 'grapheme' | 'word' | 'line' | 'document';
@@ -4999,7 +5016,6 @@ export {
   describeLength,
   describeOverrides,
   detectEditingPlatform,
-  df,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
@@ -5035,6 +5051,7 @@ export {
   EnvironmentProps,
   EXTERNAL_FILES,
   fade,
+  ff,
   fillTextRects,
   findEnvironmentKey,
   FindHost,
@@ -5398,6 +5415,7 @@ export {
   SharedClaim,
   sharedElement,
   SharedElementArgs,
+  SheetHeaderRenderer,
   SheetRange,
   SheetRowRenderer,
   sheetSource,
@@ -6269,6 +6287,7 @@ import {
   SharedClaim,
   sharedElement,
   SharedElementArgs,
+  SheetHeaderRenderer,
   SheetRange,
   SheetRowRenderer,
   sheetSource,
@@ -6597,7 +6616,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-Cy8g5GB9.js";
+} from "./index-A2LzeuMR.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7183,6 +7202,7 @@ export {
   type SelectionHost,
   type SharedClaim,
   type SharedElementArgs,
+  type SheetHeaderRenderer,
   type SheetRange,
   type SheetRowRenderer,
   type SheetSourceArgs,
@@ -7499,7 +7519,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Cy8g5GB9.js";
+} from "./index-A2LzeuMR.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

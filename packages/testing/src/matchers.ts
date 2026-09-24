@@ -49,6 +49,10 @@ function boxOf(node: UiNode): LayoutBox | null {
   return renderedFor(node)?.getLayout(node) ?? null;
 }
 
+function visibleBoxOf(node: UiNode): LayoutBox | null {
+  return renderedFor(node)?.getVisibleBox(node) ?? null;
+}
+
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -89,6 +93,41 @@ export const matchers = {
           ? `Expected '${received.id}' not to have box ${JSON.stringify(expected)}.`
           : `Expected '${received.id}' to have ${wrong.map(key => `${key} ${expected[key]}`).join(', ')}, ` +
             `but its box is ${JSON.stringify({
+              x: round(box.x),
+              y: round(box.y),
+              width: round(box.width),
+              height: round(box.height)
+            })}.\n\nWhy:\n${explanationOf(received)}`
+    };
+  },
+
+  /**
+   * Where the node is *seen*, with scroll offsets and sticky shifts
+   * applied.
+   *
+   * The matcher to reach for when the claim is about scrolling. A
+   * sticky header's laid-out box is at the top of its content whether
+   * or not sticky works, so `toHaveBox` asserts nothing about it after
+   * a scroll; this is the one that does.
+   */
+  toHaveVisibleBox(received: UiNode, expected: Partial<LayoutBox>): MatcherResult {
+    const box = visibleBoxOf(received);
+    if (box === null) {
+      return {
+        pass: false,
+        message: () => `Expected a node mounted by renderTest(); '${received.id}' was not.`
+      };
+    }
+    const wrong = (Object.keys(expected) as (keyof LayoutBox)[]).filter(
+      key => round(box[key]) !== round(expected[key] as number)
+    );
+    return {
+      pass: wrong.length === 0,
+      message: () =>
+        wrong.length === 0
+          ? `Expected '${received.id}' not to be seen at ${JSON.stringify(expected)}.`
+          : `Expected '${received.id}' to be seen at ${wrong.map(key => `${key} ${expected[key]}`).join(', ')}, ` +
+            `but it is seen at ${JSON.stringify({
               x: round(box.x),
               y: round(box.y),
               width: round(box.width),
@@ -186,6 +225,7 @@ expect.extend(matchers);
 
 interface GessoMatchers<R = unknown> {
   toHaveBox: (expected: Partial<LayoutBox>) => R;
+  toHaveVisibleBox: (expected: Partial<LayoutBox>) => R;
   toHaveText: (expected: string) => R;
   toHaveSemantics: (expected: ExpectedSemantics) => R;
   toHaveFocus: () => R;

@@ -1637,6 +1637,11 @@ export class GessoRuntime {
     return this.engine.worldBox(node);
   }
 
+  /** Where the node is seen: scroll offsets and sticky shifts applied. */
+  debugVisibleBox(node: UiNode): { x: number; y: number; width: number; height: number } {
+    return this.engine.visibleBox(node);
+  }
+
   /**
    * The node layout, hit testing and painting start from: a stack that
    * stretches the app root over the viewport with the overlay layer on

@@ -54,8 +54,19 @@ export interface RenderedBase {
    */
   settle(options?: { maxFrames?: number }): Promise<void>;
 
-  /** The node's border box in layout-root coordinates. */
+  /** The node's border box in layout-root coordinates, before scrolling. */
   getLayout(node: UiNode): LayoutBox;
+  /**
+   * Where the node is *seen*: scroll offsets and sticky shifts applied.
+   *
+   * `getLayout` answers where a node was laid out, which for anything
+   * inside a scroll container is not where it is. Nothing about
+   * scrolling or sticky could be asserted without this — a sticky
+   * header's laid-out box is at the top of the content whether or not
+   * sticky works at all, so a spec written against `getLayout` passes
+   * for a header that scrolled away.
+   */
+  getVisibleBox(node: UiNode): LayoutBox;
   /** Why the node has the size it has, as `LayoutEngine.explain` gives it. */
   explain(node: UiNode): LayoutExplanation;
   /** The same explanation as the sentences `formatExplanation` prints. */
@@ -188,6 +199,7 @@ export function renderTest(root: FrameworkChild, options: RenderTestOptions = {}
     frame,
     settle,
     getLayout: node => runtime.debugLayoutBox(node),
+    getVisibleBox: node => runtime.debugVisibleBox(node),
     explain: node => runtime.explain(node),
     explainText: node => formatExplanation(runtime.explain(node)),
     getSemantics: node => {

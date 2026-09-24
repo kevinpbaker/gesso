@@ -1634,6 +1634,12 @@ declare class GessoRuntime {
     width: number;
     height: number;
   };
+  debugVisibleBox(node: UiNode): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
   layoutRoot(): UiNode;
   scrollIntoView(node: UiNode, padding?: number): void;
   reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
@@ -2829,7 +2835,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-CBEywPmg.js";
+} from "./index-GqeHATuN.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3302,7 +3308,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CBEywPmg.js";
+} from "../index-GqeHATuN.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

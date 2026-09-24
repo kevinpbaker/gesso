@@ -1,9 +1,24 @@
-import { createChannelRegistry, type ChannelReplica, type ChannelToken, type ServedChannel } from 'gesso-framework';
+import {
+  createChannelRegistry,
+  type ChannelRegistry,
+  type ChannelReplica,
+  type ChannelToken,
+  type ServedChannel
+} from 'gesso-framework';
 
 /** What `serveForTest` hands back: the replicas a screen would bind to, and a way to wait for patches. */
 export interface ServedForTest {
   /** The replica of one served channel, as `ctx.channel(token)` would return it. */
   get<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
+  /**
+   * The registry, for `renderTest(component, { channels: served.registry })`.
+   *
+   * Without it there is no supported way to render a component against
+   * served channels: `serveForTest` answers "did the wiring work" and
+   * `renderTest` answers "what does it look like", and a screen driven
+   * by a worker is exactly the case that needs both at once.
+   */
+  readonly registry: ChannelRegistry;
   /**
    * Waits for the patch stream to deliver. With a condition, until it
    * holds; without one, until two turns of the event loop have passed
@@ -40,6 +55,7 @@ export function serveForTest(channels: readonly ServedChannel[]): ServedForTest 
   );
   return {
     errors,
+    registry: handle.registry,
     get: token => handle.registry.get(token),
     async settle(until, timeoutMs = 2000): Promise<void> {
       const deadline = Date.now() + timeoutMs;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Button, Column, Row, Text } from 'gesso-core';
+import { Box, Button, Column, Row, ScrollView, Text } from 'gesso-core';
 
 import './matchers';
 import { renderTest } from './renderTest';
@@ -78,5 +78,48 @@ describe('toHaveText and toHaveFocus', () => {
 
     expect(ui.getByLabel('One')).toHaveFocus();
     expect(ui.getByLabel('Two')).not.toHaveFocus();
+  });
+});
+
+describe('toHaveVisibleBox', () => {
+  /**
+   * The matcher exists because `toHaveBox` cannot make this claim. A
+   * sticky header is laid out at the top of its content and stays laid
+   * out there however far the container scrolls, so a spec written
+   * against the laid-out box passes for a header that scrolled away —
+   * which is the one thing a sticky header must not do.
+   */
+  it('reports where a scrolled node is seen, not where it was laid out', async () => {
+    const ui = renderTest(
+      ScrollView(
+        { width: 100, height: 100, role: 'region', label: 'scroller' },
+        Box({ key: 'head', height: 20, width: 100, position: 'sticky', top: 0, role: 'banner' }),
+        Box({ key: 'tall', height: 1000, width: 100, role: 'main' })
+      )
+    );
+    await ui.settle();
+
+    const head = ui.getByRole('banner');
+    const body = ui.getByRole('main');
+    expect(head).toHaveVisibleBox({ y: 0 });
+    expect(body).toHaveVisibleBox({ y: 20 });
+
+    ui.fireEvent.wheel({ x: 50, y: 50, deltaY: 300 });
+    await ui.settle();
+
+    // Both are laid out exactly where they always were, so `toHaveBox`
+    // cannot tell these two apart. Seen, the content has gone up by
+    // three hundred and the header has not moved at all, which is the
+    // whole of what sticky claims.
+    expect(head).toHaveBox({ y: 0 });
+    expect(body).toHaveBox({ y: 20 });
+    expect(head).toHaveVisibleBox({ y: 0 });
+    expect(body).toHaveVisibleBox({ y: -280 });
+  });
+
+  it('prints where the node is actually seen when it misses', async () => {
+    const ui = renderTest(Box({ width: 10, height: 10, role: 'banner' }));
+    await ui.settle();
+    expect(() => expect(ui.getByRole('banner')).toHaveVisibleBox({ x: 99 })).toThrow(/seen at/);
   });
 });
