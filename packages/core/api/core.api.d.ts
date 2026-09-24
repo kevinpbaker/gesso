@@ -672,6 +672,7 @@ declare enum UiEventType {
   Blur = "blur",
   BeforeInput = "beforeinput",
   Input = "input",
+  Paste = "paste",
   Click = "click",
   LongPress = "longpress",
   DragStart = "dragstart",
@@ -753,6 +754,10 @@ declare class UiBeforeInputEvent extends UiInputEvent {
   readonly inputType: string;
   readonly data: string | null;
   constructor(inputType: string, data: string | null);
+}
+declare class UiPasteEvent extends UiInputEvent {
+  readonly text: string;
+  constructor(text: string);
 }
 declare class UiTextChangeEvent extends UiInputEvent {
   readonly value: string;
@@ -1463,6 +1468,10 @@ declare class UiVirtualSheet {
   private get columnsWidth();
   get contentWidth(): number;
   get contentHeight(): number;
+  cellAt(x: number, y: number): {
+    row: number;
+    column: number;
+  };
   rowAt(offset: number): number;
   columnAt(offset: number): number;
   setRowCount(count: number): void;
@@ -1734,6 +1743,7 @@ type UiEventProps = {
   onBlur?: (event: UiFocusEvent) => void;
   onBeforeInput?: (event: UiBeforeInputEvent) => void;
   onInput?: (event: UiTextChangeEvent) => void;
+  onPaste?: (event: UiPasteEvent) => void;
 };
 type IdentityProps = {
   key?: string | number;
@@ -3008,6 +3018,7 @@ declare class UiEditingController {
   insertText(text: string): boolean;
   replaceText(text: string): boolean;
   paste(text: string): boolean;
+  private offerPaste;
   private insert;
   compositionStart(): void;
   compositionUpdate(text: string, caret?: number): void;
@@ -5605,6 +5616,7 @@ export {
   UiObjectFit,
   UiOverflow,
   UiPaint,
+  UiPasteEvent,
   UiPath,
   UiPinchEvent,
   UiPinchRecognizer,
@@ -6477,6 +6489,7 @@ import {
   UiObjectFit,
   UiOverflow,
   UiPaint,
+  UiPasteEvent,
   UiPath,
   UiPinchEvent,
   UiPinchRecognizer,
@@ -6616,7 +6629,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-A2LzeuMR.js";
+} from "./index-OUITElxn.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7393,6 +7406,7 @@ export {
   UiNodeType,
   UiObjectFit,
   UiOverflow,
+  UiPasteEvent,
   UiPinchEvent,
   UiPinchRecognizer,
   UiPlacement,
@@ -7507,6 +7521,7 @@ import {
   ScrollSink,
   TextMeasurer,
   TouchScrollerOptions,
+  UiEditingController,
   UiFocusManager,
   UiGestureRecognizer,
   UiGraph,
@@ -7519,7 +7534,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-A2LzeuMR.js";
+} from "./index-OUITElxn.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -7537,6 +7552,7 @@ declare class InputTestHarness {
   readonly root: UiNode;
   readonly dispatcher: UiInputDispatcher;
   readonly scrollSink: HarnessScrollSink;
+  private readonly textMeasurer;
   constructor(width?: number, height?: number, textMeasurer?: TextMeasurer);
   node(id: string, type: UiNodeType, props?: Record<string, unknown>): UiNode;
   add(parent: UiNode, ...children: UiNode[]): void;
@@ -7546,6 +7562,7 @@ declare class InputTestHarness {
   createGestureRecognizer(): UiGestureRecognizer;
   createFocusManager(): UiFocusManager;
   createKeyboardController(): UiKeyboardController;
+  createEditingController(focus?: UiFocusManager): UiEditingController;
   createWheelController(): UiWheelController;
   createGesturePointerController(options?: PointerControllerOptions): UiPointerController;
   createTouchScroller(options?: TouchScrollerOptions): UiTouchScroller;

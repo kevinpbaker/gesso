@@ -238,6 +238,22 @@ export class UiVirtualSheet {
     return this.headerHeight + this.rowCount * this.rowHeight;
   }
 
+  /**
+   * The cell under a point in the scroll container's own coordinates.
+   *
+   * The window already knows where everything is and how far it is
+   * scrolled, which is the whole of this: a drag towards a cell — a
+   * fill handle, a selection being stretched — is usually heading for
+   * one that has not been mounted, so there is no node to hit-test and
+   * arithmetic is the only answer available.
+   */
+  cellAt(x: number, y: number): { row: number; column: number } {
+    return {
+      row: this.rowAt(this.viewport.scrollY + y),
+      column: this.columnAt(this.viewport.scrollX + x)
+    };
+  }
+
   /** The row at a content offset, clamped to the sheet. */
   rowAt(offset: number): number {
     return clamp(Math.floor((offset - this.headerHeight) / this.rowHeight), 0, Math.max(0, this.rowCount - 1));

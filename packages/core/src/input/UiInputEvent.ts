@@ -25,6 +25,17 @@ export enum UiEventType {
   BeforeInput = 'beforeinput',
   /** An editable's text changed. */
   Input = 'input',
+  /**
+   * Text arrived from the system clipboard with nothing editable
+   * focused.
+   *
+   * A paste with a caret in it belongs to the text and never reaches
+   * here. This is the other case: a surface that owns a selection of
+   * its own — a grid with a rectangle of cells picked out — and is the
+   * only thing that knows what a block of text means to it.
+   * `preventDefault()` says it was taken.
+   */
+  Paste = 'paste',
   Click = 'click',
   LongPress = 'longpress',
   DragStart = 'dragstart',
@@ -320,6 +331,20 @@ export class UiBeforeInputEvent extends UiInputEvent {
  * An editable node's text changed: the new value and the selection
  * after the change. Bubbles, so a form can watch all its fields.
  */
+/**
+ * Text from the system clipboard, offered to whatever holds focus.
+ *
+ * Carries the text rather than a clipboard handle, because a render
+ * worker has neither a clipboard nor a window: the shell reads it and
+ * sends it across, which is the same path `ShellService.copyText`
+ * takes in the other direction.
+ */
+export class UiPasteEvent extends UiInputEvent {
+  constructor(readonly text: string) {
+    super(UiEventType.Paste);
+  }
+}
+
 export class UiTextChangeEvent extends UiInputEvent {
   constructor(
     readonly value: string,

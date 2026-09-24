@@ -9,9 +9,10 @@ import { UiGestureRecognizer } from './UiGestureRecognizer';
 import { UiTouchScroller, type TouchScrollerOptions } from './UiTouchScroller';
 import { UiFocusManager } from './UiFocusManager';
 import { UiKeyboardController } from './UiKeyboardController';
+import { UiEditingController, type EditingHost } from './UiEditingController';
 import { UiWheelController, type ScrollContainerState, type ScrollSink } from './UiWheelController';
 import { UiPlatformAdapter, type PlatformEventTarget, type PlatformSurface } from './UiPlatformAdapter';
-import type { TextMeasurer } from '../layout/TextMeasurer';
+import { CharacterCountTextMeasurer, type TextMeasurer } from '../layout/TextMeasurer';
 
 /**
  * Shared harness for input specs.
@@ -28,7 +29,10 @@ export class InputTestHarness {
   readonly scrollSink = new HarnessScrollSink(this);
 
   /** A measurer is needed only by specs whose trees contain real text. */
+  private readonly textMeasurer: TextMeasurer | undefined;
+
   constructor(width = 400, height = 400, textMeasurer?: TextMeasurer) {
+    this.textMeasurer = textMeasurer;
     this.layout = new LayoutHarness(textMeasurer);
     this.root = this.layout.createNode('app', UiNodeType.Column);
     this.root.setProperty('width', width);
@@ -69,6 +73,31 @@ export class InputTestHarness {
 
   createKeyboardController(): UiKeyboardController {
     return new UiKeyboardController(this.dispatcher, this.createFocusManager(), this.root);
+  }
+
+  /**
+   * An editing controller over this harness's layout and dispatcher.
+   *
+   * The host is the layout harness itself: everything `EditingHost`
+   * asks for is something the layout already knows, which is why the
+   * controller takes an interface rather than the engine.
+   */
+  createEditingController(focus: UiFocusManager = this.createFocusManager()): UiEditingController {
+    const layout = this.layout;
+    const hitTester = this.createHitTester();
+    const host: EditingHost = {
+      recordFor: node => layout.engine.recordFor(node),
+      visibleBox: node => layout.engine.visibleBox(node),
+      toLocal: (node, x, y) => hitTester.toLocal(node, x, y),
+      // The controller measures only for caret geometry. A spec whose
+      // tree has real text passes its own measurer to the harness; the
+      // deterministic one is right for every other.
+      measurer: this.textMeasurer ?? new CharacterCountTextMeasurer(),
+      markDirty: () => undefined,
+      reveal: () => undefined,
+      now: () => 0
+    };
+    return new UiEditingController(host, this.dispatcher, focus);
   }
 
   createWheelController(): UiWheelController {

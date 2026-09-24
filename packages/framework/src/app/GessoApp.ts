@@ -403,7 +403,13 @@ export class GessoApp {
     }
     const mirror = new SemanticsMirror(
       canvas,
-      { action: action => this.runtime.applySemanticsAction(action) },
+      {
+        action: action => this.runtime.applySemanticsAction(action),
+        // A paste onto something that is not a text field lands here,
+        // because the element holding focus while the app has it is
+        // one of the mirror's and not the canvas.
+        paste: text => this.runtime.input.editing.paste(text)
+      },
       this.proxy
     );
     this.mirror = mirror;

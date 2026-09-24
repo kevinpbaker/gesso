@@ -8,6 +8,7 @@ import type {
   UiFocusEvent,
   UiKeyboardEvent,
   UiPinchEvent,
+  UiPasteEvent,
   UiPointerEvent,
   UiTextChangeEvent,
   UiWheelEvent
@@ -73,6 +74,13 @@ export type UiEventProps = {
   onBeforeInput?: (event: UiBeforeInputEvent) => void;
   /** An editable's text changed. */
   onInput?: (event: UiTextChangeEvent) => void;
+  /**
+   * Text from the clipboard, when nothing editable has the caret.
+   *
+   * `preventDefault()` says it was taken. A paste with a caret in it
+   * belongs to the text and never reaches here.
+   */
+  onPaste?: (event: UiPasteEvent) => void;
 };
 
 /** Reconciliation identity and node access; never stored on the node. */

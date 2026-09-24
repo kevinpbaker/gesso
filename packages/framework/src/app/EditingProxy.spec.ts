@@ -301,6 +301,38 @@ describe('EditingProxy', () => {
     expect(sink.calls.at(-1)).toEqual(['beforeInput', 'deleteByCut', null]);
   });
 
+  /**
+   * A paste with nothing editable focused.
+   *
+   * The proxy blurs and hands focus back to the canvas when no field
+   * has it, so the browser fires `paste` there — and the listener on
+   * the textarea never hears it. Before this the text was dropped
+   * before it reached the application at all, which is one half of why
+   * a grid could not be pasted into; the other half was the editing
+   * controller having nowhere to send it.
+   */
+  it('takes a paste aimed at the canvas when no field has focus', () => {
+    const { proxy, canvas, sink } = setup();
+    proxy.update(null);
+    const clipboardData = { getData: () => 'a\tb\nc\td', setData: () => undefined };
+
+    expect(canvas.dispatch('paste', { clipboardData }).defaultPrevented).toBe(true);
+
+    expect(sink.calls.at(-1)).toEqual(['paste', 'a\tb\nc\td']);
+  });
+
+  /** One paste, one delivery: the event goes to whichever has focus. */
+  it('does not take it twice when the field does have focus', () => {
+    const { proxy, canvas, textarea, sink, state } = setup();
+    proxy.update(state());
+    expect(textarea.ownerDocument.activeElement).toBe(textarea);
+    const clipboardData = { getData: () => 'x', setData: () => undefined };
+
+    canvas.dispatch('paste', { clipboardData });
+
+    expect(sink.calls.filter(call => call[0] === 'paste')).toEqual([]);
+  });
+
   it('forwards key events from the textarea', () => {
     const { proxy, textarea, sink, state } = setup();
     proxy.update(state());

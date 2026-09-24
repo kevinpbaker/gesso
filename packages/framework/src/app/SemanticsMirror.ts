@@ -20,6 +20,16 @@ export interface SemanticsMirrorSink {
    */
   keyDown?(event: KeyboardEvent): void;
   keyUp?(event: KeyboardEvent): void;
+  /**
+   * Text pasted while a mirrored element holds focus.
+   *
+   * The same reasoning as the keys, and the same surprise: a paste
+   * onto a grid lands on the mirror's element, not on the canvas and
+   * not on the editing proxy — so a shell listening on either hears
+   * nothing at all and the text is dropped before the application
+   * sees it.
+   */
+  paste?(text: string): void;
 }
 
 /**
@@ -613,15 +623,25 @@ export class SemanticsMirror {
     };
     const onKeyDown = (event: KeyboardEvent): void => this.sink.keyDown?.(event);
     const onKeyUp = (event: KeyboardEvent): void => this.sink.keyUp?.(event);
+    const onPaste = (event: ClipboardEvent): void => {
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (text.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      this.sink.paste?.(text);
+    };
     this.container.addEventListener('click', onClick);
     this.container.addEventListener('focusin', onFocusIn);
     this.container.addEventListener('keydown', onKeyDown);
     this.container.addEventListener('keyup', onKeyUp);
+    this.container.addEventListener('paste', onPaste);
     return () => {
       this.container.removeEventListener('click', onClick);
       this.container.removeEventListener('focusin', onFocusIn);
       this.container.removeEventListener('keydown', onKeyDown);
       this.container.removeEventListener('keyup', onKeyUp);
+      this.container.removeEventListener('paste', onPaste);
     };
   }
 

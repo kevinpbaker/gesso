@@ -452,16 +452,17 @@ export class WorkerApp {
       keyUp: event => this.forwardKeyUp(event)
     });
     if (this.options.accessibility !== false) {
-      // The off-screen DOM an assistive technology reads. Keys are
-      // forwarded from it for the same reason they are forwarded from
-      // the proxy: while the app has focus, the element holding it is
-      // one of these and not the canvas.
+      // The off-screen DOM an assistive technology reads. Keys and
+      // pastes are forwarded from it for the same reason they are
+      // forwarded from the proxy: while the app has focus, the element
+      // holding it is one of these and not the canvas.
       this.mirror = new SemanticsMirror(
         canvas,
         {
           action: action => this.post({ type: 'semanticsAction', action }),
           keyDown: event => this.forwardKeyDown(event),
-          keyUp: event => this.forwardKeyUp(event)
+          keyUp: event => this.forwardKeyUp(event),
+          paste: text => this.post({ type: 'paste', text })
         },
         this.proxy
       );

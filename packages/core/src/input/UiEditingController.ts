@@ -11,7 +11,7 @@ import { wordRangeAt, lineStartAt, lineEndAt } from '../editing/TextBoundaries';
 import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
-import { UiBeforeInputEvent, UiTextChangeEvent, type UiKeyModifiers } from './UiInputEvent';
+import { UiBeforeInputEvent, UiPasteEvent, UiTextChangeEvent, type UiKeyModifiers } from './UiInputEvent';
 
 /**
  * What the controller needs from the runtime around it: geometry,
@@ -316,13 +316,32 @@ export class UiEditingController {
     return this.insert(node, model, 'insertReplacementText', text);
   }
 
-  /** Pastes text: newlines are kept in a multiline field and become spaces in a single-line one. */
+  /**
+   * Pastes text: newlines are kept in a multiline field and become
+   * spaces in a single-line one.
+   *
+   * With nothing editable focused the text is offered to whatever is,
+   * as a `Paste` event, instead of being dropped. That is the case a
+   * grid needs: it owns a rectangle of cells, a block of tab-separated
+   * text means something to it that it means to nothing else, and
+   * before this there was no way for it to hear about one at all.
+   */
   paste(text: string): boolean {
     const node = this.focusedEditable;
     if (node === null || isReadOnly(node)) {
-      return false;
+      return this.offerPaste(text);
     }
     return this.insert(node, editorFor(node), 'insertFromPaste', text);
+  }
+
+  private offerPaste(text: string): boolean {
+    const target = this.focus.focusedNode;
+    if (target === null) {
+      return false;
+    }
+    const event = new UiPasteEvent(text);
+    this.dispatcher.dispatch(event, target);
+    return event.defaultPrevented;
   }
 
   private insert(node: UiNode, model: EditableTextModel, inputType: string, text: string): boolean {

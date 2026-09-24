@@ -372,6 +372,26 @@ export class EditingProxy {
       }
     };
 
+    /**
+     * A paste aimed at the canvas rather than at the field.
+     *
+     * When no editable has focus this proxy blurs and hands focus back
+     * to the canvas, so the browser fires `paste` there — and the
+     * listener above, which is on the textarea, never hears it. The
+     * text was dropped before it reached the application at all, which
+     * is half of why a grid could not be pasted into; the other half
+     * was `UiEditingController.paste` having nowhere to send it.
+     *
+     * The two listeners cannot both fire for one paste: the event goes
+     * to whichever element has focus, and only one of them ever does.
+     */
+    const onCanvasPaste = (event: Event): void => {
+      if (this.doc.activeElement === textarea) {
+        return;
+      }
+      onPaste(event);
+    };
+
     const onCopy = (event: Event): void => {
       const clipboard = (event as ClipboardEvent).clipboardData;
       const state = this.state;
@@ -426,6 +446,7 @@ export class EditingProxy {
     textarea.addEventListener('copy', onCopy);
     textarea.addEventListener('cut', onCut);
     textarea.addEventListener('keydown', onKeyDown);
+    this.canvas.addEventListener('paste', onCanvasPaste);
     textarea.addEventListener('keyup', onKeyUp);
     textarea.addEventListener('blur', onBlur);
     this.view?.addEventListener('scroll', onReposition, { capture: true, passive: true });
@@ -440,6 +461,7 @@ export class EditingProxy {
       textarea.removeEventListener('copy', onCopy);
       textarea.removeEventListener('cut', onCut);
       textarea.removeEventListener('keydown', onKeyDown);
+      this.canvas.removeEventListener('paste', onCanvasPaste);
       textarea.removeEventListener('keyup', onKeyUp);
       textarea.removeEventListener('blur', onBlur);
       this.view?.removeEventListener('scroll', onReposition, { capture: true });

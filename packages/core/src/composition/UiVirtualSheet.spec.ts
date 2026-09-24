@@ -359,3 +359,47 @@ describe('UiVirtualSheet with columns of different widths', () => {
     expect(sheet.columnAt(250)).toBe(2);
   });
 });
+
+describe('UiVirtualSheet.cellAt', () => {
+  /**
+   * A drag towards a cell is usually heading for one that has not been
+   * mounted, so there is no node to hit-test: the window's own offsets
+   * are the only answer available.
+   */
+  it('maps a point in the viewport to a cell, scroll included', () => {
+    const sheet = new UiVirtualSheet(
+      {
+        rowCount: 1_000,
+        columnCount: 50,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        initialViewport: { width: 500, height: 240 }
+      },
+      renderRow
+    );
+
+    expect(sheet.cellAt(0, 0)).toEqual({ row: 0, column: 0 });
+    expect(sheet.cellAt(COLUMN * 2 + 5, ROW * 3 + 5)).toEqual({ row: 3, column: 2 });
+
+    sheet.update({ scrollX: COLUMN * 10, scrollY: ROW * 20, width: 500, height: 240 });
+    expect(sheet.cellAt(0, 0)).toEqual({ row: 20, column: 10 });
+    expect(sheet.cellAt(COLUMN, ROW)).toEqual({ row: 21, column: 11 });
+  });
+
+  it('measures past the frozen strips when there are any', () => {
+    const sheet = new UiVirtualSheet(
+      {
+        rowCount: 1_000,
+        columnCount: 50,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        gutterWidth: 48,
+        headerHeight: 22,
+        initialViewport: { width: 500, height: 240 }
+      },
+      renderRow
+    );
+    expect(sheet.cellAt(48, 22)).toEqual({ row: 0, column: 0 });
+    expect(sheet.cellAt(48 + COLUMN, 22 + ROW)).toEqual({ row: 1, column: 1 });
+  });
+});
