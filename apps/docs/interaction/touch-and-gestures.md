@@ -197,11 +197,22 @@ inside the scroller.
 - **The container is resolved on every move**, not at the start, so a
   list that has reached its end hands the rest of the gesture to the
   page it sits in without the finger being lifted.
+- **Both axes at once.** Each axis is asked separately whether the
+  container has room, so a surface that overflows in both directions is
+  dragged diagonally and goes on taking the axis that still has room
+  when the other is spent. This used to be decided from the container's
+  flex direction, which meant a spreadsheet's viewport, one `ScrollView`
+  over content wider and taller than itself, could not be dragged
+  sideways at all. The wheel had the same bug and the same fix, on the
+  same shared state, so the two paths cannot disagree about which
+  container takes a gesture.
 - **A flick coasts.** The distance is projected from the release speed
   and handed to the same smooth path a programmatic scroll uses, so one
   animator owns the offset. Speed is measured over the last 100 ms,
   because a long slow drag ending in a flick averages out to nothing
-  across the whole gesture.
+  across the whole gesture. Each axis passes the fling threshold on its
+  own, so a diagonal throw coasts on both and a vertical one does not
+  drift sideways by whatever the thumb happened to do.
 - **Scrolling reveals the scrollbars.** The usual reveal is driven by
   hovering near the bar, and a finger never hovers, so without this a
   touchscreen would never see where it is in the content.

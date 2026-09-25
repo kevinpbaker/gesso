@@ -164,6 +164,103 @@ describe('UiTouchScroller', () => {
     expect(h.layout.engine.recordFor(scroll)?.scrollX).toBe(40);
   });
 
+  describe('a surface that overflows both ways', () => {
+    /**
+     * A 300x200 viewport over 600x600 of content, which is a
+     * spreadsheet. This container used to be classified from its flex
+     * direction and asked for one axis, so a finger could not move it
+     * sideways at all: the same bug the wheel had until 38e70a3, on the
+     * same shared state, found the same way.
+     */
+    function sheet() {
+      const h = new InputTestHarness();
+      const scroll = h.node('scroll', UiNodeType.ScrollView, { width: 300, height: 200 });
+      const content = h.node('content', UiNodeType.Box, { width: 600, height: 600 });
+      h.add(h.root, scroll);
+      h.add(scroll, content);
+      h.layoutTree();
+      let clock = 0;
+      const scroller = h.createTouchScroller({ now: () => clock });
+      return {
+        h,
+        scroll,
+        scroller,
+        controller: h.createGesturePointerController(),
+        tick: (ms: number) => {
+          clock += ms;
+        },
+        at: () => {
+          const record = h.layout.engine.recordFor(scroll);
+          return { x: record?.scrollX ?? 0, y: record?.scrollY ?? 0 };
+        }
+      };
+    }
+
+    it('drags sideways', () => {
+      const { controller, at } = sheet();
+
+      controller.pointerDown(150, 50, 1, NO_MODS, FINGER);
+      controller.pointerMove(110, 50, 1, NO_MODS, FINGER);
+
+      expect(at()).toEqual({ x: 40, y: 0 });
+    });
+
+    it('drags on both axes at once, because a finger moves diagonally', () => {
+      const { controller, at } = sheet();
+
+      controller.pointerDown(150, 100, 1, NO_MODS, FINGER);
+      controller.pointerMove(120, 70, 1, NO_MODS, FINGER);
+
+      expect(at()).toEqual({ x: 30, y: 30 });
+    });
+
+    it('goes on taking the axis that still has room when the other is spent', () => {
+      const { controller, at } = sheet();
+
+      // Right to the bottom, then keep dragging up and left.
+      controller.pointerDown(150, 190, 1, NO_MODS, FINGER);
+      controller.pointerMove(150, 0, 1, NO_MODS, FINGER);
+      controller.pointerMove(100, 0, 1, NO_MODS, FINGER);
+
+      expect(at()).toEqual({ x: 50, y: 190 });
+    });
+
+    it('coasts on both axes after a diagonal throw', () => {
+      const { controller, tick, at } = sheet();
+
+      controller.pointerDown(150, 150, 1, NO_MODS, FINGER);
+      tick(16);
+      controller.pointerMove(130, 130, 1, NO_MODS, FINGER);
+      tick(16);
+      controller.pointerMove(110, 110, 1, NO_MODS, FINGER);
+      tick(16);
+      controller.pointerUp(90, 90, 0, NO_MODS, FINGER);
+
+      const { x, y } = at();
+      expect(x).toBeGreaterThan(60);
+      expect(y).toBeGreaterThan(60);
+    });
+
+    it("does not drag a vertical throw sideways by the thumb's drift", () => {
+      // One threshold on the combined speed would let this through.
+      const { controller, tick, at } = sheet();
+
+      controller.pointerDown(150, 150, 1, NO_MODS, FINGER);
+      tick(16);
+      controller.pointerMove(150, 110, 1, NO_MODS, FINGER);
+      tick(16);
+      controller.pointerMove(149, 70, 1, NO_MODS, FINGER);
+      tick(16);
+      controller.pointerUp(149, 30, 0, NO_MODS, FINGER);
+
+      const { x, y } = at();
+      expect(y).toBeGreaterThan(120);
+      // The single pixel of sideways drift is well under the fling
+      // threshold on its own axis, so nothing coasts on it.
+      expect(x).toBe(1);
+    });
+  });
+
   it('stops scrolling once disposed', () => {
     const { h, scroll, controller, scroller } = setup();
     scroller.dispose();

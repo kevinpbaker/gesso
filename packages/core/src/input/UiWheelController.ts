@@ -133,7 +133,7 @@ const EVERYTHING_SCROLLABLE: UiScrollability = Object.freeze({
 const SCROLL_EPSILON = 0.5;
 
 /** Whether an offset can still move in the direction `delta` points. */
-function hasRoom(offset: number, max: number, delta: number): boolean {
+export function hasScrollRoom(offset: number, max: number, delta: number): boolean {
   return delta > 0 ? offset < max - SCROLL_EPSILON : offset > SCROLL_EPSILON;
 }
 
@@ -318,10 +318,10 @@ export class UiWheelController {
       if (state === undefined) {
         continue;
       }
-      left ||= hasRoom(state.scrollX, state.maxScrollX, -1);
-      right ||= hasRoom(state.scrollX, state.maxScrollX, 1);
-      up ||= hasRoom(state.scrollY, state.maxScrollY, -1);
-      down ||= hasRoom(state.scrollY, state.maxScrollY, 1);
+      left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
+      right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
+      up ||= hasScrollRoom(state.scrollY, state.maxScrollY, -1);
+      down ||= hasScrollRoom(state.scrollY, state.maxScrollY, 1);
       if (containsOverscroll(node)) {
         // Nothing past here can be reached by chaining, so nothing
         // past here is worth reporting — and the contained node keeps
@@ -395,8 +395,8 @@ export class UiWheelController {
       // horizontal container to chain to either. A container that
       // overflows on one axis only is unaffected — the axis it does
       // not scroll has no room, so it is not taken.
-      const takesX = deltaX !== 0 && hasRoom(state.scrollX, state.maxScrollX, deltaX);
-      const takesY = deltaY !== 0 && hasRoom(state.scrollY, state.maxScrollY, deltaY);
+      const takesX = deltaX !== 0 && hasScrollRoom(state.scrollX, state.maxScrollX, deltaX);
+      const takesY = deltaY !== 0 && hasScrollRoom(state.scrollY, state.maxScrollY, deltaY);
       if (takesX || takesY) {
         this.applyDelta(
           node,

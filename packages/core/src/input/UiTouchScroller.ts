@@ -1,7 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiEventType, type UiInputEvent, type UiPointerEvent } from './UiInputEvent';
 import type { UiInputDispatcher } from './UiInputDispatcher';
-import { isScrollContainer, type ScrollContainerState, type ScrollSink } from './UiWheelController';
+import { hasScrollRoom, isScrollContainer, type ScrollContainerState, type ScrollSink } from './UiWheelController';
 
 export interface TouchScrollerOptions {
   /**
@@ -37,6 +37,14 @@ export interface TouchScrollerOptions {
    * will do.
    */
   now?: () => number;
+}
+
+/** A container that will take a gesture, and the axes it will take it on. */
+interface ResolvedScroll {
+  node: UiNode;
+  state: ScrollContainerState;
+  takesX: boolean;
+  takesY: boolean;
 }
 
 /** One position of the finger, kept only long enough to measure speed. */
@@ -166,12 +174,8 @@ export class UiTouchScroller {
     if (resolved === null) {
       return;
     }
-    const { node, state } = resolved;
-    if (state.horizontal) {
-      this.scrollSink.scrollBy(node, dx, 0);
-    } else {
-      this.scrollSink.scrollBy(node, 0, dy);
-    }
+    const { node, takesX, takesY } = resolved;
+    this.scrollSink.scrollBy(node, takesX ? dx : 0, takesY ? dy : 0);
     // A touchscreen has no hover, so this is the only chance the person
     // gets to see where they are in the content.
     this.scrollSink.revealScrollbars?.(node);
@@ -193,17 +197,18 @@ export class UiTouchScroller {
     if (resolved === null) {
       return;
     }
-    const { node, state } = resolved;
-    const speed = state.horizontal ? velocity.x : velocity.y;
-    if (Math.abs(speed) < this.flingVelocity) {
+    const { node, takesX, takesY } = resolved;
+    // Each axis passes the threshold on its own, so a diagonal throw
+    // coasts on both and a vertical one with a pixel of drift coasts on
+    // neither sideways. One threshold on the combined speed would let a
+    // fast vertical fling drag the content sideways by whatever the
+    // thumb happened to do.
+    const flingX = takesX && Math.abs(velocity.x) >= this.flingVelocity ? velocity.x * this.momentum : 0;
+    const flingY = takesY && Math.abs(velocity.y) >= this.flingVelocity ? velocity.y * this.momentum : 0;
+    if (flingX === 0 && flingY === 0) {
       return;
     }
-    const distance = speed * this.momentum;
-    if (state.horizontal) {
-      this.scrollSink.scrollBy(node, distance, 0, 'smooth');
-    } else {
-      this.scrollSink.scrollBy(node, 0, distance, 'smooth');
-    }
+    this.scrollSink.scrollBy(node, flingX, flingY, 'smooth');
   }
 
   private sample(x: number, y: number): void {
@@ -232,7 +237,7 @@ export class UiTouchScroller {
   }
 
   /**
-   * The container that should take this movement.
+   * The container that should take this movement, and which of its axes.
    *
    * The nearest scroll container that can still move in the direction
    * asked for, walking outward. A container already at its end is
@@ -240,9 +245,21 @@ export class UiTouchScroller {
    * that has hit its bottom keep scrolling the page it sits in. When
    * nothing can move, the innermost container is returned so the
    * gesture still belongs somewhere.
+   *
+   * **Each axis is asked for separately**, because a container may
+   * scroll on both, and this used to pick one from the container's
+   * flex direction and drop the other on the floor. A spreadsheet is
+   * the case that found it on the wheel in 38e70a3: one `ScrollView`
+   * whose content overflows in both directions, classified as vertical,
+   * so a sideways drag moved nothing at all. This is the same fix on
+   * the same shared state, so the two input paths cannot disagree about
+   * which container takes a gesture.
+   *
+   * A container that overflows on one axis only is unaffected: the axis
+   * it does not scroll has no room, so it is not taken.
    */
-  private resolve(target: UiNode | null, dx: number, dy: number): { node: UiNode; state: ScrollContainerState } | null {
-    let innermost: { node: UiNode; state: ScrollContainerState } | null = null;
+  private resolve(target: UiNode | null, dx: number, dy: number): ResolvedScroll | null {
+    let innermost: ResolvedScroll | null = null;
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
       if (!isScrollContainer(node)) {
         continue;
@@ -251,12 +268,14 @@ export class UiTouchScroller {
       if (state === undefined) {
         continue;
       }
-      innermost ??= { node, state };
-      const delta = state.horizontal ? dx : dy;
-      const offset = state.horizontal ? state.scrollX : state.scrollY;
-      const max = state.horizontal ? state.maxScrollX : state.maxScrollY;
-      if ((delta < 0 && offset > 0) || (delta > 0 && offset < max)) {
-        return { node, state };
+      const takesX = dx !== 0 && hasScrollRoom(state.scrollX, state.maxScrollX, dx);
+      const takesY = dy !== 0 && hasScrollRoom(state.scrollY, state.maxScrollY, dy);
+      // The innermost is the fallback, and it takes nothing: a gesture
+      // that nothing can move should belong somewhere without moving
+      // anything.
+      innermost ??= { node, state, takesX: false, takesY: false };
+      if (takesX || takesY) {
+        return { node, state, takesX, takesY };
       }
     }
     return innermost;
