@@ -155,7 +155,7 @@ describe('fanOut', () => {
 
     source.next({ a: 1, b: 2 });
 
-    expect(read).toHaveBeenCalledExactlyOnceWith({ a: 1, b: 2 }, 'b');
+    expect(read).toHaveBeenCalledExactlyOnceWith({ a: 1, b: 2 }, 'b', undefined);
     expect(cells.for('b').value).toBe(2);
   });
 
@@ -201,7 +201,41 @@ describe('fanOut', () => {
 
     source.next({ a: 2 });
 
-    expect(read).toHaveBeenCalledExactlyOnceWith({ a: 2 }, 'a');
+    expect(read).toHaveBeenCalledExactlyOnceWith({ a: 2 }, 'a', undefined);
+  });
+
+  it('hands the reader whatever the key stands for, so it is never parsed back out', () => {
+    // The reason this exists. A grid's key is `${row}:${column}`,
+    // because a Map wants a string, and a reader that took the string
+    // apart on every read would be doing it for every live cell on
+    // every emission. gessosheet keeps the row and column beside its
+    // subjects for exactly that reason; this is the same trick, kept
+    // by the registry.
+    const source = new BehaviorSubject<Grid>({ '1:2': 7 });
+    const read = vi.fn(
+      (grid: Grid, _key: FanKey, at: { row: number; column: number }) => grid[`${at.row}:${at.column}`] ?? 0
+    );
+    const cells = fanOut(source, read, { initial: 0 });
+
+    const cell = cells.for('1:2', { row: 1, column: 2 });
+
+    expect(cell.value).toBe(7);
+    expect(read).toHaveBeenCalledWith({ '1:2': 7 }, '1:2', { row: 1, column: 2 });
+    expect(cell.datum).toEqual({ row: 1, column: 2 });
+  });
+
+  it('gives the datum back on every later read, not only the first', () => {
+    const source = new BehaviorSubject<Grid>({ '1:2': 7 });
+    const read = vi.fn(
+      (grid: Grid, _key: FanKey, at: { row: number; column: number }) => grid[`${at.row}:${at.column}`] ?? 0
+    );
+    const cells = fanOut(source, read, { initial: 0 });
+    cells.for('1:2', { row: 1, column: 2 });
+    read.mockClear();
+
+    source.next({ '1:2': 9 });
+
+    expect(read).toHaveBeenCalledExactlyOnceWith({ '1:2': 9 }, '1:2', { row: 1, column: 2 });
   });
 
   it('says so when a closed registry is asked for a key', () => {

@@ -357,21 +357,22 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
 }
 declare function computed<T>(compute: (read: ReadSource) => T, options?: ComputedOptions<T>): ComputedCell<T>;
 type FanKey = string | number;
-interface FanOutOptions<S, V> {
-  readonly initial: V | ((key: FanKey) => V);
+interface FanOutOptions<S, V, D> {
+  readonly initial: V | ((key: FanKey, datum: D) => V);
   readonly changed?: (next: S, previous: S | undefined) => Iterable<FanKey> | undefined;
   readonly equal?: Equality<V>;
   readonly label?: string;
 }
-declare class FanCell<V> extends Observable<V> implements ReadableCell<V> {
+declare class FanCell<V, D = unknown> extends Observable<V> implements ReadableCell<V> {
   readonly key: FanKey;
+  readonly datum: D;
   readonly label: string | undefined;
   readonly subject: BehaviorSubject<V>;
-  constructor(initial: V, key: FanKey, label: string | undefined);
+  constructor(initial: V, key: FanKey, datum: D, label: string | undefined);
   get value(): V;
 }
-declare function fanOut<S, V>(source: Observable<S>, read: (snapshot: S, key: FanKey) => V, options: FanOutOptions<S, V>): FanOut<S, V>;
-declare class FanOut<S, V> {
+declare function fanOut<S, V, D = undefined>(source: Observable<S>, read: (snapshot: S, key: FanKey, datum: D) => V, options: FanOutOptions<S, V, D>): FanOut<S, V, D>;
+declare class FanOut<S, V, D = undefined> {
   private readonly source;
   private readonly read;
   private readonly cells;
@@ -383,10 +384,10 @@ declare class FanOut<S, V> {
   private snapshot;
   private hasSnapshot;
   private closed;
-  constructor(source: Observable<S>, read: (snapshot: S, key: FanKey) => V, options: FanOutOptions<S, V>);
+  constructor(source: Observable<S>, read: (snapshot: S, key: FanKey, datum: D) => V, options: FanOutOptions<S, V, D>);
   get size(): number;
-  for(key: FanKey): FanCell<V>;
-  peek(key: FanKey): FanCell<V> | undefined;
+  for(key: FanKey, datum?: D): FanCell<V, D>;
+  peek(key: FanKey): FanCell<V, D> | undefined;
   release(key: FanKey): void;
   releaseAll(): void;
   close(): void;
@@ -2898,7 +2899,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-RACyx5zz.js";
+} from "./index-BFBy6qhN.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3378,7 +3379,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-RACyx5zz.js";
+} from "../index-BFBy6qhN.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

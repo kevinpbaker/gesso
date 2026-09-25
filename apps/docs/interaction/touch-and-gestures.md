@@ -278,7 +278,7 @@ neither `-webkit-` property, so the two iOS settings are inert where they
 were tested, and the soft keyboard behaviour is an iOS one that cannot be
 observed off iOS.
 
-The part a browser *can* answer now runs every build. `pnpm check:touch`
+The part a browser _can_ answer now runs every build. `pnpm check:touch`
 drives real `pointerType: 'touch'` contacts through the DevTools protocol
 at a `ScrollView` over content wider and taller than itself, and asserts
 that a sideways drag moves the content sideways, that a diagonal one

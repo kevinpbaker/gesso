@@ -6,7 +6,23 @@ import { trackRead, type ReadableCell } from './Input';
 /** What a key is. A cell in a grid names itself `${row}:${column}`. */
 export type FanKey = string | number;
 
-export interface FanOutOptions<S, V> {
+/**
+ * What a key stands for, carried beside it.
+ *
+ * A key has to be a string or a number, because the registry looks one
+ * up in a `Map` and identity is the wrong test for `${row}:${column}`.
+ * That leaves a reader with a compound key parsing it back out on
+ * every read, which is precisely what a grid cannot afford: gessosheet
+ * keeps a cell's row and column beside its subjects for exactly this
+ * reason, and its comment says so — "parsing them back out of the key
+ * was the only reason the key had a shape".
+ *
+ * So the caller hands `for` whatever the key means, the registry
+ * remembers it, and the reader is given it. `undefined` for a caller
+ * whose key is already the whole answer.
+ */
+
+export interface FanOutOptions<S, V, D> {
   /**
    * What a key's cell holds before the source has said anything.
    *
@@ -16,7 +32,7 @@ export interface FanOutOptions<S, V> {
    * to be a value it can draw rather than a hole. A function is given
    * the key, for a default that varies by position.
    */
-  readonly initial: V | ((key: FanKey) => V);
+  readonly initial: V | ((key: FanKey, datum: D) => V);
   /**
    * Which keys an emission could have changed, when the source knows.
    *
@@ -54,13 +70,14 @@ export interface FanOutOptions<S, V> {
  * comes from — it is *pushed* by the registry that made it rather than
  * pulled through a pipeline of its own, and that is the whole point.
  */
-export class FanCell<V> extends Observable<V> implements ReadableCell<V> {
+export class FanCell<V, D = unknown> extends Observable<V> implements ReadableCell<V> {
   /** @internal */
   readonly subject: BehaviorSubject<V>;
 
   constructor(
     initial: V,
     readonly key: FanKey,
+    readonly datum: D,
     readonly label: string | undefined
   ) {
     const subject = new BehaviorSubject(initial);
@@ -110,19 +127,19 @@ export class FanCell<V> extends Observable<V> implements ReadableCell<V> {
  * would be rebuilt on every scroll frame by exactly the code that
  * cannot afford it.
  */
-export function fanOut<S, V>(
+export function fanOut<S, V, D = undefined>(
   source: Observable<S>,
-  read: (snapshot: S, key: FanKey) => V,
-  options: FanOutOptions<S, V>
-): FanOut<S, V> {
+  read: (snapshot: S, key: FanKey, datum: D) => V,
+  options: FanOutOptions<S, V, D>
+): FanOut<S, V, D> {
   return new FanOut(source, read, options);
 }
 
 /** What `fanOut` returns. See there. */
-export class FanOut<S, V> {
-  private readonly cells = new Map<FanKey, FanCell<V>>();
+export class FanOut<S, V, D = undefined> {
+  private readonly cells = new Map<FanKey, FanCell<V, D>>();
   private readonly equal: (a: V, b: V) => boolean;
-  private readonly initial: (key: FanKey) => V;
+  private readonly initial: (key: FanKey, datum: D) => V;
   private readonly changed: ((next: S, previous: S | undefined) => Iterable<FanKey> | undefined) | undefined;
   private readonly label: string | undefined;
   private upstream: Subscription | null = null;
@@ -132,12 +149,12 @@ export class FanOut<S, V> {
 
   constructor(
     private readonly source: Observable<S>,
-    private readonly read: (snapshot: S, key: FanKey) => V,
-    options: FanOutOptions<S, V>
+    private readonly read: (snapshot: S, key: FanKey, datum: D) => V,
+    options: FanOutOptions<S, V, D>
   ) {
     this.equal = equalityOf(options.equal ?? 'structural');
     const initial = options.initial;
-    this.initial = typeof initial === 'function' ? (initial as (key: FanKey) => V) : () => initial;
+    this.initial = typeof initial === 'function' ? (initial as (key: FanKey, datum: D) => V) : () => initial;
     this.changed = options.changed;
     this.label = options.label;
   }
@@ -154,7 +171,7 @@ export class FanOut<S, V> {
    * by key binds this once and is never re-bound, which is the reason
    * the registry hands out cells rather than values.
    */
-  for(key: FanKey): FanCell<V> {
+  for(key: FanKey, datum: D = undefined as D): FanCell<V, D> {
     const existing = this.cells.get(key);
     if (existing !== undefined) {
       return existing;
@@ -171,14 +188,14 @@ export class FanOut<S, V> {
     // is not in the map yet — so it is read directly here and the
     // walk below skips it.
     this.attach();
-    const first = this.hasSnapshot ? this.read(this.snapshot as S, key) : this.initial(key);
-    const cell = new FanCell(first, key, this.label);
+    const first = this.hasSnapshot ? this.read(this.snapshot as S, key, datum) : this.initial(key, datum);
+    const cell = new FanCell(first, key, datum, this.label);
     this.cells.set(key, cell);
     return cell;
   }
 
   /** The cell for a key if it is live, without making one. */
-  peek(key: FanKey): FanCell<V> | undefined {
+  peek(key: FanKey): FanCell<V, D> | undefined {
     return this.cells.get(key);
   }
 
@@ -235,7 +252,7 @@ export class FanOut<S, V> {
       if (cell === undefined) {
         continue;
       }
-      const next = this.read(snapshot, key);
+      const next = this.read(snapshot, key, cell.datum);
       if (!this.equal(cell.subject.value, next)) {
         cell.subject.next(next);
       }
