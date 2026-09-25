@@ -157,10 +157,73 @@ properties run layout again from the nearest ancestor that can absorb
 the change, and `transform` does neither, moving the node without
 touching layout or paint.
 
-Fan-out is free. Ten nodes bound to the same Observable are ten writes
-from one emission, with no list to re-render and no diff. That is why
-the two order lines above can share a currency cell without the parent
-knowing how many lines there are.
+Fan-out is free when the nodes share a cell. Ten nodes bound to the same
+Observable are ten writes from one emission, with no list to re-render
+and no diff. That is why the two order lines above can share a currency
+cell without the parent knowing how many lines there are.
+
+What is not free is ten thousand nodes each reading a _different_ slice
+of one upstream value, which is the next section.
+
+## `fanOut`, when every node wants its own slice
+
+A grid, a timeline and a log viewer all arrive at the same shape: one
+source, and N things on screen each reading one part of it. The natural
+spelling is a pipe per part:
+
+```ts
+const cell = cells.pipe(
+  map(all => all[key]),
+  distinctUntilChanged()
+);
+```
+
+It is the one spelling in this guide that does not scale. Every
+emission runs N pipelines whatever changed, and each pipeline is one
+more observer on one Subject, which RxJS removes by scanning the list:
+so unmounting a window of N costs N². At a few dozen nodes none of that
+is measurable. At ten thousand it is the frame.
+
+`fanOut` is the same idea with the costs the other way round:
+
+```ts
+const cells = fanOut(sheet.view.cells, (all, key) => all[key] ?? null, {
+  initial: null,
+  changed: (next, previous) => next.touched
+});
+
+const cell = cells.for(`${row}:${column}`); // a stable cell, made on demand
+Text({ text: cell });
+cells.release(`${row}:${column}`); // when it leaves the screen
+```
+
+One subscription on the source for the whole registry, whatever N is.
+Each cell carries its own subject with one observer, so its teardown is
+the constant-time case. And `changed` is where the frame is won: a
+source that knows which keys a patch touched reads only those, so a
+change to one cell of ten thousand costs one read rather than ten
+thousand. Leave it out and every live key is read on every emission,
+which is correct, is what the pipe costs too, and is the honest answer
+for a source that genuinely does not know.
+
+Measured, ten thousand live keys, against the pipe per key:
+
+|                         | mount   | one key changes | unmount |
+| ----------------------- | ------- | --------------- | ------- |
+| a pipe per key          | 29.8 ms | 2.2 ms          | 9.7 ms  |
+| `fanOut`                | 10.7 ms | 2.2 ms          | 4.0 ms  |
+| `fanOut` with `changed` | 10.8 ms | 0.1 ms          | 3.7 ms  |
+
+A registry is a resource: it holds a key until `release` and the source
+until the last key goes. That is deliberate. The surfaces that need it
+are the ones that mount and unmount deliberately, and a cell that
+vanished when its last binding did would be rebuilt on every scroll
+frame by exactly the code that cannot afford it.
+
+Reach for it when N is large and each node's slice is its own. For a
+list of components, [`each`](/guide/components-run-once) is still the
+answer: a row that is a component already has its own identity and its
+own inputs, and does not need a registry to give it one.
 
 ## Cells outside a component
 

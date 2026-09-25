@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { Text } from 'gesso-core';
+
 import { createApp } from './createApp';
 import { createComponent } from '../createComponent';
-import type { ComponentContext, Inputs } from '../Component';
 
 /**
  * The two ways `createApp` is called wrongly, and what it says.
@@ -18,8 +19,8 @@ import type { ComponentContext, Inputs } from '../Component';
  * one identifier, and a message that does not say which one turns a
  * rename into an afternoon.
  */
-function Probe(_inputs: Inputs<Record<string, never>>, _ctx: ComponentContext) {
-  return null;
+function Probe() {
+  return Text({ text: 'probe' });
 }
 
 describe('createApp', () => {

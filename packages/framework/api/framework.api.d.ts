@@ -241,6 +241,7 @@ import {
   ReadableCell
 } from "./FunctionComponent-DAyf5HQ6.js";
 import {
+  BehaviorSubject,
   Observable,
   Subscription
 } from "rxjs";
@@ -353,6 +354,44 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private onSourceChanged;
 }
 declare function computed<T>(compute: (read: ReadSource) => T, options?: ComputedOptions<T>): ComputedCell<T>;
+type FanKey = string | number;
+interface FanOutOptions<S, V> {
+  readonly initial: V | ((key: FanKey) => V);
+  readonly changed?: (next: S, previous: S | undefined) => Iterable<FanKey> | undefined;
+  readonly equal?: Equality<V>;
+  readonly label?: string;
+}
+declare class FanCell<V> extends Observable<V> implements ReadableCell<V> {
+  readonly key: FanKey;
+  readonly label: string | undefined;
+  readonly subject: BehaviorSubject<V>;
+  constructor(initial: V, key: FanKey, label: string | undefined);
+  get value(): V;
+}
+declare function fanOut<S, V>(source: Observable<S>, read: (snapshot: S, key: FanKey) => V, options: FanOutOptions<S, V>): FanOut<S, V>;
+declare class FanOut<S, V> {
+  private readonly source;
+  private readonly read;
+  private readonly cells;
+  private readonly equal;
+  private readonly initial;
+  private readonly changed;
+  private readonly label;
+  private upstream;
+  private snapshot;
+  private hasSnapshot;
+  private closed;
+  constructor(source: Observable<S>, read: (snapshot: S, key: FanKey) => V, options: FanOutOptions<S, V>);
+  get size(): number;
+  for(key: FanKey): FanCell<V>;
+  peek(key: FanKey): FanCell<V> | undefined;
+  release(key: FanKey): void;
+  releaseAll(): void;
+  close(): void;
+  refresh(keys?: Iterable<FanKey>): void;
+  private attach;
+  private detach;
+}
 interface SelectOptions<T> {
   readonly equal?: Equality<T>;
   readonly label?: string;
@@ -2382,6 +2421,11 @@ export {
   EditingProxySink,
   EditingState$1,
   Equality,
+  FanCell,
+  FanKey,
+  fanOut,
+  FanOut,
+  FanOutOptions,
   FindService,
   findUnplainPath,
   FocusService,
@@ -2665,6 +2709,11 @@ import {
   EditingProxySink,
   EditingState,
   Equality,
+  FanCell,
+  FanKey,
+  fanOut,
+  FanOut,
+  FanOutOptions,
   FindService,
   findUnplainPath,
   FocusService,
@@ -2838,7 +2887,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-DOjfIhpO.js";
+} from "./index-DfZz7Qe-.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2876,6 +2925,9 @@ export {
   each,
   Each,
   EditingProxy,
+  FanCell,
+  fanOut,
+  FanOut,
   FindService,
   findUnplainPath,
   FocusService,
@@ -3013,6 +3065,8 @@ export {
   type EmitArgs,
   type EmitValue,
   type Equality,
+  type FanKey,
+  type FanOutOptions,
   type FontFaceDeclaration,
   type FontFaceLike,
   type FontFamilyDeclaration,
@@ -3312,7 +3366,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-DOjfIhpO.js";
+} from "../index-DfZz7Qe-.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
