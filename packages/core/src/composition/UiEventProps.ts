@@ -31,6 +31,7 @@ const EVENT_PROPS: Readonly<Record<string, UiEventType>> = {
   onBlur: UiEventType.Blur,
   onBeforeInput: UiEventType.BeforeInput,
   onInput: UiEventType.Input,
+  onSelectionChange: UiEventType.SelectionChange,
   onClick: UiEventType.Click,
   onLongPress: UiEventType.LongPress,
   onDragStart: UiEventType.DragStart,

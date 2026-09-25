@@ -26,6 +26,21 @@ export enum UiEventType {
   /** An editable's text changed. */
   Input = 'input',
   /**
+   * An editable's selection moved, whether or not its text changed.
+   *
+   * Separate from `Input` because the caret moves without the text on
+   * every arrow key, every click into the text and every
+   * select-all — and something has to be able to follow it. A formula
+   * editor that colours the bracket beside the caret has no other way
+   * to know it moved.
+   *
+   * Fires *after* `Input` when a change did both, so a listener that
+   * reads the text sees the new one. It is skipped entirely when the
+   * selection did not actually move, so holding a key that is already
+   * at the end of the text is silent.
+   */
+  SelectionChange = 'selectionchange',
+  /**
    * Text arrived from the system clipboard with nothing editable
    * focused.
    *
@@ -352,6 +367,34 @@ export class UiTextChangeEvent extends UiInputEvent {
     readonly selectionEnd: number
   ) {
     super(UiEventType.Input);
+  }
+}
+
+/**
+ * An editable's selection moved.
+ *
+ * Carries the text as well as the offsets, because every use of this
+ * is "what is under the caret" and the answer needs both — and
+ * reading the text back off the model afterwards is a second source
+ * of truth that can disagree by a frame.
+ *
+ * `start` and `end` are ordered; `anchor` and `focus` are where the
+ * selection was begun and where the caret now is, which is the pair
+ * that says which way it was dragged.
+ */
+export class UiSelectionChangeEvent extends UiInputEvent {
+  constructor(
+    readonly value: string,
+    readonly start: number,
+    readonly end: number,
+    readonly anchor: number,
+    readonly focus: number
+  ) {
+    super(UiEventType.SelectionChange);
+  }
+
+  get collapsed(): boolean {
+    return this.start === this.end;
   }
 }
 

@@ -674,6 +674,7 @@ declare enum UiEventType {
   Blur = "blur",
   BeforeInput = "beforeinput",
   Input = "input",
+  SelectionChange = "selectionchange",
   Paste = "paste",
   Click = "click",
   LongPress = "longpress",
@@ -766,6 +767,15 @@ declare class UiTextChangeEvent extends UiInputEvent {
   readonly selectionStart: number;
   readonly selectionEnd: number;
   constructor(value: string, selectionStart: number, selectionEnd: number);
+}
+declare class UiSelectionChangeEvent extends UiInputEvent {
+  readonly value: string;
+  readonly start: number;
+  readonly end: number;
+  readonly anchor: number;
+  readonly focus: number;
+  constructor(value: string, start: number, end: number, anchor: number, focus: number);
+  get collapsed(): boolean;
 }
 declare enum UiWheelDeltaMode {
   Pixel = 0,
@@ -1546,6 +1556,8 @@ declare class EditableTextModel {
   version: number;
   blinkOrigin: number;
   syncedValue: string | undefined;
+  notifiedAnchor: number;
+  notifiedFocus: number;
   constructor(text?: string);
   get text(): string;
   get anchor(): number;
@@ -1770,6 +1782,7 @@ type UiEventProps = {
   onBlur?: (event: UiFocusEvent) => void;
   onBeforeInput?: (event: UiBeforeInputEvent) => void;
   onInput?: (event: UiTextChangeEvent) => void;
+  onSelectionChange?: (event: UiSelectionChangeEvent) => void;
   onPaste?: (event: UiPasteEvent) => void;
 };
 type IdentityProps = {
@@ -3061,8 +3074,10 @@ declare class UiEditingController {
   private applyEdit;
   private history;
   private afterTextChange;
+  private notifySelection;
   private afterSelectionChange;
   private revealCaret;
+  caretRectOf(node: UiNode): CaretRect | null;
   private layoutOf;
 }
 interface PlatformEventTarget {
@@ -5696,6 +5711,7 @@ export {
   UiSchedulerOptions,
   UiScrollability,
   UiScrollBehavior,
+  UiSelectionChangeEvent,
   UiSelectionController,
   UiSelfAlignment,
   UiSemanticsAction,
@@ -6576,6 +6592,7 @@ import {
   UiSchedulerOptions,
   UiScrollability,
   UiScrollBehavior,
+  UiSelectionChangeEvent,
   UiSelectionController,
   UiSelfAlignment,
   UiSemanticsAction,
@@ -6685,7 +6702,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-YeWKf2ss.js";
+} from "./index-B4o3nKt2.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7486,6 +7503,7 @@ export {
   UiResolvedTextSpan,
   UiRole,
   UiScheduler,
+  UiSelectionChangeEvent,
   UiSelectionController,
   UiSelfAlignment,
   UiSemanticState,
@@ -7596,7 +7614,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-YeWKf2ss.js";
+} from "./index-B4o3nKt2.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

@@ -73,6 +73,22 @@ export class EditableTextModel {
   /** The last `value` the host synchronised in; see `UiEditable`. */
   syncedValue: string | undefined = undefined;
 
+  /**
+   * The selection the last `selectionchange` reported.
+   *
+   * Kept on the model rather than worked out at each call site,
+   * because the caret is moved from a dozen places — arrows, clicks,
+   * select-all, an edit that replaces a range — and every one of them
+   * would otherwise have to remember to compare. Storing what was
+   * last said makes the comparison the notifier's job and the answer
+   * the same wherever the move came from.
+   *
+   * `NaN` to begin with, so the first report always fires: a fresh
+   * model at offset zero has genuinely not told anyone yet.
+   */
+  notifiedAnchor = Number.NaN;
+  notifiedFocus = Number.NaN;
+
   constructor(text = '') {
     this.textValue = text;
   }

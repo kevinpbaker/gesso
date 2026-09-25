@@ -12,6 +12,7 @@ export {
   UiPinchEvent,
   UiPointerEvent,
   UiPasteEvent,
+  UiSelectionChangeEvent,
   UiTextChangeEvent,
   UiWheelDeltaMode,
   UiWheelEvent,

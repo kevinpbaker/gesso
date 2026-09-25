@@ -249,6 +249,7 @@ import {
   AnimatedCell,
   AnimationDriver,
   CanvasHost,
+  CaretRect,
   ComponentLikeElement,
   ComponentResolver,
   EditingState,
@@ -2236,6 +2237,11 @@ declare class TextService {
   measure(request: TextMeasureRequest): Size;
   widthOf(text: string, style: Omit<TextMeasureRequest, 'text' | 'maxWidth'>): number;
 }
+declare class EditingService {
+  private controller;
+  setController(controller: UiEditingController | null): void;
+  caretRectOf(node: UiNode | null): CaretRect | null;
+}
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
   readonly trapped: InternalState<boolean>;
@@ -2375,7 +2381,6 @@ declare class RenderWorkerApp {
   private initialize;
 }
 export {
-  _n,
   ActionCause,
   ActionEntry,
   AnimateOptions,
@@ -2437,6 +2442,7 @@ export {
   EditingMirrorTarget,
   EditingProxy,
   EditingProxySink,
+  EditingService,
   EditingState$1,
   Equality,
   FanCell,
@@ -2612,6 +2618,7 @@ export {
   UndoStack,
   UndoStackOptions,
   UndoTransaction,
+  vn,
   WorkerApp,
   WorkerAppOptions,
   workerHandle,
@@ -2725,6 +2732,7 @@ import {
   EditingMirrorTarget,
   EditingProxy,
   EditingProxySink,
+  EditingService,
   EditingState,
   Equality,
   FanCell,
@@ -2906,7 +2914,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-Zh2eyHcJ.js";
+} from "./index-D3SBTLAB.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2944,6 +2952,7 @@ export {
   each,
   Each,
   EditingProxy,
+  EditingService,
   FanCell,
   fanOut,
   FanOut,
@@ -3386,7 +3395,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-Zh2eyHcJ.js";
+} from "../index-D3SBTLAB.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

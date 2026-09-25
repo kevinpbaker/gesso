@@ -9,9 +9,16 @@ import type { EditableTextModel, EditUnit } from '../editing/EditableTextModel';
 import { commandForKey, detectEditingPlatform, type EditCommand, type EditingPlatform } from '../editing/EditingKeymap';
 import { wordRangeAt, lineStartAt, lineEndAt } from '../editing/TextBoundaries';
 import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
+import type { CaretRect } from '../editing/TextGeometry';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
-import { UiBeforeInputEvent, UiPasteEvent, UiTextChangeEvent, type UiKeyModifiers } from './UiInputEvent';
+import {
+  UiBeforeInputEvent,
+  UiPasteEvent,
+  UiSelectionChangeEvent,
+  UiTextChangeEvent,
+  type UiKeyModifiers
+} from './UiInputEvent';
 
 /**
  * What the controller needs from the runtime around it: geometry,
@@ -592,7 +599,33 @@ export class UiEditingController {
     if (changed) {
       this.dispatcher.dispatch(new UiTextChangeEvent(model.text, model.start, model.end), node);
     }
+    // After the text change, so a listener reading the value sees the
+    // new one rather than the value it is about to be told about.
+    this.notifySelection(node, model);
     this.revealCaret(node);
+  }
+
+  /**
+   * Reports the selection, if it has actually moved since last time.
+   *
+   * The guard is what keeps this quiet: holding a right arrow against
+   * the end of the text moves nothing and must say nothing, and a
+   * listener that recomputed decoration on every key would otherwise
+   * do it forever for no reason.
+   *
+   * `hasListeners` already makes an unheard dispatch free, so the
+   * cost when nobody is listening is the two comparisons here.
+   */
+  private notifySelection(node: UiNode, model: EditableTextModel): void {
+    if (model.anchor === model.notifiedAnchor && model.focus === model.notifiedFocus) {
+      return;
+    }
+    model.notifiedAnchor = model.anchor;
+    model.notifiedFocus = model.focus;
+    this.dispatcher.dispatch(
+      new UiSelectionChangeEvent(model.text, model.start, model.end, model.anchor, model.focus),
+      node
+    );
   }
 
   private afterSelectionChange(node: UiNode, model: EditableTextModel, keepGoal = false): void {
@@ -601,6 +634,7 @@ export class UiEditingController {
     }
     model.blinkOrigin = this.host.now();
     this.host.markDirty(node, DirtyFlags.Paint);
+    this.notifySelection(node, model);
     this.revealCaret(node);
   }
 
@@ -637,6 +671,29 @@ export class UiEditingController {
    * layout the record is empty and the lines fall at the origin, which
    * is still a valid place for a caret.
    */
+  /**
+   * Where the caret is inside a field, in the field's own coordinates.
+   *
+   * Relative to the node's border-box origin, with the field's own
+   * scroll already applied — so a popup placed under the caret adds
+   * the node's position on screen and nothing else.
+   *
+   * Public because an application cannot work this out. The geometry
+   * needs the paragraph as it was *laid out*, which means the
+   * measurer, the resolved paint and the layout record, and an
+   * application that re-measured the text to find the caret would be
+   * a second measurer that must never disagree with this one. Asking
+   * is the only version that stays right.
+   *
+   * Null when the node is not an editable, or has not been laid out.
+   */
+  caretRectOf(node: UiNode): CaretRect | null {
+    if (!isEditableNode(node) || this.host.recordFor(node) === undefined) {
+      return null;
+    }
+    return this.layoutOf(node).caretRect();
+  }
+
   private layoutOf(node: UiNode): EditableLayout {
     const rec = this.host.recordFor(node);
     const state = resolvePaintState(node, this.paint);

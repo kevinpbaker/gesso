@@ -10,6 +10,7 @@ import type {
   UiPinchEvent,
   UiPasteEvent,
   UiPointerEvent,
+  UiSelectionChangeEvent,
   UiTextChangeEvent,
   UiWheelEvent
 } from '../input/UiInputEvent';
@@ -74,6 +75,16 @@ export type UiEventProps = {
   onBeforeInput?: (event: UiBeforeInputEvent) => void;
   /** An editable's text changed. */
   onInput?: (event: UiTextChangeEvent) => void;
+  /**
+   * An editable's selection moved, with or without a text change.
+   *
+   * The caret moves without the text on every arrow key, every click
+   * into the text and every select-all, and `onInput` says nothing
+   * about any of them. Anything that decorates by caret position — a
+   * bracket matched against the one beside it, a hint about the
+   * argument being typed — needs this one.
+   */
+  onSelectionChange?: (event: UiSelectionChangeEvent) => void;
   /**
    * Text from the clipboard, when nothing editable has the caret.
    *

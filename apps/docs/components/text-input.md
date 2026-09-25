@@ -186,6 +186,50 @@ That is what the spec beside the example queries, and it is the same
 tree the accessibility mirror hands the platform. There is no second
 definition of what this control is.
 
+## Following the caret
+
+`onInput` says the text changed. It says nothing about the caret,
+which moves without the text on every arrow key, every click into the
+text and every select-all. `onSelectionChange` is the other half:
+
+```tsx
+<editabletext
+  value={formula}
+  onInput={event => setFormula(event.value)}
+  onSelectionChange={event => setCaret(event.focus)}
+/>
+```
+
+It carries the text as well as the offsets, because every use of it
+is "what is under the caret" and reading the text back afterwards is
+a second source of truth that can disagree by a frame. `start` and
+`end` are ordered; `anchor` and `focus` say which end was begun at
+and which the caret is on. It is skipped when the selection did not
+actually move, so holding a key against the end of the text is
+silent, and skipped entirely when nothing is listening.
+
+When both happen, `onInput` fires first, so a listener reading the
+value sees the new one.
+
+## Putting something at the caret
+
+A popup under the word being typed needs to know where the caret is
+on screen, and an application cannot work that out: the geometry
+depends on the paragraph as it was laid out, so re-measuring the text
+would be a second measurer that must never disagree with the
+engine's. Ask instead.
+
+```tsx
+const editing = ctx.inject(EditingService);
+const caret = editing.caretRectOf(fieldNode);
+```
+
+The rectangle is in the field's own coordinates, with the field's
+scroll already applied, so a popup adds the field's position on
+screen and nothing else. It is null for a node that is not a field
+and for one that has not been laid out yet. Both happen in the frame
+a field first appears, and both mean ask again next frame.
+
 ## Next
 
 [Slider](/components/slider) and
