@@ -419,6 +419,17 @@ interface MenuBarContext<T> {
   readonly labelOf: (item: T) => string;
 }
 declare function menuBarStep<T>(state: MenuBarState, key: string, menus: readonly MenuBarMenu<T>[], context: MenuBarContext<T>): MenuBarStep<T> | null;
+interface MenuBarProps<T> {
+  menus: readonly MenuBarMenu<T>[];
+  enabled?: (item: T) => boolean;
+  labelOf: (item: T) => string;
+  acceleratorOf?: (item: T) => string | undefined;
+  onChoose?: (item: T) => void;
+  onDismiss?: () => void;
+  barRef?: (node: UiNode | null) => void;
+  label?: string;
+}
+declare function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContext): UiChild;
 interface SelectOption {
   readonly value: string;
   readonly label: string;
@@ -835,6 +846,7 @@ export {
   Menu,
   MENU_BAR_CLOSED,
   MENU_SEPARATOR,
+  MenuBar,
   menuBarStep,
   Meter,
   minLength,
@@ -923,6 +935,7 @@ export {
   type MenuBarContext,
   type MenuBarEntry,
   type MenuBarMenu,
+  type MenuBarProps,
   type MenuBarState,
   type MenuBarStep,
   type MenuItem,

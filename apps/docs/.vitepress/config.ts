@@ -227,6 +227,7 @@ export default defineConfig({
           { text: 'Toast', link: '/components/toast' },
           { text: 'SplitPane', link: '/components/split-pane' },
           { text: 'FindBar', link: '/components/find-bar' },
+          { text: 'MenuBar', link: '/components/menu-bar' },
           { text: 'Breadcrumb', link: '/components/breadcrumb' },
           { text: 'Pagination', link: '/components/pagination' },
           { text: 'Image', link: '/components/image' },

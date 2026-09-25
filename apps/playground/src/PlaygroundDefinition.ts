@@ -230,35 +230,51 @@ function paritySection(state: PlaygroundState): UiElement {
     }),
     Column(
       { gap: 6 },
-      Box({
-        width: 90,
-        height: 34,
-        borderWidth: 2,
-        borderColor: '#10b981',
-        borderRadius: 8,
-        backgroundColor: 'rgba(16,185,129,0.15)',
-        modifiers: [decorated(CARD_DECORATION)]
-      }),
-      Box({ width: 90, height: 34, borderWidth: 3, borderColor: '#f43f5e' }),
-      // A border per edge, which `borderWidth` cannot describe: four
-      // widths and two colours on one node. It is four decoration
-      // rectangles rather than a border property, so this is the only
-      // place either backend has been asked to draw one, and the only
-      // place the far insets on `DecorationBox` are exercised at all.
-      // The four differ in width so a transposed axis shows, and the
-      // sides are a second colour so a corner painted twice shows.
-      Box({
-        width: 90,
-        height: 34,
-        backgroundColor: 'rgba(148,163,184,0.18)',
-        modifiers: [borders({ top: 1, right: 4, bottom: 6, left: 2, color: '#e2e8f0' })]
-      }),
-      Box({
-        width: 90,
-        height: 34,
-        backgroundColor: 'rgba(148,163,184,0.18)',
-        modifiers: [borders({ top: 3, bottom: { width: 3, color: '#f59e0b' }, left: { width: 5, color: '#22d3ee' } })]
-      })
+      Row(
+        { gap: 6 },
+        Box({
+          width: 90,
+          height: 34,
+          borderWidth: 2,
+          borderColor: '#10b981',
+          borderRadius: 8,
+          backgroundColor: 'rgba(16,185,129,0.15)',
+          modifiers: [decorated(CARD_DECORATION)]
+        }),
+        // A border per edge, which `borderWidth` cannot describe: four
+        // widths on one node. It is four decoration rectangles rather
+        // than a border property, so this is the only place either
+        // backend is asked to draw one, and the only place the far
+        // insets on `DecorationBox` are exercised at all. The widths
+        // differ so a transposed axis shows.
+        Box({
+          width: 90,
+          height: 34,
+          backgroundColor: 'rgba(148,163,184,0.18)',
+          modifiers: [borders({ top: 1, right: 4, bottom: 6, left: 2, color: '#e2e8f0' })]
+        })
+      ),
+      Row(
+        { gap: 6 },
+        Box({ width: 90, height: 34, borderWidth: 3, borderColor: '#f43f5e' }),
+        // Two colours, so a corner painted twice shows: the sides are
+        // amber where the horizontal edges are cyan, and the corners
+        // belong to the horizontal ones.
+        Box({
+          width: 90,
+          height: 34,
+          backgroundColor: 'rgba(148,163,184,0.18)',
+          modifiers: [
+            borders({
+              top: 3,
+              bottom: 3,
+              left: { width: 5, color: '#f59e0b' },
+              right: { width: 5, color: '#f59e0b' },
+              color: '#22d3ee'
+            })
+          ]
+        })
+      )
     ),
     Column(
       { width: 130, height: 80, overflow: 'scroll', scrollY: 22, backgroundColor: '#0f172a', borderRadius: 6 },

@@ -7,7 +7,7 @@ import {
   type MenuBarContext,
   type MenuBarMenu,
   type MenuBarState
-} from './menuBar';
+} from './menuBarModel';
 
 /**
  * The menu bar, as a table.
