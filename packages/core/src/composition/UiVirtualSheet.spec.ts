@@ -570,7 +570,12 @@ describe('a sheet whose rows are not all the same height', () => {
 
     /** The spacers and the rows still add up to the sheet's height. */
     it('adds up to the content height', () => {
-      const sheet = sheetWith(new Map([[2, 60], [7, 0]]));
+      const sheet = sheetWith(
+        new Map([
+          [2, 60],
+          [7, 0]
+        ])
+      );
       sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
       const children = sheet.children$.value;
       const total = children.reduce((sum, child) => sum + ((child.props.height as number) ?? 0), 0);
@@ -631,14 +636,18 @@ describe('a window the document widens', () => {
 
   it('mounts the columns the caller asked to reach back to', () => {
     // A merge anchored at column 2, spanning to column 8.
-    const sheet = sheetWith(range => (range.firstColumn > 2 && range.firstColumn <= 8 ? { ...range, firstColumn: 2 } : range));
+    const sheet = sheetWith(range =>
+      range.firstColumn > 2 && range.firstColumn <= 8 ? { ...range, firstColumn: 2 } : range
+    );
     sheet.update({ scrollX: 5 * COLUMN, scrollY: 0, width: 500, height: 240 });
 
     expect(columnsOf(sheet, 0)[0]).toBe(2);
   });
 
   it('mounts the rows the caller asked to reach back to', () => {
-    const sheet = sheetWith(range => (range.firstRow > 10 && range.firstRow <= 14 ? { ...range, firstRow: 10 } : range));
+    const sheet = sheetWith(range =>
+      range.firstRow > 10 && range.firstRow <= 14 ? { ...range, firstRow: 10 } : range
+    );
     sheet.update({ scrollX: 0, scrollY: 12 * ROW, width: 500, height: 240 });
 
     expect(rows(sheet)[0]).toBe(10);
@@ -646,7 +655,9 @@ describe('a window the document widens', () => {
 
   /** The spacer follows the widened window, or the rows sit wrong. */
   it('places the spacers against the widened window', () => {
-    const sheet = sheetWith(range => (range.firstRow > 10 && range.firstRow <= 14 ? { ...range, firstRow: 10 } : range));
+    const sheet = sheetWith(range =>
+      range.firstRow > 10 && range.firstRow <= 14 ? { ...range, firstRow: 10 } : range
+    );
     sheet.update({ scrollX: 0, scrollY: 12 * ROW, width: 500, height: 240 });
 
     expect(spacers(sheet).top).toBe(10 * ROW);
@@ -655,7 +666,15 @@ describe('a window the document widens', () => {
 
   it('costs nothing when the caller widens nothing', () => {
     const plain = new UiVirtualSheet(
-      { rowCount: 100, columnCount: 40, rowHeight: ROW, columnWidth: COLUMN, rowOverscan: 0, columnOverscan: 0, initialViewport: { width: 500, height: 240 } },
+      {
+        rowCount: 100,
+        columnCount: 40,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        rowOverscan: 0,
+        columnOverscan: 0,
+        initialViewport: { width: 500, height: 240 }
+      },
       renderRow
     );
     const hooked = sheetWith(range => range);
