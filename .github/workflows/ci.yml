@@ -240,6 +240,30 @@ jobs:
         env:
           CHROME_BIN: google-chrome
 
+  touch:
+    name: a finger scrolls a two-axis surface on both axes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The scroller's specs run in Node against synthesised pointer
+      # events. This drives real `pointerType: 'touch'` contacts through
+      # the DevTools protocol at a real surface, which is the only way to
+      # cover what sits between a contact and those events: whether the
+      # events arrive at all, whether `touch-action` lets the page keep
+      # the gesture, and whether the recognizer's slop and the
+      # platform's agree. Compares no pixels.
+      - name: Touch scroll
+        run: pnpm check:touch
+        env:
+          CHROME_BIN: google-chrome
+
   parity:
     name: Canvas2D and WebGPU agree
     runs-on: ubuntu-latest

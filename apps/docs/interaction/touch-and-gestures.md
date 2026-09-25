@@ -273,13 +273,21 @@ inside the `pointerdown`'s own call stack.
 **None of this was verified on a physical touchscreen.** No phone or
 tablet was available. The behaviours above are covered by unit specs for
 the scroller, the pointer controller, the recognizer and the editing
-proxy, by the spec beside the example on this page, and by a session in
-Chrome on Linux driving synthetic `pointerType: 'touch'` events at a
-real render-worker shell: a touch drag scrolled a container and coasted
-past the drag distance, the same drag from a mouse scrolled nothing, and
-hover cleared on release. Chrome implements neither `-webkit-` property,
-so the two iOS settings are inert where they were tested, and the soft
-keyboard behaviour is an iOS one that cannot be observed off iOS.
+proxy, and by the spec beside the example on this page. Chrome implements
+neither `-webkit-` property, so the two iOS settings are inert where they
+were tested, and the soft keyboard behaviour is an iOS one that cannot be
+observed off iOS.
+
+The part a browser *can* answer now runs every build. `pnpm check:touch`
+drives real `pointerType: 'touch'` contacts through the DevTools protocol
+at a `ScrollView` over content wider and taller than itself, and asserts
+that a sideways drag moves the content sideways, that a diagonal one
+moves both axes, and that the axis with room left goes on taking the
+gesture once the other is spent. That covers everything between a real
+contact and the events the unit specs synthesise: whether they arrive,
+whether `touch-action` lets the page keep the gesture, and whether the
+recognizer's slop and the platform's agree. What it is not is a hand on
+glass.
 
 **The pinch was verified in Chrome and not on a hand.** Two synthetic
 `pointerType: 'touch'` contacts spread apart over a real render-worker
