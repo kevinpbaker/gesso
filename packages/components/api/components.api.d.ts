@@ -396,6 +396,29 @@ interface MenuProps {
   };
 }
 declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
+declare const MENU_SEPARATOR: '-';
+type MenuBarEntry<T> = T | typeof MENU_SEPARATOR;
+interface MenuBarMenu<T> {
+  readonly label: string;
+  readonly mnemonic?: string;
+  readonly entries: readonly MenuBarEntry<T>[];
+}
+interface MenuBarState {
+  readonly focused: number;
+  readonly open: boolean;
+  readonly active: number;
+}
+declare const MENU_BAR_CLOSED: MenuBarState;
+interface MenuBarStep<T> {
+  readonly state: MenuBarState;
+  readonly choose?: T;
+  readonly dismiss?: boolean;
+}
+interface MenuBarContext<T> {
+  readonly enabled: (item: T) => boolean;
+  readonly labelOf: (item: T) => string;
+}
+declare function menuBarStep<T>(state: MenuBarState, key: string, menus: readonly MenuBarMenu<T>[], context: MenuBarContext<T>): MenuBarStep<T> | null;
 interface SelectOption {
   readonly value: string;
   readonly label: string;
@@ -810,6 +833,9 @@ export {
   matches,
   maxLength,
   Menu,
+  MENU_BAR_CLOSED,
+  MENU_SEPARATOR,
+  menuBarStep,
   Meter,
   minLength,
   NumberInput,
@@ -894,6 +920,11 @@ export {
   type LazyListProps,
   type LinkProps,
   type LinkUnderline,
+  type MenuBarContext,
+  type MenuBarEntry,
+  type MenuBarMenu,
+  type MenuBarState,
+  type MenuBarStep,
   type MenuItem,
   type MenuProps,
   type MeterOptimum,

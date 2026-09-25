@@ -47,6 +47,8 @@ export { SplitPane, type SplitPaneProps } from './SplitPane';
 export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
+export { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep } from './menuBar';
+export type { MenuBarContext, MenuBarEntry, MenuBarMenu, MenuBarState, MenuBarStep } from './menuBar';
 export { Select, type SelectProps, type SelectOption } from './Select';
 export {
   Tooltip,
