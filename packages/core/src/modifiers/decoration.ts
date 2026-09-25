@@ -177,3 +177,91 @@ const DEFAULT_RING: UiModifier<FocusRingOptions> = kind(Object.freeze({}));
 export function focusRing(options?: FocusRingOptions): UiModifier<FocusRingOptions> {
   return options === undefined ? DEFAULT_RING : kind(options);
 }
+
+/** One edge's border: a thickness, and a colour if it is not the shared one. */
+export interface BorderEdge {
+  readonly width: number;
+  readonly color?: UiColorValue;
+}
+
+/** What `borders()` takes. An omitted edge is not drawn. */
+export interface BordersOptions {
+  readonly top?: number | BorderEdge;
+  readonly right?: number | BorderEdge;
+  readonly bottom?: number | BorderEdge;
+  readonly left?: number | BorderEdge;
+  /** The colour for any edge that does not name its own. Defaults to `border`. */
+  readonly color?: UiColorValue;
+}
+
+/**
+ * A border per edge, as paint rather than as layout.
+ *
+ * `borderWidth` is one number and `borderColor` one colour, so a node
+ * cannot have a heavy bottom edge and a hairline top. This is the gap
+ * closed from the cheap side. A border in Gesso is paint-only —
+ * `paintBorder` strokes inside the box and touches no layout — so four
+ * edges are four filled rectangles in the node's own paint pass, with
+ * nothing to lay out and nothing to hit test. A bordered cell costs
+ * four draw instances and no extra nodes.
+ *
+ *   Box({ modifiers: [borders({ bottom: 2, right: 1, color: 'border' })] })
+ *
+ * They lie *inside* the box, where `borderWidth` puts them, so a border
+ * never changes where anything sits and never overlaps a neighbour.
+ *
+ * **Why this is a modifier and not four props.** First-class
+ * `borderTopWidth` is a much larger change, and the cost is not where
+ * it looks: the property, the paint state and the Canvas2D stroke are
+ * easy, but the WebGPU instance packs `radius, opacity, borderWidth` as
+ * one `float32x3`, the fragment shader draws the border as an
+ * isotropic SDF band, and one instance carries one colour — so four
+ * widths need a wider vertex format, an anisotropic inner rect in the
+ * shader, and up to four instances when the colours differ. This needs
+ * none of that, because a decoration is already a rectangle with its
+ * own colour that both backends already draw.
+ *
+ * What it does not do is round its corners. Four rectangles meeting at
+ * a square corner is right for a grid, a table and a rule, which is
+ * what per-edge borders are for; a rounded box wants the single
+ * `borderWidth`, which the renderers draw as one band and get right.
+ */
+export function borders(options: BordersOptions): UiModifier<Decorations> {
+  return decorated(borderShapes(options));
+}
+
+function borderShapes(options: BordersOptions): readonly DecorationShape[] {
+  const shared = options.color ?? 'border';
+  const edge = (side: number | BorderEdge | undefined): BorderEdge | undefined => {
+    if (side === undefined) {
+      return undefined;
+    }
+    const resolved = typeof side === 'number' ? { width: side } : side;
+    return resolved.width > 0 ? resolved : undefined;
+  };
+  const top = edge(options.top);
+  const bottom = edge(options.bottom);
+  const left = edge(options.left);
+  const right = edge(options.right);
+
+  // The corners belong to the horizontal edges, as a table's do: the
+  // top and bottom run the full width, and the sides run between them.
+  // Four full-length rectangles would paint each corner twice, which a
+  // translucent colour shows and an opaque one hides until somebody
+  // uses a translucent one.
+  const between = { y: top?.width ?? 0, bottom: bottom?.width ?? 0 };
+  const shapes: DecorationShape[] = [];
+  if (top !== undefined) {
+    shapes.push({ kind: 'fill', color: top.color ?? shared, y: 0, height: top.width, radius: 0 });
+  }
+  if (bottom !== undefined) {
+    shapes.push({ kind: 'fill', color: bottom.color ?? shared, bottom: 0, height: bottom.width, radius: 0 });
+  }
+  if (left !== undefined) {
+    shapes.push({ kind: 'fill', color: left.color ?? shared, x: 0, width: left.width, radius: 0, ...between });
+  }
+  if (right !== undefined) {
+    shapes.push({ kind: 'fill', color: right.color ?? shared, right: 0, width: right.width, radius: 0, ...between });
+  }
+  return shapes;
+}

@@ -43,6 +43,29 @@ interface DecorationBox {
   readonly width?: number;
   readonly height?: number;
   /**
+   * The far edges, as distances inward from the node's right and
+   * bottom. Any two of `x`, `width`, `right` fix the horizontal axis,
+   * exactly as CSS's `left`, `width` and `right` do, and likewise
+   * `y`, `height`, `bottom`.
+   *
+   *   { y: 0, height: 2 }                 the top edge, two pixels
+   *   { bottom: 0, height: 2 }            the bottom edge
+   *   { x: 0, width: 2, y: 2, bottom: 2 } the left edge, between them
+   *
+   * Without them a shape could only be placed from the top left, and
+   * `width` and `height` only defaulted to the node's own — so
+   * anything pinned to a far edge, or spanning between two, had to be
+   * built by a caller that had already measured the node. An
+   * application that declares its own geometry, as a spreadsheet
+   * declares its row height, does not need this; a general modifier
+   * such as `borders()` cannot exist without it.
+   *
+   * Given all three on one axis, the size wins and the far inset is
+   * ignored, which is the rule CSS settles the same conflict with.
+   */
+  readonly right?: number;
+  readonly bottom?: number;
+  /**
    * Grows the rectangle on all four sides. This is what puts a focus
    * ring outside the control instead of on top of it.
    */
@@ -96,12 +119,45 @@ export interface DecorationRect {
  */
 export function decorationRect(shape: DecorationShape, rec: LayoutRecord, nodeRadius: number): DecorationRect {
   const outset = shape.outset ?? 0;
-  const x = rec.x + (shape.x ?? 0) - outset;
-  const y = rec.y + (shape.y ?? 0) - outset;
-  const width = Math.max(0, (shape.width ?? rec.width) + 2 * outset);
-  const height = Math.max(0, (shape.height ?? rec.height) + 2 * outset);
+  const horizontal = axis(rec.x, rec.width, shape.x, shape.width, shape.right, outset);
+  const vertical = axis(rec.y, rec.height, shape.y, shape.height, shape.bottom, outset);
   const radius = Math.max(0, shape.radius ?? nodeRadius + outset);
-  return { x, y, width, height, radius };
+  return {
+    x: horizontal.start,
+    y: vertical.start,
+    width: horizontal.size,
+    height: vertical.size,
+    radius
+  };
+}
+
+/**
+ * One axis of the placement, from any two of near, size and far.
+ *
+ * The outset applies after the three are reconciled, growing the
+ * rectangle by it on both sides, so it means the same thing however
+ * the rectangle was described.
+ */
+function axis(
+  origin: number,
+  extent: number,
+  near: number | undefined,
+  size: number | undefined,
+  far: number | undefined,
+  outset: number
+): { start: number; size: number } {
+  let start: number;
+  let length: number;
+  if (near === undefined && size !== undefined && far !== undefined) {
+    // Pinned to the far edge at a fixed size: the only case where the
+    // near edge is the one that has to be worked out.
+    length = size;
+    start = extent - far - size;
+  } else {
+    start = near ?? 0;
+    length = size ?? extent - start - (far ?? 0);
+  }
+  return { start: origin + start - outset, size: Math.max(0, length + 2 * outset) };
 }
 
 /**

@@ -485,6 +485,8 @@ interface DecorationBox {
   readonly y?: number;
   readonly width?: number;
   readonly height?: number;
+  readonly right?: number;
+  readonly bottom?: number;
   readonly outset?: number;
   readonly radius?: number;
   readonly after?: 'children';
@@ -3585,6 +3587,18 @@ interface FocusRingOptions {
   readonly after?: 'children';
 }
 declare function focusRing(options?: FocusRingOptions): UiModifier<FocusRingOptions>;
+interface BorderEdge {
+  readonly width: number;
+  readonly color?: UiColorValue;
+}
+interface BordersOptions {
+  readonly top?: number | BorderEdge;
+  readonly right?: number | BorderEdge;
+  readonly bottom?: number | BorderEdge;
+  readonly left?: number | BorderEdge;
+  readonly color?: UiColorValue;
+}
+declare function borders(options: BordersOptions): UiModifier<Decorations>;
 declare function autoFocus(): UiModifier<void>;
 interface ClickOutsideOptions {
   readonly onOutside: (event: UiInputEvent) => void;
@@ -4927,11 +4941,14 @@ export {
   AxisExplanation,
   bandOf,
   BindingId,
+  BorderEdge,
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
+  borders,
+  BordersOptions,
   Box,
   BoxModelProps,
   BoxProps,
@@ -5112,6 +5129,7 @@ export {
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
+  gf,
   GLYPH_SUBPIXEL_PHASES,
   GlyphCommand,
   glyphCount,
@@ -5337,7 +5355,6 @@ export {
   percent,
   PercentLength,
   performanceMarksEnabled,
-  pf,
   pinchable,
   PinchableOptions,
   PinchRecognizerOptions,
@@ -5802,11 +5819,14 @@ import {
   AxisExplanation,
   bandOf,
   BindingId,
+  BorderEdge,
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
+  borders,
+  BordersOptions,
   Box,
   BoxModelProps,
   BoxProps,
@@ -6656,7 +6676,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CRQXv8sS.js";
+} from "./index-zg22cmiZ.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6673,6 +6693,7 @@ export {
   borderRadiusEqual,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
+  borders,
   Box,
   boxShadow,
   boxShadowArraysEqual,
@@ -7068,6 +7089,8 @@ export {
   type AutoScrollOptions,
   type AxisExplanation,
   type BindingId,
+  type BorderEdge,
+  type BordersOptions,
   type BoxModelProps,
   type BoxProps,
   type BreakpointArgs,
@@ -7562,7 +7585,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CRQXv8sS.js";
+} from "./index-zg22cmiZ.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

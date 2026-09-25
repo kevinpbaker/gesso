@@ -222,12 +222,37 @@ listeners walked per scrolled frame.
 | `draggable(options)`                          | `gesso-core`       | Moves the node with the pointer, as a transform                          |
 | `clickOutside(options)`                       | `gesso-core`       | Calls back when a press lands outside the node                           |
 | `decorated(shapes)`                           | `gesso-core`       | Draws shapes on the node for as long as it is attached                   |
+| `borders(options)`                            | `gesso-core`       | A border per edge, as paint, with no extra nodes                         |
 | `animateLayout(options?)`                     | `gesso-core`       | Animates a node from where it was to where layout has put it             |
 | `motion(args)`, `sharedElement(args)`         | `gesso-core`       | Entrances and exits, and an element that continues across a change       |
 | `imageSource`, `iconSource`, `videoSource`    | `gesso-core`       | Resolve media for a node that paints it                                  |
 | `tooltip(ctx, options)`                       | `gesso-components` | A tooltip on the element, with no wrapper node                           |
 
-Three of those are worth a sentence more.
+Four of those are worth a sentence more.
+
+**`borders()` is the per-edge border `borderWidth` cannot give you.**
+`borderWidth` is one number and `borderColor` one colour, so a node
+cannot have a heavy bottom edge and a hairline top:
+
+```ts
+Box({ modifiers: [borders({ bottom: 2, right: 1 })] });
+```
+
+It is a modifier rather than four properties because of where the cost
+actually is. A border in Gesso is paint-only, and a decoration is
+already a coloured rectangle drawn in the node's own paint pass, so
+four edges are four draw instances and no extra nodes. Real
+`borderTopWidth` properties would need a wider WebGPU vertex format, an
+anisotropic inner rect in the fragment shader, and up to four instances
+when the colours differ, because the shader draws a border as one
+isotropic band carrying one colour.
+
+The edges lie inside the box, where `borderWidth` puts them, so they
+never move anything. The sides run between the top and bottom rather
+than the full height, so a corner is painted once. And they square
+their corners: four rectangles meeting at a radius is not a border, and
+a rounded box wants the single `borderWidth`, which both renderers draw
+as one band and get right.
 
 **`draggable()` listens for a Pan, not a Drag.** A card the pointer
 picks up immediately is a press-and-move, which this input model calls a
