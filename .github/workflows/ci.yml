@@ -5,14 +5,22 @@
 # budgets, renderer parity) was a command someone remembered to type.
 #
 # The jobs are split by what they need. `checks` needs nothing but Node.
-# `install`, `scaffold`, `parity` and `accessibility` need a browser,
-# and the runner images ship Google Chrome. `text` needs a browser and
-# the seven Noto faces the text fixtures were rendered in, which apt
-# provides. `screenshots` and `docs-screenshots` need a browser *and*
-# baselines captured in the same environment, which is why they are the
-# two jobs here that cannot yet be authoritative.
+# `install`, `scaffold`, `rest`, `video`, `parity` and `accessibility`
+# need a browser, and the runner images ship Google Chrome. `text` needs
+# a browser and the seven Noto faces the text fixtures were rendered in,
+# which apt provides. `screenshots` and `docs-screenshots` need a
+# browser *and* baselines captured in the same environment, which is why
+# they are the two jobs here that cannot yet be authoritative.
 #
 # `pnpm check` runs the `checks` job's steps locally in the same order.
+#
+# **Every script under `scripts/` that ends in a verdict belongs to a
+# job here.** That is not tidiness: `check:rest` and `check:video` were
+# written, committed, and then run by nobody, and `check:bundle` was
+# added to `pnpm check` without being added here, which is the same
+# thing one step later. A gate that is not in this file is a gate that
+# is already failing and has not told anyone — which is exactly what
+# `check:a11y` was doing until it was looked at.
 
 name: CI
 
@@ -57,6 +65,21 @@ jobs:
 
       - name: Build the packages and the playground
         run: pnpm build
+
+      # What a worker application sends to the thread it is protecting.
+      # A budget on the shell's gzipped bytes, and a look for Canvas2D
+      # calls in them: the main thread must not be able to reach the
+      # engine it does not run. It regressed once, silently, by one
+      # import, and a number in CI is the only thing that holds it.
+      - name: Main-thread bundle budget
+        run: pnpm check:bundle
+
+      # Every gate is named by a job in this file, and this file names
+      # no gate that has stopped existing. The rule that keeps the rest
+      # of them honest, checked rather than written down.
+      - name: Every gate is in CI
+        run: pnpm check:gates
+
       - name: Public API report
         run: pnpm api:check
 
@@ -144,6 +167,14 @@ jobs:
         env:
           CHROME_BIN: google-chrome
 
+      # The other template. It shares the CLI and most of the project it
+      # writes, and it is the one nobody runs by hand, so it is the one
+      # that breaks.
+      - name: Scaffold check, the Electrobun template
+        run: pnpm check:scaffold:electrobun
+        env:
+          CHROME_BIN: google-chrome
+
   install:
     name: packed packages install, test and run
     runs-on: ubuntu-latest
@@ -163,6 +194,49 @@ jobs:
       # pixels, so it is environment-independent.
       - name: Install check
         run: pnpm check:install
+        env:
+          CHROME_BIN: google-chrome
+
+  rest:
+    name: a command's extra arguments cross a real Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # `rest` is specified over a MessageChannel in vitest, and vitest
+      # runs in Node, which has no Web `Worker`. This is the same claim
+      # watched crossing a real one, read back through Chrome's own
+      # DevTools protocol. Compares no pixels.
+      - name: Rest across a worker
+        run: pnpm check:rest
+        env:
+          CHROME_BIN: google-chrome
+
+  video:
+    name: a real clip decodes in a real browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Everything else covering video runs in Node against a fake
+      # decoder, on purpose. This is the part only a browser can answer:
+      # the real demuxer, the platform's own `VideoDecoder`, and a
+      # matrix over where the bytes came from — a path, a blob:, a
+      # data:, and across an origin with CORS. Compares no pixels.
+      - name: Video decode
+        run: pnpm check:video
         env:
           CHROME_BIN: google-chrome
 

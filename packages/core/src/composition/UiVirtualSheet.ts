@@ -349,7 +349,7 @@ export class UiVirtualSheet {
    * it per probe.
    */
   private rebuildExceptionStarts(): void {
-    this.exceptionStarts = new Array<number>(this.exceptionRows.length);
+    this.exceptionStarts = Array.from<number>({ length: this.exceptionRows.length });
     let extra = 0;
     for (let index = 0; index < this.exceptionRows.length; index++) {
       this.exceptionStarts[index] = this.exceptionRows[index] * this.rowHeight + extra;
