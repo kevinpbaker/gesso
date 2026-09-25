@@ -1012,6 +1012,9 @@ export function buildRenderList(
         // or placeholder, composition underline, caret.
         const model = text.editor;
         const editable = new EditableLayout(model, contentBox, text, measurer);
+        // A run's own background goes under the selection, the same
+        // order Canvas2D paints it in.
+        pushTextRects(textRunBackgrounds(editable.lines, text));
         if (model.focused && !model.collapsed) {
           const selection = parseColor(text.selectionColor);
           if (selection !== undefined) {
@@ -1024,6 +1027,7 @@ export function buildRenderList(
           pushTextRun(editable.placeholderLines, colorToCss(text.placeholderColor));
         } else {
           pushTextRun(editable.lines, colorToCss(text.textColor));
+          pushTextRects(textRunDecorations(editable.lines, text));
         }
         if (model.composing) {
           const underline = parseColor(text.textColor);

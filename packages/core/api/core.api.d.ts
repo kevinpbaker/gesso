@@ -1194,6 +1194,7 @@ declare function flattenTextSpans(spans: readonly UiTextSpan[]): UiSpannedText;
 declare function spannedTextOf(node: UiNode): UiSpannedText | undefined;
 declare function textContentOf(node: UiNode): string;
 declare function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[];
+declare function editableSpansOf(node: UiNode, text: string): readonly UiResolvedTextSpan[];
 declare function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined;
 declare function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
 declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
@@ -1795,7 +1796,7 @@ type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' |
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
-type EditableTextProps = CommonProps & PropsOf<'value' | 'placeholder' | 'multiline' | 'readOnly' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
+type EditableTextProps = CommonProps & PropsOf<'value' | 'spans' | 'placeholder' | 'multiline' | 'readOnly' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
 type BoxProps = ContainerProps & PropsOf<'x' | 'y' | 'image' | 'objectFit'>;
 type StackProps = BoxProps;
 type PaintElementProps = BoxProps & PropsOf<'paint' | 'path' | 'clipPath' | 'blur'>;
@@ -4925,7 +4926,6 @@ interface UiSemanticsAction {
   readonly value?: string;
 }
 export {
-  _f,
   accumulatedOffsetTo,
   Affine,
   AlignContent,
@@ -5089,6 +5089,7 @@ export {
   easings,
   Edges,
   EditableLayout,
+  editableSpansOf,
   EditableText,
   EditableTextModel,
   EditableTextProps,
@@ -5764,6 +5765,7 @@ export {
   validateStates,
   validateSubgrid,
   VerticalAlign,
+  vf,
   VideoClock,
   videoFrameSize,
   VideoPlayback,
@@ -5966,6 +5968,7 @@ import {
   easings,
   Edges,
   EditableLayout,
+  editableSpansOf,
   EditableText,
   EditableTextModel,
   EditableTextProps,
@@ -6679,7 +6682,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-wPzFBpMO.js";
+} from "./index-BSwDTqlV.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6800,6 +6803,7 @@ export {
   dropTarget,
   easings,
   EditableLayout,
+  editableSpansOf,
   EditableText,
   EditableTextModel,
   EDITOR_PROP,
@@ -7589,7 +7593,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-wPzFBpMO.js";
+} from "./index-BSwDTqlV.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

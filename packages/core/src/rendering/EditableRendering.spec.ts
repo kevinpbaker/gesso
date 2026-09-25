@@ -169,3 +169,75 @@ describe('WebGPU editable render list', () => {
     expect(list.instanceCount).toBe(0);
   });
 });
+
+/**
+ * Runs on an editable, which mean something narrower than runs on a
+ * `Text`.
+ *
+ * A `Text` gets its paragraph *from* its runs. An editable's
+ * paragraph is its model's, so the runs only describe it — which is
+ * what a formula editor needs to colour the references in a formula
+ * somebody is halfway through typing, without the text itself
+ * stopping being the text the user is editing.
+ */
+describe('an editable with runs', () => {
+  const coloured = [
+    { text: '=', color: '#000000' },
+    { text: 'A1', color: '#1a73e8' },
+    { text: '+', color: '#000000' },
+    { text: 'B2', color: '#d93025' }
+  ];
+
+  it('draws the model’s text in the colours the runs give it', () => {
+    const h = new RenderHarness();
+    const { root, model } = scene(h, { value: '=A1+B2', spans: coloured });
+    model.focused = false;
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+
+    // One `fillText` per run rather than one for the paragraph, and
+    // the runs' texts concatenated are still what the model holds.
+    const drawn = callArgs(h.context, 'fillText').map(call => call[0]);
+    expect(drawn).toEqual(['=', 'A1', '+', 'B2']);
+    expect(drawn.join('')).toBe(model.text);
+  });
+
+  /**
+   * The guard that keeps the caret honest. Every offset an editor
+   * works in — caret, selection, the hit test that turns a click into
+   * a text position — is an offset into the model's string, so runs
+   * describing a different string must not be used to place glyphs.
+   */
+  it('ignores runs that describe a different string', () => {
+    const h = new RenderHarness();
+    const { root } = scene(h, { value: '=A1+B2', spans: [{ text: 'something else', color: '#1a73e8' }] });
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+
+    // Drawn plainly, as one paragraph, rather than as the wrong runs.
+    expect(callArgs(h.context, 'fillText').map(call => call[0])).toEqual(['=A1+B2']);
+  });
+
+  it('goes back to plain text when the runs are taken away', () => {
+    const h = new RenderHarness();
+    const { root, field } = scene(h, { value: '=A1+B2', spans: coloured });
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+    expect(callArgs(h.context, 'fillText')).toHaveLength(4);
+
+    h.context.calls.length = 0;
+    field.setProperty('spans', undefined);
+    h.layout(root);
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+    expect(callArgs(h.context, 'fillText').map(call => call[0])).toEqual(['=A1+B2']);
+  });
+
+  /** The field is still a field: the caret and selection still work. */
+  it('still draws a caret where the model says', () => {
+    const h = new RenderHarness();
+    const { root, model } = scene(h, { value: '=A1+B2', spans: coloured });
+    model.focused = true;
+    model.blinkOrigin = 1000;
+    model.select(3);
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 1000 });
+
+    expect(callsOf(h.context, 'fillRect').length).toBeGreaterThan(0);
+  });
+});

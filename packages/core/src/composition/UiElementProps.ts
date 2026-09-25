@@ -270,10 +270,19 @@ export type TextProps = CommonProps & TextContentProps;
  * every change; `multiline` lets Enter insert a newline. Wrapping
  * follows `textWrap` (use `'none'` for a single-line field that scrolls
  * rather than wraps).
+ *
+ * `spans` styles that text in runs, and here it means something
+ * narrower than it does on a `Text`: an editable's paragraph is the
+ * model's, so the runs describe the text rather than supplying it.
+ * Their concatenation has to equal `value`, and when it does not the
+ * text is drawn unstyled — every offset the editor works in is an
+ * offset into the model's string, and runs describing a different one
+ * would put the glyphs where the caret does not agree with them.
  */
 export type EditableTextProps = CommonProps &
   PropsOf<
     | 'value'
+    | 'spans'
     | 'placeholder'
     | 'multiline'
     | 'readOnly'

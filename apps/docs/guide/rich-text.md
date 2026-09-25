@@ -109,6 +109,33 @@ line height here, and both renderers step by that. Keep a run's size
 close to its paragraph's and the two agree exactly; the fixture that
 pins the difference is `runs/a-taller-run-grows-only-its-own-line`.
 
+## Runs in a field being typed into
+
+`<editabletext>` takes `spans` too, and there it means something
+narrower. A `<text>` gets its paragraph _from_ its runs; a field's
+paragraph belongs to the thing the user is typing, so its runs only
+describe that text rather than supplying it.
+
+```tsx
+<editabletext
+  value={formula}
+  spans={[{ text: '=' }, { text: 'A1', color: 'primary' }, { text: '+' }, { text: 'B2', color: 'danger' }]}
+/>
+```
+
+**The runs' texts concatenated have to equal `value`.** When they do
+not, the field draws its text plainly and ignores them. That is not a
+nicety: every offset a field works in (the caret, the selection, the
+hit test that turns a click into a text position) is an offset into
+the string the model holds, so runs describing a different string
+would put the glyphs where the caret does not agree with them, and the
+field would look subtly and unfixably wrong. A frame of plain colour
+while the application catches up is the better failure.
+
+Everything else about a field is unchanged: it still scrolls its own
+text, still shows a placeholder, still carries a caret and a
+selection.
+
 ## What is not here
 
 Justified text and hyphenation are still deferred. Font features

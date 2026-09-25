@@ -240,6 +240,28 @@ export function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[] {
   return spannedTextOf(node)?.spans ?? EMPTY_SPANS;
 }
 
+/**
+ * The runs an *editable* node styles its own text with.
+ *
+ * An editable's paragraph is the user's, held by its model rather
+ * than by a property — so unlike a `Text`, its runs do not supply the
+ * text, they only describe it. `spans` on an editable is presentation
+ * over a string somebody is typing.
+ *
+ * Which is why this checks. Every offset the editor works in — the
+ * caret, the selection, the hit test that turns a click into a text
+ * position — is an offset into the model's string. Runs describing a
+ * *different* string would put the glyphs somewhere the caret does
+ * not agree with, and the field would look subtly, unfixably wrong.
+ * When they disagree the text is drawn unstyled, which is a frame of
+ * plain colour rather than a frame of nonsense, and corrects itself
+ * as soon as the application catches up.
+ */
+export function editableSpansOf(node: UiNode, text: string): readonly UiResolvedTextSpan[] {
+  const spanned = spannedTextOf(node);
+  return spanned !== undefined && spanned.text === text ? spanned.spans : EMPTY_SPANS;
+}
+
 /** The span covering an offset, or undefined where no run does. */
 export function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined {
   for (const span of spans) {

@@ -715,6 +715,10 @@ export class Canvas2DRenderer implements UiRenderer {
   private paintEditable(ctx: Canvas2DContext, paint: PaintState, context: RenderContext): void {
     const model = paint.editor!;
     const layout = new EditableLayout(model, this.contentBox, paint, context.text);
+    // A run's own background goes under the selection, as a CSS inline
+    // background goes under one. Nothing is drawn here unless the
+    // field was given runs, which almost none are.
+    fillTextRects(ctx, textRunBackgrounds(layout.lines, paint));
     if (model.focused && !model.collapsed) {
       ctx.fillStyle = colorToCss(paint.selectionColor);
       for (const box of layout.selectionBoxes()) {
@@ -731,14 +735,19 @@ export class Canvas2DRenderer implements UiRenderer {
         paint.rtl
       );
     } else {
+      // `paint` last: that is what turns this into a run-by-run draw
+      // for a field that was given runs, and changes nothing for one
+      // that was not.
       drawTextLines(
         ctx,
         layout.lines,
         buildFontString(paint),
         colorToCss(paint.textColor),
         paint.letterSpacing,
-        paint.rtl
+        paint.rtl,
+        paint
       );
+      fillTextRects(ctx, textRunDecorations(layout.lines, paint));
     }
     if (model.composing) {
       ctx.fillStyle = colorToCss(paint.textColor);

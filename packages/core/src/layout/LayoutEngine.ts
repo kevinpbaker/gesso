@@ -2,8 +2,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { resolveFont } from '../properties/UiTextFont';
-import type { UiResolvedTextSpan } from '../properties/UiTextStyle';
-import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
+import { editableSpansOf, resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
 import { CARET_WIDTH, editorFor } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
@@ -46,7 +45,6 @@ export const SCROLLBAR_FADE_MS = 350;
 const ANCHOR_CHAIN_LIMIT = 4;
 
 /** An editable's text is the user's; runs are a property of a `Text` node. */
-const EMPTY_TEXT_SPANS: readonly UiResolvedTextSpan[] = [];
 
 export interface ScrollAdjustment {
   container: UiNode;
@@ -2558,9 +2556,14 @@ export class LayoutEngine {
       // into the request so each is measured in its own font. The
       // request is otherwise the one it always was: the text is one
       // string either way and the algorithm above it is unchanged.
-      const spans = editable ? EMPTY_TEXT_SPANS : resolvedSpansOf(node);
+      // An editable's runs describe its model's text rather than
+      // supplying it, so the text is read first and the runs are
+      // accepted only if they describe that string; see
+      // `editableSpansOf`.
+      const typed = editable ? editorFor(node).text : '';
+      const spans = editable ? editableSpansOf(node, typed) : resolvedSpansOf(node);
       const text = editable
-        ? editorFor(node).text
+        ? typed
         : spans.length > 0
           ? textContentOf(node)
           : String(node.properties.get('text') ?? '');

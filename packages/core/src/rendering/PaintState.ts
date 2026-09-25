@@ -29,7 +29,7 @@ import type {
   UiTextMetrics,
   UiResolvedTextSpan
 } from '../properties/UiTextStyle';
-import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
+import { editableSpansOf, resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
 import { linkHoverOf } from '../selection/UiTextLinks';
 import { parseTransform } from '../properties/UiTransform';
 
@@ -310,7 +310,12 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   // straight into the scratch: the state already has the fields under
   // those names, so paint has no record to allocate and copy.
   resolveFontInto(node, out);
-  out.spans = out.editor === undefined ? resolvePaintSpans(node) : undefined;
+  // An editable may carry runs too, but only ones that describe the
+  // text its model holds — see `editableSpansOf`.
+  out.spans = resolvePaintSpans(
+    node,
+    out.editor === undefined ? resolvedSpansOf(node) : editableSpansOf(node, out.text ?? '')
+  );
   out.linkHover = out.spans === undefined ? -1 : linkHoverOf(node);
   out.textDecoration = resolveProperty(node, UiProperties.textDecoration);
   out.textColor = resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
@@ -377,8 +382,7 @@ function resetTextStyle(out: PaintState): void {
  */
 const paintSpans = new WeakMap<readonly UiResolvedTextSpan[], { theme: unknown; spans: readonly PaintTextSpan[] }>();
 
-function resolvePaintSpans(node: UiNode): readonly PaintTextSpan[] | undefined {
-  const spans = resolvedSpansOf(node);
+function resolvePaintSpans(node: UiNode, spans: readonly UiResolvedTextSpan[]): readonly PaintTextSpan[] | undefined {
   if (spans.length === 0) {
     return undefined;
   }
