@@ -570,21 +570,64 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
   if (unnamedStop !== undefined) {
     failures.push(`${route}: Tab lands on ${unnamedStop}; a screen reader hears nothing there`);
   }
+  const committed = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
   if (UPDATE) {
+    // Only when it actually says something different. The committed
+    // copy has been through `oxfmt`, which pads a markdown table's
+    // columns, and rewriting it unpadded on every update would leave
+    // three files dirty after a check that found nothing.
+    if (committed !== undefined && sameReport(committed, content)) {
+      return failures;
+    }
     mkdirSync(REPORT_DIR, { recursive: true });
     writeFileSync(path, content);
     console.log(`  wrote ${path}`);
     return failures;
   }
-  if (!existsSync(path)) {
+  if (committed === undefined) {
     failures.push(`${route}: no report at ${path}. Run \`pnpm check:a11y:update\` and commit it.`);
-  } else if (readFileSync(path, 'utf8') !== content) {
+  } else if (!sameReport(committed, content)) {
     failures.push(
       `${route}: what a screen reader would hear has changed; the report at ${path} no longer matches. ` +
         `Review the diff after \`pnpm check:a11y:update\` and commit it if the change is intended.`
     );
   }
   return failures;
+}
+
+/**
+ * Whether two reports say the same thing.
+ *
+ * Not byte for byte, and the reason is a loop this check used to lose.
+ * `oxfmt` formats markdown, and formatting a table pads its columns to
+ * the widest cell; this script writes them unpadded. So every
+ * `pnpm format` rewrote all three reports and the next `check:a11y`
+ * failed with "what a screen reader would hear has changed" when
+ * nothing had. A gate that goes red on its own is a gate people stop
+ * reading, and this one is the only thing standing between a control
+ * losing its name and nobody noticing.
+ *
+ * Padding is removed per cell rather than by collapsing every run of
+ * spaces, so a name that really does contain two spaces still counts
+ * as a change.
+ */
+function sameReport(a: string, b: string): boolean {
+  return normalizeReport(a) === normalizeReport(b);
+}
+
+function normalizeReport(text: string): string {
+  return text
+    .split('\n')
+    .map(line => {
+      if (!line.startsWith('|')) {
+        return line.trimEnd();
+      }
+      const cells = line.split('|').map(cell => cell.trim());
+      // A separator row's dashes are padded to the column width too.
+      return cells.map(cell => (/^-+$/.test(cell) ? '-' : cell)).join('|');
+    })
+    .join('\n')
+    .trimEnd();
 }
 
 /** The report: one row per node of the computed tree, in tree order, and a count of controls. */
