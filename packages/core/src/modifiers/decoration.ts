@@ -210,16 +210,25 @@ export interface BordersOptions {
  * They lie *inside* the box, where `borderWidth` puts them, so a border
  * never changes where anything sits and never overlaps a neighbour.
  *
- * **Why this is a modifier and not four props.** First-class
- * `borderTopWidth` is a much larger change, and the cost is not where
- * it looks: the property, the paint state and the Canvas2D stroke are
- * easy, but the WebGPU instance packs `radius, opacity, borderWidth` as
- * one `float32x3`, the fragment shader draws the border as an
- * isotropic SDF band, and one instance carries one colour — so four
- * widths need a wider vertex format, an anisotropic inner rect in the
- * shader, and up to four instances when the colours differ. This needs
- * none of that, because a decoration is already a rectangle with its
- * own colour that both backends already draw.
+ * **Why this is a modifier and not four props, and why that is the
+ * answer rather than a stopgap.** First-class `borderTopWidth` is a
+ * much larger change, and the cost is not where it looks: the
+ * property, the paint state and the Canvas2D stroke are easy, but the
+ * WebGPU instance packs `radius, opacity, borderWidth` as one
+ * `float32x3`, the fragment shader draws the border as an isotropic
+ * SDF band, and one instance carries one colour — so four widths need
+ * a wider vertex format, an anisotropic inner rect in the shader, and
+ * up to four instances when the colours differ. This needs none of it,
+ * because a decoration is already a rectangle with its own colour that
+ * both backends draw.
+ *
+ * What the properties would buy over this, once written, is a rounded
+ * per-edge border and one instance instead of four. The first is a
+ * thing square-cornered borders are for — a grid, a table, a rule —
+ * and the second is four draws on a node that already costs one. So
+ * the properties are not planned. If something turns up that wants a
+ * heavy bottom edge on a rounded card, that is the case to reopen it
+ * with, and it will be a better case than "for completeness".
  *
  * What it does not do is round its corners. Four rectangles meeting at
  * a square corner is right for a grid, a table and a rule, which is

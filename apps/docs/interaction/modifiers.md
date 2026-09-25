@@ -247,6 +247,11 @@ anisotropic inner rect in the fragment shader, and up to four instances
 when the colours differ, because the shader draws a border as one
 isotropic band carrying one colour.
 
+They are not planned. What they would buy over this is a rounded
+per-edge border and one draw instead of four, and square corners are
+what per-edge borders are for. If something turns up that wants a heavy
+bottom edge on a rounded card, that is the case to reopen it with.
+
 The edges lie inside the box, where `borderWidth` puts them, so they
 never move anything. The sides run between the top and bottom rather
 than the full height, so a corner is painted once. And they square
