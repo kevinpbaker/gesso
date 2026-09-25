@@ -62,9 +62,29 @@ describe('fanOut', () => {
     expect(b).not.toHaveBeenCalled();
   });
 
-  it('judges a rebuilt equal value unchanged, by structure', () => {
+  it('judges a rebuilt equal value changed, by default', () => {
+    // `reference` is the default because the comparison runs once per
+    // live key per emission, and a surface with thousands of them is
+    // the whole reason the registry exists. A reader that builds a
+    // value asks for `structural`; one that can hand back the same
+    // object for an unchanged key keeps the cheap test.
     const source = new BehaviorSubject<Record<string, readonly number[]>>({ a: [1, 2] });
     const cells = fanOut(source, (grid, key) => grid[key] ?? [], { initial: [] as readonly number[] });
+    const seen = vi.fn();
+    cells.for('a').subscribe(seen);
+    seen.mockClear();
+
+    source.next({ a: [1, 2] });
+
+    expect(seen).toHaveBeenCalledOnce();
+  });
+
+  it('judges a rebuilt equal value unchanged when asked for structure', () => {
+    const source = new BehaviorSubject<Record<string, readonly number[]>>({ a: [1, 2] });
+    const cells = fanOut(source, (grid, key) => grid[key] ?? [], {
+      initial: [] as readonly number[],
+      equal: 'structural'
+    });
     const seen = vi.fn();
     cells.for('a').subscribe(seen);
     seen.mockClear();
@@ -236,6 +256,56 @@ describe('fanOut', () => {
     source.next({ '1:2': 9 });
 
     expect(read).toHaveBeenCalledExactlyOnceWith({ '1:2': 9 }, '1:2', { row: 1, column: 2 });
+  });
+
+  it('says so once when a registry has grown large and released nothing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const cells = fanOut(new BehaviorSubject<Grid>({}), (grid, key) => grid[key] ?? 0, {
+        initial: 0,
+        label: 'cells'
+      });
+      for (let index = 0; index < 2100; index++) {
+        cells.for(index);
+      }
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]?.[0]).toMatch(/fanOut\(cells\).*released none/s);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('says nothing about a registry that is large and churning', () => {
+    // The leak signature is "never released anything", not "is big". A
+    // grid holds ten thousand cells and is right to.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const cells = fanOut(new BehaviorSubject<Grid>({}), (grid, key) => grid[key] ?? 0, { initial: 0 });
+      cells.for('first');
+      cells.release('first');
+      for (let index = 0; index < 3000; index++) {
+        cells.for(index);
+      }
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('says nothing about a registry that stays small', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const cells = fanOut(new BehaviorSubject<Grid>({}), (grid, key) => grid[key] ?? 0, { initial: 0 });
+      for (let index = 0; index < 500; index++) {
+        cells.for(index);
+      }
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('says so when a closed registry is asked for a key', () => {

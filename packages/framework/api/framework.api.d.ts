@@ -380,6 +380,8 @@ declare class FanOut<S, V, D = undefined> {
   private readonly initial;
   private readonly changed;
   private readonly label;
+  private releases;
+  private warnedGrowing;
   private upstream;
   private snapshot;
   private hasSnapshot;
@@ -392,6 +394,7 @@ declare class FanOut<S, V, D = undefined> {
   releaseAll(): void;
   close(): void;
   refresh(keys?: Iterable<FanKey>): void;
+  private warnIfOnlyGrowing;
   private attach;
   private detach;
 }
@@ -2899,7 +2902,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-BFBy6qhN.js";
+} from "./index-Cr0HWtGY.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3379,7 +3382,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-BFBy6qhN.js";
+} from "../index-Cr0HWtGY.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

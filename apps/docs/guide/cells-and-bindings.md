@@ -218,12 +218,30 @@ A registry is a resource: it holds a key until `release` and the source
 until the last key goes. That is deliberate. The surfaces that need it
 are the ones that mount and unmount deliberately, and a cell that
 vanished when its last binding did would be rebuilt on every scroll
-frame by exactly the code that cannot afford it.
+frame by exactly the code that cannot afford it. It is also the one
+thing here that can be got wrong silently, so a registry that has grown
+past a couple of thousand keys and released none of them says so once.
 
-Reach for it when N is large and each node's slice is its own. For a
-list of components, [`each`](/guide/components-run-once) is still the
-answer: a row that is a component already has its own identity and its
-own inputs, and does not need a registry to give it one.
+**It compares by reference, where `select` and `derive` compare by
+content.** The opposite default, for the opposite reason: those run
+once per emission, and this runs once per live key per emission. On ten
+thousand keys with the source republishing the lot, which is what a
+scroll does, structural comparison costs 1.9 ms against 0.8. Pass
+`equal: 'structural'` when the reader _builds_ a value rather than
+passing one through. Better still, hand back the same object for an
+unchanged key, one `EMPTY` for every cell with nothing in it, and keep
+the cheap test.
+
+Reach for it when N is large **and each emission touches few of them**.
+That second half is the one to check: a source that republishes its
+whole window on every scroll gets the cheaper mount and teardown and
+nothing from `changed`, because every key really did change. A log
+that appends, a presence list, a dashboard of independent tiles are
+where the 0.1 ms above comes from.
+
+For a list of components, [`each`](/guide/components-run-once) is still
+the answer: a row that is a component already has its own identity and
+its own inputs, and does not need a registry to give it one.
 
 ## Cells outside a component
 

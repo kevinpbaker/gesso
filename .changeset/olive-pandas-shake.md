@@ -16,6 +16,16 @@ source that knows which keys a patch touched reads only those. Ten thousand live
 keys, measured against a pipe per key: mount 29.8 ms to 10.7 ms, teardown 9.7 ms
 to 3.7 ms, and one key changing 2.2 ms to 0.1 ms.
 
+Reach for it when N is large _and each emission touches few of them_. A source
+that republishes its whole window on every scroll gets the cheaper mount and
+teardown and nothing from `changed`, because every key really did change.
+
+It compares by reference where `select` and `derive` compare by content, which is
+the opposite default for the opposite reason: those run once per emission and this
+runs once per live key per emission. And a registry that has grown past a couple
+of thousand keys having released none of them says so once, because `release` is
+the caller's and forgetting it is the one thing here that goes wrong silently.
+
 **`tabStop`, which is `tabindex="-1"`.** Focusable, reachable by a press and by
 `focus()`, skipped by the Tab cycle. `focusable` only ever answered "may this node
 hold focus", which is the wrong question for a container: `UiFocusManager.settleScope`
