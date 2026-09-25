@@ -403,3 +403,192 @@ describe('UiVirtualSheet.cellAt', () => {
     expect(sheet.cellAt(48 + COLUMN, 22 + ROW)).toEqual({ row: 1, column: 1 });
   });
 });
+
+/**
+ * Rows that are not the default height.
+ *
+ * Sparse, where `columnWidth` is an array: a sheet has a few hundred
+ * columns and up to a million rows, so a height per row would be the
+ * largest allocation in the application to describe a sheet where
+ * every row but two is the same. What produces an exception is hiding
+ * a row, autofitting one, or wrapping text in it — tens of them, not
+ * thousands.
+ */
+describe('a sheet whose rows are not all the same height', () => {
+  const sheetWith = (heights: ReadonlyMap<number, number>) =>
+    new UiVirtualSheet(
+      {
+        rowCount: 100,
+        columnCount: 5,
+        rowHeight: ROW,
+        rowHeights: heights,
+        columnWidth: COLUMN,
+        rowOverscan: 0,
+        columnOverscan: 0,
+        initialViewport: { width: 500, height: 240 }
+      },
+      renderRow
+    );
+
+  it('gives a row its own height and everything else the default', () => {
+    const sheet = sheetWith(new Map([[3, 60]]));
+    expect(sheet.rowHeightOf(3)).toBe(60);
+    expect(sheet.rowHeightOf(2)).toBe(ROW);
+    expect(sheet.rowHeightOf(4)).toBe(ROW);
+  });
+
+  it('carries the difference into every offset past it', () => {
+    const sheet = sheetWith(new Map([[3, 60]]));
+    expect(sheet.rowOffsetOf(3)).toBe(3 * ROW);
+    expect(sheet.rowOffsetOf(4)).toBe(3 * ROW + 60);
+    expect(sheet.rowOffsetOf(5)).toBe(3 * ROW + 60 + ROW);
+  });
+
+  it('adds the difference to the height of the whole sheet', () => {
+    const sheet = sheetWith(new Map([[3, 60]]));
+    expect(sheet.contentHeight).toBe(100 * ROW + (60 - ROW));
+  });
+
+  it('handles several exceptions in order, however they were given', () => {
+    const sheet = sheetWith(
+      new Map([
+        [9, 48],
+        [2, 12]
+      ])
+    );
+    expect(sheet.rowOffsetOf(3)).toBe(2 * ROW + 12);
+    expect(sheet.rowOffsetOf(10)).toBe(9 * ROW + (12 - ROW) + 48);
+    expect(sheet.contentHeight).toBe(100 * ROW + (12 - ROW) + (48 - ROW));
+  });
+
+  /** A row of the default height is not an exception. */
+  it('ignores an exception that is the default height', () => {
+    const sheet = sheetWith(new Map([[3, ROW]]));
+    expect(sheet.rowOffsetOf(4)).toBe(4 * ROW);
+    expect(sheet.contentHeight).toBe(100 * ROW);
+  });
+
+  describe('a hidden row, which is one of height zero', () => {
+    it('takes up no space', () => {
+      const sheet = sheetWith(new Map([[3, 0]]));
+      expect(sheet.rowHeightOf(3)).toBe(0);
+      expect(sheet.rowOffsetOf(3)).toBe(3 * ROW);
+      expect(sheet.rowOffsetOf(4)).toBe(3 * ROW);
+      expect(sheet.contentHeight).toBe(99 * ROW);
+    });
+
+    /**
+     * The offset where a hidden row would be belongs to the row after
+     * it. It falls out of the arithmetic — a zero-height row starts
+     * and ends in the same place, so a point is never inside it.
+     */
+    it('is never the row under a point', () => {
+      const sheet = sheetWith(new Map([[3, 0]]));
+      expect(sheet.rowAt(3 * ROW)).toBe(4);
+      expect(sheet.rowAt(3 * ROW - 1)).toBe(2);
+    });
+
+    it('is skipped over when several are hidden together', () => {
+      const sheet = sheetWith(
+        new Map([
+          [3, 0],
+          [4, 0],
+          [5, 0]
+        ])
+      );
+      expect(sheet.rowAt(3 * ROW)).toBe(6);
+      expect(sheet.contentHeight).toBe(97 * ROW);
+    });
+
+    it('is still mounted, so the row after it can be reached', () => {
+      const sheet = sheetWith(new Map([[3, 0]]));
+      sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+      expect(rows(sheet)).toContain(3);
+    });
+  });
+
+  describe('finding the row under a point', () => {
+    it('divides when every row is the default', () => {
+      const sheet = sheetWith(new Map());
+      expect(sheet.rowAt(0)).toBe(0);
+      expect(sheet.rowAt(ROW * 7 + 1)).toBe(7);
+    });
+
+    it('finds the tall row itself', () => {
+      const sheet = sheetWith(new Map([[3, 60]]));
+      expect(sheet.rowAt(3 * ROW)).toBe(3);
+      expect(sheet.rowAt(3 * ROW + 59)).toBe(3);
+      expect(sheet.rowAt(3 * ROW + 60)).toBe(4);
+    });
+
+    it('finds a row well past the last exception', () => {
+      const sheet = sheetWith(new Map([[3, 60]]));
+      const extra = 60 - ROW;
+      expect(sheet.rowAt(50 * ROW + extra)).toBe(50);
+      expect(sheet.rowAt(50 * ROW + extra + ROW - 1)).toBe(50);
+    });
+
+    it('finds a row before the first exception', () => {
+      const sheet = sheetWith(new Map([[30, 60]]));
+      expect(sheet.rowAt(2 * ROW)).toBe(2);
+    });
+
+    it('does not run off either end', () => {
+      const sheet = sheetWith(new Map([[3, 60]]));
+      expect(sheet.rowAt(-100)).toBe(0);
+      expect(sheet.rowAt(1_000_000)).toBe(99);
+    });
+  });
+
+  describe('the rows it mounts', () => {
+    it('places the spacer above them at the right offset', () => {
+      const sheet = sheetWith(new Map([[1, 60]]));
+      sheet.update({ scrollX: 0, scrollY: 200, width: 500, height: 240 });
+      const first = rows(sheet)[0];
+      expect(spacers(sheet).top).toBe(sheet.rowOffsetOf(first));
+    });
+
+    it('gives each mounted row its own height', () => {
+      const sheet = sheetWith(new Map([[2, 60]]));
+      sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+      const tall = sheet.children$.value.find(child => child.props.key === 'sheet:row:2');
+      const short = sheet.children$.value.find(child => child.props.key === 'sheet:row:3');
+      expect(tall?.props.height).toBe(60);
+      expect(short?.props.height).toBe(ROW);
+    });
+
+    /** The spacers and the rows still add up to the sheet's height. */
+    it('adds up to the content height', () => {
+      const sheet = sheetWith(new Map([[2, 60], [7, 0]]));
+      sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+      const children = sheet.children$.value;
+      const total = children.reduce((sum, child) => sum + ((child.props.height as number) ?? 0), 0);
+      expect(total).toBe(sheet.contentHeight);
+    });
+  });
+
+  describe('changing them while the sheet is up', () => {
+    it('takes new heights and rebuilds', () => {
+      const sheet = sheetWith(new Map());
+      sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+      expect(sheet.contentHeight).toBe(100 * ROW);
+
+      sheet.setRowHeights(new Map([[0, 0]]));
+      expect(sheet.contentHeight).toBe(99 * ROW);
+      expect(sheet.rowHeightOf(0)).toBe(0);
+    });
+
+    it('takes a new default and moves the exceptions with it', () => {
+      const sheet = sheetWith(new Map([[3, 60]]));
+      sheet.setRowHeight(30);
+      expect(sheet.rowOffsetOf(3)).toBe(3 * 30);
+      expect(sheet.rowOffsetOf(4)).toBe(3 * 30 + 60);
+      expect(sheet.contentHeight).toBe(100 * 30 + (60 - 30));
+    });
+
+    it('refuses a negative height', () => {
+      const sheet = sheetWith(new Map());
+      expect(() => sheet.setRowHeights(new Map([[0, -1]]))).toThrow(/negative/);
+    });
+  });
+});

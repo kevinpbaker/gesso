@@ -70,8 +70,26 @@ export type SheetRowRenderer = (row: number, firstColumn: number, lastColumn: nu
 export interface UiVirtualSheetOptions {
   readonly rowCount: Reactive<number>;
   readonly columnCount: Reactive<number>;
-  /** Height of every row. */
+  /** The height every row has unless `rowHeights` says otherwise. */
   readonly rowHeight: number;
+  /**
+   * The rows that are not the default height, by row index.
+   *
+   * **Sparse, where `columnWidth` is an array, and the asymmetry is
+   * deliberate.** A sheet has a few hundred columns and a width for
+   * each of them is a reasonable thing to hand over; it has up to a
+   * million rows, and an array that long — rebuilt whenever one row
+   * changed — would be the largest allocation in the application, to
+   * describe a sheet where every row but two is the same.
+   *
+   * What actually produces a non-default height is hiding a row
+   * (zero), autofitting one, or wrapping text in it. All three are
+   * exceptions by nature, and there are tens of them rather than
+   * thousands, so the offsets are a multiplication plus a binary
+   * search over the exceptions rather than a prefix sum over
+   * everything.
+   */
+  readonly rowHeights?: ReadonlyMap<number, number>;
   /**
    * One width for every column, or a width per column.
    *
@@ -134,7 +152,7 @@ export class UiVirtualSheet {
   private columnCount: number;
   private rowOverscan: number;
   private columnOverscan: number;
-  private readonly rowHeight: number;
+  private rowHeight: number;
   private readonly gutterWidth: number;
   private readonly headerHeight: number;
   private readonly renderRow: SheetRowRenderer;
@@ -146,6 +164,18 @@ export class UiVirtualSheet {
   private offsets: number[] = [];
   private uniformWidth = 0;
 
+  /**
+   * The rows that are not `rowHeight` tall, in row order.
+   *
+   * Three parallel arrays rather than a map of objects: this is
+   * searched on every hit test and on every frame that scrolls, and
+   * the arrays are read in step.
+   */
+  private exceptionRows: number[] = [];
+  private exceptionHeights: number[] = [];
+  /** `exceptionStarts[i]` is where `exceptionRows[i]` starts, past the header. */
+  private exceptionStarts: number[] = [];
+
   private range: SheetRange = EMPTY_RANGE;
   private viewport: SheetViewport;
   /** Rows built for the current column range, so a vertical scroll rebuilds one row. */
@@ -156,6 +186,7 @@ export class UiVirtualSheet {
     this.rowCount = typeof options.rowCount === 'number' ? options.rowCount : 0;
     this.columnCount = typeof options.columnCount === 'number' ? options.columnCount : 0;
     this.rowHeight = positive('rowHeight', options.rowHeight);
+    this.adoptHeights(options.rowHeights);
     this.gutterWidth = Math.max(0, options.gutterWidth ?? 0);
     this.headerHeight = Math.max(0, options.headerHeight ?? 0);
     this.rowOverscan = typeof options.rowOverscan === 'number' ? options.rowOverscan : 3;
@@ -208,6 +239,140 @@ export class UiVirtualSheet {
     this.offsets[owned.length] = running;
   }
 
+  /**
+   * New row heights, as hiding a row or autofitting one produces.
+   *
+   * The exceptions are rebuilt whole, which is one pass over *them*
+   * and not over the rows — the whole reason they are sparse. A
+   * height of zero is a hidden row and is allowed; a negative one is
+   * not.
+   */
+  setRowHeights(heights: ReadonlyMap<number, number> | undefined): void {
+    this.adoptHeights(heights);
+    this.invalidate();
+  }
+
+  /** The height every row has unless it is an exception. */
+  setRowHeight(height: number): void {
+    const next = positive('rowHeight', height);
+    if (next === this.rowHeight) {
+      return;
+    }
+    this.rowHeight = next;
+    // The exception starts are measured against the default, so they
+    // are wrong the moment it moves.
+    this.rebuildExceptionStarts();
+    this.invalidate();
+  }
+
+  private adoptHeights(heights: ReadonlyMap<number, number> | undefined): void {
+    this.exceptionRows = [];
+    this.exceptionHeights = [];
+    if (heights !== undefined) {
+      const rows = [...heights.keys()].sort((a, b) => a - b);
+      for (const row of rows) {
+        const height = heights.get(row) ?? 0;
+        if (!(height >= 0)) {
+          throw new Error(`LazySheet row heights must not be negative, got ${String(height)}.`);
+        }
+        // A row that happens to be the default height is not an
+        // exception, and keeping it as one would make every offset
+        // past it a search that finds nothing.
+        if (height !== this.rowHeight) {
+          this.exceptionRows.push(row);
+          this.exceptionHeights.push(height);
+        }
+      }
+    }
+    this.rebuildExceptionStarts();
+  }
+
+  /**
+   * Where each exception begins, and what they cost in total.
+   *
+   * `start` is the row's own offset past the header, so the inverse —
+   * `rowAt` — can binary search it directly rather than reconstructing
+   * it per probe.
+   */
+  private rebuildExceptionStarts(): void {
+    this.exceptionStarts = new Array<number>(this.exceptionRows.length);
+    let extra = 0;
+    for (let index = 0; index < this.exceptionRows.length; index++) {
+      this.exceptionStarts[index] = this.exceptionRows[index] * this.rowHeight + extra;
+      extra += this.exceptionHeights[index] - this.rowHeight;
+    }
+  }
+
+  /** The index of the last exception starting at or before an offset, or -1. */
+  private exceptionAt(offset: number): number {
+    let low = 0;
+    let high = this.exceptionStarts.length - 1;
+    let found = -1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (this.exceptionStarts[mid] <= offset) {
+        found = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return found;
+  }
+
+  /** How many exceptions come before a row, as an index into them. */
+  private exceptionsBefore(row: number): number {
+    let low = 0;
+    let high = this.exceptionRows.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (this.exceptionRows[mid] < row) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
+
+  /** The height of one row. Zero when it is hidden. */
+  rowHeightOf(row: number): number {
+    if (this.exceptionRows.length === 0) {
+      return this.rowHeight;
+    }
+    const index = this.exceptionsBefore(row);
+    return this.exceptionRows[index] === row ? this.exceptionHeights[index] : this.rowHeight;
+  }
+
+  /** Where a row starts, measured past the header. */
+  rowOffsetOf(row: number): number {
+    const clamped = clamp(row, 0, this.rowCount);
+    return clamped * this.rowHeight + this.extraWithin(clamped);
+  }
+
+  /** Total height of the rows, not counting the header. */
+  private get rowsHeight(): number {
+    return this.rowCount * this.rowHeight + this.extraWithin(this.rowCount);
+  }
+
+  /**
+   * What the exceptions before `row` add to or take off the offset.
+   *
+   * Read off the last exception before it rather than summed: the
+   * start of an exception already carries everything before it, so
+   * its end minus where it *would* have ended is the running total.
+   */
+  private extraWithin(row: number): number {
+    const before = this.exceptionsBefore(row);
+    if (before === 0) {
+      return 0;
+    }
+    const index = before - 1;
+    return (
+      this.exceptionStarts[index] + this.exceptionHeights[index] - (this.exceptionRows[index] + 1) * this.rowHeight
+    );
+  }
+
   /** The width of one column. */
   widthOf(column: number): number {
     if (this.widths === undefined) {
@@ -235,7 +400,7 @@ export class UiVirtualSheet {
   }
 
   get contentHeight(): number {
-    return this.headerHeight + this.rowCount * this.rowHeight;
+    return this.headerHeight + this.rowsHeight;
   }
 
   /**
@@ -254,9 +419,42 @@ export class UiVirtualSheet {
     };
   }
 
-  /** The row at a content offset, clamped to the sheet. */
+  /**
+   * The row at a content offset, clamped to the sheet.
+   *
+   * A division when every row is the default height — the common case
+   * by a very long way — and otherwise a binary search over the
+   * exceptions followed by a division inside the uniform run that
+   * follows the one it lands in.
+   *
+   * A hidden row occupies no offset at all, so the offset where it
+   * *would* be belongs to the row after it. That falls out of the
+   * arithmetic rather than being special-cased: a zero-height
+   * exception starts and ends at the same place, so the point is
+   * never inside it.
+   */
   rowAt(offset: number): number {
-    return clamp(Math.floor((offset - this.headerHeight) / this.rowHeight), 0, Math.max(0, this.rowCount - 1));
+    const last = Math.max(0, this.rowCount - 1);
+    const past = offset - this.headerHeight;
+    if (this.exceptionRows.length === 0) {
+      return clamp(Math.floor(past / this.rowHeight), 0, last);
+    }
+    if (past <= 0) {
+      return 0;
+    }
+    const index = this.exceptionAt(past);
+    if (index === -1) {
+      return clamp(Math.floor(past / this.rowHeight), 0, last);
+    }
+    const start = this.exceptionStarts[index];
+    const height = this.exceptionHeights[index];
+    if (past < start + height) {
+      return clamp(this.exceptionRows[index], 0, last);
+    }
+    // Past that exception, and before the next one: the rows between
+    // are all the default height.
+    const after = this.exceptionRows[index] + 1;
+    return clamp(after + Math.floor((past - start - height) / this.rowHeight), 0, last);
   }
 
   /**
@@ -405,7 +603,7 @@ export class UiVirtualSheet {
       children.push(this.mountedHeader);
     }
 
-    children.push(spacer('sheet:top', firstRow * this.rowHeight));
+    children.push(spacer('sheet:top', this.rowOffsetOf(firstRow)));
     for (const row of this.mountedRows.keys()) {
       if (row < firstRow || row > lastRow) {
         this.mountedRows.delete(row);
@@ -419,7 +617,7 @@ export class UiVirtualSheet {
       }
       children.push(built);
     }
-    children.push(spacer('sheet:bottom', (this.rowCount - lastRow - 1) * this.rowHeight));
+    children.push(spacer('sheet:bottom', this.rowsHeight - this.rowOffsetOf(lastRow + 1)));
     return children;
   }
 
@@ -481,7 +679,7 @@ export class UiVirtualSheet {
         ...built.props,
         key: `sheet:row:${row}`,
         width,
-        height: this.rowHeight,
+        height: this.rowHeightOf(row),
         flexShrink: 0
       },
       children: this.withLead(built.children, lead)
@@ -605,6 +803,7 @@ export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): U
     rowCount,
     columnCount,
     rowHeight,
+    rowHeights,
     columnWidth,
     rowOverscan,
     columnOverscan,
@@ -616,7 +815,17 @@ export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): U
     ...rest
   } = props;
   const sheet = new UiVirtualSheet(
-    { rowCount, columnCount, rowHeight, columnWidth, rowOverscan, columnOverscan, gutterWidth, headerHeight },
+    {
+      rowCount,
+      columnCount,
+      rowHeight,
+      rowHeights,
+      columnWidth,
+      rowOverscan,
+      columnOverscan,
+      gutterWidth,
+      headerHeight
+    },
     renderRow,
     header
   );
