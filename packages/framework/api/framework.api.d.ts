@@ -266,7 +266,9 @@ import {
   performanceMarksEnabled,
   RendererBackend,
   setPerformanceMarks as setPerformanceMarks$1,
+  Size,
   TextMeasurer,
+  TextMeasureRequest,
   UI_ROLES,
   UI_SEMANTIC_STATES,
   UiAnimation,
@@ -2219,6 +2221,13 @@ declare class FindService {
   refresh(): void;
   private sync;
 }
+declare class TextService {
+  private measurer;
+  setMeasurer(measurer: TextMeasurer | null): void;
+  get ready(): boolean;
+  measure(request: TextMeasureRequest): Size;
+  widthOf(text: string, style: Omit<TextMeasureRequest, 'text' | 'maxWidth'>): number;
+}
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
   readonly trapped: InternalState<boolean>;
@@ -2358,6 +2367,7 @@ declare class RenderWorkerApp {
   private initialize;
 }
 export {
+  _n,
   ActionCause,
   ActionEntry,
   AnimateOptions,
@@ -2450,7 +2460,6 @@ export {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
-  gn,
   IndexedDbStorage,
   IndexedDbStorageOptions,
   Inject,
@@ -2564,6 +2573,7 @@ export {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  TextService,
   themeTokenCell,
   ThemeTokenCell,
   throttled,
@@ -2851,6 +2861,7 @@ import {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  TextService,
   themeTokenCell,
   ThemeTokenCell,
   throttled,
@@ -2887,7 +2898,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-DfZz7Qe-.js";
+} from "./index-RACyx5zz.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3010,6 +3021,7 @@ export {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  TextService,
   themeTokenCell,
   ThemeTokenCell,
   throttled,
@@ -3366,7 +3378,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-DfZz7Qe-.js";
+} from "../index-RACyx5zz.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
