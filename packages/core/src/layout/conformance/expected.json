@@ -1,7 +1,7 @@
 {
   "generator": {
-    "chrome": "Google Chrome 152.0.7977.64",
-    "generatedAt": "2026-09-07T00:55:38.695Z"
+    "chrome": "Google Chrome 153.0.8010.47",
+    "generatedAt": "2026-09-25T19:05:00.921Z"
   },
   "cases": {
     "root/column-fills-viewport": {
@@ -3351,6 +3351,39 @@
         }
       ]
     },
+    "paragraph/shrink-wrap-around-a-grown-label": {
+      "fingerprint": "bf0303d9",
+      "boxes": [
+        {
+          "path": "root",
+          "x": 0,
+          "y": 0,
+          "width": 300,
+          "height": 200
+        },
+        {
+          "path": "root/0",
+          "x": 0,
+          "y": 0,
+          "width": 120,
+          "height": 12
+        },
+        {
+          "path": "root/0/0",
+          "x": 0,
+          "y": 0,
+          "width": 90,
+          "height": 12
+        },
+        {
+          "path": "root/0/1",
+          "x": 100,
+          "y": 0,
+          "width": 20,
+          "height": 12
+        }
+      ]
+    },
     "paragraph/ellipsis-in-shrunk-row-item": {
       "fingerprint": "4b121918",
       "boxes": [
@@ -5312,6 +5345,72 @@
           "x": 100,
           "y": 0,
           "width": 200,
+          "height": 20
+        }
+      ]
+    },
+    "flex/shrink-wrap-around-a-grown-item": {
+      "fingerprint": "a0445c01",
+      "boxes": [
+        {
+          "path": "root",
+          "x": 0,
+          "y": 0,
+          "width": 300,
+          "height": 200
+        },
+        {
+          "path": "root/0",
+          "x": 0,
+          "y": 0,
+          "width": 160,
+          "height": 20
+        },
+        {
+          "path": "root/0/0",
+          "x": 0,
+          "y": 0,
+          "width": 120,
+          "height": 20
+        },
+        {
+          "path": "root/0/1",
+          "x": 120,
+          "y": 0,
+          "width": 40,
+          "height": 20
+        }
+      ]
+    },
+    "flex/shrink-wrap-around-a-weighted-item": {
+      "fingerprint": "45bb5b82",
+      "boxes": [
+        {
+          "path": "root",
+          "x": 0,
+          "y": 0,
+          "width": 300,
+          "height": 200
+        },
+        {
+          "path": "root/0",
+          "x": 0,
+          "y": 0,
+          "width": 160,
+          "height": 20
+        },
+        {
+          "path": "root/0/0",
+          "x": 0,
+          "y": 0,
+          "width": 106.672,
+          "height": 20
+        },
+        {
+          "path": "root/0/1",
+          "x": 106.672,
+          "y": 0,
+          "width": 53.328,
           "height": 20
         }
       ]

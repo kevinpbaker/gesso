@@ -544,6 +544,14 @@ export const layoutCases: readonly LayoutCase[] = [
     row({ width: 100 }, paragraph('abcd efgh ijkl'), leaf(40, 10, { flexShrink: 0 }))
   ),
   ahem('paragraph/two-texts-shrink-by-max-content', row({ width: 100 }, paragraph('abcd efgh'), paragraph('ab cd'))),
+  // A menu row: a label that takes the space and a shortcut beside it.
+  // The panel round them has no width of its own, so if the label's
+  // text is left out of what the row asks for, the label wraps in a
+  // panel measured as though it had not.
+  ahem(
+    'paragraph/shrink-wrap-around-a-grown-label',
+    column({ x: 'start' }, row({ gap: 10 }, paragraph('abcd efgh', { flex: 1 }), paragraph('ij')))
+  ),
   ahem(
     'paragraph/ellipsis-in-shrunk-row-item',
     row({ width: 60 }, paragraph('abcdefghij', { textWrap: 'none', textOverflow: 'ellipsis' }))
@@ -875,6 +883,17 @@ export const layoutCases: readonly LayoutCase[] = [
     row({ y: 'start' }, box({ height: 20, flex: 1 }), leaf(120, 20, { flex: 1 }), box({ height: 20, flex: 1 }))
   ),
   testCase('flex/weighted', row({ y: 'start' }, box({ height: 20, flex: 1 }), box({ height: 20, flex: 2 }))),
+  // `flex: 1` is `flex-basis: 0`, and a container with no width of its
+  // own still has to be as wide as what that item holds: the basis is
+  // where the item starts growing, not what it asks for.
+  testCase(
+    'flex/shrink-wrap-around-a-grown-item',
+    column({ x: 'start' }, row({ y: 'start' }, leaf(120, 20, { flex: 1 }), leaf(40, 20)))
+  ),
+  testCase(
+    'flex/shrink-wrap-around-a-weighted-item',
+    column({ x: 'start' }, row({ y: 'start' }, leaf(120, 20, { flex: 2 }), leaf(40, 20, { flex: 1 })))
+  ),
   testCase(
     'flex/explicit-basis-wins',
     row({ y: 'start' }, box({ height: 20, flex: 1, flexBasis: 100 }), box({ height: 20, flex: 1 }))

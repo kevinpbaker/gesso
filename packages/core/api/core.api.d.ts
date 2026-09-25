@@ -3372,6 +3372,7 @@ declare class LayoutEngine {
   private flexBasis;
   private flexChildConstraints;
   private breakLines;
+  private lineMaxContentMain;
   private lineOuterMain;
   private resolveLine;
   private measureFlexedItems;
@@ -6682,7 +6683,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BSwDTqlV.js";
+} from "./index-kreII5U8.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7593,7 +7594,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BSwDTqlV.js";
+} from "./index-kreII5U8.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

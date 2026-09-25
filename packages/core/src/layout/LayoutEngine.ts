@@ -233,6 +233,14 @@ interface FlexItem {
   rec: LayoutRecord;
   /** Flex base size: max-content along the main axis, or flexBasis. */
   baseMain: number;
+  /**
+   * What the item's own content asks for along the main axis, which is
+   * the base size again unless `flexBasis` replaced it. Kept apart from
+   * `baseMain` because a container shrink-wrapping around an item that
+   * starts flexing from zero has to wrap around the content, not
+   * around the zero.
+   */
+  maxContentMain: number;
   /** Base size clamped to the item's min/max. */
   hypotheticalMain: number;
   finalMain: number;
@@ -1826,7 +1834,7 @@ export class LayoutEngine {
         for (const item of line.items) {
           item.finalMain = item.hypotheticalMain;
         }
-        contentMain = Math.max(contentMain, lineTotal);
+        contentMain = Math.max(contentMain, this.lineMaxContentMain(line, config.gapMain));
       }
     }
     if (mainDefinite) {
@@ -1990,6 +1998,7 @@ export class LayoutEngine {
         child,
         rec: cRec,
         baseMain,
+        maxContentMain: measuredMain,
         hypotheticalMain: this.clamp(baseMain, minMain, maxMain),
         finalMain: baseMain,
         cross: row ? cRec.measuredHeight : cRec.measuredWidth,
@@ -2106,6 +2115,34 @@ export class LayoutEngine {
       lines.push({ items: current, cross: 0, crossStart: 0 });
     }
     return lines;
+  }
+
+  /**
+   * A line's main size when the container shrink-wraps it.
+   *
+   * The sum of the hypothetical sizes would be the answer if an item
+   * never grew — but `flex: 1` is `flex-basis: 0`, and an item that
+   * starts flexing from zero asks for nothing while its content still
+   * wants the width of its text. A container wrapped around that sum
+   * comes out too narrow; the item's text then wraps inside a box that
+   * was measured as though it had not, and the container is left
+   * shorter than the children it draws — a menu whose last rows fall
+   * out of its own panel.
+   *
+   * So an item that can grow contributes whichever is larger, the size
+   * its basis gives it or the size its content asks for. Chrome ignores
+   * the basis entirely here and browsers disagree with each other about
+   * it; the larger of the two is the reading that keeps `flex-basis`
+   * counting for something, which is what `basis/sizes-container`
+   * already records this engine as doing.
+   */
+  private lineMaxContentMain(line: FlexLine, gap: number): number {
+    let total = gap * (line.items.length - 1);
+    for (const item of line.items) {
+      const wanted = item.grow > 0 ? this.clamp(item.maxContentMain, item.minMain, item.maxMain) : 0;
+      total += Math.max(item.hypotheticalMain, wanted) + item.marginMainStart + item.marginMainEnd;
+    }
+    return total;
   }
 
   private lineOuterMain(line: FlexLine, gap: number, size: 'hypothetical' | 'final'): number {

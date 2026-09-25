@@ -148,6 +148,39 @@ describe('LayoutEngine text', () => {
       expect(harness.box(column)).toEqual({ x: 0, y: 0, width: 120, height: 12 });
       expect(harness.box(paragraph)).toEqual({ x: 0, y: 0, width: 120, height: 12 });
     });
+
+    /**
+     * A menu panel: rows of a label that takes the space and a shortcut
+     * beside it, in a panel with no width of its own.
+     *
+     * `flex: 1` on the label is `flex-basis: 0`, and a panel measured
+     * from the bases alone is as wide as the shortcuts. The label then
+     * wraps inside a panel whose height was taken before it did, and
+     * the last rows are drawn past the bottom of their own background —
+     * which is what this looked like in an application.
+     */
+    it('shrink-wraps a panel around a flexible label instead of wrapping it', () => {
+      const harness = new LayoutHarness();
+      const panel = harness.createNode('panel', UiNodeType.Column);
+      const rows = ['abcd efgh ij', 'kl mn'].map((words, index) => {
+        const row = harness.createNode(`row${index}`, UiNodeType.Row);
+        row.setProperty('gap', 10);
+        const label = text(harness, `label${index}`, words, { flex: 1 });
+        const shortcut = text(harness, `shortcut${index}`, 'xy');
+        harness.append(row, label, shortcut);
+        harness.append(panel, row);
+        return row;
+      });
+      // Shrink-wrapped: the layout root fills bounded constraints, so
+      // the panel is measured without any, as an overlay's is.
+      harness.layout(panel, Constraints.unbounded());
+      // The widest label is 72 wide; with the gap and the shortcut the
+      // panel is 94, and every label stays on one line.
+      expect(harness.record(panel).measuredWidth).toBe(94);
+      expect(harness.box(rows[0])).toEqual({ x: 0, y: 0, width: 94, height: 12 });
+      expect(harness.box(rows[1])).toEqual({ x: 0, y: 12, width: 94, height: 12 });
+      expect(harness.record(panel).measuredHeight).toBe(24);
+    });
   });
 
   describe('baseline alignment', () => {
