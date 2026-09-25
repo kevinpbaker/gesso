@@ -230,7 +230,19 @@ export function borders(options: BordersOptions): UiModifier<Decorations> {
   return decorated(borderShapes(options));
 }
 
-function borderShapes(options: BordersOptions): readonly DecorationShape[] {
+/**
+ * The rectangles `borders()` draws, without the modifier around them.
+ *
+ * For a surface that cannot afford a modifier per node and pushes its
+ * decorations in instead. A spreadsheet is the case: ten thousand
+ * mounted cells, each with its own border, fed from one writer into a
+ * subject per cell — a modifier per cell would be ten thousand
+ * attachments to do what ten thousand array writes already do. The
+ * arithmetic is the same either way, and sharing it is the point:
+ * an application that rolled its own would be the second place a
+ * corner could be painted twice.
+ */
+export function borderShapes(options: BordersOptions): readonly DecorationShape[] {
   const shared = options.color ?? 'border';
   const edge = (side: number | BorderEdge | undefined): BorderEdge | undefined => {
     if (side === undefined) {

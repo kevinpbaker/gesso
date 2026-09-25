@@ -8,6 +8,7 @@ import {
   Text,
   type UiElement,
   type UiProps,
+  borders,
   decorated,
   linearGradient,
   percent,
@@ -238,7 +239,26 @@ function paritySection(state: PlaygroundState): UiElement {
         backgroundColor: 'rgba(16,185,129,0.15)',
         modifiers: [decorated(CARD_DECORATION)]
       }),
-      Box({ width: 90, height: 34, borderWidth: 3, borderColor: '#f43f5e' })
+      Box({ width: 90, height: 34, borderWidth: 3, borderColor: '#f43f5e' }),
+      // A border per edge, which `borderWidth` cannot describe: four
+      // widths and two colours on one node. It is four decoration
+      // rectangles rather than a border property, so this is the only
+      // place either backend has been asked to draw one, and the only
+      // place the far insets on `DecorationBox` are exercised at all.
+      // The four differ in width so a transposed axis shows, and the
+      // sides are a second colour so a corner painted twice shows.
+      Box({
+        width: 90,
+        height: 34,
+        backgroundColor: 'rgba(148,163,184,0.18)',
+        modifiers: [borders({ top: 1, right: 4, bottom: 6, left: 2, color: '#e2e8f0' })]
+      }),
+      Box({
+        width: 90,
+        height: 34,
+        backgroundColor: 'rgba(148,163,184,0.18)',
+        modifiers: [borders({ top: 3, bottom: { width: 3, color: '#f59e0b' }, left: { width: 5, color: '#22d3ee' } })]
+      })
     ),
     Column(
       { width: 130, height: 80, overflow: 'scroll', scrollY: 22, backgroundColor: '#0f172a', borderRadius: 6 },

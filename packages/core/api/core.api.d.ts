@@ -3599,6 +3599,7 @@ interface BordersOptions {
   readonly color?: UiColorValue;
 }
 declare function borders(options: BordersOptions): UiModifier<Decorations>;
+declare function borderShapes(options: BordersOptions): readonly DecorationShape[];
 declare function autoFocus(): UiModifier<void>;
 interface ClickOutsideOptions {
   readonly onOutside: (event: UiInputEvent) => void;
@@ -4924,6 +4925,7 @@ interface UiSemanticsAction {
   readonly value?: string;
 }
 export {
+  _f,
   accumulatedOffsetTo,
   Affine,
   AlignContent,
@@ -4948,6 +4950,7 @@ export {
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   borders,
+  borderShapes,
   BordersOptions,
   Box,
   BoxModelProps,
@@ -5129,7 +5132,6 @@ export {
   GestureInput,
   GestureRecognizerOptions,
   getPropertyNames,
-  gf,
   GLYPH_SUBPIXEL_PHASES,
   GlyphCommand,
   glyphCount,
@@ -5826,6 +5828,7 @@ import {
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   borders,
+  borderShapes,
   BordersOptions,
   Box,
   BoxModelProps,
@@ -6676,7 +6679,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-aT7yf3Wo.js";
+} from "./index-CgG2FpkB.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6694,6 +6697,7 @@ export {
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   borders,
+  borderShapes,
   Box,
   boxShadow,
   boxShadowArraysEqual,
@@ -7585,7 +7589,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-aT7yf3Wo.js";
+} from "./index-CgG2FpkB.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

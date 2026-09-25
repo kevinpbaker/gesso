@@ -9,6 +9,7 @@ import { setSelectionRange } from '../selection/UiSelectable';
 import { setMatchRanges } from '../find/UiTextMatches';
 import { setLinkHover } from '../selection/UiTextLinks';
 import type { DecorationShape } from './Decorations';
+import { borderShapes } from '../modifiers/decoration';
 import { linearGradient, radialGradient } from '../properties/UiGradient';
 import { percent } from '../layout/UiLength';
 import { FakePaintCanvases, RenderHarness, RecordedGradient } from './RenderTestUtils';
@@ -704,6 +705,49 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     expect(drawnRing.clip).toEqual({ x: 8, y: 8, width: 200, height: 80 });
     // The reordered child's own ring is not clipped by anything.
     expect(draws[8].clip).toBeNull();
+  });
+
+  /**
+   * `borders()`, which is the reason `DecorationBox` grew far insets.
+   *
+   * A border per edge is four decoration rectangles rather than a
+   * border property, and this is the only place either backend is
+   * asked to draw one. The four widths differ so a transposed axis
+   * shows; the sides carry a second colour so a corner painted twice
+   * shows; and the boxes are asserted absolutely rather than against
+   * each other, because two backends agreeing on the wrong rectangle
+   * is exactly what a parity test cannot see by itself.
+   */
+  it('a border per edge, placed from the far insets', () => {
+    const h = new RenderHarness(200, 120);
+    const root = h.createNode('app', UiNodeType.Column);
+    const node = box(h, 'bordered', { width: 100, height: 50, backgroundColor: '#1e293b' });
+    node.decorations = borderShapes({
+      top: 1,
+      right: 4,
+      bottom: 6,
+      left: { width: 2, color: '#f59e0b' },
+      color: '#e2e8f0'
+    });
+    h.append(root, node);
+
+    const draws = expectParity(h, root);
+    expect(draws.map(d => d.kind)).toEqual(['fill', 'fill', 'fill', 'fill', 'fill']);
+
+    const edges = draws.slice(1).map(d => ({ x: d.x, y: d.y, width: d.width, height: d.height }));
+    expect(edges).toEqual([
+      // Top and bottom run the full width.
+      { x: 0, y: 0, width: 100, height: 1 },
+      { x: 0, y: 44, width: 100, height: 6 },
+      // The sides run between them, so each corner is painted once.
+      { x: 0, y: 1, width: 2, height: 43 },
+      { x: 96, y: 1, width: 4, height: 43 }
+    ]);
+    // The edge that named its own colour kept it, and the others took
+    // the shared one.
+    const colours = draws.slice(1).map(d => d.color);
+    expect(colours[2]).not.toBe(colours[0]);
+    expect(new Set([colours[0], colours[1], colours[3]]).size).toBe(1);
   });
 
   /**
