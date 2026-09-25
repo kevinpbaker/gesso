@@ -116,6 +116,52 @@ export interface UiVirtualSheetOptions {
   readonly gutterWidth?: number;
   /** Height of the header row above the rows, when there is one. */
   readonly headerHeight?: number;
+  /**
+   * Rows and columns kept mounted however far the sheet is scrolled.
+   *
+   * A frozen pane, and the second thing that cannot be windowed by
+   * position alone — `extendRange` is no use here, because widening
+   * the window back to row 0 from row 5,000 would mount five thousand
+   * rows to show one.
+   *
+   * What this does is *mount* them and take them out of the scrolled
+   * window, so they appear once rather than twice and the spacers
+   * account for them. Keeping them **visible** is the renderer's
+   * business, with `position: 'sticky'` — exactly as it already is
+   * for the header row and the gutter, which are this idea with the
+   * count fixed at one.
+   *
+   * With `frozenColumns` set, a row renderer is asked for the columns
+   * in `[0, frozenColumns)` first and then for `[firstColumn,
+   * lastColumn]`, and the window puts the leading spacer between the
+   * two groups.
+   */
+  readonly frozenRows?: number;
+  readonly frozenColumns?: number;
+  /**
+   * Widens the window the viewport implies, for things the document
+   * says reach outside it.
+   *
+   * **The one place a sheet's geometry is allowed to depend on its
+   * contents.** Everything else here is arithmetic on the scroll
+   * offset, which is what makes it cheap; this is the exception, and
+   * it exists because two things genuinely cannot be windowed by
+   * position alone.
+   *
+   * A **merged cell** is the case that forced it. A merge spanning
+   * C3:E3 is drawn by its anchor, C3, and when the sheet is scrolled
+   * so the window begins at column D there is no anchor to draw —
+   * the merge silently disappears at the left edge of the screen.
+   * Widening the window to include the anchor is the only fix that
+   * does not put the document inside this class: the caller knows
+   * where its merges are, and returns a range that covers them.
+   *
+   * Called on every recompute, so it must be cheap — a lookup, not a
+   * scan. Returning the range unchanged costs nothing at all. If what
+   * it would answer changes without the viewport moving, the caller
+   * says so with `invalidate`.
+   */
+  readonly extendRange?: (range: SheetRange) => SheetRange;
   /** Viewport assumed before the first layout. */
   readonly initialViewport?: { readonly width: number; readonly height: number };
 }
@@ -155,8 +201,11 @@ export class UiVirtualSheet {
   private rowHeight: number;
   private readonly gutterWidth: number;
   private readonly headerHeight: number;
+  private frozenRows: number;
+  private frozenColumns: number;
   private readonly renderRow: SheetRowRenderer;
   private renderHeader: SheetHeaderRenderer | undefined;
+  private readonly extendRange: ((range: SheetRange) => SheetRange) | undefined;
 
   /** One width per column, or undefined when every column is the same. */
   private widths: number[] | undefined;
@@ -180,6 +229,8 @@ export class UiVirtualSheet {
   private viewport: SheetViewport;
   /** Rows built for the current column range, so a vertical scroll rebuilds one row. */
   private readonly mountedRows = new Map<number, UiElement>();
+  /** The frozen rows, kept separately because they never leave. */
+  private readonly frozenMounted = new Map<number, UiElement>();
   private mountedHeader: UiElement | undefined;
 
   constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer, renderHeader?: SheetHeaderRenderer) {
@@ -189,10 +240,13 @@ export class UiVirtualSheet {
     this.adoptHeights(options.rowHeights);
     this.gutterWidth = Math.max(0, options.gutterWidth ?? 0);
     this.headerHeight = Math.max(0, options.headerHeight ?? 0);
+    this.frozenRows = Math.max(0, Math.floor(options.frozenRows ?? 0));
+    this.frozenColumns = Math.max(0, Math.floor(options.frozenColumns ?? 0));
     this.rowOverscan = typeof options.rowOverscan === 'number' ? options.rowOverscan : 3;
     this.columnOverscan = typeof options.columnOverscan === 'number' ? options.columnOverscan : 2;
     this.renderRow = renderRow;
     this.renderHeader = renderHeader;
+    this.extendRange = options.extendRange;
     this.adoptWidths(options.columnWidth);
     this.viewport = {
       scrollX: 0,
@@ -399,6 +453,11 @@ export class UiVirtualSheet {
     return this.gutterWidth + this.columnsWidth;
   }
 
+  /** Where the scrolled columns begin, past the gutter and the frozen ones. */
+  private get frozenWidth(): number {
+    return this.offsetOf(this.frozenColumns);
+  }
+
   get contentHeight(): number {
     return this.headerHeight + this.rowsHeight;
   }
@@ -525,9 +584,28 @@ export class UiVirtualSheet {
     this.invalidate();
   }
 
+  /**
+   * How many rows and columns stay put while the rest scrolls.
+   *
+   * Freezing changes which rows are in the scrolled window, so every
+   * mounted row is rebuilt — a row that was scrolling is now frozen
+   * or the other way about.
+   */
+  setFrozen(rows: number, columns: number): void {
+    const nextRows = Math.max(0, Math.floor(rows));
+    const nextColumns = Math.max(0, Math.floor(columns));
+    if (nextRows === this.frozenRows && nextColumns === this.frozenColumns) {
+      return;
+    }
+    this.frozenRows = nextRows;
+    this.frozenColumns = nextColumns;
+    this.invalidate();
+  }
+
   /** Drops every mounted row and rebuilds against the last viewport. */
   invalidate(): void {
     this.mountedRows.clear();
+    this.frozenMounted.clear();
     this.mountedHeader = undefined;
     this.range = EMPTY_RANGE;
     this.recompute();
@@ -554,6 +632,7 @@ export class UiVirtualSheet {
     // survives a vertical scroll and nothing else.
     if (next.firstColumn !== this.range.firstColumn || next.lastColumn !== this.range.lastColumn) {
       this.mountedRows.clear();
+      this.frozenMounted.clear();
       this.mountedHeader = undefined;
     }
     this.range = next;
@@ -576,17 +655,35 @@ export class UiVirtualSheet {
     if (this.rowCount === 0 || this.columnCount === 0) {
       return EMPTY_RANGE;
     }
-    const firstRow = Math.max(0, this.rowAt(viewport.scrollY) - this.rowOverscan);
+    // The frozen rows and columns are mounted separately, so the
+    // scrolled window starts past them — otherwise a sheet scrolled
+    // to the top would build each of them twice, once frozen and once
+    // in the window, and the keys would collide.
+    const firstRow = Math.max(this.frozenRows, this.rowAt(viewport.scrollY) - this.rowOverscan);
     const lastRow = Math.min(
       this.rowCount - 1,
       this.rowAt(viewport.scrollY + Math.max(0, viewport.height)) + this.rowOverscan
     );
-    const firstColumn = Math.max(0, this.columnAt(viewport.scrollX) - this.columnOverscan);
+    const firstColumn = Math.max(this.frozenColumns, this.columnAt(viewport.scrollX) - this.columnOverscan);
     const lastColumn = Math.min(
       this.columnCount - 1,
       this.columnAt(viewport.scrollX + Math.max(0, viewport.width)) + this.columnOverscan
     );
-    return { firstRow, lastRow, firstColumn, lastColumn };
+    const range = { firstRow, lastRow, firstColumn, lastColumn };
+    if (this.extendRange === undefined) {
+      return range;
+    }
+    // Clamped to the sheet and never *narrowed*: a caller that
+    // returned a smaller range would be deciding what the viewport
+    // covers, which is not its question, and a window smaller than
+    // the screen is a hole in the middle of the sheet.
+    const wanted = this.extendRange(range);
+    return {
+      firstRow: clamp(Math.min(wanted.firstRow, firstRow), this.frozenRows, firstRow),
+      lastRow: clamp(Math.max(wanted.lastRow, lastRow), lastRow, this.rowCount - 1),
+      firstColumn: clamp(Math.min(wanted.firstColumn, firstColumn), this.frozenColumns, firstColumn),
+      lastColumn: clamp(Math.max(wanted.lastColumn, lastColumn), lastColumn, this.columnCount - 1)
+    };
   }
 
   private buildChildren(): UiElement[] {
@@ -595,7 +692,7 @@ export class UiVirtualSheet {
       return [];
     }
     const width = this.contentWidth;
-    const lead = this.offsetOf(firstColumn);
+    const lead = this.offsetOf(firstColumn) - this.frozenWidth;
     const children: UiElement[] = [];
 
     if (this.renderHeader !== undefined) {
@@ -603,7 +700,19 @@ export class UiVirtualSheet {
       children.push(this.mountedHeader);
     }
 
-    children.push(spacer('sheet:top', this.rowOffsetOf(firstRow)));
+    // The frozen rows, before the spacer and exactly where the header
+    // goes — a frozen pane is the header row with the count turned
+    // up. Keeping them visible is the renderer's, with sticky.
+    for (let row = 0; row < this.frozenRows && row < this.rowCount; row++) {
+      let built = this.frozenMounted.get(row);
+      if (built === undefined) {
+        built = this.wrap(row, width, lead);
+        this.frozenMounted.set(row, built);
+      }
+      children.push(built);
+    }
+
+    children.push(spacer('sheet:top', this.rowOffsetOf(firstRow) - this.rowOffsetOf(this.frozenRows)));
     for (const row of this.mountedRows.keys()) {
       if (row < firstRow || row > lastRow) {
         this.mountedRows.delete(row);
@@ -651,10 +760,15 @@ export class UiVirtualSheet {
    */
   private withLead(children: readonly UiChild[], lead: number): UiChild[] {
     const pad = spacer('sheet:lead', undefined, lead);
-    if (this.gutterWidth <= 0) {
+    // Everything that stays put comes first: the gutter, then the
+    // frozen columns. The spacer for the columns scrolled out of view
+    // goes after them, which is what puts `firstColumn` at its own
+    // offset without the row holding the columns between.
+    const stays = (this.gutterWidth > 0 ? 1 : 0) + this.frozenColumns;
+    if (stays === 0) {
       return [pad, ...children];
     }
-    return [...children.slice(0, 1), pad, ...children.slice(1)];
+    return [...children.slice(0, stays), pad, ...children.slice(stays)];
   }
 
   /**
@@ -809,7 +923,10 @@ export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): U
     columnOverscan,
     gutterWidth,
     headerHeight,
+    frozenRows,
+    frozenColumns,
     header,
+    extendRange,
     modifiers,
     sheetRef,
     ...rest
@@ -824,7 +941,10 @@ export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): U
       rowOverscan,
       columnOverscan,
       gutterWidth,
-      headerHeight
+      headerHeight,
+      frozenRows,
+      frozenColumns,
+      extendRange
     },
     renderRow,
     header

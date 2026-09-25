@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Row, Text } from './UiComponents';
-import type { UiElement } from './UiElement';
+import type { UiChild, UiElement } from './UiElement';
 import { UiVirtualSheet, type SheetRange } from './UiVirtualSheet';
 
 const ROW = 24;
@@ -23,23 +23,34 @@ function rows(sheet: UiVirtualSheet): number[] {
     .map(key => Number(key.slice('sheet:row:'.length)));
 }
 
+/**
+ * The columns a mounted row holds, by the keys its cells carry.
+ *
+ * By key and not by position: the window's own leading spacer sits
+ * among them, and with a frozen pane it is no longer first. Anything
+ * positional here breaks the moment a sheet freezes a column, which
+ * is how this was written and what it cost to find out.
+ */
 function columnsOf(sheet: UiVirtualSheet, row: number): number[] {
   const element = sheet.children$.value.find(child => child.props.key === `sheet:row:${row}`);
   if (element === undefined) {
     throw new Error(`row ${row} is not mounted`);
   }
-  // The first child is the window's own leading spacer.
-  return (element.children.slice(1) as UiElement[]).map(cell => cell.props.key as number);
+  return (element.children as UiElement[])
+    .map(cell => cell.props.key)
+    .filter((key): key is number => typeof key === 'number');
 }
 
 function spacers(sheet: UiVirtualSheet): { top: number; bottom: number; lead: number } {
   const children = sheet.children$.value;
   const first = rows(sheet)[0];
   const row = children.find(child => child.props.key === `sheet:row:${first}`) as UiElement;
+  const find = (list: readonly UiChild[], key: string): UiElement =>
+    (list as UiElement[]).find(child => child.props.key === key) as UiElement;
   return {
-    top: children[0].props.height as number,
-    bottom: children[children.length - 1].props.height as number,
-    lead: (row.children[0] as UiElement).props.width as number
+    top: find(children, 'sheet:top').props.height as number,
+    bottom: find(children, 'sheet:bottom').props.height as number,
+    lead: find(row.children, 'sheet:lead').props.width as number
   };
 }
 
@@ -590,5 +601,203 @@ describe('a sheet whose rows are not all the same height', () => {
       const sheet = sheetWith(new Map());
       expect(() => sheet.setRowHeights(new Map([[0, -1]]))).toThrow(/negative/);
     });
+  });
+});
+
+/**
+ * A window widened by what the document says.
+ *
+ * The one place a sheet's geometry depends on its contents. A merge
+ * spanning C3:E3 is drawn by its anchor, and scrolled so the window
+ * begins at column D there is no anchor to draw — the merge vanishes
+ * at the left edge of the screen. The caller knows where its merges
+ * are; this lets it say so.
+ */
+describe('a window the document widens', () => {
+  const sheetWith = (extendRange: (range: SheetRange) => SheetRange) =>
+    new UiVirtualSheet(
+      {
+        rowCount: 100,
+        columnCount: 40,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        rowOverscan: 0,
+        columnOverscan: 0,
+        extendRange,
+        initialViewport: { width: 500, height: 240 }
+      },
+      renderRow
+    );
+
+  it('mounts the columns the caller asked to reach back to', () => {
+    // A merge anchored at column 2, spanning to column 8.
+    const sheet = sheetWith(range => (range.firstColumn > 2 && range.firstColumn <= 8 ? { ...range, firstColumn: 2 } : range));
+    sheet.update({ scrollX: 5 * COLUMN, scrollY: 0, width: 500, height: 240 });
+
+    expect(columnsOf(sheet, 0)[0]).toBe(2);
+  });
+
+  it('mounts the rows the caller asked to reach back to', () => {
+    const sheet = sheetWith(range => (range.firstRow > 10 && range.firstRow <= 14 ? { ...range, firstRow: 10 } : range));
+    sheet.update({ scrollX: 0, scrollY: 12 * ROW, width: 500, height: 240 });
+
+    expect(rows(sheet)[0]).toBe(10);
+  });
+
+  /** The spacer follows the widened window, or the rows sit wrong. */
+  it('places the spacers against the widened window', () => {
+    const sheet = sheetWith(range => (range.firstRow > 10 && range.firstRow <= 14 ? { ...range, firstRow: 10 } : range));
+    sheet.update({ scrollX: 0, scrollY: 12 * ROW, width: 500, height: 240 });
+
+    expect(spacers(sheet).top).toBe(10 * ROW);
+    expect(spacers(sheet).lead).toBe(0);
+  });
+
+  it('costs nothing when the caller widens nothing', () => {
+    const plain = new UiVirtualSheet(
+      { rowCount: 100, columnCount: 40, rowHeight: ROW, columnWidth: COLUMN, rowOverscan: 0, columnOverscan: 0, initialViewport: { width: 500, height: 240 } },
+      renderRow
+    );
+    const hooked = sheetWith(range => range);
+    plain.update({ scrollX: 3 * COLUMN, scrollY: 5 * ROW, width: 500, height: 240 });
+    hooked.update({ scrollX: 3 * COLUMN, scrollY: 5 * ROW, width: 500, height: 240 });
+    expect(rows(hooked)).toEqual(rows(plain));
+    expect(columnsOf(hooked, rows(hooked)[0])).toEqual(columnsOf(plain, rows(plain)[0]));
+  });
+
+  /**
+   * A caller that narrowed the window would be deciding what the
+   * viewport covers, which is not its question — and a window smaller
+   * than the screen is a hole in the middle of the sheet.
+   */
+  it('refuses to be narrowed', () => {
+    const sheet = sheetWith(() => ({ firstRow: 50, lastRow: 51, firstColumn: 30, lastColumn: 31 }));
+    sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+
+    expect(rows(sheet)[0]).toBe(0);
+    expect(columnsOf(sheet, 0)[0]).toBe(0);
+  });
+
+  it('does not let the caller run off the sheet', () => {
+    const sheet = sheetWith(() => ({ firstRow: -20, lastRow: 10_000, firstColumn: -5, lastColumn: 900 }));
+    sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+
+    expect(rows(sheet)[0]).toBe(0);
+    expect(rows(sheet).at(-1)).toBe(99);
+    expect(columnsOf(sheet, 0).at(-1)).toBe(39);
+  });
+});
+
+/**
+ * A frozen pane: rows and columns that stay while the rest scrolls.
+ *
+ * `extendRange` is no use here — widening the window back to row 0
+ * from row 5,000 would mount five thousand rows to show one — so
+ * these are a second mounted set, placed where the header row already
+ * goes. Keeping them *visible* is the renderer's job with sticky
+ * positioning; this is about what exists and where the spacers are.
+ */
+describe('a sheet with a frozen pane', () => {
+  /** Frozen columns are emitted first, then the window's own. */
+  const renderFrozenRow = (frozen: number) => (row: number, first: number, last: number) => {
+    const cells = [];
+    for (let column = 0; column < frozen; column++) {
+      cells.push(Text({ key: column, text: `${row}:${column}` }));
+    }
+    for (let column = first; column <= last; column++) {
+      cells.push(Text({ key: column, text: `${row}:${column}` }));
+    }
+    return Row({}, ...cells);
+  };
+
+  const sheetWith = (frozenRows: number, frozenColumns: number) =>
+    new UiVirtualSheet(
+      {
+        rowCount: 100,
+        columnCount: 40,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        rowOverscan: 0,
+        columnOverscan: 0,
+        frozenRows,
+        frozenColumns,
+        initialViewport: { width: 500, height: 240 }
+      },
+      renderFrozenRow(frozenColumns)
+    );
+
+  it('keeps the frozen rows mounted however far it has scrolled', () => {
+    const sheet = sheetWith(2, 0);
+    sheet.update({ scrollX: 0, scrollY: 80 * ROW, width: 500, height: 240 });
+
+    const mounted = rows(sheet);
+    expect(mounted).toContain(0);
+    expect(mounted).toContain(1);
+    expect(mounted).toContain(80);
+    // And nothing in between.
+    expect(mounted).not.toContain(40);
+  });
+
+  /** Each row appears once: frozen, or in the window, never both. */
+  it('does not build a frozen row twice when the sheet is at the top', () => {
+    const sheet = sheetWith(2, 0);
+    sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+
+    const mounted = rows(sheet);
+    expect(new Set(mounted).size).toBe(mounted.length);
+    expect(mounted[0]).toBe(0);
+  });
+
+  it('shortens the spacer above the window by the frozen rows', () => {
+    const sheet = sheetWith(2, 0);
+    sheet.update({ scrollX: 0, scrollY: 20 * ROW, width: 500, height: 240 });
+
+    const first = rows(sheet).find(row => row >= 2) ?? 0;
+    expect(spacers(sheet).top).toBe((first - 2) * ROW);
+  });
+
+  it('keeps the frozen columns in every row', () => {
+    const sheet = sheetWith(0, 2);
+    sheet.update({ scrollX: 20 * COLUMN, scrollY: 0, width: 500, height: 240 });
+
+    const columns = columnsOf(sheet, rows(sheet)[0]);
+    expect(columns[0]).toBe(0);
+    expect(columns[1]).toBe(1);
+    expect(columns[2]).toBeGreaterThan(2);
+  });
+
+  it('shortens the leading spacer by the frozen columns', () => {
+    const sheet = sheetWith(0, 2);
+    sheet.update({ scrollX: 20 * COLUMN, scrollY: 0, width: 500, height: 240 });
+
+    const columns = columnsOf(sheet, rows(sheet)[0]);
+    // The spacer stands in for the columns between the frozen ones
+    // and the first one in the window.
+    expect(spacers(sheet).lead).toBe((columns[2] - 2) * COLUMN);
+  });
+
+  it('does not put a frozen column in the window as well', () => {
+    const sheet = sheetWith(0, 2);
+    sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240 });
+
+    const columns = columnsOf(sheet, 0);
+    expect(new Set(columns).size).toBe(columns.length);
+  });
+
+  it('freezes both axes at once', () => {
+    const sheet = sheetWith(1, 1);
+    sheet.update({ scrollX: 20 * COLUMN, scrollY: 40 * ROW, width: 500, height: 240 });
+
+    expect(rows(sheet)).toContain(0);
+    expect(columnsOf(sheet, 0)[0]).toBe(0);
+  });
+
+  it('rebuilds when the pane moves', () => {
+    const sheet = sheetWith(0, 0);
+    sheet.update({ scrollX: 0, scrollY: 40 * ROW, width: 500, height: 240 });
+    expect(rows(sheet)).not.toContain(0);
+
+    sheet.setFrozen(2, 0);
+    expect(rows(sheet)).toContain(0);
   });
 });
