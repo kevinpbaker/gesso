@@ -30,6 +30,10 @@ const ORIGINS: Record<ErrorOrigin, { label: string; note: string }> = {
     label: 'event listener',
     note: 'The dispatcher caught this, so the event still reached the rest of the tree and the application is running. What did not happen is whatever this handler was for.'
   },
+  frame: {
+    label: 'frame',
+    note: 'A frame threw and was abandoned. The clock is still running and the application is still drawing, so what you see is the last frame that finished: this is a report, not a stop. Whatever the broken frame was going to change has not changed.'
+  },
   channel: {
     label: 'channel',
     note: 'A channel’s worker or its patch stream threw. The view is intact; the data behind it has stopped arriving.'

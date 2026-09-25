@@ -623,6 +623,20 @@ export class RenderWorkerApp {
     this.runtime.onListenerError((message, stack) => {
       this.host.postMessage({ type: 'error', message, stack, source: 'listener' });
     });
+    /**
+     * A frame that threw, which the shell has to hear about.
+     *
+     * It used to arrive as `message`: the throw escaped the frame,
+     * unwound into `receive`, and was caught there. That reported it
+     * and killed the application, because nothing re-armed the clock
+     * afterwards. Now the scheduler keeps drawing and the failure
+     * comes back under its own name, which is also the more honest
+     * one — the frame broke, not the message that happened to be
+     * forwarding the tick.
+     */
+    this.runtime.onFrameError((message, stack) => {
+      this.host.postMessage({ type: 'error', message, stack, source: 'frame' });
+    });
     this.runtime.onFrame(metrics => {
       this.host.postMessage({
         type: 'frame',

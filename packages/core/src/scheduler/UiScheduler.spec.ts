@@ -260,3 +260,113 @@ describe('UiScheduler', () => {
     });
   });
 });
+
+/**
+ * A frame that throws must not stop the clock.
+ *
+ * The failure this guards against is not a crash, it is a *stop*: an
+ * exception escaping a frame unwound past the re-arm at the bottom of
+ * `handleFrame`, `pending` had already been cleared at the top, and
+ * nothing ever asked for another frame. The last frame stayed on
+ * screen, every click landed in a surface nobody was listening to,
+ * and a debugger attached to the worker found nothing running and
+ * nothing to pause — indistinguishable from a hang, and silent.
+ *
+ * Found by typing quickly into a spreadsheet.
+ */
+describe('a frame that throws', () => {
+  const makeNode = () => new UiNode('dirty', UiNodeType.Text);
+
+  function failing(times: number) {
+    const clock = new UiManualFrameClock(() => {});
+    const dirty = new DirtyNodeSet();
+    const errors: unknown[] = [];
+    let frames = 0;
+    const scheduler = new UiScheduler({
+      clock: onFrame => {
+        clock.setCallback(onFrame);
+        return clock;
+      },
+      dirty,
+      onFrame: () => {
+        frames++;
+        if (frames <= times) {
+          throw new Error(`frame ${frames} is broken`);
+        }
+      },
+      onFrameError: error => errors.push(error)
+    });
+    return { clock, dirty, scheduler, errors, frames: () => frames };
+  }
+
+  it('reports the error rather than letting it escape', () => {
+    const h = failing(1);
+    const node = makeNode();
+    h.dirty.mark(node);
+    h.scheduler.notifyDirty();
+
+    expect(() => h.clock.tick(0)).not.toThrow();
+    expect(h.errors).toHaveLength(1);
+    expect((h.errors[0] as Error).message).toBe('frame 1 is broken');
+  });
+
+  /** The line that decides whether this is a bad frame or the end. */
+  it('keeps asking for frames afterwards', () => {
+    const h = failing(1);
+    const node = makeNode();
+    h.dirty.mark(node);
+    h.scheduler.notifyDirty();
+    h.clock.tick(0);
+
+    // The frame threw before it could clear the node, so there is
+    // still work and the clock must have been asked again.
+    h.dirty.mark(node);
+    h.scheduler.notifyDirty();
+    expect(() => h.clock.tick(1)).not.toThrow();
+    expect(h.frames()).toBe(2);
+  });
+
+  it('recovers completely once the frames stop throwing', () => {
+    const h = failing(2);
+    const node = makeNode();
+    for (let at = 0; at < 4; at++) {
+      h.dirty.mark(node);
+      h.scheduler.notifyDirty();
+      if (h.scheduler.framePending) {
+        h.clock.tick(at);
+      }
+    }
+    expect(h.errors).toHaveLength(2);
+    expect(h.frames()).toBeGreaterThanOrEqual(3);
+  });
+
+  it('is not left mid-collection when the collection itself throws', () => {
+    const clock = new UiManualFrameClock(() => {});
+    const dirty = new DirtyNodeSet();
+    const errors: unknown[] = [];
+    const scheduler = new UiScheduler({
+      clock: onFrame => {
+        clock.setCallback(onFrame);
+        return clock;
+      },
+      dirty,
+      beforeCollect: () => {
+        throw new Error('before collect is broken');
+      },
+      onFrame: () => {},
+      onFrameError: error => errors.push(error)
+    });
+    const node = makeNode();
+    dirty.mark(node);
+    scheduler.notifyDirty();
+    expect(() => clock.tick(0)).not.toThrow();
+    expect(errors).toHaveLength(1);
+
+    // `collecting` has to be false again, or every later dirty mark is
+    // swallowed by the guard in `notifyDirty` and the clock is never
+    // armed again — the same silent stop by another route.
+    dirty.mark(node);
+    scheduler.notifyDirty();
+    expect(scheduler.framePending).toBe(true);
+  });
+});

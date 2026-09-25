@@ -1180,6 +1180,7 @@ declare class GessoRuntime {
   private lastFrameMs;
   private frameListener;
   private rendererErrorListener;
+  private frameErrorListener;
   private gpuTimings;
   private inspectListener;
   private lastInspection;
@@ -1229,6 +1230,8 @@ declare class GessoRuntime {
   start(): void;
   get rendererBackend(): RendererBackend | 'pending';
   onRendererError(listener: ((message: string) => void) | null): void;
+  onFrameError(listener: ((message: string, stack?: string) => void) | null): void;
+  private reportFrameError;
   onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
   private reportRendererError;
   private fallBackToCanvas2D;
@@ -1508,7 +1511,8 @@ type ShellToRuntimeMessage = {
 } | {
   type: 'dispose';
 };
-type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener';
+type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener' |
+'frame';
 type RuntimeToShellMessage = {
   type: 'ready';
 } | {
@@ -2902,7 +2906,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-Cr0HWtGY.js";
+} from "./index-Zh2eyHcJ.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3382,7 +3386,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-Cr0HWtGY.js";
+} from "../index-Zh2eyHcJ.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

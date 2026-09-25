@@ -37,6 +37,29 @@ export interface UiSchedulerOptions {
    * animation reading it would not be reproducible.
    */
   beforeCollect?: (time: UiFrameTime) => void;
+
+  /**
+   * Told when a frame throws, instead of the clock simply stopping.
+   *
+   * A frame is the only thing that drives a Gesso application, so an
+   * exception escaping one used to end it: the throw unwound past the
+   * re-arm at the bottom of `handleFrame`, `pending` was already
+   * false, and nothing ever asked for another frame. The application
+   * did not crash — it *stopped*, with its last frame still on screen
+   * and every click landing in a surface nobody was listening to. The
+   * worker sat idle, so a debugger attached to it reported nothing
+   * running and nothing to pause.
+   *
+   * That failure is silent, indistinguishable from a hang, and was
+   * found by typing quickly into a spreadsheet. The scheduler now
+   * survives it: the frame is abandoned, this is called, and the
+   * clock keeps running so the next frame can try again.
+   *
+   * Defaults to reporting on `console.error`, because a frame that
+   * threw is a bug somewhere and the one thing that must not happen
+   * is for nobody to hear about it.
+   */
+  onFrameError?: (error: unknown, time: UiFrameTime) => void;
 }
 
 /**
@@ -55,6 +78,7 @@ export class UiScheduler {
   private readonly dirty: DirtyNodeSet;
   private readonly onFrame: UiFrameCallback;
   private readonly beforeCollect: ((time: UiFrameTime) => void) | undefined;
+  private readonly onFrameError: (error: unknown, time: UiFrameTime) => void;
 
   private disposed = false;
   private active = true;
@@ -76,6 +100,11 @@ export class UiScheduler {
     this.dirty = options.dirty;
     this.onFrame = options.onFrame;
     this.beforeCollect = options.beforeCollect;
+    this.onFrameError =
+      options.onFrameError ??
+      ((error: unknown) => {
+        console.error('A Gesso frame threw. The frame was abandoned and the clock kept running.', error);
+      });
     this.clock = options.clock((time: UiFrameTime) => {
       this.handleFrame(time);
     });
@@ -207,35 +236,49 @@ export class UiScheduler {
     const started = measuring ? markNow() : 0;
     this.pending = false;
     this.collecting = true;
-    let frame: UiFrame;
+    let frame: UiFrame | undefined;
     let collected = 0;
+    /**
+     * Everything a frame does, inside one guard.
+     *
+     * The guard is the whole point: an exception used to unwind past
+     * the re-arm at the bottom of this method, and since `pending` had
+     * already been cleared at the top, nothing asked for another
+     * frame. One throw stopped the application for good.
+     */
     try {
-      this.beforeCollect?.(time);
-      if (measuring) {
-        collected = markNow();
-        measureSpan('before collect', started, collected);
+      try {
+        this.beforeCollect?.(time);
+        if (measuring) {
+          collected = markNow();
+          measureSpan('before collect', started, collected);
+        }
+        frame = this.collectFrame(time);
+      } finally {
+        this.collecting = false;
       }
-      frame = this.collectFrame(time);
-    } finally {
-      this.collecting = false;
+      let processed = 0;
+      if (measuring) {
+        processed = markNow();
+        measureSpan('collect', collected, processed);
+      }
+      if (frame.size > 0) {
+        this.onFrame(frame);
+      }
+      if (measuring) {
+        const finished = markNow();
+        const detail = { frame: frame.id, nodes: frame.size };
+        measureSpan('process', processed, finished, detail);
+        measureSpan('frame', started, finished, detail);
+      }
+    } catch (error) {
+      this.onFrameError(error, time);
     }
-    let processed = 0;
-    if (measuring) {
-      processed = markNow();
-      measureSpan('collect', collected, processed);
-    }
-    if (frame.size > 0) {
-      this.onFrame(frame);
-    }
-    if (measuring) {
-      const finished = markNow();
-      const detail = { frame: frame.id, nodes: frame.size };
-      measureSpan('process', processed, finished, detail);
-      measureSpan('frame', started, finished, detail);
-    }
-    // Work may have arrived while the frame was being processed.
-    // The dirty listener also arms a frame, but this covers a
-    // scheduler used without a listener wired to the graph.
+    // Work may have arrived while the frame was being processed, or
+    // the frame threw and left its nodes dirty. Either way the clock
+    // has to be asked for another one: this is the line that decides
+    // whether a thrown frame is a bad frame or the end of the
+    // application.
     if (!this.dirty.isEmpty()) {
       this.notifyDirty();
     }

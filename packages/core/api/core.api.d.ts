@@ -4825,12 +4825,14 @@ interface UiSchedulerOptions {
   dirty: DirtyNodeSet;
   onFrame: UiFrameCallback;
   beforeCollect?: (time: UiFrameTime) => void;
+  onFrameError?: (error: unknown, time: UiFrameTime) => void;
 }
 declare class UiScheduler {
   private readonly clock;
   private readonly dirty;
   private readonly onFrame;
   private readonly beforeCollect;
+  private readonly onFrameError;
   private disposed;
   private active;
   private pending;
@@ -6683,7 +6685,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-kreII5U8.js";
+} from "./index-YeWKf2ss.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7594,7 +7596,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-kreII5U8.js";
+} from "./index-YeWKf2ss.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

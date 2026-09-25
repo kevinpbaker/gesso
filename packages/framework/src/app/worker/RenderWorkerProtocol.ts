@@ -275,7 +275,23 @@ export type ShellToRuntimeMessage =
  *     the tree, so this is the one source that costs the running
  *     application nothing but whatever the handler was supposed to do.
  */
-export type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener';
+export type RuntimeErrorSource =
+  | 'message'
+  | 'uncaught'
+  | 'renderer'
+  | 'channel'
+  | 'listener'
+  /**
+   * A frame threw. The frame was abandoned and the clock kept
+   * running, so the application is still drawing: this is a report,
+   * not an obituary.
+   *
+   * Its own source because it used to arrive as `message` — the throw
+   * escaped into whatever was forwarding the tick — and that both
+   * mislabelled it and stopped the application, since nothing re-armed
+   * the clock afterwards.
+   */
+  | 'frame';
 
 /**
  * Messages the render worker sends back.

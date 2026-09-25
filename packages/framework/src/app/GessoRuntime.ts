@@ -362,6 +362,7 @@ export class GessoRuntime {
   private lastFrameMs = 0;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
   private rendererErrorListener: ((message: string) => void) | null = null;
+  private frameErrorListener: ((message: string, stack?: string) => void) | null = null;
   /** WebGPU stage timings of the frame being rendered; null on Canvas2D. */
   private gpuTimings: GpuStageTimings | null = null;
   private inspectListener: ((report: UiNodeReport | null) => void) | null = null;
@@ -726,7 +727,18 @@ export class GessoRuntime {
       clock: options.clock ?? (callback => new UiTimerFrameClock(callback)),
       dirty: this.graph.getDirtyNodes(),
       beforeCollect: time => this.runPreCollectPhases(time),
-      onFrame: frame => this.handleFrame(frame)
+      onFrame: frame => this.handleFrame(frame),
+      /**
+       * A frame that threw is reported and the clock keeps running.
+       *
+       * Both halves matter. Letting it escape used to report it — the
+       * throw unwound into whatever was forwarding the tick — and stop
+       * the application dead, because nothing re-armed the clock. An
+       * application that merely stops looks exactly like a hang: the
+       * last frame stays on screen and every click lands in a surface
+       * nobody is listening to.
+       */
+      onFrameError: error => this.reportFrameError(error)
     });
 
     // An animation started between frames — from a click handler that
@@ -815,6 +827,30 @@ export class GessoRuntime {
    * console of whichever thread dispatched, and in the worker
    * configuration that console is not the page's.
    */
+  /**
+   * Told when a frame throws, with the clock still running.
+   *
+   * Separate from `onListenerError` because the two are different
+   * failures: a listener that throws has broken one interaction, and
+   * a frame that throws has broken the thing that draws. It is
+   * reported rather than fatal — see the scheduler — so somebody has
+   * to be able to hear it.
+   */
+  onFrameError(listener: ((message: string, stack?: string) => void) | null): void {
+    this.frameErrorListener = listener;
+  }
+
+  private reportFrameError(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    if (this.frameErrorListener !== null) {
+      this.frameErrorListener(message, stack);
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.error('A Gesso frame threw. The frame was abandoned and the clock kept running.', error);
+  }
+
   onListenerError(listener: ((message: string, stack?: string) => void) | null): void {
     this.dispatcher.onListenerError(
       listener === null
@@ -1796,6 +1832,7 @@ export class GessoRuntime {
     this.cursorListener = null;
     this.scrollabilityListener = null;
     this.rendererErrorListener = null;
+    this.frameErrorListener = null;
     this.scheduler.stop();
     // An animation holds its cell, and a cell holds whatever the
     // component that made it captured. A disposed runtime must not.

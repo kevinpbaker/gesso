@@ -38,13 +38,13 @@ your dependency as much as theirs.
 ```json
 {
   "dependencies": {
-    "gesso-core": "^0.1.0",
-    "gesso-framework": "^0.1.0",
-    "gesso-components": "^0.1.0",
+    "gesso-core": "^0.2.1",
+    "gesso-framework": "^0.2.1",
+    "gesso-components": "^0.2.1",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "gesso-testing": "^0.1.0",
+    "gesso-testing": "^0.2.1",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
   }

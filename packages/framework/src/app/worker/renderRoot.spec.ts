@@ -271,7 +271,7 @@ describe('RenderWorkerApp', () => {
     expect(error && 'source' in error && error.source).toBe('message');
   });
 
-  it('reports a frame that threw under a forwarded tick, which `receive` does see', () => {
+  it('reports a frame that threw, and goes on drawing', () => {
     const { host, sent, send } = createFakeWorkerGlobal();
     const canvas = createMockCanvas();
     const ctx = canvas.getContext('2d') as unknown as { fillText: () => void };
@@ -279,22 +279,31 @@ describe('RenderWorkerApp', () => {
     send(initMessage(canvas));
 
     // Paint is the last phase of a frame, so a canvas call that throws
-    // is a throw inside the frame and nowhere else. Nothing has been
-    // awaited, so no timer has run: this frame can only be the one the
-    // tick delivers.
+    // is a throw inside the frame and nowhere else.
+    let exploding = true;
+    const painted: number[] = [];
     ctx.fillText = () => {
-      throw new Error('paint exploded');
+      if (exploding) {
+        throw new Error('paint exploded');
+      }
+      painted.push(1);
     };
     expect(() => send({ type: 'tick', time: 16 })).not.toThrow();
 
-    // `UiHostFrameClock.tick` delivers the frame synchronously, so the
-    // whole frame runs inside `receive`'s try and comes back labelled
-    // `message`. This is what a frame throws as whenever the shell is
-    // forwarding refreshes, which is every frame of a healthy app.
+    /**
+     * Under its own source, not `message`.
+     *
+     * It used to arrive as `message` because the throw escaped the
+     * frame and unwound into `receive`, which caught it. That
+     * mislabelled the failure *and* killed the application: nothing
+     * re-armed the clock afterwards, so the last frame stayed on
+     * screen and every click landed in a surface nobody was listening
+     * to. A frame that throws is a bad frame, not the end.
+     */
     const error = sent.find(m => m.type === 'error');
     expect(error).toBeDefined();
     expect(error && 'message' in error && error.message).toBe('paint exploded');
-    expect(error && 'source' in error && error.source).toBe('message');
+    expect(error && 'source' in error && error.source).toBe('frame');
   });
 
   it('reports what threw outside any message handler', () => {
