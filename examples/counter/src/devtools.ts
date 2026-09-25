@@ -15,7 +15,7 @@
  * Both configurations are here because they report different things.
  */
 import { mountErrorOverlay } from 'gesso-devtools';
-import { createApp, type FrameworkChild } from 'gesso-framework';
+import { createApp, createSyncApp, type FrameworkChild } from 'gesso-framework';
 
 /**
  * Worker-hosted: the overlay *is* the `onError` callback.
@@ -42,7 +42,7 @@ export function mountWithOverlay(host: HTMLElement, renderWorker: () => Worker):
 export function mountSyncWithOverlay(host: HTMLElement, root: FrameworkChild): () => void {
   const overlay = mountErrorOverlay(host);
   overlay.captureWindowErrors();
-  const dispose = createApp(root).onError(overlay.report).mountSync(host);
+  const dispose = createSyncApp(root).onError(overlay.report).mountSync(host);
   return () => {
     dispose();
     overlay.dispose();

@@ -14,7 +14,14 @@
  * and paint, not the worker plumbing the playground already exercises.
  */
 import { Button, Row, Text } from 'gesso-core';
-import { createApp, createComponent, input, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import {
+  createComponent,
+  createSyncApp,
+  input,
+  internalState,
+  type ComponentContext,
+  type Inputs
+} from 'gesso-framework';
 import { combineLatest, map } from 'rxjs';
 
 function Counter(inputs: Inputs<{ label?: string }>, _ctx: ComponentContext) {
@@ -27,4 +34,4 @@ function Counter(inputs: Inputs<{ label?: string }>, _ctx: ComponentContext) {
   );
 }
 
-createApp(createComponent(Counter, { label: 'Clicks' })).mountSync('#app');
+createSyncApp(createComponent(Counter, { label: 'Clicks' })).mountSync('#app');

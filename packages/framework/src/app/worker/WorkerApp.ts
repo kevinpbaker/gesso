@@ -360,7 +360,7 @@ export class WorkerApp {
     if (typeof canvas.transferControlToOffscreen !== 'function') {
       throw new Error(
         'OffscreenCanvas is unavailable, so the render worker cannot draw. ' +
-          'Use createApp(Root).mountSync(host) for the single-thread configuration.'
+          'Use createSyncApp(Root).mountSync(host) for the single-thread configuration.'
       );
     }
 

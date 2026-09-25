@@ -14,7 +14,7 @@ import {
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
-import { createApp } from './createApp';
+import { createSyncApp } from './createSyncApp';
 import { GessoApp } from './GessoApp';
 import { MediaService } from './MediaService';
 
@@ -127,7 +127,7 @@ describe('GessoApp and the media option', () => {
   });
 });
 
-describe('createApp().useMedia', () => {
+describe('createSyncApp().useMedia', () => {
   it('forwards what it was given all the way to the first component body', () => {
     const canvas = createMockCanvas();
     // `mountSync` makes its own canvas element; there is no document in
@@ -144,7 +144,7 @@ describe('createApp().useMedia', () => {
     const videoResolver = stubVideoResolver();
 
     try {
-      const dispose = createApp(MediaProbe)
+      const dispose = createSyncApp(MediaProbe)
         .useMedia({ resolver, rasterizer, videoResolver })
         .mountSync(createMockHost());
 

@@ -4036,11 +4036,27 @@ export class LayoutEngine {
    */
   private assignBox(node: UiNode, x: number, y: number, width: number, height: number): void {
     const rec = this.record(node);
-    if (rec.positioned && !rec.absolute && node !== this.layoutRoot) {
+    if (rec.positioned && !rec.absolute && !rec.sticky && node !== this.layoutRoot) {
       // A relative node keeps its place in the flow and is drawn offset.
       x += rec.left ?? (rec.right !== undefined ? -rec.right : 0);
       y += rec.top ?? (rec.bottom !== undefined ? -rec.bottom : 0);
     }
+    /**
+     * A **sticky** node is not offset by its insets, and that is the
+     * difference between the two.
+     *
+     * `top: 0` on a sticky header is a threshold — "do not let me go
+     * above the top of the scrollport" — and not a displacement, which
+     * is what CSS means by it and what `resolveStickyOffset` below
+     * assumes when it computes `viewLeft + rec.left - rec.x`. Offset
+     * here *and* used as a threshold there, an inset is applied twice
+     * and the two errors cancel only when it is zero.
+     *
+     * Which is why nothing noticed: every sticky node in the framework
+     * and its examples sticks at zero. The first one that did not — a
+     * spreadsheet's second frozen column, which sticks at the width of
+     * the gutter — was drawn one gutter too far to the right.
+     */
     if (rec.x !== x || rec.y !== y || rec.width !== width || rec.height !== height) {
       rec.x = x;
       rec.y = y;

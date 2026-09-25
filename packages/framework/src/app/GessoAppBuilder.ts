@@ -90,7 +90,7 @@ export class GessoAppBuilder {
    * the icon rasteriser and the video decoder. Mirrors
    * `renderRoot().useMedia`.
    *
-   *   createApp(AppRoot).useMedia({ resolver: new CachingResolver() });
+   *   createSyncApp(AppRoot).useMedia({ resolver: new CachingResolver() });
    *
    * Declared here rather than set on `MediaService` afterwards because
    * the tree is built inside the runtime's constructor and an `Image`

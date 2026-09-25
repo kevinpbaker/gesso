@@ -87,6 +87,60 @@ describe('LayoutEngine overflow', () => {
       return { h, root, header, body };
     }
 
+    /**
+     * An inset is a *threshold*, not a displacement.
+     *
+     * `top: 8` on a sticky node means "do not go above eight pixels
+     * from the top of the scrollport"; it does not move the node eight
+     * pixels down where it sits in the flow. It did, and the two
+     * errors cancelled for every sticky node in the framework and its
+     * examples — because every one of them sticks at zero. The first
+     * one that did not was drawn one inset too far along.
+     */
+    it('does not move a sticky node by its inset while it is in flow', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'top', { height: 60, overflow: 'scroll', x: 'start' });
+      const first = box(h, 'first', { width: 20, height: 10, flexShrink: 0 });
+      const stuck = box(h, 'stuck', { position: 'sticky', top: 10, width: 20, height: 10, flexShrink: 0 });
+      const body = box(h, 'body', { width: 20, height: 200, flexShrink: 0 });
+      h.append(root, first, stuck, body);
+      h.layout(root, Constraints.loose(300, 300));
+
+      // Directly under `first`, where the flow put it — not ten
+      // pixels further down.
+      expect(h.record(stuck).y).toBe(10);
+      expect(h.visibleBox(stuck).y).toBe(10);
+    });
+
+    it('holds a sticky node at its inset once scrolling reaches it', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'top', { height: 60, overflow: 'scroll', scrollY: 40, x: 'start' });
+      const first = box(h, 'first', { width: 20, height: 10, flexShrink: 0 });
+      const stuck = box(h, 'stuck', { position: 'sticky', top: 10, width: 20, height: 10, flexShrink: 0 });
+      const body = box(h, 'body', { width: 20, height: 200, flexShrink: 0 });
+      h.append(root, first, stuck, body);
+      h.layout(root, Constraints.loose(300, 300));
+
+      // Ten pixels from the top of the scrollport, which is what the
+      // inset asked for, and nowhere near where the flow left it.
+      expect(h.visibleBox(stuck).y).toBe(10);
+    });
+
+    /** The same on the other axis, which is what a frozen column is. */
+    it('holds a sticky node at its inset on the horizontal axis', () => {
+      const h = new LayoutHarness();
+      const root = node(h, 'top', UiNodeType.Row, { width: 60, overflow: 'scroll', scrollX: 100, y: 'start' });
+      const gutter = box(h, 'gutter', { position: 'sticky', left: 0, width: 20, height: 10, flexShrink: 0 });
+      const frozen = box(h, 'frozen', { position: 'sticky', left: 20, width: 20, height: 10, flexShrink: 0 });
+      const body = box(h, 'body', { width: 400, height: 10, flexShrink: 0 });
+      h.append(root, gutter, frozen, body);
+      h.layout(root, Constraints.loose(300, 300));
+
+      expect(h.visibleBox(gutter).x).toBe(0);
+      // Right against the gutter, and not one gutter past it.
+      expect(h.visibleBox(frozen).x).toBe(20);
+    });
+
     it('stays in flow until scrolling reaches it', () => {
       const { h, header } = scrolledList(0);
       expect(h.record(header).stickyOffsetY).toBe(0);

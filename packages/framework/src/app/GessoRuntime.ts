@@ -258,7 +258,7 @@ export interface GessoRuntimeOptions {
    * that fetches through its own stack, or one that has measured a
    * reason to decode in a worker of its own, passes it here.
    *
-   * An application reaches this through `createApp(Root).useMedia()`
+   * An application reaches this through `createSyncApp(Root).useMedia()`
    * on the single thread and `renderRoot(Root).useMedia()` in a render
    * worker. It is declared in the worker rather than in the shell
    * because a resolver is a function and no function crosses a

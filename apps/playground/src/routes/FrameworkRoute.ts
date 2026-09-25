@@ -1,4 +1,4 @@
-import { createApp, type RendererChoice, workerHandle } from 'gesso-framework';
+import { createApp, createSyncApp, type RendererChoice, workerHandle } from 'gesso-framework';
 import { DemoCounter, FrameworkDemoRoot } from '../FrameworkPlayground';
 import { Heavy } from '../HeavyWork';
 import { Ticker } from '../TickerChannel';
@@ -195,7 +195,7 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     );
     const actionPanel = mountActionLogPanel(shell.preview, actions);
     actionPanel.setVisible(logging);
-    const builder = createApp(FrameworkDemoRoot)
+    const builder = createSyncApp(FrameworkDemoRoot)
       .useService(DemoCounter)
       .useChannel(Heavy, { worker: dataWorker })
       .useChannel(Ticker, { worker: dataWorker })
