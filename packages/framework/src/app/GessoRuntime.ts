@@ -117,6 +117,7 @@ import { FindService } from './FindService';
 import { FocusService } from './FocusService';
 import { MediaService, type MediaOptions } from './MediaService';
 import { FontService, type FontFamilyDeclaration } from './FontService';
+import { TextService } from './TextService';
 import { AnimationService } from './AnimationService';
 import { FrameService } from './FrameService';
 import { InputLatencyTracker } from './InputLatency';
@@ -658,6 +659,13 @@ export class GessoRuntime {
       this.services.register(FontService);
     }
     this.services.get(FontService).setListener(() => this.fontsChanged());
+    // And measurement, which is the same measurer layout uses: a
+    // width an application asks for has to be the width the engine
+    // would lay the text out at, cache and font-loading and all.
+    if (!this.services.has(TextService)) {
+      this.services.register(TextService);
+    }
+    this.services.get(TextService).setMeasurer(this.textMeasurer);
     if (options.fonts !== undefined) {
       this.services.get(FontService).declare(options.fonts);
     }

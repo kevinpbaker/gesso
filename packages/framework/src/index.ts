@@ -194,6 +194,7 @@ export {
   type FontHost,
   type FontFaceLike
 } from './app/FontService';
+export { TextService } from './app/TextService';
 export { FocusService } from './app/FocusService';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';
