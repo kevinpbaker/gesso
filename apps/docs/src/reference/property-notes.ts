@@ -328,7 +328,11 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Interaction',
     note: 'Whether the node takes pointer input, or lets it through to what is behind.'
   },
-  focusable: { group: 'Interaction', note: 'Whether focus can land here, by tab or by click.' },
+  focusable: { group: 'Interaction', note: 'Whether focus can land here at all, by tab, by click or by `focus()`.' },
+  tabStop: {
+    group: 'Interaction',
+    note: 'Whether Tab stops here. `false` keeps a focusable container out of the cycle, as `tabindex="-1"` does.'
+  },
   disabled: { group: 'Interaction', note: 'Blocks input and publishes the disabled state to the mirror.' },
   hitTestable: { group: 'Interaction', note: 'Whether hit testing considers this node at all.' },
   visualState: {
@@ -368,6 +372,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   virtualWindow: {
     group: 'Virtualization',
     note: 'The range currently built, and the estimate for everything outside it.'
+  },
+  virtualSheet: {
+    group: 'Virtualization',
+    note: 'Marks the surface a `LazySheet` windows on both axes, and carries the geometry it was given.'
   },
 
   // Environment

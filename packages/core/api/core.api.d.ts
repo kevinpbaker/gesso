@@ -1696,6 +1696,7 @@ declare const UiProperties: {
   readonly selectable: UiPropertyDefinition<boolean | undefined>;
   readonly pointerEvents: UiPropertyDefinition<UiPointerEvents | undefined>;
   readonly focusable: UiPropertyDefinition<boolean | undefined>;
+  readonly tabStop: UiPropertyDefinition<boolean | undefined>;
   readonly disabled: UiPropertyDefinition<boolean | undefined>;
   readonly role: UiPropertyDefinition<UiRole | undefined>;
   readonly label: UiPropertyDefinition<string | undefined>;
@@ -1778,7 +1779,7 @@ type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
-type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
+type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
@@ -3123,6 +3124,7 @@ declare function touchActionFor(scrollsAnything: boolean): string;
 declare function isNodeInert(node: UiNode): boolean;
 declare function isNodeHitTestable(node: UiNode): boolean;
 declare function isNodeFocusable(node: UiNode): boolean;
+declare function isNodeTabStop(node: UiNode): boolean;
 declare function isNodeSelectable(node: UiNode): boolean;
 declare function resolveCursor(node: UiNode | null): string | null;
 type UiFrameTime = number;
@@ -5085,7 +5087,6 @@ export {
   EnvironmentProps,
   EXTERNAL_FILES,
   fade,
-  ff,
   fillTextRects,
   findEnvironmentKey,
   FindHost,
@@ -5182,6 +5183,7 @@ export {
   isNodeHitTestable,
   isNodeInert,
   isNodeSelectable,
+  isNodeTabStop,
   isObservable$1,
   isPaintVisible,
   isPercentLength,
@@ -5335,6 +5337,7 @@ export {
   percent,
   PercentLength,
   performanceMarksEnabled,
+  pf,
   pinchable,
   PinchableOptions,
   PinchRecognizerOptions,
@@ -6055,6 +6058,7 @@ import {
   isNodeHitTestable,
   isNodeInert,
   isNodeSelectable,
+  isNodeTabStop,
   isObservable,
   isPaintVisible,
   isPercentLength,
@@ -6652,7 +6656,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DyRDvjxa.js";
+} from "./index-CRQXv8sS.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6840,6 +6844,7 @@ export {
   isNodeHitTestable,
   isNodeInert,
   isNodeSelectable,
+  isNodeTabStop,
   isObservable,
   isPaintVisible,
   isPercentLength,
@@ -7557,7 +7562,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DyRDvjxa.js";
+} from "./index-CRQXv8sS.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

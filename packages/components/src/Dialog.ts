@@ -119,6 +119,18 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         label: title,
         description,
         states: ['modal'],
+        // The keyboard's home of last resort. A dialog whose content is
+        // a sentence and nothing focusable used to hand the keyboard to
+        // nothing when the trap settled, and Escape had nowhere to be
+        // delivered: the one thing a modal must always answer could not
+        // be reached without a mouse. The body takes focus when nothing
+        // inside it will.
+        //
+        // `tabStop: false` is the other half and is not optional. Without
+        // it every dialog gains a stop in its own Tab cycle, on a box
+        // that announces nothing and does nothing.
+        focusable: true,
+        tabStop: false,
         onKeyDown: keymap(dismissible.value ? { Escape: close } : {})
       },
       Column(

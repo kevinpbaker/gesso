@@ -56,4 +56,11 @@ export {
   UiPlatformAdapter
 } from './UiPlatformAdapter';
 export type { PlatformAdapterOptions, PlatformEventTarget, PlatformSurface } from './UiPlatformAdapter';
-export { isNodeFocusable, isNodeHitTestable, isNodeInert, isNodeSelectable, resolveCursor } from './UiInteraction';
+export {
+  isNodeFocusable,
+  isNodeHitTestable,
+  isNodeInert,
+  isNodeSelectable,
+  isNodeTabStop,
+  resolveCursor
+} from './UiInteraction';

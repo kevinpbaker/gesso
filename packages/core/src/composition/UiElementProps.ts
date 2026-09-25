@@ -173,7 +173,7 @@ export type TypographyProps = PropsOf<
 >;
 
 export type InteractionProps = PropsOf<
-  'cursor' | 'pointerEvents' | 'focusable' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'
+  'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'
 >;
 
 /**

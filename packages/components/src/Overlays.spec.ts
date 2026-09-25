@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Button, Column, Row, type UiRole, type UiSemanticsRecord } from 'gesso-core';
+import { Button, Column, Row, Text, type UiRole, type UiSemanticsRecord } from 'gesso-core';
 import { Dialog } from './Dialog';
 import { Menu } from './Menu';
 import { Select } from './Select';
@@ -93,6 +93,54 @@ describe('Dialog', () => {
 
     expect(ui.entries()).toHaveLength(0);
     expect(open.value).toBe(false);
+  });
+
+  it('Escape closes one whose content has nothing focusable in it', () => {
+    // The bug `tabStop` was added for. `settleScope` moved focus into
+    // the innermost scope and blurred when the scope held nothing
+    // focusable, so a dialog whose content is a sentence handed the
+    // keyboard to nothing and could not be dismissed without a mouse.
+    // The body is now `focusable: true, tabStop: false`: it takes focus
+    // when nothing inside it will, and does not become a stop of its own.
+    const open = new BehaviorSubject(true);
+    const ui = mount(
+      Column(
+        Button({ text: 'Open', label: 'Open' }),
+        createComponent(Dialog, {
+          open,
+          title: 'Saved',
+          description: 'Your changes are on disk.',
+          content: Text({ text: 'Nothing here takes the keyboard.' }),
+          onClose: () => open.next(false)
+        })
+      )
+    );
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
+    expect(ui.runtime.input.focus.focusedNode).not.toBeNull();
+
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+
+    expect(ui.entries()).toHaveLength(0);
+    expect(open.value).toBe(false);
+  });
+
+  it('does not add a tab stop of its own for the body', () => {
+    // The other half. Making the body focusable without `tabStop: false`
+    // is the one-line fix that looks right and puts a box announcing
+    // nothing into every dialog's Tab cycle.
+    const open = new BehaviorSubject(true);
+    const ui = mount(app(open));
+    ui.frame();
+
+    const seen: (string | undefined)[] = [];
+    for (let press = 0; press < 4; press++) {
+      seen.push(ui.runtime.input.focus.focusedNode?.properties.get('label') as string | undefined);
+      ui.fireEvent.keyDown('Tab');
+    }
+
+    expect(seen).toEqual(['Cancel', 'Delete', 'Cancel', 'Delete']);
   });
 
   it('Escape closes only the topmost, because focus is in it', () => {

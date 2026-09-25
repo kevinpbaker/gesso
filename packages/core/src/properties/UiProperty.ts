@@ -1140,6 +1140,13 @@ export const UiProperties = {
     affects: DirtyFlags.Properties
   }),
 
+  tabStop: defineProperty<boolean | undefined>({
+    name: 'tabStop',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
   disabled: defineProperty<boolean | undefined>({
     name: 'disabled',
     defaultValue: undefined,

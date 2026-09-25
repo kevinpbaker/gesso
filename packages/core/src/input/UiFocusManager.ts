@@ -1,6 +1,6 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiEventType, UiFocusEvent } from './UiInputEvent';
-import { isNodeFocusable } from './UiInteraction';
+import { isNodeFocusable, isNodeTabStop } from './UiInteraction';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 
 /**
@@ -269,12 +269,26 @@ export class UiFocusManager {
    * this again once the frame's tree is built, which is when a dialog
    * gets its caret. Idempotent: with focus already inside the scope,
    * or no scope at all, it does nothing.
+   *
+   * **The scope root is the fallback, and it is the whole reason
+   * `tabStop` exists.** A scope with no tab stop inside it used to
+   * blur, which hands the keyboard to nothing: a `Dialog` whose body
+   * is a sentence and a button could not be dismissed with Escape,
+   * because Escape had nowhere to be delivered. Falling back to the
+   * root fixes that only if the root can hold focus without becoming a
+   * stop of its own, or every dialog grows a tab stop that announces
+   * nothing. `focusable: true, tabStop: false` on the body is exactly
+   * that pair, and the fallback is what makes it worth setting.
+   *
+   * Blurring is still what happens when the root cannot hold focus
+   * either, because a scope that has genuinely nothing to focus is
+   * better admitted than faked.
    */
   settleScope(): void {
     if (this.scopes.length === 0 || (this.focused !== null && this.withinScope(this.focused))) {
       return;
     }
-    if (!this.focusNext()) {
+    if (!this.focusNext() && !this.focus(this.scopeRoot)) {
       this.blur();
     }
   }
@@ -344,11 +358,18 @@ export class UiFocusManager {
     return this.focus(next, 'keyboard');
   }
 
-  /** Focusable nodes in document order (parent before children). */
+  /**
+   * The tab stops in document order (parent before children).
+   *
+   * Tab stops and not every focusable node: a container with
+   * `tabStop: false` can hold focus and is not a place the cycle
+   * stops, which is what lets a dialog body be the keyboard's home of
+   * last resort without becoming a stop of its own.
+   */
   private collectFocusable(): UiNode[] {
     const result: UiNode[] = [];
     const visit = (node: UiNode): void => {
-      if (isNodeFocusable(node)) {
+      if (isNodeTabStop(node)) {
         result.push(node);
       }
       for (let child = node.firstChild; child !== null; child = child.nextSibling) {

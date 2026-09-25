@@ -13,7 +13,9 @@ control that wants to know about its own focus asks rather than tracks.
 focusable and in what order, and it is short: a `<button>` and an
 `<editabletext>` are focusable, anything with `focusable` opts in,
 nothing inert ever is, and Tab walks document order and wraps. There is
-no `tabIndex`, so the way to change the order is to change the tree.
+no `tabIndex`, so the way to change the _order_ is to change the tree.
+What you can change without moving anything is whether a focusable node
+is in the cycle at all: see [tab stops](#tab-stops-and-focusable-nodes).
 
 This page is what an application does with it.
 
@@ -118,6 +120,36 @@ overlay that takes the keyboard traps focus, so a dialog binds Escape on
 its own content and the key cannot reach a dialog underneath: nothing
 underneath is focusable.
 
+A scope with nothing focusable in it falls back to the scope root, and
+blurs only when the root cannot hold focus either. That fallback is why
+a dialog whose content is a sentence still answers Escape: it used to
+hand the keyboard to nothing, and the one key a modal must always
+answer had nowhere to be delivered.
+
+## Tab stops and focusable nodes
+
+Every tab stop is focusable; not every focusable node is a tab stop.
+`focusable` answers "may this node hold focus at all", and `tabStop`
+answers "does Tab land here":
+
+```ts
+Box({ focusable: true, tabStop: false } /* … */);
+```
+
+That pair is `tabindex="-1"`: reachable by a press and by `focus()`,
+skipped by the cycle. It is what a container wants when it must be able
+to _take_ the keyboard without being a place a person tabs _to_: a
+dialog body that is the keyboard's home of last resort, a scroll region
+that answers arrow keys, a canvas-like surface that owns its own
+navigation. `Dialog` sets exactly this pair, and setting only the first
+half is the fix that looks right and gives every dialog a tab stop on a
+box that announces nothing.
+
+`tabStop` says nothing on a node that is not focusable, because there is
+no order for it to be out of. And it does not reorder anything: the
+cycle is still document order, and the only way to change that is still
+to change the tree.
+
 `Dialog`, in [the component library](/components/), is this with an
 entrance, a backdrop and the semantics already attached. Reach for it
 first; take the trap yourself when you are building something the
@@ -163,7 +195,8 @@ the ring marks; which item is chosen is said by that item's own
 selection colour and by the semantics record, not by moving focus into
 it. So a group that behaves this way sets `focusable` on the container,
 handles the arrow keys there, and renders its items as ordinary
-non-focusable nodes.
+non-focusable nodes. A container that should own the arrows without
+being a stop of its own adds `tabStop: false`.
 
 ## The focus ring
 

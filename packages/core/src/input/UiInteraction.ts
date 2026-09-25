@@ -74,6 +74,27 @@ export function isNodeFocusable(node: UiNode): boolean {
 }
 
 /**
+ * Whether Tab should stop here.
+ *
+ * Every tab stop is focusable and not every focusable node is a tab
+ * stop, which is the distinction `tabindex="-1"` draws in the DOM and
+ * the one this engine was missing. `focusable` answers "may this node
+ * hold focus at all", and that is the wrong question for a container:
+ * a dialog's body must be able to *take* the keyboard, so that opening
+ * a dialog whose content is a sentence does not hand it to nothing, and
+ * must not be a place Tab *lands*, or every dialog gains a stop that
+ * announces nothing and does nothing.
+ *
+ * So `tabStop: false` means focusable, reachable by a press and by
+ * `focus()`, and skipped by the cycle. It says nothing on a node that
+ * is not focusable in the first place, because there is no order to be
+ * out of.
+ */
+export function isNodeTabStop(node: UiNode): boolean {
+  return isNodeFocusable(node) && node.properties.get('tabStop') !== false;
+}
+
+/**
  * Whether the user may select this node's text with the pointer.
  *
  * `selectable` inherits down the tree the way CSS `user-select` does:
