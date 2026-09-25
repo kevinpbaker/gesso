@@ -30,7 +30,7 @@ createApp({
 Single-thread, the builder carries the same choice:
 
 ```ts
-createApp(AppRoot).renderer('canvas2d').mountSync('#app');
+createSyncApp(AppRoot).renderer('canvas2d').mountSync('#app');
 ```
 
 | Value        | What happens                                                                                             |

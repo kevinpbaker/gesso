@@ -43,3 +43,7 @@ apps/docs/.vitepress/cache
 
 # The art generator writes frames here before ffmpeg encodes them.
 apps/playground/art/frames/
+
+# The bundle-size check builds into these and removes them again; a
+# crashed run should not leave them to be committed.
+scripts/bundle-probe/.out-*/

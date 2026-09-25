@@ -77,7 +77,7 @@ On the single thread the builder takes the same object, and a spec
 hands it to the runtime directly:
 
 ```ts
-createApp(AppRoot).useMedia({ resolver: myResolver }).mountSync('#app');
+createSyncApp(AppRoot).useMedia({ resolver: myResolver }).mountSync('#app');
 renderTest(root, { media: { resolver: myResolver } });
 ```
 

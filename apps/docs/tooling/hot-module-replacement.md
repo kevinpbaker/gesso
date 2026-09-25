@@ -40,7 +40,7 @@ The framework imports no bundler and knows nothing about one. It offers
 `import.meta.hot.accept` has to be at the top level, because a bundler
 reads it statically to work out where the boundary is.
 
-`GessoApp` and `createApp(Root)` carry the same method, so the
+`GessoApp` and `createSyncApp(Root)` carry the same method, so the
 single-thread configuration is identical.
 
 ## Hand over the services the module defines

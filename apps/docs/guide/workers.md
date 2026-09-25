@@ -194,7 +194,7 @@ configurations run the same runtime, so a screen written for one runs
 unchanged on the other:
 
 ```ts
-createApp(App).mountSync('#app');
+createSyncApp(App).mountSync('#app');
 ```
 
 Reach for it in tests, in headless rendering, and where

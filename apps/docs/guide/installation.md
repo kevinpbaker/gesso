@@ -158,10 +158,10 @@ reason for the second file.
 **Single-thread** mounts the same tree on the calling thread:
 
 ```ts
-import { createApp } from 'gesso-framework';
+import { createSyncApp } from 'gesso-framework';
 import { App } from './App';
 
-createApp(App).mountSync('#app');
+createSyncApp(App).mountSync('#app');
 ```
 
 Use it for tests, for headless rendering, and where `OffscreenCanvas` is

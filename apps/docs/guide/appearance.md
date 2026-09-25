@@ -68,7 +68,7 @@ toggle moves. Passing it up front rather than correcting it after
 mounting is what keeps the first frame from flashing the appearance the
 reader did not choose.
 
-`GessoApp` and `createApp(Root)` take the same option and the same
+`GessoApp` and `createSyncApp(Root)` take the same option and the same
 method, so the single-thread configuration behaves identically.
 
 ## The other two settings

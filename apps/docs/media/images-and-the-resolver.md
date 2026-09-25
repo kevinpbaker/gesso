@@ -112,7 +112,7 @@ renderRoot(AppRoot).useMedia({ resolver: new CachingResolver() });
 On the single thread it is the builder, which takes the same object:
 
 ```ts
-createApp(AppRoot).useMedia({ resolver: new CachingResolver() }).mountSync('#app');
+createSyncApp(AppRoot).useMedia({ resolver: new CachingResolver() }).mountSync('#app');
 ```
 
 There is nothing about media in the shell's own `createApp({ renderWorker })`

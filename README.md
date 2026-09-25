@@ -105,7 +105,7 @@ The shell spawns both workers, creates one `MessageChannel` between them, hands 
 
 Notice what isn't there. No re-render pass: the component body runs **once**, and the `Observable` is bound straight into the retained graph. No virtual DOM diff: component identity _is_ node identity, so there is no second reconciler. No `useEffect`. No CSS. No base class to extend for your state, and no framework type anywhere in your domain layer.
 
-Single-thread mode exists too, `createApp(NotesApp).useChannel(Notes, { source }).mountSync('#app')`, for tests, headless rendering, and environments without `OffscreenCanvas`. Channels resolve in-process there, so the same contract runs with no ports.
+Single-thread mode exists too, `createSyncApp(NotesApp).useChannel(Notes, { source }).mountSync('#app')`, for tests, headless rendering, and environments without `OffscreenCanvas`. Channels resolve in-process there, so the same contract runs with no ports.
 
 ## Three threads and a declared barrier
 

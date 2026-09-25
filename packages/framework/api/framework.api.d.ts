@@ -639,9 +639,261 @@ declare class ComponentHostResolver implements ComponentResolver {
   get size(): number;
   hostFor(anchorId: string): ComponentHost | undefined;
 }
+interface UiNodeReport {
+  readonly id: string;
+  readonly type: string;
+  readonly box: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly owners: readonly UiOwnerReport[];
+  readonly props: readonly UiPropReport[];
+  readonly environment: readonly UiEnvironmentReport[];
+  readonly modifiers: readonly string[];
+  readonly listens: readonly string[];
+  readonly beneath: readonly UiBeneathReport[];
+  readonly semantics?: UiSemanticsReport;
+  readonly explanation: string;
+}
+interface UiBeneathReport {
+  readonly id: string;
+  readonly type: string;
+  readonly owner?: string;
+  readonly listens: readonly string[];
+}
+interface UiOwnerReport {
+  readonly name: string;
+  readonly anchorId: string;
+}
+interface NodePathTarget {
+  readonly type: string;
+  readonly id: string;
+  readonly label?: string;
+}
+declare function formatNodePath(owners: readonly UiOwnerReport[], node: NodePathTarget): string;
+type UiPropOrigin = 'element' | 'binding' | 'modifier';
+interface UiPropReport {
+  readonly name: string;
+  readonly value: string;
+  readonly origin: UiPropOrigin;
+  readonly source?: string;
+  readonly stream?: UiStreamReport;
+}
+interface UiStreamReport {
+  readonly source: string;
+  readonly kind: 'cell' | 'observable';
+  readonly value: string;
+  readonly emissions: number;
+  readonly emittedAt: number | null;
+  readonly connected: boolean;
+}
+interface BoundStream {
+  readonly id: number;
+  readonly observable: unknown;
+  value(): unknown;
+  emissionCount(): number;
+  emittedAt(): number | null;
+  connected(): boolean;
+}
+declare function describeStream(binding: BoundStream, timeOrigin: number): UiStreamReport;
+declare function formatStream(stream: UiStreamReport, now?: number): string;
+declare function formatAge(ms: number): string;
+interface UiEnvironmentReport {
+  readonly key: string;
+  readonly value: string;
+  readonly provided: boolean;
+}
+interface UiSemanticsReport {
+  readonly role?: string;
+  readonly label?: string;
+  readonly value?: string;
+  readonly states?: readonly string[];
+}
+declare function printPropValue(value: unknown): string;
+declare function formatNodeReport(report: UiNodeReport): string;
 type ColorScheme = 'light' | 'dark';
 type ColorSchemePreference = ColorScheme | 'auto';
 declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
+type ShellRequest = {
+  type: 'clipboard';
+  text: string;
+} | {
+  type: 'openUrl';
+  url: string;
+} | {
+  type: 'fullscreen';
+  enter: boolean;
+} | {
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
+} | {
+  type: 'storage';
+  id: number;
+  op: ShellStorageOp;
+  key: string;
+  value?: string;
+} | {
+  type: 'history';
+  action: 'push' | 'replace';
+  url: string;
+} | {
+  type: 'history';
+  action: 'back' | 'forward';
+  url?: undefined;
+};
+type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
+interface ShellStorageResult {
+  readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
+  readonly value: string | null;
+  readonly keys: readonly string[];
+  readonly error: string | null;
+}
+declare class ShellService {
+  private handler;
+  private readonly scheme;
+  private readonly insets;
+  private readonly isFullscreen;
+  private readonly popups;
+  private nextPopupId;
+  private readonly stores;
+  private nextStorageId;
+  readonly colorScheme: ReadableCell<ColorScheme>;
+  get currentColorScheme(): ColorScheme;
+  readonly viewportInsets: ReadableCell<UiInsets>;
+  get currentViewportInsets(): UiInsets;
+  setHandler(handler: ((request: ShellRequest) => void) | null): void;
+  applyColorScheme(scheme: ColorScheme): void;
+  applyViewportInsets(insets: UiInsets): void;
+  copyText(text: string): void;
+  openUrl(url: string): void;
+  readonly fullscreen: ReadableCell<boolean>;
+  requestFullscreen(enter: boolean): void;
+  applyFullscreen(active: boolean): void;
+  openPopup(request: {
+    readonly url: string;
+    readonly name?: string;
+    readonly width?: number;
+    readonly height?: number;
+  }): Promise<boolean>;
+  settlePopup(id: number, opened: boolean): void;
+  requestStorage(request: {
+    readonly op: ShellStorageOp;
+    readonly key: string;
+    readonly value?: string;
+  }): Promise<ShellStorageResult>;
+  settleStorage(id: number, result: ShellStorageResult): void;
+}
+type UiDuration = UiDurationToken | number;
+type UiEasingChoice = UiEasingToken | UiEasing;
+interface AnimateOptions {
+  duration?: UiDuration;
+  easing?: UiEasingChoice;
+  stepMs?: number;
+  repeat?: boolean;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+}
+interface SpringOptions {
+  spring?: UiSpringToken | UiSpringSpec;
+  stiffness?: number;
+  damping?: number;
+  mass?: number;
+  velocity?: number;
+  restDelta?: number;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+}
+declare class AnimationService {
+  readonly reducedMotion: InternalState<boolean>;
+  private driver;
+  private motionVocabulary;
+  setDriver(driver: AnimationDriver | null): void;
+  setMotion(motion: UiMotion): void;
+  get motion(): UiMotion;
+  applyReducedMotion(reduced: boolean): void;
+  animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
+  spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
+  stop<T>(cell: AnimatedCell<T>): boolean;
+  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
+  private resolveDuration;
+  private resolveEasing;
+}
+interface AudioSample {
+  readonly status: AudioStatus;
+  readonly position: number;
+  readonly duration: number;
+  readonly buffered: number;
+  readonly at: number;
+  readonly error?: string;
+}
+type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
+type AudioRequest = {
+  readonly type: 'load';
+  readonly src: string;
+  readonly autoplay: boolean;
+} |
+{
+  readonly type: 'preload';
+  readonly src: string;
+} | {
+  readonly type: 'play';
+} | {
+  readonly type: 'pause';
+} | {
+  readonly type: 'seek';
+  readonly seconds: number;
+} | {
+  readonly type: 'volume';
+  readonly level: number;
+} | {
+  readonly type: 'metadata';
+  readonly metadata: AudioMetadata | null;
+};
+type AudioAction = 'play' | 'pause' | 'next' | 'previous';
+interface AudioMetadata {
+  readonly title: string;
+  readonly artist: string;
+  readonly album?: string;
+  readonly artwork?: string;
+}
+interface AudioState {
+  readonly status: AudioStatus;
+  readonly position: number;
+  readonly duration: number;
+  readonly buffered: number;
+  readonly src: string | null;
+  readonly error?: string;
+}
+declare class AudioService {
+  private handler;
+  private animations;
+  private readonly sample;
+  private readonly source;
+  private readonly position;
+  private readonly actionSubject;
+  readonly state: ComputedCell<AudioState>;
+  readonly actions: Observable<AudioAction>;
+  get current(): AudioState;
+  setHandler(handler: ((request: AudioRequest) => void) | null): void;
+  setAnimations(animations: AnimationService | null): void;
+  applySample(sample: AudioSample): void;
+  applyAction(action: AudioAction): void;
+  load(src: string, options?: {
+    readonly autoplay?: boolean;
+  }): void;
+  preload(src: string): void;
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  setVolume(level: number): void;
+  setMetadata(metadata: AudioMetadata | null): void;
+}
 type PatternSegment = {
   readonly kind: 'static';
   readonly text: string;
@@ -761,288 +1013,303 @@ declare class RouterService {
   private resolve;
   private runGuards;
 }
-type ShellHistoryMode = 'path' | 'hash' | 'memory';
-interface ShellHistoryOptions {
-  readonly mode?: ShellHistoryMode;
-  readonly base?: string;
-  readonly initialUrl?: string;
+interface MediaOptions {
+  resolver?: ImageResolver;
+  rasterizer?: IconRasterizer;
+  videoResolver?: VideoResolver;
 }
-interface ShellHistory {
-  readonly url: string;
-  push(url: string): void;
-  replace(url: string): void;
-  back(): void;
-  forward(): void;
-  onChange(listener: (url: string) => void): void;
+declare class MediaService {
+  private imageResolver;
+  private iconRasterizer;
+  private videoResolver;
+  private ownsResolver;
+  private ownsRasterizer;
+  private ownsVideoResolver;
+  get images(): ImageResolver;
+  get icons(): IconRasterizer;
+  get videos(): VideoResolver;
+  setResolver(resolver: ImageResolver): void;
+  setVideoResolver(resolver: VideoResolver): void;
+  setRasterizer(rasterizer: IconRasterizer): void;
   dispose(): void;
 }
-interface HistoryWindow {
-  readonly location: {
-    pathname: string;
-    search: string;
-    hash: string;
-  };
-  readonly history: {
-    pushState(data: unknown, title: string, url: string): void;
-    replaceState(data: unknown, title: string, url: string): void;
-    back(): void;
-    forward(): void;
-  };
-  addEventListener(type: string, listener: () => void): void;
-  removeEventListener(type: string, listener: () => void): void;
+interface FontFaceDeclaration {
+  source: string | ArrayBuffer;
+  weight?: string | number;
+  style?: 'normal' | 'italic' | 'oblique';
+  stretch?: string;
+  unicodeRange?: string;
+  display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
 }
-declare function createShellHistory(options?: ShellHistoryOptions, host?: HistoryWindow | undefined): ShellHistory;
-interface UiNodeReport {
-  readonly id: string;
-  readonly type: string;
-  readonly box: {
-    readonly x: number;
-    readonly y: number;
-    readonly width: number;
-    readonly height: number;
-  };
-  readonly owners: readonly UiOwnerReport[];
-  readonly props: readonly UiPropReport[];
-  readonly environment: readonly UiEnvironmentReport[];
-  readonly modifiers: readonly string[];
-  readonly listens: readonly string[];
-  readonly beneath: readonly UiBeneathReport[];
-  readonly semantics?: UiSemanticsReport;
-  readonly explanation: string;
+interface FontFamilyDeclaration {
+  family: string;
+  faces: readonly FontFaceDeclaration[];
+  fallback?: readonly string[];
 }
-interface UiBeneathReport {
-  readonly id: string;
-  readonly type: string;
-  readonly owner?: string;
-  readonly listens: readonly string[];
+type FontFamilyStatus = 'undeclared' | 'unavailable' | 'loading' | 'loaded' | 'error';
+interface FontFaceLike {
+  readonly family: string;
+  load(): Promise<unknown>;
 }
-interface UiOwnerReport {
-  readonly name: string;
-  readonly anchorId: string;
+interface FontHost {
+  readonly fonts: {
+    add(face: FontFaceLike): unknown;
+  } | undefined;
+  createFace(family: string, source: string | ArrayBuffer, descriptors: FontFaceDescriptors): FontFaceLike;
 }
-interface NodePathTarget {
-  readonly type: string;
-  readonly id: string;
-  readonly label?: string;
+declare class FontService {
+  private readonly statuses;
+  private readonly pending;
+  private readonly failed;
+  private readonly batches;
+  private listener;
+  private disposed;
+  declare(families: readonly FontFamilyDeclaration[], host?: FontHost): void;
+  get ready(): Promise<void>;
+  statusOf(family: string): FontFamilyStatus;
+  get families(): readonly string[];
+  setListener(listener: ((family: string) => void) | null): void;
+  dispose(): void;
+  private loadFace;
+  private settle;
 }
-declare function formatNodePath(owners: readonly UiOwnerReport[], node: NodePathTarget): string;
-type UiPropOrigin = 'element' | 'binding' | 'modifier';
-interface UiPropReport {
-  readonly name: string;
-  readonly value: string;
-  readonly origin: UiPropOrigin;
-  readonly source?: string;
-  readonly stream?: UiStreamReport;
+declare const UI_FRAME_PHASES: readonly ['ticks', 'patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'];
+type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
+type FramePhaseTimings = Record<UiFramePhase, number>;
+interface RuntimeInput {
+  readonly dispatcher: UiInputDispatcher;
+  readonly pointer: UiPointerController;
+  readonly wheel: UiWheelController;
+  readonly keyboard: UiKeyboardController;
+  readonly focus: UiFocusManager;
+  readonly editing: UiEditingController;
+  readonly selection: UiSelectionController;
+  readonly find: UiFindController;
+  readonly touchScroll: UiTouchScroller;
 }
-interface UiStreamReport {
-  readonly source: string;
-  readonly kind: 'cell' | 'observable';
-  readonly value: string;
-  readonly emissions: number;
-  readonly emittedAt: number | null;
-  readonly connected: boolean;
+type RendererChoice = RendererBackend | 'auto';
+interface GessoRuntimeOptions {
+  root: FrameworkChild;
+  canvas: CanvasHost;
+  renderer?: RendererChoice;
+  measureCanvas?: CanvasHost;
+  textMeasurer?: TextMeasurer;
+  media?: MediaOptions;
+  fonts?: readonly FontFamilyDeclaration[];
+  services?: ServiceRegistry;
+  routes?: RouterRoutes;
+  channels?: ChannelRegistry;
+  clock?: UiFrameClockFactory;
+  width?: number;
+  height?: number;
+  dpr?: number;
 }
-interface BoundStream {
-  readonly id: number;
-  readonly observable: unknown;
-  value(): unknown;
-  emissionCount(): number;
-  emittedAt(): number | null;
-  connected(): boolean;
-}
-declare function describeStream(binding: BoundStream, timeOrigin: number): UiStreamReport;
-declare function formatStream(stream: UiStreamReport, now?: number): string;
-declare function formatAge(ms: number): string;
-interface UiEnvironmentReport {
-  readonly key: string;
-  readonly value: string;
-  readonly provided: boolean;
-}
-interface UiSemanticsReport {
-  readonly role?: string;
-  readonly label?: string;
-  readonly value?: string;
-  readonly states?: readonly string[];
-}
-declare function printPropValue(value: unknown): string;
-declare function formatNodeReport(report: UiNodeReport): string;
-type UiDuration = UiDurationToken | number;
-type UiEasingChoice = UiEasingToken | UiEasing;
-interface AnimateOptions {
-  duration?: UiDuration;
-  easing?: UiEasingChoice;
-  stepMs?: number;
-  repeat?: boolean;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-}
-interface SpringOptions {
-  spring?: UiSpringToken | UiSpringSpec;
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  velocity?: number;
-  restDelta?: number;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-}
-declare class AnimationService {
-  readonly reducedMotion: InternalState<boolean>;
-  private driver;
-  private motionVocabulary;
-  setDriver(driver: AnimationDriver | null): void;
-  setMotion(motion: UiMotion): void;
-  get motion(): UiMotion;
-  applyReducedMotion(reduced: boolean): void;
-  animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
-  spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
-  stop<T>(cell: AnimatedCell<T>): boolean;
-  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
-  private resolveDuration;
-  private resolveEasing;
-}
-interface AudioSample {
-  readonly status: AudioStatus;
-  readonly position: number;
-  readonly duration: number;
-  readonly buffered: number;
-  readonly at: number;
-  readonly error?: string;
-}
-type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
-type AudioRequest = {
-  readonly type: 'load';
-  readonly src: string;
-  readonly autoplay: boolean;
-} |
-{
-  readonly type: 'preload';
-  readonly src: string;
-} | {
-  readonly type: 'play';
-} | {
-  readonly type: 'pause';
-} | {
-  readonly type: 'seek';
-  readonly seconds: number;
-} | {
-  readonly type: 'volume';
-  readonly level: number;
-} | {
-  readonly type: 'metadata';
-  readonly metadata: AudioMetadata | null;
-};
-type AudioAction = 'play' | 'pause' | 'next' | 'previous';
-interface AudioMetadata {
-  readonly title: string;
-  readonly artist: string;
-  readonly album?: string;
-  readonly artwork?: string;
-}
-interface AudioState {
-  readonly status: AudioStatus;
-  readonly position: number;
-  readonly duration: number;
-  readonly buffered: number;
-  readonly src: string | null;
-  readonly error?: string;
-}
-declare class AudioService {
-  private handler;
-  private animations;
-  private readonly sample;
-  private readonly source;
-  private readonly position;
-  private readonly actionSubject;
-  readonly state: ComputedCell<AudioState>;
-  readonly actions: Observable<AudioAction>;
-  get current(): AudioState;
-  setHandler(handler: ((request: AudioRequest) => void) | null): void;
-  setAnimations(animations: AnimationService | null): void;
-  applySample(sample: AudioSample): void;
-  applyAction(action: AudioAction): void;
-  load(src: string, options?: {
-    readonly autoplay?: boolean;
-  }): void;
-  preload(src: string): void;
-  play(): void;
-  pause(): void;
-  seek(seconds: number): void;
-  setVolume(level: number): void;
-  setMetadata(metadata: AudioMetadata | null): void;
-}
-type ShellRequest = {
-  type: 'clipboard';
-  text: string;
-} | {
-  type: 'openUrl';
-  url: string;
-} | {
-  type: 'fullscreen';
-  enter: boolean;
-} | {
-  type: 'popup';
-  id: number;
-  url: string;
-  name: string;
-  width: number;
-  height: number;
-} | {
-  type: 'storage';
-  id: number;
-  op: ShellStorageOp;
-  key: string;
-  value?: string;
-} | {
-  type: 'history';
-  action: 'push' | 'replace';
-  url: string;
-} | {
-  type: 'history';
-  action: 'back' | 'forward';
-  url?: undefined;
-};
-type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
-interface ShellStorageResult {
-  readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
-  readonly value: string | null;
-  readonly keys: readonly string[];
-  readonly error: string | null;
-}
-declare class ShellService {
-  private handler;
-  private readonly scheme;
-  private readonly insets;
-  private readonly isFullscreen;
-  private readonly popups;
-  private nextPopupId;
-  private readonly stores;
-  private nextStorageId;
-  readonly colorScheme: ReadableCell<ColorScheme>;
-  get currentColorScheme(): ColorScheme;
-  readonly viewportInsets: ReadableCell<UiInsets>;
-  get currentViewportInsets(): UiInsets;
-  setHandler(handler: ((request: ShellRequest) => void) | null): void;
-  applyColorScheme(scheme: ColorScheme): void;
-  applyViewportInsets(insets: UiInsets): void;
-  copyText(text: string): void;
-  openUrl(url: string): void;
-  readonly fullscreen: ReadableCell<boolean>;
-  requestFullscreen(enter: boolean): void;
-  applyFullscreen(active: boolean): void;
-  openPopup(request: {
-    readonly url: string;
-    readonly name?: string;
-    readonly width?: number;
-    readonly height?: number;
-  }): Promise<boolean>;
+declare class GessoRuntime {
+  readonly services: ServiceRegistry;
+  readonly channels: ChannelRegistry;
+  readonly input: RuntimeInput;
+  readonly inspector: LayoutInspector;
+  private readonly resolver;
+  private readonly graph;
+  private readonly engine;
+  private readonly builder;
+  private readonly scheduler;
+  private readonly inputLatency;
+  private readonly canvas;
+  private readonly textMeasurer;
+  private canvasSurface;
+  private renderer;
+  private rendererState;
+  readonly rendererReady: Promise<RendererBackend>;
+  private readonly dispatcher;
+  private width;
+  private height;
+  private root;
+  private appRoot;
+  private viewportInsetValue;
+  private viewportInsetRegistry;
+  private viewportInsetWrite;
+  private detachViewportInsetEnvironment;
+  private constraints;
+  private pixelRatio;
+  private lastFrameMs;
+  private frameListener;
+  private rendererErrorListener;
+  private gpuTimings;
+  private inspectListener;
+  private lastInspection;
+  private devtoolsListener;
+  private watchingTree;
+  private lastSubscriptions;
+  private watchingFrames;
+  private selectedId;
+  private lastSelectedReport;
+  private cursorListener;
+  private lastCursor;
+  private scrollabilityListener;
+  private lastScrollability;
+  private lastScrollsAnything;
+  private editingListener;
+  private selectionController;
+  private findController;
+  private readonly focusManager;
+  private hitTester;
+  private readonly layoutNotifier;
+  private readonly smoothScroller;
+  private visible;
+  private readonly animations;
+  private readonly sharedElements;
+  private readonly focusNotifier;
+  private readonly environmentNotifier;
+  private semantics;
+  private semanticsListener;
+  private semanticsBoxes;
+  private lastFocusedId;
+  private focusAfterReload;
+  private restoringFocus;
+  private semanticsStale;
+  private lastEditingState;
+  private shellListener;
+  private audioListener;
+  private caretTimer;
+  private scrollbarTimer;
+  private inspectorTimer;
+  private animationTimer;
+  private replicas;
+  private phaseTimings;
+  private started;
+  private laidOutOnce;
+  constructor(options: GessoRuntimeOptions);
+  deferPatchesFrom(sources: readonly PatchSource[]): void;
+  start(): void;
+  get rendererBackend(): RendererBackend | 'pending';
+  onRendererError(listener: ((message: string) => void) | null): void;
+  onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
+  private reportRendererError;
+  private fallBackToCanvas2D;
+  private requestRepaint;
+  private fontsChanged;
+  resize(width: number, height: number, dpr?: number): void;
+  onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
+  noteInput(at: number | undefined): void;
+  setInspectorEnabled(enabled: boolean): void;
+  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  handleDevtools(request: DevtoolsRequest): void;
+  private writeInspectedProperty;
+  snapshotTree(): UiTreeSnapshot;
+  private sendTree;
+  inspectNodeById(id: string): UiNodeReport | null;
+  setHighlightedNode(id: string | null): void;
+  onCursor(listener: ((cursor: string | null) => void) | null): void;
+  get cursor(): string | null;
+  onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
+  get scrollability(): UiScrollability;
+  onEditingState(listener: ((state: EditingState | null) => void) | null): void;
+  get editingState(): EditingState | null;
+  onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
+  onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
+  applyAudioSample(sample: AudioSample): void;
+  applyAudioAction(action: AudioAction): void;
+  setTextInputSource(source: 'proxy' | 'keys'): void;
+  setFullscreen(active: boolean): void;
+  setVisible(visible: boolean): void;
+  setReducedMotion(reduced: boolean): void;
+  setUrl(url: string): void;
+  setColorScheme(scheme: ColorScheme): void;
+  setViewportInsets(insets: UiInsets): void;
+  private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
-  requestStorage(request: {
-    readonly op: ShellStorageOp;
-    readonly key: string;
-    readonly value?: string;
-  }): Promise<ShellStorageResult>;
   settleStorage(id: number, result: ShellStorageResult): void;
+  get reducedMotion(): boolean;
+  get colorScheme(): ColorScheme;
+  get viewportInsets(): UiInsets;
+  get sharedElementNames(): readonly string[];
+  explain(node: UiNode): LayoutExplanation;
+  inspectNode(node: UiNode): UiNodeReport;
+  private beneathAtPointer;
+  private pathOf;
+  private ownersOf;
+  private propsOf;
+  private environmentOf;
+  private semanticsOf;
+  debugRoot(): UiNode;
+  debugLayoutBox(node: UiNode): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  debugVisibleBox(node: UiNode): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  layoutRoot(): UiNode;
+  scrollIntoView(node: UiNode, padding?: number): void;
+  reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
+  private restoreFocusAfterReload;
+  dispose(): void;
+  private buildRoot;
+  private resolveRootElement;
+  private createInput;
+  onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
+  semanticsTree(): UiSemanticsMap;
+  applySemanticsAction(action: UiSemanticsAction): void;
+  private applyTextRunAction;
+  private updateSemantics;
+  private rebuildSemantics;
+  private rescopeSemantics;
+  private semanticsOwnerOf;
+  private semanticIdsUnder;
+  private collectSemanticsBoxes;
+  private onScreen;
+  private revealBox;
+  private handleHoverChange;
+  private createScrollSink;
+  private runPreCollectPhases;
+  private hasVirtualWindows;
+  private updateVirtualWindows;
+  private updateVirtualSheet;
+  private collectVirtualMeasures;
+  private extentOf;
+  private handleFrame;
+  private scheduleAnimationTick;
+  private scheduleScrollbarFade;
+  private scheduleCaretBlink;
+  private sendEditingState;
+  private scheduleInspectorRepaint;
+  private sendCursor;
+  private sendScrollability;
+  private sendInspection;
+  private hoveredReport;
+  private sendDevtoolsUpdates;
+  private sendSelectedReport;
+  private timePhase;
+  get lastFrameDurationMs(): number;
+}
+interface PatchSource {
+  readonly hasPendingPatches: boolean;
+  flush(): void;
+  deferPatches(scheduleFlush: () => void): void;
+}
+interface FrameMetrics {
+  frame: number;
+  durationMs: number;
+  nodes: number;
+  measured: number;
+  relayoutRoots: number;
+  phases: FramePhaseTimings;
+  renderer: RendererBackend | 'pending';
+  gpu: GpuStageTimings | null;
+  at: number;
+  inputLatencyMs: number | null;
+}
+interface GpuStageTimings {
+  prepare: number;
+  upload: number;
+  encode: number;
 }
 type ShellToRuntimeMessage = {
   type: 'init';
@@ -1407,340 +1674,37 @@ type DevtoolsEvent = {
   source: RuntimeErrorSource;
 };
 declare function treeText(text: unknown): string | undefined;
-interface MediaOptions {
-  resolver?: ImageResolver;
-  rasterizer?: IconRasterizer;
-  videoResolver?: VideoResolver;
+type ShellHistoryMode = 'path' | 'hash' | 'memory';
+interface ShellHistoryOptions {
+  readonly mode?: ShellHistoryMode;
+  readonly base?: string;
+  readonly initialUrl?: string;
 }
-declare class MediaService {
-  private imageResolver;
-  private iconRasterizer;
-  private videoResolver;
-  private ownsResolver;
-  private ownsRasterizer;
-  private ownsVideoResolver;
-  get images(): ImageResolver;
-  get icons(): IconRasterizer;
-  get videos(): VideoResolver;
-  setResolver(resolver: ImageResolver): void;
-  setVideoResolver(resolver: VideoResolver): void;
-  setRasterizer(rasterizer: IconRasterizer): void;
+interface ShellHistory {
+  readonly url: string;
+  push(url: string): void;
+  replace(url: string): void;
+  back(): void;
+  forward(): void;
+  onChange(listener: (url: string) => void): void;
   dispose(): void;
 }
-interface FontFaceDeclaration {
-  source: string | ArrayBuffer;
-  weight?: string | number;
-  style?: 'normal' | 'italic' | 'oblique';
-  stretch?: string;
-  unicodeRange?: string;
-  display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
-}
-interface FontFamilyDeclaration {
-  family: string;
-  faces: readonly FontFaceDeclaration[];
-  fallback?: readonly string[];
-}
-type FontFamilyStatus = 'undeclared' | 'unavailable' | 'loading' | 'loaded' | 'error';
-interface FontFaceLike {
-  readonly family: string;
-  load(): Promise<unknown>;
-}
-interface FontHost {
-  readonly fonts: {
-    add(face: FontFaceLike): unknown;
-  } | undefined;
-  createFace(family: string, source: string | ArrayBuffer, descriptors: FontFaceDescriptors): FontFaceLike;
-}
-declare class FontService {
-  private readonly statuses;
-  private readonly pending;
-  private readonly failed;
-  private readonly batches;
-  private listener;
-  private disposed;
-  declare(families: readonly FontFamilyDeclaration[], host?: FontHost): void;
-  get ready(): Promise<void>;
-  statusOf(family: string): FontFamilyStatus;
-  get families(): readonly string[];
-  setListener(listener: ((family: string) => void) | null): void;
-  dispose(): void;
-  private loadFace;
-  private settle;
-}
-declare const UI_FRAME_PHASES: readonly ['ticks', 'patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'];
-type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
-type FramePhaseTimings = Record<UiFramePhase, number>;
-interface RuntimeInput {
-  readonly dispatcher: UiInputDispatcher;
-  readonly pointer: UiPointerController;
-  readonly wheel: UiWheelController;
-  readonly keyboard: UiKeyboardController;
-  readonly focus: UiFocusManager;
-  readonly editing: UiEditingController;
-  readonly selection: UiSelectionController;
-  readonly find: UiFindController;
-  readonly touchScroll: UiTouchScroller;
-}
-type RendererChoice = RendererBackend | 'auto';
-interface GessoRuntimeOptions {
-  root: FrameworkChild;
-  canvas: CanvasHost;
-  renderer?: RendererChoice;
-  measureCanvas?: CanvasHost;
-  textMeasurer?: TextMeasurer;
-  media?: MediaOptions;
-  fonts?: readonly FontFamilyDeclaration[];
-  services?: ServiceRegistry;
-  routes?: RouterRoutes;
-  channels?: ChannelRegistry;
-  clock?: UiFrameClockFactory;
-  width?: number;
-  height?: number;
-  dpr?: number;
-}
-declare class GessoRuntime {
-  readonly services: ServiceRegistry;
-  readonly channels: ChannelRegistry;
-  readonly input: RuntimeInput;
-  readonly inspector: LayoutInspector;
-  private readonly resolver;
-  private readonly graph;
-  private readonly engine;
-  private readonly builder;
-  private readonly scheduler;
-  private readonly inputLatency;
-  private readonly canvas;
-  private readonly textMeasurer;
-  private canvasSurface;
-  private renderer;
-  private rendererState;
-  readonly rendererReady: Promise<RendererBackend>;
-  private readonly dispatcher;
-  private width;
-  private height;
-  private root;
-  private appRoot;
-  private viewportInsetValue;
-  private viewportInsetRegistry;
-  private viewportInsetWrite;
-  private detachViewportInsetEnvironment;
-  private constraints;
-  private pixelRatio;
-  private lastFrameMs;
-  private frameListener;
-  private rendererErrorListener;
-  private gpuTimings;
-  private inspectListener;
-  private lastInspection;
-  private devtoolsListener;
-  private watchingTree;
-  private lastSubscriptions;
-  private watchingFrames;
-  private selectedId;
-  private lastSelectedReport;
-  private cursorListener;
-  private lastCursor;
-  private scrollabilityListener;
-  private lastScrollability;
-  private lastScrollsAnything;
-  private editingListener;
-  private selectionController;
-  private findController;
-  private readonly focusManager;
-  private hitTester;
-  private readonly layoutNotifier;
-  private readonly smoothScroller;
-  private visible;
-  private readonly animations;
-  private readonly sharedElements;
-  private readonly focusNotifier;
-  private readonly environmentNotifier;
-  private semantics;
-  private semanticsListener;
-  private semanticsBoxes;
-  private lastFocusedId;
-  private focusAfterReload;
-  private restoringFocus;
-  private semanticsStale;
-  private lastEditingState;
-  private shellListener;
-  private audioListener;
-  private caretTimer;
-  private scrollbarTimer;
-  private inspectorTimer;
-  private animationTimer;
-  private replicas;
-  private phaseTimings;
-  private started;
-  private laidOutOnce;
-  constructor(options: GessoRuntimeOptions);
-  deferPatchesFrom(sources: readonly PatchSource[]): void;
-  start(): void;
-  get rendererBackend(): RendererBackend | 'pending';
-  onRendererError(listener: ((message: string) => void) | null): void;
-  onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
-  private reportRendererError;
-  private fallBackToCanvas2D;
-  private requestRepaint;
-  private fontsChanged;
-  resize(width: number, height: number, dpr?: number): void;
-  onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
-  noteInput(at: number | undefined): void;
-  setInspectorEnabled(enabled: boolean): void;
-  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
-  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
-  handleDevtools(request: DevtoolsRequest): void;
-  private writeInspectedProperty;
-  snapshotTree(): UiTreeSnapshot;
-  private sendTree;
-  inspectNodeById(id: string): UiNodeReport | null;
-  setHighlightedNode(id: string | null): void;
-  onCursor(listener: ((cursor: string | null) => void) | null): void;
-  get cursor(): string | null;
-  onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
-  get scrollability(): UiScrollability;
-  onEditingState(listener: ((state: EditingState | null) => void) | null): void;
-  get editingState(): EditingState | null;
-  onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
-  onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
-  applyAudioSample(sample: AudioSample): void;
-  applyAudioAction(action: AudioAction): void;
-  setTextInputSource(source: 'proxy' | 'keys'): void;
-  setFullscreen(active: boolean): void;
-  setVisible(visible: boolean): void;
-  setReducedMotion(reduced: boolean): void;
-  setUrl(url: string): void;
-  setColorScheme(scheme: ColorScheme): void;
-  setViewportInsets(insets: UiInsets): void;
-  private publishViewportInsets;
-  settlePopup(id: number, opened: boolean): void;
-  settleStorage(id: number, result: ShellStorageResult): void;
-  get reducedMotion(): boolean;
-  get colorScheme(): ColorScheme;
-  get viewportInsets(): UiInsets;
-  get sharedElementNames(): readonly string[];
-  explain(node: UiNode): LayoutExplanation;
-  inspectNode(node: UiNode): UiNodeReport;
-  private beneathAtPointer;
-  private pathOf;
-  private ownersOf;
-  private propsOf;
-  private environmentOf;
-  private semanticsOf;
-  debugRoot(): UiNode;
-  debugLayoutBox(node: UiNode): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+interface HistoryWindow {
+  readonly location: {
+    pathname: string;
+    search: string;
+    hash: string;
   };
-  debugVisibleBox(node: UiNode): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+  readonly history: {
+    pushState(data: unknown, title: string, url: string): void;
+    replaceState(data: unknown, title: string, url: string): void;
+    back(): void;
+    forward(): void;
   };
-  layoutRoot(): UiNode;
-  scrollIntoView(node: UiNode, padding?: number): void;
-  reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
-  private restoreFocusAfterReload;
-  dispose(): void;
-  private buildRoot;
-  private resolveRootElement;
-  private createInput;
-  onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
-  semanticsTree(): UiSemanticsMap;
-  applySemanticsAction(action: UiSemanticsAction): void;
-  private applyTextRunAction;
-  private updateSemantics;
-  private rebuildSemantics;
-  private rescopeSemantics;
-  private semanticsOwnerOf;
-  private semanticIdsUnder;
-  private collectSemanticsBoxes;
-  private onScreen;
-  private revealBox;
-  private handleHoverChange;
-  private createScrollSink;
-  private runPreCollectPhases;
-  private hasVirtualWindows;
-  private updateVirtualWindows;
-  private updateVirtualSheet;
-  private collectVirtualMeasures;
-  private extentOf;
-  private handleFrame;
-  private scheduleAnimationTick;
-  private scheduleScrollbarFade;
-  private scheduleCaretBlink;
-  private sendEditingState;
-  private scheduleInspectorRepaint;
-  private sendCursor;
-  private sendScrollability;
-  private sendInspection;
-  private hoveredReport;
-  private sendDevtoolsUpdates;
-  private sendSelectedReport;
-  private timePhase;
-  get lastFrameDurationMs(): number;
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener(type: string, listener: () => void): void;
 }
-interface PatchSource {
-  readonly hasPendingPatches: boolean;
-  flush(): void;
-  deferPatches(scheduleFlush: () => void): void;
-}
-interface FrameMetrics {
-  frame: number;
-  durationMs: number;
-  nodes: number;
-  measured: number;
-  relayoutRoots: number;
-  phases: FramePhaseTimings;
-  renderer: RendererBackend | 'pending';
-  gpu: GpuStageTimings | null;
-  at: number;
-  inputLatencyMs: number | null;
-}
-interface GpuStageTimings {
-  prepare: number;
-  upload: number;
-  encode: number;
-}
-declare class GessoAppBuilder {
-  private root;
-  private readonly channelRegistrations;
-  private readonly serviceRegistrations;
-  private frameListener;
-  private inspectListener;
-  private devtoolsListener;
-  private errorListener;
-  private rendererChoice;
-  private routes;
-  private historyOptions;
-  private mediaOptions;
-  private fontDeclarations;
-  private app;
-  private colorSchemePreference;
-  constructor(root: FrameworkChild | ComponentType);
-  useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options: {
-    worker?: WorkerHandle | (() => Worker);
-    source?: ChannelSource<V, C>;
-  }): this;
-  useService(ServiceClass: new () => object): this;
-  useRoutes(routes: RouterRoutes): this;
-  useMedia(media: MediaOptions): this;
-  useFonts(families: readonly FontFamilyDeclaration[]): this;
-  useHistory(history: ShellHistoryOptions): this;
-  renderer(choice: RendererChoice): this;
-  onFrame(listener: (metrics: FrameMetrics) => void): this;
-  onInspect(listener: (report: UiNodeReport | null) => void): this;
-  onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
-  setInspector(enabled: boolean): void;
-  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
-  devtools(request: DevtoolsRequest): void;
-  reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): this;
-  setColorScheme(preference: ColorSchemePreference): this;
-  mountSync(host: HTMLElement | string): () => void;
-}
+declare function createShellHistory(options?: ShellHistoryOptions, host?: HistoryWindow | undefined): ShellHistory;
 interface AppLogicEndpoint {
   postMessage(message: unknown, transfer?: Transferable[]): void;
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
@@ -1820,7 +1784,43 @@ interface CreateAppOptions extends Omit<WorkerAppOptions, 'renderWorker'> {
   workerName?: string;
 }
 declare function createApp(options?: CreateAppOptions): WorkerApp;
-declare function createApp(root: FrameworkChild | ComponentType): GessoAppBuilder;
+declare class GessoAppBuilder {
+  private root;
+  private readonly channelRegistrations;
+  private readonly serviceRegistrations;
+  private frameListener;
+  private inspectListener;
+  private devtoolsListener;
+  private errorListener;
+  private rendererChoice;
+  private routes;
+  private historyOptions;
+  private mediaOptions;
+  private fontDeclarations;
+  private app;
+  private colorSchemePreference;
+  constructor(root: FrameworkChild | ComponentType);
+  useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options: {
+    worker?: WorkerHandle | (() => Worker);
+    source?: ChannelSource<V, C>;
+  }): this;
+  useService(ServiceClass: new () => object): this;
+  useRoutes(routes: RouterRoutes): this;
+  useMedia(media: MediaOptions): this;
+  useFonts(families: readonly FontFamilyDeclaration[]): this;
+  useHistory(history: ShellHistoryOptions): this;
+  renderer(choice: RendererChoice): this;
+  onFrame(listener: (metrics: FrameMetrics) => void): this;
+  onInspect(listener: (report: UiNodeReport | null) => void): this;
+  onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
+  setInspector(enabled: boolean): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  devtools(request: DevtoolsRequest): void;
+  reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): this;
+  setColorScheme(preference: ColorSchemePreference): this;
+  mountSync(host: HTMLElement | string): () => void;
+}
+declare function createSyncApp(root: FrameworkChild | ComponentType): GessoAppBuilder;
 interface GessoAppOptions {
   host: HTMLElement;
   root: FrameworkChild;
@@ -2234,6 +2234,7 @@ interface SemanticsMirrorSink {
   action(action: UiSemanticsAction): void;
   keyDown?(event: KeyboardEvent): void;
   keyUp?(event: KeyboardEvent): void;
+  paste?(text: string): void;
 }
 interface EditingMirrorTarget {
   readonly active: boolean;
@@ -2364,6 +2365,7 @@ export {
   createChannelRegistry,
   createComponent,
   createShellHistory,
+  createSyncApp,
   debounced,
   Define,
   derive,
@@ -2404,6 +2406,7 @@ export {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
+  gn,
   IndexedDbStorage,
   IndexedDbStorageOptions,
   Inject,
@@ -2412,7 +2415,6 @@ export {
   isHubMessage,
   isPortErrorMessage,
   isPortHandshake,
-  Kn,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -2646,6 +2648,7 @@ import {
   createChannelRegistry,
   createComponent,
   createShellHistory,
+  createSyncApp,
   debounced,
   Define,
   derive,
@@ -2835,7 +2838,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-GqeHATuN.js";
+} from "./index-DOjfIhpO.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -2863,6 +2866,7 @@ export {
   createChannelRegistry,
   createComponent,
   createShellHistory,
+  createSyncApp,
   debounced,
   Define,
   defineChannel,
@@ -3308,7 +3312,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-GqeHATuN.js";
+} from "../index-DOjfIhpO.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

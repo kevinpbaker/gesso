@@ -40,7 +40,7 @@ the descriptors CSS knows, `weight`, `style`, `stretch`, `unicodeRange`
 and `display`, in their CSS spellings. A variable font is one face with
 a weight range.
 
-The single-thread twin is `createApp(AppRoot).useFonts([...])`, which
+The single-thread twin is `createSyncApp(AppRoot).useFonts([...])`, which
 loads into `document.fonts` instead.
 
 ## Naming the family

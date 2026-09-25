@@ -1429,11 +1429,15 @@ interface UiVirtualSheetOptions {
   readonly rowCount: Reactive<number>;
   readonly columnCount: Reactive<number>;
   readonly rowHeight: number;
+  readonly rowHeights?: ReadonlyMap<number, number>;
   readonly columnWidth: number | readonly number[];
   readonly rowOverscan?: Reactive<number>;
   readonly columnOverscan?: Reactive<number>;
   readonly gutterWidth?: number;
   readonly headerHeight?: number;
+  readonly frozenRows?: number;
+  readonly frozenColumns?: number;
+  readonly extendRange?: (range: SheetRange) => SheetRange;
   readonly initialViewport?: {
     readonly width: number;
     readonly height: number;
@@ -1448,25 +1452,43 @@ declare class UiVirtualSheet {
   private columnCount;
   private rowOverscan;
   private columnOverscan;
-  private readonly rowHeight;
+  private rowHeight;
   private readonly gutterWidth;
   private readonly headerHeight;
+  private frozenRows;
+  private frozenColumns;
   private readonly renderRow;
   private renderHeader;
+  private readonly extendRange;
   private widths;
   private offsets;
   private uniformWidth;
+  private exceptionRows;
+  private exceptionHeights;
+  private exceptionStarts;
   private range;
   private viewport;
   private readonly mountedRows;
+  private readonly frozenMounted;
   private mountedHeader;
   constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer, renderHeader?: SheetHeaderRenderer);
   setColumnWidths(widths: number | readonly number[]): void;
   private adoptWidths;
+  setRowHeights(heights: ReadonlyMap<number, number> | undefined): void;
+  setRowHeight(height: number): void;
+  private adoptHeights;
+  private rebuildExceptionStarts;
+  private exceptionAt;
+  private exceptionsBefore;
+  rowHeightOf(row: number): number;
+  rowOffsetOf(row: number): number;
+  private get rowsHeight();
+  private extraWithin;
   widthOf(column: number): number;
   offsetOf(column: number): number;
   private get columnsWidth();
   get contentWidth(): number;
+  private get frozenWidth();
   get contentHeight(): number;
   cellAt(x: number, y: number): {
     row: number;
@@ -1477,6 +1499,7 @@ declare class UiVirtualSheet {
   setRowCount(count: number): void;
   setColumnCount(count: number): void;
   setOverscan(rows: number, columns: number): void;
+  setFrozen(rows: number, columns: number): void;
   invalidate(): void;
   update(viewport: SheetViewport): void;
   private recompute;
@@ -6629,7 +6652,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-OUITElxn.js";
+} from "./index-DyRDvjxa.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7534,7 +7557,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-OUITElxn.js";
+} from "./index-DyRDvjxa.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

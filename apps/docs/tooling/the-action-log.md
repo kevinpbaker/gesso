@@ -42,7 +42,9 @@ const dataWorker = actions.tap(
   [Notes, Settings]
 );
 
-const app = createApp(AppRoot).useChannel(Notes, { worker: dataWorker }).useChannel(Settings, { worker: dataWorker });
+const app = createSyncApp(AppRoot)
+  .useChannel(Notes, { worker: dataWorker })
+  .useChannel(Settings, { worker: dataWorker });
 ```
 
 A channel served from this thread rather than from a worker is tapped
