@@ -112,7 +112,7 @@ import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayService } from '../overlay/OverlayService';
 import type { ColorScheme } from './colorScheme';
-import { ShellService, type ShellRequest, type ShellStorageResult } from './ShellService';
+import { ShellService, type ShellFileResult, type ShellRequest, type ShellStorageResult } from './ShellService';
 import { AudioService, type AudioAction, type AudioRequest, type AudioSample } from './AudioService';
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
@@ -1471,6 +1471,14 @@ export class GessoRuntime {
    */
   settleStorage(id: number, result: ShellStorageResult): void {
     this.services.get(ShellService).settleStorage(id, result);
+  }
+
+  /**
+   * Reports what the shell did with a file request, settling the
+   * promise `ShellService.requestFile` returned.
+   */
+  settleFile(id: number, result: ShellFileResult): void {
+    this.services.get(ShellService).settleFile(id, result);
   }
 
   /** Whether the runtime is currently honouring a reduced-motion preference. */

@@ -1,5 +1,5 @@
 ---
-description: 'ShellService: the clipboard, URLs and the appearance signal a component in a render worker reaches through the thread that has a window.'
+description: 'ShellService: the clipboard, URLs, files and the appearance signal a component in a render worker reaches through the thread that has a window.'
 ---
 
 # Shell services
@@ -120,6 +120,52 @@ element, which matters when the host has padding: `clientWidth` includes
 it and the canvas is sized to its content box, so measuring the host
 started the runtime with a viewport wider than the surface it draws on.
 
+## Files
+
+A picker, a download and a `FileSystemFileHandle` are all the window's,
+so opening and saving files are shell requests too, answered with a
+promise the way a popup is:
+
+```ts
+const shell = ctx.inject(ShellService);
+const CSV = [{ description: 'CSV', mediaType: 'text/csv', extensions: ['.csv'] }];
+
+// In the click handler, before anything slow: a picker needs the gesture.
+const opened = await shell.openFiles({ accept: CSV });
+if (opened.outcome === 'ok') {
+  const [file] = opened.files; // name, mediaType, bytes, handle
+}
+
+const saved = await shell.saveFile({ name: 'book.csv', text, mediaType: 'text/csv', accept: CSV });
+// saved.saved: { name, handle, via: 'file' | 'download' }
+```
+
+| Action               | What the shell does with it                                                                   |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| `openFiles(options)` | `showOpenFilePicker`, or a file input where there is no picker; reads each file's bytes       |
+| `saveFile(options)`  | writes to `handle` when given (Save); otherwise `showSaveFilePicker` (Save As), or a download |
+| `reopenFile(handle)` | reads a remembered file, asking the browser for permission again if it lapsed                 |
+| `recentFiles()`      | lists the remembered files, most recently used first                                          |
+| `forgetFile(handle)` | stops remembering one                                                                         |
+
+A handle is a **number**. The `FileSystemFileHandle` behind it is not
+plain data and cannot cross the barrier, so the shell keeps it (in
+IndexedDB, which can hold one) and hands out its key. That is also
+what makes "recent files" work across a reload: the numbers name the
+same files tomorrow. What does not survive a reload is the permission,
+which the browser asks for again, and asking needs a gesture; so a
+`reopenFile` or a `saveFile` to a handle belongs in a click handler as
+much as a picker does.
+
+Every answer is one `ShellFileResult`. `cancelled` is a person closing
+a picker, which is a decision rather than a failure; `denied` is the
+browser refusing, most often for want of a gesture; `unsupported` is a
+shell with no way to do it. Where there is no File System Access API,
+as in Firefox and Safari, files come back with `handle: null` and a save is
+a download, and the answer says so rather than leaving an application
+to feature-test for itself. A file read in the worker configuration
+arrives with its buffer transferred, not copied.
+
 ## The single-thread configuration
 
 Nothing above changes. `GessoApp` registers the same `ShellService`,
@@ -146,6 +192,18 @@ when it happens to have one.
   created. Whether that matters to a clipboard write is the browser's
   decision, and it is not something this project has measured. Where a
   copy has to be certain, drive it from the shell.
+
+- The file requests have run in Chrome through real handles, a save,
+  a tab closed and the file reopened from `recentFiles`, but with the
+  two pickers replaced by functions returning Origin Private File
+  System handles, since automation cannot click a native dialog.
+  Everything past the dialog is the code above.
+- The file requests' fallbacks, a file input and a download, are in the
+  source and specced against doubles, and no browser without the File
+  System Access API has run them.
+- A dismissed file input is reported as `cancelled` only where the
+  browser fires `cancel` on it. Where it does not, the promise waits,
+  as every file input always has.
 
 ## Next
 

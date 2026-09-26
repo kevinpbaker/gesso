@@ -22,6 +22,7 @@ import {
 } from 'gesso-core';
 import { AudioSink } from '../AudioSink';
 import { attachFileDrop } from '../fileDrop';
+import { browserFilesHost, fileResultTransfer, ShellFiles } from '../shellFiles';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
@@ -276,6 +277,8 @@ export class WorkerApp {
   private host: HTMLElement | undefined;
   private resizeObserver: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
+  /** Pickers and remembered handles, made on the first file request. */
+  private files: ShellFiles | null = null;
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
   /** The one audio element, behind `AudioService`; see `AudioSink`. */
@@ -791,6 +794,16 @@ export class WorkerApp {
         id: message.id,
         result: performShellStorage(message, () => globalThis.localStorage)
       });
+      return;
+    }
+    if (message.type === 'file') {
+      // Pickers, handles and IndexedDB are all the window's. The answer
+      // is posted on every path — `perform` never rejects — and a file
+      // read goes back with its buffer moved rather than copied.
+      this.files ??= new ShellFiles(browserFilesHost(window));
+      void this.files
+        .perform(message.request)
+        .then(result => this.post({ type: 'fileResult', id: message.id, result }, fileResultTransfer(result)));
       return;
     }
     if (message.type === 'audio') {

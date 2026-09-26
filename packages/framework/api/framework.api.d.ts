@@ -786,6 +786,10 @@ type ShellRequest = {
   key: string;
   value?: string;
 } | {
+  type: 'file';
+  id: number;
+  request: ShellFileRequest;
+} | {
   type: 'history';
   action: 'push' | 'replace';
   url: string;
@@ -794,6 +798,59 @@ type ShellRequest = {
   action: 'back' | 'forward';
   url?: undefined;
 };
+interface ShellFileType {
+  readonly description: string;
+  readonly mediaType: string;
+  readonly extensions: readonly string[];
+}
+type ShellFileRequest =
+{
+  readonly op: 'open';
+  readonly accept: readonly ShellFileType[];
+  readonly multiple: boolean;
+} |
+{
+  readonly op: 'reopen';
+  readonly handle: number;
+} |
+{
+  readonly op: 'save';
+  readonly name: string;
+  readonly mediaType: string;
+  readonly text: string;
+  readonly handle?: number;
+  readonly accept: readonly ShellFileType[];
+} |
+{
+  readonly op: 'recent';
+} |
+{
+  readonly op: 'forget';
+  readonly handle: number;
+};
+interface ShellFile {
+  readonly name: string;
+  readonly mediaType: string;
+  readonly lastModified: number;
+  readonly bytes: ArrayBuffer;
+  readonly handle: number | null;
+}
+interface ShellRecentFile {
+  readonly handle: number;
+  readonly name: string;
+  readonly used: number;
+}
+interface ShellFileResult {
+  readonly outcome: 'ok' | 'cancelled' | 'denied' | 'unsupported' | 'failed';
+  readonly files: readonly ShellFile[];
+  readonly saved: {
+    readonly name: string;
+    readonly handle: number | null;
+    readonly via: 'file' | 'download';
+  } | null;
+  readonly recent: readonly ShellRecentFile[];
+  readonly error: string | null;
+}
 type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
 interface ShellStorageResult {
   readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
@@ -810,6 +867,8 @@ declare class ShellService {
   private nextPopupId;
   private readonly stores;
   private nextStorageId;
+  private readonly files;
+  private nextFileId;
   readonly colorScheme: ReadableCell<ColorScheme>;
   get currentColorScheme(): ColorScheme;
   readonly viewportInsets: ReadableCell<UiInsets>;
@@ -835,6 +894,22 @@ declare class ShellService {
     readonly value?: string;
   }): Promise<ShellStorageResult>;
   settleStorage(id: number, result: ShellStorageResult): void;
+  openFiles(options?: {
+    readonly accept?: readonly ShellFileType[];
+    readonly multiple?: boolean;
+  }): Promise<ShellFileResult>;
+  reopenFile(handle: number): Promise<ShellFileResult>;
+  saveFile(options: {
+    readonly name: string;
+    readonly text: string;
+    readonly mediaType?: string;
+    readonly handle?: number;
+    readonly accept?: readonly ShellFileType[];
+  }): Promise<ShellFileResult>;
+  recentFiles(): Promise<ShellFileResult>;
+  forgetFile(handle: number): Promise<ShellFileResult>;
+  requestFile(request: ShellFileRequest): Promise<ShellFileResult>;
+  settleFile(id: number, result: ShellFileResult): void;
 }
 type UiDuration = UiDurationToken | number;
 type UiEasingChoice = UiEasingToken | UiEasing;
@@ -1271,6 +1346,7 @@ declare class GessoRuntime {
   private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
   settleStorage(id: number, result: ShellStorageResult): void;
+  settleFile(id: number, result: ShellFileResult): void;
   get reducedMotion(): boolean;
   get colorScheme(): ColorScheme;
   get viewportInsets(): UiInsets;
@@ -1492,6 +1568,11 @@ type ShellToRuntimeMessage = {
   type: 'storageResult';
   id: number;
   result: ShellStorageResult;
+} |
+{
+  type: 'fileResult';
+  id: number;
+  result: ShellFileResult;
 } | {
   type: 'inspector';
   enabled: boolean;
@@ -1583,6 +1664,11 @@ type RuntimeToShellMessage = {
   op: ShellStorageOp;
   key: string;
   value?: string;
+} |
+{
+  type: 'file';
+  id: number;
+  request: ShellFileRequest;
 } |
 {
   type: 'history';
@@ -1773,6 +1859,7 @@ interface WorkerAppOptions {
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;
+  interceptKey?: (event: KeyboardEvent) => boolean;
   colorScheme?: ColorSchemePreference;
   accessibility?: boolean;
   history?: ShellHistoryOptions;
@@ -1788,6 +1875,7 @@ declare class WorkerApp {
   private host;
   private resizeObserver;
   private detachInput;
+  private files;
   private proxy;
   private mirror;
   private audio;
@@ -1906,6 +1994,7 @@ declare class GessoApp {
   private history;
   private detachVisibility;
   private detachFileDrop;
+  private files;
   private detachFullscreen;
   private fullscreen;
   private detachReducedMotion;
@@ -2568,10 +2657,15 @@ export {
   servePorts,
   ServiceRegistry,
   setPerformanceMarks$1,
+  ShellFile,
+  ShellFileRequest,
+  ShellFileResult,
+  ShellFileType,
   ShellHistory,
   ShellHistoryMode,
   ShellHistoryOptions,
   ShellLocalStore,
+  ShellRecentFile,
   ShellRequest,
   ShellService,
   ShellStorage,
@@ -2858,10 +2952,15 @@ import {
   servePorts,
   ServiceRegistry,
   setPerformanceMarks,
+  ShellFile,
+  ShellFileRequest,
+  ShellFileResult,
+  ShellFileType,
   ShellHistory,
   ShellHistoryMode,
   ShellHistoryOptions,
   ShellLocalStore,
+  ShellRecentFile,
   ShellRequest,
   ShellService,
   ShellStorage,
@@ -2918,7 +3017,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-DSMrQ4MB.js";
+} from "./index-hrhCqW_c.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3158,10 +3257,15 @@ export {
   type SelectOptions,
   type SemanticsMirrorSink,
   type ServedChannel,
+  type ShellFile,
+  type ShellFileRequest,
+  type ShellFileResult,
+  type ShellFileType,
   type ShellHistory,
   type ShellHistoryMode,
   type ShellHistoryOptions,
   type ShellLocalStore,
+  type ShellRecentFile,
   type ShellRequest,
   type ShellStorageOp,
   type ShellStorageOptions,
@@ -3399,7 +3503,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-DSMrQ4MB.js";
+} from "../index-hrhCqW_c.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

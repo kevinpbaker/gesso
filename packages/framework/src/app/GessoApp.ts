@@ -12,9 +12,10 @@ import {
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import type { UiNodeReport } from './NodeReport';
 import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
-import type { ShellRequest } from './ShellService';
+import { shellFilesUnsupported, type ShellRequest } from './ShellService';
 import { AudioSink } from './AudioSink';
 import { attachFileDrop } from './fileDrop';
+import { browserFilesHost, ShellFiles } from './shellFiles';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
@@ -114,6 +115,8 @@ export class GessoApp {
   private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
   private detachFileDrop: (() => void) | null = null;
+  /** Pickers and remembered handles, made on the first file request. */
+  private files: ShellFiles | null = null;
   private detachFullscreen: (() => void) | null = null;
   private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
@@ -482,6 +485,8 @@ export class GessoApp {
         this.runtime.settlePopup(request.id, false);
       } else if (request.type === 'storage') {
         this.runtime.settleStorage(request.id, shellStorageDenied());
+      } else if (request.type === 'file') {
+        this.runtime.settleFile(request.id, shellFilesUnsupported('There is no document to reach files through.'));
       }
       return;
     }
@@ -498,6 +503,17 @@ export class GessoApp {
       return;
     }
     const view = this.canvas.ownerDocument.defaultView;
+    if (request.type === 'file') {
+      if (view === null) {
+        this.runtime.settleFile(request.id, shellFilesUnsupported('There is no window to reach files through.'));
+        return;
+      }
+      // The same shell half the worker configuration runs, with no
+      // thread to cross: the answer settles the promise directly.
+      this.files ??= new ShellFiles(browserFilesHost(view as Window & typeof globalThis));
+      void this.files.perform(request.request).then(result => this.runtime.settleFile(request.id, result));
+      return;
+    }
     if (request.type === 'storage') {
       // Performed here rather than posted, because in this
       // configuration the shell and the render side are the same

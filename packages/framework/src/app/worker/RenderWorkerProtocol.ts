@@ -13,7 +13,7 @@ import type {
 } from 'gesso-core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
-import type { ShellStorageOp, ShellStorageResult } from '../ShellService';
+import type { ShellFileRequest, ShellFileResult, ShellStorageOp, ShellStorageResult } from '../ShellService';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
 /**
@@ -209,6 +209,12 @@ export type ShellToRuntimeMessage =
    * its request's `id` for the same reason `popupResult` does.
    */
   | { type: 'storageResult'; id: number; result: ShellStorageResult }
+  /**
+   * What the shell did with a file request (ShellService.openFiles and
+   * its siblings), under the request's `id`. A file read comes back
+   * with its bytes, transferred rather than copied.
+   */
+  | { type: 'fileResult'; id: number; result: ShellFileResult }
   | { type: 'inspector'; enabled: boolean }
   /**
    * What an assistive technology did to the accessibility mirror: a
@@ -377,6 +383,13 @@ export type RuntimeToShellMessage =
    * which is what keeps it the dumb half of the thread model.
    */
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
+  /**
+   * Open, save, reopen, list or forget files (ShellService.openFiles
+   * and its siblings). Answered with `fileResult`. Sent at once, like
+   * `popup`, because a picker is shown only while the click that asked
+   * for it is fresh.
+   */
+  | { type: 'file'; id: number; request: ShellFileRequest }
   /** The router navigated; the shell owns the address bar (RouterService). */
   | { type: 'history'; action: 'push' | 'replace' | 'back' | 'forward'; url?: string }
   /** Load, play, pause, seek, set the volume or the OS metadata (AudioService). */

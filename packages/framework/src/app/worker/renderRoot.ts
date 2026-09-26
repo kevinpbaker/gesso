@@ -447,6 +447,9 @@ export class RenderWorkerApp {
       case 'storageResult':
         runtime.settleStorage(message.id, message.result);
         break;
+      case 'fileResult':
+        runtime.settleFile(message.id, message.result);
+        break;
       case 'tick':
         this.clock?.tick(message.time);
         break;
@@ -608,6 +611,8 @@ export class RenderWorkerApp {
           width: request.width,
           height: request.height
         });
+      } else if (request.type === 'file') {
+        this.host.postMessage({ type: 'file', id: request.id, request: request.request });
       } else if (request.type === 'storage') {
         this.host.postMessage({
           type: 'storage',

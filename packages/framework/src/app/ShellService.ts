@@ -21,8 +21,94 @@ export type ShellRequest =
   | { type: 'fullscreen'; enter: boolean }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
+  | { type: 'file'; id: number; request: ShellFileRequest }
   | { type: 'history'; action: 'push' | 'replace'; url: string }
   | { type: 'history'; action: 'back' | 'forward'; url?: undefined };
+
+/**
+ * A kind of file a picker offers, as the File System Access API and a
+ * file input both understand it.
+ *
+ * `extensions` include the dot (`.csv`), because that is the form both
+ * APIs take and a spelling this layer translated would be one more
+ * place for the two to disagree.
+ */
+export interface ShellFileType {
+  readonly description: string;
+  readonly mediaType: string;
+  readonly extensions: readonly string[];
+}
+
+/**
+ * What the shell is asked to do with files.
+ *
+ * `handle` is a number the shell hands out for a file somebody picked
+ * — the `FileSystemFileHandle` itself cannot leave the main thread,
+ * since nothing that is not plain data crosses the barrier. The shell
+ * keeps the handle and remembers it across reloads, so a number from
+ * yesterday's session still names yesterday's file.
+ */
+export type ShellFileRequest =
+  /** Show an open picker. */
+  | { readonly op: 'open'; readonly accept: readonly ShellFileType[]; readonly multiple: boolean }
+  /** Read a file the shell already has a handle to, asking permission again if it lapsed. */
+  | { readonly op: 'reopen'; readonly handle: number }
+  /**
+   * Write a file: to `handle` when given, and otherwise to wherever a
+   * save picker says — or, where there is no picker, as a download.
+   */
+  | {
+      readonly op: 'save';
+      readonly name: string;
+      readonly mediaType: string;
+      readonly text: string;
+      readonly handle?: number;
+      readonly accept: readonly ShellFileType[];
+    }
+  /** The files the shell remembers, most recently used first. */
+  | { readonly op: 'recent' }
+  /** Stop remembering one. */
+  | { readonly op: 'forget'; readonly handle: number };
+
+/** One file the shell read. */
+export interface ShellFile {
+  readonly name: string;
+  readonly mediaType: string;
+  readonly lastModified: number;
+  readonly bytes: ArrayBuffer;
+  /** The shell's number for it, or null where the platform gives none (a file input). */
+  readonly handle: number | null;
+}
+
+/** A file the shell remembers. */
+export interface ShellRecentFile {
+  readonly handle: number;
+  readonly name: string;
+  /** When it was last opened or saved, in epoch milliseconds. */
+  readonly used: number;
+}
+
+/**
+ * What the shell made of a file request.
+ *
+ * One record with a field per shape of answer, as `ShellStorageResult`
+ * is and for the same reason. `cancelled` is its own outcome because a
+ * person closing a picker is a decision and not a failure, and an
+ * application that reported it as one would be wrong every time.
+ * `denied` is a permission refused; `unsupported` is a shell with no
+ * way to do it at all.
+ */
+export interface ShellFileResult {
+  readonly outcome: 'ok' | 'cancelled' | 'denied' | 'unsupported' | 'failed';
+  /** What `open` and `reopen` read. */
+  readonly files: readonly ShellFile[];
+  /** Where `save` wrote: `'file'` through a handle, `'download'` without one. */
+  readonly saved: { readonly name: string; readonly handle: number | null; readonly via: 'file' | 'download' } | null;
+  /** What `recent` lists. */
+  readonly recent: readonly ShellRecentFile[];
+  /** Why it did not answer, as a message; null when it did. */
+  readonly error: string | null;
+}
 
 /** The four things `localStorage` is asked for; see `ShellStorage`. */
 export type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
@@ -65,6 +151,9 @@ export class ShellService {
   /** Storage requests asked for and not yet answered, by the id sent with each. */
   private readonly stores = new Map<number, (result: ShellStorageResult) => void>();
   private nextStorageId = 1;
+  /** File requests asked for and not yet answered, by the id sent with each. */
+  private readonly files = new Map<number, (result: ShellFileResult) => void>();
+  private nextFileId = 1;
 
   /**
    * The appearance the platform is asking for, as the shell reports it:
@@ -332,4 +421,105 @@ export class ShellService {
     this.stores.delete(id);
     resolve(result);
   }
+
+  /**
+   * Shows an open picker and reads what was picked.
+   *
+   * A request, like a popup, and for the same reason: a picker is the
+   * window's, and a browser shows one only while the click that asked
+   * for it is fresh. Call this from the handler of that click and
+   * before any slow work, and the round trip through a worker is fast
+   * enough. With the File System Access API each file comes back with
+   * a `handle` the shell remembers; through a file input, which is
+   * what a browser without the API has, `handle` is null and the file
+   * cannot be saved back to.
+   */
+  openFiles(
+    options: { readonly accept?: readonly ShellFileType[]; readonly multiple?: boolean } = {}
+  ): Promise<ShellFileResult> {
+    return this.requestFile({ op: 'open', accept: options.accept ?? [], multiple: options.multiple ?? false });
+  }
+
+  /**
+   * Reads a file the shell has a handle to — from `recentFiles`, or
+   * from an earlier `openFiles` or `saveFile` — asking for permission
+   * again when the browser has let it lapse, which it does across a
+   * reload. Asking needs a gesture, so this belongs in a click handler
+   * too.
+   */
+  reopenFile(handle: number): Promise<ShellFileResult> {
+    return this.requestFile({ op: 'reopen', handle });
+  }
+
+  /**
+   * Writes text to a file.
+   *
+   * With `handle`, to that file, which is Save; without one, to
+   * wherever a save picker says, which is Save As. A browser with no
+   * picker gets a download instead, and `saved.via` says which
+   * happened, so an application can tell the person where the file
+   * went — and knows it has no handle to save back to next time.
+   */
+  saveFile(options: {
+    readonly name: string;
+    readonly text: string;
+    readonly mediaType?: string;
+    readonly handle?: number;
+    readonly accept?: readonly ShellFileType[];
+  }): Promise<ShellFileResult> {
+    return this.requestFile({
+      op: 'save',
+      name: options.name,
+      text: options.text,
+      mediaType: options.mediaType ?? 'application/octet-stream',
+      accept: options.accept ?? [],
+      ...(options.handle === undefined ? {} : { handle: options.handle })
+    });
+  }
+
+  /** The files the shell remembers, most recently used first. */
+  recentFiles(): Promise<ShellFileResult> {
+    return this.requestFile({ op: 'recent' });
+  }
+
+  /** Stops remembering a file. Its handle means nothing afterwards. */
+  forgetFile(handle: number): Promise<ShellFileResult> {
+    return this.requestFile({ op: 'forget', handle });
+  }
+
+  /**
+   * The wire under the five above. With no shell installed the answer
+   * is `unsupported`, for the reason a storage request's is `denied`:
+   * a promise left unsettled would hang whatever was waiting on it.
+   */
+  requestFile(request: ShellFileRequest): Promise<ShellFileResult> {
+    const handler = this.handler;
+    if (handler === undefined || handler === null) {
+      return Promise.resolve(shellFilesUnsupported());
+    }
+    const id = this.nextFileId++;
+    const settled = new Promise<ShellFileResult>(resolve => {
+      this.files.set(id, resolve);
+    });
+    handler({ type: 'file', id, request });
+    return settled;
+  }
+
+  /**
+   * Called by the runtime with what the shell did. Not for
+   * applications. An unknown id is ignored, on `settlePopup`'s terms.
+   */
+  settleFile(id: number, result: ShellFileResult): void {
+    const resolve = this.files.get(id);
+    if (resolve === undefined) {
+      return;
+    }
+    this.files.delete(id);
+    resolve(result);
+  }
+}
+
+/** The answer for a shell that cannot do anything with files. */
+export function shellFilesUnsupported(error = 'There is no shell to reach files through.'): ShellFileResult {
+  return { outcome: 'unsupported', files: [], saved: null, recent: [], error };
 }
