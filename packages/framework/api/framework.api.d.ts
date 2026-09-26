@@ -279,6 +279,7 @@ import {
   UiEasingToken,
   UiEditingController,
   UiElement,
+  UiFileDropMessage,
   UiFindController,
   UiFocusManager,
   UiFrameClockFactory,
@@ -1305,6 +1306,7 @@ declare class GessoRuntime {
   private createInput;
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
   semanticsTree(): UiSemanticsMap;
+  applyFileDrop(message: UiFileDropMessage): void;
   applySemanticsAction(action: UiSemanticsAction): void;
   private applyTextRunAction;
   private updateSemantics;
@@ -1498,6 +1500,7 @@ type ShellToRuntimeMessage = {
   type: 'semanticsAction';
   action: UiSemanticsAction;
 } |
+UiFileDropMessage |
 {
   type: 'audioSample';
   sample: AudioSample;
@@ -1902,6 +1905,7 @@ declare class GessoApp {
   private mirror;
   private history;
   private detachVisibility;
+  private detachFileDrop;
   private detachFullscreen;
   private fullscreen;
   private detachReducedMotion;
@@ -2914,7 +2918,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-D3SBTLAB.js";
+} from "./index-DSMrQ4MB.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3395,7 +3399,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-D3SBTLAB.js";
+} from "../index-DSMrQ4MB.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

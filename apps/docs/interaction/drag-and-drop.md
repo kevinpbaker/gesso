@@ -192,9 +192,10 @@ dropTarget({
 });
 ```
 
-::: warning Not wired yet
-Nothing on the main thread listens for the browser's `dragover` and
-`drop` and posts a `fileDrop` message. The protocol is defined and the
-session handles it; the shell half is the desktop adapter's work. Until
-it lands, a zone that accepts `gesso/files` lights up for nothing.
-:::
+Both browser shells post the message: `createApp`'s worker shell and
+`createSyncApp`'s single-thread one listen for `dragenter`, `dragover`,
+`dragleave` and `drop` on the canvas, for drags that carry files and
+no others. While a drag is in flight the browser lets a page see each
+file's type and nothing more, so `name` is empty and `bytes` absent
+until the drop, when the files arrive whole; the worker shell
+transfers their buffers rather than copying them.

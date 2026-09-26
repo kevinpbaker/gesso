@@ -21,6 +21,7 @@ import {
   type UiScrollability
 } from 'gesso-core';
 import { AudioSink } from '../AudioSink';
+import { attachFileDrop } from '../fileDrop';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
@@ -850,7 +851,7 @@ export class WorkerApp {
     }
   }
 
-  private post(message: ShellToRuntimeMessage): void {
+  private post(message: ShellToRuntimeMessage, transfer: Transferable[] = []): void {
     // A backstop only. An input forwarded from a DOM event carries the
     // event's own timestamp (see `epochFromEvent`); this covers the
     // few that have no event behind them, and costs a listener that
@@ -859,7 +860,7 @@ export class WorkerApp {
     if (isInputMessage(message) && message.at === undefined) {
       (message as { at?: number }).at = epochNow();
     }
-    this.renderWorker?.postMessage(message);
+    this.renderWorker?.postMessage(message, transfer);
   }
 
   private observeResize(element: HTMLElement): void {
@@ -1232,6 +1233,11 @@ export class WorkerApp {
       this.canvasOrigin = null;
     };
 
+    // Files dragged in from the desktop. Their bytes are moved to the
+    // render worker rather than copied: a dropped file is the largest
+    // thing this shell ever posts, and it has no further use for it.
+    const detachFileDrop = attachFileDrop(canvas, toLocal, (message, transfer) => this.post(message, transfer));
+
     canvas.addEventListener('mousedown', onMouseDown);
     document.addEventListener('visibilitychange', onVisibilityChange);
     canvas.addEventListener('pointerdown', onPointerDown);
@@ -1253,6 +1259,7 @@ export class WorkerApp {
     return () => {
       detachReducedMotion();
       detachFullscreen();
+      detachFileDrop();
       canvas.removeEventListener('mousedown', onMouseDown);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       canvas.removeEventListener('pointerdown', onPointerDown);

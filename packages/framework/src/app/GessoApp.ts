@@ -14,6 +14,7 @@ import type { UiNodeReport } from './NodeReport';
 import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
 import type { ShellRequest } from './ShellService';
 import { AudioSink } from './AudioSink';
+import { attachFileDrop } from './fileDrop';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
@@ -112,6 +113,7 @@ export class GessoApp {
   private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
   private detachVisibility: (() => void) | null = null;
+  private detachFileDrop: (() => void) | null = null;
   private detachFullscreen: (() => void) | null = null;
   private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
@@ -310,6 +312,8 @@ export class GessoApp {
     this.mirror = null;
     this.detachVisibility?.();
     this.detachVisibility = null;
+    this.detachFileDrop?.();
+    this.detachFileDrop = null;
     this.detachFullscreen?.();
     this.detachFullscreen = null;
     this.detachReducedMotion?.();
@@ -363,6 +367,16 @@ export class GessoApp {
     });
     this.runtime.onAudioRequest(request => this.audio?.handle(request));
     this.attachSemanticsMirror(canvas);
+    // Files dragged in from the desktop, handed straight to the
+    // runtime: there is no thread to cross, so nothing to transfer.
+    this.detachFileDrop = attachFileDrop(
+      canvas,
+      (clientX, clientY) => {
+        const box = canvas.getBoundingClientRect();
+        return { x: clientX - box.left, y: clientY - box.top };
+      },
+      message => this.runtime.applyFileDrop(message)
+    );
     if (typeof document !== 'undefined') {
       const onVisibility = (): void => this.runtime.setVisible(document.visibilityState !== 'hidden');
       document.addEventListener('visibilitychange', onVisibility);

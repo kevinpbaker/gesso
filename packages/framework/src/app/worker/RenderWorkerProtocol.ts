@@ -8,7 +8,8 @@ import type {
   UiPointerDevice,
   UiSemanticsAction,
   UiScrollability,
-  UiSemanticsUpdate
+  UiSemanticsUpdate,
+  UiFileDropMessage
 } from 'gesso-core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
@@ -221,6 +222,13 @@ export type ShellToRuntimeMessage =
    * turns it back into the events a pointer and a keyboard produce.
    */
   | { type: 'semanticsAction'; action: UiSemanticsAction }
+  /**
+   * Files dragged over the canvas from outside the application, and
+   * let go on it: `UiDragSession.applyFileDrop` turns the four phases
+   * into a drag like any other. On `drop` the files' bytes ride along
+   * and are transferred rather than copied; see `attachFileDrop`.
+   */
+  | UiFileDropMessage
   /**
    * What the shell's audio element is doing: on every state change and
    * about once a second while it plays. The element lives on the shell

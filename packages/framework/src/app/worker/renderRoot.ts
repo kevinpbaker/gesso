@@ -475,6 +475,9 @@ export class RenderWorkerApp {
       case 'semanticsAction':
         runtime.applySemanticsAction(message.action);
         break;
+      case 'fileDrop':
+        runtime.applyFileDrop(message);
+        break;
       case 'dispose':
         this.setConsoleForwarding(false);
         runtime.dispose();

@@ -586,19 +586,16 @@ const MENU_ITEMS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Files: the drop that has no shell behind it yet
+// Files: a drop from the desktop
 // ---------------------------------------------------------------------------
 
 /**
- * The zone an OS file drop would land in.
+ * The zone an OS file drop lands in.
  *
- * The message shape is defined and `UiDragSession.applyFileDrop` turns
- * one into an ordinary drag, so this zone is written exactly as the
- * trays are and cannot tell the two apart. What is missing is the shell
- * half: nothing on the main thread listens for the browser's `dragover`
- * and `drop` and posts a `fileDrop` message yet, because the shell is
- * another workstream's. Until it does, this zone lights up for a drag
- * that started inside the application and for nothing else.
+ * The shell turns the browser's drag events into `fileDrop` messages
+ * and `UiDragSession.applyFileDrop` turns those into an ordinary drag,
+ * so this zone is written exactly as the trays are and cannot tell the
+ * two apart.
  */
 function FilesPane(inputs: Inputs<PaneProps>, _ctx: ComponentContext): UiChild {
   const registry = inputs.registry.value;
@@ -654,7 +651,7 @@ function FilesPane(inputs: Inputs<PaneProps>, _ctx: ComponentContext): UiChild {
               color="textMuted"
             />
             <text
-              text="A zone that accepts gesso/files is a zone like any other: the session turns the shell's message into a drag and this one never learns where it came from. The shell that posts the message is the desktop adapter's work and does not exist yet."
+              text="A zone that accepts gesso/files is a zone like any other: the session turns the shell's message into a drag and this one never learns where it came from. Drag a file in from the desktop to see one arrive."
               fontSize={12}
               color="textMuted"
             />

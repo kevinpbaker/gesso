@@ -79,6 +79,8 @@ import {
   diffSemantics,
   LayoutNotifier,
   type UiSemanticsAction,
+  type UiFileDropMessage,
+  dragSessionFor,
   type UiSemanticsBox,
   type UiSemanticsMap,
   type UiSemanticsPatch,
@@ -2104,6 +2106,21 @@ export class GessoRuntime {
    * through the focus manager, which means an AT cannot escape an open
    * focus trap any more than Tab can.
    */
+  /**
+   * Files from outside the application, dragged over it or dropped.
+   *
+   * Handed to the tree's drag session, which turns them into a drag
+   * like any other, so a zone that accepts `EXTERNAL_FILES` answers
+   * the drop exactly as it answers one from inside. A drop that
+   * arrives before there is a tree has nowhere to land and is dropped.
+   */
+  applyFileDrop(message: UiFileDropMessage): void {
+    if (this.root === undefined) {
+      return;
+    }
+    dragSessionFor(this.root).applyFileDrop(message);
+  }
+
   applySemanticsAction(action: UiSemanticsAction): void {
     if (this.applyTextRunAction(action)) {
       return;
