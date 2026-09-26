@@ -158,6 +158,19 @@ export interface WorkerAppOptions {
    */
   interceptFind?: boolean;
   /**
+   * Cancel the browser's default for any key this answers true for —
+   * Ctrl/Cmd+S for an app with a Save of its own, Ctrl/Cmd+O for one
+   * with an Open. `interceptFind` for any shortcut, on its terms: the
+   * shell has to decide before the worker has heard of the key, so the
+   * decision is the application's, made here on the main thread, and a
+   * predicate rather than a list so it can say "Ctrl or Cmd" in one
+   * line.
+   *
+   * Called for every keydown that reaches the shell, so it should be a
+   * comparison and nothing more.
+   */
+  interceptKey?: (event: KeyboardEvent) => boolean;
+  /**
    * The appearance the application is told about: `auto` (the default)
    * follows `prefers-color-scheme`, `light` and `dark` override it.
    *
@@ -513,7 +526,7 @@ export class WorkerApp {
     // reach here from the canvas, the editing proxy and the semantics
     // mirror, so the flush belongs here rather than in one listener.
     this.flushPendingMove();
-    if (this.options.interceptFind === true && isFind(event)) {
+    if ((this.options.interceptFind === true && isFind(event)) || this.options.interceptKey?.(event) === true) {
       event.preventDefault();
     }
     if (event.key === 'Tab' || isSelectAll(event)) {

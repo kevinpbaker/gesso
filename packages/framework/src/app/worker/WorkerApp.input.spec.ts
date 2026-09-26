@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { WorkerApp } from './WorkerApp';
+import { WorkerApp, type WorkerAppOptions } from './WorkerApp';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
@@ -79,7 +79,7 @@ interface Harness {
   restore: () => void;
 }
 
-function harness(): Harness {
+function harness(options: Partial<WorkerAppOptions> = {}): Harness {
   const scope = globalThis as Record<string, unknown>;
   const before = {
     window: scope.window,
@@ -124,7 +124,7 @@ function harness(): Harness {
   scope.ResizeObserver = FakeResizeObserver;
 
   const posts: ShellToRuntimeMessage[] = [];
-  const app = new WorkerApp({ renderWorker: () => ({}) as unknown as Worker });
+  const app = new WorkerApp({ ...options, renderWorker: () => ({}) as unknown as Worker });
   const internals = app as unknown as Internals;
   internals.renderWorker = { postMessage: (message: ShellToRuntimeMessage) => posts.push(message) };
   const canvas = new FakeCanvas();
@@ -214,8 +214,8 @@ function key(): KeyboardEvent {
 
 let active: Harness | undefined;
 
-function setup(): Harness {
-  active = harness();
+function setup(options: Partial<WorkerAppOptions> = {}): Harness {
+  active = harness(options);
   return active;
 }
 
@@ -459,5 +459,27 @@ describe('hover coalescing', () => {
     // The surface it was measured against has gone; posting it would
     // hover a canvas the shell no longer owns.
     expect(shell.posts.filter(message => message.type === 'pointerMove')).toEqual([]);
+  });
+
+  /**
+   * Ctrl+S for an app with a Save of its own. The worker would hear
+   * the key a message later, after the browser had opened its own
+   * "Save page as" dialog, so the shell asks the application's
+   * predicate and cancels on the spot.
+   */
+  it('cancels the browser default for a key the application claims, and forwards it', () => {
+    const claimed = (event: KeyboardEvent): boolean => event.ctrlKey && event.key === 's';
+    const shell = setup({ interceptKey: claimed });
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    const prevented: string[] = [];
+    const press = (name: string, ctrlKey: boolean) =>
+      ({ ...key(), key: name, ctrlKey, preventDefault: () => prevented.push(name) }) as unknown as KeyboardEvent;
+
+    shell.canvas.dispatch('keydown', press('s', true));
+    shell.canvas.dispatch('keydown', press('s', false));
+    shell.canvas.dispatch('keydown', press('p', true));
+
+    expect(prevented).toEqual(['s']);
+    expect(shell.posts.filter(message => message.type === 'keyDown')).toHaveLength(3);
   });
 });
