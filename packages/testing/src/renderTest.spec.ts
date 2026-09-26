@@ -141,3 +141,21 @@ describe('fireEvent', () => {
     expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByLabel('Two'));
   });
 });
+
+describe('the coordinate path with a finger', () => {
+  it('reports the device a press was made with, and a mouse when none is named', () => {
+    const kinds: string[] = [];
+    const ui = renderTest(Box({ width: 200, height: 100, onPointerDown: event => kinds.push(event.pointer.kind) }), {
+      width: 200,
+      height: 100
+    });
+    ui.fireEvent.pointerDown(50, 50, { pointer: 'touch' });
+    ui.fireEvent.pointerUp(50, 50, { pointer: 'touch' });
+    ui.fireEvent.pointerDown(50, 50);
+    ui.fireEvent.pointerUp(50, 50);
+    ui.fireEvent.pointerDown(50, 50, { pointer: 'pen' });
+    ui.fireEvent.pointerUp(50, 50, { pointer: 'pen' });
+    expect(kinds).toEqual(['touch', 'mouse', 'pen']);
+    ui.unmount();
+  });
+});

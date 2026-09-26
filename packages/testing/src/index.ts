@@ -26,7 +26,7 @@
 export { renderTest } from './renderTest';
 export type { Rendered, RenderedBase, RenderTestOptions } from './renderTest';
 export { createFireEvent } from './fireEvent';
-export type { FireEvent, PointAt } from './fireEvent';
+export type { FireEvent, PointAt, PointerOptions } from './fireEvent';
 export { nodesUnder, textProperty } from './queries';
 export type { Queries, RoleQueryOptions, TextMatch } from './queries';
 export { formatTree } from './debug';

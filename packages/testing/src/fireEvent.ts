@@ -1,4 +1,13 @@
-import { noKeyModifiers, UiEventType, UiPointerEvent, type UiKeyModifiers, type UiNode } from 'gesso-core';
+import {
+  MOUSE_POINTER,
+  noKeyModifiers,
+  UiEventType,
+  UiPointerEvent,
+  type UiKeyModifiers,
+  type UiNode,
+  type UiPointerDevice,
+  type UiPointerKind
+} from 'gesso-core';
 import type { GessoRuntime } from 'gesso-framework';
 
 export interface PointAt {
@@ -48,10 +57,17 @@ export interface FireEvent {
   /** A press-and-move on a node: what grabbing a divider or a thumb is. */
   pan(node: UiNode, x: number, y: number): void;
 
-  /** The coordinate path, through the hit tester. */
-  pointerDown(x: number, y: number, options?: { buttons?: number; modifiers?: Partial<UiKeyModifiers> }): void;
-  pointerMove(x: number, y: number, options?: { buttons?: number; modifiers?: Partial<UiKeyModifiers> }): void;
-  pointerUp(x: number, y: number, options?: { buttons?: number; modifiers?: Partial<UiKeyModifiers> }): void;
+  /**
+   * The coordinate path, through the hit tester.
+   *
+   * `pointer` says what made the contact — a finger, a pen — for the
+   * behaviours that are only a finger's: a pan that scrolls, a long
+   * press that asks for a menu, a larger slop. A mouse when absent, as
+   * everywhere else a device is not named.
+   */
+  pointerDown(x: number, y: number, options?: PointerOptions): void;
+  pointerMove(x: number, y: number, options?: PointerOptions): void;
+  pointerUp(x: number, y: number, options?: PointerOptions): void;
   wheel(options: {
     x?: number;
     y?: number;
@@ -104,11 +120,11 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
     pan: (node, x, y) => dispatch(UiEventType.PanMove, node, { x, y }),
 
     pointerDown: (x, y, options = {}) =>
-      void runtime.input.pointer.pointerDown(x, y, options.buttons ?? 1, modifiersOf(options.modifiers)),
+      void runtime.input.pointer.pointerDown(x, y, options.buttons ?? 1, modifiersOf(options.modifiers), deviceOf(options.pointer)),
     pointerMove: (x, y, options = {}) =>
-      void runtime.input.pointer.pointerMove(x, y, options.buttons ?? 0, modifiersOf(options.modifiers)),
+      void runtime.input.pointer.pointerMove(x, y, options.buttons ?? 0, modifiersOf(options.modifiers), deviceOf(options.pointer)),
     pointerUp: (x, y, options = {}) =>
-      void runtime.input.pointer.pointerUp(x, y, options.buttons ?? 0, modifiersOf(options.modifiers)),
+      void runtime.input.pointer.pointerUp(x, y, options.buttons ?? 0, modifiersOf(options.modifiers), deviceOf(options.pointer)),
     wheel: options =>
       void runtime.input.wheel.wheel(
         options.x ?? 0,
@@ -133,4 +149,22 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
     type: text => void runtime.input.editing.insertText(text),
     paste: text => void runtime.input.editing.paste(text)
   };
+}
+
+/** What `pointerDown`, `pointerMove` and `pointerUp` take. */
+export interface PointerOptions {
+  readonly buttons?: number;
+  readonly modifiers?: Partial<UiKeyModifiers>;
+  readonly pointer?: UiPointerKind;
+}
+
+/** One device per kind, with the ids a browser gives them, so a press and its moves agree on who made them. */
+const DEVICES: Readonly<Record<UiPointerKind, UiPointerDevice>> = {
+  mouse: MOUSE_POINTER,
+  pen: Object.freeze({ id: 3, kind: 'pen' as const }),
+  touch: Object.freeze({ id: 2, kind: 'touch' as const })
+};
+
+function deviceOf(kind: UiPointerKind | undefined): UiPointerDevice {
+  return DEVICES[kind ?? 'mouse'];
 }
