@@ -254,6 +254,12 @@ export class UiDragSession {
         if (this.current === null) {
           this.begin(payload, message.x, message.y, null, true);
         } else {
+          // The drop's files replace the drag's. A browser shows a page
+          // only the types of what is being dragged until it is let go,
+          // so the payload the drag began with has no names and no
+          // bytes — and a zone handed that one would receive a file it
+          // cannot open.
+          this.current = { ...this.current, payload };
           this.move(message.x, message.y);
         }
         return this.end();

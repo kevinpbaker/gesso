@@ -175,6 +175,39 @@ describe('UiDragSession', () => {
       expect(result).toEqual({ node: list, effect: 'copy' });
     });
 
+    /**
+     * The shape a browser actually sends: during the drag a page may
+     * read a file's type and nothing else, so the files a drag begins
+     * with are not the files it ends with.
+     */
+    it('hands the zone the files the drop carried, not the ones the drag began with', () => {
+      const { list } = tree();
+      const session = new UiDragSession();
+      let dropped: UiDragPayload | null = null;
+      session.addZone({
+        node: list,
+        boxOf: () => ({ x: 0, y: 0, width: 200, height: 200 }),
+        accepts: payload => payload.type === EXTERNAL_FILES,
+        enter: () => {},
+        over: () => {},
+        leave: () => {},
+        drop: state => {
+          dropped = state.payload;
+          return 'copy';
+        }
+      });
+      const during = [{ name: '', mediaType: 'audio/mpeg', size: 0, lastModified: 0 }];
+      const bytes = new ArrayBuffer(12);
+      const released = [{ ...FILES[0], bytes }];
+
+      session.applyFileDrop({ type: 'fileDrop', phase: 'enter', x: 10, y: 10, files: during });
+      session.applyFileDrop({ type: 'fileDrop', phase: 'over', x: 11, y: 11, files: during });
+      session.applyFileDrop({ type: 'fileDrop', phase: 'drop', x: 12, y: 12, files: released });
+
+      expect(dropped).not.toBeNull();
+      expect(dropped!.data).toBe(released);
+    });
+
     it('drops the drag when the pointer leaves the window', () => {
       const { list } = tree();
       const session = new UiDragSession();
