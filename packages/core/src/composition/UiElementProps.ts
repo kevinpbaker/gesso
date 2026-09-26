@@ -54,6 +54,8 @@ export type UiEventProps = {
   onPointerEnter?: (event: UiPointerEvent) => void;
   onPointerLeave?: (event: UiPointerEvent) => void;
   onClick?: (event: UiPointerEvent) => void;
+  /** A second Click on the same node, within the double-click window. */
+  onDoubleClick?: (event: UiPointerEvent) => void;
   onLongPress?: (event: UiPointerEvent) => void;
   onDragStart?: (event: UiPointerEvent) => void;
   onDragMove?: (event: UiPointerEvent) => void;

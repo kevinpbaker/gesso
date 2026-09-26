@@ -33,6 +33,7 @@ const EVENT_PROPS: Readonly<Record<string, UiEventType>> = {
   onInput: UiEventType.Input,
   onSelectionChange: UiEventType.SelectionChange,
   onClick: UiEventType.Click,
+  onDoubleClick: UiEventType.DoubleClick,
   onLongPress: UiEventType.LongPress,
   onDragStart: UiEventType.DragStart,
   onDragMove: UiEventType.DragMove,

@@ -33,6 +33,15 @@ export interface FireEvent {
    * `pointerDown`/`pointerUp` for the coordinate path.
    */
   click(node: UiNode, at?: PointAt): void;
+  /**
+   * Two clicks on a node and the DoubleClick that follows them, in the
+   * order a real pointer produces them. Use the coordinate path twice
+   * to ask whether two presses *make* a double click; this is for
+   * asking what a double click does.
+   */
+  doubleClick(node: UiNode, at?: PointAt): void;
+  /** A request for a node's menu: the right button, or a held finger. */
+  contextMenu(node: UiNode, at?: PointAt): void;
   /** A press on a node without the release, for hold and drag behaviour. */
   pressDown(node: UiNode, at?: PointAt): void;
   pressUp(node: UiNode, at?: PointAt): void;
@@ -84,6 +93,12 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
 
   return {
     click: (node, at) => dispatch(UiEventType.Click, node, at),
+    doubleClick: (node, at) => {
+      dispatch(UiEventType.Click, node, at);
+      dispatch(UiEventType.Click, node, at);
+      dispatch(UiEventType.DoubleClick, node, at);
+    },
+    contextMenu: (node, at) => dispatch(UiEventType.ContextMenu, node, at),
     pressDown: (node, at) => dispatch(UiEventType.PointerDown, node, at),
     pressUp: (node, at) => dispatch(UiEventType.PointerUp, node, at),
     pan: (node, x, y) => dispatch(UiEventType.PanMove, node, { x, y }),

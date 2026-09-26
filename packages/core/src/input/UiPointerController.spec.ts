@@ -3,7 +3,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { UiEventType, type UiPointerDevice, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
-import type { UiPointerController } from './UiPointerController';
+import { UiPointerController } from './UiPointerController';
 
 /**
  * A 300x100 row holding two 100x100 boxes at (0,0) and (100,0),
@@ -249,6 +249,106 @@ describe('UiPointerController', () => {
     expect(down).not.toHaveBeenCalled();
     expect(controller.pressedNode).toBeNull();
     expect(controller.pointerUp(500, 50)).toBeNull();
+  });
+
+  describe('double click', () => {
+    /** The row above, with a clock the spec moves by hand. */
+    function timed(): ReturnType<typeof setupRow> & { clock: { t: number }; double: ReturnType<typeof vi.fn> } {
+      const setup = setupRow();
+      const clock = { t: 1000 };
+      const controller = new UiPointerController(setup.h.createHitTester(), setup.h.dispatcher, { now: () => clock.t });
+      const double = vi.fn();
+      setup.h.dispatcher.addEventListener(setup.a, UiEventType.DoubleClick, double);
+      return { ...setup, controller, clock, double };
+    }
+
+    function click(controller: UiPointerController, x = 50, y = 50): void {
+      controller.pointerDown(x, y);
+      controller.pointerUp(x, y);
+    }
+
+    it('follows a second click on the same node, after it', () => {
+      const { h, a, controller, clock, double } = timed();
+      const order: string[] = [];
+      h.dispatcher.addEventListener(a, UiEventType.Click, () => order.push('click'));
+      h.dispatcher.addEventListener(a, UiEventType.DoubleClick, () => order.push('double'));
+
+      click(controller);
+      clock.t += 200;
+      click(controller);
+
+      expect(double).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(['click', 'click', 'double']);
+    });
+
+    it('bubbles, as the click does', () => {
+      const { h, row, controller } = timed();
+      const ancestor = vi.fn();
+      h.dispatcher.addEventListener(row, UiEventType.DoubleClick, ancestor);
+
+      click(controller);
+      click(controller);
+
+      expect(ancestor).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not two clicks too far apart in time', () => {
+      const { controller, clock, double } = timed();
+
+      click(controller);
+      clock.t += 501;
+      click(controller);
+
+      expect(double).not.toHaveBeenCalled();
+    });
+
+    it('is not two clicks too far apart on screen', () => {
+      const { controller, double } = timed();
+
+      click(controller, 50, 50);
+      click(controller, 60, 50);
+
+      expect(double).not.toHaveBeenCalled();
+    });
+
+    it('is not a click on one node and then another', () => {
+      const { h, b, controller, double } = timed();
+      const onB = vi.fn();
+      h.dispatcher.addEventListener(b, UiEventType.DoubleClick, onB);
+
+      // 99 and 101 are within the slop of each other and either side
+      // of the boundary between the two boxes.
+      click(controller, 99, 50);
+      click(controller, 101, 50);
+
+      expect(double).not.toHaveBeenCalled();
+      expect(onB).not.toHaveBeenCalled();
+    });
+
+    it('is not made out of a press that became a drag', () => {
+      const { controller, double } = timed();
+
+      click(controller);
+      controller.pointerDown(50, 50);
+      controller.pointerMove(90, 50, 1);
+      controller.pointerUp(90, 50);
+      click(controller);
+
+      // The drag spent the first click; the last one starts a new pair.
+      expect(double).not.toHaveBeenCalled();
+    });
+
+    it('fires once for three clicks, and again for the fourth', () => {
+      const { controller, double } = timed();
+
+      click(controller);
+      click(controller);
+      click(controller);
+      expect(double).toHaveBeenCalledTimes(1);
+
+      click(controller);
+      expect(double).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('touch', () => {

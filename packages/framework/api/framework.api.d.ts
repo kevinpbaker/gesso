@@ -818,6 +818,7 @@ type ShellFileRequest =
   readonly name: string;
   readonly mediaType: string;
   readonly text: string;
+  readonly bytes?: Uint8Array<ArrayBuffer>;
   readonly handle?: number;
   readonly accept: readonly ShellFileType[];
 } |
@@ -901,7 +902,8 @@ declare class ShellService {
   reopenFile(handle: number): Promise<ShellFileResult>;
   saveFile(options: {
     readonly name: string;
-    readonly text: string;
+    readonly text?: string;
+    readonly bytes?: Uint8Array<ArrayBuffer>;
     readonly mediaType?: string;
     readonly handle?: number;
     readonly accept?: readonly ShellFileType[];
@@ -3017,7 +3019,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-hrhCqW_c.js";
+} from "./index-DaR94RYP.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3503,7 +3505,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-hrhCqW_c.js";
+} from "../index-DaR94RYP.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

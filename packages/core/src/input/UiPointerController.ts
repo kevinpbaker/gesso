@@ -54,6 +54,11 @@ export interface PointerControllerOptions {
    */
   onHoverChange?: (node: UiNode | null) => void;
   /**
+   * The clock a double click is timed against, in milliseconds.
+   * `performance.now` by default; a spec hands in its own.
+   */
+  now?: () => number;
+  /**
    * Default pointer behaviour for editable text: a press places the
    * caret (or selects a word, a line), a drag extends the selection.
    * Applied after the app's listeners, and skipped when the pointerdown
@@ -157,6 +162,15 @@ export class UiPointerController {
   private readonly onHoverChange: ((node: UiNode | null) => void) | null;
   private readonly editing: PointerControllerOptions['editing'];
   private readonly selection: PointerControllerOptions['selection'];
+  private readonly now: () => number;
+  /**
+   * The last Click, for telling whether the next one makes a pair.
+   *
+   * Only a Click counts, not a press: a press that became a drag, or
+   * was cancelled, is not half of a double click, and a release that
+   * followed one would otherwise be read as the second half of it.
+   */
+  private lastClick: { node: UiNode; x: number; y: number; at: number } | null = null;
 
   private hoverNode: UiNode | null = null;
 
@@ -189,6 +203,7 @@ export class UiPointerController {
     this.onHoverChange = options.onHoverChange ?? null;
     this.editing = options.editing;
     this.selection = options.selection;
+    this.now = options.now ?? defaultClock;
   }
 
   /** The node currently under the pointer, or null over empty space. */
@@ -381,10 +396,50 @@ export class UiPointerController {
       if (dx <= slop && dy <= slop) {
         const click = new UiPointerEvent(UiEventType.Click, x, y, buttons, modifiers, pointer);
         this.dispatcher.dispatch(click, target);
+        this.countClick(target, x, y, buttons, modifiers, pointer);
+      } else {
+        this.lastClick = null;
       }
+    } else {
+      this.lastClick = null;
     }
     this.releaseHover(x, y, modifiers, pointer);
     return event;
+  }
+
+  /**
+   * Pairs this Click with the one before it, and dispatches a
+   * DoubleClick when they make a pair.
+   *
+   * A pair is two Clicks on the same node within `MULTI_CLICK_MS` and
+   * `MULTI_CLICK_SLOP` of each other — the window the editing and
+   * selection controllers already use for a word, so a double click
+   * means the same thing on a label as it does in a field. The pair is
+   * spent once it has fired: a third Click starts the next pair rather
+   * than making a second DoubleClick out of the second and third.
+   */
+  private countClick(
+    target: UiNode,
+    x: number,
+    y: number,
+    buttons: number,
+    modifiers: UiKeyModifiers,
+    pointer: UiPointerDevice
+  ): void {
+    const now = this.now();
+    const last = this.lastClick;
+    const paired =
+      last !== null &&
+      last.node === target &&
+      now - last.at <= MULTI_CLICK_MS &&
+      Math.abs(last.x - x) <= MULTI_CLICK_SLOP &&
+      Math.abs(last.y - y) <= MULTI_CLICK_SLOP;
+    if (!paired) {
+      this.lastClick = { node: target, x, y, at: now };
+      return;
+    }
+    this.lastClick = null;
+    this.dispatcher.dispatch(new UiPointerEvent(UiEventType.DoubleClick, x, y, buttons, modifiers, pointer), target);
   }
 
   /**
@@ -607,4 +662,12 @@ export class UiPointerController {
  */
 function isSecondaryButton(buttons: number): boolean {
   return buttons === 2;
+}
+
+/** How long, and how far, a second Click may be from the first and still pair with it. */
+const MULTI_CLICK_MS = 500;
+const MULTI_CLICK_SLOP = 4;
+
+function defaultClock(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }

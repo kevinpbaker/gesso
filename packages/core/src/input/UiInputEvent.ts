@@ -52,6 +52,16 @@ export enum UiEventType {
    */
   Paste = 'paste',
   Click = 'click',
+  /**
+   * A second Click on the same node, soon enough after the first and
+   * close enough to it.
+   *
+   * Dispatched after that second Click rather than instead of it, as
+   * the DOM's `dblclick` is: a listener that answers a click has
+   * already answered both by the time this arrives, which is what lets
+   * a double click on a cell select it and then do more.
+   */
+  DoubleClick = 'doubleclick',
   LongPress = 'longpress',
   DragStart = 'dragstart',
   DragMove = 'dragmove',
