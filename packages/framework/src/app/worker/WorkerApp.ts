@@ -465,7 +465,9 @@ export class WorkerApp {
       compositionEnd: text => this.post({ type: 'compositionEnd', text }),
       paste: text => this.post({ type: 'paste', text }),
       blur: () => this.post({ type: 'blur' }),
-      keyDown: event => this.forwardKeyDown(event),
+      // From the proxy, a printable key's text follows it as a
+      // `beforeinput`; see `forwardKeyDown`.
+      keyDown: event => this.forwardKeyDown(event, true),
       keyUp: event => this.forwardKeyUp(event)
     });
     if (this.options.accessibility !== false) {
@@ -523,7 +525,18 @@ export class WorkerApp {
     report(message, stack, source);
   }
 
-  private forwardKeyDown(event: KeyboardEvent): void {
+  /**
+   * A key, to the worker, saying whether its text will follow it.
+   *
+   * Only the proxy turns a key into text. The proxy takes DOM focus when
+   * the worker reports a focused editable, which is a round trip — so a
+   * key typed in the gap, after an editable has the focus in the worker
+   * and before the proxy has it here, reaches the canvas, and the text
+   * that key would have produced never exists. The worker is told, and
+   * inserts the key itself. Typing quickly into a spreadsheet cell that
+   * the first letter opens lives in exactly that gap.
+   */
+  private forwardKeyDown(event: KeyboardEvent, viaProxy = false): void {
     // Whatever hover the shell is holding happened before this key
     // and has to be posted before it; see `flushPendingMove`. Keys
     // reach here from the canvas, the editing proxy and the semantics
@@ -540,7 +553,13 @@ export class WorkerApp {
       // its own text.
       event.preventDefault();
     }
-    this.post({ type: 'keyDown', key: event.key, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
+    this.post({
+      type: 'keyDown',
+      key: event.key,
+      modifiers: modifiersFrom(event),
+      at: epochFromEvent(event),
+      textFollows: viaProxy
+    });
   }
 
   private forwardKeyUp(event: KeyboardEvent): void {

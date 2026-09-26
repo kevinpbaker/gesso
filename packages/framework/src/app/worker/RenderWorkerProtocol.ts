@@ -121,7 +121,12 @@ export type ShellToRuntimeMessage =
       wheelDeltaY?: number;
       at?: number;
     }
-  | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers; at?: number }
+  /**
+   * `textFollows`: whether the key reached the editing proxy, which
+   * turns it into a `beforeinput` of its own. False means the key went
+   * to the canvas and its text, if it has any, is the runtime's to make.
+   */
+  | { type: 'keyDown'; key: string; modifiers: UiKeyModifiers; at?: number; textFollows?: boolean }
   | { type: 'keyUp'; key: string; modifiers: UiKeyModifiers; at?: number }
   /** A `beforeinput` from the editing proxy, in the DOM's inputType vocabulary. */
   | { type: 'beforeInput'; inputType: string; data: string | null; at?: number }

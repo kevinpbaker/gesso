@@ -406,7 +406,7 @@ export class RenderWorkerApp {
         );
         break;
       case 'keyDown':
-        runtime.input.keyboard.keyDown(message.key, message.modifiers);
+        runtime.input.keyboard.keyDown(message.key, message.modifiers, message.textFollows);
         break;
       case 'keyUp':
         runtime.input.keyboard.keyUp(message.key, message.modifiers);

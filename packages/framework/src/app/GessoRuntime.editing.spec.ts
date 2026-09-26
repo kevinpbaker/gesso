@@ -254,6 +254,30 @@ describe('GessoRuntime editing', () => {
     expect(model().focus).toBe(2);
   });
 
+  /**
+   * The gap between the worker focusing an editable and the proxy taking
+   * DOM focus: a key typed inside it reaches the canvas, and no
+   * `beforeinput` will follow it. The shell says so, and the key is
+   * inserted here — the keys a quick typist lost after the first one.
+   */
+  it('inserts a key the shell says no text will follow, even with a proxy as the source', () => {
+    const { runtime, press, model } = mount(Column(EditableText({ value: '' })));
+    runtime.setTextInputSource('proxy');
+    press(0, 5);
+
+    runtime.input.keyboard.keyDown('a', mods({}), false);
+    expect(model().text).toBe('a');
+    // Through the proxy the text follows, and the key is not text.
+    runtime.input.keyboard.keyDown('b', mods({}), true);
+    expect(model().text).toBe('a');
+    // A chord is a command wherever it came from.
+    runtime.input.keyboard.keyDown('c', mods({ ctrl: true }), false);
+    expect(model().text).toBe('a');
+    // Said nothing about: the source decides, as before.
+    runtime.input.keyboard.keyDown('d', mods({}));
+    expect(model().text).toBe('a');
+  });
+
   it('composes through the IME: updates replace in place, the commit lands once and undoes as one', () => {
     const changes: string[] = [];
     const { runtime, press, model } = mount(

@@ -125,11 +125,12 @@ export class UiEditingController {
    * when the key was an editing command, so the caller can mark the
    * event handled.
    */
-  handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers): boolean {
+  /** `textFromKeys` overrides the controller's own setting for this one key; see `UiKeyboardController.keyDown`. */
+  handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys = this.textFromKeys): boolean {
     if (!isEditableNode(node)) {
       return false;
     }
-    const command = commandForKey(key, modifiers, this.platform, this.textFromKeys);
+    const command = commandForKey(key, modifiers, this.platform, textFromKeys);
     if (command === null) {
       return false;
     }

@@ -458,7 +458,7 @@ interface TooltipProps {
 }
 declare function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): UiChild;
 interface TooltipModifierOptions {
-  text: string;
+  text: string | (() => string);
   placement?: OverlayPlacement;
   delay?: number;
 }

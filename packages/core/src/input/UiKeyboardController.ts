@@ -17,7 +17,7 @@ export interface KeyboardControllerOptions {
    * after the app's KeyDown listeners and only if none called
    * preventDefault(); a key it handles is marked default-prevented.
    */
-  editing?: { handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers): boolean };
+  editing?: { handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean };
   /**
    * Default keyboard behaviour for a canvas text selection: copy it,
    * select everything, or clear it. Runs only when no focused editable
@@ -91,7 +91,13 @@ export class UiKeyboardController {
     this.activation = options.activation;
   }
 
-  keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
+  /**
+   * `textFollows` says whether the shell will send the key's text on its
+   * own, as a `beforeinput`. False — a key that reached the canvas while
+   * an editable held the focus — has the key inserted here, whatever the
+   * text source; absent leaves it to the editing controller's setting.
+   */
+  keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers(), textFollows?: boolean): UiKeyboardEvent {
     // A key makes focus visible again after a mouse press, as
     // `:focus-visible` does. A modifier on its own does not count: it is
     // held for a click as often as for a shortcut.
@@ -106,7 +112,7 @@ export class UiKeyboardController {
       !event.defaultPrevented &&
       focused !== null &&
       this.editing !== undefined &&
-      this.editing.handleKey(focused, key, modifiers)
+      this.editing.handleKey(focused, key, modifiers, textFollows === false ? true : undefined)
     ) {
       event.preventDefault();
       return event;
