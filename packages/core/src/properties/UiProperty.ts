@@ -698,6 +698,21 @@ export const UiProperties = {
     affects: L
   }),
 
+  /**
+   * A point to be placed beside, as though it were an anchor of no
+   * size: where a context menu was asked for. Relative to the
+   * containing block, like `top` and `left`, and with `placement` the
+   * same flip and clamp an anchored node gets — so a menu opened near
+   * the bottom edge opens upward instead of off the screen. Ignored
+   * when `anchor` is set.
+   */
+  anchorPoint: defineProperty<{ readonly x: number; readonly y: number } | undefined>({
+    name: 'anchorPoint',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
   /** Gap between an anchored node and its anchor. */
   anchorOffset: defineProperty<number | undefined>({
     name: 'anchorOffset',

@@ -71,8 +71,9 @@ describe('the docs menu example', () => {
     ui.frame();
 
     const entry = entries(ui)[0];
-    expect(entry.left).toBe(120);
-    expect(entry.top).toBe(200);
+    // A point to open beside, so the menu flips or shifts to stay on
+    // the screen, rather than a top and a left that do not.
+    expect(entry.point).toEqual({ x: 120, y: 200 });
     expect(entry.anchor ?? null).toBeNull();
     expect(items(ui)).toEqual(['Copy', 'Cut', 'Paste']);
   });

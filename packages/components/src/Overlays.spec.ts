@@ -280,6 +280,35 @@ describe('Select', () => {
 });
 
 describe('Menu', () => {
+  /**
+   * A context menu asked for near the bottom of the window. It opened
+   * downward from the point and ran off the screen, because a point was
+   * a `top` and a `left` and nothing more; it is a point to open beside
+   * now, and flips above it when there is no room below.
+   */
+  it('stays on the screen when opened at a point near the bottom edge', () => {
+    const open = new BehaviorSubject(false);
+    const ui = mount(
+      createComponent(Menu, {
+        open,
+        at: { x: 20, y: 390 },
+        items: [
+          { value: 'a', label: 'First' },
+          { value: 'b', label: 'Second' },
+          { value: 'c', label: 'Third' }
+        ],
+        onOpenChange: (next: boolean) => open.next(next)
+      })
+    );
+    open.next(true);
+    ui.frame();
+
+    const menu = ui.getLayout(ui.getByRole('menu'));
+    expect(menu.y + menu.height).toBeLessThanOrEqual(400);
+    expect(menu.y + menu.height).toBeCloseTo(390, 0);
+    expect(menu.x).toBe(20);
+  });
+
   it('walks its items and chooses one, then closes', () => {
     const open = new BehaviorSubject(false);
     const chosen: string[] = [];

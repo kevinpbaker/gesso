@@ -1295,6 +1295,7 @@ declare class GessoRuntime {
   private semanticsStale;
   private lastEditingState;
   private shellListener;
+  private heldShellRequests;
   private audioListener;
   private caretTimer;
   private scrollbarTimer;
@@ -3021,7 +3022,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-K92dF4Js.js";
+} from "./index-DoSwzfFI.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3507,7 +3508,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-K92dF4Js.js";
+} from "../index-DoSwzfFI.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

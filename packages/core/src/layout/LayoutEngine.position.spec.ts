@@ -230,6 +230,40 @@ describe('LayoutEngine positioning', () => {
     });
   });
 
+  /**
+   * A point, as an anchor of no size: where a context menu was asked
+   * for. It gets the flip and the clamp an anchored node gets — what
+   * `top` and `left` do not — so a menu opened near an edge stays on
+   * the screen. Found by a status bar whose menu opened below the
+   * bottom of the window.
+   */
+  describe('placement at a point', () => {
+    function atPoint(x: number, y: number, placement = 'bottom-start') {
+      const h = new LayoutHarness();
+      const root = column(h, 'block', { width: 300, height: 200 });
+      const popup = box(h, 'popup', { position: 'absolute', anchorPoint: { x, y }, placement, width: 100, height: 50 });
+      h.append(root, popup);
+      h.layout(root, Constraints.loose(300, 200));
+      return h.box(popup);
+    }
+
+    it('opens below and to the right of the point', () => {
+      expect(atPoint(40, 30)).toEqual({ x: 40, y: 30, width: 100, height: 50 });
+    });
+
+    it('opens above the point when there is no room below it', () => {
+      expect(atPoint(40, 190)).toEqual({ x: 40, y: 140, width: 100, height: 50 });
+    });
+
+    it('shifts left to stay inside when there is no room to the right', () => {
+      expect(atPoint(260, 30)).toEqual({ x: 200, y: 30, width: 100, height: 50 });
+    });
+
+    it('does both in a corner', () => {
+      expect(atPoint(290, 195)).toEqual({ x: 200, y: 145, width: 100, height: 50 });
+    });
+  });
+
   describe('anchored placement', () => {
     function scene(anchorProps: Record<string, unknown>, popupProps: Record<string, unknown>) {
       const h = new LayoutHarness();

@@ -28,6 +28,8 @@ export interface OverlayOptions {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  /** A point to open beside, kept on screen; see `OverlayEntry.point`. */
+  readonly point?: { readonly x: number; readonly y: number };
   /** Keep the entry in the middle of the viewport along an axis. */
   readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;

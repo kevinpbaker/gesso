@@ -39,6 +39,13 @@ export interface OverlayEntry {
   readonly bottom?: number;
   readonly left?: number;
   /**
+   * A point to open beside, relative to the viewport: where a context
+   * menu was asked for. Placed as an anchor of no size would be, with
+   * `placement`, so an entry that would run off an edge flips or shifts
+   * to stay on screen — which `top` and `left` do not do.
+   */
+  readonly point?: { readonly x: number; readonly y: number };
+  /**
    * Centre an unanchored entry in the viewport along an axis.
    *
    * The edges of that axis stop being a position and become the region

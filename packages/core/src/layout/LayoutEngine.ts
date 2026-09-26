@@ -2881,6 +2881,7 @@ export class LayoutEngine {
       this.percentBase = { width: block.width, height: block.height };
       this.resolveLayoutProps(child, cRec);
       const anchor = child.properties.get('anchor');
+      const point = child.properties.get('anchorPoint') as { x: number; y: number } | undefined;
       if (anchor !== undefined && anchor !== null) {
         this.anchoredNodes.add(child);
         this.trackAnchor(child, anchor as UiNode);
@@ -2889,6 +2890,14 @@ export class LayoutEngine {
           this.placeAnchored(child, cRec, anchorRec, anchor as UiNode, block);
           return;
         }
+      } else if (point !== undefined && point !== null) {
+        this.anchoredNodes.delete(child);
+        this.trackAnchor(child, null);
+        // A point is an anchor of no size, and is placed beside the same
+        // way; it does not move, so there is nothing to follow.
+        this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
+        this.placeBeside(child, cRec, block.x + point.x, block.y + point.y, 0, 0, block);
+        return;
       } else {
         this.anchoredNodes.delete(child);
         this.trackAnchor(child, null);
@@ -2957,10 +2966,6 @@ export class LayoutEngine {
     block: LayoutBox
   ): void {
     this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
-    const width = cRec.measuredWidth;
-    const height = cRec.measuredHeight;
-    const gap = this.numberProp(child, 'anchorOffset') ?? 0;
-    const { side, align } = this.parsePlacement(child.properties.get('placement'));
 
     // Anchor box in the child's coordinate space: where each of the two
     // is seen, which is its box less the scrolling above it and plus the
@@ -2971,8 +2976,28 @@ export class LayoutEngine {
     const stickyChild = this.stickyOffsetOf(child);
     const ax = anchorRec.x + stickyAnchor.x - scrollAnchor.x + scrollChild.x - stickyChild.x;
     const ay = anchorRec.y + stickyAnchor.y - scrollAnchor.y + scrollChild.y - stickyChild.y;
-    const aw = anchorRec.width;
-    const ah = anchorRec.height;
+    this.placeBeside(child, cRec, ax, ay, anchorRec.width, anchorRec.height, block);
+  }
+
+  /**
+   * Places a measured node beside a box — an anchor's, or a point's of
+   * no size — flipping to the opposite side when the named one would
+   * overflow the block and the other has more room, and clamping along
+   * the side to stay inside it.
+   */
+  private placeBeside(
+    child: UiNode,
+    cRec: LayoutRecord,
+    ax: number,
+    ay: number,
+    aw: number,
+    ah: number,
+    block: LayoutBox
+  ): void {
+    const width = cRec.measuredWidth;
+    const height = cRec.measuredHeight;
+    const gap = this.numberProp(child, 'anchorOffset') ?? 0;
+    const { side, align } = this.parsePlacement(child.properties.get('placement'));
 
     const vertical = side === 'top' || side === 'bottom';
     let resolvedSide = side;

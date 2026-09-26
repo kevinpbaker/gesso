@@ -144,10 +144,11 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
       overlay.show(body(), {
         anchor: inputs.anchor.value ?? null,
         environment: inputs.anchor.value ?? placeholder,
-        placement: placement.value,
-        offset: 4,
-        top: inputs.at.value?.y,
-        left: inputs.at.value?.x,
+        // At a point, a menu opens below and to the right of it, and
+        // above or to the left when that would run off the screen.
+        placement: inputs.at.value === undefined ? placement.value : (placement.value ?? 'bottom-start'),
+        offset: inputs.at.value === undefined ? 4 : 0,
+        ...(inputs.at.value === undefined ? {} : { point: inputs.at.value }),
         dismissOnOutsidePress: true,
         onClose: () => {
           release();

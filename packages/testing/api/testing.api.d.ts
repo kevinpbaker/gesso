@@ -11,6 +11,7 @@ import {
   UiKeyModifiers,
   UiManualFrameClock,
   UiNode,
+  UiPointerKind,
   UiRole,
   UiSemanticsMap,
   UiSemanticsRecord,
@@ -41,18 +42,9 @@ interface FireEvent {
   pressDown(node: UiNode, at?: PointAt): void;
   pressUp(node: UiNode, at?: PointAt): void;
   pan(node: UiNode, x: number, y: number): void;
-  pointerDown(x: number, y: number, options?: {
-    buttons?: number;
-    modifiers?: Partial<UiKeyModifiers>;
-  }): void;
-  pointerMove(x: number, y: number, options?: {
-    buttons?: number;
-    modifiers?: Partial<UiKeyModifiers>;
-  }): void;
-  pointerUp(x: number, y: number, options?: {
-    buttons?: number;
-    modifiers?: Partial<UiKeyModifiers>;
-  }): void;
+  pointerDown(x: number, y: number, options?: PointerOptions): void;
+  pointerMove(x: number, y: number, options?: PointerOptions): void;
+  pointerUp(x: number, y: number, options?: PointerOptions): void;
   wheel(options: {
     x?: number;
     y?: number;
@@ -71,6 +63,11 @@ interface FireEvent {
   paste(text: string): void;
 }
 declare function createFireEvent(runtime: GessoRuntime): FireEvent;
+interface PointerOptions {
+  readonly buttons?: number;
+  readonly modifiers?: Partial<UiKeyModifiers>;
+  readonly pointer?: UiPointerKind;
+}
 type TextMatch = string | RegExp;
 interface RoleQueryOptions {
   name?: TextMatch;
@@ -148,6 +145,7 @@ export {
   textProperty,
   type FireEvent,
   type PointAt,
+  type PointerOptions,
   type Queries,
   type Rendered,
   type RenderedBase,

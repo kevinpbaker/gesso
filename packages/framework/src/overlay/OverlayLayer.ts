@@ -57,6 +57,7 @@ export class OverlayLayer extends Component {
             key: entry.id,
             position: 'absolute',
             anchor: entry.anchor ?? undefined,
+            anchorPoint: entry.anchor == null ? entry.point : undefined,
             placement: entry.placement,
             anchorOffset: entry.offset,
             top: entry.top,
