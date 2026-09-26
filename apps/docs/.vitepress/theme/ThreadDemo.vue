@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useData } from 'vitepress';
-import { createApp, createComponent, type WorkerApp } from 'gesso-framework';
+import { createApp, createComponent, createSyncApp, type WorkerApp } from 'gesso-framework';
 
 import { exampleRoot } from '../../src/examples/ExampleRoot';
 import { Pulse } from '../../src/examples/PulseExample';
@@ -81,7 +81,7 @@ onMounted(() => {
     });
     disposeWorker = worker.mount(workerHost.value!);
 
-    const builder = createApp(
+    const builder = createSyncApp(
       exampleRoot(createComponent(Pulse, { label: 'Main thread', caption: 'On the main thread' }))
     );
     builder.setColorScheme(colorScheme);
