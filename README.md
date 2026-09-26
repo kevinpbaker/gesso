@@ -4,9 +4,9 @@
 
 # Gesso
 
-### Block the main thread for three seconds. The interface will not drop a frame.
+### Your code can be slow. Your interface can't.
 
-Gesso is a UI framework for the web that runs the **whole interface** in a worker: components, layout, text, input and paint.<br>Your application logic runs in a second worker. The main thread is left holding a `<canvas>` and forwarding events.<br>Whatever you compute, the frame still lands.
+Gesso is a UI framework for the web that runs the **whole interface** in a worker: components, layout, text, input and paint.<br>Your application logic runs in a second worker. The main thread is left holding a `<canvas>` and forwarding events.
 
 [![npm](https://img.shields.io/npm/v/gesso-framework?label=npm&color=BE9A6E)](https://www.npmjs.com/package/gesso-framework)
 [![CI](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml)
