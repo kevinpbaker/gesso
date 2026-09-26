@@ -1,6 +1,6 @@
 {
   "name": "create-gesso-app",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Scaffolds a Gesso application: a Vite project whose interface runs in a render worker.",
   "license": "MIT",
   "author": "Kevin Baker",

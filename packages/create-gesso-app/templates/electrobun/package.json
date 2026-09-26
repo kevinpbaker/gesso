@@ -5,10 +5,10 @@
   "type": "module",
   "description": "A Gesso application in a native Electrobun window.",
   "dependencies": {
-    "gesso-components": "^0.2.1",
-    "gesso-core": "^0.2.1",
-    "gesso-electrobun": "^0.2.1",
-    "gesso-framework": "^0.2.1",
+    "gesso-components": "^0.3.0",
+    "gesso-core": "^0.3.0",
+    "gesso-electrobun": "^0.3.0",
+    "gesso-framework": "^0.3.0",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "gesso-vite-plugin",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Finds a Gesso application's worker entries, writes the constructions and the hot-replacement wiring, and says when a save will reload the page.",
   "license": "MIT",
   "author": "Kevin Baker",
