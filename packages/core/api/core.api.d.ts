@@ -2866,7 +2866,7 @@ declare class UiPointerController {
 interface KeyboardControllerOptions {
   tabNavigation?: boolean;
   editing?: {
-    handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers): boolean;
+    handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean;
   };
   selection?: {
     handleKey(key: string, modifiers: UiKeyModifiers): boolean;
@@ -2891,7 +2891,7 @@ declare class UiKeyboardController {
   private readonly activation;
   private readonly root;
   constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode | (() => UiNode), options?: KeyboardControllerOptions);
-  keyDown(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
+  keyDown(key: string, modifiers?: UiKeyModifiers, textFollows?: boolean): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
 }
 interface UiShortcutStep {
@@ -3057,7 +3057,7 @@ declare class UiEditingController {
   constructor(host: EditingHost, dispatcher: UiInputDispatcher, focus: UiFocusManager, options?: EditingControllerOptions);
   get focused(): UiNode | null;
   isEditable(node: UiNode): boolean;
-  handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers): boolean;
+  handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean;
   private execute;
   private move;
   beforeInput(inputType: string, data: string | null): boolean;
@@ -6708,7 +6708,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-wCMPc3V2.js";
+} from "./index-DCMaqrm_.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7620,7 +7620,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-wCMPc3V2.js";
+} from "./index-DCMaqrm_.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

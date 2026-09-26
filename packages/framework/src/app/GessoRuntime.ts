@@ -320,6 +320,9 @@ export interface GessoRuntimeOptions {
  * between this class and its two hosts — GessoApp on the main thread
  * and renderRoot() in a render worker.
  */
+/** How many shell requests are held for a listener that has not attached, before the rest are dropped. */
+const HELD_SHELL_REQUESTS = 256;
+
 export class GessoRuntime {
   readonly services: ServiceRegistry;
   readonly channels: ChannelRegistry;
@@ -467,6 +470,8 @@ export class GessoRuntime {
   private semanticsStale = false;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
+  /** Shell requests made before `onShellRequest` gave them somewhere to go; see there. */
+  private heldShellRequests: ShellRequest[] = [];
   private audioListener: ((request: AudioRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
@@ -630,7 +635,13 @@ export class GessoRuntime {
     if (!this.services.has(ShellService)) {
       this.services.register(ShellService);
     }
-    this.services.get(ShellService).setHandler(request => this.shellListener?.(request));
+    this.services.get(ShellService).setHandler(request => {
+      if (this.shellListener !== null && this.shellListener !== undefined) {
+        this.shellListener(request);
+      } else if (this.heldShellRequests.length < HELD_SHELL_REQUESTS) {
+        this.heldShellRequests.push(request);
+      }
+    });
     // And sound, which is the shell's element and this thread's client.
     if (!this.services.has(AudioService)) {
       this.services.register(AudioService);
@@ -1264,6 +1275,18 @@ export class GessoRuntime {
    */
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void {
     this.shellListener = listener;
+    // What was asked before anyone was listening, handed over now. The
+    // root is built in the constructor, so a component that reads a
+    // stored preference as it mounts asks before a shell *can* have
+    // attached — and a storage or file request is a promise waiting for
+    // its answer, which a dropped request never gets.
+    if (listener !== null) {
+      const held = this.heldShellRequests;
+      this.heldShellRequests = [];
+      for (const request of held) {
+        listener(request);
+      }
+    }
   }
 
   /**

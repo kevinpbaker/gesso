@@ -1499,11 +1499,13 @@ type ShellToRuntimeMessage = {
   deltaMode?: number;
   wheelDeltaY?: number;
   at?: number;
-} | {
+} |
+{
   type: 'keyDown';
   key: string;
   modifiers: UiKeyModifiers;
   at?: number;
+  textFollows?: boolean;
 } | {
   type: 'keyUp';
   key: string;
@@ -3019,7 +3021,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-DaR94RYP.js";
+} from "./index-K92dF4Js.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3505,7 +3507,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-DaR94RYP.js";
+} from "../index-K92dF4Js.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
