@@ -3568,6 +3568,7 @@ export class LayoutEngine {
    */
   private markLayoutDirty(node: UiNode, selfCanBound = false): void {
     let current: UiNode = node;
+    let bounded = false;
     for (;;) {
       // Only nodes that have been laid out have records. Fragments never
       // do — measure and place look through them to their children —
@@ -3579,12 +3580,37 @@ export class LayoutEngine {
         rec.placeDirty = true;
       }
       if (current === this.layoutRoot || current.parent === null) {
-        this.relayoutRoots.add(this.layoutRoot ?? current);
+        if (!bounded) {
+          this.relayoutRoots.add(this.layoutRoot ?? current);
+        }
         return;
       }
-      if (rec?.relayoutBoundary && !rec.positioned && (current !== node || selfCanBound)) {
+      if (!bounded && rec?.relayoutBoundary && !rec.positioned && (current !== node || selfCanBound)) {
         this.relayoutRoots.add(current);
-        return;
+        /**
+         * The boundary is where the *relayout* starts, and the walk
+         * carries on past it marking ancestors.
+         *
+         * Stopping here as well is sound only while the pass really
+         * does start at this boundary. It does not always: another
+         * node dirtied in the same frame can drag the layout root
+         * into `relayoutRoots`, and then the pass is a `fullLayout`
+         * that measures from the root — down through ancestors this
+         * walk left clean, every one of which short-circuits on its
+         * own measure memo and never reaches the node that changed.
+         *
+         * Found with a bar switched into the chrome by choosing a
+         * menu item: the menu's own teardown put the root in the set,
+         * the frame did a full layout, and `measure` was never called
+         * on the column that had gained a child. It drew at zero
+         * height, with every spec passing — a spec asks what a node's
+         * properties are, and they were all correct.
+         *
+         * Marking to the root costs a walk of the depth and two
+         * booleans a node, against a memo that is otherwise believed
+         * when it should not be.
+         */
+        bounded = true;
       }
       current = current.parent;
     }
