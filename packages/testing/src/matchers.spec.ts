@@ -146,4 +146,18 @@ describe('toHaveText on a field', () => {
     await ui.settle();
     expect(() => expect(ui.getByRole('textbox')).toHaveText('hello')).toThrow(/has none/);
   });
+
+  /** An emptied field is a thing specs need to assert, and `''` is what it shows. */
+  it('matches the empty string on a field that is empty', async () => {
+    const ui = renderTest(EditableText({ value: '', role: 'textbox', label: 'Greeting', width: 100 }));
+    await ui.settle();
+    expect(ui.getByRole('textbox')).toHaveText('');
+    expect(() => expect(ui.getByRole('textbox')).not.toHaveText('')).toThrow();
+  });
+
+  it('does not match the empty string on a field that has text', async () => {
+    const ui = renderTest(EditableText({ value: 'hello', role: 'textbox', label: 'Greeting', width: 100 }));
+    await ui.settle();
+    expect(() => expect(ui.getByRole('textbox')).toHaveText('')).toThrow(/"hello"/);
+  });
 });

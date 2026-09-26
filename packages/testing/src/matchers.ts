@@ -138,14 +138,21 @@ export const matchers = {
 
   /** The text the node itself draws — not its descendants, and not its label. */
   toHaveText(received: UiNode, expected: string): MatcherResult {
-    const actual = textProperty(received);
+    // `textProperty` answers undefined for empty text, so that
+    // `getByText` does not find every empty node on the page. Here the
+    // question is narrower — what does this one node show — and a field
+    // or a text holding the empty string shows exactly that: asserting
+    // `toHaveText('')` on an emptied field used to fail with "it has
+    // none", which was true and was not the answer to the question.
+    const own = received.properties.get('value') ?? received.properties.get('text');
+    const actual = textProperty(received) ?? (own === '' ? '' : undefined);
     return {
       pass: actual === expected,
       message: () =>
         actual === expected
           ? `Expected '${received.id}' not to have the text ${JSON.stringify(expected)}.`
           : `Expected '${received.id}' to have the text ${JSON.stringify(expected)}, but it has ` +
-            `${actual === undefined ? 'none' : JSON.stringify(actual)}.`
+            `${actual === undefined || actual === '' ? 'none' : JSON.stringify(actual)}.`
     };
   },
 
