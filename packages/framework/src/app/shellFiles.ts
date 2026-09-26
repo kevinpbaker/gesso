@@ -37,7 +37,7 @@ import { shellFilesUnsupported } from './ShellService';
 export interface ShellFileHandle {
   readonly name: string;
   getFile(): Promise<File>;
-  createWritable?(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
+  createWritable?(): Promise<{ write(data: string | Uint8Array<ArrayBuffer>): Promise<void>; close(): Promise<void> }>;
   queryPermission?(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
   requestPermission?(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
   isSameEntry?(other: ShellFileHandle): Promise<boolean>;
@@ -154,7 +154,7 @@ export class ShellFiles {
       if (!(await permitted(entry.handle, 'readwrite'))) {
         return denied();
       }
-      await write(entry.handle, request.text);
+      await write(entry.handle, request.bytes ?? request.text);
       await this.host.store.put({ ...entry, used: this.host.now() });
       return ok({ saved: { name: entry.handle.name, handle: entry.id, via: 'file' } });
     }
@@ -163,12 +163,12 @@ export class ShellFiles {
         ...pickerTypes(request.accept),
         suggestedName: request.name
       });
-      await write(handle, request.text);
+      await write(handle, request.bytes ?? request.text);
       const id = await this.remember(handle);
       return ok({ saved: { name: handle.name, handle: id, via: 'file' } });
     }
     if (this.host.download !== undefined) {
-      this.host.download(request.name, new Blob([request.text], { type: request.mediaType }));
+      this.host.download(request.name, new Blob([request.bytes ?? request.text], { type: request.mediaType }));
       return ok({ saved: { name: request.name, handle: null, via: 'download' } });
     }
     return shellFilesUnsupported('This browser cannot save files.');
@@ -218,12 +218,12 @@ async function read(file: File, handle: number | null): Promise<ShellFile> {
   };
 }
 
-async function write(handle: ShellFileHandle, text: string): Promise<void> {
+async function write(handle: ShellFileHandle, data: string | Uint8Array<ArrayBuffer>): Promise<void> {
   if (handle.createWritable === undefined) {
     throw new Error('This file cannot be written to.');
   }
   const stream = await handle.createWritable();
-  await stream.write(text);
+  await stream.write(data);
   await stream.close();
 }
 

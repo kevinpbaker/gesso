@@ -62,6 +62,12 @@ export type ShellFileRequest =
       readonly name: string;
       readonly mediaType: string;
       readonly text: string;
+      /**
+       * The file's bytes, for one that is not text — a zip, an image.
+       * Written instead of `text` when given; bytes cross the barrier
+       * as they do on the way in, in `ShellFile.bytes`.
+       */
+      readonly bytes?: Uint8Array<ArrayBuffer>;
       readonly handle?: number;
       readonly accept: readonly ShellFileType[];
     }
@@ -452,7 +458,7 @@ export class ShellService {
   }
 
   /**
-   * Writes text to a file.
+   * Writes text, or bytes, to a file.
    *
    * With `handle`, to that file, which is Save; without one, to
    * wherever a save picker says, which is Save As. A browser with no
@@ -462,7 +468,10 @@ export class ShellService {
    */
   saveFile(options: {
     readonly name: string;
-    readonly text: string;
+    /** What to write, for a text file. */
+    readonly text?: string;
+    /** What to write, for any other kind; taken over `text` when both are given. */
+    readonly bytes?: Uint8Array<ArrayBuffer>;
     readonly mediaType?: string;
     readonly handle?: number;
     readonly accept?: readonly ShellFileType[];
@@ -470,7 +479,8 @@ export class ShellService {
     return this.requestFile({
       op: 'save',
       name: options.name,
-      text: options.text,
+      text: options.text ?? '',
+      ...(options.bytes === undefined ? {} : { bytes: options.bytes }),
       mediaType: options.mediaType ?? 'application/octet-stream',
       accept: options.accept ?? [],
       ...(options.handle === undefined ? {} : { handle: options.handle })

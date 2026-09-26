@@ -23,7 +23,7 @@ import {
 
 /** A file on a disk that does not exist. */
 class Disk {
-  readonly contents = new Map<string, string>();
+  readonly contents = new Map<string, string | Uint8Array<ArrayBuffer>>();
 }
 
 class FakeHandle implements ShellFileHandle {
@@ -43,11 +43,11 @@ class FakeHandle implements ShellFileHandle {
     );
   }
 
-  createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }> {
-    let written = '';
+  createWritable(): Promise<{ write(data: string | Uint8Array<ArrayBuffer>): Promise<void>; close(): Promise<void> }> {
+    let written: string | Uint8Array<ArrayBuffer> = '';
     return Promise.resolve({
-      write: (data: string) => {
-        written += data;
+      write: (data: string | Uint8Array<ArrayBuffer>) => {
+        written = typeof data === 'string' && typeof written === 'string' ? written + data : data;
         return Promise.resolve();
       },
       close: () => {
@@ -237,6 +237,26 @@ describe('saving files', () => {
     expect(downloads[0].name).toBe('Sheet1.csv');
     expect(downloads[0].blob.type).toBe('text/csv');
     expect(await downloads[0].blob.text()).toBe('a,b');
+  });
+
+  /** A zip, an image: a file that is not text is written as the bytes it is. */
+  it('writes bytes rather than text when given them, to a file and as a download', async () => {
+    const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff]);
+    const { files, disk, saves } = host();
+    saves.push('book.xlsx');
+    await files.perform({ op: 'save', name: 'book.xlsx', mediaType: 'application/zip', text: '', bytes: zip, accept: [] });
+    expect(disk.contents.get('book.xlsx')).toEqual(zip);
+
+    const downloading = host({ showSaveFilePicker: undefined });
+    await downloading.files.perform({
+      op: 'save',
+      name: 'book.xlsx',
+      mediaType: 'application/zip',
+      text: '',
+      bytes: zip,
+      accept: []
+    });
+    expect(new Uint8Array(await downloading.downloads[0].blob.arrayBuffer())).toEqual(zip);
   });
 
   it('calls a dismissed save picker cancelled', async () => {
