@@ -677,6 +677,7 @@ declare enum UiEventType {
   SelectionChange = "selectionchange",
   Paste = "paste",
   Click = "click",
+  DoubleClick = "doubleclick",
   LongPress = "longpress",
   DragStart = "dragstart",
   DragMove = "dragmove",
@@ -1764,6 +1765,7 @@ type UiEventProps = {
   onPointerEnter?: (event: UiPointerEvent) => void;
   onPointerLeave?: (event: UiPointerEvent) => void;
   onClick?: (event: UiPointerEvent) => void;
+  onDoubleClick?: (event: UiPointerEvent) => void;
   onLongPress?: (event: UiPointerEvent) => void;
   onDragStart?: (event: UiPointerEvent) => void;
   onDragMove?: (event: UiPointerEvent) => void;
@@ -2803,6 +2805,7 @@ interface PointerControllerOptions {
   onPress?: (node: UiNode) => void;
   scrollSink?: ScrollSink;
   onHoverChange?: (node: UiNode | null) => void;
+  now?: () => number;
   editing?: {
     isEditable(node: UiNode): boolean;
     pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
@@ -2828,6 +2831,8 @@ declare class UiPointerController {
   private readonly onHoverChange;
   private readonly editing;
   private readonly selection;
+  private readonly now;
+  private lastClick;
   private hoverNode;
   private downTarget;
   private downX;
@@ -2847,6 +2852,7 @@ declare class UiPointerController {
   pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent;
   pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
   pointerUp(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
+  private countClick;
   pointerCancel(pointer?: UiPointerDevice): void;
   private ownsPress;
   private pressScrollbar;
@@ -6702,7 +6708,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-B4o3nKt2.js";
+} from "./index-wCMPc3V2.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7614,7 +7620,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-B4o3nKt2.js";
+} from "./index-wCMPc3V2.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

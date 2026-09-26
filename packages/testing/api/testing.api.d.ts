@@ -36,6 +36,8 @@ interface PointAt {
 }
 interface FireEvent {
   click(node: UiNode, at?: PointAt): void;
+  doubleClick(node: UiNode, at?: PointAt): void;
+  contextMenu(node: UiNode, at?: PointAt): void;
   pressDown(node: UiNode, at?: PointAt): void;
   pressUp(node: UiNode, at?: PointAt): void;
   pan(node: UiNode, x: number, y: number): void;

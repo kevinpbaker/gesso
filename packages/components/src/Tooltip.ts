@@ -96,7 +96,12 @@ export function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): Ui
 }
 
 export interface TooltipModifierOptions {
-  text: string;
+  /**
+   * What it says. A function is asked each time the tooltip opens,
+   * for a label that follows the application — "Undo sort" rather
+   * than "Undo" — without the element being rebuilt to change it.
+   */
+  text: string | (() => string);
   placement?: OverlayPlacement;
   /** Milliseconds the pointer must rest before it opens. */
   delay?: number;
@@ -154,10 +159,11 @@ const tooltipKind = defineModifier<TooltipArgs>({
       }
     };
     const open = (): void => {
-      if (current.text.length === 0) {
+      const text = typeof current.text === 'function' ? current.text() : current.text;
+      if (text.length === 0) {
         return;
       }
-      current.overlay.show(tooltipContent(current.text), {
+      current.overlay.show(tooltipContent(text), {
         anchor: host.node,
         placement: current.placement ?? 'top',
         offset: 6

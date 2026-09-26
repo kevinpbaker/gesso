@@ -105,6 +105,45 @@ describe('the tooltip modifier', () => {
     expect(ui.entries()).toHaveLength(0);
   });
 
+  it('asks a function for its text each time it opens', async () => {
+    let said = 'Undo typing';
+    function Live(_props: Record<string, never>, ctx: ComponentContext): UiChild {
+      return Button({ text: 'Undo', label: 'Undo', modifiers: [tooltip(ctx, { text: () => said })] });
+    }
+    // Real time, because what the tooltip draws is only on screen
+    // after a frame, and a frame does not come under fake timers.
+    vi.useRealTimers();
+    const ui = mount(Column(createComponent(Live, {})));
+    const rest = async () => {
+      await new Promise(resolve => setTimeout(resolve, 450));
+      await ui.settle();
+    };
+
+    ui.hover('Undo');
+    await rest();
+    expect(ui.queryByText('Undo typing')).not.toBeNull();
+
+    ui.away();
+    await ui.settle();
+    said = 'Undo sort';
+    ui.hover('Undo');
+    await rest();
+    expect(ui.queryByText('Undo sort')).not.toBeNull();
+    expect(ui.queryByText('Undo typing')).toBeNull();
+  });
+
+  it('says nothing when a function has nothing to say', () => {
+    function Quiet(_props: Record<string, never>, ctx: ComponentContext): UiChild {
+      return Button({ text: 'Undo', label: 'Undo', modifiers: [tooltip(ctx, { text: () => '' })] });
+    }
+    const ui = mount(Column(createComponent(Quiet, {})));
+
+    ui.hover('Undo');
+    vi.advanceTimersByTime(400);
+
+    expect(ui.entries()).toHaveLength(0);
+  });
+
   it('closes with the component that opened it', () => {
     const ui = mount(Column(createComponent(Trigger, {})));
     ui.hover('Save');
