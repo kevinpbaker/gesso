@@ -1669,6 +1669,10 @@ declare const UiProperties: {
   readonly liftBoundary: UiPropertyDefinition<boolean | undefined>;
   readonly anchor: UiPropertyDefinition<UiNode | null | undefined>;
   readonly placement: UiPropertyDefinition<UiPlacement | undefined>;
+  readonly anchorPoint: UiPropertyDefinition<{
+    readonly x: number;
+    readonly y: number;
+  } | undefined>;
   readonly anchorOffset: UiPropertyDefinition<number | undefined>;
   readonly direction: UiPropertyDefinition<UiDirection | undefined>;
   readonly overflow: UiPropertyDefinition<UiOverflow | undefined>;
@@ -1794,7 +1798,7 @@ type IdentityProps = {
 type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'paddingStart' | 'paddingEnd' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'marginStart' | 'marginEnd' | 'aspectRatio'>;
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
-type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'placement' | 'anchorOffset'>;
+type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
@@ -3414,6 +3418,7 @@ declare class LayoutEngine {
   private updateContentExtent;
   private placeAbsoluteChildren;
   private placeAnchored;
+  private placeBeside;
   private trackAnchor;
   private forgetAnchoring;
   private replaceMovedAnchored;
@@ -6708,7 +6713,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DCMaqrm_.js";
+} from "./index-BzXn0Bci.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7620,7 +7625,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DCMaqrm_.js";
+} from "./index-BzXn0Bci.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

@@ -626,6 +626,10 @@ interface OverlayEntry {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  readonly point?: {
+    readonly x: number;
+    readonly y: number;
+  };
   readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;
   readonly zIndex?: number;
@@ -3022,7 +3026,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-DoSwzfFI.js";
+} from "./index-Bdp1v_HO.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3508,7 +3512,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-DoSwzfFI.js";
+} from "../index-Bdp1v_HO.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

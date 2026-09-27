@@ -244,7 +244,14 @@ describe('saving files', () => {
     const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff]);
     const { files, disk, saves } = host();
     saves.push('book.xlsx');
-    await files.perform({ op: 'save', name: 'book.xlsx', mediaType: 'application/zip', text: '', bytes: zip, accept: [] });
+    await files.perform({
+      op: 'save',
+      name: 'book.xlsx',
+      mediaType: 'application/zip',
+      text: '',
+      bytes: zip,
+      accept: []
+    });
     expect(disk.contents.get('book.xlsx')).toEqual(zip);
 
     const downloading = host({ showSaveFilePicker: undefined });

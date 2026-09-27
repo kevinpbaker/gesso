@@ -120,11 +120,29 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
     pan: (node, x, y) => dispatch(UiEventType.PanMove, node, { x, y }),
 
     pointerDown: (x, y, options = {}) =>
-      void runtime.input.pointer.pointerDown(x, y, options.buttons ?? 1, modifiersOf(options.modifiers), deviceOf(options.pointer)),
+      void runtime.input.pointer.pointerDown(
+        x,
+        y,
+        options.buttons ?? 1,
+        modifiersOf(options.modifiers),
+        deviceOf(options.pointer)
+      ),
     pointerMove: (x, y, options = {}) =>
-      void runtime.input.pointer.pointerMove(x, y, options.buttons ?? 0, modifiersOf(options.modifiers), deviceOf(options.pointer)),
+      void runtime.input.pointer.pointerMove(
+        x,
+        y,
+        options.buttons ?? 0,
+        modifiersOf(options.modifiers),
+        deviceOf(options.pointer)
+      ),
     pointerUp: (x, y, options = {}) =>
-      void runtime.input.pointer.pointerUp(x, y, options.buttons ?? 0, modifiersOf(options.modifiers), deviceOf(options.pointer)),
+      void runtime.input.pointer.pointerUp(
+        x,
+        y,
+        options.buttons ?? 0,
+        modifiersOf(options.modifiers),
+        deviceOf(options.pointer)
+      ),
     wheel: options =>
       void runtime.input.wheel.wheel(
         options.x ?? 0,

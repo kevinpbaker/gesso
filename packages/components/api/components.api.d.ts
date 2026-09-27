@@ -370,6 +370,10 @@ interface OverlayOptions {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  readonly point?: {
+    readonly x: number;
+    readonly y: number;
+  };
   readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;
   readonly zIndex?: number;
@@ -447,6 +451,8 @@ interface SelectProps extends ControlLayoutProps {
   error?: string;
   required?: boolean;
   ref?: (node: UiNode | null) => void;
+  compact?: boolean;
+  labelHidden?: boolean;
 }
 declare function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
 declare function tooltipContent(text: string): UiChild;
