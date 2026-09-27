@@ -267,6 +267,72 @@ describe('UiHostFrameClock', () => {
     expect(armed()).toBe(0);
   });
 
+  it('keeps drawing from its own compositor while the host thread is blocked', () => {
+    // The local path arms no timer at all, and that is deliberate
+    // rather than an omission. This spec exists because the omission
+    // reading is the tempting one: the hosted path below grew a
+    // watchdog for a symptom described exactly this way — "the worker
+    // stops drawing when the main thread is blocked" — and the obvious
+    // next move is to add the same watchdog here.
+    //
+    // It would be wrong. The compositor answers *this* thread, so a
+    // host that never ticks is not in the frame path to stall, and a
+    // watchdog here would fire against a worker that is drawing
+    // perfectly well. Measured in a browser before this was written:
+    // with something animating throughout, a five-second block of the
+    // shell's thread leaves the worker drawing 77 frames.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      const active: boolean[] = [];
+      const callbacks: ((time: number) => void)[] = [];
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        running => active.push(running),
+        {
+          fallbackMs: 16,
+          stallMs: 100,
+          requestAnimationFrame: callback => {
+            callbacks.push(callback);
+            return callbacks.length;
+          }
+        }
+      );
+
+      // A compositor's timestamps, deliberately not on the same origin
+      // as the fake wall clock. A frame delivered by a timer would
+      // carry `hostTime()`, which under fake timers advances in step
+      // with `advanceTimersByTime` and would otherwise be indis-
+      // tinguishable from a real refresh.
+      const refreshAt = (frame: number): number => 900_000 + frame * 16;
+
+      // Five seconds at 60Hz with no host tick at any point. Time
+      // passes between every refresh, so a fallback or a watchdog
+      // would have had three hundred chances to fire.
+      const expected: number[] = [];
+      for (let frame = 1; frame <= 300; frame++) {
+        clock.requestFrame();
+        // The assertion this spec turns on: asking for a frame on the
+        // local path arms nothing that can go off. A watchdog added
+        // here fails on the first iteration, before any timing
+        // coincidence can hide it.
+        expect(vi.getTimerCount()).toBe(0);
+        vi.advanceTimersByTime(16);
+        callbacks.shift()!(refreshAt(frame));
+        expected.push(refreshAt(frame));
+      }
+
+      // Every frame came from the compositor, in order, and none from
+      // a timer standing in for a host that never spoke.
+      expect(frames).toEqual(expected);
+      // And the host was never asked to start ticking on this clock's
+      // behalf, blocked or not.
+      expect(active).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('falls back to the host where the thread has no compositor of its own', () => {
     // An older browser, or a nested worker on Chromium.
     const { clock, frames, active } = hosted();
