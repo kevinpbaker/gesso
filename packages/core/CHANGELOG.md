@@ -1,5 +1,62 @@
 # gesso-core
 
+## 0.4.0
+
+### Minor Changes
+
+- **`DoubleClick`, dispatched after a second Click on the same node.** The pointer
+  controller pairs Clicks on the same node within 500 ms and 4 px — the window the
+  editing and selection controllers already use for a word — and dispatches
+  `DoubleClick` after the second, as the DOM's `dblclick` follows its `click`. A
+  press that became a drag or was cancelled spends the pair.
+
+  `onDoubleClick` on any element; `fireEvent` gains `doubleClick` and
+  `contextMenu`.
+
+- **A menu opened at a point stays on the screen.** A context menu's point was a
+  top and a left and nothing more, so a menu asked for near the bottom or right
+  edge opened off the screen.
+
+  The layout engine gains `anchorPoint`, a point placed beside as an anchor of no
+  size would be — the same flip and clamp — and overlays a `point` option that
+  uses it. `Menu`'s `at` opens below and to the right of the point, and above or
+  to the left when there is no room.
+
+  Found by a spreadsheet's status bar, whose menu opened below the window.
+
+### Patch Changes
+
+- **An absolute box past its containing block keeps its explicit size.** With no
+  room left on an axis, the loose constraint an absolute child was measured under
+  came out `(0, 0)`, which reads as tight, and a box with an explicit width or
+  height was laid out at zero on that axis — where one pixel of room would have
+  left it whole.
+
+  An explicit size is the box's own, as in CSS; the block no longer caps it.
+
+- **The browser shells post OS file drops.** The `fileDrop` message, its shape and
+  the session that turns it into an ordinary drag have existed since drop targets
+  did, and nothing posted one: a zone accepting `gesso/files` could be written and
+  never reached.
+
+  `attachFileDrop` is the shell half, shared by `createApp`'s worker shell and
+  `createSyncApp`'s single-thread one because it is the same four DOM events
+  either way. It answers drags that carry files and no others, prevents the
+  default on every `dragover` (which is what tells a browser the drop is wanted)
+  and on `drop` (or the tab is replaced by the file), and reads the bytes before
+  posting the drop. The worker shell transfers the buffers rather than copying
+  them; a drop whose files cannot be read is reported as a leave, so no zone stays
+  lit waiting. `GessoRuntime.applyFileDrop` hands the message to the tree's drag
+  session.
+
+  The core half was wrong in a way no spec could have caught: `applyFileDrop` began
+  a drag with the files of `enter` and, on `drop`, only moved it, so a zone
+  received the payload the drag started with. A browser lets a page see the _types_
+  of dragged files and nothing else until they are let go, so that payload has
+  empty names and no bytes — every file dropped from a desktop would have arrived
+  unopenable. The spec that covered it sent the same files on both phases, which is
+  the one shape a browser never produces. It now sends what one does.
+
 ## 0.3.0
 
 ### Minor Changes

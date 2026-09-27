@@ -1,5 +1,45 @@
 # gesso-components
 
+## 0.4.0
+
+### Minor Changes
+
+- **A compact `Select`, and one whose label is not drawn.** For a `Select` inside
+  a line of text or a toolbar row, not on a form.
+
+  With `compact`, the trigger and its list use 12px text and a trigger no taller
+  than a field beside it. With `labelHidden`, the label stays the control's name
+  but is not drawn above it, because the words around it already say what it is
+  for.
+
+- **A menu opened at a point stays on the screen.** A context menu's point was a
+  top and a left and nothing more, so a menu asked for near the bottom or right
+  edge opened off the screen.
+
+  The layout engine gains `anchorPoint`, a point placed beside as an anchor of no
+  size would be — the same flip and clamp — and overlays a `point` option that
+  uses it. `Menu`'s `at` opens below and to the right of the point, and above or
+  to the left when there is no room.
+
+  Found by a spreadsheet's status bar, whose menu opened below the window.
+
+- **A tooltip's text may be a function, asked each time it opens.** For a label
+  that follows the application — "Undo sort" rather than "Undo" — without
+  rebuilding the element it is attached to.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.4.0
+  - gesso-framework@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

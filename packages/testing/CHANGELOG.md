@@ -1,5 +1,52 @@
 # gesso-testing
 
+## 0.4.0
+
+### Minor Changes
+
+- **`DoubleClick`, dispatched after a second Click on the same node.** The pointer
+  controller pairs Clicks on the same node within 500 ms and 4 px — the window the
+  editing and selection controllers already use for a word — and dispatches
+  `DoubleClick` after the second, as the DOM's `dblclick` follows its `click`. A
+  press that became a drag or was cancelled spends the pair.
+
+  `onDoubleClick` on any element; `fireEvent` gains `doubleClick` and
+  `contextMenu`.
+
+- **The coordinate path names the device, so a spec can press with a finger.**
+  `fireEvent.pointerDown`, `pointerMove` and `pointerUp` take
+  `pointer: 'mouse' | 'touch' | 'pen'`, passed to the controller as a
+  `UiPointerDevice` with the ids a browser gives each. A mouse when absent, as
+  everywhere.
+
+  Every touch behaviour the engine has — a pan that scrolls, a long press that
+  asks for a menu, the finger's slop — was reachable only from a shell until now.
+
+### Patch Changes
+
+- **`toHaveText('')` matches a field that is empty.** `textProperty` answers
+  `undefined` for empty text, so that `getByText` does not find every empty node
+  on the page — and `toHaveText` used it directly, so asserting that a field had
+  been emptied failed with "it has none". That was true, and not the answer to the
+  question asked of one node.
+
+  The matcher now reads a node whose value or text is the empty string as showing
+  `''`, and the queries keep their rule.
+
+  Found by gessosheet, whose rules bar spec had to assert an emptied field
+  indirectly.
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.4.0
+  - gesso-framework@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes

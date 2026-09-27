@@ -1,5 +1,107 @@
 # gesso-framework
 
+## 0.4.0
+
+### Minor Changes
+
+- **The browser shells post OS file drops.** The `fileDrop` message, its shape and
+  the session that turns it into an ordinary drag have existed since drop targets
+  did, and nothing posted one: a zone accepting `gesso/files` could be written and
+  never reached.
+
+  `attachFileDrop` is the shell half, shared by `createApp`'s worker shell and
+  `createSyncApp`'s single-thread one because it is the same four DOM events
+  either way. It answers drags that carry files and no others, prevents the
+  default on every `dragover` (which is what tells a browser the drop is wanted)
+  and on `drop` (or the tab is replaced by the file), and reads the bytes before
+  posting the drop. The worker shell transfers the buffers rather than copying
+  them; a drop whose files cannot be read is reported as a leave, so no zone stays
+  lit waiting. `GessoRuntime.applyFileDrop` hands the message to the tree's drag
+  session.
+
+  The core half was wrong in a way no spec could have caught: `applyFileDrop` began
+  a drag with the files of `enter` and, on `drop`, only moved it, so a zone
+  received the payload the drag started with. A browser lets a page see the _types_
+  of dragged files and nothing else until they are let go, so that payload has
+  empty names and no bytes — every file dropped from a desktop would have arrived
+  unopenable. The spec that covered it sent the same files on both phases, which is
+  the one shape a browser never produces. It now sends what one does.
+
+- **`interceptKey`, for a shortcut the app takes from the browser.**
+  `interceptFind` cancelled one browser default so an app's own find bar could
+  have Ctrl+F. An app with a Save of its own needs the same for Ctrl+S, or
+  Chrome's "Save page as" opens over it, and one with an Open for Ctrl+O.
+
+  The shell has to decide before the worker has heard of the key, so the decision
+  stays the application's and is made on the main thread: a predicate over the
+  `KeyboardEvent`, which can say "Ctrl or Cmd" in one line where a list could not.
+  The key is still forwarded; only the browser's default is cancelled. The
+  single-thread shell needs nothing, since its platform adapter already cancels
+  whatever the app's own listener claimed.
+
+- **Files through the shell — open, save, reopen, recent.** A picker, a download
+  and a `FileSystemFileHandle` are all the window's, so an application in a render
+  worker could read a dropped file and do nothing else with files at all.
+  `ShellService` now asks the shell, in the shape a popup and a storage request
+  already have: a request with an id, and one `ShellFileResult` back on every path.
+
+  ```
+  openFiles    showOpenFilePicker, or a file input where there is none
+  saveFile     to a handle (Save), a picker (Save As), or a download
+  reopenFile   a remembered file, asking permission again if it lapsed
+  recentFiles  the remembered files, most recently used first
+  forgetFile   stop remembering one
+  ```
+
+  A handle crosses as a number. The `FileSystemFileHandle` is not plain data, so
+  the shell keeps it — in IndexedDB, which can hold one — and a number handed out
+  yesterday still names yesterday's file, which is the whole of how "recent files"
+  survives a reload. The same file picked twice is one entry (`isSameEntry`, not
+  identity), and past fifty the least recently used is let go. What does not
+  survive a reload is the permission, and asking needs a gesture, so reopening
+  belongs in a click handler as much as a picker does.
+
+  `cancelled` is its own outcome because closing a picker is a decision, not a
+  failure; `denied` is the browser refusing; `unsupported` is a shell with no way
+  to do it. Without the File System Access API files come back with `handle` null
+  and a save is a download, and the answer says so rather than leaving the
+  application to feature-test.
+
+  `saveFile` takes bytes as well as text, for a file that is not text — a zip, an
+  image. Bytes cross the barrier on the way out as they already do on the way in,
+  in `ShellFile.bytes`, and are written to the handle, the picked file or the
+  download in place of the text when given.
+
+### Patch Changes
+
+- **A key typed before the editing proxy has focus keeps its text.** The proxy
+  takes DOM focus when the worker reports a focused editable, a round trip; a key
+  typed in that gap reaches the canvas, and the text it would have made never
+  exists.
+
+  The `keyDown` message now says whether it came through the proxy (`textFollows`),
+  and a key that did not is inserted by the runtime when an editable has the focus.
+
+  Typing a word quickly into a spreadsheet cell the first letter opens kept only
+  the first letter.
+
+- **A shell request made while the root is built is held, not dropped.** The root
+  is built in the runtime's constructor, so a component that reads a stored
+  preference as it mounts asked before `onShellRequest` could have been called,
+  and the request went nowhere — for a storage or file request, a promise that
+  never settled.
+
+  The runtime now holds what is asked before a listener attaches, up to 256, and
+  hands it over when one does.
+
+  Found by a spreadsheet's status-bar figures that never came back after a reload.
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
