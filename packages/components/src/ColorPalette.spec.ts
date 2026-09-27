@@ -44,6 +44,19 @@ describe('ColorPalette', () => {
     expect(ui.getAllByRole('option')).toHaveLength(1 + PALETTE.flat().length);
   });
 
+  /** The swatch under the pointer is its own colour, ringed, and not washed grey. */
+  it('keeps a hovered swatch its own colour', () => {
+    const { ui, open } = mount();
+    open.next(true);
+    ui.frame();
+    const red = ui.getByRole('option', { name: 'red' });
+    const box = ui.getLayout(red);
+    ui.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
+    ui.frame();
+    expect(red.properties.get('backgroundColor')).toBe('#ff0000');
+    expect(red.properties.get('borderColor')).toBe('focusRing');
+  });
+
   it('chooses a colour with a click, and closes', () => {
     const { ui, open, chosen, entries } = mount();
     open.next(true);

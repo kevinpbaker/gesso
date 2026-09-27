@@ -195,7 +195,9 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
     const chosen = input(inputs.value, '').pipe(map(value => value.toLowerCase() === color.value.toLowerCase()));
     return Box({
       key: `${row}-${column}`,
-      modifiers: [CONTROL_INTERACTION],
+      // No hover background: on a swatch the background *is* the colour,
+      // and a control's grey wash over it hid the one being pointed at.
+      // Hovering moves the ring instead, which is what the keyboard does.
       width: 18,
       height: 18,
       borderRadius: 3,
