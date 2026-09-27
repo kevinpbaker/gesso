@@ -1,7 +1,17 @@
 import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
 import { input, type ComponentContext, type Inputs, FocusService } from 'gesso-framework';
-import { Box, Column, Row, Text, type UiChild, type UiElement, type UiNode, type UiSemanticState } from 'gesso-core';
+import {
+  Box,
+  Column,
+  linearGradient,
+  Row,
+  Text,
+  type UiChild,
+  type UiElement,
+  type UiNode,
+  type UiSemanticState
+} from 'gesso-core';
 import { CONTROL_INTERACTION, keymap } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
 
@@ -87,7 +97,16 @@ export interface ColorPaletteProps {
   colors?: readonly (readonly PaletteColor[])[];
   /** What the palette is called: "Text colour", "Fill colour". */
   label?: string;
+  /**
+   * Offers "Custom colour…" at the foot of the grid, for a colour it
+   * does not have; chosen, the palette closes and this is called, and
+   * the caller opens whatever picks one — a `ColorPicker`, usually.
+   */
+  onCustom?: () => void;
 }
+
+/** The value of the "Custom colour…" row, which is no colour. */
+const CUSTOM = '\u0000custom';
 
 /** Where the keyboard is in the grid: a row, and a place along it. */
 interface At {
@@ -108,10 +127,12 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
   /** Every row the keyboard walks: the automatic choice, the recent colours, then the grid. */
   const rows = (): readonly (readonly PaletteColor[])[] => {
     const recent = (inputs.recent.value ?? []).slice(0, 10).map(value => ({ value, name: `recent ${value}` }));
+    const custom = inputs.onCustom.value === undefined ? [] : [[{ value: CUSTOM, name: 'Custom colour…' }]];
     return [
       [{ value: '', name: automatic.value }],
       ...(recent.length === 0 ? [] : [recent]),
-      ...(inputs.colors.value ?? PALETTE)
+      ...(inputs.colors.value ?? PALETTE),
+      ...custom
     ];
   };
 
@@ -136,8 +157,12 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
     if (chosen === undefined) {
       return;
     }
-    inputs.onSelect.value?.(chosen);
     close();
+    if (chosen === CUSTOM) {
+      inputs.onCustom.value?.();
+      return;
+    }
+    inputs.onSelect.value?.(chosen);
   };
 
   const move = (rowBy: number, columnBy: number): void => {
@@ -188,12 +213,12 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
     });
   };
 
-  const automaticRow = (color: PaletteColor): UiElement => {
-    const lit = active.pipe(map(at => at.row === 0));
-    const chosen = input(inputs.value, '').pipe(map(value => value === ''));
+  const automaticRow = (color: PaletteColor, row = 0): UiElement => {
+    const lit = active.pipe(map(at => at.row === row));
+    const chosen = input(inputs.value, '').pipe(map(value => row === 0 && value === ''));
     return Row(
       {
-        key: 'automatic',
+        key: row === 0 ? 'automatic' : 'custom',
         modifiers: [CONTROL_INTERACTION],
         y: 'center',
         gap: 8,
@@ -203,8 +228,8 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
         role: 'option',
         label: color.name,
         states: chosen.pipe(map((picked): UiSemanticState[] => (picked ? ['selected'] : []))),
-        onPointerEnter: () => active.next({ row: 0, column: 0 }),
-        onClick: () => choose('')
+        onPointerEnter: () => active.next({ row, column: 0 }),
+        onClick: () => choose(color.value)
       },
       Box({
         width: 18,
@@ -212,7 +237,14 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
         borderRadius: 3,
         borderColor: 'border',
         borderWidth: 1,
-        backgroundColor: 'background'
+        ...(color.value === CUSTOM
+          ? {
+              backgroundGradient: linearGradient(
+                Math.PI / 2,
+                ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff'].map(stop => ({ color: stop }))
+              )
+            }
+          : { backgroundColor: 'background' })
       }),
       Text({ text: color.name, fontSize: 12, color: 'controlForeground', selectable: false })
     );
@@ -253,6 +285,9 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
       automaticRow(all[0][0]),
       ...all.slice(1).map((colors, at) => {
         const row = at + 1;
+        if (colors[0]?.value === CUSTOM) {
+          return automaticRow(colors[0], row);
+        }
         // A gap under the recent row and under the greys, where people read one.
         const gapAfter = (hasRecent && row === 1) || row === (hasRecent ? 2 : 1);
         return Row(

@@ -47,6 +47,7 @@ export { SplitPane, type SplitPaneProps } from './SplitPane';
 export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { ColorPalette, normalizeHex, PALETTE, type ColorPaletteProps, type PaletteColor } from './ColorPalette';
+export { ColorPicker, hexOfHsv, hsvOfHex, type ColorPickerProps, type Hsv } from './ColorPicker';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
 export { MenuBar, type MenuBarProps } from './MenuBar';
 export { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep } from './menuBarModel';
