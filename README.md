@@ -12,9 +12,12 @@ Gesso is a UI framework for the web that runs the **whole interface** in a worke
 [![CI](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/npm/l/gesso-framework?color=555)](LICENSE)
 
-**[Try it live](https://gesso-docs.vercel.app)** · [Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
+**[Try it live](https://gesso-docs.vercel.app)** · **[A spreadsheet built on it](https://gesso-sheets.vercel.app/)** · [Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
 
 _gesso_ (**JESS**-oh): the primer coat that makes a raw canvas take paint.
+
+The spreadsheet is the framework's own load-bearing example: formulas, charts, sandboxed scripts,
+and a grid that holds its frame budget while it recalculates two hundred thousand cells.
 
 </div>
 
