@@ -59,6 +59,24 @@ describe('LayoutEngine positioning', () => {
       expect(h.box(floating)).toEqual({ x: 10, y: 10, width: 280, height: 180 });
     });
 
+    it('keeps an explicit size when it starts past its containing block', () => {
+      // A chart hung off a row 24 tall, and drawn 46 below its top: it
+      // overflows the block, as CSS lets an absolute box do. With no
+      // room left on an axis the loose constraint was (0, 0), which
+      // reads as tight, and the box came out with no size at all —
+      // where one pixel of room would have left it whole.
+      const h = new LayoutHarness();
+      const root = column(h, 'top');
+      const row = box(h, 'row', { position: 'relative', width: 300, height: 24 });
+      const below = box(h, 'below', { position: 'absolute', top: 46, left: 10, width: 120, height: 80 });
+      const beyond = box(h, 'beyond', { position: 'absolute', top: 0, left: 400, width: 120, height: 80 });
+      h.append(row, below, beyond);
+      h.append(root, row);
+      h.layout(root, Constraints.loose(600, 400));
+      expect(h.box(below)).toEqual({ x: 10, y: 46, width: 120, height: 80 });
+      expect(h.box(beyond)).toEqual({ x: 400, y: 0, width: 120, height: 80 });
+    });
+
     it('uses the nearest positioned ancestor as its containing block', () => {
       const h = new LayoutHarness();
       const root = column(h, 'top', { padding: 20 });

@@ -2907,21 +2907,20 @@ export class LayoutEngine {
       const marginV = cRec.marginTop + cRec.marginBottom;
       const availableWidth = Math.max(0, block.width - (cRec.left ?? 0) - (cRec.right ?? 0) - marginH);
       const availableHeight = Math.max(0, block.height - (cRec.top ?? 0) - (cRec.bottom ?? 0) - marginV);
-      const tightWidth =
-        cRec.left !== undefined &&
-        cRec.right !== undefined &&
-        this.lengthProp(child, 'width', block.width) === undefined;
-      const tightHeight =
-        cRec.top !== undefined &&
-        cRec.bottom !== undefined &&
-        this.lengthProp(child, 'height', block.height) === undefined;
+      const explicitWidth = this.lengthProp(child, 'width', block.width) !== undefined;
+      const explicitHeight = this.lengthProp(child, 'height', block.height) !== undefined;
+      const tightWidth = cRec.left !== undefined && cRec.right !== undefined && !explicitWidth;
+      const tightHeight = cRec.top !== undefined && cRec.bottom !== undefined && !explicitHeight;
+      // An explicit size is the box's own, as in CSS, and the block does
+      // not cap it: a box that starts past the block's far edge has no
+      // room left there, and (0, 0) is a tight zero.
       this.measure(
         child,
         new Constraints(
           tightWidth ? availableWidth : 0,
-          availableWidth,
+          explicitWidth ? Infinity : availableWidth,
           tightHeight ? availableHeight : 0,
-          availableHeight
+          explicitHeight ? Infinity : availableHeight
         )
       );
       const width = cRec.measuredWidth;
