@@ -167,6 +167,19 @@ jobs:
         env:
           CHROME_BIN: google-chrome
 
+      # Electrobun is a toolchain Hutch downloads, not a package the
+      # registry serves, so `pnpm install` cannot put `hutch` on a fresh
+      # runner and `check-scaffold` deliberately downloads nothing
+      # itself. Running the npm bootstrap once caches the launcher under
+      # `~/.hutch/npm`, which is the last place `findHutch` looks.
+      #
+      # 2.0.1 is the version the template pins, in `electrobun.version`
+      # and in the `@hutch cli=` pragma above it. If those move, this
+      # moves with them, or the gate checks a launcher the template does
+      # not use.
+      - name: Cache the Hutch launcher
+        run: npx --yes electrobun@2.0.1 --help
+
       # The other template. It shares the CLI and most of the project it
       # writes, and it is the one nobody runs by hand, so it is the one
       # that breaks.
