@@ -381,6 +381,40 @@ interface OverlayOptions {
   readonly onClose?: () => void;
 }
 declare function useOverlay(ctx: ComponentContext, name: string): OverlayHandle;
+interface PaletteColor {
+  readonly value: string;
+  readonly name: string;
+}
+declare const PALETTE: readonly (readonly PaletteColor[])[];
+interface ColorPaletteProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  anchor?: UiNode | null;
+  placement?: OverlayPlacement;
+  value?: string;
+  onSelect?: (color: string) => void;
+  automaticLabel?: string;
+  recent?: readonly string[];
+  colors?: readonly (readonly PaletteColor[])[];
+  label?: string;
+  onCustom?: () => void;
+}
+declare function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentContext): UiChild;
+declare function normalizeHex(text: string): string | null;
+interface Hsv {
+  readonly h: number;
+  readonly s: number;
+  readonly v: number;
+}
+declare function hsvOfHex(hex: string): Hsv;
+declare function hexOfHsv({ h, s, v }: Hsv): string;
+interface ColorPickerProps {
+  value?: string;
+  onChange?: (color: string) => void;
+  label?: string;
+  width?: number;
+}
+declare function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentContext): UiChild;
 interface MenuItem {
   readonly value: string;
   readonly label: string;
@@ -829,6 +863,8 @@ export {
   Checkbox,
   Chip,
   clockTime,
+  ColorPalette,
+  ColorPicker,
   controlDescription,
   controlled,
   controlMessage,
@@ -842,6 +878,8 @@ export {
   FindBar,
   followTransport,
   form,
+  hexOfHsv,
+  hsvOfHex,
   Icon,
   Image,
   keymap,
@@ -856,8 +894,10 @@ export {
   menuBarStep,
   Meter,
   minLength,
+  normalizeHex,
   NumberInput,
   Pagination,
+  PALETTE,
   pattern,
   ProgressBar,
   quantize,
@@ -908,6 +948,8 @@ export {
   type ChipProps,
   type ChipSize,
   type ChipVariant,
+  type ColorPaletteProps,
+  type ColorPickerProps,
   type ControlFocus,
   type ControlLayoutProps,
   type ControlledValue,
@@ -932,6 +974,7 @@ export {
   type FormOptions,
   type FormValidator,
   type FormValues,
+  type Hsv,
   type IconProps,
   type ImageProps,
   type Keymap,
@@ -952,6 +995,7 @@ export {
   type OverlayHandle,
   type OverlayOptions,
   type PaginationProps,
+  type PaletteColor,
   type Problems,
   type ProgressBarProps,
   type RadioGroupProps,
