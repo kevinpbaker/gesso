@@ -192,6 +192,21 @@ describe('Select', () => {
     });
   }
 
+  it('keeps a hidden label as its name, and draws none', () => {
+    const shown = mount(createComponent(Select, { label: 'Payment', options, defaultValue: 'card' }));
+    const hidden = mount(
+      createComponent(Select, { label: 'Payment', options, defaultValue: 'card', labelHidden: true, compact: true })
+    );
+    const texts = (ui: typeof shown) => ui.allNodes().filter(node => node.properties.get('text') === 'Payment');
+    expect(texts(shown)).toHaveLength(1);
+    expect(texts(hidden)).toHaveLength(0);
+    expect(hidden.getByRole('combobox', { name: 'Payment' })).toBeDefined();
+    // Compact is shorter than the form-sized trigger.
+    expect(hidden.getLayout(hidden.getByRole('combobox')).height).toBeLessThan(
+      shown.getLayout(shown.getByRole('combobox')).height
+    );
+  });
+
   it('opens, walks and chooses from the keyboard alone', () => {
     const changes: string[] = [];
     const ui = mount(selectApp(changes));

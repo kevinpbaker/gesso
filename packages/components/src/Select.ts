@@ -65,6 +65,18 @@ export interface SelectProps extends ControlLayoutProps {
   error?: string;
   required?: boolean;
   ref?: (node: UiNode | null) => void;
+  /**
+   * A smaller trigger and list, for a Select inside a line of text or a
+   * toolbar row rather than on a form: the text of a 12px line and a
+   * trigger no taller than a field beside it.
+   */
+  compact?: boolean;
+  /**
+   * The label is the control's name and is not drawn above it — for a
+   * Select whose meaning the words around it already say. It is still
+   * what a screen reader announces.
+   */
+  labelHidden?: boolean;
 }
 
 export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild {
@@ -76,6 +88,9 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
     map(([marked, message]) => marked || message.length > 0)
   );
   const required = input(inputs.required, false);
+  const compact = inputs.compact?.value === true;
+  const labelHidden = inputs.labelHidden?.value === true;
+  const fontSize = compact ? 12 : undefined;
   const focusStore = ctx.inject(FocusService);
   const focus = trackFocus(ctx, inputs.ref);
   const overlay = useOverlay(ctx, 'select');
@@ -214,7 +229,9 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         }
       },
       inputs.options.pipe(
-        map(options => options.map((option, index) => row(option, index, options.length, active, value.value, choose)))
+        map(options =>
+          options.map((option, index) => row(option, index, options.length, active, value.value, choose, compact))
+        )
       )
     );
 
@@ -242,7 +259,9 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
     { ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(text =>
-        text.length === 0 ? [] : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+        text.length === 0 || labelHidden
+          ? []
+          : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
       )
     ),
     Row(
@@ -252,8 +271,8 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         disabled,
         modifiers: modifiersOf(inputs, CONTROL_INTERACTION, CONTROL_FOCUS_RING),
         y: 'center',
-        padding: 8,
-        gap: 8,
+        ...(compact ? { paddingLeft: 8, paddingRight: 6, paddingTop: 3, paddingBottom: 3 } : { padding: 8 }),
+        gap: compact ? 6 : 8,
         backgroundColor: 'controlBackground',
         borderWidth: 1,
         borderColor: borderToken(invalid),
@@ -283,9 +302,11 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         ),
         color: foregroundToken(disabled),
         flexGrow: 1,
+        fontSize,
+        textWrap: 'none',
         selectable: false
       }),
-      Text({ text: '▾', color: foregroundToken(disabled), selectable: false })
+      Text({ text: '▾', color: foregroundToken(disabled), fontSize, selectable: false })
     ),
     controlMessage(error)
   );
@@ -297,14 +318,15 @@ function row(
   total: number,
   active: Observable<number>,
   chosen: Observable<string>,
-  choose: (value: string) => void
+  choose: (value: string) => void,
+  compact = false
 ): UiElement {
   const selected = chosen.pipe(map(current => current === option.value));
   return Row(
     {
       key: option.value,
       modifiers: [CONTROL_INTERACTION],
-      padding: 8,
+      ...(compact ? { paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 } : { padding: 8 }),
       borderRadius: 4,
       disabled: option.disabled === true,
       backgroundColor: active.pipe(map(current => (current === index ? 'controlBackgroundHovered' : 'transparent'))),
@@ -321,6 +343,7 @@ function row(
     Text({
       text: option.label,
       color: option.disabled === true ? 'controlForegroundDisabled' : 'controlForeground',
+      fontSize: compact ? 12 : undefined,
       selectable: false
     })
   );
