@@ -4438,6 +4438,7 @@ declare class PaintPictureCache {
   resetStats(): void;
   pictureFor(node: UiNode, rec: LayoutRecord, scale: number): UiImage | undefined;
   draw(node: UiNode, rec: LayoutRecord, scale: number, ctx: PaintContext2D): void;
+  private replay;
   private pictureOf;
   private remember;
   recordingFor(node: UiNode): PaintRecording;
@@ -6748,7 +6749,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-D5923_17.js";
+} from "./index-Bvybj3-f.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7663,7 +7664,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-D5923_17.js";
+} from "./index-Bvybj3-f.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

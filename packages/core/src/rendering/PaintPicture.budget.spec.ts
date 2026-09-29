@@ -148,7 +148,8 @@ describe('paint budgets', () => {
     expect(names).toContain('restore');
     expect(callsOf(h.context, 'drawImage')).toEqual([]);
 
-    // And on the next frame, the bitmap in the same box.
+    // And once it has settled, the bitmap in the same box.
+    for (let frame = 0; frame < 3; frame++) h.render(root);
     h.context.calls.length = 0;
     h.render(root);
     expect(callsOf(h.context, 'drawImage').map(call => call.args.slice(1))).toEqual([[10, 10, 120, 24]]);
@@ -210,8 +211,35 @@ describe('paint budgets', () => {
     expect(canvases.bitmaps.length).toBe(NODES);
     expect(canvases.bitmaps.filter(bitmap => bitmap.closed).length).toBe(1);
 
-    // Held still for a frame, it gets one again.
+    // Held still, it gets one again — but not on the first still frame,
+    // which proves nothing: see the next spec.
+    for (let frame = 0; frame < 3; frame++) {
+      h.render(root);
+      expect(canvases.bitmaps.length).toBe(NODES);
+    }
     h.render(root);
     expect(canvases.bitmaps.length).toBe(NODES + 1);
+  });
+
+  it('makes no bitmap for a picture that changes most frames, with still frames between', () => {
+    // gessologic's live wires, which change on every publish while its
+    // frame readout draws a frame between publishes. Rasterising on the
+    // first still frame made a bitmap per gap that the next change threw
+    // away, and in software compositing each fresh canvas could wait on
+    // the page's main thread — which stalled the render worker through a
+    // blocked page. Replayed until they settle, they make none.
+    const { root, painted } = buildTree();
+    h.render(root);
+    paintPictures.resetStats();
+
+    for (let i = 0; i < 30; i++) {
+      painted[0].setProperty('paint', sparkline(i / 30));
+      h.render(root);
+      // One or two frames drawn for something else before the next change.
+      h.render(root);
+      if (i % 2 === 0) h.render(root);
+    }
+    expect(paintPictures.stats.rasterized).toBe(0);
+    expect(canvases.bitmaps.length).toBe(NODES);
   });
 });

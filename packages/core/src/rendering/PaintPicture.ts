@@ -39,6 +39,31 @@ export type PaintCanvasFactory = (width: number, height: number) => PaintCanvas 
  */
 const MAX_PICTURE_SIDE = 8192;
 
+/**
+ * How many frames a picture that was changing must hold still before it
+ * is rasterised on Canvas2D; until then it is replayed as it was while
+ * it changed.
+ *
+ * One was the first value, and it is the bug this constant records. A
+ * frame is not only drawn when a picture's inputs change: anything else
+ * on screen changing draws one too. gessologic's live wires change on
+ * every publish from the application worker, and its readout's frame
+ * counter changes on every frame, so between two publishes there is
+ * usually a frame in which the wires have not moved. One still frame
+ * was taken as "settled", and each such frame rasterised a bitmap that
+ * the next publish threw away — about 1.4 a frame at full speed, each a
+ * fresh canvas. That is waste anywhere, and in software compositing it
+ * was worse: allocating a canvas's pixels can wait on the page's main
+ * thread, so while the page was blocked the render worker stalled on
+ * the first such canvas and drew nothing for as long as the block
+ * lasted.
+ *
+ * Four is about sixty-six milliseconds at 60Hz: longer than the gap
+ * between publishes of anything animating, and short enough that a
+ * picture which has truly stopped is a bitmap before anyone could tell.
+ */
+const SETTLE_FRAMES = 4;
+
 interface PaintedSlot {
   picture: UiImage | null;
   /**
@@ -47,6 +72,11 @@ interface PaintedSlot {
    * on the first frame its inputs stay put. See `draw`.
    */
   rasterized: boolean;
+  /**
+   * Frames left to replay before rasterising, after the recording was
+   * replayed because its content changed. See `SETTLE_FRAMES`.
+   */
+  settling: number;
   recording: PaintRecording;
   paint: UiPaint | undefined;
   path: UiPath | undefined;
@@ -168,10 +198,11 @@ export class PaintPictureCache {
    *
    * So a recording made because the painter's inputs changed is
    * replayed straight onto the frame's context, clipped to the node's
-   * box, and no bitmap is made. If the next frame finds the inputs
-   * unchanged, it makes the bitmap then and draws that from there on,
-   * exactly as `pictureFor` would. A picture that changes every frame is
-   * never rasterised; one that settles is rasterised once, a frame late.
+   * box, and no bitmap is made. Once it has held still for
+   * `SETTLE_FRAMES` frames it makes the bitmap and draws that from there
+   * on, exactly as `pictureFor` would. A picture that changes every
+   * frame, or nearly every frame, is never rasterised; one that settles
+   * is rasterised once, a few frames late.
    * A picture seen for the first time, or at a new size, is rasterised
    * at once, because it most likely holds still.
    *
@@ -189,6 +220,13 @@ export class PaintPictureCache {
     }
     const slot = this.slots.get(node);
     if (slot !== undefined && matches(slot, key)) {
+      if (!slot.rasterized && slot.settling > 0) {
+        // Unchanged, but it was changing a moment ago; it has to hold
+        // still a little longer before a bitmap is worth making.
+        slot.settling--;
+        this.replay(node, slot.recording, rec, ctx);
+        return;
+      }
       const picture = this.pictureOf(node, slot, key.box);
       if (picture !== null) {
         ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
@@ -213,6 +251,12 @@ export class PaintPictureCache {
       }
       return;
     }
+    next.settling = SETTLE_FRAMES - 1;
+    this.replay(node, recording, rec, ctx);
+  }
+
+  /** A recording drawn straight onto the frame, clipped to the box its bitmap would fill. */
+  private replay(node: UiNode, recording: PaintRecording, rec: LayoutRecord, ctx: PaintContext2D): void {
     this.stats.direct++;
     ctx.save();
     ctx.translate(rec.x, rec.y);
@@ -245,6 +289,7 @@ export class PaintPictureCache {
     const slot: PaintedSlot = {
       picture: null,
       rasterized: false,
+      settling: 0,
       recording,
       paint: key.paint,
       path: key.path,
