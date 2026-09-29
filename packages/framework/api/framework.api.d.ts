@@ -239,7 +239,7 @@ import {
   OutputCell,
   Patch,
   ReadableCell
-} from "./FunctionComponent-DAyf5HQ6.js";
+} from "./FunctionComponent-CgwLKE5d.js";
 import {
   BehaviorSubject,
   Observable,
@@ -2776,7 +2776,7 @@ import {
   ReadableCell,
   viewKeys,
   ViewOf
-} from "./FunctionComponent-DAyf5HQ6.js";
+} from "./FunctionComponent-CgwLKE5d.js";
 import {
   ActionCause,
   ActionEntry,
@@ -3026,7 +3026,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-Bdp1v_HO.js";
+} from "./index-C9FAI_Kt.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3342,7 +3342,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-DAyf5HQ6.js";
+} from "../FunctionComponent-CgwLKE5d.js";
 import {
   Observable
 } from "rxjs";
@@ -3449,7 +3449,7 @@ import {
   ReadableCell,
   viewKeys,
   ViewOf
-} from "../FunctionComponent-DAyf5HQ6.js";
+} from "../FunctionComponent-CgwLKE5d.js";
 import {
   APPLICATION_WORKER,
   ChannelSource,
@@ -3512,7 +3512,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-Bdp1v_HO.js";
+} from "../index-C9FAI_Kt.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

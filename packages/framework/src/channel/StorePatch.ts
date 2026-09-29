@@ -117,50 +117,73 @@ function diffArray(projection: string, path: PatchPath, previous: unknown[], cur
  * Applies patches to a projection value, sharing structure with the
  * original everywhere the patch did not reach.
  *
- * Nothing is mutated: bindings hold onto emitted values, so a replica
- * that edited in place would change data a component already rendered.
+ * Nothing handed in is mutated: bindings hold onto emitted values, so a
+ * replica that edited in place would change data a component already
+ * rendered.
+ *
+ * **Each container on a patched path is copied once per batch, not once
+ * per patch.** A batch of N patches into one K-key object used to cost
+ * N × K: every patch spread the whole object again to change one key.
+ * A snapshot keyed by id is exactly that shape — gessologic published
+ * `Record<netId, 0 | 1>` for ten thousand nets, about nine hundred
+ * patches a publish, and the render worker's patch phase fell minutes
+ * behind a 60 Hz stream it could never catch. So the batch remembers
+ * the containers it has copied, and writes into those in place: they
+ * are its own, made during this call and seen by nobody yet. Values
+ * that arrived inside a patch are never written into, because they are
+ * the patch's — a devtools log replays the same patch objects again.
  */
 export function applyPatches(root: unknown, patches: readonly Patch[]): unknown {
+  const owned = new Set<object>();
   let next = root;
   for (const patch of patches) {
-    next = applyPatch(next, patch);
+    next = applyOne(next, patch, owned);
   }
   return next;
 }
 
 export function applyPatch(root: unknown, patch: Patch): unknown {
+  return applyOne(root, patch, new Set());
+}
+
+/** The containers this batch copied, and may therefore write into. */
+type Owned = Set<object>;
+
+function applyOne(root: unknown, patch: Patch, owned: Owned): unknown {
   switch (patch.op) {
     case 'set':
-      return setIn(root, patch.path, 0, patch.value);
+      return setIn(root, patch.path, 0, patch.value, owned);
     case 'delete':
       if (patch.path.length === 0) {
         return undefined;
       }
-      return deleteIn(root, patch.path, 0);
+      return deleteIn(root, patch.path, 0, owned);
     case 'splice':
-      return updateIn(root, patch.path, 0, node => {
+      return updateIn(root, patch.path, 0, owned, node => {
         // Concatenation rather than `splice(..., ...items)`: spreading
         // the items passes each as an argument, and a batch of two
         // hundred thousand overflows the call stack.
         const array = Array.isArray(node) ? node : [];
-        return array.slice(0, patch.index).concat(patch.items, array.slice(patch.index + patch.deleteCount));
+        const spliced = array.slice(0, patch.index).concat(patch.items, array.slice(patch.index + patch.deleteCount));
+        owned.add(spliced);
+        return spliced;
       });
   }
 }
 
-function setIn(node: unknown, path: PatchPath, index: number, value: unknown): unknown {
+function setIn(node: unknown, path: PatchPath, index: number, value: unknown, owned: Owned): unknown {
   if (index === path.length) {
     return value;
   }
   const key = path[index];
-  const copy = cloneContainer(node, key);
-  setKey(copy, key, setIn(readKey(node, key), path, index + 1, value));
+  const copy = cloneContainer(node, key, owned);
+  setKey(copy, key, setIn(readKey(node, key), path, index + 1, value, owned));
   return copy;
 }
 
-function deleteIn(node: unknown, path: PatchPath, index: number): unknown {
+function deleteIn(node: unknown, path: PatchPath, index: number, owned: Owned): unknown {
   const key = path[index];
-  const copy = cloneContainer(node, key);
+  const copy = cloneContainer(node, key, owned);
   if (index === path.length - 1) {
     if (Array.isArray(copy)) {
       copy.splice(Number(key), 1);
@@ -169,30 +192,46 @@ function deleteIn(node: unknown, path: PatchPath, index: number): unknown {
     }
     return copy;
   }
-  setKey(copy, key, deleteIn(readKey(node, key), path, index + 1));
+  setKey(copy, key, deleteIn(readKey(node, key), path, index + 1, owned));
   return copy;
 }
 
-function updateIn(node: unknown, path: PatchPath, index: number, update: (node: unknown) => unknown): unknown {
+function updateIn(
+  node: unknown,
+  path: PatchPath,
+  index: number,
+  owned: Owned,
+  update: (node: unknown) => unknown
+): unknown {
   if (index === path.length) {
     return update(node);
   }
   const key = path[index];
-  const copy = cloneContainer(node, key);
-  setKey(copy, key, updateIn(readKey(node, key), path, index + 1, update));
+  const copy = cloneContainer(node, key, owned);
+  setKey(copy, key, updateIn(readKey(node, key), path, index + 1, owned, update));
   return copy;
 }
 
-function cloneContainer(node: unknown, key: string | number): unknown[] | Record<string, unknown> {
+/**
+ * The container to write `key` into: `node` itself when this batch
+ * already copied it, and a fresh copy, remembered, when it did not.
+ */
+function cloneContainer(node: unknown, key: string | number, owned: Owned): unknown[] | Record<string, unknown> {
+  if (typeof node === 'object' && node !== null && owned.has(node)) {
+    return node as unknown[] | Record<string, unknown>;
+  }
+  let copy: unknown[] | Record<string, unknown>;
   if (Array.isArray(node)) {
-    return node.slice();
+    copy = node.slice();
+  } else if (isPlainObject(node)) {
+    copy = { ...node };
+  } else {
+    // The path runs past the end of what the replica holds, which
+    // happens when a patch fills in a branch that did not exist yet.
+    copy = typeof key === 'number' ? [] : {};
   }
-  if (isPlainObject(node)) {
-    return { ...node };
-  }
-  // The path runs past the end of what the replica holds, which
-  // happens when a patch fills in a branch that did not exist yet.
-  return typeof key === 'number' ? [] : {};
+  owned.add(copy);
+  return copy;
 }
 
 function readKey(node: unknown, key: string | number): unknown {
