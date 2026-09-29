@@ -60,6 +60,12 @@ export interface Canvas2DRendererOptions {
    * `OffscreenCanvas`; a spec passes a double.
    */
   createLayerCanvas?: LayerCanvasFactory;
+  /**
+   * How many frames in a row a container must scroll quietly before it
+   * gets a layer. Defaults to `SCROLL_LAYER_SETTLE_FRAMES`; a spec of
+   * the layers themselves passes 1.
+   */
+  scrollLayerSettleFrames?: number;
 }
 
 /**
@@ -162,7 +168,10 @@ export class Canvas2DRenderer implements UiRenderer {
   private volatileDraws = 0;
 
   constructor(private readonly options: Canvas2DRendererOptions) {
-    this.layers = new ScrollLayerCache(options.createLayerCanvas ?? offscreenLayerCanvas);
+    this.layers = new ScrollLayerCache(
+      options.createLayerCanvas ?? offscreenLayerCanvas,
+      options.scrollLayerSettleFrames
+    );
   }
 
   /** What the scroll layers did since the last reset. For budget specs. */

@@ -13,6 +13,7 @@ import { callArgs, callsOf, FakeCanvasHost, RecordingCanvasContext } from '../Re
 import { Canvas2DRenderer } from './Canvas2DRenderer';
 import { CanvasSurface } from './CanvasSurface';
 import type { CanvasHost } from './CanvasSurface';
+import { SCROLL_LAYER_SETTLE_FRAMES } from './ScrollLayers';
 
 /**
  * A recording context that also keeps its transform, as a real one
@@ -90,7 +91,7 @@ describe('scroll layers', () => {
   let rows: UiNode[];
   const constraints = Constraints.tight(400, 300);
 
-  function setup(options: { dpr?: number; scrollLayers?: boolean; left?: number } = {}): void {
+  function setup(options: { dpr?: number; scrollLayers?: boolean; left?: number; settle?: number } = {}): void {
     graph = new UiGraph();
     const measurer = new CharacterCountTextMeasurer();
     engine = new LayoutEngine(measurer);
@@ -101,6 +102,9 @@ describe('scroll layers', () => {
     renderer = new Canvas2DRenderer({
       surface,
       scrollLayers: options.scrollLayers,
+      // These specs are about what a layer does once it exists; when to
+      // build one is the settle spec's, at the default.
+      scrollLayerSettleFrames: options.settle ?? 1,
       createLayerCanvas: (width, height) => {
         const layerContext = new TransformingContext();
         const layer: FakeLayer = {
@@ -195,6 +199,40 @@ describe('scroll layers', () => {
     expect(composites()).toEqual([[layers[0], 0, 0, 200, 100]]);
     // Rows 0..3 cover 10..110 of the content; the layer drew all four.
     expect(callsOf(layers[0].context, 'fillRect').length).toBe(4);
+  });
+
+  it('builds a layer only once a container has scrolled quietly for a few frames running', () => {
+    setup({ settle: SCROLL_LAYER_SETTLE_FRAMES });
+    frame();
+    for (let step = 1; step < SCROLL_LAYER_SETTLE_FRAMES; step++) {
+      scrollTo(step * 2);
+      expect(renderer.scrollLayerStats.built).toBe(0);
+      expect(directRowFills().length).toBeGreaterThan(0);
+    }
+    scrollTo(SCROLL_LAYER_SETTLE_FRAMES * 2);
+    expect(renderer.scrollLayerStats.built).toBe(1);
+  });
+
+  it('builds none for a scroll that mounts rows as it goes, where each would be dropped on the next frame', () => {
+    // A virtualised list: every frame of its scroll adds a row. A layer
+    // built on each scroll frame was two viewport canvases made, filled
+    // and thrown away per frame — gessosheet's scroll, three times
+    // slower in software rendering, and a render worker that stalled on
+    // the allocations whenever the page was blocked.
+    setup({ settle: SCROLL_LAYER_SETTLE_FRAMES });
+    frame();
+    let built = 0;
+    for (let step = 1; step <= 20; step++) {
+      const row = graph.createNode(`more${step}`, UiNodeType.Box);
+      row.setProperty('height', ROW);
+      row.setProperty('flexShrink', 0);
+      graph.appendChild(scroll, row);
+      graph.markDirty(scroll, DirtyFlags.Children | DirtyFlags.Layout);
+      scrollTo(step * 2);
+      built += renderer.scrollLayerStats.built;
+    }
+    expect(built).toBe(0);
+    expect(layers).toEqual([]);
   });
 
   it('on a frame that only scrolled, shifts the pixels and paints only the strip that came into view', () => {

@@ -4073,6 +4073,7 @@ interface Canvas2DRendererOptions {
   surface: CanvasSurface;
   scrollLayers?: boolean;
   createLayerCanvas?: LayerCanvasFactory;
+  scrollLayerSettleFrames?: number;
 }
 declare class Canvas2DRenderer implements UiRenderer {
   private readonly options;
@@ -6749,7 +6750,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-Bvybj3-f.js";
+} from "./index-3ffYa_9X.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7664,7 +7665,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Bvybj3-f.js";
+} from "./index-3ffYa_9X.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

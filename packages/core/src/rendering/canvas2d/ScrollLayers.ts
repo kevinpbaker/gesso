@@ -95,6 +95,24 @@ const EPSILON = 1e-3;
  */
 const MAX_LAYERS = 4;
 
+/**
+ * How many frames in a row a container must scroll, with nothing else
+ * in or above it changing, before it gets a layer.
+ *
+ * One — a layer on the first scroll — was the first value, and it made
+ * a spreadsheet three times slower to scroll in software rendering. A
+ * virtualised list mounts and unmounts rows as it scrolls, so almost no
+ * frame of its scroll is scroll-only: each one built a layer (two
+ * viewport-sized canvases, the content drawn into one, the copy onto the
+ * frame) and the next frame's new rows dropped it. gessosheet measured
+ * 2.8 ms a frame without layers and 9 ms with. The allocations were
+ * worse than slow: a canvas's pixels can wait on the page's main thread
+ * in software compositing, so a blocked page stalled the render worker
+ * outright. A container whose scroll has been scroll-only for a few
+ * frames running is one a layer will be kept for.
+ */
+export const SCROLL_LAYER_SETTLE_FRAMES = 3;
+
 /** Dirt that says only what was painted, scrolled or meant — nothing moved. */
 const RETAINABLE = DirtyFlags.Paint | DirtyFlags.Properties | DirtyFlags.Transform | DirtyFlags.Semantics;
 
@@ -170,6 +188,12 @@ export class ScrollLayerCache {
   private surfaceWidth = 0;
   private surfaceHeight = 0;
   private frame: RenderChanges['frame'] | null = null;
+  /** Whether this frame changed nothing a layer could not absorb: no layout, children, content or environment. */
+  private calm = false;
+  /** Nodes this frame dirtied, and every ancestor of each, less a container that only scrolled. */
+  private readonly disturbed = new Set<UiNode>();
+  /** Consecutive frames each container without a layer has scrolled quietly. See `SCROLL_LAYER_SETTLE_FRAMES`. */
+  private readonly streaks = new WeakMap<UiNode, number>();
   /**
    * Between `beginFrame` and `endFrame`. Still true at the next
    * `beginFrame` means the last frame threw part way through, perhaps
@@ -178,7 +202,10 @@ export class ScrollLayerCache {
   private open = false;
   readonly stats: ScrollLayerStats = { built: 0, composited: 0, shifted: 0, dropped: 0 };
 
-  constructor(private readonly createCanvas: LayerCanvasFactory) {}
+  constructor(
+    private readonly createCanvas: LayerCanvasFactory,
+    private readonly settleFrames: number = SCROLL_LAYER_SETTLE_FRAMES
+  ) {}
 
   /** Whether layers may be used on this frame; false until `beginFrame` says so. */
   get active(): boolean {
@@ -200,6 +227,26 @@ export class ScrollLayerCache {
   beginFrame(changes: RenderChanges | undefined, dpr: number, surfaceWidth: number, surfaceHeight: number): void {
     const interrupted = this.open;
     this.open = true;
+    this.disturbed.clear();
+    // What this frame disturbed, worked out whether or not any layer
+    // exists yet: it is also the evidence `wants` builds on.
+    this.calm = changes !== undefined;
+    for (const [node, flags] of changes?.frame.entries() ?? []) {
+      if ((flags & ~RETAINABLE) !== 0) {
+        this.calm = false;
+        break;
+      }
+      // A container that scrolled disturbs what is above it, not its own
+      // layer, which holds its children and absorbs the scroll; whatever
+      // else it repainted of itself is drawn outside the layer.
+      for (
+        let current = (flags & DirtyFlags.Transform) !== 0 ? node.parent : node;
+        current !== null;
+        current = current.parent
+      ) {
+        this.disturbed.add(current);
+      }
+    }
     if (
       interrupted ||
       changes === undefined ||
@@ -267,18 +314,30 @@ export class ScrollLayerCache {
   }
 
   /**
-   * Whether a container with no layer should get one now: it scrolled
-   * on this frame, which is the evidence it will scroll on the next,
-   * and it has not just shown it holds something a layer cannot.
+   * Whether a container with no layer should get one now: it has
+   * scrolled on the last few frames running with nothing else in or
+   * above it changing, which is the evidence a layer would be kept, and
+   * it has not just shown it holds something a layer cannot.
    */
   wants(node: UiNode): boolean {
     const frame = this.frame;
-    return (
-      frame !== null &&
-      this.layers.size < MAX_LAYERS &&
-      !this.refused.has(node) &&
-      (frame.dirtyFlagsFor(node) & DirtyFlags.Transform) !== 0
-    );
+    if (frame === null || this.layers.size >= MAX_LAYERS || this.refused.has(node)) {
+      return false;
+    }
+    if (!this.calm || this.disturbed.has(node) || dirtyAbove(frame, node)) {
+      this.streaks.delete(node);
+      return false;
+    }
+    if ((frame.dirtyFlagsFor(node) & DirtyFlags.Transform) === 0) {
+      return false;
+    }
+    const streak = (this.streaks.get(node) ?? 0) + 1;
+    if (streak < this.settleFrames) {
+      this.streaks.set(node, streak);
+      return false;
+    }
+    this.streaks.delete(node);
+    return true;
   }
 
   /** A new layer for the placement, or null where no canvas could be had. */
@@ -411,6 +470,17 @@ export class ScrollLayerCache {
     this.drop(node);
     this.refused.delete(node);
   }
+}
+
+/** Whether an ancestor was dirtied by more than its own scroll: inherited paint reaches the subtree without saying so. */
+function dirtyAbove(frame: RenderChanges['frame'], node: UiNode): boolean {
+  for (let ancestor = node.parent; ancestor !== null; ancestor = ancestor.parent) {
+    const flags = frame.dirtyFlagsFor(ancestor);
+    if (flags !== DirtyFlags.None && flags !== DirtyFlags.Transform) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
