@@ -69,25 +69,30 @@ export interface Canvas2DContext {
   /**
    * A `VideoFrame` as well as an `ImageBitmap`: both are
    * `CanvasImageSource`, and the frame is what WebCodecs hands back.
-   * Kept to these two rather than the whole union because those are
-   * the only two anything in this renderer can produce.
+   * Kept to these rather than the whole union because they are the
+   * only sources anything in this renderer can produce. The third is a
+   * scroll layer: a canvas of the renderer's own holding a scroll
+   * container's content (see `ScrollLayers.ts`), which is drawn from
+   * where it is rather than turned into a bitmap every frame it moves.
    */
-  drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
+  drawImage(image: ImageBitmap | VideoFrame | OffscreenCanvas, dx: number, dy: number, dw: number, dh: number): void;
   /**
-   * The current transform, read to size pre-scaled image copies.
+   * The current transform, read to size pre-scaled image copies and to
+   * place a scroll layer.
    *
-   * Only the four scaling and skewing terms are named, because the
-   * only question asked of it is how many device pixels a box of a
-   * given size covers; the translation says where, which does not
-   * change the answer. A real context returns a `DOMMatrix`, which
-   * satisfies this structurally.
+   * Pre-scaled copies ask only the four scaling and skewing terms how
+   * many device pixels a box covers. A scroll layer asks the
+   * translation too, because it is drawn onto whole device pixels and
+   * has to know where, to the fraction, its content would have landed
+   * had it been drawn directly. A real context returns a `DOMMatrix`,
+   * which satisfies this structurally.
    *
    * Optional, like `letterSpacing`: a recording or stub context has
-   * no transform worth reporting, and the one caller falls back to
-   * the surface's device pixel ratio when it is absent, which is the
-   * right answer for everything but a scaled node.
+   * no transform worth reporting. Pre-scaled copies then fall back to
+   * the surface's device pixel ratio, which is the right answer for
+   * everything but a scaled node, and scroll layers are not used.
    */
-  getTransform?(): { a: number; b: number; c: number; d: number };
+  getTransform?(): { a: number; b: number; c: number; d: number; e: number; f: number };
 
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
   createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;

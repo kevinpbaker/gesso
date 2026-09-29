@@ -2269,12 +2269,14 @@ interface Canvas2DContext {
   stroke(): void;
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
-  drawImage(image: ImageBitmap | VideoFrame, dx: number, dy: number, dw: number, dh: number): void;
+  drawImage(image: ImageBitmap | VideoFrame | OffscreenCanvas, dx: number, dy: number, dw: number, dh: number): void;
   getTransform?(): {
     a: number;
     b: number;
     c: number;
     d: number;
+    e: number;
+    f: number;
   };
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
   createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
@@ -3343,6 +3345,7 @@ declare class LayoutEngine {
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
   subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined;
+  get geometryVersion(): number;
   get root(): UiNode | null;
   explain(node: UiNode): LayoutExplanation;
   private explainCustom;
@@ -4043,6 +4046,11 @@ interface RenderContext {
   readonly text: TextMeasurer;
   readonly now?: number;
   readonly overlay?: readonly OverlayShape[];
+  readonly changes?: RenderChanges;
+}
+interface RenderChanges {
+  readonly frame: UiFrame;
+  readonly geometryVersion: number;
 }
 type RendererBackend = 'canvas2d' | 'webgpu';
 interface UiRenderer {
@@ -4054,8 +4062,17 @@ interface UiRenderer {
   fontsChanged?(): void;
   dispose(): void;
 }
+type LayerCanvasFactory = (width: number, height: number) => CanvasHost | null;
+interface ScrollLayerStats {
+  built: number;
+  composited: number;
+  shifted: number;
+  dropped: number;
+}
 interface Canvas2DRendererOptions {
   surface: CanvasSurface;
+  scrollLayers?: boolean;
+  createLayerCanvas?: LayerCanvasFactory;
 }
 declare class Canvas2DRenderer implements UiRenderer {
   private readonly options;
@@ -4071,7 +4088,12 @@ declare class Canvas2DRenderer implements UiRenderer {
   private readonly cullStack;
   private readonly scaledImages;
   private readonly liftedPass;
+  private readonly layers;
+  private layerDepth;
+  private volatileDraws;
   constructor(options: Canvas2DRendererOptions);
+  get scrollLayerStats(): ScrollLayerStats;
+  resetScrollLayerStats(): void;
   private get surface();
   initialize(): Promise<void>;
   get isReady(): boolean;
@@ -4094,6 +4116,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private paintContent;
   private paintHighlightedText;
   private paintEditable;
+  private renderScrolledThroughLayer;
+  private paintLayer;
   private applyTransform;
   private intersectsCull;
   private paintScrollbars;
@@ -5258,6 +5282,7 @@ export {
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
+  LayerCanvasFactory,
   LayoutBox,
   LayoutEngine,
   LayoutExplanation,
@@ -5431,6 +5456,7 @@ export {
   registerFontStack,
   relativeLuminance,
   RelayoutExplanation,
+  RenderChanges,
   RenderCommand,
   RenderContext,
   RendererBackend,
@@ -5483,6 +5509,7 @@ export {
   scrollbarThumbs,
   scrollbarZoneAt,
   ScrollContainerState,
+  ScrollLayerStats,
   ScrollOffset,
   scrollPosition,
   ScrollPositionArgs,
@@ -5800,7 +5827,6 @@ export {
   validateStates,
   validateSubgrid,
   VerticalAlign,
-  vf,
   VideoClock,
   videoFrameSize,
   VideoPlayback,
@@ -5837,6 +5863,7 @@ export {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty,
+  xf,
   ZoomState
 };
 // ==== index.d.ts ====
@@ -6139,6 +6166,7 @@ import {
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
+  LayerCanvasFactory,
   LayoutBox,
   LayoutEngine,
   LayoutExplanation,
@@ -6312,6 +6340,7 @@ import {
   registerFontStack,
   relativeLuminance,
   RelayoutExplanation,
+  RenderChanges,
   RenderCommand,
   RenderContext,
   RendererBackend,
@@ -6364,6 +6393,7 @@ import {
   scrollbarThumbs,
   scrollbarZoneAt,
   ScrollContainerState,
+  ScrollLayerStats,
   ScrollOffset,
   scrollPosition,
   ScrollPositionArgs,
@@ -6718,7 +6748,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-vOA2LlKv.js";
+} from "./index-D5923_17.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7216,6 +7246,7 @@ export {
   type InteractionProps,
   type InteractiveOptions,
   type KeyboardControllerOptions,
+  type LayerCanvasFactory,
   type LayoutBox,
   type LayoutExplanation,
   type LayoutInspectorOptions,
@@ -7286,6 +7317,7 @@ export {
   type RangeSourceOptions,
   type Reactive,
   type RelayoutExplanation,
+  type RenderChanges,
   type RenderCommand,
   type RenderContext,
   type RendererBackend,
@@ -7302,6 +7334,7 @@ export {
   type ScrollbarAxis,
   type ScrollbarThumb,
   type ScrollContainerState,
+  type ScrollLayerStats,
   type ScrollOffset,
   type ScrollPositionArgs,
   type ScrollSink,
@@ -7630,7 +7663,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-vOA2LlKv.js";
+} from "./index-D5923_17.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

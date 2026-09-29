@@ -464,6 +464,24 @@ export class LayoutEngine {
     return this.records.get(node);
   }
 
+  /**
+   * A number that changes whenever a box may have moved: every box
+   * written, every pass that did any work, every sticky shift and every
+   * node newly given a transform. It is the counter subtree bounds are
+   * kept honest by, read out for a renderer.
+   *
+   * What it deliberately does not count is a scroll offset on its own.
+   * A scroll container's descendants keep their pre-scroll records, so
+   * a frame that only scrolled leaves this alone, and that is what lets
+   * Canvas2D tell a frame that scrolled a list from one that moved it.
+   * The answer is conservative the other way: a pass that did work and
+   * moved nothing still counts, because proving it moved nothing would
+   * cost the walk the counter exists to avoid.
+   */
+  get geometryVersion(): number {
+    return this.layoutVersion;
+  }
+
   /** The node the last `layout` / `layoutForFrame` started from, if any. */
   get root(): UiNode | null {
     return this.layoutRoot;

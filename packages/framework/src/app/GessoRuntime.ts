@@ -100,6 +100,7 @@ import {
   WebGPURenderer,
   type CanvasHost,
   type CanvasSurface,
+  type RenderChanges,
   type RendererBackend,
   type UiRenderer,
   type WebGPUCanvasHost,
@@ -2838,6 +2839,15 @@ export class GessoRuntime {
     // sent when it differs from what the listener already has.
     const overlay = this.inspector.hasOverlay ? this.inspector.overlay(started) : null;
     this.gpuTimings = null;
+    // What changed, for a renderer that keeps pixels across frames
+    // (Canvas2D's scroll layers). Only offered when it is the whole
+    // truth: a node dirtied since the frame was collected — by a layout
+    // listener, a focus settling, anything in the phases above — may
+    // already show in what is drawn and is not in `frame`, so the
+    // renderer is told nothing and draws from scratch.
+    const changes: RenderChanges | undefined = this.graph.getDirtyNodes().isEmpty()
+      ? { frame, geometryVersion: this.engine.geometryVersion }
+      : undefined;
     this.phaseTimings.render = this.timePhase(
       () => this.renderer.isReady,
       () =>
@@ -2845,7 +2855,8 @@ export class GessoRuntime {
           layout: this.engine,
           text: this.textMeasurer,
           now: started,
-          overlay: overlay?.shapes
+          overlay: overlay?.shapes,
+          changes
         })
     );
     if (overlay !== null) {

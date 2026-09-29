@@ -32,6 +32,8 @@ import { decorationColor, decorationRect, hasDecorationPhase, type DecorationSha
 import { ScaledImageCache } from '../ScaledImageCache';
 import { paintPictures } from '../PaintPicture';
 import type { PaintContext2D } from '../PaintTarget';
+import { offscreenLayerCanvas, placeLayer, ScrollLayerCache } from './ScrollLayers';
+import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -43,6 +45,21 @@ export interface Canvas2DRendererOptions {
    * runtime knowing.
    */
   surface: CanvasSurface;
+  /**
+   * Whether a scroll container's content is kept as pixels across
+   * frames that only scroll it. Defaults to true.
+   *
+   * It only ever acts on a frame whose `RenderContext.changes` says
+   * what changed, which only the runtime supplies, so a caller drawing
+   * frames of its own is unaffected either way. False draws every
+   * frame from scratch, as before layers existed. See `ScrollLayers.ts`.
+   */
+  scrollLayers?: boolean;
+  /**
+   * Makes the canvases scroll layers are kept in. Defaults to an
+   * `OffscreenCanvas`; a spec passes a double.
+   */
+  createLayerCanvas?: LayerCanvasFactory;
 }
 
 /**
@@ -76,6 +93,9 @@ export interface Canvas2DRendererOptions {
  * The frame strategy is a full clear + full traversal. Off-screen
  * subtrees are culled (while no ancestor transform is active) so
  * scrolling large lists only issues draws for the visible window.
+ * The one exception is a scroll container's content on a frame that
+ * only scrolled it, which is copied from the last frame's pixels and
+ * has only the strip that came into view drawn (`ScrollLayers.ts`).
  */
 export class Canvas2DRenderer implements UiRenderer {
   readonly backend: RendererBackend = 'canvas2d';
@@ -124,8 +144,35 @@ export class Canvas2DRenderer implements UiRenderer {
    * Drained after the walk; see `render`.
    */
   private readonly liftedPass: UiNode[] = [];
+  /** Scroll containers' content held as pixels; see `ScrollLayers.ts`. */
+  private readonly layers: ScrollLayerCache;
+  /**
+   * How deep inside a layer's walk the traversal is. A layer is drawn
+   * onto the frame, never onto another layer: an inner container that
+   * scrolls dirties the outer one's subtree anyway, so a layer inside
+   * a layer would be rebuilt every frame the inner one was useful.
+   */
+  private layerDepth = 0;
+  /**
+   * Bumped whenever something is drawn whose pixels change without the
+   * frame's changes saying so — a caret, a scrollbar still fading, a
+   * video frame. A layer's walk compares it before and after, and does
+   * not keep what it drew if it moved.
+   */
+  private volatileDraws = 0;
 
-  constructor(private readonly options: Canvas2DRendererOptions) {}
+  constructor(private readonly options: Canvas2DRendererOptions) {
+    this.layers = new ScrollLayerCache(options.createLayerCanvas ?? offscreenLayerCanvas);
+  }
+
+  /** What the scroll layers did since the last reset. For budget specs. */
+  get scrollLayerStats(): ScrollLayerStats {
+    return this.layers.stats;
+  }
+
+  resetScrollLayerStats(): void {
+    this.layers.resetStats();
+  }
 
   private get surface(): CanvasSurface {
     return this.options.surface;
@@ -142,11 +189,13 @@ export class Canvas2DRenderer implements UiRenderer {
 
   resize(width: number, height: number, dpr: number): void {
     this.surface.setLogicalSize(width, height, dpr);
+    this.layers.dropAll();
   }
 
   dispose(): void {
     this.disposed = true;
     this.scaledImages.dispose();
+    this.layers.dropAll();
   }
 
   render(root: UiNode, context: RenderContext): void {
@@ -164,11 +213,19 @@ export class Canvas2DRenderer implements UiRenderer {
     // node within one `renderNode` — but the field would otherwise be
     // a true statement about the wrong frame.
     this.paintOwner = null;
+    this.layerDepth = 0;
+    this.layers.beginFrame(
+      this.options.scrollLayers === false ? undefined : context.changes,
+      this.surface.dpr,
+      this.surface.physicalWidth,
+      this.surface.physicalHeight
+    );
     this.renderNode(root, context, ctx, true, false);
     this.renderLifted(context, ctx);
     if (context.overlay !== undefined && context.overlay.length > 0) {
       drawOverlayShapes(ctx, context.overlay);
     }
+    this.layers.endFrame();
   }
 
   /**
@@ -276,18 +333,19 @@ export class Canvas2DRenderer implements UiRenderer {
       ctx.clip();
       this.pushCull(rec);
     }
-    if (rec.scrollable) {
-      ctx.save();
-      ctx.translate(-rec.scrollX, -rec.scrollY);
-    }
-
-    // Culling works in record coordinates; a transform or a sticky shift
-    // moves what is drawn away from them, so descendants are not culled.
     const liftedBefore = this.liftedPass.length;
-    this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
-
-    if (rec.scrollable) {
-      ctx.restore();
+    if (!rec.scrollable || !this.renderScrolledThroughLayer(node, rec, context, ctx)) {
+      if (rec.scrollable) {
+        ctx.save();
+        ctx.translate(-rec.scrollX, -rec.scrollY);
+      }
+      // Culling works in record coordinates; a transform or a sticky
+      // shift moves what is drawn away from them, so descendants are
+      // not culled.
+      this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
+      if (rec.scrollable) {
+        ctx.restore();
+      }
     }
     if (rec.clips) {
       this.popCull();
@@ -487,6 +545,11 @@ export class Canvas2DRenderer implements UiRenderer {
     const source = video?.frame ?? paint.image;
     if (source === undefined || source === null) {
       return;
+    }
+    if (video !== undefined) {
+      // A new frame arrives on the same surface object, so nothing
+      // about it is dirtied; see `UiVideo.ts`.
+      this.volatileDraws++;
     }
     const size =
       video === undefined ? { width: paint.image!.width, height: paint.image!.height } : videoFrameSize(video);
@@ -714,6 +777,10 @@ export class Canvas2DRenderer implements UiRenderer {
    */
   private paintEditable(ctx: Canvas2DContext, paint: PaintState, context: RenderContext): void {
     const model = paint.editor!;
+    if (model.focused) {
+      // The caret blinks with the clock.
+      this.volatileDraws++;
+    }
     const layout = new EditableLayout(model, this.contentBox, paint, context.text);
     // A run's own background goes under the selection, as a CSS inline
     // background goes under one. Nothing is drawn here unless the
@@ -761,6 +828,145 @@ export class Canvas2DRenderer implements UiRenderer {
       const caret = layout.caretRect();
       ctx.fillStyle = colorToCss(paint.caretColor);
       ctx.fillRect(Math.round(caret.x), caret.y, CARET_WIDTH, caret.height);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Scroll layers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Draws a scroll container's children through its layer, and returns
+   * whether it did. False means the caller draws them directly, as it
+   * always used to; that is the answer to every doubt below.
+   *
+   * Called where the direct path would translate by the scroll offset,
+   * so the container's clip is open and its background and border are
+   * already drawn. The layer is copied onto the frame under that clip,
+   * which is how a rounded viewport stays rounded.
+   */
+  private renderScrolledThroughLayer(
+    node: UiNode,
+    rec: LayoutRecord,
+    context: RenderContext,
+    ctx: Canvas2DContext
+  ): boolean {
+    const layers = this.layers;
+    if (!layers.active || this.layerDepth > 0) {
+      return false;
+    }
+    const dpr = this.surface.dpr;
+    const width = this.surface.physicalWidth;
+    const height = this.surface.physicalHeight;
+    const placement =
+      rec.clips && node.type !== UiNodeType.EditableText && node.firstChild !== null
+        ? placeLayer(ctx, rec, dpr, width, height)
+        : null;
+    let layer = layers.get(node);
+    if (placement === null) {
+      layers.drop(node);
+      return false;
+    }
+    if (layer !== undefined && !layers.fits(layer, placement)) {
+      layers.drop(node);
+      layer = undefined;
+    }
+
+    const volatileBefore = this.volatileDraws;
+    const liftedBefore = this.liftedPass.length;
+    if (layer === undefined) {
+      if (!layers.wants(node)) {
+        return false;
+      }
+      const created = layers.create(node, placement, rec);
+      if (created === null) {
+        return false;
+      }
+      layer = created;
+      this.paintLayer(layer, null, node, rec, context);
+    } else {
+      const strips = layers.shift(layer, rec);
+      if (strips === null) {
+        layers.drop(node);
+        return false;
+      }
+      for (const strip of strips) {
+        this.paintLayer(layer, strip, node, rec, context);
+      }
+    }
+
+    layer.used = true;
+    layers.stats.composited++;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(layer.front as unknown as OffscreenCanvas, placement.x, placement.y, layer.width, layer.height);
+    ctx.restore();
+
+    // Drawn correctly for this frame either way. What is decided here is
+    // whether the pixels can stand for the next one: not if any of them
+    // follow the clock, and not if the walk met a lifted node, which is
+    // drawn on the frame outside the layer and would be lost on the
+    // next frame that did not walk.
+    if (this.volatileDraws !== volatileBefore || this.liftedPass.length !== liftedBefore) {
+      layers.refuse(node);
+    }
+    return true;
+  }
+
+  /**
+   * Draws the container's children into its layer: the whole of it
+   * when `strip` is null, otherwise only the strip a scroll exposed.
+   *
+   * A strip is clipped, not culled. The walk visits exactly the nodes a
+   * direct draw of the viewport would, and the clip keeps their pixels
+   * inside the strip; culling to the strip instead would miss a shadow,
+   * a focus ring or overflowing text reaching into it from a node whose
+   * box does not, and leave a seam where a direct draw has none. What a
+   * strip saves is raster, which is the cost it exists for; the walk
+   * costs what a direct draw's walk would.
+   */
+  private paintLayer(
+    layer: ScrollLayer,
+    strip: LayerRect | null,
+    node: UiNode,
+    rec: LayoutRecord,
+    context: RenderContext
+  ): void {
+    const lctx = layer.frontContext;
+    lctx.save();
+    if (strip !== null) {
+      lctx.setTransform(1, 0, 0, 1, 0, 0);
+      lctx.beginPath();
+      lctx.rect(strip.x, strip.y, strip.width, strip.height);
+      lctx.clip();
+    }
+    const dpr = layer.dpr;
+    lctx.setTransform(dpr, 0, 0, dpr, layer.offsetX, layer.offsetY);
+    lctx.translate(-layer.scrollX, -layer.scrollY);
+
+    const savedCullX = this.cullX;
+    const savedCullY = this.cullY;
+    const savedCullWidth = this.cullWidth;
+    const savedCullHeight = this.cullHeight;
+    // The viewport in the children's coordinates, which is what the
+    // direct path's `pushCull` produces for a container nothing above
+    // clips. The layer covers the whole viewport even where the frame
+    // does not show it, so a later scroll of an outer container finds
+    // it already drawn.
+    this.cullX = rec.x + layer.scrollX;
+    this.cullY = rec.y + layer.scrollY;
+    this.cullWidth = rec.width;
+    this.cullHeight = rec.height;
+    this.layerDepth++;
+    try {
+      this.renderChildren(node, context, lctx, true);
+    } finally {
+      this.layerDepth--;
+      this.cullX = savedCullX;
+      this.cullY = savedCullY;
+      this.cullWidth = savedCullWidth;
+      this.cullHeight = savedCullHeight;
+      lctx.restore();
     }
   }
 
@@ -815,6 +1021,8 @@ export class Canvas2DRenderer implements UiRenderer {
     if (remaining <= 0) {
       return;
     }
+    // It fades with the clock, and nothing is dirtied as it does.
+    this.volatileDraws++;
     const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
     ctx.fillStyle = `rgba(128,128,128,${alpha.toFixed(3)})`;
     const { vertical, horizontal } = scrollbarThumbs(rec);
