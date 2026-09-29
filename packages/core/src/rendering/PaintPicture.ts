@@ -166,12 +166,14 @@ export class PaintPictureCache {
    * rendering `transferToImageBitmap` alone was a quarter of the render
    * worker's time.
    *
-   * So a recording made this frame is replayed straight onto the
-   * frame's context, clipped to the node's box, and no bitmap is made.
-   * If the next frame finds the inputs unchanged, it makes the bitmap
-   * then and draws that from there on, exactly as `pictureFor` would.
-   * A picture that changes every frame is never rasterised twice; one
-   * that settles is rasterised once, a frame late.
+   * So a recording made because the painter's inputs changed is
+   * replayed straight onto the frame's context, clipped to the node's
+   * box, and no bitmap is made. If the next frame finds the inputs
+   * unchanged, it makes the bitmap then and draws that from there on,
+   * exactly as `pictureFor` would. A picture that changes every frame is
+   * never rasterised; one that settles is rasterised once, a frame late.
+   * A picture seen for the first time, or at a new size, is rasterised
+   * at once, because it most likely holds still.
    *
    * Canvas2D only. WebGPU has no path pipeline to replay onto, which is
    * the reason the cache exists (see the class comment), and asks
@@ -194,8 +196,21 @@ export class PaintPictureCache {
       return;
     }
     const recording = this.record(key.paint, key.path, key.clipPath, key.blur, key.box);
-    this.remember(node, slot, key, recording);
+    const next = this.remember(node, slot, key, recording);
     if (recording.ops.length === 0) {
+      return;
+    }
+    // Only a change of what the painter draws is taken as a sign the
+    // picture moves every frame. A node seen for the first time, or
+    // resized, or re-themed, most likely holds still from here, so its
+    // bitmap is made now — replaying it this frame and rasterising it
+    // the next would draw it twice. gessologic's zoom found this: every
+    // tile a new grid brought in had its static layers drawn twice.
+    if (slot === undefined || !contentChanged(slot, key)) {
+      const picture = this.pictureOf(node, next, key.box);
+      if (picture !== null) {
+        ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
+      }
       return;
     }
     this.stats.direct++;
@@ -351,6 +366,16 @@ function keyFor(node: UiNode, rec: LayoutRecord, scale: number): SlotKey | null 
       scale
     }
   };
+}
+
+/** Whether what the painter draws changed, as against where or at what size it is drawn. */
+function contentChanged(slot: PaintedSlot, key: SlotKey): boolean {
+  return (
+    slot.clipPath !== key.clipPath ||
+    slot.blur !== key.blur ||
+    !paintValuesEqual(slot.paint, key.paint) ||
+    !pathValuesEqual(slot.path, key.path)
+  );
 }
 
 function matches(slot: PaintedSlot, key: SlotKey): boolean {

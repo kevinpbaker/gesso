@@ -17,7 +17,8 @@ import { buildRenderList, CommandKind } from './webgpu/WebGPURenderData';
  * counts of painter runs, rasterisations and draw calls, not wall
  * time. A frame that draws twenty painted nodes whose inputs did not
  * move must make twenty draw calls and run no painter at all; a picture
- * that changes every frame must not be rasterised into a bitmap at all.
+ * that changes every frame must not be rasterised into a bitmap at all,
+ * and one seen for the first time must be rasterised once, not twice.
  */
 describe('paint budgets', () => {
   const NODES = 20;
@@ -70,23 +71,14 @@ describe('paint budgets', () => {
     return { root, painted };
   }
 
-  it('paints each node once, draws it straight onto the first frame, and rasterises it once when it holds still', () => {
+  it('paints and rasterises each node once on the first frame, and never again while it holds still', () => {
     const { root } = buildTree();
     h.render(root);
-    // The first frame: every picture is new, so each is replayed onto the
-    // frame's context and no bitmap is made — one would be used once.
+    // A node seen for the first time most likely holds still, so its
+    // bitmap is made at once rather than replayed and rasterised later.
     expect(paintPictures.stats.recorded).toBe(NODES);
-    expect(paintPictures.stats.direct).toBe(NODES);
-    expect(paintPictures.stats.rasterized).toBe(0);
-    expect(callsOf(h.context, 'drawImage').length).toBe(0);
-
-    // The second frame finds the inputs unchanged: now each is worth a
-    // bitmap, made from the recording already held, without painting.
-    paintPictures.resetStats();
-    h.context.calls.length = 0;
-    h.render(root);
-    expect(paintPictures.stats.recorded).toBe(0);
     expect(paintPictures.stats.rasterized).toBe(NODES);
+    expect(paintPictures.stats.direct).toBe(0);
     expect(callsOf(h.context, 'drawImage').length).toBe(NODES);
 
     paintPictures.resetStats();
@@ -103,9 +95,22 @@ describe('paint budgets', () => {
     expect(callsOf(h.context, 'drawImage').length).toBe(NODES * 5);
   });
 
-  it('repaints only the node whose inputs changed, and draws that one straight onto the frame', () => {
+  it('rasterises a resized node at once rather than replaying it', () => {
     const { root, painted } = buildTree();
     h.render(root);
+    paintPictures.resetStats();
+
+    painted[3].setProperty('width', 140);
+    h.layout(root, VIEWPORT);
+    h.render(root);
+
+    expect(paintPictures.stats.recorded).toBe(1);
+    expect(paintPictures.stats.rasterized).toBe(1);
+    expect(paintPictures.stats.direct).toBe(0);
+  });
+
+  it('repaints only the node whose inputs changed, and draws that one straight onto the frame', () => {
+    const { root, painted } = buildTree();
     h.render(root);
     paintPictures.resetStats();
 
@@ -118,7 +123,7 @@ describe('paint budgets', () => {
     expect(paintPictures.stats.resolved).toBe(NODES);
   });
 
-  it('replays a new picture in the box its bitmap would fill, clipped to it', () => {
+  it('replays a changed picture in the box its bitmap would fill, clipped to it', () => {
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('padding', 10);
     const node = h.createNode('spark', UiNodeType.Paint);
@@ -127,7 +132,10 @@ describe('paint budgets', () => {
     node.setProperty('paint', sparkline(0.5));
     h.append(root, node);
     h.layout(root, VIEWPORT);
+    h.render(root);
 
+    node.setProperty('paint', sparkline(0.75));
+    h.context.calls.length = 0;
     h.render(root);
     const names = h.context.calls.map(call => call.name);
     const start = names.indexOf('translate');
@@ -138,6 +146,7 @@ describe('paint budgets', () => {
     expect(h.context.calls[start + 2]!.args).toEqual([0, 0, 120, 24]);
     expect(names.slice(start + 4, start + 7)).toEqual(['beginPath', 'moveTo', 'lineTo']);
     expect(names).toContain('restore');
+    expect(callsOf(h.context, 'drawImage')).toEqual([]);
 
     // And on the next frame, the bitmap in the same box.
     h.context.calls.length = 0;
@@ -147,7 +156,6 @@ describe('paint budgets', () => {
 
   it('hands the second backend the pictures the first settled on, without repainting them', () => {
     const { root } = buildTree();
-    h.render(root);
     h.render(root);
     const drawn = callsOf(h.context, 'drawImage').map(call => call.args[0]);
     paintPictures.resetStats();
@@ -165,8 +173,11 @@ describe('paint budgets', () => {
   });
 
   it('rasterises for WebGPU from the recording Canvas2D replayed, and Canvas2D then draws that bitmap', () => {
-    const { root } = buildTree();
+    const { root, painted } = buildTree();
     h.render(root);
+    painted.forEach((node, i) => node.setProperty('paint', sparkline((i + 0.5) / NODES)));
+    h.render(root);
+    expect(paintPictures.stats.direct).toBe(NODES);
     paintPictures.resetStats();
 
     // WebGPU asks before Canvas2D has settled: the pictures are made from
@@ -186,7 +197,6 @@ describe('paint budgets', () => {
 
   it('makes no bitmap for a picture that changes every frame, and releases the one it had', () => {
     const { root, painted } = buildTree();
-    h.render(root);
     h.render(root);
     expect(canvases.bitmaps.length).toBe(NODES);
 
