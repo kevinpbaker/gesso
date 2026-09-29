@@ -138,6 +138,15 @@ export function hasScrollRoom(offset: number, max: number, delta: number): boole
 }
 
 /** Whether this node keeps overscroll rather than chaining it outwards. */
+/**
+ * Whether a node keeps the wheel deltas nothing below it used.
+ *
+ * Honoured on any node, where CSS's `overscroll-behavior` applies only
+ * to scroll containers. The property is how an app says "no wheel over
+ * me reaches the page", and the nodes that most need to say it — an
+ * app's root, a canvas that pans and zooms on the wheel itself — are
+ * the ones that are not scroll containers.
+ */
 function containsOverscroll(node: UiNode | null): boolean {
   return node !== null && node.getProperty('overscrollBehavior') === 'contain';
 }
@@ -311,25 +320,22 @@ export class UiWheelController {
     let left = false;
     let right = false;
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
-      if (!isScrollContainer(node)) {
-        continue;
+      const state = isScrollContainer(node) ? this.scrollSink.containerState(node) : undefined;
+      if (state !== undefined) {
+        left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
+        right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
+        up ||= hasScrollRoom(state.scrollY, state.maxScrollY, -1);
+        down ||= hasScrollRoom(state.scrollY, state.maxScrollY, 1);
       }
-      const state = this.scrollSink.containerState(node);
-      if (state === undefined) {
-        continue;
-      }
-      left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
-      right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
-      up ||= hasScrollRoom(state.scrollY, state.maxScrollY, -1);
-      down ||= hasScrollRoom(state.scrollY, state.maxScrollY, 1);
       if (containsOverscroll(node)) {
         // Nothing past here can be reached by chaining, so nothing
         // past here is worth reporting — and the contained node keeps
-        // every direction whether or not it has room left.
+        // every direction whether or not it has room left. Any node,
+        // not only a scroll container: see `containsOverscroll`.
         return EVERYTHING_SCROLLABLE;
       }
     }
-    if (containsOverscroll(rootOf(target))) {
+    if (this.appContainsOverscroll(target)) {
       return EVERYTHING_SCROLLABLE;
     }
     return { up, down, left, right };
@@ -380,11 +386,12 @@ export class UiWheelController {
     wheelDeltaY: number | undefined
   ): void {
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
-      if (!isScrollContainer(node)) {
-        continue;
-      }
-      const state = this.scrollSink.containerState(node);
+      const state = isScrollContainer(node) ? this.scrollSink.containerState(node) : undefined;
       if (state === undefined) {
+        if (containsOverscroll(node)) {
+          event.markConsumed();
+          return;
+        }
         continue;
       }
       // Each axis is asked for separately, because a container may
@@ -417,9 +424,25 @@ export class UiWheelController {
     // Nothing had room. The root has the last word on whether the
     // leftover leaves the canvas: by default it does, so a page
     // around an embedded runtime goes on scrolling.
-    if (containsOverscroll(rootOf(target))) {
+    if (this.appContainsOverscroll(target)) {
       event.markConsumed();
     }
+  }
+
+  /**
+   * Whether the application's root asked to keep every wheel.
+   *
+   * Asked of `rootNode` first, because in a mounted app the tree's
+   * topmost node is not the application's: the runtime wraps the app
+   * in a stack beside its overlay layer, and `contain` set on the app's
+   * own root — which is where the property's documentation says to set
+   * it — was on a node `rootOf` never reached. A node in the overlay
+   * layer is not under the app's root either, so the chain walk alone
+   * would miss it too. `rootOf` is kept for a host that passes no
+   * root, where the topmost node is the only root there is.
+   */
+  private appContainsOverscroll(target: UiNode): boolean {
+    return containsOverscroll(this.rootNode?.() ?? null) || containsOverscroll(rootOf(target));
   }
 
   private applyDelta(

@@ -2052,7 +2052,10 @@ export class GessoRuntime {
         editing,
         selection
       }),
-      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink, () => root),
+      // The application's root, not the layout root that wraps it, for
+      // the reason the keyboard's below gives: `overscrollBehavior` set
+      // on the app's own top element has to be the one that is read.
+      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink, () => this.appRoot ?? root),
       // Unfocused keys land on the application's root, not the layout
       // root that wraps it: the wrapper is the runtime's, and an app
       // listening for Escape on its own top element would otherwise

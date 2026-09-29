@@ -3,7 +3,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { noKeyModifiers, UiEventType, UiWheelDeltaMode, type UiKeyModifiers } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
-import { isNotchedWheel, type UiWheelController } from './UiWheelController';
+import { isNotchedWheel, UiWheelController } from './UiWheelController';
 
 /**
  * A 400x400 app root holding a 300x200 ScrollView at (0,0). The
@@ -399,6 +399,56 @@ describe('UiWheelController', () => {
     h.root.setProperty('overscrollBehavior', 'contain');
 
     expect(controller.scrollabilityOf(null)).toEqual({ up: true, down: true, left: true, right: true });
+  });
+
+  it('keeps every wheel over a contained node that is not a scroll container', () => {
+    // A canvas that pans and zooms on the wheel itself: a plain box, not
+    // a ScrollView, so it has no room to report. `contain` on it has to
+    // keep every wheel over it anyway — a ctrl-wheel, or a trackpad
+    // pinch, which Chrome sends as one, would otherwise zoom the page.
+    // Below the 300x200 scroll view sits a 300x100 canvas at (0,200).
+    const { h } = setupVertical();
+    const canvas = h.node('canvas', UiNodeType.Box, { width: 300, height: 100 });
+    h.add(h.root, canvas);
+    h.layoutTree();
+    const controller = h.createWheelController();
+
+    expect(controller.scrollabilityAt(50, 250)).toEqual({ up: false, down: false, left: false, right: false });
+    expect(controller.wheel(50, 250, 0, -100).consumed).toBe(false);
+
+    canvas.setProperty('overscrollBehavior', 'contain');
+
+    expect(controller.scrollabilityAt(50, 250)).toEqual({ up: true, down: true, left: true, right: true });
+    expect(controller.wheel(50, 250, 0, -100).consumed).toBe(true);
+    // Only over the canvas: the empty root beside it still lets the
+    // wheel out to the page.
+    expect(controller.scrollabilityAt(350, 350)).toEqual({ up: false, down: false, left: false, right: false });
+    expect(controller.wheel(350, 350, 0, 100).consumed).toBe(false);
+  });
+
+  it('reads containment from the root it is given, not the topmost node', () => {
+    // A mounted app is not the tree's root: the runtime wraps it in a
+    // stack beside its overlay layer. `contain` on the app's own root
+    // was on a node the controller never asked, so the property's
+    // documented use did nothing. Here the harness root plays the
+    // wrapper, `app` the application and `overlay` the overlay layer.
+    const h = new InputTestHarness();
+    const app = h.node('application', UiNodeType.Box, { width: 400, height: 300 });
+    const overlay = h.node('overlay', UiNodeType.Box, { width: 400, height: 100 });
+    h.add(h.root, app);
+    h.add(h.root, overlay);
+    h.layoutTree();
+    const controller = new UiWheelController(h.createHitTester(), h.dispatcher, h.scrollSink, () => app);
+    app.setProperty('overscrollBehavior', 'contain');
+
+    // Over the app, where the chain walk finds it.
+    expect(controller.wheel(50, 50, 0, 100).consumed).toBe(true);
+    // Over the overlay layer, which is not under the app's root.
+    expect(controller.scrollabilityAt(50, 350)).toEqual({ up: true, down: true, left: true, right: true });
+    expect(controller.wheel(50, 350, 0, 100).consumed).toBe(true);
+    // Before anything is hovered.
+    expect(controller.scrollabilityOf(null)).toEqual({ up: true, down: true, left: true, right: true });
+    expect(controller.scrollsAnything()).toBe(true);
   });
 
   it('carries the modifiers on the event', () => {

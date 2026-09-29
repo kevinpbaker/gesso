@@ -1396,6 +1396,12 @@ export const UiProperties = {
    * wants the default, or the article stops scrolling whenever the
    * cursor crosses the canvas.
    *
+   * Unlike the CSS property it is honoured on any node, not only a
+   * scroll container. An app's root is rarely one, and neither is a
+   * canvas that pans and zooms on the wheel itself — which wants
+   * `'contain'` so a ctrl-wheel, or a trackpad pinch, zooms the canvas
+   * and not the page around it.
+   *
    * Like `scrollBehavior`, this is read by the input layer and
    * affects nothing laid out or painted.
    */
