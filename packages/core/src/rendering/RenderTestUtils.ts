@@ -133,11 +133,52 @@ export class RecordingCanvasContext implements Canvas2DContext {
     this.record('set:textBaseline', [value]);
   }
 
+  /**
+   * Drawing state saved by `save`, as a real context keeps it. Without
+   * it a spec that renders twice read the first frame's leftovers: the
+   * renderer multiplies `globalAlpha` inside a `save`, and a double that
+   * did not restore it compounded the opacity frame over frame.
+   */
+  private readonly saved: {
+    fillStyle: string | Canvas2DGradient | CanvasPattern;
+    strokeStyle: string | Canvas2DGradient | CanvasPattern;
+    lineWidth: number;
+    lineJoin: CanvasLineJoin;
+    globalAlpha: number;
+    font: string;
+    textAlign: CanvasTextAlign;
+    textBaseline: CanvasTextBaseline;
+    letterSpacing: string;
+  }[] = [];
+
   save(): void {
+    this.saved.push({
+      fillStyle: this._fillStyle,
+      strokeStyle: this._strokeStyle,
+      lineWidth: this._lineWidth,
+      lineJoin: this._lineJoin,
+      globalAlpha: this._globalAlpha,
+      font: this._font,
+      textAlign: this._textAlign,
+      textBaseline: this._textBaseline,
+      letterSpacing: this.letterSpacing
+    });
     this.record('save', []);
   }
 
   restore(): void {
+    const state = this.saved.pop();
+    if (state !== undefined) {
+      this._fillStyle = state.fillStyle;
+      this._strokeStyle = state.strokeStyle;
+      this._lineWidth = state.lineWidth;
+      this._lineJoin = state.lineJoin;
+      this._globalAlpha = state.globalAlpha;
+      this._font = state.font;
+      this._textAlign = state.textAlign;
+      this._textBaseline = state.textBaseline;
+      this.letterSpacing = state.letterSpacing;
+    }
     this.record('restore', []);
   }
 
@@ -217,6 +258,29 @@ export class RecordingCanvasContext implements Canvas2DContext {
 
   drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void {
     this.record('drawImage', [image, dx, dy, dw, dh]);
+  }
+
+  // Path calls a painter's recording makes when it is replayed straight
+  // onto the frame's context (`PaintPictureCache.draw`), rather than
+  // onto a picture canvas of its own.
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.record('transform', [a, b, c, d, e, f]);
+  }
+
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void {
+    this.record('quadraticCurveTo', [cx, cy, x, y]);
+  }
+
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void {
+    this.record('bezierCurveTo', [c1x, c1y, c2x, c2y, x, y]);
+  }
+
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise = false): void {
+    this.record('arc', [x, y, radius, startAngle, endAngle, counterclockwise]);
+  }
+
+  setLineDash(segments: readonly number[]): void {
+    this.record('setLineDash', [segments]);
   }
 
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): RecordedGradient {

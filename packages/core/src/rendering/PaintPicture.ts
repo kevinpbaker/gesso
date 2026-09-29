@@ -41,6 +41,12 @@ const MAX_PICTURE_SIDE = 8192;
 
 interface PaintedSlot {
   picture: UiImage | null;
+  /**
+   * Whether `recording` has been turned into `picture` yet. A recording
+   * drawn straight onto a Canvas2D context has not: it gets its bitmap
+   * on the first frame its inputs stay put. See `draw`.
+   */
+  rasterized: boolean;
   recording: PaintRecording;
   paint: UiPaint | undefined;
   path: UiPath | undefined;
@@ -60,6 +66,11 @@ export interface PaintStats {
   rasterized: number;
   /** How many times a renderer asked for a node's picture. */
   resolved: number;
+  /**
+   * How many times a new recording was replayed straight onto the
+   * frame's context instead of into a bitmap. See `draw`.
+   */
+  direct: number;
 }
 
 /**
@@ -75,6 +86,14 @@ export interface PaintStats {
  * nothing for them to disagree about. What the parity gate then checks
  * is what remains: that both place the same picture in the same box,
  * at the same point in paint order, under the same clip and opacity.
+ *
+ * **A picture that changes every frame is the exception**, on Canvas2D:
+ * `draw` replays its new recording straight onto the frame and makes a
+ * bitmap only on the first frame its inputs hold still. The parity
+ * claim is kept where it is made — both backends draw the same bitmap of
+ * a settled picture, and a changing one is the same recording through
+ * the same `PaintTarget` — and a canvas whose layers move every frame
+ * stops paying for a bitmap per layer per frame that nobody draws twice.
  *
  * **The cost follows the change.** A frame that draws a painted node
  * whose inputs, box, scale and theme are unchanged makes no recording
@@ -92,7 +111,7 @@ export interface PaintStats {
 export class PaintPictureCache {
   private readonly slots = new WeakMap<UiNode, PaintedSlot>();
   private createCanvas: PaintCanvasFactory;
-  readonly stats: PaintStats = { recorded: 0, rasterized: 0, resolved: 0 };
+  readonly stats: PaintStats = { recorded: 0, rasterized: 0, resolved: 0, direct: 0 };
 
   constructor(createCanvas: PaintCanvasFactory = offscreenPaintCanvas) {
     this.createCanvas = createCanvas;
@@ -107,6 +126,7 @@ export class PaintPictureCache {
     this.stats.recorded = 0;
     this.stats.rasterized = 0;
     this.stats.resolved = 0;
+    this.stats.direct = 0;
   }
 
   /**
@@ -119,60 +139,109 @@ export class PaintPictureCache {
    */
   pictureFor(node: UiNode, rec: LayoutRecord, scale: number): UiImage | undefined {
     this.stats.resolved++;
-    const paint = node.properties.get('paint') as UiPaint | undefined;
-    const path = node.properties.get('path') as UiPath | undefined;
-    if (paint === undefined && path === undefined) {
+    const key = keyFor(node, rec, scale);
+    if (key === null) {
       return undefined;
     }
-    if (!(rec.width > 0) || !(rec.height > 0)) {
-      return undefined;
-    }
-    const clipPath = node.properties.get('clipPath') as string | undefined;
-    const blur = node.properties.get('blur') as number | undefined;
     const slot = this.slots.get(node);
-    if (
-      slot !== undefined &&
-      slot.picture !== null &&
-      slot.width === rec.width &&
-      slot.height === rec.height &&
-      slot.scale === scale &&
-      slot.environment === node.environment &&
-      slot.clipPath === clipPath &&
-      slot.blur === blur &&
-      paintValuesEqual(slot.paint, paint) &&
-      pathValuesEqual(slot.path, path)
-    ) {
-      return slot.picture;
+    if (slot !== undefined && matches(slot, key)) {
+      return this.pictureOf(node, slot, key.box) ?? undefined;
     }
+    const recording = this.record(key.paint, key.path, key.clipPath, key.blur, key.box);
+    const next = this.remember(node, slot, key, recording);
+    return this.pictureOf(node, next, key.box) ?? undefined;
+  }
 
-    const box: PaintBox = {
-      width: rec.width,
-      height: rec.height,
-      paddingTop: rec.paddingTop,
-      paddingRight: rec.paddingRight,
-      paddingBottom: rec.paddingBottom,
-      paddingLeft: rec.paddingLeft,
-      scale
-    };
-    const recording = this.record(paint, path, clipPath, blur, box);
-    const picture = this.rasterize(node, recording, box);
+  /**
+   * Draws a node's picture onto a Canvas2D frame, making a bitmap only
+   * when one will be drawn more than once.
+   *
+   * `pictureFor` rasterises every new recording into a bitmap, which
+   * pays for itself when the picture is drawn again — a chart that
+   * changed once and is panned for a minute. It does not when the
+   * picture changes every frame: the bitmap is drawn once and thrown
+   * away, and the frame has paid for a canvas cleared, a separate
+   * flush, and a composite of every pixel of it. gessologic's canvas
+   * redraws a layer of live wires per tile per frame, and in software
+   * rendering `transferToImageBitmap` alone was a quarter of the render
+   * worker's time.
+   *
+   * So a recording made this frame is replayed straight onto the
+   * frame's context, clipped to the node's box, and no bitmap is made.
+   * If the next frame finds the inputs unchanged, it makes the bitmap
+   * then and draws that from there on, exactly as `pictureFor` would.
+   * A picture that changes every frame is never rasterised twice; one
+   * that settles is rasterised once, a frame late.
+   *
+   * Canvas2D only. WebGPU has no path pipeline to replay onto, which is
+   * the reason the cache exists (see the class comment), and asks
+   * `pictureFor`. The two backends then differ only in when the pixels
+   * of a changing picture are made, not in which: both come from the
+   * same recording through the same `PaintTarget`.
+   */
+  draw(node: UiNode, rec: LayoutRecord, scale: number, ctx: PaintContext2D): void {
+    this.stats.resolved++;
+    const key = keyFor(node, rec, scale);
+    if (key === null) {
+      return;
+    }
+    const slot = this.slots.get(node);
+    if (slot !== undefined && matches(slot, key)) {
+      const picture = this.pictureOf(node, slot, key.box);
+      if (picture !== null) {
+        ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
+      }
+      return;
+    }
+    const recording = this.record(key.paint, key.path, key.clipPath, key.blur, key.box);
+    this.remember(node, slot, key, recording);
+    if (recording.ops.length === 0) {
+      return;
+    }
+    this.stats.direct++;
+    ctx.save();
+    ctx.translate(rec.x, rec.y);
+    ctx.beginPath();
+    ctx.rect(0, 0, rec.width, rec.height);
+    ctx.clip();
+    replayPaint(recording, new PaintTarget(ctx, resolverFor(node)));
+    ctx.restore();
+  }
+
+  /** A slot's bitmap, made now if it has not been. */
+  private pictureOf(node: UiNode, slot: PaintedSlot, box: PaintBox): UiImage | null {
+    if (!slot.rasterized) {
+      slot.picture = this.rasterize(node, slot.recording, box);
+      slot.rasterized = true;
+    }
+    return slot.picture;
+  }
+
+  private remember(
+    node: UiNode,
+    previous: PaintedSlot | undefined,
+    key: SlotKey,
+    recording: PaintRecording
+  ): PaintedSlot {
     // The old bitmap is released now rather than when the collector
     // gets to it: a chart repainting on a stream would otherwise hold
     // every frame it has ever drawn until it did.
-    slot?.picture?.close?.();
-    this.slots.set(node, {
-      picture,
+    previous?.picture?.close?.();
+    const slot: PaintedSlot = {
+      picture: null,
+      rasterized: false,
       recording,
-      paint,
-      path,
-      clipPath,
-      blur,
+      paint: key.paint,
+      path: key.path,
+      clipPath: key.clipPath,
+      blur: key.blur,
       environment: node.environment,
-      width: rec.width,
-      height: rec.height,
-      scale
-    });
-    return picture ?? undefined;
+      width: key.box.width,
+      height: key.box.height,
+      scale: key.box.scale
+    };
+    this.slots.set(node, slot);
+    return slot;
   }
 
   /**
@@ -245,6 +314,57 @@ export class PaintPictureCache {
  * make it possible for them not to.
  */
 export const paintPictures = new PaintPictureCache();
+
+/** Everything a slot's picture depends on, read off the node and its box. */
+interface SlotKey {
+  readonly paint: UiPaint | undefined;
+  readonly path: UiPath | undefined;
+  readonly clipPath: string | undefined;
+  readonly blur: number | undefined;
+  readonly environment: UiEnvironment | null;
+  readonly box: PaintBox;
+}
+
+/** The key for a node's picture, or null when it paints nothing or its box has no area. */
+function keyFor(node: UiNode, rec: LayoutRecord, scale: number): SlotKey | null {
+  const paint = node.properties.get('paint') as UiPaint | undefined;
+  const path = node.properties.get('path') as UiPath | undefined;
+  if (paint === undefined && path === undefined) {
+    return null;
+  }
+  if (!(rec.width > 0) || !(rec.height > 0)) {
+    return null;
+  }
+  return {
+    paint,
+    path,
+    clipPath: node.properties.get('clipPath') as string | undefined,
+    blur: node.properties.get('blur') as number | undefined,
+    environment: node.environment,
+    box: {
+      width: rec.width,
+      height: rec.height,
+      paddingTop: rec.paddingTop,
+      paddingRight: rec.paddingRight,
+      paddingBottom: rec.paddingBottom,
+      paddingLeft: rec.paddingLeft,
+      scale
+    }
+  };
+}
+
+function matches(slot: PaintedSlot, key: SlotKey): boolean {
+  return (
+    slot.width === key.box.width &&
+    slot.height === key.box.height &&
+    slot.scale === key.box.scale &&
+    slot.environment === key.environment &&
+    slot.clipPath === key.clipPath &&
+    slot.blur === key.blur &&
+    paintValuesEqual(slot.paint, key.paint) &&
+    pathValuesEqual(slot.path, key.path)
+  );
+}
 
 /** A painter's colour values, against the node's own theme. */
 function resolverFor(node: UiNode): PaintResolver {

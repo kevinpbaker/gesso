@@ -4403,6 +4403,7 @@ interface PaintStats {
   recorded: number;
   rasterized: number;
   resolved: number;
+  direct: number;
 }
 declare class PaintPictureCache {
   private readonly slots;
@@ -4412,6 +4413,9 @@ declare class PaintPictureCache {
   setCanvasFactory(factory: PaintCanvasFactory): void;
   resetStats(): void;
   pictureFor(node: UiNode, rec: LayoutRecord, scale: number): UiImage | undefined;
+  draw(node: UiNode, rec: LayoutRecord, scale: number, ctx: PaintContext2D): void;
+  private pictureOf;
+  private remember;
   recordingFor(node: UiNode): PaintRecording;
   private record;
   private rasterize;
@@ -6714,7 +6718,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-blB0IGRr.js";
+} from "./index-vOA2LlKv.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7626,7 +7630,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-blB0IGRr.js";
+} from "./index-vOA2LlKv.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -7740,6 +7744,7 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   set textAlign(value: CanvasTextAlign);
   get textBaseline(): CanvasTextBaseline;
   set textBaseline(value: CanvasTextBaseline);
+  private readonly saved;
   save(): void;
   restore(): void;
   translate(x: number, y: number): void;
@@ -7761,6 +7766,11 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): TextMetrics;
   drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise?: boolean): void;
+  setLineDash(segments: readonly number[]): void;
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): RecordedGradient;
   createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): RecordedGradient;
   private record;

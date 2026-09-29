@@ -414,6 +414,14 @@ function webgpuDraws(list: RenderList): Draw[] {
 
 function expectParity(h: RenderHarness, root: UiNode, constraints = Constraints.tight(800, 600)): Draw[] {
   h.layout(root, constraints);
+  // A frame first, then the frame that is compared. A painted node's
+  // picture is replayed straight onto a Canvas2D frame on the frame its
+  // inputs change, and becomes the bitmap both backends draw only on the
+  // frame after (`PaintPictureCache.draw`). Parity is the claim about
+  // that bitmap: both backends place the same picture in the same box.
+  // The replayed frame's placement has its own spec, in
+  // `PaintPicture.budget.spec.ts`.
+  h.renderer.render(root, { layout: h.engine, text: h.measurer, now: NOW });
   h.context.calls.length = 0;
   h.renderer.render(root, { layout: h.engine, text: h.measurer, now: NOW });
   const canvas = canvasDraws(h.context.calls);

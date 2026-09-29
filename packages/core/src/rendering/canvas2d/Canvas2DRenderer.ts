@@ -31,6 +31,7 @@ import { drawOverlayShapes } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
 import { ScaledImageCache } from '../ScaledImageCache';
 import { paintPictures } from '../PaintPicture';
+import type { PaintContext2D } from '../PaintTarget';
 
 export interface Canvas2DRendererOptions {
   /**
@@ -533,11 +534,10 @@ export class Canvas2DRenderer implements UiRenderer {
    * story for a painted node.
    */
   private paintPicture(ctx: Canvas2DContext, node: UiNode, rec: LayoutRecord): void {
-    const picture = paintPictures.pictureFor(node, rec, this.surface.dpr);
-    if (picture === undefined) {
-      return;
-    }
-    ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
+    // `draw` rather than `pictureFor`: a picture that changed this frame
+    // is replayed onto this context instead of rasterised into a bitmap
+    // used once. See `PaintPictureCache.draw`.
+    paintPictures.draw(node, rec, this.surface.dpr, ctx as unknown as PaintContext2D);
   }
 
   /**
