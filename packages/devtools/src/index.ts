@@ -8,8 +8,10 @@
  * therefore the error overlay — the worker's exceptions, source-mapped,
  * drawn over the application that was running when they were thrown.
  *
- * Four tools in the page: the overlay, the node inspector, the frame
- * profiler and the store action log. And one outside it: the devtools
+ * Five tools in the page: the overlay, the node inspector, the frame
+ * profiler, the store action log, and the proof strip — a main-thread
+ * readout that a stranger can believe, with a button that blocks the
+ * main thread to show the application carrying on without it. And one outside it: the devtools
  * panel, which shows the tree, a node's report, the workers' consoles,
  * the profiler and the action log through a port, so it can be a
  * browser extension's panel or a pane beside the application.
@@ -110,3 +112,13 @@ export {
   type OriginalPosition,
   type SourceMapV3
 } from './sourceMap';
+export {
+  PROOF_RECORDING,
+  ProofRecording,
+  proofPanel,
+  type ProofBlock,
+  type ProofFrame,
+  type ProofHandle,
+  type ProofPanelOptions,
+  type ProofReadout
+} from './ProofPanel';

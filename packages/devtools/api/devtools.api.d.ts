@@ -21,6 +21,7 @@ import {
   UiFramePhase,
   UiNodeReport,
   UiTreeNode,
+  WorkerApp,
   WorkerHandle
 } from "gesso-framework";
 interface SourceMapV3 {
@@ -338,6 +339,65 @@ declare function mapStack(frames: StackFrame[], store: SourceMapStore): Promise<
 declare function primaryFrame(frames: StackFrame[]): StackFrame | null;
 declare function shortenPath(url: string, origin?: string): string;
 declare function formatFrame(frame: StackFrame, origin?: string): string;
+interface ProofPanelOptions {
+  readonly global?: string;
+  readonly blockMs?: number;
+  readonly layout?: boolean;
+}
+interface ProofFrame {
+  readonly at: number;
+  readonly durationMs: number;
+  readonly measured: number;
+  readonly nodes: number;
+  readonly inputLatencyMs: number | null;
+  readonly renderer: string;
+  readonly phases: Record<string, number>;
+  readonly gpu: Record<string, number> | null;
+}
+interface ProofHandle {
+  frames(): readonly ProofFrame[];
+  reset(): void;
+  lastBlock(): ProofBlock | null;
+}
+interface ProofBlock {
+  readonly start: number;
+  readonly end: number;
+}
+type ProofReadout = {
+  readonly idle: true;
+} | {
+  readonly idle: false;
+  readonly fps: number;
+  readonly worstGapMs: number;
+  readonly medianWorkMs: number;
+};
+declare const PROOF_RECORDING = 2000;
+declare class ProofRecording implements ProofHandle {
+  private readonly hostNow;
+  private readonly recorded;
+  private readonly finishes;
+  private readonly costs;
+  private offset;
+  private block;
+  private peak;
+  constructor(hostNow?: () => number);
+  frame(metrics: FrameMetrics): void;
+  workerNow(): number;
+  blocked(start: number, end: number): void;
+  readout(): ProofReadout;
+  peakMeasured(): number;
+  frames(): readonly ProofFrame[];
+  lastBlock(): ProofBlock | null;
+  reset(): void;
+}
+declare function proofPanel(host: HTMLElement, options?: ProofPanelOptions): {
+  readonly recording: ProofRecording;
+  readonly options: {
+    onFrame: (metrics: FrameMetrics) => void;
+    onInspect?: (report: UiNodeReport | null) => void;
+  };
+  readonly attach: (app: WorkerApp) => void;
+};
 export {
   actionGlyph,
   codeFrame,
@@ -367,6 +427,9 @@ export {
   parseStack,
   pathTo,
   primaryFrame,
+  PROOF_RECORDING,
+  proofPanel,
+  ProofRecording,
   renderNodeReport,
   rowLabel,
   shortenPath,
@@ -414,6 +477,11 @@ export {
   type PanelMessage,
   type PanelPort,
   type PatchEntry,
+  type ProofBlock,
+  type ProofFrame,
+  type ProofHandle,
+  type ProofPanelOptions,
+  type ProofReadout,
   type RenderWorkerHost,
   type RenderWorkerTap,
   type RenderWorkerTapOptions,
