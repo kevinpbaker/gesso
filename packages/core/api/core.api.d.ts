@@ -2798,6 +2798,7 @@ declare class UiWheelController {
   scrollabilityOf(target: UiNode | null): UiScrollability;
   scrollsAnything(): boolean;
   private scrollChain;
+  private appContainsOverscroll;
   private applyDelta;
   private toPixels;
 }
@@ -6713,7 +6714,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BzXn0Bci.js";
+} from "./index-blB0IGRr.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7625,7 +7626,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BzXn0Bci.js";
+} from "./index-blB0IGRr.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
