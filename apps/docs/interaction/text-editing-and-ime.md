@@ -202,10 +202,17 @@ push its other children narrower with every character typed. The box
 clips and the text behind it carries a scroll offset, exactly as a
 scroll container carries one for its children.
 
-It is not a scroll container, though: it draws no scrollbars and the
-wheel does not scroll it. It follows the caret, which is what a text
-field does, and the caret is then revealed through any real scroll
-containers above it.
+It follows the caret, which is what a text field does, and the caret
+is then revealed through any real scroll containers above it. The
+wheel scrolls it too, on either axis it overflows, stopping where the
+caret would, and without moving the caret; a wheel it has no room for
+goes on to the scroll container around it. A multiline field shows the
+overlay scrollbar a scroll container does while it scrolls, which
+hovering its edge also reveals and which can be dragged once it shows.
+A single-line field draws none.
+
+It is not a scroll container, though. It has no children to scroll,
+and a finger on it places the caret rather than panning the text.
 
 ## Semantics
 

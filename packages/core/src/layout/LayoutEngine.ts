@@ -3,7 +3,7 @@ import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { resolveFont } from '../properties/UiTextFont';
 import { editableSpansOf, resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
-import { CARET_WIDTH, editorFor } from '../editing/UiEditable';
+import { editorFor } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
   AlignContent,
@@ -22,6 +22,7 @@ import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
 import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 import { LayoutRecord } from './LayoutRecord';
+import { scrollRange } from './Scrollbars';
 import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer } from './TextMeasurer';
@@ -1270,6 +1271,12 @@ export class LayoutEngine {
     return this.scrollNodes;
   }
 
+  /** Everything that can show a scrollbar: scroll containers, then fields. */
+  private *scrollbarNodes(): Iterable<UiNode> {
+    yield* this.scrollNodes;
+    yield* this.textScrollNodes;
+  }
+
   /**
    * When the next scrollbar changes appearance (starts fading or
    * disappears), or undefined when none is showing. Lets a host schedule
@@ -1277,9 +1284,9 @@ export class LayoutEngine {
    */
   nextScrollbarChange(now: number): number | undefined {
     let next: number | undefined;
-    for (const node of this.scrollNodes) {
+    for (const node of this.scrollbarNodes()) {
       const rec = this.records.get(node);
-      if (rec === undefined || !rec.scrollable || rec.scrollbarVisibleUntil <= now) {
+      if (rec === undefined || !(rec.scrollable || rec.textScrollbars) || rec.scrollbarVisibleUntil <= now) {
         continue;
       }
       if (rec.contentWidth <= rec.width && rec.contentHeight <= rec.height) {
@@ -3662,8 +3669,8 @@ export class LayoutEngine {
     for (const node of this.scrollNodes) {
       this.applyScrollOffset(node, false);
     }
-    // A field has no scrollbars, so nothing lingers after it scrolls;
-    // it does keep room for the caret past the end of its text.
+    // A single-line field has no scrollbars, so nothing lingers after
+    // it scrolls; any field keeps room for the caret past its text.
     for (const node of this.textScrollNodes) {
       this.applyScrollOffset(node, true);
     }
@@ -3672,32 +3679,21 @@ export class LayoutEngine {
 
   /**
    * Brings a record's scroll offset up to date with its `scrollX` and
-   * `scrollY` properties, clamped to what there is to scroll. This runs
-   * every pass, so an offset written against a larger content — a field
-   * whose text has since been deleted, a list that lost rows — comes
-   * back into range on its own.
-   *
-   * A field that scrolls may go one caret width further than its text,
-   * so that a caret at the very end is inside the box and not on its
-   * edge, where the clip would take it. A field wide enough for its
-   * text does not: the allowance would shift the line by a pixel the
-   * moment the caret reached the end.
+   * `scrollY` properties, clamped to what there is to scroll (see
+   * `scrollRange`). This runs every pass, so an offset written against
+   * a larger content — a field whose text has since been deleted, a
+   * list that lost rows — comes back into range on its own.
    */
   private applyScrollOffset(node: UiNode, field: boolean): void {
     const rec = this.record(node);
     const rawX = this.numberProp(node, 'scrollX') ?? 0;
     const rawY = this.numberProp(node, 'scrollY') ?? 0;
-    const caret = field ? CARET_WIDTH : 0;
-    const overflowX = rec.contentWidth - rec.width;
-    const overflowY = rec.contentHeight - rec.height;
-    const maxX = overflowX > 0 ? overflowX + caret : 0;
-    const maxY = overflowY > 0 ? overflowY + caret : 0;
-    const scrollX = this.clamp(rawX, 0, maxX);
-    const scrollY = this.clamp(rawY, 0, maxY);
+    const scrollX = this.clamp(rawX, 0, scrollRange(rec, 'x'));
+    const scrollY = this.clamp(rawY, 0, scrollRange(rec, 'y'));
     if (scrollX !== rec.scrollX || scrollY !== rec.scrollY) {
       rec.scrollX = scrollX;
       rec.scrollY = scrollY;
-      if (!field) {
+      if (!field || rec.textScrollbars) {
         // Overlay scrollbars show while the user scrolls and linger a
         // moment after; the host repaints when they fade.
         rec.scrollbarVisibleUntil = this.now() + SCROLLBAR_LINGER_MS;
@@ -3982,9 +3978,11 @@ export class LayoutEngine {
     rec.positioned = rec.absolute || rec.sticky || position === 'relative';
     const overflow = props.get('overflow');
     rec.scrollable = node.type === UiNodeType.ScrollView || overflow === 'scroll' || overflow === 'auto';
-    // Only a scroll container asks, and there are few of them, so this
-    // resolution is not on the path every box takes.
-    rec.mirrored = rec.scrollable && this.startEdge(node) === 'right';
+    rec.scrollsText = node.type === UiNodeType.EditableText;
+    rec.textScrollbars = rec.scrollsText && props.get('multiline') === true;
+    // Only something with scrollbars asks, and there are few of them,
+    // so this resolution is not on the path every box takes.
+    rec.mirrored = (rec.scrollable || rec.textScrollbars) && this.startEdge(node) === 'right';
     // An editable clips like a form control: its box is a window on the
     // text, which scrolls behind it (see `measureLeaf`). Without this a
     // field narrower than its line would paint the overflow across

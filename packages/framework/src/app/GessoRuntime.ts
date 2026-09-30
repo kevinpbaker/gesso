@@ -32,6 +32,7 @@ import {
   type UiElement,
   Stack,
   scrollbarThumb,
+  scrollRange,
   UiVirtualWindow,
   UiVirtualSheet,
   VIRTUAL_INDEX_PROP,
@@ -711,9 +712,7 @@ export class GessoRuntime {
         if (record === undefined) {
           return 0;
         }
-        return axis === 'scrollY'
-          ? Math.max(0, record.contentHeight - record.height)
-          : Math.max(0, record.contentWidth - record.width);
+        return scrollRange(record, axis === 'scrollY' ? 'y' : 'x');
       }
     );
     // And the router, whose matches hold route definitions, which hold
@@ -2527,8 +2526,8 @@ export class GessoRuntime {
         return {
           scrollX: record.scrollX,
           scrollY: record.scrollY,
-          maxScrollX: Math.max(0, record.contentWidth - record.width),
-          maxScrollY: Math.max(0, record.contentHeight - record.height),
+          maxScrollX: scrollRange(record, 'x'),
+          maxScrollY: scrollRange(record, 'y'),
           horizontal: node.getProperty('direction') === 'row' || node.type === UiNodeType.Row,
           viewportWidth: record.width,
           viewportHeight: record.height

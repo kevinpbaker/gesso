@@ -112,9 +112,10 @@ this arrives with the component and none of it is yours to write:
   clipboard is reachable only from a user gesture there. Newlines
   pasted into a single-line field become spaces.
 - **Scrolling that follows the caret.** A single-line field scrolls its
-  text rather than wrapping it. It is not a scroll container, so it
-  draws no scrollbars and the wheel does not scroll it; it follows the
-  caret, which is what a text field does.
+  text rather than wrapping it, and follows the caret, which is what a
+  text field does. The wheel scrolls a field that overflows as well,
+  without moving the caret, and a multiline one shows an overlay
+  scrollbar while it scrolls.
 
 What is not here: password masking, a `maxLength`, and drag-and-drop of
 text. There is no `type` prop, so a field that must hide what it holds

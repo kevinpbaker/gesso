@@ -16,7 +16,8 @@ import {
   type UiTextChangeEvent,
   type EditingState,
   type CanvasHost,
-  UiManualFrameClock
+  UiManualFrameClock,
+  scrollbarThumb
 } from 'gesso-core';
 import { GessoRuntime } from './GessoRuntime';
 
@@ -485,6 +486,112 @@ describe('GessoRuntime editing', () => {
     tick();
     expect(runtime.explain(field).state.clips).toBe(true);
     expect(runtime.explain(field).scroll!.scrollX).toBe(0);
+  });
+
+  it('scrolls a tall field on the wheel, without moving the caret', () => {
+    // A hundred 16.8px lines in a 200px field.
+    const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
+    const { runtime, field, model, press, tick } = mount(
+      Column(EditableText({ value: lines, multiline: true, width: 300, height: 200 }))
+    );
+    press(5, 5);
+    const caret = model().focus;
+    runtime.input.wheel.wheel(50, 50, 0, 120);
+    tick();
+    expect(runtime.explain(field).scroll!.scrollY).toBe(120);
+    expect(model().focus).toBe(caret);
+
+    // The wheel stops where Ctrl+End's caret-follow would, and no
+    // further: the text's height past the box, and a caret's width.
+    runtime.input.wheel.wheel(50, 50, 0, 100_000);
+    tick();
+    const wheeled = runtime.explain(field).scroll!.scrollY;
+    const { contentHeight } = runtime.explain(field).scroll!;
+    expect(wheeled).toBe(contentHeight - 200 + 1);
+    runtime.input.wheel.wheel(50, 50, 0, -100_000);
+    tick();
+    expect(runtime.explain(field).scroll!.scrollY).toBe(0);
+  });
+
+  it('chains a wheel its field has no room for to the scroll container around it', () => {
+    const { runtime, find, tick } = mount(
+      Column(
+        ScrollView(
+          { height: 100, width: 200 },
+          Column(EditableText({ value: 'one line', width: 150 }), Column({ height: 400 }))
+        )
+      )
+    );
+    runtime.input.wheel.wheel(5, 5, 0, 50);
+    tick();
+    expect(find(UiNodeType.ScrollView).properties.get('scrollY')).toBe(50);
+  });
+
+  it('scrolls an unwrapped field sideways on a horizontal wheel', () => {
+    const { runtime, field, tick } = mount(Column(EditableText({ value: 'abcdefghijklmnopqrstuvwxyz', width: 70 })));
+    const event = runtime.input.wheel.wheel(5, 5, 40, 0);
+    tick();
+    expect(event.consumed).toBe(true);
+    expect(runtime.explain(field).scroll!.scrollX).toBe(40);
+  });
+
+  it('shows a multiline field its scrollbar while it scrolls, and a single-line one none', () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
+    const { runtime, field, tick } = mount(
+      Column(EditableText({ value: lines, multiline: true, width: 300, height: 200 }))
+    );
+    const record = runtime['engine'].recordFor(field)!;
+    expect(record.scrollbarVisibleUntil).toBe(0);
+    runtime.input.wheel.wheel(50, 50, 0, 120);
+    tick();
+    expect(record.scrollbarVisibleUntil).toBeGreaterThan(0);
+    expect(runtime['engine'].nextScrollbarChange(0)).toBeDefined();
+
+    const single = mount(Column(EditableText({ value: 'abcdefghijklmnopqrstuvwxyz', width: 70 })));
+    single.runtime.input.wheel.wheel(5, 5, 40, 0);
+    single.tick();
+    expect(single.runtime['engine'].recordFor(single.field)!.scrollbarVisibleUntil).toBe(0);
+  });
+
+  it("drags a field's scrollbar once it shows, and leaves a press on the hidden one to the caret", () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `${'x'.repeat(50)} ${i}`).join('\n');
+    const { runtime, field, model, press, tick } = mount(
+      Column(EditableText({ value: lines, multiline: true, textWrap: 'none', width: 300, height: 200 }))
+    );
+    const record = runtime['engine'].recordFor(field)!;
+    const hidden = scrollbarThumb(record, 'y')!;
+    // Hidden, the thumb's band is the ends of lines like any other.
+    press(hidden.thumb.x + 2, hidden.thumb.y + 2);
+    expect(runtime.input.focus.focusedNode).toBe(field);
+    expect(model().focus).toBeGreaterThan(0);
+    expect(record.scrollY).toBe(0);
+
+    runtime.input.wheel.wheel(50, 50, 0, 1);
+    tick();
+    const bar = scrollbarThumb(record, 'y')!;
+    const caret = model().focus;
+    runtime.input.pointer.pointerDown(bar.thumb.x + 2, bar.thumb.y + 2, 1, noKeyModifiers());
+    runtime.input.pointer.pointerMove(bar.thumb.x + 2, bar.thumb.y + 42, 1, noKeyModifiers());
+    runtime.input.pointer.pointerUp(bar.thumb.x + 2, bar.thumb.y + 42, 0, noKeyModifiers());
+    tick();
+    expect(record.scrollY).toBeGreaterThan(100);
+    expect(model().focus).toBe(caret);
+  });
+
+  it('keeps a scroll container where it is when a press lands far down a tall field in it', () => {
+    const lines = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n');
+    const { runtime, find, model, press, tick } = mount(
+      Column(ScrollView({ height: 100, width: 200 }, EditableText({ value: lines, multiline: true })))
+    );
+    const scroller = find(UiNodeType.ScrollView);
+    runtime.input.wheel.wheel(5, 5, 0, 300);
+    tick();
+    expect(scroller.properties.get('scrollY')).toBe(300);
+    // 50px down the viewport is 350px into the text: line 20.
+    press(1, 50);
+    tick();
+    expect(model().focus).toBe(lines.indexOf('line 20'));
+    expect(scroller.properties.get('scrollY')).toBe(300);
   });
 
   it('sizes an empty field by its placeholder', () => {

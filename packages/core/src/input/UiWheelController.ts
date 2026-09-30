@@ -320,7 +320,7 @@ export class UiWheelController {
     let left = false;
     let right = false;
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
-      const state = isScrollContainer(node) ? this.scrollSink.containerState(node) : undefined;
+      const state = takesWheel(node) ? this.scrollSink.containerState(node) : undefined;
       if (state !== undefined) {
         left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
         right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
@@ -386,7 +386,7 @@ export class UiWheelController {
     wheelDeltaY: number | undefined
   ): void {
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
-      const state = isScrollContainer(node) ? this.scrollSink.containerState(node) : undefined;
+      const state = takesWheel(node) ? this.scrollSink.containerState(node) : undefined;
       if (state === undefined) {
         if (containsOverscroll(node)) {
           event.markConsumed();
@@ -502,6 +502,17 @@ function behaviorFor(
     return 'instant';
   }
   return isNotchedWheel(deltaMode, wheelDeltaY) ? 'smooth' : 'instant';
+}
+
+/**
+ * Whether the wheel scrolls this node: a scroll container, or an
+ * editable, which scrolls its own text.
+ *
+ * Only the wheel. A finger on a field places a caret or selects, and a
+ * scrollbar drag is found by hit test, so neither asks this.
+ */
+function takesWheel(node: UiNode): boolean {
+  return isScrollContainer(node) || node.type === UiNodeType.EditableText;
 }
 
 /** A ScrollView, or any node with overflow 'scroll' or 'auto'. */

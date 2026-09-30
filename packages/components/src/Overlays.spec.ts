@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
@@ -173,6 +173,35 @@ describe('Dialog', () => {
     expect(inner.value).toBe(false);
     expect(outer.value).toBe(true);
     expect(ui.entries()).toHaveLength(1);
+  });
+
+  it('follows a title given as an observable, open and reopened', () => {
+    // gessologic's program editor: a title from two streams, whose
+    // suffix was reported as sticking. It does not, in a test.
+    const program = new BehaviorSubject('alu');
+    const edited = new BehaviorSubject(false);
+    const title = combineLatest([program, edited]).pipe(map(([name, dirty]) => (dirty ? `${name} (edited)` : name)));
+    const open = new BehaviorSubject(true);
+    const ui = mount(createComponent(Dialog, { open, title, content: Row() }));
+    const seen = (): string[] => [
+      ui.recordFor('dialog')?.label ?? '',
+      ...ui.getAllByText(/alu|mul/).map(n => String(n.properties.get('text')))
+    ];
+    ui.frame();
+    expect(seen()).toEqual(['alu', 'alu']);
+    edited.next(true);
+    ui.frame();
+    expect(seen()).toEqual(['alu (edited)', 'alu (edited)']);
+    edited.next(false);
+    program.next('mul');
+    ui.frame();
+    expect(seen()).toEqual(['mul', 'mul']);
+    open.next(false);
+    ui.frame();
+    edited.next(true);
+    open.next(true);
+    ui.frame();
+    expect(seen()).toEqual(['mul (edited)', 'mul (edited)']);
   });
 });
 

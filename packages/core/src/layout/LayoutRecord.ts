@@ -153,6 +153,25 @@ export class LayoutRecord {
   scrollable = false;
 
   /**
+   * An editable, which scrolls its own text inside its box.
+   *
+   * Not `scrollable`: it has no children to translate and its offset
+   * follows the caret, so every path that treats a scroll container's
+   * content as children leaves it alone. What it shares with one is
+   * the offset and its clamp — see `scrollRange` — and, when it is
+   * multiline, the overlay scrollbars.
+   */
+  scrollsText = false;
+
+  /**
+   * A multiline editable, which shows the overlay scrollbars a scroll
+   * container does over its own text. A single-line field scrolls
+   * sideways too, but a bar under one line of text reads as part of
+   * the control rather than a hint that there is more of it.
+   */
+  textScrollbars = false;
+
+  /**
    * A scroll container that reads right to left, so its overlay
    * scrollbar hangs on the left edge and the band that reveals it is
    * on the left too.
@@ -435,6 +454,8 @@ export class LayoutRecord {
     this.liftBoundary = false;
     this.clips = false;
     this.scrollable = false;
+    this.scrollsText = false;
+    this.textScrollbars = false;
     this.mirrored = false;
     this.sticky = false;
     this.stickyOffsetX = 0;

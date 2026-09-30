@@ -1,6 +1,7 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { Constraints } from '../layout/LayoutTypes';
+import { scrollRange } from '../layout/Scrollbars';
 import { LayoutHarness } from '../layout/LayoutTestUtils';
 import { UiHitTester } from './UiHitTester';
 import { UiInputDispatcher } from './UiInputDispatcher';
@@ -207,8 +208,8 @@ export class HarnessScrollSink implements ScrollSink {
     return {
       scrollX: record.scrollX,
       scrollY: record.scrollY,
-      maxScrollX: Math.max(0, record.contentWidth - record.width),
-      maxScrollY: Math.max(0, record.contentHeight - record.height),
+      maxScrollX: scrollRange(record, 'x'),
+      maxScrollY: scrollRange(record, 'y'),
       horizontal,
       viewportWidth: record.width,
       viewportHeight: record.height
@@ -221,10 +222,8 @@ export class HarnessScrollSink implements ScrollSink {
     if (record === undefined) {
       return;
     }
-    const maxX = Math.max(0, record.contentWidth - record.width);
-    const maxY = Math.max(0, record.contentHeight - record.height);
-    node.setProperty('scrollX', clamp(record.scrollX + dx, 0, maxX));
-    node.setProperty('scrollY', clamp(record.scrollY + dy, 0, maxY));
+    node.setProperty('scrollX', clamp(record.scrollX + dx, 0, scrollRange(record, 'x')));
+    node.setProperty('scrollY', clamp(record.scrollY + dy, 0, scrollRange(record, 'y')));
     this.harness.layoutTree();
   }
 

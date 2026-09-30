@@ -397,7 +397,7 @@ export class Canvas2DRenderer implements UiRenderer {
         true
       );
     }
-    if (rec.scrollable) {
+    if (rec.scrollable || rec.textScrollbars) {
       this.paintScrollbars(ctx, rec, context.now ?? performance.now());
     }
 

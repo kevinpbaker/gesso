@@ -350,6 +350,8 @@ declare class LayoutRecord {
   liftBoundary: boolean;
   clips: boolean;
   scrollable: boolean;
+  scrollsText: boolean;
+  textScrollbars: boolean;
   mirrored: boolean;
   sticky: boolean;
   stickyOffsetX: number;
@@ -2434,6 +2436,7 @@ declare const SCROLLBAR_INSET = 2;
 declare const SCROLLBAR_MIN_THUMB = 24;
 declare const SCROLLBAR_HOVER_ZONE = 16;
 type ScrollbarAxis = 'x' | 'y';
+declare function scrollRange(rec: LayoutRecord, axis: ScrollbarAxis): number;
 interface ScrollbarThumb {
   axis: ScrollbarAxis;
   thumb: LayoutBox;
@@ -3374,6 +3377,7 @@ declare class LayoutEngine {
   private textScrollAdjustment;
   revealScrollbars(node: UiNode): void;
   scrollContainers(): Iterable<UiNode>;
+  private scrollbarNodes;
   nextScrollbarChange(now: number): number | undefined;
   contentWindow(node: UiNode): LayoutBox;
   detachNode(node: UiNode): void;
@@ -5515,6 +5519,7 @@ export {
   ScrollOffset,
   scrollPosition,
   ScrollPositionArgs,
+  scrollRange,
   ScrollSink,
   ScrollView,
   ScrollViewProps,
@@ -5530,6 +5535,7 @@ export {
   setMatchRanges,
   setPerformanceMarks,
   setSelectionRange,
+  Sf,
   shadowsEqual,
   shapesEqual,
   SharedClaim,
@@ -5865,7 +5871,6 @@ export {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty,
-  xf,
   ZoomState
 };
 // ==== index.d.ts ====
@@ -6399,6 +6404,7 @@ import {
   ScrollOffset,
   scrollPosition,
   ScrollPositionArgs,
+  scrollRange,
   ScrollSink,
   ScrollView,
   ScrollViewProps,
@@ -6750,7 +6756,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CfUSbphd.js";
+} from "./index-CCz-6uPS.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7100,6 +7106,7 @@ export {
   scrollbarThumbs,
   scrollbarZoneAt,
   scrollPosition,
+  scrollRange,
   ScrollView,
   selectableTextNodes,
   selectableTextOf,
@@ -7665,7 +7672,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CfUSbphd.js";
+} from "./index-CCz-6uPS.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

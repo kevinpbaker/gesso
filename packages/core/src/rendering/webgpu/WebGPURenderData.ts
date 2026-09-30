@@ -1091,7 +1091,7 @@ export function buildRenderList(
       drawLifted(liftedFrom, nextClip, nextRounded);
     }
 
-    if (rec.scrollable) {
+    if (rec.scrollable || rec.textScrollbars) {
       beginPrimitives(ownScissor);
       pushScrollbars(instanceData, rec, effectiveOpacity, nodeCtm, ownRounded, now);
     }

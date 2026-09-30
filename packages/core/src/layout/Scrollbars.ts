@@ -1,3 +1,4 @@
+import { CARET_WIDTH } from '../editing/UiEditable';
 import type { LayoutRecord } from './LayoutRecord';
 import type { LayoutBox } from './LayoutTypes';
 
@@ -11,6 +12,24 @@ export const SCROLLBAR_MIN_THUMB = 24;
 export const SCROLLBAR_HOVER_ZONE = 16;
 
 export type ScrollbarAxis = 'x' | 'y';
+
+/**
+ * The furthest a record's content can be scrolled along an axis.
+ *
+ * The one answer the layout engine's clamp, the scrollbars and the
+ * scroll sinks all read, so a wheel stops exactly where the caret
+ * would. A field may go one caret width past its text, so that a
+ * caret at the very end is inside the box and not on the clipped
+ * edge; a field wide enough for its text gets no allowance, or the
+ * line would shift by a pixel the moment the caret reached the end.
+ */
+export function scrollRange(rec: LayoutRecord, axis: ScrollbarAxis): number {
+  const overflow = axis === 'y' ? rec.contentHeight - rec.height : rec.contentWidth - rec.width;
+  if (!(overflow > 0)) {
+    return 0;
+  }
+  return rec.scrollsText ? overflow + CARET_WIDTH : overflow;
+}
 
 /**
  * One scrollbar's geometry, in the container's record coordinates
@@ -55,7 +74,7 @@ function thumbFor(rec: LayoutRecord, axis: ScrollbarAxis): ScrollbarThumb | null
   const track = viewport - SCROLLBAR_INSET * 2;
   const length = Math.min(track, Math.max(SCROLLBAR_MIN_THUMB, (track * viewport) / content));
   const travel = Math.max(0, track - length);
-  const maxScroll = content - viewport;
+  const maxScroll = scrollRange(rec, axis);
   const offset = axis === 'y' ? rec.scrollY : rec.scrollX;
   const along = SCROLLBAR_INSET + (maxScroll > 0 ? (travel * offset) / maxScroll : 0);
   const thumb: LayoutBox =

@@ -434,7 +434,7 @@ export class UiHitTester implements HitTester {
       if (px < rec.x || px >= rec.x + rec.width || py < rec.y || py >= rec.y + rec.height) {
         return false;
       }
-      if (rec.scrollable && this.hitScrollbar(node, rec, px, py)) {
+      if ((rec.scrollable || rec.textScrollbars) && this.hitScrollbar(node, rec, px, py)) {
         return true;
       }
       if (this.zoneOnly) {
@@ -554,7 +554,10 @@ export class UiHitTester implements HitTester {
       return false;
     }
     const visible = rec.scrollbarVisibleUntil > (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    if (!onThumb && !visible && !this.zoneOnly) {
+    // A field's hidden thumb takes nothing: it lies over the ends of
+    // lines, and a press there is a caret being placed. It is grabbed
+    // once it is showing, which hovering the band does.
+    if (!visible && !this.zoneOnly && (!onThumb || !rec.scrollable)) {
       return false;
     }
     this.recordHit(node, rec, px, py);
