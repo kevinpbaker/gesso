@@ -161,6 +161,12 @@ class Draggable {
     );
     this.host.on(longPress ? UiEventType.DragMove : UiEventType.PanMove, event => this.move(event as UiPointerEvent));
     this.host.on(longPress ? UiEventType.DragEnd : UiEventType.PanEnd, event => this.end(event as UiPointerEvent));
+    if (longPress) {
+      // The long press is this node's: it is picked up, not asked for a
+      // menu, and the first move after it carries the node. Left alone,
+      // a mouse long press stays a slow click until it travels the slop.
+      this.host.on(UiEventType.LongPress, event => event.preventDefault());
+    }
     return this;
   }
 

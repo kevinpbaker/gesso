@@ -173,6 +173,38 @@ describe('UiGestureRecognizer', () => {
 
     controller.pointerDown(50, 50);
     vi.advanceTimersByTime(500); // LongPress
+    controller.pointerMove(62, 50); // and on into a Drag
+    controller.pointerUp(62, 50);
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('still clicks when a mouse press is held still past the delay', () => {
+    vi.useFakeTimers();
+    const { h, box, controller } = setup();
+    const click = vi.fn();
+    const longPress = vi.fn();
+    h.dispatcher.addEventListener(box, UiEventType.Click, click);
+    h.dispatcher.addEventListener(box, UiEventType.LongPress, longPress);
+
+    controller.pointerDown(50, 50);
+    vi.advanceTimersByTime(700);
+    controller.pointerMove(51, 50); // a held hand's jitter
+    controller.pointerUp(51, 50);
+
+    expect(longPress).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not click when a listener took the mouse long press', () => {
+    vi.useFakeTimers();
+    const { h, box, controller } = setup();
+    const click = vi.fn();
+    h.dispatcher.addEventListener(box, UiEventType.Click, click);
+    h.dispatcher.addEventListener(box, UiEventType.LongPress, event => event.preventDefault());
+
+    controller.pointerDown(50, 50);
+    vi.advanceTimersByTime(500);
     controller.pointerUp(50, 50);
 
     expect(click).not.toHaveBeenCalled();
@@ -305,6 +337,19 @@ describe('UiGestureRecognizer', () => {
       vi.advanceTimersByTime(500);
       expect(menu).toHaveBeenCalledTimes(1);
       controller.pointerUp(50, 50);
+    });
+
+    it('does not click when a finger is held', () => {
+      vi.useFakeTimers();
+      const { h, box, controller } = setup();
+      const click = vi.fn();
+      h.dispatcher.addEventListener(box, UiEventType.Click, click);
+
+      controller.pointerDown(50, 50, 1, noMods, finger);
+      vi.advanceTimersByTime(500);
+      controller.pointerUp(50, 50, 0, noMods, finger);
+
+      expect(click).not.toHaveBeenCalled();
     });
 
     it('lets a node that means to be picked up refuse the menu', () => {

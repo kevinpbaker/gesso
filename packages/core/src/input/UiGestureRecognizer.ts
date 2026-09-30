@@ -136,6 +136,11 @@ interface Sample {
  * long press raises nothing: it has a secondary button, and the
  * pointer controller dispatches the event from that instead.
  *
+ * A mouse long press does not cost the Click either, unless its
+ * LongPress was `preventDefault()`ed or it went on to a Drag: a button
+ * held down a moment before letting go is a slow click, and dropping
+ * it made toolbar buttons seem to ignore a deliberate press.
+ *
  * ## Two contacts
  *
  * Every contact the controller sees is fed to a `UiPinchRecognizer`,
@@ -224,6 +229,11 @@ export class UiGestureRecognizer implements GestureInput {
       return;
     }
     if (this.state === 'longPressed') {
+      // A mouse long press nobody took is still a click in the making:
+      // the jitter of a held hand does not make it a Drag.
+      if (!this.claimedPress && Math.hypot(event.x - this.startX, event.y - this.startY) <= this.pressSlop()) {
+        return;
+      }
       this.state = 'dragging';
       this.claimedPress = true;
       this.dispatch(UiEventType.DragStart, target, this.startX, this.startY, event);
@@ -309,8 +319,17 @@ export class UiGestureRecognizer implements GestureInput {
         return;
       }
       this.state = 'longPressed';
-      this.claimedPress = true;
+      const mouse = down.pointer.kind === 'mouse';
+      this.claimedPress = !mouse;
       const held = this.dispatch(UiEventType.LongPress, target, this.startX, this.startY, down);
+      // A slow click is still a click. A mouse press held past the
+      // delay only stops being one when a listener took the long press
+      // — a drop target refusing its default, say — or when it moves
+      // on into a Drag. A finger's hold is claimed either way: it asks
+      // for a menu, and a tap is what a finger clicks with.
+      if (mouse && held.defaultPrevented) {
+        this.claimedPress = true;
+      }
       // A finger has no second button. A held finger is how a
       // touchscreen asks for the commands that apply to something, so
       // the menu request follows the press it was made with — unless a
