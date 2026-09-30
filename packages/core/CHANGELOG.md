@@ -1,5 +1,39 @@
 # gesso-core
 
+## 0.4.1
+
+### Patch Changes
+
+- **Scroll layers: a scrolled container is shifted, not redrawn.** On Canvas2D,
+  when a frame's only change is a scroll container's offset by a whole number of
+  device pixels, the renderer copies the pixels it already drew inside it over by
+  the scroll distance and redraws only the strip that came into view —
+  pixel-for-pixel identical to a full redraw, and several times cheaper in
+  software rendering. A layer is built only after the container has scrolled on a
+  few quiet frames running (`scrollLayerSettleFrames`, default 3), so a
+  virtualised list that mounts rows as it scrolls never builds one. Anything else
+  — a fractional smooth-wheel offset, a zoom, content that changes as it scrolls,
+  a caret or video inside — is drawn directly as before.
+  `Canvas2DRendererOptions.scrollLayers` turns it off. WebGPU is unchanged.
+
+  **Pictures that change every frame are no longer rasterised every frame.** On
+  Canvas2D, a painter's recording whose drawing changed this frame is replayed
+  straight onto the frame and rasterised only once it has held still for four
+  frames, so a live layer is never turned into a bitmap it throws away. A picture
+  seen for the first time, resized or re-themed is still rasterised at once.
+  `PaintStats` counts the replays as `direct`.
+
+  **A held mouse click is still a click.** A mouse press held past the long-press
+  delay lost its Click, so a deliberate, slow press on a button did nothing. A
+  mouse long press is now claimed only when a listener takes it (`preventDefault`
+  on `LongPress`) or it moves into a Drag. A finger's hold is claimed as before.
+
+  **`overscrollBehavior="contain"` keeps the wheel in a mounted app.** It was read
+  from the tree's topmost node, which in a mounted app is the runtime's wrapper,
+  not the app's root, and mid-chain it was honoured only on scroll containers. It
+  is now honoured on any ancestor of the target, so a pan-and-zoom canvas can keep
+  a ctrl-wheel or trackpad pinch from zooming the page.
+
 ## 0.4.0
 
 ### Minor Changes

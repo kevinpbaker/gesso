@@ -1,5 +1,31 @@
 # gesso-components
 
+## 0.4.1
+
+### Patch Changes
+
+- **`ColorPalette` and `ColorPicker`.** `ColorPalette` is a colour chosen from a
+  grid, anchored to whatever opened it and built as `Menu` is: the caller owns the
+  trigger and whether it is open, and the palette owns the keyboard while it is.
+  Rows of greys then ten hues from light to dark, each swatch named for a screen
+  reader; an optional no-colour choice ('Automatic', 'No fill') and a row of recent
+  colours above the grid; it opens on the current colour, ringed. `onCustom` adds
+  'Custom colour…' at the foot of the grid.
+
+  `ColorPicker` picks any colour at all: a saturation/brightness square, a hue
+  bar, and a `#rrggbb` field that takes one typed or pasted. It is a panel, so its
+  holder decides when it shows; `onChange` is told on every move, the square and
+  bar take the arrows (Shift for a bigger step), and a grey keeps the hue somebody
+  was on. `normalizeHex`, `hsvOfHex` and `hexOfHsv` are exported alongside.
+
+  A hovered swatch keeps its own colour: hovering moves the ring, as the keyboard
+  does, rather than washing the swatch grey.
+
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.4.1
+  - gesso-framework@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

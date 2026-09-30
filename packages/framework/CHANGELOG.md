@@ -1,5 +1,18 @@
 # gesso-framework
 
+## 0.4.1
+
+### Patch Changes
+
+- **A patch batch copies each container once.** `applyPatches` copied every
+  container on a patch's path once per patch, so a batch of N patches into one
+  K-key object cost N × K — a store publishing a wide keyed map at 60 Hz could fall
+  minutes behind. A batch now copies each container once and writes into its own
+  copy in place. It never writes into the value it was handed nor into a value a
+  patch carried.
+- Updated dependencies
+  - gesso-core@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

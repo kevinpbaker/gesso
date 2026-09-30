@@ -1,5 +1,19 @@
 # gesso-devtools
 
+## 0.4.1
+
+### Patch Changes
+
+- **`proofPanel`, the main-thread strip a worker app is judged by.** A pulse on the
+  main thread's own animation frame, a button that blocks the thread and records
+  when on the render worker's clock, and the render worker's rate, worst gap and
+  median frame work — with `layout`, the layout heatmap and re-measure count too.
+  The recording is published on a global for a budget script to read, including
+  the last block's window. The arithmetic is `ProofRecording`, usable without a
+  DOM.
+- Updated dependencies
+  - gesso-framework@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes
