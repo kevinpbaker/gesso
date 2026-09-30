@@ -1379,6 +1379,44 @@ export const UiProperties = {
   }),
 
   /**
+   * Another node whose scroll offset this scroll container takes, on
+   * the axes `scrollWithAxis` names: a line-number gutter beside an
+   * editable's text, a spreadsheet's row header beside its grid.
+   *
+   * Taken in the same layout pass that settles the other node's
+   * offset, so the two are painted in step on every frame, whatever
+   * scrolled the other one — a wheel, a scrollbar, the caret, a clamp
+   * after text was deleted. Binding `scrollY` to what `scrollPosition`
+   * reports cannot do that: the report arrives after the frame is laid
+   * out, and the follower is a frame behind.
+   *
+   * The follower's own `scrollX`/`scrollY` are ignored on a followed
+   * axis, it shows no scrollbars, and a wheel over it scrolls the node
+   * it follows. The other node may be any scroll container or an
+   * editable, which scrolls its own text; the offset is clamped to the
+   * follower's own range, so give it content as tall as the text.
+   *
+   * The follower may be `overflow: 'hidden'`, which is otherwise never
+   * scrolled: following makes it scrolled, and nothing but the leader
+   * moves it.
+   */
+  scrollWith: defineProperty<UiNode | null | undefined>({
+    name: 'scrollWith',
+    defaultValue: undefined,
+    inherited: false,
+    // Layout as well: it can make an `overflow: 'hidden'` box scrolled.
+    affects: L | T
+  }),
+
+  /** Which axes `scrollWith` follows: 'both' (default), 'x' or 'y'. */
+  scrollWithAxis: defineProperty<'x' | 'y' | 'both' | undefined>({
+    name: 'scrollWithAxis',
+    defaultValue: undefined,
+    inherited: false,
+    affects: T
+  }),
+
+  /**
    * What happens to a wheel delta this node cannot use.
    *
    * Named after the CSS property it means the same thing as.

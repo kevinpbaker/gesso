@@ -22,7 +22,7 @@ import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
 import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 import { LayoutRecord } from './LayoutRecord';
-import { scrollRange } from './Scrollbars';
+import { scrollLeaderOf, scrollRange } from './Scrollbars';
 import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer } from './TextMeasurer';
@@ -3666,7 +3666,12 @@ export class LayoutEngine {
   }
 
   private applyScroll(): void {
+    let followers: UiNode[] | undefined;
     for (const node of this.scrollNodes) {
+      if (scrollLeaderOf(node) !== null) {
+        (followers ??= []).push(node);
+        continue;
+      }
       this.applyScrollOffset(node, false);
     }
     // A single-line field has no scrollbars, so nothing lingers after
@@ -3674,7 +3679,33 @@ export class LayoutEngine {
     for (const node of this.textScrollNodes) {
       this.applyScrollOffset(node, true);
     }
+    // Last, so each reads an offset this pass has already settled.
+    // A follower of a follower reads it as of wherever it came in this
+    // loop, which is the order they were first laid out in.
+    if (followers !== undefined) {
+      for (const node of followers) {
+        this.applyFollowedScroll(node, scrollLeaderOf(node)!);
+      }
+    }
     this.applySticky();
+  }
+
+  /**
+   * A `scrollWith` container's offset: the leader's, on the axes it
+   * follows, clamped to the follower's own range. No scrollbar shows
+   * for it, since what is being scrolled is the leader.
+   */
+  private applyFollowedScroll(node: UiNode, leader: UiNode): void {
+    const rec = this.record(node);
+    const source = this.records.get(leader);
+    const axis = node.properties.get('scrollWithAxis') ?? 'both';
+    const followsX = axis !== 'y';
+    const followsY = axis !== 'x';
+    const rawX = followsX ? (source?.scrollX ?? 0) : (this.numberProp(node, 'scrollX') ?? 0);
+    const rawY = followsY ? (source?.scrollY ?? 0) : (this.numberProp(node, 'scrollY') ?? 0);
+    rec.scrollX = this.clamp(rawX, 0, scrollRange(rec, 'x'));
+    rec.scrollY = this.clamp(rawY, 0, scrollRange(rec, 'y'));
+    rec.transformDirty = false;
   }
 
   /**
@@ -3977,7 +4008,13 @@ export class LayoutEngine {
     rec.sticky = position === 'sticky';
     rec.positioned = rec.absolute || rec.sticky || position === 'relative';
     const overflow = props.get('overflow');
-    rec.scrollable = node.type === UiNodeType.ScrollView || overflow === 'scroll' || overflow === 'auto';
+    // A hidden overflow that follows another node's scroll is scrolled
+    // all the same, as script scrolls one in CSS; nothing else moves it.
+    rec.scrollable =
+      node.type === UiNodeType.ScrollView ||
+      overflow === 'scroll' ||
+      overflow === 'auto' ||
+      (overflow === 'hidden' && scrollLeaderOf(node) !== null);
     rec.scrollsText = node.type === UiNodeType.EditableText;
     rec.textScrollbars = rec.scrollsText && props.get('multiline') === true;
     // Only something with scrollbars asks, and there are few of them,

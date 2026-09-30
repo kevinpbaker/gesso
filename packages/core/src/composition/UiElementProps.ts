@@ -260,7 +260,16 @@ export type CommonProps = IdentityProps &
  * children, whichever container it is; see `layout/CustomLayout.ts`.
  */
 export type ContainerProps = CommonProps &
-  PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
+  PropsOf<
+    | 'overflow'
+    | 'scrollX'
+    | 'scrollY'
+    | 'scrollWith'
+    | 'scrollWithAxis'
+    | 'scrollBehavior'
+    | 'overscrollBehavior'
+    | 'layout'
+  >;
 
 /** Props of a flex container: Row, Column, ScrollView. */
 export type FlexContainerProps = ContainerProps &

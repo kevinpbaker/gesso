@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 import {
+  Box,
   Button,
   Column,
+  Row,
+  scrollPosition,
   EditableText,
   ScrollView,
   Text,
@@ -592,6 +595,71 @@ describe('GessoRuntime editing', () => {
     tick();
     expect(model().focus).toBe(lines.indexOf('line 20'));
     expect(scroller.properties.get('scrollY')).toBe(300);
+  });
+
+  it("reports a field's own text scroll through scrollPosition, whatever scrolled it", () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
+    const value = new BehaviorSubject(lines);
+    const seen: number[] = [];
+    const { runtime, press, key, tick } = mount(
+      Column(
+        EditableText({
+          value,
+          multiline: true,
+          width: 300,
+          height: 200,
+          modifiers: [scrollPosition({ onChange: offset => seen.push(offset.y) })]
+        })
+      )
+    );
+    runtime.input.wheel.wheel(50, 50, 0, 120);
+    tick();
+    press(5, 5);
+    key('End', mods({ ctrl: true }));
+    tick();
+    // Deleting the text pulls the offset back in on the next pass.
+    value.next('short');
+    tick();
+    // The first is the first layout's, as for any container.
+    expect(seen).toEqual([0, 120, seen[2], 0]);
+    expect(seen[2]).toBeGreaterThan(1000);
+  });
+
+  it('keeps a scrollWith gutter in step with the field on the same frame', () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
+    const leader = new BehaviorSubject<UiNode | null>(null);
+    const { runtime, field, find, press, key, tick } = mount(
+      Row(
+        Box(
+          { overflow: 'hidden', width: 40, height: 200, scrollWith: leader, scrollWithAxis: 'y' },
+          Column({ height: 2000 })
+        ),
+        EditableText({ value: lines, multiline: true, width: 300, height: 200, ref: node => leader.next(node) })
+      )
+    );
+    tick();
+    const gutter = find(UiNodeType.Box);
+    const offsets = (): [number, number] => [
+      runtime['engine'].recordFor(field)!.scrollY,
+      runtime['engine'].recordFor(gutter)!.scrollY
+    ];
+    runtime.input.wheel.wheel(100, 50, 0, 120);
+    tick();
+    expect(offsets()).toEqual([120, 120]);
+    press(45, 5);
+    key('End', mods({ ctrl: true }));
+    tick();
+    const [end] = offsets();
+    expect(end).toBeGreaterThan(1000);
+    expect(offsets()).toEqual([end, end]);
+    // A wheel over the gutter scrolls the field, and the gutter with it.
+    runtime.input.wheel.wheel(10, 50, 0, -end);
+    tick();
+    expect(offsets()).toEqual([0, 0]);
+    // A horizontal scroll of the text leaves a y-only gutter alone.
+    expect(runtime['engine'].recordFor(gutter)!.scrollX).toBe(0);
+    // Nothing reveals a bar on the follower: what scrolls is the field.
+    expect(runtime['engine'].recordFor(gutter)!.scrollbarVisibleUntil).toBe(0);
   });
 
   it('sizes an empty field by its placeholder', () => {

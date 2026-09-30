@@ -240,6 +240,14 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   },
   scrollX: { group: 'Overflow and scrolling', note: 'Current horizontal scroll offset. Readable and writable.' },
   scrollY: { group: 'Overflow and scrolling', note: 'Current vertical scroll offset. Readable and writable.' },
+  scrollWith: {
+    group: 'Overflow and scrolling',
+    note: 'Another node whose scroll offset this container takes, in the same frame. A gutter beside a field.'
+  },
+  scrollWithAxis: {
+    group: 'Overflow and scrolling',
+    note: 'Which axes `scrollWith` follows: `both` (the default), `x` or `y`.'
+  },
   scrollBehavior: {
     group: 'Overflow and scrolling',
     note: 'Whether a wheel moves this container at once or animates it. Read by input, not by layout.'

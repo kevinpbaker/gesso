@@ -6,6 +6,7 @@ import { isNodeHitTestable, isNodeInert } from './UiInteraction';
 import {
   pointInBox,
   scrollbarGrabBox,
+  scrollLeaderOf,
   scrollbarThumb,
   scrollbarZoneAt,
   type ScrollbarAxis
@@ -434,7 +435,12 @@ export class UiHitTester implements HitTester {
       if (px < rec.x || px >= rec.x + rec.width || py < rec.y || py >= rec.y + rec.height) {
         return false;
       }
-      if ((rec.scrollable || rec.textScrollbars) && this.hitScrollbar(node, rec, px, py)) {
+      // A follower has no bar of its own: the node it follows is what scrolls.
+      if (
+        (rec.scrollable || rec.textScrollbars) &&
+        scrollLeaderOf(node) === null &&
+        this.hitScrollbar(node, rec, px, py)
+      ) {
         return true;
       }
       if (this.zoneOnly) {

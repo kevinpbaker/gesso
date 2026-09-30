@@ -4,6 +4,7 @@ export {
   scrollbarThumbs,
   scrollbarZoneAt,
   scrollRange,
+  scrollLeaderOf,
   SCROLLBAR_THICKNESS,
   SCROLLBAR_INSET,
   SCROLLBAR_MIN_THUMB,

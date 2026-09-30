@@ -1740,6 +1740,8 @@ declare const UiProperties: {
   readonly scrollX: UiPropertyDefinition<number | undefined>;
   readonly scrollBehavior: UiPropertyDefinition<"instant" | "smooth" | undefined>;
   readonly scrollY: UiPropertyDefinition<number | undefined>;
+  readonly scrollWith: UiPropertyDefinition<UiNode | null | undefined>;
+  readonly scrollWithAxis: UiPropertyDefinition<"both" | "x" | "y" | undefined>;
   readonly overscrollBehavior: UiPropertyDefinition<"auto" | "contain" | undefined>;
   readonly hitTestable: UiPropertyDefinition<boolean | undefined>;
   readonly virtualIndex: UiPropertyDefinition<number | undefined>;
@@ -1813,7 +1815,7 @@ type TransitionProps = {
   transition?: Partial<Record<UiPropertyName, UiTransitionValue>>;
 };
 type CommonProps = IdentityProps & UiEventProps & BoxModelProps & FlexItemProps & GridItemProps & PositionProps & PaintProps & TypographyProps & InteractionProps & SemanticsProps & ModifierProps & TransitionProps & EnvironmentProps;
-type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
+type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollWith' | 'scrollWithAxis' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
@@ -2436,6 +2438,7 @@ declare const SCROLLBAR_INSET = 2;
 declare const SCROLLBAR_MIN_THUMB = 24;
 declare const SCROLLBAR_HOVER_ZONE = 16;
 type ScrollbarAxis = 'x' | 'y';
+declare function scrollLeaderOf(node: UiNode): UiNode | null;
 declare function scrollRange(rec: LayoutRecord, axis: ScrollbarAxis): number;
 interface ScrollbarThumb {
   axis: ScrollbarAxis;
@@ -3446,6 +3449,7 @@ declare class LayoutEngine {
   private stackOffset;
   private markLayoutDirty;
   private applyScroll;
+  private applyFollowedScroll;
   private applyScrollOffset;
   private applySticky;
   private resolveStickyOffset;
@@ -5052,6 +5056,7 @@ export {
   CaretRect,
   caretRectFor,
   caretVisibleAt,
+  Cf,
   CharacterCountTextMeasurer,
   ChildrenBindingId,
   clampSize,
@@ -5516,6 +5521,7 @@ export {
   scrollbarZoneAt,
   ScrollContainerState,
   ScrollLayerStats,
+  scrollLeaderOf,
   ScrollOffset,
   scrollPosition,
   ScrollPositionArgs,
@@ -5535,7 +5541,6 @@ export {
   setMatchRanges,
   setPerformanceMarks,
   setSelectionRange,
-  Sf,
   shadowsEqual,
   shapesEqual,
   SharedClaim,
@@ -6401,6 +6406,7 @@ import {
   scrollbarZoneAt,
   ScrollContainerState,
   ScrollLayerStats,
+  scrollLeaderOf,
   ScrollOffset,
   scrollPosition,
   ScrollPositionArgs,
@@ -6756,7 +6762,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CCz-6uPS.js";
+} from "./index-BiN3WdTh.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7105,6 +7111,7 @@ export {
   scrollbarThumb,
   scrollbarThumbs,
   scrollbarZoneAt,
+  scrollLeaderOf,
   scrollPosition,
   scrollRange,
   ScrollView,
@@ -7672,7 +7679,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CCz-6uPS.js";
+} from "./index-BiN3WdTh.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

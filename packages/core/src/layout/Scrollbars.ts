@@ -1,4 +1,5 @@
 import { CARET_WIDTH } from '../editing/UiEditable';
+import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from './LayoutRecord';
 import type { LayoutBox } from './LayoutTypes';
 
@@ -12,6 +13,16 @@ export const SCROLLBAR_MIN_THUMB = 24;
 export const SCROLLBAR_HOVER_ZONE = 16;
 
 export type ScrollbarAxis = 'x' | 'y';
+
+/**
+ * The node a `scrollWith` container follows, or null for one that
+ * scrolls on its own. A follower has no scrollbar of its own, and what
+ * would scroll it scrolls this instead.
+ */
+export function scrollLeaderOf(node: UiNode): UiNode | null {
+  const leader = node.properties.get('scrollWith') as UiNode | null | undefined;
+  return leader !== undefined && leader !== null && leader !== node ? leader : null;
+}
 
 /**
  * The furthest a record's content can be scrolled along an axis.

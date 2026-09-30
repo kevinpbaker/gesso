@@ -120,6 +120,36 @@ for them; and the runtime already has exactly one mechanism for "this
 node's box changed on this frame", which is what the modifier is built
 on.
 
+An `<editabletext>` reports through it too. Its offset is how far it
+has scrolled its own text, by the wheel, its scrollbar, the caret
+following typing, or the clamp when text is deleted.
+
+## Scrolling two things together
+
+What `onChange` reports arrives after the frame is laid out, so a
+second container whose `scrollY` is bound to it is painted a frame
+behind. For something that has to line up row for row, such as a line
+number gutter beside a field or a row header beside a grid, name the
+leader with `scrollWith` instead:
+
+```tsx
+<row>
+  <box overflow="hidden" width={40} height={420} scrollWith={field} scrollWithAxis="y">
+    {/* one row per line, in the field's font and line height */}
+  </box>
+  <editabletext ref={node => field.next(node)} multiline height={420} textWrap="none" />
+</row>
+```
+
+The follower takes the leader's offset in the same layout pass that
+settles it, so the two are painted in step whatever moved the leader.
+`scrollWithAxis` is `both` by default. The follower's own `scrollX` and
+`scrollY` are ignored on a followed axis, it shows no scrollbar, and a
+wheel over it scrolls the leader. An `overflow="hidden"` box that
+follows is scrolled all the same, the way script scrolls one in CSS.
+The offset is clamped to the follower's own range, so give it content
+as tall as the leader's.
+
 ## The wheel
 
 A wheel is dispatched to the node under the pointer first, so a handler

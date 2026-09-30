@@ -2,7 +2,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { noKeyModifiers, UiEventType, UiWheelDeltaMode, UiWheelEvent, type UiKeyModifiers } from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
-import type { ScrollbarThumb } from '../layout/Scrollbars';
+import { scrollLeaderOf, type ScrollbarThumb } from '../layout/Scrollbars';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 
 /**
@@ -320,7 +320,8 @@ export class UiWheelController {
     let left = false;
     let right = false;
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
-      const state = takesWheel(node) ? this.scrollSink.containerState(node) : undefined;
+      const scrolled = scrollLeaderOf(node) ?? node;
+      const state = takesWheel(node) ? this.scrollSink.containerState(scrolled) : undefined;
       if (state !== undefined) {
         left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
         right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
@@ -386,7 +387,8 @@ export class UiWheelController {
     wheelDeltaY: number | undefined
   ): void {
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
-      const state = takesWheel(node) ? this.scrollSink.containerState(node) : undefined;
+      const scrolled = scrollLeaderOf(node) ?? node;
+      const state = takesWheel(node) ? this.scrollSink.containerState(scrolled) : undefined;
       if (state === undefined) {
         if (containsOverscroll(node)) {
           event.markConsumed();
@@ -406,12 +408,12 @@ export class UiWheelController {
       const takesY = deltaY !== 0 && hasScrollRoom(state.scrollY, state.maxScrollY, deltaY);
       if (takesX || takesY) {
         this.applyDelta(
-          node,
+          scrolled,
           state,
           takesX ? deltaX : 0,
           takesY ? deltaY : 0,
           deltaMode,
-          behaviorFor(node, deltaMode, wheelDeltaY)
+          behaviorFor(scrolled, deltaMode, wheelDeltaY)
         );
         event.markConsumed();
         return;
@@ -505,14 +507,15 @@ function behaviorFor(
 }
 
 /**
- * Whether the wheel scrolls this node: a scroll container, or an
- * editable, which scrolls its own text.
+ * Whether the wheel scrolls this node: a scroll container, an
+ * editable, which scrolls its own text, or a `scrollWith` follower,
+ * whose wheel goes to the node it follows.
  *
  * Only the wheel. A finger on a field places a caret or selects, and a
  * scrollbar drag is found by hit test, so neither asks this.
  */
 function takesWheel(node: UiNode): boolean {
-  return isScrollContainer(node) || node.type === UiNodeType.EditableText;
+  return isScrollContainer(node) || node.type === UiNodeType.EditableText || scrollLeaderOf(node) !== null;
 }
 
 /** A ScrollView, or any node with overflow 'scroll' or 'auto'. */
