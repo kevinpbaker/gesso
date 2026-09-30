@@ -1,5 +1,38 @@
 # gesso-core
 
+## 0.4.2
+
+### Patch Changes
+
+- d27e076: **The wheel scrolls an editable that overflows.** A multiline field with a fixed
+  height, or an unwrapped one narrower than its line, followed the caret and
+  nothing else: a wheel over it did nothing. It now scrolls the field's text on
+  either axis, clamped where the caret-follow offset is and without moving the
+  caret, and a wheel the field has no room for chains to the scroll container
+  around it, as one from a scroll container's end does.
+
+  A multiline field also shows the overlay scrollbar a scroll container does,
+  fading when idle, revealed by hovering its edge, and draggable once it shows.
+  While hidden it takes no presses, so a click at the end of a line still places
+  the caret. A single-line field draws none.
+
+  `scrollRange(record, axis)` is the furthest a record can scroll, the one answer
+  the layout engine's clamp, the scrollbars and the scroll sinks now all read.
+
+- d6c52da: **`scrollWith`: a container that scrolls in step with another node.** Binding a
+  container's `scrollY` to what `scrollPosition` reports leaves it a frame behind,
+  because the report arrives after the frame is laid out. A line-number gutter
+  beside a field, or a row header beside a grid, has to line up on every frame.
+  `scrollWith` names the node to follow and `scrollWithAxis` the axes (`both` by
+  default); the follower takes the leader's effective offset in the same layout
+  pass that settles it, whatever moved the leader. It ignores its own offset on a
+  followed axis, shows no scrollbar, and passes a wheel over it to the leader. An
+  `overflow="hidden"` box that follows is scrolled all the same, as script scrolls
+  one in CSS.
+
+  `scrollPosition` on an `<editabletext>` reports how far the field has scrolled
+  its own text, from the wheel, its scrollbar, the caret or a clamp.
+
 ## 0.4.1
 
 ### Patch Changes
