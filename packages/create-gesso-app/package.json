@@ -1,7 +1,7 @@
 {
   "name": "create-gesso-app",
   "version": "0.4.2",
-  "description": "Scaffolds a Gesso application: a Vite project whose interface runs in a render worker.",
+  "description": "Scaffolds a Gesso app: a native-grade web application built from declarative components, with its interface in a render worker.",
   "license": "MIT",
   "author": "Kevin Baker",
   "homepage": "https://gesso-docs.vercel.app",
@@ -22,7 +22,11 @@
     "starter",
     "cli",
     "create-app",
-    "template"
+    "template",
+    "declarative-ui",
+    "swiftui",
+    "jetpack-compose",
+    "web-worker"
   ],
   "type": "module",
   "bin": {

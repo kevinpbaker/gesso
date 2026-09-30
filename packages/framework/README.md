@@ -1,5 +1,7 @@
 # gesso-framework
 
+SwiftUI and Compose, for the web: declarative components for native-grade apps, with the whole interface drawn from a worker so it stays fast however hard your code works.
+
 Components, cells, the frame runtime, channels, routing and the worker barrier, over [`gesso-core`](https://github.com/kevinpbaker/gesso/tree/main/packages/core).
 
 ```bash

@@ -1,7 +1,7 @@
 {
   "name": "gesso-framework",
   "version": "0.4.2",
-  "description": "Components, stores, the frame runtime and the worker barrier over gesso-core.",
+  "description": "SwiftUI and Compose, for the web: declarative components, stores and a frame runtime that keeps the whole interface off the main thread.",
   "license": "MIT",
   "author": "Kevin Baker",
   "homepage": "https://gesso-docs.vercel.app",
@@ -25,7 +25,11 @@
     "web-worker",
     "offscreencanvas",
     "jsx",
-    "state-management"
+    "state-management",
+    "declarative-ui",
+    "swiftui",
+    "jetpack-compose",
+    "native-apps"
   ],
   "type": "module",
   "sideEffects": false,

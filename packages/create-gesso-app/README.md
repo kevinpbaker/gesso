@@ -1,7 +1,8 @@
 # create-gesso-app
 
-Scaffolds a Gesso application: a Vite project whose interface is built,
-laid out and painted in a render worker.
+Scaffolds a Gesso app: a native-grade web application built from
+declarative components, whose interface is built, laid out and painted
+in a render worker.
 
 ```bash
 npm create gesso-app my-app

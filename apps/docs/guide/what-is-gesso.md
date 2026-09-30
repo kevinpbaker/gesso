@@ -1,8 +1,13 @@
 ---
-description: What Gesso is, the three things that follow from drawing to a canvas in a worker, and when to use something else.
+description: What Gesso is, a declarative UI toolkit for web applications, the three things that follow from drawing to a canvas in a worker, and when to use something else.
 ---
 
 # What Gesso is
+
+Gesso is a declarative UI toolkit for building applications on the web,
+in the spirit of SwiftUI and Jetpack Compose. You describe a screen as
+components; the engine lays it out, sets its text and paints it, fast
+enough to stay smooth however hard the application is working.
 
 Gesso draws an application's interface into a canvas. Everything above
 that canvas (components, layout, paint, input, text, accessibility)
@@ -41,6 +46,24 @@ occasional interaction, the single thread was never the problem and the
 DOM is the better tool. If it is an editor, a simulation, a console over
 a live feed, or anything where work and frames compete, the thread
 boundary is the entire point.
+
+## If you know SwiftUI or Compose
+
+Most of what you know carries over. The names are these:
+
+| SwiftUI               | Compose          | Gesso                                                              |
+| --------------------- | ---------------- | ------------------------------------------------------------------ |
+| `HStack` / `VStack`   | `Row` / `Column` | `row` / `column`                                                   |
+| `ZStack`              | `Box`            | `stack`                                                            |
+| `@State`              | `mutableStateOf` | `internalState`                                                    |
+| view modifiers        | `Modifier`       | typed props, and [modifiers](/interaction/modifiers) for behaviour |
+| `Environment` colours | `MaterialTheme`  | theme tokens such as `primary`                                     |
+
+One thing does not carry over: re-running. SwiftUI recomputes `body`
+and Compose recomposes; a Gesso component function runs once, and a
+state change writes one property on one node.
+[Why Gesso](/guide/why-gesso#declarative-with-nothing-to-re-run) has the
+side-by-side.
 
 ## Three things follow
 

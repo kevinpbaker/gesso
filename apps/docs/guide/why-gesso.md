@@ -9,11 +9,18 @@ including the parts that are not flattering: what has been measured and
 by what, how Gesso compares to the frameworks you would otherwise
 reach for, and the kinds of screen it is the wrong tool for.
 
-Your application has real work to do: parsing a file, diffing a
-document, simulating a system, sorting a hundred thousand rows. On the
-web that work and your interface share one thread of execution, so they
-take turns, and the person using it watches them take turns. The pointer
-sticks. The list stutters mid-scroll. The keystroke lands a beat late.
+Gesso is an application toolkit for the web, in the spirit of SwiftUI
+and Jetpack Compose. A screen is a tree of declarative components, laid
+out by a real layout engine with typed props and coloured by a theme,
+with no DOM or stylesheet underneath. The result is an app that feels
+native in a browser tab or a desktop window.
+
+It is also fast in a way the web usually is not. Your application has
+real work to do: parsing a file, diffing a document, simulating a
+system, sorting a hundred thousand rows. On the web that work and your
+interface share one thread of execution, so they take turns, and the
+person using it watches them take turns. The pointer sticks. The list
+stutters mid-scroll. The keystroke lands a beat late.
 
 Gesso moves the entire interface somewhere else. Components, layout,
 paint, text and input run in a render worker. Your application logic runs
@@ -93,7 +100,7 @@ and dark toggle without being told either exists.
   Latin, Japanese, Chinese, Korean, Arabic, Hebrew, Hindi and Thai, with
   colour emoji, right-to-left paragraphs and web fonts loaded in the
   worker, on both renderers.
-- **Twenty-seven components.** Inputs, overlays, tables, trees and
+- **Thirty-nine components.** Inputs, overlays, tables, trees and
   media, every one of them themed, keyboard operable, and announced to
   assistive technology without you doing anything.
 - **Tests without a browser.** `renderTest` queries the same tree a
@@ -133,6 +140,12 @@ The axes that decide the choice, not a feature list.
 | Accessibility                     | a semantics tree mirrored into an off-screen DOM; a report per route; no screen reader run against it yet                   | the DOM itself                                                   | the DOM itself                                            | a semantics tree mirrored into off-screen DOM   |
 | Indexing, view source, extensions | none; not the goal                                                                                                          | complete                                                         | complete                                                  | none                                            |
 | Ecosystem                         | one component library, one theme system, young                                                                              | the largest there is                                             | large                                                     | large, Dart                                     |
+
+Flutter Web is the nearest neighbour: it also draws the whole interface
+to a canvas and mirrors a semantics tree for assistive technology. The
+difference is the thread. Flutter Web builds, lays out and paints on the
+main thread beside your code; Gesso does all three in a worker, and
+writes in TypeScript rather than Dart.
 
 Read the right-hand columns as the price. If your screen is a document, or its value is being indexed, or you need the ecosystem more than the thread, they are the better tools and it is not close.
 

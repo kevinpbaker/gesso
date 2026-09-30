@@ -32,12 +32,12 @@
           <svg class="stroke-glyph" viewBox="0 0 64 64" aria-hidden="true">
             <path d="M0 40H16V28H32V16H48V4H64V24H48V36H32V48H16V60H0Z" />
           </svg>
-          The whole interface, off the main thread
+          SwiftUI and Compose, for the web
         </p>
-        <h1>Interfaces that don't stutter</h1>
+        <h1>Native-grade apps, built on the web</h1>
         <p class="lede">
-          Components, layout, paint, text and input all run in a render worker. Your application logic runs in another.
-          Whatever you compute, the frame still lands.
+          A declarative UI toolkit: components that run once, a real layout engine with typed props, and a theme instead
+          of CSS. The whole interface runs in a worker, so whatever your code computes, the frame still lands.
         </p>
         <div class="actions">
           <a class="button button-primary" href="/guide/installation">
@@ -67,7 +67,7 @@
         <div class="band-head">
           <p class="eyebrow eyebrow-linen">Try it</p>
           <h2>Block the main thread for three seconds</h2>
-          <p class="lede">Two copies of the same component. Only one of them notices.</p>
+          <p class="lede">Why it stays fast: two copies of the same component, and only one of them notices.</p>
         </div>
         <ThreadDemo scheme="dark" />
       </div>
@@ -113,7 +113,7 @@
           <div class="figure figure-parts">
             <span /><span /><span class="fill-brand" /><span /> <span /><span class="fill-linen" /><span /><span />
           </div>
-          <h3>Twenty-seven components</h3>
+          <h3>Thirty-nine components</h3>
           <p>
             Inputs, overlays, tables, trees and media. Every one themed, keyboard operable, and announced to assistive
             technology without you doing anything.

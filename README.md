@@ -4,9 +4,9 @@
 
 # Gesso
 
-### Your code can be slow. Your interface can't.
+### Native-grade apps, built on the web.
 
-Gesso is a UI framework for the web that runs the **whole interface** in a worker: components, layout, text, input and paint.<br>Your application logic runs in a second worker. The main thread is left holding a `<canvas>` and forwarding events.
+Gesso is a declarative UI toolkit in the spirit of SwiftUI and Jetpack Compose: components that run once, a real layout engine with typed props, and a theme instead of CSS.<br>It draws the whole interface to a `<canvas>` from a worker, so the app stays fast however hard your code is working.
 
 [![npm](https://img.shields.io/npm/v/gesso-framework?label=npm&color=BE9A6E)](https://www.npmjs.com/package/gesso-framework)
 [![CI](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml)
@@ -25,7 +25,13 @@ and a grid that holds its frame budget while it recalculates two hundred thousan
 
 ---
 
-## The problem it exists for
+## What it is
+
+The web has a document toolkit. Gesso is an application toolkit: the kind of thing SwiftUI is on the Mac and Compose is on Android, written in TypeScript and running in any modern browser.
+
+You describe a screen as a tree of components. Stacks are `row` and `column`, sizes and alignment are typed props, and colour comes from the theme. There is no DOM underneath, no stylesheet and no virtual DOM. The engine lays the tree out with flex and grid semantics checked against Chrome, sets text in every script, and paints through Canvas2D or WebGPU.
+
+## Why it stays fast
 
 Every web framework you have used shares one thread between your work and your interface. Parse a file, diff a document, simulate a system, sort a hundred thousand rows, and the person using the app watches the two take turns. The pointer sticks. The list stutters mid-scroll. The keystroke lands a beat late.
 
@@ -33,7 +39,7 @@ The usual fix is to move the work into a worker and post the results back. By ha
 
 Gesso moves the **interface** instead, and moves it once. Layout is not the DOM's, so it can run anywhere; paint is a canvas, so it can be an `OffscreenCanvas`; input is raw pointer events, so the main thread's only job is to forward them. Your application gets its own worker and talks to the interface over a `MessageChannel` that never touches main. The result is a browser app whose frame rate does not depend on how busy your code is.
 
-## The receipt
+### The receipt
 
 Two copies of the same component, one in a render worker and one on the main thread. Each ticks every 40 ms and remembers the longest gap it has ever seen. Block the main thread for three seconds:
 

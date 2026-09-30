@@ -19,7 +19,7 @@ import { defineConfig } from 'vitepress';
  */
 export default defineConfig({
   title: 'Gesso',
-  description: 'A canvas UI framework that keeps the whole interface off the main thread.',
+  description: 'SwiftUI and Compose, for the web: a declarative UI toolkit for fast, native-grade apps.',
   cleanUrls: true,
   /**
    * Three faces, from Google Fonts: `Newsreader` sets the display line,
