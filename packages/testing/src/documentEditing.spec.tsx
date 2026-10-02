@@ -1,4 +1,5 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { describe, expect, it } from 'vitest';
 
 import { percent } from 'gesso-core';
@@ -64,6 +65,41 @@ describe('a thousand-block document', () => {
     await ui.settle();
     // A caret move is paint: no layout ran, so nothing was measured.
     expect(since(from).every(measured => measured === 0)).toBe(true);
+    ui.unmount();
+  });
+});
+
+describe('a parent that re-renders its children', () => {
+  it('does not replay an unchanged input into a child, so nothing derived from it runs again', async () => {
+    const rows = new BehaviorSubject(0);
+    const block = { text: 'Unchanged' };
+    let derived = 0;
+
+    function Child(inputs: Inputs<{ block: { text: string } }>, _ctx: ComponentContext) {
+      return (
+        <text
+          text={inputs.block.pipe(
+            map(value => {
+              derived += 1;
+              return value.text;
+            })
+          )}
+        />
+      );
+    }
+    function Parent(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+      // Each render hands the child a new Observable of the same value,
+      // which is what a list re-rendered for an insertion does.
+      return <column>{rows.pipe(map(() => [<Child key="only" block={of(block)} />]))}</column>;
+    }
+
+    const ui = renderTest(createComponent(Parent), { width: 400, height: 200 });
+    await ui.settle();
+    const before = derived;
+    rows.next(1);
+    rows.next(2);
+    await ui.settle();
+    expect(derived).toBe(before);
     ui.unmount();
   });
 });
