@@ -231,6 +231,16 @@ function fakeEditing(active: boolean): EditingMirrorTarget & { described: UiSema
 }
 
 describe('SemanticsMirror', () => {
+  it('clips rather than hides overflow, so the browser cannot scroll an element off its box', () => {
+    // A browser scrolls even an `overflow: hidden` box to reveal what
+    // it focuses, and a sidebar region left scrolled 49 pixels had
+    // every element in it described above where it is drawn.
+    const { container, elementFor, apply } = setup();
+    apply({ patches: [{ op: 'add', node: record('nav', { role: 'navigation', label: 'Sidebar' }) }] });
+    expect(container.style.overflow).toBe('clip');
+    expect(elementFor('nav').style.overflow).toBe('clip');
+  });
+
   it('mirrors a record as an element carrying its ARIA', () => {
     const { container, elementFor, apply } = setup();
 

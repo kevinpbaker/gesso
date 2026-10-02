@@ -236,7 +236,9 @@ export class SemanticsMirror {
       // as well as out of the picture, which is the whole content of
       // this element. Transparent and un-drawable is the combination
       // that stays readable.
-      overflow: 'hidden',
+      //
+      // `clip` and not `hidden`: see `createElement`.
+      overflow: 'clip',
       margin: '0',
       padding: '0',
       border: '0',
@@ -383,7 +385,16 @@ export class SemanticsMirror {
       padding: '0',
       border: '0',
       outline: 'none',
-      overflow: 'hidden',
+      // `clip` and not `hidden`. Every element is placed in canvas
+      // pixels and the app scrolls its content by placing it again,
+      // but a browser scrolls an `overflow: hidden` box to bring
+      // something into view: Tab focus, a screen reader's cursor, an
+      // automation tool clicking an element. A sidebar whose list
+      // reached past its box was left scrolled, and every element in
+      // it was described 49 pixels above where it is drawn and hit, so
+      // activating one by its position activated its neighbour. A
+      // `clip` box cannot be scrolled at all.
+      overflow: 'clip',
       // The container is `pointer-events: none`, but an element that
       // opted back in would take presses from the canvas.
       pointerEvents: 'none',
