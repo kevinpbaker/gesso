@@ -190,15 +190,33 @@ replacement back.
 Once per file per session, in the dev server's own output. `gesso({
 diagnostics: false })` turns it off.
 
+## Dependencies with a worker build
+
+Your application's code runs in workers, and Vite resolves every
+dependency for a page: with the `browser` export condition. A package's
+browser build may reach for `document`, which a worker doesn't have.
+Every markdown parser built on micromark imports
+`decode-named-character-reference`, whose browser build does exactly
+that, and a render worker that imports one dies on start with
+"document is not defined".
+
+Packages like that usually publish a `worker` build too, so the plugin
+adds the `worker` condition ahead of Vite's defaults. A package's own
+export order decides between `worker` and `browser`, and the packages
+that ship both list `worker` first. The main thread resolves the same
+way: a worker build runs in a page as well. To resolve as Vite does by
+default, pass `workerConditions: false`.
+
 ## Options
 
-| Option           | Default    | What it does                                                          |
-| ---------------- | ---------- | --------------------------------------------------------------------- |
-| `renderWorker`   | discovered | The render worker entry, as a specifier beside the shell              |
-| `appLogicWorker` | discovered | The application worker entry, or `false` for an app with none         |
-| `overlay`        | `true`     | Wire the error overlay into `onError` while the dev server is running |
-| `hmr`            | `true`     | Emit the `import.meta.hot.accept` wiring                              |
-| `diagnostics`    | `true`     | Report a save that will reload the page                               |
+| Option             | Default    | What it does                                                          |
+| ------------------ | ---------- | --------------------------------------------------------------------- |
+| `renderWorker`     | discovered | The render worker entry, as a specifier beside the shell              |
+| `appLogicWorker`   | discovered | The application worker entry, or `false` for an app with none         |
+| `overlay`          | `true`     | Wire the error overlay into `onError` while the dev server is running |
+| `hmr`              | `true`     | Emit the `import.meta.hot.accept` wiring                              |
+| `diagnostics`      | `true`     | Report a save that will reload the page                               |
+| `workerConditions` | `true`     | Resolve a dependency's `worker` build ahead of its `browser` one      |
 
 ## Is it required?
 

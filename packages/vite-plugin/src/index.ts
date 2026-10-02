@@ -1,4 +1,4 @@
-import type { EnvironmentModuleNode, Plugin } from 'vite';
+import { defaultClientConditions, type EnvironmentModuleNode, type Plugin, type UserConfig } from 'vite';
 
 import { transformRenderWorker } from './render.ts';
 import { findShellCall, transformShell, type WorkerEntries } from './shell.ts';
@@ -73,7 +73,31 @@ export interface GessoPluginOptions {
    * module (default true).
    */
   readonly diagnostics?: boolean;
+  /**
+   * Resolve a dependency's `worker` export ahead of its `browser` one
+   * (default true). See {@link workerConditions}.
+   */
+  readonly workerConditions?: boolean;
 }
+
+/**
+ * The export conditions a Gesso application resolves its dependencies
+ * with: `worker` ahead of Vite's defaults.
+ *
+ * A Gesso application's code runs in workers, and Vite resolves every
+ * dependency with the `browser` condition, which is the right call for
+ * a page and the wrong one for a worker: a package's browser build may
+ * reach for `document`. `decode-named-character-reference`, which every
+ * markdown parser built on micromark imports, does exactly that, and a
+ * render worker that imported one died on start with "document is not
+ * defined". The same package publishes a `worker` build, as packages
+ * with a DOM-only browser build tend to. A package's own export order
+ * decides between the two, and those list `worker` first.
+ *
+ * The main thread resolves the same way. A worker build runs in a page
+ * as well, and the shell imports little beyond Gesso itself.
+ */
+export const workerConditions: readonly string[] = ['worker', ...defaultClientConditions];
 
 /**
  * Where a render worker entry is looked for, beside the shell.
@@ -113,6 +137,13 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     // the TypeScript transform, so the module still reads as it was
     // written.
     enforce: 'pre',
+
+    config(): UserConfig | null {
+      if (options.workerConditions === false) {
+        return null;
+      }
+      return { resolve: { conditions: [...workerConditions] } };
+    },
 
     configResolved(config) {
       serving = config.command === 'serve';
