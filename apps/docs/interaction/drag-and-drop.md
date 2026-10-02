@@ -141,7 +141,14 @@ has already invalidated.
 dropTarget({ accepts: 'gesso/reorder', onDrop: () => 'move', autoScroll: { edge: 40, speed: 700 } });
 ```
 
-On a scroll container, a drag held near an edge scrolls it. It has to be
+On a scroll container, a drag held near an edge scrolls it, whether or
+not this zone is the one that would take the drop. A list whose rows are
+drop targets of their own is never the winner while the pointer is over
+a row, and it still has to scroll when a card is held at its edge, so
+auto-scroll follows the pointer being inside the zone rather than the
+zone winning. A zone written by hand gets the same signal through the
+optional `hover(state)` on `UiDropZone`, called for every accepting zone
+under the pointer and with `null` once it leaves. It has to be
 driven by a timer rather than by pointer movement, because the gesture a
 person makes is to hold the card still at the top of the list and wait,
 which produces no pointer events at all. Without it the only rows a

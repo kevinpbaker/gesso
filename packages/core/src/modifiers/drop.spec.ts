@@ -170,6 +170,36 @@ describe('dropTarget', () => {
     expect(list.properties.get('scrollY')).toBeGreaterThan(0);
   });
 
+  it('scrolls even when a row inside it is the zone that would take the drop', () => {
+    vi.useFakeTimers();
+    const layout = new Boxes();
+    const { graph } = build(
+      Column(
+        { modifiers: [dropTarget({ accepts: 'board/card', onDrop: () => {}, autoScroll: { edge: 40, speed: 600 } })] },
+        Box({ modifiers: [dropTarget({ accepts: 'board/card', onDrop: () => {} })] })
+      ),
+      layout
+    );
+    const list = graph.root.firstChild!;
+    const row = list.firstChild!;
+    layout.place(list, { x: 0, y: 0, width: 200, height: 200 });
+    layout.place(row, { x: 0, y: 160, width: 200, height: 40 });
+    layout.scrollable(list, { x: 0, y: 0 });
+    const session = dragSessionFor(graph.root);
+
+    // Over the row, at the list's bottom edge: the row wins the drop,
+    // and the list scrolls anyway.
+    session.begin(CARD, 100, 195, null);
+    vi.advanceTimersByTime(100);
+    expect(list.properties.get('scrollY')).toBeGreaterThan(0);
+
+    // And stops once the drag is over.
+    session.cancel();
+    const scrolled = list.properties.get('scrollY');
+    vi.advanceTimersByTime(200);
+    expect(list.properties.get('scrollY')).toBe(scrolled);
+  });
+
   it('stops scrolling when the drag leaves', () => {
     vi.useFakeTimers();
     const layout = new Boxes();

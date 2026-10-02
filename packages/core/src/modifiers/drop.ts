@@ -207,15 +207,26 @@ class DropTarget implements UiDropZone {
 
   over(state: UiDragState): void {
     this.options.onOver?.(state.payload, { x: state.x, y: state.y });
-    this.updateAutoScroll(state);
   }
 
   leave(): void {
     for (const property of Object.keys(this.options.over ?? {})) {
       this.host.clear(property);
     }
-    this.stopScrolling();
     this.options.onLeave?.();
+  }
+
+  /**
+   * Auto-scroll follows the point being inside this zone, not this zone
+   * winning the drop: a list covered in row zones is never the winner,
+   * and still has to scroll when a card is held at its edge.
+   */
+  hover(state: UiDragState | null): void {
+    if (state === null) {
+      this.stopScrolling();
+    } else {
+      this.updateAutoScroll(state);
+    }
   }
 
   drop(state: UiDragState): UiDropEffect {
