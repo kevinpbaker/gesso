@@ -143,6 +143,28 @@ describe('LayoutEngine budgets', () => {
     expect(measured).toBeLessThan(20);
   });
 
+  it('moves the rows below an inserted row without placing them again', () => {
+    // A document editor's Enter: a row goes in near the top of a long
+    // list, and every row below it moves down. Boxes are absolute, so
+    // each moved row used to be placed again, all the way down: 9,572
+    // nodes for an Enter in a 5,000-line document. A row that only moved
+    // is shifted instead, one addition per node in it.
+    const h = new LayoutHarness();
+    const { root, list } = buildTree(h);
+    h.layout(root, VIEWPORT);
+    const below = list.firstChild!.nextSibling!.nextSibling!;
+    const before = h.boxOf(below.firstChild!.firstChild!);
+
+    const inserted = node(h, 'inserted', UiNodeType.Row, { height: 40 });
+    h.graph.insertBefore(list, inserted, list.firstChild!.nextSibling);
+    const { ms } = timed('insert a row above 498 others', () => frame(h, [[list, DirtyFlags.Children]]));
+
+    expect(h.boxOf(below.firstChild!.firstChild!).y).toBe(before.y + 40);
+    expect(h.engine.stats.shifted).toBe(ROWS - 1);
+    expect(h.engine.stats.placed).toBeLessThan(10);
+    expect(ms).toBeLessThan(50);
+  });
+
   it('re-measures fewer than 20 nodes for a text change deep in the tree', () => {
     const h = new LayoutHarness();
     const { root, texts } = buildTree(h);

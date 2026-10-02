@@ -348,9 +348,11 @@ describe('LayoutEngine positioning', () => {
       const frame = new UiFrame(1, 0, new Map([[scroller, DirtyFlags.Transform]]));
       h.engine.layoutForFrame(frame, Constraints.loose(300, 400));
       expect(h.box(popup).y).toBe(180);
-      // A scroll re-places the popup and measures nothing.
+      // A scroll moves the popup and measures nothing. It only moved, so
+      // it is shifted rather than placed again.
       expect(h.engine.stats.measured).toBe(0);
-      expect(h.engine.stats.placed).toBe(1);
+      expect(h.engine.stats.placed).toBe(0);
+      expect(h.engine.stats.shifted).toBe(1);
       expect(h.engine.stats.fullLayout).toBe(false);
     });
 
@@ -390,10 +392,11 @@ describe('LayoutEngine positioning', () => {
       h.engine.layoutForFrame(new UiFrame(1, 0, new Map([[spacer, DirtyFlags.Layout]])), Constraints.loose(300, 200));
       expect(h.box(anchor).y).toBe(80);
       expect(h.box(popup)).toEqual({ x: 20, y: 100, width: 100, height: 50 });
-      // The root, the app column, the spacer and the anchor would be
-      // placed by this frame anyway; following the anchor adds the
-      // popup's own placement and nothing else.
-      expect(h.engine.stats.placed).toBe(5);
+      // The root, the app column and the spacer are placed by this frame;
+      // the anchor only moved, and the popup follows it, so both are
+      // shifted rather than placed, and nothing else is touched.
+      expect(h.engine.stats.placed).toBe(3);
+      expect(h.engine.stats.shifted).toBe(2);
     });
 
     it('follows an anchor moved by its own offsets', () => {
@@ -478,10 +481,11 @@ describe('LayoutEngine positioning', () => {
       expect(h.record(header).stickyOffsetY).toBe(30);
       expect(h.visibleBox(header).y).toBe(0);
       expect(h.box(popup)).toEqual({ x: 0, y: 20, width: 40, height: 10 });
-      // The overlay's own placement, and nothing else: the scroll frame
-      // measures nothing and places no other node.
+      // The overlay moving, and nothing else: the scroll frame measures
+      // nothing and places no node.
       expect(h.engine.stats.measured).toBe(0);
-      expect(h.engine.stats.placed).toBe(1);
+      expect(h.engine.stats.placed).toBe(0);
+      expect(h.engine.stats.shifted).toBe(1);
       expect(h.engine.stats.fullLayout).toBe(false);
 
       scrollTo(h, scroller, 0, 2);

@@ -91,9 +91,11 @@ describe('the docs sticky example', () => {
 
     const gone = seen(coast);
     expect(gone.y).toBeLessThan(list.y);
-    // It stopped exactly on its group's bottom edge rather than
-    // carrying on to the top of the list.
-    expect(gone.y + gone.height).toBe(groupBottom - 250);
+    // It stopped on its group's bottom edge rather than carrying on to
+    // the top of the list. To within float noise: a group that moved
+    // without changing size has its boxes shifted rather than placed
+    // again, and old + delta can differ from a fresh sum in the last bit.
+    expect(gone.y + gone.height).toBeCloseTo(groupBottom - 250, 9);
     expect(seen(ui.getByRole('heading', { name: 'Interior' })).y).toBeCloseTo(list.y, 6);
   });
 

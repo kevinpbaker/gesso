@@ -796,7 +796,14 @@ export class LayoutEngine {
    * ran (memo hits are free and not counted); `relayoutRoots` counts
    * subtrees laid out from a relayout boundary instead of the root.
    */
-  readonly stats: LayoutStats = { measured: 0, placed: 0, relayoutRoots: 0, fullLayout: false, measuredNodes: [] };
+  readonly stats: LayoutStats = {
+    measured: 0,
+    placed: 0,
+    shifted: 0,
+    relayoutRoots: 0,
+    fullLayout: false,
+    measuredNodes: []
+  };
 
   /** Records the measured nodes in `stats.measuredNodes` (for inspectors and tests). */
   trace = false;
@@ -1071,6 +1078,7 @@ export class LayoutEngine {
   private resetStats(): void {
     this.stats.measured = 0;
     this.stats.placed = 0;
+    this.stats.shifted = 0;
     this.stats.relayoutRoots = 0;
     this.stats.fullLayout = false;
     this.stats.measuredNodes.length = 0;
@@ -2836,6 +2844,7 @@ export class LayoutEngine {
     }
     this.stats.placed++;
     rec.placeDirty = false;
+    rec.placedOnce = true;
     if (!node.hasChildren()) {
       return;
     }
@@ -4229,6 +4238,12 @@ export class LayoutEngine {
      * the gutter — was drawn one gutter too far to the right.
      */
     if (rec.x !== x || rec.y !== y || rec.width !== width || rec.height !== height) {
+      if (rec.width === width && rec.height === height && !rec.placeDirty && !rec.measureDirty && rec.placedOnce) {
+        // Moved, and nothing else: its subtree is placed relative to it
+        // already, so it moves by the same amount. See `shiftSubtree`.
+        this.shiftSubtree(node, x - rec.x, y - rec.y);
+        return;
+      }
       rec.x = x;
       rec.y = y;
       rec.width = width;
@@ -4251,6 +4266,60 @@ export class LayoutEngine {
             this.movedAnchored.add(dependent);
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Moves a laid-out subtree by (dx, dy) without placing it again.
+   *
+   * Boxes are absolute, so a block inserted at the top of a long
+   * document moved every box below it, and each one that moved was
+   * placed again: its children re-measured (memo hits) and re-assigned,
+   * all the way down. An Enter in a 5,000-line document placed 9,572
+   * nodes and cost 18 ms of layout. A subtree that moved without
+   * changing size, with nothing inside it waiting to be laid out, is
+   * placed relative to itself already, so every box in it moves by the
+   * same amount, which is one addition per node.
+   *
+   * Two kinds of node don't move with it. An absolutely positioned
+   * descendant whose containing block is outside the subtree is placed
+   * against that block, which didn't move. An anchored one is placed
+   * against its anchor, and is placed again (`movedAnchored`) when its
+   * anchor is one of the boxes that moved.
+   */
+  private shiftSubtree(node: UiNode, dx: number, dy: number): void {
+    this.stats.shifted++;
+    this.layoutVersion++;
+    const stack: [UiNode, boolean][] = [[node, false]];
+    while (stack.length > 0) {
+      const [current, inside] = stack.pop()!;
+      const rec = this.records.get(current);
+      if (rec !== undefined && current !== node && rec.absolute) {
+        if (current.properties.get('anchor') !== undefined && current.properties.get('anchor') !== null) {
+          continue;
+        }
+        if (!inside) {
+          continue;
+        }
+      }
+      if (rec !== undefined) {
+        rec.x += dx;
+        rec.y += dy;
+        if (this.anchorDependents.size > 0) {
+          const dependents = this.anchorDependents.get(current);
+          if (dependents !== undefined) {
+            for (const dependent of dependents) {
+              this.movedAnchored.add(dependent);
+            }
+          }
+        }
+      }
+      // A positioned node is the containing block of the absolute
+      // nodes under it, and it is moving with the rest.
+      const contains = inside || (rec !== undefined && rec.positioned);
+      for (let child = current.firstChild; child !== null; child = child.nextSibling) {
+        stack.push([child, contains]);
       }
     }
   }

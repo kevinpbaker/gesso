@@ -357,6 +357,8 @@ export class LayoutRecord {
 
   measureDirty = true;
   placeDirty = true;
+  /** Whether the node's children have been placed at least once, so its subtree can be shifted rather than placed. */
+  placedOnce = false;
   transformDirty = false;
 
   /**
@@ -481,6 +483,7 @@ export class LayoutRecord {
     this.alternates = null;
     this.contentMatters = true;
     this.relayoutBoundary = false;
+    this.placedOnce = false;
     this.measureDirty = true;
     this.placeDirty = true;
     this.transformDirty = false;
