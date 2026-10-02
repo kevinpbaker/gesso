@@ -292,13 +292,13 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     }
 
     if (isObservable(provided)) {
-      const subscription = provided.subscribe(value => cell.next(value));
+      const subscription = provided.subscribe(value => pushInput(cell, value));
       this.inputSubscriptions.set(inputName, subscription);
       this.subscriptions.add(subscription);
       return;
     }
 
-    cell.next(provided);
+    pushInput(cell, provided);
   }
 
   private validateInputs(): void {
@@ -340,3 +340,29 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
 }
 
 export type { ClassComponent };
+
+/**
+ * Hands an input cell a value from its parent, unless it already holds
+ * that very value.
+ *
+ * A parent that re-renders hands every child its props again, and a
+ * prop that is an Observable built in the parent's render is a new
+ * source each time, which re-subscribes and replays the current value.
+ * Pushed through regardless, that replay re-ran every binding derived
+ * from the input. In the issue tracker's editor, inserting one block
+ * re-rendered the list of 2,868, each replay rebuilt its block's text
+ * runs as a new array, and every editable on the page was re-measured:
+ * 12,912 nodes for one Enter. Values that cross into a component are
+ * treated as immutable everywhere else in the framework (bindings hold
+ * on to them, patches share structure), so the same reference is the
+ * same value and there is nothing to tell the child.
+ */
+function pushInput(cell: InputCell<unknown>, value: unknown): void {
+  // `getValue`, not `value`: the getter records a read for the
+  // stale-read warning, and this is the framework looking, not a body.
+  const current = cell.getValue();
+  if (current !== undefined && Object.is(current, value)) {
+    return;
+  }
+  cell.next(value);
+}
