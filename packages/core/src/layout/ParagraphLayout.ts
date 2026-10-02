@@ -109,7 +109,16 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
   // Split into paragraphs and segment each, so the widest segment is
   // known before any line is broken: it is the floor of the box, and
   // the width the lines wrap against.
-  const paragraphs: { start: number; text: string; segments: TextSegment[] }[] = [];
+  // Without runs a hard line's widths depend on its own text and the
+  // font alone, not on where it sits, so each one is remembered on its
+  // own: a keystroke in a 5,000-line field re-segments and re-breaks the
+  // one line it changed instead of all of them (19 ms a keystroke before,
+  // in node with the cheapest measurer there is). With runs, widths are
+  // asked for by offsets into the whole text, so those take the path
+  // they always took.
+  const memo = spanned === undefined ? hardLinesFor(runs) : undefined;
+  const style = memo === undefined ? '' : styleKey(request);
+  const paragraphs: { start: number; text: string; segments: TextSegment[]; cached?: HardLine }[] = [];
   let maxContentWidth = 0;
   let minContentWidth = 0;
   let paragraphStart = 0;
@@ -119,18 +128,25 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
       paragraphEnd = text.length;
     }
     const paragraph = text.slice(paragraphStart, paragraphEnd);
-    const segments = segmentParagraph(paragraph, wrap);
-    paragraphs.push({ start: paragraphStart, text: paragraph, segments });
-    maxContentWidth = Math.max(maxContentWidth, measure(paragraph, paragraphStart, paragraphEnd));
-    for (const segment of segments) {
-      minContentWidth = Math.max(
-        minContentWidth,
-        measure(
-          paragraph.slice(segment.start, segment.end),
-          paragraphStart + segment.start,
-          paragraphStart + segment.end
-        )
-      );
+    if (memo !== undefined) {
+      const cached = hardLine(memo, style, paragraph, wrap, measure);
+      paragraphs.push({ start: paragraphStart, text: paragraph, segments: cached.segments, cached });
+      maxContentWidth = Math.max(maxContentWidth, cached.maxContentWidth);
+      minContentWidth = Math.max(minContentWidth, cached.minContentWidth);
+    } else {
+      const segments = segmentParagraph(paragraph, wrap);
+      paragraphs.push({ start: paragraphStart, text: paragraph, segments });
+      maxContentWidth = Math.max(maxContentWidth, measure(paragraph, paragraphStart, paragraphEnd));
+      for (const segment of segments) {
+        minContentWidth = Math.max(
+          minContentWidth,
+          measure(
+            paragraph.slice(segment.start, segment.end),
+            paragraphStart + segment.start,
+            paragraphStart + segment.end
+          )
+        );
+      }
     }
     if (paragraphEnd >= text.length) {
       break;
@@ -138,11 +154,34 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     paragraphStart = paragraphEnd + 1;
   }
   const available = Math.max(maxWidth, minContentWidth);
+  const unwrapped = wrap === 'none' || !isFinite(available);
 
   const lines: TextLine[] = [];
   for (const paragraph of paragraphs) {
+    if (paragraph.cached !== undefined) {
+      // Broken once per width, relative to the line's own start, and
+      // moved to where the line sits in this text.
+      const key = unwrapped ? -1 : available;
+      let relative = paragraph.cached.lines.get(key);
+      if (relative === undefined) {
+        relative = breakHardLine(paragraph.text, paragraph.segments, available, unwrapped, measure);
+        if (paragraph.cached.lines.size >= WIDTHS_PER_LINE) {
+          paragraph.cached.lines.clear();
+        }
+        paragraph.cached.lines.set(key, relative);
+      }
+      for (const line of relative) {
+        lines.push({
+          start: line.start + paragraph.start,
+          end: line.end + paragraph.start,
+          text: line.text,
+          width: line.width
+        });
+      }
+      continue;
+    }
     const before = lines.length;
-    if (wrap === 'none' || !isFinite(available)) {
+    if (unwrapped) {
       pushLine(text, paragraph.text, paragraph.start, 0, paragraph.text.length, measure, spanned, lines);
     } else {
       breakGreedy(text, paragraph.text, paragraph.start, paragraph.segments, available, measure, spanned, lines);
@@ -179,6 +218,112 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     minContentWidth,
     maxContentWidth
   };
+}
+
+// ---------------------------------------------------------------------------
+// Hard lines, remembered one by one
+// ---------------------------------------------------------------------------
+
+/** One hard line (the text between two `\n`) of a paragraph without runs, as measured and broken. */
+interface HardLine {
+  readonly segments: TextSegment[];
+  readonly maxContentWidth: number;
+  readonly minContentWidth: number;
+  /** Lines with offsets relative to the hard line's start, by the width they were broken at (-1 when unwrapped). */
+  readonly lines: Map<number, readonly TextLine[]>;
+}
+
+/** Hard lines remembered per measurer before the least recently used is forgotten. */
+const HARD_LINE_ENTRIES = 20_000;
+/** Widths a hard line keeps its breaking for: a resize sweeps through many, an edit asks for one. */
+const WIDTHS_PER_LINE = 4;
+
+/**
+ * Per measurer, because a measurer is what a width is a width under:
+ * two runtimes with different fonts must not share answers. A WeakMap,
+ * so a measurer that is dropped takes its lines with it.
+ */
+const hardLineMemos = new WeakMap<TextRunMeasurer, Map<string, HardLine>>();
+
+/** Forgets a measurer's hard lines: what its widths mean has changed, as when a font face arrives. */
+export function forgetHardLines(runs: TextRunMeasurer): void {
+  hardLineMemos.delete(runs);
+}
+
+function hardLinesFor(runs: TextRunMeasurer): Map<string, HardLine> {
+  let memo = hardLineMemos.get(runs);
+  if (memo === undefined) {
+    memo = new Map();
+    hardLineMemos.set(runs, memo);
+  }
+  return memo;
+}
+
+/** The request's fields that change a run's width; text, width and line limits are not among them. */
+function styleKey(request: TextMeasureRequest): string {
+  return `${request.fontSize}\0${request.fontFamily ?? ''}\0${request.fontWeight ?? ''}\0${request.letterSpacing ?? ''}\0${
+    request.fontStyle ?? ''
+  }\0${request.fontStretch ?? ''}\0${request.fontVariant ?? ''}\0${request.fontKerning ?? ''}`;
+}
+
+function hardLine(
+  memo: Map<string, HardLine>,
+  style: string,
+  text: string,
+  wrap: TextWrap,
+  measure: Measure
+): HardLine {
+  const key = `${style}\0${wrap}\0${text}`;
+  const cached = memo.get(key);
+  if (cached !== undefined) {
+    // Re-inserted so the map's order is recency, which eviction reads.
+    memo.delete(key);
+    memo.set(key, cached);
+    return cached;
+  }
+  const segments = segmentParagraph(text, wrap);
+  let minContentWidth = 0;
+  for (const segment of segments) {
+    minContentWidth = Math.max(
+      minContentWidth,
+      measure(text.slice(segment.start, segment.end), segment.start, segment.end)
+    );
+  }
+  const entry: HardLine = {
+    segments,
+    maxContentWidth: measure(text, 0, text.length),
+    minContentWidth,
+    lines: new Map()
+  };
+  if (memo.size >= HARD_LINE_ENTRIES) {
+    const oldest = memo.keys().next().value;
+    if (oldest !== undefined) {
+      memo.delete(oldest);
+    }
+  }
+  memo.set(key, entry);
+  return entry;
+}
+
+/** Breaks one hard line on its own, as if it were the whole text. */
+function breakHardLine(
+  text: string,
+  segments: readonly TextSegment[],
+  available: number,
+  unwrapped: boolean,
+  measure: Measure
+): TextLine[] {
+  const lines: TextLine[] = [];
+  if (unwrapped) {
+    pushLine(text, text, 0, 0, text.length, measure, undefined, lines);
+  } else {
+    breakGreedy(text, text, 0, segments, available, measure, undefined, lines);
+  }
+  if (lines.length === 0) {
+    // A blank or all-space paragraph still occupies a line.
+    lines.push({ start: 0, end: 0, text: '', width: 0 });
+  }
+  return lines;
 }
 
 /** Metrics for measurers that cannot ask the platform for them. */

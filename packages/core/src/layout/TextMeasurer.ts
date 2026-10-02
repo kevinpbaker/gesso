@@ -1,5 +1,5 @@
 import type { Size } from './LayoutTypes';
-import { layoutParagraph, proportionalFontMetrics } from './ParagraphLayout';
+import { forgetHardLines, layoutParagraph, proportionalFontMetrics } from './ParagraphLayout';
 
 export type TextWrap = 'word' | 'char' | 'none';
 export type TextOverflow = 'clip' | 'ellipsis';
@@ -359,6 +359,7 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
    */
   invalidate(): void {
     this.paragraphs.clear();
+    forgetHardLines(this);
   }
 }
 

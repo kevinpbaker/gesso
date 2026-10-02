@@ -93,9 +93,38 @@ describe('ParagraphTextMeasurer', () => {
     }
     expect(measurer.cachedParagraphs).toBe(4096);
     const before = measurer.runs;
-    measurer.layout({ text: 'row 4199', fontSize: 10 });
+    const kept = measurer.layout({ text: 'row 4199', fontSize: 10 });
     expect(measurer.runs).toBe(before);
+    // The oldest paragraph was forgotten, so it is laid out again and is
+    // a new object. Its one line's widths are still remembered by the
+    // hard-line memo, so laying it out again measures nothing.
+    const again = measurer.layout({ text: 'row 0', fontSize: 10 });
+    expect(again).not.toBe(kept);
+    expect(again.lines.map(line => line.text)).toEqual(['row 0']);
+    expect(measurer.runs).toBe(before);
+    // And invalidate forgets those as well, as a font arriving needs.
+    measurer.invalidate();
     measurer.layout({ text: 'row 0', fontSize: 10 });
     expect(measurer.runs).toBeGreaterThan(before);
+  });
+
+  it('re-breaks only the hard line an edit changed', () => {
+    const measurer = new CountingMeasurer();
+    const lines = Array.from({ length: 500 }, (_, i) => `Line ${i} of a long field`);
+    measurer.layout({ text: lines.join('\n'), fontSize: 10, maxWidth: 80 });
+    const before = measurer.runs;
+    lines[250] = 'Line 250 of a long field, edited';
+    const edited = measurer.layout({ text: lines.join('\n'), fontSize: 10, maxWidth: 80 });
+    // A handful of measurements for the one changed line, not thousands.
+    expect(measurer.runs - before).toBeLessThan(20);
+    // And the result is the result a cold measurer gives.
+    const cold = new CountingMeasurer().layout({ text: lines.join('\n'), fontSize: 10, maxWidth: 80 });
+    expect(edited.lines).toEqual(cold.lines);
+    expect([edited.width, edited.height, edited.minContentWidth, edited.maxContentWidth]).toEqual([
+      cold.width,
+      cold.height,
+      cold.minContentWidth,
+      cold.maxContentWidth
+    ]);
   });
 });
