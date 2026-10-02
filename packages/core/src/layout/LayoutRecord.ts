@@ -238,6 +238,33 @@ export class LayoutRecord {
   lastConstraints: Constraints = NEVER_MEASURED;
 
   /**
+   * The percentage base the current measurement resolved against, and
+   * whether the node has a length that resolves against one.
+   *
+   * A percentage is resolved against the container's content box,
+   * which is not in the constraints. A node sized `height: 100%` and
+   * asked the same loose constraints under a taller container must
+   * not be handed back the height it had in the shorter one, so for a
+   * node with a percentage the base is part of what a memo matches.
+   * Each axis counts only for a node with a percentage on it, so a
+   * block that is `width: 100%` is not measured again because its
+   * column's height changed, and a node with none (the overwhelming
+   * majority) matches as cheaply as it always did.
+   */
+  lastBaseWidth: number | undefined = undefined;
+  lastBaseHeight: number | undefined = undefined;
+  percentWidth = false;
+  percentHeight = false;
+
+  /** Whether a measurement under `baseWidth` by `baseHeight` would resolve the same percentages as the current one. */
+  sameBase(baseWidth: number | undefined, baseHeight: number | undefined): boolean {
+    return (
+      (!this.percentWidth || this.lastBaseWidth === baseWidth) &&
+      (!this.percentHeight || this.lastBaseHeight === baseHeight)
+    );
+  }
+
+  /**
    * Earlier memoised measurements, most recently used first.
    *
    * Flex measures an item more than once a pass, and a memo of one
@@ -275,14 +302,19 @@ export class LayoutRecord {
    * keeps the current one as an alternate in its place. False when
    * nothing remembered matches.
    */
-  recallAlt(constraints: Constraints): boolean {
+  recallAlt(constraints: Constraints, baseWidth?: number, baseHeight?: number): boolean {
     const slots = this.alternates;
     if (slots === null) {
       return false;
     }
     for (let index = 0; index < slots.length; index++) {
       const slot = slots[index]!;
-      if (slot.valid && constraintsEqual(slot.constraints, constraints)) {
+      if (
+        slot.valid &&
+        constraintsEqual(slot.constraints, constraints) &&
+        (!this.percentWidth || slot.baseWidth === baseWidth) &&
+        (!this.percentHeight || slot.baseHeight === baseHeight)
+      ) {
         slot.swap(this);
         // Most recently used first: the measurement just set aside is
         // the likeliest to be asked for next.
@@ -442,6 +474,10 @@ export class LayoutRecord {
     this.contentWidth = 0;
     this.contentHeight = 0;
     this.lastConstraints = NEVER_MEASURED;
+    this.lastBaseWidth = undefined;
+    this.lastBaseHeight = undefined;
+    this.percentWidth = false;
+    this.percentHeight = false;
     this.alternates = null;
     this.contentMatters = true;
     this.relayoutBoundary = false;
@@ -466,6 +502,8 @@ const ALTERNATES = 2;
 class MeasureSlot {
   valid = false;
   constraints: Constraints = NEVER_MEASURED;
+  baseWidth: number | undefined = undefined;
+  baseHeight: number | undefined = undefined;
   private measuredWidth = 0;
   private measuredHeight = 0;
   private outerWidth = 0;
@@ -484,6 +522,8 @@ class MeasureSlot {
   capture(rec: LayoutRecord): void {
     this.valid = true;
     this.constraints = rec.lastConstraints;
+    this.baseWidth = rec.lastBaseWidth;
+    this.baseHeight = rec.lastBaseHeight;
     this.measuredWidth = rec.measuredWidth;
     this.measuredHeight = rec.measuredHeight;
     this.outerWidth = rec.outerWidth;
@@ -504,6 +544,12 @@ class MeasureSlot {
     const constraints = rec.lastConstraints;
     rec.lastConstraints = this.constraints;
     this.constraints = constraints;
+    let base = rec.lastBaseWidth;
+    rec.lastBaseWidth = this.baseWidth;
+    this.baseWidth = base;
+    base = rec.lastBaseHeight;
+    rec.lastBaseHeight = this.baseHeight;
+    this.baseHeight = base;
     let n: number = rec.measuredWidth;
     rec.measuredWidth = this.measuredWidth;
     this.measuredWidth = n;

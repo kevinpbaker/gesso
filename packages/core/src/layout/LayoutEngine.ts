@@ -14,7 +14,7 @@ import {
   parseMainAxisAlignment
 } from './Alignment';
 import { resolveString } from '../properties/UiPropertyResolver';
-import { resolveLength } from './UiLength';
+import { isPercentLength, resolveLength } from './UiLength';
 import type { UiTrackSize } from './UiLength';
 import { placeGridItems, sizeGridTracks } from './GridLayout';
 import type { GridContribution, GridItemRequest, GridPlacement, GridTrackSizingResult } from './GridLayout';
@@ -1354,11 +1354,12 @@ export class LayoutEngine {
       rec.measureDirty = false;
       return;
     }
+    const base = this.percentBase;
     if (!rec.measureDirty) {
-      if (constraintsEqual(rec.lastConstraints, constraints)) {
+      if (constraintsEqual(rec.lastConstraints, constraints) && rec.sameBase(base.width, base.height)) {
         return;
       }
-      if (rec.recallAlt(constraints)) {
+      if (rec.recallAlt(constraints, base.width, base.height)) {
         return;
       }
       rec.saveAlt();
@@ -1370,6 +1371,8 @@ export class LayoutEngine {
       this.stats.measuredNodes.push(node);
     }
     rec.lastConstraints = constraints;
+    rec.lastBaseWidth = this.percentBase.width;
+    rec.lastBaseHeight = this.percentBase.height;
     this.resolveLayoutProps(node, rec);
     rec.hasBaseline = false;
     // Containers that know their min-content height set it as they
@@ -2492,20 +2495,10 @@ export class LayoutEngine {
       const stretchY =
         definiteHeight !== undefined &&
         this.stackAlignment(child, 'selfY', 'height', stackY) === CrossAxisAlignment.Stretch;
-      const availableWidth = Math.max(0, content.maxWidth - cRec.marginLeft - cRec.marginRight);
-      const availableHeight = Math.max(0, content.maxHeight - cRec.marginTop - cRec.marginBottom);
       // The stack passes its first child's baseline and every child's
       // min-content on to its own parent.
       cRec.contentMatters = rec.contentMatters;
-      this.measure(
-        child,
-        new Constraints(
-          stretchX ? availableWidth : 0,
-          stretchX ? availableWidth : content.maxWidth,
-          stretchY ? availableHeight : 0,
-          stretchY ? availableHeight : content.maxHeight
-        )
-      );
+      this.measure(child, this.stackQuestion(cRec, content, stretchX, stretchY));
       cRec.relayoutBoundary =
         (explicitWidth || stretchX) &&
         (explicitHeight || stretchY) &&
@@ -2532,6 +2525,18 @@ export class LayoutEngine {
       width: rec.paddingLeft + rec.paddingRight + maxWidth,
       height: rec.paddingTop + rec.paddingBottom + maxHeight
     };
+  }
+
+  /** What a stack asks a child while measuring: tight on a stretched axis, up to its content box otherwise. */
+  private stackQuestion(cRec: LayoutRecord, content: Constraints, stretchX: boolean, stretchY: boolean): Constraints {
+    const availableWidth = Math.max(0, content.maxWidth - cRec.marginLeft - cRec.marginRight);
+    const availableHeight = Math.max(0, content.maxHeight - cRec.marginTop - cRec.marginBottom);
+    return new Constraints(
+      stretchX ? availableWidth : 0,
+      stretchX ? availableWidth : content.maxWidth,
+      stretchY ? availableHeight : 0,
+      stretchY ? availableHeight : content.maxHeight
+    );
   }
 
   private measureScroll(node: UiNode, rec: LayoutRecord, content: Constraints): Size {
@@ -3522,9 +3527,31 @@ export class LayoutEngine {
     const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Start;
     const mirrored = this.startEdge(node) === 'right';
     const savedBase = this.percentBase;
+    // The content box the stack was measured against, which is what a
+    // child that is not stretched is placed at the size it measured
+    // under. Rebuilt rather than trusted: the stack's measurement may
+    // have been a memo hit, which leaves each child holding its answer
+    // to whatever it was asked last, and that need not be this.
+    this.percentBase = { width: rec.lastBaseWidth, height: rec.lastBaseHeight };
+    const measured = this.contentConstraints(rec, this.effectiveConstraints(node, rec.lastConstraints, rec));
+    const measuredBase = { width: this.definiteAxis(measured, 'width'), height: this.definiteAxis(measured, 'height') };
     this.percentBase = { width: contentWidth, height: contentHeight };
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
+      this.percentBase = measuredBase;
+      this.resolveLayoutProps(child, cRec);
+      this.measure(
+        child,
+        this.stackQuestion(
+          cRec,
+          measured,
+          measuredBase.width !== undefined &&
+            this.stackAlignment(child, 'selfX', 'width', stackX) === CrossAxisAlignment.Stretch,
+          measuredBase.height !== undefined &&
+            this.stackAlignment(child, 'selfY', 'height', stackY) === CrossAxisAlignment.Stretch
+        )
+      );
+      this.percentBase = { width: contentWidth, height: contentHeight };
       this.resolveLayoutProps(child, cRec);
       const alignX = this.stackAlignment(child, 'selfX', 'width', stackX, mirrored);
       const alignY = this.stackAlignment(child, 'selfY', 'height', stackY);
@@ -3967,6 +3994,8 @@ export class LayoutEngine {
     rec.propsPass = this.layoutPass;
     rec.propsBaseWidth = base.width;
     rec.propsBaseHeight = base.height;
+    rec.percentWidth = hasPercentLength(props, WIDTH_RELATIVE);
+    rec.percentHeight = hasPercentLength(props, HEIGHT_RELATIVE);
     // `flex: n` is CSS's shorthand for grow n, shrink 1, basis 0.
     const flex = this.numberProp(node, 'flex');
     rec.flexGrow = this.numberProp(node, 'flexGrow') ?? flex ?? 0;
@@ -4464,4 +4493,23 @@ export class LayoutEngine {
   private clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
   }
+}
+
+/**
+ * The length properties that resolve against each axis of the
+ * percentage base. `flexBasis` and `inset` are in both: which axis a
+ * basis is on is the parent's direction, and an inset is all four
+ * sides.
+ */
+const WIDTH_RELATIVE = ['width', 'minWidth', 'maxWidth', 'left', 'right', 'inset', 'flexBasis'] as const;
+const HEIGHT_RELATIVE = ['height', 'minHeight', 'maxHeight', 'top', 'bottom', 'inset', 'flexBasis'] as const;
+
+/** Whether any of these lengths on a node is a percentage. */
+function hasPercentLength(props: ReadonlyMap<string, unknown>, names: readonly string[]): boolean {
+  for (const name of names) {
+    if (isPercentLength(props.get(name))) {
+      return true;
+    }
+  }
+  return false;
 }
