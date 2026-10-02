@@ -82,6 +82,17 @@ digits with one condition rather than three.
 form can watch all its fields from one listener. Nothing is reported
 when an edit changed no text.
 
+### Owning undo
+
+`historyUndo` and `historyRedo` arrive through `onBeforeInput` like
+every other edit, so an application that keeps its own history (an
+editor whose document is several fields, where one undo has to cover a
+paragraph split as well as the typing either side of it) cancels them
+there and applies its own. The field's history is also cleared whenever
+`value` changes from outside, because text the application replaced is
+text the field never typed: a document-level history is the one that
+can say what an outside change undoes to.
+
 ## The caret and the selection
 
 A press places the caret, and Shift extends the selection to it. A
