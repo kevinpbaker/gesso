@@ -2881,8 +2881,11 @@ export class GessoRuntime {
       frame: frame.id,
       durationMs: elapsed,
       nodes: frame.size,
-      measured: this.engine.stats.measured,
-      relayoutRoots: this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
+      // The engine's counters are reset when a layout pass starts, so a
+      // frame that skipped layout would otherwise report the last pass's
+      // numbers as its own: a caret blink claimed thousands of nodes.
+      measured: laidOut ? this.engine.stats.measured : 0,
+      relayoutRoots: !laidOut || this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
       at: finished,
       inputLatencyMs: this.inputLatency.take(epochAt(finished)),
       phases: this.phaseTimings,
