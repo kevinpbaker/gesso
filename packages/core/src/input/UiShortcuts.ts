@@ -361,10 +361,27 @@ function parseStep(text: string): UiShortcutStep {
  * `'Mod+K'` and `'Mod+k'` are the same shortcut, and the browser
  * reports whichever the shift state produced. Anything longer than one
  * character is a named key (`'Enter'`, `'ArrowUp'`) and keeps its case.
+ *
+ * The space bar is the exception that has to be spelled out. The
+ * platform reports it as `' '`, which a shortcut string cannot contain
+ * because space separates the steps of a chord, so the name `Space`
+ * stands for it. Before this, `'Space'` was kept as the literal name and
+ * never matched a press: the board's keyboard drag in the issue tracker
+ * was the first thing to need it.
  */
 function normalizeKey(key: string): string {
+  const named = NAMED_KEYS[key.toLowerCase()];
+  if (named !== undefined) {
+    return named;
+  }
   return key.length === 1 ? key.toLowerCase() : key;
 }
+
+/** Key names a shortcut string uses for keys it cannot spell. */
+const NAMED_KEYS: Readonly<Record<string, string>> = {
+  space: ' ',
+  spacebar: ' '
+};
 
 /** Whether the presses so far could still complete this shortcut. */
 function matchesPrefix(steps: readonly UiShortcutStep[], sequence: readonly UiShortcutStep[]): boolean {
@@ -422,7 +439,7 @@ function formatStep(step: UiShortcutStep): string {
   if (step.shift) {
     parts.push('Shift');
   }
-  parts.push(step.key.length === 1 ? step.key.toUpperCase() : step.key);
+  parts.push(step.key === ' ' ? 'Space' : step.key.length === 1 ? step.key.toUpperCase() : step.key);
   return parts.join('+');
 }
 

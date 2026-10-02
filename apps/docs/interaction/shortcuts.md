@@ -64,6 +64,14 @@ out: `Ctrl+S` or `Meta+S`.
 the same reason. An application that knows what it is running on can
 format the parsed `steps` itself.
 
+## Space
+
+A shortcut string separates the presses of a chord with spaces, so the
+space bar cannot be written as itself. `Space` names it, alone or with
+modifiers: `shortcut({ registry, keys: 'Space', … })` runs on the space
+bar, and `formatShortcut` prints it back as `Space`. Like any bare key,
+it is skipped while a text field has focus.
+
 ## Scope
 
 ```ts

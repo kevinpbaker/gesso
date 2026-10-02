@@ -55,6 +55,19 @@ describe('UiShortcutRegistry', () => {
     expect(registry.handleKey('p', mods({ ctrl: true, shift: true }), null)).toBe(true);
   });
 
+  it('binds the space bar by name, and prints it by name', () => {
+    const registry = new UiShortcutRegistry();
+    const pick = vi.fn();
+    registry.register({ keys: 'Space', label: 'Pick up', run: pick });
+    registry.register({ keys: 'Shift+Space', label: 'Pick up more', run: pick });
+
+    // The platform reports the space bar as a space.
+    expect(registry.handleKey(' ', mods(), null)).toBe(true);
+    expect(registry.handleKey(' ', mods({ shift: true }), null)).toBe(true);
+    expect(pick).toHaveBeenCalledTimes(2);
+    expect(formatShortcut(parseShortcut('Shift+Space'))).toBe('Shift+Space');
+  });
+
   it('unregisters when the returned function is called', () => {
     const registry = new UiShortcutRegistry();
     const run = vi.fn();
