@@ -4,6 +4,7 @@ import { BehaviorSubject, map } from 'rxjs';
 import {
   Box,
   Button,
+  ScrollView,
   Column,
   EditableText,
   Row,
@@ -235,6 +236,41 @@ describe('GessoRuntime semantics', () => {
       expect(moved.patches).toHaveLength(0);
       expect(moved.boxes).toHaveLength(1);
       expect(moved.boxes[0].box.y).toBe(42);
+    });
+
+    it('looks only at what is on screen to find the boxes that moved', () => {
+      // A long document, in groups as an editor renders one: thousands
+      // of mirrored nodes, a screenful seen. Every node's box used to be
+      // worked out on every layout frame to learn whether it was on
+      // screen, which cost a keystroke in a 5,000-line editor 4 to 24 ms.
+      // A group whose bounds are off screen is passed over whole now.
+      const width$ = new BehaviorSubject(80);
+      const groups = Array.from({ length: 100 }, (_, group) =>
+        Column(
+          {},
+          ...Array.from({ length: 50 }, (_, i) =>
+            Button({ text: `Row ${group}.${i}`, width: group === 0 && i === 0 ? width$ : 80, height: 30 })
+          )
+        )
+      );
+      const updates: UiSemanticsUpdate[] = [];
+      const { runtime, frame } = mountRuntime(ScrollView({ height: 600 }, Column({}, ...groups)), {
+        onCreate: created => created.onSemantics(update => updates.push(update))
+      });
+      frame(0);
+
+      const engine = (runtime as unknown as { engine: { recordFor(node: unknown): unknown } }).engine;
+      const read = engine.recordFor.bind(engine);
+      let reads = 0;
+      engine.recordFor = node => {
+        reads++;
+        return read(node);
+      };
+      width$.next(120);
+      frame();
+
+      expect(updates.at(-1)!.boxes.map(entry => entry.box.width)).toEqual([120]);
+      expect(reads).toBeLessThan(500);
     });
 
     it('reports the focused node when focus moves, and not when it has not', () => {
