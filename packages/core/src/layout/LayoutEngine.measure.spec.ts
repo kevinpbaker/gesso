@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiNodeType } from '../graph/UiNodeType';
+import { UiFrame } from '../scheduler/UiFrame';
 import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
 import { percent } from './UiLength';
@@ -202,6 +204,76 @@ describe('LayoutEngine measurement', () => {
       expect(harness.record(lines).width).toBe(736);
       expect(harness.record(target).left).toBe(147.2);
       expect(harness.boxOf(target).x).toBe(203.2);
+    });
+  });
+
+  describe('a size it has been laid out at before', () => {
+    /**
+     * An application shell's shape: a full-height page, a split pane
+     * whose first pane is a percentage of the width and the full
+     * height, and a column inside it with a footer pinned to its
+     * bottom. The window is resized and resized back, so every node is
+     * asked questions it has answered before.
+     */
+    function shell() {
+      const harness = new LayoutHarness();
+      const node = (id: string, type: UiNodeType, props: Record<string, unknown> = {}) => {
+        const created = harness.createNode(id, type);
+        for (const [name, value] of Object.entries(props)) {
+          created.setProperty(name, value);
+        }
+        return created;
+      };
+      const root = node('app', UiNodeType.Box, { x: 'stretch', y: 'stretch' });
+      const page = node('page', UiNodeType.Column, { width: percent(100), height: percent(100) });
+      const row = node('row', UiNodeType.Row, { width: percent(100), height: percent(100), y: 'stretch' });
+      const split = node('split', UiNodeType.Row, { width: percent(100), height: percent(100), flexGrow: 1 });
+      const pane = node('pane', UiNodeType.Box, {
+        width: percent(20),
+        height: percent(100),
+        minWidth: 0,
+        minHeight: 0,
+        flexShrink: 0,
+        overflow: 'hidden'
+      });
+      const column = node('column', UiNodeType.Column, { height: percent(100) });
+      const footer = node('footer', UiNodeType.Box, { height: 40 });
+      harness.append(column, node('list', UiNodeType.Box, { flexGrow: 1 }), footer);
+      harness.append(pane, column);
+      harness.append(split, pane, node('main', UiNodeType.Box, { flexGrow: 1, flexBasis: 0 }));
+      harness.append(row, split);
+      harness.append(page, row);
+      harness.append(root, page);
+      const resize = (height: number) =>
+        harness.engine.layoutForFrame(
+          new UiFrame(1, 0, new Map([[root, DirtyFlags.Layout]])),
+          Constraints.tight(1280, height)
+        );
+      harness.layout(root, Constraints.tight(1280, 988));
+      return { harness, column, footer, resize };
+    }
+
+    it('lays out a taller window at the taller size', () => {
+      // A percentage resolves against the container's content box,
+      // which is not in the constraints. The pane was asked the same
+      // loose height under both windows, and handing back the height
+      // it had in the shorter one left the footer 312 pixels short.
+      const { harness, column, footer, resize } = shell();
+      resize(1300);
+      expect(harness.boxOf(column).height).toBe(1300);
+      expect(harness.boxOf(footer).y).toBe(1260);
+    });
+
+    it('lays out a window resized back at the size it came from', () => {
+      // The pane remembers its answer for this window from before, and
+      // a memo hit leaves its children holding their answers to the
+      // last question they were asked, which was the taller window's.
+      // A stack placed each one at that size.
+      const { harness, column, footer, resize } = shell();
+      resize(1300);
+      resize(988);
+      expect(harness.boxOf(column).height).toBe(988);
+      expect(harness.boxOf(footer).y).toBe(948);
     });
   });
 });

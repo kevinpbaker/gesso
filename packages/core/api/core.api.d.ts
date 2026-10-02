@@ -370,9 +370,14 @@ declare class LayoutRecord {
   contentWidth: number;
   contentHeight: number;
   lastConstraints: Constraints;
+  lastBaseWidth: number | undefined;
+  lastBaseHeight: number | undefined;
+  percentWidth: boolean;
+  percentHeight: boolean;
+  sameBase(baseWidth: number | undefined, baseHeight: number | undefined): boolean;
   private alternates;
   saveAlt(): void;
-  recallAlt(constraints: Constraints): boolean;
+  recallAlt(constraints: Constraints, baseWidth?: number, baseHeight?: number): boolean;
   forgetAlts(): void;
   contentMatters: boolean;
   relayoutBoundary: boolean;
@@ -3410,6 +3415,7 @@ declare class LayoutEngine {
   private minContentContribution;
   private minContentHeightContribution;
   private measureStack;
+  private stackQuestion;
   private measureScroll;
   private measureLeaf;
   private measureCustom;
@@ -6752,7 +6758,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DyJNsyTr.js";
+} from "./index-DVJ41ISy.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7669,7 +7675,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DyJNsyTr.js";
+} from "./index-DVJ41ISy.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
