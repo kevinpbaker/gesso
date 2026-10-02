@@ -114,6 +114,22 @@ describe('RouterService', () => {
       expect(service.params(Settings)).toBeNull();
     });
 
+    it('reads params for a copy of a route, as a hot reload makes', () => {
+      const { router: service } = router();
+      service.go(MailItem, { folder: 'inbox', id: '3' });
+      // The same declaration, evaluated a second time by a module that
+      // was loaded twice: a different object with the same path.
+      const copy = route({
+        path: '/mail/:folder/:id',
+        component: Screen,
+        parent: route({ path: '/mail', component: Screen })
+      });
+      expect(service.params(copy)).toEqual({ folder: 'inbox', id: '3' });
+      const active: boolean[] = [];
+      service.isActive(copy).subscribe(value => active.push(value));
+      expect(active).toEqual([true]);
+    });
+
     it('reports a layout as active while any of its children shows', () => {
       const { router: service } = router();
       const active: boolean[] = [];

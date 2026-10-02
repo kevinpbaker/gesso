@@ -196,7 +196,7 @@ export class RouterService {
    */
   params<Path extends string>(route: RouteDefinition<Path>): RouteParams<Path> | null {
     const match = this.match.value;
-    if (match === null || !match.chain.includes(route)) {
+    if (match === null || !inChain(match.chain, route)) {
       return null;
     }
     return match.params as RouteParams<Path>;
@@ -308,7 +308,7 @@ export class RouterService {
   isActive(route: RouteDefinition): ComputedCell<boolean> {
     return computed(() => {
       const match = this.match.value;
-      return match !== null && match.chain.includes(route);
+      return match !== null && inChain(match.chain, route);
     });
   }
 
@@ -470,4 +470,22 @@ function sameParams(a: object | null, b: object | null): boolean {
   const right = b as Record<string, string>;
   const keys = Object.keys(left);
   return keys.length === Object.keys(right).length && keys.every(key => left[key] === right[key]);
+}
+
+/**
+ * Whether a route is in a matched chain: the same object, or a route
+ * declared with the same path.
+ *
+ * Identity alone was the original test, and it is right for a table
+ * loaded once. It fails silently under a dev server's hot replacement:
+ * a route table that imports its screens, with screens that import the
+ * table to read their params, is an import cycle, and after a hot edit
+ * Vite can serve the two sides as `routes.tsx` and `routes.tsx?t=…`.
+ * The table then loads twice, the router holds one copy's route objects
+ * and the screens hold the other's, and every `params(route)` answers
+ * null, so a team page quietly showed the default team. Matching is by
+ * path already, so two routes with one path are one route to the url.
+ */
+function inChain(chain: readonly RouteDefinition[], route: RouteDefinition): boolean {
+  return chain.some(link => link === route || link.path === route.path);
 }
