@@ -6,6 +6,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiFrame } from '../scheduler/UiFrame';
 import { LayoutHarness } from './LayoutTestUtils';
 import { Constraints } from './LayoutTypes';
+import { percent } from './UiLength';
 
 /**
  * Layout budgets. A synthetic application tree — a page
@@ -100,6 +101,46 @@ describe('LayoutEngine budgets', () => {
     expect(fullLayout).toBe(true);
     expect(measured).toBeLessThan(20);
     expect(ms).toBeLessThan(50);
+  });
+
+  it('re-measures a handful of nodes when one block of an auto-height document changes', () => {
+    // A document editor's shape: a row holding a flexible scroller, a
+    // column of auto-height blocks inside it, each block an editable.
+    // Nothing is a relayout boundary, so the change is laid out from the
+    // root, and every block is asked three questions: unbounded for the
+    // row's flex basis, loose at the final width, and at the stretched
+    // height. A two-entry memo evicted one of them each time and
+    // re-measured all 6,005 nodes per keystroke; see LayoutRecord.
+    const h = new LayoutHarness();
+    const root = node(h, 'doc', UiNodeType.Row);
+    const scroll = node(h, 'scroll', UiNodeType.ScrollView, { flexGrow: 1, height: percent(100) });
+    const column = node(h, 'blocks', UiNodeType.Column, { gap: 6, padding: 20, width: percent(100) });
+    const blocks: UiNode[] = [];
+    for (let i = 0; i < 1000; i++) {
+      const box = node(h, `block${i}`, UiNodeType.Box, { width: percent(100) });
+      const field = node(h, `field${i}`, UiNodeType.EditableText, {
+        value: `Paragraph ${i} with some words`,
+        multiline: true,
+        flexGrow: 1
+      });
+      h.append(box, field);
+      h.append(column, box);
+      blocks.push(field);
+    }
+    h.append(scroll, column);
+    h.append(root, scroll);
+    h.layout(root, Constraints.tight(900, 600));
+
+    const target = blocks[3]!;
+    target.setProperty('value', 'Paragraph 3 with some words, and one more');
+    h.engine.layoutForFrame(
+      new UiFrame(2, 0, new Map([[target, DirtyFlags.Content | DirtyFlags.Layout]])),
+      Constraints.tight(900, 600)
+    );
+    const { measured } = h.engine.stats;
+    // eslint-disable-next-line no-console
+    console.info(`[layout budget] auto-height document edit: measured ${measured}`);
+    expect(measured).toBeLessThan(20);
   });
 
   it('re-measures fewer than 20 nodes for a text change deep in the tree', () => {

@@ -29,7 +29,6 @@ describe('LayoutRecord.reset', () => {
         typeof value === 'number' ? value + 7 : typeof value === 'boolean' ? !value : { touched: true };
     }
     used.lastConstraints = Constraints.tight(3, 4);
-    used.altConstraints = Constraints.tight(5, 6);
     used.reset();
 
     const fresh = new LayoutRecord(node);
@@ -56,12 +55,35 @@ describe('LayoutRecord.reset', () => {
     rec.baseline = 0;
     rec.lastConstraints = Constraints.tight(30, 40);
 
-    rec.swapAlt();
+    expect(rec.recallAlt(Constraints.tight(10, 20))).toBe(true);
     expect([rec.measuredWidth, rec.measuredHeight, rec.hasBaseline, rec.baseline]).toEqual([10, 20, true, 4]);
     expect(rec.lastConstraints.maxWidth).toBe(10);
 
-    rec.swapAlt();
+    expect(rec.recallAlt(Constraints.tight(30, 40))).toBe(true);
     expect([rec.measuredWidth, rec.measuredHeight, rec.hasBaseline, rec.baseline]).toEqual([30, 40, false, 0]);
     expect(rec.lastConstraints.maxWidth).toBe(30);
+  });
+
+  it('remembers three measurements, so a third question does not evict the other two', () => {
+    const rec = new LayoutRecord(node);
+    const ask = (width: number) => {
+      rec.measuredWidth = width;
+      rec.lastConstraints = Constraints.tight(width, 1);
+    };
+    ask(1);
+    rec.saveAlt();
+    ask(2);
+    rec.saveAlt();
+    ask(3);
+    // Each of the earlier two comes back, in any order, as often as asked.
+    for (const width of [1, 2, 3, 2, 1, 3]) {
+      if (rec.lastConstraints.maxWidth !== width) {
+        expect(rec.recallAlt(Constraints.tight(width, 1))).toBe(true);
+      }
+      expect(rec.measuredWidth).toBe(width);
+    }
+    expect(rec.recallAlt(Constraints.tight(4, 1))).toBe(false);
+    rec.forgetAlts();
+    expect(rec.recallAlt(Constraints.tight(2, 1))).toBe(false);
   });
 });
