@@ -43,6 +43,13 @@ Nothing else is special: no regular expressions, no optional segments,
 no repeats. A pattern whose params the compiler cannot name would give
 up the thing this router is for.
 
+The router recognises a route by its path as well as by the object.
+That matters during development: a route table that imports its screens,
+with screens that import the table to call `observeParams`, is an import
+cycle, and after a hot edit a dev server can load the table twice. The
+screens then hold one copy's route objects and the router the other's,
+and a path is what still matches.
+
 Routes reach the runtime through `useRoutes`, in the worker, for the
 same reason the patterns never leave it: a route holds a component
 class.
