@@ -79,6 +79,14 @@ otherwise refuse to shrink and stop the divider partway across, while
 the reported position carried on as if nothing were wrong. The fraction
 is the size; the content is not an opinion about it.
 
+For the same reason the second pane's basis is zero: it is whatever the
+first pane and the divider leave, so the row never measures its content
+to find that out, and the divider never shrinks. A divider that could
+shrink gave up a sliver of its width whenever a pane's content
+overflowed, and a different sliver for every content width, so typing
+in a pane moved the pane by a fraction of a pixel and re-measured
+everything in it.
+
 ## Dragging
 
 The divider follows the pointer from the first pixel, because it
