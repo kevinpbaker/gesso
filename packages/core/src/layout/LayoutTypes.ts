@@ -67,6 +67,8 @@ export interface LayoutStats {
   measured: number;
   /** Nodes whose place ran. */
   placed: number;
+  /** Laid-out subtrees that moved without changing size, and were shifted rather than placed again. */
+  shifted: number;
   /** Subtrees laid out from a relayout boundary instead of the root. */
   relayoutRoots: number;
   /** Whether the pass started from the root. */

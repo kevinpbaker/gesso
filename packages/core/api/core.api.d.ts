@@ -383,6 +383,7 @@ declare class LayoutRecord {
   relayoutBoundary: boolean;
   measureDirty: boolean;
   placeDirty: boolean;
+  placedOnce: boolean;
   transformDirty: boolean;
   propsPass: number;
   propsBaseWidth: number | undefined;
@@ -578,6 +579,7 @@ declare class Constraints {
 interface LayoutStats {
   measured: number;
   placed: number;
+  shifted: number;
   relayoutRoots: number;
   fullLayout: boolean;
   measuredNodes: UiNode[];
@@ -3465,6 +3467,7 @@ declare class LayoutEngine {
   private axisMax;
   private axisConstraints;
   private assignBox;
+  private shiftSubtree;
   private scrollDirection;
   private forEachLayoutChild;
   private forEachAbsoluteChild;
@@ -6758,7 +6761,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DVJ41ISy.js";
+} from "./index-BbpCIppX.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7675,7 +7678,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DVJ41ISy.js";
+} from "./index-BbpCIppX.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
