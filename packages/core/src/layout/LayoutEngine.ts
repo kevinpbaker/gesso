@@ -819,7 +819,7 @@ export class LayoutEngine {
     for (const rec of this.records.values()) {
       rec.measureDirty = true;
       rec.placeDirty = true;
-      rec.altValid = false;
+      rec.forgetAlts();
     }
   }
 
@@ -1358,13 +1358,12 @@ export class LayoutEngine {
       if (constraintsEqual(rec.lastConstraints, constraints)) {
         return;
       }
-      if (rec.altValid && constraintsEqual(rec.altConstraints, constraints)) {
-        rec.swapAlt();
+      if (rec.recallAlt(constraints)) {
         return;
       }
       rec.saveAlt();
     } else {
-      rec.altValid = false;
+      rec.forgetAlts();
     }
     this.stats.measured++;
     if (this.trace) {

@@ -1,4 +1,4 @@
-import { Constraints } from './LayoutTypes';
+import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { UiNode } from '../graph/UiNode';
 
 /**
@@ -238,103 +238,71 @@ export class LayoutRecord {
   lastConstraints: Constraints = NEVER_MEASURED;
 
   /**
-   * A second memoised measurement. Flex measures every item twice —
-   * loose for its max-content size, then tight at its final size — and
-   * a one-entry memo would miss on every pass of every later frame. The
-   * outputs of the previous constraints are kept here and swapped back
-   * in when those constraints come round again, so an unchanged item
-   * costs nothing in either pass.
-   */
-  altValid = false;
-  altConstraints: Constraints = NEVER_MEASURED;
-
-  /**
-   * The alternate measurement's twelve outputs, one field each.
+   * Earlier memoised measurements, most recently used first.
    *
-   * These were a `number[]` built by an `outputs()` helper, which reads
-   * better and cost two array allocations on every flex item of every
-   * pass: a full pass of the benchmark list spent 2.2% of its time in
-   * the pair of helpers that packed and unpacked them, before the
-   * collector's share of having made the arrays at all. A field per
-   * output is the same twelve numbers with nothing built to hold them.
+   * Flex measures an item more than once a pass, and a memo of one
+   * entry missed on every pass of every later frame. Two entries (the
+   * last one and one alternate) covered a column of items: loose for
+   * the max-content size, then tight at the final size. A row with a
+   * flexible child holding a column of auto-height blocks asks that
+   * column's items a third question: the flex basis measures them
+   * unbounded, the final width measures them loose in height, and a
+   * row that stretches its items measures them again at the stretched
+   * height. With two slots the third evicted one of the others, so an
+   * edit to one block re-measured every block on every keystroke: 6,005
+   * nodes for a 1,000-paragraph document, where a hit costs nothing.
+   *
+   * The slots are allocated the first time a record needs one, so a
+   * node only ever measured one way carries none.
    */
-  private altMeasuredWidth = 0;
-  private altMeasuredHeight = 0;
-  private altOuterWidth = 0;
-  private altOuterHeight = 0;
-  private altMinContentWidth = 0;
-  private altMinContentHeight = 0;
-  private altMaxContentWidth = 0;
-  private altIntrinsicWidth = 0;
-  private altIntrinsicHeight = 0;
-  private altHasBaseline = false;
-  private altBaseline = 0;
-  private altContentWidth = 0;
-  private altContentHeight = 0;
+  private alternates: MeasureSlot[] | null = null;
 
-  /** Keeps the current measurement as the alternate before a fresh one overwrites it. */
+  /** Keeps the current measurement as the most recent alternate before a fresh one overwrites it. */
   saveAlt(): void {
-    this.altValid = true;
-    this.altConstraints = this.lastConstraints;
-    this.altMeasuredWidth = this.measuredWidth;
-    this.altMeasuredHeight = this.measuredHeight;
-    this.altOuterWidth = this.outerWidth;
-    this.altOuterHeight = this.outerHeight;
-    this.altMinContentWidth = this.minContentWidth;
-    this.altMinContentHeight = this.minContentHeight;
-    this.altMaxContentWidth = this.maxContentWidth;
-    this.altIntrinsicWidth = this.intrinsicWidth;
-    this.altIntrinsicHeight = this.intrinsicHeight;
-    this.altHasBaseline = this.hasBaseline;
-    this.altBaseline = this.baseline;
-    this.altContentWidth = this.contentWidth;
-    this.altContentHeight = this.contentHeight;
+    let slots = this.alternates;
+    if (slots === null) {
+      slots = this.alternates = [];
+    }
+    // Reuse the least recently used slot rather than allocating: it is
+    // the one about to be dropped anyway.
+    const slot = slots.length < ALTERNATES ? new MeasureSlot() : slots.pop()!;
+    slot.capture(this);
+    slots.unshift(slot);
   }
 
-  /** Makes the alternate measurement current, and the current one alternate. */
-  swapAlt(): void {
-    const constraints = this.lastConstraints;
-    this.lastConstraints = this.altConstraints;
-    this.altConstraints = constraints;
-    let swap: number = this.measuredWidth;
-    this.measuredWidth = this.altMeasuredWidth;
-    this.altMeasuredWidth = swap;
-    swap = this.measuredHeight;
-    this.measuredHeight = this.altMeasuredHeight;
-    this.altMeasuredHeight = swap;
-    swap = this.outerWidth;
-    this.outerWidth = this.altOuterWidth;
-    this.altOuterWidth = swap;
-    swap = this.outerHeight;
-    this.outerHeight = this.altOuterHeight;
-    this.altOuterHeight = swap;
-    swap = this.minContentWidth;
-    this.minContentWidth = this.altMinContentWidth;
-    this.altMinContentWidth = swap;
-    swap = this.minContentHeight;
-    this.minContentHeight = this.altMinContentHeight;
-    this.altMinContentHeight = swap;
-    swap = this.maxContentWidth;
-    this.maxContentWidth = this.altMaxContentWidth;
-    this.altMaxContentWidth = swap;
-    swap = this.intrinsicWidth;
-    this.intrinsicWidth = this.altIntrinsicWidth;
-    this.altIntrinsicWidth = swap;
-    swap = this.intrinsicHeight;
-    this.intrinsicHeight = this.altIntrinsicHeight;
-    this.altIntrinsicHeight = swap;
-    const hadBaseline = this.hasBaseline;
-    this.hasBaseline = this.altHasBaseline;
-    this.altHasBaseline = hadBaseline;
-    swap = this.baseline;
-    this.baseline = this.altBaseline;
-    this.altBaseline = swap;
-    swap = this.contentWidth;
-    this.contentWidth = this.altContentWidth;
-    this.altContentWidth = swap;
-    swap = this.contentHeight;
-    this.contentHeight = this.altContentHeight;
-    this.altContentHeight = swap;
+  /**
+   * Makes a remembered measurement for these constraints current, and
+   * keeps the current one as an alternate in its place. False when
+   * nothing remembered matches.
+   */
+  recallAlt(constraints: Constraints): boolean {
+    const slots = this.alternates;
+    if (slots === null) {
+      return false;
+    }
+    for (let index = 0; index < slots.length; index++) {
+      const slot = slots[index]!;
+      if (slot.valid && constraintsEqual(slot.constraints, constraints)) {
+        slot.swap(this);
+        // Most recently used first: the measurement just set aside is
+        // the likeliest to be asked for next.
+        if (index > 0) {
+          slots.splice(index, 1);
+          slots.unshift(slot);
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Forgets every remembered measurement: the node's content changed. */
+  forgetAlts(): void {
+    if (this.alternates !== null) {
+      for (const slot of this.alternates) {
+        slot.valid = false;
+      }
+    }
   }
 
   /**
@@ -474,21 +442,7 @@ export class LayoutRecord {
     this.contentWidth = 0;
     this.contentHeight = 0;
     this.lastConstraints = NEVER_MEASURED;
-    this.altValid = false;
-    this.altConstraints = NEVER_MEASURED;
-    this.altMeasuredWidth = 0;
-    this.altMeasuredHeight = 0;
-    this.altOuterWidth = 0;
-    this.altOuterHeight = 0;
-    this.altMinContentWidth = 0;
-    this.altMinContentHeight = 0;
-    this.altMaxContentWidth = 0;
-    this.altIntrinsicWidth = 0;
-    this.altIntrinsicHeight = 0;
-    this.altHasBaseline = false;
-    this.altBaseline = 0;
-    this.altContentWidth = 0;
-    this.altContentHeight = 0;
+    this.alternates = null;
     this.contentMatters = true;
     this.relayoutBoundary = false;
     this.measureDirty = true;
@@ -497,5 +451,97 @@ export class LayoutRecord {
     this.propsPass = 0;
     this.propsBaseWidth = undefined;
     this.propsBaseHeight = undefined;
+  }
+}
+
+/** How many earlier measurements a record remembers besides the current one. */
+const ALTERNATES = 2;
+
+/**
+ * One remembered measurement: the constraints it answered and the
+ * outputs it produced. A field per output rather than an array, for the
+ * reason the record's own fields are: packing and unpacking arrays cost
+ * 2.2% of a full pass in allocation alone.
+ */
+class MeasureSlot {
+  valid = false;
+  constraints: Constraints = NEVER_MEASURED;
+  private measuredWidth = 0;
+  private measuredHeight = 0;
+  private outerWidth = 0;
+  private outerHeight = 0;
+  private minContentWidth = 0;
+  private minContentHeight = 0;
+  private maxContentWidth = 0;
+  private intrinsicWidth = 0;
+  private intrinsicHeight = 0;
+  private hasBaseline = false;
+  private baseline = 0;
+  private contentWidth = 0;
+  private contentHeight = 0;
+
+  /** Copies the record's current measurement in. */
+  capture(rec: LayoutRecord): void {
+    this.valid = true;
+    this.constraints = rec.lastConstraints;
+    this.measuredWidth = rec.measuredWidth;
+    this.measuredHeight = rec.measuredHeight;
+    this.outerWidth = rec.outerWidth;
+    this.outerHeight = rec.outerHeight;
+    this.minContentWidth = rec.minContentWidth;
+    this.minContentHeight = rec.minContentHeight;
+    this.maxContentWidth = rec.maxContentWidth;
+    this.intrinsicWidth = rec.intrinsicWidth;
+    this.intrinsicHeight = rec.intrinsicHeight;
+    this.hasBaseline = rec.hasBaseline;
+    this.baseline = rec.baseline;
+    this.contentWidth = rec.contentWidth;
+    this.contentHeight = rec.contentHeight;
+  }
+
+  /** Trades places with the record's current measurement. */
+  swap(rec: LayoutRecord): void {
+    const constraints = rec.lastConstraints;
+    rec.lastConstraints = this.constraints;
+    this.constraints = constraints;
+    let n: number = rec.measuredWidth;
+    rec.measuredWidth = this.measuredWidth;
+    this.measuredWidth = n;
+    n = rec.measuredHeight;
+    rec.measuredHeight = this.measuredHeight;
+    this.measuredHeight = n;
+    n = rec.outerWidth;
+    rec.outerWidth = this.outerWidth;
+    this.outerWidth = n;
+    n = rec.outerHeight;
+    rec.outerHeight = this.outerHeight;
+    this.outerHeight = n;
+    n = rec.minContentWidth;
+    rec.minContentWidth = this.minContentWidth;
+    this.minContentWidth = n;
+    n = rec.minContentHeight;
+    rec.minContentHeight = this.minContentHeight;
+    this.minContentHeight = n;
+    n = rec.maxContentWidth;
+    rec.maxContentWidth = this.maxContentWidth;
+    this.maxContentWidth = n;
+    n = rec.intrinsicWidth;
+    rec.intrinsicWidth = this.intrinsicWidth;
+    this.intrinsicWidth = n;
+    n = rec.intrinsicHeight;
+    rec.intrinsicHeight = this.intrinsicHeight;
+    this.intrinsicHeight = n;
+    const had = rec.hasBaseline;
+    rec.hasBaseline = this.hasBaseline;
+    this.hasBaseline = had;
+    n = rec.baseline;
+    rec.baseline = this.baseline;
+    this.baseline = n;
+    n = rec.contentWidth;
+    rec.contentWidth = this.contentWidth;
+    this.contentWidth = n;
+    n = rec.contentHeight;
+    rec.contentHeight = this.contentHeight;
+    this.contentHeight = n;
   }
 }
