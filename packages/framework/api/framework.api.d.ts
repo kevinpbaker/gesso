@@ -3026,7 +3026,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-C9FAI_Kt.js";
+} from "./index-CDaAL-r4.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3512,7 +3512,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-C9FAI_Kt.js";
+} from "../index-CDaAL-r4.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

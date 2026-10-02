@@ -2434,28 +2434,80 @@ export class GessoRuntime {
    *
    * Ids that have left the tree are dropped here rather than tracked,
    * since a removal patch has already told the mirror about them.
+   *
+   * **Found by walking what is on screen, not by checking everything.**
+   * Bounding what was sent still computed every node's box to find out
+   * whether it was on screen: a 5,000-line document has three thousand
+   * fields, and the sweep cost 4 to 24 ms of every keystroke. The walk
+   * goes down from the root carrying the scroll and sticky offsets that
+   * `visibleBox` adds up per node, and passes over any subtree whose
+   * bounds (the hit tester's, see `subtreeBoundsFor`) are off screen.
+   * A node it passes over is one this skipped before anyway.
    */
   private collectSemanticsBoxes(): UiSemanticsBox[] {
     const changed: UiSemanticsBox[] = [];
-    const focused = this.focusManager.focusedNode?.id;
-    for (const id of this.semantics.keys()) {
-      const node = this.graph.getNode(id);
-      if (node === undefined || this.engine.recordFor(node) === undefined) {
-        continue;
-      }
-      const box = this.engine.visibleBox(node);
+    const focused = this.focusManager.focusedNode;
+    let focusedSeen = false;
+    const offer = (id: string, box: LayoutBox): void => {
       const last = this.semanticsBoxes.get(id);
       if (last !== undefined && boxesEqual(last, box)) {
-        continue;
-      }
-      if (id !== focused && !this.onScreen(box)) {
-        // Left where it was, deliberately: `semanticsBoxes` is what the
-        // mirror has been told, and leaving the two in step is what
-        // makes the box arrive on the frame this node returns.
-        continue;
+        return;
       }
       this.semanticsBoxes.set(id, box);
       changed.push({ id, box });
+    };
+    const root = this.root;
+    if (root !== undefined) {
+      // Fills the bounds for every record, if anything moved since.
+      this.engine.subtreeBoundsFor(root);
+      const stack: [UiNode, number, number][] = [[root, 0, 0]];
+      while (stack.length > 0) {
+        const [node, dx, dy] = stack.pop()!;
+        const rec = this.engine.recordFor(node);
+        let childX = dx;
+        let childY = dy;
+        if (rec !== undefined) {
+          const x = dx + rec.stickyOffsetX;
+          const y = dy + rec.stickyOffsetY;
+          if (
+            !rec.boundsUnbounded &&
+            node !== focused &&
+            !this.onScreen({
+              x: rec.boundsMinX + x,
+              y: rec.boundsMinY + y,
+              width: rec.boundsMaxX - rec.boundsMinX,
+              height: rec.boundsMaxY - rec.boundsMinY
+            })
+          ) {
+            // Left where it was, deliberately: \`semanticsBoxes\` is what
+            // the mirror has been told, and leaving the two in step is
+            // what makes the box arrive on the frame this node returns.
+            continue;
+          }
+          if (this.semantics.has(node.id)) {
+            const box = { x: rec.x + x, y: rec.y + y, width: rec.width, height: rec.height };
+            if (node === focused) {
+              focusedSeen = true;
+              offer(node.id, box);
+            } else if (this.onScreen(box)) {
+              offer(node.id, box);
+            }
+          }
+          childX = x - (rec.scrollable ? rec.scrollX : 0);
+          childY = y - (rec.scrollable ? rec.scrollY : 0);
+        }
+        // Last child first, so the boxes come out in document order.
+        for (let child = node.lastChild; child !== null; child = child.previousSibling) {
+          stack.push([child, childX, childY]);
+        }
+      }
+    }
+    // The focused node always, on screen or not: the focus ring is drawn
+    // from its rectangle.
+    if (focused !== null && focused !== undefined && !focusedSeen && this.semantics.has(focused.id)) {
+      if (this.engine.recordFor(focused) !== undefined) {
+        offer(focused.id, this.engine.visibleBox(focused));
+      }
     }
     if (this.semanticsBoxes.size > this.semantics.size) {
       for (const id of this.semanticsBoxes.keys()) {
