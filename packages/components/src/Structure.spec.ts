@@ -194,6 +194,35 @@ describe('SplitPane', () => {
     expect(changes.at(-1)).toBeCloseTo(0.75, 5);
   });
 
+  it('keeps the second pane still when its content changes width', async () => {
+    // Content wider than the track: the case where an automatic basis
+    // and a shrinkable divider moved the pane by a sliver for every
+    // content width, and so re-measured the whole pane on every edit.
+    const line = new BehaviorSubject('x'.repeat(200));
+    const ui = mount(
+      createComponent(SplitPane, {
+        defaultSplit: 0.25,
+        first: Box({}),
+        second: Box({ label: 'content' }, Text({ text: line, textWrap: 'none' }))
+      })
+    );
+    await ui.settle();
+    const pane = () => ui.getLayout(ui.getByLabel('content').parent!);
+    const divider = () => ui.getLayout(ui.getByRole('separator'));
+    const before = pane();
+    expect(divider().width).toBe(6);
+
+    line.next('x'.repeat(320));
+    await ui.settle();
+    expect(pane()).toEqual(before);
+    expect(divider().width).toBe(6);
+    const from = ui.frames.length;
+    line.next('x'.repeat(321));
+    await ui.settle();
+    // Only the text and what holds it, not the pane's whole subtree.
+    expect(Math.max(...ui.frames.slice(from).map(frame => frame.measured))).toBeLessThan(6);
+  });
+
   it('puts the divider at the fraction even when a pane holds wider content', () => {
     const split = new BehaviorSubject(0.4);
     const ui = mount(

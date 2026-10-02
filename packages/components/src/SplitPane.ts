@@ -78,6 +78,12 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
     modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
     width: horizontal() ? 6 : undefined,
     height: horizontal() ? undefined : 6,
+    // A divider is a fixed size. Left shrinkable, it gave up a sliver of
+    // its six pixels whenever the second pane's content was wider than
+    // the track, a different sliver for every content width, so every
+    // keystroke in a pane moved the pane by a fraction of a pixel and
+    // re-measured everything in it.
+    flexShrink: 0,
     backgroundColor: 'controlBackground',
     borderColor: 'controlBorder',
     borderWidth: 1,
@@ -135,7 +141,11 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
     },
     inputs.first.value ?? Row()
   );
-  const second = Box({ flexGrow: 1, ...shrinkable }, inputs.second.value ?? Row());
+  // The second pane is whatever the first and the divider leave, so its
+  // basis is zero rather than its content: with an automatic basis the
+  // row measured everything in it at max-content first, on every pass,
+  // to arrive at a size that never depended on that content.
+  const second = Box({ flexGrow: 1, flexBasis: 0, ...shrinkable }, inputs.second.value ?? Row());
 
   return horizontal() ? Row(container, first, divider, second) : Column(container, first, divider, second);
 }
