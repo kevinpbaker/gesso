@@ -57,6 +57,17 @@ export interface UiDropZone {
   leave(): void;
   /** The drag was released over the zone. What it did, for the source. */
   drop(state: UiDragState): UiDropEffect;
+  /**
+   * The point is inside this zone and the zone would take the payload,
+   * whether or not a deeper zone won the drop; null once it no longer
+   * is, or the drag ended.
+   *
+   * `over` goes to the winner alone, which is right for "where would
+   * this land" and wrong for auto-scroll: a list whose rows are drop
+   * zones of their own is never the winner, so a drag held at its edge
+   * never scrolled it. Auto-scroll listens here instead.
+   */
+  hover?(state: UiDragState | null): void;
 }
 
 /** The result a completed drag reports back to whatever started it. */
@@ -149,6 +160,8 @@ export class UiDragSession {
   private readonly zones: UiDropZone[] = [];
   private current: UiDragState | null = null;
   private inside: UiDropZone | null = null;
+  /** Every zone the point is in that would take the payload, winner or not. */
+  private hovering = new Set<UiDropZone>();
 
   /** Registers a drop target. The returned function unregisters it. */
   addZone(zone: UiDropZone): () => void {
@@ -217,6 +230,7 @@ export class UiDragSession {
     }
     const effect = zone.drop(state);
     zone.leave();
+    this.unhover();
     return { node: zone.node, effect };
   }
 
@@ -225,6 +239,15 @@ export class UiDragSession {
     this.inside?.leave();
     this.inside = null;
     this.current = null;
+    this.unhover();
+  }
+
+  /** Tells every zone the drag was hovering over that it no longer is. */
+  private unhover(): void {
+    for (const zone of this.hovering) {
+      zone.hover?.(null);
+    }
+    this.hovering.clear();
   }
 
   /**
@@ -282,6 +305,7 @@ export class UiDragSession {
     }
     let best: UiDropZone | null = null;
     let bestDepth = -1;
+    const containing = new Set<UiDropZone>();
     for (const zone of this.zones) {
       if (!zone.accepts(state.payload)) {
         continue;
@@ -290,6 +314,7 @@ export class UiDragSession {
       if (box === null || !contains(box, state.x, state.y)) {
         continue;
       }
+      containing.add(zone);
       const depth = depthOf(zone.node);
       if (depth > bestDepth) {
         best = zone;
@@ -300,9 +325,20 @@ export class UiDragSession {
       this.inside?.leave();
       this.inside = best;
       best?.enter(state);
-      return;
+    } else {
+      best?.over(state);
     }
-    best?.over(state);
+    // After the winner is settled, so a zone whose `leave` stops
+    // something can have `hover` start it again on the same move.
+    for (const zone of this.hovering) {
+      if (!containing.has(zone)) {
+        zone.hover?.(null);
+      }
+    }
+    for (const zone of containing) {
+      zone.hover?.(state);
+    }
+    this.hovering = containing;
   }
 }
 

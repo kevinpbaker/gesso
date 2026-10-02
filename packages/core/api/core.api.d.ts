@@ -2968,6 +2968,7 @@ interface UiDropZone {
   over(state: UiDragState): void;
   leave(): void;
   drop(state: UiDragState): UiDropEffect;
+  hover?(state: UiDragState | null): void;
 }
 interface UiDragResult {
   readonly node: UiNode;
@@ -2992,6 +2993,7 @@ declare class UiDragSession {
   private readonly zones;
   private current;
   private inside;
+  private hovering;
   addZone(zone: UiDropZone): () => void;
   get state(): UiDragState | null;
   get overNode(): UiNode | null;
@@ -3000,6 +3002,7 @@ declare class UiDragSession {
   move(x: number, y: number): void;
   end(): UiDragResult | null;
   cancel(): void;
+  private unhover;
   applyFileDrop(message: UiFileDropMessage): UiDragResult | null;
   private resolve;
 }
