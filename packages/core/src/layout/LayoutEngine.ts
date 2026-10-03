@@ -1957,6 +1957,7 @@ export class LayoutEngine {
     const mainBase = this.definiteAxis(content, row ? 'width' : 'height');
     const crossBase = this.definiteAxis(content, row ? 'height' : 'width');
     const savedBase = this.percentBase;
+    const scrollContentMatters = config.isScroll && this.scrollContentMatters(node, rec, savedBase);
     this.percentBase = row ? { width: mainBase, height: crossBase } : { width: crossBase, height: mainBase };
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
@@ -1980,9 +1981,20 @@ export class LayoutEngine {
         align = mirrorAlignment(align);
       }
       // What this container reads from the item beyond its size: its
-      // baseline when aligning by baseline, and whatever this container
-      // passes on to its own parent.
-      cRec.contentMatters = rec.contentMatters || align === CrossAxisAlignment.Baseline;
+      // baseline when aligning by baseline, its content when that is
+      // where its flex base comes from, and whatever this container
+      // passes on to its own parent. The base is read once, while a
+      // percentage inside may have nothing to resolve against, so a
+      // node below that later resolves one is not a boundary: content
+      // arriving under it changes how this line is shared out.
+      // A scroller's items are the scroller's content, which is read
+      // only through the scroller's own size; see `measureScroll`.
+      const contentBase =
+        this.flexBasis(child, cRec, mainBase) === undefined &&
+        this.lengthProp(child, row ? 'width' : 'height', mainBase) === undefined;
+      cRec.contentMatters = config.isScroll
+        ? scrollContentMatters
+        : rec.contentMatters || align === CrossAxisAlignment.Baseline || contentBase;
       this.measure(child, this.flexChildConstraints(cRec, content, direction, align, undefined, crossTightForStretch));
       const measuredMain = row ? cRec.measuredWidth : cRec.measuredHeight;
       const explicitMain = this.lengthProp(child, row ? 'width' : 'height', mainBase);
@@ -2552,6 +2564,24 @@ export class LayoutEngine {
     );
   }
 
+  /**
+   * Whether a scroller's content is read from outside it. Scrolled
+   * content pushes on nothing past a scroller whose size is its own,
+   * but one without is its content's size under a loose bound, so
+   * whatever reads its size reads the content's.
+   */
+  private scrollContentMatters(
+    node: UiNode,
+    rec: LayoutRecord,
+    base: { width: number | undefined; height: number | undefined }
+  ): boolean {
+    return (
+      rec.contentMatters &&
+      (this.lengthProp(node, 'width', base.width) === undefined ||
+        this.lengthProp(node, 'height', base.height) === undefined)
+    );
+  }
+
   private measureScroll(node: UiNode, rec: LayoutRecord, content: Constraints): Size {
     const direction = this.scrollDirection(node);
     const vertical = direction === FlexDirection.Column;
@@ -2567,6 +2597,7 @@ export class LayoutEngine {
     this.percentBase = { width: definiteWidth, height: definiteHeight };
     const crossDefinite = vertical ? definiteWidth : definiteHeight;
     const crossAlign = parseCrossAxisAlignment(node.properties.get(vertical ? 'x' : 'y')) ?? CrossAxisAlignment.Stretch;
+    const contentMatters = this.scrollContentMatters(node, rec, savedBase);
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
       this.resolveLayoutProps(child, cRec);
@@ -2585,8 +2616,7 @@ export class LayoutEngine {
       const childBase = vertical
         ? new Constraints(crossTight ? crossLimit : 0, crossLimit, 0, Infinity)
         : new Constraints(0, Infinity, crossTight ? crossLimit : 0, crossLimit);
-      // Scrollable content pushes on nothing outside the scroller.
-      cRec.contentMatters = false;
+      cRec.contentMatters = contentMatters;
       this.measure(child, childBase);
       cRec.relayoutBoundary =
         explicitMain !== undefined &&

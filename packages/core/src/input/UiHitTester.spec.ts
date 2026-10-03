@@ -560,7 +560,9 @@ describe('UiHitTester', () => {
      */
     function spillingSection(badgeTop: number) {
       const h = new InputTestHarness();
-      const section = h.node('section', UiNodeType.Column);
+      // A height of its own, so the column above doesn't size it from
+      // the row and the row is free to bound its own relayout.
+      const section = h.node('section', UiNodeType.Column, { height: 200 });
       const row = h.node('row', UiNodeType.Row, { height: 40 });
       const badge = h.node('badge', UiNodeType.Box, {
         position: 'absolute',

@@ -72,6 +72,15 @@ and `flex={2}` come out exactly one to two whatever they contain.
 so the growth is added on top of content that differs per item, and the
 ratio you get is not the ratio you wrote.
 
+A basis taken from content is also read again whenever that content
+changes, however deep the change is: rows arriving in a list inside a
+`flexGrow={1}` region change the region's basis, and with it how the
+column shares its height with a header beside it, so the layout runs
+from the column rather than stopping inside. A region meant to fill
+what's left, such as an application's main pane, wants `flex={1}`. Its
+basis is zero, nothing inside it is read, and the header keeps its
+height however long the list gets.
+
 Shrinking is weighted rather than even: an item's share of the overflow
 is scaled by its basis, so a wide item gives up more pixels than a
 narrow one at the same factor. `flexShrink={0}` opts out entirely, which
