@@ -1,4 +1,6 @@
-import { input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { combineLatest } from 'rxjs';
+
+import { FocusService, input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Box, Text, UiEventType, defineModifier, type UiChild, type UiModifier, type UiNode } from 'gesso-core';
 import { useOverlay, type OverlayHandle, type OverlayPlacement } from './overlay';
 
@@ -77,6 +79,25 @@ export function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): Ui
     overlay.hide();
   };
 
+  // Keyboard users get it too: a tooltip that only answers to a pointer
+  // is a tooltip half the people cannot read. The wrapper is not what
+  // takes focus — the control inside it is, and a focus event does not
+  // bubble — so it follows focus anywhere inside, and only focus the
+  // keyboard can see: a press focuses what it lands on as well, and a
+  // tooltip there would arrive just after the click it described.
+  const focus = ctx.inject(FocusService);
+  let focusedInside = false;
+  ctx.effect(combineLatest([focus.focused, focus.focusVisible]), ([node, visible]) => {
+    const inside = contains(anchor, node);
+    if (inside && visible) {
+      focusedInside = true;
+      show();
+    } else if (focusedInside) {
+      focusedInside = false;
+      hide();
+    }
+  });
+
   return Box(
     {
       ref: (node: UiNode | null) => (anchor = node),
@@ -85,11 +106,7 @@ export function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): Ui
         timer = setTimeout(show, delay.value);
       },
       onPointerLeave: hide,
-      onPointerDown: hide,
-      // Keyboard users get it too: a tooltip that only answers to a
-      // pointer is a tooltip half the people cannot read.
-      onFocus: show,
-      onBlur: hide
+      onPointerDown: hide
     },
     inputs.children.value ?? Text({ text: '' })
   );
@@ -168,6 +185,7 @@ const tooltipKind = defineModifier<TooltipArgs>({
         placement: current.placement ?? 'top',
         offset: 6
       });
+      openedOn.set(current.overlay, host.node);
     };
     const show = (): void => {
       if (current.overlay.isOpen()) {
@@ -187,10 +205,30 @@ const tooltipKind = defineModifier<TooltipArgs>({
     host.on(UiEventType.PointerLeave, hide);
     host.on(UiEventType.PointerDown, hide);
     // Keyboard users get it too: a tooltip that only answers to a
-    // pointer is a tooltip half the people cannot read.
-    host.on(UiEventType.Focus, show);
-    host.on(UiEventType.Blur, hide);
-    host.own(cancel);
+    // pointer is a tooltip half the people cannot read. Only for focus
+    // the keyboard can see, though, as a focus ring is: a press focuses
+    // a button as well, and a tooltip that opened on every click would
+    // say what the button does just after it was done, and stay there
+    // over whatever it opened. The host reports a change of visibility
+    // as a focus change, so a key pressed on a clicked button opens it.
+    host.onFocusChange(focused => {
+      if (focused && host.isFocusVisible()) {
+        show();
+      } else if (!focused) {
+        hide();
+      }
+    });
+    // The element can go while the component that rendered it stays —
+    // a Run button that turns into Cancel — and an open tooltip is
+    // then anchored to nothing, with no pointer left to leave and no
+    // focus left to blur. It closes with the element, unless the same
+    // tooltip has since been opened on another one.
+    host.own(() => {
+      cancel();
+      if (openedOn.get(current.overlay) === host.node) {
+        current.overlay.hide();
+      }
+    });
   },
   update(host, args) {
     tooltipArgs.get(host)?.(args);
@@ -198,3 +236,15 @@ const tooltipKind = defineModifier<TooltipArgs>({
 });
 
 const tooltipArgs = new WeakMap<object, (args: TooltipArgs) => void>();
+
+/** Which element each tooltip was last opened on, so leaving one does not close it on another. */
+const openedOn = new WeakMap<OverlayHandle, UiNode>();
+
+function contains(root: UiNode | null, node: UiNode | null): boolean {
+  for (let at = node; at !== null && root !== null; at = at.parent) {
+    if (at === root) {
+      return true;
+    }
+  }
+  return false;
+}

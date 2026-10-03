@@ -130,7 +130,7 @@ describe('the docs tooltip example', () => {
     expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByLabel('Archive'));
   });
 
-  it('closes on a press, and a focusable trigger opens it again with the focus', () => {
+  it('closes on a press, and the focus a press gives does not open it again', () => {
     const ui = mount();
     const badge = ui.getByText('Read only');
     ui.hover(badge);
@@ -153,10 +153,15 @@ describe('the docs tooltip example', () => {
     ui.fireEvent.pointerDown(onSave.x, onSave.y);
     ui.frame();
 
-    // The press closed it and the focus that follows a press on a
-    // button opened it again, so it stays up while the button holds
-    // the keyboard.
+    // The press closed it, and the button took focus from the press:
+    // focus the keyboard cannot see, so the tooltip stays closed rather
+    // than sitting over whatever the press went on to open.
     expect(ui.runtime.input.focus.focusedNode).toBe(save);
+    expect(ui.entries()).toHaveLength(0);
+
+    // A key makes that focus visible, and the tooltip opens for it.
+    ui.fireEvent.press('ArrowRight');
+    ui.frame();
     expect(ui.shown()).toBe('Writes the note to the server');
   });
 

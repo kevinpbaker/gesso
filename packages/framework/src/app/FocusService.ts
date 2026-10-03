@@ -25,6 +25,14 @@ export class FocusService {
   readonly focused = internalState<UiNode | null>(null);
   /** Whether focus is confined to a subtree by an open trap. */
   readonly trapped = internalState(false);
+  /**
+   * Whether the focus held is focus the keyboard can see: reached by Tab
+   * or an arrow key, or by code with no pointer since, rather than by a
+   * press. CSS's `:focus-visible`, for something other than a ring that
+   * should answer the keyboard and not the click that happened to focus
+   * the same control: a tooltip, say.
+   */
+  readonly focusVisible = internalState(false);
 
   private manager: UiFocusManager | null = null;
   private detach: (() => void) | null = null;
@@ -40,8 +48,12 @@ export class FocusService {
       this.queued = [];
       return;
     }
+    // A change of modality alone — a key pressed on a control a click
+    // focused — is reported as a focus change on the same node, so this
+    // one listener keeps both cells right.
     const focusChange = manager.onFocusChange(node => {
       this.focused.value = node;
+      this.focusVisible.value = manager.focusVisible;
     });
     const scopeChange = manager.onScopeChange(() => {
       this.trapped.value = manager.trapped;
@@ -107,6 +119,7 @@ export class FocusService {
 
   private sync(manager: UiFocusManager): void {
     this.focused.value = manager.focusedNode;
+    this.focusVisible.value = manager.focusVisible;
     this.trapped.value = manager.trapped;
   }
 }
