@@ -295,7 +295,11 @@ inside, eight pixels from the nearest edge, and does nothing when it is
 already visible. A node bigger than its container can't be shown whole,
 so it's brought in by its start, unless it already fills the view, as
 a browser's `focus()` does: a page that opens with its first section
-focused stays at its top. Clicking a control does not reveal it, because a
+focused stays at its top. A section that starts below some padding is
+still brought in eight pixels from the edge, so a page that focuses it
+only to have it read out says `autoFocus({ preventScroll: true })` or
+`focus(node, { preventScroll: true })` and stays where it is. Clicking a
+control does not reveal it, because a
 person can already see what they pressed and moving it would pull it
 out from under the pointer resting on it.
 

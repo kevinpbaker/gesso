@@ -225,7 +225,9 @@ where it was: pressing the background is not a request to blur.
 Moving focus by keyboard scrolls the focused node into view; moving it
 by pointer does not. A person who clicked something can already see it,
 and scrolling would pull it out from under the pointer still resting on
-it.
+it. Moving it from code scrolls as the keyboard does, unless the call
+says `{ preventScroll: true }`, as `element.focus()` takes in a browser:
+see [focus and traps](/interaction/focus-and-traps#autofocus).
 
 Components reach focus through `FocusService`, injected like any other
 service. It offers `focus`, `blur`, `focusNext`, `focusPrevious`,

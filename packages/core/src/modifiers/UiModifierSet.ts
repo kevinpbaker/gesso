@@ -18,6 +18,7 @@ import { clearOverrideProperty, writeOverrideProperty } from '../graph/UiPropert
 import type { UiEventListener, UiEventListenerOptions, UiInputDispatcher } from '../input/UiInputDispatcher';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventType } from '../input/UiInputEvent';
+import type { FocusOptions } from '../input/UiFocusManager';
 import type { DecorationShape } from '../rendering/Decorations';
 import { findPropertyDefinition, propertyEffects } from '../properties/UiPropertyRegistry';
 import { resolveProperty } from '../properties/UiPropertyResolver';
@@ -77,7 +78,7 @@ export interface UiModifierFocus {
   isFocused(node: UiNode): boolean;
   /** Whether the focus `node` holds should be shown; see `UiFocusManager.focusVisible`. */
   isFocusVisible(node: UiNode): boolean;
-  focus(node: UiNode): void;
+  focus(node: UiNode, options?: FocusOptions): void;
   onFocusChange(node: UiNode, listener: (focused: boolean) => void): () => void;
 }
 
@@ -424,13 +425,13 @@ class Host implements UiModifierHost {
     this.own(environment.onChange(this.node, listener));
   }
 
-  focus(): void {
+  focus(options?: FocusOptions): void {
     const focus = this.services.focus;
     if (focus === undefined) {
       warnMissing(this.name, 'move focus', 'focus');
       return;
     }
-    focus.focus(this.node);
+    focus.focus(this.node, options);
   }
 
   isFocused(): boolean {

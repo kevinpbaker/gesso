@@ -447,6 +447,7 @@ import {
   ComponentResolver,
   EditingState,
   EditingState as EditingState$1,
+  FocusOptions,
   IconRasterizer,
   ImageResolver,
   LayoutExplanation,
@@ -2539,7 +2540,7 @@ declare class FocusService {
   private detach;
   private queued;
   setManager(manager: UiFocusManager | null): void;
-  focus(node: UiNode): void;
+  focus(node: UiNode, options?: FocusOptions): void;
   blur(): void;
   focusNext(): void;
   focusPrevious(): void;

@@ -5,6 +5,7 @@ import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { UiEventListener, UiEventListenerOptions } from '../input/UiInputDispatcher';
 import type { UiEventType } from '../input/UiInputEvent';
+import type { FocusOptions } from '../input/UiFocusManager';
 import type { DecorationShape } from '../rendering/Decorations';
 import type { AnimatedCell, UiSharedElements, UiSpringOptions, UiTweenOptions } from '../animation';
 
@@ -152,8 +153,12 @@ export interface UiModifierHost {
    * at all.
    */
   onEnvironment(listener: () => void): void;
-  /** Moves keyboard focus to the node, if it can take it. */
-  focus(): void;
+  /**
+   * Moves keyboard focus to the node, if it can take it. It is scrolled
+   * into view as any focus from code is, unless `options.preventScroll`
+   * says otherwise.
+   */
+  focus(options?: FocusOptions): void;
   /** Whether the node currently holds keyboard focus. */
   isFocused(): boolean;
   /**

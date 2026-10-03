@@ -31,7 +31,7 @@ const focus = ctx.inject(FocusService);
 
 | Member            | What it does                                                    |
 | ----------------- | --------------------------------------------------------------- |
-| `focus(node)`     | Moves focus there. A node that cannot take it is ignored        |
+| `focus(node, o?)` | Moves focus there. A node that cannot take it is ignored        |
 | `blur()`          | Drops focus without moving it anywhere                          |
 | `focusNext()`     | The next focusable node, wrapping                               |
 | `focusPrevious()` | The previous one, wrapping                                      |
@@ -39,6 +39,10 @@ const focus = ctx.inject(FocusService);
 | `releaseTrap()`   | Ends the innermost trap and restores the control that opened it |
 | `focused`         | The node holding focus, or null, as state to bind to            |
 | `trapped`         | Whether a trap is open, as state to bind to                     |
+
+`focus(node)` scrolls the node into view, as focus from code does in a
+browser. `focus(node, { preventScroll: true })` leaves every scroll
+container where it is, as `element.focus({ preventScroll: true })` does.
 
 `focused` carries the `UiNode` itself, not an id, which is what lets a
 readout name it or a control compare it with its own node. Nodes come
@@ -187,6 +191,23 @@ lands there rather than on the dialog's first focusable node. That is
 the point of it: the scope's own entry rule picks the first stop, and
 `autoFocus()` is how you say it should be somewhere else.
 
+The node is scrolled into view, like any focus from code, once the
+frame's layout has settled, so it is revealed from where it ends up,
+not from where a first layout pass put it. When the focus is there for a
+screen reader rather than for the eye, use `autoFocus({ preventScroll:
+true })`. A page that focuses its content region as it opens, so the
+region is read out, wants to start at its top; revealing a region taller
+than the viewport scrolls it to a few pixels short of its own top
+instead, because a reveal keeps a margin from the edge.
+
+```tsx
+<column role="region" label={title} focusable tabStop={false} modifiers={[autoFocus({ preventScroll: true })]}>
+```
+
+Focus taken without scrolling stays that way while the node holds it: a
+key pressed later shows the focus ring where it is and does not scroll
+to it either.
+
 ## Roving focus
 
 A group whose items are all tab stops makes a person press Tab five
@@ -259,7 +280,8 @@ your own carries it by name.
 **Focus moves by keyboard scroll the focused node into view; focus
 moved by pointer does not.** Someone who clicked a control can already
 see it, and scrolling would pull it out from under a pointer still
-resting on it.
+resting on it. Focus moved by code scrolls too, unless it asked for
+`preventScroll`.
 
 **Where this was checked.** The behaviour on this page is covered by the
 spec beside the example above, which drives Tab through the focus

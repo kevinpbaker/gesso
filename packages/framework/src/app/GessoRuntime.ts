@@ -615,8 +615,8 @@ export class GessoRuntime {
       focus: {
         isFocused: node => this.focusNotifier.isFocused(node),
         isFocusVisible: node => this.focusNotifier.isFocusVisible(node),
-        focus: node => {
-          this.focusManager.focus(node);
+        focus: (node, options) => {
+          this.focusManager.focus(node, 'program', options);
         },
         onFocusChange: (node, listener) => this.focusNotifier.add(node, listener)
       },
@@ -828,9 +828,10 @@ export class GessoRuntime {
     // page out from under a pointer that is still resting on it: a
     // half-visible 562px card jumped 511px up the screen on the press,
     // before the transition it started had drawn a frame. A browser
-    // draws the same line, and for the same reason.
-    this.input.focus.onFocusChange((node, source) => {
-      if (node !== null && source !== 'pointer') {
+    // draws the same line, and for the same reason. Focus from code that
+    // asked for `preventScroll` is left where it is, as in a browser.
+    this.input.focus.onFocusChange((node, source, options) => {
+      if (node !== null && source !== 'pointer' && options.preventScroll !== true) {
         this.scrollIntoView(node);
       }
     });

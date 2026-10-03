@@ -28,6 +28,31 @@ import type { UiInputDispatcher } from './UiInputDispatcher';
 export type FocusSource = 'pointer' | 'keyboard' | 'program';
 
 /**
+ * How focus is moved, beyond what moved it. The DOM's `FocusOptions`,
+ * for the part of it that means something here.
+ */
+export interface FocusOptions {
+  /**
+   * Leaves every scroll container where it is, as
+   * `element.focus({ preventScroll: true })` does: the node takes focus
+   * without being scrolled into view.
+   *
+   * For focus placed for a screen reader's sake rather than the eye's.
+   * A page that focuses its content region when it opens, so the region
+   * is read out, starts at its top; revealing the region as well would
+   * scroll a tall one to a few pixels short of its own edge, because a
+   * reveal keeps a margin from the viewport.
+   *
+   * Kept for as long as the node holds focus: a key pressed later makes
+   * the focus visible without scrolling to it either. Moving focus
+   * again, by Tab or by code, reveals as usual.
+   */
+  readonly preventScroll?: boolean;
+}
+
+const NO_OPTIONS: FocusOptions = {};
+
+/**
  * How the person last drove the app, as far as focus can tell: the
  * pointer or the keyboard. This is what decides whether focus is
  * *visible*, the way `:focus-visible` does in a browser: a ring that
@@ -74,7 +99,9 @@ export class UiFocusManager {
    * would show it.
    */
   private modality: FocusModality = 'keyboard';
-  private readonly listeners = new Set<(node: UiNode | null, source: FocusSource) => void>();
+  /** How the focused node took focus; see `FocusOptions.preventScroll`. */
+  private focusedOptions: FocusOptions = NO_OPTIONS;
+  private readonly listeners = new Set<(node: UiNode | null, source: FocusSource, options: FocusOptions) => void>();
   private readonly scopeListeners = new Set<() => void>();
   private readonly scopes: FocusScope[] = [];
   /** The field of each editing group that last had focus, where Tab back into the group lands. */
@@ -128,7 +155,7 @@ export class UiFocusManager {
     }
     this.modality = modality;
     if (this.focused !== null) {
-      this.notify(this.focused, modality);
+      this.notify(this.focused, modality, this.focusedOptions);
     }
   }
 
@@ -150,8 +177,11 @@ export class UiFocusManager {
    * focused (inert, non-focusable, outside the active scope); true
    * otherwise, including when the node already held focus (a no-op
    * that emits nothing).
+   *
+   * `options` travel with the change to the listeners, which is where
+   * the runtime decides whether to scroll the node into view.
    */
-  focus(node: UiNode, source: FocusSource = 'program'): boolean {
+  focus(node: UiNode, source: FocusSource = 'program', options: FocusOptions = NO_OPTIONS): boolean {
     if (!isNodeFocusable(node) || !this.withinScope(node) || this.insideHidden(node)) {
       return false;
     }
@@ -163,6 +193,7 @@ export class UiFocusManager {
     }
     const previous = this.focused;
     this.focused = node;
+    this.focusedOptions = options;
     const group = this.groupOf(node);
     if (group !== null) {
       this.groupEntries.set(group, node);
@@ -171,15 +202,16 @@ export class UiFocusManager {
       this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Blur, node), previous);
     }
     this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Focus, previous), node);
-    this.notify(node, source);
+    this.notify(node, source, options);
     return true;
   }
 
   /**
    * Called after focus moves or clears, with the new focused node. The
-   * runtime uses it to scroll the focused node into view.
+   * runtime uses it to scroll the focused node into view, unless the
+   * options say not to.
    */
-  onFocusChange(listener: (node: UiNode | null, source: FocusSource) => void): () => void {
+  onFocusChange(listener: (node: UiNode | null, source: FocusSource, options: FocusOptions) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
@@ -194,9 +226,9 @@ export class UiFocusManager {
     };
   }
 
-  private notify(node: UiNode | null, source: FocusSource): void {
+  private notify(node: UiNode | null, source: FocusSource, options: FocusOptions = NO_OPTIONS): void {
     for (const listener of this.listeners) {
-      listener(node, source);
+      listener(node, source, options);
     }
   }
 

@@ -1,4 +1,4 @@
-import type { UiNode, UiFocusManager } from 'gesso-core';
+import type { FocusOptions, UiNode, UiFocusManager } from 'gesso-core';
 import { internalState } from '../InternalState';
 
 /**
@@ -70,9 +70,15 @@ export class FocusService {
     this.sync(manager);
   }
 
-  /** Gives the node keyboard focus. Non-focusable nodes are ignored. */
-  focus(node: UiNode): void {
-    this.run(manager => manager.focus(node));
+  /**
+   * Gives the node keyboard focus. Non-focusable nodes are ignored.
+   *
+   * The node is scrolled into view, unless `options.preventScroll` asks
+   * for the page to stay where it is, as `element.focus({ preventScroll:
+   * true })` does in a browser.
+   */
+  focus(node: UiNode, options?: FocusOptions): void {
+    this.run(manager => manager.focus(node, 'program', options));
   }
 
   /** Drops focus without moving it anywhere. */
