@@ -452,7 +452,13 @@ function formatMacStep(step: UiShortcutStep): string {
 }
 
 /** The arrows as arrows, which every keyboard prints them as. */
-const KEY_NAMES: Readonly<Record<string, string>> = { ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+const KEY_NAMES: Readonly<Record<string, string>> = {
+  ' ': 'Space',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→'
+};
 
 function keyName(key: string): string {
   return KEY_NAMES[key] ?? (key.length === 1 ? key.toUpperCase() : key);
