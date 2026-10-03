@@ -451,27 +451,33 @@ export class UiEditingController {
    * text means something to it that it means to nothing else, and
    * before this there was no way for it to hear about one at all.
    */
-  paste(text: string): boolean {
+  paste(text: string, html: string | null = null): boolean {
     const node = this.focusedEditable;
     if (node === null || isReadOnly(node)) {
-      return this.offerPaste(text);
+      return this.offerPaste(text, html);
     }
-    return this.insert(node, editorFor(node), 'insertFromPaste', text);
+    return this.insert(node, editorFor(node), 'insertFromPaste', text, html);
   }
 
-  private offerPaste(text: string): boolean {
+  private offerPaste(text: string, html: string | null): boolean {
     const target = this.focus.focusedNode;
     if (target === null) {
       return false;
     }
-    const event = new UiPasteEvent(text);
+    const event = new UiPasteEvent(text, html);
     this.dispatcher.dispatch(event, target);
     return event.defaultPrevented;
   }
 
-  private insert(node: UiNode, model: EditableTextModel, inputType: string, text: string): boolean {
+  private insert(
+    node: UiNode,
+    model: EditableTextModel,
+    inputType: string,
+    text: string,
+    html: string | null = null
+  ): boolean {
     const data = isMultiline(node) ? text : text.replace(/\r\n|\r|\n/g, ' ');
-    return this.applyEdit(node, model, inputType, data, () => model.insertText(data));
+    return this.applyEdit(node, model, inputType, data, () => model.insertText(data), html);
   }
 
   // ---------------------------------------------------------------------------
@@ -730,12 +736,13 @@ export class UiEditingController {
     model: EditableTextModel,
     inputType: string,
     data: string | null,
-    run: () => void
+    run: () => void,
+    html: string | null = null
   ): boolean {
     if (this.span !== null && this.span.focus.node === node) {
-      return this.spanEdit(inputType, data);
+      return this.spanEdit(inputType, data, html);
     }
-    const before = new UiBeforeInputEvent(inputType, data);
+    const before = new UiBeforeInputEvent(inputType, data, html);
     this.dispatcher.dispatch(before, node);
     if (before.defaultPrevented) {
       return true;
@@ -901,14 +908,14 @@ export class UiEditingController {
    * the selection. No field is changed: the application changes its
    * document, which changes the fields, and places the caret.
    */
-  private spanEdit(inputType: string, data: string | null): boolean {
+  private spanEdit(inputType: string, data: string | null, html: string | null = null): boolean {
     const span = this.span!;
     const forward = comparePositions(span.anchor, span.focus) <= 0;
     const start = forward ? span.anchor : span.focus;
     const end = forward ? span.focus : span.anchor;
     this.clearSpan();
     editorFor(span.focus.node).select(span.focus.offset);
-    span.group.onEdit({ inputType, data, start, end });
+    span.group.onEdit({ inputType, data, html, start, end });
     return true;
   }
 

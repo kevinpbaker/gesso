@@ -289,11 +289,11 @@ describe('EditingProxy', () => {
     proxy.update(state({ selectionStart: 0, selectionEnd: 5 }));
     const written: string[] = [];
     const clipboardData = {
-      getData: () => 'pasted',
+      getData: (type: string) => (type === 'text/plain' ? 'pasted' : ''),
       setData: (_type: string, value: string) => void written.push(value)
     };
     expect(textarea.dispatch('paste', { clipboardData }).defaultPrevented).toBe(true);
-    expect(sink.calls.at(-1)).toEqual(['paste', 'pasted']);
+    expect(sink.calls.at(-1)).toEqual(['paste', 'pasted', null]);
     textarea.dispatch('copy', { clipboardData });
     expect(written).toEqual(['hello']);
     textarea.dispatch('cut', { clipboardData });
@@ -314,11 +314,29 @@ describe('EditingProxy', () => {
   it('takes a paste aimed at the canvas when no field has focus', () => {
     const { proxy, canvas, sink } = setup();
     proxy.update(null);
-    const clipboardData = { getData: () => 'a\tb\nc\td', setData: () => undefined };
+    const clipboardData = {
+      getData: (type: string) => (type === 'text/plain' ? 'a\tb\nc\td' : ''),
+      setData: () => undefined
+    };
 
     expect(canvas.dispatch('paste', { clipboardData }).defaultPrevented).toBe(true);
 
-    expect(sink.calls.at(-1)).toEqual(['paste', 'a\tb\nc\td']);
+    expect(sink.calls.at(-1)).toEqual(['paste', 'a\tb\nc\td', null]);
+  });
+
+  it('carries the HTML a paste had along with its text', () => {
+    // A copy from a web page or a document has its headings, lists and
+    // links in the HTML; an editor that keeps structure needs them, and
+    // the proxy used to read the plain text only.
+    const { proxy, textarea, sink, state } = setup();
+    proxy.update(state());
+    const html = '<h2>Steps</h2><ul><li>one</li></ul>';
+    const clipboardData = {
+      getData: (type: string) => (type === 'text/html' ? html : 'Steps\none'),
+      setData: () => undefined
+    };
+    textarea.dispatch('paste', { clipboardData });
+    expect(sink.calls.at(-1)).toEqual(['paste', 'Steps\none', html]);
   });
 
   /** One paste, one delivery: the event goes to whichever has focus. */

@@ -753,11 +753,15 @@ declare class UiKeyboardEvent extends UiInputEvent {
 declare class UiBeforeInputEvent extends UiInputEvent {
   readonly inputType: string;
   readonly data: string | null;
-  constructor(inputType: string, data: string | null);
+  readonly html: string | null;
+  constructor(inputType: string, data: string | null,
+  html?: string | null);
 }
 declare class UiPasteEvent extends UiInputEvent {
   readonly text: string;
-  constructor(text: string);
+  readonly html: string | null;
+  constructor(text: string,
+  html?: string | null);
 }
 declare class UiTextChangeEvent extends UiInputEvent {
   readonly value: string;
@@ -939,6 +943,7 @@ interface UiTextPosition {
 interface UiGroupEdit {
   readonly inputType: string;
   readonly data: string | null;
+  readonly html?: string | null;
   readonly start: UiTextPosition;
   readonly end: UiTextPosition;
 }
@@ -3104,7 +3109,7 @@ declare class UiEditingController {
   beforeInput(inputType: string, data: string | null): boolean;
   insertText(text: string): boolean;
   replaceText(text: string): boolean;
-  paste(text: string): boolean;
+  paste(text: string, html?: string | null): boolean;
   private offerPaste;
   private insert;
   compositionStart(): void;
@@ -6861,7 +6866,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CXiMWXQF.js";
+} from "./index-q4HgduT7.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7793,7 +7798,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CXiMWXQF.js";
+} from "./index-q4HgduT7.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

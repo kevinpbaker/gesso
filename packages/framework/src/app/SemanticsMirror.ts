@@ -29,7 +29,7 @@ export interface SemanticsMirrorSink {
    * nothing at all and the text is dropped before the application
    * sees it.
    */
-  paste?(text: string): void;
+  paste?(text: string, html: string | null): void;
 }
 
 /**
@@ -636,11 +636,12 @@ export class SemanticsMirror {
     const onKeyUp = (event: KeyboardEvent): void => this.sink.keyUp?.(event);
     const onPaste = (event: ClipboardEvent): void => {
       const text = event.clipboardData?.getData('text/plain') ?? '';
-      if (text.length === 0) {
+      const html = event.clipboardData?.getData('text/html') ?? '';
+      if (text.length === 0 && html.length === 0) {
         return;
       }
       event.preventDefault();
-      this.sink.paste?.(text);
+      this.sink.paste?.(text, html.length > 0 ? html : null);
     };
     this.container.addEventListener('click', onClick);
     this.container.addEventListener('focusin', onFocusIn);

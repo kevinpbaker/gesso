@@ -48,6 +48,8 @@ export interface UiTextPosition {
 export interface UiGroupEdit {
   readonly inputType: string;
   readonly data: string | null;
+  /** For a paste, the clipboard's HTML when it held some. */
+  readonly html?: string | null;
   readonly start: UiTextPosition;
   readonly end: UiTextPosition;
 }

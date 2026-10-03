@@ -195,7 +195,11 @@ applied every such edit twice.
 - **The clipboard.** Copy, cut and paste are handled on the main thread
   against the runtime's text, because the clipboard is reachable only
   from a user gesture there. Newlines pasted into a single-line field
-  become spaces. A component that wants to put text on the clipboard
+  become spaces. A paste carries the clipboard's HTML too, when it has
+  some, as `html` on the `insertFromPaste` `onBeforeInput` (and on a
+  `Paste` event and an editing group's edit): the field inserts the
+  plain text, and an editor that keeps headings, lists and links can
+  cancel that and convert the HTML instead. A component that wants to put text on the clipboard
   itself asks `ShellService.copyText`, which crosses the barrier as a
   request rather than as a permission.
 - **The soft keyboard.** A phone raises it for a focus a person's

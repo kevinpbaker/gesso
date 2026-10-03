@@ -66,6 +66,7 @@ function createFakeWorkerGlobal() {
 }
 
 const values: string[] = [];
+const pastedHtml: (string | null)[] = [];
 
 @Define('editing-worker-root')
 class EditingRoot extends Component {
@@ -74,7 +75,15 @@ class EditingRoot extends Component {
   override render() {
     return Column(
       { gap: 10 },
-      EditableText({ value: 'ab', onInput: event => values.push(event.value) }),
+      EditableText({
+        value: 'ab',
+        onInput: event => values.push(event.value),
+        onBeforeInput: event => {
+          if (event.inputType === 'insertFromPaste') {
+            pastedHtml.push(event.html);
+          }
+        }
+      }),
       Button({
         width: 40,
         height: 20,
@@ -146,6 +155,16 @@ describe('RenderWorkerApp editing', () => {
     send({ type: 'paste', text: ' pasted' });
     await settle();
     expect(values).toEqual(['ab你', 'ab你 pasted']);
+  });
+
+  it("hands a paste's HTML to the field's onBeforeInput", async () => {
+    pastedHtml.length = 0;
+    const { send, press } = start();
+    press(100, 5);
+    send({ type: 'paste', text: 'one', html: '<b>one</b>' });
+    send({ type: 'paste', text: 'two' });
+    await settle();
+    expect(pastedHtml).toEqual(['<b>one</b>', null]);
   });
 
   it('clears the editable on a shell blur and reports null', async () => {
