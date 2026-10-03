@@ -180,6 +180,15 @@ already sends a fine-grained inertial stream, and animating that would
 lay one inertia curve over another, so a device that looks precise is
 left alone. The evidence read is the delta's unit and the legacy
 `wheelDeltaY` field, and only a positive answer smooths.
+
+One event can't always tell. Chrome on a Mac reports a trackpad's
+`wheelDeltaY` as three times its pixel delta, so a step of 40 pixels
+reads as a whole detent, and a flick passing through that speed had
+single steps smoothed among instant ones, which reads as stutter. A
+mouse wheel never sends an event that doesn't look notched, so once one
+arrives the wheel is taken to be precise for as long as events keep
+coming (400 ms after each), which covers a gesture and its momentum.
+
 `scrollBehavior="instant"` opts a container out; under a reduced-motion
 preference the animation snaps, which lands the same offset in one
 frame.
@@ -187,8 +196,9 @@ frame.
 That classifier was checked in a browser against a real mouse, which is
 the only place it could be, and the first version of it turned out to
 be wrong on a second monitor whose scaled deltas were a pixel short of
-a whole detent. It has **not** been checked with a trackpad, and it
-fails towards leaving a device alone.
+a whole detent. The trackpad half was found by reading what Chrome
+reports and is covered by specs; it has yet to be watched on a Mac
+trackpad.
 
 A wheel's delta is only a distance when the browser reports it in
 pixels. Chrome does; Firefox reports lines, three to a notch, and page
