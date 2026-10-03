@@ -221,6 +221,61 @@ be split, so before this a dynamic import in a worker was inlined into
 it and its module went into every page load. An application that sets
 `worker.format` itself keeps its choice.
 
+## Channels, described
+
+A channel's contract is types and comments, and both are gone once the
+module runs. The plugin reads each contract with TypeScript's checker
+and puts them back: it appends a `describeChannel` call to the module,
+so the token carries a JSON Schema of its view and of every command
+wherever it is imported.
+
+```ts
+import { channelSchema } from 'gesso-framework';
+
+channelSchema(Notes);
+// {
+//   description: 'The notes the person has written.',
+//   view: { type: 'object', properties: { rows: { type: 'array', ... } } },
+//   commands: {
+//     remove: {
+//       description: 'Deletes a note for good.',
+//       parameters: ['id'],
+//       input: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+//       destructive: true,
+//       confirm: true
+//     }
+//   }
+// }
+```
+
+That is what an AI agent driving the application reads to know what it
+can see and what it can ask for, and it is written from what the
+author already wrote. The JSDoc on the token, on a view key and on a
+command becomes its description; `@param` describes a parameter; and
+four tags annotate a command:
+
+| Tag            | Means                                                    |
+| -------------- | -------------------------------------------------------- |
+| `@destructive` | What it does cannot be undone                            |
+| `@idempotent`  | Sending it twice changes nothing the first did not       |
+| `@confirm`     | A person should approve it before anything else sends it |
+| `@hidden`      | For the application's own components, not for an agent   |
+
+So write those comments for a reader who has never seen the code. A
+comment explaining why two keys are separate is useful to a maintainer
+and noise to an agent deciding what to send.
+
+A value that cannot cross a channel cannot be described either. A
+`Date`, a `Map`, a class instance or a function in a contract is
+reported as a build warning naming its path, and so is an empty array
+literal with no type, `[]`, which is `never[]` until it says what it
+holds.
+
+It needs TypeScript 7 in the project, which is what reads the types.
+Without it the plugin says so once and the application runs
+undescribed. A build reads each worker's contracts too, through
+`worker.plugins`, which Vite adds to rather than replaces.
+
 ## Options
 
 | Option             | Default    | What it does                                                          |
@@ -231,6 +286,7 @@ it and its module went into every page load. An application that sets
 | `hmr`              | `true`     | Emit the `import.meta.hot.accept` wiring                              |
 | `diagnostics`      | `true`     | Report a save that will reload the page                               |
 | `workerConditions` | `true`     | Resolve a dependency's `worker` build ahead of its `browser` one      |
+| `channelSchemas`   | `true`     | Describe each channel as JSON Schema, from its types and JSDoc        |
 
 ## Is it required?
 

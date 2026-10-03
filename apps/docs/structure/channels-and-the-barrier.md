@@ -206,6 +206,18 @@ The test is not how important the value is:
 | Shared between screens, never leaves the thread           | a service        |
 | Authoritative, outlives a screen, or is on another thread | a channel        |
 
+## Describing a channel
+
+The token's types are erased at run time, so a channel cannot say what
+it accepts to anything that was not typechecked against it: an AI
+agent, a devtools panel, a test driving the app by its commands.
+`describeChannel(token, schema)` attaches a JSON Schema of the view and
+of each command, and `channelSchema(token)` reads it back.
+
+Nobody has to write one by hand. [The Vite plugin](/tooling/vite-plugin#channels-described)
+writes it from the contract's types and JSDoc, which is a reason to
+write the JSDoc as if an agent were going to read it, because one is.
+
 ## Limits
 
 - **A command has no completion signal.** It is fire and forget by

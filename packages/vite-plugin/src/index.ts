@@ -1,5 +1,6 @@
 import { defaultClientConditions, type EnvironmentModuleNode, type Plugin, type UserConfig } from 'vite';
 
+import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
 import { transformRenderWorker } from './render.ts';
 import { findShellCall, transformShell, type WorkerEntries } from './shell.ts';
 
@@ -78,6 +79,17 @@ export interface GessoPluginOptions {
    * (default true). See {@link workerConditions}.
    */
   readonly workerConditions?: boolean;
+  /**
+   * Describe every channel the application declares as JSON Schema,
+   * read from the contract's types and JSDoc, and attach it to the
+   * token with `describeChannel` (default true). It is what lets an AI
+   * agent, or anything else that meets the application only at run
+   * time, ask a channel what it holds and what its commands take.
+   *
+   * Needs TypeScript 7, whose checker does the reading. Without it the
+   * plugin says so once and carries on undescribed.
+   */
+  readonly channelSchemas?: boolean;
 }
 
 /**
@@ -129,6 +141,65 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
   let renderWorkerId: string | null = null;
   /** Files already reported as reloading, so a save is not a stream of warnings. */
   const reported = new Set<string>();
+  /** The checker, started by the first contract, or null once it is known to be unavailable. */
+  let contracts: Promise<ContractReader | null> | undefined;
+  let root = '';
+  const readerFor = (warn: (message: string) => void): Promise<ContractReader | null> =>
+    (contracts ??= import('typescript/unstable/sync').then(
+      ts => new ContractReader(ts as TypeScriptApi, root),
+      () => {
+        warn(
+          'Channels are not described, because TypeScript 7 is not installed. Add `typescript` (7 or later) to ' +
+            'devDependencies, or pass `channelSchemas: false` to stop this message.'
+        );
+        return null;
+      }
+    ));
+  const closeContracts = async () => {
+    const reader = await contracts;
+    reader?.close();
+    contracts = undefined;
+  };
+  /** The module with its channels described, or null when it declares none. */
+  const describeContract = async (code: string, id: string, warn: (message: string) => void) => {
+    if (
+      options.channelSchemas === false ||
+      !SOURCE.test(id) ||
+      id.includes('/node_modules/') ||
+      !declaresChannel(code)
+    ) {
+      return null;
+    }
+    const reader = await readerFor(warn);
+    if (reader === null) {
+      return null;
+    }
+    const reading = reader.read(id.replace(/\?.*$/, ''));
+    reading.warnings.forEach(warn);
+    return reading.channels.size > 0 ? code + describeCalls(reading.channels) : null;
+  };
+  /**
+   * The same description, for a worker's bundle.
+   *
+   * A build bundles each worker with `worker.plugins` rather than with
+   * the plugins of the page, and a contract is imported by workers far
+   * more often than by the page, so without this a build would describe
+   * almost nothing. A dev server runs every module through the main
+   * plugins and does not need it. Each worker bundle closes the checker
+   * when it is done, because nothing guarantees another bundle follows
+   * to close it; the next contract starts it again.
+   */
+  const workerContracts: Plugin = {
+    name: 'gesso:channel-schemas',
+    enforce: 'pre',
+    async transform(code, id) {
+      const described = await describeContract(code, id, message => this.warn(message));
+      return described === null ? null : { code: described, map: null };
+    },
+    async closeBundle() {
+      await closeContracts();
+    }
+  };
 
   return {
     name: 'gesso',
@@ -146,18 +217,39 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         // told otherwise, and an IIFE cannot split: a dynamic import in
         // the render worker was inlined, and a markdown editor's HTML
         // parser, loaded only on a paste, went into every page load.
-        ...(config.worker?.format === undefined ? { worker: { format: 'es' as const } } : {})
+        worker: {
+          ...(config.worker?.format === undefined ? { format: 'es' as const } : {}),
+          // Vite concatenates this with the application's own.
+          ...(options.channelSchemas === false ? {} : { plugins: () => [workerContracts] })
+        }
       };
     },
 
     configResolved(config) {
       serving = config.command === 'serve';
+      root = config.root;
     },
 
-    async transform(code, id) {
+    watchChange(id) {
+      void contracts?.then(reader => reader?.invalidate(id));
+    },
+
+    /**
+     * The checker is a child process, and a build that left it running
+     * would never exit. A dev server calls this when it closes, so the
+     * one hook covers both.
+     */
+    async closeBundle() {
+      await closeContracts();
+    },
+
+    async transform(source, id) {
       if (!SOURCE.test(id) || id.includes('/node_modules/')) {
         return null;
       }
+
+      const described = await describeContract(source, id, message => this.warn(message));
+      const code = described ?? source;
 
       if (serving && options.hmr !== false) {
         const wiring = transformRenderWorker(code);
@@ -172,12 +264,12 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
 
       const call = findShellCall(code);
       if (call === null) {
-        return null;
+        return described === null ? null : { code, map: null };
       }
       shellId = id;
       const entries = call.needsWorkers ? await resolveEntries(this, id, options) : null;
       const shell = transformShell(code, { entries, overlay: serving && options.overlay !== false });
-      return shell === null ? null : { code: shell, map: null };
+      return shell === null ? (described === null ? null : { code, map: null }) : { code: shell, map: null };
     },
 
     /**
