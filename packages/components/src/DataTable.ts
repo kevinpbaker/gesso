@@ -9,6 +9,7 @@ import {
   Text,
   LazyGrid,
   type UiChild,
+  type UiColorValue,
   type UiElement,
   type UiNodeRef,
   fr,
@@ -59,8 +60,17 @@ export interface DataColumn<T> {
   readonly width?: UiTrackSize;
   /** Orders two rows by this column. Required to make it sortable. */
   readonly compare?: (a: T, b: T) => number;
-  /** The content of one cell. */
-  readonly cell: (row: T, index: number) => UiChild;
+  /**
+   * The content of one cell.
+   *
+   * `color` is what the cell's text should be drawn in: the control
+   * foreground, or the selection foreground while the row is chosen.
+   * Bind it on every text the cell draws. A row cannot colour its cells
+   * itself, because `color` does not cascade from a parent node, and a
+   * cell that ignores it keeps its colour when the row is chosen, which
+   * on the selection background may not be readable.
+   */
+  readonly cell: (row: T, index: number, color: Observable<UiColorValue>) => UiChild;
   readonly align?: 'start' | 'center' | 'end';
 }
 
@@ -217,6 +227,9 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
     const rowIndex = order[position];
     const data = inputs.rows.value[rowIndex];
     const chosen = selected.value.pipe(map(current => current === rowIndex));
+    // Handed to every cell rather than set on the row, which would reach
+    // no text: see `DataColumn.cell`.
+    const color = chosen.pipe(map((on): UiColorValue => (on ? 'selectionForeground' : 'controlForeground')));
     return Grid(
       {
         subgrid: 'columns',
@@ -226,7 +239,6 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
         setSize: count,
         states: chosen.pipe(map(on => (on ? (['selected'] as UiSemanticState[]) : []))),
         backgroundColor: chosen.pipe(map(on => (on ? 'selectionBackground' : 'transparent'))),
-        color: chosen.pipe(map(on => (on ? 'selectionForeground' : 'controlForeground'))),
         onClick: () => choose(position)
       },
       ...columns.map(column =>
@@ -241,7 +253,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
             x: column.align ?? 'start',
             y: 'center'
           },
-          data === undefined ? Text({ text: '' }) : column.cell(data, rowIndex)
+          data === undefined ? Text({ text: '' }) : column.cell(data, rowIndex, color)
         )
       )
     );

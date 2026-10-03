@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, type Observable } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
@@ -13,6 +13,7 @@ import {
   UiNodeType,
   type UiRole,
   type UiSemanticsRecord,
+  type UiColorValue,
   fr
 } from 'gesso-core';
 import { DataTable } from './DataTable';
@@ -107,7 +108,64 @@ describe('LazyList', () => {
   });
 });
 
+/** The colour each drawn string was filled with, last one wins. */
+function textColours(ui: { draws: readonly { name: string; args: unknown[] }[] }): Map<string, string> {
+  const out = new Map<string, string>();
+  let style = '';
+  for (const call of ui.draws) {
+    if (call.name === 'set:fillStyle') {
+      style = String(call.args[0]);
+    } else if (call.name === 'fillText') {
+      out.set(String(call.args[0]), style);
+    }
+  }
+  return out;
+}
+
+function hex(color: { r: number; g: number; b: number }): string {
+  return `#${[color.r, color.g, color.b]
+    .map(channel =>
+      Math.round(channel * 255)
+        .toString(16)
+        .padStart(2, '0')
+    )
+    .join('')}`;
+}
+
 describe('DataTable', () => {
+  it('hands each cell the colour of its row, the selection colour while it is chosen', () => {
+    const chosen = new BehaviorSubject(1);
+    const ui = mount(
+      Column(
+        { theme: darkTheme, height: 200 },
+        createComponent(DataTable<Person>, {
+          label: 'People',
+          columns: [
+            {
+              key: 'name',
+              header: 'Name',
+              cell: (person: Person, _index: number, color: Observable<UiColorValue>) =>
+                Text({ text: person.name, color })
+            }
+          ],
+          rows: PEOPLE,
+          selectedRow: chosen,
+          height: 200
+        })
+      )
+    );
+    const drawn = textColours(ui);
+    expect(drawn.get(PEOPLE[0].name)).toBe(hex(darkTheme.colors.controlForeground));
+    expect(drawn.get(PEOPLE[1].name)).toBe(hex(darkTheme.colors.selectionForeground));
+
+    chosen.next(0);
+    ui.clearDraws();
+    ui.frame();
+    const after = textColours(ui);
+    expect(after.get(PEOPLE[0].name)).toBe(hex(darkTheme.colors.selectionForeground));
+    expect(after.get(PEOPLE[1].name)).toBe(hex(darkTheme.colors.controlForeground));
+  });
+
   it('sizes one set of tracks across the header and every mounted row', () => {
     const ui = mount(
       createComponent(DataTable<Person>, {
@@ -325,26 +383,7 @@ describe('Tree', () => {
   }
 
   it('draws its labels in the control colours of the theme it is under, and the chosen one in the selection colour', () => {
-    const textColour = (ui: ReturnType<typeof tree>, text: string): string => {
-      let style = '';
-      let found = '';
-      for (const call of ui.draws) {
-        if (call.name === 'set:fillStyle') {
-          style = String(call.args[0]);
-        } else if (call.name === 'fillText' && call.args[0] === text) {
-          found = style;
-        }
-      }
-      return found;
-    };
-    const hex = (color: { r: number; g: number; b: number }) =>
-      `#${[color.r, color.g, color.b]
-        .map(channel =>
-          Math.round(channel * 255)
-            .toString(16)
-            .padStart(2, '0')
-        )
-        .join('')}`;
+    const textColour = (ui: ReturnType<typeof tree>, text: string): string => textColours(ui).get(text) ?? '';
     const ui = mount(
       Column(
         { theme: darkTheme, height: 200 },
