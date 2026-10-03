@@ -12,7 +12,7 @@ const mount = () => renderTest(createComponent(Observations, {}), { width: 720, 
  * The page claims five things about `Pagination`: that the strip is a
  * named landmark, that each numbered control is named as a sentence
  * while the screen shows a numeral, that the current page is
- * `selected` rather than only painted, that the ends are disabled
+ * `current` rather than only painted, that the ends are disabled
  * rather than absent, and that an ellipsis is never drawn where a
  * single page would do. Each is a test here, reached the way an
  * assistive technology reaches it.
@@ -35,10 +35,10 @@ describe('the docs pagination example', () => {
     expect(ui.queryByRole('button', { name: 'Page 11' })).toBeNull();
   });
 
-  it('marks the page you are on, and only in a state the union has', () => {
+  it('marks the page you are on as current', () => {
     const ui = mount();
 
-    expect(ui.getByRole('button', { name: 'Page 1' })).toHaveSemantics({ states: ['selected'] });
+    expect(ui.getByRole('button', { name: 'Page 1' })).toHaveSemantics({ states: ['current'] });
     expect(ui.getSemantics(ui.getByRole('button', { name: 'Page 2' })).states ?? []).toEqual([]);
   });
 
@@ -61,7 +61,7 @@ describe('the docs pagination example', () => {
 
     expect(ui.getByText('Showing 9 to 16 of 96')).toBeTruthy();
     expect(ui.getByText('09')).toBeTruthy();
-    expect(ui.getByRole('button', { name: 'Page 2' })).toHaveSemantics({ states: ['selected'] });
+    expect(ui.getByRole('button', { name: 'Page 2' })).toHaveSemantics({ states: ['current'] });
     // Previous is reachable now, and it was not before.
     expect(ui.getByRole('button', { name: 'Previous page', disabled: false })).toBeTruthy();
   });
