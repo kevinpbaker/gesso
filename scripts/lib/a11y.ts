@@ -147,7 +147,9 @@ export async function runA11yChecks(run: A11yRun): Promise<string[]> {
         () => false
       );
       if (taken) {
-        throw new Error(`Port ${app.port}, which ${name} is checked on, is already in use. Free it or give ${name} another.`);
+        throw new Error(
+          `Port ${app.port}, which ${name} is checked on, is already in use. Free it or give ${name} another.`
+        );
       }
       servers.push(spawn('npx', ['vite', app.root, '--port', String(app.port), '--strictPort'], { stdio: 'ignore' }));
       await waitFor(
@@ -468,7 +470,10 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
   const route = check.route;
   const unnamed = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? '') && (node.name?.value ?? '') === '');
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
-  const unreachable = controls.map(describeNode).filter(name => !tabOrder.includes(name));
+  const unreachable = controls
+    .filter(node => !isDisabled(node) && !reachedThroughComposite(node, nodes, tabOrder))
+    .map(describeNode)
+    .filter(name => !tabOrder.includes(name));
   const content = renderReport(config.apps[check.app]!.url(check.path ?? route), nodes, unnamed, tabOrder, unreachable);
   const path = join(config.reportDir, `${route}.md`);
   const failures = unnamed.map(node => `${route}: a ${node.role?.value} with no accessible name`);
@@ -594,6 +599,39 @@ function renderReport(
       : `**Not reached by Tab**: ${unreachable.join(', ')}.`,
     ''
   ].join('\n');
+}
+
+/** A disabled control is not a tab stop, rightly. */
+function isDisabled(node: AxNode): boolean {
+  return (node.properties ?? []).some(property => property.name === 'disabled' && property.value.value === true);
+}
+
+/**
+ * Widgets that are one tab stop, whose items the arrows walk: a radio
+ * group's radios, a tab list's tabs, a listbox's options, a tree's
+ * items, a grid's cells, a menu's items.
+ */
+const COMPOSITES = new Set(['radiogroup', 'tablist', 'listbox', 'tree', 'treegrid', 'grid', 'menu', 'menubar']);
+
+/** Whether a control is an item of a composite widget that Tab reached, the widget or one of its items. */
+function reachedThroughComposite(node: AxNode, nodes: readonly AxNode[], tabOrder: readonly string[]): boolean {
+  const parentOf = new Map<string, AxNode>();
+  for (const entry of nodes) {
+    for (const child of entry.childIds ?? []) parentOf.set(child, entry);
+  }
+  for (let at = parentOf.get(node.nodeId); at !== undefined; at = parentOf.get(at.nodeId)) {
+    if (COMPOSITES.has(at.role?.value ?? '')) {
+      const composite = at;
+      const inside = nodes.filter(entry => {
+        for (let up = parentOf.get(entry.nodeId); up !== undefined; up = parentOf.get(up.nodeId)) {
+          if (up === composite) return true;
+        }
+        return false;
+      });
+      return [composite, ...inside].some(entry => tabOrder.includes(describeNode(entry)));
+    }
+  }
+  return false;
 }
 
 /** A node as the report names it: role and accessible name. */
