@@ -49,7 +49,14 @@ interface AgentSurfaceOptions {
   quietMs?: number;
   settleMs?: number;
 }
-interface AgentSurface {
+interface AgentSurfaceLike {
+  tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
+  read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
+  dispose?(): void;
+}
+interface AgentSurface extends AgentSurfaceLike {
   tools(): readonly AgentTool[];
   call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
   resources(): readonly AgentResource[];
@@ -77,25 +84,91 @@ type JsonRpcResponse = {
     message: string;
   };
 };
-declare function handleMcpMessage(surface: AgentSurface, message: unknown, info?: McpServerInfo): Promise<JsonRpcResponse | null>;
+declare function handleMcpMessage(surface: AgentSurfaceLike, message: unknown, info?: McpServerInfo): Promise<JsonRpcResponse | null>;
 interface McpHandlerOptions extends McpServerInfo {
   allowedOrigins?: readonly string[];
   token?: string;
 }
-declare function mcpHandler(surface: AgentSurface, options?: McpHandlerOptions): (request: Request) => Promise<Response>;
+declare function mcpHandler(surface: AgentSurfaceLike, options?: McpHandlerOptions): (request: Request) => Promise<Response>;
 declare function validate(schema: JsonSchema, value: unknown, root?: JsonSchema, at?: string): string | null;
+declare const AGENT_PORT = "gesso:agent";
+type AgentPortRequest = {
+  id: number;
+  op: 'tools';
+} | {
+  id: number;
+  op: 'resources';
+} | {
+  id: number;
+  op: 'call';
+  name: string;
+  args?: Readonly<Record<string, unknown>>;
+} | {
+  id: number;
+  op: 'read';
+  uri: string;
+};
+type AgentPortResponse = {
+  id: number;
+  result: unknown;
+} | {
+  id: number;
+  error: string;
+};
+type AgentConfirm = (request: AgentConfirmation) => boolean | Promise<boolean>;
+type AgentPort = Pick<MessagePort, 'postMessage' | 'onmessage'>;
+declare function serveAgentPort(port: AgentPort, makeSurface: (confirm: AgentConfirm) => AgentSurfaceLike): () => void;
+declare function remoteSurface(port: AgentPort, options?: {
+  timeoutMs?: number;
+  confirm?: AgentConfirm;
+}): AgentSurfaceLike;
+declare function combineSurfaces(surfaces: readonly AgentSurfaceLike[]): AgentSurfaceLike;
+interface DevAgentHot {
+  send(event: string, data?: unknown): void;
+  on(event: string, listener: (data: never) => void): void;
+}
+interface DevAgentApp {
+  openRenderPort(key: string): MessagePort | undefined;
+}
+interface DevAgentRequest {
+  readonly id: number;
+  readonly message: unknown;
+}
+interface DevAgentResponse {
+  readonly id: number;
+  readonly response: JsonRpcResponse | null;
+}
+declare const DEV_AGENT_EVENTS: {
+  readonly ready: 'gesso:agent:ready';
+  readonly request: 'gesso:agent:request';
+  readonly response: 'gesso:agent:response';
+};
+declare function connectDevAgent(app: DevAgentApp, hot: DevAgentHot, info?: McpServerInfo): void;
 export {
+  AGENT_PORT,
   agentSurface,
+  combineSurfaces,
+  connectDevAgent,
+  DEV_AGENT_EVENTS,
   handleMcpMessage,
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
+  remoteSurface,
   resourceUri,
+  serveAgentPort,
   type AgentConfirmation,
+  type AgentPortRequest,
+  type AgentPortResponse,
   type AgentResource,
   type AgentSurface,
+  type AgentSurfaceLike,
   type AgentSurfaceOptions,
   type AgentTool,
   type AgentToolResult,
+  type DevAgentApp,
+  type DevAgentHot,
+  type DevAgentRequest,
+  type DevAgentResponse,
   type JsonRpcResponse,
   type McpHandlerOptions,
   type McpServerInfo,
@@ -639,6 +712,7 @@ interface ChannelRegistration {
 }
 interface ChannelRegistryHandle {
   registry: ChannelRegistry;
+  readonly workers: ReadonlySet<WorkerHandle>;
   dispose(): void;
 }
 declare function createChannelRegistry(registrations: readonly ChannelRegistration[], onError?: (channelName: string, message: string, stack?: string) => void): ChannelRegistryHandle;
@@ -1953,6 +2027,7 @@ declare class WorkerApp {
   private moveFrame;
   constructor(options: WorkerAppOptions);
   get appLogic(): WorkerHandle | undefined;
+  openRenderPort(key: string): MessagePort | undefined;
   mount(host: HTMLElement | string): () => void;
   private handleWorkerFailure;
   private report;
@@ -2536,6 +2611,7 @@ declare class RenderWorkerApp {
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
   receive(message: ShellToRuntimeMessage): void;
+  private serveAgent;
   private setConsoleForwarding;
   private dispatch;
   private resolveWorker;
@@ -3079,7 +3155,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-uLkPzQNC.js";
+} from "./index-BrT0EHQz.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3703,7 +3779,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-uLkPzQNC.js";
+} from "../index-BrT0EHQz.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

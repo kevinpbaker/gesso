@@ -4,6 +4,7 @@ export {
   type AgentConfirmation,
   type AgentResource,
   type AgentSurface,
+  type AgentSurfaceLike,
   type AgentSurfaceOptions,
   type AgentTool,
   type AgentToolResult
@@ -17,3 +18,19 @@ export {
   type McpServerInfo
 } from './mcp';
 export { validate } from './validate';
+export {
+  AGENT_PORT,
+  combineSurfaces,
+  remoteSurface,
+  serveAgentPort,
+  type AgentPortRequest,
+  type AgentPortResponse
+} from './remote';
+export {
+  connectDevAgent,
+  DEV_AGENT_EVENTS,
+  type DevAgentApp,
+  type DevAgentHot,
+  type DevAgentRequest,
+  type DevAgentResponse
+} from './dev';

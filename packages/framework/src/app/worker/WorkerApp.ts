@@ -361,6 +361,16 @@ export class WorkerApp {
     return this.appLogicWorker === undefined ? undefined : portHandle(this.appLogicWorker);
   }
 
+  /**
+   * Opens a port to whatever the render worker serves under `key`, or
+   * returns undefined before `mount` has started it. The development
+   * agent bridge asks for `gesso:agent` this way; nothing else in the
+   * shell talks to the render worker except through its protocol.
+   */
+  openRenderPort(key: string): MessagePort | undefined {
+    return this.renderWorker === undefined ? undefined : portHandle(this.renderWorker).open(key);
+  }
+
   mount(host: HTMLElement | string): () => void {
     const element = resolveHost(host);
     this.host = element;

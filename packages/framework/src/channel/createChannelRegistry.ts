@@ -42,6 +42,12 @@ export interface ChannelRegistration {
 
 export interface ChannelRegistryHandle {
   registry: ChannelRegistry;
+  /**
+   * The workers serving this registry's channels, so a thread can reach
+   * them for something other than a channel: an agent asking what each
+   * one serves.
+   */
+  readonly workers: ReadonlySet<WorkerHandle>;
   dispose(): void;
 }
 
@@ -108,6 +114,7 @@ export function createChannelRegistry(
 
   return {
     registry,
+    workers: handles,
     dispose: () => {
       for (const channel of local) {
         channel.dispose();

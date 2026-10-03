@@ -84,6 +84,36 @@ const surface = agentSurface(channels, {
 command is refused and the agent is told to ask the person to do it,
 which is the safe reading of a contract that asked for a person.
 
+## In development, with nothing to write
+
+A web application's channels are in its workers, and a browser tab
+cannot listen on a port, so it cannot host the server above. In
+development it does not need to. [The Vite plugin](/tooling/vite-plugin)
+serves MCP at `/__gesso/mcp` on the dev server and prints the command
+to connect when it starts:
+
+```text
+  ➜  Agents:  http://localhost:5173/__gesso/mcp
+             claude mcp add --transport http my-app http://localhost:5173/__gesso/mcp
+```
+
+Open the app in a browser, connect, and the agent sees every channel
+the open page can reach: the ones its render worker feeds itself, and
+the ones its application worker and channel workers serve. Its
+commands change the page in front of you as they would from a click.
+
+The dev server cannot reach a worker, but the page can, and it already
+holds a socket to the server for hot replacement. So each message an
+agent posts goes down that socket to the page, the page answers it
+against the render worker, and the render worker asks each worker
+behind it over a port of its own. A command marked `@confirm` is put
+to you in the page with the browser's own dialog before it is sent.
+
+With several tabs open, the newest answers, and closing it hands back
+to the one before. With none open, the agent is told to open one. The
+endpoint refuses any request from a browser page, so a site you have
+open cannot reach it, and a build carries none of it.
+
 ## The server
 
 `mcpHandler` is MCP's Streamable HTTP transport as a `fetch` handler,
@@ -113,8 +143,9 @@ for stdio, or to relay messages from somewhere else.
 - **The surface runs where the data does.** It needs the channel
   sources, so it lives in the process or worker that serves them: an
   Electrobun main process, a Bun or Node server, an application worker.
-  A browser tab cannot listen on a port, so a web application cannot
-  host this server itself.
+  A browser tab cannot listen on a port, so a web application in
+  production cannot host this server itself; in development the dev
+  server does it for the page.
 - **Descriptions come from the Vite plugin.** A process whose bundle
   Vite does not build, such as an Electrobun main process, gets
   undescribed channels unless it calls `describeChannel` itself.
