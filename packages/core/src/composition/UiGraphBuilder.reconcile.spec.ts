@@ -35,6 +35,28 @@ describe('UiGraphBuilder reconciliation', () => {
       expect(node.getProperty('text')).toBe('Goodbye');
     });
 
+    it('takes off a plain property the element stopped declaring', () => {
+      // A conditional that swapped a padded scroll view for a plain one
+      // reused the node and kept the padding: an editor came back from
+      // its source view twenty pixels narrower.
+      const { builder } = createBuilder();
+      const first = builder.build(Column({ padding: 20, gap: 4 }, Text({ text: 'a', fontSize: 20 })));
+      const node = builder.build(Column({ gap: 4 }, Text({ text: 'a' })));
+      expect(node).toBe(first);
+      expect(node.properties.has('padding')).toBe(false);
+      expect(node.getProperty('gap')).toBe(4);
+      expect(node.firstChild!.properties.has('fontSize')).toBe(false);
+    });
+
+    it('takes off a bound property the element stopped declaring, rather than keep its last value', () => {
+      const { builder } = createBuilder();
+      const size = new BehaviorSubject(18);
+      const first = builder.build(Text({ text: 'a', fontSize: size }));
+      const node = builder.build(Text({ text: 'a' }));
+      expect(node).toBe(first);
+      expect(node.properties.has('fontSize')).toBe(false);
+    });
+
     it('reuses descendant nodes with the same shape', () => {
       const { builder } = createBuilder();
       const first = builder.build(Column(Text({ text: 'Hello' }), Text({ text: 'World' })));
