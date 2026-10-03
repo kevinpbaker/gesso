@@ -795,9 +795,12 @@ export class Canvas2DRenderer implements UiRenderer {
     // background goes under one. Nothing is drawn here unless the
     // field was given runs, which almost none are.
     fillTextRects(ctx, textRunBackgrounds(layout.lines, paint));
-    if (model.focused && !model.collapsed) {
+    // A field's part of a selection across an editing group is drawn
+    // whether or not it has focus; its own selection only while it does.
+    const spanned = paint.textSelection;
+    if (spanned !== undefined || (model.focused && !model.collapsed)) {
       ctx.fillStyle = colorToCss(paint.selectionColor);
-      for (const box of layout.selectionBoxes()) {
+      for (const box of layout.selectionBoxes(spanned)) {
         ctx.fillRect(box.x, box.y, box.width, box.height);
       }
     }
@@ -833,7 +836,12 @@ export class Canvas2DRenderer implements UiRenderer {
         ctx.fillRect(box.x, underlineY, box.width, 1);
       }
     }
-    if (model.focused && model.collapsed && caretVisibleAt(model, context.now ?? performance.now())) {
+    if (
+      spanned === undefined &&
+      model.focused &&
+      model.collapsed &&
+      caretVisibleAt(model, context.now ?? performance.now())
+    ) {
       const caret = layout.caretRect();
       ctx.fillStyle = colorToCss(paint.caretColor);
       ctx.fillRect(Math.round(caret.x), caret.y, CARET_WIDTH, caret.height);

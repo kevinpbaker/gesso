@@ -928,6 +928,27 @@ declare class UiModifierSet {
   private detachOne;
 }
 declare function assertModifierList(node: UiNode, value: unknown): readonly UiModifier[];
+interface UiEditingGroup {
+  onEdit(edit: UiGroupEdit): void;
+  copyText?(start: UiTextPosition, end: UiTextPosition): string;
+}
+interface UiTextPosition {
+  readonly node: UiNode;
+  readonly offset: number;
+}
+interface UiGroupEdit {
+  readonly inputType: string;
+  readonly data: string | null;
+  readonly start: UiTextPosition;
+  readonly end: UiTextPosition;
+}
+declare function editingGroupOf(node: UiNode): {
+  readonly root: UiNode;
+  readonly group: UiEditingGroup;
+} | null;
+declare function adjacentField(root: UiNode, from: UiNode, direction: 1 | -1): UiNode | null;
+declare function edgeField(root: UiNode, direction: 1 | -1): UiNode | null;
+declare function comparePositions(a: UiTextPosition, b: UiTextPosition): number;
 interface UiContainerSize {
   readonly current: Size;
   readonly changes: Observable<Size>;
@@ -1710,6 +1731,7 @@ declare const UiProperties: {
   readonly editor: UiPropertyDefinition<EditableTextModel | undefined>;
   readonly cursor: UiPropertyDefinition<UiCursor | undefined>;
   readonly selectable: UiPropertyDefinition<boolean | undefined>;
+  readonly editingGroup: UiPropertyDefinition<UiEditingGroup | undefined>;
   readonly pointerEvents: UiPropertyDefinition<UiPointerEvents | undefined>;
   readonly focusable: UiPropertyDefinition<boolean | undefined>;
   readonly tabStop: UiPropertyDefinition<boolean | undefined>;
@@ -1799,7 +1821,7 @@ type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
-type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable'>;
+type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
@@ -2347,7 +2369,10 @@ declare class EditableLayout {
     offset: number;
     x: number;
   } | null;
-  selectionBoxes(): LayoutBox[];
+  selectionBoxes(range?: {
+    readonly start: number;
+    readonly end: number;
+  }): LayoutBox[];
   compositionBoxes(): LayoutBox[];
 }
 type EditingPlatform = 'mac' | 'other';
@@ -3064,12 +3089,18 @@ declare class UiEditingController {
   private dragging;
   private lastPress;
   private compositionOpen;
+  private span;
+  private spanFocusing;
+  private pressedFrom;
   constructor(host: EditingHost, dispatcher: UiInputDispatcher, focus: UiFocusManager, options?: EditingControllerOptions);
   get focused(): UiNode | null;
   isEditable(node: UiNode): boolean;
   handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean;
   private execute;
   private move;
+  private leavesField;
+  private entryOffset;
+  private moveInField;
   beforeInput(inputType: string, data: string | null): boolean;
   insertText(text: string): boolean;
   replaceText(text: string): boolean;
@@ -3092,6 +3123,15 @@ declare class UiEditingController {
   private afterTextChange;
   private notifySelection;
   private afterSelectionChange;
+  get spanning(): boolean;
+  private setSpan;
+  private clearSpan;
+  private collapseSpan;
+  private spanEdit;
+  private spanText;
+  private anchorIn;
+  private fieldAt;
+  private focusField;
   private revealCaret;
   caretRectOf(node: UiNode): CaretRect | null;
   private layoutOf;
@@ -5024,6 +5064,7 @@ interface UiSemanticsAction {
 }
 export {
   accumulatedOffsetTo,
+  adjacentField,
   Affine,
   AlignContent,
   AnimatedCell,
@@ -5109,6 +5150,7 @@ export {
   commandForKey,
   CommandKind,
   CommonProps,
+  comparePositions,
   ComponentLikeElement,
   ComponentResolver,
   CompositionRange,
@@ -5185,6 +5227,7 @@ export {
   dropTarget,
   DropTargetOptions,
   easings,
+  edgeField,
   Edges,
   EditableLayout,
   editableSpansOf,
@@ -5193,6 +5236,7 @@ export {
   EditableTextProps,
   EditCommand,
   EditingControllerOptions,
+  editingGroupOf,
   EditingHost,
   EditingPlatform,
   EditingState,
@@ -5701,6 +5745,7 @@ export {
   UiEasing,
   UiEasingToken,
   UiEditingController,
+  UiEditingGroup,
   UiElement,
   UiEnvironment,
   UiEnvironmentKey,
@@ -5734,6 +5779,7 @@ export {
   UiGraph,
   UiGraphBuilder,
   UiGridAutoFlow,
+  UiGroupEdit,
   UiHitTester,
   UiHostFrameClock,
   UiHostFrameClockOptions,
@@ -5838,6 +5884,7 @@ export {
   UiTextLink,
   UiTextMetrics,
   UiTextOverflowValue,
+  UiTextPosition,
   UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
@@ -5918,6 +5965,7 @@ export {
 // ==== index.d.ts ====
 import {
   accumulatedOffsetTo,
+  adjacentField,
   Affine,
   AlignContent,
   AnimatedCell,
@@ -6002,6 +6050,7 @@ import {
   commandForKey,
   CommandKind,
   CommonProps,
+  comparePositions,
   ComponentLikeElement,
   ComponentResolver,
   CompositionRange,
@@ -6078,6 +6127,7 @@ import {
   dropTarget,
   DropTargetOptions,
   easings,
+  edgeField,
   Edges,
   EditableLayout,
   editableSpansOf,
@@ -6086,6 +6136,7 @@ import {
   EditableTextProps,
   EditCommand,
   EditingControllerOptions,
+  editingGroupOf,
   EditingHost,
   EditingPlatform,
   EditingState,
@@ -6594,6 +6645,7 @@ import {
   UiEasing,
   UiEasingToken,
   UiEditingController,
+  UiEditingGroup,
   UiElement,
   UiEnvironment,
   UiEnvironmentKey,
@@ -6627,6 +6679,7 @@ import {
   UiGraph,
   UiGraphBuilder,
   UiGridAutoFlow,
+  UiGroupEdit,
   UiHitTester,
   UiHostFrameClock,
   UiHostFrameClockOptions,
@@ -6731,6 +6784,7 @@ import {
   UiTextLink,
   UiTextMetrics,
   UiTextOverflowValue,
+  UiTextPosition,
   UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
@@ -6807,9 +6861,10 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DkAE8ZRX.js";
+} from "./index-CXiMWXQF.js";
 export {
   accumulatedOffsetTo,
+  adjacentField,
   AlignContent,
   animateLayout,
   AnimationDriver,
@@ -6870,6 +6925,7 @@ export {
   Column,
   commandForKey,
   CommandKind,
+  comparePositions,
   computeObjectFitRect,
   Constraints,
   constraintsEqual,
@@ -6928,10 +6984,12 @@ export {
   dropIndexShifts,
   dropTarget,
   easings,
+  edgeField,
   EditableLayout,
   editableSpansOf,
   EditableText,
   EditableTextModel,
+  editingGroupOf,
   EDITOR_PROP,
   editorFor,
   editorOf,
@@ -7457,6 +7515,7 @@ export {
   type UiDroppedFile,
   type UiDropZone,
   type UiEasing,
+  type UiEditingGroup,
   type UiElement,
   type UiEventListener,
   type UiEventListenerOptions,
@@ -7466,6 +7525,7 @@ export {
   type UiFrameClock,
   type UiFrameClockFactory,
   type UiFrameTime,
+  type UiGroupEdit,
   type UiHostFrameClockOptions,
   type UiImage,
   type UiInterpolator,
@@ -7509,6 +7569,7 @@ export {
   type UiShortcutBinding,
   type UiShortcutStep,
   type UiSpringOptions,
+  type UiTextPosition,
   type UiTimerFrameClockOptions,
   type UiTrackSize,
   type UiTransitionSpec,
@@ -7732,7 +7793,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DkAE8ZRX.js";
+} from "./index-CXiMWXQF.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

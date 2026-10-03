@@ -336,6 +336,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Interaction',
     note: 'Whether the pointer may select text in this subtree. Read up the ancestor chain, like `user-select`.'
   },
+  editingGroup: {
+    group: 'Interaction',
+    note: 'Makes the editables inside select as one, with edits over a selection across them going to `onEdit`. See text editing.'
+  },
   pointerEvents: {
     group: 'Interaction',
     note: 'Whether the node takes pointer input, or lets it through to what is behind.'

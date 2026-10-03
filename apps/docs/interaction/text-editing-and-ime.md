@@ -233,6 +233,53 @@ content is its value. Give it a `label` and that is the accessible
 name. Those are the same records the accessibility mirror hands the
 platform, and the same ones the spec beside the example queries.
 
+## Fields that select as one
+
+A document editor is usually many fields, one per paragraph, because
+each block lays out and styles on its own. A person still selects
+across them as if they were one text. Set `editingGroup` on the
+container, and the editables inside it select as one:
+
+```tsx
+<column
+  editingGroup={{
+    onEdit: edit => replaceRange(edit.start, edit.end, edit.inputType, edit.data),
+    copyText: (start, end) => toMarkdown(start, end)
+  }}>
+  {blocks.map(block => (
+    <editabletext key={block.id} value={block.text} multiline={true} />
+  ))}
+</column>
+```
+
+Inside a group:
+
+| Gesture                             | What it does                                           |
+| ----------------------------------- | ------------------------------------------------------ |
+| An arrow off the edge of a field    | Moves into the next field: up and down keep the column |
+| Shift and an arrow off the edge     | Extends the selection into the next field              |
+| Dragging out of a field             | Extends the selection into the fields it crosses       |
+| Shift and a press in another field  | Extends the selection there from where it was anchored |
+| `Ctrl/Cmd+A`                        | Selects every field in the group                       |
+| A plain arrow over such a selection | Collapses it to the side the arrow points to           |
+
+Every field between the two ends draws its part of the selection.
+Focus is in the field holding the moving end.
+
+**What the person does to a selection that spans fields is yours.**
+Typing, Backspace and Delete, Enter, paste and cut over it are not
+applied to any field. They go to `onEdit` with both ends, as positions
+(`{ node, offset }`) in document order, and an `inputType` in the DOM's
+vocabulary. Only the application knows that joining a heading to the
+list under it gives a heading, so it changes its document, which
+changes the fields, and puts the caret where it belongs. A selection
+inside one field is that field's, edited as always.
+
+**Copy and cut take all of it.** The shell is handed the selected text
+while such a selection is up, so the browser's own copy and cut work on
+it. By default that's each field's selected text joined by newlines;
+`copyText` says what it should be instead, such as markdown.
+
 ## Limits
 
 **Where this was checked.** The editing path was verified by hand in

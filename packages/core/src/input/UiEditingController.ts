@@ -9,6 +9,15 @@ import type { EditableTextModel, EditUnit } from '../editing/EditableTextModel';
 import { commandForKey, detectEditingPlatform, type EditCommand, type EditingPlatform } from '../editing/EditingKeymap';
 import { wordRangeAt, lineStartAt, lineEndAt } from '../editing/TextBoundaries';
 import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
+import {
+  adjacentField,
+  comparePositions,
+  edgeField,
+  editingGroupOf,
+  type UiEditingGroup,
+  type UiTextPosition
+} from '../editing/UiEditingGroup';
+import { clearSelectionRange, setSelectionRange } from '../selection/UiSelectable';
 import type { CaretRect } from '../editing/TextGeometry';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
@@ -95,6 +104,26 @@ export class UiEditingController {
   private dragging: UiNode | null = null;
   private lastPress: { node: UiNode; x: number; y: number; at: number; count: number } | null = null;
   private compositionOpen = false;
+  /**
+   * A selection across the fields of an editing group, while it spans
+   * more than one; null while the selection is one field's own. `lit`
+   * is every field drawing part of it. See `UiEditingGroup`.
+   */
+  private span: {
+    readonly root: UiNode;
+    readonly group: UiEditingGroup;
+    readonly anchor: UiTextPosition;
+    readonly focus: UiTextPosition;
+    readonly lit: readonly UiNode[];
+  } | null = null;
+  /** Set while the span moves focus to the field its focus end is in, so that move does not end it. */
+  private spanFocusing = false;
+  /**
+   * The field focus left for the one just pressed. A press focuses its
+   * field before this controller hears of it, so a Shift and press in a
+   * new field needs to know where the selection was anchored.
+   */
+  private pressedFrom: UiNode | null = null;
 
   constructor(
     private readonly host: EditingHost,
@@ -142,6 +171,11 @@ export class UiEditingController {
     const readOnly = isReadOnly(node);
     switch (command.kind) {
       case 'move':
+        if (this.span !== null && !command.extend) {
+          // A plain arrow over a selection lands on the side it points to.
+          this.collapseSpan(command.direction);
+          return true;
+        }
         this.move(node, model, command.unit, command.direction, command.extend);
         return true;
       case 'delete':
@@ -169,17 +203,28 @@ export class UiEditingController {
           return true;
         }
         return this.applyEdit(node, model, 'insertText', command.text, () => model.insertText(command.text));
-      case 'selectAll':
+      case 'selectAll': {
+        // Inside a group, everything in it, as select all in a document.
+        const owner = editingGroupOf(node);
+        const first = owner === null ? null : edgeField(owner.root, 1);
+        const last = owner === null ? null : edgeField(owner.root, -1);
+        if (owner !== null && first !== null && last !== null && first !== last) {
+          this.setSpan(owner, { node: first, offset: 0 }, { node: last, offset: editorFor(last).text.length });
+          return true;
+        }
         model.selectAll();
         this.afterSelectionChange(node, model);
         return true;
+      }
       case 'undo':
+        this.clearSpan();
         if (readOnly) {
           return true;
         }
         this.history(node, model, 'historyUndo', () => model.undo());
         return true;
       case 'redo':
+        this.clearSpan();
         if (readOnly) {
           return true;
         }
@@ -189,6 +234,76 @@ export class UiEditingController {
   }
 
   private move(
+    node: UiNode,
+    model: EditableTextModel,
+    unit: EditUnit | 'vertical',
+    direction: -1 | 1,
+    extend: boolean
+  ): void {
+    const owner = editingGroupOf(node);
+    if (owner !== null && this.leavesField(node, model, unit, direction, extend)) {
+      const next = adjacentField(owner.root, node, direction);
+      if (next !== null) {
+        // Off the edge of one field and into the next, as in a document:
+        // up and down keep the column, left and right take the near end.
+        const goal = this.verticalGoalX ?? this.layoutOf(node).caretRect(model.focus).x;
+        const from = this.host.visibleBox(node).x;
+        const to = this.host.visibleBox(next).x;
+        const target = { node: next, offset: this.entryOffset(next, direction, unit, goal + from - to) };
+        const keepGoal = unit === 'vertical' ? goal + from - to : undefined;
+        if (extend) {
+          this.setSpan(owner, this.span?.anchor ?? { node, offset: model.anchor }, target, keepGoal);
+        } else {
+          this.clearSpan();
+          const entered = editorFor(next);
+          entered.select(target.offset);
+          this.focusField(next);
+          this.verticalGoalX = keepGoal;
+          this.afterSelectionChange(next, entered, keepGoal !== undefined);
+        }
+        return;
+      }
+    }
+    this.moveInField(node, model, unit, direction, extend);
+    if (extend && owner !== null && this.span !== null) {
+      this.setSpan(owner, this.span.anchor, { node, offset: model.focus });
+    }
+  }
+
+  /** Whether a move would go past the edge of a field, rather than somewhere in it. */
+  private leavesField(
+    node: UiNode,
+    model: EditableTextModel,
+    unit: EditUnit | 'vertical',
+    direction: -1 | 1,
+    extend: boolean
+  ): boolean {
+    if (!extend && !model.collapsed) {
+      // A plain arrow over a selection collapses it first.
+      return false;
+    }
+    if (unit === 'vertical') {
+      return this.layoutOf(node).verticalMove(model.focus, direction, this.verticalGoalX) === null;
+    }
+    if (unit === 'grapheme' || unit === 'word') {
+      return direction < 0 ? model.focus === 0 : model.focus === model.text.length;
+    }
+    return false;
+  }
+
+  /** Where a selection extended into a field from the one before or after it lands. */
+  private entryOffset(node: UiNode, direction: -1 | 1, unit: EditUnit | 'vertical', x: number): number {
+    const text = editorFor(node).text;
+    if (unit !== 'vertical') {
+      return direction > 0 ? 0 : text.length;
+    }
+    // Up or down keeps the column, on the first or last line.
+    const layout = this.layoutOf(node);
+    const line = layout.lines[direction > 0 ? 0 : layout.lines.length - 1];
+    return line === undefined ? (direction > 0 ? 0 : text.length) : layout.offsetAt(x, line.y + line.height / 2);
+  }
+
+  private moveInField(
     node: UiNode,
     model: EditableTextModel,
     unit: EditUnit | 'vertical',
@@ -287,8 +402,10 @@ export class UiEditingController {
         });
       }
       case 'historyUndo':
+        this.clearSpan();
         return readOnly || this.history(node, model, inputType, () => model.undo());
       case 'historyRedo':
+        this.clearSpan();
         return readOnly || this.history(node, model, inputType, () => model.redo());
       default:
         return false;
@@ -362,6 +479,10 @@ export class UiEditingController {
   // ---------------------------------------------------------------------------
 
   compositionStart(): void {
+    if (this.span !== null) {
+      // Composing over a selection replaces it, as typing does.
+      this.spanEdit('deleteContent', null);
+    }
     const node = this.focusedEditable;
     if (node === null || isReadOnly(node)) {
       return;
@@ -416,6 +537,21 @@ export class UiEditingController {
     const layout = this.layoutOf(node);
     const local = this.host.toLocal(node, x, y);
     const offset = layout.offsetAt(local.x, local.y);
+    const pressedFrom = this.pressedFrom;
+    this.pressedFrom = null;
+    if (modifiers.shift) {
+      // Shift and a press in another field of the same group extends
+      // the selection there from wherever it was anchored.
+      const owner = editingGroupOf(node);
+      const from =
+        this.span?.anchor ?? this.anchorIn(owner, this.focusedEditable === node ? pressedFrom : this.focusedEditable);
+      if (owner !== null && from !== null && (this.span !== null || from.node !== node)) {
+        this.dragging = node;
+        this.setSpan(owner, from, { node, offset });
+        return;
+      }
+    }
+    this.clearSpan();
     const now = this.host.now();
     const last = this.lastPress;
     // Shift+press extends the selection whatever came before it, and
@@ -450,6 +586,19 @@ export class UiEditingController {
     if (this.dragging !== node) {
       return;
     }
+    const owner = editingGroupOf(node);
+    if (owner !== null) {
+      // A drag can leave the field it started in for another in the group.
+      const from = this.span?.focus.node ?? node;
+      const target = this.fieldAt(owner.root, from, y);
+      if (target !== node || this.span !== null) {
+        const local = this.host.toLocal(target, x, y);
+        const offset = this.layoutOf(target).offsetAt(local.x, local.y);
+        const anchor = this.span?.anchor ?? { node, offset: editorFor(node).anchor };
+        this.setSpan(owner, anchor, { node: target, offset });
+        return;
+      }
+    }
     const model = editorFor(node);
     const layout = this.layoutOf(node);
     const local = this.host.toLocal(node, x, y);
@@ -477,6 +626,20 @@ export class UiEditingController {
     const model = editorFor(node);
     const caret = this.layoutOf(node).caretRect();
     const visible = this.host.visibleBox(node);
+    if (this.span !== null) {
+      // The shell is handed the whole selection, selected, so that its
+      // native copy and cut take all of it; what is typed over it comes
+      // back as an edit for the group.
+      const text = this.spanText();
+      return {
+        text,
+        selectionStart: 0,
+        selectionEnd: text.length,
+        caret: { x: visible.x + caret.x, y: visible.y + caret.y, width: 1, height: caret.height },
+        multiline: true,
+        composing: false
+      };
+    }
     return {
       text: model.text,
       selectionStart: model.start,
@@ -530,11 +693,15 @@ export class UiEditingController {
   // ---------------------------------------------------------------------------
 
   private handleFocusChange(node: UiNode | null): void {
+    if (this.span !== null && !this.spanFocusing && node !== this.span.focus.node) {
+      this.clearSpan();
+    }
     const previous = this.focusedEditable;
     const next = node !== null && isEditableNode(node) ? node : null;
     if (previous === next) {
       return;
     }
+    this.pressedFrom = previous;
     if (previous !== null) {
       const model = editorFor(previous);
       if (model.composing) {
@@ -565,6 +732,9 @@ export class UiEditingController {
     data: string | null,
     run: () => void
   ): boolean {
+    if (this.span !== null && this.span.focus.node === node) {
+      return this.spanEdit(inputType, data);
+    }
     const before = new UiBeforeInputEvent(inputType, data);
     this.dispatcher.dispatch(before, node);
     if (before.defaultPrevented) {
@@ -637,6 +807,174 @@ export class UiEditingController {
     this.host.markDirty(node, DirtyFlags.Paint);
     this.notifySelection(node, model);
     this.revealCaret(node);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selections across fields
+  // ---------------------------------------------------------------------------
+
+  /** Whether a selection is spanning the fields of a group. */
+  get spanning(): boolean {
+    return this.span !== null;
+  }
+
+  /**
+   * Selects from `anchor` to `focus` across a group's fields: lights
+   * every field between them with its part, gives the focus field its
+   * own part in its model (anchored on the side the selection comes
+   * from, so its keys and its IME stay sensible), and moves focus there.
+   * Two ends in one field are that field's selection, as ever.
+   */
+  private setSpan(
+    owner: { readonly root: UiNode; readonly group: UiEditingGroup },
+    anchor: UiTextPosition,
+    focus: UiTextPosition,
+    goalX?: number
+  ): void {
+    if (anchor.node === focus.node) {
+      this.clearSpan();
+      const model = editorFor(focus.node);
+      model.select(anchor.offset, focus.offset);
+      this.focusField(focus.node);
+      this.afterSelectionChange(focus.node, model);
+      return;
+    }
+    const forward = comparePositions(anchor, focus) <= 0;
+    const start = forward ? anchor : focus;
+    const end = forward ? focus : anchor;
+    const lit: UiNode[] = [];
+    for (let node: UiNode | null = start.node; node !== null; node = adjacentField(owner.root, node, 1)) {
+      const length = editorFor(node).text.length;
+      const from = node === start.node ? start.offset : 0;
+      const to = node === end.node ? end.offset : length;
+      if (setSelectionRange(node, from, to)) {
+        this.host.markDirty(node, DirtyFlags.Paint);
+      }
+      lit.push(node);
+      if (node === end.node) {
+        break;
+      }
+    }
+    const keep = new Set(lit);
+    for (const node of this.span?.lit ?? []) {
+      if (!keep.has(node) && clearSelectionRange(node)) {
+        this.host.markDirty(node, DirtyFlags.Paint);
+      }
+    }
+    const model = editorFor(focus.node);
+    model.select(forward ? 0 : model.text.length, focus.offset);
+    this.span = { root: owner.root, group: owner.group, anchor, focus, lit };
+    this.focusField(focus.node);
+    // A run of Shift and up or down keeps returning to one column.
+    this.verticalGoalX = goalX;
+    this.afterSelectionChange(focus.node, model, goalX !== undefined);
+  }
+
+  /** Ends a selection across fields, if there is one, unlighting them. */
+  private clearSpan(): void {
+    const span = this.span;
+    if (span === null) {
+      return;
+    }
+    this.span = null;
+    for (const node of span.lit) {
+      if (clearSelectionRange(node)) {
+        this.host.markDirty(node, DirtyFlags.Paint);
+      }
+    }
+  }
+
+  /** Collapses a selection across fields to its start (-1) or its end (1). */
+  private collapseSpan(direction: -1 | 1): void {
+    const span = this.span!;
+    const forward = comparePositions(span.anchor, span.focus) <= 0;
+    const target = direction < 0 === forward ? span.anchor : span.focus;
+    this.clearSpan();
+    const model = editorFor(target.node);
+    model.select(target.offset);
+    this.focusField(target.node);
+    this.afterSelectionChange(target.node, model);
+  }
+
+  /**
+   * Hands an edit over a selection across fields to the group, and ends
+   * the selection. No field is changed: the application changes its
+   * document, which changes the fields, and places the caret.
+   */
+  private spanEdit(inputType: string, data: string | null): boolean {
+    const span = this.span!;
+    const forward = comparePositions(span.anchor, span.focus) <= 0;
+    const start = forward ? span.anchor : span.focus;
+    const end = forward ? span.focus : span.anchor;
+    this.clearSpan();
+    editorFor(span.focus.node).select(span.focus.offset);
+    span.group.onEdit({ inputType, data, start, end });
+    return true;
+  }
+
+  /** The text a selection across fields copies as. */
+  private spanText(): string {
+    const span = this.span!;
+    const forward = comparePositions(span.anchor, span.focus) <= 0;
+    const start = forward ? span.anchor : span.focus;
+    const end = forward ? span.focus : span.anchor;
+    if (span.group.copyText !== undefined) {
+      return span.group.copyText(start, end);
+    }
+    return span.lit
+      .map(node => {
+        const text = editorFor(node).text;
+        return text.slice(node === start.node ? start.offset : 0, node === end.node ? end.offset : text.length);
+      })
+      .join('\n');
+  }
+
+  /** Where a Shift and press extends from: the focused field's anchor, if it is in the same group. */
+  private anchorIn(owner: { readonly root: UiNode } | null, node: UiNode | null): UiTextPosition | null {
+    if (owner === null || node === null || editingGroupOf(node)?.root !== owner.root) {
+      return null;
+    }
+    return { node, offset: editorFor(node).anchor };
+  }
+
+  /**
+   * The field of a group a drag at height `y` is over: stepping up or
+   * down from `from` until one reaches it, so a drag costs the fields it
+   * crosses. A point in the gap between two fields belongs to the next
+   * one in the direction of travel.
+   */
+  private fieldAt(root: UiNode, from: UiNode, y: number): UiNode {
+    let current = from;
+    for (;;) {
+      const box = this.host.visibleBox(current);
+      const step = y < box.y ? -1 : y > box.y + box.height ? 1 : 0;
+      if (step === 0) {
+        return current;
+      }
+      const next = adjacentField(root, current, step);
+      if (next === null) {
+        return current;
+      }
+      const nextBox = this.host.visibleBox(next);
+      if (step > 0 ? y < nextBox.y : y > nextBox.y + nextBox.height) {
+        // In the gap: the next field, the way the drag is going.
+        return next;
+      }
+      current = next;
+    }
+  }
+
+  /** Focuses a field for the span without ending it. */
+  private focusField(node: UiNode): void {
+    if (this.focusedEditable === node) {
+      return;
+    }
+    this.spanFocusing = true;
+    try {
+      this.focus.focus(node);
+    } finally {
+      this.spanFocusing = false;
+    }
   }
 
   /**
