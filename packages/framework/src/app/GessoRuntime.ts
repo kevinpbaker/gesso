@@ -33,6 +33,7 @@ import {
   Stack,
   scrollbarThumb,
   scrollRange,
+  type LayoutRecord,
   UiVirtualWindow,
   UiVirtualSheet,
   VIRTUAL_INDEX_PROP,
@@ -2908,6 +2909,17 @@ export class GessoRuntime {
    * every pass, so writing the raw offset here is enough.
    */
   private createScrollSink(): ScrollSink {
+    // Where a container is going, not where the last layout left it: a
+    // scroll written since that layout is in the property, and several
+    // wheel steps arrive between two frames whenever a device sends
+    // faster than the display draws. Each was added to the record's
+    // offset, so each overwrote the last and most of a flick was lost.
+    // Clamped, so an overshoot past either end isn't banked.
+    const going = (node: UiNode, record: LayoutRecord, axis: 'x' | 'y'): number => {
+      const written = node.getProperty(axis === 'x' ? 'scrollX' : 'scrollY');
+      const offset = typeof written === 'number' ? written : axis === 'x' ? record.scrollX : record.scrollY;
+      return Math.min(Math.max(offset, 0), scrollRange(record, axis));
+    };
     return {
       containerState: (node): ScrollContainerState | undefined => {
         const record = this.engine.recordFor(node);
@@ -2915,8 +2927,8 @@ export class GessoRuntime {
           return undefined;
         }
         return {
-          scrollX: record.scrollX,
-          scrollY: record.scrollY,
+          scrollX: going(node, record, 'x'),
+          scrollY: going(node, record, 'y'),
           maxScrollX: scrollRange(record, 'x'),
           maxScrollY: scrollRange(record, 'y'),
           horizontal: node.getProperty('direction') === 'row' || node.type === UiNodeType.Row,
@@ -2933,10 +2945,10 @@ export class GessoRuntime {
           // The smooth path adds to where the container is *going*, so
           // it needs the effective offset only as a starting point.
           if (dx !== 0) {
-            this.smoothScroller.scrollBy(node, 'scrollX', dx, record.scrollX);
+            this.smoothScroller.scrollBy(node, 'scrollX', dx, going(node, record, 'x'));
           }
           if (dy !== 0) {
-            this.smoothScroller.scrollBy(node, 'scrollY', dy, record.scrollY);
+            this.smoothScroller.scrollBy(node, 'scrollY', dy, going(node, record, 'y'));
           }
           return;
         }
@@ -2945,10 +2957,10 @@ export class GessoRuntime {
         // and would chase a moving value.
         this.smoothScroller.stop(node);
         if (dx !== 0) {
-          node.setProperty('scrollX', record.scrollX + dx);
+          node.setProperty('scrollX', going(node, record, 'x') + dx);
         }
         if (dy !== 0) {
-          node.setProperty('scrollY', record.scrollY + dy);
+          node.setProperty('scrollY', going(node, record, 'y') + dy);
         }
         this.graph.markDirty(node, DirtyFlags.Transform);
       },
