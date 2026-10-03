@@ -204,6 +204,28 @@ describe('LayoutEngine overflow', () => {
       expect(h.engine.revealAdjustments(rows[0], 8)).toEqual([{ container: root, scrollX: 0, scrollY: 0 }]);
     });
 
+    it('brings a node taller than the viewport in by its start, not its end', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'top', { height: 50, overflow: 'scroll', x: 'start' });
+      const above = box(h, 'above', { width: 20, height: 10, flexShrink: 0 });
+      const tall = box(h, 'tall', { width: 20, height: 200, flexShrink: 0 });
+      const below = box(h, 'below', { width: 20, height: 300, flexShrink: 0 });
+      h.append(root, above, tall, below);
+      h.layout(root, Constraints.loose(300, 300));
+      // 10..210 in a 50-tall viewport: its start, padded, at the top, as
+      // CSSOM's `nearest` does. Its end would be 168 pixels down: a page
+      // opening with its first section focused opened at its bottom.
+      expect(h.engine.revealAdjustments(tall, 8)).toEqual([{ container: root, scrollX: 0, scrollY: 2 }]);
+      // From below it, the same.
+      root.setProperty('scrollY', 400);
+      h.layout(root, Constraints.loose(300, 300));
+      expect(h.engine.revealAdjustments(tall, 8)).toEqual([{ container: root, scrollX: 0, scrollY: 2 }]);
+      // Covering the viewport already, it stays.
+      root.setProperty('scrollY', 100);
+      h.layout(root, Constraints.loose(300, 300));
+      expect(h.engine.revealAdjustments(tall, 8)).toEqual([]);
+    });
+
     it('adjusts every scroll ancestor, innermost first', () => {
       const h = new LayoutHarness();
       const outer = column(h, 'outer', { height: 50, overflow: 'scroll', x: 'start' });
