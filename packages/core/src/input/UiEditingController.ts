@@ -871,6 +871,7 @@ export class UiEditingController {
     const model = editorFor(focus.node);
     model.select(forward ? 0 : model.text.length, focus.offset);
     this.span = { root: owner.root, group: owner.group, anchor, focus, lit };
+    owner.group.onSelectionChange?.({ start, end });
     this.focusField(focus.node);
     // A run of Shift and up or down keeps returning to one column.
     this.verticalGoalX = goalX;
@@ -889,6 +890,7 @@ export class UiEditingController {
         this.host.markDirty(node, DirtyFlags.Paint);
       }
     }
+    span.group.onSelectionChange?.(null);
   }
 
   /** Collapses a selection across fields to its start (-1) or its end (1). */
