@@ -24,7 +24,7 @@ describe('LayoutEngine placement', () => {
     expect(harness.box(child)).toEqual({ x: 10, y: 10, width: 40, height: 20 });
   });
 
-  it('centres a button\'s content by default, as a box starts it at the top left', () => {
+  it("centres a button's content by default, as a box starts it at the top left", () => {
     const harness = new LayoutHarness();
     const root = harness.createNode('app', UiNodeType.Column);
     const content = (id: string) => {
