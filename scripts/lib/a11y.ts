@@ -471,7 +471,12 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
   const unnamed = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? '') && (node.name?.value ?? '') === '');
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
   const unreachable = controls
-    .filter(node => !isDisabled(node) && !reachedThroughComposite(node, nodes, tabOrder))
+    .filter(
+      node =>
+        !isDisabled(node) &&
+        !reachedThroughComposite(node, nodes, tabOrder) &&
+        !reachedThroughGroup(node, nodes, tabOrder)
+    )
     .map(describeNode)
     .filter(name => !tabOrder.includes(name));
   const content = renderReport(config.apps[check.app]!.url(check.path ?? route), nodes, unnamed, tabOrder, unreachable);
@@ -632,6 +637,38 @@ function reachedThroughComposite(node: AxNode, nodes: readonly AxNode[], tabOrde
     }
   }
   return false;
+}
+
+/**
+ * Whether a text box is one of a run that Tab treats as one stop: the
+ * fields of an editing group, a document of blocks, are one stop at the
+ * field last in, so only one of them is ever reached. The platform's tree
+ * doesn't know the group, so it's read as the text boxes of the nearest
+ * region or group, one of which Tab reached.
+ */
+function reachedThroughGroup(node: AxNode, nodes: readonly AxNode[], tabOrder: readonly string[]): boolean {
+  if (node.role?.value !== 'textbox') return false;
+  const parentOf = new Map<string, AxNode>();
+  for (const entry of nodes) {
+    for (const child of entry.childIds ?? []) parentOf.set(child, entry);
+  }
+  let container: AxNode | undefined;
+  for (let at = parentOf.get(node.nodeId); at !== undefined; at = parentOf.get(at.nodeId)) {
+    if (at.role?.value === 'region' || at.role?.value === 'group') {
+      container = at;
+      break;
+    }
+  }
+  if (container === undefined) return false;
+  const within = (entry: AxNode): boolean => {
+    for (let up = parentOf.get(entry.nodeId); up !== undefined; up = parentOf.get(up.nodeId)) {
+      if (up === container) return true;
+    }
+    return false;
+  };
+  return nodes.some(
+    entry => entry.role?.value === 'textbox' && within(entry) && tabOrder.includes(describeNode(entry))
+  );
 }
 
 /** A node as the report names it: role and accessible name. */
