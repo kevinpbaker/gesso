@@ -32,18 +32,27 @@ means, and a request goes back out.
 | `copyText(text)` | Writes the text to the system clipboard through `navigator.clipboard`, or a hidden textarea and `execCommand` where that is refused |
 | `openUrl(url)`   | `window.open(url, '_blank', 'noopener,noreferrer')`                                                                                 |
 
-Both return `void`, and nothing comes back. There is no acknowledgement
-on the protocol and no promise to await, so an application cannot find
-out whether the clipboard write succeeded. That is deliberate rather
-than missing: a request that crossed a thread boundary and back would be
-a round trip an application had to sequence its UI around, for an answer
-the browser gives no useful detail in anyway.
+`openUrl` returns `void`, and nothing comes back. `copyText` returns a
+promise of whether the text reached the clipboard, and most callers
+ignore it: the text is on its way the moment the call returns, and
+nothing waits on the answer unless something asks for it. It is for the
+application that tells the person what happened, a "Copied" toast after
+a menu command or a shortcut, which would otherwise say so on the
+occasions the browser refused. Browsers do refuse: the clipboard wants a
+focused document, some want a fresh gesture too, and a key pressed in a
+render worker reaches the window's clipboard a message after it reached
+the canvas.
 
-A request with no shell listening is dropped, silently and without
-throwing. That is the state a runtime is in under `renderTest` unless
-the test installs a listener, and it is what a headless host leaves
-behind, so a component that calls `copyText` in a test does not need a
-clipboard to exist.
+```ts
+const copied = await shell.copyText(link);
+status.value = copied ? 'Copied the link' : "Couldn't copy the link";
+```
+
+A runtime with no shell at all answers `false` straight away. Under
+`renderTest` a request made before a test installs a listener is held
+for the listener, so a component that calls `copyText` in a test does
+not need a clipboard to exist; a test that wants the answer settles it
+with `runtime.settleClipboard(request.id, true)`.
 
 There is a third request on the same channel, `history`, and no
 component issues it: the router turns a navigation into one because the

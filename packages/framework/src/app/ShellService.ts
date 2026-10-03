@@ -17,7 +17,7 @@ import type { ReadableCell } from '../Input';
  * have exactly one place that answers them.
  */
 export type ShellRequest =
-  | { type: 'clipboard'; text: string }
+  | { type: 'clipboard'; id: number; text: string }
   | { type: 'openUrl'; url: string }
   | { type: 'fullscreen'; enter: boolean }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
@@ -159,6 +159,9 @@ export class ShellService {
   /** Storage requests asked for and not yet answered, by the id sent with each. */
   private readonly stores = new Map<number, (result: ShellStorageResult) => void>();
   private nextStorageId = 1;
+  /** Clipboard writes asked for and not yet answered, by the id sent with each. */
+  private readonly copies = new Map<number, (copied: boolean) => void>();
+  private nextCopyId = 1;
   /** File requests asked for and not yet answered, by the id sent with each. */
   private readonly files = new Map<number, (result: ShellFileResult) => void>();
   private nextFileId = 1;
@@ -272,9 +275,45 @@ export class ShellService {
     }
   }
 
-  /** Puts text on the system clipboard. */
-  copyText(text: string): void {
-    this.handler?.({ type: 'clipboard', text });
+  /**
+   * Puts text on the system clipboard, and answers whether it got there.
+   *
+   * Most callers ignore the answer, and may: the text is on its way the
+   * moment this returns. It is for an application that tells the person
+   * what happened, a "Copied" toast after a menu command, say, which
+   * would be a lie on the occasions the browser refused. It does refuse:
+   * the clipboard wants a focused document, and some browsers a fresh
+   * gesture, and a key pressed in a render worker reaches the window's
+   * clipboard a message later than it reached the canvas.
+   *
+   * With no shell installed the answer is false, as `openPopup`'s is,
+   * rather than a promise that never settles.
+   */
+  copyText(text: string): Promise<boolean> {
+    const handler = this.handler;
+    if (handler === undefined || handler === null) {
+      return Promise.resolve(false);
+    }
+    const id = this.nextCopyId++;
+    const settled = new Promise<boolean>(resolve => {
+      this.copies.set(id, resolve);
+    });
+    handler({ type: 'clipboard', id, text });
+    return settled;
+  }
+
+  /**
+   * Called by the runtime when the shell reports whether a clipboard
+   * write landed. Not for applications. An unknown id is ignored, on
+   * `settlePopup`'s terms.
+   */
+  settleClipboard(id: number, copied: boolean): void {
+    const resolve = this.copies.get(id);
+    if (resolve === undefined) {
+      return;
+    }
+    this.copies.delete(id);
+    resolve(copied);
   }
 
   /** Opens a URL in the user's browser, in a new tab or window. */

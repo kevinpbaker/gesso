@@ -41,7 +41,7 @@ describe('the docs shell services example', () => {
     // The text is built in the handler from `currentColorScheme`, so
     // what crosses to the shell is the link for the appearance the
     // shell itself last reported.
-    expect(requests).toEqual([{ type: 'clipboard', text: 'https://gesso.invalid/report?theme=dark' }]);
+    expect(requests).toEqual([{ type: 'clipboard', id: 1, text: 'https://gesso.invalid/report?theme=dark' }]);
     expect(ui.getByText('The link is on the clipboard.')).toBeDefined();
   });
 

@@ -66,6 +66,8 @@ function createFakeWorkerGlobal() {
 }
 
 const values: string[] = [];
+/** What each `copyText` the button made was answered with. */
+const copies: boolean[] = [];
 const pastedHtml: (string | null)[] = [];
 
 @Define('editing-worker-root')
@@ -88,7 +90,7 @@ class EditingRoot extends Component {
         width: 40,
         height: 20,
         onClick: () => {
-          this.shell.copyText('copied!');
+          void this.shell.copyText('copied!').then(copied => copies.push(copied));
           this.shell.openUrl('https://example.test/');
         }
       })
@@ -191,8 +193,21 @@ describe('RenderWorkerApp editing', () => {
     // The button sits 10px below the 16.8px field.
     press(10, 40);
     await settle();
-    expect(sent.filter(m => m.type === 'clipboard')).toEqual([{ type: 'clipboard', text: 'copied!' }]);
+    expect(sent.filter(m => m.type === 'clipboard')).toEqual([{ type: 'clipboard', id: 1, text: 'copied!' }]);
     expect(sent.filter(m => m.type === 'openUrl')).toEqual([{ type: 'openUrl', url: 'https://example.test/' }]);
+  });
+
+  it("settles a copy with the shell's answer to it", async () => {
+    const { send, press } = start();
+    await settle();
+    copies.length = 0;
+    press(10, 40);
+    press(10, 40);
+    await settle();
+    send({ type: 'clipboardResult', id: 2, copied: false });
+    send({ type: 'clipboardResult', id: 1, copied: true });
+    await settle();
+    expect(copies).toEqual([false, true]);
   });
 
   it('accepts a visibility change', () => {

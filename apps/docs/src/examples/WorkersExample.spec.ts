@@ -60,7 +60,7 @@ describe('the docs workers example', () => {
     // The component performed nothing. It handed the runtime a request,
     // and in the worker configuration that request is a message the
     // main thread answers.
-    expect(requests).toEqual([{ type: 'clipboard', text: 'Typed into a canvas in a worker' }]);
+    expect(requests).toEqual([{ type: 'clipboard', id: 1, text: 'Typed into a canvas in a worker' }]);
     expect(readout(ui, /request/)).toBe('1 request to the shell');
   });
 

@@ -53,7 +53,7 @@ describe('shell requests made while the root is built', () => {
       onCreate: created => created.onShellRequest(request => heard.push(request))
     });
     runtime.services.get(ShellService).copyText('now');
-    expect(heard).toEqual([{ type: 'clipboard', text: 'now' }]);
+    expect(heard).toEqual([{ type: 'clipboard', id: 1, text: 'now' }]);
     runtime.dispose();
   });
 });
