@@ -2002,6 +2002,7 @@ interface WorkerAppOptions {
   webmcp?: boolean | {
     confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
   };
+  pageKeys?: boolean;
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;

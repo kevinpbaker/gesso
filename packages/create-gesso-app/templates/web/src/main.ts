@@ -26,6 +26,8 @@ if (host === null) {
   throw new Error('index.html has no #app element to mount into.');
 }
 
-const app = createApp();
+// The app is the whole page, so a key pressed before anything is
+// clicked is the app's: `pageKeys` sends it there.
+const app = createApp({ pageKeys: true });
 
 app.mount(host);

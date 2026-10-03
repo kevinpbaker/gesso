@@ -138,6 +138,18 @@ export interface WorkerAppOptions {
    */
   webmcp?: boolean | { confirm?: (request: AgentConfirmation) => boolean | Promise<boolean> };
   /**
+   * The app is the page (default false): a key pressed while nothing
+   * on the page has focus goes to the app, and the canvas takes focus.
+   *
+   * Keys reach the app through the canvas, which has focus only once
+   * something put it there. A page that is all app loads with focus on
+   * the body, so its shortcuts did nothing until the first click, and a
+   * person who pressed `c` or Mod+K straight away got nothing. An app
+   * embedded in a page with other things on it leaves this off: a key
+   * pressed on that page isn't its.
+   */
+  pageKeys?: boolean;
+  /**
    * Receives errors thrown inside the render worker: while handling a
    * message, uncaught during a frame, from the renderer, or from a
    * channel — `source` says which, and `RuntimeErrorSource` says what
@@ -1336,6 +1348,26 @@ export class WorkerApp {
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('keydown', onKeyDown);
     canvas.addEventListener('keyup', onKeyUp);
+    // A key aimed at the page itself, when the app is the page: the
+    // canvas takes focus, so the keys after it arrive the usual way.
+    const aimedAtPage = (target: EventTarget | null): boolean =>
+      target === null || target === document || target === document.body || target === document.documentElement;
+    const onPageKeyDown = (event: KeyboardEvent): void => {
+      if (aimedAtPage(event.target)) {
+        canvas.focus({ preventScroll: true });
+        this.forwardKeyDown(event);
+      }
+    };
+    const onPageKeyUp = (event: KeyboardEvent): void => {
+      if (aimedAtPage(event.target)) {
+        this.forwardKeyUp(event);
+      }
+    };
+    const pageKeys = this.options.pageKeys === true;
+    if (pageKeys) {
+      document.addEventListener('keydown', onPageKeyDown);
+      document.addEventListener('keyup', onPageKeyUp);
+    }
     // Capturing, because a scroll only reaches the scrolled element
     // and its ancestors otherwise, and it is an *ancestor* of the
     // canvas scrolling that moves the canvas. Passive, because this
@@ -1358,6 +1390,10 @@ export class WorkerApp {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('keydown', onKeyDown);
       canvas.removeEventListener('keyup', onKeyUp);
+      if (pageKeys) {
+        document.removeEventListener('keydown', onPageKeyDown);
+        document.removeEventListener('keyup', onPageKeyUp);
+      }
       window.removeEventListener('scroll', onCanvasMayHaveMoved, { capture: true });
       window.removeEventListener('resize', onCanvasMayHaveMoved);
       // A frame still holding a hover move would post it against a

@@ -48,6 +48,8 @@ const shell = createApp({
   // A link in a desktop application belongs in the person's browser,
   // which only the process outside this window can reach.
   onOpenUrl: url => bridge.openUrl(url),
+  // The window is all app: a key pressed before anything is clicked is its.
+  pageKeys: true,
   onError: (message, stack, source) => console.error(`[gesso ${source}] ${message}`, stack)
 });
 shell.mount(host);

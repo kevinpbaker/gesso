@@ -196,6 +196,16 @@ After the application's listeners, and only if none of them called
 A key one of those handles is marked default-prevented, which is how
 the shell learns to cancel the browser's own default for it.
 
+Keys reach the application through its canvas, which has DOM focus
+only once something put it there. A page that is all application
+loads with focus on the page's body, so without help its shortcuts do
+nothing until the first click. `createApp({ pageKeys: true })` says the
+application is the page: a key pressed while nothing on the page has
+focus goes to it, and the canvas takes focus. The templates
+`create-gesso-app` writes turn it on. An application embedded in a page
+with other things on it leaves it off, since a key pressed on that page
+isn't its.
+
 ## Focus
 
 A node is focusable when it is a `<button>` or an `<editabletext>`, or
