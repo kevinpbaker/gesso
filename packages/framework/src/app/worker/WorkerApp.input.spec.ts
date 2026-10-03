@@ -48,6 +48,9 @@ class FakeCanvas {
     this.listeners.delete(type);
   }
 
+  /** How many times something gave it focus. */
+  focused = 0;
+
   focus(): void {}
 
   setPointerCapture(): void {}
@@ -76,6 +79,10 @@ interface Harness {
   frame: () => void;
   /** Fires a listener the shell put on the window. */
   fireWindow: (type: string) => void;
+  /** Fires a listener the shell put on the document, as an event aimed at `target`. */
+  fireDocument: (type: string, event: Record<string, unknown>) => boolean;
+  /** The document's body, to aim an event at the page itself. */
+  body: object;
   restore: () => void;
 }
 
@@ -107,10 +114,14 @@ function harness(options: Partial<WorkerAppOptions> = {}): Harness {
     addEventListener: (type: string, listener: () => void) => windowListeners.set(type, listener),
     removeEventListener: (type: string) => windowListeners.delete(type)
   };
+  const documentListeners = new Map<string, (event: unknown) => void>();
+  const body = {};
   scope.document = {
     visibilityState: 'visible',
-    addEventListener: () => {},
-    removeEventListener: () => {}
+    body,
+    documentElement: {},
+    addEventListener: (type: string, listener: (event: unknown) => void) => documentListeners.set(type, listener),
+    removeEventListener: (type: string) => documentListeners.delete(type)
   };
 
   let notify: ((entries: { contentRect: { width: number; height: number } }[]) => void) | undefined;
@@ -128,6 +139,9 @@ function harness(options: Partial<WorkerAppOptions> = {}): Harness {
   const internals = app as unknown as Internals;
   internals.renderWorker = { postMessage: (message: ShellToRuntimeMessage) => posts.push(message) };
   const canvas = new FakeCanvas();
+  canvas.focus = () => {
+    canvas.focused += 1;
+  };
 
   return {
     app,
@@ -148,6 +162,12 @@ function harness(options: Partial<WorkerAppOptions> = {}): Harness {
         callback();
       }
     },
+    fireDocument: (type, event) => {
+      const listener = documentListeners.get(type);
+      listener?.(event);
+      return listener !== undefined;
+    },
+    body,
     fireWindow: type => {
       const listener = windowListeners.get(type);
       if (listener === undefined) {
@@ -481,5 +501,38 @@ describe('hover coalescing', () => {
 
     expect(prevented).toEqual(['s']);
     expect(shell.posts.filter(message => message.type === 'keyDown')).toHaveLength(3);
+  });
+});
+
+describe('keys pressed on the page', () => {
+  it('go to an app that is the page, which takes focus', () => {
+    const shell = setup({ pageKeys: true });
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    shell.fireDocument('keydown', { ...key(), key: 'c', target: shell.body });
+    shell.frame();
+    expect(shell.posts.filter(message => message.type === 'keyDown')).toEqual([expect.objectContaining({ key: 'c' })]);
+    expect(shell.canvas.focused).toBe(1);
+  });
+
+  it('leave alone a key aimed at something else on the page', () => {
+    const shell = setup({ pageKeys: true });
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    shell.fireDocument('keydown', { ...key(), target: { tagName: 'INPUT' } });
+    shell.frame();
+    expect(shell.posts.filter(message => message.type === 'keyDown')).toEqual([]);
+    expect(shell.canvas.focused).toBe(0);
+  });
+
+  it('are not the app’s unless it says it is the page', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    expect(shell.fireDocument('keydown', { ...key(), target: shell.body })).toBe(false);
+  });
+
+  it('stop being heard when the input is detached', () => {
+    const shell = setup({ pageKeys: true });
+    const detach = shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    detach();
+    expect(shell.fireDocument('keydown', { ...key(), target: shell.body })).toBe(false);
   });
 });
