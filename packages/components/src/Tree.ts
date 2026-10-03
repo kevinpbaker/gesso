@@ -174,6 +174,11 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
     const chosen = selected.value.pipe(map(current => current === row.node.key));
     const open = expanded.value.pipe(map(keys => keys.includes(row.node.key)));
     const branch = hasChildren(row.node);
+    // Bound on the text rather than on the row: `color` does not cascade
+    // from a parent node, so a row's colour reached neither its label
+    // nor its arrow, which drew in the text style's colour instead.
+    // That is black in a dark theme too, on a dark row.
+    const ink = chosen.pipe(map(on => (on ? 'selectionForeground' : 'controlForeground')));
     return Row(
       {
         modifiers: [CONTROL_INTERACTION],
@@ -204,7 +209,6 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
           })
         ),
         backgroundColor: chosen.pipe(map(on => (on ? 'selectionBackground' : 'transparent'))),
-        color: chosen.pipe(map(on => (on ? 'selectionForeground' : 'controlForeground'))),
         onClick: () => {
           choose(index);
           if (branch) {
@@ -218,9 +222,10 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         text: branch ? open.pipe(map(on => (on ? '▾' : '▸'))) : ' ',
         width: 10,
         fontSize: 11,
+        color: ink,
         selectable: false
       }),
-      Text({ text: row.node.label, fontSize: 13, selectable: false, maxLines: 1, textOverflow: 'ellipsis' })
+      Text({ text: row.node.label, fontSize: 13, color: ink, selectable: false, maxLines: 1, textOverflow: 'ellipsis' })
     );
   };
 

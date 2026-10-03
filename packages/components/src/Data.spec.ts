@@ -5,6 +5,7 @@ import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import {
   Box,
+  Column,
   Text,
   UiEnvironmentKeys,
   darkTheme,
@@ -322,6 +323,37 @@ describe('Tree', () => {
       })
     );
   }
+
+  it('draws its labels in the control colours of the theme it is under, and the chosen one in the selection colour', () => {
+    const textColour = (ui: ReturnType<typeof tree>, text: string): string => {
+      let style = '';
+      let found = '';
+      for (const call of ui.draws) {
+        if (call.name === 'set:fillStyle') {
+          style = String(call.args[0]);
+        } else if (call.name === 'fillText' && call.args[0] === text) {
+          found = style;
+        }
+      }
+      return found;
+    };
+    const hex = (color: { r: number; g: number; b: number }) =>
+      `#${[color.r, color.g, color.b]
+        .map(channel =>
+          Math.round(channel * 255)
+            .toString(16)
+            .padStart(2, '0')
+        )
+        .join('')}`;
+    const ui = mount(
+      Column(
+        { theme: darkTheme, height: 200 },
+        createComponent(Tree, { label: 'Files', nodes: FOLDERS, height: 200, defaultSelectedKey: 'docs' })
+      )
+    );
+    expect(textColour(ui, 'src')).toBe(hex(darkTheme.colors.controlForeground));
+    expect(textColour(ui, 'docs')).toBe(hex(darkTheme.colors.selectionForeground));
+  });
 
   it('renders only the open part of the model, and says how deep each row is', () => {
     const ui = tree({ defaultExpanded: ['src'] });
