@@ -32,7 +32,40 @@ export interface MockCanvas extends CanvasHost {
  * the default 14px font.
  */
 export function mockCanvas(width = 800, height = 600): MockCanvas {
-  const ctx = new Proxy({} as Record<string, unknown>, {
+  // The transform is kept as a real context keeps it, because the
+  // renderer reads it back (`getTransform`) to place scroll layers on
+  // whole device pixels: a mock answering `undefined` threw in the frame,
+  // and the runtime abandoned the frame rather than failing the spec.
+  type Matrix = { a: number; b: number; c: number; d: number; e: number; f: number };
+  let m: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  const saved: Matrix[] = [];
+  const times = (n: Matrix): void => {
+    m = {
+      a: m.a * n.a + m.c * n.b,
+      b: m.b * n.a + m.d * n.b,
+      c: m.a * n.c + m.c * n.d,
+      d: m.b * n.c + m.d * n.d,
+      e: m.a * n.e + m.c * n.f + m.e,
+      f: m.b * n.e + m.d * n.f + m.f
+    };
+  };
+  const transforms: Record<string, (...args: number[]) => unknown> = {
+    save: () => void saved.push(m),
+    restore: () => void (m = saved.pop() ?? m),
+    setTransform: (a, b, c, d, e, f) => void (m = { a, b, c, d, e, f }),
+    resetTransform: () => void (m = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    transform: (a, b, c, d, e, f) => times({ a, b, c, d, e, f }),
+    translate: (x, y) => times({ a: 1, b: 0, c: 0, d: 1, e: x, f: y }),
+    scale: (x, y) => times({ a: x, b: 0, c: 0, d: y, e: 0, f: 0 }),
+    rotate: angle =>
+      times({ a: Math.cos(angle), b: Math.sin(angle), c: -Math.sin(angle), d: Math.cos(angle), e: 0, f: 0 }),
+    getTransform: () => ({ ...m })
+  };
+  const methods: Record<string, unknown> = {};
+  for (const [name, run] of Object.entries(transforms)) {
+    methods[name] = vi.fn(run);
+  }
+  const ctx = new Proxy(methods, {
     get: (target, key) => {
       if (key === 'measureText') {
         return (text: string) => ({ width: String(text).length * 7 });
@@ -65,6 +98,11 @@ export interface MountedRuntime {
 }
 
 export interface MountOptions extends Omit<Partial<GessoRuntimeOptions>, 'root' | 'canvas' | 'clock'> {
+  /**
+   * Let a frame that throws be abandoned, as it is in an application,
+   * rather than failing the spec. For a spec about that recovery.
+   */
+  allowFrameErrors?: boolean;
   /** Runs before `start()`, for listeners that must see the first frame. */
   onCreate?: (runtime: GessoRuntime) => void;
   /** Leave the runtime stopped; the spec calls `start()` itself. */
@@ -73,7 +111,7 @@ export interface MountOptions extends Omit<Partial<GessoRuntimeOptions>, 'root' 
 
 /** Mounts a tree on a manual clock over a mock canvas, and starts it. */
 export function mountRuntime(root: FrameworkChild, options: MountOptions = {}): MountedRuntime {
-  const { onCreate, start = true, ...rest } = options;
+  const { onCreate, start = true, allowFrameErrors = false, ...rest } = options;
   const canvas = mockCanvas(rest.width ?? 800, rest.height ?? 600);
   const frames: FrameMetrics[] = [];
   let clock!: UiManualFrameClock;
@@ -86,6 +124,15 @@ export function mountRuntime(root: FrameworkChild, options: MountOptions = {}): 
     clock: callback => (clock = new UiManualFrameClock(callback))
   });
   runtime.onFrame(metrics => frames.push(metrics));
+  // A frame that throws is reported and abandoned, so an application
+  // keeps drawing; a spec has to hear it, or it passes on a frame that
+  // never ran.
+  let thrown: string | null = null;
+  if (!allowFrameErrors) {
+    runtime.onFrameError((message, stack) => {
+      thrown ??= stack ?? message;
+    });
+  }
   onCreate?.(runtime);
   if (start) {
     runtime.start();
@@ -95,6 +142,11 @@ export function mountRuntime(root: FrameworkChild, options: MountOptions = {}): 
     now = time ?? now + 16;
     if (clock.isPending) {
       clock.tick(now);
+    }
+    if (thrown !== null) {
+      const error = thrown;
+      thrown = null;
+      throw new Error(`A frame threw and was abandoned:\n${error}`);
     }
   };
   return { runtime, clock, canvas, frames, frame };
