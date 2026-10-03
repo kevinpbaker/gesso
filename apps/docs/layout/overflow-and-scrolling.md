@@ -197,11 +197,15 @@ waiting for steps puts the page a frame behind the hand. The runtime
 does what a browser does for a native page instead: each frame puts the
 page where the input will have reached when the frame is shown, the
 steps so far plus their velocity times the time since the last one,
-never more than a frame and a half ahead. The steps come out even and
-the page keeps up. A gesture's first step goes as it is, and once the
-steps stop the prediction is withdrawn and the page settles exactly
-where they add up to. Every step counts: several arriving between two
-frames add up.
+read from the last few steps only and never more than a frame and a
+half ahead. The steps come out even and the page keeps up. A gesture's
+first step goes as it is. A frame never moves against the way the
+latest step went, so a prediction that ran ahead as a flick slowed
+holds until the steps catch up, and one left ahead when they stop stays
+there, a frame's travel on, rather than pulling back, which the eye
+reads as a spring. Against an edge the steps are judged from where they
+have really taken the container, so the list stops at the edge and
+stays. Every step counts: several arriving between two frames add up.
 
 A trackpad's steps can be a fraction of a pixel, and the offset keeps
 them exactly, so they add up. What's drawn lands on a whole device pixel,
