@@ -728,13 +728,16 @@ export class UiGraphBuilder {
     const present = new Set<string>();
     const presentEvents = new Set<string>();
     let declaredModifiers: unknown;
+    let declaredRef: unknown;
+    let hasRef = false;
 
     for (const [property, value] of Object.entries(props)) {
       if (property === KEY_PROP) {
         continue;
       }
       if (property === REF_PROP) {
-        this.reconcileRef(node, value);
+        declaredRef = value;
+        hasRef = true;
         continue;
       }
       if (property === MODIFIERS_PROP) {
@@ -807,6 +810,14 @@ export class UiGraphBuilder {
       // attach and keeps this instance when it agrees, so nothing is
       // marked dirty twice.
       node.environment = this.graph.buildNodeEnvironment(node, parent);
+    }
+
+    // Handed over once the node has every prop written and the
+    // environment it will be under, wherever `ref` sits among the
+    // props: a ref that read the theme, as an overlay's placeholder
+    // does, used to see the default on a node built this pass.
+    if (hasRef) {
+      this.reconcileRef(node, declaredRef);
     }
 
     this.reconcileModifiers(node, declaredModifiers);

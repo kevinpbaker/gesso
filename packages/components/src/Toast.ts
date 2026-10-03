@@ -124,8 +124,8 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
   let wanted = false;
   const sync = (): void => {
     if (wanted && !overlay.isOpen()) {
-      // A toast declared open runs this before its placeholder is in the
-      // tree, and opened then it would take no theme: it waits for it.
+      // A toast declared open runs this before its placeholder exists,
+      // and opened then it would take no theme: it waits for it.
       if (placeholder === null) {
         return;
       }

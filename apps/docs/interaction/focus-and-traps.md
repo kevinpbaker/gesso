@@ -107,10 +107,10 @@ closes.
   left the tree is a trap that ended, so it pops and restores. A dialog
   that simply unmounts hands the keyboard back without sequencing its
   own teardown, and a `releaseTrap()` afterwards does nothing.
-- **Entering a scope is settled once per frame.** A `ref` fires while
-  its node's props are being reconciled, which is before its children
-  exist, so a trap taken from a ref sees an empty box with nothing
-  focusable in it. The runtime moves focus into the innermost scope
+- **Entering a scope is settled once per frame.** A `ref` fires once
+  its node's own props are written and it has the environment (the
+  theme) it will be under, but before its children exist, so a trap
+  taken from a ref sees an empty box with nothing focusable in it. The runtime moves focus into the innermost scope
   after the frame's tree is built and before layout, which is why the
   caret is in the dialog on the frame that mounts it, and why a
   component does not have to know when its children appear.
