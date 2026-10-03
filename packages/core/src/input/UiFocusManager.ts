@@ -152,7 +152,7 @@ export class UiFocusManager {
    * that emits nothing).
    */
   focus(node: UiNode, source: FocusSource = 'program'): boolean {
-    if (!isNodeFocusable(node) || !this.withinScope(node)) {
+    if (!isNodeFocusable(node) || !this.withinScope(node) || this.insideHidden(node)) {
       return false;
     }
     if (node === this.focused) {
@@ -395,6 +395,12 @@ export class UiFocusManager {
     // group (a task's checkbox) keeps its own stop.
     const groups = new Set<UiNode>();
     const visit = (node: UiNode): void => {
+      // A hidden or disabled subtree has no stops, as `display: none` and
+      // a disabled fieldset have none in a page: a toolbar hidden until
+      // something is selected was a run of stops nothing could see.
+      if (node.properties.get('visible') === false || node.properties.get('disabled') === true) {
+        return;
+      }
       if (isNodeTabStop(node)) {
         const group = this.groupOf(node);
         if (group === null) {
@@ -410,6 +416,16 @@ export class UiFocusManager {
     };
     visit(this.scopeRoot);
     return result;
+  }
+
+  /** Whether an ancestor is hidden or disabled, which takes the node's focus away with it. */
+  private insideHidden(node: UiNode): boolean {
+    for (let current = node.parent; current !== null; current = current.parent) {
+      if (current.properties.get('visible') === false || current.properties.get('disabled') === true) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** The editing group a field belongs to, by its root, or null for anything that isn't a field of one. */

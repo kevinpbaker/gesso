@@ -150,6 +150,11 @@ no order for it to be out of. And it does not reorder anything: the
 cycle is still document order, and the only way to change that is still
 to change the tree.
 
+A subtree that is hidden (`visible={false}`) or disabled has no stops
+and can't be focused from code, as `display: none` and a disabled
+fieldset take theirs out of a page: a toolbar hidden until something is
+selected isn't a run of stops nobody can see.
+
 One thing does fold stops together: the fields of an
 [editing group](/interaction/text-editing-and-ime) are a single stop, at
 the first field, entered at the one last focused.
