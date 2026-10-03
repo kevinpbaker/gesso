@@ -9,7 +9,8 @@ import type {
   UiSemanticsAction,
   UiScrollability,
   UiSemanticsUpdate,
-  UiFileDropMessage
+  UiFileDropMessage,
+  UiContrast
 } from 'gesso-core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
@@ -170,6 +171,7 @@ export type ShellToRuntimeMessage =
    * host tells a shell, not a thing that crosses.
    */
   | { type: 'colorScheme'; scheme: ColorScheme }
+  | { type: 'contrast'; contrast: UiContrast }
   /**
    * What the window's own chrome is covering on each edge: the safe
    * area a notch or a home indicator takes, and the strip a soft

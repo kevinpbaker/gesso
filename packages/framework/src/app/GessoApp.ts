@@ -22,6 +22,7 @@ import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
+import { observeContrast } from './contrast';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from './fullscreen';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
 import { measure } from './worker/WorkerApp';
@@ -130,6 +131,7 @@ export class GessoApp {
   private detachFullscreen: (() => void) | null = null;
   private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
+  private detachContrast: (() => void) | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
   private detachColorScheme: (() => void) | null = null;
   /** Stops watching `visualViewport` for the safe area and the keyboard. */
@@ -374,6 +376,8 @@ export class GessoApp {
     this.detachFullscreen = null;
     this.detachReducedMotion?.();
     this.detachReducedMotion = null;
+    this.detachContrast?.();
+    this.detachContrast = null;
     this.detachColorScheme?.();
     this.detachColorScheme = null;
     this.detachViewportInsets?.();
@@ -455,6 +459,7 @@ export class GessoApp {
       this.runtime.setFullscreen(isDocumentFullscreen(canvas));
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
+    this.detachContrast = observeContrast(contrast => this.runtime.setContrast(contrast));
     this.setColorScheme(this.colorSchemePreference);
   }
 

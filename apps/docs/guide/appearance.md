@@ -92,9 +92,21 @@ turned the operating system's high contrast setting on is asking for.
 Both are described in [themes and the
 environment](/appearance/themes-and-the-environment).
 
-Neither is wired to a media query for you, for the reason the section
-below gives: which settings an application offers, and where it
-remembers them, is the application's.
+What the operating system asks for is reported, as the colour scheme
+is: `shell.contrast` is `high` while the person has turned up contrast
+(`prefers-contrast: more`) or turned on a contrast theme (Windows'
+forced colours, which a canvas doesn't get from the browser), and
+`standard` otherwise. Following it is one more input to the theme:
+
+```ts
+const theme = derive([shell.colorScheme, shell.contrast], (scheme, contrast) =>
+  withContrast(scheme === 'dark' ? appDarkTheme : appLightTheme, contrast)
+);
+```
+
+Density has no platform setting to follow, and whether an application
+offers its own control for either, and where it remembers it, is the
+application's, for the reason the section below gives.
 
 ## An app with its own setting
 

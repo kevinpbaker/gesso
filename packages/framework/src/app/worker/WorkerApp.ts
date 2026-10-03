@@ -29,6 +29,7 @@ import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
+import { observeContrast } from '../contrast';
 import { observeReducedMotion } from '../reducedMotion';
 import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
@@ -1239,6 +1240,7 @@ export class WorkerApp {
     const detachReducedMotion = observeReducedMotion(reduced => {
       this.post({ type: 'reducedMotion', reduced });
     });
+    const detachContrast = observeContrast(contrast => this.post({ type: 'contrast', contrast }));
     const onPointerMove = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
       const move: PointerMoveMessage = {
@@ -1379,6 +1381,7 @@ export class WorkerApp {
 
     return () => {
       detachReducedMotion();
+      detachContrast();
       detachFullscreen();
       detachFileDrop();
       canvas.removeEventListener('mousedown', onMouseDown);
