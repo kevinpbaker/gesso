@@ -49,7 +49,27 @@ export function resolveColorValue(node: UiNode, value: UiColorValue | undefined)
       return themed;
     }
   }
-  return normalizeColor(value);
+  const color = normalizeColor(value);
+  if (color === undefined && typeof value === 'string') {
+    warnUnknownColor(value);
+  }
+  return color;
+}
+
+const warned = new Set<string>();
+
+/**
+ * A colour that names nothing paints nothing; this says so, once a
+ * name. It can only be known here, against the node's theme: a theme
+ * may add tokens of its own, so a misspelt token and a custom one look
+ * alike until a lookup fails.
+ */
+function warnUnknownColor(name: string): void {
+  if (warned.has(name)) {
+    return;
+  }
+  warned.add(name);
+  console.warn(`Gesso: the colour '${name}' is neither a palette name nor a colour, so nothing is painted with it.`);
 }
 
 /**

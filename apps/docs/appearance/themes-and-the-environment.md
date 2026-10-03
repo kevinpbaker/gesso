@@ -58,10 +58,14 @@ all: `borderRadius` affects paint and nothing else, so the lookup
 happens where the theme is already being consulted for every colour. A
 box that names a number never reaches the lookup.
 
-A name the scale does not carry draws square, the same quiet failure a
-colour name nothing matches already had. That is a theme missing a
+A name the scale does not carry draws square. That is a theme missing a
 step rather than a typo: a misspelling does not compile, because the
 names are a closed union.
+
+A colour name can't be held to a union. A colour prop takes any colour
+string as well, and a theme may add tokens of its own, so a misspelt
+token and a custom one look alike until the lookup fails. When one does,
+nothing is painted and the console says so, once for each name.
 
 `shadows` and `spacing` are read from the theme and passed as values
 instead: `boxShadows` takes the array, and a padding takes a number.

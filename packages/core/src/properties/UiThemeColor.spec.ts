@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { darkTheme, lightTheme } from '../environment/UiTheme';
 import { UiGraph } from '../graph/UiGraph';
@@ -28,6 +28,19 @@ describe('theme color tokens', () => {
     node.setProperty('backgroundColor', 'surface');
     expect(resolveColor(node, UiProperties.color)).toEqual(darkTheme.colors.primary);
     expect(resolveColor(node, UiProperties.backgroundColor)).toEqual(darkTheme.colors.surface);
+  });
+
+  it('says so once when a colour names nothing, rather than painting nothing in silence', () => {
+    // Checked where it's painted, against the node's theme: a theme may
+    // add tokens of its own, so no list fixed at build time can say.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const node = themedNode(darkTheme);
+    node.setProperty('backgroundColor', 'surfaceRaisd');
+    expect(resolveColor(node, UiProperties.backgroundColor)).toBeUndefined();
+    expect(resolveColor(node, UiProperties.backgroundColor)).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toMatch(/surfaceRaisd/);
+    warn.mockRestore();
   });
 
   it('falls back to the default theme when nothing provides one', () => {
