@@ -126,6 +126,13 @@ export interface UiModifierHost {
    * A scroll is a superset of what a listener may care about: read
    * `flowBox()` inside the listener when what matters is the node's
    * place in the layout rather than on the screen.
+   *
+   * It runs after the frame's layout and before the frame paints, and
+   * the listener may change layout from it: the runtime lays out again
+   * before painting, and tells the listeners whose boxes that moved, so
+   * what was written is on screen on the same frame. The loop is
+   * bounded, so a listener that answers its own change with another
+   * one is painted unsettled and warned about rather than hanging.
    */
   onLayout(listener: (box: LayoutBox) => void): void;
   /**

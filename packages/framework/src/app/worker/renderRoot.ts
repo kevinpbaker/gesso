@@ -720,6 +720,7 @@ export class RenderWorkerApp {
         nodes: metrics.nodes,
         measured: metrics.measured,
         relayoutRoots: metrics.relayoutRoots,
+        layoutPasses: metrics.layoutPasses,
         at: metrics.at,
         inputLatencyMs: metrics.inputLatencyMs,
         phases: metrics.phases,

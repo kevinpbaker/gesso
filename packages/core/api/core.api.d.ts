@@ -660,6 +660,7 @@ declare class DirtyNodeSet {
   delete(node: UiNode): boolean;
   get size(): number;
   isEmpty(): boolean;
+  anyFlags(flags: DirtyFlags): boolean;
   take(): UiNode[];
   drainInto(buffer: UiNode[]): number;
   clear(): void;
@@ -3375,6 +3376,7 @@ declare class UiFrame {
   get nodes(): UiNode[];
   entries(): IterableIterator<[UiNode, DirtyFlags]>;
   anyFlags(flags: DirtyFlags): boolean;
+  merged(later: UiFrame): UiFrame;
   get size(): number;
   isEmpty(): boolean;
   dirtyFlagsFor(node: UiNode): DirtyFlags;
@@ -5049,6 +5051,7 @@ declare class UiScheduler {
   get framePending(): boolean;
   get frameCount(): number;
   flush(time: UiFrameTime): void;
+  recollect(frame: UiFrame): UiFrame;
   private handleFrame;
   private collectFrame;
 }

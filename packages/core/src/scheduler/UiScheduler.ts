@@ -217,6 +217,33 @@ export class UiScheduler {
   }
 
   /**
+   * Takes what was dirtied since `frame` was collected into that same
+   * frame, rather than leaving it for the next one.
+   *
+   * For a phase that has to finish inside the frame what the frame
+   * started. A layout listener (a `breakpoint`, a `sizeContainer`)
+   * that writes padding after the boxes are final has made those boxes
+   * stale, and painting them would show the stale layout for one frame
+   * before the next corrects it. The runtime lays the writes out again
+   * from what this returns, before anything paints.
+   *
+   * The result holds only the newly dirtied nodes, with `frame`'s id
+   * and time: it is more of the same frame, not a new one, so the
+   * frame count does not move. Anything armed by those writes finds
+   * nothing left to do.
+   */
+  recollect(frame: UiFrame): UiFrame {
+    const count = this.dirty.drainInto(this.drained);
+    const dirty = new Map<UiNode, DirtyFlags>();
+    for (let i = 0; i < count; i++) {
+      const node = this.drained[i];
+      dirty.set(node, node.dirtyFlags);
+      node.dirtyFlags = DirtyFlags.None;
+    }
+    return new UiFrame(frame.id, frame.time, dirty);
+  }
+
+  /**
    * Runs one frame, and names its three parts for the browser's
    * profiler when anything is recording (`PerformanceMarks`).
    *

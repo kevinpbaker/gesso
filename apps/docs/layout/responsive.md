@@ -35,9 +35,18 @@ Bands are applied cumulatively from the narrowest up, so a band names
 only what it changes: the column above keeps `gap: 8` at 1000 px because
 the 900 band did not say otherwise.
 
-Nothing is written until the node has been laid out once, so the first
-frame uses the element's own values. Give the element the narrowest
-band's values as its declared props when that matters.
+The first frame is already right. The band is written when the node's
+box is first known, which is after the frame's layout has run, and the
+runtime lays the node out again before it paints, so a page mounted at
+1400 px is drawn with the 900 band's padding on the frame it appears,
+not with its declared padding and then again a frame later. The same
+holds when a resize crosses a width: the frame the new size is drawn on
+has the new band.
+
+The element's own values are still what the first layout pass measures
+with. Give it the narrowest band's values as its declared props, so a
+container laid out where no runtime settles it (a headless layout, a
+spec driving layout by hand) starts from the right band.
 
 ## Children that differ: `Responsive`
 
@@ -60,7 +69,10 @@ dragging a window edge from 1000 px to 1399 px does no work at all.
 The first build happens before any layout, when the size is zero, so
 `build` has to return something sensible for a container whose room is
 not yet known. Zero picks the narrowest arm, which is the right guess
-and also what a phone gets.
+and also what a phone gets. It is not what gets drawn when the room is
+wider: the first layout reports the real size, the matching arm is
+built, and it is laid out before the frame paints, so the narrow arm is
+never on screen at 1400 px.
 
 ## What a band costs
 
@@ -68,9 +80,10 @@ Two numbers, both pinned by
 `packages/core/src/layout/ContainerQuery.budget.spec.ts`:
 
 - **Crossing a band costs one extra layout pass**, over the container's
-  own subtree. The modifier hears the new box, writes its properties,
-  and the node is laid out again. There is no way around that and no
-  reason to want one.
+  own subtree, in the same frame. The modifier hears the new box,
+  writes its properties, and the node is laid out again before anything
+  paints. There is no way around that and no reason to want one. The
+  frame's metrics count it: `layoutPasses` is 2 on that frame.
 - **A resize inside a band costs nothing at all.** The modifier hears
   every width and writes on none of them, so nothing is dirtied and the
   frame's pass is the only pass.
@@ -79,6 +92,27 @@ That second number is the one worth watching in your own code: a
 container query that recomputed on every width would lay the page out
 twice per frame of a window drag, and nobody would notice until the drag
 felt heavy.
+
+## Listeners that change layout
+
+`breakpoint`, `sizeContainer` (which `Responsive` attaches) and any
+modifier of your own on `host.onLayout` hear a box after layout, so
+anything they write that changes layout makes the frame's boxes stale.
+The runtime does what a browser does after a `ResizeObserver` callback:
+it lays out again, only what was written, tells the listeners whose
+boxes then changed, and repeats until they write nothing more that lays
+out. Only then does the frame paint. A frame whose listeners wrote
+nothing that lays out, which is nearly every frame, runs one pass and
+pays one look at what is dirty.
+
+The loop is bounded at **8 layout passes a frame**. A browser bounds the
+same loop by tree depth; a count is simpler to reason about and far more
+than a real chain needs (a breakpoint inside a `Responsive` inside a
+`Responsive` is four). Listeners that never settle, such as one that
+widens its node whenever it is narrow and narrows it whenever it is
+wide, stop at the bound: the frame paints what it has, the rest waits
+for the next frame, and a warning naming the problem appears once in
+the console.
 
 ## The size, for anything else
 

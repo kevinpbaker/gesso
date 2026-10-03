@@ -337,6 +337,7 @@ export type RuntimeToShellMessage =
       nodes: number;
       measured: number;
       relayoutRoots: number;
+      layoutPasses: number;
       at: number;
       inputLatencyMs: number | null;
       phases: FramePhaseTimings;

@@ -1430,6 +1430,8 @@ declare class GessoRuntime {
   private lastFocusedId;
   private focusAfterReload;
   private restoringFocus;
+  private deferredReveals;
+  private warnedLayoutPasses;
   private semanticsStale;
   private lastEditingState;
   private shellListener;
@@ -1550,6 +1552,10 @@ declare class GessoRuntime {
   private updateVirtualSheet;
   private collectVirtualMeasures;
   private extentOf;
+  private settleLayout;
+  private layoutPending;
+  private finishSettling;
+  private warnLayoutPasses;
   private handleFrame;
   private scheduleAnimationTick;
   private scheduleScrollbarFade;
@@ -1576,6 +1582,7 @@ interface FrameMetrics {
   nodes: number;
   measured: number;
   relayoutRoots: number;
+  layoutPasses: number;
   phases: FramePhaseTimings;
   renderer: RendererBackend | 'pending';
   gpu: GpuStageTimings | null;
@@ -1768,6 +1775,7 @@ type RuntimeToShellMessage = {
   nodes: number;
   measured: number;
   relayoutRoots: number;
+  layoutPasses: number;
   at: number;
   inputLatencyMs: number | null;
   phases: FramePhaseTimings;

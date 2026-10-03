@@ -51,7 +51,9 @@ export interface ResponsiveProps extends ColumnProps {
  * The first build happens before any layout, when the size is zero, so
  * `build` must return something sensible for a container whose room is
  * not yet known. Zero picks the narrowest arm, which is the right
- * guess and also what a phone gets.
+ * guess and also what a phone gets. It is never what a wider container
+ * paints: the first layout reports the real size, the arm for it is
+ * built, and the runtime lays that out before the frame paints.
  */
 export function Responsive(props: ResponsiveProps, build: (size: Size) => UiChild | readonly UiChild[]): UiElement {
   const { at, as = 'column', modifiers, ...rest } = props;
