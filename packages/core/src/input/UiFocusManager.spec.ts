@@ -116,6 +116,35 @@ describe('UiFocusManager', () => {
     expect(focus).not.toHaveBeenCalled();
   });
 
+  /**
+   * A toolbar hidden until something is selected was a run of Tab stops
+   * nothing could see, and a screen reader heard nothing at any of them.
+   */
+  it('has no stops in a hidden or disabled subtree, and refuses to focus into one', () => {
+    const h = new InputTestHarness();
+    const first = h.node('first', UiNodeType.Button, { width: 100, height: 20 });
+    const hidden = h.node('hidden', UiNodeType.Column, { visible: false });
+    const inHidden = h.node('inHidden', UiNodeType.Button, { width: 100, height: 20 });
+    const off = h.node('off', UiNodeType.Column, { disabled: true });
+    const inOff = h.node('inOff', UiNodeType.Button, { width: 100, height: 20 });
+    const last = h.node('last', UiNodeType.Button, { width: 100, height: 20 });
+    h.add(hidden, inHidden);
+    h.add(off, inOff);
+    h.add(h.root, first, hidden, off, last);
+    h.layoutTree();
+    const manager = h.createFocusManager();
+    manager.focus(first);
+    manager.focusNext();
+    expect(manager.focusedNode).toBe(last);
+    expect(manager.focus(inHidden)).toBe(false);
+    expect(manager.focus(inOff)).toBe(false);
+    // Shown again, its stops are back.
+    hidden.setProperty('visible', true);
+    manager.focus(first);
+    manager.focusNext();
+    expect(manager.focusedNode).toBe(inHidden);
+  });
+
   it('moves focus with Blur on the old node then Focus on the new', () => {
     const { h, btn1, btn2, focusManager } = setup();
     focusManager.focus(btn1);

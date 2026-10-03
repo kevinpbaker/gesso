@@ -2696,6 +2696,7 @@ declare class UiFocusManager {
   handleNodeRemoved(_node: UiNode): void;
   private moveFocus;
   private collectFocusable;
+  private insideHidden;
   private groupOf;
   private withinScope;
   private isAttached;
@@ -6890,7 +6891,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BV3MbrEi.js";
+} from "./index-UPXlgUAB.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7822,7 +7823,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BV3MbrEi.js";
+} from "./index-UPXlgUAB.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
