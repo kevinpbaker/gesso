@@ -266,9 +266,17 @@ Inside a group:
 | Shift and a press in another field  | Extends the selection there from where it was anchored |
 | `Ctrl/Cmd+A`                        | Selects every field in the group                       |
 | A plain arrow over such a selection | Collapses it to the side the arrow points to           |
+| A press beside or between fields    | Lands in the nearest field, at the nearest position    |
 
 Every field between the two ends draws its part of the selection.
 Focus is in the field holding the moving end.
+
+A press in the group that lands on none of its fields (in its padding,
+in the gap between two, or on the plain structure a field sits in, such
+as a list item's bullet) goes to the nearest field by height, as a
+document puts the caret on the nearest line. A press on something that
+answers presses itself, a button or anything with a click or pointer
+listener, is left to it.
 
 **What the person does to a selection that spans fields is yours.**
 Typing, Backspace and Delete, Enter, paste and cut over it are not

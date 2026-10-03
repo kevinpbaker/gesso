@@ -43,6 +43,12 @@ function Document(inputs: Inputs<{ copyText?: boolean; copyHtml?: boolean }>, _c
         {TEXTS.map((text, i) => (
           <editabletext key={String(i)} value={text} label={`p${i}`} multiline={true} width={percent(100)} />
         ))}
+        <button
+          label="tool"
+          width={40}
+          height={20}
+          onClick={() => void edits.push({ inputType: 'tool' } as UiGroupEdit)}
+        />
       </column>
       <editabletext value="Outside" label="outside" width={300} />
     </column>
@@ -231,6 +237,47 @@ describe('a selection across the fields of an editing group', () => {
     ui.fireEvent.focus(field('outside'));
     await ui.settle();
     expect(lit()).toEqual({ p0: undefined, p1: undefined, p2: undefined });
+  });
+
+  describe('a press on none of its fields', () => {
+    async function pressAt(x: number, y: number): Promise<void> {
+      ui.fireEvent.pointerDown(x, y);
+      ui.fireEvent.pointerUp(x, y);
+      await ui.settle();
+    }
+    const focused = (): string | null => {
+      const node = ui.runtime.input.focus.focusedNode;
+      return node === null ? null : ((node.properties.get('label') as string | undefined) ?? null);
+    };
+
+    it('lands in the nearest field: between two, below the last, beside one', async () => {
+      await mount();
+      const [p0, p1, p2] = ['p0', 'p1', 'p2'].map(label => ui.getLayout(field(label)));
+      // In the gap, nearer the field above.
+      await pressAt(p0!.x + 20, p0!.y + p0!.height + 3);
+      expect(focused()).toBe('p0');
+      // Below the last field, in the group's padding: the end of its text.
+      await pressAt(p2!.x + 280, p2!.y + p2!.height + 4);
+      expect(focused()).toBe('p2');
+      expect(editorFor(field('p2')).focus).toBe(TEXTS[2]!.length);
+      // In the padding beside a field, at its height.
+      await pressAt(p1!.x - 5, p1!.y + p1!.height / 2);
+      expect(focused()).toBe('p1');
+      expect(editorFor(field('p1')).focus).toBe(0);
+    });
+
+    it('leaves a press on something that answers presses itself, and one outside the group', async () => {
+      await mount();
+      await caretIn('p0', 2);
+      // Outside the group: nothing moves to its nearest field, p2.
+      await pressAt(450, 380);
+      expect(focused()).toBe('p0');
+      // The button below p2 has its press, and p2 doesn't take it.
+      const tool = ui.getLayout(ui.getByLabel('tool'));
+      await pressAt(tool.x + 5, tool.y + 5);
+      expect(edits.at(-1)?.inputType).toBe('tool');
+      expect(focused()).not.toBe('p2');
+    });
   });
 
   it("copies as the group's own text when it says what that is", async () => {

@@ -66,6 +66,8 @@ export interface PointerControllerOptions {
    */
   editing?: {
     isEditable(node: UiNode): boolean;
+    /** The field of an editing group a press on none of its fields belongs to; see `UiEditingController.fieldNear`. */
+    fieldNear?(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null;
     pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
     pointerMove(node: UiNode, x: number, y: number): void;
     pointerUp(): void;
@@ -154,6 +156,13 @@ interface ScrollbarDrag {
  * pressing is ignored.
  */
 export class UiPointerController {
+  /** Whether a node answers a press itself: a click or pointer listener of its own. */
+  private handlesPress(node: UiNode): boolean {
+    return this.dispatcher
+      .listenerTypes(node)
+      .some(type => type === UiEventType.Click || type === UiEventType.PointerDown || type === UiEventType.PointerUp);
+  }
+
   private readonly slop: number;
   private readonly touchSlop: number;
   private readonly gestures: GestureInput | null;
@@ -277,9 +286,16 @@ export class UiPointerController {
       this.dispatcher.dispatch(event, target);
       this.gestures?.pointerDown(event, target);
       if (!event.defaultPrevented) {
-        this.onPress?.(target);
-        if (this.editing !== undefined && this.editing.isEditable(target)) {
-          this.editing.pointerDown(target, x, y, modifiers);
+        // A press in a document's margins or between its lines lands on
+        // the nearest line, as it does in any editor.
+        const field =
+          this.editing !== undefined && !this.editing.isEditable(target)
+            ? (this.editing.fieldNear?.(target, y, node => this.handlesPress(node)) ?? null)
+            : null;
+        const pressed = field ?? target;
+        this.onPress?.(pressed);
+        if (this.editing !== undefined && this.editing.isEditable(pressed)) {
+          this.editing.pointerDown(pressed, x, y, modifiers);
           this.selection?.clear();
         } else {
           this.selection?.pointerDown(target, x, y, modifiers);
