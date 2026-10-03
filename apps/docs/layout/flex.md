@@ -79,7 +79,10 @@ column shares its height with a header beside it, so the layout runs
 from the column rather than stopping inside. A region meant to fill
 what's left, such as an application's main pane, wants `flex={1}`. Its
 basis is zero, nothing inside it is read, and the header keeps its
-height however long the list gets.
+height however long the list gets. A line's only item that grows and
+shrinks to fill a line of definite size, with a minimum of its own
+(`minWidth={0}`), is the same: no base could change its size, so its
+content isn't read either.
 
 Shrinking is weighted rather than even: an item's share of the overflow
 is scaled by its basis, so a wide item gives up more pixels than a

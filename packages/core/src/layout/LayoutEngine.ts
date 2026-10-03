@@ -1973,6 +1973,8 @@ export class LayoutEngine {
     const crossBase = this.definiteAxis(content, row ? 'height' : 'width');
     const savedBase = this.percentBase;
     const scrollContentMatters = config.isScroll && this.scrollContentMatters(node, rec, savedBase);
+    let itemCount = 0;
+    this.forEachLayoutChild(node, () => void itemCount++);
     this.percentBase = row ? { width: mainBase, height: crossBase } : { width: crossBase, height: mainBase };
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
@@ -2004,7 +2006,20 @@ export class LayoutEngine {
       // arriving under it changes how this line is shared out.
       // A scroller's items are the scroller's content, which is read
       // only through the scroller's own size; see `measureScroll`.
+      // Unless the base can't change the outcome: the line's only item,
+      // in a definite main size, growing to fill it and shrinking to fit
+      // it, with a minimum of its own, is that size whatever its base.
+      // That's an application's main region, and without this every row
+      // a list below it mounts is laid out from the root.
+      const fills =
+        itemCount === 1 &&
+        mainBase !== undefined &&
+        cRec.flexGrow >= 1 &&
+        cRec.flexShrink > 0 &&
+        !(row ? cRec.minWidthAuto : cRec.minHeightAuto) &&
+        !(row ? cRec.marginLeftAuto || cRec.marginRightAuto : cRec.marginTopAuto || cRec.marginBottomAuto);
       const contentBase =
+        !fills &&
         this.flexBasis(child, cRec, mainBase) === undefined &&
         this.lengthProp(child, row ? 'width' : 'height', mainBase) === undefined;
       cRec.contentMatters = config.isScroll
