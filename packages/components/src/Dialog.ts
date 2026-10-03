@@ -9,7 +9,7 @@ import {
   FocusService,
   internalState
 } from 'gesso-framework';
-import { Box, Column, Row, Text, type UiChild, type UiNode } from 'gesso-core';
+import { Box, Column, percent, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { keymap } from './internals';
 import { controlTokens } from './tokens';
 import { useOverlay } from './overlay';
@@ -134,7 +134,9 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         onKeyDown: keymap(dismissible.value ? { Escape: close } : {})
       },
       Column(
-        { gap: 12 },
+        // The dialog's width, inside its padding: content that asks for
+        // 100% means the dialog, not whatever the title happens to need.
+        { gap: 12, width: percent(100) },
         title.pipe(
           map(text => (text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600 })]))
         ),
