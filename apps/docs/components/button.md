@@ -89,6 +89,7 @@ change variant should change its `key`, which builds a new one.
 | `size`        | `ButtonSize`    | `'medium'`  | How big it is                                                       |
 | `disabled`    | `boolean`       | `false`     | Refuses presses and draws in the disabled foreground token          |
 | `busy`        | `boolean`       | `false`     | Refuses presses and announces `busy`, without looking disabled      |
+| `tabStop`     | `boolean`       | `true`      | Whether Tab stops on it; false leaves it pressable and focusable    |
 | `onClick`     | `() => void`    | none        | Fired on a press and on Enter or Space, which the element handles   |
 | `children`    | `UiChild`       | the label   | Content instead of the words; `label` stays the name                |
 | `ref`         | `UiNodeRef`     | none        | Receives the node that _is_ the button, for focus and for anchoring |
@@ -101,6 +102,14 @@ caller can place it without wrapping it in a box.
 saving is not a button you may not press; it is one that is already
 doing what you would press it for, and it says so as `busy` rather than
 going grey and losing its place in the tab order.
+
+`tabStop={false}` is for a button that is the pointer's way to
+something the keyboard already has a key for: the Previous and Next
+beside a page's j and k, say. It stays a button a click, a screen
+reader and `focus()` all reach, and Tab goes past it, so the keys a
+page offers don't cost the keyboard two more stops on the way to what
+the page is about. A button whose action has no key of its own should
+keep its stop.
 
 ## Hover, press and focus
 
@@ -147,7 +156,8 @@ controls](/components/restyling) is that group in full.
 
 `Button.spec.ts` mounts the component with `gesso-testing` and asserts
 the label as both the words and the name, that a press calls back and a
-disabled or busy one does not, that every one of the twelve variant and
+disabled or busy one does not, that Tab goes past a button with
+`tabStop={false}` which a press and `focus()` still reach, that every one of the twelve variant and
 tone pairs names a palette entry rather than a colour, that the cursor
 is `pointer`, that hovering writes the hover token on a surfaced
 variant and the dimmed opacity on a filled one, that the size changes
