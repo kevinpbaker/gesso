@@ -194,21 +194,43 @@ export async function openPage(
       ...(options.flags ?? []),
       options.url
     ],
-    { stdio: 'ignore' }
+    // Its error output is kept, the last few kilobytes of it: a browser
+    // that cannot start says why there and nowhere else, and without it a
+    // failed launch was a 15 s timeout with no reason attached.
+    { stdio: ['ignore', 'ignore', 'pipe'] }
   );
+  let said = '';
+  browser.stderr?.setEncoding('utf8');
+  browser.stderr?.on('data', (chunk: string) => {
+    said = (said + chunk).slice(-4000);
+  });
+  let exited: string | undefined;
+  browser.on('exit', (code, signal) => {
+    exited = signal === null ? `exited with code ${code}` : `was killed by ${signal}`;
+  });
 
   const origin = new URL(options.url).origin;
-  const target = await waitFor(
-    'the DevTools endpoint',
-    async () => {
-      const targets = (await (await fetch(`http://localhost:${options.devtoolsPort}/json`)).json()) as {
-        type: string;
-        url: string;
-        webSocketDebuggerUrl: string;
-      }[];
-      return targets.find(t => t.type === 'page' && t.url.startsWith(origin));
-    },
-    15_000
-  );
+  let target: { webSocketDebuggerUrl: string };
+  try {
+    target = await waitFor(
+      'the DevTools endpoint',
+      async () => {
+        const targets = (await (await fetch(`http://localhost:${options.devtoolsPort}/json`)).json()) as {
+          type: string;
+          url: string;
+          webSocketDebuggerUrl: string;
+        }[];
+        return targets.find(t => t.type === 'page' && t.url.startsWith(origin));
+      },
+      15_000
+    );
+  } catch (error) {
+    browser.kill();
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}` +
+        (exited === undefined ? '' : ` Chrome ${exited}.`) +
+        (said.trim() === '' ? '' : `\nChrome said:\n${said.trim()}`)
+    );
+  }
   return { browser, devtools: await DevTools.connect(target.webSocketDebuggerUrl) };
 }
