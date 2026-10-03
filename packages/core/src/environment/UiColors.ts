@@ -1,5 +1,5 @@
 import type { UiColor } from '../properties/UiColor';
-import { colorsEqual, UiBasicColors } from '../properties/UiColor';
+import { colorsEqual, rgb8, UiBasicColors } from '../properties/UiColor';
 
 /**
  * A renderer-independent color palette.
@@ -66,50 +66,59 @@ export interface UiColors {
   readonly selectionForeground: UiColor;
 }
 
+/**
+ * The stock palettes.
+ *
+ * Neutrals carry a little blue, as a screen's greys do now, rather
+ * than being an even mix of the three channels; the accent is deep
+ * enough that white on it reads (4.5:1 and up), which the bright
+ * Material blue this replaced did not. Values are written as 8-bit
+ * channels so each one can be read as the hex it is.
+ */
 export const lightColors: UiColors = {
   background: UiBasicColors.white,
-  surface: { r: 0.98, g: 0.98, b: 0.98, a: 1 },
-  primary: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
-  secondary: { r: 0.61, g: 0.15, b: 0.69, a: 1 },
-  text: UiBasicColors.black,
-  textMuted: { r: 0.4, g: 0.4, b: 0.4, a: 1 },
-  border: { r: 0.85, g: 0.85, b: 0.85, a: 1 },
-  shadow: { r: 0, g: 0, b: 0, a: 0.2 },
-  placeholder: { r: 0.91, g: 0.91, b: 0.92, a: 1 },
+  surface: rgb8(249, 250, 251),
+  primary: rgb8(37, 99, 235),
+  secondary: rgb8(124, 58, 237),
+  text: rgb8(17, 24, 39),
+  textMuted: rgb8(91, 99, 112),
+  border: rgb8(229, 231, 235),
+  shadow: rgb8(17, 24, 39, 41),
+  placeholder: rgb8(240, 241, 244),
   controlBackground: UiBasicColors.white,
-  controlBackgroundHovered: { r: 0.95, g: 0.95, b: 0.96, a: 1 },
-  controlBackgroundPressed: { r: 0.9, g: 0.9, b: 0.92, a: 1 },
-  controlBorder: { r: 0.76, g: 0.77, b: 0.79, a: 1 },
-  controlForeground: { r: 0.07, g: 0.09, b: 0.13, a: 1 },
-  controlForegroundDisabled: { r: 0.6, g: 0.62, b: 0.65, a: 1 },
-  controlAccent: { r: 0.13, g: 0.59, b: 0.95, a: 1 },
-  danger: { r: 0.86, g: 0.15, b: 0.15, a: 1 },
-  focusRing: { r: 0.07, g: 0.09, b: 0.13, a: 1 },
-  selectionBackground: { r: 0.85, g: 0.92, b: 0.99, a: 1 },
-  selectionForeground: { r: 0.05, g: 0.24, b: 0.44, a: 1 }
+  controlBackgroundHovered: rgb8(243, 244, 246),
+  controlBackgroundPressed: rgb8(229, 231, 235),
+  controlBorder: rgb8(209, 213, 219),
+  controlForeground: rgb8(17, 24, 39),
+  controlForegroundDisabled: rgb8(156, 163, 175),
+  controlAccent: rgb8(37, 99, 235),
+  danger: rgb8(220, 38, 38),
+  focusRing: rgb8(17, 24, 39),
+  selectionBackground: rgb8(219, 234, 254),
+  selectionForeground: rgb8(30, 58, 138)
 } as const;
 
 export const darkColors: UiColors = {
-  background: { r: 0.12, g: 0.12, b: 0.12, a: 1 },
-  surface: { r: 0.18, g: 0.18, b: 0.18, a: 1 },
-  primary: { r: 0.4, g: 0.76, b: 1, a: 1 },
-  secondary: { r: 0.88, g: 0.6, b: 0.94, a: 1 },
-  text: UiBasicColors.white,
-  textMuted: { r: 0.6, g: 0.6, b: 0.6, a: 1 },
-  border: { r: 0.3, g: 0.3, b: 0.3, a: 1 },
-  shadow: { r: 0, g: 0, b: 0, a: 0.5 },
-  placeholder: { r: 0.26, g: 0.26, b: 0.27, a: 1 },
-  controlBackground: { r: 0.16, g: 0.17, b: 0.2, a: 1 },
-  controlBackgroundHovered: { r: 0.21, g: 0.23, b: 0.27, a: 1 },
-  controlBackgroundPressed: { r: 0.26, g: 0.28, b: 0.33, a: 1 },
-  controlBorder: { r: 0.34, g: 0.36, b: 0.41, a: 1 },
-  controlForeground: { r: 0.9, g: 0.91, b: 0.94, a: 1 },
-  controlForegroundDisabled: { r: 0.48, g: 0.5, b: 0.55, a: 1 },
-  controlAccent: { r: 0.4, g: 0.76, b: 1, a: 1 },
-  danger: { r: 0.94, g: 0.42, b: 0.42, a: 1 },
-  focusRing: { r: 0.9, g: 0.91, b: 0.94, a: 1 },
-  selectionBackground: { r: 0.16, g: 0.29, b: 0.42, a: 1 },
-  selectionForeground: { r: 0.85, g: 0.93, b: 1, a: 1 }
+  background: rgb8(17, 19, 24),
+  surface: rgb8(26, 29, 35),
+  primary: rgb8(96, 165, 250),
+  secondary: rgb8(167, 139, 250),
+  text: rgb8(243, 244, 246),
+  textMuted: rgb8(156, 163, 175),
+  border: rgb8(42, 46, 54),
+  shadow: rgb8(0, 0, 0, 128),
+  placeholder: rgb8(37, 41, 48),
+  controlBackground: rgb8(26, 29, 35),
+  controlBackgroundHovered: rgb8(35, 39, 46),
+  controlBackgroundPressed: rgb8(44, 49, 57),
+  controlBorder: rgb8(58, 63, 72),
+  controlForeground: rgb8(243, 244, 246),
+  controlForegroundDisabled: rgb8(107, 114, 128),
+  controlAccent: rgb8(96, 165, 250),
+  danger: rgb8(248, 113, 113),
+  focusRing: rgb8(243, 244, 246),
+  selectionBackground: rgb8(30, 58, 95),
+  selectionForeground: rgb8(219, 234, 254)
 } as const;
 
 /**

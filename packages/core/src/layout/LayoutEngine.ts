@@ -46,6 +46,9 @@ export const SCROLLBAR_FADE_MS = 350;
  */
 const ANCHOR_CHAIN_LIMIT = 4;
 
+/** Free space on a flex line smaller than this is float noise, not room. */
+const FREE_SPACE_TOLERANCE = 1e-9;
+
 /** An editable's text is the user's; runs are a property of a `Text` node. */
 
 export interface ScrollAdjustment {
@@ -2347,11 +2350,20 @@ export class LayoutEngine {
       margins += item.marginMainStart + item.marginMainEnd;
       hypothetical += item.hypotheticalMain;
     }
-    const growing = availableMain - margins - hypothetical > 0;
+    const initialFree = availableMain - margins - hypothetical;
+    const growing = initialFree > 0;
+    // A line that already fits, to within float noise, does not flex.
+    // A container that shrink-wraps its items sums their sizes in one
+    // order and this sums them in another, so "exactly enough room"
+    // arrives as -3e-14, and shrinking by it moved a `width: 28` item
+    // to 27.99999999999997. A browser lays out in 1/64 px and never
+    // sees the dust; here it is rounded away before it can be shared.
+    const fits = Math.abs(initialFree) < FREE_SPACE_TOLERANCE;
 
     for (const item of items) {
       const factor = growing ? item.grow : item.shrink;
       item.frozen =
+        fits ||
         factor === 0 ||
         (growing && item.baseMain > item.hypotheticalMain) ||
         (!growing && item.baseMain < item.hypotheticalMain);

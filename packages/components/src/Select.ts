@@ -12,6 +12,7 @@ import {
   type UiSemanticState
 } from 'gesso-core';
 import { controlled } from './controlled';
+import { chevron, CHEVRON_DOWN } from './chevron';
 import { trackFocus } from './focus';
 import { controlMessage } from './message';
 import {
@@ -329,7 +330,7 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         textWrap: 'none',
         selectable: false
       }),
-      Text({ text: '▾', color: foregroundToken(disabled), fontSize, selectable: false })
+      chevron(CHEVRON_DOWN, foregroundToken(disabled))
     ),
     controlMessage(error)
   );

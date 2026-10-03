@@ -413,10 +413,10 @@ describe('GessoRuntime editing', () => {
     tick();
     expect(states).toHaveLength(1);
     expect(states[0]).toMatchObject({ text: 'ab', selectionStart: 2, selectionEnd: 2, multiline: false });
-    // Caret at the end of 'ab' inside 4px of padding: x = 4 + 14; height is the 14px font's 16.8px line.
+    // Caret at the end of 'ab' inside 4px of padding: x = 4 + 14; height is the 14px font's 20px line.
     expect(states[0]!.caret.x).toBeCloseTo(18, 5);
     expect(states[0]!.caret.y).toBe(4);
-    expect(states[0]!.caret.height).toBeCloseTo(16.8, 5);
+    expect(states[0]!.caret.height).toBe(20);
     type('c');
     tick();
     expect(states[1]).toMatchObject({ text: 'abc', selectionStart: 3 });
@@ -454,7 +454,7 @@ describe('GessoRuntime editing', () => {
   });
 
   it('scrolls the caret into view inside a scroll container', () => {
-    // Eight 16.8px lines in a 40px viewport: End goes to the last line.
+    // Eight 20px lines in a 40px viewport: End goes to the last line.
     const lines = Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\n');
     const { press, key, tick, find } = mount(
       Column(
@@ -515,7 +515,7 @@ describe('GessoRuntime editing', () => {
   });
 
   it('scrolls a tall field on the wheel, without moving the caret', () => {
-    // A hundred 16.8px lines in a 200px field.
+    // A hundred 20px lines in a 200px field.
     const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
     const { runtime, field, model, press, tick } = mount(
       Column(EditableText({ value: lines, multiline: true, width: 300, height: 200 }))
@@ -613,10 +613,10 @@ describe('GessoRuntime editing', () => {
     runtime.input.wheel.wheel(5, 5, 0, 300);
     tick();
     expect(scroller.properties.get('scrollY')).toBe(300);
-    // 50px down the viewport is 350px into the text: line 20.
+    // 50px down the viewport is 350px into the text: line 17.
     press(1, 50);
     tick();
-    expect(model().focus).toBe(lines.indexOf('line 20'));
+    expect(model().focus).toBe(lines.indexOf('line 17'));
     expect(scroller.properties.get('scrollY')).toBe(300);
   });
 
@@ -655,7 +655,7 @@ describe('GessoRuntime editing', () => {
       Row(
         Box(
           { overflow: 'hidden', width: 40, height: 200, scrollWith: leader, scrollWithAxis: 'y' },
-          Column({ height: 2000 })
+          Column({ height: 2400 })
         ),
         EditableText({ value: lines, multiline: true, width: 300, height: 200, ref: node => leader.next(node) })
       )

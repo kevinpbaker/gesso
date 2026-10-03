@@ -50,7 +50,7 @@ describe('Canvas2D editable painting', () => {
     h.context.calls.length = 0;
     h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 1000 });
     // The caret after two 8.4px glyphs, rounded to a pixel, one line tall.
-    expect(callArgs(h.context, 'fillRect')).toEqual([[17, 0, 1, expect.closeTo(16.8, 5)]]);
+    expect(callArgs(h.context, 'fillRect')).toEqual([[17, 0, 1, expect.closeTo(20, 5)]]);
 
     h.context.calls.length = 0;
     h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 1000 + CARET_BLINK_MS + 1 });
@@ -67,7 +67,7 @@ describe('Canvas2D editable painting', () => {
     expect(callArgs(h.context, 'fillText')).toEqual([['abcdefgh', -20, expect.any(Number)]]);
     // The caret is at the end of the text, inside the box rather than
     // past its right edge, and the box clips what runs off it.
-    expect(callArgs(h.context, 'fillRect')).toEqual([[47, 0, 1, expect.closeTo(16.8, 5)]]);
+    expect(callArgs(h.context, 'fillRect')).toEqual([[47, 0, 1, expect.closeTo(20, 5)]]);
     expect(callsOf(h.context, 'clip')).not.toHaveLength(0);
   });
 
@@ -95,7 +95,7 @@ describe('Canvas2D editable painting', () => {
     h.renderer.render(root, { layout: h.engine, text: h.measurer, now: model.blinkOrigin });
     expect(callArgs(h.context, 'fillText')).toEqual([['Name', 0, expect.any(Number)]]);
     expect(callArgs(h.context, 'set:fillStyle')).toContain('#123456');
-    expect(callArgs(h.context, 'fillRect')).toEqual([[0, 0, 1, expect.closeTo(16.8, 5)]]);
+    expect(callArgs(h.context, 'fillRect')).toEqual([[0, 0, 1, expect.closeTo(20, 5)]]);
   });
 
   it('underlines the text an IME is composing and holds the caret steady', () => {
@@ -112,7 +112,7 @@ describe('Canvas2D editable painting', () => {
     expect(fills[0][0]).toBeCloseTo(8.4, 5);
     expect(fills[0][2]).toBeCloseTo(16.8, 5);
     expect(fills[0][3]).toBe(1);
-    expect(fills[1]).toEqual([25, 0, 1, expect.closeTo(16.8, 5)]);
+    expect(fills[1]).toEqual([25, 0, 1, expect.closeTo(20, 5)]);
   });
 });
 

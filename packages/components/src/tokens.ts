@@ -30,10 +30,11 @@ import { defaultSpacing, defineThemeExtension, type UiThemeExtension, type UiTyp
  *   });
  *   <box theme={mine}>…</box>
  *
- * **The defaults are exactly what the components drew before.** That
- * is deliberate: converting a component to read a token must not move
- * a pixel, so the migration is provably visual-no-op and a baseline
- * that shifts is a bug rather than a decision.
+ * The defaults began as exactly what the components drew before, so
+ * converting a component to read a token moved no pixel. They have
+ * since been changed on purpose, once, with the stock theme: a medium
+ * button is 36 high on the 20-point body line, with 16 either side.
+ * Outside a change like that, a baseline that shifts is a bug.
  */
 export type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'plain';
 export type ButtonTone = 'neutral' | 'accent' | 'danger';
@@ -105,19 +106,19 @@ export interface ControlTokens {
  */
 const SIZES: Readonly<Record<ButtonSize, ButtonSizeTokens>> = {
   small: {
-    paddingX: defaultSpacing.small,
+    paddingX: defaultSpacing.medium,
     paddingY: defaultSpacing.extraSmall,
     radius: 6,
     textStyle: 'bodySmall'
   },
   medium: {
-    paddingX: defaultSpacing.medium,
+    paddingX: defaultSpacing.large,
     paddingY: defaultSpacing.small,
     radius: 8,
     textStyle: 'body'
   },
   large: {
-    paddingX: defaultSpacing.large,
+    paddingX: defaultSpacing.extraLarge,
     paddingY: defaultSpacing.medium,
     radius: 10,
     textStyle: 'bodyLarge'

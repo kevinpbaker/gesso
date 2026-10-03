@@ -16,6 +16,7 @@ import {
   type UiSemanticState
 } from 'gesso-core';
 import { addDays, addMonths, clampDate, formatDate, monthGrid, parseIsoDate, startOfWeek, todayIso } from './calendar';
+import { chevron, CHEVRON_DOWN } from './chevron';
 import { trackFocus } from './focus';
 import { controlDescription, controlMessage } from './message';
 import {
@@ -370,7 +371,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
         textWrap: 'none',
         selectable: false
       }),
-      Text({ text: '▾', color: foregroundToken(disabled), selectable: false })
+      chevron(CHEVRON_DOWN, foregroundToken(disabled))
     ),
     controlMessage(error, description)
   );

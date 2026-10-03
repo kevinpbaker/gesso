@@ -295,7 +295,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   fontFamily: { group: 'Text', note: 'Font stack, as a CSS family list.' },
   fontSize: { group: 'Text', note: 'Size in pixels.' },
   fontWeight: { group: 'Text', note: 'A number, a numeric string, or a CSS keyword.' },
-  lineHeight: { group: 'Text', note: 'Line box height in pixels. The default is 1.2 times the default size.' },
+  lineHeight: {
+    group: 'Text',
+    note: 'Line box height in pixels. The default is the body line, 20 on 14; a node that sets its own fontSize alone gets 1.2 times it.'
+  },
   letterSpacing: { group: 'Text', note: 'Extra space between characters, in pixels.' },
   textAlign: { group: 'Text', note: 'How lines sit within the text box.' },
   textDirection: { group: 'Text', note: 'Base direction for bidirectional text.' },

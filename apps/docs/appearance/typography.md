@@ -45,7 +45,7 @@ goes in this order:
 
 1. The value set on the node.
 2. The matching field of the `textStyle` in the environment.
-3. The property's own default, which is the 14 pixel sans-serif black
+3. The property's own default, which is the 14 pixel `system-ui` ink
    of `defaultTextStyle`.
 
 Because the fall-back is per field rather than per style, a node that
@@ -103,17 +103,25 @@ What the shipped scale sets them to, in logical pixels:
 
 | Role        | Size | Weight   | Line height | Tracking |
 | ----------- | ---- | -------- | ----------- | -------- |
-| `headline`  | 24   | `bold`   | 28.8        | 0        |
-| `title`     | 20   | `500`    | 24          | 0        |
-| `bodyLarge` | 16   | `normal` | 19.2        | 0        |
-| `body`      | 14   | `normal` | 16.8        | 0        |
-| `bodySmall` | 12   | `normal` | 14.4        | 0        |
-| `label`     | 11   | `500`    | 13.2        | 0.5      |
+| `headline`  | 24   | `600`    | 32          | -0.25    |
+| `title`     | 20   | `600`    | 28          | 0        |
+| `bodyLarge` | 16   | `normal` | 24          | 0        |
+| `body`      | 14   | `normal` | 20          | 0        |
+| `bodySmall` | 12   | `normal` | 16          | 0        |
+| `label`     | 12   | `500`    | 16          | 0        |
 
-The face is `sans-serif` throughout, and the colour is black in
-`lightTheme` and white in `darkTheme`. That is the whole difference
-between the two scales that ship, which is a fair summary of how much
-opinion the framework has about type.
+The face is `system-ui, sans-serif` throughout: the platform's own
+interface face, San Francisco on Apple systems, Segoe UI on Windows and
+Roboto on Android, so an application looks at home wherever it runs.
+Line heights sit on a 4-point grid rather than at 1.2 of the size, which
+is too tight to read a paragraph in. The colour is the palette's `text`
+in each theme, a blue-black in `lightTheme` and a near-white in
+`darkTheme`.
+
+A node that sets its own `fontSize` and no `lineHeight` gets 1.2 of
+that size, as CSS's `normal` would give it, rather than the 20 of a
+14-point body line: the scale's line heights belong to the scale's
+sizes.
 
 A scale lives on a theme, as `theme.typography`, and a role is an
 ordinary value, so `theme.typography.title` is what you hand to a

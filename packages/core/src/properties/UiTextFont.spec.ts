@@ -60,8 +60,8 @@ describe('resolveFont', () => {
   it('uses the default style when nothing is set', () => {
     const font = resolveFont(tree({}, {}).text);
     expect(font.fontSize).toBe(14);
-    expect(font.lineHeight).toBeCloseTo(16.8);
-    expect(font.fontFamily).toBe('sans-serif');
+    expect(font.lineHeight).toBe(20);
+    expect(font.fontFamily).toBe('system-ui, sans-serif');
   });
 
   it('measures and paints a text node with the same line box', () => {

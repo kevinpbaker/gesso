@@ -19,6 +19,25 @@ describe('LayoutEngine flex (Row/Column)', () => {
     return { harness, root };
   }
 
+  it('leaves a line that fits to within float noise unflexed', () => {
+    // 0.1 + 0.2 + 0.3 is 0.6000000000000001, so a row exactly 0.6 wide
+    // is "short" by 1e-16. Shrinking by that moved a fixed width off
+    // its own value; the items should come out exactly as written.
+    const harness = new LayoutHarness();
+    const root = harness.createNode('app', UiNodeType.Row);
+    root.setProperty('width', 0.6);
+    const widths = [0.1, 0.2, 0.3];
+    const items = widths.map((width, i) => {
+      const node = harness.createNode(`item${i}`, UiNodeType.Box);
+      node.setProperty('width', width);
+      node.setProperty('height', 10);
+      return node;
+    });
+    harness.append(root, ...items);
+    harness.layout(root, Constraints.loose(300, 200));
+    expect(items.map(node => harness.record(node).width)).toEqual(widths);
+  });
+
   describe('measurement', () => {
     it('measures the column as the max cross size and summed main size', () => {
       const { harness, root } = columnHarness([

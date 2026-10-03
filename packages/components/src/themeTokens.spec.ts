@@ -126,12 +126,12 @@ describe('restyling the library through the theme', () => {
     expect(button.properties.get('opacity')).toBe(0.5);
   });
 
-  it('leaves a button under no provider exactly as it was', () => {
-    // The migration's own guarantee: the defaults are what the library
-    // drew before, so converting a component moves no pixel.
+  it('dresses a button under no provider in the stock tokens', () => {
+    // What a button is when nobody themed it: 16 either side, 8 above
+    // and below a 20-point body line, so 36 high.
     const ui = renderTest(createComponent(Button, { label: 'Stock' }), { width: 400, height: 400 });
     const button = ui.getByRole('button');
-    expect(button.properties.get('paddingX')).toBe(12);
+    expect(button.properties.get('paddingX')).toBe(16);
     expect(button.properties.get('paddingY')).toBe(8);
     expect(button.properties.get('borderRadius')).toBe(8);
     expect(button.properties.get('backgroundColor')).toBe('controlForeground');

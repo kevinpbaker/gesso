@@ -2,6 +2,7 @@ import { map, type Observable } from 'rxjs';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Box, Column, Row, Text, type UiChild, type UiElement, type UiSemanticState } from 'gesso-core';
+import { chevron, CHEVRON_DOWN, CHEVRON_RIGHT } from './chevron';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
@@ -335,7 +336,7 @@ function panel(
           Enter: () => toggle(section.value)
         })
       },
-      Text({ text: expanded.pipe(map(on => (on ? '▾' : '▸'))), color: 'controlForeground', selectable: false }),
+      chevron(expanded.pipe(map(on => (on ? CHEVRON_DOWN : CHEVRON_RIGHT))), 'controlForeground'),
       Text({ text: section.label, color: 'controlForeground', selectable: false })
     ),
     // A closed section is not in the tree at all, so it costs no layout
