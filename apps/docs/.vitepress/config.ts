@@ -13,6 +13,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Why Gesso', link: '/guide/why-gesso' },
       { text: 'What Gesso is', link: '/guide/what-is-gesso' },
       { text: 'Is Gesso for your project?', link: '/guide/is-gesso-for-you' },
+      { text: 'Built for AI agents', link: '/guide/built-for-agents' },
       { text: 'Installation', link: '/guide/installation' },
       { text: 'Your first component', link: '/guide/counter' },
       { text: 'Components run once', link: '/guide/components-run-once' },
@@ -266,6 +267,7 @@ export default defineConfig({
       { text: 'Interaction', link: '/interaction/pointer-and-keyboard' },
       { text: 'Appearance', link: '/appearance/themes-and-the-environment' },
       { text: 'Components', link: '/components/' },
+      { text: 'Agents', link: '/guide/built-for-agents' },
       { text: 'Tooling', link: '/tooling/devtools' },
       { text: 'Reference', link: '/reference/api' }
     ],

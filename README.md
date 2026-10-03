@@ -14,7 +14,7 @@ Gesso is a declarative UI toolkit in the spirit of SwiftUI and Jetpack Compose: 
 
 **[Try it live](https://gesso-docs.vercel.app)** · **[A logic simulator built on it](https://gesso-logic.vercel.app/)** · **[A spreadsheet built on it](https://gesso-sheets.vercel.app/)**
 
-[Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
+[Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Built for agents](#built-for-ai-agents) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
 
 _gesso_ (**JESS**-oh): the primer coat that makes a raw canvas take paint.
 
@@ -84,12 +84,38 @@ Notice what isn't there. No re-render pass, so nothing to memoise and no depende
 - **Cost follows the change, not the tree.** A text edit deep in a 10k-node page re-measures fewer than 20 nodes. A scroll frame re-measures zero. Those are CI budgets.
 - **Two renderers, one truth.** Canvas2D and WebGPU consume the same layout records and are pixel-diffed against each other in headless Chrome.
 - **A 15 kB main thread.** The shell bundle is 15.2 kB gzipped against a 20 kB budget CI enforces, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
-- **Tests without a browser.** `gesso-testing` mounts a tree on a manual clock and queries it through the same semantics tree a screen reader gets. A failing box assertion prints `explain`'s answer under it. 4,328 tests run in under thirty seconds with no browser.
+- **Tests without a browser.** `gesso-testing` mounts a tree on a manual clock and queries it through the same semantics tree a screen reader gets. A failing box assertion prints `explain`'s answer under it. 4,640 tests run in under thirty seconds with no browser.
+- **An MCP server in every app.** The channels you declared become an AI agent's tools, described from your JSDoc, and the screen is offered as the outline a screen reader hears. [Built for AI agents](#built-for-ai-agents).
 - **Routing, motion, editing, devtools.** Typed routes with guards. Springs, FLIP, and shared elements that morph across screens. A text editor with IME, undo and clipboard. A Chrome devtools panel with the tree, the frame profiler and the workers' consoles.
+
+## Built for AI agents
+
+A Gesso app already declares what it holds and what it can be asked to do, as channels of plain data and typed commands, and already describes its screen as a semantics tree for assistive technology. Those are an AI agent's tools, so every Gesso app is an MCP server with nothing more written.
+
+```ts
+/** The notes the person has written. */
+export const Notes = defineChannel('notes', {
+  view: { rows: [] as readonly NoteRow[] },
+  commands: {} as {
+    /** Opens a note in the editor. @param id The note's id. */
+    open(id: string): void;
+    /** Deletes a note for good. @destructive @confirm */
+    remove(id: string): void;
+  }
+});
+```
+
+From that, an agent gets `notes_view`, `notes_open` and `notes_remove`, described from the JSDoc and checked against the types, and `remove` is put to the person before it is sent. For anything no channel covers, `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the screen the way a screen reader does.
+
+- **While you develop**, `pnpm dev` serves MCP at `/__gesso/mcp` and prints the `claude mcp add` line to connect.
+- **In the browser**, `createApp({ webmcp: true })` registers the same tools with WebMCP.
+- **On a server or a desktop**, `mcpHandler` from `gesso-framework/agent` serves them over HTTP.
+
+Gesso is easy for a coding agent to write, too: every new project carries an `AGENTS.md`, the documentation is published as [llms.txt](https://gesso-docs.vercel.app/llms.txt), and most wrong guesses are type errors. [Built for AI agents](https://gesso-docs.vercel.app/guide/built-for-agents) has the whole story.
 
 ## Is it for you?
 
-Gesso is a runtime for **applications**: editors, dashboards, tools, anything with a hundred thousand rows or a computation the interface must not wait on. It is the wrong tool for anything whose value is being read by a machine.
+Gesso is a runtime for **applications**: editors, dashboards, tools, anything with a hundred thousand rows or a computation the interface must not wait on. It is the wrong tool for anything whose value is being read by a crawler.
 
 | Reach for it when                                                   | Don't when                                                                   |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -231,7 +257,7 @@ Every figure above is produced by a script in the repository, and the script is 
 | Every control works from the keyboard   | One form holding every control in the library, tabbed through from nothing, each control operated by its role's key with the result read from the semantics tree                                                                                                   | `Keyboard.spec.ts` in `gesso-components`                 |
 | A screen reader has something to read   | Chrome's own computed accessibility tree for the example routes, written to committed reports in `apps/playground/accessibility/`: every node's role, name, states and value, and the order the Tab key reaches them in                                            | `pnpm check:a11y`                                        |
 | A route cannot change silently          | Covered playground routes are captured in headless Chrome and diffed against committed baselines                                                                                                                                                                   | `pnpm screenshots`                                       |
-| It stays this way                       | 4,328 tests in 399 files, every push. The pinned divergences run as expected failures, so there are exactly as many of those as the tables above say                                                                                                               | `pnpm test:run`                                          |
+| It stays this way                       | 4,640 tests in 431 files, every push. The pinned divergences run as expected failures, so there are exactly as many of those as the tables above say                                                                                                               | `pnpm test:run`                                          |
 | The docs do not lie                     | Every live example on the site has a worker and a spec behind it, every quoted code region exists, and every page carries a description                                                                                                                            | `pnpm docs:check`                                        |
 
 One thing is deliberately **not** claimed: no screen reader has been run against any of this. `pnpm check:a11y` proves the information reaches the platform's accessibility API and that presses and focus come back, which is the strongest evidence a Linux machine can produce. VoiceOver and NVDA remain unrun.

@@ -106,6 +106,10 @@ and dark toggle without being told either exists.
 - **Tests without a browser.** `renderTest` queries the same tree a
   screen reader reads, so a test finds a control by asking for a
   control.
+- **An MCP server in every app.** The channels you declared become an AI
+  agent's tools, described from your JSDoc, and the screen is offered as
+  the outline a screen reader hears. A command marked `@confirm` is put
+  to the person first. [Built for AI agents](/guide/built-for-agents).
 - **A hundred thousand rows at sixty frames.** Virtualization, shared
   grid tracks, and a frame cost proportional to what changed rather than
   to what is on screen.
@@ -124,6 +128,7 @@ script is the claim.
 | Every route paints what it painted                  | pixel diff against a committed baseline per route                                                                               | `pnpm screenshots`                                                                                        |
 | What a screen reader is given is what the tree says | Chrome's computed accessibility tree per route, written to a committed report with every control named and the Tab order walked | `pnpm check:a11y`; VoiceOver and NVDA have not been run says so                                           |
 | Every control works from the keyboard               | a form of every control tabbed through from nothing, each operated by its keys                                                  | `Keyboard.spec.ts` in `gesso-components`                                                                  |
+| An agent goes through the paths a person does       | a channel command reaches the handler a click does; a screen press is the mirror's click, refused by a disabled control         | the specs beside `gesso-framework/agent`, over real ports and a real runtime                              |
 | It stays this way                                   | 2,850 tests in 272 files, the public surface as committed reports                                                               | `pnpm test:run`, `pnpm api:check`                                                                         |
 
 ## How it compares
@@ -138,6 +143,7 @@ The axes that decide the choice, not a feature list.
 | A shared element across screens   | FLIP over the live node, interruptible, no raster                                                                           | the View Transitions API: snapshots cross-faded by the browser   | the same API                                              | Hero animations over the live widget            |
 | Text                              | its own line breaking, checked against Chrome in eight scripts and emoji; no hyphenation yet; the browser shapes the glyphs | the browser's, complete                                          | the browser's, complete                                   | its own engine, with the same class of gaps     |
 | Accessibility                     | a semantics tree mirrored into an off-screen DOM; a report per route; no screen reader run against it yet                   | the DOM itself                                                   | the DOM itself                                            | a semantics tree mirrored into off-screen DOM   |
+| AI agents                         | channels are MCP tools from the contract; the screen is offered by its semantics tree; WebMCP in the browser                | nothing built in; agents read and click the DOM                  | likewise                                                  | nothing built in; the semantics DOM is readable |
 | Indexing, view source, extensions | none; not the goal                                                                                                          | complete                                                         | complete                                                  | none                                            |
 | Ecosystem                         | one component library, one theme system, young                                                                              | the largest there is                                             | large                                                     | large, Dart                                     |
 

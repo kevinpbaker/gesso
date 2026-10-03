@@ -149,6 +149,61 @@
       </div>
     </section>
 
+    <section class="agents">
+      <div class="section-head section-head-wide">
+        <p class="eyebrow">Built for agents</p>
+        <h2>Every app is an MCP server</h2>
+        <p class="lede">
+          The channel contract you already wrote is the tool definition. An AI agent reads what your app holds, sends
+          the commands it declares, and operates the screen as a screen reader would, with nothing more for you to
+          write.
+        </p>
+      </div>
+      <div class="pillar-grid">
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>notes_view</span>
+            <span>notes_open(id)</span>
+            <span>notes_remove(id) <em>asks first</em></span>
+          </div>
+          <h3>Your contract is the tool</h3>
+          <p>
+            Each channel's view and commands become tools, described from your JSDoc and checked against your types. A
+            command marked <code>@confirm</code> is put to the person before it is sent.
+          </p>
+          <a class="card-link" href="/guide/built-for-agents">Built for AI agents</a>
+        </article>
+
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>- textbox "Your name" [e3]</span>
+            <span>- checkbox "Weekly email" [e4]</span>
+            <span>- button "Save" [e5]</span>
+          </div>
+          <h3>The screen, as a screen reader hears it</h3>
+          <p>
+            For what no channel covers, an agent reads the interface as an outline and presses, types and tabs through
+            it, by the same path assistive technology takes.
+          </p>
+          <a class="card-link" href="/structure/agents-and-mcp#operating-the-interface">Operating the interface</a>
+        </article>
+
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>AGENTS.md</span>
+            <span>llms.txt</span>
+            <span>pnpm dev → /__gesso/mcp</span>
+          </div>
+          <h3>Easy for a coding agent to write</h3>
+          <p>
+            Every new project tells a coding agent the rules, the docs are published for models, and the dev server lets
+            the agent drive the running app to check its own work.
+          </p>
+          <a class="card-link" href="/guide/built-for-agents#easy-for-a-coding-agent-to-write">For coding agents</a>
+        </article>
+      </div>
+    </section>
+
     <section class="fit">
       <div class="fit-grid">
         <div>
@@ -708,6 +763,40 @@ h3 {
   border-color: transparent;
 }
 
+/* Built for agents */
+
+.agents {
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-bottom: 100px;
+}
+
+.figure-tools {
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  overflow: hidden;
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+}
+
+.figure-tools span {
+  white-space: nowrap;
+  color: var(--vp-c-text-1);
+}
+
+.figure-tools em {
+  font-style: normal;
+  color: var(--gesso-linen-shade);
+}
+
+.dark .figure-tools em {
+  color: var(--gesso-linen);
+}
+
 /* The model */
 
 .model {
@@ -976,6 +1065,7 @@ h3 {
 
   .pillars,
   .model,
+  .agents,
   .fit,
   .start {
     padding-bottom: 64px;
