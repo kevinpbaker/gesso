@@ -935,6 +935,7 @@ declare function assertModifierList(node: UiNode, value: unknown): readonly UiMo
 interface UiEditingGroup {
   onEdit(edit: UiGroupEdit): void;
   copyText?(start: UiTextPosition, end: UiTextPosition): string;
+  copyHtml?(start: UiTextPosition, end: UiTextPosition): string | null;
   onSelectionChange?(selection: {
     readonly start: UiTextPosition;
     readonly end: UiTextPosition;
@@ -3085,6 +3086,7 @@ interface EditingState {
   readonly caret: LayoutBox;
   readonly multiline: boolean;
   readonly composing: boolean;
+  readonly html?: string;
 }
 interface EditingControllerOptions {
   platform?: EditingPlatform;
@@ -3104,6 +3106,7 @@ declare class UiEditingController {
   private compositionOpen;
   private compositionBase;
   private span;
+  private copied;
   private spanFocusing;
   private pressedFrom;
   constructor(host: EditingHost, dispatcher: UiInputDispatcher, focus: UiFocusManager, options?: EditingControllerOptions);
@@ -3143,7 +3146,9 @@ declare class UiEditingController {
   private clearSpan;
   private collapseSpan;
   private spanEdit;
-  private spanText;
+  private spanCopy;
+  private fieldHtml;
+  private cachedCopy;
   private anchorIn;
   private fieldAt;
   private focusField;
@@ -6876,7 +6881,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-0gKxe3-s.js";
+} from "./index-CJE2rkvB.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7808,7 +7813,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-0gKxe3-s.js";
+} from "./index-CJE2rkvB.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

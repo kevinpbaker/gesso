@@ -15,17 +15,26 @@ import type { Rendered } from './renderTest';
 let ui: Rendered;
 let edits: UiGroupEdit[] = [];
 let selections: ({ start: number; end: number } | null)[] = [];
+let htmlCalls = 0;
 afterEach(() => ui?.unmount());
 
 const TEXTS = ['First paragraph', 'Second paragraph', 'Third paragraph'];
 
-function Document(inputs: Inputs<{ copyText?: boolean }>, _ctx: ComponentContext) {
+function Document(inputs: Inputs<{ copyText?: boolean; copyHtml?: boolean }>, _ctx: ComponentContext) {
   const group = {
     onEdit: (edit: UiGroupEdit) => void edits.push(edit),
     onSelectionChange: (selection: { start: { offset: number }; end: { offset: number } } | null) =>
       void selections.push(selection === null ? null : { start: selection.start.offset, end: selection.end.offset }),
     ...(inputs.copyText.value === true
       ? { copyText: (start: { offset: number }, end: { offset: number }) => `copied ${start.offset}-${end.offset}` }
+      : {}),
+    ...(inputs.copyHtml.value === true
+      ? {
+          copyHtml: (start: { offset: number }, end: { offset: number }) => {
+            htmlCalls++;
+            return `<b>${start.offset}-${end.offset}</b>`;
+          }
+        }
       : {})
   };
   return (
@@ -40,10 +49,11 @@ function Document(inputs: Inputs<{ copyText?: boolean }>, _ctx: ComponentContext
   );
 }
 
-async function mount(copyText = false): Promise<void> {
+async function mount(copyText = false, copyHtml = false): Promise<void> {
   edits = [];
   selections = [];
-  ui = renderTest(createComponent(Document, { copyText }), { width: 600, height: 400 });
+  htmlCalls = 0;
+  ui = renderTest(createComponent(Document, { copyText, copyHtml }), { width: 600, height: 400 });
   await ui.settle();
 }
 
@@ -228,6 +238,21 @@ describe('a selection across the fields of an editing group', () => {
     await caretIn('p0', 3);
     await press('ArrowDown', { shift: true });
     expect(ui.runtime.editingState!.text).toMatch(/^copied 3-\d+$/);
+  });
+
+  it("copies the group's HTML beside the text, across fields and inside one", async () => {
+    await mount(false, true);
+    await caretIn('p0', 3);
+    expect(ui.runtime.editingState!.html).toBeUndefined();
+    await press('ArrowRight', { shift: true });
+    expect(ui.runtime.editingState!.html).toBe('<b>3-4</b>');
+    await press('ArrowDown', { shift: true });
+    expect(ui.runtime.editingState!.html).toMatch(/^<b>3-\d+<\/b>$/);
+    // Asked once per selection, not once per frame.
+    const calls = htmlCalls;
+    ui.runtime.resize(610, 400);
+    await ui.settle();
+    expect(htmlCalls).toBe(calls);
   });
 
   it('moves the caret between fields with the arrows, keeping its column', async () => {

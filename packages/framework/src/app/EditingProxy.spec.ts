@@ -301,6 +301,25 @@ describe('EditingProxy', () => {
     expect(sink.calls.at(-1)).toEqual(['beforeInput', 'deleteByCut', null]);
   });
 
+  it("copies the selection's HTML beside its text when the state has some", () => {
+    const { proxy, textarea, state } = setup();
+    const written: [string, string][] = [];
+    const clipboardData = {
+      getData: () => '',
+      setData: (type: string, value: string) => void written.push([type, value])
+    };
+    proxy.update(state({ selectionStart: 0, selectionEnd: 5, html: '<b>hello</b>' }));
+    textarea.dispatch('copy', { clipboardData });
+    expect(written).toEqual([
+      ['text/plain', 'hello'],
+      ['text/html', '<b>hello</b>']
+    ]);
+    written.length = 0;
+    proxy.update(state({ selectionStart: 0, selectionEnd: 5 }));
+    textarea.dispatch('copy', { clipboardData });
+    expect(written).toEqual([['text/plain', 'hello']]);
+  });
+
   /**
    * A paste with nothing editable focused.
    *

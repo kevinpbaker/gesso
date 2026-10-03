@@ -32,6 +32,13 @@ export interface UiEditingGroup {
    */
   copyText?(start: UiTextPosition, end: UiTextPosition): string;
   /**
+   * The selection as HTML, which a copy puts on the clipboard beside
+   * the text, for a target that takes formatting (a document, an email).
+   * Asked for a selection across fields and for one inside a single
+   * field of the group. Null or absent copies text alone.
+   */
+  copyHtml?(start: UiTextPosition, end: UiTextPosition): string | null;
+  /**
    * A selection across fields began, moved, or ended (null). For a
    * command the application runs over it, such as making it bold:
    * keys reach the focused field first, and only the group knows what

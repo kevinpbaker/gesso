@@ -290,7 +290,11 @@ which takes two positions in one field or across a group's fields.
 **Copy and cut take all of it.** The shell is handed the selected text
 while such a selection is up, so the browser's own copy and cut work on
 it. By default that's each field's selected text joined by newlines;
-`copyText` says what it should be instead, such as markdown.
+`copyText` says what it should be instead, such as markdown. `copyHtml`
+gives HTML that a copy puts on the clipboard beside the text, so pasting
+into a document or an email keeps the formatting. It's asked for a
+selection inside one field of the group as well, and only again when
+the selection or the text under it changes, not every frame.
 
 ## Limits
 

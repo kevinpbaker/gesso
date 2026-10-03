@@ -405,6 +405,12 @@ export class EditingProxy {
       }
       event.preventDefault();
       clipboard.setData('text/plain', state.text.slice(state.selectionStart, state.selectionEnd));
+      // HTML too when the field's editing group gave some, so a copy
+      // into a document or an email keeps its formatting. It describes
+      // the selection the state carries, which is the one being copied.
+      if (state.html !== undefined) {
+        clipboard.setData('text/html', state.html);
+      }
     };
 
     const onCut = (event: Event): void => {
