@@ -14,6 +14,7 @@ import { Video, VideoPlayer, type VideoControlsOptions } from 'gesso-components'
 
 import { gessoTheme } from './brand';
 import { blobUrlOf, dataUrlOf, RANGED, type ScenarioResolver } from './video/VideoScenarios';
+import { isStill } from '../shell/still';
 
 /**
  * Every way a clip can arrive, on one page.
@@ -162,7 +163,10 @@ function Scenario(inputs: Inputs<ScenarioProps>, _ctx: ComponentContext): UiChil
         src={src}
         alt={inputs.title.value}
         poster={inputs.poster.value}
-        autoplay={inputs.autoplay.value ?? true}
+        // Still mode keeps every card on its first frame, as `still.ts`
+        // promises; a clip playing would never hold still for the
+        // screenshot gate.
+        autoplay={(inputs.autoplay.value ?? true) && !isStill()}
         loop={inputs.loop.value ?? true}
         rate={inputs.rate.value}
         width={PICTURE}
