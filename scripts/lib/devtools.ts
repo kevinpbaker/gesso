@@ -13,7 +13,16 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-const CHROME_CANDIDATES = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser', 'chrome'];
+const CHROME_CANDIDATES = [
+  'google-chrome-stable',
+  'google-chrome',
+  'chromium',
+  'chromium-browser',
+  'chrome',
+  // macOS keeps its browsers in app bundles, off the PATH.
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium'
+];
 
 /** The flags that make WebGPU work without a display: Dawn on Vulkan on SwiftShader. */
 export const WEBGPU_FLAGS = [
