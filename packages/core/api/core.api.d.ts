@@ -1218,6 +1218,7 @@ interface UiTextMetrics {
   readonly fontVariant?: UiFontVariant;
   readonly fontKerning?: UiFontKerning;
   readonly letterSpacing?: number;
+  readonly hidden?: boolean;
 }
 interface UiTextLink {
   readonly onClick?: () => void;
@@ -1248,7 +1249,13 @@ declare function flattenTextSpans(spans: readonly UiTextSpan[]): UiSpannedText;
 declare function spannedTextOf(node: UiNode): UiSpannedText | undefined;
 declare function textContentOf(node: UiNode): string;
 declare function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[];
-declare function editableSpansOf(node: UiNode, text: string): readonly UiResolvedTextSpan[];
+declare function editableSpansOf(node: UiNode, text: string, composition?: UiTextRange | null): readonly UiResolvedTextSpan[];
+interface UiTextRange {
+  readonly start: number;
+  readonly end: number;
+}
+type HiddenSpan = Pick<UiResolvedTextSpan, 'start' | 'end' | 'hidden'>;
+declare function hiddenRangesOf(spans: readonly HiddenSpan[]): readonly UiTextRange[];
 declare function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined;
 declare function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
 declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
@@ -1596,6 +1603,9 @@ declare class EditableTextModel {
   private redoStack;
   private lastEdit;
   private lastEditEnd;
+  private hiddenRanges;
+  private hiddenText;
+  private visibleCache;
   focused: boolean;
   version: number;
   blinkOrigin: number;
@@ -1614,11 +1624,17 @@ declare class EditableTextModel {
   get composing(): boolean;
   get canUndo(): boolean;
   get canRedo(): boolean;
+  get hidden(): readonly UiTextRange[];
+  setHidden(text: string, ranges: readonly UiTextRange[]): void;
+  caretOffsetNear(offset: number): number;
+  atVisibleEdge(direction: -1 | 1): boolean;
   select(anchor: number, focus?: number): void;
   moveTo(offset: number, extend: boolean): void;
   selectAll(): void;
   move(unit: EditUnit, direction: -1 | 1, extend: boolean): void;
   offsetBy(from: number, unit: EditUnit, direction: -1 | 1): number;
+  private visible;
+  private visibleDeletion;
   insertText(text: string): void;
   deleteBackward(unit?: EditUnit): void;
   deleteForward(unit?: EditUnit): void;
@@ -2123,6 +2139,7 @@ interface TextRunStyle {
 interface TextRunSpan extends TextRunStyle {
   readonly start: number;
   readonly end: number;
+  readonly hidden?: boolean;
 }
 interface TextMeasureRequest {
   text: string;
@@ -2185,6 +2202,7 @@ interface SpannedRuns {
   readonly spans: readonly TextRunSpan[];
   indexAt(offset: number): number;
   requestAt(offset: number): TextMeasureRequest;
+  hiddenAt(offset: number): boolean;
   width(text: string, start: number, end: number): number;
   widthOf(run: string, offset: number): number;
   cut(text: string, start: number, end: number, x: number): TextLineRun[];
@@ -5039,6 +5057,7 @@ interface ParagraphGeometry {
   readonly end: number;
   readonly measure: RunMeasure;
   readonly rtl: boolean;
+  readonly hidden: readonly UiTextRange[];
 }
 declare function paragraphGeometry(text: string, box: LayoutBox, state: PaintState, measurer: TextMeasurer): ParagraphGeometry;
 declare function paragraphGeometryFrom(lines: readonly TextLinePlacement[], text: string, box: LayoutBox, state: PaintState, measurer: TextMeasurer): ParagraphGeometry;
@@ -5377,6 +5396,7 @@ export {
   hasTextLinks,
   hasThemeExtension,
   hasVisualState,
+  hiddenRangesOf,
   highContrastColors,
   HitTester,
   HitTestLayoutReader,
@@ -5494,7 +5514,6 @@ export {
   MAX_MEASURES_PER_CHILD,
   measure,
   measureSpan,
-  Mf,
   minmax,
   MinMaxTrack,
   motion,
@@ -5583,6 +5602,7 @@ export {
   percent,
   PercentLength,
   performanceMarksEnabled,
+  Pf,
   pinchable,
   PinchableOptions,
   PinchRecognizerOptions,
@@ -5966,6 +5986,7 @@ export {
   UiTextMetrics,
   UiTextOverflowValue,
   UiTextPosition,
+  UiTextRange,
   UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
@@ -6282,6 +6303,7 @@ import {
   hasTextLinks,
   hasThemeExtension,
   hasVisualState,
+  hiddenRangesOf,
   highContrastColors,
   HitTester,
   HitTestLayoutReader,
@@ -6870,6 +6892,7 @@ import {
   UiTextMetrics,
   UiTextOverflowValue,
   UiTextPosition,
+  UiTextRange,
   UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
@@ -6946,7 +6969,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BQ_HOXuw.js";
+} from "./index-DDRne5C3.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7113,6 +7136,7 @@ export {
   hasTextLinks,
   hasThemeExtension,
   hasVisualState,
+  hiddenRangesOf,
   highContrastColors,
   hoverable,
   iconKey,
@@ -7795,6 +7819,7 @@ export {
   UiTextLink,
   UiTextMetrics,
   UiTextOverflowValue,
+  UiTextRange,
   UiTextSpan,
   UiTextStyle,
   UiTextWrapValue,
@@ -7882,7 +7907,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BQ_HOXuw.js";
+} from "./index-DDRne5C3.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

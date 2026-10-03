@@ -116,6 +116,12 @@ next toggles. Nothing is scheduled while no field has focus, while a
 composition is open, because an IME caret must not wink, or while the
 page is hidden.
 
+A field given runs with `hidden: true` keeps that text but draws none of
+it, and the caret steps over each stretch of it as one unit, so every
+arrow and every Backspace changes something you can see. [Rich
+text](/guide/rich-text#hidden-runs) has the rules: which side of hidden
+text a move stops on, what Backspace keeps, and where a press lands.
+
 An undo entry coalesces a run of typing, a run of backspaces, or a whole
 composition. Placing the caret with a press breaks the run, so what
 comes next is its own entry.
@@ -181,7 +187,10 @@ string, which is the one thing only the browser knows.
 While a composition is open the composing text is in the model, both
 renderers draw the composition underline, and the caret holds steady.
 Nothing is reported to the application until the commit, and the whole
-composition lands as one undo entry.
+composition lands as one undo entry. A field's runs describe the text
+the application last heard of, so while a composition is open they are
+moved to make room for it rather than dropped, and the field keeps its
+styling and its hidden text through the composition.
 
 Deletes, newlines, undo and redo are deliberately **not** forwarded from
 the textarea. They reach the runtime as key presses and are applied
@@ -236,6 +245,10 @@ An `<editabletext>` is a `textbox` without being told, and its
 content is its value. Give it a `label` and that is the accessible
 name. Those are the same records the accessibility mirror hands the
 platform, and the same ones the spec beside the example queries.
+
+The value is the whole text, hidden runs included, and so is what the
+editing proxy holds: a screen reader reads a markdown field's markers
+that the screen does not show. A known limitation, not yet solved.
 
 ## Fields that select as one
 

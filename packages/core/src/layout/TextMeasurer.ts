@@ -26,6 +26,12 @@ export interface TextRunStyle {
 export interface TextRunSpan extends TextRunStyle {
   readonly start: number;
   readonly end: number;
+  /**
+   * The run is in the text but takes no room: every width that touches
+   * it counts it as nothing, and a line's `runs` leave it out, so no
+   * renderer has anything to draw for it.
+   */
+  readonly hidden?: boolean;
 }
 
 export interface TextMeasureRequest {
@@ -87,7 +93,7 @@ export interface TextLine {
   width: number;
   /**
    * The line cut at its runs, present only for a paragraph that has
-   * spans.
+   * spans. A hidden run is not among them.
    *
    * Measured once, here, where the line's own width is measured. That
    * is what keeps a spanned paragraph as cheap to paint as a plain
@@ -176,6 +182,8 @@ export interface SpannedRuns {
   indexAt(offset: number): number;
   /** The request an offset is measured with: its run's, or the paragraph's. */
   requestAt(offset: number): TextMeasureRequest;
+  /** Whether the character at `offset` is in a hidden run. */
+  hiddenAt(offset: number): boolean;
   /** Width of `text.slice(start, end)`, measured run by run. */
   width(text: string, start: number, end: number): number;
   /**
@@ -184,7 +192,10 @@ export interface SpannedRuns {
    * as.
    */
   widthOf(run: string, offset: number): number;
-  /** `text.slice(start, end)` cut at the run boundaries, each piece placed from `x`. */
+  /**
+   * `text.slice(start, end)` cut at the run boundaries, each piece
+   * placed from `x`. Hidden pieces take no room and are left out.
+   */
   cut(text: string, start: number, end: number, x: number): TextLineRun[];
 }
 
@@ -237,7 +248,7 @@ export function spannedRunsFor(
     return index < 0 ? base : requests[index];
   };
   const measure = (text: string, from: number, to: number, index: number): number => {
-    if (to <= from) {
+    if (to <= from || (index >= 0 && spans[index].hidden === true)) {
       return 0;
     }
     return runs.measureRunWidth(text.slice(from, to), index < 0 ? base : requests[index]);
@@ -268,6 +279,10 @@ export function spannedRunsFor(
     spans,
     indexAt,
     requestAt,
+    hiddenAt(offset) {
+      const index = indexAt(offset);
+      return index >= 0 && spans[index].hidden === true;
+    },
     width(text, start, end) {
       let width = 0;
       each(start, end, (from, to, index) => {
@@ -282,6 +297,9 @@ export function spannedRunsFor(
       const out: TextLineRun[] = [];
       let pen = x;
       each(start, end, (from, to, index) => {
+        if (index >= 0 && spans[index].hidden === true) {
+          return;
+        }
         const width = measure(text, from, to, index);
         out.push({ span: index, start: from, end: to, text: text.slice(from, to), x: pen, width });
         pen += width;
@@ -397,7 +415,7 @@ function spansKey(spans: readonly TextRunSpan[] | undefined): string {
   for (const span of spans) {
     key += `${span.start}:${span.end}:${span.fontFamily ?? ''}:${span.fontWeight ?? ''}:${span.fontSize ?? ''}:${
       span.fontStyle ?? ''
-    }:${span.fontStretch ?? ''}:${span.fontVariant ?? ''}:${span.fontKerning ?? ''}:${span.letterSpacing ?? ''};`;
+    }:${span.fontStretch ?? ''}:${span.fontVariant ?? ''}:${span.fontKerning ?? ''}:${span.letterSpacing ?? ''}:${span.hidden === true ? 'h' : ''};`;
   }
   spanKeys.set(spans, key);
   return key;
