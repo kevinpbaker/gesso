@@ -99,6 +99,12 @@ A press places the caret, and Shift extends the selection to it. A
 second press within half a second selects the word, a third the line,
 and dragging after any of them extends from the anchor.
 
+Where a press lands in the text is read before the press moves focus.
+A field may draw itself differently once it has focus (a markdown
+editor that shows its markers only in the block being edited), and
+the caret belongs where the person pressed in what they saw, not at
+the same x in the field as it is about to be drawn.
+
 Moves and deletes step by grapheme, through `Intl.Segmenter` with a
 surrogate-pair fallback, so the caret never splits an emoji. Word
 boundaries come from the same segmenter, which is what makes a CJK word

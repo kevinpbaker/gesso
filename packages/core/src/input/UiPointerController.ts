@@ -68,7 +68,10 @@ export interface PointerControllerOptions {
     isEditable(node: UiNode): boolean;
     /** The field of an editing group a press on none of its fields belongs to; see `UiEditingController.fieldNear`. */
     fieldNear?(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null;
-    pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
+    /** The text offset under a point in a field, as the field is drawn now; see `UiEditingController.offsetAt`. */
+    offsetAt?(node: UiNode, x: number, y: number): number;
+    /** `offset`, when given, is where the press landed, found before it moved focus. */
+    pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers, offset?: number): void;
     pointerMove(node: UiNode, x: number, y: number): void;
     pointerUp(): void;
   };
@@ -293,9 +296,15 @@ export class UiPointerController {
             ? (this.editing.fieldNear?.(target, y, node => this.handlesPress(node)) ?? null)
             : null;
         const pressed = field ?? target;
+        // Where in a field's text the press landed is read before the
+        // press moves focus: a field that restyles itself on focus (a
+        // markdown editor showing its markers) is laid out again by it,
+        // and the caret belongs where the press was in what was drawn.
+        const editable = this.editing !== undefined && this.editing.isEditable(pressed);
+        const offset = editable ? this.editing!.offsetAt?.(pressed, x, y) : undefined;
         this.onPress?.(pressed);
-        if (this.editing !== undefined && this.editing.isEditable(pressed)) {
-          this.editing.pointerDown(pressed, x, y, modifiers);
+        if (editable) {
+          this.editing!.pointerDown(pressed, x, y, modifiers, offset);
           this.selection?.clear();
         } else {
           this.selection?.pointerDown(target, x, y, modifiers);
