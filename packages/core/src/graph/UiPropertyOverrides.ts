@@ -39,6 +39,24 @@ export function writeDeclaredProperty(
 }
 
 /**
+ * The element stopped declaring the property. A modifier overriding it
+ * still wins; once none is, the node has none, so it inherits again.
+ */
+export function removeDeclaredProperty(
+  graph: UiGraph,
+  node: UiNode,
+  property: NodeProperty,
+  flags: DirtyFlags
+): boolean {
+  const overrides = node.overrides?.get(property);
+  if (overrides === undefined) {
+    return graph.applyResolvedProperty(node, property, false, undefined, flags);
+  }
+  overrides.declared = { present: false, value: undefined };
+  return applyEffective(graph, node, property, overrides, flags);
+}
+
+/**
  * A write from a modifier. Replaces that modifier's own entry, or adds
  * one in its position in the list.
  */

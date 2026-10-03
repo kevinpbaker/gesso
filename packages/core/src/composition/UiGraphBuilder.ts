@@ -705,6 +705,19 @@ export class UiGraphBuilder {
    * instance is unchanged and torn down when a property stops
    * being reactive.
    */
+  /**
+   * The properties each node's element declared last time, so a render
+   * that stops declaring one takes it off the node.
+   *
+   * Only bindings used to be torn down that way. A plain value stayed:
+   * a conditional that swapped `<scrollview padding={20}>` for a
+   * `<scrollview>` reused the node and kept the padding, and an editor
+   * switching from its source view back to its document came back
+   * twenty pixels narrower. Only what the builder declared is tracked,
+   * so what modifiers and the runtime write on a node is left alone.
+   */
+  private readonly declaredProps = new WeakMap<UiNode, Set<string>>();
+
   private reconcileProps(node: UiNode, props: UiProps, parent?: UiNode): void {
     // Installed before this pass writes anything, so a re-render that
     // both adds a transition and changes the value it covers animates
@@ -772,6 +785,16 @@ export class UiGraphBuilder {
         this.graph.unbindEvent(node, binding);
       }
     }
+
+    const previous = this.declaredProps.get(node);
+    if (previous !== undefined) {
+      for (const property of previous) {
+        if (!present.has(property)) {
+          this.graph.removeNodeProperty(node, property, propertyEffects(property));
+        }
+      }
+    }
+    this.declaredProps.set(node, present);
 
     if (node.environment === null && parent?.environment != null) {
       // A freshly built node is not in the tree yet — the builder

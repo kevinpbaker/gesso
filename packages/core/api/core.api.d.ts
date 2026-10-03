@@ -1894,6 +1894,7 @@ declare class UiGraphBuilder {
   private matchNode;
   private createNode;
   private moveBefore;
+  private readonly declaredProps;
   private reconcileProps;
   private reconcileModifiers;
   private reconcileTransitions;
@@ -1985,6 +1986,7 @@ declare class UiGraph {
   getDirtyNodes(): DirtyNodeSet;
   updateProperty<T>(nodeId: string, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
   updateNodeProperty<T>(node: UiNode, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
+  removeNodeProperty(node: UiNode, property: string, dirtyFlags?: DirtyFlags): boolean;
   updateNodePropertyNow<T>(node: UiNode, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
   applyResolvedProperty(node: UiNode, property: NodeProperty, present: boolean, value: unknown, dirtyFlags: DirtyFlags): boolean;
   processDirty(callback: (node: UiNode) => void): void;
@@ -2971,6 +2973,8 @@ declare class UiShortcutRegistry {
   get all(): readonly UiShortcutBinding[];
   active(focused: UiNode | null): readonly UiShortcutBinding[];
   handleKey(key: string, modifiers: UiKeyModifiers, focused: UiNode | null): boolean;
+  private platform;
+  private isEditingKey;
   reset(): void;
   private isLive;
 }
@@ -3098,6 +3102,7 @@ declare class UiEditingController {
   private dragging;
   private lastPress;
   private compositionOpen;
+  private compositionBase;
   private span;
   private spanFocusing;
   private pressedFrom;
@@ -6871,7 +6876,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-RpdXpm8m.js";
+} from "./index-0gKxe3-s.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7803,7 +7808,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-RpdXpm8m.js";
+} from "./index-0gKxe3-s.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

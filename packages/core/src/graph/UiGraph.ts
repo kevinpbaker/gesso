@@ -1,5 +1,5 @@
 import { DirtyFlags } from './DirtyFlags';
-import { writeDeclaredProperty } from './UiPropertyOverrides';
+import { removeDeclaredProperty, writeDeclaredProperty } from './UiPropertyOverrides';
 import { DirtyNodeSet } from './DirtyNodeSet';
 import { type NodeId, type NodeProperty, UiNode } from './UiNode';
 import { UiNodeType } from './UiNodeType';
@@ -568,6 +568,15 @@ export class UiGraph {
       return true;
     }
     return this.updateNodePropertyNow(node, property, value, dirtyFlags);
+  }
+
+  /**
+   * Removes a property the element declared and no longer does, through
+   * the same cascade a write goes through, so a modifier overriding it
+   * keeps its value. See `UiGraphBuilder.reconcileProps`.
+   */
+  public removeNodeProperty(node: UiNode, property: string, dirtyFlags: DirtyFlags = DirtyFlags.Properties): boolean {
+    return removeDeclaredProperty(this, node, property as NodeProperty, dirtyFlags);
   }
 
   /**
