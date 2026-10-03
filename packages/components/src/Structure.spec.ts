@@ -60,6 +60,43 @@ describe('Tabs', () => {
     ]);
     expect(ui.recordsFor('tabpanel')[0].label).toBe('Props');
   });
+
+  it('gives its panel the height the strip leaves, when it has a height', () => {
+    const ui = mount(
+      Column(
+        { height: 300 },
+        createComponent(Tabs, {
+          tabs,
+          defaultValue: 'stories',
+          flex: 1,
+          minHeight: 0,
+          children: Box({ role: 'region', label: 'content' })
+        })
+      )
+    );
+    const strip = ui.getLayout(ui.getByRole('tablist'))!;
+    const panel = ui.getLayout(ui.getByRole('tabpanel'))!;
+    const content = ui.getLayout(ui.getByRole('region', { name: 'content' }))!;
+    // The strip, the gap under it, and the panel are the whole height.
+    expect(panel.y + panel.height).toBeCloseTo(300, 5);
+    expect(panel.y).toBeGreaterThan(strip.y + strip.height);
+    // And what the panel holds fills it, without asking for a height.
+    expect(content.height).toBeCloseTo(panel.height, 5);
+  });
+
+  it('is still as tall as its content when nothing gives it a height', () => {
+    const ui = mount(
+      Column(
+        { height: 300 },
+        createComponent(Tabs, {
+          tabs,
+          defaultValue: 'stories',
+          children: Box({ role: 'region', label: 'content', height: 40 })
+        })
+      )
+    );
+    expect(ui.getLayout(ui.getByRole('tabpanel'))!.height).toBe(40);
+  });
 });
 
 describe('Accordion', () => {

@@ -68,6 +68,12 @@ The [shared layout props](/components/#layout-is-yours) land on the strip's oute
 `rootModifiers` goes somewhere else: onto the tab list, beside the focus
 ring, because that is the element that takes focus and carries the role.
 
+Give the strip a height, with `flex` in a column or a `height`, and the
+panel takes whatever the tab list leaves, with its child stretched to
+fill it: a sidebar of tabs holding a tree, or a list that scrolls,
+needs nothing more. A strip given no height is as tall as its tab list
+and its panel's content, as before.
+
 ## Controlled and uncontrolled
 
 ```tsx
