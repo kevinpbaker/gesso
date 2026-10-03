@@ -1,7 +1,6 @@
 import type { UiNode } from '../graph/UiNode';
-import { UiNodeType } from '../graph/UiNodeType';
 import { noKeyModifiers, UiEventType, UiKeyboardEvent, UiPointerEvent, type UiKeyModifiers } from './UiInputEvent';
-import { isNodeInert } from './UiInteraction';
+import { isPressable } from './UiInteraction';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
 
@@ -152,13 +151,4 @@ export class UiKeyboardController {
     this.dispatcher.dispatch(event, target);
     return event;
   }
-}
-
-/** A focused node Enter and Space press: a Button, or anything playing one that is not inert. */
-function isPressable(node: UiNode): boolean {
-  if (isNodeInert(node)) {
-    return false;
-  }
-  const role = node.properties.get('role');
-  return node.type === UiNodeType.Button || role === 'button' || role === 'link';
 }

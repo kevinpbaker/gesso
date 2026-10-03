@@ -1,7 +1,7 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { commandForKey, detectEditingPlatform, type EditingPlatform } from '../editing/EditingKeymap';
-import { isNodeInert } from './UiInteraction';
+import { isNodeInert, isPressable } from './UiInteraction';
 import type { UiKeyModifiers } from './UiInputEvent';
 
 /**
@@ -118,6 +118,12 @@ const MODIFIER_KEYS: ReadonlySet<string> = new Set(['Shift', 'Control', 'Alt', '
  * Without that rule an application with a `n` for "new note" becomes an
  * application you cannot type the letter n into, which is the failure
  * every home-grown key handler eventually ships.
+ *
+ * ## Pressing is not a shortcut
+ *
+ * A bare Enter or Space is skipped while a button or link has focus,
+ * unless the shortcut is that control's own: the control is focused, so
+ * it has the key first, as it would in a browser.
  */
 export class UiShortcutRegistry {
   private readonly bindings: UiShortcutBinding[] = [];
@@ -243,11 +249,13 @@ export class UiShortcutRegistry {
   /**
    * Whether a binding would fire for a key going to `focused`.
    *
-   * Three things take a shortcut out: its scope does not contain the
-   * focused node, its own `when` says no, and, for a shortcut with no
-   * modifier at all, the focused node is somewhere text is being
-   * typed. The last is the rule that keeps a single-letter shortcut
-   * from making a text field unusable.
+   * Four things take a shortcut out: its scope does not contain the
+   * focused node, its own `when` says no, for a shortcut with no
+   * modifier at all the focused node is somewhere text is being typed,
+   * and for a bare Enter or Space the focused node is a button that
+   * isn't the shortcut's own. The third keeps a single-letter shortcut
+   * from making a text field unusable; the fourth keeps a list's Enter
+   * from opening a row when the button focused inside it was pressed.
    */
   private isLive(binding: UiShortcutBinding, focused: UiNode | null): boolean {
     const scope = binding.scope ?? null;
@@ -258,6 +266,9 @@ export class UiShortcutRegistry {
       return false;
     }
     if (focused !== null && isTypingInto(focused) && binding.steps.every(step => isBare(step))) {
+      return false;
+    }
+    if (focused !== null && scope !== focused && isPressing(binding.steps) && isPressable(focused)) {
       return false;
     }
     return true;
@@ -308,6 +319,18 @@ function isTypingInto(node: UiNode): boolean {
     }
   }
   return false;
+}
+
+/** A bare Enter or Space on its own: what presses a focused button. */
+function isPressing(steps: readonly UiShortcutStep[]): boolean {
+  const [step] = steps;
+  return (
+    steps.length === 1 &&
+    step !== undefined &&
+    isBare(step) &&
+    !step.shift &&
+    (step.key === 'Enter' || step.key === ' ')
+  );
 }
 
 /** A press with no modifier at all: an ordinary character. */

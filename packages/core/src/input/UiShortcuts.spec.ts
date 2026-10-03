@@ -134,6 +134,48 @@ describe('UiShortcutRegistry', () => {
     });
   });
 
+  describe('pressing', () => {
+    function withButton() {
+      const h = new InputTestHarness();
+      const list = h.node('list', UiNodeType.Column, { width: 200, height: 200 });
+      const button = h.node('clear', UiNodeType.Button, { width: 80, height: 30 });
+      h.add(list, button);
+      h.add(h.root, list);
+      h.layoutTree();
+      return { list, button };
+    }
+
+    it('leaves Enter and Space to a focused button, however wide the shortcut', () => {
+      const { list, button } = withButton();
+      const registry = new UiShortcutRegistry();
+      const open = vi.fn();
+      registry.register({ keys: 'Enter', label: 'Open the issue', run: open });
+      registry.register({ keys: 'Space', label: 'Peek', scope: list, run: open });
+
+      expect(registry.handleKey('Enter', mods(), button)).toBe(false);
+      expect(registry.handleKey(' ', mods(), button)).toBe(false);
+      expect(open).not.toHaveBeenCalled();
+      // Not listed as what would run there either.
+      expect(registry.active(button).map(binding => binding.label)).toEqual([]);
+      // Anywhere else, Enter is the shortcut.
+      expect(registry.handleKey('Enter', mods(), list)).toBe(true);
+    });
+
+    it('lets a button bind its own Enter, and a modified Enter through', () => {
+      const { button } = withButton();
+      const registry = new UiShortcutRegistry();
+      const own = vi.fn();
+      const send = vi.fn();
+      registry.register({ keys: 'Enter', label: 'Confirm', scope: button, run: own });
+      registry.register({ keys: 'Mod+Enter', label: 'Send', run: send });
+
+      expect(registry.handleKey('Enter', mods(), button)).toBe(true);
+      expect(registry.handleKey('Enter', mods({ ctrl: true }), button)).toBe(true);
+      expect(own).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('typing', () => {
     it('leaves a bare letter alone while a field has focus', () => {
       const { field, row } = tree();
