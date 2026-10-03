@@ -59,7 +59,8 @@ export interface ComboboxOption {
  * **One value or several.** Single by default: choosing puts the label
  * in the field and closes the list. With `multiple`, every choice
  * toggles a value, the list stays open for the next one, and the
- * chosen values sit above the field, each with a button to take it off.
+ * chosen values sit in the field before the text, each with a button to
+ * take it off.
  *
  * **Operable from the keyboard alone.** Typing or Down opens the list;
  * Down and Up walk it, Enter chooses, Escape closes it (and, closed,
@@ -405,6 +406,75 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
     })
   );
 
+  const editable = EditableText({
+    ref: focus.ref,
+    // In `multiple` the box around the field and the chosen values is
+    // what's measured for the list's width, and what shows focus.
+    modifiers: multiple ? modifiersOf(inputs) : modifiersOf(inputs, CONTROL_FOCUS_RING, field.modifier),
+    value: query,
+    placeholder,
+    disabled,
+    textWrap: 'none',
+    color: 'controlForeground',
+    ...(multiple
+      ? { padding: 4, minHeight: 24, flexGrow: 1, flexBasis: 80, minWidth: 80 }
+      : {
+          backgroundColor: 'controlBackground',
+          borderWidth: 1,
+          borderColor: borderToken(invalid),
+          borderRadius: 6,
+          padding: 8,
+          minHeight: 32
+        }),
+    role: 'combobox',
+    label,
+    description: controlDescription(error, description),
+    states: fieldStates,
+    activeDescendant: activeNode,
+    onInput: (event: UiTextChangeEvent) => {
+      query.next(event.value);
+      inputs.onQueryChange?.value?.(event.value);
+      open();
+    },
+    onKeyDown,
+    // The label of what's chosen is selected on the way in, so typing
+    // starts a new search rather than adding to the name. A press
+    // focuses first and then puts the caret where it landed, so the
+    // press that focused the field selects it again once it's done.
+    onFocus: () => {
+      selectAll();
+      justFocused = true;
+    },
+    onClick: () => {
+      if (justFocused) {
+        justFocused = false;
+        selectAll();
+      }
+      open();
+    }
+  });
+
+  // The chosen values, named from the options as they are now: options
+  // that arrive after the values (from a channel, say) name them then.
+  const chosenList = combineLatest([many.value, inputs.options]).pipe(
+    map(([values]) =>
+      values.length === 0
+        ? []
+        : [
+            Row(
+              {
+                gap: 4,
+                flexWrap: 'wrap',
+                y: 'center',
+                role: 'list',
+                label: label.pipe(map(text => `${text}, chosen`))
+              },
+              ...values.map(value => token(value, labelOf(value), remove, disabled))
+            )
+          ]
+    )
+  );
+
   return Column(
     { ...layoutOf(inputs), gap: 4 },
     label.pipe(
@@ -414,63 +484,33 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
           : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
       )
     ),
-    ...(multiple
-      ? [
-          many.value.pipe(
-            map(values =>
-              values.length === 0
-                ? []
-                : [
-                    Row(
-                      { gap: 4, flexWrap: 'wrap', role: 'list', label: label.pipe(map(text => `${text}, chosen`)) },
-                      ...values.map(value => token(value, labelOf(value), remove, disabled))
-                    )
-                  ]
-            )
-          )
-        ]
-      : []),
-    EditableText({
-      ref: focus.ref,
-      modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING, field.modifier),
-      value: query,
-      placeholder,
-      disabled,
-      textWrap: 'none',
-      backgroundColor: 'controlBackground',
-      color: 'controlForeground',
-      borderWidth: 1,
-      borderColor: borderToken(invalid),
-      borderRadius: 6,
-      padding: 8,
-      minHeight: 32,
-      role: 'combobox',
-      label,
-      description: controlDescription(error, description),
-      states: fieldStates,
-      activeDescendant: activeNode,
-      onInput: (event: UiTextChangeEvent) => {
-        query.next(event.value);
-        inputs.onQueryChange?.value?.(event.value);
-        open();
-      },
-      onKeyDown,
-      // The label of what's chosen is selected on the way in, so typing
-      // starts a new search rather than adding to the name. A press
-      // focuses first and then puts the caret where it landed, so the
-      // press that focused the field selects it again once it's done.
-      onFocus: () => {
-        selectAll();
-        justFocused = true;
-      },
-      onClick: () => {
-        if (justFocused) {
-          justFocused = false;
-          selectAll();
-        }
-        open();
-      }
-    }),
+    multiple
+      ? Row(
+          {
+            // One box, as a field looks: the chosen values and then the
+            // text, wrapping onto more lines as values are added.
+            modifiers: [field.modifier],
+            flexWrap: 'wrap',
+            gap: 4,
+            padding: 4,
+            y: 'center',
+            minHeight: 32,
+            backgroundColor: 'controlBackground',
+            borderRadius: 6,
+            borderWidth: focus.focused.pipe(map(on => (on ? 2 : 1))),
+            borderColor: combineLatest([focus.focused, borderToken(invalid)]).pipe(
+              map(([on, border]) => (on && border !== 'danger' ? 'controlAccent' : border))
+            ),
+            // A press beside the values is a press on the field.
+            onClick: () => {
+              focus.focus();
+              open();
+            }
+          },
+          chosenList,
+          editable
+        )
+      : editable,
     controlMessage(error, description)
   );
 }

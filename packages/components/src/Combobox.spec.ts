@@ -242,6 +242,15 @@ describe('Combobox', () => {
       expect(changes.at(-1)).toEqual(['ada']);
     });
 
+    it('names the chosen values once options arrive after them', async () => {
+      const options = new BehaviorSubject<readonly ComboboxOption[]>([]);
+      mount({ multiple: true, defaultValues: ['ada'], options });
+      options.next(PEOPLE);
+      await ui.settle();
+      expect(ui.getByRole('listitem', { name: 'Ada Okafor' })).toBeDefined();
+      expect(ui.getByRole('button', { name: 'Remove Ada Okafor' })).toBeDefined();
+    });
+
     it('takes a value off with its remove button', async () => {
       const changes: (readonly string[])[] = [];
       mount({
