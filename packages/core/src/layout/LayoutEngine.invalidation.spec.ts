@@ -1,4 +1,4 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, map } from 'rxjs';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -246,6 +246,31 @@ describe('LayoutEngine invalidation', () => {
         )
       );
     }
+
+    it('lets a lone item that fills its line bound a relayout below it', () => {
+      // An application shell: a row holding one region that grows and
+      // shrinks to fill it, and a list inside that region. The region's
+      // base is its content, but nothing about the base can change its
+      // size, so the rows coming and going in the list are laid out
+      // from near the list, not from the root.
+      const h = createHarness(Constraints.tight(400, 300));
+      const rows = new BehaviorSubject(5);
+      const list = ScrollView(
+        { flexGrow: 1, flexBasis: 0 },
+        rows.pipe(map(n => Array.from({ length: n }, (_, i) => Box({ key: String(i), height: 20, flexShrink: 0 }))))
+      );
+      h.root = h.builder.build(
+        Row(
+          { width: 400, height: 300 },
+          Row({ flexGrow: 1, minWidth: 0 }, Column({ width: percent(100), height: percent(100) }, list))
+        )
+      );
+      firstFrame(h);
+      rows.next(6);
+      h.clock.tick(0);
+      expect(h.engine.stats.fullLayout).toBe(false);
+      expect(h.engine.stats.measured).toBeLessThan(6);
+    });
 
     for (const list of ['column', 'scroll'] as const) {
       it(`re-measures the flex base when content arrives below a boundary (${list})`, () => {
