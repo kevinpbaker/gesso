@@ -123,6 +123,7 @@ import { AudioService, type AudioAction, type AudioRequest, type AudioSample } f
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
 import { EditingService } from './EditingService';
+import { ScrollService } from './ScrollService';
 import { FocusService } from './FocusService';
 import { MediaService, type MediaOptions } from './MediaService';
 import { FontService, type FontFamilyDeclaration } from './FontService';
@@ -683,6 +684,11 @@ export class GessoRuntime {
     if (!this.services.has(EditingService)) {
       this.services.register(EditingService);
     }
+    // And scrolling a node into view, for a highlight that moves
+    // without focus.
+    if (!this.services.has(ScrollService)) {
+      this.services.register(ScrollService);
+    }
     // And the frames themselves, for a screen that shows its own
     // frame gap or input latency.
     if (!this.services.has(FrameService)) {
@@ -805,6 +811,7 @@ export class GessoRuntime {
     this.input = this.createInput();
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
+    this.services.get(ScrollService).setScroller((node, padding) => this.scrollIntoView(node, padding));
     // Keyboard navigation must keep the focused control visible — but
     // only keyboard navigation. A click has already shown the person
     // where they are, and revealing what they just pressed scrolls the

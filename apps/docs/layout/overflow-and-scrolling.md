@@ -251,6 +251,22 @@ A component that owns a list of rows maps the keys itself.
 which then reveals itself through the same mechanism. See
 [using components](/guide/using-components).
 
+A highlight that moves without focus has to ask. A combobox's arrows
+walk its list while the caret stays in the field, so nothing is
+focused to reveal; it calls `ScrollService.scrollIntoView(node)`, which
+scrolls the containers above the node the same way, by the same
+amount, and leaves a visible node where it is:
+
+```tsx
+const scroll = ctx.inject(ScrollService);
+ctx.effect(active, index => {
+  const row = rows.get(index);
+  if (row !== undefined) {
+    scroll.scrollIntoView(row);
+  }
+});
+```
+
 ## What the main thread is left doing
 
 In a browser, scrolling a page is the compositor's job and the main
