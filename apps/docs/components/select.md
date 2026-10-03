@@ -12,9 +12,9 @@ When there are two or three options and the screen has room, a
 [radio group](/components/radio-group) is better, because it shows every
 answer without a gesture. When the list holds commands rather than a
 value, that is a [menu](/components/menu): a menu does something and
-forgets, a select goes on showing what was picked. There is no
-multiple-selection form of this component; a list of independent choices
-is a column of [checkboxes](/components/checkbox).
+forgets, a select goes on showing what was picked. When the list is one
+a person searches rather than reads, or the answer is several values,
+that is a [combobox](/components/combobox).
 
 The trigger is the component's, not the caller's. It is the node that
 carries the `combobox` role, holds focus and shows the chosen label, so
