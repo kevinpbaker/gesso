@@ -4,12 +4,15 @@ import { BehaviorSubject, map } from 'rxjs';
 import {
   Box,
   Button,
+  buildSemanticsTree,
   ScrollView,
   Column,
   EditableText,
   Row,
   Text,
+  type UiNode,
   type UiSemanticsPatch,
+  type UiSemanticsRecord,
   type UiSemanticsUpdate
 } from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
@@ -82,12 +85,208 @@ describe('GessoRuntime semantics', () => {
     rows$.next([0, 2]);
     frame();
 
-    // The removed row goes; the one that moved up reports its new index.
+    // The removed row goes, and nothing else is sent: the row after it
+    // moved up an index, but a mirror that removed the row already has
+    // it in the right place.
     const last = patches.at(-1)!;
-    expect(last.filter(patch => patch.op === 'remove')).toHaveLength(1);
-    const update = last.find(patch => patch.op === 'update');
-    expect(update?.op === 'update' && update.node.label).toBe('Row 2');
-    expect(update?.op === 'update' && update.node.index).toBe(1);
+    expect(last).toHaveLength(1);
+    expect(last[0]!.op).toBe('remove');
+  });
+
+  describe('a change in the shape of the tree', () => {
+    interface Item {
+      readonly key: string;
+      readonly label: BehaviorSubject<string>;
+      readonly visible: BehaviorSubject<boolean>;
+    }
+    interface Group {
+      readonly key: string;
+      readonly items: BehaviorSubject<readonly Item[]>;
+    }
+
+    /**
+     * A document's shape: a labelled region holding transparent groups
+     * (an editor's chunks) of list items, each with a button inside.
+     */
+    function mountGroups(groups: BehaviorSubject<readonly Group[]>) {
+      const patches: UiSemanticsPatch[][] = [];
+      const item = (entry: Item) =>
+        Box(
+          { key: entry.key, role: 'listitem', label: entry.label, visible: entry.visible },
+          Button({ text: `Open ${entry.key}`, width: 40, height: 20 })
+        );
+      const mounted = mountRuntime(
+        Column(
+          { role: 'region', label: 'Document' },
+          groups.pipe(
+            map(list => list.map(group => Column({ key: group.key }, group.items.pipe(map(items => items.map(item))))))
+          ),
+          Text({ text: 'Footer' })
+        ),
+        { onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches])) }
+      );
+      const fullTree = () => buildSemanticsTree((mounted.runtime as unknown as { layoutRoot(): UiNode }).layoutRoot());
+      return { ...mounted, patches, fullTree };
+    }
+
+    it('comes out exactly as a full rebuild would, in document order', () => {
+      let seed = 11;
+      const random = (n: number): number => {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        return seed % n;
+      };
+      let made = 0;
+      const newItem = (): Item => ({
+        key: `i${made++}`,
+        label: new BehaviorSubject(`Item ${made}`),
+        visible: new BehaviorSubject(true)
+      });
+      const newGroup = (): Group => ({
+        key: `g${made++}`,
+        items: new BehaviorSubject<readonly Item[]>([newItem(), newItem(), newItem()])
+      });
+      const groups = new BehaviorSubject<readonly Group[]>([newGroup(), newGroup(), newGroup()]);
+      const { runtime, frame, patches, fullTree } = mountGroups(groups);
+      frame(0);
+
+      // A mirror, applying every patch the way `SemanticsMirror` does:
+      // an element is placed before whatever sits at its index, or
+      // appended. What it ends up showing has to match a full rebuild.
+      const records = new Map<string, UiSemanticsRecord>();
+      const children = new Map<string | null, string[]>();
+      const parentOf = new Map<string, string | null>();
+      const apply = (): void => {
+        for (const batch of patches.splice(0)) {
+          for (const patch of batch) {
+            if (patch.op === 'remove') {
+              const list = children.get(parentOf.get(patch.id) ?? null);
+              list?.splice(list.indexOf(patch.id), 1);
+              records.delete(patch.id);
+              parentOf.delete(patch.id);
+              continue;
+            }
+            const { id, parent, index } = patch.node;
+            if (parentOf.has(id)) {
+              const old = children.get(parentOf.get(id)!)!;
+              if (parentOf.get(id) === parent && old[index] === id) {
+                records.set(id, patch.node);
+                continue;
+              }
+              old.splice(old.indexOf(id), 1);
+            }
+            if (!children.has(parent)) children.set(parent, []);
+            const list = children.get(parent)!;
+            const at = list[index];
+            list.splice(at === undefined ? list.length : list.indexOf(at), 0, id);
+            records.set(id, patch.node);
+            parentOf.set(id, parent);
+          }
+        }
+      };
+      const shown = () => {
+        const out: Record<string, unknown> = {};
+        for (const [parent, list] of children) {
+          if (list.length > 0) out[String(parent)] = list.map(id => ({ ...records.get(id)!, index: 0 }));
+        }
+        return out;
+      };
+      const expectedShown = (tree: ReadonlyMap<string, UiSemanticsRecord>) => {
+        const out: Record<string, UiSemanticsRecord[]> = {};
+        for (const record of tree.values()) (out[String(record.parent)] ??= []).push(record);
+        for (const key of Object.keys(out)) {
+          out[key] = out[key]!.sort((a, b) => a.index - b.index).map(record => ({ ...record, index: 0 }));
+        }
+        return out;
+      };
+      apply();
+
+      for (let step = 0; step < 300; step++) {
+        const list = [...groups.value];
+        const group = list[random(list.length)]!;
+        const items = [...group.items.value];
+        switch (random(7)) {
+          case 0:
+            items.splice(random(items.length + 1), 0, newItem());
+            group.items.next(items);
+            break;
+          case 1:
+            if (items.length > 0) items.splice(random(items.length), 1);
+            group.items.next(items);
+            break;
+          case 2:
+            if (items.length > 1) items.splice(random(items.length), 0, ...items.splice(random(items.length), 1));
+            group.items.next(items);
+            break;
+          case 3:
+            items[random(items.length)]?.label.next(`Renamed ${step}`);
+            break;
+          case 4:
+            items[random(items.length)]?.visible.next(random(2) === 0);
+            break;
+          case 5:
+            list.splice(random(list.length + 1), 0, newGroup());
+            groups.next(list);
+            break;
+          default:
+            if (list.length > 1) list.splice(random(list.length), 1);
+            groups.next(list);
+        }
+        frame();
+        apply();
+        const expected = fullTree();
+        expect([...runtime.semanticsTree()]).toEqual([...expected]);
+        expect(shown()).toEqual(expectedShown(expected));
+      }
+    });
+
+    it('keeps what it did not touch rather than describing it again', () => {
+      // A block inserted at the top of a long document used to rebuild
+      // every record in it: 11 ms of an Enter in a 5,000-line editor.
+      // Now a record nothing touched is carried over as it was.
+      const items = (from: number) =>
+        Array.from({ length: 50 }, (_, i) => ({
+          key: `i${from + i}`,
+          label: new BehaviorSubject(`Item ${from + i}`),
+          visible: new BehaviorSubject(true)
+        }));
+      const groups = new BehaviorSubject<readonly Group[]>(
+        Array.from({ length: 40 }, (_, g) => ({
+          key: `g${g}`,
+          items: new BehaviorSubject<readonly Item[]>(items(g * 50))
+        }))
+      );
+      const { runtime, frame } = mountGroups(groups);
+      frame(0);
+      const tree = runtime.semanticsTree();
+      const farButton = [...tree.values()].find(record => record.label === 'Open i1999')!;
+
+      const first = groups.value[0]!;
+      first.items.next([items(5000)[0]!, ...first.items.value]);
+      frame();
+
+      expect(runtime.semanticsTree().get(farButton.id)).toBe(farButton);
+    });
+  });
+
+  it('sends the new indices when rows change their order', () => {
+    const rows$ = new BehaviorSubject([0, 1, 2]);
+    const patches: UiSemanticsPatch[][] = [];
+    const { frame } = mountRuntime(
+      Column(
+        { role: 'list', label: 'Notes' },
+        rows$.pipe(map(rows => rows.map(row => Box({ key: String(row), role: 'listitem', label: `Row ${row}` }))))
+      ),
+      { onCreate: runtime => runtime.onSemantics(update => patches.push([...update.patches])) }
+    );
+    frame(0);
+    rows$.next([2, 0, 1]);
+    frame();
+    const moved = patches.at(-1)!.filter(patch => patch.op === 'update');
+    expect(moved.map(patch => patch.op === 'update' && `${patch.node.label}@${patch.node.index}`)).toEqual([
+      'Row 2@0',
+      'Row 0@1',
+      'Row 1@2'
+    ]);
   });
 
   it('removes the record of a node that was hidden, and brings it back', () => {

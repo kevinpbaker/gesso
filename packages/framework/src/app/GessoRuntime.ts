@@ -74,10 +74,13 @@ import {
   UiSharedElements,
   buildSemanticsTree,
   buildSemanticsSubtree,
+  rebuildSemanticsSubtree,
   semanticsInertAbove,
+  semanticsMemory,
   recordsEqual,
   TEXT_RUN_ID_SEPARATOR,
   diffSemantics,
+  dropIndexShifts,
   LayoutNotifier,
   type UiSemanticsAction,
   type UiFileDropMessage,
@@ -455,6 +458,8 @@ export class GessoRuntime {
    * them. Only populated while a listener is attached.
    */
   private semanticsBoxes = new Map<string, LayoutBox>();
+  /** What each semantics walk leaves for the next; see `SemanticsMemory`. */
+  private readonly semanticsMemory = semanticsMemory();
   private lastFocusedId: string | null = null;
   /**
    * Where the caret was when `reload` replaced the tree, put back on
@@ -2123,7 +2128,7 @@ export class GessoRuntime {
    */
   semanticsTree(): UiSemanticsMap {
     if (this.semanticsStale) {
-      this.semantics = buildSemanticsTree(this.layoutRoot());
+      this.semantics = buildSemanticsTree(this.layoutRoot(), this.semanticsMemory);
       this.semanticsStale = false;
     }
     return this.semantics;
@@ -2236,7 +2241,7 @@ export class GessoRuntime {
         // any bound label does this. The work moves to whoever asks.
         this.semanticsStale = true;
       } else {
-        patches = this.rescopeSemantics(frame) ?? this.rebuildSemantics();
+        patches = this.rescopeSemantics(frame) ?? this.restructureSemantics(frame) ?? this.rebuildSemantics();
       }
     }
     if (listener === null) {
@@ -2254,8 +2259,8 @@ export class GessoRuntime {
 
   /** Walks the whole tree and diffs it against the last one. */
   private rebuildSemantics(): readonly UiSemanticsPatch[] {
-    const next = buildSemanticsTree(this.layoutRoot());
-    const patches = diffSemantics(this.semantics, next);
+    const next = buildSemanticsTree(this.layoutRoot(), this.semanticsMemory);
+    const patches = dropIndexShifts(this.semantics, next, diffSemantics(this.semantics, next));
     this.semantics = next;
     this.semanticsStale = false;
     return patches;
@@ -2331,7 +2336,13 @@ export class GessoRuntime {
     const updates: UiSemanticsRecord[] = [];
     for (const owner of owners) {
       const previous = this.semantics.get(owner.id)!;
-      const subtree = buildSemanticsSubtree(owner, previous.parent, previous.index, semanticsInertAbove(owner));
+      const subtree = buildSemanticsSubtree(
+        owner,
+        previous.parent,
+        previous.index,
+        semanticsInertAbove(owner),
+        this.semanticsMemory
+      );
       if (subtree === null) {
         return null;
       }
@@ -2361,6 +2372,157 @@ export class GessoRuntime {
       patches.push({ op: 'update', node: record });
     }
     return patches;
+  }
+
+  /**
+   * The patches for a frame that changed the shape of the tree, without
+   * walking all of it, or null when the whole tree has to be rebuilt.
+   *
+   * Any frame that added or removed a child used to rebuild the tree
+   * from the root, describing every node again. In a 5,000-line editor
+   * that was 11 ms of every Enter, for one new paragraph. Now the walk
+   * starts at the nearest record above each change, as
+   * `rescopeSemantics` does for a change of meaning, and inside it a
+   * subtree nothing touched keeps its records: renumbered if its
+   * siblings moved, never described again (see
+   * `rebuildSemanticsSubtree`). What is described is the path down to
+   * each change, whatever is new, and everything under a node whose
+   * own meaning changed.
+   *
+   * The result is spliced into `this.semantics` in place, since the map
+   * is in document order and a record's subtree is a contiguous run of
+   * it, so adds still arrive in document order. Removals come first.
+   */
+  private restructureSemantics(frame: UiFrame): readonly UiSemanticsPatch[] | null {
+    if (this.semantics.size === 0 || this.semanticsStale) {
+      return null;
+    }
+    const dirty: UiNode[] = [];
+    /** Nodes whose own meaning may have changed: everything under them is described afresh. */
+    const meaning = new Set<UiNode>();
+    let structural = false;
+    for (const [node, flags] of frame.entries()) {
+      const children = (flags & DirtyFlags.Children) !== 0;
+      const semantics = (flags & DirtyFlags.Semantics) !== 0;
+      if (!children && !semantics) {
+        continue;
+      }
+      if (!this.attached(node)) {
+        // Removed this frame; its parent carries the change.
+        continue;
+      }
+      structural ||= children;
+      dirty.push(node);
+      if (semantics) {
+        meaning.add(node);
+      }
+    }
+    if (!structural) {
+      return null;
+    }
+
+    const owners = new Set<UiNode>();
+    for (const node of dirty) {
+      const owner = this.semanticsOwnerOf(node);
+      if (owner === null) {
+        return null;
+      }
+      owners.add(owner);
+    }
+    // One walk covers an owner inside another.
+    for (const owner of [...owners]) {
+      for (let above = owner.parent; above !== null; above = above.parent) {
+        if (owners.has(above)) {
+          owners.delete(owner);
+          break;
+        }
+      }
+    }
+    if (owners.size > SCOPED_SEMANTICS_OWNERS) {
+      return null;
+    }
+
+    // The path from each change up to its owner: the nodes that may now
+    // hold different children, so none of them is taken as it was.
+    const path = new Set<UiNode>();
+    for (const node of dirty) {
+      for (let current: UiNode | null = node; current !== null && !path.has(current); current = current.parent) {
+        path.add(current);
+        if (owners.has(current)) {
+          break;
+        }
+      }
+    }
+    const underChangedMeaning = (node: UiNode): boolean => {
+      for (let current: UiNode | null = node; current !== null; current = current.parent) {
+        if (meaning.has(current)) {
+          return true;
+        }
+        if (owners.has(current)) {
+          return false;
+        }
+      }
+      return false;
+    };
+    const unchanged = (node: UiNode): boolean => !path.has(node) && (meaning.size === 0 || !underChangedMeaning(node));
+
+    // Built completely before anything is committed, so a give-up part
+    // way through leaves `this.semantics` as it was.
+    let next: Map<string, UiSemanticsRecord> = this.semantics;
+    const patches: UiSemanticsPatch[] = [];
+    const later: UiSemanticsPatch[] = [];
+    for (const owner of owners) {
+      const before = next.get(owner.id);
+      if (before === undefined) {
+        return null;
+      }
+      const previous = next;
+      let children: Map<string | null, string[]> | null = null;
+      const childrenOf = (parent: string | null): readonly string[] => {
+        if (children === null) {
+          children = new Map();
+          for (const record of previous.values()) {
+            let list = children.get(record.parent);
+            if (list === undefined) {
+              children.set(record.parent, (list = []));
+            }
+            list[record.index] = record.id;
+          }
+        }
+        return children.get(parent) ?? [];
+      };
+      const reuse = {
+        previous,
+        childrenOf,
+        memory: this.semanticsMemory,
+        unchanged,
+        reused: [] as string[],
+        renumbered: [] as string[]
+      };
+      const subtree = rebuildSemanticsSubtree(owner, before.parent, before.index, semanticsInertAbove(owner), reuse);
+      if (subtree === null) {
+        return null;
+      }
+      const spliced = spliceSemantics(next, owner.id, subtree, new Set(reuse.reused), new Set(reuse.renumbered));
+      for (const id of spliced.removed) {
+        patches.push({ op: 'remove', id });
+      }
+      later.push(...spliced.changed);
+      next = spliced.map;
+    }
+    this.semantics = next;
+    return [...patches, ...later];
+  }
+
+  /** Whether a node is still in the tree being laid out. */
+  private attached(node: UiNode): boolean {
+    const root = this.layoutRoot();
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      if (current === root) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -2479,7 +2641,7 @@ export class GessoRuntime {
               height: rec.boundsMaxY - rec.boundsMinY
             })
           ) {
-            // Left where it was, deliberately: \`semanticsBoxes\` is what
+            // Left where it was, deliberately: `semanticsBoxes` is what
             // the mirror has been told, and leaving the two in step is
             // what makes the box arrive on the frame this node returns.
             continue;
@@ -3373,6 +3535,131 @@ function frameNeedsLayout(frame: UiFrame): boolean {
  * everything is both cheaper and simpler than many walks of parts.
  */
 const SCOPED_SEMANTICS_OWNERS = 32;
+
+/**
+ * Replaces the run of `map` that is `owner`'s subtree with `subtree`,
+ * keeping document order, and says what changed.
+ *
+ * The map is in document order, so a record's descendants are the run
+ * of entries straight after it whose parent chain reaches it. The run
+ * is rebuilt from `subtree`, and after each record in `reused` its own
+ * descendants are carried over from the old run unchanged.
+ *
+ * A `renumbered` record differs from the old one in its place and in
+ * nothing else, so it is never compared field by field: it is sent
+ * only if the records it stays among changed their order (see
+ * `dropIndexShifts`, which this does in the same pass).
+ */
+function spliceSemantics(
+  map: ReadonlyMap<string, UiSemanticsRecord>,
+  owner: string,
+  subtree: ReadonlyMap<string, UiSemanticsRecord>,
+  reused: ReadonlySet<string>,
+  renumbered: ReadonlySet<string>
+): { map: Map<string, UiSemanticsRecord>; removed: string[]; changed: UiSemanticsPatch[] } {
+  const out = new Map<string, UiSemanticsRecord>();
+  const changed: UiSemanticsPatch[] = [];
+  const shifted: UiSemanticsRecord[] = [];
+  const shiftedParents = new Set<string | null>();
+  for (const id of renumbered) {
+    shiftedParents.add(subtree.get(id)!.parent);
+  }
+  const lastOld = new Map<string | null, number>();
+  const reordered = new Set<string | null>();
+  const take = (id: string, record: UiSemanticsRecord): void => {
+    out.set(id, record);
+    const was = map.get(id);
+    if (was === undefined) {
+      changed.push({ op: 'add', node: record });
+      return;
+    }
+    if (was === record) {
+      return;
+    }
+    if (was.parent === record.parent && shiftedParents.has(record.parent)) {
+      if (was.index < (lastOld.get(record.parent) ?? -1)) {
+        reordered.add(record.parent);
+      }
+      lastOld.set(record.parent, was.index);
+    }
+    if (renumbered.has(id) && was.parent === record.parent) {
+      shifted.push(record);
+    } else if (!recordsEqual(was, record)) {
+      changed.push({ op: 'update', node: record });
+    }
+  };
+
+  // The map in order: what comes before the owner, the owner's old run
+  // (the owner and every record whose parent is in it), what comes after.
+  const old: [string, UiSemanticsRecord][] = [];
+  const inside = new Set<string>();
+  let state = 0; // 0 before, 1 in the old run, 2 after
+  const after: [string, UiSemanticsRecord][] = [];
+  for (const entry of map) {
+    if (state === 0 && entry[0] !== owner) {
+      out.set(entry[0], entry[1]);
+      continue;
+    }
+    if (state < 2 && (entry[0] === owner || (entry[1].parent !== null && inside.has(entry[1].parent)))) {
+      state = 1;
+      inside.add(entry[0]);
+      old.push(entry);
+      continue;
+    }
+    state = 2;
+    after.push(entry);
+  }
+  const position = new Map<string, number>();
+  for (let i = 0; i < old.length; i++) {
+    const id = old[i]![0];
+    // Only a reused record with descendants needs finding again.
+    if (reused.has(id) && i + 1 < old.length && old[i + 1]![1].parent === id) {
+      position.set(id, i);
+    }
+  }
+
+  for (const [id, record] of subtree) {
+    take(id, record);
+    const from = position.get(id);
+    if (from === undefined) {
+      continue;
+    }
+    // Its descendants, as they were.
+    const under = new Set<string>([id]);
+    for (let i = from + 1; i < old.length && old[i]![1].parent !== null && under.has(old[i]![1].parent!); i++) {
+      under.add(old[i]![0]);
+      out.set(old[i]![0], old[i]![1]);
+    }
+  }
+  for (const [id, record] of after) {
+    out.set(id, record);
+  }
+
+  if (reordered.size > 0) {
+    for (const record of shifted) {
+      if (reordered.has(record.parent)) {
+        changed.push({ op: 'update', node: record });
+      }
+    }
+    // Back into document order, which is the order a mirror applies them in.
+    const order = new Map<string, number>();
+    let i = 0;
+    for (const id of out.keys()) {
+      order.set(id, i++);
+    }
+    changed.sort(
+      (a, b) =>
+        order.get((a as { node: UiSemanticsRecord }).node.id)! - order.get((b as { node: UiSemanticsRecord }).node.id)!
+    );
+  }
+  const removed: string[] = [];
+  for (const [id] of old) {
+    if (!out.has(id)) {
+      removed.push(id);
+    }
+  }
+  return { map: out, removed, changed };
+}
 
 /**
  * How far outside the canvas a mirrored box is still worth reporting.
