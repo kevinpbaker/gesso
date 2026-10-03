@@ -211,7 +211,16 @@ export function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild 
         // strip, and anything inside sized as a fraction of the panel
         // — a `SplitPane`, a percentage width — had no definite width
         // to be a fraction of, and quietly stopped responding.
-        x: 'stretch'
+        x: 'stretch',
+        // And as tall as what the tabs leave, when the tabs were given a
+        // height: the strip is a header and the panel is the rest. With
+        // only the width stretched, a sidebar of tabs drew its panel at
+        // the height of its content, so a tree or a list inside it could
+        // neither fill the column nor scroll within it. A Tabs sized by
+        // its content is unchanged: the panel then grows into no space.
+        flexGrow: 1,
+        minHeight: 0,
+        y: 'stretch'
       },
       inputs.children.value ?? Row()
     )
