@@ -79,6 +79,12 @@ override with `selfX` and `selfY`:
 stretched child is measured tight, so text inside one wraps at the
 stack's width rather than at its own.
 
+A box's children start at its top left. A `<button>` is a stack too,
+and its children start in its middle, both ways, as an HTML button's
+label does: a label in a 30 pixel high button sits halfway down it
+without an alignment prop. `x` and `y` override that as they do on a
+box, so a row that should span the button takes `x="stretch"`.
+
 ## zIndex is decided in layout
 
 Within one `zIndex`, positioned children paint after their in-flow

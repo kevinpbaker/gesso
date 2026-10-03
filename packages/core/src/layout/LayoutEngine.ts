@@ -414,6 +414,16 @@ function revealShift(start: number, end: number, view: number, size: number): nu
   return 0;
 }
 
+/**
+ * Where a stack puts a child that doesn't say. A box starts at the top
+ * left, as a block does; a button centres its content both ways, as an
+ * HTML button and the `Button` component do, so a label inside a fixed
+ * height sits in the middle of it.
+ */
+function stackDefault(node: UiNode): CrossAxisAlignment {
+  return node.type === UiNodeType.Button ? CrossAxisAlignment.Center : CrossAxisAlignment.Start;
+}
+
 export class LayoutEngine {
   private records = new Map<UiNode, LayoutRecord>();
   /**
@@ -2629,8 +2639,8 @@ export class LayoutEngine {
     const definiteWidth = this.definiteAxis(content, 'width');
     const definiteHeight = this.definiteAxis(content, 'height');
     this.percentBase = { width: definiteWidth, height: definiteHeight };
-    const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Start;
-    const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Start;
+    const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? stackDefault(node);
+    const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? stackDefault(node);
     this.forEachLayoutChild(node, child => {
       const cRec = this.record(child);
       this.resolveLayoutProps(child, cRec);
@@ -3714,8 +3724,8 @@ export class LayoutEngine {
     const contentY = rec.y + rec.paddingTop;
     const contentWidth = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
     const contentHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
-    const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Start;
-    const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Start;
+    const stackX = parseCrossAxisAlignment(node.properties.get('x')) ?? stackDefault(node);
+    const stackY = parseCrossAxisAlignment(node.properties.get('y')) ?? stackDefault(node);
     const mirrored = this.startEdge(node) === 'right';
     const savedBase = this.percentBase;
     // The content box the stack was measured against, which is what a
