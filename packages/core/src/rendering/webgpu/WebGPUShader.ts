@@ -1,3 +1,5 @@
+import { BOX_SHADOW_BLUR_REACH } from '../../properties/UiBoxShadow';
+
 /**
  * WGSL sources for the two WebGPU pipelines.
  *
@@ -20,7 +22,17 @@
  * in physical pixels. A box on integer coordinates is still crisp —
  * every pixel centre is half a pixel from its edge — and rounded
  * corners match the anti-aliased paths Canvas2D draws.
+ *
+ * A box shadow is a primitive too, drawn analytically: the coverage of
+ * a Gaussian-blurred rounded rectangle is integrated in closed form
+ * across one axis (an error function) and sampled along the other, as
+ * in Evan Wallace's "Fast rounded rectangle shadows". It is exact for
+ * square corners and within a fraction of a percent for round ones,
+ * which is closer than browsers' own blur gets to a Gaussian.
  */
+
+/** Mirrors `BOX_SHADOW_BLUR_REACH`: a shadow's quad reaches this many blur radii past its shape. */
+const SHADOW_REACH = BOX_SHADOW_BLUR_REACH;
 
 /** Shared uniforms: logical viewport width and height, device pixel ratio. */
 export const VIEW_UNIFORM_FLOATS = 4;
@@ -173,6 +185,86 @@ fn gradientColor(index: u32, local: vec2f) -> vec4f {
   return unpremultiply(previousColor);
 }
 
+// PrimitiveKind: 0 fill, 1 border, 2 shadow, 3 inset shadow.
+const KIND_BORDER = 1u;
+const KIND_SHADOW = 2u;
+const SHADOW_REACH = ${SHADOW_REACH};
+
+// Abramowitz and Stegun's approximation, to about 5e-4, for two values.
+fn erf2(x: vec2f) -> vec2f {
+  let s = sign(x);
+  let a = abs(x);
+  var t = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
+  t = t * t;
+  return s - s / (t * t);
+}
+
+fn gaussian(x: f32, sigma: f32) -> f32 {
+  return exp(-(x * x) / (2.0 * sigma * sigma)) / (2.5066283 * sigma);
+}
+
+// The blurred shape's coverage along x at one height y, both relative
+// to its centre: an error function across the row the rounded corner
+// leaves at that height.
+fn shadowRow(x: f32, y: f32, sigma: f32, corner: f32, halfSize: vec2f) -> f32 {
+  let delta = min(halfSize.y - corner - abs(y), 0.0);
+  let curved = halfSize.x - corner + sqrt(max(0.0, corner * corner - delta * delta));
+  let integral = 0.5 + 0.5 * erf2((x + vec2f(-curved, curved)) * (0.70710678 / sigma));
+  return integral.y - integral.x;
+}
+
+// Coverage at a point of a rounded rectangle blurred by a Gaussian of
+// the given standard deviation. The row integral is weighted by the
+// Gaussian over the three deviations either side that it reaches.
+fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radius: f32, sigma: f32, dpr: f32) -> f32 {
+  if (size.x <= 0.0 || size.y <= 0.0) {
+    return 0.0;
+  }
+  if (sigma * dpr < 0.25) {
+    // Under a quarter of a device pixel: the sharp shape, anti-aliased.
+    return coverage(roundedRectDistance(point, origin, size, radius), dpr);
+  }
+  let halfSize = size * 0.5;
+  let corner = min(radius, min(halfSize.x, halfSize.y));
+  let p = point - (origin + halfSize);
+  let low = p.y - halfSize.y;
+  let high = p.y + halfSize.y;
+  let first = clamp(-3.0 * sigma, low, high);
+  let last = clamp(3.0 * sigma, low, high);
+  let stride = (last - first) / 4.0;
+  var y = first + stride * 0.5;
+  var value = 0.0;
+  for (var i = 0; i < 4; i = i + 1) {
+    value = value + shadowRow(p.x, p.y - y, sigma, corner, halfSize) * gaussian(y, sigma) * stride;
+    y = y + stride;
+  }
+  return clamp(value, 0.0, 1.0);
+}
+
+// A shadow's alpha at a point of its quad; see the instance layout in
+// WebGPURenderData.ts for what each field holds.
+fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radius: f32, blur: f32, shadow: vec4f, dpr: f32) -> f32 {
+  let sigma = blur * 0.5;
+  let offset = shadow.xy;
+  let spread = shadow.z;
+  if (kind == KIND_SHADOW) {
+    // The quad is the blurred shape grown by the blur's reach; the box
+    // sits back by the offset and in by the spread, and hides it.
+    let reach = blur * SHADOW_REACH;
+    let shapeOrigin = vec2f(reach, reach);
+    let shapeSize = size - vec2f(reach, reach) * 2.0;
+    let boxOrigin = shapeOrigin - offset + vec2f(spread, spread);
+    let boxSize = shapeSize - vec2f(spread, spread) * 2.0;
+    let blurred = blurredRoundedRect(local, shapeOrigin, shapeSize, radius, sigma, dpr);
+    return blurred * (1.0 - coverage(roundedRectDistance(local, boxOrigin, boxSize, shadow.w), dpr));
+  }
+  // Inset: the quad is the box; everything but the blurred hole is shadow.
+  let holeOrigin = offset + vec2f(spread, spread);
+  let holeSize = size - vec2f(spread, spread) * 2.0;
+  let inside = coverage(roundedRectDistance(local, vec2f(0.0, 0.0), size, radius), dpr);
+  return inside * (1.0 - blurredRoundedRect(local, holeOrigin, holeSize, shadow.w, sigma, dpr));
+}
+
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) localPos: vec2f,
@@ -182,6 +274,7 @@ struct VertexOutput {
   @location(4) @interpolate(flat) kind: u32,
   @location(5) @interpolate(flat) clipIndex: f32,
   @location(6) @interpolate(flat) gradientIndex: f32,
+  @location(7) @interpolate(flat) shadow: vec4f,
 };
 
 @vertex
@@ -191,12 +284,13 @@ fn vs(
   @location(2) instanceSize: vec2f,
   @location(3) instanceColor: vec4f,
   @location(4) radiusOpacityBorder: vec3f,
-  @location(5) instanceKind: u32,
+  @location(5) instanceKind: f32,
   @location(6) transformA: vec2f,
   @location(7) transformB: vec2f,
   @location(8) transformC: vec2f,
   @location(9) clipIndex: f32,
   @location(10) gradientIndex: f32,
+  @location(11) shadow: vec4f,
 ) -> VertexOutput {
   var out: VertexOutput;
   // The quad is inflated by one physical pixel on every side so the
@@ -215,9 +309,10 @@ fn vs(
   out.size = instanceSize;
   out.color = instanceColor;
   out.radiusOpacityBorder = radiusOpacityBorder;
-  out.kind = instanceKind;
+  out.kind = u32(instanceKind + 0.5);
   out.clipIndex = clipIndex;
   out.gradientIndex = gradientIndex;
+  out.shadow = shadow;
   return out;
 }
 
@@ -227,7 +322,17 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
   let dist = roundedRectDistance(in.localPos, vec2f(0.0, 0.0), in.size, in.radiusOpacityBorder.x);
 
   var shape = coverage(dist, dpr);
-  if (in.kind != 0u) {
+  if (in.kind >= KIND_SHADOW) {
+    shape = shadowAlpha(
+      in.kind,
+      in.localPos,
+      in.size,
+      in.radiusOpacityBorder.x,
+      in.radiusOpacityBorder.z,
+      in.shadow,
+      dpr
+    );
+  } else if (in.kind == KIND_BORDER) {
     // Border: the band between the outer edge and the inner edge inset
     // by borderWidth.
     let bw = max(in.radiusOpacityBorder.z, 0.0);

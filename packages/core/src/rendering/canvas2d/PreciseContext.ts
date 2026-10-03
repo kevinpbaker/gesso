@@ -286,6 +286,32 @@ export class PreciseContext implements Canvas2DContext, PaintContext2D {
   set globalAlpha(value) {
     this.inner.globalAlpha = value;
   }
+  // A shadow's offset is in device pixels, so a translation held back
+  // here has nothing to add to it.
+  get shadowColor() {
+    return this.inner.shadowColor;
+  }
+  set shadowColor(value) {
+    this.inner.shadowColor = value;
+  }
+  get shadowBlur() {
+    return this.inner.shadowBlur;
+  }
+  set shadowBlur(value) {
+    this.inner.shadowBlur = value;
+  }
+  get shadowOffsetX() {
+    return this.inner.shadowOffsetX;
+  }
+  set shadowOffsetX(value) {
+    this.inner.shadowOffsetX = value;
+  }
+  get shadowOffsetY() {
+    return this.inner.shadowOffsetY;
+  }
+  set shadowOffsetY(value) {
+    this.inner.shadowOffsetY = value;
+  }
   get font() {
     return this.inner.font;
   }

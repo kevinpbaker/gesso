@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { parseTransform } from '../properties/UiTransform';
+import { boxShadow } from '../properties/UiBoxShadow';
+import { lightTheme } from '../environment/UiTheme';
 import {
   computeObjectFitRect,
   createPaintState,
@@ -152,6 +154,27 @@ describe('resolvePaintState', () => {
  * scratch itself; `Canvas2DRenderer.spec` checks that a real walk over
  * a label and its neighbour draws them apart.
  */
+describe('resolvePaintState box shadows', () => {
+  it('resolves palette names against the theme, drops what names nothing, and remembers the result', () => {
+    const shadows = [
+      boxShadow(0, 2, 4, 0, 'primary'),
+      boxShadow(0, 1, 2, 0, 'notAColour'),
+      boxShadow(1, 1, 0, 0, '#ff0000', true)
+    ];
+    const node = nodeWith({ boxShadows: shadows });
+    const first = resolvePaintState(node, createPaintState()).boxShadows;
+    expect(first.map(shadow => shadow.color)).toEqual([lightTheme.colors.primary, { r: 1, g: 0, b: 0, a: 1 }]);
+    expect(first[1]!.inset).toBe(true);
+    // The same array under the same theme is the same answer, so a frame
+    // allocates nothing for it.
+    expect(resolvePaintState(node, createPaintState()).boxShadows).toBe(first);
+  });
+
+  it('is empty for a node with none', () => {
+    expect(resolve({}).boxShadows).toEqual([]);
+  });
+});
+
 describe('resolvePaintState reusing a scratch', () => {
   it('leaves a box none of the text node resolved before it', () => {
     const scratch = createPaintState();

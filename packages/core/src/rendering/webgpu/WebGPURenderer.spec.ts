@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WebGPURenderer } from './WebGPURenderer';
 import { WebGPUSurface } from './WebGPUSurface';
 import { WebGPUError } from './WebGPUError';
+import { INSTANCE_STRIDE_BYTES } from './WebGPURenderData';
 import { RenderHarness } from '../RenderTestUtils';
 import { UiNodeType } from '../../graph/UiNodeType';
 import { Constraints } from '../../layout/LayoutTypes';
@@ -108,6 +109,51 @@ describe('WebGPURenderer initialization', () => {
       await renderer.initialize();
       renderer.resize(800, 600, 1);
       expect(renderer.isReady).toBe(true);
+      renderer.dispose();
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', {
+        value: originalNavigator,
+        configurable: true
+      });
+    }
+  });
+
+  it('reads every float of a primitive instance, the kind as the float it is written as', async () => {
+    // The builder writes instances into a Float32Array, the kind and the
+    // shadow fields included; a layout that skipped a field, or read the
+    // kind's bits as an integer, would draw a shadow as something else.
+    const device = createMockDevice();
+    const adapter = createMockAdapter(device);
+    const originalNavigator = globalThis.navigator;
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        gpu: {
+          requestAdapter: vi.fn(async () => adapter),
+          getPreferredCanvasFormat: vi.fn(() => 'bgra8unorm')
+        }
+      },
+      configurable: true
+    });
+    try {
+      const { host } = createMockHost(createMockContext());
+      const renderer = new WebGPURenderer({ surface: new WebGPUSurface(host) });
+      await renderer.initialize();
+      const descriptors = vi
+        .mocked(device.createRenderPipeline)
+        .mock.calls.map(call => call[0] as GPURenderPipelineDescriptor);
+      const layout = descriptors
+        .map(descriptor => [...descriptor.vertex.buffers!][1] as GPUVertexBufferLayout)
+        .find(buffer => buffer.arrayStride === INSTANCE_STRIDE_BYTES)!;
+      const attributes = [...layout.attributes].sort((a, b) => a.offset - b.offset);
+      const sizes: Record<string, number> = { float32: 4, float32x2: 8, float32x3: 12, float32x4: 16 };
+      let next = 0;
+      for (const attribute of attributes) {
+        expect(attribute.offset, `location ${attribute.shaderLocation}`).toBe(next);
+        expect(sizes[attribute.format], `location ${attribute.shaderLocation} format`).toBeDefined();
+        next += sizes[attribute.format]!;
+      }
+      expect(next).toBe(INSTANCE_STRIDE_BYTES);
+      expect(attributes.find(attribute => attribute.offset === 44)!.format).toBe('float32');
       renderer.dispose();
     } finally {
       Object.defineProperty(globalThis, 'navigator', {

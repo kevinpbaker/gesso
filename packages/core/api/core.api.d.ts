@@ -353,6 +353,10 @@ declare class LayoutRecord {
   extentMinY: number;
   extentMaxX: number;
   extentMaxY: number;
+  paintReachLeft: number;
+  paintReachTop: number;
+  paintReachRight: number;
+  paintReachBottom: number;
   scrollable: boolean;
   scrollsText: boolean;
   textScrollbars: boolean;
@@ -1017,12 +1021,20 @@ interface UiBoxShadow {
   readonly offsetY: number;
   readonly blurRadius: number;
   readonly spreadRadius: number;
-  readonly color: UiColor;
+  readonly color: UiColorValue;
   readonly inset?: boolean;
 }
-declare function boxShadow(offsetX: number, offsetY: number, blurRadius: number, spreadRadius: number, color: UiColor, inset?: boolean): UiBoxShadow;
+declare function boxShadow(offsetX: number, offsetY: number, blurRadius: number, spreadRadius: number, color: UiColorValue, inset?: boolean): UiBoxShadow;
 declare function boxShadowsEqual(a: UiBoxShadow, b: UiBoxShadow): boolean;
 declare function boxShadowArraysEqual(a: readonly UiBoxShadow[], b: readonly UiBoxShadow[]): boolean;
+declare const BOX_SHADOW_BLUR_REACH = 1.5;
+declare function boxShadowRadius(boxRadius: number, spreadRadius: number, inset: boolean): number;
+declare function boxShadowReach(shadows: readonly UiBoxShadow[], out: {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}): void;
 interface PercentLength {
   readonly unit: 'percent';
   readonly value: number;
@@ -2225,7 +2237,7 @@ interface PaintState {
   borderColor: UiColor | undefined;
   borderWidth: number;
   borderRadius: UiBorderRadius;
-  boxShadows: readonly UiBoxShadow[];
+  boxShadows: readonly PaintBoxShadow[];
   hasTransform: boolean;
   transform: UiTransform;
   text: string | undefined;
@@ -2256,6 +2268,9 @@ interface PaintState {
   selectionColor: UiColor;
   matchColor: UiColor;
   caretColor: UiColor;
+}
+interface PaintBoxShadow extends UiBoxShadow {
+  readonly color: UiColor;
 }
 interface PaintTextSpan extends UiTextMetrics {
   readonly start: number;
@@ -2328,6 +2343,10 @@ interface Canvas2DContext {
   font: string;
   textAlign: CanvasTextAlign;
   textBaseline: CanvasTextBaseline;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
 }
 interface TextLinePlacement {
   text: string;
@@ -3552,6 +3571,7 @@ declare class LayoutEngine {
   private axisMax;
   private axisConstraints;
   private assignBox;
+  private refreshPaintReach;
   private updateExtent;
   private growExtentUp;
   private shiftSubtree;
@@ -4203,6 +4223,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private renderLifted;
   private applyAncestors;
   private paintBackground;
+  private paintShadows;
   private fillBox;
   private paintImage;
   private paintPicture;
@@ -4755,7 +4776,7 @@ declare class GlyphShaper {
   private shapeClusters;
   clear(): void;
 }
-declare const INSTANCE_STRIDE_FLOATS = 20;
+declare const INSTANCE_STRIDE_FLOATS = 24;
 declare const INSTANCE_STRIDE_BYTES: number;
 declare const TEXTURED_STRIDE_FLOATS = 16;
 declare const TEXTURED_STRIDE_BYTES: number;
@@ -4764,7 +4785,9 @@ declare const CLIP_STRIDE_BYTES: number;
 declare const NO_CLIP_INDEX = -1;
 declare const enum PrimitiveKind {
   Fill = 0,
-  Border = 1
+  Border = 1,
+  Shadow = 2,
+  InsetShadow = 3
 }
 declare const enum CommandKind {
   Primitives = 0,
@@ -5140,10 +5163,13 @@ export {
   borderShapes,
   BordersOptions,
   Box,
+  BOX_SHADOW_BLUR_REACH,
   BoxModelProps,
   BoxProps,
   boxShadow,
   boxShadowArraysEqual,
+  boxShadowRadius,
+  boxShadowReach,
   boxShadowsEqual,
   breakpoint,
   BreakpointArgs,
@@ -5411,7 +5437,6 @@ export {
   isUiSemanticState,
   isVideoSurface,
   isWebGPUAvailable,
-  jf,
   KeyboardControllerOptions,
   LABEL_PADDING_X,
   labelNode,
@@ -5464,6 +5489,7 @@ export {
   MAX_MEASURES_PER_CHILD,
   measure,
   measureSpan,
+  Mf,
   minmax,
   MinMaxTrack,
   motion,
@@ -5510,6 +5536,7 @@ export {
   OverrideSources,
   Paint,
   PaintBox,
+  PaintBoxShadow,
   PaintCanvas,
   PaintCanvasFactory,
   PaintContext2D,
@@ -6041,10 +6068,13 @@ import {
   borderShapes,
   BordersOptions,
   Box,
+  BOX_SHADOW_BLUR_REACH,
   BoxModelProps,
   BoxProps,
   boxShadow,
   boxShadowArraysEqual,
+  boxShadowRadius,
+  boxShadowReach,
   boxShadowsEqual,
   breakpoint,
   BreakpointArgs,
@@ -6410,6 +6440,7 @@ import {
   OverrideSources,
   Paint,
   PaintBox,
+  PaintBoxShadow,
   PaintCanvas,
   PaintCanvasFactory,
   PaintContext2D,
@@ -6910,7 +6941,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DfsfzSuk.js";
+} from "./index-gDp3EJVq.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -6931,8 +6962,11 @@ export {
   borders,
   borderShapes,
   Box,
+  BOX_SHADOW_BLUR_REACH,
   boxShadow,
   boxShadowArraysEqual,
+  boxShadowRadius,
+  boxShadowReach,
   boxShadowsEqual,
   breakpoint,
   bufferSource,
@@ -7451,6 +7485,7 @@ export {
   type OverlayShape,
   type OverrideSources,
   type PaintBox,
+  type PaintBoxShadow,
   type PaintCanvas,
   type PaintCanvasFactory,
   type PaintContext2D,
@@ -7842,7 +7877,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DfsfzSuk.js";
+} from "./index-gDp3EJVq.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
@@ -7939,6 +7974,10 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   private _font;
   private _textAlign;
   private _textBaseline;
+  private _shadowColor;
+  private _shadowBlur;
+  private _shadowOffsetX;
+  private _shadowOffsetY;
   letterSpacing: string;
   get fillStyle(): string | Canvas2DGradient | CanvasPattern;
   set fillStyle(value: string | Canvas2DGradient | CanvasPattern);
@@ -7956,6 +7995,14 @@ declare class RecordingCanvasContext implements Canvas2DContext {
   set textAlign(value: CanvasTextAlign);
   get textBaseline(): CanvasTextBaseline;
   set textBaseline(value: CanvasTextBaseline);
+  get shadowColor(): string;
+  set shadowColor(value: string);
+  get shadowBlur(): number;
+  set shadowBlur(value: number);
+  get shadowOffsetX(): number;
+  set shadowOffsetX(value: number);
+  get shadowOffsetY(): number;
+  set shadowOffsetY(value: number);
   private readonly saved;
   save(): void;
   restore(): void;

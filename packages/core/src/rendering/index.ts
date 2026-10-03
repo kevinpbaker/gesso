@@ -66,7 +66,7 @@ export {
 } from './TextRenderer';
 export { registerFontStack, fontStackFor, bumpFontStack, clearFontStacks } from './FontStacks';
 export type { TextLinePlacement, PlacedTextRun, TextRunRect, CanvasTextStyle, SpanPaint } from './TextRenderer';
-export type { PaintTextSpan } from './PaintState';
+export type { PaintBoxShadow, PaintTextSpan } from './PaintState';
 export type { UiRenderer, RendererBackend } from './UiRenderer';
 export { WebGPURenderer } from './webgpu/WebGPURenderer';
 export type { WebGPURendererOptions, RenderHooks, DrawStats, CapturedFrame } from './webgpu/WebGPURenderer';

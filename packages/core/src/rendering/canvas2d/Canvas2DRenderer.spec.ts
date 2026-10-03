@@ -4,6 +4,7 @@ import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import { Constraints } from '../../layout/LayoutTypes';
 import { callArgs, callNames, RenderHarness, savedDepth } from '../RenderTestUtils';
+import { boxShadow } from '../../properties/UiBoxShadow';
 
 function box(harness: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
   const node = harness.createNode(id, UiNodeType.Box);
@@ -597,6 +598,82 @@ describe('Canvas2DRenderer device pixel ratio', () => {
     expect(first[0].args).toEqual([1, 0, 0, 1, 0, 0]);
     expect(first[1].args).toEqual([0, 0, 1600, 1200]);
     expect(first[2].args).toEqual([2, 0, 0, 2, 0, 0]);
+  });
+});
+
+describe('Canvas2DRenderer box shadows', () => {
+  /** The values set on a shadow property, in order. */
+  function shadowSets(h: RenderHarness, name: string): unknown[] {
+    return h.context.calls.filter(call => call.name === `set:${name}`).map(call => call.args[0]);
+  }
+
+  it('casts the shadow back from where the shape is thrown, in device pixels', () => {
+    // At a device pixel ratio of 2 the canvas's shadow offset and blur
+    // are twice their logical size: neither is touched by the transform.
+    const h = new RenderHarness(800, 600, 2);
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 50);
+    h.append(
+      root,
+      box(h, 'card', {
+        width: 100,
+        height: 40,
+        backgroundColor: '#fff',
+        boxShadows: [boxShadow(3, 4, 6, 2, 'rgba(0, 0, 0, 0.5)')]
+      })
+    );
+    h.layout(root);
+    h.render(root);
+
+    expect(shadowSets(h, 'shadowBlur')).toEqual([12]);
+    expect(shadowSets(h, 'shadowColor')).toEqual(['rgba(0, 0, 0, 0.5)']);
+    const [throwX] = shadowSets(h, 'shadowOffsetX') as number[];
+    const [throwY] = shadowSets(h, 'shadowOffsetY') as number[];
+    expect(throwY).toBeCloseTo(0);
+    // The shape is drawn `away` to the right of where the shadow lands,
+    // and the shadow is cast back by the same distance.
+    const fill = h.context.calls.findIndex(call => call.name === 'fill');
+    const shape = h.context.calls.slice(0, fill).findLast(call => call.name === 'rect')!.args as number[];
+    expect(shape[0] + throwX / 2).toBe(50 + 3 - 2);
+    expect(shape.slice(1)).toEqual([50 + 4 - 2, 104, 44]);
+    // Thrown past the clip, so the shape itself never shows.
+    expect(shape[0]).toBeGreaterThan(50 + 100 + 6 * 2 + 2 + 3 + 4);
+    // The background follows the shadow, and the shadow state does not
+    // outlive it.
+    expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#000', '#fff']);
+    expect(h.context.shadowColor).toBe('rgba(0, 0, 0, 0)');
+  });
+
+  it('carries the throw through the transform', () => {
+    // A quarter turn: what is thrown along the node's x lands on the
+    // device's y, and the cast back has to follow it there.
+    const h = new RenderHarness();
+    (h.context as { getTransform?: () => object }).getTransform = () => ({ a: 0, b: 1, c: -1, d: 0, e: 0, f: 0 });
+    const root = h.createNode('app', UiNodeType.Column);
+    h.append(root, box(h, 'card', { width: 100, height: 40, boxShadows: [boxShadow(0, 0, 4, 0, '#000')] }));
+    h.layout(root);
+    h.render(root);
+    const [throwX] = shadowSets(h, 'shadowOffsetX') as number[];
+    const [throwY] = shadowSets(h, 'shadowOffsetY') as number[];
+    expect(throwX).toBeCloseTo(0);
+    expect(throwY).toBeLessThan(-100);
+    expect(shadowSets(h, 'shadowBlur')).toEqual([4]);
+  });
+
+  it('skips a transparent shadow and one whose colour names nothing', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    h.append(
+      root,
+      box(h, 'card', {
+        width: 100,
+        height: 40,
+        boxShadows: [boxShadow(0, 2, 4, 0, 'rgba(0, 0, 0, 0)'), boxShadow(0, 2, 4, 0, 'notAColour')]
+      })
+    );
+    h.layout(root);
+    h.render(root);
+    expect(shadowSets(h, 'shadowColor')).toEqual([]);
   });
 });
 
