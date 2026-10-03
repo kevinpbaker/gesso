@@ -83,6 +83,18 @@ export interface UiTextMetrics {
   readonly fontVariant?: UiFontVariant;
   readonly fontKerning?: UiFontKerning;
   readonly letterSpacing?: number;
+  /**
+   * Kept in the text but not drawn: the run takes no room, paints
+   * nothing, and a caret steps over it as one unit.
+   *
+   * It is a metric field because it changes a width, to nothing. Its
+   * characters stay where they were, so every offset still means what
+   * it meant, a copy of the text still copies them, and the semantics
+   * mirror still reads them. It is how an editor that styles markup
+   * as it is typed (`**bold**` drawn as a bold word) puts the markers
+   * out of sight without taking them out of the string.
+   */
+  readonly hidden?: boolean;
 }
 
 /**
@@ -200,6 +212,7 @@ export function flattenTextSpans(spans: readonly UiTextSpan[]): UiSpannedText {
       fontVariant: span.fontVariant,
       fontKerning: span.fontKerning,
       letterSpacing: span.letterSpacing,
+      hidden: span.hidden,
       color: span.color,
       backgroundColor: span.backgroundColor,
       textDecoration: span.textDecoration,
@@ -268,9 +281,114 @@ export function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[] {
  * plain colour rather than a frame of nonsense, and corrects itself
  * as soon as the application catches up.
  */
-export function editableSpansOf(node: UiNode, text: string): readonly UiResolvedTextSpan[] {
+export function editableSpansOf(
+  node: UiNode,
+  text: string,
+  composition?: UiTextRange | null
+): readonly UiResolvedTextSpan[] {
   const spanned = spannedTextOf(node);
-  return spanned !== undefined && spanned.text === text ? spanned.spans : EMPTY_SPANS;
+  if (spanned === undefined) {
+    return EMPTY_SPANS;
+  }
+  if (spanned.text === text) {
+    return spanned.spans;
+  }
+  if (composition !== undefined && composition !== null) {
+    return composedSpans(spanned, text, composition) ?? EMPTY_SPANS;
+  }
+  return EMPTY_SPANS;
+}
+
+/**
+ * The runs of a field an IME is composing in.
+ *
+ * The application hears nothing until the composition commits, so its
+ * runs describe the text without the composing characters. That is a
+ * difference with one known shape, so rather than drawing the field
+ * unstyled for the whole composition, which would show every hidden
+ * marker in it until the commit, the runs are moved to make room: the
+ * composing text joins the visible run it is typed at the end of or
+ * inside, and is plain where that run is hidden or there is none.
+ * Hidden text is never extended over it.
+ */
+const composed = new WeakMap<UiSpannedText, { key: string; spans: readonly UiResolvedTextSpan[] }>();
+
+function composedSpans(
+  spanned: UiSpannedText,
+  text: string,
+  composition: UiTextRange
+): readonly UiResolvedTextSpan[] | undefined {
+  const at = composition.start;
+  const length = composition.end - composition.start;
+  if (
+    text.length !== spanned.text.length + length ||
+    text.slice(0, at) + text.slice(composition.end) !== spanned.text
+  ) {
+    return undefined;
+  }
+  const key = `${at}:${length}`;
+  const cached = composed.get(spanned);
+  if (cached !== undefined && cached.key === key) {
+    return cached.spans;
+  }
+  const spans: UiResolvedTextSpan[] = [];
+  for (const span of spanned.spans) {
+    if (span.end < at || (span.end === at && span.hidden === true)) {
+      spans.push(span);
+    } else if (span.start >= at) {
+      spans.push({ ...span, start: span.start + length, end: span.end + length });
+    } else if (span.hidden === true) {
+      // Typed inside hidden text: the hidden text is cut round it.
+      spans.push({ ...span, end: at }, { ...span, start: at + length, end: span.end + length });
+    } else {
+      spans.push({ ...span, end: span.end + length });
+    }
+  }
+  composed.set(spanned, { key, spans });
+  return spans;
+}
+
+/** A stretch of a paragraph, as offsets into its text. */
+export interface UiTextRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+const NO_RANGES: readonly UiTextRange[] = [];
+const hiddenRanges = new WeakMap<readonly HiddenSpan[], readonly UiTextRange[]>();
+
+/** The part of a run `hiddenRangesOf` reads; a paint span has it as well as a resolved one. */
+type HiddenSpan = Pick<UiResolvedTextSpan, 'start' | 'end' | 'hidden'>;
+
+/**
+ * The stretches of a paragraph its runs hide, in order, with runs that
+ * touch merged into one: `**` hidden next to a hidden `_` is one
+ * stretch of three characters, which a caret steps over at once.
+ * Remembered by the identity of the array, as the flattening is.
+ */
+export function hiddenRangesOf(spans: readonly HiddenSpan[]): readonly UiTextRange[] {
+  if (spans.length === 0) {
+    return NO_RANGES;
+  }
+  const cached = hiddenRanges.get(spans);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const ranges: { start: number; end: number }[] = [];
+  for (const span of spans) {
+    if (span.hidden !== true) {
+      continue;
+    }
+    const last = ranges[ranges.length - 1];
+    if (last !== undefined && last.end === span.start) {
+      last.end = span.end;
+    } else {
+      ranges.push({ start: span.start, end: span.end });
+    }
+  }
+  const result = ranges.length === 0 ? NO_RANGES : ranges;
+  hiddenRanges.set(spans, result);
+  return result;
 }
 
 /** The span covering an offset, or undefined where no run does. */
@@ -317,6 +435,7 @@ function spansEqual(a: UiTextSpan, b: UiTextSpan): boolean {
     a.fontVariant === b.fontVariant &&
     a.fontKerning === b.fontKerning &&
     a.letterSpacing === b.letterSpacing &&
+    a.hidden === b.hidden &&
     colorValueEqual(a.color, b.color) &&
     colorValueEqual(a.backgroundColor, b.backgroundColor) &&
     a.textDecoration === b.textDecoration &&

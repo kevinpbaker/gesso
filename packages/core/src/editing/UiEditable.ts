@@ -1,6 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { EditableTextModel } from './EditableTextModel';
+import { editableSpansOf, hiddenRangesOf } from '../properties/UiTextStyle';
 
 /** The node property holding an editable's model; see UiProperties.editor. */
 export const EDITOR_PROP = 'editor';
@@ -36,6 +37,7 @@ export function editorFor(node: UiNode): EditableTextModel {
     node.properties.set(EDITOR_PROP, model);
   }
   syncEditorValue(node, model);
+  syncEditorHidden(node, model);
   return model;
 }
 
@@ -54,6 +56,15 @@ export function syncEditorValue(node: UiNode, model: EditableTextModel): void {
   }
   model.syncedValue = text;
   model.replaceText(text ?? '');
+}
+
+/**
+ * Tells the model which of its text the node's runs hide, so the caret
+ * steps over it. The same runs paint and layout accept: none at all
+ * when they describe some other text.
+ */
+function syncEditorHidden(node: UiNode, model: EditableTextModel): void {
+  model.setHidden(model.text, hiddenRangesOf(editableSpansOf(node, model.text, model.composition)));
 }
 
 export function isEditableNode(node: UiNode): boolean {

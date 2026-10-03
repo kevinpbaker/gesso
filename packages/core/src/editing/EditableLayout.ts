@@ -1,5 +1,6 @@
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { TextMeasurer } from '../layout/TextMeasurer';
+import { spannedRunsFor } from '../layout/TextMeasurer';
 import type { PaintState } from '../rendering/PaintState';
 import { placeLines, textMeasureRequest, type TextLinePlacement } from '../rendering/TextRenderer';
 import type { EditableTextModel } from './EditableTextModel';
@@ -46,7 +47,17 @@ export class EditableLayout {
     request.maxLines = undefined;
     request.overflow = 'clip';
     this.lines = placeLines(box, state, measurer.layout(request));
-    this.measure = text => (text.length === 0 ? 0 : measurer.measureRunWidth(text, request));
+    // A field with runs is measured run by run, by offset, as its lines
+    // were: a caret after a bold word sits after the bold glyphs, and
+    // one after a hidden run sits where that run takes no room. A string
+    // that is not in the text (no offset) is measured in the field's font.
+    const spanned = spannedRunsFor(request, measurer);
+    this.measure = (text, start) =>
+      text.length === 0
+        ? 0
+        : spanned === undefined || start === undefined
+          ? measurer.measureRunWidth(text, request)
+          : spanned.width(model.text, start, start + text.length);
     this.rtl = state.rtl;
     this.placeholderLines =
       model.text.length === 0 && state.placeholder !== undefined && state.placeholder.length > 0
@@ -58,12 +69,21 @@ export class EditableLayout {
     return caretRectFor(this.lines, this.model.text, offset, this.measure, this.rtl);
   }
 
+  /**
+   * The caret position nearest a point. Where hidden text sits at the
+   * boundary nearest the point, a point before the boundary (left of it
+   * in left-to-right text) lands before the hidden text and a point
+   * past it lands after: hidden text takes no room, so its two ends
+   * are drawn at one x and the side of the press is what tells them
+   * apart. Never inside hidden text.
+   */
   offsetAt(x: number, y: number): number {
-    return offsetAtPoint(this.lines, this.model.text, x, y, this.measure, this.rtl);
+    return this.model.caretOffsetNear(offsetAtPoint(this.lines, this.model.text, x, y, this.measure, this.rtl));
   }
 
   verticalMove(offset: number, direction: -1 | 1, goalX?: number): { offset: number; x: number } | null {
-    return offsetForVerticalMove(this.lines, this.model.text, offset, direction, this.measure, this.rtl, goalX);
+    const move = offsetForVerticalMove(this.lines, this.model.text, offset, direction, this.measure, this.rtl, goalX);
+    return move === null ? null : { offset: this.model.caretOffsetNear(move.offset), x: move.x };
   }
 
   /**

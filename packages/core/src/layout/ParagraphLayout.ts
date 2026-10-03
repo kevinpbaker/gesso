@@ -386,6 +386,10 @@ function lineBox(
   let above = metrics.ascent + halfLeading(lineHeight, metrics);
   let below = lineHeight - above;
   for (const span of spanned.spans) {
+    if (span.hidden === true) {
+      // A run that is not drawn has no glyphs to make room for.
+      continue;
+    }
     const runMetrics = runs.fontMetrics(spanned.requestAt(span.start));
     const top = halfLeading(lineHeight, runMetrics);
     ascent = Math.max(ascent, runMetrics.ascent);
@@ -435,7 +439,7 @@ function breakGreedy(
     for (let i = from; i < to; i++) {
       const blank = paragraph.charCodeAt(i) === IDEOGRAPHIC_SPACE ? '　' : ' ';
       if (spanned !== undefined) {
-        width += spanned.widthOf(blank, offset + i);
+        width += spanned.hiddenAt(offset + i) ? 0 : spanned.widthOf(blank, offset + i);
       } else if (blank === ' ') {
         width += spaceWidth;
       } else {

@@ -124,4 +124,44 @@ describe('layoutParagraph with runs', () => {
       expect(paragraph.height).toBe(paragraph.lineHeight * 2);
     });
   });
+
+  describe('hidden runs', () => {
+    it('take no room and are left out of the line’s runs', () => {
+      // `**ab**cd`: the markers are in the text and nowhere in the picture.
+      const paragraph = layout('**ab**cd', [
+        { start: 0, end: 2, hidden: true },
+        { start: 2, end: 4, fontWeight: 700 },
+        { start: 4, end: 6, hidden: true }
+      ]);
+      expect(paragraph.lines[0].start).toBe(0);
+      expect(paragraph.lines[0].end).toBe(8);
+      expect(paragraph.lines[0].width).toBe(24);
+      expect(shapeOf(paragraph.lines[0].runs)).toEqual([
+        [1, 'ab', 0, 12],
+        [-1, 'cd', 12, 12]
+      ]);
+      expect(paragraph.maxContentWidth).toBe(24);
+    });
+
+    it('break lines by the visible text alone', () => {
+      // 'aa bb' fits 30 (five glyphs, 30); with the hidden link target
+      // counted it would not.
+      const text = 'aa bb](https://example.com)';
+      const paragraph = layout(text, [{ start: 5, end: text.length, hidden: true }], { maxWidth: 30 });
+      expect(paragraph.lines).toHaveLength(1);
+    });
+
+    it('count a hidden space between words as nothing', () => {
+      const paragraph = layout('ab cd', [{ start: 2, end: 3, hidden: true }], { maxWidth: 24 });
+      expect(paragraph.lines).toHaveLength(1);
+      expect(paragraph.lines[0].width).toBe(24);
+    });
+
+    it('do not make the line box taller', () => {
+      const plain = layout('abcd', []);
+      const paragraph = layout('abcd', [{ start: 0, end: 2, fontSize: 40, hidden: true }]);
+      expect(paragraph.lineHeight).toBe(plain.lineHeight);
+      expect(paragraph.firstBaseline).toBe(plain.firstBaseline);
+    });
+  });
 });

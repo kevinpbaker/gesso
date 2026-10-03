@@ -39,11 +39,12 @@ did.
 | `fontStyle`                                 | `normal`, `italic` or `oblique`                    |
 | `fontStretch`, `fontVariant`, `fontKerning` | The width axis, small caps, and the font's kerning |
 | `letterSpacing`                             | Tracking, for this run only                        |
+| `hidden`                                    | Keeps the run in the text but draws nothing for it |
 | `color`, `backgroundColor`                  | A value or a theme token, resolved per run         |
 | `textDecoration`                            | `underline`, `line-through`, or both               |
 | `link`                                      | Makes the run pressable; see below                 |
 
-The first seven change how wide the run measures, so a paragraph is
+The first eight change how wide the run measures, so a paragraph is
 laid out again when one of them changes. The last three do not: a run
 that changed only its colour, its background, its underline or its
 handler is repainted from the lines the layout already found.
@@ -135,6 +136,67 @@ while the application catches up is the better failure.
 Everything else about a field is unchanged: it still scrolls its own
 text, still shows a placeholder, still carries a caret and a
 selection.
+
+## Hidden runs
+
+A run with `hidden: true` stays in the text and leaves the picture: it
+takes no room, the line breaker counts it as nothing, and neither
+renderer draws it. Its characters keep their offsets, so a selection,
+a copy, find-in-page and undo all still see them. It is how a markdown
+editor draws `**bold**` as a bold word while the asterisks stay in the
+string being typed, which the rule above insists on.
+
+```tsx
+<editabletext
+  value="**bold** text"
+  spans={[
+    { text: '**', hidden: true },
+    { text: 'bold', fontWeight: 700 },
+    { text: '**', hidden: true },
+    { text: ' text' }
+  ]}
+/>
+```
+
+In a field, the caret treats each stretch of hidden text (runs that
+touch count as one) as a unit it cannot stop inside, so every key moves
+something you can see:
+
+- **Arrows** cross one visible character, or with the word modifier one
+  visible word, and the hidden text in the way. They stop on the side
+  of any hidden text there nearest where they started: from the end of
+  `**bold**`, Left stops between `l` and `d`; from just after the `d`,
+  Right goes over the markers and on. Where nothing visible is left in
+  that direction the caret goes past the hidden text to the end, and
+  in an editing group it goes on to the next field.
+- **Backspace and Delete** remove the visible character or word next to
+  the caret and keep hidden text at either end of it: Backspace at the
+  end of `**bold**` leaves `**bol**`. Hidden text strictly inside what
+  they remove goes with it. A selection is deleted exactly as selected,
+  hidden text included. Where nothing visible is left in that
+  direction they delete nothing.
+- **A press** lands on the nearest boundary as always. Where hidden
+  text sits there, both its ends are drawn at one x, so the side of the
+  press decides: before the boundary (left of it, in left-to-right
+  text) is before the hidden text, past it is after. A double click
+  selects the word as drawn, with hidden text inside the word included
+  and hidden text round it left out.
+- **The selection highlight** skips hidden text, which has no width to
+  highlight; `selectedText` and a copy still include it.
+- **An offset the application sets** with a selection is kept as given,
+  even inside hidden text, since the application may be about to show
+  that text. The next move steps out of it.
+- **An IME** composes at the caret as usual. While it composes the
+  application has not been told about the new characters, so its runs
+  describe the text without them; rather than dropping the runs and
+  showing every hidden marker until the commit, the field moves them
+  to make room. The composing text joins the visible run it is typed
+  at the end of or inside, and is never made hidden.
+
+The accessibility mirror, and the editing proxy a screen reader reads a
+field through, still have the whole text, hidden runs included: a
+screen reader hears `**bold**` with its asterisks. That is a known
+limitation, not a decision.
 
 ## What is not here
 

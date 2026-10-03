@@ -2815,7 +2815,7 @@ export class LayoutEngine {
       // accepted only if they describe that string; see
       // `editableSpansOf`.
       const typed = editable ? editorFor(node).text : '';
-      const spans = editable ? editableSpansOf(node, typed) : resolvedSpansOf(node);
+      const spans = editable ? editableSpansOf(node, typed, editorFor(node).composition) : resolvedSpansOf(node);
       const text = editable
         ? typed
         : spans.length > 0

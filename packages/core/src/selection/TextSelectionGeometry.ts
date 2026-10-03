@@ -4,7 +4,10 @@ import { spannedRunsFor } from '../layout/TextMeasurer';
 import type { PaintState } from '../rendering/PaintState';
 import { placeLines, textMeasureRequest, type TextLinePlacement } from '../rendering/TextRenderer';
 import { offsetAtPoint, selectionRects, type RunMeasure } from '../editing/TextGeometry';
-import { wordRangeAt } from '../editing/TextBoundaries';
+import { visibleWordRange } from '../editing/HiddenText';
+import { hiddenRangesOf, type UiTextRange } from '../properties/UiTextStyle';
+
+const NO_RANGES: readonly UiTextRange[] = [];
 
 /**
  * A laid-out paragraph, ready to answer the two questions a selection
@@ -30,6 +33,8 @@ export interface ParagraphGeometry {
   readonly end: number;
   readonly measure: RunMeasure;
   readonly rtl: boolean;
+  /** Stretches of the text its runs hide; a double click selects words as drawn. */
+  readonly hidden: readonly UiTextRange[];
 }
 
 /**
@@ -91,7 +96,8 @@ function geometryFor(
         : spanned === undefined || from === undefined
           ? measurer.measureRunWidth(run, request)
           : spanned.width(text, from, from + run.length),
-    rtl: state.rtl
+    rtl: state.rtl,
+    hidden: state.spans === undefined ? NO_RANGES : hiddenRangesOf(state.spans)
   };
 }
 
@@ -120,7 +126,7 @@ export function selectionRectsIn(geometry: ParagraphGeometry, start: number, end
 
 /** The word around an offset, for a double click. */
 export function wordRangeIn(geometry: ParagraphGeometry, offset: number): { start: number; end: number } {
-  return wordRangeAt(geometry.text, clamp(offset, geometry.start, geometry.end));
+  return visibleWordRange(geometry.text, geometry.hidden, clamp(offset, geometry.start, geometry.end));
 }
 
 function clamp(value: number, low: number, high: number): number {

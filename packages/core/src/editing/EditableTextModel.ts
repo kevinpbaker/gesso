@@ -6,6 +6,8 @@ import {
   previousGraphemeStart,
   previousWordStart
 } from './TextBoundaries';
+import type { UiTextRange } from '../properties/UiTextStyle';
+import { VisibleText, caretOffsetNear } from './HiddenText';
 
 /** How far a caret move or a delete reaches. */
 export type EditUnit = 'grapheme' | 'word' | 'line' | 'document';
@@ -25,6 +27,7 @@ interface Snapshot {
 type EditKind = 'insert' | 'delete' | 'other';
 
 const MAX_UNDO = 500;
+const NOTHING_HIDDEN: readonly UiTextRange[] = [];
 
 /**
  * The text behind an editable node: the buffer, the selection, the
@@ -46,6 +49,26 @@ const MAX_UNDO = 500;
  * took. `replaceText` — the host resetting the value from outside —
  * drops the history: the text it replaces never existed as far as the
  * next undo is concerned.
+ *
+ * **Hidden text.** Runs the field draws as nothing (`hidden` on a
+ * span) are still in the text, and the caret treats each stretch of
+ * them as one unit it cannot stop inside:
+ *
+ * - A move by grapheme or word crosses one visible grapheme or word,
+ *   and with it the hidden text in the way, and stops on the side of
+ *   any hidden text there nearest where it started. From the end of
+ *   `**bold**`, Left stops between `l` and `d`; from the start, Right
+ *   stops after `b`. Where nothing visible is left that way the caret
+ *   goes past the hidden text to the edge, so it is never stuck.
+ * - Backspace and Delete remove the visible grapheme or word next to
+ *   the caret and keep hidden text at either end of it: Backspace at
+ *   the end of `**bold**` leaves `**bol**`. Hidden text strictly inside
+ *   what they remove goes with it, as it does from a selection, which
+ *   is deleted exactly as selected. With nothing visible that way they
+ *   delete nothing.
+ * - An offset the application sets is kept as given, even inside
+ *   hidden text: it may be about to show that text. The next move
+ *   steps out of it.
  */
 export class EditableTextModel {
   private textValue = '';
@@ -57,6 +80,9 @@ export class EditableTextModel {
   private redoStack: Snapshot[] = [];
   private lastEdit: EditKind = 'other';
   private lastEditEnd = -1;
+  private hiddenRanges: readonly UiTextRange[] = NOTHING_HIDDEN;
+  private hiddenText = '';
+  private visibleCache: VisibleText | null = null;
 
   /** Whether the node holds focus; the caret only shows (and blinks) then. */
   focused = false;
@@ -138,6 +164,43 @@ export class EditableTextModel {
     return this.redoStack.length > 0;
   }
 
+  /**
+   * The stretches of the text that are not drawn, in order; empty when
+   * none are, or when the ranges were given for a text the field no
+   * longer holds (a keystroke the application has not restyled yet).
+   */
+  get hidden(): readonly UiTextRange[] {
+    return this.hiddenText === this.textValue ? this.hiddenRanges : NOTHING_HIDDEN;
+  }
+
+  /**
+   * Says which stretches of `text` are not drawn. `editorFor` calls
+   * this from the node's runs; the ranges only count while the field
+   * holds that text.
+   */
+  setHidden(text: string, ranges: readonly UiTextRange[]): void {
+    if (ranges !== this.hiddenRanges || text !== this.hiddenText) {
+      this.hiddenRanges = ranges;
+      this.hiddenText = text;
+      this.visibleCache = null;
+    }
+  }
+
+  /** An offset moved out of hidden text, to the nearer end of it; any other offset as it is. */
+  caretOffsetNear(offset: number): number {
+    return caretOffsetNear(this.hidden, offset);
+  }
+
+  /** Whether no visible grapheme lies from the caret in `direction`, so a move that way can only reach the edge. */
+  atVisibleEdge(direction: -1 | 1): boolean {
+    const visible = this.visible();
+    if (visible === null) {
+      return direction < 0 ? this.focusValue === 0 : this.focusValue === this.textValue.length;
+    }
+    const at = visible.toVisible(this.focusValue);
+    return direction < 0 ? at === 0 : at === visible.text.length;
+  }
+
   // ---------------------------------------------------------------------------
   // Selection
   // ---------------------------------------------------------------------------
@@ -178,19 +241,61 @@ export class EditableTextModel {
     this.moveTo(this.offsetBy(this.focusValue, unit, direction), extend);
   }
 
-  /** The offset one `unit` away from `from` in `direction`. */
+  /** The offset one `unit` away from `from` in `direction`; see "Hidden text" above. */
   offsetBy(from: number, unit: EditUnit, direction: -1 | 1): number {
-    const text = this.textValue;
-    switch (unit) {
-      case 'grapheme':
-        return direction < 0 ? previousGraphemeStart(text, from) : nextGraphemeEnd(text, from);
-      case 'word':
-        return direction < 0 ? previousWordStart(text, from) : nextWordEnd(text, from);
-      case 'line':
-        return direction < 0 ? lineStartAt(text, from) : lineEndAt(text, from);
-      case 'document':
-        return direction < 0 ? 0 : text.length;
+    const visible = this.visible();
+    if (visible === null || unit === 'document') {
+      return offsetIn(this.textValue, from, unit, direction);
     }
+    if (unit === 'line') {
+      return this.caretOffsetNear(offsetIn(this.textValue, from, unit, direction));
+    }
+    const at = visible.toVisible(from);
+    const to = offsetIn(visible.text, at, unit, direction);
+    // Nothing visible that way: past the hidden text to the edge.
+    // Otherwise the side of whatever is hidden there nearest the start.
+    return to === at ? visible.toSource(at, direction) : visible.toSource(to, direction < 0 ? 1 : -1);
+  }
+
+  /** The text as drawn, or null when nothing in it is hidden. */
+  private visible(): VisibleText | null {
+    const hidden = this.hidden;
+    if (hidden.length === 0) {
+      return null;
+    }
+    if (this.visibleCache === null || this.visibleCache.source !== this.textValue) {
+      this.visibleCache = new VisibleText(this.textValue, hidden);
+    }
+    return this.visibleCache;
+  }
+
+  /**
+   * The source range a delete of one `unit` from the caret removes, in
+   * a text with hidden runs: the visible stretch it crosses, without
+   * the hidden text at either end of it. Null when nothing visible is
+   * there to delete.
+   */
+  private visibleDeletion(
+    visible: VisibleText,
+    caret: number,
+    unit: EditUnit,
+    direction: -1 | 1
+  ): [number, number] | null {
+    const at = visible.toVisible(caret);
+    let to =
+      unit === 'line' || unit === 'document'
+        ? visible.toVisible(offsetIn(this.textValue, caret, unit, direction))
+        : offsetIn(visible.text, at, unit, direction);
+    if (to === at) {
+      // Already at the line's edge: one grapheme, as Cmd+Backspace on an empty line joins it.
+      to = offsetIn(visible.text, at, 'grapheme', direction);
+    }
+    if (to === at) {
+      return null;
+    }
+    return direction < 0
+      ? [visible.toSource(to, 1), visible.toSource(at, -1)]
+      : [visible.toSource(at, 1), visible.toSource(to, -1)];
   }
 
   // ---------------------------------------------------------------------------
@@ -223,6 +328,15 @@ export class EditableTextModel {
     if (caret === 0) {
       return;
     }
+    const visible = this.visible();
+    if (visible !== null) {
+      const range = this.visibleDeletion(visible, caret, unit, -1);
+      if (range !== null) {
+        const coalesce = unit === 'grapheme' && this.lastEdit === 'delete' && this.lastEditEnd === caret;
+        this.edit(range[0], range[1], '', coalesce, 'delete');
+      }
+      return;
+    }
     let start = this.offsetBy(caret, unit, -1);
     if (start === caret) {
       // Already at the line start: Cmd+Backspace on an empty line joins it.
@@ -240,6 +354,14 @@ export class EditableTextModel {
     }
     const caret = this.focusValue;
     if (caret >= this.textValue.length) {
+      return;
+    }
+    const visible = this.visible();
+    if (visible !== null) {
+      const range = this.visibleDeletion(visible, caret, unit, 1);
+      if (range !== null) {
+        this.edit(range[0], range[1], '', false, 'other');
+      }
       return;
     }
     let end = this.offsetBy(caret, unit, 1);
@@ -442,5 +564,19 @@ export class EditableTextModel {
 
   private touch(): void {
     this.version++;
+  }
+}
+
+/** The offset one `unit` away from `from` in `direction`, in a text with nothing hidden. */
+function offsetIn(text: string, from: number, unit: EditUnit, direction: -1 | 1): number {
+  switch (unit) {
+    case 'grapheme':
+      return direction < 0 ? previousGraphemeStart(text, from) : nextGraphemeEnd(text, from);
+    case 'word':
+      return direction < 0 ? previousWordStart(text, from) : nextWordEnd(text, from);
+    case 'line':
+      return direction < 0 ? lineStartAt(text, from) : lineEndAt(text, from);
+    case 'document':
+      return direction < 0 ? 0 : text.length;
   }
 }

@@ -7,7 +7,8 @@ import { createPaintState, resolvePaintState } from '../rendering/PaintState';
 import { EditableLayout } from '../editing/EditableLayout';
 import type { EditableTextModel, EditUnit } from '../editing/EditableTextModel';
 import { commandForKey, detectEditingPlatform, type EditCommand, type EditingPlatform } from '../editing/EditingKeymap';
-import { wordRangeAt, lineStartAt, lineEndAt } from '../editing/TextBoundaries';
+import { lineStartAt, lineEndAt } from '../editing/TextBoundaries';
+import { visibleWordRange } from '../editing/HiddenText';
 import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
 import {
   adjacentField,
@@ -312,7 +313,9 @@ export class UiEditingController {
       return this.layoutOf(node).verticalMove(model.focus, direction, this.verticalGoalX) === null;
     }
     if (unit === 'grapheme' || unit === 'word') {
-      return direction < 0 ? model.focus === 0 : model.focus === model.text.length;
+      // Hidden text at the field's edge is not somewhere to stop on the
+      // way to the next one: past the last visible character is the edge.
+      return model.atVisibleEdge(direction);
     }
     return false;
   }
@@ -358,7 +361,8 @@ export class UiEditingController {
       const line = layout.lines[caret.line];
       const hard = direction < 0 ? lineStartAt(model.text, model.focus) : lineEndAt(model.text, model.focus);
       const visual = direction < 0 ? line.start : line.end;
-      model.moveTo(direction < 0 ? Math.max(hard, visual) : Math.min(hard, visual), extend);
+      // A line may wrap inside hidden text; the caret stops at its end.
+      model.moveTo(model.caretOffsetNear(direction < 0 ? Math.max(hard, visual) : Math.min(hard, visual)), extend);
       this.afterSelectionChange(node, model);
       return;
     }
@@ -660,7 +664,7 @@ export class UiEditingController {
     if (modifiers.shift) {
       model.moveTo(offset, true);
     } else if (count === 2) {
-      const word = wordRangeAt(model.text, offset);
+      const word = visibleWordRange(model.text, model.hidden, offset);
       model.select(word.start, word.end);
     } else if (count >= 3) {
       model.select(lineStartAt(model.text, offset), lineEndAt(model.text, offset));

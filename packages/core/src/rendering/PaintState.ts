@@ -326,7 +326,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   // text its model holds — see `editableSpansOf`.
   out.spans = resolvePaintSpans(
     node,
-    out.editor === undefined ? resolvedSpansOf(node) : editableSpansOf(node, out.text ?? '')
+    out.editor === undefined ? resolvedSpansOf(node) : editableSpansOf(node, out.text ?? '', out.editor.composition)
   );
   out.linkHover = out.spans === undefined ? -1 : linkHoverOf(node);
   out.textDecoration = resolveProperty(node, UiProperties.textDecoration);
@@ -414,6 +414,7 @@ function resolvePaintSpans(node: UiNode, spans: readonly UiResolvedTextSpan[]): 
     fontVariant: span.fontVariant,
     fontKerning: span.fontKerning,
     letterSpacing: span.letterSpacing,
+    hidden: span.hidden,
     color: resolveColorValue(node, span.color),
     backgroundColor: resolveColorValue(node, span.backgroundColor),
     textDecoration: span.textDecoration,
