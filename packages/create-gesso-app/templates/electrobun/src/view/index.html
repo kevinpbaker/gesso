@@ -11,12 +11,18 @@
         in it is painted, not styled. The background is here so that
         the moment before the first frame is not a white flash on a
         dark desktop.
+
+        overscroll-behavior: a scroll the app has no use for, such as one
+        past the end of a list, goes back to the page, and on a Mac the
+        webview then stretches the whole window's content. The app is the
+        window, so it doesn't.
       */
       html,
       body {
         margin: 0;
         height: 100%;
         background: #14161a;
+        overscroll-behavior: none;
       }
       #app {
         width: 100vw;

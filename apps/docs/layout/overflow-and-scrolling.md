@@ -174,6 +174,22 @@ root, so that nothing outside it moves. The default is what a canvas
 embedded in a document wants, and it is why the list above hands this
 page its scrolling back.
 
+An application that is the whole page also wants the page itself to
+keep still. A scroll handed back to a page that can't scroll is still a
+gesture to the browser, and on a Mac it stretches the whole page,
+showing white behind it, or takes a sideways swipe as Back. One line of
+CSS on the page says not to, and it covers the moment before the first
+frame, too:
+
+```css
+html,
+body {
+  overscroll-behavior: none;
+}
+```
+
+The `create-gesso-app` templates have it.
+
 Smoothing is applied only where it helps: a wheel with detents, which
 delivers one large jump per notch and nothing in between. A trackpad
 already sends a fine-grained inertial stream, and animating that would
