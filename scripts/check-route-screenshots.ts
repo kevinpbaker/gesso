@@ -579,7 +579,7 @@ async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[
         viewport: VIEWPORT,
         captured: new Date().toISOString()
       };
-      writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`);
+      writeFileSync(manifestPath, manifestJson(next));
       console.log(
         `\nwrote ${written.length} ${appName} baselines and the manifest (${version} on ${process.platform}).`
       );
@@ -656,3 +656,25 @@ main().catch(error => {
   console.error(`\nroute screenshots failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });
+
+/**
+ * The manifest, written the way the formatter wants it.
+ *
+ * `JSON.stringify(_, null, 2)` puts each number of the viewport on a
+ * line of its own and oxfmt puts them back on one, so a regenerated
+ * manifest failed the format check. `check-docs-screenshots.ts` had
+ * already learned this; the baselines workflow runs both, and this one
+ * was the half still writing it the other way.
+ */
+function manifestJson(manifest: Manifest): string {
+  return (
+    [
+      '{',
+      `  "chrome": ${JSON.stringify(manifest.chrome)},`,
+      `  "platform": ${JSON.stringify(manifest.platform)},`,
+      `  "viewport": [${manifest.viewport[0]}, ${manifest.viewport[1]}],`,
+      `  "captured": ${JSON.stringify(manifest.captured)}`,
+      '}'
+    ].join('\n') + '\n'
+  );
+}
