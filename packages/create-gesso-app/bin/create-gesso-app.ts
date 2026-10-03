@@ -100,7 +100,7 @@ const TEMPLATES: Record<string, Template> = {
       ].join('\n')
   },
   electrobun: {
-    vendored: ['core', 'framework', 'components', 'electrobun'],
+    vendored: ['core', 'framework', 'components', 'electrobun', 'vite-plugin'],
     substitute: ['electrobun.config.ts', 'src/main/index.ts', 'src/view/index.html', 'README.md'],
     next: (name, where) => `
 Created ${name} in ${where}.

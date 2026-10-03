@@ -15,6 +15,42 @@ import {
 import {
   Observable
 } from "rxjs";
+import {
+  AgentConfirmation,
+  AgentSurface,
+  McpHandlerOptions
+} from "gesso-framework/agent";
+type DesktopServe = (options: {
+  hostname: string;
+  port: number;
+  fetch: (request: Request) => Promise<Response>;
+}) => {
+  stop(closeActiveConnections?: boolean): void;
+};
+interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOrigins'> {
+  port?: number;
+  hostname?: string;
+  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  serve?: DesktopServe;
+}
+interface DesktopAgent {
+  readonly url: string;
+  readonly surface: AgentSurface;
+  stop(): void;
+}
+declare function serveDesktopAgent(channels: readonly ServedChannel[], options?: DesktopAgentOptions): DesktopAgent;
+type ShowMessageBox = (options: {
+  type?: 'info' | 'warning' | 'error' | 'question';
+  title?: string;
+  message?: string;
+  detail?: string;
+  buttons?: string[];
+  defaultId?: number;
+  cancelId?: number;
+}) => Promise<{
+  response: number;
+}>;
+declare function messageBoxConfirm(showMessageBox: ShowMessageBox): (request: AgentConfirmation) => Promise<boolean>;
 interface DesktopWindowTransport {
   send: (frame: GessoFrame) => void;
   close: () => void;
@@ -57,6 +93,12 @@ export {
   DesktopWindowsCommands,
   DesktopWindowsView,
   DesktopWindowTransport,
+  messageBoxConfirm,
+  serveDesktopAgent,
+  type DesktopAgent,
+  type DesktopAgentOptions,
+  type DesktopServe,
+  type ShowMessageBox,
   windowsChannel
 };
 // ==== frames.d.ts ====

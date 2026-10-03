@@ -6,6 +6,12 @@
   */
   "extends": "./.hutch/devkit/tsconfig.json",
   "compilerOptions": {
+    /*
+      The projected config sets `baseUrl`, which TypeScript 7 has removed.
+      Its `paths` are relative to its own directory either way, so
+      clearing it here changes nothing they resolve to.
+    */
+    "baseUrl": null,
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],

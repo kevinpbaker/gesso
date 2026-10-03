@@ -26,6 +26,9 @@
   ],
   "type": "module",
   "sideEffects": false,
+  "bin": {
+    "gesso-channels": "./dist/gesso-channels.mjs"
+  },
   "exports": {
     ".": "./src/index.ts"
   },

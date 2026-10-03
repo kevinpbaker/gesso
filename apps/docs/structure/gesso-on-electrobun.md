@@ -63,9 +63,10 @@ pnpm create gesso-app my-app --template electrobun
 ```
 
 The project depends on `gesso-core`, `gesso-framework`,
-`gesso-components` and `gesso-electrobun` by version range and installs
+`gesso-components`, `gesso-electrobun` and, for `gesso-channels`,
+`gesso-vite-plugin` by version range and installs
 them from the registry. Run it from inside a Gesso checkout with
-`--local` to pack those four out of the working tree instead, into the
+`--local` to pack those five out of the working tree instead, into the
 project's `vendor/`. What it writes:
 
 ```text
@@ -74,6 +75,7 @@ hutch.config.ts          what `hutch run <script>` does, and which Electrobun to
 vite.config.ts           the window's assets, with one alias list for the projected SDK
 tsconfig.json            extends the projected SDK's config; bundler resolution; the two JSX lines
 src/shared/Counter.ts    the channel both processes import
+src/shared/channels.described.ts  the channel described for AI agents, written by `hutch run channels`
 src/shared/rpc.ts        the one RPC message both sides exchange
 src/main/index.ts        the main process: the state, the windows
 src/view/main.ts         a window's main thread: the bridge, then mount

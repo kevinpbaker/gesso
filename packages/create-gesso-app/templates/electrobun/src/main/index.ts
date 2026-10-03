@@ -15,9 +15,12 @@ import { BrowserView, BrowserWindow, Utils } from 'electrobun/main';
 import { BehaviorSubject, map } from 'rxjs';
 
 import type { GessoFrame } from 'gesso-electrobun';
-import { createDesktopApp, windowsChannel } from 'gesso-electrobun/desktop';
+import { createDesktopApp, messageBoxConfirm, serveDesktopAgent, windowsChannel } from 'gesso-electrobun/desktop';
+import { serve } from 'gesso-framework';
 
 import { Counter } from '../shared/Counter';
+// Describes the channels for agents. Written by `hutch run channels`.
+import '../shared/channels.described';
 import type { GessoWindowRPC } from '../shared/rpc';
 
 /** The application's whole state, in the process that owns it. */
@@ -33,18 +36,18 @@ const count = new BehaviorSubject(0);
  */
 const dark = new BehaviorSubject(true);
 
+/** The counter, served to every window and to AI agents alike. */
+const counter = serve(Counter, {
+  view: { count, dark },
+  commands: {
+    increment: (by: number) => count.next(count.value + by),
+    setDark: (next: boolean) => dark.next(next)
+  }
+});
+
 const app = createDesktopApp({
   channels: window => [
-    {
-      token: Counter,
-      source: {
-        view: { count, dark },
-        commands: {
-          increment: (by: number) => count.next(count.value + by),
-          setDark: (next: boolean) => dark.next(next)
-        }
-      }
-    },
+    counter,
     // What a window opens another window through. Without it a screen
     // would have to import this adapter to do it.
     windowsChannel(app, window)
@@ -88,3 +91,20 @@ const app = createDesktopApp({
 });
 
 app.openWindow();
+
+/**
+ * The same channel, served to AI agents over MCP on this machine.
+ *
+ * An agent such as Claude Code connects with the line this prints, then
+ * reads the count and sends `increment` and `setDark` the way a window
+ * does, and the windows follow. A command marked `@confirm` in the
+ * contract is put to the person with the native dialog first.
+ * `channels.described.ts`, imported above, is what tells the agent what
+ * each command is for; `hutch run channels` rewrites it after a contract
+ * changes, and every other script does so first.
+ */
+const agent = serveDesktopAgent([counter], {
+  name: '{{name}}',
+  confirm: messageBoxConfirm(Utils.showMessageBox)
+});
+console.log(`AI agents can connect: claude mcp add --transport http {{name}} ${agent.url}`);

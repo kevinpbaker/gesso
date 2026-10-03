@@ -271,3 +271,12 @@ export function windowsChannel(app: DesktopApp, window: DesktopWindowHandle): Se
     }
   };
 }
+
+export {
+  messageBoxConfirm,
+  serveDesktopAgent,
+  type DesktopAgent,
+  type DesktopAgentOptions,
+  type DesktopServe,
+  type ShowMessageBox
+} from './agent';

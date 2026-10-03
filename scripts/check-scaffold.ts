@@ -304,7 +304,16 @@ async function checkElectrobun(app: string): Promise<void> {
   if (!existsSync(mainBundle) || !readFileSync(mainBundle, 'utf8').includes('gessoFrame')) {
     throw new Error(`The main process bundle at ${mainBundle} is missing, or does not carry the gessoFrame handler.`);
   }
-  console.log(`  the page, the render worker chunk and the main process bundle are all in ${dev}`);
+  // What an agent reaches: the MCP server, and the descriptions
+  // `hutch run channels` wrote, which only arrive if the generated
+  // module was imported into the bundle Electrobun built.
+  const main = readFileSync(mainBundle, 'utf8');
+  if (!main.includes('tools/list') || !main.includes('How much to add; negative to subtract.')) {
+    throw new Error(
+      `The main process bundle at ${mainBundle} does not serve agents, or carries no channel descriptions.`
+    );
+  }
+  console.log(`  the page, the render worker chunk and the main process bundle, agent server and all, are in ${dev}`);
 
   console.log('building the distributable…');
   run(hutch, ['electrobun', 'build', '--env=stable'], app);
