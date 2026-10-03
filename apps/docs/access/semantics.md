@@ -30,7 +30,7 @@ mapping table.
 | `role`                             | What the node is. A closed set of 50 ARIA names: `button`, `switch`, `listbox`, `dialog`, `heading`, and the rest         |
 | `label`                            | The accessible name. Without one, the node is named by the text it draws                                                  |
 | `description`                      | Read after the name: a hint, or the reason a field is invalid                                                             |
-| `live`                             | `polite` or `assertive`: announce this node's text when it changes, without focus moving. `status` and `alert` imply it   |
+| `live`                             | `polite` or `assertive`: announce this node's name when it changes, without focus moving. `status` and `alert` imply it   |
 | `states`                           | Conditions beyond role and value, as an array. Also a closed set                                                          |
 | `valueNow`, `valueMin`, `valueMax` | A range control's position and its bounds                                                                                 |
 | `valueText`                        | How the value should be spoken when the number is not it, as in `40%` or `3 stories`                                      |
@@ -179,9 +179,12 @@ name of this control is that node over there": referring to another
 node would need an id system nothing else here has, so `description`
 takes the string.
 
-**There are no live regions.** A node with `role="status"` or
-`role="alert"` reaches the platform as one, and nothing beyond that
-raises an announcement of its own when the text under it changes.
+**A live region speaks its name.** A node with `live`, or with
+`role="status"` or `role="alert"`, is announced when its name changes,
+and its name is its `label` when it has one: a status line labelled
+"Board announcements" says "Board announcements" every time, whatever
+text it draws. Leave `label` off a live region whose text is the
+message, or bind the label to the same cell as the text.
 
 ## Next
 
