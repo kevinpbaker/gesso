@@ -151,8 +151,8 @@ pass.
 
 ## What a command costs, and what it does not do
 
-A command is fire and forget. It has at most one argument, that
-argument is structured-cloned onto the owning thread, and it returns
+A command is fire and forget. It takes as many arguments as it needs,
+each is structured-cloned onto the owning thread, and it returns
 nothing. There is no synchronous answer to be had across a thread, so
 the effect arrives as a patch on the view keys it changed.
 

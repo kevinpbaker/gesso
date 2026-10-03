@@ -16,6 +16,13 @@ export {
   type ChannelHostMessage,
   type ChannelPort
 } from './ChannelProtocol';
+export {
+  channelSchema,
+  describeChannel,
+  type ChannelSchema,
+  type CommandSchema,
+  type JsonSchema
+} from './ChannelSchema';
 export { provide, ProvidedChannel, type ChannelSource } from './provide';
 export { ChannelReplica } from './ChannelReplica';
 export { ChannelRegistry } from './ChannelRegistry';

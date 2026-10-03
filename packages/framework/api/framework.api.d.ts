@@ -505,6 +505,28 @@ declare function Inject<T extends Function>(StoreClass: T): PropertyDecorator;
 declare function Channel(token: {
   name: string;
 }): PropertyDecorator;
+type JsonSchema = {
+  readonly [keyword: string]: unknown;
+};
+interface CommandSchema {
+  readonly description?: string;
+  readonly parameters: readonly string[];
+  readonly rest?: true;
+  readonly input: JsonSchema;
+  readonly destructive?: true;
+  readonly idempotent?: true;
+  readonly confirm?: true;
+  readonly hidden?: true;
+}
+interface ChannelSchema {
+  readonly description?: string;
+  readonly view: JsonSchema;
+  readonly commands: {
+    readonly [name: string]: CommandSchema;
+  };
+}
+declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
+declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
 interface ChannelSource<View extends object, Commands extends object> {
   view: { readonly [K in keyof View]: Observable<View[K]>; };
   commands?: Commands;
@@ -2521,11 +2543,14 @@ export {
   ChannelRegistration,
   ChannelRegistry,
   ChannelRegistryHandle,
+  channelSchema,
+  ChannelSchema,
   ChannelSource,
   classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
+  CommandSchema,
   ComponentElement,
   ComponentHost,
   ComponentHostResolver,
@@ -2546,6 +2571,7 @@ export {
   Define,
   derive,
   DeriveOptions,
+  describeChannel,
   describeStream,
   DevtoolsEvent,
   DevtoolsRequest,
@@ -2596,6 +2622,7 @@ export {
   isHubMessage,
   isPortErrorMessage,
   isPortHandshake,
+  JsonSchema,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -2816,11 +2843,14 @@ import {
   ChannelRegistration,
   ChannelRegistry,
   ChannelRegistryHandle,
+  channelSchema,
+  ChannelSchema,
   ChannelSource,
   classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
+  CommandSchema,
   ComponentElement,
   ComponentHost,
   ComponentHostResolver,
@@ -2841,6 +2871,7 @@ import {
   Define,
   derive,
   DeriveOptions,
+  describeChannel,
   describeStream,
   DevtoolsEvent,
   DevtoolsRequest,
@@ -2891,6 +2922,7 @@ import {
   isHubMessage,
   isPortErrorMessage,
   isPortHandshake,
+  JsonSchema,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3038,7 +3070,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-gJHA6Lfx.js";
+} from "./index-BdRgu-FB.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3055,6 +3087,7 @@ export {
   Channel,
   ChannelRegistry,
   ChannelReplica,
+  channelSchema,
   classifyStorageError,
   Component,
   ComponentHost,
@@ -3071,6 +3104,7 @@ export {
   Define,
   defineChannel,
   derive,
+  describeChannel,
   describeStream,
   diffProjection,
   each,
@@ -3188,6 +3222,7 @@ export {
   type ChannelPort,
   type ChannelRegistration,
   type ChannelRegistryHandle,
+  type ChannelSchema,
   type ChannelSource,
   type ChannelSpec,
   type ChannelToken,
@@ -3197,6 +3232,7 @@ export {
   type Command,
   type CommandEntry,
   type CommandMap,
+  type CommandSchema,
   type CommandsOf,
   type ComponentContext,
   type ComponentElement,
@@ -3234,6 +3270,7 @@ export {
   type GessoRuntimeOptions,
   type IndexedDbStorageOptions,
   type Inputs,
+  type JsonSchema,
   type MediaOptions,
   type MediaSessionLike,
   type MessageEndpoint,
@@ -3524,7 +3561,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-gJHA6Lfx.js";
+} from "../index-BdRgu-FB.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

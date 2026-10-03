@@ -16,7 +16,9 @@ export default defineConfig({
   format: 'esm',
   dts: true,
   platform: 'neutral',
-  external: ['vite'],
+  // TypeScript too: its checker is an optional peer the application
+  // installs, and is loaded only when a contract is read.
+  external: ['vite', /^typescript(\/|$)/],
   sourcemap: true,
   clean: true
 });

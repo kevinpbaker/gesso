@@ -32,6 +32,8 @@ describe('the format workers are built in', () => {
 
   it("is the application's when it chose one", () => {
     const hook = gesso().config as unknown as (config: object, env: object) => { worker?: unknown };
-    expect(hook({ worker: { format: 'iife' } }, { command: 'build', mode: 'production' }).worker).toBeUndefined();
+    expect(hook({ worker: { format: 'iife' } }, { command: 'build', mode: 'production' }).worker).not.toHaveProperty(
+      'format'
+    );
   });
 });
