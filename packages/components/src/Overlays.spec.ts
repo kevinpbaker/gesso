@@ -3,7 +3,7 @@ import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Button, Column, Row, Text, type UiRole, type UiSemanticsRecord } from 'gesso-core';
+import { Button, Column, percent, Row, Text, type UiRole, type UiSemanticsRecord } from 'gesso-core';
 import { Dialog } from './Dialog';
 import { Menu } from './Menu';
 import { Select } from './Select';
@@ -55,6 +55,25 @@ describe('Dialog', () => {
 
     expect(ui.runtime.input.focus.trapped).toBe(false);
     expect(ui.runtime.input.focus.focusedNode).toBe(opener);
+  });
+
+  it('gives its content the dialog’s whole width, inside its padding', () => {
+    const open = new BehaviorSubject(true);
+    const ui = mount(
+      Column(
+        createComponent(Dialog, {
+          open,
+          title: 'Wide',
+          width: 300,
+          content: Row({ label: 'body', width: percent(100) }, Text({ text: 'x' })),
+          onClose: () => open.next(false)
+        })
+      )
+    );
+    ui.frame();
+    const dialog = ui.getLayout(ui.getByRole('dialog'));
+    expect(dialog.width).toBe(300);
+    expect(ui.getLayout(ui.getByLabel('body')).width).toBe(300 - 2 * 20);
   });
 
   it('says what it is, and that it is modal', () => {

@@ -45,7 +45,9 @@ backdrop to press.
 `Dialog` does not take the shared layout props the rest of the library
 takes, and it has no `rootModifiers`. Nothing is drawn where it is
 declared, so there is no root to place or decorate: `width` is the only
-size it answers to, and the layer decides the rest.
+size it answers to, and the layer decides the rest. The content is as
+wide as the dialog inside its padding, so a field or a row given
+`width={percent(100)}` spans the dialog.
 
 `content` is read once, when the dialog opens, so a body that changes
 while the dialog is up is one element with an Observable inside it,
