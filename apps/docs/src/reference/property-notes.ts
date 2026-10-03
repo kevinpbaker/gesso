@@ -376,6 +376,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Semantics',
     note: 'How deep a tree item sits, 1 for a root. A tree is a flat list of rows, so nothing else carries this.'
   },
+  activeDescendant: {
+    group: 'Semantics',
+    note: "The node that's active while this one keeps focus, such as a combobox's highlighted option. Read as if it had focus."
+  },
 
   // Media
   image: { group: 'Media', note: 'A decoded bitmap drawn inside the box, clipped by `borderRadius`.' },

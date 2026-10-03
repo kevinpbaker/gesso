@@ -140,6 +140,17 @@ describe('buildSemanticsTree', () => {
     );
   });
 
+  it('names the active descendant by its record id', () => {
+    const t = new Tree();
+    const list = t.node(UiNodeType.Column, { role: 'listbox', label: 'People' });
+    const option = t.node(UiNodeType.Row, { role: 'option', label: 'Ada' });
+    const field = t.node(UiNodeType.EditableText, { role: 'combobox', label: 'Assignee', activeDescendant: option });
+    t.add(list, option);
+    t.add(t.root, field, list);
+
+    expect(t.build()[0]).toMatchObject({ role: 'combobox', activeDescendant: option.id });
+  });
+
   it('claims the text inside a menu item, which is how the item is named', () => {
     const t = new Tree();
     const menu = t.node(UiNodeType.Column, { role: 'menu', label: 'Actions' });

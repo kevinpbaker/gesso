@@ -11,6 +11,7 @@ import { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } f
  * the same approach `EditingProxy.spec` takes.
  */
 class FakeElement {
+  id = '';
   /**
    * Every style property this element has ever been assigned, in order,
    * as `name:value`.
@@ -216,13 +217,16 @@ function setup(editing: (EditingMirrorTarget & { described: UiSemanticsRecord | 
   return { doc, canvas, mirror, container, actions, keys, elementFor, apply };
 }
 
-function fakeEditing(active: boolean): EditingMirrorTarget & { described: UiSemanticsRecord | null; focused: number } {
+function fakeEditing(
+  active: boolean
+): EditingMirrorTarget & { described: UiSemanticsRecord | null; activeDescendant?: string; focused: number } {
   return {
     active,
     described: null,
     focused: 0,
-    describe(next) {
+    describe(next, activeDescendant) {
       this.described = next;
+      this.activeDescendant = activeDescendant;
     },
     focus() {
       this.focused++;
@@ -479,6 +483,35 @@ describe('SemanticsMirror', () => {
     expect(doc.activeElement).not.toBe(elementFor('n1'));
     expect(editing.described?.label).toBe('Email');
     expect(editing.focused).toBe(1);
+  });
+
+  /**
+   * A combobox keeps focus in its field while a highlight walks the
+   * list, so the highlighted option is named by id from the element
+   * that has focus: the record's own element, or the editing proxy when
+   * the combobox is a text field.
+   */
+  it('points at the active descendant by DOM id, from the element and from the proxy', () => {
+    const editing = fakeEditing(true);
+    const { elementFor, apply } = setup(editing);
+    const field = record('n1', { role: 'combobox', label: 'Assignee', states: ['expanded'], activeDescendant: 'n3' });
+    apply({
+      patches: [
+        { op: 'add', node: field },
+        { op: 'add', node: record('n2', { role: 'listbox', label: 'People', index: 1 }) },
+        { op: 'add', node: record('n3', { role: 'option', label: 'Ada', parent: 'n2' }) }
+      ],
+      focused: 'n1'
+    });
+
+    const option = elementFor('n3');
+    expect(option.id).not.toBe('');
+    expect(elementFor('n1').getAttribute('aria-activedescendant')).toBe(option.id);
+    expect(editing.activeDescendant).toBe(option.id);
+
+    apply({ patches: [{ op: 'update', node: record('n1', { role: 'combobox', label: 'Assignee' }) }] });
+    expect(elementFor('n1').getAttribute('aria-activedescendant')).toBeNull();
+    expect(editing.activeDescendant).toBeUndefined();
   });
 
   it('clears the proxy description when focus leaves the field', () => {
