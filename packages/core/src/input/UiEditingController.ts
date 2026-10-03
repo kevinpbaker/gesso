@@ -622,14 +622,28 @@ export class UiEditingController {
     }
   }
 
-  pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void {
+  /**
+   * The offset under a point in a field, by its layout as it stands. The
+   * pointer controller asks this before a press moves focus, and hands
+   * the answer to `pointerDown`; see there.
+   */
+  offsetAt(node: UiNode, x: number, y: number): number {
+    const local = this.host.toLocal(node, x, y);
+    return this.layoutOf(node).offsetAt(local.x, local.y);
+  }
+
+  /**
+   * `pressedAt` is the offset the press landed on, found before focus
+   * moved. A field may change how it is drawn when it takes focus (its
+   * runs show text they hid), and from then on its geometry is not the
+   * one the person pressed on. Without it, the offset is found here.
+   */
+  pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers, pressedAt?: number): void {
     if (!isEditableNode(node)) {
       return;
     }
     const model = editorFor(node);
-    const layout = this.layoutOf(node);
-    const local = this.host.toLocal(node, x, y);
-    const offset = layout.offsetAt(local.x, local.y);
+    const offset = Math.min(pressedAt ?? this.offsetAt(node, x, y), model.text.length);
     const pressedFrom = this.pressedFrom;
     this.pressedFrom = null;
     if (modifiers.shift) {

@@ -2915,7 +2915,8 @@ interface PointerControllerOptions {
   editing?: {
     isEditable(node: UiNode): boolean;
     fieldNear?(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null;
-    pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
+    offsetAt?(node: UiNode, x: number, y: number): number;
+    pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers, offset?: number): void;
     pointerMove(node: UiNode, x: number, y: number): void;
     pointerUp(): void;
   };
@@ -3192,7 +3193,8 @@ declare class UiEditingController {
   compositionUpdate(text: string, caret?: number): void;
   compositionEnd(text: string): void;
   fieldNear(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null;
-  pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
+  offsetAt(node: UiNode, x: number, y: number): number;
+  pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers, pressedAt?: number): void;
   pointerMove(node: UiNode, x: number, y: number): void;
   pointerUp(): void;
   state(): EditingState | null;
@@ -6969,7 +6971,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-DDRne5C3.js";
+} from "./index-rY6tlBAu.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7907,7 +7909,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-DDRne5C3.js";
+} from "./index-rY6tlBAu.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

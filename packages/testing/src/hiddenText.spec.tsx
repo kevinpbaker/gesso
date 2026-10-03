@@ -1,4 +1,4 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -204,6 +204,37 @@ describe('a field whose runs hide text', () => {
     editing.compositionEnd('x');
     await ui.settle();
     expect(texts[0].value).toBe('a xc');
+  });
+
+  it('places the caret by what was drawn when the field shows its hidden text on focus', async () => {
+    // A live-preview editor: markers hidden until the field has focus.
+    const text = new BehaviorSubject('Some **bold** words');
+    const focused = new BehaviorSubject(false);
+    function Preview(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+      const spans = combineLatest([text, focused]).pipe(
+        map(([value, shown]) => (shown ? [{ text: value }] : markup(value)))
+      );
+      return (
+        <column width={400}>
+          <editabletext
+            label="preview"
+            value={text}
+            spans={spans}
+            onInput={event => text.next(event.value)}
+            onFocus={() => focused.next(true)}
+            onBlur={() => focused.next(false)}
+            width={percent(100)}
+          />
+        </column>
+      );
+    }
+    ui = renderTest(createComponent(Preview), { width: 600, height: 400 });
+    await ui.settle();
+    // `Some bold wo|rds` as drawn: offset 16 in the text, though with the
+    // markers showing that x is between the closing asterisks.
+    await pressAt(ui.getByLabel('preview'), 12 * GLYPH + 1);
+    expect(focused.value).toBe(true);
+    expect(editorFor(ui.getByLabel('preview')).focus).toBe(16);
   });
 
   it('leaves for the next field of a group when only hidden text is left', async () => {
