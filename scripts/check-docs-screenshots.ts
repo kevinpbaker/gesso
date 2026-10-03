@@ -90,6 +90,18 @@ const QUIESCE_MATCHES = 3;
 const QUIESCE_INTERVAL_MS = 250;
 const QUIESCE_TIMEOUT_MS = 20_000;
 /**
+ * How long a capture must have held still, at least, to be trusted.
+ *
+ * A run of matching captures can fall entirely inside something that
+ * is still for a moment and then changes: an overlay scrollbar thumb is
+ * shown for `SCROLLBAR_LINGER_MS` (1200) after a scroll and fades over
+ * `SCROLLBAR_FADE_MS` (350), both in gesso-core's LayoutEngine. A page
+ * that scrolls as it mounts was captured with the thumb on one run and
+ * without it on the next. Holding longer than both together means a
+ * settled capture is one nothing transient is about to change.
+ */
+const QUIESCE_MIN_HOLD_MS = 2000;
+/**
  * Differing pixels allowed, as a percentage of the compared ones.
  *
  * Measured on this machine, not chosen by taste. Four verify runs over
@@ -431,8 +443,11 @@ async function captureSettled(devtools: DevTools, count: number): Promise<Settle
   let previousShots: Buffer[] | undefined;
   let previousBoxes: Box[] | undefined;
   let matches = 0;
+  /** When the capture the current run of matches agrees with was taken. */
+  let heldSince = Date.now();
   const deadline = Date.now() + QUIESCE_TIMEOUT_MS;
   while (Date.now() < deadline) {
+    const takenAt = Date.now();
     const boxes: Box[] = [];
     const shots: Buffer[] = [];
     for (let index = 0; index < count; index += 1) {
@@ -457,11 +472,12 @@ async function captureSettled(devtools: DevTools, count: number): Promise<Settle
         shots.every((shot, index) => shot.equals(lastShots[index]));
       if (agreed) {
         matches += 1;
-        if (matches >= QUIESCE_MATCHES) {
+        if (matches >= QUIESCE_MATCHES && Date.now() - heldSince >= QUIESCE_MIN_HOLD_MS) {
           return { kind: 'settled', shots, boxes };
         }
       } else {
         matches = 0;
+        heldSince = takenAt;
       }
       previousShots = shots;
       previousBoxes = boxes;
