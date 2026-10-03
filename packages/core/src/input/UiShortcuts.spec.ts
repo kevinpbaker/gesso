@@ -157,6 +157,26 @@ describe('UiShortcutRegistry', () => {
       expect(registry.handleKey('s', mods({ ctrl: true }), field)).toBe(true);
       expect(run).toHaveBeenCalledTimes(1);
     });
+
+    it('leaves a field its own editing keys: undo, redo, select all, moving and deleting', () => {
+      // An application-wide Mod+Z undid the app's last change instead of
+      // the typing in the focused field. A browser gives the field these.
+      const { field, row } = tree();
+      const registry = new UiShortcutRegistry();
+      const run = vi.fn();
+      for (const keys of ['Mod+Z', 'Mod+Shift+Z', 'Mod+A', 'Alt+ArrowLeft', 'Mod+Backspace', 'Shift+End']) {
+        registry.register({ keys, label: keys, run });
+      }
+      expect(registry.handleKey('z', mods({ ctrl: true }), field)).toBe(false);
+      expect(registry.handleKey('z', mods({ ctrl: true, shift: true }), field)).toBe(false);
+      expect(registry.handleKey('a', mods({ ctrl: true }), field)).toBe(false);
+      expect(registry.handleKey('Backspace', mods({ ctrl: true }), field)).toBe(false);
+      expect(registry.handleKey('End', mods({ shift: true }), field)).toBe(false);
+      expect(run).not.toHaveBeenCalled();
+
+      // Outside a field they are the application's, as before.
+      expect(registry.handleKey('z', mods({ ctrl: true }), row)).toBe(true);
+    });
   });
 
   describe('chords', () => {

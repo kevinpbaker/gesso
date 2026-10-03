@@ -1,5 +1,6 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
+import { commandForKey, detectEditingPlatform, type EditingPlatform } from '../editing/EditingKeymap';
 import { isNodeInert } from './UiInteraction';
 import type { UiKeyModifiers } from './UiInputEvent';
 
@@ -185,6 +186,14 @@ export class UiShortcutRegistry {
     if (MODIFIER_KEYS.has(key)) {
       return false;
     }
+    if (focused !== null && isTypingInto(focused) && this.isEditingKey(key, modifiers)) {
+      // The field's: undo, redo, select all, moving and deleting by
+      // word or line. In a browser a text field owns these whatever the
+      // page binds, and an application-wide Mod+Z that undid the app's
+      // last change instead of the typing was the bug that showed it.
+      this.pending = [];
+      return false;
+    }
     const step = stepFor(key, modifiers);
     const at = this.now();
     if (this.pending.length > 0 && at - this.pendingAt > this.chordTimeout) {
@@ -214,6 +223,15 @@ export class UiShortcutRegistry {
     }
     this.pending = [];
     return false;
+  }
+
+  private platform: EditingPlatform | null = null;
+
+  /** Whether a field would take this key as an edit of its own, rather than as text or as Enter. */
+  private isEditingKey(key: string, modifiers: UiKeyModifiers): boolean {
+    this.platform ??= detectEditingPlatform();
+    const command = commandForKey(key, modifiers, this.platform, false);
+    return command !== null && command.kind !== 'newline' && command.kind !== 'insert';
   }
 
   /** Forgets a half-typed chord, for a route change or a lost focus. */
