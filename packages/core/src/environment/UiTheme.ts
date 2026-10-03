@@ -7,7 +7,7 @@ import type { UiDensity } from './UiDensity';
 import type { UiContrast } from './UiContrast';
 import type { UiThemeExtensions } from './UiThemeExtension';
 import { colorsEqualPalette, darkColors, lightColors } from './UiColors';
-import { typographyEqual } from './UiTypography';
+import { defaultTypography, typographyEqual } from './UiTypography';
 import { shapesEqual } from './UiShapes';
 import { shadowsEqual } from './UiShadows';
 import { defaultSpacing, scaleSpacing, spacingEqual } from './UiSpacing';
@@ -42,68 +42,7 @@ export interface UiTheme {
 
 export const lightTheme: UiTheme = {
   colors: lightColors,
-  typography: {
-    body: {
-      fontFamily: 'sans-serif',
-      fontSize: 14,
-      fontWeight: 'normal',
-      lineHeight: 16.8,
-      letterSpacing: 0,
-      color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'start',
-      textDirection: 'ltr'
-    },
-    bodyLarge: {
-      fontFamily: 'sans-serif',
-      fontSize: 16,
-      fontWeight: 'normal',
-      lineHeight: 19.2,
-      letterSpacing: 0,
-      color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'start',
-      textDirection: 'ltr'
-    },
-    bodySmall: {
-      fontFamily: 'sans-serif',
-      fontSize: 12,
-      fontWeight: 'normal',
-      lineHeight: 14.4,
-      letterSpacing: 0,
-      color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'start',
-      textDirection: 'ltr'
-    },
-    headline: {
-      fontFamily: 'sans-serif',
-      fontSize: 24,
-      fontWeight: 'bold',
-      lineHeight: 28.8,
-      letterSpacing: 0,
-      color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'start',
-      textDirection: 'ltr'
-    },
-    title: {
-      fontFamily: 'sans-serif',
-      fontSize: 20,
-      fontWeight: '500',
-      lineHeight: 24,
-      letterSpacing: 0,
-      color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'start',
-      textDirection: 'ltr'
-    },
-    label: {
-      fontFamily: 'sans-serif',
-      fontSize: 11,
-      fontWeight: '500',
-      lineHeight: 13.2,
-      letterSpacing: 0.5,
-      color: { r: 0, g: 0, b: 0, a: 1 },
-      textAlign: 'start',
-      textDirection: 'ltr'
-    }
-  },
+  typography: defaultTypography,
   spacing: defaultSpacing,
   density: 'comfortable',
   contrast: 'standard',
@@ -139,12 +78,12 @@ export const darkTheme: UiTheme = {
   ...lightTheme,
   colors: darkColors,
   typography: {
-    body: { ...lightTheme.typography.body, color: { r: 1, g: 1, b: 1, a: 1 } },
-    bodyLarge: { ...lightTheme.typography.bodyLarge, color: { r: 1, g: 1, b: 1, a: 1 } },
-    bodySmall: { ...lightTheme.typography.bodySmall, color: { r: 1, g: 1, b: 1, a: 1 } },
-    headline: { ...lightTheme.typography.headline, color: { r: 1, g: 1, b: 1, a: 1 } },
-    title: { ...lightTheme.typography.title, color: { r: 1, g: 1, b: 1, a: 1 } },
-    label: { ...lightTheme.typography.label, color: { r: 1, g: 1, b: 1, a: 1 } }
+    body: { ...lightTheme.typography.body, color: darkColors.text },
+    bodyLarge: { ...lightTheme.typography.bodyLarge, color: darkColors.text },
+    bodySmall: { ...lightTheme.typography.bodySmall, color: darkColors.text },
+    headline: { ...lightTheme.typography.headline, color: darkColors.text },
+    title: { ...lightTheme.typography.title, color: darkColors.text },
+    label: { ...lightTheme.typography.label, color: darkColors.text }
   },
   shadows: {
     none: [],

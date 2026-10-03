@@ -69,17 +69,17 @@ describe('LayoutPlayground integration', () => {
 
       const row = recordFor(h, 'root:0:1');
       expect(row.x).toBeCloseTo(20);
-      expect(row.y).toBeCloseTo(46.8);
+      expect(row.y).toBe(50);
 
       const a = recordFor(h, 'root:0:1:0');
       expect(a.x).toBeCloseTo(20);
-      expect(a.y).toBeCloseTo(46.8);
+      expect(a.y).toBe(50);
       expect(a.width).toBe(100);
       expect(a.height).toBe(100);
 
       const b = recordFor(h, 'root:0:1:1');
       expect(b.x).toBeCloseTo(130);
-      expect(b.y).toBeCloseTo(46.8);
+      expect(b.y).toBe(50);
       expect(b.width).toBeCloseTo(450);
       expect(b.height).toBe(100);
     });
@@ -97,9 +97,9 @@ describe('LayoutPlayground integration', () => {
       const nested = recordFor(h, 'root:0:2');
       const buttonA = recordFor(h, 'root:0:2:1');
       const buttonB = recordFor(h, 'root:0:2:2');
-      expect(nested.y).toBeCloseTo(156.8);
-      expect(buttonA.y).toBeCloseTo(181.6);
-      expect(buttonB.y).toBeCloseTo(206.4);
+      expect(nested.y).toBe(160);
+      expect(buttonA.y).toBe(188);
+      expect(buttonB.y).toBe(216);
       expect(buttonB.x).toBeCloseTo(buttonA.x);
     });
   });
@@ -270,7 +270,7 @@ describe('LayoutPlayground integration', () => {
       const scroll = recordFor(h, 'root:0:4');
       expect(scroll.width).toBe(300);
       expect(scroll.height).toBe(120);
-      expect(scroll.contentHeight).toBeCloseTo(2274);
+      expect(scroll.contentHeight).toBe(2594);
       expect(scroll.scrollY).toBe(0);
     });
 

@@ -1,5 +1,5 @@
 import type { UiTextStyle } from '../properties/UiTextStyle';
-import { textStylesEqual } from '../properties/UiTextStyle';
+import { defaultTextStyle, textStylesEqual } from '../properties/UiTextStyle';
 
 /**
  * A typography scale.
@@ -62,24 +62,18 @@ export function isTypographyRole(value: unknown, scale: UiTypography): value is 
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(scale, value);
 }
 
-const defaultBody: UiTextStyle = {
-  fontFamily: 'sans-serif',
-  fontSize: 14,
-  fontWeight: 'normal',
-  lineHeight: 16.8,
-  letterSpacing: 0,
-  color: { r: 0, g: 0, b: 0, a: 1 },
-  textAlign: 'start',
-  textDirection: 'ltr'
-} as const;
-
+/**
+ * The stock scale: one face, and line heights on a 4-point grid rather
+ * than 1.2 of the size, so a paragraph has room and a stack of text
+ * lines up with the spacing scale around it.
+ */
 export const defaultTypography: UiTypography = {
-  body: defaultBody,
-  bodyLarge: { ...defaultBody, fontSize: 16, lineHeight: 19.2 },
-  bodySmall: { ...defaultBody, fontSize: 12, lineHeight: 14.4 },
-  headline: { ...defaultBody, fontSize: 24, fontWeight: 'bold', lineHeight: 28.8 },
-  title: { ...defaultBody, fontSize: 20, fontWeight: '500', lineHeight: 24 },
-  label: { ...defaultBody, fontSize: 11, fontWeight: '500', lineHeight: 13.2, letterSpacing: 0.5 }
+  body: defaultTextStyle,
+  bodyLarge: { ...defaultTextStyle, fontSize: 16, lineHeight: 24 },
+  bodySmall: { ...defaultTextStyle, fontSize: 12, lineHeight: 16 },
+  headline: { ...defaultTextStyle, fontSize: 24, fontWeight: '600', lineHeight: 32, letterSpacing: -0.25 },
+  title: { ...defaultTextStyle, fontSize: 20, fontWeight: '600', lineHeight: 28 },
+  label: { ...defaultTextStyle, fontSize: 12, fontWeight: '500', lineHeight: 16 }
 } as const;
 
 /**

@@ -498,7 +498,7 @@ describe('Canvas2DRenderer text', () => {
     h.append(root, text);
     h.layout(root);
     h.render(root);
-    expect(callArgs(h.context, 'set:font')).toEqual(['normal 14px sans-serif']);
+    expect(callArgs(h.context, 'set:font')).toEqual(['normal 14px system-ui, sans-serif']);
     expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#000']);
     expect(callArgs(h.context, 'set:textBaseline')).toEqual(['alphabetic']);
     // 16.8 line box around a 14px font: 1.4 half-leading floored to 1,
@@ -578,7 +578,7 @@ describe('Canvas2DRenderer text', () => {
     h.render(root);
     // Two runs of glyphs and no third: the swatch draws a rectangle.
     expect(callArgs(h.context, 'fillText').map(args => args[0])).toEqual(['Loud', 'Quiet']);
-    expect(callArgs(h.context, 'set:font')).toEqual(['900 40px Georgia', 'normal 14px sans-serif']);
+    expect(callArgs(h.context, 'set:font')).toEqual(['900 40px Georgia', 'normal 14px system-ui, sans-serif']);
     // The swatch's fill is its own, and the label after it is back to
     // the default colour rather than carrying the first one's red.
     expect(callArgs(h.context, 'set:fillStyle')).toEqual(['#f00', '#0f0', '#000']);

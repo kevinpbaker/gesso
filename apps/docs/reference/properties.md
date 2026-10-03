@@ -159,10 +159,10 @@ The text style properties are the inherited ones. Set them on a container and ev
 | Property | Default | Inherited | Invalidates | What it does |
 | -------- | ------- | --------- | ----------- | ------------ |
 | `color` | black | yes | Paint | Text colour. Inherited, and a theme token resolves against the theme in scope. |
-| `fontFamily` | `sans-serif` | yes | Paint, Layout | Font stack, as a CSS family list. |
+| `fontFamily` | `system-ui, sans-serif` | yes | Paint, Layout | Font stack, as a CSS family list. |
 | `fontSize` | `14` | yes | Paint, Layout | Size in pixels. |
 | `fontWeight` | `normal` | yes | Paint, Layout | A number, a numeric string, or a CSS keyword. |
-| `lineHeight` | `16.8` | yes | Paint, Layout | Line box height in pixels. The default is 1.2 times the default size. |
+| `lineHeight` | `20` | yes | Paint, Layout | Line box height in pixels. The default is the body line, 20 on 14; a node that sets its own fontSize alone gets 1.2 times it. |
 | `letterSpacing` | `0` | yes | Paint, Layout | Extra space between characters, in pixels. |
 | `textAlign` | `start` | yes | Paint | How lines sit within the text box. |
 | `textDirection` | `ltr` | yes | Paint | Base direction for bidirectional text. |

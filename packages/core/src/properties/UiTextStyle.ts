@@ -1,4 +1,5 @@
 import type { UiColor } from './UiColor';
+import { rgb8 } from './UiColor';
 import type { UiColorValue, UiFontWeight, UiTextAlign, UiTextDirection } from './UiPropertyValues';
 import type { UiNode } from '../graph/UiNode';
 
@@ -137,13 +138,23 @@ export interface UiSpannedText {
   readonly spans: readonly UiResolvedTextSpan[];
 }
 
+/**
+ * What text is set in when nothing says otherwise.
+ *
+ * `system-ui` is the platform's own interface face (San Francisco,
+ * Segoe UI, Roboto), which is what an application on that platform is
+ * expected to look like; `sans-serif` is there for an engine that does
+ * not know the generic. The line is 20 on 14, about 1.43, because the
+ * 1.2 that a browser's `normal` comes to sets lines too tight to read
+ * in a paragraph. The ink is the stock palette's `text`, not black.
+ */
 export const defaultTextStyle: UiTextStyle = {
-  fontFamily: 'sans-serif',
+  fontFamily: 'system-ui, sans-serif',
   fontSize: 14,
   fontWeight: 'normal',
-  lineHeight: 16.8,
+  lineHeight: 20,
   letterSpacing: 0,
-  color: { r: 0, g: 0, b: 0, a: 1 },
+  color: rgb8(17, 24, 39),
   textAlign: 'start',
   textDirection: 'ltr'
 } as const;

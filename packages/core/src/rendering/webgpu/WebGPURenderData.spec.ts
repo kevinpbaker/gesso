@@ -360,7 +360,7 @@ describe('buildRenderList text', () => {
     expect(runs).toHaveLength(1);
     expect(runs[0].text).toBe('Hello');
     expect(runs[0].glyphs).toBe(5);
-    expect(runs[0].font).toBe('normal 14px sans-serif');
+    expect(runs[0].font).toBe('normal 14px system-ui, sans-serif');
     expect(runs[0].color).toBe('#123456');
     // The five glyphs share a page and a scissor, so they are one draw.
     expect(list.commands).toHaveLength(1);

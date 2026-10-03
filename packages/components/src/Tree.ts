@@ -2,7 +2,8 @@ import { combineLatest, map } from 'rxjs';
 
 import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
-import { Row, Text, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from 'gesso-core';
+import { Box, Row, Text, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from 'gesso-core';
+import { chevron, CHEVRON_DOWN, CHEVRON_RIGHT } from './chevron';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import {
@@ -216,15 +217,9 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
           }
         }
       },
-      Text({
-        // A triangle, drawn as text for the same reason the checkbox's
-        // tick is: an icon is the Media tier's, and this does not wait.
-        text: branch ? open.pipe(map(on => (on ? '▾' : '▸'))) : ' ',
-        width: 10,
-        fontSize: 11,
-        color: ink,
-        selectable: false
-      }),
+      // A leaf keeps the arrow's width, so its label lines up with its
+      // siblings' under the branch.
+      branch ? chevron(open.pipe(map(on => (on ? CHEVRON_DOWN : CHEVRON_RIGHT))), ink, 14) : Box({ width: 14 }),
       Text({ text: row.node.label, fontSize: 13, color: ink, selectable: false, maxLines: 1, textOverflow: 'ellipsis' })
     );
   };
