@@ -2865,16 +2865,20 @@ declare class UiWheelController {
   now?: () => number, options?: UiWheelControllerOptions);
   private readonly paced;
   private readonly pacing;
+  private eventTime;
+  private lastFrame;
+  private frameInterval;
   private preciseUntil;
   lastWheelTarget: UiNode | null;
-  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number): UiWheelEvent;
+  wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number,
+  at?: number): UiWheelEvent;
   scrollabilityAt(x: number, y: number): UiScrollability;
   scrollabilityOf(target: UiNode | null): UiScrollability;
   scrollsAnything(): boolean;
   private scrollChain;
   private appContainsOverscroll;
   private applyDelta;
-  advance(): boolean;
+  advance(time?: number): boolean;
   private toPixels;
 }
 declare function isScrollContainer(node: UiNode): boolean;

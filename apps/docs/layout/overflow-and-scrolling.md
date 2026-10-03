@@ -192,14 +192,16 @@ coming (400 ms after each), which covers a gesture and its momentum.
 A trackpad also sends on its own clock rather than the display's, so at
 a steady speed a frame gets two of its steps, now and then one or three,
 and on a 120 Hz display sometimes none. Applied as they come, a steady
-flick moves the page unevenly, which reads as judder. The runtime paces a
-precision device's steps instead, as a browser resamples scroll input
-for a native page: each frame moves by the rate the steps have been
-arriving at, never more than a frame behind, and what's left is applied
-as soon as the input stops, so the page ends where the steps add up to.
-A gesture's first frame, a push the other way and a sudden harder one
-apply at once, so pacing evens out a stream without adding a delay to
-it. Every step counts: several arriving between two frames add up.
+flick moves the page unevenly, which reads as judder; evening it out by
+waiting for steps puts the page a frame behind the hand. The runtime
+does what a browser does for a native page instead: each frame puts the
+page where the input will have reached when the frame is shown, the
+steps so far plus their velocity times the time since the last one,
+never more than a frame and a half ahead. The steps come out even and
+the page keeps up. A gesture's first step goes as it is, and once the
+steps stop the prediction is withdrawn and the page settles exactly
+where they add up to. Every step counts: several arriving between two
+frames add up.
 
 A trackpad's steps can be a fraction of a pixel, and the offset keeps
 them exactly, so they add up. What's drawn lands on a whole device pixel,
