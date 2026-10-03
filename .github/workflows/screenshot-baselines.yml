@@ -1,0 +1,61 @@
+# Recaptures the screenshot baselines where CI compares them.
+#
+# Canvas text is rasterised with the system's fonts, so a baseline is
+# only comparable with a capture from the same browser on the same
+# machine image, and the `screenshots` and `docs-screenshots` jobs in
+# ci.yml refuse to compare across a mismatch. A developer machine is not
+# that environment, so the baselines cannot be regenerated there: this
+# runs the two update scripts on the runner CI uses, with the same
+# setup as those jobs, and uploads what they wrote.
+#
+# Run it from the Actions tab (or `gh workflow run screenshot-baselines.yml`)
+# whenever the runner's Chrome moves, then download the
+# `screenshot-baselines` artifact, copy it over the repository and commit.
+# It commits nothing itself, so a new set of baselines is always a change
+# somebody looked at.
+
+name: Screenshot baselines
+
+on:
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  capture:
+    name: capture the route and docs baselines on the CI runner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # As the route screenshots job installs it, for the WebGPU routes.
+      - name: Vulkan loader for SwiftShader
+        run: sudo apt-get update && sudo apt-get install -y libvulkan1 mesa-vulkan-drivers
+
+      - name: Route baselines
+        run: pnpm screenshots:update
+        env:
+          CHROME_BIN: google-chrome
+
+      - name: Docs baselines
+        run: pnpm docs:screenshots:update
+        env:
+          CHROME_BIN: google-chrome
+
+      - name: Upload the baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-baselines
+          path: |
+            apps/playground/screenshots/*.png
+            apps/playground/screenshots/manifest.json
+            apps/docs/screenshots/*.png
+            apps/docs/screenshots/manifest.json
+            !**/*.actual.png
+          if-no-files-found: error
