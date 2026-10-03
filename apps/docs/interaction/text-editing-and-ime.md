@@ -258,15 +258,16 @@ container, and the editables inside it select as one:
 
 Inside a group:
 
-| Gesture                             | What it does                                           |
-| ----------------------------------- | ------------------------------------------------------ |
-| An arrow off the edge of a field    | Moves into the next field: up and down keep the column |
-| Shift and an arrow off the edge     | Extends the selection into the next field              |
-| Dragging out of a field             | Extends the selection into the fields it crosses       |
-| Shift and a press in another field  | Extends the selection there from where it was anchored |
-| `Ctrl/Cmd+A`                        | Selects every field in the group                       |
-| A plain arrow over such a selection | Collapses it to the side the arrow points to           |
-| A press beside or between fields    | Lands in the nearest field, at the nearest position    |
+| Gesture                             | What it does                                            |
+| ----------------------------------- | ------------------------------------------------------- |
+| An arrow off the edge of a field    | Moves into the next field: up and down keep the column  |
+| Shift and an arrow off the edge     | Extends the selection into the next field               |
+| Dragging out of a field             | Extends the selection into the fields it crosses        |
+| Shift and a press in another field  | Extends the selection there from where it was anchored  |
+| `Ctrl/Cmd+A`                        | Selects every field in the group                        |
+| A plain arrow over such a selection | Collapses it to the side the arrow points to            |
+| A press beside or between fields    | Lands in the nearest field, at the nearest position     |
+| Tab                                 | Leaves the group: its fields are one stop, not one each |
 
 Every field between the two ends draws its part of the selection.
 Focus is in the field holding the moving end.
@@ -277,6 +278,14 @@ as a list item's bullet) goes to the nearest field by height, as a
 document puts the caret on the nearest line. A press on something that
 answers presses itself, a button or anything with a click or pointer
 listener, is left to it.
+
+The group's fields are one place in the Tab order, at its first field,
+so a document of two hundred paragraphs is one stop to Tab to and one to
+Tab past. Tabbing back in lands on the field the person was last in.
+Anything else focusable inside the group, a task's checkbox, keeps its
+own stop. A field that wants Tab for itself (a list item that indents)
+takes the key in `onKeyDown`, and should let it go when it can't use it,
+or the person can't leave.
 
 **What the person does to a selection that spans fields is yours.**
 Typing, Backspace and Delete, Enter, paste and cut over it are not

@@ -150,6 +150,10 @@ no order for it to be out of. And it does not reorder anything: the
 cycle is still document order, and the only way to change that is still
 to change the tree.
 
+One thing does fold stops together: the fields of an
+[editing group](/interaction/text-editing-and-ime) are a single stop, at
+the first field, entered at the one last focused.
+
 `Dialog`, in [the component library](/components/), is this with an
 entrance, a backdrop and the semantics already attached. Reach for it
 first; take the trap yourself when you are building something the

@@ -1,6 +1,8 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiEventType, UiFocusEvent } from './UiInputEvent';
 import { isNodeFocusable, isNodeTabStop } from './UiInteraction';
+import { isEditableNode } from '../editing/UiEditable';
+import { editingGroupOf } from '../editing/UiEditingGroup';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 
 /**
@@ -75,6 +77,8 @@ export class UiFocusManager {
   private readonly listeners = new Set<(node: UiNode | null, source: FocusSource) => void>();
   private readonly scopeListeners = new Set<() => void>();
   private readonly scopes: FocusScope[] = [];
+  /** The field of each editing group that last had focus, where Tab back into the group lands. */
+  private readonly groupEntries = new WeakMap<UiNode, UiNode>();
 
   constructor(
     root: UiNode,
@@ -159,6 +163,10 @@ export class UiFocusManager {
     }
     const previous = this.focused;
     this.focused = node;
+    const group = this.groupOf(node);
+    if (group !== null) {
+      this.groupEntries.set(group, node);
+    }
     if (previous !== null) {
       this.dispatcher.dispatch(new UiFocusEvent(UiEventType.Blur, node), previous);
     }
@@ -349,12 +357,25 @@ export class UiFocusManager {
       return false;
     }
     let index = this.focused === null ? -1 : focusables.indexOf(this.focused);
+    const from = this.focused === null ? null : this.groupOf(this.focused);
+    if (index === -1 && from !== null) {
+      // A field of an editing group other than the one standing for it.
+      index = focusables.findIndex(node => this.groupOf(node) === from);
+    }
     if (index === -1) {
       // Nothing focused, or focus sits outside the active scope: move
       // to the first (next) or last (previous).
       index = delta > 0 ? focusables.length - 1 : 0;
     }
-    const next = focusables[(index + delta + focusables.length) % focusables.length];
+    let next = focusables[(index + delta + focusables.length) % focusables.length]!;
+    const into = this.groupOf(next);
+    if (into !== null) {
+      // Into a group, at the field the person was last in.
+      const entry = this.groupEntries.get(into);
+      if (entry !== undefined && this.isAttached(entry) && isNodeTabStop(entry) && this.groupOf(entry) === into) {
+        next = entry;
+      }
+    }
     return this.focus(next, 'keyboard');
   }
 
@@ -368,9 +389,20 @@ export class UiFocusManager {
    */
   private collectFocusable(): UiNode[] {
     const result: UiNode[] = [];
+    // An editing group's fields are one stop, where its first field is:
+    // a document of two hundred paragraphs is one place to Tab to and one
+    // to Tab past, not two hundred. Anything else focusable inside the
+    // group (a task's checkbox) keeps its own stop.
+    const groups = new Set<UiNode>();
     const visit = (node: UiNode): void => {
       if (isNodeTabStop(node)) {
-        result.push(node);
+        const group = this.groupOf(node);
+        if (group === null) {
+          result.push(node);
+        } else if (!groups.has(group)) {
+          groups.add(group);
+          result.push(node);
+        }
       }
       for (let child = node.firstChild; child !== null; child = child.nextSibling) {
         visit(child);
@@ -378,6 +410,11 @@ export class UiFocusManager {
     };
     visit(this.scopeRoot);
     return result;
+  }
+
+  /** The editing group a field belongs to, by its root, or null for anything that isn't a field of one. */
+  private groupOf(node: UiNode): UiNode | null {
+    return isEditableNode(node) ? (editingGroupOf(node)?.root ?? null) : null;
   }
 
   /** Whether the node may hold focus given the active scope, if any. */

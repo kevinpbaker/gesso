@@ -239,6 +239,34 @@ describe('a selection across the fields of an editing group', () => {
     expect(lit()).toEqual({ p0: undefined, p1: undefined, p2: undefined });
   });
 
+  describe('Tab', () => {
+    const focused = (): string | null => {
+      const node = ui.runtime.input.focus.focusedNode;
+      return node === null ? null : ((node.properties.get('label') as string | undefined) ?? null);
+    };
+
+    it('stops once at a group of fields, not at each field', async () => {
+      await mount();
+      await caretIn('p0', 0);
+      await press('Tab');
+      // Past the group's other fields, to the button inside it, then out.
+      expect(focused()).toBe('tool');
+      await press('Tab');
+      expect(focused()).toBe('outside');
+    });
+
+    it('comes back into the group at the field it left', async () => {
+      await mount();
+      await caretIn('p1', 2);
+      await press('Tab');
+      await press('Tab');
+      expect(focused()).toBe('outside');
+      await press('Tab', { shift: true });
+      await press('Tab', { shift: true });
+      expect(focused()).toBe('p1');
+    });
+  });
+
   describe('a press on none of its fields', () => {
     async function pressAt(x: number, y: number): Promise<void> {
       ui.fireEvent.pointerDown(x, y);
