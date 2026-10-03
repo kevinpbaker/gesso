@@ -3401,6 +3401,7 @@ declare class LayoutEngine {
   private retiredRecords;
   private readonly scrollNodes;
   private readonly textScrollNodes;
+  private readonly textScrollPending;
   private readonly anchoredNodes;
   private readonly anchorOf;
   private readonly anchorDependents;
@@ -6894,7 +6895,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BlbWU-rO.js";
+} from "./index-CEtDhK4G.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7826,7 +7827,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BlbWU-rO.js";
+} from "./index-CEtDhK4G.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
