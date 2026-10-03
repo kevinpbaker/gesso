@@ -60,6 +60,12 @@ export interface EditingState {
   readonly caret: LayoutBox;
   readonly multiline: boolean;
   readonly composing: boolean;
+  /**
+   * The selection as HTML, which a copy puts on the clipboard beside
+   * the text, when the field's editing group gives some (see
+   * `UiEditingGroup.copyHtml`). Absent otherwise.
+   */
+  readonly html?: string;
 }
 
 export interface EditingControllerOptions {
@@ -123,6 +129,17 @@ export class UiEditingController {
     readonly anchor: UiTextPosition;
     readonly focus: UiTextPosition;
     readonly lit: readonly UiNode[];
+  } | null = null;
+  /**
+   * What the group last made of a selection for the clipboard, kept
+   * while the selection and the texts it covers stay the same: the
+   * state is asked for every frame, and serializing a long selection
+   * every frame would cost more than the frame.
+   */
+  private copied: {
+    readonly key: readonly unknown[];
+    readonly text: string;
+    readonly html: string | undefined;
   } | null = null;
   /** Set while the span moves focus to the field its focus end is in, so that move does not end it. */
   private spanFocusing = false;
@@ -646,23 +663,26 @@ export class UiEditingController {
       // The shell is handed the whole selection, selected, so that its
       // native copy and cut take all of it; what is typed over it comes
       // back as an edit for the group.
-      const text = this.spanText();
+      const { text, html } = this.spanCopy();
       return {
         text,
         selectionStart: 0,
         selectionEnd: text.length,
         caret: { x: visible.x + caret.x, y: visible.y + caret.y, width: 1, height: caret.height },
         multiline: true,
-        composing: false
+        composing: false,
+        ...(html === undefined ? {} : { html })
       };
     }
+    const html = model.collapsed || model.composing ? undefined : this.fieldHtml(node, model.start, model.end);
     return {
       text: model.text,
       selectionStart: model.start,
       selectionEnd: model.end,
       caret: { x: visible.x + caret.x, y: visible.y + caret.y, width: 1, height: caret.height },
       multiline: isMultiline(node),
-      composing: model.composing
+      composing: model.composing,
+      ...(html === undefined ? {} : { html })
     };
   }
 
@@ -962,21 +982,53 @@ export class UiEditingController {
     return true;
   }
 
-  /** The text a selection across fields copies as. */
-  private spanText(): string {
+  /** The text and HTML a selection across fields copies as. */
+  private spanCopy(): { readonly text: string; readonly html: string | undefined } {
     const span = this.span!;
     const forward = comparePositions(span.anchor, span.focus) <= 0;
     const start = forward ? span.anchor : span.focus;
     const end = forward ? span.focus : span.anchor;
-    if (span.group.copyText !== undefined) {
-      return span.group.copyText(start, end);
+    const key: unknown[] = [span];
+    for (const node of span.lit) {
+      key.push(editorFor(node).text);
     }
-    return span.lit
-      .map(node => {
-        const text = editorFor(node).text;
-        return text.slice(node === start.node ? start.offset : 0, node === end.node ? end.offset : text.length);
-      })
-      .join('\n');
+    return this.cachedCopy(key, () => {
+      const text =
+        span.group.copyText !== undefined
+          ? span.group.copyText(start, end)
+          : span.lit
+              .map(node => {
+                const text = editorFor(node).text;
+                return text.slice(node === start.node ? start.offset : 0, node === end.node ? end.offset : text.length);
+              })
+              .join('\n');
+      return { text, html: span.group.copyHtml?.(start, end) ?? undefined };
+    });
+  }
+
+  /** The HTML a selection inside one field of a group copies as, if the group gives any. */
+  private fieldHtml(node: UiNode, start: number, end: number): string | undefined {
+    const group = editingGroupOf(node)?.group;
+    if (group?.copyHtml === undefined) {
+      return undefined;
+    }
+    const text = editorFor(node).text;
+    return this.cachedCopy([node, text, start, end], () => ({
+      text: text.slice(start, end),
+      html: group.copyHtml!({ node, offset: start }, { node, offset: end }) ?? undefined
+    })).html;
+  }
+
+  private cachedCopy(
+    key: readonly unknown[],
+    make: () => { readonly text: string; readonly html: string | undefined }
+  ): { readonly text: string; readonly html: string | undefined } {
+    const last = this.copied;
+    if (last !== null && last.key.length === key.length && last.key.every((part, i) => part === key[i])) {
+      return last;
+    }
+    this.copied = { key, ...make() };
+    return this.copied;
   }
 
   /** Where a Shift and press extends from: the focused field's anchor, if it is in the same group. */
