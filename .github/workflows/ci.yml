@@ -9,8 +9,9 @@
 # need a browser, and the runner images ship Google Chrome. `text` needs
 # a browser and the seven Noto faces the text fixtures were rendered in,
 # which apt provides. `screenshots` and `docs-screenshots` need a
-# browser *and* baselines captured in the same environment, which is why
-# they are the two jobs here that cannot yet be authoritative.
+# browser *and* baselines captured in the same environment, so they run
+# a pinned Chrome rather than the runner's, and their baselines come from
+# the screenshot-baselines workflow on this runner.
 #
 # `pnpm check` runs the `checks` job's steps locally in the same order.
 #
@@ -335,17 +336,14 @@ jobs:
           CHROME_BIN: google-chrome
 
   screenshots:
-    name: route screenshots (advisory until baselines are captured here)
+    name: route screenshots
     runs-on: ubuntu-latest
-    # Not authoritative yet, and deliberately not pretending to be. The
-    # baselines committed in apps/playground/screenshots were captured on
-    # a developer machine, and canvas text is rasterised with the system's
-    # fonts, so they are not comparable with this runner's output. The
-    # script says so and fails rather than comparing anyway. To promote
-    # this job to a gate: run `pnpm screenshots:update` in this
-    # environment, commit the baselines and the manifest, and delete this
-    # line.
-    continue-on-error: true
+    # A gate. The baselines in apps/playground/screenshots were captured
+    # on this runner with the Chrome pinned in SCREENSHOT_CHROME, and the
+    # script refuses to compare against a capture from any other build,
+    # because canvas text is rasterised with the browser and the system's
+    # fonts. A route that changes on purpose is updated by running the
+    # screenshot-baselines workflow and committing what it captures.
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
@@ -388,19 +386,11 @@ jobs:
           if-no-files-found: ignore
 
   docs-screenshots:
-    name: docs screenshots (advisory until baselines are captured here)
+    name: docs screenshots
     runs-on: ubuntu-latest
-    # Advisory for exactly the reason the route job above is, and no
-    # other. The baselines committed in apps/docs/screenshots were
-    # captured on a developer machine; canvas text is rasterised by the
-    # browser with the system's fonts, so a runner with different faces
-    # draws different pixels and the two sets are not comparable. The
-    # script refuses to compare across that mismatch rather than
-    # reporting a meaningless diff, so this job would fail on its
-    # manifest check every run. To promote it to a gate: run
-    # `pnpm docs:screenshots:update` in this environment, commit
-    # apps/docs/screenshots and its manifest.json, and delete this line.
-    continue-on-error: true
+    # A gate, on the same terms as the route job above: baselines from
+    # this runner and the pinned Chrome, updated by the
+    # screenshot-baselines workflow.
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
