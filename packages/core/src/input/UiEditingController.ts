@@ -21,6 +21,7 @@ import { clearSelectionRange, setSelectionRange } from '../selection/UiSelectabl
 import type { CaretRect } from '../editing/TextGeometry';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
+import { isNodeFocusable } from './UiInteraction';
 import {
   UiBeforeInputEvent,
   UiPasteEvent,
@@ -562,6 +563,61 @@ export class UiEditingController {
    * selects the word, a third the line. Dragging afterwards extends the
    * selection from the anchor.
    */
+  /**
+   * The field a press belongs to that landed inside an editing group
+   * but on none of its fields: in the padding round the fields, the gap
+   * between two of them, or the plain structure a field sits in (a list
+   * item's bullet). The nearest field, by height, as a document puts the
+   * caret on the nearest line. Null for a press outside any group, and
+   * for one on something that answers presses itself, such as a task's
+   * checkbox: `handlesPress` says which nodes do.
+   */
+  fieldNear(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null {
+    let root: UiNode | null = null;
+    for (let node: UiNode | null = target; node !== null; node = node.parent) {
+      if (isEditableNode(node) || isNodeFocusable(node) || handlesPress(node)) {
+        return null;
+      }
+      const group = node.properties.get('editingGroup') as UiEditingGroup | null | undefined;
+      if (group !== undefined && group !== null) {
+        root = node;
+        break;
+      }
+    }
+    if (root === null) {
+      return null;
+    }
+    // Walked from a field near the press, so a press costs the fields
+    // between, not the whole group: the focused field when it's in this
+    // group, else the next one after the press in document order.
+    const focused = this.focusedEditable;
+    let current =
+      focused !== null && editingGroupOf(focused)?.root === root
+        ? focused
+        : (adjacentField(root, target, 1) ?? edgeField(root, -1));
+    if (current === null) {
+      return null;
+    }
+    const distance = (node: UiNode): number => {
+      const box = this.host.visibleBox(node);
+      return y < box.y ? box.y - y : y > box.y + box.height ? y - box.y - box.height : 0;
+    };
+    for (;;) {
+      const here = distance(current);
+      if (here === 0) {
+        return current;
+      }
+      const box = this.host.visibleBox(current);
+      const next = adjacentField(root, current, y < box.y ? -1 : 1);
+      // A tie stays put, so two fields the same distance away can't
+      // hand the press back and forth.
+      if (next === null || distance(next) >= here) {
+        return current;
+      }
+      current = next;
+    }
+  }
+
   pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void {
     if (!isEditableNode(node)) {
       return;

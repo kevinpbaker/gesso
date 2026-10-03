@@ -2854,6 +2854,7 @@ interface PointerControllerOptions {
   now?: () => number;
   editing?: {
     isEditable(node: UiNode): boolean;
+    fieldNear?(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null;
     pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
     pointerMove(node: UiNode, x: number, y: number): void;
     pointerUp(): void;
@@ -2869,6 +2870,7 @@ interface PointerControllerOptions {
 declare class UiPointerController {
   private readonly hitTester;
   private readonly dispatcher;
+  private handlesPress;
   private readonly slop;
   private readonly touchSlop;
   private readonly gestures;
@@ -3129,6 +3131,7 @@ declare class UiEditingController {
   compositionStart(): void;
   compositionUpdate(text: string, caret?: number): void;
   compositionEnd(text: string): void;
+  fieldNear(target: UiNode, y: number, handlesPress: (node: UiNode) => boolean): UiNode | null;
   pointerDown(node: UiNode, x: number, y: number, modifiers: UiKeyModifiers): void;
   pointerMove(node: UiNode, x: number, y: number): void;
   pointerUp(): void;
@@ -6884,7 +6887,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-gQuMMlyl.js";
+} from "./index-CIavOtyN.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7816,7 +7819,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-gQuMMlyl.js";
+} from "./index-CIavOtyN.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
