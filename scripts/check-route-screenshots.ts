@@ -51,7 +51,7 @@
  *   node scripts/check-route-screenshots.ts --update    # rewrite baselines
  *   node scripts/check-route-screenshots.ts --route framework
  *   node scripts/check-route-screenshots.ts --route modifiers,compare
- *   node scripts/check-route-screenshots.ts --app segue
+ *   node scripts/check-route-screenshots.ts --app playground
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import {
@@ -76,12 +76,12 @@ import { ROUTES } from '../apps/playground/src/shell/routes.ts';
  * The applications this gate photographs, and how a route in each is
  * addressed.
  *
- * One browser and one preview server per application rather than one of
- * each for both, because the two need different browser flags: Segue
- * reads Audius, so it is photographed with no name resolution, and the
- * playground's baselines were captured without that and should not be
- * regenerated to accommodate a second app. Separate launches keep each
- * gate's meaning its own.
+ * One browser and one preview server per application, because two apps
+ * may need different browser flags, and separate launches keep each
+ * gate's meaning its own. The playground is the only one now: Segue,
+ * the second, left the repository and its entry went with it, after the
+ * capture failed trying to start a preview server in a directory that
+ * no longer existed.
  */
 interface AppUnderTest {
   readonly root: readonly string[];
@@ -99,21 +99,10 @@ interface AppUnderTest {
    * One means the baseline keeps the route's bare name and nothing is
    * emulated, which is how the playground was photographed before this
    * existed and how it stays. More than one suffixes the name and asks
-   * for each in turn, because M8 wants Segue seen in both.
+   * for each in turn.
    */
   readonly appearances: readonly ('light' | 'dark')[];
 }
-
-/**
- * No name resolves but localhost's, so Segue photographs its committed
- * snapshot rather than whatever Audius is trending this hour.
- *
- * A browser-wide flag rather than the DevTools network domain, because
- * the requests to block are made by workers, and a worker is a target
- * of its own that the page's client never sees. The same flag, for the
- * same reason, as `check-a11y-tree.ts`.
- */
-const OFFLINE_FLAGS = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost'];
 
 const APPS: Record<string, AppUnderTest> = {
   playground: {
@@ -124,39 +113,9 @@ const APPS: Record<string, AppUnderTest> = {
     url: (base, route) => `${base}?still#${route}`,
     flags: WEBGPU_FLAGS,
     appearances: ['dark']
-  },
-  segue: {
-    root: ['apps', 'segue'],
-    port: 5190,
-    devtoolsPort: 9351,
-    baselines: ['apps', 'segue', 'screenshots'],
-    // Segue addresses routes off the path, and still mode is a query,
-    // so the flag goes on whatever path the route is.
-    url: (base, route) => `${base.replace(/\/$/, '')}${route}${route.includes('?') ? '&' : '?'}still`,
-    flags: [...WEBGPU_FLAGS, ...OFFLINE_FLAGS],
-    appearances: ['light', 'dark']
   }
 };
 
-/**
- * Segue's routes, as concrete addresses.
- *
- * Four of its nine take parameters, so they cannot be photographed from
- * the route table alone. These are the same nine addresses
- * `check-a11y-tree.ts` walks, so the two gates cover the same screens
- * and a route added to one is obviously missing from the other.
- */
-const SEGUE_ROUTES: readonly { readonly id: string; readonly path: string }[] = [
-  { id: 'segue-home', path: '/' },
-  { id: 'segue-about', path: '/about' },
-  { id: 'segue-search', path: '/search' },
-  { id: 'segue-library', path: '/library' },
-  { id: 'segue-now-playing', path: '/now-playing' },
-  { id: 'segue-collection', path: '/Dreameaterism/playlist/deep-house-vol1' },
-  { id: 'segue-album', path: '/HEXED/album/alchemy' },
-  { id: 'segue-track', path: '/Hypertraffic/stay-a-little-longer' },
-  { id: 'segue-artist', path: '/Audius' }
-];
 /** Fixed so a baseline means something; DPR is forced to 1 by the launcher. */
 const VIEWPORT: readonly [number, number] = [1280, 900];
 /**
@@ -488,7 +447,7 @@ async function shoot(appName: string, app: AppUnderTest, routes: readonly Route[
       devtoolsPort: app.devtoolsPort,
       windowSize: VIEWPORT,
       // Some routes are WebGPU; the adapter has to exist for them to
-      // paint. Segue adds the flag that stops names resolving.
+      // paint.
       flags: [...app.flags],
       profileDir: profile
     }));
@@ -646,13 +605,10 @@ async function main(): Promise<void> {
   const failures: string[] = [];
   let captured = 0;
   for (const [name, app] of wanted) {
-    const all: Route[] =
-      name === 'segue'
-        ? SEGUE_ROUTES.map(route => ({ id: route.id, address: route.path }))
-        : ROUTES.filter(route => CANNOT_SETTLE[route.id] === undefined).map(route => ({
-            id: route.id,
-            address: route.id
-          }));
+    const all: Route[] = ROUTES.filter(route => CANNOT_SETTLE[route.id] === undefined).map(route => ({
+      id: route.id,
+      address: route.id
+    }));
     const routes = all.filter(route => onlyRoutes === undefined || onlyRoutes.has(route.id));
     if (routes.length === 0) {
       if (onlyRoutes !== undefined) {
