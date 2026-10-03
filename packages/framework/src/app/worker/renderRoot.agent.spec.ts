@@ -68,10 +68,23 @@ describe('the render worker, asked by an agent', () => {
     });
 
     const agent = remoteSurface(open(AGENT_PORT));
-    expect((await agent.tools()).map(tool => tool.name)).toEqual(['counter_view', 'counter_add', 'clock_view']);
+    expect((await agent.tools()).map(tool => tool.name)).toEqual([
+      'counter_view',
+      'counter_add',
+      'clock_view',
+      'ui_snapshot',
+      'ui_press',
+      'ui_type',
+      'ui_focus',
+      'ui_key'
+    ]);
     expect((await agent.call('counter_add', { arguments: [3] })).structuredContent).toEqual({ count: 3 });
     expect(count.value).toBe(3);
     expect((await agent.call('clock_view', {})).structuredContent).toEqual({ now: 1234 });
+
+    // And the screen, read through the same port.
+    const screen = await agent.call('ui_snapshot', {});
+    expect(screen.isError).toBe(false);
 
     appLink.port1.close();
     appLink.port2.close();

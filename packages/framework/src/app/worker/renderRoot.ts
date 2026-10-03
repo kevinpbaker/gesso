@@ -352,7 +352,26 @@ export class RenderWorkerApp {
         const remote = [...workers]
           .filter(worker => worker.spawned)
           .map(worker => agent.remoteSurface(worker.open(AGENT_PORT), { confirm }));
-        return agent.combineSurfaces([agent.agentSurface(local, { confirm }), ...remote]);
+        // The screen itself as well: for what no channel covers, an
+        // agent can read and operate the interface as a screen reader
+        // does. After the channels, so a channel tool keeps its name.
+        const ui = agent.uiSurface(() => {
+          const runtime = this.runtime;
+          if (runtime === undefined) {
+            return undefined;
+          }
+          return {
+            semanticsTree: () => runtime.semanticsTree(),
+            focusedNodeId: () => runtime.focusedNodeId(),
+            applySemanticsAction: action => runtime.applySemanticsAction(action),
+            key: (key, modifiers) => {
+              runtime.input.keyboard.keyDown(key, modifiers);
+              runtime.input.keyboard.keyUp(key, modifiers);
+            },
+            flush: () => this.clock?.tick(performance.now())
+          };
+        });
+        return agent.combineSurfaces([agent.agentSurface(local, { confirm }), ...remote, ui]);
       })
     );
   }

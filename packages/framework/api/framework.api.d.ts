@@ -17,6 +17,12 @@ import {
   JsonSchema,
   resourceUri
 } from "../AgentSurface-B1aIbMhb.js";
+import {
+  UiKeyModifiers,
+  UiSemanticsAction,
+  UiSemanticsMap,
+  UiSemanticsRecord
+} from "gesso-core";
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
 interface McpServerInfo {
   name?: string;
@@ -123,6 +129,26 @@ declare function connectWebMcp(app: {
   openRenderPort(key: string): MessagePort | undefined;
 }, options?: WebMcpOptions): Promise<() => void>;
 declare function confirmInWindow(request: AgentConfirmation): boolean;
+interface UiHost {
+  semanticsTree(): UiSemanticsMap;
+  focusedNodeId(): string | null;
+  applySemanticsAction(action: UiSemanticsAction): void;
+  key(key: string, modifiers: UiKeyModifiers): void;
+  flush(): void;
+}
+interface UiSurfaceOptions {
+  quietMs?: number;
+  settleMs?: number;
+}
+declare class UiRefs {
+  private readonly byId;
+  private readonly byRef;
+  refOf(id: string): string;
+  idOf(ref: string): string;
+}
+declare function uiSurface(host: () => UiHost | undefined, options?: UiSurfaceOptions): AgentSurface;
+declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs): string;
+declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
 export {
   AGENT_PORT,
   agentSurface,
@@ -134,9 +160,11 @@ export {
   handleMcpMessage,
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
+  outline,
   pageModelContext,
   registerWebMcpTools,
   remoteSurface,
+  resolveTarget,
   resourceUri,
   serveAgentPort,
   type AgentConfirmation,
@@ -156,7 +184,11 @@ export {
   type McpHandlerOptions,
   type McpServerInfo,
   type ModelContextLike,
+  type UiHost,
+  type UiSurfaceOptions,
   type WebMcpOptions,
+  UiRefs,
+  uiSurface,
   validate
 };
 // ==== AgentSurface.d.ts ====
@@ -1684,6 +1716,7 @@ declare class GessoRuntime {
   private resolveRootElement;
   private createInput;
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
+  focusedNodeId(): string | null;
   semanticsTree(): UiSemanticsMap;
   private storeSemantics;
   private orderedSemantics;
@@ -3338,7 +3371,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-CwOef2NN.js";
+} from "./index-sT3KcrMq.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3834,7 +3867,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CwOef2NN.js";
+} from "../index-sT3KcrMq.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
