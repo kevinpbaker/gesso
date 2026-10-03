@@ -11,9 +11,10 @@
  * and the outline off and lets a band run the full width of the
  * window.
  *
- * Two things on this page are the live framework rather than a picture
- * of it: the hero panel is a `DataTable` in a render worker, and the
- * proof band is the same component mounted twice, once on each thread.
+ * The hero panel is the live framework rather than a picture of it: a
+ * `DataTable` in a render worker. The section under it is the agent pitch,
+ * which replaced the block-the-main-thread demo there; that demo lives
+ * on `/guide/why-gesso` and `/guide/workers`.
  * The counter's source is the file the test suite asserts on, included
  * by `index.md` and slotted in below through `<Content />`, so the one
  * code sample on the site's front page cannot drift from the code.
@@ -62,14 +63,58 @@
       </div>
     </section>
 
-    <section class="proof">
-      <div class="band">
-        <div class="band-head">
-          <p class="eyebrow eyebrow-linen">Try it</p>
-          <h2>Block the main thread for three seconds</h2>
-          <p class="lede">Why it stays fast: two copies of the same component, and only one of them notices.</p>
-        </div>
-        <ThreadDemo scheme="dark" />
+    <section class="agents">
+      <div class="section-head section-head-wide">
+        <p class="eyebrow">Built for agents</p>
+        <h2>Every app is an MCP server</h2>
+        <p class="lede">
+          The channel contract you already wrote is the tool definition. An AI agent reads what your app holds, sends
+          the commands it declares, and operates the screen as a screen reader would, with nothing more for you to
+          write.
+        </p>
+      </div>
+      <div class="pillar-grid">
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>notes_view</span>
+            <span>notes_open(id)</span>
+            <span>notes_remove(id) <em>asks first</em></span>
+          </div>
+          <h3>Your contract is the tool</h3>
+          <p>
+            Each channel's view and commands become tools, described from your JSDoc and checked against your types. A
+            command marked <code>@confirm</code> is put to the person before it is sent.
+          </p>
+          <a class="card-link" href="/guide/built-for-agents">Built for AI agents</a>
+        </article>
+
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>- textbox "Your name" [e3]</span>
+            <span>- checkbox "Weekly email" [e4]</span>
+            <span>- button "Save" [e5]</span>
+          </div>
+          <h3>The screen, as a screen reader hears it</h3>
+          <p>
+            For what no channel covers, an agent reads the interface as an outline and presses, types and tabs through
+            it, by the same path assistive technology takes.
+          </p>
+          <a class="card-link" href="/structure/agents-and-mcp#operating-the-interface">Operating the interface</a>
+        </article>
+
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>AGENTS.md</span>
+            <span>llms.txt</span>
+            <span>pnpm dev → /__gesso/mcp</span>
+          </div>
+          <h3>Easy for a coding agent to write</h3>
+          <p>
+            Every new project tells a coding agent the rules, the docs are published for models, and the dev server lets
+            the agent drive the running app to check its own work.
+          </p>
+          <a class="card-link" href="/guide/built-for-agents#easy-for-a-coding-agent-to-write">For coding agents</a>
+        </article>
       </div>
     </section>
 
@@ -146,61 +191,6 @@
             why the counter follows this page's light and dark toggle.
           </p>
         </div>
-      </div>
-    </section>
-
-    <section class="agents">
-      <div class="section-head section-head-wide">
-        <p class="eyebrow">Built for agents</p>
-        <h2>Every app is an MCP server</h2>
-        <p class="lede">
-          The channel contract you already wrote is the tool definition. An AI agent reads what your app holds, sends
-          the commands it declares, and operates the screen as a screen reader would, with nothing more for you to
-          write.
-        </p>
-      </div>
-      <div class="pillar-grid">
-        <article class="card">
-          <div class="figure figure-tools">
-            <span>notes_view</span>
-            <span>notes_open(id)</span>
-            <span>notes_remove(id) <em>asks first</em></span>
-          </div>
-          <h3>Your contract is the tool</h3>
-          <p>
-            Each channel's view and commands become tools, described from your JSDoc and checked against your types. A
-            command marked <code>@confirm</code> is put to the person before it is sent.
-          </p>
-          <a class="card-link" href="/guide/built-for-agents">Built for AI agents</a>
-        </article>
-
-        <article class="card">
-          <div class="figure figure-tools">
-            <span>- textbox "Your name" [e3]</span>
-            <span>- checkbox "Weekly email" [e4]</span>
-            <span>- button "Save" [e5]</span>
-          </div>
-          <h3>The screen, as a screen reader hears it</h3>
-          <p>
-            For what no channel covers, an agent reads the interface as an outline and presses, types and tabs through
-            it, by the same path assistive technology takes.
-          </p>
-          <a class="card-link" href="/structure/agents-and-mcp#operating-the-interface">Operating the interface</a>
-        </article>
-
-        <article class="card">
-          <div class="figure figure-tools">
-            <span>AGENTS.md</span>
-            <span>llms.txt</span>
-            <span>pnpm dev → /__gesso/mcp</span>
-          </div>
-          <h3>Easy for a coding agent to write</h3>
-          <p>
-            Every new project tells a coding agent the rules, the docs are published for models, and the dev server lets
-            the agent drive the running app to check its own work.
-          </p>
-          <a class="card-link" href="/guide/built-for-agents#easy-for-a-coding-agent-to-write">For coding agents</a>
-        </article>
       </div>
     </section>
 
@@ -358,10 +348,6 @@
 }
 
 .dark .eyebrow {
-  color: var(--gesso-linen);
-}
-
-.eyebrow-linen {
   color: var(--gesso-linen);
 }
 
@@ -572,67 +558,6 @@ h3 {
   border-radius: 0;
 }
 
-/* Proof */
-
-.proof {
-  padding-block: 0;
-}
-
-.band {
-  display: flex;
-  flex-direction: column;
-  gap: 40px;
-  max-width: var(--measure);
-  margin-inline: auto;
-  padding: 76px 60px;
-  background: var(--gesso-ink);
-  border-radius: 20px;
-
-  /* The band is ink in both appearances, so the default theme's
-     variables are remapped inside it rather than around it: the demo's
-     own controls are built from these. */
-  --vp-c-text-1: #f7f3ea;
-  --vp-c-text-2: #a69f91;
-  --vp-c-divider: #2e323c;
-  --vp-c-bg-soft: #1e2128;
-  --vp-c-default-soft: #262a33;
-}
-
-.dark .band {
-  background: #101216;
-}
-
-.band-head {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: center;
-  max-width: 640px;
-  margin-inline: auto;
-  text-align: center;
-}
-
-.band h2,
-.band .lede {
-  color: #f7f3ea;
-}
-
-.band .lede {
-  color: #a69f91;
-}
-
-.band :deep(.thread-demo) {
-  margin: 0;
-}
-
-.band :deep(.thread-demo-canvas) {
-  height: 196px;
-}
-
-.band :deep(.thread-demo-controls) {
-  justify-content: center;
-}
-
 /* Pillars */
 
 .pillars {
@@ -771,7 +696,8 @@ h3 {
   gap: 44px;
   max-width: var(--measure);
   margin-inline: auto;
-  padding-bottom: 100px;
+  /* The pillars below bring their own space above them. */
+  padding-bottom: 0;
 }
 
 .figure-tools {
@@ -1065,7 +991,6 @@ h3 {
 
   .pillars,
   .model,
-  .agents,
   .fit,
   .start {
     padding-bottom: 64px;
@@ -1074,12 +999,6 @@ h3 {
   .pillars {
     padding-top: 64px;
     gap: 36px;
-  }
-
-  .band {
-    gap: 28px;
-    padding: 48px 24px;
-    border-radius: 16px;
   }
 
   .fit-against {

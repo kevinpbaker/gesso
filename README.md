@@ -48,7 +48,7 @@ Two copies of the same component, one in a render worker and one on the main thr
 | **Main thread** |                    3,010 ms |
 | **Gesso**       |                       41 ms |
 
-The worker copy did not miss a tick. The demo, and the input-latency version of the same measurement, runs on [the front page of the docs](https://gesso-docs.vercel.app). Press the button and watch which one cares.
+The worker copy did not miss a tick. The demo, and the input-latency version of the same measurement, runs on [Why Gesso](https://gesso-docs.vercel.app/guide/why-gesso) in the docs. Press the button and watch which one cares.
 
 ## Thirty seconds of code
 
