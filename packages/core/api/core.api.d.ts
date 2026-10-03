@@ -349,6 +349,10 @@ declare class LayoutRecord {
   lifted: boolean;
   liftBoundary: boolean;
   clips: boolean;
+  extentMinX: number;
+  extentMinY: number;
+  extentMaxX: number;
+  extentMaxY: number;
   scrollable: boolean;
   scrollsText: boolean;
   textScrollbars: boolean;
@@ -3539,6 +3543,8 @@ declare class LayoutEngine {
   private axisMax;
   private axisConstraints;
   private assignBox;
+  private updateExtent;
+  private growExtentUp;
   private shiftSubtree;
   private scrollDirection;
   private forEachLayoutChild;
@@ -6895,7 +6901,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CEtDhK4G.js";
+} from "./index-BS5A_n3Y.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7827,7 +7833,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CEtDhK4G.js";
+} from "./index-BS5A_n3Y.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

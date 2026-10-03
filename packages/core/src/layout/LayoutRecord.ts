@@ -150,6 +150,21 @@ export class LayoutRecord {
    * that offset to its content extent.
    */
   clips = false;
+
+  /**
+   * Where anything in this subtree may paint, in the same space as the
+   * box: the box itself, grown by whatever reaches past it under a node
+   * that doesn't clip (an absolute child, a child pushed past it). A
+   * renderer culls a node by this rather than by its box, since a node
+   * that doesn't clip lets its children paint anywhere. It's the box
+   * whenever nothing reaches past, which is nearly always. Worked out
+   * when a node with children is placed, and grown up the ancestors
+   * when a box is written; too large costs a descent, never a paint.
+   */
+  extentMinX = 0;
+  extentMinY = 0;
+  extentMaxX = 0;
+  extentMaxY = 0;
   scrollable = false;
 
   /**
@@ -455,6 +470,10 @@ export class LayoutRecord {
     this.lifted = false;
     this.liftBoundary = false;
     this.clips = false;
+    this.extentMinX = 0;
+    this.extentMinY = 0;
+    this.extentMaxX = 0;
+    this.extentMaxY = 0;
     this.scrollable = false;
     this.scrollsText = false;
     this.textScrollbars = false;
