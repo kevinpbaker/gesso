@@ -117,4 +117,33 @@ describe('LayoutEngine min-content size of a box holding an editable with a mini
     expect(harness.box(field).width).toBe(46);
     expect(harness.box(filler).x).toBeGreaterThanOrEqual(harness.box(editable).x + 32);
   });
+
+  /**
+   * A wrapping row is as tall as all its lines at the width it's given,
+   * and that is its minimum too. Counting only its tallest item let a
+   * growing sibling squeeze a filter bar down to its first line, and its
+   * second line was drawn over the list below.
+   */
+  it('keeps a wrapping row as tall as its lines when a growing sibling squeezes it', () => {
+    const harness = new LayoutHarness();
+    const root = harness.createNode('outer', UiNodeType.Column);
+    const bar = harness.createNode('bar', UiNodeType.Row);
+    bar.setProperty('flexWrap', 'wrap');
+    bar.setProperty('padding', 5);
+    for (let n = 0; n < 3; n++) {
+      const chip = harness.createNode(`chip${n}`, UiNodeType.Box);
+      chip.setProperty('width', 150);
+      chip.setProperty('height', 40);
+      harness.append(bar, chip);
+    }
+    const list = harness.createNode('list', UiNodeType.Column);
+    list.setProperty('flexGrow', 1);
+    const tall = harness.createNode('tall', UiNodeType.Box);
+    tall.setProperty('height', 1000);
+    harness.append(list, tall);
+    harness.append(root, bar, list);
+    harness.layout(root, Constraints.tight(200, 300));
+    expect(harness.box(bar).height).toBe(3 * 40 + 10);
+    expect(harness.box(list).y).toBe(130);
+  });
 });
