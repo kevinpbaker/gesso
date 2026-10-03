@@ -84,6 +84,47 @@ const surface = agentSurface(channels, {
 command is refused and the agent is told to ask the person to do it,
 which is the safe reading of a contract that asked for a person.
 
+## Operating the interface
+
+Channels are the application's own vocabulary, and the right way in for
+anything they cover. Not everything is covered: a dialog's buttons, a
+tab, a field the person is halfway through. For those an agent has to
+do what a person does, and a canvas gives it no DOM to query and no
+element to click.
+
+So the page offers the screen too, as a screen reader hears it:
+
+| Tool          | Does                                                                        |
+| ------------- | --------------------------------------------------------------------------- |
+| `ui_snapshot` | The screen as an outline: each control's role, name, state, value and a ref |
+| `ui_press`    | Presses a control, as a click would                                         |
+| `ui_type`     | Replaces a field's text                                                     |
+| `ui_focus`    | Moves focus to a control                                                    |
+| `ui_key`      | Presses a key where focus is: Enter, Escape, Tab, ArrowDown                 |
+
+```text
+- text "Newsletter" [e1]
+- textbox "Your name" value="Ada Lovelace" [e3] (focused)
+- checkbox "Send me the weekly email" [checked] [e4]
+- button "Save" [e5]
+```
+
+A control is named by its ref, or by role and name: a name matches
+exactly before it matches as a part, so `Save` is not `Save as`, and
+two matches are an error listing both rather than a guess. A ref stays
+the same from one snapshot to the next. Every action answers with the
+outline as it is afterwards, read once the screen holds still.
+
+Acting goes through the path the accessibility mirror uses, so a press
+is the click a pointer makes and a value is the edit a keyboard makes.
+An agent can do exactly what a person could and no more: a disabled
+control refuses it, and an open focus trap holds it as it holds Tab.
+The outline is also exactly what `gesso-testing` queries, so a control
+a test can find by role and name is one an agent can use.
+
+These are offered wherever the page's channels are, in the dev server
+endpoint and through WebMCP, after the channel tools.
+
 ## In development, with nothing to write
 
 A web application's channels are in its workers, and a browser tab

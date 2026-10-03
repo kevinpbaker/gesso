@@ -42,3 +42,4 @@ export {
   type ModelContextLike,
   type WebMcpOptions
 } from './webmcp';
+export { outline, resolveTarget, UiRefs, uiSurface, type UiHost, type UiSurfaceOptions } from './ui';

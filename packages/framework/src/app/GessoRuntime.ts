@@ -2141,6 +2141,15 @@ export class GessoRuntime {
   }
 
   /**
+   * The id of the node that holds focus, or null. The same id the
+   * semantics tree keys its records by, so a reader of the tree can
+   * say which control a key press would reach.
+   */
+  focusedNodeId(): string | null {
+    return this.focusManager.focusedNode?.id ?? null;
+  }
+
+  /**
    * The semantics tree as of the last frame that changed it.
    *
    * Rebuilt here when no mirror was listening and a frame marked it

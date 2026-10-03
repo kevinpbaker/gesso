@@ -75,5 +75,11 @@ export function connectDevAgent(app: DevAgentApp, hot: DevAgentHot, info: McpSer
       ...info
     }).then(response => hot.send(DEV_AGENT_EVENTS.response, { id: request.id, response } satisfies DevAgentResponse));
   });
-  hot.send(DEV_AGENT_EVENTS.ready, { title: document.title, url: location.href });
+  const announce = () => hot.send(DEV_AGENT_EVENTS.ready, { title: document.title, url: location.href });
+  announce();
+  // A restarted dev server is a new one that has never heard of this
+  // page, and the page reconnects to it without reloading. Saying so
+  // again on every connection is what keeps an agent from being told
+  // no page is open while one plainly is.
+  hot.on('vite:ws:connect', announce);
 }

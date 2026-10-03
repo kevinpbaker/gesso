@@ -158,7 +158,9 @@ what the app is doing:
   serves MCP at `/__gesso/mcp` and prints the `claude mcp add` line
   for it. Connected, you can read every channel's view and send its
   commands to the page open in the browser, which is the quickest way
-  to check that a command does what it should.
+  to check that a command does what it should. `ui_snapshot`, `ui_press`,
+  `ui_type` and `ui_key` read and operate the screen itself, the way a
+  screen reader does, for anything no channel covers.
 - **Agents in the browser.** `createApp({ webmcp: true })` registers the
   same tools with WebMCP, for an agent the browser runs. The dev
   server turns it on already; nothing happens in a browser without it.
