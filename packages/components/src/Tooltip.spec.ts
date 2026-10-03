@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BehaviorSubject, map } from 'rxjs';
 
 import { createComponent, OverlayService, type ComponentContext } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
@@ -72,10 +73,48 @@ describe('the tooltip modifier', () => {
   it('opens on focus, so a keyboard reaches it too', () => {
     const ui = mount(Column(createComponent(Trigger, {})));
 
-    ui.fireEvent.focus(ui.getByLabel('Save'));
+    ui.fireEvent.tab();
 
     expect(ui.entries()).toHaveLength(1);
     ui.fireEvent.blur();
+    expect(ui.entries()).toHaveLength(0);
+  });
+
+  it('does not open when a press is what focused the element', () => {
+    const ui = mount(Column(createComponent(Trigger, {})));
+
+    ui.fireEvent.click(ui.getByLabel('Save'));
+    vi.advanceTimersByTime(1000);
+
+    expect(ui.entries()).toHaveLength(0);
+  });
+
+  it('closes when the element goes and the component that rendered it stays', () => {
+    const running = new BehaviorSubject(false);
+    function Swapping(_props: Record<string, never>, ctx: ComponentContext): UiChild {
+      const runTip = tooltip(ctx, { text: 'Runs the query' });
+      const cancelTip = tooltip(ctx, { text: 'Stops the query' });
+      return Column(
+        {},
+        running.pipe(
+          map(on => [
+            on
+              ? Button({ key: 'cancel', text: 'Cancel', label: 'Cancel', modifiers: [cancelTip] })
+              : Button({ key: 'run', text: 'Run', label: 'Run', modifiers: [runTip] })
+          ])
+        )
+      );
+    }
+    const ui = mount(Column(createComponent(Swapping, {})));
+    running.next(true);
+    ui.frame();
+    ui.hover('Cancel');
+    vi.advanceTimersByTime(400);
+    expect(ui.entries()).toHaveLength(1);
+
+    running.next(false);
+    ui.frame();
+
     expect(ui.entries()).toHaveLength(0);
   });
 
@@ -180,6 +219,25 @@ describe('the Tooltip component', () => {
     const entry = ui.entries()[0];
     expect(entry).toBeDefined();
     expect(entry?.placement).toBe('top');
+  });
+
+  it('opens for keyboard focus inside it, and not for a press', () => {
+    const ui = mount(
+      Column(
+        createComponent(Tooltip, {
+          text: 'Saves the note',
+          children: Button({ text: 'Save', label: 'Save note' })
+        })
+      )
+    );
+
+    ui.fireEvent.click(ui.getByLabel('Save note'));
+    vi.advanceTimersByTime(1000);
+    expect(ui.entries()).toHaveLength(0);
+
+    ui.fireEvent.blur();
+    ui.fireEvent.tab();
+    expect(ui.entries()).toHaveLength(1);
   });
 });
 

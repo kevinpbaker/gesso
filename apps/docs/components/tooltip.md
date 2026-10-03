@@ -98,22 +98,27 @@ edge of the viewport without anything here watching layout.
 tab stop. A tooltip that could be tabbed into would be a trap with no
 way out.
 
-| Event         | What happens                                              |
-| ------------- | --------------------------------------------------------- |
-| Pointer enter | Opens after `delay`                                       |
-| Pointer leave | Closes, and cancels a pending open that had not fired yet |
-| Pointer down  | Closes                                                    |
-| Focus         | Opens at once, with no delay, so a keyboard reaches it    |
-| Blur          | Closes                                                    |
+| Event          | What happens                                              |
+| -------------- | --------------------------------------------------------- |
+| Pointer enter  | Opens after `delay`                                       |
+| Pointer leave  | Closes, and cancels a pending open that had not fired yet |
+| Pointer down   | Closes                                                    |
+| Keyboard focus | Opens at once, with no delay, so a keyboard reaches it    |
+| Blur           | Closes                                                    |
 
 Focus opening it is why the trigger should be focusable in the first
 place. A tooltip on a box nothing can reach with Tab is a tooltip half
 the people using the screen cannot read.
 
-One consequence is worth knowing: pressing a focusable trigger closes
-the tooltip and the focus that follows the press opens it again, so it
-stays up while that control holds the keyboard. On a trigger that takes
-no focus, a press closes it and it stays closed. Both are asserted in
+Only focus the keyboard can see opens it, as only that focus draws a
+ring. A press focuses the control it lands on too, and a tooltip opened
+by that would describe the button just after it was used and stay over
+whatever the press opened, so a press closes the tooltip and it stays
+closed. A key pressed afterwards makes that focus visible, and the
+tooltip opens then. The component form follows focus anywhere inside
+its wrapper, since the control it wraps is what takes focus. And a
+tooltip whose element goes away closes with it, even while the
+component that rendered the element stays. All of this is asserted in
 the spec beside the example.
 
 ## Semantics
