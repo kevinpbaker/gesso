@@ -44,8 +44,12 @@ export interface SemanticsMirrorSink {
 export interface EditingMirrorTarget {
   /** True while the proxy holds DOM focus for a focused editable. */
   readonly active: boolean;
-  /** Describes the focused editable on the proxy's element, or clears it. */
-  describe(record: UiSemanticsRecord | null): void;
+  /**
+   * Describes the focused editable on the proxy's element, or clears it.
+   * `activeDescendant` is the DOM id of the element its record's
+   * `activeDescendant` names, for `aria-activedescendant`.
+   */
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void;
   /** Takes DOM focus back for the focused editable. */
   focus(): void;
 }
@@ -110,8 +114,11 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'aria-invalid',
   'aria-required',
   'aria-readonly',
-  'aria-modal'
+  'aria-modal',
+  'aria-activedescendant'
 ];
+
+let mirrors = 0;
 
 /**
  * Roles whose accessible name comes from what the element contains
@@ -212,6 +219,12 @@ export class SemanticsMirror {
   private applying = false;
   private focusedId: string | null = null;
   private disposed = false;
+  /**
+   * Prefixes every element's DOM id, which `aria-activedescendant`
+   * refers to. Per mirror, because two apps on one page have nodes with
+   * the same ids.
+   */
+  private readonly idPrefix = `gesso-${mirrors++}-`;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -346,6 +359,7 @@ export class SemanticsMirror {
     if (existing === undefined) {
       this.entries.set(record.id, { element, record });
       this.ids.set(element, record.id);
+      element.id = this.idPrefix + record.id;
     } else {
       existing.record = record;
     }
@@ -364,8 +378,14 @@ export class SemanticsMirror {
     if (record.id === this.focusedId) {
       // A record that changed while focused: the proxy's copy of it
       // has to change too, or a screen reader reads the old value.
-      this.editing?.describe(this.editing.active ? record : null);
+      this.describeEditing(this.editing?.active === true ? record : null);
     }
+  }
+
+  /** Hands the proxy the focused editable's record, with its active descendant's DOM id. */
+  private describeEditing(record: UiSemanticsRecord | null): void {
+    const active = record?.activeDescendant;
+    this.editing?.describe(record, active === undefined ? undefined : this.idPrefix + active);
   }
 
   private createElement(): HTMLElement {
@@ -456,6 +476,9 @@ export class SemanticsMirror {
     setNumber(element, 'aria-level', record.level);
     if (record.valueText !== undefined) {
       element.setAttribute('aria-valuetext', record.valueText);
+    }
+    if (record.activeDescendant !== undefined) {
+      element.setAttribute('aria-activedescendant', this.idPrefix + record.activeDescendant);
     }
   }
 
@@ -586,7 +609,7 @@ export class SemanticsMirror {
       // what makes it the field rather than an anonymous text box, and
       // claiming focus is what moves the caret off whichever mirrored
       // element held it a moment ago.
-      this.editing.describe(entry?.record ?? null);
+      this.describeEditing(entry?.record ?? null);
       this.applying = true;
       try {
         this.editing.focus();
@@ -595,7 +618,7 @@ export class SemanticsMirror {
       }
       return;
     }
-    this.editing?.describe(null);
+    this.describeEditing(null);
     this.applying = true;
     try {
       if (entry !== undefined) {

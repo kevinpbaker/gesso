@@ -41,6 +41,8 @@ export interface UiSemanticsRecord {
   readonly setSize?: number;
   /** How deep a treeitem sits, 1 for a root. */
   readonly level?: number;
+  /** The record id of the descendant that's active while this one keeps focus. */
+  readonly activeDescendant?: string;
 }
 
 /** Insertion-ordered: iterating the map walks the tree in document order. */
@@ -451,7 +453,8 @@ function describe(
     valueText: valueTextOf(node),
     posInSet: node.properties.get('posInSet') as number | undefined,
     setSize: node.properties.get('setSize') as number | undefined,
-    level: node.properties.get('level') as number | undefined
+    level: node.properties.get('level') as number | undefined,
+    activeDescendant: (node.properties.get('activeDescendant') as UiNode | null | undefined)?.id
   });
 }
 

@@ -1757,6 +1757,7 @@ declare const UiProperties: {
   readonly valueText: UiPropertyDefinition<string | undefined>;
   readonly posInSet: UiPropertyDefinition<number | undefined>;
   readonly setSize: UiPropertyDefinition<number | undefined>;
+  readonly activeDescendant: UiPropertyDefinition<UiNode | null | undefined>;
   readonly level: UiPropertyDefinition<number | undefined>;
   readonly transform: UiPropertyDefinition<Partial<UiTransform> | undefined>;
   readonly text: UiPropertyDefinition<string | undefined>;
@@ -1832,7 +1833,7 @@ type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup'>;
-type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level'>;
+type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'activeDescendant'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
@@ -5016,6 +5017,7 @@ interface UiSemanticsRecord {
   readonly posInSet?: number;
   readonly setSize?: number;
   readonly level?: number;
+  readonly activeDescendant?: string;
 }
 type UiSemanticsMap = ReadonlyMap<string, UiSemanticsRecord>;
 declare function buildSemanticsTree(root: UiNode, memory?: SemanticsMemory): Map<string, UiSemanticsRecord>;
@@ -6881,7 +6883,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CJE2rkvB.js";
+} from "./index-BZvGxlv_.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7813,7 +7815,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CJE2rkvB.js";
+} from "./index-BZvGxlv_.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

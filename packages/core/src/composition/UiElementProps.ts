@@ -216,6 +216,7 @@ export type SemanticsProps = PropsOf<
   | 'posInSet'
   | 'setSize'
   | 'level'
+  | 'activeDescendant'
 >;
 
 /** Environment values an element provides to its subtree. */

@@ -1285,6 +1285,20 @@ export const UiProperties = {
   }),
 
   /**
+   * The descendant that's active while this node keeps focus: the
+   * highlighted option of a combobox whose field holds the caret, the
+   * cell a grid's cursor is on. A screen reader announces it as if it
+   * were focused. The node should be a record of its own (an `option`,
+   * a `gridcell`); see `aria-activedescendant`.
+   */
+  activeDescendant: defineProperty<UiNode | null | undefined>({
+    name: 'activeDescendant',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
    * How deep a treeitem sits, 1 for a root. A tree is rendered as a
    * flat list of rows — it must be, to be virtualized — so the nesting
    * exists nowhere else for a reader to find.

@@ -242,7 +242,7 @@ export class EditingProxy {
    * the reason the field's semantics live here rather than on a second
    * element beside it.
    */
-  describe(record: UiSemanticsRecord | null): void {
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void {
     if (this.disposed) {
       return;
     }
@@ -256,7 +256,9 @@ export class EditingProxy {
         'aria-required',
         'aria-invalid',
         'aria-readonly',
-        'aria-disabled'
+        'aria-disabled',
+        'aria-expanded',
+        'aria-activedescendant'
       ]) {
         textarea.removeAttribute(attribute);
       }
@@ -271,6 +273,15 @@ export class EditingProxy {
     setOrClear(textarea, 'aria-invalid', states.has('invalid') ? 'true' : undefined);
     setOrClear(textarea, 'aria-readonly', states.has('readonly') ? 'true' : undefined);
     setOrClear(textarea, 'aria-disabled', record.disabled === true ? 'true' : undefined);
+    // A field that opens a list (a combobox) keeps focus while a
+    // highlight moves through the list; these say the list is open and
+    // which option the highlight is on.
+    setOrClear(
+      textarea,
+      'aria-expanded',
+      states.has('expanded') ? 'true' : states.has('collapsed') ? 'false' : undefined
+    );
+    setOrClear(textarea, 'aria-activedescendant', activeDescendant);
   }
 
   dispose(): void {
