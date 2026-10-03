@@ -167,20 +167,37 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
 
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
-  /** Type-ahead: the first option starting with the character typed. */
-  const jumpTo = (character: string): void => {
+  /** Type-ahead: the first option starting with the character typed. Whether there was one. */
+  const jumpTo = (character: string): boolean => {
     const wanted = character.toLowerCase();
     const index = inputs.options.value.findIndex(
       option => option.disabled !== true && option.label.toLowerCase().startsWith(wanted)
     );
     if (index === -1) {
-      return;
+      return false;
     }
     if (overlay.isOpen()) {
       active.next(index);
     } else {
       choose(inputs.options.value[index].value);
     }
+    return true;
+  };
+
+  /**
+   * A letter typed at the select, for type-ahead: a printable key with
+   * nothing held but Shift. Mod+K is a shortcut, not a K.
+   */
+  const typed = (event: UiKeyboardEvent): boolean =>
+    event.key.length === 1 &&
+    event.key !== ' ' &&
+    !event.modifiers.ctrl &&
+    !event.modifiers.meta &&
+    !event.modifiers.alt;
+
+  const consume = (event: UiKeyboardEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   const list = (): UiElement =>
@@ -223,8 +240,12 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
             Escape: close
           });
           bound(event);
-          if (event.key.length === 1 && event.key !== ' ') {
+          // The open list has the keyboard to itself, so a letter is its
+          // type-ahead whether or not an option starts with it, and never
+          // a page's single-letter shortcut acting behind the list.
+          if (typed(event)) {
             jumpTo(event.key);
+            consume(event);
           }
         }
       },
@@ -291,8 +312,10 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
             ArrowUp: open
           });
           bound(event);
-          if (!overlay.isOpen() && event.key.length === 1 && event.key !== ' ') {
-            jumpTo(event.key);
+          // Closed, a letter that picks an option is the select's; one
+          // that picks nothing goes on to the page's shortcuts.
+          if (!overlay.isOpen() && typed(event) && jumpTo(event.key)) {
+            consume(event);
           }
         }
       },
