@@ -1,6 +1,7 @@
 import type { Observable } from 'rxjs';
 
-import { AGENT_PORT } from '../agent/remote';
+import { agentSurface } from '../agent/AgentSurface';
+import { AGENT_PORT, serveAgentPort } from '../agent/remote';
 import { servePorts, type PortHost } from '../worker/WorkerPorts';
 import { provide, type ChannelSource, ProvidedChannel } from './provide';
 import type { ChannelPort } from './ChannelProtocol';
@@ -76,11 +77,10 @@ export function serveChannels(channels: readonly ServedChannel[], host?: PortHos
     (key, port) => {
       if (key === AGENT_PORT) {
         // An agent asking, through the page, what this worker serves.
-        // Loaded on demand, so a worker no agent ever asks pays for
-        // one string comparison.
-        void import('../agent/index').then(agent =>
-          agent.serveAgentPort(port as never, confirm => agent.agentSurface(channels, { confirm }))
-        );
+        // Imported rather than loaded on demand: a worker built as an
+        // IIFE, which is Vite's default, cannot split off a chunk, and
+        // a dynamic import here failed every such build.
+        serveAgentPort(port, confirm => agentSurface(channels, { confirm }));
         return true;
       }
       const served = byName.get(key);

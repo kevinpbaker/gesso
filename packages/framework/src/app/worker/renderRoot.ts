@@ -3,6 +3,7 @@ import { createComponent } from '../../createComponent';
 import type { ComponentType } from '../../FunctionComponent';
 import { APPLICATION_WORKER, portHandle, servePorts, type PortHost, type WorkerHandle } from '../../worker/WorkerPorts';
 import { AGENT_PORT } from '../../agent/remote';
+import { serveApplicationAgent } from '../../agent/app';
 import type { ServedChannel } from '../../channel/serveChannels';
 import { captureConsole } from '../../worker/captureConsole';
 import {
@@ -333,44 +334,43 @@ export class RenderWorkerApp {
   /**
    * Answers an agent port with every channel this application can
    * reach: the ones fed from this thread, and whatever each worker
-   * behind them serves, asked over a port of its own. Loaded on
-   * demand, so a render worker no agent asks pays for nothing but the
-   * handshake check.
+   * behind them serves, asked over a port of its own. Imported rather
+   * than loaded on demand: a worker built as an IIFE, which is Vite's
+   * default, cannot split off a chunk, and a dynamic import here failed
+   * every such build. Nothing runs until an agent asks.
    */
   private serveAgent(port: MessagePort): void {
-    void import('../../agent/app').then(agent =>
-      agent.serveApplicationAgent(port, {
-        channels: () =>
-          this.channelRegistrations
-            .filter(registration => registration.source !== undefined)
-            .map(
-              registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
-            ),
-        workers: () => {
-          const workers = new Set(this.channels?.workers ?? []);
-          if (this.appLogicWorker !== undefined) {
-            workers.add(this.appLogicWorker);
-          }
-          return workers;
-        },
-        ui: () => {
-          const runtime = this.runtime;
-          if (runtime === undefined) {
-            return undefined;
-          }
-          return {
-            semanticsTree: () => runtime.semanticsTree(),
-            focusedNodeId: () => runtime.focusedNodeId(),
-            applySemanticsAction: action => runtime.applySemanticsAction(action),
-            key: (key, modifiers) => {
-              runtime.input.keyboard.keyDown(key, modifiers);
-              runtime.input.keyboard.keyUp(key, modifiers);
-            },
-            flush: () => this.clock?.tick(performance.now())
-          };
+    serveApplicationAgent(port, {
+      channels: () =>
+        this.channelRegistrations
+          .filter(registration => registration.source !== undefined)
+          .map(
+            registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
+          ),
+      workers: () => {
+        const workers = new Set(this.channels?.workers ?? []);
+        if (this.appLogicWorker !== undefined) {
+          workers.add(this.appLogicWorker);
         }
-      })
-    );
+        return workers;
+      },
+      ui: () => {
+        const runtime = this.runtime;
+        if (runtime === undefined) {
+          return undefined;
+        }
+        return {
+          semanticsTree: () => runtime.semanticsTree(),
+          focusedNodeId: () => runtime.focusedNodeId(),
+          applySemanticsAction: action => runtime.applySemanticsAction(action),
+          key: (key, modifiers) => {
+            runtime.input.keyboard.keyDown(key, modifiers);
+            runtime.input.keyboard.keyUp(key, modifiers);
+          },
+          flush: () => this.clock?.tick(performance.now())
+        };
+      }
+    });
   }
 
   private setConsoleForwarding(enabled: boolean): void {
