@@ -1,4 +1,190 @@
-import { defineConfig } from 'vitepress';
+import { defineConfig, type DefaultTheme } from 'vitepress';
+
+import { llmsFiles } from './llms';
+
+/**
+ * The sidebar, named so the llms.txt plugin can walk it in the same
+ * order a reader does.
+ */
+const sidebar: DefaultTheme.SidebarItem[] = [
+  {
+    text: 'Guide',
+    items: [
+      { text: 'Why Gesso', link: '/guide/why-gesso' },
+      { text: 'What Gesso is', link: '/guide/what-is-gesso' },
+      { text: 'Is Gesso for your project?', link: '/guide/is-gesso-for-you' },
+      { text: 'Installation', link: '/guide/installation' },
+      { text: 'Your first component', link: '/guide/counter' },
+      { text: 'Components run once', link: '/guide/components-run-once' },
+      { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
+      { text: 'Lists and conditionals', link: '/guide/lists-and-conditionals' },
+      { text: 'Inputs and outputs', link: '/guide/inputs-and-outputs' },
+      { text: 'Layout basics', link: '/guide/layout-basics' },
+      { text: 'Text', link: '/guide/text' },
+      { text: 'Rich text', link: '/guide/rich-text' },
+      { text: 'Using components', link: '/guide/using-components' },
+      { text: 'Forms', link: '/guide/forms' },
+      { text: 'Light and dark', link: '/guide/appearance' },
+      { text: 'State and services', link: '/guide/state-and-services' },
+      { text: 'Workers', link: '/guide/workers' },
+      { text: 'Testing', link: '/guide/testing' }
+    ]
+  },
+  {
+    text: 'Layout',
+    items: [
+      { text: 'Flex in full', link: '/layout/flex' },
+      { text: 'Grid', link: '/layout/grid' },
+      { text: 'Custom layouts', link: '/layout/custom-layouts' },
+      { text: 'Layouts that change', link: '/layout/responsive' },
+      { text: 'Insets', link: '/layout/insets' },
+      { text: 'Right to left', link: '/layout/right-to-left' },
+      { text: 'Overflow and scrolling', link: '/layout/overflow-and-scrolling' },
+      { text: 'Sticky positioning', link: '/layout/sticky' },
+      { text: 'Positioning and overlays', link: '/layout/positioning-and-overlays' },
+      { text: 'Virtualization', link: '/layout/virtualization' },
+      { text: 'Asking the engine why', link: '/layout/explain' }
+    ]
+  },
+  {
+    text: 'Interaction',
+    items: [
+      { text: 'Pointer and keyboard', link: '/interaction/pointer-and-keyboard' },
+      { text: 'Touch and gestures', link: '/interaction/touch-and-gestures' },
+      { text: 'Drag and drop', link: '/interaction/drag-and-drop' },
+      { text: 'Shortcuts', link: '/interaction/shortcuts' },
+      { text: 'Focus and traps', link: '/interaction/focus-and-traps' },
+      { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' },
+      { text: 'Selection', link: '/interaction/selection' },
+      { text: 'Find', link: '/interaction/find' },
+      { text: 'Modifiers', link: '/interaction/modifiers' },
+      { text: 'Writing a modifier', link: '/interaction/writing-a-modifier' }
+    ]
+  },
+  {
+    text: 'Appearance',
+    items: [
+      { text: 'Themes and the environment', link: '/appearance/themes-and-the-environment' },
+      { text: 'The type scale', link: '/appearance/typography' },
+      { text: 'Fonts', link: '/appearance/fonts' },
+      { text: 'Motion', link: '/appearance/motion' },
+      { text: 'Enter and exit', link: '/appearance/enter-and-exit' },
+      { text: 'Shared elements', link: '/appearance/shared-elements' }
+    ]
+  },
+  {
+    text: 'Media',
+    items: [
+      { text: 'Images and the resolver', link: '/media/images-and-the-resolver' },
+      { text: 'Icons', link: '/media/icons' },
+      { text: 'Video', link: '/media/video' }
+    ]
+  },
+  {
+    text: 'Structure',
+    items: [
+      { text: 'Routing', link: '/structure/routing' },
+      { text: 'Channels and the barrier', link: '/structure/channels-and-the-barrier' },
+      { text: 'Shell services', link: '/structure/shell-services' },
+      { text: 'Undo and redo', link: '/structure/undo' },
+      { text: 'Remembering state', link: '/structure/persistence' },
+      { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
+      { text: 'Desktop windows', link: '/structure/desktop-windows' },
+      { text: 'Gesso on Electrobun', link: '/structure/gesso-on-electrobun' }
+    ]
+  },
+  {
+    text: 'Access',
+    items: [
+      { text: 'Semantics', link: '/access/semantics' },
+      { text: 'The mirror', link: '/access/the-mirror' },
+      { text: 'Keyboard operability', link: '/access/keyboard' }
+    ]
+  },
+  {
+    text: 'Rendering',
+    items: [{ text: 'Canvas2D and WebGPU', link: '/rendering/canvas2d-and-webgpu' }]
+  },
+  {
+    text: 'Tooling',
+    items: [
+      { text: 'Devtools', link: '/tooling/devtools' },
+      { text: 'Inspecting a node', link: '/tooling/inspecting-a-node' },
+      { text: 'Frames and phases', link: '/tooling/frames-and-phases' },
+      { text: 'The action log', link: '/tooling/the-action-log' },
+      { text: 'The devtools panel', link: '/tooling/the-devtools-panel' },
+      { text: 'The Vite plugin', link: '/tooling/vite-plugin' },
+      { text: 'Hot module replacement', link: '/tooling/hot-module-replacement' },
+      { text: 'Reporting errors', link: '/tooling/reporting-errors' },
+      { text: 'create-gesso-app', link: '/tooling/create-gesso-app' }
+    ]
+  },
+  {
+    text: 'Reference',
+    items: [
+      { text: 'Properties', link: '/reference/properties' },
+      { text: 'API index', link: '/reference/api' },
+      { text: 'The render-worker protocol', link: '/reference/render-worker-protocol' }
+    ]
+  },
+  {
+    text: 'Components',
+    items: [
+      { text: 'Overview', link: '/components/' },
+      { text: 'Restyling the controls', link: '/components/restyling' },
+      { text: 'Button', link: '/components/button' },
+      { text: 'Link', link: '/components/link' },
+      { text: 'Chip', link: '/components/chip' },
+      { text: 'Badge', link: '/components/badge' },
+      { text: 'Alert', link: '/components/alert' },
+      { text: 'Checkbox', link: '/components/checkbox' },
+      { text: 'Switch', link: '/components/switch' },
+      { text: 'RadioGroup', link: '/components/radio-group' },
+      { text: 'SegmentedControl', link: '/components/segmented-control' },
+      { text: 'TextInput and TextArea', link: '/components/text-input' },
+      { text: 'Slider', link: '/components/slider' },
+      { text: 'NumberInput', link: '/components/number-input' },
+      { text: 'DataTable', link: '/components/data-table' },
+      { text: 'Tree', link: '/components/tree' },
+      { text: 'LazyList', link: '/components/lazy-list' },
+      { text: 'Tabs', link: '/components/tabs' },
+      { text: 'Accordion', link: '/components/accordion' },
+      { text: 'Card', link: '/components/card' },
+      { text: 'Divider', link: '/components/divider' },
+      { text: 'Toolbar', link: '/components/toolbar' },
+      { text: 'Dialog', link: '/components/dialog' },
+      { text: 'Menu', link: '/components/menu' },
+      { text: 'Select', link: '/components/select' },
+      { text: 'Tooltip', link: '/components/tooltip' },
+      { text: 'Toast', link: '/components/toast' },
+      { text: 'SplitPane', link: '/components/split-pane' },
+      { text: 'FindBar', link: '/components/find-bar' },
+      { text: 'MenuBar', link: '/components/menu-bar' },
+      { text: 'Breadcrumb', link: '/components/breadcrumb' },
+      { text: 'Pagination', link: '/components/pagination' },
+      { text: 'Image', link: '/components/image' },
+      { text: 'Avatar', link: '/components/avatar' },
+      { text: 'Video', link: '/components/video' },
+      { text: 'VideoPlayer', link: '/components/video-player' },
+      { text: 'Icon', link: '/components/icon' },
+      { text: 'Spinner', link: '/components/spinner' },
+      { text: 'ProgressBar', link: '/components/progress-bar' },
+      { text: 'Meter', link: '/components/meter' },
+      { text: 'Skeleton', link: '/components/skeleton' }
+    ]
+  },
+  {
+    text: 'Recipes',
+    items: [
+      { text: 'A settings page', link: '/recipes/settings-page' },
+      { text: 'A dialog flow', link: '/recipes/dialog-flow' },
+      { text: 'An appearance setting', link: '/recipes/appearance-setting' },
+      { text: 'Loading, failing, and saving', link: '/recipes/loading-and-saving' },
+      { text: 'A table over 100,000 rows', link: '/recipes/large-table' },
+      { text: 'A virtualized feed', link: '/recipes/virtualized-feed' }
+    ]
+  }
+];
 
 /**
  * The documentation site.
@@ -21,6 +207,12 @@ export default defineConfig({
   title: 'Gesso',
   description: 'SwiftUI and Compose, for the web: a declarative UI toolkit for fast, native-grade apps.',
   cleanUrls: true,
+  /**
+   * The site again as markdown, for a coding agent: `llms.txt`,
+   * `llms-full.txt` and a `.md` beside every page. `llms.ts` says why
+   * and what is in them.
+   */
+  vite: { plugins: [llmsFiles(sidebar)] },
   /**
    * Three faces, from Google Fonts: `Newsreader` sets the display line,
    * `Instrument Sans` the running text, `JetBrains Mono` the code.
@@ -74,184 +266,6 @@ export default defineConfig({
       { text: 'Tooling', link: '/tooling/devtools' },
       { text: 'Reference', link: '/reference/api' }
     ],
-    sidebar: [
-      {
-        text: 'Guide',
-        items: [
-          { text: 'Why Gesso', link: '/guide/why-gesso' },
-          { text: 'What Gesso is', link: '/guide/what-is-gesso' },
-          { text: 'Is Gesso for your project?', link: '/guide/is-gesso-for-you' },
-          { text: 'Installation', link: '/guide/installation' },
-          { text: 'Your first component', link: '/guide/counter' },
-          { text: 'Components run once', link: '/guide/components-run-once' },
-          { text: 'Cells and bindings', link: '/guide/cells-and-bindings' },
-          { text: 'Lists and conditionals', link: '/guide/lists-and-conditionals' },
-          { text: 'Inputs and outputs', link: '/guide/inputs-and-outputs' },
-          { text: 'Layout basics', link: '/guide/layout-basics' },
-          { text: 'Text', link: '/guide/text' },
-          { text: 'Rich text', link: '/guide/rich-text' },
-          { text: 'Using components', link: '/guide/using-components' },
-          { text: 'Forms', link: '/guide/forms' },
-          { text: 'Light and dark', link: '/guide/appearance' },
-          { text: 'State and services', link: '/guide/state-and-services' },
-          { text: 'Workers', link: '/guide/workers' },
-          { text: 'Testing', link: '/guide/testing' }
-        ]
-      },
-      {
-        text: 'Layout',
-        items: [
-          { text: 'Flex in full', link: '/layout/flex' },
-          { text: 'Grid', link: '/layout/grid' },
-          { text: 'Custom layouts', link: '/layout/custom-layouts' },
-          { text: 'Layouts that change', link: '/layout/responsive' },
-          { text: 'Insets', link: '/layout/insets' },
-          { text: 'Right to left', link: '/layout/right-to-left' },
-          { text: 'Overflow and scrolling', link: '/layout/overflow-and-scrolling' },
-          { text: 'Sticky positioning', link: '/layout/sticky' },
-          { text: 'Positioning and overlays', link: '/layout/positioning-and-overlays' },
-          { text: 'Virtualization', link: '/layout/virtualization' },
-          { text: 'Asking the engine why', link: '/layout/explain' }
-        ]
-      },
-      {
-        text: 'Interaction',
-        items: [
-          { text: 'Pointer and keyboard', link: '/interaction/pointer-and-keyboard' },
-          { text: 'Touch and gestures', link: '/interaction/touch-and-gestures' },
-          { text: 'Drag and drop', link: '/interaction/drag-and-drop' },
-          { text: 'Shortcuts', link: '/interaction/shortcuts' },
-          { text: 'Focus and traps', link: '/interaction/focus-and-traps' },
-          { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' },
-          { text: 'Selection', link: '/interaction/selection' },
-          { text: 'Find', link: '/interaction/find' },
-          { text: 'Modifiers', link: '/interaction/modifiers' },
-          { text: 'Writing a modifier', link: '/interaction/writing-a-modifier' }
-        ]
-      },
-      {
-        text: 'Appearance',
-        items: [
-          { text: 'Themes and the environment', link: '/appearance/themes-and-the-environment' },
-          { text: 'The type scale', link: '/appearance/typography' },
-          { text: 'Fonts', link: '/appearance/fonts' },
-          { text: 'Motion', link: '/appearance/motion' },
-          { text: 'Enter and exit', link: '/appearance/enter-and-exit' },
-          { text: 'Shared elements', link: '/appearance/shared-elements' }
-        ]
-      },
-      {
-        text: 'Media',
-        items: [
-          { text: 'Images and the resolver', link: '/media/images-and-the-resolver' },
-          { text: 'Icons', link: '/media/icons' },
-          { text: 'Video', link: '/media/video' }
-        ]
-      },
-      {
-        text: 'Structure',
-        items: [
-          { text: 'Routing', link: '/structure/routing' },
-          { text: 'Channels and the barrier', link: '/structure/channels-and-the-barrier' },
-          { text: 'Shell services', link: '/structure/shell-services' },
-          { text: 'Undo and redo', link: '/structure/undo' },
-          { text: 'Remembering state', link: '/structure/persistence' },
-          { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
-          { text: 'Desktop windows', link: '/structure/desktop-windows' },
-          { text: 'Gesso on Electrobun', link: '/structure/gesso-on-electrobun' }
-        ]
-      },
-      {
-        text: 'Access',
-        items: [
-          { text: 'Semantics', link: '/access/semantics' },
-          { text: 'The mirror', link: '/access/the-mirror' },
-          { text: 'Keyboard operability', link: '/access/keyboard' }
-        ]
-      },
-      {
-        text: 'Rendering',
-        items: [{ text: 'Canvas2D and WebGPU', link: '/rendering/canvas2d-and-webgpu' }]
-      },
-      {
-        text: 'Tooling',
-        items: [
-          { text: 'Devtools', link: '/tooling/devtools' },
-          { text: 'Inspecting a node', link: '/tooling/inspecting-a-node' },
-          { text: 'Frames and phases', link: '/tooling/frames-and-phases' },
-          { text: 'The action log', link: '/tooling/the-action-log' },
-          { text: 'The devtools panel', link: '/tooling/the-devtools-panel' },
-          { text: 'The Vite plugin', link: '/tooling/vite-plugin' },
-          { text: 'Hot module replacement', link: '/tooling/hot-module-replacement' },
-          { text: 'Reporting errors', link: '/tooling/reporting-errors' },
-          { text: 'create-gesso-app', link: '/tooling/create-gesso-app' }
-        ]
-      },
-      {
-        text: 'Reference',
-        items: [
-          { text: 'Properties', link: '/reference/properties' },
-          { text: 'API index', link: '/reference/api' },
-          { text: 'The render-worker protocol', link: '/reference/render-worker-protocol' }
-        ]
-      },
-      {
-        text: 'Components',
-        items: [
-          { text: 'Overview', link: '/components/' },
-          { text: 'Restyling the controls', link: '/components/restyling' },
-          { text: 'Button', link: '/components/button' },
-          { text: 'Link', link: '/components/link' },
-          { text: 'Chip', link: '/components/chip' },
-          { text: 'Badge', link: '/components/badge' },
-          { text: 'Alert', link: '/components/alert' },
-          { text: 'Checkbox', link: '/components/checkbox' },
-          { text: 'Switch', link: '/components/switch' },
-          { text: 'RadioGroup', link: '/components/radio-group' },
-          { text: 'SegmentedControl', link: '/components/segmented-control' },
-          { text: 'TextInput and TextArea', link: '/components/text-input' },
-          { text: 'Slider', link: '/components/slider' },
-          { text: 'NumberInput', link: '/components/number-input' },
-          { text: 'DataTable', link: '/components/data-table' },
-          { text: 'Tree', link: '/components/tree' },
-          { text: 'LazyList', link: '/components/lazy-list' },
-          { text: 'Tabs', link: '/components/tabs' },
-          { text: 'Accordion', link: '/components/accordion' },
-          { text: 'Card', link: '/components/card' },
-          { text: 'Divider', link: '/components/divider' },
-          { text: 'Toolbar', link: '/components/toolbar' },
-          { text: 'Dialog', link: '/components/dialog' },
-          { text: 'Menu', link: '/components/menu' },
-          { text: 'Select', link: '/components/select' },
-          { text: 'Tooltip', link: '/components/tooltip' },
-          { text: 'Toast', link: '/components/toast' },
-          { text: 'SplitPane', link: '/components/split-pane' },
-          { text: 'FindBar', link: '/components/find-bar' },
-          { text: 'MenuBar', link: '/components/menu-bar' },
-          { text: 'Breadcrumb', link: '/components/breadcrumb' },
-          { text: 'Pagination', link: '/components/pagination' },
-          { text: 'Image', link: '/components/image' },
-          { text: 'Avatar', link: '/components/avatar' },
-          { text: 'Video', link: '/components/video' },
-          { text: 'VideoPlayer', link: '/components/video-player' },
-          { text: 'Icon', link: '/components/icon' },
-          { text: 'Spinner', link: '/components/spinner' },
-          { text: 'ProgressBar', link: '/components/progress-bar' },
-          { text: 'Meter', link: '/components/meter' },
-          { text: 'Skeleton', link: '/components/skeleton' }
-        ]
-      },
-      {
-        text: 'Recipes',
-        items: [
-          { text: 'A settings page', link: '/recipes/settings-page' },
-          { text: 'A dialog flow', link: '/recipes/dialog-flow' },
-          { text: 'An appearance setting', link: '/recipes/appearance-setting' },
-          { text: 'Loading, failing, and saving', link: '/recipes/loading-and-saving' },
-          { text: 'A table over 100,000 rows', link: '/recipes/large-table' },
-          { text: 'A virtualized feed', link: '/recipes/virtualized-feed' }
-        ]
-      }
-    ]
+    sidebar
   }
 });
