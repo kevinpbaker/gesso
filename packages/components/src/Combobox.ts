@@ -308,7 +308,9 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
         borderRadius: 8
       },
       Column(
-        { padding: 4, gap: 2, role: 'listbox', label },
+        // A set of values says so, or the option the arrows are on is
+        // announced as the one selected.
+        { padding: 4, gap: 2, role: 'listbox', label, states: multiple ? ['multiselectable'] : [] },
         combineLatest([matches, emptyText]).pipe(
           map(([options, nothing]) =>
             options.length === 0

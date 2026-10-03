@@ -39,8 +39,10 @@ mapping table.
 | `activeDescendant`                 | The node that's active while this one keeps focus, such as the highlighted option of a combobox whose field has the caret |
 
 The states are `checked`, `mixed`, `expanded`, `collapsed`, `selected`,
-`pressed`, `busy`, `invalid`, `required`, `readonly` and `modal`. Order
-does not matter: the record sorts and de-duplicates them, so two
+`pressed`, `busy`, `invalid`, `required`, `readonly`, `modal` and
+`multiselectable`, which a `listbox`, `grid` or `tree` whose selection is
+a set of items says: without it, a screen reader takes the option it's
+on to be the one selected. Order does not matter: the record sorts and de-duplicates them, so two
 spellings of the same set do not show up as a change.
 
 `disabled` is not among them, deliberately. It is already a property,

@@ -155,7 +155,12 @@ export type UiSemanticState =
   | 'invalid'
   | 'required'
   | 'readonly'
-  | 'modal';
+  | 'modal'
+  /**
+   * On a `listbox`, `grid` or `tree` whose selection is a set: without
+   * it a screen reader treats the option it's on as the one selected.
+   */
+  | 'multiselectable';
 
 export const UI_SEMANTIC_STATES: readonly UiSemanticState[] = [
   'checked',
@@ -168,7 +173,8 @@ export const UI_SEMANTIC_STATES: readonly UiSemanticState[] = [
   'invalid',
   'required',
   'readonly',
-  'modal'
+  'modal',
+  'multiselectable'
 ];
 
 const stateSet: ReadonlySet<string> = new Set<string>(UI_SEMANTIC_STATES);

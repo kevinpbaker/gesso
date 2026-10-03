@@ -314,6 +314,14 @@ describe('SemanticsMirror', () => {
     expect(element.getAttribute('aria-setsize')).toBe('5');
   });
 
+  it('says a list whose selection is a set is multiselectable', () => {
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [{ op: 'add', node: record('n1', { role: 'listbox', label: 'Issues', states: ['multiselectable'] }) }]
+    });
+    expect(elementFor('n1').getAttribute('aria-multiselectable')).toBe('true');
+  });
+
   it('clears an attribute a record stopped saying', () => {
     const { elementFor, apply } = setup();
     const required = record('n1', { role: 'textbox', label: 'Name', states: ['required'] });
