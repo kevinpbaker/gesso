@@ -99,6 +99,11 @@ describe('a layout listener that changes layout', () => {
     const mounted = mountRuntime(Box({ width: 600 }, show));
     mounted.frame();
 
+    // Arms that differ in their box. Two Text arms that differ only in
+    // their words prove nothing here: the arm is patched in place, the
+    // painter lays a paragraph's lines out from the text it holds now,
+    // and a one-line label stretched across the column has the same box
+    // either way, so even a frame laid out once looks right.
     show.next([
       Responsive({ at: [400], width: 600 }, size =>
         size.width >= 400 ? Box({ label: 'arm', height: 50 }) : Box({ label: 'arm', height: 10 })
