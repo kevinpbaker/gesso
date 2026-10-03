@@ -160,7 +160,14 @@ export type UiSemanticState =
    * On a `listbox`, `grid` or `tree` whose selection is a set: without
    * it a screen reader treats the option it's on as the one selected.
    */
-  | 'multiselectable';
+  | 'multiselectable'
+  /**
+   * The item that is the current one of a set, such as the page a
+   * navigation link leads to while it's open. `selected` is for choices
+   * in a listbox, grid or tabs, and a screen reader ignores it on a link
+   * or a button.
+   */
+  | 'current';
 
 export const UI_SEMANTIC_STATES: readonly UiSemanticState[] = [
   'checked',
@@ -174,7 +181,8 @@ export const UI_SEMANTIC_STATES: readonly UiSemanticState[] = [
   'required',
   'readonly',
   'modal',
-  'multiselectable'
+  'multiselectable',
+  'current'
 ];
 
 const stateSet: ReadonlySet<string> = new Set<string>(UI_SEMANTIC_STATES);

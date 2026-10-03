@@ -322,6 +322,12 @@ describe('SemanticsMirror', () => {
     expect(elementFor('n1').getAttribute('aria-multiselectable')).toBe('true');
   });
 
+  it('says which link is the current one', () => {
+    const { elementFor, apply } = setup();
+    apply({ patches: [{ op: 'add', node: record('n1', { role: 'link', label: 'My issues', states: ['current'] }) }] });
+    expect(elementFor('n1').getAttribute('aria-current')).toBe('true');
+  });
+
   it('clears an attribute a record stopped saying', () => {
     const { elementFor, apply } = setup();
     const required = record('n1', { role: 'textbox', label: 'Name', states: ['required'] });

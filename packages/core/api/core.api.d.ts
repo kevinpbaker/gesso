@@ -1628,7 +1628,8 @@ type UiLiveRegion = 'polite' | 'assertive';
 declare const UI_ROLES: readonly UiRole[];
 declare function isUiRole(value: unknown): value is UiRole;
 type UiSemanticState = 'checked' | 'mixed' | 'expanded' | 'collapsed' | 'selected' | 'pressed' | 'busy' | 'invalid' | 'required' | 'readonly' | 'modal' |
-'multiselectable';
+'multiselectable' |
+'current';
 declare const UI_SEMANTIC_STATES: readonly UiSemanticState[];
 declare function isUiSemanticState(value: unknown): value is UiSemanticState;
 type UiSemanticStates = readonly UiSemanticState[];
@@ -6893,7 +6894,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-Fj6kxGtX.js";
+} from "./index-C_jtKJxh.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7825,7 +7826,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Fj6kxGtX.js";
+} from "./index-C_jtKJxh.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

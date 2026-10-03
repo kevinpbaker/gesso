@@ -188,7 +188,7 @@ becomes the current one, and the current one is always in the window.
 | What               | Role         | Name                          | States                          |
 | ------------------ | ------------ | ----------------------------- | ------------------------------- |
 | The strip          | `navigation` | `label`, default `Pagination` | none                            |
-| A numbered control | `button`     | `Page 4`                      | `selected` on the current page  |
+| A numbered control | `button`     | `Page 4`                      | `current` on the current page   |
 | Previous and next  | `button`     | `Previous page`, `Next page`  | disabled at that end of the set |
 | The elision        | none         | none                          | not a control, not focusable    |
 
@@ -199,10 +199,10 @@ name is "Page 4" while the glyph drawn stays "4". That is the one case
 it is the difference between a strip that can be driven by voice and
 one that cannot.
 
-**The current page is `selected`, not merely painted.** `UiSemanticState`
-has no `current` and inventing one would be a state the mirror cannot
-emit, so the strip uses the honest member of that union, which is also
-what the accent pill means. It stays focusable and it is not disabled:
+**The current page is `current`, not merely painted**, which a screen
+reader hears through `aria-current`. (It was `selected` before Gesso had
+`current`, and a screen reader ignores `aria-selected` on a button.) It
+stays focusable and it is not disabled:
 disabling the page you are on would take it out of the Tab order for no
 reason anybody could guess.
 
@@ -230,7 +230,7 @@ sweeps of the input space: that the number of slots is the same for
 every page of a given set, that no page is ever drawn twice, and that
 the page somebody is on is always offered. The mounted tests assert
 that each numbered control is named "Page n" while drawing the numeral,
-that exactly one carries `selected`, that previous and next are named
+that exactly one carries `current`, that previous and next are named
 and are disabled at the ends and for a single-page set, that the
 elision is neither a control nor focusable, that the landmark carries
 its name, that below a `pageCount` of 1 there is no landmark and no
