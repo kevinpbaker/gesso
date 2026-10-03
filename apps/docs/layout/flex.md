@@ -110,6 +110,10 @@ and an item that fits nowhere gets a line to itself. Each line then
 resolves its own grow and shrink separately, so the same item can be
 shrunk on a crowded line and sit at its full basis on a line of its own.
 
+A wrapping row is as tall as all its lines, and that height is also its
+minimum: in a column, a sibling that grows can't squeeze it back to one
+line, just as in CSS.
+
 The gaps split by role rather than by name:
 
 | Prop        | On a row                | On a column             |

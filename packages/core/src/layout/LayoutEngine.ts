@@ -1886,7 +1886,12 @@ export class LayoutEngine {
 
     this.setFlexBaseline(rec, lines[0].items, row);
     rec.minContentWidth = this.flexMinContentWidth(rec, items, row, config);
-    rec.minContentHeight = this.flexMinContentHeight(rec, items, row, config);
+    // A wrapping row's height is its lines' at the width it was given,
+    // and it can't be shorter: its minimum is all of them, not the
+    // tallest item, or a sibling that grows squeezes it to one line and
+    // the rest spill out over whatever comes next.
+    rec.minContentHeight =
+      row && config.wrap ? paddingCross + contentCross : this.flexMinContentHeight(rec, items, row, config);
     return {
       width: row ? paddingMain + contentMain : paddingCross + contentCross,
       height: row ? paddingCross + contentCross : paddingMain + contentMain
