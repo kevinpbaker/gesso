@@ -115,8 +115,10 @@ they are met:
   `<button>{icon$}</button>` binds an element to the button's label and
   draws nothing; the framework warns once when a text turns out not to
   be text. Put such a child in an array, `{[icon$]}`, or in a `<box>`.
-- A `button` stacks its children at its origin, as a `box` does. To lay
-  out an icon beside a label, put a `<row>` inside it.
+- A `button` stacks its children as a `box` does, but centred both ways
+  rather than at its origin, as an HTML button centres its label. To lay
+  out an icon beside a label, put a `<row>` inside it, and give the
+  button `x="stretch"` when that row should span it.
 - A modifier written inline, `modifiers={[interactive({ hovered: ... })]}`,
   is compared by what it holds, so it is the same modifier across a
   rebuild. A modifier whose arguments include a fresh callback each time
