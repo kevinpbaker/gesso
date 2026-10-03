@@ -1,6 +1,7 @@
 import type { UiNodeReport } from '../NodeReport';
 import type { DevtoolsEvent, DevtoolsRequest } from '../DevtoolsProtocol';
 import { isConsoleEntryMessage, type ConsoleForwardingMessage } from '../../worker/captureConsole';
+import type { AgentConfirmation } from '../../agent/AgentSurface';
 import type { FrameMetrics, RendererChoice } from '../GessoRuntime';
 import {
   epochFromEvent,
@@ -126,6 +127,16 @@ export interface WorkerAppOptions {
    * reach. `gesso-electrobun`'s bridge is what goes here.
    */
   onOpenUrl?: (url: string) => void;
+  /**
+   * Offer the application's channels to an AI agent in the browser,
+   * through WebMCP (default false). Each channel's view and commands
+   * become tools registered with `document.modelContext` once the app
+   * mounts, removed when it is disposed. A browser without WebMCP
+   * registers nothing. Pass `{ confirm }` to ask the person about a
+   * `@confirm` command with the application's own dialog instead of
+   * the browser's. `gesso-framework/agent` has the rest.
+   */
+  webmcp?: boolean | { confirm?: (request: AgentConfirmation) => boolean | Promise<boolean> };
   /**
    * Receives errors thrown inside the render worker: while handling a
    * message, uncaught during a frame, from the renderer, or from a
@@ -497,8 +508,29 @@ export class WorkerApp {
       );
     }
 
+    const webmcp = this.options.webmcp;
+    if (webmcp !== undefined && webmcp !== false) {
+      // Loaded on demand: the shell carries the agent code only for an
+      // application that asked for it, and only once it is mounted.
+      void import('../../agent/webmcp')
+        .then(agent => agent.connectWebMcp(this, webmcp === true ? {} : webmcp))
+        .then(
+          disconnect => {
+            if (this.renderWorker === worker) {
+              this.disconnectWebMcp = disconnect;
+            } else {
+              disconnect();
+            }
+          },
+          (error: unknown) => console.warn('[gesso] WebMCP could not register the channels:', error)
+        );
+    }
+
     return () => this.dispose();
   }
+
+  /** Removes the WebMCP tools `webmcp` registered, if it did. */
+  private disconnectWebMcp: (() => void) | null = null;
 
   /**
    * An error the browser raised *at the worker object*, which is not
@@ -674,6 +706,8 @@ export class WorkerApp {
   }
 
   dispose(): void {
+    this.disconnectWebMcp?.();
+    this.disconnectWebMcp = null;
     this.ready = false;
     this.setFrameLoop(false);
     this.detachColorScheme?.();

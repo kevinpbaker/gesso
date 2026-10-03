@@ -127,6 +127,10 @@ function prelude(options: ShellTransformOptions): string {
           `    appLogicWorker: () => new Worker(new URL(${JSON.stringify(entries.appLogicWorker)}, import.meta.url), { type: 'module', name: options.workerName }),`
         ]),
     ...(options.overlay ? ['    onError: __gessoReportError,'] : []),
+    // In a dev server the channels are offered to an agent in the
+    // browser too, where the browser has WebMCP; the app's own
+    // `webmcp`, spread below, still decides.
+    ...(options.agent === true ? ['    webmcp: true,'] : []),
     '    ...options',
     '  };',
     '}'

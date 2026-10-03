@@ -1,5 +1,6 @@
 import { handleMcpMessage, type JsonRpcResponse, type McpServerInfo } from './mcp';
 import { AGENT_PORT, combineSurfaces, remoteSurface } from './remote';
+import { confirmInWindow } from './webmcp';
 import type { AgentSurfaceLike } from './AgentSurface';
 
 /**
@@ -65,15 +66,7 @@ export function connectDevAgent(app: DevAgentApp, hot: DevAgentHot, info: McpSer
     // A command marked `@confirm` is put to the person here, in the
     // page they are looking at. A browser's own dialog: in development
     // that is enough, and it cannot be mistaken for the application's.
-    surface = remoteSurface(port, {
-      confirm: request =>
-        window.confirm(
-          `An AI agent wants to ${request.command} in ${request.channel}.` +
-            (request.description === undefined ? '' : `\n\n${request.description}`) +
-            (Object.keys(request.arguments).length === 0 ? '' : `\n\n${JSON.stringify(request.arguments, null, 2)}`) +
-            (request.destructive ? '\n\nThis cannot be undone.' : '')
-        )
-    });
+    surface = remoteSurface(port, { confirm: confirmInWindow });
     return surface;
   };
   hot.on(DEV_AGENT_EVENTS.request, (request: DevAgentRequest) => {

@@ -134,6 +134,7 @@ describe('the shell, in a dev server', () => {
     const out = transformShell(SHELL, { entries: null, overlay: false, agent: true })!;
     expect(out).toContain("__gessoAgent(createApp(__gessoOptions({ history: { mode: 'path' } }))).mount('#app');");
     expect(out).toContain("import('gesso-framework/agent')");
+    expect(out).toContain('webmcp: true,');
   });
 
   it('writes no bridge for a build', () => {

@@ -159,5 +159,8 @@ what the app is doing:
   for it. Connected, you can read every channel's view and send its
   commands to the page open in the browser, which is the quickest way
   to check that a command does what it should.
+- **Agents in the browser.** `createApp({ webmcp: true })` registers the
+  same tools with WebMCP, for an agent the browser runs. The dev
+  server turns it on already; nothing happens in a browser without it.
 - **Errors** from the render worker are drawn over the app by the dev
   overlay, source-mapped. They also reach the browser console.
