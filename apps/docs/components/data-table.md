@@ -56,14 +56,14 @@ const RunTable = DataTable<Run>;
 
 One column, and everything the table knows about it.
 
-| Field     | Type                                 | Default   | What it does                                                                     |
-| --------- | ------------------------------------ | --------- | -------------------------------------------------------------------------------- |
-| `key`     | `string`                             | required  | The column's identity, and what a `DataTableSort` names.                         |
-| `header`  | `string`                             | required  | The header's text, and the column's accessible name.                             |
-| `cell`    | `(row: T, index: number) => UiChild` | required  | The content of one cell. `index` is the row's index in `rows`, not its position. |
-| `width`   | `UiTrackSize`                        | `fr(1)`   | The track this column takes: pixels, `percent`, `fr`, `auto` or `minmax`.        |
-| `compare` | `(a: T, b: T) => number`             | none      | Orders two rows by this column. A column without it cannot be sorted.            |
-| `align`   | `'start' \| 'center' \| 'end'`       | `'start'` | Where the cell's content sits in its track, in the header and in every row.      |
+| Field     | Type                                                                  | Default   | What it does                                                                                                                      |
+| --------- | --------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `key`     | `string`                                                              | required  | The column's identity, and what a `DataTableSort` names.                                                                          |
+| `header`  | `string`                                                              | required  | The header's text, and the column's accessible name.                                                                              |
+| `cell`    | `(row: T, index: number, color: Observable<UiColorValue>) => UiChild` | required  | The content of one cell. `index` is the row's index in `rows`, not its position. `color` is what its text is drawn in; see below. |
+| `width`   | `UiTrackSize`                                                         | `fr(1)`   | The track this column takes: pixels, `percent`, `fr`, `auto` or `minmax`.                                                         |
+| `compare` | `(a: T, b: T) => number`                                              | none      | Orders two rows by this column. A column without it cannot be sorted.                                                             |
+| `align`   | `'start' \| 'center' \| 'end'`                                        | `'start'` | Where the cell's content sits in its track, in the header and in every row.                                                       |
 
 ### `DataTableSort`
 
@@ -80,6 +80,22 @@ re-agree on between frames, so a later array is not picked up: build a
 new table when the columns change. `rowHeight` and `columnGap` are read
 the same way. `rows` is bound, so new data does arrive, and so does a
 different number of rows.
+
+### Colouring a cell
+
+A cell's text is the application's, so the table cannot colour it, and
+a row cannot either: `color` does not cascade from a parent node. The
+table hands each cell its colour instead, as the third argument, and a
+cell binds it on the text it draws:
+
+```tsx
+cell: (run, _index, color) => <text text={run.name} color={color} />;
+```
+
+It is the control foreground, and the selection foreground while the
+row is chosen, so the text stays readable on the selection background
+in either theme. A cell that wants a colour of its own, a red for a
+failed run, names it instead and keeps it when the row is chosen.
 
 ## Controlled and uncontrolled
 

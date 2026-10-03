@@ -77,7 +77,7 @@ const COLUMNS: readonly DataColumn<Request>[] = [
     width: 68,
     align: 'end',
     compare: (a, b) => a.id - b.id,
-    cell: request => <text text={request.id.toLocaleString('en-US')} fontSize={12} />
+    cell: (request, _index, color) => <text text={request.id.toLocaleString('en-US')} fontSize={12} color={color} />
   },
   {
     key: 'route',
@@ -86,7 +86,7 @@ const COLUMNS: readonly DataColumn<Request>[] = [
     // A plain comparison rather than `localeCompare`: these are ASCII
     // route names, and the sort runs over every row at once.
     compare: (a, b) => (a.route < b.route ? -1 : a.route > b.route ? 1 : 0),
-    cell: request => <text text={request.route} fontSize={12} />
+    cell: (request, _index, color) => <text text={request.route} fontSize={12} color={color} />
   },
   {
     key: 'status',
@@ -94,7 +94,7 @@ const COLUMNS: readonly DataColumn<Request>[] = [
     width: 64,
     align: 'end',
     compare: (a, b) => a.status - b.status,
-    cell: request => <text text={String(request.status)} fontSize={12} />
+    cell: (request, _index, color) => <text text={String(request.status)} fontSize={12} color={color} />
   },
   {
     key: 'ms',
@@ -102,7 +102,7 @@ const COLUMNS: readonly DataColumn<Request>[] = [
     width: 72,
     align: 'end',
     compare: (a, b) => a.ms - b.ms,
-    cell: request => <text text={`${request.ms} ms`} fontSize={12} />
+    cell: (request, _index, color) => <text text={`${request.ms} ms`} fontSize={12} color={color} />
   }
 ];
 // #endregion columns

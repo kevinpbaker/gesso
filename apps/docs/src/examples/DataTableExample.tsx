@@ -48,13 +48,13 @@ const COLUMNS: readonly DataColumn<Run>[] = [
     header: 'Name',
     width: fr(2),
     compare: (a, b) => a.name.localeCompare(b.name),
-    cell: run => <text text={run.name} fontSize={13} />
+    cell: (run, _index, color) => <text text={run.name} fontSize={13} color={color} />
   },
   {
     key: 'team',
     header: 'Team',
     width: fr(1),
-    cell: run => <text text={run.team} fontSize={12} />
+    cell: (run, _index, color) => <text text={run.team} fontSize={12} color={color} />
   },
   {
     key: 'score',
@@ -62,7 +62,7 @@ const COLUMNS: readonly DataColumn<Run>[] = [
     width: 76,
     align: 'end',
     compare: (a, b) => a.score - b.score,
-    cell: run => <text text={String(run.score)} fontSize={13} />
+    cell: (run, _index, color) => <text text={String(run.score)} fontSize={13} color={color} />
   }
 ];
 

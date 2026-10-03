@@ -55,10 +55,12 @@ column that takes the space the fixed ones leave. The header and every
 row are subgrids of one grid, which is what makes a track a single
 decision rather than an agreement between rows.
 
-**No cell names a colour.** `color` is inherited, and the chosen row
-sets it to the selection foreground, so a cell that named its own colour
-would be the one thing on the row that did not change when the row was
-picked.
+**Every cell binds the colour it is handed.** The third argument to
+`cell` is the control foreground, and the selection foreground while
+the row is chosen. A row cannot colour its cells itself, because
+`color` does not cascade from a parent node, so a cell that drew its
+text without it would keep the default colour on the selection
+background and, in a dark theme, would not be readable at all.
 
 ## The screen
 
