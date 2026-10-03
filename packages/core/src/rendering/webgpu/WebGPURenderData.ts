@@ -1015,10 +1015,11 @@ export function buildRenderList(
         // A run's own background goes under the selection, the same
         // order Canvas2D paints it in.
         pushTextRects(textRunBackgrounds(editable.lines, text));
-        if (model.focused && !model.collapsed) {
+        const spanned = text.textSelection;
+        if (spanned !== undefined || (model.focused && !model.collapsed)) {
           const selection = parseColor(text.selectionColor);
           if (selection !== undefined) {
-            for (const box of editable.selectionBoxes()) {
+            for (const box of editable.selectionBoxes(spanned)) {
               pushContentRect(box, selection);
             }
           }
@@ -1038,7 +1039,7 @@ export function buildRenderList(
             }
           }
         }
-        if (model.focused && model.collapsed && caretVisibleAt(model, now)) {
+        if (spanned === undefined && model.focused && model.collapsed && caretVisibleAt(model, now)) {
           const caretColor = parseColor(text.caretColor);
           if (caretColor !== undefined) {
             const caret = editable.caretRect();

@@ -272,7 +272,9 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
     out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
     out.caretColor =
       resolveColor(node, UiProperties.caretColor) ?? resolveColor(node, UiProperties.color) ?? UiBasicColors.black;
-    out.textSelection = undefined;
+    // A field's part of a selection that spans an editing group's
+    // fields; its own selection is in the model.
+    out.textSelection = selectionRangeOf(node);
     out.textMatches = undefined;
   } else {
     out.editor = undefined;

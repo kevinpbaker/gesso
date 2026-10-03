@@ -1,3 +1,4 @@
+import type { UiEditingGroup } from '../editing/UiEditingGroup';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import type { UiContainerSize } from '../environment/UiContainerSize';
@@ -1136,6 +1137,18 @@ export const UiProperties = {
    */
   selectable: defineProperty<boolean | undefined>({
     name: 'selectable',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /**
+   * Makes the editables inside one selection: a selection can start in
+   * one and end in another, and edits over it go to the group's
+   * `onEdit`. See `UiEditingGroup`.
+   */
+  editingGroup: defineProperty<UiEditingGroup | undefined>({
+    name: 'editingGroup',
     defaultValue: undefined,
     inherited: false,
     affects: DirtyFlags.Properties

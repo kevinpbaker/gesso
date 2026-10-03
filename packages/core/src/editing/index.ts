@@ -43,3 +43,12 @@ export {
   caretVisibleAt,
   nextCaretToggle
 } from './UiEditable';
+export {
+  adjacentField,
+  comparePositions,
+  edgeField,
+  editingGroupOf,
+  type UiEditingGroup,
+  type UiGroupEdit,
+  type UiTextPosition
+} from './UiEditingGroup';

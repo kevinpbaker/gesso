@@ -66,9 +66,14 @@ export class EditableLayout {
     return offsetForVerticalMove(this.lines, this.model.text, offset, direction, this.measure, this.rtl, goalX);
   }
 
-  /** Boxes behind the selected text. */
-  selectionBoxes(): LayoutBox[] {
-    return selectionRects(this.lines, this.model.text, this.model.start, this.model.end, this.measure, this.rtl);
+  /**
+   * Boxes behind the selected text: the field's part of a selection
+   * across an editing group when `range` is given, else its own.
+   */
+  selectionBoxes(range?: { readonly start: number; readonly end: number }): LayoutBox[] {
+    const start = range?.start ?? this.model.start;
+    const end = range?.end ?? this.model.end;
+    return selectionRects(this.lines, this.model.text, start, end, this.measure, this.rtl);
   }
 
   /** Boxes under the text the IME is composing, for its underline. */

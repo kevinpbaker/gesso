@@ -145,7 +145,9 @@ selection; copy, select all and clear are the whole keyboard surface.
 
 **A selection cannot cross into a field.** The two models are separate,
 so a drag that starts in a paragraph and ends inside an
-`<editabletext>` does not select the two together.
+`<editabletext>` does not select the two together. Fields can select
+across each other, though: see
+[fields that select as one](/interaction/text-editing-and-ime#fields-that-select-as-one).
 
 **An application cannot read or write it.** There is no selection
 service and no selection-changed event: no component can ask what is
