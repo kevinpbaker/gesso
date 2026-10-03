@@ -201,7 +201,13 @@ function findHutch(): string {
       return join(dir, binary);
     }
   }
-  const platform = `${process.platform === 'darwin' ? 'darwin' : process.platform}-${process.arch}`;
+  // The bootstrap names a Mac `macos`, not Node's `darwin`: on a Mac the
+  // launcher is under `macos-arm64`, and looking only for `darwin-arm64`
+  // never found it. Both are tried, in case a release spells it Node's way.
+  const platforms =
+    process.platform === 'darwin'
+      ? [`macos-${process.arch}`, `darwin-${process.arch}`]
+      : [`${process.platform}-${process.arch}`];
   const homes = [process.env.HUTCH_HOME, join(homedir(), '.hutch')].filter(
     (home): home is string => home !== undefined
   );
@@ -211,9 +217,11 @@ function findHutch(): string {
       continue;
     }
     for (const version of readdirSync(bootstrap).sort().reverse()) {
-      const candidate = join(bootstrap, version, platform, 'bin', binary);
-      if (existsSync(candidate)) {
-        return candidate;
+      for (const platform of platforms) {
+        const candidate = join(bootstrap, version, platform, 'bin', binary);
+        if (existsSync(candidate)) {
+          return candidate;
+        }
       }
     }
   }
@@ -244,6 +252,27 @@ function onlyChild(dir: string, prefix: string): string {
  * all of that into an archive, so for it the assertion is that the
  * launcher and the archive exist.
  */
+/**
+ * Where a built bundle keeps its resources and its launcher.
+ *
+ * Linux and Windows lay a bundle out flat, `Resources/` and `bin/`
+ * beside each other. A Mac bundle is a `.app`, with both inside
+ * `Contents/` and the launcher in `MacOS/`, and the check, written
+ * against the Linux runner, failed on every Mac for that alone.
+ */
+function bundleLayout(bundle: string): { resources: string; launcher: string } {
+  if (bundle.endsWith('.app')) {
+    return {
+      resources: join(bundle, 'Contents', 'Resources'),
+      launcher: join(bundle, 'Contents', 'MacOS', 'launcher')
+    };
+  }
+  return {
+    resources: join(bundle, 'Resources'),
+    launcher: join(bundle, 'bin', process.platform === 'win32' ? 'launcher.exe' : 'launcher')
+  };
+}
+
 async function checkElectrobun(app: string): Promise<void> {
   const hutch = findHutch();
   console.log(`  using ${hutch}`);
@@ -263,7 +292,7 @@ async function checkElectrobun(app: string): Promise<void> {
   run(hutch, ['pm', 'exec', '--', 'vite', 'build', '--logLevel', 'warn'], app);
   run(hutch, ['electrobun', 'build'], app);
   const dev = onlyChild(onlyChild(join(app, 'build'), 'dev-'), 'my-app');
-  const views = join(dev, 'Resources', 'app', 'views', 'mainview');
+  const views = join(bundleLayout(dev).resources, 'app', 'views', 'mainview');
   if (!existsSync(join(views, 'index.html'))) {
     throw new Error(`The bundle has no page at ${join(views, 'index.html')}.`);
   }
@@ -271,7 +300,7 @@ async function checkElectrobun(app: string): Promise<void> {
   if (!assets.some(asset => asset.startsWith('render.worker-') && asset.endsWith('.js'))) {
     throw new Error(`The bundle carries no render worker chunk. Assets: ${assets.join(', ') || 'none'}.`);
   }
-  const mainBundle = join(dev, 'Resources', 'app', 'bun', 'index.js');
+  const mainBundle = join(bundleLayout(dev).resources, 'app', 'bun', 'index.js');
   if (!existsSync(mainBundle) || !readFileSync(mainBundle, 'utf8').includes('gessoFrame')) {
     throw new Error(`The main process bundle at ${mainBundle} is missing, or does not carry the gessoFrame handler.`);
   }
@@ -280,8 +309,8 @@ async function checkElectrobun(app: string): Promise<void> {
   console.log('building the distributable…');
   run(hutch, ['electrobun', 'build', '--env=stable'], app);
   const stable = onlyChild(onlyChild(join(app, 'build'), 'stable-'), 'my-app');
-  const launcher = join(stable, 'bin', process.platform === 'win32' ? 'launcher.exe' : 'launcher');
-  const archives = readdirSync(join(stable, 'Resources')).filter(entry => entry.endsWith('.tar.zst'));
+  const { launcher, resources } = bundleLayout(stable);
+  const archives = readdirSync(resources).filter(entry => entry.endsWith('.tar.zst'));
   if (!existsSync(launcher) || archives.length === 0) {
     throw new Error(`The distributable at ${stable} has no launcher or no archive.`);
   }
