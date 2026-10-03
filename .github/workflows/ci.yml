@@ -36,6 +36,14 @@ concurrency:
 env:
   # The scripts run TypeScript directly through Node's type stripping.
   NODE_VERSION: '24'
+  # The Chrome the screenshot baselines were captured with, from Chrome
+  # for Testing, which keeps every build at its version for good. The
+  # runner's own Chrome moves about monthly, and canvas text depends on
+  # the browser and the system's fonts, so a gate against it would go red
+  # with nothing changed. Moving this is a decision: change it here and
+  # in screenshot-baselines.yml, run that workflow, and commit what it
+  # captures.
+  SCREENSHOT_CHROME: '154.0.8037.57'
 
 jobs:
   checks:
@@ -349,10 +357,17 @@ jobs:
       - name: Vulkan loader for SwiftShader
         run: sudo apt-get update && sudo apt-get install -y libvulkan1 mesa-vulkan-drivers
 
+      - name: Chrome, pinned
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: ${{ env.SCREENSHOT_CHROME }}
+          install-dependencies: true
+
       - name: Route screenshots
         run: pnpm screenshots
         env:
-          CHROME_BIN: google-chrome
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
       # What a reviewer needs to see when a route's rendering changes.
       - name: Upload the captures that differed
@@ -390,10 +405,17 @@ jobs:
       # live example in still mode. No Vulkan loader: the docs examples
       # are Canvas2D, which is the framework's default backend, and the
       # site offers no renderer switch.
+      - name: Chrome, pinned
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: ${{ env.SCREENSHOT_CHROME }}
+          install-dependencies: true
+
       - name: Docs screenshots
         run: pnpm docs:screenshots
         env:
-          CHROME_BIN: google-chrome
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
       # What a reviewer needs to see when a page's canvas changes.
       - name: Upload the captures that differed
