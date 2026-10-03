@@ -4971,14 +4971,24 @@ interface SemanticsSpan {
 declare function semanticsMemory(): SemanticsMemory;
 declare function buildSemanticsSubtree(node: UiNode, parent: string | null, index: number, inert: boolean, memory?: SemanticsMemory): Map<string, UiSemanticsRecord> | null;
 interface SemanticsReuse {
-  readonly previous: UiSemanticsMap;
+  readonly previous: ReadonlyMap<string, UiSemanticsRecord>;
   readonly childrenOf: (parent: string | null) => readonly string[];
+  readonly positionOf: (parent: string | null, id: string) => number;
   readonly memory: SemanticsMemory;
   readonly unchanged: (node: UiNode) => boolean;
-  readonly reused: string[];
-  readonly renumbered: string[];
 }
-declare function rebuildSemanticsSubtree(node: UiNode, parent: string | null, index: number, inert: boolean, reuse: SemanticsReuse): Map<string, UiSemanticsRecord> | null;
+interface SemanticsRewalk {
+  readonly records: Map<string, UiSemanticsRecord>;
+  readonly children: Map<string | null, string[]>;
+  readonly kept: Set<string>;
+  readonly placed: readonly SemanticsPlacement[];
+}
+interface SemanticsPlacement {
+  readonly id: string;
+  readonly parent: string | null;
+  readonly index: number;
+}
+declare function rewalkSemantics(node: UiNode, parent: string | null, index: number, inert: boolean, reuse: SemanticsReuse): SemanticsRewalk | null;
 declare function semanticsInertAbove(node: UiNode): boolean;
 declare const TEXT_RUN_ID_SEPARATOR = "#run";
 declare function textRunOfRecordId(id: string): {
@@ -5308,8 +5318,8 @@ export {
   isUiSemanticState,
   isVideoSurface,
   isWebGPUAvailable,
+  jf,
   KeyboardControllerOptions,
-  kf,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
@@ -5483,7 +5493,6 @@ export {
   RangeSourceOptions,
   Reactive,
   readMp3Header,
-  rebuildSemanticsSubtree,
   recordsEqual,
   registerFontStack,
   relativeLuminance,
@@ -5516,6 +5525,7 @@ export {
   resolveString,
   Responsive,
   ResponsiveProps,
+  rewalkSemantics,
   rgb8,
   rgba,
   rotateFrom,
@@ -5560,7 +5570,9 @@ export {
   semanticsInertAbove,
   semanticsMemory,
   SemanticsMemory,
+  SemanticsPlacement,
   SemanticsReuse,
+  SemanticsRewalk,
   SemanticsSpan,
   setLinkHover,
   setMatchRanges,
@@ -6374,7 +6386,6 @@ import {
   RangeSourceOptions,
   Reactive,
   readMp3Header,
-  rebuildSemanticsSubtree,
   recordsEqual,
   registerFontStack,
   relativeLuminance,
@@ -6407,6 +6418,7 @@ import {
   resolveString,
   Responsive,
   ResponsiveProps,
+  rewalkSemantics,
   rgb8,
   rgba,
   rotateFrom,
@@ -6451,7 +6463,9 @@ import {
   semanticsInertAbove,
   semanticsMemory,
   SemanticsMemory,
+  SemanticsPlacement,
   SemanticsReuse,
+  SemanticsRewalk,
   SemanticsSpan,
   setLinkHover,
   setMatchRanges,
@@ -6793,7 +6807,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-5x0wGgJB.js";
+} from "./index-DkAE8ZRX.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -7104,7 +7118,6 @@ export {
   raiseContrast,
   rangeSource,
   readMp3Header,
-  rebuildSemanticsSubtree,
   recordsEqual,
   registerFontStack,
   relativeLuminance,
@@ -7126,6 +7139,7 @@ export {
   resolvePropertyByName,
   resolveString,
   Responsive,
+  rewalkSemantics,
   rgb8,
   rgba,
   rotateFrom,
@@ -7392,7 +7406,9 @@ export {
   type SelectionControllerOptions,
   type SelectionHost,
   type SemanticsMemory,
+  type SemanticsPlacement,
   type SemanticsReuse,
+  type SemanticsRewalk,
   type SemanticsSpan,
   type SharedClaim,
   type SharedElementArgs,
@@ -7716,7 +7732,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-5x0wGgJB.js";
+} from "./index-DkAE8ZRX.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
