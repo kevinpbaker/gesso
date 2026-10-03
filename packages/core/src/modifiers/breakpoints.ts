@@ -24,6 +24,9 @@ export interface SizeContainerArgs {
  * padding, and a layout that switched arms at 600 px would otherwise
  * switch at 600 px of border box and lay itself out in 560.
  *
+ * What a subtree builds from the size it reports is laid out on the
+ * same frame, before anything paints; see `UiModifierHost.onLayout`.
+ *
  * `Responsive` attaches this for you. Attach it by hand when the
  * source has to be reachable somewhere the helper's own children are
  * not, and put the same object on the node's `containerSize` prop.
@@ -81,9 +84,15 @@ export interface BreakpointArgs {
  * about it and the thing a media query cannot do: a card in a sidebar
  * asks how wide the card is, not how wide the window is.
  *
- * Nothing is written until the node has been laid out once, so the
- * first frame uses the element's own values. Give the element the
- * narrowest band's values as its declared props if that matters.
+ * Nothing is written until the node has been laid out once, but the
+ * first frame is already right: the runtime lays out again before it
+ * paints when a layout listener changes layout (see
+ * `UiModifierHost.onLayout`), so the frame a node first appears on,
+ * and the frame a resize crosses a width on, are drawn with the band's
+ * values. The element's own values are what that first pass measures
+ * with; give it the narrowest band's values as its declared props so a
+ * layout nothing settles (a headless one, a spec driving layout by
+ * hand) starts from the right band.
  */
 export const breakpoint = defineModifier<BreakpointArgs>({
   name: 'breakpoint',

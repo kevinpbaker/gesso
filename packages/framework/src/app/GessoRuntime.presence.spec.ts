@@ -293,19 +293,21 @@ describe('a shared element handing over', () => {
     drain(mounted);
     expect(opacityOf(seen.get('a')!)).toBe(1);
 
+    const arrived = mounted.runtime.debugLayoutBox(seen.get('a')!);
     shown.value = 'b';
     mounted.frame();
-    // The frame of the change. A geometry morph cannot write a box after
-    // this frame's layout has run, so what covers the frame is the
-    // transform: the arriving element is *opaque* and translated onto
-    // the departing element's box. There is no frame on which neither
-    // is drawn, which is the whole point — one used to flash the page.
+    // The frame of the change. The arriving element is *opaque* and
+    // already standing on the departing element's box: the geometry it
+    // writes from its first layout is laid out again before the frame
+    // paints, so it is there by its own `top` rather than by a stand-in
+    // transform. There is no frame on which neither is drawn, which is
+    // the whole point — one used to flash the page.
     expect(opacityOf(seen.get('b')!)).toBe(1);
-    expect(translationOf(seen.get('b')!).y).toBeCloseTo(-150, 0);
+    expect(mounted.runtime.debugLayoutBox(seen.get('b')!).y).toBeCloseTo(arrived.y, 0);
+    expect(translationOf(seen.get('b')!).y).toBe(0);
     expect(opacityOf(seen.get('a')!)).toBe(0);
 
     mounted.frame();
-    // The geometry has landed, so the stand-in transform comes off.
     expect(opacityOf(seen.get('b')!)).toBe(1);
     expect(translationOf(seen.get('b')!).y).toBe(0);
 

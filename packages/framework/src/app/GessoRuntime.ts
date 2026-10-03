@@ -490,6 +490,14 @@ export class GessoRuntime {
   private focusAfterReload: string | null = null;
   /** Whether `focusAfterReload` is waiting to be applied. */
   private restoringFocus = false;
+  /**
+   * Reveals asked for while the layout listeners run, kept until the
+   * frame's boxes have settled; null outside `settleLayout`, where a
+   * reveal is applied at once.
+   */
+  private deferredReveals: { node: UiNode; padding: number }[] | null = null;
+  /** Whether a frame has run out of layout passes and been warned about; see `MAX_LAYOUT_PASSES`. */
+  private warnedLayoutPasses = false;
   /** A frame changed semantics while nothing was listening; see `semanticsTree`. */
   private semanticsStale = false;
   private lastEditingState: EditingState | null = null;
@@ -1783,8 +1791,17 @@ export class GessoRuntime {
    * Scrolls every scroll container above `node` just enough that the
    * node is inside its viewport, `padding` pixels from the nearest edge.
    * Nothing moves when it is already visible.
+   *
+   * Asked for from a layout listener — `autoFocus` taking focus is the
+   * usual one — it waits until the frame's layout has settled, so it
+   * reveals where the node ends up rather than where the first pass
+   * put it (see `settleLayout`).
    */
   scrollIntoView(node: UiNode, padding = 8): void {
+    if (this.deferredReveals !== null) {
+      this.deferredReveals.push({ node, padding });
+      return;
+    }
     for (const adjustment of this.engine.revealAdjustments(node, padding)) {
       // A reveal knows exactly where the container has to be, and a
       // spring still running would overwrite that on its next tick.
@@ -3180,7 +3197,151 @@ export class GessoRuntime {
       : rec.measuredWidth + rec.marginLeft + rec.marginRight;
   }
 
-  private handleFrame(frame: UiFrame): void {
+  /**
+   * Tells the layout listeners what moved, and lays out again for as
+   * long as what they do in answer needs it, so the frame paints the
+   * layout they settle on rather than the one they were told about.
+   *
+   * The browser's answer to the same problem. A `ResizeObserver`
+   * callback runs after layout and before paint, and when it changes
+   * layout the browser lays out again before it paints rather than
+   * showing the stale boxes for a frame. The listeners here are
+   * `breakpoint`, `sizeContainer` (and so `Responsive`),
+   * `scrollPosition`, `autoFocus` and anything else on `host.onLayout`.
+   * Before this a page whose breakpoint gave it wide padding was
+   * painted with its narrow padding on the frame it appeared, and
+   * jumped 16 px on the next.
+   *
+   * A pass after the first lays out only what the listeners dirtied,
+   * the same incremental pass any frame runs, and then tells only the
+   * listeners whose boxes it changed. A frame whose listeners wrote
+   * nothing that lays out, which is almost every frame, runs no second
+   * pass: it pays one look at the dirty set.
+   *
+   * **Bounded.** Listeners that keep moving each other's boxes would
+   * otherwise never let the frame paint. ResizeObserver bounds its loop
+   * by tree depth; this one is bounded by count, `MAX_LAYOUT_PASSES` in
+   * all, which is easier to reason about and more than a real chain
+   * needs (a breakpoint inside a `Responsive` inside a `Responsive` is
+   * four passes). Past it the frame paints what it has, the rest waits
+   * for the next frame as it always used to, and a warning says so
+   * once, as the browser's "ResizeObserver loop completed with
+   * undelivered notifications" does.
+   *
+   * **Reveals wait for the end.** `autoFocus` takes focus from a layout
+   * listener, on its node's first layout, and focus reveals the node:
+   * revealed from the first pass's boxes, it scrolled to where the node
+   * was before a breakpoint moved it. A reveal asked for while the
+   * listeners run is applied once they are quiet, from final boxes, and
+   * its scroll laid out like any other write. So is the focus a hot
+   * reload restores, after the listeners rather than before because
+   * `autoFocus` is one of them and the restore has to be the last word:
+   * every node in a subtree a reload replaced has its first layout on
+   * this frame.
+   */
+  private settleLayout(frame: UiFrame, root: UiNode, laidOut: boolean): SettledLayout {
+    const stats = this.engine.stats;
+    const settled: SettledLayout = {
+      frame,
+      passes: laidOut ? 1 : 0,
+      measured: laidOut ? stats.measured : 0,
+      relayoutRoots: laidOut && !stats.fullLayout ? stats.relayoutRoots : 0
+    };
+    let fromRoot = laidOut && stats.fullLayout;
+    const read = (node: UiNode) => {
+      const record = this.engine.recordFor(node);
+      return {
+        box: this.engine.visibleBox(node),
+        scrollX: record?.scrollX ?? 0,
+        scrollY: record?.scrollY ?? 0
+      };
+    };
+    this.deferredReveals = [];
+    try {
+      for (;;) {
+        // Nothing listening means nothing walked.
+        if (!this.layoutNotifier.isEmpty()) {
+          this.layoutNotifier.notify(read);
+        }
+        if (!this.layoutPending()) {
+          this.finishSettling(settled.passes > 0);
+          if (!this.layoutPending()) {
+            break;
+          }
+        }
+        if (settled.passes >= MAX_LAYOUT_PASSES) {
+          this.warnLayoutPasses();
+          this.finishSettling(true);
+          break;
+        }
+        // A listener's write can be inherited (a theme, a font size), so
+        // what it changes for the subtree is worked out first, as the
+        // frame does before its own layout.
+        this.phaseTimings.environment += this.timePhase(
+          () => this.graph.hasEnvironmentDirty(),
+          () => this.graph.processEnvironmentDirty()
+        );
+        const more = this.scheduler.recollect(frame);
+        settled.frame = settled.frame.merged(more);
+        this.phaseTimings.layout += this.timePhase(
+          () => true,
+          () => this.engine.layoutForFrame(more, this.constraints, root)
+        );
+        settled.passes++;
+        settled.measured += stats.measured;
+        settled.relayoutRoots += stats.fullLayout ? 0 : stats.relayoutRoots;
+        fromRoot ||= stats.fullLayout;
+      }
+    } finally {
+      this.deferredReveals = null;
+    }
+    // Zero means the frame ran from the root, as one pass reports it.
+    if (fromRoot) {
+      settled.relayoutRoots = 0;
+    }
+    return settled;
+  }
+
+  /**
+   * Whether something written since the frame was collected has to be
+   * laid out before the frame paints: the same flags that make a frame
+   * lay out, or an inherited value still to be handed down.
+   */
+  private layoutPending(): boolean {
+    return this.graph.hasEnvironmentDirty() || this.graph.getDirtyNodes().anyFlags(LAYOUT_DIRT);
+  }
+
+  /** Applies what waits for settled boxes: a reload's focus, then the reveals asked for. */
+  private finishSettling(laidOut: boolean): void {
+    const reveals = this.deferredReveals ?? [];
+    this.deferredReveals = null;
+    if (this.restoringFocus && laidOut) {
+      this.restoringFocus = false;
+      this.restoreFocusAfterReload();
+    }
+    for (const { node, padding } of reveals) {
+      // A node taken out by the listeners that asked has nothing to show.
+      if (this.engine.recordFor(node) !== undefined) {
+        this.scrollIntoView(node, padding);
+      }
+    }
+    this.deferredReveals = [];
+  }
+
+  private warnLayoutPasses(): void {
+    if (this.warnedLayoutPasses) {
+      return;
+    }
+    this.warnedLayoutPasses = true;
+    console.warn(
+      `Gesso: a frame laid out ${MAX_LAYOUT_PASSES} times and its layout listeners were still changing it, so it ` +
+        `was painted unsettled and the rest left for the next frame. Something on \`host.onLayout\` (a ` +
+        `breakpoint, a sizeContainer, a Responsive, a modifier of your own) is writing a property that changes ` +
+        `the box it is listening to, back and forth. Shown once.`
+    );
+  }
+
+  private handleFrame(collected: UiFrame): void {
     const root = this.root;
     if (root === undefined) {
       return;
@@ -3193,36 +3354,22 @@ export class GessoRuntime {
     // it before the frame is laid out and revealed.
     this.focusManager.settleScope();
 
-    const laidOut = frameNeedsLayout(frame);
+    const firstPass = frameNeedsLayout(collected);
     this.phaseTimings.layout = this.timePhase(
-      () => laidOut,
-      () => this.engine.layoutForFrame(frame, this.constraints, root)
+      () => firstPass,
+      () => this.engine.layoutForFrame(collected, this.constraints, root)
     );
+    // A modifier that follows its node's box hears about it here, after
+    // the boxes are final and before anything paints from them; and
+    // when what it does in answer moves boxes, they are laid out again
+    // before anything paints. From here on `frame` is everything the
+    // frame changed, the listeners' writes included.
+    const settled = this.settleLayout(collected, root, firstPass);
+    const frame = settled.frame;
+    const laidOut = settled.passes > 0;
     if (laidOut) {
       this.laidOutOnce = true;
       this.inspector.recordLayout(started);
-    }
-    // A modifier that follows its node's box hears about it here, after
-    // the boxes are final and before anything paints from them. Nothing
-    // listening means nothing walked.
-    if (!this.layoutNotifier.isEmpty()) {
-      this.layoutNotifier.notify(node => {
-        const record = this.engine.recordFor(node);
-        return {
-          box: this.engine.visibleBox(node),
-          scrollX: record?.scrollX ?? 0,
-          scrollY: record?.scrollY ?? 0
-        };
-      });
-    }
-
-    // After the layout listeners rather than before, because
-    // `autoFocus` is one of them: it takes focus on the first layout
-    // of the node it is attached to, and every node in a subtree a
-    // reload replaced is having its first layout on this frame.
-    if (this.restoringFocus && laidOut) {
-      this.restoringFocus = false;
-      this.restoreFocusAfterReload();
     }
 
     // Before the semantics phase, not after the frame: the mirror
@@ -3304,11 +3451,13 @@ export class GessoRuntime {
       frame: frame.id,
       durationMs: elapsed,
       nodes: frame.size,
-      // The engine's counters are reset when a layout pass starts, so a
-      // frame that skipped layout would otherwise report the last pass's
+      // The engine's counters are reset when a layout pass starts, so
+      // they are added up pass by pass (see `settleLayout`), and a frame
+      // that skipped layout reports zeroes rather than the last pass's
       // numbers as its own: a caret blink claimed thousands of nodes.
-      measured: laidOut ? this.engine.stats.measured : 0,
-      relayoutRoots: !laidOut || this.engine.stats.fullLayout ? 0 : this.engine.stats.relayoutRoots,
+      measured: settled.measured,
+      relayoutRoots: settled.relayoutRoots,
+      layoutPasses: settled.passes,
       at: finished,
       inputLatencyMs: this.inputLatency.take(epochAt(finished)),
       phases: this.phaseTimings,
@@ -3613,6 +3762,14 @@ export interface FrameMetrics {
   measured: number;
   /** Relayout boundaries the layout phase started from; 0 when it ran from the root or not at all. */
   relayoutRoots: number;
+  /**
+   * Times the frame laid out: 0 when it laid nothing out, 1 usually,
+   * more when a layout listener (a `breakpoint`, a `sizeContainer`, an
+   * `autoFocus`'s reveal) changed what the first pass laid out and the
+   * frame laid it out again before painting. `measured` and
+   * `relayoutRoots` count every pass.
+   */
+  layoutPasses: number;
   /** Milliseconds per phase. A phase with no work reports 0. */
   phases: FramePhaseTimings;
   /** The backend that drew this frame, or `pending` while WebGPU initialises. */
@@ -3713,6 +3870,26 @@ function emptyGpuTimings(): GpuStageTimings {
   return { prepare: 0, upload: 0, encode: 0 };
 }
 
+/** What `settleLayout` leaves the rest of the frame. */
+interface SettledLayout {
+  /** Everything the frame changed, including what its layout listeners wrote. */
+  frame: UiFrame;
+  /** Layout passes run: 0 for a frame that laid nothing out, 1 for one whose listeners moved nothing. */
+  passes: number;
+  measured: number;
+  relayoutRoots: number;
+}
+
+/**
+ * The most layout passes one frame runs before it paints; see
+ * `settleLayout`. One for the frame and up to seven more for what its
+ * layout listeners change.
+ */
+const MAX_LAYOUT_PASSES = 8;
+
+/** Dirt that makes a frame lay out; `frameNeedsLayout` asks the same of a collected frame. */
+const LAYOUT_DIRT = DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform;
+
 function emptyPhaseTimings(): FramePhaseTimings {
   return { ticks: 0, patches: 0, environment: 0, virtualize: 0, layout: 0, semantics: 0, render: 0 };
 }
@@ -3725,7 +3902,7 @@ function emptyPhaseTimings(): FramePhaseTimings {
  * spending an immeasurable amount of time deciding to do nothing.
  */
 function frameNeedsLayout(frame: UiFrame): boolean {
-  return frame.anyFlags(DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout | DirtyFlags.Transform);
+  return frame.anyFlags(LAYOUT_DIRT);
 }
 
 /**

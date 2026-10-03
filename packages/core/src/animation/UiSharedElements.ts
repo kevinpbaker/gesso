@@ -83,11 +83,12 @@ export class UiSharedElements {
    * But it must not disappear *yet*. A claim happens during
    * reconciliation, and the arriving node has no box until the frame
    * lays out — so yielding here leaves a window in which neither
-   * element is drawn. For a transform morph that window is closed
-   * within the same frame; for a geometry morph, which cannot write a
-   * box after layout has run, it is a whole frame long, and a whole
-   * frame with neither the old card nor the new one is a flash of the
-   * page behind them. It was exactly that visible.
+   * element is drawn. The window closes within the frame now, for a
+   * geometry morph as for a transform one, but only because the
+   * arriving element takes its place in that frame's layout pass; when
+   * a geometry morph's box waited for the next frame, a whole frame
+   * with neither the old card nor the new one was a flash of the page
+   * behind them, and it was exactly that visible.
    *
    * So the caller yields the previous holder at the moment it actually
    * takes its place. Until then both are on screen, in the same

@@ -60,6 +60,26 @@ export class UiFrame {
     return false;
   }
 
+  /**
+   * This frame and `later` as one: every node in either, with the
+   * flags it carried in both.
+   *
+   * What the phases after layout read when layout ran more than once
+   * in a frame (see `UiScheduler.recollect`): a node dirtied by a
+   * layout listener has to be re-meant and redrawn like any other
+   * node the frame changed.
+   */
+  merged(later: UiFrame): UiFrame {
+    if (later.isEmpty()) {
+      return this;
+    }
+    const dirty = new Map(this.dirty);
+    for (const [node, flags] of later.entries()) {
+      dirty.set(node, (dirty.get(node) ?? DirtyFlags.None) | flags);
+    }
+    return new UiFrame(this.id, this.time, dirty);
+  }
+
   get size(): number {
     return this.dirty.size;
   }

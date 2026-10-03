@@ -1,3 +1,4 @@
+import type { DirtyFlags } from './DirtyFlags';
 import type { UiNode } from './UiNode';
 
 /**
@@ -33,6 +34,23 @@ export class DirtyNodeSet {
 
   isEmpty(): boolean {
     return this.nodes.size === 0;
+  }
+
+  /**
+   * Whether any node in the set carries one of `flags`, without
+   * draining it.
+   *
+   * What a frame asks after its layout listeners have run: whether one
+   * of them wrote something that has to be laid out again before the
+   * frame paints. Stops at the first node that says yes.
+   */
+  anyFlags(flags: DirtyFlags): boolean {
+    for (const node of this.nodes) {
+      if ((node.dirtyFlags & flags) !== 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

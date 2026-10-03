@@ -656,15 +656,15 @@ class SharedElementController {
    *
    * Held rather than called on arrival: see `UiSharedElements.claim`.
    * Between claiming a name and taking the departing element's place
-   * there is at least one layout, and for a geometry morph a whole
-   * frame — and hiding it up front makes that a frame with neither
-   * element on screen, which reads as a flash of the page behind them.
+   * there is at least one layout pass — and hiding it up front, on a
+   * frame painted between the two, would leave neither element on
+   * screen, which reads as a flash of the page behind them.
    */
   private yieldPrevious: (() => void) | null = null;
   private yielded = false;
   /** Whether a morph is running, so `onMorph` is never told twice. */
   private morphing = false;
-  /** Set for the one frame a geometry morph spends being measured. */
+  /** Set between a geometry morph writing its first box and that box being laid out. */
   private geometryTarget: LayoutBox | null = null;
 
   constructor(
@@ -832,7 +832,7 @@ class SharedElementController {
     this.host.shared?.report(this.args.name, this.host.node, box);
     this.layer.measure(this.host.layoutBox());
     if (this.geometryTarget !== null) {
-      // The frame after the geometry override landed: the element is
+      // The layout after the geometry override landed: the element is
       // genuinely laid out at the departing element's box now, so the
       // transform that was standing in for it comes off. Both draw the
       // same rectangle, so there is nothing to see at the changeover.
@@ -880,14 +880,17 @@ class SharedElementController {
     this.layer.snapTo(flip);
     this.takeOver();
     if (this.args.morph === 'geometry') {
-      // A geometry morph cannot land until the next frame, because it
-      // writes `left`/`top`/`width`/`height` and this frame's layout has
-      // already run. The transform above is what covers that frame: it
-      // draws the element at exactly the box the geometry is about to
-      // give it, and comes off as soon as it has. Hiding the element for
-      // that frame instead — which is what this did first — is a frame
-      // with neither the departing element nor the arriving one on
-      // screen, and it reads as the page flashing through.
+      // A geometry morph writes `left`/`top`/`width`/`height`, and this
+      // frame's layout has already run. The runtime lays out again
+      // before it paints when a layout listener changes layout, so the
+      // geometry lands on this same frame and the transform above comes
+      // straight off again. It stays for a host that does not, where it
+      // covers the frame until the geometry has landed: it draws the
+      // element at exactly the box the geometry is about to give it.
+      // Hiding the element for that frame instead — which is what this
+      // did first — is a frame with neither the departing element nor
+      // the arriving one on screen, and it reads as the page flashing
+      // through.
       this.morphGeometry(from, box, timing);
       return;
     }

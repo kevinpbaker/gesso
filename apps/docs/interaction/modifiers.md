@@ -206,7 +206,11 @@ not moved.
 
 `onLayout` fires after any frame that moved the node's box, which
 includes a scroll, because a scroll moves everything under the
-scroller. Register it only while it is needed. A tooltip on every one of
+scroller. It fires after the frame's layout and before it paints, and a
+listener may change layout from it: the runtime lays out again before
+painting, up to a bound, so what the listener wrote is on screen on the
+same frame. See
+[listeners that change layout](/layout/responsive#listeners-that-change-layout). Register it only while it is needed. A tooltip on every one of
 ten thousand table cells that registered eagerly would be ten thousand
 listeners walked per scrolled frame.
 

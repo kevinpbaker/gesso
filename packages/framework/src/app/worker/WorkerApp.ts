@@ -787,6 +787,7 @@ export class WorkerApp {
         nodes: message.nodes,
         measured: message.measured,
         relayoutRoots: message.relayoutRoots,
+        layoutPasses: message.layoutPasses,
         at: message.at,
         inputLatencyMs: message.inputLatencyMs,
         phases: message.phases,
