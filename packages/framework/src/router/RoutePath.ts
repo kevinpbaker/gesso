@@ -160,9 +160,23 @@ export function parseUrl(url: string): ParsedUrl {
 
 /** Joins a path and a query back into the url the history stores. */
 export function formatUrl(path: string, query: Readonly<Record<string, string>> = {}): string {
-  const pairs = Object.entries(query).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+  const pairs = Object.entries(query).map(([key, value]) => `${encodeQueryPart(key)}=${encodeQueryPart(value)}`);
   const normalized = `/${pathSegments(path).join('/')}`;
   return pairs.length === 0 ? normalized : `${normalized}?${pairs.join('&')}`;
+}
+
+/**
+ * Encodes a query key or value, leaving the characters a query may hold
+ * as they are (`,` `:` `@` `/`), so a list of values reads as one:
+ * `status=todo,done`, not `status=todo%2Cdone`. What would change how
+ * the query parses (`&`, `=`, `+`, `#`) is still encoded.
+ */
+function encodeQueryPart(text: string): string {
+  return encodeURIComponent(text)
+    .replace(/%2C/gi, ',')
+    .replace(/%3A/gi, ':')
+    .replace(/%40/gi, '@')
+    .replace(/%2F/gi, '/');
 }
 
 function splitOnce(text: string, separator: string): [string, string] {
