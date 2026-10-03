@@ -52,6 +52,13 @@ focus. Without that rule an application with `n` for "new note" becomes
 an application you cannot type the letter n into, which is the failure
 every home-grown key handler eventually ships.
 
+Nor are a field's editing keys. While a text field has focus it keeps
+undo and redo, select all, and moving and deleting by word or line,
+whatever the application binds: an application-wide `Mod+Z` would
+otherwise undo the app's last change instead of the typing. Other
+modified keys (`Mod+S`, `Mod+K`) still reach the registry, and so does
+Enter in a single-line field.
+
 ## Mod
 
 `Mod` matches **either** Control or Command. The framework runs in a
