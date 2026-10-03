@@ -71,6 +71,17 @@ function normalizeChunkName(name: string): string {
   return name.replace(/-[A-Za-z0-9_-]{8}(\.d\.ts)$/, '$1');
 }
 
+/**
+ * Drops the same hash from a module specifier that names a chunk.
+ *
+ * `from "./index-rY6tlBAu.js"` → `from "./index.js"`, for the same
+ * reason: an entry's imports name its chunk, so without this every
+ * change anywhere in a package rewrote the entry's `from` lines too.
+ */
+function normalizeChunkSpecifier(from: string): string {
+  return from.replace(/-[A-Za-z0-9_-]{8}(\.js")$/, '$1');
+}
+
 /** A single- or double-letter local name the bundler generated. */
 const GENERATED_ALIAS = /^[A-Za-z_$][A-Za-z0-9_$]{0,2}$/;
 
@@ -83,7 +94,7 @@ const GENERATED_ALIAS = /^[A-Za-z_$][A-Za-z0-9_$]{0,2}$/;
  * `EditingState as EditingState$1` is kept, because it is part of what
  * the entry exposes.
  */
-function normalizeNameList(clause: string): string {
+function normalizeNameList(clause: string, keyword: string): string {
   const names = clause
     .split(',')
     .map(part => part.trim())
@@ -96,8 +107,12 @@ function normalizeNameList(clause: string): string {
       // Which side is the generated one depends on the direction: an
       // import reads `{ C as channel }` and an export of the same
       // declaration reads `{ accumulatedOffsetTo as Xt }`. Keep the side
-      // that does not look generated; when both do, keep the longer, so
-      // the choice is at least deterministic.
+      // that does not look generated. When both do, a short export such
+      // as `fr` against an alias such as `Mf`, keep the declaration's own
+      // name: the local side, which is the right of an import and the
+      // left of an export. Keeping either by length let the alias through
+      // whenever the two were the same length, and the alias changes
+      // letter with every build that adds an export.
       const left = match[1].trim();
       const right = match[2].trim();
       const leftGenerated = GENERATED_ALIAS.test(left);
@@ -109,7 +124,7 @@ function normalizeNameList(clause: string): string {
         return left;
       }
       if (leftGenerated && rightGenerated) {
-        return left.length > right.length ? left : right;
+        return keyword === 'import' ? right : left;
       }
       return part;
     })
@@ -128,7 +143,7 @@ function normalizeClauses(source: string): string {
   return source.replace(
     /^(import|export)\s*\{([^}]*)\}\s*(from\s*"[^"]*")?;$/gm,
     (_all, keyword: string, clause: string, from: string | undefined) =>
-      `${keyword} {\n${normalizeNameList(clause)}\n}${from === undefined ? '' : ` ${from}`};`
+      `${keyword} {\n${normalizeNameList(clause, keyword)}\n}${from === undefined ? '' : ` ${normalizeChunkSpecifier(from)}`};`
   );
 }
 
