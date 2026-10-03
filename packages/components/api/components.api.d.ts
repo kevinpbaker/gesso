@@ -542,6 +542,8 @@ interface ComboboxProps extends ControlLayoutProps {
   required?: boolean;
   disabled?: boolean;
   emptyText?: string;
+  onQueryChange?: (query: string) => void;
+  filter?: boolean;
   listHeight?: number;
   ref?: UiNodeRef;
 }
