@@ -4153,6 +4153,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private disposed;
   private readonly contentBox;
   private readonly paint;
+  private precise;
   private paintOwner;
   private cullX;
   private cullY;
