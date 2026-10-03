@@ -1622,7 +1622,8 @@ declare class EditableTextModel {
   private clampOffset;
   private touch;
 }
-type UiRole = 'button' | 'checkbox' | 'switch' | 'radio' | 'radiogroup' | 'slider' | 'spinbutton' | 'textbox' | 'searchbox' | 'combobox' | 'listbox' | 'option' | 'menu' | 'menubar' | 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' | 'tab' | 'tablist' | 'tabpanel' | 'link' | 'progressbar' | 'list' | 'listitem' | 'tree' | 'treeitem' | 'grid' | 'row' | 'columnheader' | 'rowheader' | 'cell' | 'group' | 'separator' | 'toolbar' | 'heading' | 'image' | 'paragraph' | 'dialog' | 'alertdialog' | 'tooltip' | 'alert' | 'status' | 'banner' | 'navigation' | 'main' | 'region' | 'form' | 'search' | 'contentinfo';
+type UiRole = 'button' | 'checkbox' | 'switch' | 'radio' | 'radiogroup' | 'slider' | 'spinbutton' | 'textbox' | 'searchbox' | 'combobox' | 'listbox' | 'option' | 'menu' | 'menubar' | 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' | 'tab' | 'tablist' | 'tabpanel' | 'link' | 'progressbar' | 'list' | 'listitem' | 'tree' | 'treeitem' | 'grid' | 'row' | 'columnheader' | 'rowheader' | 'cell' |
+'gridcell' | 'group' | 'separator' | 'toolbar' | 'heading' | 'image' | 'paragraph' | 'dialog' | 'alertdialog' | 'tooltip' | 'alert' | 'status' | 'banner' | 'navigation' | 'main' | 'region' | 'form' | 'search' | 'contentinfo';
 type UiLiveRegion = 'polite' | 'assertive';
 declare const UI_ROLES: readonly UiRole[];
 declare function isUiRole(value: unknown): value is UiRole;
@@ -6883,7 +6884,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BZvGxlv_.js";
+} from "./index-gQuMMlyl.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7815,7 +7816,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BZvGxlv_.js";
+} from "./index-gQuMMlyl.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
