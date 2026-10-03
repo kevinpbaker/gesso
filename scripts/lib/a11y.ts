@@ -140,6 +140,15 @@ export async function runA11yChecks(run: A11yRun): Promise<string[]> {
     // once per report.
     for (const name of new Set(CHECKS.map(check => check.app))) {
       const app = config.apps[name]!;
+      // A port something else already serves would answer the readiness
+      // probe below, and the check would read a stranger's app.
+      const taken = await fetch(`http://localhost:${app.port}/`).then(
+        () => true,
+        () => false
+      );
+      if (taken) {
+        throw new Error(`Port ${app.port}, which ${name} is checked on, is already in use. Free it or give ${name} another.`);
+      }
       servers.push(spawn('npx', ['vite', app.root, '--port', String(app.port), '--strictPort'], { stdio: 'ignore' }));
       await waitFor(
         `Vite to serve ${name}`,
