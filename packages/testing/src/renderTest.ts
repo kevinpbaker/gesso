@@ -105,6 +105,11 @@ export interface RenderTestOptions extends Omit<Partial<GessoRuntimeOptions>, 'r
   autoFrame?: boolean;
   /** Runs after the runtime is built and before it starts. */
   onCreate?: (runtime: GessoRuntime) => void;
+  /**
+   * Let a frame that throws be abandoned, as it is in an application,
+   * rather than failing the test with the error. Default false.
+   */
+  allowFrameErrors?: boolean;
 }
 
 const DEFAULT_WIDTH = 800;
@@ -137,7 +142,7 @@ const DEFAULT_MAX_FRAMES = 100;
  *    is built, laid out and described before the first query.
  */
 export function renderTest(root: FrameworkChild, options: RenderTestOptions = {}): Rendered {
-  const { autoFrame = true, onCreate, ...runtimeOptions } = options;
+  const { autoFrame = true, onCreate, allowFrameErrors = false, ...runtimeOptions } = options;
   const context = new RecordingCanvasContext();
   const canvas: CanvasHost = new FakeCanvasHost(context);
   const width = runtimeOptions.width ?? DEFAULT_WIDTH;
@@ -158,6 +163,15 @@ export function renderTest(root: FrameworkChild, options: RenderTestOptions = {}
     clock: callback => (clock = new UiManualFrameClock(callback))
   });
   runtime.onFrame(metrics => frames.push(metrics));
+  // An application abandons a frame that throws and keeps drawing, which
+  // in a test is a pass on a frame that never ran. The error is thrown
+  // from the `frame()` that ran it instead.
+  let thrown: string | null = null;
+  if (!allowFrameErrors) {
+    runtime.onFrameError((message, stack) => {
+      thrown ??= stack ?? message;
+    });
+  }
   onCreate?.(runtime);
   runtime.start();
 
@@ -166,6 +180,11 @@ export function renderTest(root: FrameworkChild, options: RenderTestOptions = {}
     now = time ?? now + 16;
     if (clock.isPending) {
       clock.tick(now);
+    }
+    if (thrown !== null) {
+      const error = thrown;
+      thrown = null;
+      throw new Error(`A frame threw and was abandoned:\n${error}`);
     }
   };
 

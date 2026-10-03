@@ -32,7 +32,8 @@ Four imports and one call.
 <<< @/src/examples/TestingExample.spec.ts#mount
 
 `renderTest` takes the same options as the runtime, minus the three it
-decides itself, plus `autoFrame` and an `onCreate` hook. Those three are
+decides itself, plus `autoFrame`, `allowFrameErrors` and an `onCreate`
+hook. Those three are
 decided rather than left to the caller because getting any of them wrong
 makes a test that passes for the wrong reason:
 
@@ -46,6 +47,12 @@ makes a test that passes for the wrong reason:
   would make a heading and its caption the same size.
 - **A first frame has already run** when the call returns, so the tree
   is built, laid out and described before the first query.
+- **A frame that throws fails the test.** An application abandons such a
+  frame and keeps drawing, so the user sees the last good picture; a
+  test that did the same would pass on a frame that never ran. The
+  error is thrown from the `frame()` or `settle()` that ran the frame.
+  Pass `allowFrameErrors: true` for a test about that recovery, and
+  listen with `runtime.onFrameError`.
 
 Pass `textMeasurer` if you want different metrics, and `autoFrame:
 false` if the spec needs to be holding the result when the first frame

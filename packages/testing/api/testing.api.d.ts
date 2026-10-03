@@ -123,6 +123,7 @@ type Rendered = RenderedBase & Queries;
 interface RenderTestOptions extends Omit<Partial<GessoRuntimeOptions>, 'root' | 'canvas' | 'clock'> {
   autoFrame?: boolean;
   onCreate?: (runtime: GessoRuntime) => void;
+  allowFrameErrors?: boolean;
 }
 declare function renderTest(root: FrameworkChild, options?: RenderTestOptions): Rendered;
 declare function formatTree(runtime: GessoRuntime, root: UiNode): string;
