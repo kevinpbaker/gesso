@@ -2,7 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { Column, ScrollView, Text } from '../composition/UiComponents';
+import { Box, Column, Row, ScrollView, Text } from '../composition/UiComponents';
 import { UiGraphBuilder } from '../composition/UiGraphBuilder';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
@@ -12,6 +12,7 @@ import { UiManualFrameClock } from '../scheduler/UiFrameClock';
 import { UiScheduler } from '../scheduler/UiScheduler';
 import { LayoutEngine } from './LayoutEngine';
 import { Constraints } from './LayoutTypes';
+import { percent } from './UiLength';
 
 describe('LayoutEngine invalidation', () => {
   function createHarness(constraints: Constraints = Constraints.loose(400, 400)) {
@@ -217,6 +218,52 @@ describe('LayoutEngine invalidation', () => {
       h.clock.tick(0);
       expect(h.engine.recordFor(text)!.x).toBe(30);
     });
+  });
+
+  describe('a size taken from content', () => {
+    /**
+     * A column whose last item grows from its content, holding a page
+     * that is 100% of it and a list that grows to fill the page: the
+     * shape of an application shell. The item's flex base is the page's
+     * content, measured while the 100% has nothing to resolve against,
+     * so content arriving in the list changes how the column shares its
+     * height. Laid out again from the root, the bar above has shrunk;
+     * the frame has to agree, however deep the change was.
+     */
+    function shell(rows: BehaviorSubject<number>, list: 'column' | 'scroll') {
+      const content = Box({ height: rows, flexShrink: 0 });
+      return Column(
+        { height: 300, x: 'stretch' },
+        Row({ height: 48 }, Box({ width: 10, height: 26 })),
+        Box(
+          { flexGrow: 1, minHeight: 0, x: 'stretch', y: 'stretch' },
+          Column(
+            { height: percent(100) },
+            list === 'scroll'
+              ? ScrollView({ flexGrow: 1 }, Column({ height: percent(100) }, content))
+              : Column({ flexGrow: 1 }, content)
+          )
+        )
+      );
+    }
+
+    for (const list of ['column', 'scroll'] as const) {
+      it(`re-measures the flex base when content arrives below a boundary (${list})`, () => {
+        const h = createHarness(Constraints.tight(400, 300));
+        const rows = new BehaviorSubject(10);
+        h.root = h.builder.build(shell(rows, list));
+        firstFrame(h);
+        const bar = h.root.firstChild!;
+        expect(h.engine.recordFor(bar)!.height).toBe(48);
+
+        rows.next(2000);
+        h.clock.tick(0);
+        const fresh = new LayoutEngine();
+        fresh.layout(h.root, Constraints.tight(400, 300));
+        expect(fresh.recordFor(bar)!.height).toBe(26);
+        expect(h.engine.recordFor(bar)!.height).toBe(26);
+      });
+    }
   });
 
   it('marks the parent dirty when children change via build', () => {

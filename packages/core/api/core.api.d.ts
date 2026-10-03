@@ -3486,6 +3486,7 @@ declare class LayoutEngine {
   private minContentHeightContribution;
   private measureStack;
   private stackQuestion;
+  private scrollContentMatters;
   private measureScroll;
   private measureLeaf;
   private measureCustom;
@@ -6891,7 +6892,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-UPXlgUAB.js";
+} from "./index-Bh8X7WaZ.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7823,7 +7824,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-UPXlgUAB.js";
+} from "./index-Bh8X7WaZ.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
