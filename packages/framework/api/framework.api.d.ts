@@ -467,6 +467,7 @@ import {
   UI_SEMANTIC_STATES,
   UiAnimation,
   UiChild,
+  UiContrast,
   UiDurationToken,
   UiEasing,
   UiEasingToken,
@@ -989,6 +990,7 @@ interface ShellStorageResult {
 declare class ShellService {
   private handler;
   private readonly scheme;
+  private readonly contrastState;
   private readonly insets;
   private readonly isFullscreen;
   private readonly popups;
@@ -998,11 +1000,13 @@ declare class ShellService {
   private readonly files;
   private nextFileId;
   readonly colorScheme: ReadableCell<ColorScheme>;
+  readonly contrast: ReadableCell<UiContrast>;
   get currentColorScheme(): ColorScheme;
   readonly viewportInsets: ReadableCell<UiInsets>;
   get currentViewportInsets(): UiInsets;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
+  applyContrast(contrast: UiContrast): void;
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): void;
   openUrl(url: string): void;
@@ -1475,6 +1479,7 @@ declare class GessoRuntime {
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
+  setContrast(contrast: UiContrast): void;
   setViewportInsets(insets: UiInsets): void;
   private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
@@ -1693,6 +1698,9 @@ type ShellToRuntimeMessage = {
 {
   type: 'colorScheme';
   scheme: ColorScheme;
+} | {
+  type: 'contrast';
+  contrast: UiContrast;
 } |
 {
   type: 'viewportInsets';
@@ -2159,6 +2167,7 @@ declare class GessoApp {
   private detachFullscreen;
   private fullscreen;
   private detachReducedMotion;
+  private detachContrast;
   private detachColorScheme;
   private detachViewportInsets;
   private colorSchemePreference;
@@ -3185,7 +3194,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-CM-8dpER.js";
+} from "./index-Br9Xv08_.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3907,7 +3916,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CM-8dpER.js";
+} from "../index-Br9Xv08_.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

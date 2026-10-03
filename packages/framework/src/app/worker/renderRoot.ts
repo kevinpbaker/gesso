@@ -494,6 +494,9 @@ export class RenderWorkerApp {
       case 'colorScheme':
         runtime.setColorScheme(message.scheme);
         break;
+      case 'contrast':
+        runtime.setContrast(message.contrast);
+        break;
       case 'viewportInsets':
         runtime.setViewportInsets(message.insets);
         break;

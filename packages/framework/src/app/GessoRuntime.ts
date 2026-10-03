@@ -112,7 +112,8 @@ import {
   UiScheduler,
   UiTimerFrameClock,
   type UiFrame,
-  type UiFrameClockFactory
+  type UiFrameClockFactory,
+  type UiContrast
 } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
@@ -1430,6 +1431,11 @@ export class GessoRuntime {
    */
   setColorScheme(scheme: ColorScheme): void {
     this.services.get(ShellService).applyColorScheme(scheme);
+  }
+
+  /** The contrast the platform asks for, passed straight to `ShellService`; see `ShellService.contrast`. */
+  setContrast(contrast: UiContrast): void {
+    this.services.get(ShellService).applyContrast(contrast);
   }
 
   /**

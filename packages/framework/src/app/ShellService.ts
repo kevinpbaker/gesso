@@ -1,6 +1,7 @@
 import { insetsEqual, noInsets, type UiInsets } from 'gesso-core';
 
 import { internalState } from '../InternalState';
+import type { UiContrast } from 'gesso-core';
 import type { ColorScheme } from './colorScheme';
 import type { ReadableCell } from '../Input';
 
@@ -149,6 +150,7 @@ export interface ShellStorageResult {
 export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
+  private readonly contrastState = internalState<UiContrast>('standard');
   private readonly insets = internalState<UiInsets>(noInsets);
   private readonly isFullscreen = internalState<boolean>(false);
   /** Popups asked for and not yet answered, by the id sent with each. */
@@ -190,6 +192,19 @@ export class ShellService {
    * read it beside a channel's view; its setter stays private here.
    */
   readonly colorScheme: ReadableCell<ColorScheme> = this.scheme;
+
+  /**
+   * The contrast the platform is asking for: `high` when the person has
+   * turned up contrast or turned on a contrast theme, `standard`
+   * otherwise. Reported by the shell like `colorScheme`, and as with it,
+   * what it means is the application's: `withContrast(theme, contrast)`
+   * is the theme that answers it.
+   *
+   *   const theme = combineLatest([shell.colorScheme, shell.contrast]).pipe(
+   *     map(([scheme, contrast]) => withContrast(scheme === 'dark' ? darkTheme : lightTheme, contrast))
+   *   );
+   */
+  readonly contrast: ReadableCell<UiContrast> = this.contrastState;
 
   /** The current appearance, for code that needs it without subscribing. */
   get currentColorScheme(): ColorScheme {
@@ -234,6 +249,13 @@ export class ShellService {
   applyColorScheme(scheme: ColorScheme): void {
     if (this.scheme.value !== scheme) {
       this.scheme.value = scheme;
+    }
+  }
+
+  /** Called by the runtime when the shell reports the contrast; not for applications. */
+  applyContrast(contrast: UiContrast): void {
+    if (this.contrastState.value !== contrast) {
+      this.contrastState.value = contrast;
     }
   }
 

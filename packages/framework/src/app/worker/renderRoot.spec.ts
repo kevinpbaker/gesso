@@ -463,6 +463,24 @@ describe('RenderWorkerApp colour scheme', () => {
   });
 });
 
+describe('RenderWorkerApp contrast', () => {
+  it('carries the contrast the shell reports through to a component', async () => {
+    const seen: string[] = [];
+
+    function Contrast(_inputs: Inputs<{}>, ctx: ComponentContext) {
+      ctx.inject(ShellService).contrast.subscribe(contrast => seen.push(contrast));
+      return Text({ text: 'contrast' });
+    }
+
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(Contrast), host);
+    send(initMessage(createMockCanvas()));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+    send({ type: 'contrast', contrast: 'high' });
+    expect(seen).toEqual(['standard', 'high']);
+  });
+});
+
 describe('RenderWorkerApp viewport insets', () => {
   it('publishes what the shell reports into the registry the root provides', async () => {
     const registry = new UiInsetRegistry();
