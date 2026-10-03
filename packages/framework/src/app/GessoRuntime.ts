@@ -2539,8 +2539,9 @@ export class GessoRuntime {
       }
       owners.add(owner);
     }
-    // One walk covers an owner inside another.
-    for (const owner of [...owners]) {
+    // One walk covers an owner inside another. Deleting the entry being
+    // visited is safe mid-iteration; a Set only skips what is not yet reached.
+    for (const owner of owners) {
       for (let above = owner.parent; above !== null; above = above.parent) {
         if (owners.has(above)) {
           owners.delete(owner);
