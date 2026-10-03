@@ -489,6 +489,37 @@ interface SelectProps extends ControlLayoutProps {
   labelHidden?: boolean;
 }
 declare function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
+interface ComboboxOption {
+  readonly value: string;
+  readonly label: string;
+  readonly detail?: string;
+  readonly keywords?: readonly string[];
+  readonly disabled?: boolean;
+}
+interface ComboboxProps extends ControlLayoutProps {
+  options: readonly ComboboxOption[];
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
+  multiple?: boolean;
+  values?: readonly string[];
+  defaultValues?: readonly string[];
+  onValuesChange?: (values: readonly string[]) => void;
+  label?: string;
+  labelHidden?: boolean;
+  placeholder?: string;
+  description?: string;
+  error?: string;
+  invalid?: boolean;
+  required?: boolean;
+  disabled?: boolean;
+  emptyText?: string;
+  listHeight?: number;
+  ref?: UiNodeRef;
+}
+declare function comboboxRank(option: ComboboxOption, query: string): number;
+declare function filterCombobox(options: readonly ComboboxOption[], query: string): ComboboxOption[];
+declare function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): UiChild;
 declare function tooltipContent(text: string): UiChild;
 interface TooltipProps {
   text?: string;
@@ -865,6 +896,8 @@ export {
   clockTime,
   ColorPalette,
   ColorPicker,
+  Combobox,
+  comboboxRank,
   controlDescription,
   controlled,
   controlMessage,
@@ -875,6 +908,7 @@ export {
   email,
   field,
   fieldArray,
+  filterCombobox,
   FindBar,
   followTransport,
   form,
@@ -950,6 +984,8 @@ export {
   type ChipVariant,
   type ColorPaletteProps,
   type ColorPickerProps,
+  type ComboboxOption,
+  type ComboboxProps,
   type ControlFocus,
   type ControlLayoutProps,
   type ControlledValue,

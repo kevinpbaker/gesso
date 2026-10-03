@@ -53,6 +53,7 @@ export { MenuBar, type MenuBarProps } from './MenuBar';
 export { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep } from './menuBarModel';
 export type { MenuBarContext, MenuBarEntry, MenuBarMenu, MenuBarState, MenuBarStep } from './menuBarModel';
 export { Select, type SelectProps, type SelectOption } from './Select';
+export { Combobox, comboboxRank, filterCombobox, type ComboboxProps, type ComboboxOption } from './Combobox';
 export {
   Tooltip,
   tooltip,

@@ -156,6 +156,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Dialog', link: '/components/dialog' },
       { text: 'Menu', link: '/components/menu' },
       { text: 'Select', link: '/components/select' },
+      { text: 'Combobox', link: '/components/combobox' },
       { text: 'Tooltip', link: '/components/tooltip' },
       { text: 'Toast', link: '/components/toast' },
       { text: 'SplitPane', link: '/components/split-pane' },

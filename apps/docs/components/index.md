@@ -143,7 +143,7 @@ The pages, by what they are for:
   [Chip](/components/chip), [Switch](/components/switch),
   [RadioGroup](/components/radio-group),
   [SegmentedControl](/components/segmented-control),
-  [Select](/components/select).
+  [Select](/components/select), [Combobox](/components/combobox).
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
   [Slider](/components/slider), [NumberInput](/components/number-input).
 - **Showing data:** [DataTable](/components/data-table),
