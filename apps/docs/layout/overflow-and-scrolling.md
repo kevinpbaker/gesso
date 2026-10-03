@@ -57,7 +57,9 @@ squeezed into 180 pixels between them, and there is nothing to scroll:
 
 Either way the container needs a definite size on the scrolling axis.
 A `<scrollview>` given a loose bound takes its content's height, and
-content that fits its container has nothing to scroll. A `height`, or
+content that fits its container has nothing to scroll. Its own
+`maxHeight` is such a bound: a list in a popup with `maxHeight={300}` is
+as tall as its rows until they reach 300, and scrolls after that. A `height`, or
 `flex={1}` inside a parent that has one, is what gives it a viewport.
 
 A scroll container scrolls its main axis, which is vertical unless
