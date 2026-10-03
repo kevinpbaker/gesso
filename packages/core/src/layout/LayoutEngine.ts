@@ -2614,8 +2614,28 @@ export class LayoutEngine {
 
     const explicitWidth = this.lengthProp(node, 'width', savedBase.width);
     const explicitHeight = this.lengthProp(node, 'height', savedBase.height);
-    const width = explicitWidth ?? (content.hasBoundedWidth() ? content.maxWidth : rec.contentWidth);
-    const height = explicitHeight ?? (content.hasBoundedHeight() ? content.maxHeight : rec.contentHeight);
+    // Along the axis it scrolls, a scroller with no size of its own is
+    // its content's size, within the bounds it was given: a loose bound,
+    // such as its own maxHeight, caps it rather than sizing it, so a list
+    // of two items under a 400-pixel cap is two items tall. A tight bound
+    // (a flexed or stretched size) is still the size. Across, it fills a
+    // bounded width as a block does.
+    const scrolled = (contentSize: number, min: number, max: number): number =>
+      Math.min(max, Math.max(min, contentSize));
+    const width =
+      explicitWidth ??
+      (!vertical
+        ? scrolled(rec.contentWidth, content.minWidth, content.maxWidth)
+        : content.hasBoundedWidth()
+          ? content.maxWidth
+          : rec.contentWidth);
+    const height =
+      explicitHeight ??
+      (vertical
+        ? scrolled(rec.contentHeight, content.minHeight, content.maxHeight)
+        : content.hasBoundedHeight()
+          ? content.maxHeight
+          : rec.contentHeight);
     return { width, height };
   }
 

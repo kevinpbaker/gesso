@@ -150,4 +150,38 @@ describe('LayoutEngine scrolling', () => {
       expect(harness.engine.contentWindow(scroll)).toEqual({ x: 0, y: 0, width: 200, height: 100 });
     });
   });
+
+  /**
+   * A list in a popup under a cap: a scroll view with a maxHeight and no
+   * height of its own was always the cap, so a list of one item was a
+   * 400-pixel panel of empty space. It's its content now, up to the cap,
+   * and still the size a parent makes it when that size is tight.
+   */
+  describe('with no size of its own', () => {
+    function capped(rows: number, parentHeight: number, grow: boolean) {
+      const harness = new LayoutHarness();
+      const column = harness.createNode('column', UiNodeType.Column);
+      const scroll = harness.createNode('scroll', UiNodeType.ScrollView);
+      scroll.setProperty('maxHeight', 300);
+      if (grow) scroll.setProperty('flexGrow', 1);
+      for (let n = 0; n < rows; n++) {
+        const row = harness.createNode(`row${n}`, UiNodeType.Box);
+        row.setProperty('height', 30);
+        harness.append(scroll, row);
+      }
+      harness.append(column, scroll);
+      harness.layout(column, Constraints.tight(200, parentHeight));
+      return harness.box(scroll).height;
+    }
+
+    it('is as tall as its content, up to its cap', () => {
+      expect(capped(1, 800, false)).toBe(30);
+      expect(capped(5, 800, false)).toBe(150);
+      expect(capped(20, 800, false)).toBe(300);
+    });
+
+    it('is the size a parent gives it, when that size is tight', () => {
+      expect(capped(1, 200, true)).toBe(200);
+    });
+  });
 });
