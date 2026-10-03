@@ -76,6 +76,17 @@ export interface ButtonProps extends ControlLayoutProps {
    * refuses presses without looking disabled.
    */
   busy?: boolean;
+  /**
+   * Whether Tab stops on it. Default true.
+   *
+   * False keeps it a button that a press, a screen reader and a click
+   * all reach, and leaves it out of the Tab order: for a button that is
+   * the pointer's way to something the keyboard already has a key for,
+   * such as the Previous and Next beside a page's j and k, where two
+   * more stops would stand between the keyboard and what the page is
+   * about.
+   */
+  tabStop?: boolean;
   onClick?: () => void;
   /** Content instead of the label's text; `label` stays the name. */
   children?: UiChild;
@@ -86,6 +97,7 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
   const description = input(inputs.description, '');
   const disabled = input(inputs.disabled, false);
   const busy = input(inputs.busy, false);
+  const tabStop = input(inputs.tabStop, true);
   const focus = trackFocus(ctx, inputs.ref);
 
   // Read once, as `Divider` reads its direction and `Card` its
@@ -131,6 +143,7 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
       // clickable thing says so under the pointer.
       cursor: 'pointer',
       disabled,
+      tabStop,
       label,
       description,
       role: 'button',

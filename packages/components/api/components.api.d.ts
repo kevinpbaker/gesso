@@ -101,6 +101,7 @@ interface ButtonProps extends ControlLayoutProps {
   size?: ButtonSize;
   disabled?: boolean;
   busy?: boolean;
+  tabStop?: boolean;
   onClick?: () => void;
   children?: UiChild;
 }

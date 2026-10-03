@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Text, type UiNode } from 'gesso-core';
+import { Row, Text, type UiNode } from 'gesso-core';
 import { Button } from './Button';
 
 function mount(root: Parameters<typeof renderTest>[0]) {
@@ -47,6 +47,26 @@ describe('Button', () => {
     ui.fireEvent.click(ui.getByRole('button'));
     expect(presses).toEqual([]);
     expect(ui.getByRole('button')).toHaveSemantics({ states: ['busy'] });
+  });
+
+  it('can be left out of the Tab order, and still be pressed and focused', () => {
+    const presses: number[] = [];
+    const ui = mount(
+      Row(
+        { gap: 8 },
+        createComponent(Button, { label: 'Before' }),
+        createComponent(Button, { label: 'Next issue', tabStop: false, onClick: () => presses.push(1) }),
+        createComponent(Button, { label: 'After' })
+      )
+    );
+    ui.fireEvent.focus(ui.getByRole('button', { name: 'Before' }));
+    ui.fireEvent.tab();
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('button', { name: 'After' }));
+    // A button still: pressed, and focused when something asks.
+    const skipped = ui.getByRole('button', { name: 'Next issue' });
+    ui.fireEvent.click(skipped);
+    expect(presses).toEqual([1]);
+    expect(ui.fireEvent.focus(skipped)).toBe(true);
   });
 
   it('names a palette entry rather than a colour, on every axis', () => {
