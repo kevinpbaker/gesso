@@ -2403,6 +2403,7 @@ declare class ScrollService {
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
   readonly trapped: InternalState<boolean>;
+  readonly focusVisible: InternalState<boolean>;
   private manager;
   private detach;
   private queued;
@@ -3078,7 +3079,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-eK9SB_3A.js";
+} from "./index-uLkPzQNC.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3702,7 +3703,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-eK9SB_3A.js";
+} from "../index-uLkPzQNC.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
