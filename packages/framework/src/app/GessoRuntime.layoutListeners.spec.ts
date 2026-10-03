@@ -1,7 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Column, Responsive, ScrollView, autoFocus, breakpoint, defineModifier, percent, type UiChild, type UiNode } from 'gesso-core';
+import {
+  Box,
+  Column,
+  Responsive,
+  ScrollView,
+  autoFocus,
+  breakpoint,
+  defineModifier,
+  percent,
+  type UiChild,
+  type UiNode
+} from 'gesso-core';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 
 /**
@@ -66,7 +77,10 @@ describe('a layout listener that changes layout', () => {
 
   it('is painted with the new band on the frame a resize crosses into it', () => {
     const mounted = mountRuntime(
-      Column({ width: percent(100), padding: 16, modifiers: [gutter()] }, Box({ label: 'inner', width: 10, height: 10 })),
+      Column(
+        { width: percent(100), padding: 16, modifiers: [gutter()] },
+        Box({ label: 'inner', width: 10, height: 10 })
+      ),
       { width: 300, height: 300 }
     );
     mounted.frame();
