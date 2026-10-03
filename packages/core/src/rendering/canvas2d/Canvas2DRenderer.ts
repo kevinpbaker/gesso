@@ -32,6 +32,7 @@ import { decorationColor, decorationRect, hasDecorationPhase, type DecorationSha
 import { ScaledImageCache } from '../ScaledImageCache';
 import { paintPictures } from '../PaintPicture';
 import type { PaintContext2D } from '../PaintTarget';
+import { PreciseContext } from './PreciseContext';
 import { offscreenLayerCanvas, placeLayer, ScrollLayerCache } from './ScrollLayers';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
 
@@ -110,6 +111,8 @@ export class Canvas2DRenderer implements UiRenderer {
   /** Scratch for the padded box text is drawn in; reused across nodes. */
   private readonly contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
   private readonly paint = createPaintState();
+  /** The frame's context, wrapped so a huge scroll offset keeps its precision; reset each frame. */
+  private precise: PreciseContext | null = null;
   /**
    * Whose style the shared paint scratch currently holds.
    *
@@ -208,7 +211,11 @@ export class Canvas2DRenderer implements UiRenderer {
   }
 
   render(root: UiNode, context: RenderContext): void {
-    const ctx = this.surface.getContext2D();
+    // Through a context that holds a scroll offset of millions of pixels
+    // in doubles, so a row at the bottom of a five-million-row grid lands
+    // on its pixel; see `PreciseContext`.
+    const raw = this.surface.getContext2D();
+    const ctx = this.precise === null ? (this.precise = new PreciseContext(raw)) : this.precise.reset(raw);
     this.beginFrame(ctx);
     this.cullStack.length = 0;
     this.cullX = 0;
@@ -949,7 +956,9 @@ export class Canvas2DRenderer implements UiRenderer {
     rec: LayoutRecord,
     context: RenderContext
   ): void {
-    const lctx = layer.frontContext;
+    // A layer of its own: a nested layer is painted while this one is
+    // still in the middle of its walk, so they cannot share a wrapper.
+    const lctx = new PreciseContext(layer.frontContext);
     lctx.save();
     if (strip !== null) {
       lctx.setTransform(1, 0, 0, 1, 0, 0);

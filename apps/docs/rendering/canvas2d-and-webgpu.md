@@ -158,6 +158,15 @@ looking for a difference will otherwise assume one:
 - **Neither redraws partially.** Both clear and redraw the whole scene
   every frame, and both cull subtrees outside the visible region first,
   so cost follows what is on screen rather than what exists.
+- **Both place a row a hundred million pixels down on its pixel.** The
+  GPU keeps positions in 32-bit floats and so does Skia, under Canvas2D,
+  and either alone would round a row of a five-million-row list to the
+  nearest eight pixels. WebGPU applies the scroll offset in JavaScript
+  before a position becomes a float. Canvas2D holds any translation of
+  a million pixels or more in a double and adds it to each coordinate
+  before the call reaches the canvas, so what the canvas is given is the
+  small number the two cancel to. Below a million pixels it changes
+  nothing.
 
 ## What parity means, and how it is checked
 
