@@ -243,7 +243,10 @@ A bare scroll container does not answer the arrow keys. What scrolls
 from the keyboard is focus: moving focus to a node that is off screen
 scrolls every scroll container above it just enough to bring the node
 inside, eight pixels from the nearest edge, and does nothing when it is
-already visible. Clicking a control does not reveal it, because a
+already visible. A node bigger than its container can't be shown whole,
+so it's brought in by its start, unless it already fills the view, as
+a browser's `focus()` does: a page that opens with its first section
+focused stays at its top. Clicking a control does not reveal it, because a
 person can already see what they pressed and moving it would pull it
 out from under the pointer resting on it.
 

@@ -106,11 +106,12 @@ describe('scrollPosition', () => {
     expect(seen).toEqual([]);
 
     // The keyboard still reveals, which is the case the behaviour
-    // exists for.
+    // exists for: by its start, eight pixels clear, since all of it
+    // won't fit.
     mounted.runtime.input.focus.blur();
     mounted.runtime.input.focus.focusNext();
     drain(mounted);
-    expect(seen.map(at => at.y)).toEqual([190]);
+    expect(seen.map(at => at.y)).toEqual([82]);
   });
 
   it('reports the end of a scroll once, however many frames it took', () => {

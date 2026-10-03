@@ -323,6 +323,31 @@ interface FlexConfig {
  * container record; descendants keep content coordinates, so
  * scrolling never re-measures or re-places them.
  */
+/**
+ * How far a scroller moves along one axis to reveal `start`..`end` in a
+ * view of `size` from `view`: by the nearer edge, the least that shows
+ * all of it.
+ *
+ * A target bigger than the view can't be shown whole. It's aligned by
+ * its start, unless it already covers the view, which is CSSOM's
+ * `nearest`: moving it by its end, as the nearer-edge rule would,
+ * scrolled a page that opened with its first section focused to the
+ * page's bottom.
+ */
+function revealShift(start: number, end: number, view: number, size: number): number {
+  if (end - start > size) {
+    const covers = start <= view && end >= view + size;
+    return covers ? 0 : start - view;
+  }
+  if (start < view) {
+    return start - view;
+  }
+  if (end > view + size) {
+    return end - (view + size);
+  }
+  return 0;
+}
+
 export class LayoutEngine {
   private records = new Map<UiNode, LayoutRecord>();
   /**
@@ -1198,18 +1223,8 @@ export class LayoutEngine {
       const bottom = targetY + targetHeight - innerScrollY + padding;
       const viewLeft = container.x + container.scrollX;
       const viewTop = container.y + container.scrollY;
-      let scrollX = container.scrollX;
-      let scrollY = container.scrollY;
-      if (left < viewLeft) {
-        scrollX -= viewLeft - left;
-      } else if (right > viewLeft + container.width) {
-        scrollX += right - (viewLeft + container.width);
-      }
-      if (top < viewTop) {
-        scrollY -= viewTop - top;
-      } else if (bottom > viewTop + container.height) {
-        scrollY += bottom - (viewTop + container.height);
-      }
+      let scrollX = container.scrollX + revealShift(left, right, viewLeft, container.width);
+      let scrollY = container.scrollY + revealShift(top, bottom, viewTop, container.height);
       scrollX = this.clamp(scrollX, 0, Math.max(0, container.contentWidth - container.width));
       scrollY = this.clamp(scrollY, 0, Math.max(0, container.contentHeight - container.height));
       if (scrollX !== container.scrollX || scrollY !== container.scrollY) {
