@@ -78,6 +78,12 @@ describe('RoutePath', () => {
       expect(parseUrl('/mail/1#anchor').path).toBe('/mail/1');
     });
 
+    it('leaves a list of values readable, and keeps what would change the parse encoded', () => {
+      const url = formatUrl('/team/web/list', { status: 'todo,done', at: 'u1@x:y/z', q: 'a&b=c+d #e' });
+      expect(url).toBe('/team/web/list?status=todo,done&at=u1@x:y/z&q=a%26b%3Dc%2Bd%20%23e');
+      expect(parseUrl(url).query).toEqual({ status: 'todo,done', at: 'u1@x:y/z', q: 'a&b=c+d #e' });
+    });
+
     it('round-trips through formatUrl', () => {
       const { path, query } = parseUrl('/search?q=gesso');
       expect(formatUrl(path, query)).toBe('/search?q=gesso');

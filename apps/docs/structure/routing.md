@@ -107,6 +107,11 @@ silent no-op.
 `navigate` take `{ replace: true }` to overwrite the current history
 entry instead of pushing a new one.
 
+A match's `query` is the query decoded, as a record of strings, and
+`formatUrl(path, query)` writes one back. It encodes only what would
+change how the query parses, so a list of values joined by commas reads
+as written: `?status=todo,done`.
+
 ## What a route change does to the tree
 
 The outlet compares chains of route objects, not urls, and three
