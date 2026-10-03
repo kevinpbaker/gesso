@@ -2,7 +2,7 @@ import { BehaviorSubject, map } from 'rxjs';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { Box, Column, Row, ScrollView, Text } from '../composition/UiComponents';
+import { Box, Column, EditableText, Row, ScrollView, Text } from '../composition/UiComponents';
 import { UiGraphBuilder } from '../composition/UiGraphBuilder';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
@@ -217,6 +217,27 @@ describe('LayoutEngine invalidation', () => {
       marginLeft$.next(30);
       h.clock.tick(0);
       expect(h.engine.recordFor(text)!.x).toBe(30);
+    });
+  });
+
+  describe('scroll offsets', () => {
+    it("clamps the offsets of the fields a frame laid out, not every field's", () => {
+      // A document of fields: typing into one lays out that one, and a
+      // frame that clamped every field's text scroll did five thousand
+      // in a 5,000-line document for each key.
+      const h = createHarness(Constraints.tight(400, 4000));
+      const texts = Array.from({ length: 200 }, (_, i) => new BehaviorSubject(`Line ${i}`));
+      h.root = h.builder.build(
+        Column({ x: 'stretch' }, ...texts.map(text => EditableText({ value: text, fontSize: 10 })))
+      );
+      firstFrame(h);
+      const clamp = vi.spyOn(
+        h.engine as unknown as { applyScrollOffset(node: UiNode, field: boolean): void },
+        'applyScrollOffset'
+      );
+      texts[7]!.next('Line 7, edited');
+      h.clock.tick(0);
+      expect(clamp.mock.calls.length).toBeLessThan(5);
     });
   });
 

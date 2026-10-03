@@ -382,6 +382,14 @@ export class LayoutEngine {
    * no children to translate, so they are kept apart from `scrollNodes`.
    */
   private readonly textScrollNodes = new Set<UiNode>();
+  /**
+   * The editables whose text scroll needs clamping at the end of this
+   * pass: the ones measured in it, whose extent may have changed, and
+   * the ones whose offset was written. A field nothing touched keeps
+   * the offset it had; clamping every editable every frame cost a
+   * keystroke five thousand clamps in a 5,000-line document.
+   */
+  private readonly textScrollPending = new Set<UiNode>();
   /** Absolutely positioned nodes placed against an anchor node. */
   private readonly anchoredNodes = new Set<UiNode>();
   /** The anchor each of those nodes was last placed against. */
@@ -954,7 +962,12 @@ export class LayoutEngine {
           this.layoutVersion++;
         }
         this.record(node).transformDirty = true;
-        (node.type === UiNodeType.EditableText ? this.textScrollNodes : this.scrollNodes).add(node);
+        if (node.type === UiNodeType.EditableText) {
+          this.textScrollNodes.add(node);
+          this.textScrollPending.add(node);
+        } else {
+          this.scrollNodes.add(node);
+        }
         // An anchored node sits next to something that may just have
         // scrolled; it is re-placed, cheaply, once the frame settles.
         for (const anchored of this.anchoredNodes) {
@@ -1349,6 +1362,7 @@ export class LayoutEngine {
       this.liftedNodes.delete(current);
       this.scrollNodes.delete(current);
       this.textScrollNodes.delete(current);
+      this.textScrollPending.delete(current);
       this.anchoredNodes.delete(current);
       this.movedAnchored.delete(current);
       this.forgetAnchoring(current);
@@ -2773,6 +2787,7 @@ export class LayoutEngine {
         rec.contentWidth = width + paddingH;
         rec.contentHeight = paragraph.height + paddingV;
         this.textScrollNodes.add(node);
+        this.textScrollPending.add(node);
       }
       return { width: width + paddingH, height: paragraph.height + paddingV };
     }
@@ -3796,9 +3811,12 @@ export class LayoutEngine {
     }
     // A single-line field has no scrollbars, so nothing lingers after
     // it scrolls; any field keeps room for the caret past its text.
-    for (const node of this.textScrollNodes) {
-      this.applyScrollOffset(node, true);
+    for (const node of this.textScrollPending) {
+      if (this.textScrollNodes.has(node)) {
+        this.applyScrollOffset(node, true);
+      }
     }
+    this.textScrollPending.clear();
     // Last, so each reads an offset this pass has already settled.
     // A follower of a follower reads it as of wherever it came in this
     // loop, which is the order they were first laid out in.
