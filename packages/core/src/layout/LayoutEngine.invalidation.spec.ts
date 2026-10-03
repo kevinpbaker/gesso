@@ -220,6 +220,29 @@ describe('LayoutEngine invalidation', () => {
     });
   });
 
+  describe('paint extents', () => {
+    it('grows the extent of ancestors a frame did not place when a descendant moves past them', () => {
+      // The wrapper is 50 tall, and the badge inside it moves to 200: the
+      // frame lays out from the badge's container, so the wrapper and the
+      // root are never placed, and a renderer culling by their stale
+      // extents would drop the badge.
+      const h = createHarness(Constraints.tight(400, 400));
+      const top = new BehaviorSubject(10);
+      const badge = Box({ position: 'absolute', top, left: 10, width: 30, height: 30 });
+      h.root = h.builder.build(
+        Column({ x: 'stretch' }, Box({ height: 50, position: 'relative' }, Box({ width: 100, height: 40 }, badge)))
+      );
+      firstFrame(h);
+      const wrapper = h.root.firstChild!;
+      expect(h.engine.recordFor(wrapper)!.extentMaxY).toBe(50);
+      top.next(200);
+      h.clock.tick(0);
+      const extent = h.engine.recordFor(wrapper)!;
+      expect(extent.extentMaxY).toBeGreaterThanOrEqual(230);
+      expect(h.engine.recordFor(h.root)!.extentMaxY).toBeGreaterThanOrEqual(230);
+    });
+  });
+
   describe('scroll offsets', () => {
     it("clamps the offsets of the fields a frame laid out, not every field's", () => {
       // A document of fields: typing into one lays out that one, and a

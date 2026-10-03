@@ -324,6 +324,25 @@ interface FlexConfig {
  * scrolling never re-measures or re-places them.
  */
 /**
+ * Grows `into`'s extent to cover where `child` may paint: its box if it
+ * clips, its extent if not. True when it grew.
+ */
+function growExtent(into: LayoutRecord, child: LayoutRecord): boolean {
+  const minX = child.clips ? child.x : child.extentMinX;
+  const minY = child.clips ? child.y : child.extentMinY;
+  const maxX = child.clips ? child.x + child.width : child.extentMaxX;
+  const maxY = child.clips ? child.y + child.height : child.extentMaxY;
+  if (minX >= into.extentMinX && minY >= into.extentMinY && maxX <= into.extentMaxX && maxY <= into.extentMaxY) {
+    return false;
+  }
+  into.extentMinX = Math.min(into.extentMinX, minX);
+  into.extentMinY = Math.min(into.extentMinY, minY);
+  into.extentMaxX = Math.max(into.extentMaxX, maxX);
+  into.extentMaxY = Math.max(into.extentMaxY, maxY);
+  return true;
+}
+
+/**
  * How far a scroller moves along one axis to reveal `start`..`end` in a
  * view of `size` from `view`: by the nearer edge, the least that shows
  * all of it.
@@ -2963,6 +2982,7 @@ export class LayoutEngine {
     // Out-of-flow children are positioned once the flow has settled,
     // against containing blocks that are already placed.
     this.placeAbsoluteChildren(node);
+    this.updateExtent(node, rec);
     this.updatePaintOrder(node, rec);
     if (rec.clips) {
       this.updateContentExtent(node, rec);
@@ -4351,6 +4371,13 @@ export class LayoutEngine {
       rec.y = y;
       rec.width = width;
       rec.height = height;
+      // Its own box for now; placing its children grows it if they
+      // reach past, and an ancestor it now reaches past grows too.
+      rec.extentMinX = x;
+      rec.extentMinY = y;
+      rec.extentMaxX = x + width;
+      rec.extentMaxY = y + height;
+      this.growExtentUp(node);
       rec.placeDirty = true;
       // Subtree bounds are a summary of these four numbers, so this is
       // the one place that can promise they are never stale: a box
@@ -4391,24 +4418,86 @@ export class LayoutEngine {
    * against its anchor, and is placed again (`movedAnchored`) when its
    * anchor is one of the boxes that moved.
    */
+  /**
+   * A node's paint extent, once its children are placed: its box, grown
+   * by each child's (a clipping child's box, since nothing paints past
+   * it; anything else's extent). Then carried up, since an ancestor that
+   * wasn't placed this pass still needs to hear.
+   */
+  private updateExtent(node: UiNode, rec: LayoutRecord): void {
+    rec.extentMinX = rec.x;
+    rec.extentMinY = rec.y;
+    rec.extentMaxX = rec.x + rec.width;
+    rec.extentMaxY = rec.y + rec.height;
+    if (!rec.clips) {
+      const visit = (parent: UiNode): void => {
+        for (let child = parent.firstChild; child !== null; child = child.nextSibling) {
+          if (child.type === UiNodeType.Fragment) {
+            visit(child);
+            continue;
+          }
+          const cRec = this.records.get(child);
+          if (cRec !== undefined) {
+            growExtent(rec, cRec);
+          }
+        }
+      };
+      visit(node);
+    }
+    this.growExtentUp(node);
+  }
+
+  /**
+   * Grows each ancestor's extent to cover a node's, up to the first
+   * that clips or already covers it, which is at once in the usual case.
+   * An incremental pass doesn't place the ancestors of the subtree it
+   * laid out, so this is how they hear that something under them moved
+   * past them.
+   */
+  private growExtentUp(node: UiNode): void {
+    let current = node;
+    let rec = this.records.get(current);
+    while (rec !== undefined) {
+      let parent = current.parent;
+      while (parent !== null && parent.type === UiNodeType.Fragment) {
+        parent = parent.parent;
+      }
+      const parentRec = parent === null ? undefined : this.records.get(parent);
+      if (parent === null || parentRec === undefined || parentRec.clips || !growExtent(parentRec, rec)) {
+        return;
+      }
+      current = parent;
+      rec = parentRec;
+    }
+  }
+
   private shiftSubtree(node: UiNode, dx: number, dy: number): void {
     this.stats.shifted++;
     this.layoutVersion++;
+    // Absolute nodes left where they were, whose ancestors' extents just
+    // moved away from them.
+    let stayed: UiNode[] | undefined;
     const stack: [UiNode, boolean][] = [[node, false]];
     while (stack.length > 0) {
       const [current, inside] = stack.pop()!;
       const rec = this.records.get(current);
       if (rec !== undefined && current !== node && rec.absolute) {
         if (current.properties.get('anchor') !== undefined && current.properties.get('anchor') !== null) {
+          (stayed ??= []).push(current);
           continue;
         }
         if (!inside) {
+          (stayed ??= []).push(current);
           continue;
         }
       }
       if (rec !== undefined) {
         rec.x += dx;
         rec.y += dy;
+        rec.extentMinX += dx;
+        rec.extentMinY += dy;
+        rec.extentMaxX += dx;
+        rec.extentMaxY += dy;
         if (this.anchorDependents.size > 0) {
           const dependents = this.anchorDependents.get(current);
           if (dependents !== undefined) {
@@ -4424,6 +4513,10 @@ export class LayoutEngine {
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push([child, contains]);
       }
+    }
+    this.growExtentUp(node);
+    for (const left of stayed ?? []) {
+      this.growExtentUp(left);
     }
   }
 

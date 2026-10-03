@@ -293,7 +293,17 @@ export class Canvas2DRenderer implements UiRenderer {
       return;
     }
     const sticky = rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0;
-    if (cull && !this.intersectsCull(rec.x + rec.stickyOffsetX, rec.y + rec.stickyOffsetY, rec.width, rec.height)) {
+    // By where its subtree may paint, not its own box: a node that
+    // doesn't clip lets an absolute child stand anywhere.
+    if (
+      cull &&
+      !this.intersectsCull(
+        rec.extentMinX + rec.stickyOffsetX,
+        rec.extentMinY + rec.stickyOffsetY,
+        rec.extentMaxX - rec.extentMinX,
+        rec.extentMaxY - rec.extentMinY
+      )
+    ) {
       return;
     }
 

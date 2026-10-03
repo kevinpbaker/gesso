@@ -852,6 +852,21 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     expect(draws.filter(d => d.kind === 'image')).toHaveLength(4);
   });
 
+  it('an absolute child of an empty parent at the window edge', () => {
+    const h = new RenderHarness(400, 300);
+    const root = h.createNode('app', UiNodeType.Row);
+    root.setProperty('width', 400);
+    root.setProperty('height', 300);
+    const wrapper = h.createNode('wrapper', UiNodeType.Column);
+    h.append(
+      wrapper,
+      box(h, 'panel', { position: 'absolute', right: 16, bottom: 16, width: 120, height: 50, backgroundColor: '#0f0' })
+    );
+    h.append(root, box(h, 'page', { flexGrow: 1, height: 300 }), wrapper);
+    const draws = expectParity(h, root, Constraints.tight(400, 300));
+    expect(draws).toContainEqual(expect.objectContaining({ kind: 'fill', x: 264, y: 234, width: 120, height: 50 }));
+  });
+
   it('a scrolled list with a sticky header, an overlay above it, and culling', () => {
     const h = new RenderHarness(400, 200);
     const root = h.createNode('app', UiNodeType.Box);

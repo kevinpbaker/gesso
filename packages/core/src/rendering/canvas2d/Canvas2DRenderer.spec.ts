@@ -588,6 +588,30 @@ describe('Canvas2DRenderer culling', () => {
     expect(callArgs(h.context, 'fillRect')).toEqual([]);
   });
 
+  it('paints an absolute child of an empty parent, however small the parent', () => {
+    // A floating panel in an otherwise empty wrapper: the wrapper's box
+    // is nothing, at the window's edge, and the panel's is on screen.
+    // Culling the wrapper by its own box lost the panel with it.
+    const h = new RenderHarness(400, 300);
+    const root = h.createNode('app', UiNodeType.Row);
+    root.setProperty('width', 400);
+    root.setProperty('height', 300);
+    const wrapper = h.createNode('wrapper', UiNodeType.Column);
+    const panel = box(h, 'panel', {
+      position: 'absolute',
+      right: 16,
+      bottom: 16,
+      width: 120,
+      height: 50,
+      backgroundColor: '#0f0'
+    });
+    h.append(wrapper, panel);
+    h.append(root, box(h, 'page', { flexGrow: 1, height: 300 }), wrapper);
+    h.layout(root, Constraints.tight(400, 300));
+    h.render(root);
+    expect(callArgs(h.context, 'fillRect')).toContainEqual([264, 234, 120, 50]);
+  });
+
   it('skips invisible subtrees', () => {
     const h = new RenderHarness();
     const root = h.createNode('app', UiNodeType.Column);
