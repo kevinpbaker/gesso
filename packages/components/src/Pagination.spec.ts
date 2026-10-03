@@ -28,7 +28,7 @@ function drawn(ui: ReturnType<typeof mount>): string[] {
 }
 
 function selected(ui: ReturnType<typeof mount>): UiNode[] {
-  return ui.getAllByRole('button').filter(node => (ui.getSemantics(node).states ?? []).includes('selected'));
+  return ui.getAllByRole('button').filter(node => (ui.getSemantics(node).states ?? []).includes('current'));
 }
 
 /**
@@ -209,13 +209,13 @@ describe('Pagination', () => {
     expect(drawn(ui)).toEqual(['‹', '1', '…', '4', '5', '6', '…', '10', '›']);
   });
 
-  it('marks the page you are on as selected, and only that one', () => {
+  it('marks the page you are on as current, and only that one', () => {
     const ui = mount({ defaultPage: 5 });
 
     const chosen = selected(ui);
     expect(chosen).toHaveLength(1);
     expect(ui.getSemantics(chosen[0]).label).toBe('Page 5');
-    // Selected, not disabled: the page you are on stays a tab stop.
+    // Current, not disabled: the page you are on stays a tab stop.
     expect(ui.getSemantics(chosen[0]).disabled).not.toBe(true);
   });
 

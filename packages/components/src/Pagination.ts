@@ -113,10 +113,10 @@ import { controlTokens, type ButtonPaint, type ButtonSize, type ButtonSizeTokens
  *     has both a `label` and `children`, and it is the whole
  *     difference between a strip that can be operated by voice and
  *     one that cannot.
- *   - **The current page is `selected` in the semantics, not only in
- *     the paint.** `UiSemanticState` has no `current`, and inventing
- *     one would be a state the mirror cannot emit; `selected` is the
- *     honest member of that union and is what the accent pill means.
+ *   - **The current page is `current` in the semantics, not only in
+ *     the paint**, which the mirror writes as `aria-current`. It used
+ *     to be `selected`, for want of anything better, and a screen
+ *     reader ignores `aria-selected` on a button.
  *     It stays focusable and it is not `disabled`, because disabled
  *     would take the page you are on out of the Tab order for no
  *     reason a person could guess.
@@ -455,7 +455,7 @@ function pageButton(
       // The name is a sentence and the text is the numeral: "3" read
       // aloud in a list of numerals says nothing about what it does.
       label: `Page ${page}`,
-      states: chosen.pipe(map(mine => (mine ? SELECTED : NO_STATES))),
+      states: chosen.pipe(map(mine => (mine ? CURRENT : NO_STATES))),
       onClick: press
     },
     Text({
@@ -555,7 +555,7 @@ const PREVIOUS_GLYPH = '‹';
 const NEXT_GLYPH = '›';
 const ELLIPSIS = '…';
 
-const SELECTED: readonly UiSemanticState[] = Object.freeze(['selected'] as UiSemanticState[]);
+const CURRENT: readonly UiSemanticState[] = Object.freeze(['current'] as UiSemanticState[]);
 const NO_STATES: readonly UiSemanticState[] = Object.freeze([] as UiSemanticState[]);
 
 const EMPTY: readonly PaginationItem[] = Object.freeze([] as PaginationItem[]);
