@@ -304,6 +304,29 @@ describe('GessoRuntime editing', () => {
     expect(model().text).toBe('a');
   });
 
+  it('reports a commit that is what the composition already showed', () => {
+    // Pick the candidate on screen and the commit is the last update:
+    // the text with the composition in it already says it, and the
+    // commit was compared with that, so no input was reported and an
+    // application holding the text never heard of it.
+    const changes: string[] = [];
+    const { runtime, press } = mount(
+      Column(EditableText({ value: 'a', onInput: (event: UiTextChangeEvent) => changes.push(event.value) }))
+    );
+    runtime.setTextInputSource('proxy');
+    press(100, 5);
+    const editing = runtime.input.editing;
+    editing.compositionStart();
+    editing.compositionUpdate('か', 1);
+    editing.compositionEnd('か');
+    expect(changes).toEqual(['aか']);
+    // A cancelled composition changes nothing, and says nothing.
+    editing.compositionStart();
+    editing.compositionUpdate('k', 1);
+    editing.compositionEnd('');
+    expect(changes).toEqual(['aか']);
+  });
+
   it('pastes, folding newlines into spaces in a single-line field', () => {
     const { runtime, press, model } = mount(Column(EditableText({ value: '' })));
     press(0, 5);

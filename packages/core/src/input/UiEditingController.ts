@@ -105,6 +105,14 @@ export class UiEditingController {
   private lastPress: { node: UiNode; x: number; y: number; at: number; count: number } | null = null;
   private compositionOpen = false;
   /**
+   * The text as it was when the composition began. A commit is reported
+   * against this, not against the text with the composition in it,
+   * which already holds what is committed whenever the person picks
+   * the candidate on screen: compared with that, a commit changed
+   * nothing and the application never heard about the text.
+   */
+  private compositionBase: string | null = null;
+  /**
    * A selection across the fields of an editing group, while it spans
    * more than one; null while the selection is one field's own. `lit`
    * is every field drawing part of it. See `UiEditingGroup`.
@@ -494,6 +502,7 @@ export class UiEditingController {
       return;
     }
     const model = editorFor(node);
+    this.compositionBase = model.text;
     model.beginComposition();
     this.compositionOpen = true;
     this.afterTextChange(node, model, false);
@@ -520,7 +529,8 @@ export class UiEditingController {
     }
     const model = editorFor(node);
     const data = isMultiline(node) ? text : text.replace(/\r\n|\r|\n/g, ' ');
-    const before = model.text;
+    const before = this.compositionBase ?? model.text;
+    this.compositionBase = null;
     model.commitComposition(data);
     this.afterTextChange(node, model, before !== model.text);
   }
@@ -718,6 +728,7 @@ export class UiEditingController {
     }
     this.focusedEditable = next;
     this.compositionOpen = false;
+    this.compositionBase = null;
     this.verticalGoalX = undefined;
     if (next !== null) {
       const model = editorFor(next);
