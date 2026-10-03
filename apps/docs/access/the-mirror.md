@@ -81,7 +81,11 @@ screen reader reads in.
 
 Prose is the exception to `aria-label`: a heading, a paragraph and a
 loose line of text are named by what they contain, so the text goes
-into the element rather than onto an attribute. A text field is the
+into the element rather than onto an attribute. A `status` or an
+`alert` gets both: the platform names it from `aria-label`, but a live
+region announces its content when that changes, so its name is written
+as its text too. What is announced is therefore the name, which is the
+`label` when there is one, not the text the node draws. A text field is the
 same in a different way: for `textbox` and `searchbox` the mirror
 writes the value as the element's text, because that is where the
 platform reads a field's value from. `aria-valuetext` is for a slider.
@@ -172,11 +176,8 @@ that the information reaches the platform's accessibility API and that
 actions come back. Whether VoiceOver's rotor and NVDA's browse mode
 make good use of it is an argument from ARIA conformance, not evidence.
 
-**Not implemented:** live regions, so nothing announces itself when it
-changes; `aria-activedescendant`, so the active option inside a
-composite widget is not named to the platform as active; and
-find-in-page and text selection across the mirror, which stop at the
-canvas.
+**Not implemented:** find-in-page and text selection across the
+mirror, which stop at the canvas.
 
 **The specs on this page stand at the seam**, driving the update a
 mirror is handed and the action it sends back. The DOM writing itself
