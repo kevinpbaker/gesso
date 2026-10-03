@@ -220,7 +220,7 @@ listeners walked per scrolled frame.
 | --------------------------------------------- | ------------------ | ------------------------------------------------------------------------ |
 | `interactive()`, `hoverable()`, `pressable()` | `gesso-core`       | Hover and press state, and the property writes that follow               |
 | `focusRing(options?)`                         | `gesso-core`       | A ring around the node while it holds focus                              |
-| `autoFocus()`                                 | `gesso-core`       | Takes focus on the node's first layout, once                             |
+| `autoFocus(options?)`                         | `gesso-core`       | Takes focus on the node's first layout, once                             |
 | `measure(subject)`                            | `gesso-core`       | Reports the node's box whenever it moves                                 |
 | `scrollPosition(args)`                        | `gesso-core`       | Reports a scroll container's offset when it changes, and when it settles |
 | `draggable(options)`                          | `gesso-core`       | Moves the node with the pointer, as a transform                          |

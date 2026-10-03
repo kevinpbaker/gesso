@@ -1,3 +1,4 @@
+import type { FocusOptions } from '../input/UiFocusManager';
 import { defineModifier, type UiModifier } from './UiModifier';
 
 /**
@@ -27,28 +28,38 @@ import { defineModifier, type UiModifier } from './UiModifier';
  * active focus scope, which is exactly the set of cases where an
  * application would not want the focus moved either.
  */
-const kind = defineModifier<void>({
+const kind = defineModifier<FocusOptions>({
   name: 'autoFocus',
-  attach(host) {
+  attach(host, options) {
     let done = false;
     host.onLayout(() => {
       if (done) {
         return;
       }
       done = true;
-      host.focus();
+      host.focus(options);
     });
   }
 });
 
 /**
- * One shared instance, so the arguments keep their identity across
- * renders and the modifier is never detached and re-attached (which
- * would autofocus a second time).
+ * One shared instance of each, so the arguments keep their identity
+ * across renders and the modifier is never detached and re-attached
+ * (which would autofocus a second time).
  */
-const AUTO_FOCUS: UiModifier<void> = kind(undefined);
+const AUTO_FOCUS: UiModifier<FocusOptions> = kind({});
+const AUTO_FOCUS_IN_PLACE: UiModifier<FocusOptions> = kind({ preventScroll: true });
 
-/** Takes focus the first time the node is laid out. */
-export function autoFocus(): UiModifier<void> {
-  return AUTO_FOCUS;
+/**
+ * Takes focus the first time the node is laid out.
+ *
+ * The node is scrolled into view, as focus from code always is, once
+ * the frame's layout has settled. Pass `{ preventScroll: true }` to
+ * leave the page where it is, as `element.focus({ preventScroll: true })`
+ * does: for a region focused when a page opens so a screen reader reads
+ * it, where revealing it would scroll a tall region to a few pixels
+ * short of its own top instead of leaving the page at its start.
+ */
+export function autoFocus(options: FocusOptions = {}): UiModifier<FocusOptions> {
+  return options.preventScroll === true ? AUTO_FOCUS_IN_PLACE : AUTO_FOCUS;
 }

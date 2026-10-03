@@ -850,6 +850,51 @@ interface ComponentResolver {
   release(anchorId: string): void;
   flushMounts(): void;
 }
+type FocusSource = 'pointer' | 'keyboard' | 'program';
+interface FocusOptions {
+  readonly preventScroll?: boolean;
+}
+type FocusModality = 'pointer' | 'keyboard';
+declare class UiFocusManager {
+  private readonly dispatcher;
+  private root;
+  private focused;
+  private modality;
+  private focusedOptions;
+  private readonly listeners;
+  private readonly scopeListeners;
+  private readonly scopes;
+  private readonly groupEntries;
+  constructor(root: UiNode, dispatcher: UiInputDispatcher);
+  setRoot(root: UiNode): void;
+  get focusedNode(): UiNode | null;
+  hasFocus(): boolean;
+  get focusModality(): FocusModality;
+  get focusVisible(): boolean;
+  noteInput(modality: FocusModality): void;
+  get scopeRoot(): UiNode;
+  get trapped(): boolean;
+  focus(node: UiNode, source?: FocusSource, options?: FocusOptions): boolean;
+  onFocusChange(listener: (node: UiNode | null, source: FocusSource, options: FocusOptions) => void): () => void;
+  onScopeChange(listener: () => void): () => void;
+  private notify;
+  private notifyScope;
+  blur(): void;
+  focusOnPress(node: UiNode): void;
+  focusNext(): boolean;
+  focusPrevious(): boolean;
+  pushScope(root: UiNode): void;
+  settleScope(): void;
+  popScope(): void;
+  handleNodeRemoved(_node: UiNode): void;
+  private moveFocus;
+  private collectFocusable;
+  private insideHidden;
+  private groupOf;
+  private withinScope;
+  private isAttached;
+  private isWithin;
+}
 type UiModifierTeardown = (() => void) | {
   unsubscribe(): void;
 };
@@ -871,7 +916,7 @@ interface UiModifierHost {
   onLayout(listener: (box: LayoutBox) => void): void;
   environment<T>(key: UiEnvironmentKey<T>): T;
   onEnvironment(listener: () => void): void;
-  focus(): void;
+  focus(options?: FocusOptions): void;
   isFocused(): boolean;
   isFocusVisible(): boolean;
   onFocusChange(listener: (focused: boolean) => void): void;
@@ -912,7 +957,7 @@ interface UiModifierLayout {
 interface UiModifierFocus {
   isFocused(node: UiNode): boolean;
   isFocusVisible(node: UiNode): boolean;
-  focus(node: UiNode): void;
+  focus(node: UiNode, options?: FocusOptions): void;
   onFocusChange(node: UiNode, listener: (focused: boolean) => void): () => void;
 }
 interface UiModifierEnvironment {
@@ -2705,47 +2750,6 @@ declare class NodeTransitions implements UiNodeTransitions {
   private startAnimation;
 }
 declare function resetTransitionWarnings(): void;
-type FocusSource = 'pointer' | 'keyboard' | 'program';
-type FocusModality = 'pointer' | 'keyboard';
-declare class UiFocusManager {
-  private readonly dispatcher;
-  private root;
-  private focused;
-  private modality;
-  private readonly listeners;
-  private readonly scopeListeners;
-  private readonly scopes;
-  private readonly groupEntries;
-  constructor(root: UiNode, dispatcher: UiInputDispatcher);
-  setRoot(root: UiNode): void;
-  get focusedNode(): UiNode | null;
-  hasFocus(): boolean;
-  get focusModality(): FocusModality;
-  get focusVisible(): boolean;
-  noteInput(modality: FocusModality): void;
-  get scopeRoot(): UiNode;
-  get trapped(): boolean;
-  focus(node: UiNode, source?: FocusSource): boolean;
-  onFocusChange(listener: (node: UiNode | null, source: FocusSource) => void): () => void;
-  onScopeChange(listener: () => void): () => void;
-  private notify;
-  private notifyScope;
-  blur(): void;
-  focusOnPress(node: UiNode): void;
-  focusNext(): boolean;
-  focusPrevious(): boolean;
-  pushScope(root: UiNode): void;
-  settleScope(): void;
-  popScope(): void;
-  handleNodeRemoved(_node: UiNode): void;
-  private moveFocus;
-  private collectFocusable;
-  private insideHidden;
-  private groupOf;
-  private withinScope;
-  private isAttached;
-  private isWithin;
-}
 declare class FocusNotifier {
   private readonly listeners;
   private focused;
@@ -3773,7 +3777,7 @@ interface BordersOptions {
 }
 declare function borders(options: BordersOptions): UiModifier<Decorations>;
 declare function borderShapes(options: BordersOptions): readonly DecorationShape[];
-declare function autoFocus(): UiModifier<void>;
+declare function autoFocus(options?: FocusOptions): UiModifier<FocusOptions>;
 interface ClickOutsideOptions {
   readonly onOutside: (event: UiInputEvent) => void;
   readonly except?: () => readonly (UiNode | null | undefined)[];
@@ -5367,6 +5371,7 @@ export {
   FlexDirection,
   FlexItemProps,
   FocusNotifier,
+  FocusOptions,
   focusRing,
   FocusRingOptions,
   FocusSource,
@@ -6273,6 +6278,7 @@ import {
   FlexDirection,
   FlexItemProps,
   FocusNotifier,
+  FocusOptions,
   focusRing,
   FocusRingOptions,
   FocusSource,
@@ -7452,6 +7458,7 @@ export {
   type FixedMetricsOptions,
   type FlexContainerProps,
   type FlexItemProps,
+  type FocusOptions,
   type FocusRingOptions,
   type FocusSource,
   type FontMetrics,
