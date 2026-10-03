@@ -255,5 +255,14 @@ describe('UiShortcutRegistry', () => {
       expect(parseShortcut('Mod+K')).toEqual(parseShortcut('Mod+k'));
       expect(formatShortcut(parseShortcut('Mod+k'))).toBe('Ctrl+K');
     });
+
+    it('prints a shortcut the way the platform writes its own', () => {
+      expect(formatShortcut(parseShortcut('Mod+Shift+K'), 'mac')).toBe('⇧⌘K');
+      expect(formatShortcut(parseShortcut('Ctrl+Alt+Space'), 'mac')).toBe('⌃⌥Space');
+      expect(formatShortcut(parseShortcut('g d'), 'mac')).toBe('G D');
+      expect(formatShortcut(parseShortcut('Mod+Shift+K'), 'other')).toBe('Ctrl+Shift+K');
+      expect(formatShortcut(parseShortcut('Shift+ArrowDown'), 'mac')).toBe('⇧↓');
+      expect(formatShortcut(parseShortcut('Shift+ArrowDown'), 'other')).toBe('Shift+↓');
+    });
   });
 });

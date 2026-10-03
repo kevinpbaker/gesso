@@ -136,7 +136,8 @@ export class UiShortcutRegistry {
   /** Adds a shortcut. The returned function removes it again. */
   register(shortcut: UiShortcut): () => void {
     const steps = parseShortcut(shortcut.keys);
-    const binding: UiShortcutBinding = { ...shortcut, steps, display: formatShortcut(steps) };
+    this.platform ??= detectEditingPlatform();
+    const binding: UiShortcutBinding = { ...shortcut, steps, display: formatShortcut(steps, this.platform) };
     this.bindings.push(binding);
     return () => {
       const index = this.bindings.indexOf(binding);
@@ -432,15 +433,29 @@ function stepFor(key: string, modifiers: UiKeyModifiers): UiShortcutStep {
 }
 
 /**
- * The shortcut as a palette should print it.
- *
- * `Mod` is printed as `Ctrl`, not as a platform glyph: the render
- * worker cannot see the platform, and a wrong symbol is worse than a
- * plain word. An application that knows what it is running on can
- * format the `steps` itself.
+ * The shortcut as a palette should print it, the way the platform
+ * writes its own: `⇧⌘K` on a Mac, where `Mod` is Command, and
+ * `Ctrl+Shift+K` elsewhere, where it is Control. The platform is the
+ * one the editing keys follow (`detectEditingPlatform`, from the user
+ * agent, which a worker can read too).
  */
-export function formatShortcut(steps: readonly UiShortcutStep[]): string {
-  return steps.map(formatStep).join(' ');
+export function formatShortcut(
+  steps: readonly UiShortcutStep[],
+  platform: EditingPlatform = detectEditingPlatform()
+): string {
+  return steps.map(step => (platform === 'mac' ? formatMacStep(step) : formatStep(step))).join(' ');
+}
+
+/** In the order the Mac's menus print them: Control, Option, Shift, Command. */
+function formatMacStep(step: UiShortcutStep): string {
+  return `${step.ctrl ? '⌃' : ''}${step.alt ? '⌥' : ''}${step.shift ? '⇧' : ''}${step.mod || step.meta ? '⌘' : ''}${keyName(step.key)}`;
+}
+
+/** The arrows as arrows, which every keyboard prints them as. */
+const KEY_NAMES: Readonly<Record<string, string>> = { ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+
+function keyName(key: string): string {
+  return KEY_NAMES[key] ?? (key.length === 1 ? key.toUpperCase() : key);
 }
 
 function formatStep(step: UiShortcutStep): string {
@@ -457,7 +472,7 @@ function formatStep(step: UiShortcutStep): string {
   if (step.shift) {
     parts.push('Shift');
   }
-  parts.push(step.key === ' ' ? 'Space' : step.key.length === 1 ? step.key.toUpperCase() : step.key);
+  parts.push(keyName(step.key));
   return parts.join('+');
 }
 
