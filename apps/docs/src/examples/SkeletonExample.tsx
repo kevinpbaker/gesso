@@ -101,14 +101,22 @@ export function LoadingList(_inputs: Inputs<{}>, ctx: ComponentContext) {
   );
 }
 
+/**
+ * Whether a skeleton here breathes. Not in still mode: the shimmer is a
+ * repeating tween, so the screenshot gate would never see the page hold
+ * still, and a shimmer at rest is pixel for pixel the still skeleton,
+ * so nothing the page shows is lost.
+ */
+const breathe = (shimmer: boolean): boolean => shimmer && !isStill();
+
 /** One of the two panels above the list, captioned with its setting. */
 function panel(caption: string, shimmer: boolean): UiChild {
   return (
     <column gap={8} flex={1}>
       <text text={caption} textStyle="bodySmall" color="textMuted" />
       <row gap={10} y="center" width={percent(100)}>
-        <Skeleton circle width={ART} shimmer={shimmer} announce={false} />
-        <SkeletonText flex={1} lines={2} lineHeight={10} gap={7} shimmer={shimmer} announce={false} />
+        <Skeleton circle width={ART} shimmer={breathe(shimmer)} announce={false} />
+        <SkeletonText flex={1} lines={2} lineHeight={10} gap={7} shimmer={breathe(shimmer)} announce={false} />
       </row>
     </column>
   );
@@ -122,7 +130,7 @@ function panel(caption: string, shimmer: boolean): UiChild {
 function rowStandIn(): UiChild {
   return (
     <row width={percent(100)} height={ROW_HEIGHT} gap={12} paddingX={10} y="center">
-      <Skeleton circle width={ART} shimmer announce={false} />
+      <Skeleton circle width={ART} shimmer={breathe(true)} announce={false} />
       <SkeletonText
         flex={1}
         lines={2}
@@ -130,9 +138,9 @@ function rowStandIn(): UiChild {
         gap={8}
         widths={[percent(52), percent(32)]}
         announce={false}
-        shimmer
+        shimmer={breathe(true)}
       />
-      <Skeleton width={28} height={11} shimmer announce={false} />
+      <Skeleton width={28} height={11} shimmer={breathe(true)} announce={false} />
     </row>
   );
 }
