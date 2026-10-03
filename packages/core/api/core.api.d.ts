@@ -2840,8 +2840,11 @@ declare class UiWheelController {
   private readonly dispatcher;
   private readonly scrollSink;
   private readonly rootNode;
+  private readonly now;
   constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, scrollSink: ScrollSink,
-  rootNode?: (() => UiNode | null) | null);
+  rootNode?: (() => UiNode | null) | null,
+  now?: () => number);
+  private preciseUntil;
   lastWheelTarget: UiNode | null;
   wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number): UiWheelEvent;
   scrollabilityAt(x: number, y: number): UiScrollability;
@@ -6901,7 +6904,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BS5A_n3Y.js";
+} from "./index-DfsfzSuk.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7833,7 +7836,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BS5A_n3Y.js";
+} from "./index-DfsfzSuk.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

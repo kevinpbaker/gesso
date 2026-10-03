@@ -243,8 +243,20 @@ export class UiWheelController {
      * container to walk up from. Optional so every existing caller
      * still constructs; without it such a root is read as the default.
      */
-    private readonly rootNode: (() => UiNode | null) | null = null
+    private readonly rootNode: (() => UiNode | null) | null = null,
+    /** The clock the precise-device memory below reads. Injectable for specs. */
+    private readonly now: () => number = () => performance.now()
   ) {}
+
+  /**
+   * Until when the wheel is taken to be a precision device whatever an
+   * event says. One event can't always tell: Chrome on a Mac reports a
+   * trackpad's legacy delta as three times its pixel delta, so a step of
+   * 40 pixels reads as a whole detent. A mouse wheel never sends an event
+   * that doesn't look notched, so one that doesn't means a trackpad, and
+   * every event close behind it (a gesture, and its momentum) is one too.
+   */
+  private preciseUntil = -Infinity;
 
   /**
    * The node the last wheel landed on, or null before any.
@@ -273,8 +285,13 @@ export class UiWheelController {
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
     }
+    const at = this.now();
+    const notched = isNotchedWheel(deltaMode, wheelDeltaY) && at > this.preciseUntil;
+    if (!notched) {
+      this.preciseUntil = at + PRECISE_MEMORY_MS;
+    }
     if (!event.defaultPrevented && target !== null) {
-      this.scrollChain(target, event, deltaX, deltaY, deltaMode, wheelDeltaY);
+      this.scrollChain(target, event, deltaX, deltaY, deltaMode, notched);
     }
     return event;
   }
@@ -384,7 +401,7 @@ export class UiWheelController {
     deltaX: number,
     deltaY: number,
     deltaMode: UiWheelDeltaMode,
-    wheelDeltaY: number | undefined
+    notched: boolean
   ): void {
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
       const scrolled = scrollLeaderOf(node) ?? node;
@@ -413,7 +430,7 @@ export class UiWheelController {
           takesX ? deltaX : 0,
           takesY ? deltaY : 0,
           deltaMode,
-          behaviorFor(scrolled, deltaMode, wheelDeltaY)
+          behaviorFor(scrolled, notched)
         );
         event.markConsumed();
         return;
@@ -491,19 +508,15 @@ export class UiWheelController {
 /**
  * Whether this wheel should animate the container it is over.
  *
- * Both halves have to agree: the device has to be one that jumps, and
- * the container has not to have opted out with
- * `scrollBehavior="instant"`.
+ * Both halves have to agree: the device has to be one that jumps (as
+ * `wheel` decided, from the event and the ones before it), and the
+ * container has not to have opted out with `scrollBehavior="instant"`.
  */
-function behaviorFor(
-  container: UiNode,
-  deltaMode: UiWheelDeltaMode,
-  wheelDeltaY: number | undefined
-): UiScrollBehavior {
+function behaviorFor(container: UiNode, notched: boolean): UiScrollBehavior {
   if (container.getProperty('scrollBehavior') === 'instant') {
     return 'instant';
   }
-  return isNotchedWheel(deltaMode, wheelDeltaY) ? 'smooth' : 'instant';
+  return notched ? 'smooth' : 'instant';
 }
 
 /**
@@ -526,3 +539,11 @@ export function isScrollContainer(node: UiNode): boolean {
   const overflow = node.properties.get('overflow');
   return overflow === 'scroll' || overflow === 'auto';
 }
+
+/**
+ * How long after a precise-looking wheel event the wheel is still taken
+ * to be a precision device. Longer than the gap between a trackpad's
+ * events, momentum included, and far shorter than it takes to move a
+ * hand from a trackpad to a mouse.
+ */
+const PRECISE_MEMORY_MS = 400;

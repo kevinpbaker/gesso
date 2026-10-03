@@ -197,6 +197,60 @@ describe('UiWheelController', () => {
     expect(isNotchedWheel(UiWheelDeltaMode.Line, undefined)).toBe(true);
   });
 
+  describe('a trackpad whose deltas look like detents', () => {
+    // Chrome on a Mac reports a trackpad's legacy wheelDeltaY as three
+    // times its pixel delta, so a 40-pixel step reads -120, a whole
+    // detent. Taken one event at a time, those were smoothed and the
+    // steps around them weren't: a flick hesitated wherever it passed
+    // through 40 pixels a frame, most noticeably as it slowed down.
+    function flick(
+      controller: UiWheelController,
+      clock: { now: number },
+      deltas: readonly number[],
+      gapMs: number
+    ): void {
+      for (const delta of deltas) {
+        controller.wheel(50, 50, 0, delta, noKeyModifiers(), UiWheelDeltaMode.Pixel, -delta * 3);
+        clock.now += gapMs;
+      }
+    }
+
+    it("doesn't smooth any step of a gesture that has shown itself precise", () => {
+      const { h, scroll } = setupVertical();
+      const clock = { now: 1000 };
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => clock.now
+      );
+      flick(controller, clock, [3, 9, 18, 31, 40, 52, 40, 27, 19, 13, 8, 5, 3, 2, 1], 16);
+      const smooth = h.scrollSink.calls.filter(call => call.node === scroll && call.behavior === 'smooth');
+      expect(smooth).toEqual([]);
+    });
+
+    it('still smooths a mouse wheel, and one used a while after the trackpad', () => {
+      const { h, scroll } = setupVertical();
+      const clock = { now: 1000 };
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => clock.now
+      );
+      flick(controller, clock, [4, 9, 3], 16);
+      clock.now += 1000;
+      for (let notch = 0; notch < 3; notch++) {
+        controller.wheel(50, 50, 0, 100, noKeyModifiers(), UiWheelDeltaMode.Pixel, -120);
+        clock.now += 120;
+      }
+      const behaviors = h.scrollSink.calls.filter(call => call.node === scroll).map(call => call.behavior);
+      expect(behaviors).toEqual(['instant', 'instant', 'instant', 'smooth', 'smooth', 'smooth']);
+    });
+  });
+
   it('carries the mode on the event, as the DOM does', () => {
     // The deltas stay in the unit they arrived in. A handler reading
     // them without checking the mode is the bug this exists to name.
