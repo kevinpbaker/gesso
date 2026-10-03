@@ -112,5 +112,5 @@ puts back what's chosen, whatever was typed.
 The field is a `combobox`, `expanded` or `collapsed` with the list, and
 the list is a `listbox` of `option`s, each numbered with `posInSet` and
 `setSize` and marked `selected` when chosen. In `multiple`, the chosen
-values are a `list` above the field, each with a button named
+values are a `list` inside the field, before its text, each with a button named
 `Remove <label>`.
