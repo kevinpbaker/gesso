@@ -135,6 +135,18 @@ const VIEWPORT: readonly [number, number] = [1280, 900];
 const QUIESCE_MATCHES = 6;
 const QUIESCE_INTERVAL_MS = 250;
 const QUIESCE_TIMEOUT_MS = 20_000;
+/**
+ * How long a capture must have held still, at least, to be trusted.
+ *
+ * A run of matching captures can fall entirely inside something that
+ * is still for a moment and then changes: an overlay scrollbar thumb is
+ * shown for `SCROLLBAR_LINGER_MS` (1200) after a scroll and fades over
+ * `SCROLLBAR_FADE_MS` (350), both in gesso-core's LayoutEngine. A page
+ * that scrolls as it mounts was captured with the thumb on one run and
+ * without it on the next. Holding longer than both together means a
+ * settled capture is one nothing transient is about to change.
+ */
+const QUIESCE_MIN_HOLD_MS = 2000;
 /** How long a route may take to load its fonts and images. */
 const LOAD_TIMEOUT_MS = 20_000;
 /**
@@ -171,14 +183,11 @@ const CANNOT_SETTLE: Record<string, string> = {
  * Known headroom, so the next person to see one of these is not
  * surprised by it.
  *
- * `compare` carries a scrollbar thumb that is sometimes captured
- * visible and sometimes fully faded into the panel, worth about 381
- * pixels either way. Quiescence does not catch it, because both states
- * are still. That is 0.059% against a 0.1% budget, so it passes, and it
- * eats over half the headroom: a real change to that route of the size
- * that would normally be caught might not be. The fix, when someone
- * wants it, is for still mode to settle the thumb rather than for the
- * threshold to grow.
+ * `compare` carries a scrollbar thumb that used to be captured
+ * sometimes visible and sometimes faded, about 381 pixels either way,
+ * because both states are still and six captures could fall inside the
+ * thumb's 1.55 s. `QUIESCE_MIN_HOLD_MS` outlasts the thumb, so it is
+ * always captured faded now and no longer eats into the budget.
  *
  * `example-transitions` and `transitions-app` sit at 0.076% and 0.077%
  * of the same budget, with 30 gross pixels each against 129.
@@ -359,8 +368,11 @@ async function captureSettled(devtools: DevTools): Promise<{ shot: Buffer; box: 
   let previousShot: Buffer | undefined;
   let previousBox: CanvasBox | undefined;
   let matches = 0;
+  /** When the capture the current run of matches agrees with was taken. */
+  let heldSince = Date.now();
   const deadline = Date.now() + QUIESCE_TIMEOUT_MS;
   while (Date.now() < deadline) {
+    const takenAt = Date.now();
     const box = await devtools.evaluate<CanvasBox | null>(PREVIEW_BOX);
     if (box === null) {
       await sleep(QUIESCE_INTERVAL_MS);
@@ -375,11 +387,12 @@ async function captureSettled(devtools: DevTools): Promise<{ shot: Buffer; box: 
       previousBox.height === box.height;
     if (sameBox && previousShot !== undefined && shot.equals(previousShot)) {
       matches += 1;
-      if (matches >= QUIESCE_MATCHES) {
+      if (matches >= QUIESCE_MATCHES && Date.now() - heldSince >= QUIESCE_MIN_HOLD_MS) {
         return { shot, box };
       }
     } else {
       matches = 0;
+      heldSince = takenAt;
     }
     previousShot = shot;
     previousBox = box;
