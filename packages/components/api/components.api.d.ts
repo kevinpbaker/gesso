@@ -596,7 +596,7 @@ interface DataColumn<T> {
   readonly header: string;
   readonly width?: UiTrackSize;
   readonly compare?: (a: T, b: T) => number;
-  readonly cell: (row: T, index: number) => UiChild;
+  readonly cell: (row: T, index: number, color: Observable<UiColorValue>) => UiChild;
   readonly align?: 'start' | 'center' | 'end';
 }
 interface DataTableSort {
