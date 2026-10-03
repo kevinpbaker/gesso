@@ -9,7 +9,7 @@ import {
   type BridgeResponse,
   type BridgeSocket
 } from './agent.ts';
-import { transformShell } from './shell.ts';
+import { transformShell, transformSyncShell } from './shell.ts';
 
 /** Vite's HMR server, as far as the bridge uses it: events in, and a way to fire them. */
 function fakeSocket() {
@@ -139,5 +139,22 @@ describe('the shell, in a dev server', () => {
 
   it('writes no bridge for a build', () => {
     expect(transformShell(SHELL, { entries: null, overlay: false })).toBeNull();
+  });
+});
+
+describe('a single-thread shell, in a dev server', () => {
+  const SYNC =
+    "import { createSyncApp } from 'gesso-framework';\nimport { App } from './App';\n\ncreateSyncApp(App).useWebMcp(false).mountSync('#app');\n";
+
+  it('hands the builder to the bridge, before the chain the app wrote', () => {
+    const out = transformSyncShell(SYNC)!;
+    expect(out).toContain("__gessoAgent(createSyncApp(App)).useWebMcp(false).mountSync('#app');");
+    // On by default, and the app's own useWebMcp(false), later in the chain, still decides.
+    expect(out).toContain('app.useWebMcp(true);');
+  });
+
+  it('leaves a module that does not create a single-thread app alone, and does not wrap twice', () => {
+    expect(transformSyncShell("import { createSyncApp } from './elsewhere';\ncreateSyncApp(App);\n")).toBeNull();
+    expect(transformSyncShell(transformSyncShell(SYNC)!)).toBeNull();
   });
 });

@@ -60,7 +60,7 @@ export { ComponentHost } from './ComponentHost';
 export { isComponentElement, type ComponentElement, type FrameworkChild } from './ComponentElement';
 export { createApp, type CreateAppOptions } from './app/createApp';
 export { createSyncApp } from './app/createSyncApp';
-export { GessoAppBuilder } from './app/GessoAppBuilder';
+export { GessoAppBuilder, type WebMcpChoice } from './app/GessoAppBuilder';
 export { GessoApp, type GessoAppOptions } from './app/GessoApp';
 export {
   GessoRuntime,

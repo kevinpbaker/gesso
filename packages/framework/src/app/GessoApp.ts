@@ -7,6 +7,7 @@ import {
   type UiNode,
   type CanvasHost,
   UiAnimationFrameClock,
+  type UiFrameClock,
   type UiFrameClockFactory
 } from 'gesso-core';
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
@@ -29,6 +30,7 @@ import type { ServiceRegistry } from '../service/ServiceRegistry';
 import type { RouterRoutes } from '../router/RouterService';
 import type { MediaOptions } from './MediaService';
 import type { FontFamilyDeclaration } from './FontService';
+import type { UiHost } from '../agent/ui';
 
 export interface GessoAppOptions {
   host: HTMLElement;
@@ -99,6 +101,14 @@ export interface GessoAppOptions {
  */
 export class GessoApp {
   private readonly runtime: GessoRuntime;
+  /**
+   * The clock the runtime was given, its callback, and whether a frame
+   * is waiting on it: what `uiHost().flush` needs to run that frame now,
+   * since a background tab gets no animation frames to run it.
+   */
+  private clock: UiFrameClock | undefined;
+  private frameCallback: ((time: number) => void) | undefined;
+  private framePending = false;
   private readonly canvas: CanvasHost;
   private readonly host: HTMLElement;
   private readonly inputEnabled: boolean;
@@ -144,7 +154,25 @@ export class GessoApp {
       routes: options.routes,
       media: options.media,
       fonts: options.fonts,
-      clock: options.clock ?? (callback => new UiAnimationFrameClock(callback)),
+      clock: callback => {
+        const factory = options.clock ?? (onFrame => new UiAnimationFrameClock(onFrame));
+        const clock = factory(time => {
+          this.framePending = false;
+          callback(time);
+        });
+        this.clock = clock;
+        this.frameCallback = callback;
+        return {
+          requestFrame: () => {
+            this.framePending = true;
+            clock.requestFrame();
+          },
+          cancelFrame: () => {
+            this.framePending = false;
+            clock.cancelFrame();
+          }
+        };
+      },
       dpr: devicePixelRatio()
     });
 
@@ -154,6 +182,31 @@ export class GessoApp {
       wheelController: input.wheel,
       keyboardController: input.keyboard
     });
+  }
+
+  /**
+   * The running app, as the agent's screen tools need it: its semantics
+   * tree and focus, the mirror's actions, keys, and a way to run a
+   * pending frame now. See `uiSurface` in `gesso-framework/agent`.
+   */
+  uiHost(): UiHost {
+    const runtime = this.runtime;
+    return {
+      semanticsTree: () => runtime.semanticsTree(),
+      focusedNodeId: () => runtime.focusedNodeId(),
+      applySemanticsAction: action => runtime.applySemanticsAction(action),
+      key: (key, modifiers) => {
+        runtime.input.keyboard.keyDown(key, modifiers);
+        runtime.input.keyboard.keyUp(key, modifiers);
+      },
+      flush: () => {
+        if (this.framePending && this.clock !== undefined && this.frameCallback !== undefined) {
+          this.framePending = false;
+          this.clock.cancelFrame();
+          this.frameCallback(performance.now());
+        }
+      }
+    };
   }
 
   /** The runtime services a component in this app can inject. */

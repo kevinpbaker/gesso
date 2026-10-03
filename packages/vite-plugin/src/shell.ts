@@ -190,3 +190,25 @@ addEventListener('unhandledrejection', event => {
   __gessoReportError(reason?.message ?? String(reason), reason?.stack, 'window');
 });
 `;
+
+/**
+ * The single-thread shell in a dev server: `createSyncApp(Root)`
+ * wrapped so the agent bridge gets the builder, which answers an agent
+ * port from the page itself. There are no workers to write and no
+ * overlay to wire here, so this is all the plugin does to such a shell.
+ */
+export function transformSyncShell(code: string): string | null {
+  if (code.includes(MARKER)) {
+    return null;
+  }
+  const blank = blankLiterals(code);
+  if (importSources(code, blank).get('createSyncApp') !== 'gesso-framework') {
+    return null;
+  }
+  const call = findCall(code, 'createSyncApp', blank);
+  if (call === null) {
+    return null;
+  }
+  const wrapped = `__gessoAgent(${code.slice(call.start, call.end)})`;
+  return `${code.slice(0, call.start)}${wrapped}${code.slice(call.end)}\n${MARKER}\n${SHELL_BRIDGE}`;
+}

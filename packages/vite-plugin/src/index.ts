@@ -3,12 +3,13 @@ import { defaultClientConditions, type EnvironmentModuleNode, type Plugin, type 
 import { AGENT_PATH, createAgentBridge, type BridgeRequest, type BridgeResponse, type BridgeSocket } from './agent.ts';
 import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
 import { transformRenderWorker } from './render.ts';
-import { findShellCall, transformShell, type WorkerEntries } from './shell.ts';
+import { findShellCall, transformShell, transformSyncShell, type WorkerEntries } from './shell.ts';
 
 export { transformRenderWorker, type RenderWiring } from './render.ts';
 export {
   findShellCall,
   transformShell,
+  transformSyncShell,
   type ShellCall,
   type ShellTransformOptions,
   type WorkerEntries
@@ -295,6 +296,10 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
 
       const call = findShellCall(code);
       if (call === null) {
+        const sync = serving && options.agent !== false ? transformSyncShell(code) : null;
+        if (sync !== null) {
+          return { code: sync, map: null };
+        }
         return described === null ? null : { code, map: null };
       }
       shellId = id;
