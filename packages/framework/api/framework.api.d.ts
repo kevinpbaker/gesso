@@ -1291,6 +1291,8 @@ declare class GessoRuntime {
   private readonly focusNotifier;
   private readonly environmentNotifier;
   private semantics;
+  private semanticsChildren;
+  private semanticsOrdered;
   private semanticsListener;
   private semanticsBoxes;
   private readonly semanticsMemory;
@@ -1390,6 +1392,9 @@ declare class GessoRuntime {
   private createInput;
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
   semanticsTree(): UiSemanticsMap;
+  private storeSemantics;
+  private orderedSemantics;
+  private semanticsIndexOf;
   applyFileDrop(message: UiFileDropMessage): void;
   applySemanticsAction(action: UiSemanticsAction): void;
   private applyTextRunAction;
@@ -3029,7 +3034,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-C-6fQ6Kg.js";
+} from "./index-CB55E_uy.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3515,7 +3520,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-C-6fQ6Kg.js";
+} from "../index-CB55E_uy.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

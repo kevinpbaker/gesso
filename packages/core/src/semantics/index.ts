@@ -1,10 +1,12 @@
 export {
   buildSemanticsTree,
   buildSemanticsSubtree,
-  rebuildSemanticsSubtree,
+  rewalkSemantics,
   semanticsMemory,
   type SemanticsMemory,
+  type SemanticsPlacement,
   type SemanticsReuse,
+  type SemanticsRewalk,
   type SemanticsSpan,
   semanticsInertAbove,
   textRunOfRecordId,
