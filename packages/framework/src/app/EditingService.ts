@@ -1,4 +1,4 @@
-import type { CaretRect, UiEditingController, UiNode } from 'gesso-core';
+import type { CaretRect, UiEditingController, UiNode, UiTextPosition } from 'gesso-core';
 
 /**
  * The part of a text field an application has to ask about.
@@ -46,5 +46,19 @@ export class EditingService {
       return null;
     }
     return this.controller.caretRectOf(node);
+  }
+
+  /**
+   * Selects from `anchor` to `focus` and focuses the field the focus is
+   * in: within one field, or across the fields of an editing group (see
+   * `UiEditingGroup`). What an editor does after a command over a
+   * selection (making it bold, say) to leave it selected, since its
+   * fields can only select their own text.
+   *
+   * False when the two ends aren't editables of one group, or before
+   * the runtime has wired the controller.
+   */
+  select(anchor: UiTextPosition, focus: UiTextPosition): boolean {
+    return this.controller?.select(anchor, focus) ?? false;
   }
 }

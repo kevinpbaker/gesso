@@ -820,6 +820,36 @@ export class UiEditingController {
   // Selections across fields
   // ---------------------------------------------------------------------------
 
+  /**
+   * Selects from `anchor` to `focus`, in one field or across the fields
+   * of an editing group, and focuses the field the focus end is in: what
+   * an application does after a command over a selection, to leave it
+   * selected. False when the two ends are not editables of one group.
+   */
+  select(anchor: UiTextPosition, focus: UiTextPosition): boolean {
+    if (!isEditableNode(anchor.node) || !isEditableNode(focus.node)) {
+      return false;
+    }
+    if (anchor.node === focus.node) {
+      this.clearSpan();
+      const model = editorFor(focus.node);
+      model.select(anchor.offset, focus.offset);
+      this.focusField(focus.node);
+      this.afterSelectionChange(focus.node, model);
+      return true;
+    }
+    const owner = editingGroupOf(anchor.node);
+    if (owner === null || editingGroupOf(focus.node)?.root !== owner.root) {
+      return false;
+    }
+    const clamp = (position: UiTextPosition): UiTextPosition => ({
+      node: position.node,
+      offset: Math.max(0, Math.min(position.offset, editorFor(position.node).text.length))
+    });
+    this.setSpan(owner, clamp(anchor), clamp(focus));
+    return true;
+  }
+
   /** Whether a selection is spanning the fields of a group. */
   get spanning(): boolean {
     return this.span !== null;
