@@ -256,11 +256,6 @@ your own carries it by name.
 
 ## Limits
 
-**There is no `:focus-visible`.** The ring shows for any focus,
-including focus taken by a pointer press, so a button shows a ring after
-being clicked. Distinguishing the two means the input stack recording
-which device last moved focus, which nothing does.
-
 **Focus moves by keyboard scroll the focused node into view; focus
 moved by pointer does not.** Someone who clicked a control can already
 see it, and scrolling would pull it out from under a pointer still
