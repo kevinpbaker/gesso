@@ -574,7 +574,12 @@ interface ToastProps {
   tone?: 'info' | 'error';
   duration?: number;
   dismissible?: boolean;
+  action?: string;
+  onAction?: () => void;
+  placement?: ToastPlacement;
+  offset?: number;
 }
+type ToastPlacement = 'bottom-start' | 'bottom' | 'bottom-end';
 declare function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChild;
 interface LazyListProps extends ControlLayoutProps {
   ref?: UiNodeRef;
@@ -1090,6 +1095,7 @@ export {
   type TabsProps,
   type TextAreaProps,
   type TextInputProps,
+  type ToastPlacement,
   type ToastProps,
   type ToolbarProps,
   type TooltipArgs,

@@ -27,14 +27,18 @@ seconds; the second is an error, has no duration, and stays until the
 
 ## Props
 
-| Prop          | Type                | Default  | What it does                                                               |
-| ------------- | ------------------- | -------- | -------------------------------------------------------------------------- |
-| `open`        | `boolean`           | none     | Whether the notice is up. The application owns this.                       |
-| `onClose`     | `() => void`        | none     | Called when the timer expires or the ✕ is pressed. Write `open` back here. |
-| `message`     | `string`            | `''`     | The text, and the accessible name of the box.                              |
-| `tone`        | `'info' \| 'error'` | `'info'` | `info` waits its turn; `error` interrupts. See the semantics below.        |
-| `duration`    | `number`            | `4000`   | Milliseconds before it dismisses itself. `0` keeps it up.                  |
-| `dismissible` | `boolean`           | `true`   | Shows the ✕ that closes it.                                                |
+| Prop          | Type                                         | Default          | What it does                                                                    |
+| ------------- | -------------------------------------------- | ---------------- | ------------------------------------------------------------------------------- |
+| `open`        | `boolean`                                    | none             | Whether the notice is up. The application owns this.                            |
+| `onClose`     | `() => void`                                 | none             | Called when the timer expires or the ✕ is pressed. Write `open` back here.      |
+| `message`     | `string`                                     | `''`             | The text, and the accessible name of the box.                                   |
+| `tone`        | `'info' \| 'error'`                          | `'info'`         | `info` waits its turn; `error` interrupts. See the semantics below.             |
+| `duration`    | `number`                                     | `4000`           | Milliseconds before it dismisses itself. `0` keeps it up.                       |
+| `dismissible` | `boolean`                                    | `true`           | Shows the ✕ that closes it.                                                     |
+| `action`      | `string`                                     | `''`             | The text of a button that acts on the notice: `Undo`, `Retry`. None when empty. |
+| `onAction`    | `() => void`                                 | none             | Called when the action is pressed. The toast then closes, through `onClose`.    |
+| `placement`   | `'bottom-start' \| 'bottom' \| 'bottom-end'` | `'bottom-start'` | Which part of the bottom edge it is pinned to.                                  |
+| `offset`      | `number`                                     | `24`             | Pixels between the toast and the viewport's edges.                              |
 
 Every prop takes a plain value or an Observable of one. `Toast` takes
 none of the shared layout props, because it is not placed in your
@@ -43,8 +47,8 @@ layout: see below.
 There is no uncontrolled form. A toast has nothing to own: it is up
 because the application put it up.
 
-`tone` and `duration` are read when the toast opens, and so is the
-accessible name. The text drawn follows the `message` cell, so a
+`tone`, `duration`, `action`, `placement` and `offset` are read when
+the toast opens, and so is the accessible name. The text drawn follows the `message` cell, so a
 message that changes while a toast is up changes what is on screen but
 not what was announced; raise a new toast instead of editing an open
 one. The spec beside the example measures both halves of that.
@@ -56,6 +60,13 @@ it, and its box is drawn in the overlay layer the runtime mounts above
 the app root, pinned 24 pixels off the bottom left corner of the
 viewport. Nothing in your layout moves when one opens, and nothing in
 your layout decides where it goes.
+
+`placement` and `offset` move the pin, not the layout: `'bottom'`
+centres the toast along the bottom edge and `'bottom-end'` puts it in
+the right corner, `offset` pixels in from each edge. Raise it past
+anything your app keeps along the bottom of the window, a toolbar or a
+panel, so the two never cover each other: `offset={72}` clears a
+52-pixel bar with room to spare.
 
 Declare it inside the tree whose appearance it should match. The
 placeholder is what the overlay layer re-provides the theme, text style
@@ -74,10 +85,24 @@ keyboard from what the user was doing would be a bug, and Escape is not
 bound, so a toast is not something a reader has to dismiss before
 carrying on.
 
-| Key      | What it does                                                     |
-| -------- | ---------------------------------------------------------------- |
-| `Escape` | Not bound. It reaches whatever else is listening                 |
-| `Tab`    | Reaches the ✕ inside the toast, after the controls on the screen |
+| Key      | What it does                                                                    |
+| -------- | ------------------------------------------------------------------------------- |
+| `Escape` | Not bound. It reaches whatever else is listening                                |
+| `Tab`    | Reaches the action and the ✕ inside the toast, after the controls on the screen |
+
+## An action
+
+`action` puts a button in the toast for the one thing worth doing about
+the notice, most often taking back what it reports: "Moved 3 issues to
+Done", Undo. Pressing it calls `onAction` and closes the toast. The
+timer closing the toast does not call it, so a toast that times out
+has done nothing.
+
+A toast still takes no focus, so a keyboard user reaches the action by
+Tab, after everything on the screen. Anything that matters should also
+have a key of its own that works without the toast, and the message can
+say so: Mod+Z for an undo. When the user has to act, rather than may,
+it's a [dialog](/components/dialog).
 
 The ✕ is an ordinary button, so it is in the tab order like any other,
 and because the overlay layer sits above the app root it comes after
@@ -94,6 +119,7 @@ safe alongside a duration that closes it.
 | States  | None                                                             |
 | Focus   | Never taken. A toast is read through its role, not visited       |
 | Dismiss | The ✕ is a `button` named `Dismiss`, present while `dismissible` |
+| Action  | A `button` named by `action`, present while it is set            |
 
 The two roles are the whole reason `tone` exists. An `alert` interrupts
 whatever an assistive technology was reading; a `status` waits its
@@ -108,7 +134,8 @@ other colour is named: the box is `surface` with a `border` border.
 
 The roles, the name, the auto-dismiss and its timer, `duration: 0`, the
 dismiss button, the tab order and the corner it is pinned to are
-asserted in the spec beside the example, driving the real runtime with
+asserted in the spec beside the example; the action and the other
+placements in `Toast.spec.ts` beside the component, driving the real runtime with
 a fake canvas. No screen reader has been sat in front of the `alert`
 and `status` records, which is a different question from whether they
 are emitted.
