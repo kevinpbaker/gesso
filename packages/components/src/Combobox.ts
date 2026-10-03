@@ -91,6 +91,18 @@ export interface ComboboxProps extends ControlLayoutProps {
   disabled?: boolean;
   /** Shown in the list when nothing matches. */
   emptyText?: string;
+  /**
+   * Called with the text as it's typed, for a list searched somewhere
+   * else: a server, or a worker holding more than a list should carry.
+   * Pair it with `filter={false}` and pass what the search found as
+   * `options`.
+   */
+  onQueryChange?: (query: string) => void;
+  /**
+   * Filters `options` by what's typed. Default true; false shows them as
+   * given, for options a search has already narrowed.
+   */
+  filter?: boolean;
   /** The list's tallest, before it scrolls. */
   listHeight?: number;
   /** Receives the field. */
@@ -141,6 +153,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
   const emptyText = input(inputs.emptyText, 'No matches');
   const listHeight = inputs.listHeight?.value ?? 280;
   const multiple = inputs.multiple?.value === true;
+  const filtering = inputs.filter?.value !== false;
   const invalid = combineLatest([input(inputs.invalid, false), error]).pipe(
     map(([marked, message]) => marked || message.length > 0)
   );
@@ -212,7 +225,9 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
   // the label is what's chosen, not a search for it.
   const matches = combineLatest([inputs.options, query, chosen]).pipe(
     map(([options, text, values]) =>
-      filterCombobox(options, !multiple && values.length > 0 && text === labelOf(values[0]!) ? '' : text)
+      !filtering
+        ? options
+        : filterCombobox(options, !multiple && values.length > 0 && text === labelOf(values[0]!) ? '' : text)
     )
   );
   let matchesNow: readonly ComboboxOption[] = [];
@@ -424,6 +439,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
       activeDescendant: activeNode,
       onInput: (event: UiTextChangeEvent) => {
         query.next(event.value);
+        inputs.onQueryChange?.value?.(event.value);
         open();
       },
       onKeyDown,

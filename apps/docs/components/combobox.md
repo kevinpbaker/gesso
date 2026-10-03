@@ -23,27 +23,29 @@ Backspace in the empty field takes the last one off.
 
 ## Props
 
-| Prop             | Type                                  | Default        | What it does                                                                     |
-| ---------------- | ------------------------------------- | -------------- | -------------------------------------------------------------------------------- |
-| `options`        | `readonly ComboboxOption[]`           | required       | The options. Declare the array once.                                             |
-| `value`          | `string`                              | none           | The chosen value, `''` for none, when the application owns it.                   |
-| `defaultValue`   | `string`                              | none           | The value to start on, when the combobox owns it.                                |
-| `onChange`       | `(value: string) => void`             | none           | Called with the value chosen.                                                    |
-| `multiple`       | `boolean`                             | `false`        | Several values: each choice toggles one, and the list stays open.                |
-| `values`         | `readonly string[]`                   | none           | The chosen values in `multiple`, when the application owns them.                 |
-| `defaultValues`  | `readonly string[]`                   | none           | The values to start on in `multiple`, when the combobox owns them.               |
-| `onValuesChange` | `(values: readonly string[]) => void` | none           | Called with the values after a choice or a removal.                              |
-| `label`          | `string`                              | `''`           | Drawn above the field, and the name of the field and the list.                   |
-| `labelHidden`    | `boolean`                             | `false`        | The label still names the field but isn't drawn.                                 |
-| `placeholder`    | `string`                              | `''`           | Drawn in the empty field.                                                        |
-| `description`    | `string`                              | `''`           | Shown under the field and read after its name.                                   |
-| `error`          | `string`                              | `''`           | What's wrong, shown in place of the description; implies `invalid`.              |
-| `invalid`        | `boolean`                             | `false`        | Draws the border in `danger` and adds the `invalid` state.                       |
-| `required`       | `boolean`                             | `false`        | Adds the `required` state. It enforces nothing.                                  |
-| `disabled`       | `boolean`                             | `false`        | Refuses typing and presses, and greys the field.                                 |
-| `emptyText`      | `string`                              | `'No matches'` | Shown in the list when nothing matches.                                          |
-| `listHeight`     | `number`                              | `280`          | The list's tallest before it scrolls. The highlight is kept in view as it moves. |
-| `ref`            | `UiNodeRef`                           | none           | Receives the field, for focusing it or anchoring something to it.                |
+| Prop             | Type                                  | Default        | What it does                                                                                  |
+| ---------------- | ------------------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `options`        | `readonly ComboboxOption[]`           | required       | The options. Declare the array once.                                                          |
+| `value`          | `string`                              | none           | The chosen value, `''` for none, when the application owns it.                                |
+| `defaultValue`   | `string`                              | none           | The value to start on, when the combobox owns it.                                             |
+| `onChange`       | `(value: string) => void`             | none           | Called with the value chosen.                                                                 |
+| `multiple`       | `boolean`                             | `false`        | Several values: each choice toggles one, and the list stays open.                             |
+| `values`         | `readonly string[]`                   | none           | The chosen values in `multiple`, when the application owns them.                              |
+| `defaultValues`  | `readonly string[]`                   | none           | The values to start on in `multiple`, when the combobox owns them.                            |
+| `onValuesChange` | `(values: readonly string[]) => void` | none           | Called with the values after a choice or a removal.                                           |
+| `label`          | `string`                              | `''`           | Drawn above the field, and the name of the field and the list.                                |
+| `labelHidden`    | `boolean`                             | `false`        | The label still names the field but isn't drawn.                                              |
+| `placeholder`    | `string`                              | `''`           | Drawn in the empty field.                                                                     |
+| `description`    | `string`                              | `''`           | Shown under the field and read after its name.                                                |
+| `error`          | `string`                              | `''`           | What's wrong, shown in place of the description; implies `invalid`.                           |
+| `invalid`        | `boolean`                             | `false`        | Draws the border in `danger` and adds the `invalid` state.                                    |
+| `required`       | `boolean`                             | `false`        | Adds the `required` state. It enforces nothing.                                               |
+| `disabled`       | `boolean`                             | `false`        | Refuses typing and presses, and greys the field.                                              |
+| `emptyText`      | `string`                              | `'No matches'` | Shown in the list when nothing matches.                                                       |
+| `onQueryChange`  | `(query: string) => void`             | none           | Called with the text as it's typed, for a list searched somewhere else.                       |
+| `filter`         | `boolean`                             | `true`         | Filters `options` by what's typed. `false` shows them as given, already narrowed by a search. |
+| `listHeight`     | `number`                              | `280`          | The list's tallest before it scrolls. The highlight is kept in view as it moves.              |
+| `ref`            | `UiNodeRef`                           | none           | Receives the field, for focusing it or anchoring something to it.                             |
 
 A `ComboboxOption` is a `value` and a `label`, plus an optional `detail`
 drawn quieter beside the label (a handle, a team), `keywords` it also
@@ -61,6 +63,29 @@ for a caller that wants to show a count or test its own options.
 A single combobox showing its own value's label lists everything, since
 the label is what's chosen, not a search for it. Focusing the field
 selects that label, so the first character typed starts a new search.
+
+## Searching somewhere else
+
+A list too long to hand the component, such as every issue in a
+workspace held by a data worker, is searched where it lives. Pass
+`onQueryChange` to hear the text as it's typed, send it to the search,
+and pass what comes back as `options` with `filter={false}`, so the
+combobox shows the results as they are rather than filtering them
+again:
+
+```tsx
+<Combobox
+  label="Parent issue"
+  filter={false}
+  options={found}
+  onQueryChange={query => search.send.find(query)}
+  onChange={key => search.send.setParent(key)}
+/>
+```
+
+The label shown for a chosen value is looked up in the current
+`options`, so a search that moves on can leave the field blank; a caller
+that keeps a value shown keeps its option in the list.
 
 ## Keyboard
 

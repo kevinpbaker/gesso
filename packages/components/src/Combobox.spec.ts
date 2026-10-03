@@ -171,6 +171,28 @@ describe('Combobox', () => {
     expect(ui.runtime.input.focus.focusedNode).toBe(field());
   });
 
+  it('hands what is typed to a search elsewhere, and lists what it found as given', async () => {
+    const found = new BehaviorSubject<readonly ComboboxOption[]>([]);
+    const queries: string[] = [];
+    mount({
+      defaultValue: '',
+      filter: false,
+      options: found,
+      onQueryChange: (query: string) => {
+        queries.push(query);
+        // A search that matches on something the label doesn't show.
+        found.next(query === 'w' ? [{ value: 'WEB-1', label: 'Fix the login redirect' }] : []);
+      }
+    });
+    await focus();
+    await type('w');
+    expect(queries).toEqual(['w']);
+    expect(options()).toEqual(['Fix the login redirect']);
+    expect(highlighted()).toBe('Fix the login redirect');
+    await key('Enter');
+    expect(ui.getSemantics(field()).valueText).toBe('Fix the login redirect');
+  });
+
   describe('with multiple', () => {
     it('toggles values, keeps the list open, and takes the last off with Backspace', async () => {
       const changes: (readonly string[])[] = [];
