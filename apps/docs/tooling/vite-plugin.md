@@ -269,7 +269,10 @@ A value that cannot cross a channel cannot be described either. A
 `Date`, a `Map`, a class instance or a function in a contract is
 reported as a build warning naming its path, and so is an empty array
 literal with no type, `[]`, which is `never[]` until it says what it
-holds.
+holds. Bytes are the exception in a command: an `ArrayBuffer` or a
+typed array there crosses as itself and is described as a base64
+string tagged `x-gesso-binary`, which the agent surface decodes. In a
+view key they are still a warning.
 
 It needs TypeScript 7 in the project, which is what reads the types.
 Without it the plugin says so once and the application runs

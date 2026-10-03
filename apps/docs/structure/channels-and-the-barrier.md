@@ -191,6 +191,14 @@ error naming the channel, the key and the path inside it. The
 view-model layer is where rich objects become flat data, and this is
 what makes that a rule rather than a convention.
 
+**A command may carry bytes.** The rule is the differ's, and a command
+is not diffed: its argument is structured-cloned onto the owning
+thread, and an `ArrayBuffer` or a typed array clones as itself. So a
+file the person dropped crosses as its bytes, `open({ name, bytes })`,
+with no base64 pass on the render thread and no third more to copy. A
+view key still may not hold them; the plugin warns there and not in a
+command.
+
 ## What must not cross
 
 Every channel hop is a message. View state that round-trips to another

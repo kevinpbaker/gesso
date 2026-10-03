@@ -230,10 +230,39 @@ const NOT_PLAIN = new Set([
   'BigUint64Array'
 ]);
 
+/**
+ * Bytes, which a command may carry and a view key may not.
+ *
+ * A command's argument is structured-cloned onto the owning thread, and
+ * a typed array or an `ArrayBuffer` clones as itself: a file a person
+ * dropped crosses as its bytes, with no encoding pass on the render
+ * thread. A view key is diffed, and a differ that compares bytes by
+ * reference reports a change on every emission, so there they stay
+ * unplain. In a command's schema they are a base64 string, which is
+ * what an agent can write, tagged with the type the command expects so
+ * the agent surface can turn the string back into it.
+ */
+export const BINARY = new Set([
+  'ArrayBuffer',
+  'Int8Array',
+  'Uint8Array',
+  'Uint8ClampedArray',
+  'Int16Array',
+  'Uint16Array',
+  'Int32Array',
+  'Uint32Array',
+  'Float32Array',
+  'Float64Array',
+  'BigInt64Array',
+  'BigUint64Array'
+]);
+
 /** Turns checker types into JSON Schema for one module's channels. */
 class Describer {
   readonly warnings: string[] = [];
   private readonly flags: TypeScriptApi['TypeFlags'];
+  /** Describing a command's parameters, where bytes are allowed; see `BINARY`. */
+  private inCommand = false;
   /** Types being described right now, to notice a type that contains itself. */
   private readonly inProgress = new Set<number>();
   /** Types found to contain themselves, which are described once in `$defs`. */
@@ -295,6 +324,7 @@ class Describer {
     this.defs = new Map();
     const properties: Record<string, JsonSchema> = {};
     const required: string[] = [];
+    this.inCommand = true;
     parameters.forEach((parameter, index) => {
       const parameterType = this.checker.getTypeOfSymbol(parameter);
       const optional = parameterType !== undefined && this.includesUndefined(parameterType);
@@ -306,6 +336,7 @@ class Describer {
         required.push(parameter.name);
       }
     });
+    this.inCommand = false;
     const input: JsonSchema = { type: 'object', properties, additionalProperties: false };
     if (required.length > 0) {
       input.required = required;
@@ -483,6 +514,9 @@ class Describer {
   private object(type: TsApi.Type, path: string): JsonSchema {
     const checker = this.checker;
     const symbolName = type.getSymbol()?.name;
+    if (symbolName !== undefined && this.inCommand && BINARY.has(symbolName)) {
+      return { type: 'string', contentEncoding: 'base64', 'x-gesso-binary': symbolName };
+    }
     if (symbolName !== undefined && NOT_PLAIN.has(symbolName)) {
       return this.unplain(path, `a ${symbolName}`);
     }

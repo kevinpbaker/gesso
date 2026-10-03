@@ -54,6 +54,8 @@ export const Catalog = defineChannel('catalog', {
     select(...ids: string[]): void;
     /** @hidden */
     debugReset(): void;
+    /** A picture of the product, as the file it came from. */
+    attach(file: { name: string; bytes: Uint8Array }, thumbnail: ArrayBuffer | null): void;
   }
 });
 
@@ -191,6 +193,25 @@ describe('a contract, read by the checker', () => {
     expect(select.idempotent).toBe(true);
     expect(select.input.properties).toEqual({ ids: { type: 'array', items: { type: 'string' } } });
     expect(debugReset).toMatchObject({ parameters: [], hidden: true });
+  });
+
+  it('lets a command carry bytes, described as base64 tagged with what they become', () => {
+    const { attach } = catalog.channels.get('Catalog')!.commands;
+    expect(attach.input.properties).toEqual({
+      file: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          bytes: { type: 'string', contentEncoding: 'base64', 'x-gesso-binary': 'Uint8Array' }
+        },
+        required: ['name', 'bytes']
+      },
+      thumbnail: {
+        anyOf: [{ type: 'string', contentEncoding: 'base64', 'x-gesso-binary': 'ArrayBuffer' }, { type: 'null' }]
+      }
+    });
+    // Bytes in a command are not a warning; bytes in a view still are.
+    expect(catalog.warnings.some(warning => warning.includes('attach'))).toBe(false);
   });
 
   it('names what it could not describe, and where', () => {
