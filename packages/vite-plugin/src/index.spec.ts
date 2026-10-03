@@ -19,6 +19,19 @@ describe('the conditions dependencies resolve with', () => {
   });
 
   it('leaves them alone when asked to', () => {
-    expect(configOf(gesso({ workerConditions: false }))).toBeNull();
+    expect((configOf(gesso({ workerConditions: false })) as { resolve?: unknown }).resolve).toBeUndefined();
+  });
+});
+
+describe('the format workers are built in', () => {
+  it('is ES modules, so a worker can load a chunk on demand', () => {
+    // Vite's default is IIFE, which cannot split: a dynamic import in
+    // the render worker was inlined into it.
+    expect((configOf(gesso()) as { worker: { format: string } }).worker.format).toBe('es');
+  });
+
+  it("is the application's when it chose one", () => {
+    const hook = gesso().config as unknown as (config: object, env: object) => { worker?: unknown };
+    expect(hook({ worker: { format: 'iife' } }, { command: 'build', mode: 'production' }).worker).toBeUndefined();
   });
 });

@@ -207,6 +207,20 @@ that ship both list `worker` first. The main thread resolves the same
 way: a worker build runs in a page as well. To resolve as Vite does by
 default, pass `workerConditions: false`.
 
+## Workers are built as modules
+
+The workers the plugin constructs are module workers, so it builds them
+as ES modules too, and a worker can load a chunk when it needs one:
+
+```ts
+const { htmlToMarkdown } = await import('./htmlMarkdown');
+```
+
+Vite builds workers as IIFE unless told otherwise, and an IIFE cannot
+be split, so before this a dynamic import in a worker was inlined into
+it and its module went into every page load. An application that sets
+`worker.format` itself keeps its choice.
+
 ## Options
 
 | Option             | Default    | What it does                                                          |
