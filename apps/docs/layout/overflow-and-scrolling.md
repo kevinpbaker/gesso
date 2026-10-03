@@ -189,6 +189,18 @@ mouse wheel never sends an event that doesn't look notched, so once one
 arrives the wheel is taken to be precise for as long as events keep
 coming (400 ms after each), which covers a gesture and its momentum.
 
+A trackpad also sends on its own clock rather than the display's, so at
+a steady speed a frame gets two of its steps, now and then one or three,
+and on a 120 Hz display sometimes none. Applied as they come, a steady
+flick moves the page unevenly, which reads as judder. The runtime paces a
+precision device's steps instead, as a browser resamples scroll input
+for a native page: each frame moves by the rate the steps have been
+arriving at, never more than a frame behind, and what's left is applied
+as soon as the input stops, so the page ends where the steps add up to.
+A gesture's first frame, a push the other way and a sudden harder one
+apply at once, so pacing evens out a stream without adding a delay to
+it. Every step counts: several arriving between two frames add up.
+
 A trackpad's steps can be a fraction of a pixel, and the offset keeps
 them exactly, so they add up. What's drawn lands on a whole device pixel,
 as a browser draws scrolled content: text drawn between pixels

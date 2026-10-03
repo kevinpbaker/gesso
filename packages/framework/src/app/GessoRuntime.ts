@@ -2088,7 +2088,11 @@ export class GessoRuntime {
       // The application's root, not the layout root that wraps it, for
       // the reason the keyboard's below gives: `overscrollBehavior` set
       // on the app's own top element has to be the one that is read.
-      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink, () => this.appRoot ?? root),
+      // Paced: a trackpad's steps are spread evenly over frames, which a
+      // runtime can do because it advances the controller each frame.
+      wheel: new UiWheelController(hitTester, this.dispatcher, scrollSink, () => this.appRoot ?? root, undefined, {
+        pace: true
+      }),
       // Unfocused keys land on the application's root, not the layout
       // root that wraps it: the wrapper is the runtime's, and an app
       // listening for Escape on its own top element would otherwise
@@ -3025,6 +3029,13 @@ export class GessoRuntime {
       () => this.graph.hasEnvironmentDirty(),
       () => this.graph.processEnvironmentDirty()
     );
+
+    // A trackpad's steps, paced over frames (see `UiWheelController.advance`).
+    // Before the lazy lists read the offset, so the rows this frame's step
+    // reveals are built on it.
+    if (this.input.wheel.advance()) {
+      this.scheduler.wake();
+    }
 
     // Lazy lists decide which rows to mount from the scroll offset the
     // frame is about to lay out with, so rows a scroll reveals are built,

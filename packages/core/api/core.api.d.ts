@@ -2843,7 +2843,9 @@ declare class UiWheelController {
   private readonly now;
   constructor(hitTester: HitTester, dispatcher: UiInputDispatcher, scrollSink: ScrollSink,
   rootNode?: (() => UiNode | null) | null,
-  now?: () => number);
+  now?: () => number, options?: UiWheelControllerOptions);
+  private readonly paced;
+  private readonly pacing;
   private preciseUntil;
   lastWheelTarget: UiNode | null;
   wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number): UiWheelEvent;
@@ -2853,9 +2855,13 @@ declare class UiWheelController {
   private scrollChain;
   private appContainsOverscroll;
   private applyDelta;
+  advance(): boolean;
   private toPixels;
 }
 declare function isScrollContainer(node: UiNode): boolean;
+interface UiWheelControllerOptions {
+  readonly pace?: boolean;
+}
 interface PointerControllerOptions {
   slop?: number;
   touchSlop?: number;
