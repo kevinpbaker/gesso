@@ -1544,9 +1544,11 @@ type ShellToRuntimeMessage = {
   type: 'compositionEnd';
   text: string;
   at?: number;
-} | {
+} |
+{
   type: 'paste';
   text: string;
+  html?: string;
   at?: number;
 } |
 {
@@ -2373,7 +2375,7 @@ interface EditingProxySink {
   compositionStart(): void;
   compositionUpdate(text: string, caret: number): void;
   compositionEnd(text: string): void;
-  paste(text: string): void;
+  paste(text: string, html: string | null): void;
   blur(): void;
   keyDown?(event: KeyboardEvent): void;
   keyUp?(event: KeyboardEvent): void;
@@ -2406,7 +2408,7 @@ interface SemanticsMirrorSink {
   action(action: UiSemanticsAction): void;
   keyDown?(event: KeyboardEvent): void;
   keyUp?(event: KeyboardEvent): void;
-  paste?(text: string): void;
+  paste?(text: string, html: string | null): void;
 }
 interface EditingMirrorTarget {
   readonly active: boolean;
@@ -3034,7 +3036,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-CB55E_uy.js";
+} from "./index-NlXolFvd.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3520,7 +3522,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CB55E_uy.js";
+} from "../index-NlXolFvd.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

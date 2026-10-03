@@ -10,7 +10,8 @@ export interface EditingProxySink {
   compositionStart(): void;
   compositionUpdate(text: string, caret: number): void;
   compositionEnd(text: string): void;
-  paste(text: string): void;
+  /** Pasted text, and the clipboard's HTML when it held some. */
+  paste(text: string, html: string | null): void;
   /** The proxy lost focus to something outside the app. */
   blur(): void;
   /**
@@ -367,8 +368,12 @@ export class EditingProxy {
       const clipboard = (event as ClipboardEvent).clipboardData;
       event.preventDefault();
       const text = clipboard?.getData('text/plain') ?? '';
-      if (text.length > 0) {
-        this.sink.paste(text);
+      // The HTML as well, when the clipboard has it: a copy from a web
+      // page or a document carries headings, lists and links there, and
+      // an editor that keeps structure wants them.
+      const html = clipboard?.getData('text/html') ?? '';
+      if (text.length > 0 || html.length > 0) {
+        this.sink.paste(text, html.length > 0 ? html : null);
       }
     };
 

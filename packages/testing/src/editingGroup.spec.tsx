@@ -121,6 +121,15 @@ describe('a selection across the fields of an editing group', () => {
     expect(edits.map(edit => edit.inputType)).toEqual(['deleteContentBackward', 'insertLineBreak']);
   });
 
+  it("hands a paste over it to the group, with the clipboard's HTML", async () => {
+    await mount();
+    await caretIn('p0', 2);
+    await press('ArrowDown', { shift: true });
+    ui.fireEvent.paste('one', '<b>one</b>');
+    await ui.settle();
+    expect(edits.at(-1)).toMatchObject({ inputType: 'insertFromPaste', data: 'one', html: '<b>one</b>' });
+  });
+
   it('selects the whole group with select all', async () => {
     await mount();
     await caretIn('p1', 0);

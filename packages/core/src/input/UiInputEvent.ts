@@ -346,7 +346,14 @@ export class UiKeyboardEvent extends UiInputEvent {
 export class UiBeforeInputEvent extends UiInputEvent {
   constructor(
     readonly inputType: string,
-    readonly data: string | null
+    readonly data: string | null,
+    /**
+     * For `insertFromPaste`, the clipboard's HTML when it held some,
+     * else null. `data` is always its plain text, which is what the
+     * field inserts; an editor that keeps structure (a heading, a list,
+     * a link) can cancel the edit and convert this instead.
+     */
+    readonly html: string | null = null
   ) {
     super(UiEventType.BeforeInput);
   }
@@ -365,7 +372,11 @@ export class UiBeforeInputEvent extends UiInputEvent {
  * takes in the other direction.
  */
 export class UiPasteEvent extends UiInputEvent {
-  constructor(readonly text: string) {
+  constructor(
+    readonly text: string,
+    /** The clipboard's HTML when it held some, else null. */
+    readonly html: string | null = null
+  ) {
     super(UiEventType.Paste);
   }
 }

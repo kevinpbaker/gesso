@@ -92,7 +92,7 @@ export interface FireEvent {
    * proxy's `beforeinput` would deliver it.
    */
   type(text: string): void;
-  paste(text: string): void;
+  paste(text: string, html?: string): void;
 }
 
 function modifiersOf(partial: Partial<UiKeyModifiers> | undefined): UiKeyModifiers {
@@ -165,7 +165,7 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
     shiftTab: () => runtime.input.focus.focusPrevious(),
 
     type: text => void runtime.input.editing.insertText(text),
-    paste: text => void runtime.input.editing.paste(text)
+    paste: (text, html) => void runtime.input.editing.paste(text, html ?? null)
   };
 }
 

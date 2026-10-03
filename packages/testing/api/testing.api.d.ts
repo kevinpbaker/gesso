@@ -60,7 +60,7 @@ interface FireEvent {
   tab(): boolean;
   shiftTab(): boolean;
   type(text: string): void;
-  paste(text: string): void;
+  paste(text: string, html?: string): void;
 }
 declare function createFireEvent(runtime: GessoRuntime): FireEvent;
 interface PointerOptions {

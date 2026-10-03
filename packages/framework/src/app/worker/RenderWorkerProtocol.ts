@@ -135,7 +135,8 @@ export type ShellToRuntimeMessage =
   | { type: 'compositionUpdate'; text: string; caret: number; at?: number }
   /** The committed text; empty when the composition was cancelled. */
   | { type: 'compositionEnd'; text: string; at?: number }
-  | { type: 'paste'; text: string; at?: number }
+  /** `html` is the clipboard's HTML, when it held some. */
+  | { type: 'paste'; text: string; html?: string; at?: number }
   /** The editing proxy lost focus to something outside the app. */
   | { type: 'blur' }
   /** The page was hidden or shown (document.visibilityState). */

@@ -463,7 +463,7 @@ export class WorkerApp {
       compositionStart: () => this.post({ type: 'compositionStart' }),
       compositionUpdate: (text, caret) => this.post({ type: 'compositionUpdate', text, caret }),
       compositionEnd: text => this.post({ type: 'compositionEnd', text }),
-      paste: text => this.post({ type: 'paste', text }),
+      paste: (text, html) => this.post({ type: 'paste', text, ...(html === null ? {} : { html }) }),
       blur: () => this.post({ type: 'blur' }),
       // From the proxy, a printable key's text follows it as a
       // `beforeinput`; see `forwardKeyDown`.
@@ -481,7 +481,7 @@ export class WorkerApp {
           action: action => this.post({ type: 'semanticsAction', action }),
           keyDown: event => this.forwardKeyDown(event),
           keyUp: event => this.forwardKeyUp(event),
-          paste: text => this.post({ type: 'paste', text })
+          paste: (text, html) => this.post({ type: 'paste', text, ...(html === null ? {} : { html }) })
         },
         this.proxy
       );

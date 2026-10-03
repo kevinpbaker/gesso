@@ -424,7 +424,7 @@ export class RenderWorkerApp {
         runtime.input.editing.compositionEnd(message.text);
         break;
       case 'paste':
-        runtime.input.editing.paste(message.text);
+        runtime.input.editing.paste(message.text, message.html ?? null);
         break;
       case 'blur':
         runtime.input.focus.blur();

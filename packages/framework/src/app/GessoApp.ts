@@ -356,7 +356,7 @@ export class GessoApp {
       compositionStart: () => editing.compositionStart(),
       compositionUpdate: (text, caret) => editing.compositionUpdate(text, caret),
       compositionEnd: text => editing.compositionEnd(text),
-      paste: text => editing.paste(text),
+      paste: (text, html) => editing.paste(text, html),
       blur: () => this.runtime.input.focus.blur()
     });
     this.runtime.setTextInputSource('proxy');
@@ -425,7 +425,7 @@ export class GessoApp {
         // A paste onto something that is not a text field lands here,
         // because the element holding focus while the app has it is
         // one of the mirror's and not the canvas.
-        paste: text => this.runtime.input.editing.paste(text)
+        paste: (text, html) => this.runtime.input.editing.paste(text, html)
       },
       this.proxy
     );
