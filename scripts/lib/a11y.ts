@@ -726,7 +726,7 @@ async function tabThrough(devtools: DevTools, before: readonly AxNode[]): Promis
       }
       continue;
     }
-    visited.push(focused);
+    visited.push(nameOf(focused));
     previous = focused;
     if (visited.length >= controls + 3) {
       break; // enough presses to have wrapped, whatever the order
@@ -755,6 +755,12 @@ function withoutWrap(stops: readonly string[]): string[] {
 }
 
 const UNNAMED_STOP = 'a focusable node with no semantics';
+
+/** A focused element's description, without the identity the walk compares by. */
+function nameOf(active: string): string {
+  const at = active.indexOf('\u0000');
+  return at === -1 ? active : active.slice(at + 1);
+}
 
 /**
  * Where focus comes to rest after a key: a value different from
@@ -802,7 +808,9 @@ async function activeElement(devtools: DevTools): Promise<string> {
        const role = el.getAttribute('role');
        if (role === null) return '';
        const name = el.getAttribute('aria-label') ?? el.textContent ?? '';
-       return role + " '" + name.replace(/\\s+/g, ' ').trim() + "'";
+       // The element as well as its name: two checkboxes both named
+       // 'Mark done' are two stops, and the walk has to see it move.
+       return (el.id || el.tagName) + '\\u0000' + role + " '" + name.replace(/\\s+/g, ' ').trim() + "'";
      })()`
   );
 }
