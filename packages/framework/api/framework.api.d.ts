@@ -3185,7 +3185,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-BuFLkQI2.js";
+} from "./index-CM-8dpER.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3907,7 +3907,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-BuFLkQI2.js";
+} from "../index-CM-8dpER.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
