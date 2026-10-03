@@ -123,6 +123,18 @@ While the list is open:
 Opening the list puts the highlight on whatever is already chosen, so
 the walk starts where the value is rather than at the top.
 
+### Type-ahead and the page's shortcuts
+
+A letter the select uses is the select's: it is consumed, so a page's
+single-letter [shortcut](/interaction/shortcuts) on the same key does
+not also run. With the list open that is every printed character,
+whether or not an option starts with it, because the list has the
+keyboard to itself and a shortcut acting on the page behind it would be
+acting on something the reader can't see. With the list closed it is
+only a letter that picks an option; one that picks nothing goes on to
+the shortcuts. A key held with `Ctrl`, `Cmd` or `Alt` is never
+type-ahead, so `Mod+K` is a shortcut wherever focus is.
+
 ### Type-ahead is one character
 
 It is a prefix match, case-insensitive, over the options that can be
