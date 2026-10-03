@@ -31,6 +31,13 @@ export interface UiEditingGroup {
    * field's selected text, joined by newlines.
    */
   copyText?(start: UiTextPosition, end: UiTextPosition): string;
+  /**
+   * A selection across fields began, moved, or ended (null). For a
+   * command the application runs over it, such as making it bold:
+   * keys reach the focused field first, and only the group knows what
+   * the selection covers.
+   */
+  onSelectionChange?(selection: { readonly start: UiTextPosition; readonly end: UiTextPosition } | null): void;
 }
 
 /** A place in a field's text. */

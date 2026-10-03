@@ -279,6 +279,12 @@ list under it gives a heading, so it changes its document, which
 changes the fields, and puts the caret where it belongs. A selection
 inside one field is that field's, edited as always.
 
+**Commands over it are yours too.** A key reaches the focused field
+first, and that field holds only its own part, so a group that runs
+its own commands over the whole selection (bold, a link, indenting
+every block in it) listens with `onSelectionChange`, which hears the
+selection begin, move and end.
+
 **Copy and cut take all of it.** The shell is handed the selected text
 while such a selection is up, so the browser's own copy and cut work on
 it. By default that's each field's selected text joined by newlines;

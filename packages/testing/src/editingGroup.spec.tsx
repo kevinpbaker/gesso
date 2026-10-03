@@ -14,6 +14,7 @@ import type { Rendered } from './renderTest';
 
 let ui: Rendered;
 let edits: UiGroupEdit[] = [];
+let selections: ({ start: number; end: number } | null)[] = [];
 afterEach(() => ui?.unmount());
 
 const TEXTS = ['First paragraph', 'Second paragraph', 'Third paragraph'];
@@ -21,6 +22,8 @@ const TEXTS = ['First paragraph', 'Second paragraph', 'Third paragraph'];
 function Document(inputs: Inputs<{ copyText?: boolean }>, _ctx: ComponentContext) {
   const group = {
     onEdit: (edit: UiGroupEdit) => void edits.push(edit),
+    onSelectionChange: (selection: { start: { offset: number }; end: { offset: number } } | null) =>
+      void selections.push(selection === null ? null : { start: selection.start.offset, end: selection.end.offset }),
     ...(inputs.copyText.value === true
       ? { copyText: (start: { offset: number }, end: { offset: number }) => `copied ${start.offset}-${end.offset}` }
       : {})
@@ -39,6 +42,7 @@ function Document(inputs: Inputs<{ copyText?: boolean }>, _ctx: ComponentContext
 
 async function mount(copyText = false): Promise<void> {
   edits = [];
+  selections = [];
   ui = renderTest(createComponent(Document, { copyText }), { width: 600, height: 400 });
   await ui.settle();
 }
@@ -128,6 +132,17 @@ describe('a selection across the fields of an editing group', () => {
     ui.fireEvent.paste('one', '<b>one</b>');
     await ui.settle();
     expect(edits.at(-1)).toMatchObject({ inputType: 'insertFromPaste', data: 'one', html: '<b>one</b>' });
+  });
+
+  it('tells the group when a selection across fields begins, moves and ends', async () => {
+    await mount();
+    await caretIn('p0', 4);
+    await press('ArrowDown', { shift: true });
+    await press('ArrowRight', { shift: true });
+    await press('ArrowLeft');
+    expect(selections.at(0)?.start).toBe(4);
+    expect(selections.length).toBeGreaterThanOrEqual(3);
+    expect(selections.at(-1)).toBeNull();
   });
 
   it('selects the whole group with select all', async () => {

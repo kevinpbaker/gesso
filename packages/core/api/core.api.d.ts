@@ -935,6 +935,10 @@ declare function assertModifierList(node: UiNode, value: unknown): readonly UiMo
 interface UiEditingGroup {
   onEdit(edit: UiGroupEdit): void;
   copyText?(start: UiTextPosition, end: UiTextPosition): string;
+  onSelectionChange?(selection: {
+    readonly start: UiTextPosition;
+    readonly end: UiTextPosition;
+  } | null): void;
 }
 interface UiTextPosition {
   readonly node: UiNode;
@@ -6866,7 +6870,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-q4HgduT7.js";
+} from "./index-IYYqrCb3.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7798,7 +7802,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-q4HgduT7.js";
+} from "./index-IYYqrCb3.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
