@@ -48,7 +48,7 @@ const PAGE_COUNT = Math.ceil(RECORDS.length / PER_PAGE);
  *
  * What a screen reader hears is not what the screen shows. Each
  * numbered control is named "Page 4", not "4", the one you are on
- * carries the `selected` state rather than only the accent pill, the
+ * carries the `current` state rather than only the accent pill, the
  * ellipsis is decorative and cannot be reached at all, and the strip
  * itself is a navigation landmark named "Observations", because a
  * landmark with no name is a line in a list saying nothing.
