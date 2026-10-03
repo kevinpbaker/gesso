@@ -78,7 +78,7 @@ export const CONTROL_ROLES = new Set([
 ]);
 const READY_TIMEOUT_MS = 45_000;
 
-interface AxNode {
+export interface AxNode {
   nodeId: string;
   ignored?: boolean;
   role?: { value?: string };
@@ -86,7 +86,36 @@ interface AxNode {
   childIds?: string[];
   backendDOMNodeId?: number;
   value?: { value?: unknown };
-  properties?: { name: string; value: { value?: unknown } }[];
+  properties?: AxProperty[];
+}
+
+/**
+ * A property as Chrome reports it. A relation, such as
+ * `activedescendant`, has no `value`: it names nodes instead.
+ */
+export interface AxProperty {
+  name: string;
+  value: { value?: unknown; relatedNodes?: { backendDOMNodeId?: number; idref?: string; text?: string }[] };
+}
+
+/**
+ * One property as the report prints it. A relation prints the name of
+ * the node it points at, which is what a screen reader speaks when the
+ * active descendant moves; one whose target isn't in the tree prints
+ * `missing`, because a reference to nothing is a bug worth a diff.
+ */
+export function describeProperty(property: AxProperty, nodes: readonly AxNode[]): string {
+  const related = property.value.relatedNodes;
+  if (related === undefined) {
+    return `${property.name}=${String(property.value.value)}`;
+  }
+  const targets = related.map(target => {
+    const node = nodes.find(
+      candidate => candidate.backendDOMNodeId !== undefined && candidate.backendDOMNodeId === target.backendDOMNodeId
+    );
+    return node?.name?.value ?? target.text ?? (node === undefined ? 'missing' : '(unnamed)');
+  });
+  return `${property.name}=${targets.length === 0 ? 'none' : targets.join(' / ')}`;
 }
 
 /** One line of the expected tree: a role, its accessible name, and any states. */
@@ -567,7 +596,7 @@ function renderReport(
       const name = node.name?.value ?? '';
       const states = (node.properties ?? [])
         .filter(property => !['focusable', 'editable', 'settable', 'multiline', 'readonly'].includes(property.name))
-        .map(property => `${property.name}=${String(property.value.value)}`)
+        .map(property => describeProperty(property, nodes))
         .join(', ');
       const value = valueOf(node) ?? '';
       return `| ${cell(role)} | ${cell(name)} | ${cell(states)} | ${cell(value)} |`;
