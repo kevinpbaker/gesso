@@ -4958,8 +4958,27 @@ interface UiSemanticsRecord {
   readonly level?: number;
 }
 type UiSemanticsMap = ReadonlyMap<string, UiSemanticsRecord>;
-declare function buildSemanticsTree(root: UiNode): Map<string, UiSemanticsRecord>;
-declare function buildSemanticsSubtree(node: UiNode, parent: string | null, index: number, inert: boolean): Map<string, UiSemanticsRecord> | null;
+declare function buildSemanticsTree(root: UiNode, memory?: SemanticsMemory): Map<string, UiSemanticsRecord>;
+interface SemanticsMemory {
+  readonly described: WeakSet<UiNode>;
+  readonly spans: WeakMap<UiNode, SemanticsSpan>;
+}
+interface SemanticsSpan {
+  readonly parent: string | null;
+  readonly first: string | null;
+  readonly count: number;
+}
+declare function semanticsMemory(): SemanticsMemory;
+declare function buildSemanticsSubtree(node: UiNode, parent: string | null, index: number, inert: boolean, memory?: SemanticsMemory): Map<string, UiSemanticsRecord> | null;
+interface SemanticsReuse {
+  readonly previous: UiSemanticsMap;
+  readonly childrenOf: (parent: string | null) => readonly string[];
+  readonly memory: SemanticsMemory;
+  readonly unchanged: (node: UiNode) => boolean;
+  readonly reused: string[];
+  readonly renumbered: string[];
+}
+declare function rebuildSemanticsSubtree(node: UiNode, parent: string | null, index: number, inert: boolean, reuse: SemanticsReuse): Map<string, UiSemanticsRecord> | null;
 declare function semanticsInertAbove(node: UiNode): boolean;
 declare const TEXT_RUN_ID_SEPARATOR = "#run";
 declare function textRunOfRecordId(id: string): {
@@ -4977,6 +4996,7 @@ type UiSemanticsPatch = {
   readonly id: string;
 };
 declare function diffSemantics(previous: UiSemanticsMap, next: UiSemanticsMap): UiSemanticsPatch[];
+declare function dropIndexShifts(previous: UiSemanticsMap, next: UiSemanticsMap, patches: readonly UiSemanticsPatch[]): UiSemanticsPatch[];
 declare function recordsEqual(a: UiSemanticsRecord, b: UiSemanticsRecord): boolean;
 interface UiSemanticsBox {
   readonly id: string;
@@ -5055,7 +5075,6 @@ export {
   CaretRect,
   caretRectFor,
   caretVisibleAt,
-  Cf,
   CharacterCountTextMeasurer,
   ChildrenBindingId,
   clampSize,
@@ -5152,6 +5171,7 @@ export {
   drawOverlayShapes,
   DrawStats,
   drawText,
+  dropIndexShifts,
   dropTarget,
   DropTargetOptions,
   easings,
@@ -5289,6 +5309,7 @@ export {
   isVideoSurface,
   isWebGPUAvailable,
   KeyboardControllerOptions,
+  kf,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
@@ -5462,6 +5483,7 @@ export {
   RangeSourceOptions,
   Reactive,
   readMp3Header,
+  rebuildSemanticsSubtree,
   recordsEqual,
   registerFontStack,
   relativeLuminance,
@@ -5536,6 +5558,10 @@ export {
   selectionRects,
   selectionRectsIn,
   semanticsInertAbove,
+  semanticsMemory,
+  SemanticsMemory,
+  SemanticsReuse,
+  SemanticsSpan,
   setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
@@ -6036,6 +6062,7 @@ import {
   drawOverlayShapes,
   DrawStats,
   drawText,
+  dropIndexShifts,
   dropTarget,
   DropTargetOptions,
   easings,
@@ -6347,6 +6374,7 @@ import {
   RangeSourceOptions,
   Reactive,
   readMp3Header,
+  rebuildSemanticsSubtree,
   recordsEqual,
   registerFontStack,
   relativeLuminance,
@@ -6421,6 +6449,10 @@ import {
   selectionRects,
   selectionRectsIn,
   semanticsInertAbove,
+  semanticsMemory,
+  SemanticsMemory,
+  SemanticsReuse,
+  SemanticsSpan,
   setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
@@ -6761,7 +6793,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-BbpCIppX.js";
+} from "./index-5x0wGgJB.js";
 export {
   accumulatedOffsetTo,
   AlignContent,
@@ -6879,6 +6911,7 @@ export {
   dragSource,
   drawOverlayShapes,
   drawText,
+  dropIndexShifts,
   dropTarget,
   easings,
   EditableLayout,
@@ -7071,6 +7104,7 @@ export {
   raiseContrast,
   rangeSource,
   readMp3Header,
+  rebuildSemanticsSubtree,
   recordsEqual,
   registerFontStack,
   relativeLuminance,
@@ -7120,6 +7154,7 @@ export {
   selectionRects,
   selectionRectsIn,
   semanticsInertAbove,
+  semanticsMemory,
   setLinkHover,
   setMatchRanges,
   setPerformanceMarks,
@@ -7356,6 +7391,9 @@ export {
   type ScrollViewProps,
   type SelectionControllerOptions,
   type SelectionHost,
+  type SemanticsMemory,
+  type SemanticsReuse,
+  type SemanticsSpan,
   type SharedClaim,
   type SharedElementArgs,
   type SheetHeaderRenderer,
@@ -7678,7 +7716,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-BbpCIppX.js";
+} from "./index-5x0wGgJB.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

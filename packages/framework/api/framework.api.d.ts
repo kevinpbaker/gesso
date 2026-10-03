@@ -1293,6 +1293,7 @@ declare class GessoRuntime {
   private semantics;
   private semanticsListener;
   private semanticsBoxes;
+  private readonly semanticsMemory;
   private lastFocusedId;
   private focusAfterReload;
   private restoringFocus;
@@ -1395,6 +1396,8 @@ declare class GessoRuntime {
   private updateSemantics;
   private rebuildSemantics;
   private rescopeSemantics;
+  private restructureSemantics;
+  private attached;
   private semanticsOwnerOf;
   private semanticIdsUnder;
   private collectSemanticsBoxes;
@@ -3026,7 +3029,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-CDaAL-r4.js";
+} from "./index-C-6fQ6Kg.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3512,7 +3515,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-CDaAL-r4.js";
+} from "../index-C-6fQ6Kg.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

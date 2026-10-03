@@ -110,8 +110,35 @@ const PRESENTATIONAL_CHILDREN: ReadonlySet<UiRole> = new Set<UiRole>([
  *      is, carrying `disabled` — unavailable is a thing to announce,
  *      hidden is not.
  */
-export function buildSemanticsTree(root: UiNode): Map<string, UiSemanticsRecord> {
-  return walk(root, null, false);
+export function buildSemanticsTree(root: UiNode, memory?: SemanticsMemory): Map<string, UiSemanticsRecord> {
+  return walk(root, null, false, memory);
+}
+
+/**
+ * What a walk leaves behind for the next one, so a structural change can
+ * be described without walking everything again.
+ *
+ * `described` is every node a walk has given a record, so a record is
+ * only ever taken back by the node that earned it: an id can come back
+ * on a new node once its old one has gone. `spans` is, for every node
+ * without a record of its own, which records it contributed to the
+ * record above it: the first, by id, and how many. An untouched
+ * transparent subtree (a block of a long document, say) is then
+ * renumbered as a run of its parent's children instead of walked.
+ */
+export interface SemanticsMemory {
+  readonly described: WeakSet<UiNode>;
+  readonly spans: WeakMap<UiNode, SemanticsSpan>;
+}
+
+export interface SemanticsSpan {
+  readonly parent: string | null;
+  readonly first: string | null;
+  readonly count: number;
+}
+
+export function semanticsMemory(): SemanticsMemory {
+  return { described: new WeakSet(), spans: new WeakMap() };
 }
 
 /**
@@ -138,9 +165,10 @@ export function buildSemanticsSubtree(
   node: UiNode,
   parent: string | null,
   index: number,
-  inert: boolean
+  inert: boolean,
+  memory?: SemanticsMemory
 ): Map<string, UiSemanticsRecord> | null {
-  const records = walk(node, parent, inert);
+  const records = walk(node, parent, inert, memory);
   const own = records.get(node.id);
   if (own === undefined) {
     return null;
@@ -150,14 +178,120 @@ export function buildSemanticsSubtree(
   return records;
 }
 
-function walk(root: UiNode, rootParent: string | null, rootInert: boolean): Map<string, UiSemanticsRecord> {
+/**
+ * What a subtree walk may take from the tree it is replacing.
+ *
+ * `previous` is the last full tree, and `unchanged(node)` says that a
+ * node and everything under it mean what they meant then: nothing in
+ * it was described differently, and it took no children and lost none.
+ * Such a node that held a record keeps it, renumbered if its siblings
+ * moved, without being described again; its descendants' records are
+ * the caller's to copy, since they are untouched and numbered among
+ * themselves. Its id is listed in `reused`.
+ */
+export interface SemanticsReuse {
+  readonly previous: UiSemanticsMap;
+  /** The ids of `previous`'s records, by parent, in index order. */
+  readonly childrenOf: (parent: string | null) => readonly string[];
+  readonly memory: SemanticsMemory;
+  readonly unchanged: (node: UiNode) => boolean;
+  readonly reused: string[];
+  /** The reused records that took a new parent or index, and nothing else new. */
+  readonly renumbered: string[];
+}
+
+/**
+ * The records of a subtree after a structural change inside it, as
+ * `buildSemanticsSubtree` gives them, but describing only what changed.
+ *
+ * A full walk asks every node what it means, and that question, the
+ * accessible name above all, is the expensive part. After a block is
+ * inserted in a long document nearly every node means what it did, and
+ * only its position among its siblings may have moved. So a subtree
+ * `reuse.unchanged` vouches for is renumbered and not described.
+ *
+ * Null under the same condition as `buildSemanticsSubtree`.
+ */
+export function rebuildSemanticsSubtree(
+  node: UiNode,
+  parent: string | null,
+  index: number,
+  inert: boolean,
+  reuse: SemanticsReuse
+): Map<string, UiSemanticsRecord> | null {
+  const records = walk(node, parent, inert, reuse.memory, reuse);
+  const own = records.get(node.id);
+  if (own === undefined) {
+    return null;
+  }
+  records.set(node.id, { ...own, index });
+  return records;
+}
+
+function walk(
+  root: UiNode,
+  rootParent: string | null,
+  rootInert: boolean,
+  memory?: SemanticsMemory,
+  reuse?: SemanticsReuse
+): Map<string, UiSemanticsRecord> {
   const records = new Map<string, UiSemanticsRecord>();
   const childCounts = new Map<string | null, number>();
+  /** The ids given to each parent's children so far, in order, for spans. */
+  const given = new Map<string | null, string[]>();
 
   const nextIndex = (parent: string | null): number => {
     const index = childCounts.get(parent) ?? 0;
     childCounts.set(parent, index + 1);
     return index;
+  };
+  const note = (parent: string | null, id: string): void => {
+    if (memory === undefined) {
+      return;
+    }
+    let list = given.get(parent);
+    if (list === undefined) {
+      given.set(parent, (list = []));
+    }
+    list.push(id);
+  };
+  /** Takes back a record nothing changed, renumbered among its new siblings. */
+  const keep = (before: UiSemanticsRecord, parent: string | null): void => {
+    const index = nextIndex(parent);
+    if (before.parent === parent && before.index === index) {
+      records.set(before.id, before);
+    } else {
+      records.set(before.id, { ...before, parent, index });
+      reuse!.renumbered.push(before.id);
+    }
+    reuse!.reused.push(before.id);
+    note(parent, before.id);
+  };
+  /**
+   * Takes back everything an untouched transparent node contributed, as
+   * a run of its parent's old children, without walking into it. False
+   * when its span can't be trusted, and it is walked.
+   */
+  const keepSpan = (node: UiNode, parent: string | null): boolean => {
+    const span = memory!.spans.get(node);
+    if (span === undefined || span.parent !== parent) {
+      return false;
+    }
+    if (span.count === 0) {
+      return true;
+    }
+    const first = span.first === null ? undefined : reuse!.previous.get(span.first);
+    if (first === undefined || first.parent !== parent) {
+      return false;
+    }
+    const ids = reuse!.childrenOf(parent).slice(first.index, first.index + span.count);
+    if (ids.length !== span.count) {
+      return false;
+    }
+    for (const id of ids) {
+      keep(reuse!.previous.get(id)!, parent);
+    }
+    return true;
   };
 
   const visit = (node: UiNode, parent: string | null, inert: boolean): void => {
@@ -165,13 +299,30 @@ function walk(root: UiNode, rootParent: string | null, rootInert: boolean): Map<
       return;
     }
     const disabled = inert || node.properties.get('disabled') === true;
+    if (reuse !== undefined && node !== root && reuse.unchanged(node)) {
+      const before = memory!.described.has(node) ? reuse.previous.get(node.id) : undefined;
+      if (before !== undefined) {
+        keep(before, parent);
+        return;
+      }
+      if (keepSpan(node, parent)) {
+        return;
+      }
+    }
     const record = describe(node, parent, disabled, nextIndex);
     if (record === null) {
+      const start = childCounts.get(parent) ?? 0;
       for (let child = node.firstChild; child !== null; child = child.nextSibling) {
         visit(child, parent, disabled);
       }
+      if (memory !== undefined) {
+        const count = (childCounts.get(parent) ?? 0) - start;
+        memory.spans.set(node, { parent, first: count === 0 ? null : given.get(parent)![start]!, count });
+      }
       return;
     }
+    memory?.described.add(node);
+    note(parent, record.id);
     const runs = linkRunsOf(node);
     if (runs.length > 0) {
       // A paragraph with links is mirrored run by run: the prose
