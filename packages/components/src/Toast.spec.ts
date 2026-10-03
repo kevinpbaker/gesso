@@ -3,6 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
+import { Column, darkTheme } from 'gesso-core';
 import { Toast, type ToastProps } from './Toast';
 
 /**
@@ -66,5 +67,22 @@ describe('where a toast is pinned', () => {
     expect([middle.bottom, middle.left, middle.right, middle.center]).toEqual([72, undefined, undefined, 'x']);
     const end = mount({ message: 'Saved', placement: 'bottom-end', offset: 16 }).entries()[0]!;
     expect([end.bottom, end.left, end.right, end.center]).toEqual([16, undefined, 16, undefined]);
+  });
+});
+
+describe('a toast declared open', () => {
+  it('takes the theme of the tree it is declared in', () => {
+    // Found in the issue tracker, which mounts a fresh toast, already
+    // open, for each change: it opened before its placeholder was in
+    // the tree, with nothing to take a theme from, and drew light on a
+    // dark app.
+    const ui = renderTest(
+      Column({ theme: darkTheme }, createComponent(Toast, { open: true, message: 'Moved 3 issues to Done' })),
+      { width: 600, height: 400 }
+    );
+    ui.frame();
+    const [entry] = ui.runtime.services.get(OverlayService).entries.value;
+    expect(entry?.environment).not.toBeNull();
+    expect(entry?.environment).toBeDefined();
   });
 });

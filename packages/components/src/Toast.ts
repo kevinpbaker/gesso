@@ -121,20 +121,38 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
         : Row({ width: 0 })
     );
 
-  inputs.open.subscribe(isOpen => {
-    if (isOpen === true && !overlay.isOpen()) {
+  let wanted = false;
+  const sync = (): void => {
+    if (wanted && !overlay.isOpen()) {
+      // A toast declared open runs this before its placeholder is in the
+      // tree, and opened then it would take no theme: it waits for it.
+      if (placeholder === null) {
+        return;
+      }
       overlay.show(body(), { ...pin(placement.value, offset.value), environment: placeholder, onClose: cancel });
       if (duration.value > 0) {
         timer = setTimeout(close, duration.value);
       }
-    } else if (isOpen !== true && overlay.isOpen()) {
+    } else if (!wanted && overlay.isOpen()) {
       close();
     }
+  };
+  inputs.open.subscribe(isOpen => {
+    wanted = isOpen === true;
+    sync();
   });
 
   // The placeholder stays where the component was declared, which
   // is how the overlay's content inherits this tree's theme.
-  return Row({ ref: (node: UiNode | null) => (placeholder = node), visible: false, width: 0, height: 0 });
+  return Row({
+    ref: (node: UiNode | null) => {
+      placeholder = node;
+      sync();
+    },
+    visible: false,
+    width: 0,
+    height: 0
+  });
 }
 
 /** Where on the bottom edge the overlay layer puts a toast. */

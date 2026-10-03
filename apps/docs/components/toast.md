@@ -71,7 +71,9 @@ panel, so the two never cover each other: `offset={72}` clears a
 Declare it inside the tree whose appearance it should match. The
 placeholder is what the overlay layer re-provides the theme, text style
 and content colour from, which is what keeps a toast raised from a dark
-panel dark.
+panel dark. That holds for a toast declared already open, too: one
+mounted afresh for each notice, keyed by it, opens once its placeholder
+is in the tree rather than before, so it has a theme to take.
 
 There is no queue and no stack. Two toasts open at once are two entries
 pinned to the same corner, drawn on top of each other, so raise one at
