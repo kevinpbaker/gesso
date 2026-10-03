@@ -83,7 +83,7 @@ Notice what isn't there. No re-render pass, so nothing to memoise and no depende
 - **Layout you can interrogate.** `engine.explain(node)` says why a box is the size it is, in sentences, in the order the rules applied. A hover inspector paints the boxes and a heatmap of what the last frame re-measured.
 - **Cost follows the change, not the tree.** A text edit deep in a 10k-node page re-measures fewer than 20 nodes. A scroll frame re-measures zero. Those are CI budgets.
 - **Two renderers, one truth.** Canvas2D and WebGPU consume the same layout records and are pixel-diffed against each other in headless Chrome.
-- **A 12 kB main thread.** The shell bundle is 12.3 kB gzipped, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
+- **A 15 kB main thread.** The shell bundle is 15.2 kB gzipped against a 20 kB budget CI enforces, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
 - **Tests without a browser.** `gesso-testing` mounts a tree on a manual clock and queries it through the same semantics tree a screen reader gets. A failing box assertion prints `explain`'s answer under it. 4,328 tests run in under thirty seconds with no browser.
 - **Routing, motion, editing, devtools.** Typed routes with guards. Springs, FLIP, and shared elements that morph across screens. A text editor with IME, undo and clipboard. A Chrome devtools panel with the tree, the frame profiler and the workers' consoles.
 
