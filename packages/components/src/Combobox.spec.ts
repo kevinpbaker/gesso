@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Column, type UiNode } from 'gesso-core';
+import { Column, editorFor, type UiNode } from 'gesso-core';
 import { Combobox, filterCombobox, type ComboboxOption } from './Combobox';
 
 const PEOPLE: readonly ComboboxOption[] = [
@@ -121,6 +121,32 @@ describe('Combobox', () => {
     await focus();
     await type('gr');
     expect(options()).toEqual(['Grace Hopper']);
+  });
+
+  it('selects the chosen label after the press that focused it, and not after the next', async () => {
+    mount({ defaultValue: 'ada' });
+    // A press focuses, then places the caret where it landed.
+    const box = ui.getLayout(field());
+    const press = async (x: number): Promise<void> => {
+      ui.fireEvent.pointerDown(box.x + x, box.y + box.height / 2);
+      ui.fireEvent.pointerUp(box.x + x, box.y + box.height / 2);
+      await ui.settle();
+    };
+    await press(20);
+    const model = editorFor(field());
+    expect([model.start, model.end]).toEqual([0, 'Ada Okafor'.length]);
+    await key('Escape');
+    // Somewhere else, or two presses this close together are a double click.
+    await press(60);
+    expect(model.collapsed).toBe(true);
+  });
+
+  it('lists under the field, as wide as it is', async () => {
+    mount({ defaultValue: '', width: 300 });
+    await focus();
+    await key('ArrowDown');
+    const list = ui.getByRole('listbox').parent!;
+    expect(ui.getLayout(list).width).toBe(ui.getLayout(field()).width);
   });
 
   it('walks past a disabled option and never chooses one', async () => {
