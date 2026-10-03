@@ -1,6 +1,9 @@
 {
   "chrome": "Google Chrome for Testing 154.0.8037.57",
   "platform": "linux",
-  "viewport": [1280, 900],
-  "captured": "2026-10-03T19:21:37.987Z"
+  "viewport": [
+    1280,
+    900
+  ],
+  "captured": "2026-10-03T22:52:12.484Z"
 }
