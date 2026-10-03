@@ -52,6 +52,15 @@ focus. Without that rule an application with `n` for "new note" becomes
 an application you cannot type the letter n into, which is the failure
 every home-grown key handler eventually ships.
 
+Pressing isn't a shortcut either. A bare Enter or Space is skipped
+while a button or link has focus, unless the shortcut is that control's
+own, so a list's Enter for "open the row under the cursor" doesn't
+also fire when the person pressed Enter on a button inside the list.
+A button pressed by the keyboard is a default action, applied after the
+key has been through every handler, so without this rule an
+application-wide Enter would take the key from the very button that
+has it.
+
 Nor are a field's editing keys. While a text field has focus it keeps
 undo and redo, select all, and moving and deleting by word or line,
 whatever the application binds: an application-wide `Mod+Z` would

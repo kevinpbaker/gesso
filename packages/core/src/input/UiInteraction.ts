@@ -145,3 +145,12 @@ export function resolveCursor(node: UiNode | null): string | null {
   }
   return null;
 }
+
+/** A focused node Enter and Space press: a Button, or anything playing one that is not inert. */
+export function isPressable(node: UiNode): boolean {
+  if (isNodeInert(node)) {
+    return false;
+  }
+  const role = node.properties.get('role');
+  return node.type === UiNodeType.Button || role === 'button' || role === 'link';
+}
