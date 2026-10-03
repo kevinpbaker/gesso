@@ -24,7 +24,7 @@ import {
   uiSurface,
   UiSurfaceOptions,
   WorkerHandle
-} from "../ui-U39HjNFA.js";
+} from "../ui.js";
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
 interface McpServerInfo {
   name?: string;
@@ -271,7 +271,7 @@ import {
   ChannelPort,
   ChannelToken,
   Patch
-} from "./ChannelProtocol-ByNoHujM.js";
+} from "./ChannelProtocol.js";
 import {
   BehaviorSubject,
   Observable,
@@ -413,13 +413,13 @@ import {
   Command,
   CommandMap,
   Patch
-} from "./ChannelProtocol-ByNoHujM.js";
+} from "./ChannelProtocol.js";
 import {
   AgentConfirmation,
   ChannelSource,
   UiHost,
   WorkerHandle
-} from "./ui-U39HjNFA.js";
+} from "./ui.js";
 import {
   ChannelReplica,
   Component,
@@ -432,7 +432,7 @@ import {
   InternalState,
   OutputCell,
   ReadableCell
-} from "./FunctionComponent-fYMdePtH.js";
+} from "./FunctionComponent.js";
 import {
   BehaviorSubject,
   Observable,
@@ -2684,7 +2684,6 @@ export {
   AudioState,
   AudioStatus,
   bind,
-  bn,
   BoundStream,
   buildPath,
   Channel,
@@ -2868,6 +2867,7 @@ export {
   themeTokenCell,
   ThemeTokenCell,
   throttled,
+  to,
   treeText,
   UI_FRAME_PHASES,
   UI_ROLES,
@@ -2921,7 +2921,7 @@ import {
   PatchPath,
   viewKeys,
   ViewOf
-} from "./ChannelProtocol-ByNoHujM.js";
+} from "./ChannelProtocol.js";
 import {
   APPLICATION_WORKER,
   channelSchema,
@@ -2945,7 +2945,7 @@ import {
   servePorts,
   workerHandle,
   WorkerHandle
-} from "./ui-U39HjNFA.js";
+} from "./ui.js";
 import {
   bounds,
   BoundsCell,
@@ -2970,7 +2970,7 @@ import {
   OutputCell,
   OutputTarget,
   ReadableCell
-} from "./FunctionComponent-fYMdePtH.js";
+} from "./FunctionComponent.js";
 import {
   ActionCause,
   ActionEntry,
@@ -3205,7 +3205,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-DdjE-x7U.js";
+} from "./index.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3528,7 +3528,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-fYMdePtH.js";
+} from "../FunctionComponent.js";
 import {
   Observable
 } from "rxjs";
@@ -3622,7 +3622,7 @@ import {
   ChannelToken,
   Command,
   CommandMap
-} from "./ChannelProtocol-ByNoHujM.js";
+} from "./ChannelProtocol.js";
 import {
   Observable
 } from "rxjs";
@@ -3857,7 +3857,7 @@ import {
   isChannelHostMessage,
   viewKeys,
   ViewOf
-} from "../ChannelProtocol-ByNoHujM.js";
+} from "../ChannelProtocol.js";
 import {
   APPLICATION_WORKER,
   ChannelSource,
@@ -3872,12 +3872,12 @@ import {
   serveChannels,
   ServedChannel,
   servePorts
-} from "../ui-U39HjNFA.js";
+} from "../ui.js";
 import {
   internalState,
   InternalState,
   ReadableCell
-} from "../FunctionComponent-fYMdePtH.js";
+} from "../FunctionComponent.js";
 import {
   classifyStorageError,
   computed,
@@ -3927,7 +3927,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-DdjE-x7U.js";
+} from "../index.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
