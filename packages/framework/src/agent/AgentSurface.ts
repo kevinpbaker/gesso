@@ -2,6 +2,7 @@ import type { Subscription } from 'rxjs';
 
 import { channelSchema, type CommandSchema, type JsonSchema } from '../channel/ChannelSchema';
 import type { ServedChannel } from '../channel/serveChannels';
+import { decodeBinary } from './binary';
 import { validate } from './validate';
 
 /**
@@ -240,7 +241,12 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       if (problem !== null) {
         return failure(problem);
       }
-      positional = described.parameters.map(parameter => input[parameter]);
+      // Bytes arrive as base64, which is all JSON can carry, and leave
+      // as the typed array or buffer the command was written to take.
+      const properties = (described.input.properties as Record<string, JsonSchema> | undefined) ?? {};
+      positional = described.parameters.map(parameter =>
+        decodeBinary(properties[parameter], input[parameter], described.input)
+      );
       if (described.rest === true) {
         const spread = positional.pop();
         positional.push(...(Array.isArray(spread) ? spread : []));

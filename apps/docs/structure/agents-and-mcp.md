@@ -60,7 +60,11 @@ channel's schema from its types and JSDoc, and the surface uses it:
 - `@destructive` and `@idempotent` become the hints a client shows
   beside the tool;
 - `@hidden` keeps a command away from agents altogether;
-- `@confirm` asks the person first.
+- `@confirm` asks the person first;
+- a parameter that takes bytes, an `ArrayBuffer` or a typed array, is a
+  base64 string in the tool's input, tagged with the type it becomes,
+  and the surface decodes it to that type before the command is sent,
+  so the application receives what its own components would send.
 
 A channel nobody described is still offered, with its commands taking
 a positional `arguments` list and saying so in their descriptions.
