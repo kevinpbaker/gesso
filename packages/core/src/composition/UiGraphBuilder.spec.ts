@@ -2,6 +2,8 @@ import { BehaviorSubject, Subject } from 'rxjs';
 
 import { describe, expect, it } from 'vitest';
 
+import { darkTheme } from '../environment/UiTheme';
+import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { UiGraph } from '../graph/UiGraph';
 import { UiNodeType } from '../graph/UiNodeType';
 import { type UiNode } from '../graph/UiNode';
@@ -117,6 +119,30 @@ describe('UiGraphBuilder', () => {
 
       builder.build(Column({}));
       expect(seen).toEqual([seen[0], null]);
+    });
+
+    it('hands over a node built this pass with its props and the environment it will be under', () => {
+      // Found through gesso-components' Toast, whose placeholder's ref
+      // opens the overlay with the placeholder's theme: mounted into a
+      // dark tree that was already there, it read the default.
+      const graph = new UiGraph();
+      const builder = new UiGraphBuilder(graph);
+      const shown = new BehaviorSubject<ReturnType<typeof Box>[]>([]);
+      builder.build(Column({ theme: darkTheme }, Column({}, shown)));
+      let theme: unknown;
+      let width: unknown;
+      shown.next([
+        Box({
+          ref: (node: UiNode | null) => {
+            theme = node?.environment?.get(UiEnvironmentKeys.theme);
+            width = node?.getProperty('width');
+          },
+          width: 10
+        })
+      ]);
+      expect(theme).toBe(darkTheme);
+      // Written though it comes after `ref` among the props.
+      expect(width).toBe(10);
     });
   });
 
