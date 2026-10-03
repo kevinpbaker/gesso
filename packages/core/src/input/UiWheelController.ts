@@ -360,7 +360,9 @@ export class UiWheelController {
     let right = false;
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
       const scrolled = scrollLeaderOf(node) ?? node;
-      const state = takesWheel(node) ? this.gestureState(scrolled, this.scrollSink.containerState(scrolled)) : undefined;
+      const state = takesWheel(node)
+        ? this.gestureState(scrolled, this.scrollSink.containerState(scrolled))
+        : undefined;
       if (state !== undefined) {
         left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
         right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
@@ -427,7 +429,9 @@ export class UiWheelController {
   ): void {
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
       const scrolled = scrollLeaderOf(node) ?? node;
-      const state = takesWheel(node) ? this.gestureState(scrolled, this.scrollSink.containerState(scrolled)) : undefined;
+      const state = takesWheel(node)
+        ? this.gestureState(scrolled, this.scrollSink.containerState(scrolled))
+        : undefined;
       if (state === undefined) {
         if (containsOverscroll(node)) {
           event.markConsumed();
@@ -504,7 +508,19 @@ export class UiWheelController {
     if (pace) {
       let paced = this.pacing.get(container);
       if (paced === undefined) {
-        paced = { samples: [], totalX: 0, totalY: 0, baseX: state.scrollX, baseY: state.scrollY, lastX: state.scrollX, lastY: state.scrollY, dirX: 0, dirY: 0, quiet: 0, fresh: false };
+        paced = {
+          samples: [],
+          totalX: 0,
+          totalY: 0,
+          baseX: state.scrollX,
+          baseY: state.scrollY,
+          lastX: state.scrollX,
+          lastY: state.scrollY,
+          dirX: 0,
+          dirY: 0,
+          quiet: 0,
+          fresh: false
+        };
         this.pacing.set(container, paced);
       }
       paced.totalX += dx;
@@ -640,7 +656,8 @@ export class UiWheelController {
       }
       paced.lastX = toX;
       paced.lastY = toY;
-      const settled = toX === Math.min(Math.max(paced.baseX + paced.totalX, 0), state.maxScrollX) &&
+      const settled =
+        toX === Math.min(Math.max(paced.baseX + paced.totalX, 0), state.maxScrollX) &&
         toY === Math.min(Math.max(paced.baseY + paced.totalY, 0), state.maxScrollY);
       if (settled && paced.quiet >= QUIET_FRAMES) {
         this.pacing.delete(container);

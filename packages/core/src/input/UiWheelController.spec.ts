@@ -259,14 +259,30 @@ describe('UiWheelController', () => {
       h.layoutTree();
       scroll.setProperty('scrollY', 120);
       h.layoutTree();
-      const controller = new UiWheelController(h.createHitTester(), h.dispatcher, h.scrollSink, () => h.root, () => 0, { pace: true });
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => 0,
+        { pace: true }
+      );
       const offsets: number[] = [];
       let at = 0;
       for (let frame = 1; frame <= 30; frame++) {
         const time = frame * (1000 / 60);
         // A step every 7.5 ms, shrinking as the coast slows.
         while (at <= time && at < 200) {
-          controller.wheel(50, 50, 0, -Math.max(1, 20 - at / 10), noKeyModifiers(), UiWheelDeltaMode.Pixel, undefined, at);
+          controller.wheel(
+            50,
+            50,
+            0,
+            -Math.max(1, 20 - at / 10),
+            noKeyModifiers(),
+            UiWheelDeltaMode.Pixel,
+            undefined,
+            at
+          );
           at += 7.5;
         }
         controller.advance(time);
