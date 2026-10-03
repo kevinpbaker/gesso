@@ -51,6 +51,8 @@ export type UiRole =
   | 'columnheader'
   | 'rowheader'
   | 'cell'
+  /** A cell of an interactive `grid`: what a calendar's day is, and what can be `selected`. */
+  | 'gridcell'
   | 'group'
   | 'separator'
   | 'toolbar'
@@ -107,6 +109,7 @@ export const UI_ROLES: readonly UiRole[] = [
   'columnheader',
   'rowheader',
   'cell',
+  'gridcell',
   'group',
   'separator',
   'toolbar',

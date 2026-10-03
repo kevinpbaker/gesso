@@ -27,7 +27,7 @@ mapping table.
 
 | Prop                               | What it says                                                                                                              |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `role`                             | What the node is. A closed set of 49 ARIA names: `button`, `switch`, `listbox`, `dialog`, `heading`, and the rest         |
+| `role`                             | What the node is. A closed set of 50 ARIA names: `button`, `switch`, `listbox`, `dialog`, `heading`, and the rest         |
 | `label`                            | The accessible name. Without one, the node is named by the text it draws                                                  |
 | `description`                      | Read after the name: a hint, or the reason a field is invalid                                                             |
 | `live`                             | `polite` or `assertive`: announce this node's text when it changes, without focus moving. `status` and `alert` imply it   |

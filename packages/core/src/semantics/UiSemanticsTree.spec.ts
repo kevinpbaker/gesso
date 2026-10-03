@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
+import { validateRole } from '../properties/UiSemantics';
 import { buildSemanticsTree, type UiSemanticsRecord } from './UiSemanticsTree';
 
 class Tree {
@@ -138,6 +139,18 @@ describe('buildSemanticsTree', () => {
         setSize: 1000
       }))
     );
+  });
+
+  it('takes a gridcell, the cell of an interactive grid that can be selected', () => {
+    const t = new Tree();
+    const grid = t.node(UiNodeType.Column, { role: 'grid', label: 'October 2026' });
+    const day = t.node(UiNodeType.Box, { role: 'gridcell', label: 'Friday, 2 October 2026', states: ['selected'] });
+    t.add(grid, day);
+    t.add(t.root, grid);
+
+    // The builder refuses a role it doesn't know; this one it knows.
+    expect(validateRole('gridcell')).toBeUndefined();
+    expect(t.build()[1]).toMatchObject({ role: 'gridcell', states: ['selected'] });
   });
 
   it('names the active descendant by its record id', () => {
