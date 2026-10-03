@@ -100,7 +100,19 @@ export interface AgentSurfaceOptions {
   settleMs?: number;
 }
 
-export interface AgentSurface {
+/**
+ * Any surface an MCP server can speak for: one in this thread, or one
+ * across a port whose every answer is a promise.
+ */
+export interface AgentSurfaceLike {
+  tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
+  read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
+  dispose?(): void;
+}
+
+export interface AgentSurface extends AgentSurfaceLike {
   tools(): readonly AgentTool[];
   /** Calls a tool by name. Never throws: a failure is a result with `isError`, which an agent can read and correct. */
   call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;

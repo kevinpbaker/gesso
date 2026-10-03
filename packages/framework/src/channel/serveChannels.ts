@@ -1,5 +1,6 @@
 import type { Observable } from 'rxjs';
 
+import { AGENT_PORT } from '../agent/remote';
 import { servePorts, type PortHost } from '../worker/WorkerPorts';
 import { provide, type ChannelSource, ProvidedChannel } from './provide';
 import type { ChannelPort } from './ChannelProtocol';
@@ -73,6 +74,15 @@ export function serveChannels(channels: readonly ServedChannel[], host?: PortHos
 
   const stop = servePorts(
     (key, port) => {
+      if (key === AGENT_PORT) {
+        // An agent asking, through the page, what this worker serves.
+        // Loaded on demand, so a worker no agent ever asks pays for
+        // one string comparison.
+        void import('../agent/index').then(agent =>
+          agent.serveAgentPort(port as never, confirm => agent.agentSurface(channels, { confirm }))
+        );
+        return true;
+      }
       const served = byName.get(key);
       if (served === undefined) {
         // Declined rather than answered, so a worker serving more than

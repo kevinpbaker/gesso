@@ -1,4 +1,4 @@
-import type { AgentSurface } from './AgentSurface';
+import type { AgentSurfaceLike } from './AgentSurface';
 
 /**
  * An agent surface, served over the Model Context Protocol.
@@ -55,7 +55,7 @@ const RESOURCE_NOT_FOUND = -32002;
  * with the JSON-RPC error that says what was wrong with it.
  */
 export async function handleMcpMessage(
-  surface: AgentSurface,
+  surface: AgentSurfaceLike,
   message: unknown,
   info: McpServerInfo = {}
 ): Promise<JsonRpcResponse | null> {
@@ -84,7 +84,7 @@ export async function handleMcpMessage(
     case 'ping':
       return ok(id, {});
     case 'tools/list':
-      return ok(id, { tools: surface.tools() });
+      return ok(id, { tools: await surface.tools() });
     case 'tools/call': {
       if (typeof params.name !== 'string') {
         return error(id, INVALID_PARAMS, 'tools/call needs the name of a tool.');
@@ -96,12 +96,12 @@ export async function handleMcpMessage(
       return ok(id, await surface.call(params.name, args as Record<string, unknown> | undefined));
     }
     case 'resources/list':
-      return ok(id, { resources: surface.resources() });
+      return ok(id, { resources: await surface.resources() });
     case 'resources/templates/list':
       return ok(id, { resourceTemplates: [] });
     case 'resources/read': {
       const uri = params.uri;
-      const view = typeof uri === 'string' ? surface.read(uri) : undefined;
+      const view = typeof uri === 'string' ? await surface.read(uri) : undefined;
       if (typeof uri !== 'string' || view === undefined) {
         return error(id, RESOURCE_NOT_FOUND, `No resource at ${String(uri)}.`);
       }
@@ -137,7 +137,7 @@ export interface McpHandlerOptions extends McpServerInfo {
  * It answers every path; mount it where the server routes `/mcp`.
  */
 export function mcpHandler(
-  surface: AgentSurface,
+  surface: AgentSurfaceLike,
   options: McpHandlerOptions = {}
 ): (request: Request) => Promise<Response> {
   return async request => {

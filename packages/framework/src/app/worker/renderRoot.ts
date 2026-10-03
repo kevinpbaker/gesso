@@ -1,7 +1,9 @@
 import type { FrameworkChild } from '../../ComponentElement';
 import { createComponent } from '../../createComponent';
 import type { ComponentType } from '../../FunctionComponent';
-import { APPLICATION_WORKER, portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
+import { APPLICATION_WORKER, portHandle, servePorts, type PortHost, type WorkerHandle } from '../../worker/WorkerPorts';
+import { AGENT_PORT } from '../../agent/remote';
+import type { ServedChannel } from '../../channel/serveChannels';
 import { captureConsole } from '../../worker/captureConsole';
 import {
   createChannelRegistry,
@@ -93,6 +95,20 @@ export class RenderWorkerApp {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
     this.host = host;
     this.host.onmessage = event => this.receive(event.data);
+    // An agent asking, through the page, what this application serves.
+    // Wrapped around `receive` rather than in it, because the question
+    // arrives as the same port handshake every other worker answers.
+    servePorts(
+      (key, port) => {
+        if (key !== AGENT_PORT) {
+          return false;
+        }
+        this.serveAgent(port);
+        return true;
+      },
+      () => [AGENT_PORT],
+      host as unknown as PortHost
+    );
     // Everything `receive` cannot see. The usual frame is not in that
     // set: the shell forwards its `requestAnimationFrame` as a `tick`
     // message and the clock delivers it synchronously, so a component
@@ -314,6 +330,33 @@ export class RenderWorkerApp {
    * console is the worker global's, and this class is what owns the
    * global.
    */
+  /**
+   * Answers an agent port with every channel this application can
+   * reach: the ones fed from this thread, and whatever each worker
+   * behind them serves, asked over a port of its own. Loaded on
+   * demand, so a render worker no agent asks pays for nothing but the
+   * handshake check.
+   */
+  private serveAgent(port: MessagePort): void {
+    void import('../../agent/index').then(agent =>
+      agent.serveAgentPort(port, confirm => {
+        const local = this.channelRegistrations
+          .filter(registration => registration.source !== undefined)
+          .map(
+            registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
+          );
+        const workers = new Set(this.channels?.workers ?? []);
+        if (this.appLogicWorker !== undefined) {
+          workers.add(this.appLogicWorker);
+        }
+        const remote = [...workers]
+          .filter(worker => worker.spawned)
+          .map(worker => agent.remoteSurface(worker.open(AGENT_PORT), { confirm }));
+        return agent.combineSurfaces([agent.agentSurface(local, { confirm }), ...remote]);
+      })
+    );
+  }
+
   private setConsoleForwarding(enabled: boolean): void {
     this.restoreConsole?.();
     this.restoreConsole = null;

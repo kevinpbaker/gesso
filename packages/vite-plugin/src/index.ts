@@ -1,5 +1,6 @@
 import { defaultClientConditions, type EnvironmentModuleNode, type Plugin, type UserConfig } from 'vite';
 
+import { AGENT_PATH, createAgentBridge, type BridgeRequest, type BridgeResponse, type BridgeSocket } from './agent.ts';
 import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
 import { transformRenderWorker } from './render.ts';
 import { findShellCall, transformShell, type WorkerEntries } from './shell.ts';
@@ -90,6 +91,12 @@ export interface GessoPluginOptions {
    * plugin says so once and carries on undescribed.
    */
   readonly channelSchemas?: boolean;
+  /**
+   * Serve MCP at `/__gesso/mcp` while the dev server runs, so an AI
+   * agent can read the open page's channels and send their commands
+   * (default true). Development only: a build carries none of it.
+   */
+  readonly agent?: boolean;
 }
 
 /**
@@ -230,6 +237,30 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       root = config.root;
     },
 
+    /**
+     * The agent endpoint, and a line saying where it is once the server
+     * is listening, because an endpoint nobody knows the address of is
+     * one nobody connects to.
+     */
+    configureServer(server) {
+      if (options.agent === false) {
+        return;
+      }
+      const bridge = createAgentBridge(server.ws as unknown as BridgeSocket);
+      server.middlewares.use((request, response, next) =>
+        bridge.middleware(request as unknown as BridgeRequest, response as unknown as BridgeResponse, next)
+      );
+      server.httpServer?.once('listening', () => {
+        const base = server.resolvedUrls?.local[0];
+        if (base !== undefined) {
+          const url = new URL(AGENT_PATH, base).href;
+          server.config.logger.info(
+            `  ➜  Agents:  ${url}\n             claude mcp add --transport http ${agentName(server.config.root)} ${url}`
+          );
+        }
+      });
+    },
+
     watchChange(id) {
       void contracts?.then(reader => reader?.invalidate(id));
     },
@@ -268,7 +299,11 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       }
       shellId = id;
       const entries = call.needsWorkers ? await resolveEntries(this, id, options) : null;
-      const shell = transformShell(code, { entries, overlay: serving && options.overlay !== false });
+      const shell = transformShell(code, {
+        entries,
+        overlay: serving && options.overlay !== false,
+        agent: serving && options.agent !== false
+      });
       return shell === null ? (described === null ? null : { code, map: null }) : { code: shell, map: null };
     },
 
@@ -306,6 +341,11 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
 }
 
 export default gesso;
+
+/** A name for the MCP server: the project's directory, which is what a person calls the app. */
+function agentName(root: string): string {
+  return (root.split('/').filter(Boolean).pop() ?? 'gesso').replace(/[^A-Za-z0-9_-]/g, '-');
+}
 
 /** Every module that transitively imports this one, plus this one. */
 function importerClosure(module: EnvironmentModuleNode): Set<string> {

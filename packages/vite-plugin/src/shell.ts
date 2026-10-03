@@ -1,3 +1,4 @@
+import { SHELL_BRIDGE } from './agent.ts';
 import { blankLiterals, findCall, importSources, type CallSite } from './source.ts';
 
 /** Where the plugin found the two worker entries, as the shell imports them. */
@@ -28,6 +29,11 @@ export interface ShellTransformOptions {
    * carries no reference to `gesso-devtools`.
    */
   readonly overlay: boolean;
+  /**
+   * Hand the app to the development agent bridge once it is created
+   * (default false). A dev server only.
+   */
+  readonly agent?: boolean;
 }
 
 /** Marks a module the plugin has already rewritten, so it is not done twice. */
@@ -79,13 +85,17 @@ export function transformShell(code: string, options: ShellTransformOptions): st
   if (shell === null) {
     return null;
   }
-  if (options.entries === null && !options.overlay) {
+  if (options.entries === null && !options.overlay && options.agent !== true) {
     return null;
   }
   const { call } = shell;
   const args = code.slice(call.argsStart, call.argsEnd).trim();
-  const rewritten = `${code.slice(0, call.argsStart)}__gessoOptions(${args === '' ? '{}' : args})${code.slice(call.argsEnd)}`;
-  return `${rewritten}\n${prelude(options)}`;
+  const created = `${code.slice(call.start, call.argsStart)}__gessoOptions(${args === '' ? '{}' : args})${code.slice(call.argsEnd, call.end)}`;
+  // The whole call wrapped, so the bridge gets the app whatever the
+  // shell then does with it: a variable, a chained mount, or nothing.
+  const wrapped = options.agent === true ? `__gessoAgent(${created})` : created;
+  const rewritten = `${code.slice(0, call.start)}${wrapped}${code.slice(call.end)}`;
+  return `${rewritten}\n${prelude(options)}${options.agent === true ? SHELL_BRIDGE : ''}`;
 }
 
 /**

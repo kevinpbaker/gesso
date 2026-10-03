@@ -279,6 +279,15 @@ Without it the plugin says so once and the application runs
 undescribed. A build reads each worker's contracts too, through
 `worker.plugins`, which Vite adds to rather than replaces.
 
+## An endpoint for agents
+
+While the dev server runs, the plugin serves MCP at `/__gesso/mcp`, so
+an AI agent can read the open page's channels and send their commands,
+and prints the line to connect Claude Code when the server starts.
+[Agents and MCP](/structure/agents-and-mcp#in-development-with-nothing-to-write)
+has how it reaches the workers and what the agent sees. `agent: false`
+turns it off.
+
 ## Options
 
 | Option             | Default    | What it does                                                          |
@@ -290,6 +299,7 @@ undescribed. A build reads each worker's contracts too, through
 | `diagnostics`      | `true`     | Report a save that will reload the page                               |
 | `workerConditions` | `true`     | Resolve a dependency's `worker` build ahead of its `browser` one      |
 | `channelSchemas`   | `true`     | Describe each channel as JSON Schema, from its types and JSDoc        |
+| `agent`            | `true`     | Serve MCP at `/__gesso/mcp` in the dev server, for AI agents          |
 
 ## Is it required?
 

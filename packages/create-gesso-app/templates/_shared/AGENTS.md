@@ -154,5 +154,10 @@ what the app is doing:
   with its role, its name and its position over the canvas. A browser
   automation tool's accessibility tree reads it, and clicking those
   elements clicks the app. A screenshot shows what was drawn.
+- **Driving the running app.** While `pnpm dev` runs, the dev server
+  serves MCP at `/__gesso/mcp` and prints the `claude mcp add` line
+  for it. Connected, you can read every channel's view and send its
+  commands to the page open in the browser, which is the quickest way
+  to check that a command does what it should.
 - **Errors** from the render worker are drawn over the app by the dev
   overlay, source-mapped. They also reach the browser console.
