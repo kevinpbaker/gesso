@@ -270,7 +270,11 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     note: 'Corner rounding: one number, four, or a name in the theme\'s shape scale (`borderRadius="medium"`), resolved at paint against the theme the element is under. Clips the background, the image and `overflow: hidden`.',
     defaultValue: 'no rounding'
   },
-  boxShadows: { group: 'Paint', note: 'Shadows behind the box, painted in order.', defaultValue: 'none' },
+  boxShadows: {
+    group: 'Paint',
+    note: "CSS `box-shadow`s: outside the box, or inside it with `inset`, following its corner radius. The first is on top. A colour may be a palette name. Painted outside the node's own clip, and a node is culled only once its shadows are off screen too.",
+    defaultValue: 'none'
+  },
   opacity: { group: 'Paint', note: 'Applies to the whole subtree, not just this node.' },
   visible: { group: 'Paint', note: 'Hides the box and its subtree without taking it out of layout.' },
   transform: { group: 'Paint', note: 'Translation, scale and rotation applied at paint time. Layout does not see it.' },

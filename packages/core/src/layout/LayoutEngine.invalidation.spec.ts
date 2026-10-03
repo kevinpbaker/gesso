@@ -13,6 +13,7 @@ import { UiScheduler } from '../scheduler/UiScheduler';
 import { LayoutEngine } from './LayoutEngine';
 import { Constraints } from './LayoutTypes';
 import { percent } from './UiLength';
+import { boxShadow, type UiBoxShadow } from '../properties/UiBoxShadow';
 
 describe('LayoutEngine invalidation', () => {
   function createHarness(constraints: Constraints = Constraints.loose(400, 400)) {
@@ -240,6 +241,33 @@ describe('LayoutEngine invalidation', () => {
       const extent = h.engine.recordFor(wrapper)!;
       expect(extent.extentMaxY).toBeGreaterThanOrEqual(230);
       expect(h.engine.recordFor(h.root)!.extentMaxY).toBeGreaterThanOrEqual(230);
+    });
+
+    it('grows and shrinks a node and its ancestors with its shadows, though a shadow lays nothing out', () => {
+      const h = createHarness(Constraints.tight(400, 400));
+      const shadows = new BehaviorSubject<readonly UiBoxShadow[]>([]);
+      const card = Box({ width: 100, height: 40, boxShadows: shadows });
+      h.root = h.builder.build(Column({ x: 'start' }, Box({ height: 50 }, card)));
+      firstFrame(h);
+      const wrapper = h.root.firstChild!;
+      const node = wrapper.firstChild!;
+      expect(h.engine.recordFor(node)!.extentMaxX).toBe(100);
+
+      shadows.next([boxShadow(30, 0, 4, 0, '#000'), boxShadow(0, 0, 0, 2, '#000', true)]);
+      h.clock.tick(0);
+      expect(h.engine.stats.measured).toBe(0);
+      const rec = h.engine.recordFor(node)!;
+      // 30 across, plus the blur's reach of 6, rounded out; the inset
+      // shadow paints inside the box and reaches nothing.
+      expect(rec.extentMaxX).toBeGreaterThanOrEqual(136);
+      expect(rec.extentMinX).toBeLessThanOrEqual(-6 + 30);
+      expect(rec.extentMinY).toBeLessThanOrEqual(-6);
+      expect(h.engine.recordFor(wrapper)!.extentMaxX).toBeGreaterThanOrEqual(136);
+      expect(h.engine.recordFor(h.root)!.extentMaxX).toBeGreaterThanOrEqual(136);
+
+      shadows.next([]);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(node)!.extentMaxX).toBe(100);
     });
   });
 

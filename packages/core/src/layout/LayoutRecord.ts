@@ -165,6 +165,19 @@ export class LayoutRecord {
   extentMinY = 0;
   extentMaxX = 0;
   extentMaxY = 0;
+
+  /**
+   * How far past each side of its box the node itself paints: its
+   * outer `boxShadows`, which no clip of its own holds in. Zero for
+   * nearly every node. Part of the extent, and of a clipping node's
+   * contribution to its parent's, since its clip is for its children.
+   * Read from the node when its box is written and when a frame
+   * repaints it; see `LayoutEngine.refreshPaintReach`.
+   */
+  paintReachLeft = 0;
+  paintReachTop = 0;
+  paintReachRight = 0;
+  paintReachBottom = 0;
   scrollable = false;
 
   /**
@@ -474,6 +487,10 @@ export class LayoutRecord {
     this.extentMinY = 0;
     this.extentMaxX = 0;
     this.extentMaxY = 0;
+    this.paintReachLeft = 0;
+    this.paintReachTop = 0;
+    this.paintReachRight = 0;
+    this.paintReachBottom = 0;
     this.scrollable = false;
     this.scrollsText = false;
     this.textScrollbars = false;

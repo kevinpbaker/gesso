@@ -54,6 +54,10 @@ export class RecordingCanvasContext implements Canvas2DContext {
   private _font = '';
   private _textAlign: CanvasTextAlign = 'start';
   private _textBaseline: CanvasTextBaseline = 'alphabetic';
+  private _shadowColor = 'rgba(0, 0, 0, 0)';
+  private _shadowBlur = 0;
+  private _shadowOffsetX = 0;
+  private _shadowOffsetY = 0;
   /**
    * Tracking, which is a context property rather than part of the font
    * shorthand — and sticky, so a spec can check it was cleared as well
@@ -133,6 +137,42 @@ export class RecordingCanvasContext implements Canvas2DContext {
     this.record('set:textBaseline', [value]);
   }
 
+  get shadowColor(): string {
+    return this._shadowColor;
+  }
+
+  set shadowColor(value: string) {
+    this._shadowColor = value;
+    this.record('set:shadowColor', [value]);
+  }
+
+  get shadowBlur(): number {
+    return this._shadowBlur;
+  }
+
+  set shadowBlur(value: number) {
+    this._shadowBlur = value;
+    this.record('set:shadowBlur', [value]);
+  }
+
+  get shadowOffsetX(): number {
+    return this._shadowOffsetX;
+  }
+
+  set shadowOffsetX(value: number) {
+    this._shadowOffsetX = value;
+    this.record('set:shadowOffsetX', [value]);
+  }
+
+  get shadowOffsetY(): number {
+    return this._shadowOffsetY;
+  }
+
+  set shadowOffsetY(value: number) {
+    this._shadowOffsetY = value;
+    this.record('set:shadowOffsetY', [value]);
+  }
+
   /**
    * Drawing state saved by `save`, as a real context keeps it. Without
    * it a spec that renders twice read the first frame's leftovers: the
@@ -149,6 +189,10 @@ export class RecordingCanvasContext implements Canvas2DContext {
     textAlign: CanvasTextAlign;
     textBaseline: CanvasTextBaseline;
     letterSpacing: string;
+    shadowColor: string;
+    shadowBlur: number;
+    shadowOffsetX: number;
+    shadowOffsetY: number;
   }[] = [];
 
   save(): void {
@@ -161,7 +205,11 @@ export class RecordingCanvasContext implements Canvas2DContext {
       font: this._font,
       textAlign: this._textAlign,
       textBaseline: this._textBaseline,
-      letterSpacing: this.letterSpacing
+      letterSpacing: this.letterSpacing,
+      shadowColor: this._shadowColor,
+      shadowBlur: this._shadowBlur,
+      shadowOffsetX: this._shadowOffsetX,
+      shadowOffsetY: this._shadowOffsetY
     });
     this.record('save', []);
   }
@@ -178,6 +226,10 @@ export class RecordingCanvasContext implements Canvas2DContext {
       this._textAlign = state.textAlign;
       this._textBaseline = state.textBaseline;
       this.letterSpacing = state.letterSpacing;
+      this._shadowColor = state.shadowColor;
+      this._shadowBlur = state.shadowBlur;
+      this._shadowOffsetX = state.shadowOffsetX;
+      this._shadowOffsetY = state.shadowOffsetY;
     }
     this.record('restore', []);
   }

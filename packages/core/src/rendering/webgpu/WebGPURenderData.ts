@@ -30,6 +30,8 @@ import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import { gradientPaint, MAX_GRADIENT_STOPS, type ResolvedGradient } from '../../properties/UiGradient';
+import { BOX_SHADOW_BLUR_REACH, boxShadowRadius } from '../../properties/UiBoxShadow';
+import type { PaintState } from '../PaintState';
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
@@ -47,13 +49,24 @@ import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSel
  *   2  size.xy
  *   4  color.rgba
  *   8  radius, opacity, borderWidth
- *   11 kind               (u32: PrimitiveKind)
+ *   11 kind               (PrimitiveKind, as a float)
  *   12 transform          3x2 affine, absolute layout → logical screen
  *   18 clipIndex          index into the clip chain, -1 for none
  *   19 gradientIndex      index into the frame's gradients, -1 for none
- *   20 (end)
+ *   20 shadow             offsetX, offsetY, spread, the other shape's radius
+ *   24 (end)
+ *
+ * A shadow is two rounded rectangles, the blurred one and the box it
+ * is cut by, and an instance describes the first. For an outer shadow
+ * the rectangle is the blurred shape grown by the blur's reach
+ * (`BOX_SHADOW_BLUR_REACH` × blur), `radius` its corners, `borderWidth`
+ * the blur, and the box it must not show under is recovered from the
+ * offset and spread, with the box's own radius last. An inset shadow's
+ * rectangle is the box, and the hole it is cast from is the box moved
+ * by the offset and shrunk by the spread, with the hole's radius last.
+ * Every other instance writes zeros there.
  */
-export const INSTANCE_STRIDE_FLOATS = 20;
+export const INSTANCE_STRIDE_FLOATS = 24;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
 
 /**
@@ -118,7 +131,11 @@ export const NO_GRADIENT_INDEX = -1;
 
 export const enum PrimitiveKind {
   Fill = 0,
-  Border = 1
+  Border = 1,
+  /** A `boxShadows` entry outside the box; see the instance layout. */
+  Shadow = 2,
+  /** A `boxShadows` entry marked `inset`. */
+  InsetShadow = 3
 }
 
 export const enum CommandKind {
@@ -671,6 +688,13 @@ export function buildRenderList(
     const contentScissor = nextClip;
     const contentRounded = nextRounded;
 
+    // Outer shadows, under everything the node paints, and inset ones
+    // over its background; both as Canvas2D paints them.
+    if (paint.boxShadows.length > 0) {
+      beginPrimitives(ownScissor);
+      pushShadows(instanceData, rec, paint, effectiveOpacity, nodeCtm, ownRounded, false);
+    }
+
     // Background fill.
     if (paint.backgroundColor !== undefined) {
       const color = parseColor(paint.backgroundColor);
@@ -722,6 +746,11 @@ export function buildRenderList(
           index
         );
       }
+    }
+
+    if (paint.boxShadows.length > 0) {
+      beginPrimitives(ownScissor);
+      pushShadows(instanceData, rec, paint, effectiveOpacity, nodeCtm, ownRounded, true);
     }
 
     // Background image, fitted into the box and clipped to it as CSS
@@ -1342,7 +1371,11 @@ function pushInstance(
   kind: PrimitiveKind,
   transform: Affine,
   clip: number,
-  gradient: number = NO_GRADIENT_INDEX
+  gradient: number = NO_GRADIENT_INDEX,
+  shadowX = 0,
+  shadowY = 0,
+  shadowSpread = 0,
+  shadowRadius = 0
 ): void {
   out.ensure(INSTANCE_STRIDE_FLOATS);
   const data = out.data;
@@ -1367,7 +1400,89 @@ function pushInstance(
   data[at + 17] = transform[5];
   data[at + 18] = clip;
   data[at + 19] = gradient;
+  data[at + 20] = shadowX;
+  data[at + 21] = shadowY;
+  data[at + 22] = shadowSpread;
+  data[at + 23] = shadowRadius;
   out.length = at + INSTANCE_STRIDE_FLOATS;
+}
+
+/**
+ * One instance per outer shadow, or per inset one, in the order
+ * Canvas2D draws them: the last declared first, since CSS paints the
+ * first shadow on top. The shader evaluates the blurred shape exactly
+ * rather than sampling a blurred texture, so a shadow costs a quad.
+ */
+function pushShadows(
+  out: FloatBuffer,
+  rec: LayoutRecord,
+  paint: PaintState,
+  opacity: number,
+  transform: Affine,
+  clip: number,
+  inset: boolean
+): void {
+  const shadows = paint.boxShadows;
+  const radius = borderRadiusIsZero(paint.borderRadius) ? 0 : uniformBorderRadius(paint.borderRadius);
+  for (let i = shadows.length - 1; i >= 0; i--) {
+    const shadow = shadows[i]!;
+    if ((shadow.inset === true) !== inset || shadow.color.a <= 0) {
+      continue;
+    }
+    const color = parseColor(shadow.color);
+    if (color === undefined) {
+      continue;
+    }
+    const blur = Math.max(0, shadow.blurRadius);
+    const spread = shadow.spreadRadius;
+    if (inset) {
+      pushInstance(
+        out,
+        rec.x,
+        rec.y,
+        rec.width,
+        rec.height,
+        color,
+        radius,
+        opacity,
+        blur,
+        PrimitiveKind.InsetShadow,
+        transform,
+        clip,
+        NO_GRADIENT_INDEX,
+        shadow.offsetX,
+        shadow.offsetY,
+        spread,
+        boxShadowRadius(radius, spread, true)
+      );
+      continue;
+    }
+    const width = rec.width + spread * 2;
+    const height = rec.height + spread * 2;
+    if (width <= 0 || height <= 0) {
+      continue;
+    }
+    const reach = blur * BOX_SHADOW_BLUR_REACH;
+    pushInstance(
+      out,
+      rec.x + shadow.offsetX - spread - reach,
+      rec.y + shadow.offsetY - spread - reach,
+      width + reach * 2,
+      height + reach * 2,
+      color,
+      boxShadowRadius(radius, spread, false),
+      opacity,
+      blur,
+      PrimitiveKind.Shadow,
+      transform,
+      clip,
+      NO_GRADIENT_INDEX,
+      shadow.offsetX,
+      shadow.offsetY,
+      spread,
+      radius
+    );
+  }
 }
 
 /**

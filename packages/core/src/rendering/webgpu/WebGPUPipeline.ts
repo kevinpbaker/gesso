@@ -201,12 +201,13 @@ function primitiveInstanceLayout(): GPUVertexBufferLayout {
       { shaderLocation: 2, offset: 8, format: 'float32x2' }, // size
       { shaderLocation: 3, offset: 16, format: 'float32x4' }, // color
       { shaderLocation: 4, offset: 32, format: 'float32x3' }, // radius, opacity, borderWidth
-      { shaderLocation: 5, offset: 44, format: 'uint32' }, // kind
+      { shaderLocation: 5, offset: 44, format: 'float32' }, // kind, written as a float like the rest
       { shaderLocation: 6, offset: 48, format: 'float32x2' }, // transform a
       { shaderLocation: 7, offset: 56, format: 'float32x2' }, // transform b
       { shaderLocation: 8, offset: 64, format: 'float32x2' }, // transform c
       { shaderLocation: 9, offset: 72, format: 'float32' }, // clip index
-      { shaderLocation: 10, offset: 76, format: 'float32' } // gradient index
+      { shaderLocation: 10, offset: 76, format: 'float32' }, // gradient index
+      { shaderLocation: 11, offset: 80, format: 'float32x4' } // shadow: offset, spread, other radius
     ]
   };
 }

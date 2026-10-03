@@ -14,6 +14,7 @@ import {
   parseMainAxisAlignment
 } from './Alignment';
 import { resolveString } from '../properties/UiPropertyResolver';
+import { boxShadowReach, type UiBoxShadow } from '../properties/UiBoxShadow';
 import { isPercentLength, resolveLength } from './UiLength';
 import type { UiTrackSize } from './UiLength';
 import { placeGridItems, sizeGridTracks } from './GridLayout';
@@ -324,14 +325,14 @@ interface FlexConfig {
  * scrolling never re-measures or re-places them.
  */
 /**
- * Grows `into`'s extent to cover where `child` may paint: its box if it
- * clips, its extent if not. True when it grew.
+ * Grows `into`'s extent to cover where `child` may paint: its box and
+ * its own shadows if it clips, its extent if not. True when it grew.
  */
 function growExtent(into: LayoutRecord, child: LayoutRecord): boolean {
-  const minX = child.clips ? child.x : child.extentMinX;
-  const minY = child.clips ? child.y : child.extentMinY;
-  const maxX = child.clips ? child.x + child.width : child.extentMaxX;
-  const maxY = child.clips ? child.y + child.height : child.extentMaxY;
+  const minX = child.clips ? child.x - child.paintReachLeft : child.extentMinX;
+  const minY = child.clips ? child.y - child.paintReachTop : child.extentMinY;
+  const maxX = child.clips ? child.x + child.width + child.paintReachRight : child.extentMaxX;
+  const maxY = child.clips ? child.y + child.height + child.paintReachBottom : child.extentMaxY;
   if (minX >= into.extentMinX && minY >= into.extentMinY && maxX <= into.extentMaxX && maxY <= into.extentMaxY) {
     return false;
   }
@@ -340,6 +341,49 @@ function growExtent(into: LayoutRecord, child: LayoutRecord): boolean {
   into.extentMaxX = Math.max(into.extentMaxX, maxX);
   into.extentMaxY = Math.max(into.extentMaxY, maxY);
   return true;
+}
+
+const reachScratch = { left: 0, top: 0, right: 0, bottom: 0 };
+
+/**
+ * Reads how far past its box a node paints (its outer shadows) into
+ * its record. True when that changed.
+ *
+ * Rounded out to whole pixels plus one, because a browser's shadow blur
+ * is an approximation of the Gaussian and need not stop exactly where
+ * the arithmetic says. Too large costs a descent; too small culls a
+ * shadow that is on screen.
+ */
+function readPaintReach(node: UiNode, rec: LayoutRecord): boolean {
+  const shadows = node.properties.get('boxShadows') as readonly UiBoxShadow[] | undefined;
+  let left = 0;
+  let top = 0;
+  let right = 0;
+  let bottom = 0;
+  if (Array.isArray(shadows) && shadows.length > 0) {
+    boxShadowReach(shadows, reachScratch);
+    left = reachOf(reachScratch.left);
+    top = reachOf(reachScratch.top);
+    right = reachOf(reachScratch.right);
+    bottom = reachOf(reachScratch.bottom);
+  }
+  if (
+    left === rec.paintReachLeft &&
+    top === rec.paintReachTop &&
+    right === rec.paintReachRight &&
+    bottom === rec.paintReachBottom
+  ) {
+    return false;
+  }
+  rec.paintReachLeft = left;
+  rec.paintReachTop = top;
+  rec.paintReachRight = right;
+  rec.paintReachBottom = bottom;
+  return true;
+}
+
+function reachOf(value: number): number {
+  return value > 0 ? Math.ceil(value) + 1 : 0;
 }
 
 /**
@@ -963,6 +1007,12 @@ export class LayoutEngine {
         // size, so it cannot bound its own relayout; one whose children
         // changed keeps its size and can.
         this.markLayoutDirty(node, (flags & DirtyFlags.Layout) === 0);
+      }
+      if ((flags & DirtyFlags.Paint) !== 0) {
+        // A shadow is paint, so changing one lays nothing out, but it
+        // moves where the node paints, which culling reads off the
+        // extent.
+        this.refreshPaintReach(node);
       }
       if ((flags & DirtyFlags.Transform) !== 0) {
         // A transform is the one thing a hit test reads straight off
@@ -4360,23 +4410,27 @@ export class LayoutEngine {
      * spreadsheet's second frozen column, which sticks at the width of
      * the gutter — was drawn one gutter too far to the right.
      */
+    const reachChanged = readPaintReach(node, rec);
     if (rec.x !== x || rec.y !== y || rec.width !== width || rec.height !== height) {
       if (rec.width === width && rec.height === height && !rec.placeDirty && !rec.measureDirty && rec.placedOnce) {
         // Moved, and nothing else: its subtree is placed relative to it
         // already, so it moves by the same amount. See `shiftSubtree`.
         this.shiftSubtree(node, x - rec.x, y - rec.y);
+        if (reachChanged) {
+          this.updateExtent(node, rec);
+        }
         return;
       }
       rec.x = x;
       rec.y = y;
       rec.width = width;
       rec.height = height;
-      // Its own box for now; placing its children grows it if they
-      // reach past, and an ancestor it now reaches past grows too.
-      rec.extentMinX = x;
-      rec.extentMinY = y;
-      rec.extentMaxX = x + width;
-      rec.extentMaxY = y + height;
+      // Its own box and shadows for now; placing its children grows it
+      // if they reach past, and an ancestor it now reaches past grows too.
+      rec.extentMinX = x - rec.paintReachLeft;
+      rec.extentMinY = y - rec.paintReachTop;
+      rec.extentMaxX = x + width + rec.paintReachRight;
+      rec.extentMaxY = y + height + rec.paintReachBottom;
       this.growExtentUp(node);
       rec.placeDirty = true;
       // Subtree bounds are a summary of these four numbers, so this is
@@ -4397,6 +4451,21 @@ export class LayoutEngine {
           }
         }
       }
+    } else if (reachChanged) {
+      // Same box, new shadows.
+      this.updateExtent(node, rec);
+    }
+  }
+
+  /**
+   * A frame repainted the node, perhaps with new shadows. A shadow lays
+   * nothing out, so no pass would otherwise notice that the node now
+   * paints further out, or less far, than its extent says.
+   */
+  private refreshPaintReach(node: UiNode): void {
+    const rec = this.records.get(node);
+    if (rec !== undefined && readPaintReach(node, rec)) {
+      this.updateExtent(node, rec);
     }
   }
 
@@ -4419,16 +4488,16 @@ export class LayoutEngine {
    * anchor is one of the boxes that moved.
    */
   /**
-   * A node's paint extent, once its children are placed: its box, grown
-   * by each child's (a clipping child's box, since nothing paints past
+   * A node's paint extent, once its children are placed: its box and its
+   * own shadows, grown by each child's (a clipping child's box, since nothing paints past
    * it; anything else's extent). Then carried up, since an ancestor that
    * wasn't placed this pass still needs to hear.
    */
   private updateExtent(node: UiNode, rec: LayoutRecord): void {
-    rec.extentMinX = rec.x;
-    rec.extentMinY = rec.y;
-    rec.extentMaxX = rec.x + rec.width;
-    rec.extentMaxY = rec.y + rec.height;
+    rec.extentMinX = rec.x - rec.paintReachLeft;
+    rec.extentMinY = rec.y - rec.paintReachTop;
+    rec.extentMaxX = rec.x + rec.width + rec.paintReachRight;
+    rec.extentMaxY = rec.y + rec.height + rec.paintReachBottom;
     if (!rec.clips) {
       const visit = (parent: UiNode): void => {
         for (let child = parent.firstChild; child !== null; child = child.nextSibling) {

@@ -108,9 +108,19 @@ is happens before either of them:
 
 - **One tree and one layout pass.** Both read the same `LayoutRecord`s.
   A box is computed once, whatever draws it.
-- **One `PaintState`.** Colours, radii, borders, opacity, images and
-  gradients are resolved from the node's props and theme in shared code,
-  not per backend.
+- **One `PaintState`.** Colours, radii, borders, opacity, images,
+  gradients and shadows are resolved from the node's props and theme in
+  shared code, not per backend.
+- **One shadow.** `boxShadows` means what CSS `box-shadow` means: an
+  outer shadow is the node's rounded box grown by the spread, moved by
+  the offset and blurred by a Gaussian whose standard deviation is half
+  the blur radius, seen only outside the box; an `inset` one is the same
+  shape inverted and seen only inside it. The first shadow in the list
+  is on top. A shadow's colour may be a palette name. Canvas2D draws one
+  with the canvas's own shadow, cast from a shape thrown outside the
+  clip; WebGPU evaluates the blurred rounded rectangle in the fragment
+  shader, one quad per shadow. The shapes, radii, colours and order are
+  the same arithmetic on both.
 - **One measurer, and one paragraph layout.** Line breaking, `maxLines`,
   ellipsis and baselines come from the same `layoutParagraph` for layout,
   for both renderers and for the editing caret. WebGPU measures on a
@@ -124,12 +134,12 @@ is happens before either of them:
 - **One geometry for the parts an application does not draw itself**:
   scrollbar thumbs, `objectFit` rectangles, the focus and decoration
   shapes modifiers produce, and the inspector overlay.
-- **One paint order**: background, image, border, decorations, children,
-  the node's own text, then the decorations marked to come after
-  children, then its scrollbars.
-- **One clipping rule.** A node's own background, image, border and
-  scrollbars are painted outside its clip; its children and its own text
-  are clipped by it. Rounded clipping applies on both, including a
+- **One paint order**: outer shadows, background, inset shadows, image,
+  border, decorations, children, the node's own text, then the
+  decorations marked to come after children, then its scrollbars.
+- **One clipping rule.** A node's own shadows, background, image, border
+  and scrollbars are painted outside its clip; its children and its own
+  text are clipped by it. Rounded clipping applies on both, including a
   rounded box inside another. Borders sit inside the box, as CSS draws
   them. Images clip to their box under `cover` and `none`.
 
@@ -149,15 +159,17 @@ capability.
 | Start-up           | Immediate                                                 | Asynchronous: an adapter and a device, with frames before them skipped                                                                                |
 | Failure            | Nothing to lose                                           | A device can be lost, and the runtime falls back on the next frame                                                                                    |
 | Stage timings      | None: `render` is one number                              | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
+| Shadow blur        | The browser's blur, an approximation of the Gaussian      | The Gaussian evaluated analytically, so a soft edge's falloff can differ by a few percent of the shadow's colour                                      |
 
 Two things are the same on both and are worth stating because a reader
 looking for a difference will otherwise assume one:
 
-- **Neither paints `boxShadows`.** The prop resolves into `PaintState`
-  and nothing draws it. Use a border, a background, or a decoration.
 - **Neither redraws partially.** Both clear and redraw the whole scene
   every frame, and both cull subtrees outside the visible region first,
-  so cost follows what is on screen rather than what exists.
+  so cost follows what is on screen rather than what exists. A subtree
+  is culled by where it may paint, not by its box: that takes in
+  children that reach past a parent that doesn't clip, and each node's
+  outer shadows, so a card just off screen still casts its shadow on.
 - **Both place a row a hundred million pixels down on its pixel.** The
   GPU keeps positions in 32-bit floats and so does Skia, under Canvas2D,
   and either alone would round a row of a five-million-row list to the

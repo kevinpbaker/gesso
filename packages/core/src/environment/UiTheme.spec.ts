@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { colorsEqual, rgba } from '../properties/UiColor';
+import { colorsEqual, normalizeColor, rgba } from '../properties/UiColor';
 import { darkTheme, lightTheme, themesEqual, withContrast, withDensity } from './UiTheme';
 import { contrastRatio } from './UiContrast';
 
@@ -24,7 +24,9 @@ describe('UiTheme', () => {
   it('has shadow tokens that differ between light and dark', () => {
     expect(lightTheme.shadows.medium.length).toBeGreaterThan(0);
     expect(darkTheme.shadows.medium.length).toBeGreaterThan(0);
-    expect(lightTheme.shadows.medium[0]!.color.a).toBeLessThan(darkTheme.shadows.medium[0]!.color.a);
+    expect(normalizeColor(lightTheme.shadows.medium[0]!.color)!.a).toBeLessThan(
+      normalizeColor(darkTheme.shadows.medium[0]!.color)!.a
+    );
   });
 
   it('carries a spacing scale and the two axes', () => {

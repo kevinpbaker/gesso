@@ -11,6 +11,9 @@ import { setLinkHover } from '../selection/UiTextLinks';
 import type { DecorationShape } from './Decorations';
 import { borderShapes } from '../modifiers/decoration';
 import { linearGradient, radialGradient } from '../properties/UiGradient';
+import { BOX_SHADOW_BLUR_REACH, boxShadow } from '../properties/UiBoxShadow';
+import { darkTheme } from '../environment/UiTheme';
+import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { percent } from '../layout/UiLength';
 import { FakePaintCanvases, RenderHarness, RecordedGradient } from './RenderTestUtils';
 import { paintPictures } from './PaintPicture';
@@ -43,15 +46,18 @@ import {
  * buildRenderList for WebGPU — decodes each into the same ordered
  * list of draws in screen space, and asserts the lists are equal.
  *
- * A draw is a fill, a border, an image or a text line, with its box,
- * colour and opacity, and the rectangular clip it was painted under.
+ * A draw is a fill, a border, a shadow, an image or a text line, with
+ * its box, colour and opacity, and the rectangular clip it was painted
+ * under. A shadow's box is the shape it is the blur of, in screen space:
+ * the box grown by the spread and moved by the offset for an outer one,
+ * the hole shrunk by the spread for an inset one.
  * Text positions are compared to within half a pixel, because the
  * WebGPU path snaps a run's origin to a physical pixel and Canvas2D
  * does not; everything else must match exactly.
  */
 
 interface Draw {
-  kind: 'fill' | 'border' | 'image' | 'text';
+  kind: 'fill' | 'border' | 'shadow' | 'inset-shadow' | 'image' | 'text';
   x: number;
   y: number;
   width: number;
@@ -65,6 +71,10 @@ interface Draw {
   /** Rectangular clip in effect, in screen space, or null for none. */
   clip: Clip | null;
   text?: string;
+  /** A shadow's blur radius in device pixels. */
+  blur?: number;
+  /** The box an outer shadow is hidden under, in screen space, with its corner radius. */
+  cutout?: Clip & { radius: number };
 }
 
 interface Clip {
@@ -80,8 +90,13 @@ function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+/**
+ * Channels to the eight bits a CSS colour string carries, which is all
+ * Canvas2D is ever told; WebGPU keeps the float. A palette colour such
+ * as a theme's primary is not a whole number of 255ths.
+ */
 function colorKey(r: number, g: number, b: number, a: number): string {
-  return `${round(r)},${round(g)},${round(b)},${round(a)}`;
+  return `${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${round(a)}`;
 }
 
 function cssColorKey(css: unknown): string {
@@ -181,36 +196,65 @@ function intersect(a: Clip | null, b: Clip): Clip {
 }
 
 /**
- * Decodes the Canvas2D call log into draws. Tracks the CTM, alpha and
- * clip through save/restore, and recognises the two path shapes the
- * renderer traces: `rect` and the moveTo/arcTo rounded rectangle.
+ * Decodes the Canvas2D call log into draws. Tracks the CTM, alpha,
+ * clip and shadow through save/restore, and recognises the path shapes
+ * the renderer traces: `rect`, the moveTo/arcTo rounded rectangle, and
+ * a shadow's frame, a lineTo rectangle with one of those inside it.
  */
 function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
   const draws: Draw[] = [];
   let ctm: Affine = [1, 0, 0, 1, 0, 0];
   let alpha = 1;
   let clip: Clip | null = null;
+  let cutout: (Clip & { radius: number }) | undefined;
   let fillStyle: unknown = '#000';
   let strokeStyle: unknown = '#000';
   let lineWidth = 1;
-  const stack: { ctm: Affine; alpha: number; clip: Clip | null }[] = [];
+  let shadow = { color: 'rgba(0, 0, 0, 0)', blur: 0, x: 0, y: 0 };
+  const stack: {
+    ctm: Affine;
+    alpha: number;
+    clip: Clip | null;
+    cutout: (Clip & { radius: number }) | undefined;
+    shadow: typeof shadow;
+  }[] = [];
   let path: { x: number; y: number; width: number; height: number; radius: number } | null = null;
   let moveTo: [number, number] | null = null;
   let arcs = 0;
+  // A lineTo since the path began: the frame a shadow's clip or fill
+  // is traced around the rectangle that matters.
+  let framed = false;
 
   for (const call of calls) {
     const a = call.args as number[];
     switch (call.name) {
       case 'save':
-        stack.push({ ctm, alpha, clip });
+        stack.push({ ctm, alpha, clip, cutout, shadow });
         break;
       case 'restore': {
         const saved = stack.pop()!;
         ctm = saved.ctm;
         alpha = saved.alpha;
         clip = saved.clip;
+        cutout = saved.cutout;
+        shadow = saved.shadow;
         break;
       }
+      case 'set:shadowColor':
+        shadow = { ...shadow, color: call.args[0] as string };
+        break;
+      case 'set:shadowBlur':
+        shadow = { ...shadow, blur: a[0] };
+        break;
+      case 'set:shadowOffsetX':
+        shadow = { ...shadow, x: a[0] };
+        break;
+      case 'set:shadowOffsetY':
+        shadow = { ...shadow, y: a[0] };
+        break;
+      case 'lineTo':
+        framed = true;
+        break;
       case 'setTransform':
         ctm = [a[0], a[1], a[2], a[3], a[4], a[5]];
         break;
@@ -239,6 +283,7 @@ function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
         path = null;
         moveTo = null;
         arcs = 0;
+        framed = false;
         break;
       case 'rect':
         path = { x: a[0], y: a[1], width: a[2], height: a[3], radius: 0 };
@@ -259,6 +304,29 @@ function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
         draws.push(fillDraw(ctm, a[0], a[1], a[2], a[3], 0, fillStyle, alpha, clip));
         break;
       case 'fill':
+        if ((normalizeColor(shadow.color)?.a ?? 0) > 0) {
+          // A shadow: the shape was thrown out of the clip and its
+          // shadow cast back, so the shadow is where the shape is plus
+          // the device-space offset.
+          const shape =
+            path === null
+              ? { x: 0, y: 0, width: 0, height: 0 }
+              : screenBox(ctm, path.x, path.y, path.width, path.height);
+          draws.push({
+            kind: framed ? 'inset-shadow' : 'shadow',
+            x: path === null ? 0 : round(shape.x + shadow.x),
+            y: path === null ? 0 : round(shape.y + shadow.y),
+            width: shape.width,
+            height: shape.height,
+            radius: path?.radius ?? 0,
+            color: cssColorKey(shadow.color),
+            opacity: round(alpha),
+            blur: round(shadow.blur),
+            ...(framed ? {} : { cutout }),
+            clip
+          });
+          break;
+        }
         draws.push(fillDraw(ctm, path!.x, path!.y, path!.width, path!.height, path!.radius, fillStyle, alpha, clip));
         break;
       case 'strokeRect':
@@ -286,6 +354,11 @@ function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
         break;
       }
       case 'clip':
+        if (framed) {
+          // The ring around a box an outer shadow is painted in.
+          cutout = { ...screenBox(ctm, path!.x, path!.y, path!.width, path!.height), radius: path!.radius };
+          break;
+        }
         clip = intersect(clip, screenBox(ctm, path!.x, path!.y, path!.width, path!.height));
         break;
       case 'drawImage':
@@ -381,6 +454,10 @@ function webgpuDraws(list: RenderList): Draw[] {
         const o = i * INSTANCE_STRIDE_FLOATS;
         const d = list.instanceData;
         const t: Affine = [d[o + 12], d[o + 13], d[o + 14], d[o + 15], d[o + 16], d[o + 17]];
+        if (d[o + 11] === PrimitiveKind.Shadow || d[o + 11] === PrimitiveKind.InsetShadow) {
+          draws.push(shadowDraw(d, o, t, clipOf(command.scissor)));
+          continue;
+        }
         const kind = d[o + 11] === PrimitiveKind.Border ? 'border' : 'fill';
         const gradient = d[o + 19];
         draws.push({
@@ -410,6 +487,46 @@ function webgpuDraws(list: RenderList): Draw[] {
   }
   flushRuns(Number.POSITIVE_INFINITY);
   return draws;
+}
+
+/** A shadow instance as a draw; see the instance layout in WebGPURenderData. */
+function shadowDraw(d: Float32Array, o: number, t: Affine, scissor: Clip | null): Draw {
+  const blur = d[o + 10];
+  const [offsetX, offsetY, spread, other] = [d[o + 20], d[o + 21], d[o + 22], d[o + 23]];
+  const common = {
+    color: colorKey(d[o + 4], d[o + 5], d[o + 6], d[o + 7]),
+    opacity: round(d[o + 9]),
+    blur: round(blur * Math.sqrt(Math.abs(t[0] * t[3] - t[1] * t[2])))
+  };
+  if (d[o + 11] === PrimitiveKind.Shadow) {
+    const reach = blur * BOX_SHADOW_BLUR_REACH;
+    const [x, y, width, height] = [d[o] + reach, d[o + 1] + reach, d[o + 2] - reach * 2, d[o + 3] - reach * 2];
+    return {
+      kind: 'shadow',
+      ...screenBox(t, x, y, width, height),
+      radius: d[o + 8],
+      ...common,
+      cutout: {
+        ...screenBox(t, x - offsetX + spread, y - offsetY + spread, width - spread * 2, height - spread * 2),
+        radius: other
+      },
+      clip: scissor
+    };
+  }
+  const width = d[o + 2] - spread * 2;
+  const height = d[o + 3] - spread * 2;
+  const hole =
+    width > 0 && height > 0
+      ? screenBox(t, d[o] + offsetX + spread, d[o + 1] + offsetY + spread, width, height)
+      : { x: 0, y: 0, width: 0, height: 0 };
+  return {
+    kind: 'inset-shadow',
+    ...hole,
+    radius: width > 0 && height > 0 ? other : 0,
+    ...common,
+    // The quad is the box, and the shader cuts the shadow to it.
+    clip: intersect(scissor, screenBox(t, d[o], d[o + 1], d[o + 2], d[o + 3]))
+  };
 }
 
 function expectParity(h: RenderHarness, root: UiNode, constraints = Constraints.tight(800, 600)): Draw[] {
@@ -835,9 +952,9 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     expect(draws.map(d => d.kind)).toEqual(['fill', 'fill', 'fill', 'fill', 'image', 'fill']);
     // The vertical gradient's line runs the height of the box, top to
     // bottom, and its stops are the ends of it.
-    expect(draws[0].color).toBe('linear(60,0,60,40)[0:0.055,0.647,0.914,1 1:0.118,0.161,0.231,1]');
+    expect(draws[0].color).toBe('linear(60,0,60,40)[0:14,165,233,1 1:30,41,59,1]');
     // The radial one keeps the centre and radius it was given.
-    expect(draws[5].color).toMatch(/^radial\(50,10,60\)\[0:1,1,1,1 0\.7:/);
+    expect(draws[5].color).toMatch(/^radial\(50,10,60\)\[0:255,255,255,1 0\.7:/);
   });
 
   it('images under every objectFit', () => {
@@ -865,6 +982,84 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     h.append(root, box(h, 'page', { flexGrow: 1, height: 300 }), wrapper);
     const draws = expectParity(h, root, Constraints.tight(400, 300));
     expect(draws).toContainEqual(expect.objectContaining({ kind: 'fill', x: 264, y: 234, width: 120, height: 50 }));
+  });
+
+  it('box shadows: outer under the background in CSS order, inset over it, under a clip and an opacity', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 40);
+    root.setProperty('gap', 40);
+    const clipper = box(h, 'clipper', { width: 400, height: 400, overflow: 'hidden', opacity: 0.5, padding: 20 });
+    const card = box(h, 'card', {
+      width: 200,
+      height: 100,
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#cccccc',
+      boxShadows: [
+        // A palette name, resolved against the theme as a background is.
+        boxShadow(0, 4, 6, -1, 'primary'),
+        boxShadow(2, 3, 0, 4, { r: 0, g: 0, b: 0, a: 0.25 }),
+        boxShadow(-2, 1, 5, 2, '#00000040', true)
+      ]
+    });
+    const square = box(h, 'square', {
+      width: 80,
+      height: 80,
+      backgroundColor: '#eeeeee',
+      boxShadows: darkTheme.shadows.large
+    });
+    h.append(clipper, card, square);
+    h.append(root, clipper);
+    const draws = expectParity(h, root);
+
+    expect(draws.map(d => d.kind)).toEqual([
+      'shadow',
+      'shadow',
+      'fill',
+      'inset-shadow',
+      'border',
+      'shadow',
+      'shadow',
+      'fill'
+    ]);
+    const [hard, soft, , inset] = draws;
+    // The first shadow declared is on top, so it is drawn last.
+    expect(soft.blur).toBe(6);
+    expect(soft.color).toBe(cssColorKey(UiEnvironmentKeys.theme.defaultValue.colors.primary));
+    expect(soft).toMatchObject({ x: 61, y: 65, width: 198, height: 98, radius: 7, opacity: 0.5 });
+    expect(hard).toMatchObject({ x: 58, y: 59, width: 208, height: 108, radius: 12, blur: 0 });
+    expect(hard.cutout).toEqual({ x: 60, y: 60, width: 200, height: 100, radius: 8 });
+    expect(inset).toMatchObject({ x: 60, y: 63, width: 196, height: 96, radius: 6, blur: 5 });
+    expect(inset.clip).toEqual({ x: 60, y: 60, width: 200, height: 100 });
+  });
+
+  it('a shadow cast on screen by a box that is off it', () => {
+    // Culled by its box, the card would take its shadow with it. Its
+    // extent reaches as far as the shadow does, and the empty wrapper
+    // it stands in grows to cover it too.
+    const h = new RenderHarness(400, 300);
+    const root = h.createNode('app', UiNodeType.Box);
+    root.setProperty('width', 400);
+    root.setProperty('height', 300);
+    const wrapper = box(h, 'wrapper', { position: 'absolute', left: -200, top: 20, width: 10, height: 10 });
+    h.append(
+      wrapper,
+      box(h, 'card', {
+        position: 'absolute',
+        left: 50,
+        top: 0,
+        width: 100,
+        height: 60,
+        backgroundColor: '#fff',
+        boxShadows: [boxShadow(80, 0, 4, 0, '#000000')]
+      })
+    );
+    h.append(root, wrapper);
+    const draws = expectParity(h, root, Constraints.tight(400, 300));
+    expect(draws.map(d => d.kind)).toEqual(['shadow', 'fill']);
+    expect(draws[0]).toMatchObject({ x: -70, y: 20, width: 100, height: 60 });
   });
 
   it('a scrolled list with a sticky header, an overlay above it, and culling', () => {

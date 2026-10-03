@@ -69,6 +69,11 @@ nothing is painted and the console says so, once for each name.
 
 `shadows` and `spacing` are read from the theme and passed as values
 instead: `boxShadows` takes the array, and a padding takes a number.
+A floating panel says `boxShadows={theme.shadows.large}`; each entry is
+a CSS `box-shadow` (offset, blur, spread, colour, and `inset`), painted
+by both renderers with the first entry on top. A shadow's colour may be
+a palette name, `boxShadow(0, 4, 8, 0, 'shadow')`, resolved against the
+theme the element is under as any other colour is.
 A screen written from the scale says `paddingX={theme.spacing.large}`
 rather than `paddingX={16}`, and gets the density axis for free. There
 is no by-name resolution for a length, because a length is read in the
@@ -112,8 +117,8 @@ const theme = derive([scheme, wantsContrast], (dark, high) => {
 The palette of the nearest theme above the node, at the moment the node
 is painted. Every prop that takes a colour accepts a name:
 `backgroundColor`, `borderColor`, `color` on text, the colours a
-modifier paints for a hovered or pressed state, and the stops of a
-gradient.
+modifier paints for a hovered or pressed state, the stops of a
+gradient, and each shadow in `boxShadows`.
 
 The names in the shipped palette, in the three groups they fall into:
 

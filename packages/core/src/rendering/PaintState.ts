@@ -73,7 +73,12 @@ export interface PaintState {
   borderColor: UiColor | undefined;
   borderWidth: number;
   borderRadius: UiBorderRadius;
-  boxShadows: readonly UiBoxShadow[];
+  /**
+   * The node's shadows, in the order they were declared, with palette
+   * names resolved against its theme. A shadow whose colour names
+   * nothing is dropped, as a background that names nothing is.
+   */
+  boxShadows: readonly PaintBoxShadow[];
   hasTransform: boolean;
   transform: UiTransform;
   text: string | undefined;
@@ -132,6 +137,11 @@ export interface PaintState {
   selectionColor: UiColor;
   matchColor: UiColor;
   caretColor: UiColor;
+}
+
+/** A shadow ready to paint: a `UiBoxShadow` whose colour is resolved. */
+export interface PaintBoxShadow extends UiBoxShadow {
+  readonly color: UiColor;
 }
 
 /** A run of a paragraph, ready to paint: metrics, resolved colours, and its link. */
@@ -245,7 +255,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.borderColor = resolveColor(node, UiProperties.borderColor);
   out.borderWidth = resolveNumber(node, 'borderWidth') ?? 0;
   out.borderRadius = resolveBorderRadiusValue(node, resolveProperty(node, UiProperties.borderRadius));
-  out.boxShadows = resolveProperty(node, UiProperties.boxShadows);
+  out.boxShadows = resolvePaintShadows(node, resolveProperty(node, UiProperties.boxShadows));
   out.image = parseImage(node.properties.get('image'));
   out.video = parseVideo(node.properties.get('video'));
   out.objectFit = parseObjectFit(node.properties.get('objectFit'));
@@ -413,6 +423,36 @@ function resolvePaintSpans(node: UiNode, spans: readonly UiResolvedTextSpan[]): 
   return resolved;
 }
 
+const NO_SHADOWS: readonly PaintBoxShadow[] = [];
+
+/**
+ * A node's shadows with their colours resolved, remembered by the
+ * identity of the array and the theme, for the reason `paintSpans` is:
+ * a palette name needs the theme to resolve, and resolving it per
+ * frame would allocate a shadow record per shadow on screen.
+ */
+const paintShadows = new WeakMap<readonly UiBoxShadow[], { theme: unknown; shadows: readonly PaintBoxShadow[] }>();
+
+function resolvePaintShadows(node: UiNode, shadows: readonly UiBoxShadow[]): readonly PaintBoxShadow[] {
+  if (!Array.isArray(shadows) || shadows.length === 0) {
+    return NO_SHADOWS;
+  }
+  const theme = node.environment !== null ? node.environment.get(UiEnvironmentKeys.theme) : undefined;
+  const cached = paintShadows.get(shadows);
+  if (cached !== undefined && cached.theme === theme) {
+    return cached.shadows;
+  }
+  const resolved: PaintBoxShadow[] = [];
+  for (const shadow of shadows) {
+    const color = resolveColorValue(node, shadow.color);
+    if (color !== undefined) {
+      resolved.push({ ...shadow, color });
+    }
+  }
+  paintShadows.set(shadows, { theme, shadows: resolved });
+  return resolved;
+}
+
 /**
  * Whether a node paints at all, answered from its two cheapest
  * properties.
@@ -513,7 +553,7 @@ export function createPaintState(): PaintState {
     borderColor: undefined,
     borderWidth: 0,
     borderRadius: { topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 },
-    boxShadows: [],
+    boxShadows: NO_SHADOWS,
     hasTransform: false,
     transform: { x: 0, y: 0, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotation: 0 },
     text: undefined,

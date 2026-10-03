@@ -105,4 +105,13 @@ export interface Canvas2DContext {
   font: string;
   textAlign: CanvasTextAlign;
   textBaseline: CanvasTextBaseline;
+  /**
+   * The shadow a fill casts, which is how a `boxShadows` entry is drawn.
+   * Unlike everything else here, the offset and blur are in device
+   * pixels: the current transform does not apply to them.
+   */
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
 }

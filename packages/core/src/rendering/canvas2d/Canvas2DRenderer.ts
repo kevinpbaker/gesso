@@ -7,8 +7,9 @@ import type { CanvasSurface } from './CanvasSurface';
 import type { ResolvedGradient } from '../../properties/UiGradient';
 import { gradientPaint } from '../../properties/UiGradient';
 import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
-import type { PaintState } from '../PaintState';
+import type { PaintBoxShadow, PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
+import { boxShadowRadius } from '../../properties/UiBoxShadow';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { RenderContext } from '../RenderContext';
 import {
@@ -80,7 +81,9 @@ export interface Canvas2DRendererOptions {
  *
  * Painting per node (in order):
  *
+ *   0. outer shadows     (boxShadows, last declared first, as CSS stacks them)
  *   1. background fill   (backgroundColor, rounded rect when radius > 0)
+ *   1b. inset shadows    (boxShadows marked `inset`, over the background)
  *   2. background image  (image + objectFit)
  *   2b. picture          (what a Paint node's `paint`/`path` drew)
  *   3. border            (borderWidth/borderColor)
@@ -330,7 +333,13 @@ export class Canvas2DRenderer implements UiRenderer {
       }
     }
 
+    if (paint.boxShadows.length > 0) {
+      this.paintShadows(ctx, rec, paint, false);
+    }
     this.paintBackground(ctx, rec, paint);
+    if (paint.boxShadows.length > 0) {
+      this.paintShadows(ctx, rec, paint, true);
+    }
     this.paintImage(ctx, rec, paint);
     if (node.type === UiNodeType.Paint) {
       this.paintPicture(ctx, node, rec);
@@ -544,6 +553,88 @@ export class Canvas2DRenderer implements UiRenderer {
         ctx.fillStyle = style;
         this.fillBox(ctx, rec, paint);
       }
+    }
+  }
+
+  /**
+   * The node's outer shadows, or its inset ones, with CSS `box-shadow`
+   * semantics: see `UiBoxShadow`.
+   *
+   * Drawn with the canvas's own shadow, which blurs whatever a fill
+   * covers. The fill itself must not show, so the shape is drawn well
+   * away from the box, outside the clip, and its shadow is cast back by
+   * exactly that distance. The clip is what CSS clips a shadow to: for
+   * an outer shadow the ring around the box, so a translucent background
+   * does not show the shadow through it; for an inset one the box. An
+   * inset shadow is the shadow of a frame around a hole, the hole being
+   * the box moved by the offset and shrunk by the spread.
+   *
+   * A canvas shadow's offset and blur are in device pixels and ignore
+   * the transform, so both are carried through it here: the throw by
+   * the transform's linear part, the blur by its scale. The list is
+   * walked backwards because CSS paints the first shadow on top.
+   */
+  private paintShadows(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, inset: boolean): void {
+    const shadows = paint.boxShadows;
+    const radius = borderRadiusIsZero(paint.borderRadius) ? 0 : uniformBorderRadius(paint.borderRadius);
+    const dpr = this.surface.dpr;
+    const m = ctx.getTransform?.() ?? { a: dpr, b: 0, c: 0, d: dpr };
+    const scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
+    for (let i = shadows.length - 1; i >= 0; i--) {
+      const shadow = shadows[i]!;
+      if ((shadow.inset === true) !== inset || shadow.color.a <= 0) {
+        continue;
+      }
+      const blur = Math.max(0, shadow.blurRadius);
+      const spread = shadow.spreadRadius;
+      // Past anything the blur, spread or offset can reach, so the clip
+      // never cuts into the shadow and the thrown shape never lands in it.
+      const reach = blur * 2 + Math.abs(spread) + Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY) + 1;
+      const away = rec.width + reach * 2;
+      if (!inset) {
+        const width = rec.width + spread * 2;
+        const height = rec.height + spread * 2;
+        if (width <= 0 || height <= 0) {
+          continue;
+        }
+        ctx.save();
+        ctx.beginPath();
+        traceFrame(ctx, rec.x - reach, rec.y - reach, rec.width + reach * 2, rec.height + reach * 2);
+        appendRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, radius);
+        ctx.clip();
+        castShadow(ctx, shadow, blur * scale, -m.a * away, -m.b * away);
+        traceRoundedRect(
+          ctx,
+          rec.x + shadow.offsetX - spread + away,
+          rec.y + shadow.offsetY - spread,
+          width,
+          height,
+          boxShadowRadius(radius, spread, false)
+        );
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      ctx.save();
+      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, radius);
+      ctx.clip();
+      castShadow(ctx, shadow, blur * scale, -m.a * away, -m.b * away);
+      ctx.beginPath();
+      traceFrame(ctx, rec.x - reach + away, rec.y - reach, rec.width + reach * 2, rec.height + reach * 2);
+      const width = rec.width - spread * 2;
+      const height = rec.height - spread * 2;
+      if (width > 0 && height > 0) {
+        appendRoundedRect(
+          ctx,
+          rec.x + shadow.offsetX + spread + away,
+          rec.y + shadow.offsetY + spread,
+          width,
+          height,
+          boxShadowRadius(radius, spread, true)
+        );
+      }
+      ctx.fill();
+      ctx.restore();
     }
   }
 
@@ -1130,6 +1221,31 @@ function canvasGradient(
 }
 
 /**
+ * Sets up the shadow a fill is about to cast: the shadow's colour, a
+ * blur and a throw already in device pixels, and an opaque fill, since
+ * a shadow is as opaque as what casts it.
+ */
+function castShadow(ctx: Canvas2DContext, shadow: PaintBoxShadow, blur: number, throwX: number, throwY: number): void {
+  ctx.fillStyle = '#000';
+  ctx.shadowColor = colorToCss(shadow.color);
+  ctx.shadowBlur = blur;
+  ctx.shadowOffsetX = throwX;
+  ctx.shadowOffsetY = throwY;
+}
+
+/**
+ * A rectangle traced the other way round from `appendRoundedRect`, so
+ * that under the nonzero rule a rectangle traced inside it is a hole.
+ */
+function traceFrame(ctx: Canvas2DContext, x: number, y: number, width: number, height: number): void {
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y + height);
+  ctx.lineTo(x + width, y + height);
+  ctx.lineTo(x + width, y);
+  ctx.closePath();
+}
+
+/**
  * Emits a rounded-rectangle path (clamped radius) onto a context.
  *
  * Uses arcTo instead of roundRect so the renderer does not depend
@@ -1144,13 +1260,24 @@ export function traceRoundedRect(
   height: number,
   radius: number
 ): void {
+  ctx.beginPath();
+  appendRoundedRect(ctx, x, y, width, height, radius);
+}
+
+/** The same rectangle, added to the current path rather than starting one. */
+function appendRoundedRect(
+  ctx: Canvas2DContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+): void {
   const r = Math.min(radius, width / 2, height / 2);
   if (r <= 0) {
-    ctx.beginPath();
     ctx.rect(x, y, width, height);
     return;
   }
-  ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + width, y, x + width, y + height, r);
   ctx.arcTo(x + width, y + height, x, y + height, r);
