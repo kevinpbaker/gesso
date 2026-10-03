@@ -49,6 +49,15 @@ jobs:
           chrome-version: ${{ env.SCREENSHOT_CHROME }}
           install-dependencies: true
 
+      # Ubuntu 23.10 and later stop unprivileged user namespaces through
+      # AppArmor, and a Chrome that did not come from Google's .deb, which
+      # brings its own AppArmor profile, then aborts with "No usable
+      # sandbox!". Lifting the restriction on this throwaway runner is
+      # Chromium's documented fix, and keeps the sandbox, where
+      # --no-sandbox would turn it off.
+      - name: Let Chrome sandbox itself
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Route baselines
         run: pnpm screenshots:update
         env:
