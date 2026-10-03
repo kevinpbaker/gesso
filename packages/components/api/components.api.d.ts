@@ -489,6 +489,34 @@ interface SelectProps extends ControlLayoutProps {
   labelHidden?: boolean;
 }
 declare function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
+interface DatePickerProps extends ControlLayoutProps {
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
+  label?: string;
+  labelHidden?: boolean;
+  placeholder?: string;
+  description?: string;
+  error?: string;
+  invalid?: boolean;
+  required?: boolean;
+  disabled?: boolean;
+  min?: string;
+  max?: string;
+  weekStart?: number;
+  clearable?: boolean;
+  today?: string;
+  locale?: string;
+  ref?: UiNodeRef;
+}
+declare function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContext): UiChild;
+declare function parseIsoDate(value: string): Date | null;
+declare function isoDate(date: Date): string;
+declare function todayIso(now?: Date): string;
+declare function addDays(value: string, days: number): string;
+declare function addMonths(value: string, months: number): string;
+declare function monthGrid(month: string, weekStart: number): string[][];
+declare function formatDate(value: string, options: Intl.DateTimeFormatOptions, locale?: string): string;
 interface ComboboxOption {
   readonly value: string;
   readonly label: string;
@@ -883,6 +911,8 @@ interface VideoPlayerProps extends ControlLayoutProps {
 declare function VideoPlayer(inputs: Inputs<VideoPlayerProps>, ctx: ComponentContext): UiChild;
 export {
   Accordion,
+  addDays,
+  addMonths,
   Alert,
   allOf,
   Avatar,
@@ -903,6 +933,7 @@ export {
   controlMessage,
   controlTokens,
   DataTable,
+  DatePicker,
   Dialog,
   Divider,
   email,
@@ -912,10 +943,12 @@ export {
   FindBar,
   followTransport,
   form,
+  formatDate,
   hexOfHsv,
   hsvOfHex,
   Icon,
   Image,
+  isoDate,
   keymap,
   LazyList,
   Link,
@@ -928,10 +961,12 @@ export {
   menuBarStep,
   Meter,
   minLength,
+  monthGrid,
   normalizeHex,
   NumberInput,
   Pagination,
   PALETTE,
+  parseIsoDate,
   pattern,
   ProgressBar,
   quantize,
@@ -951,6 +986,7 @@ export {
   TextArea,
   TextInput,
   Toast,
+  todayIso,
   Toolbar,
   tooltip,
   Tooltip,
@@ -994,6 +1030,7 @@ export {
   type DataColumn,
   type DataTableProps,
   type DataTableSort,
+  type DatePickerProps,
   type DialogProps,
   type DividerProps,
   type Field,

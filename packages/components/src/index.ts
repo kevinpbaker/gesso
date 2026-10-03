@@ -53,6 +53,8 @@ export { MenuBar, type MenuBarProps } from './MenuBar';
 export { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep } from './menuBarModel';
 export type { MenuBarContext, MenuBarEntry, MenuBarMenu, MenuBarState, MenuBarStep } from './menuBarModel';
 export { Select, type SelectProps, type SelectOption } from './Select';
+export { DatePicker, type DatePickerProps } from './DatePicker';
+export { addDays, addMonths, formatDate, isoDate, monthGrid, parseIsoDate, todayIso } from './calendar';
 export { Combobox, comboboxRank, filterCombobox, type ComboboxProps, type ComboboxOption } from './Combobox';
 export {
   Tooltip,
