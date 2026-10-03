@@ -198,10 +198,11 @@ describe('UiWheelController', () => {
   });
 
   describe('pacing a precision device over frames', () => {
-    // A trackpad sends on its own clock: at a steady speed a frame gets
-    // two of its steps, now and then one or three. Applied as they come
-    // the page moves 20, 20, 30, 10 pixels, which is judder.
-    function paced(arrivals: readonly number[][]) {
+    // A trackpad sends on its own clock: here a 10-pixel step every 7.5
+    // ms against a frame every 16.7, so a frame catches two steps or
+    // three. Applied as they come, the page moves 20, then 30, then 20,
+    // which is judder.
+    function flick(steps: number, stepMs: number, frameMs: number) {
       const { h, scroll, content } = setupVertical();
       content.setProperty('height', 100_000);
       h.layoutTree();
@@ -213,35 +214,50 @@ describe('UiWheelController', () => {
         () => 0,
         { pace: true }
       );
-      const steps: number[] = [];
-      for (const frame of arrivals) {
-        for (const delta of frame) {
-          controller.wheel(50, 50, 0, delta, noKeyModifiers(), UiWheelDeltaMode.Pixel);
+      const moves: number[] = [];
+      const behind: number[] = [];
+      let sent = 0;
+      let next = 0;
+      for (let frame = frameMs; next < steps || frame < steps * stepMs + 200; frame += frameMs) {
+        while (next < steps && next * stepMs <= frame) {
+          controller.wheel(50, 50, 0, 10, noKeyModifiers(), UiWheelDeltaMode.Pixel, undefined, next * stepMs);
+          sent += 10;
+          next++;
         }
         const before = scrollY(h, scroll);
-        controller.advance();
-        steps.push(scrollY(h, scroll) - before);
+        controller.advance(frame);
+        moves.push(scrollY(h, scroll) - before);
+        behind.push(sent - scrollY(h, scroll));
       }
-      while (controller.advance()) {
-        // Until it has gone quiet.
-      }
-      return { steps, total: scrollY(h, scroll) };
+      return { moves, behind, total: scrollY(h, scroll) };
     }
 
-    it('moves a steady flick by even steps, and ends where the steps add up to', () => {
-      const beat = [[10, 10], [10, 10], [10, 10, 10], [10], [10, 10], [10, 10], [10, 10, 10], [10], [10, 10], [10, 10]];
-      const { steps, total } = paced(beat);
-      expect(total).toBe(200);
-      // After the first frame, nothing jumps by a whole step of input.
-      for (const step of steps.slice(1)) {
-        expect(step).toBeGreaterThan(14);
-        expect(step).toBeLessThan(26);
+    it('moves a steady flick by even steps, never behind it, and ends where the steps add up to', () => {
+      const { moves, behind, total } = flick(80, 7.5, 1000 / 60);
+      expect(total).toBe(800);
+      // While the flick is under way, each frame moves by what the input
+      // moves in a frame (22.2 pixels), give or take a pixel or two.
+      for (const move of moves.slice(2, 30)) {
+        expect(move).toBeGreaterThan(19);
+        expect(move).toBeLessThan(25.5);
       }
+      // And the page is never behind the steps that have arrived.
+      expect(Math.max(...behind.slice(0, 30))).toBeLessThanOrEqual(0);
     });
 
-    it('applies a lone step, and a push the other way, at once', () => {
-      expect(paced([[30]]).steps).toEqual([30]);
-      expect(paced([[10, 10], [10, 10], [-30]]).steps.at(-1)).toBe(-30);
+    it('applies a lone step at once, and exactly, where no time is given', () => {
+      const { h, scroll } = setupVertical();
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => 0,
+        { pace: true }
+      );
+      controller.wheel(50, 50, 0, 30, noKeyModifiers(), UiWheelDeltaMode.Pixel);
+      controller.advance();
+      expect(scrollY(h, scroll)).toBe(30);
     });
   });
 

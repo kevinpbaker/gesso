@@ -142,7 +142,9 @@ export class UiPlatformAdapter {
         w.deltaY,
         modifiersFromEvent(w),
         w.deltaMode,
-        wheelDeltaYOf(w)
+        wheelDeltaYOf(w),
+        // Same thread, same clock as the frames pacing predicts for.
+        w.timeStamp
       );
       // Both halves matter, and each was a bug on its own. `consumed`
       // says a container took the delta, and without it the page

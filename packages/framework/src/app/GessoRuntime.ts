@@ -3033,7 +3033,7 @@ export class GessoRuntime {
     // A trackpad's steps, paced over frames (see `UiWheelController.advance`).
     // Before the lazy lists read the offset, so the rows this frame's step
     // reveals are built on it.
-    if (this.input.wheel.advance()) {
+    if (this.input.wheel.advance(time)) {
       this.scheduler.wake();
     }
 

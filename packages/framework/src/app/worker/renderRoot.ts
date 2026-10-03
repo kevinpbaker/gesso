@@ -461,7 +461,9 @@ export class RenderWorkerApp {
           message.deltaY,
           message.modifiers,
           message.deltaMode,
-          message.wheelDeltaY
+          message.wheelDeltaY,
+          // The shell's epoch, as this thread's clock, which frames are on.
+          message.at === undefined ? undefined : message.at - performance.timeOrigin
         );
         break;
       case 'keyDown':
