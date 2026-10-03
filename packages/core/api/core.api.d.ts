@@ -1627,7 +1627,8 @@ type UiRole = 'button' | 'checkbox' | 'switch' | 'radio' | 'radiogroup' | 'slide
 type UiLiveRegion = 'polite' | 'assertive';
 declare const UI_ROLES: readonly UiRole[];
 declare function isUiRole(value: unknown): value is UiRole;
-type UiSemanticState = 'checked' | 'mixed' | 'expanded' | 'collapsed' | 'selected' | 'pressed' | 'busy' | 'invalid' | 'required' | 'readonly' | 'modal';
+type UiSemanticState = 'checked' | 'mixed' | 'expanded' | 'collapsed' | 'selected' | 'pressed' | 'busy' | 'invalid' | 'required' | 'readonly' | 'modal' |
+'multiselectable';
 declare const UI_SEMANTIC_STATES: readonly UiSemanticState[];
 declare function isUiSemanticState(value: unknown): value is UiSemanticState;
 type UiSemanticStates = readonly UiSemanticState[];
@@ -6892,7 +6893,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-Bh8X7WaZ.js";
+} from "./index-Jog6rB8Y.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7824,7 +7825,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-Bh8X7WaZ.js";
+} from "./index-Jog6rB8Y.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

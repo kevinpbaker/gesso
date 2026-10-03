@@ -66,7 +66,8 @@ const STATE_ATTRIBUTES: Record<string, [attribute: string, value: string]> = {
   invalid: ['aria-invalid', 'true'],
   required: ['aria-required', 'true'],
   readonly: ['aria-readonly', 'true'],
-  modal: ['aria-modal', 'true']
+  modal: ['aria-modal', 'true'],
+  multiselectable: ['aria-multiselectable', 'true']
 };
 
 /**
@@ -115,6 +116,7 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'aria-required',
   'aria-readonly',
   'aria-modal',
+  'aria-multiselectable',
   'aria-activedescendant'
 ];
 

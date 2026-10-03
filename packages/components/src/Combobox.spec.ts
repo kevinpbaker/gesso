@@ -242,6 +242,18 @@ describe('Combobox', () => {
       expect(changes.at(-1)).toEqual(['ada']);
     });
 
+    it('says its list is multiselectable, and only then', async () => {
+      mount({ multiple: true, defaultValues: [], options: PEOPLE });
+      await focus();
+      await key('ArrowDown');
+      expect(ui.getSemantics(ui.getByRole('listbox')).states).toContain('multiselectable');
+      ui.unmount();
+      mount({ defaultValue: '', options: PEOPLE });
+      await focus();
+      await key('ArrowDown');
+      expect(ui.getSemantics(ui.getByRole('listbox')).states ?? []).not.toContain('multiselectable');
+    });
+
     it('names the chosen values once options arrive after them', async () => {
       const options = new BehaviorSubject<readonly ComboboxOption[]>([]);
       mount({ multiple: true, defaultValues: ['ada'], options });
