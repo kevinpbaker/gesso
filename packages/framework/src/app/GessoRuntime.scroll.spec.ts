@@ -48,6 +48,36 @@ describe('scrollPosition', () => {
     expect(seen.map(at => at.y)).toEqual([120, 260]);
   });
 
+  it('adds up every wheel step between two frames', () => {
+    // A trackpad at 120 Hz sends two steps a frame on a 60 Hz display.
+    // Each was added to the offset the last layout settled on, so the
+    // second overwrote the first: half of every flick was lost.
+    const seen: ScrollOffset[] = [];
+    const mounted = mountRuntime(
+      ScrollView(
+        { width: 200, height: 100, modifiers: [scrollPosition({ onChange: at => seen.push(at) })] },
+        Column({ width: 200 }, Box({ width: 200, height: 600 }))
+      )
+    );
+    drain(mounted);
+    seen.length = 0;
+    for (let step = 0; step < 4; step++) {
+      mounted.runtime.input.wheel.wheel(100, 50, 0, 10);
+    }
+    drain(mounted);
+    expect(seen.at(-1)?.y).toBe(40);
+    // And past the end, the overshoot isn't banked: the way back starts at once.
+    for (let step = 0; step < 100; step++) {
+      mounted.runtime.input.wheel.wheel(100, 50, 0, 10);
+    }
+    drain(mounted);
+    expect(seen.at(-1)?.y).toBe(500);
+    mounted.runtime.input.wheel.wheel(100, 50, 0, -10);
+    mounted.runtime.input.wheel.wheel(100, 50, 0, -10);
+    drain(mounted);
+    expect(seen.at(-1)?.y).toBe(480);
+  });
+
   it('reports the offset the engine settled on, not the one that was asked for', () => {
     // 600 of content in a 100-tall viewport clamps at 500. A wheel
     // writes the property unclamped, so the property and the truth
