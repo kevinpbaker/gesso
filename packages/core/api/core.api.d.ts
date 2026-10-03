@@ -2878,6 +2878,7 @@ declare class UiWheelController {
   private scrollChain;
   private appContainsOverscroll;
   private applyDelta;
+  private gestureState;
   advance(time?: number): boolean;
   private toPixels;
 }

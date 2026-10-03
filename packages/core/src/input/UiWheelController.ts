@@ -360,7 +360,7 @@ export class UiWheelController {
     let right = false;
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
       const scrolled = scrollLeaderOf(node) ?? node;
-      const state = takesWheel(node) ? this.scrollSink.containerState(scrolled) : undefined;
+      const state = takesWheel(node) ? this.gestureState(scrolled, this.scrollSink.containerState(scrolled)) : undefined;
       if (state !== undefined) {
         left ||= hasScrollRoom(state.scrollX, state.maxScrollX, -1);
         right ||= hasScrollRoom(state.scrollX, state.maxScrollX, 1);
@@ -427,7 +427,7 @@ export class UiWheelController {
   ): void {
     for (let node: UiNode | null = target; node !== null; node = node.parent) {
       const scrolled = scrollLeaderOf(node) ?? node;
-      const state = takesWheel(node) ? this.scrollSink.containerState(scrolled) : undefined;
+      const state = takesWheel(node) ? this.gestureState(scrolled, this.scrollSink.containerState(scrolled)) : undefined;
       if (state === undefined) {
         if (containsOverscroll(node)) {
           event.markConsumed();
@@ -504,11 +504,13 @@ export class UiWheelController {
     if (pace) {
       let paced = this.pacing.get(container);
       if (paced === undefined) {
-        paced = { samples: [], totalX: 0, totalY: 0, appliedX: 0, appliedY: 0, quiet: 0, fresh: false };
+        paced = { samples: [], totalX: 0, totalY: 0, baseX: state.scrollX, baseY: state.scrollY, lastX: state.scrollX, lastY: state.scrollY, dirX: 0, dirY: 0, quiet: 0, fresh: false };
         this.pacing.set(container, paced);
       }
       paced.totalX += dx;
       paced.totalY += dy;
+      if (dx !== 0) paced.dirX = Math.sign(dx);
+      if (dy !== 0) paced.dirY = Math.sign(dy);
       paced.fresh = true;
       paced.samples.push({ t: this.eventTime, x: paced.totalX, y: paced.totalY });
       while (paced.samples.length > 2 && paced.samples[0]!.t < this.eventTime - VELOCITY_WINDOW_MS) {
@@ -519,6 +521,26 @@ export class UiWheelController {
       return;
     }
     this.scrollSink.scrollBy(container, dx, dy, behavior);
+  }
+
+  /**
+   * A container's state as a step should judge it: during a paced gesture,
+   * where the steps so far have really taken it, not where the prediction
+   * has drawn it. Judged by what's drawn, a flick into the top found no
+   * room once the prediction got there first, its last steps were refused,
+   * and withdrawing the prediction then moved the list back down off the
+   * top.
+   */
+  private gestureState(container: UiNode, state: ScrollContainerState | undefined): ScrollContainerState | undefined {
+    const paced = this.pacing.get(container);
+    if (state === undefined || paced === undefined) {
+      return state;
+    }
+    return {
+      ...state,
+      scrollX: Math.min(Math.max(paced.baseX + paced.totalX, 0), state.maxScrollX),
+      scrollY: Math.min(Math.max(paced.baseY + paced.totalY, 0), state.maxScrollY)
+    };
   }
 
   /**
@@ -559,8 +581,15 @@ export class UiWheelController {
       paced.fresh = false;
       let x = paced.totalX;
       let y = paced.totalY;
-      const last = paced.samples[paced.samples.length - 1];
-      const first = paced.samples[0];
+      const samples = paced.samples;
+      const last = samples[samples.length - 1];
+      // The velocity of the last few steps only: read further back, a flick
+      // that is slowing is predicted at the speed it had, runs ahead, and
+      // has to step back.
+      let first = last;
+      for (let k = samples.length - 2; k >= 0 && last !== undefined && samples[k]!.t >= last.t - RECENT_MS; k--) {
+        first = samples[k];
+      }
       const since = time === undefined || last === undefined ? -1 : time - last.t;
       // Only on one clock, and only while the steps are recent: a time
       // that doesn't fit is a host that didn't say when, and goes exact.
@@ -570,14 +599,49 @@ export class UiWheelController {
         x += ((last.x - first.x) / span) * ahead;
         y += ((last.y - first.y) / span) * ahead;
       }
-      const dx = x - paced.appliedX;
-      const dy = y - paced.appliedY;
+      // Where the container goes: where the gesture started, plus the
+      // steps (and the prediction), clamped to its range. A position, not
+      // a running total of what was applied: at an edge a step that can't
+      // move the list moves nothing, and withdrawing a prediction that
+      // reached past the edge has nothing to take back, so the list stays
+      // against it rather than springing off and back.
+      const state = this.scrollSink.containerState(container);
+      if (state === undefined) {
+        this.pacing.delete(container);
+        continue;
+      }
+      // Something else moved it since the last frame (a key, a scrollbar,
+      // a caret being revealed): the gesture carries on from there rather
+      // than putting it back.
+      paced.baseX += state.scrollX - paced.lastX;
+      paced.baseY += state.scrollY - paced.lastY;
+      // A gesture pushed past an edge starts again from it, so turning
+      // back moves at once instead of first unwinding the overshoot.
+      paced.baseX = Math.min(Math.max(paced.baseX, -paced.totalX), state.maxScrollX - paced.totalX);
+      paced.baseY = Math.min(Math.max(paced.baseY, -paced.totalY), state.maxScrollY - paced.totalY);
+      let toX = Math.min(Math.max(paced.baseX + x, 0), state.maxScrollX);
+      let toY = Math.min(Math.max(paced.baseY + y, 0), state.maxScrollY);
+      // Never back against the way the latest step went: a prediction that
+      // ran ahead holds there until the steps catch it up, and if they
+      // stop first, it stays, a few pixels on, rather than pulling back,
+      // which the eye sees as a spring.
+      if (paced.dirX !== 0 && Math.sign(toX - state.scrollX) === -paced.dirX) {
+        toX = state.scrollX;
+        paced.baseX = toX - paced.totalX;
+      }
+      if (paced.dirY !== 0 && Math.sign(toY - state.scrollY) === -paced.dirY) {
+        toY = state.scrollY;
+        paced.baseY = toY - paced.totalY;
+      }
+      const dx = toX - state.scrollX;
+      const dy = toY - state.scrollY;
       if (dx !== 0 || dy !== 0) {
         this.scrollSink.scrollBy(container, dx, dy, 'instant');
-        paced.appliedX = x;
-        paced.appliedY = y;
       }
-      const settled = paced.appliedX === paced.totalX && paced.appliedY === paced.totalY;
+      paced.lastX = toX;
+      paced.lastY = toY;
+      const settled = toX === Math.min(Math.max(paced.baseX + paced.totalX, 0), state.maxScrollX) &&
+        toY === Math.min(Math.max(paced.baseY + paced.totalY, 0), state.maxScrollY);
       if (settled && paced.quiet >= QUIET_FRAMES) {
         this.pacing.delete(container);
       }
@@ -665,9 +729,15 @@ interface PacedScroll {
   /** Everything the steps add up to. */
   totalX: number;
   totalY: number;
-  /** What frames have applied, prediction included. */
-  appliedX: number;
-  appliedY: number;
+  /** Where the container was when the gesture began, moved to an edge it ran into. */
+  baseX: number;
+  baseY: number;
+  /** Where the last frame put it, to tell when something else has moved it. */
+  lastX: number;
+  lastY: number;
+  /** The way the latest step went on each axis: the way the gesture is going. */
+  dirX: number;
+  dirY: number;
   /** Frames in a row with no new step. */
   quiet: number;
   /** Whether a step arrived since the last frame. */
@@ -678,8 +748,14 @@ interface PacedScroll {
 const VELOCITY_WINDOW_MS = 40;
 /** How long after the last step its velocity is still trusted. */
 const STALE_MS = 40;
-/** The furthest ahead a frame predicts, in frames. */
+/**
+ * The furthest ahead a frame predicts, in frames: a frame's lead, for the
+ * frame it takes to be shown, plus the time since the last step, which is
+ * what evens out where each frame falls between steps.
+ */
 const MAX_AHEAD_FRAMES = 1.5;
+/** How far back the velocity is read for a prediction. */
+const RECENT_MS = 20;
 /** The display's interval before one has been measured. */
 const DEFAULT_FRAME_MS = 1000 / 60;
 /** Quiet frames, once settled, after which a gesture is over. */

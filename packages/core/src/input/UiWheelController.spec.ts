@@ -232,9 +232,14 @@ describe('UiWheelController', () => {
       return { moves, behind, total: scrollY(h, scroll) };
     }
 
-    it('moves a steady flick by even steps, never behind it, and ends where the steps add up to', () => {
+    it('moves a steady flick by even steps, never behind it and never backwards', () => {
       const { moves, behind, total } = flick(80, 7.5, 1000 / 60);
-      expect(total).toBe(800);
+      // It ends within a frame's travel past where the steps add up to:
+      // a prediction that ran ahead stays, since pulling it back is the
+      // spring the eye sees.
+      expect(total).toBeGreaterThanOrEqual(800);
+      expect(total).toBeLessThanOrEqual(800 + 40);
+      expect(Math.min(...moves)).toBeGreaterThanOrEqual(0);
       // While the flick is under way, each frame moves by what the input
       // moves in a frame (22.2 pixels), give or take a pixel or two.
       for (const move of moves.slice(2, 30)) {
@@ -243,6 +248,34 @@ describe('UiWheelController', () => {
       }
       // And the page is never behind the steps that have arrived.
       expect(Math.max(...behind.slice(0, 30))).toBeLessThanOrEqual(0);
+    });
+
+    it('stops at the edge a flick runs into, without springing back off it', () => {
+      // A flick up into the top: the prediction reaches past it, the list
+      // stops at 0, and withdrawing the prediction must not move it down
+      // again while the flick's coast keeps pushing it up.
+      const { h, scroll, content } = setupVertical();
+      content.setProperty('height', 100_000);
+      h.layoutTree();
+      scroll.setProperty('scrollY', 120);
+      h.layoutTree();
+      const controller = new UiWheelController(h.createHitTester(), h.dispatcher, h.scrollSink, () => h.root, () => 0, { pace: true });
+      const offsets: number[] = [];
+      let at = 0;
+      for (let frame = 1; frame <= 30; frame++) {
+        const time = frame * (1000 / 60);
+        // A step every 7.5 ms, shrinking as the coast slows.
+        while (at <= time && at < 200) {
+          controller.wheel(50, 50, 0, -Math.max(1, 20 - at / 10), noKeyModifiers(), UiWheelDeltaMode.Pixel, undefined, at);
+          at += 7.5;
+        }
+        controller.advance(time);
+        offsets.push(scrollY(h, scroll));
+      }
+      const hit = offsets.indexOf(0);
+      expect(hit).toBeGreaterThan(-1);
+      // From the frame it reaches the top, it stays there.
+      expect(offsets.slice(hit)).toEqual(offsets.slice(hit).map(() => 0));
     });
 
     it('applies a lone step at once, and exactly, where no time is given', () => {
