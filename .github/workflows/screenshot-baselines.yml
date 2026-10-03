@@ -9,7 +9,7 @@
 # setup as those jobs, and uploads what they wrote.
 #
 # Run it from the Actions tab (or `gh workflow run screenshot-baselines.yml`)
-# whenever the runner's Chrome moves, then download the
+# after moving SCREENSHOT_CHROME, then download the
 # `screenshot-baselines` artifact, copy it over the repository and commit.
 # It commits nothing itself, so a new set of baselines is always a change
 # somebody looked at.
@@ -21,6 +21,10 @@ on:
 
 env:
   NODE_VERSION: '24'
+  # The pinned Chrome the screenshot jobs in ci.yml compare with. The two
+  # must agree: a baseline is only comparable with a capture from the
+  # same build.
+  SCREENSHOT_CHROME: '154.0.8037.57'
 
 jobs:
   capture:
@@ -38,15 +42,22 @@ jobs:
       - name: Vulkan loader for SwiftShader
         run: sudo apt-get update && sudo apt-get install -y libvulkan1 mesa-vulkan-drivers
 
+      - name: Chrome, pinned
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: ${{ env.SCREENSHOT_CHROME }}
+          install-dependencies: true
+
       - name: Route baselines
         run: pnpm screenshots:update
         env:
-          CHROME_BIN: google-chrome
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Docs baselines
         run: pnpm docs:screenshots:update
         env:
-          CHROME_BIN: google-chrome
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Upload the baselines
         uses: actions/upload-artifact@v4
