@@ -245,8 +245,17 @@ export class UiWheelController {
      */
     private readonly rootNode: (() => UiNode | null) | null = null,
     /** The clock the precise-device memory below reads. Injectable for specs. */
-    private readonly now: () => number = () => performance.now()
-  ) {}
+    private readonly now: () => number = () => performance.now(),
+    options: UiWheelControllerOptions = {}
+  ) {
+    this.paced = options.pace === true;
+  }
+
+  /** Whether a precision device's steps are paced over frames; see `advance`. */
+  private readonly paced: boolean;
+
+  /** Steps a precision device sent that frames haven't applied yet, by container. */
+  private readonly pacing = new Map<UiNode, PacedScroll>();
 
   /**
    * Until when the wheel is taken to be a precision device whatever an
@@ -430,7 +439,8 @@ export class UiWheelController {
           takesX ? deltaX : 0,
           takesY ? deltaY : 0,
           deltaMode,
-          behaviorFor(scrolled, notched)
+          behaviorFor(scrolled, notched),
+          this.paced && !notched
         );
         event.markConsumed();
         return;
@@ -470,17 +480,74 @@ export class UiWheelController {
     deltaX: number,
     deltaY: number,
     deltaMode: UiWheelDeltaMode,
-    behavior: UiScrollBehavior
+    behavior: UiScrollBehavior,
+    pace: boolean
   ): void {
     // A page-mode delta means a screenful, and a screenful is a
     // different number on each axis, so each is converted in its own
     // viewport extent rather than one of them borrowing the other's.
-    this.scrollSink.scrollBy(
-      container,
-      deltaX === 0 ? 0 : this.toPixels(deltaX, deltaMode, state.viewportWidth),
-      deltaY === 0 ? 0 : this.toPixels(deltaY, deltaMode, state.viewportHeight),
-      behavior
-    );
+    const dx = deltaX === 0 ? 0 : this.toPixels(deltaX, deltaMode, state.viewportWidth);
+    const dy = deltaY === 0 ? 0 : this.toPixels(deltaY, deltaMode, state.viewportHeight);
+    if (pace) {
+      let paced = this.pacing.get(container);
+      if (paced === undefined) {
+        paced = { x: newAxis(), y: newAxis(), quiet: 0, started: false };
+        this.pacing.set(container, paced);
+      }
+      paced.x.received += dx;
+      paced.y.received += dy;
+      // Applied a frame at a time from here on: see `advance`.
+      this.scrollSink.scrollBy(container, 0, 0, 'instant');
+      return;
+    }
+    this.scrollSink.scrollBy(container, dx, dy, behavior);
+  }
+
+  /**
+   * Applies a precision device's steps for one frame. A host that turned
+   * pacing on calls this once a frame, before the frame reads scroll
+   * offsets.
+   *
+   * A trackpad sends on its own clock, not the display's, so a frame
+   * gets two of its steps, or three, or one, or on a 120 Hz display
+   * none: applied as they come, a steady flick moves the page by uneven
+   * amounts, which reads as judder. A browser scrolling a page natively
+   * resamples the input to the frame for the same reason. This moves
+   * each frame by the rate the input has been arriving at (a running
+   * average of what each frame received), never more than a frame's
+   * worth behind it, and applies the rest once the input stops, so the
+   * page ends exactly where the steps add up to.
+   *
+   * A gesture's first frame has no rate to keep to, so it applies all it
+   * received: a single step lands on the next frame, as it did before
+   * there was pacing. Steady input applies in full every frame too; only
+   * uneven arrivals are evened out.
+   *
+   * True while a gesture is still being paced, so the host keeps frames
+   * coming until it has been quiet for a couple of them.
+   */
+  advance(): boolean {
+    for (const [container, paced] of this.pacing) {
+      const quiet = paced.x.received === 0 && paced.y.received === 0;
+      paced.quiet = quiet ? paced.quiet + 1 : 0;
+      let dx: number;
+      let dy: number;
+      if (!paced.started) {
+        paced.started = true;
+        dx = startAxis(paced.x);
+        dy = startAxis(paced.y);
+      } else {
+        dx = paceAxis(paced.x, paced.quiet >= QUIET_FRAMES);
+        dy = paceAxis(paced.y, paced.quiet >= QUIET_FRAMES);
+      }
+      if (dx !== 0 || dy !== 0) {
+        this.scrollSink.scrollBy(container, dx, dy, 'instant');
+      }
+      if (paced.x.pending === 0 && paced.y.pending === 0 && paced.quiet >= QUIET_FRAMES) {
+        this.pacing.delete(container);
+      }
+    }
+    return this.pacing.size > 0;
   }
 
   /**
@@ -547,3 +614,96 @@ export function isScrollContainer(node: UiNode): boolean {
  * hand from a trackpad to a mouse.
  */
 const PRECISE_MEMORY_MS = 400;
+
+export interface UiWheelControllerOptions {
+  /**
+   * Pace a precision device's steps over frames instead of applying each
+   * as it arrives; the host then calls `advance` once a frame.
+   */
+  readonly pace?: boolean;
+}
+
+/** One axis of a precision device's scroll, waiting for frames. */
+interface PacedAxis {
+  /** Steps that arrived since the last frame. */
+  received: number;
+  /** Arrived and not yet applied. */
+  pending: number;
+  /** A running average of what a frame receives, signed. */
+  rate: number;
+}
+
+interface PacedScroll {
+  readonly x: PacedAxis;
+  readonly y: PacedAxis;
+  /** Frames in a row that received nothing on either axis. */
+  quiet: number;
+  /** Whether the gesture's first frame has been applied. */
+  started: boolean;
+}
+
+function newAxis(): PacedAxis {
+  return { received: 0, pending: 0, rate: 0 };
+}
+
+/**
+ * How much of the input's rate a single frame's arrivals move it by.
+ * Lower is smoother and slower to follow a change of speed.
+ */
+const PACE_SMOOTHING = 0.3;
+/**
+ * How many times the running rate a frame's arrivals can be and still be
+ * the beat of the same stream, rather than a new push.
+ */
+const IMPULSE = 2.5;
+/** Frames with no input after which what's left is applied at once. */
+const QUIET_FRAMES = 2;
+
+/** A gesture's first frame: everything it received, which seeds the rate. */
+function startAxis(axis: PacedAxis): number {
+  const step = axis.received;
+  axis.rate = step;
+  axis.received = 0;
+  return step;
+}
+
+/** This frame's step on one axis; see `UiWheelController.advance`. */
+function paceAxis(axis: PacedAxis, flush: boolean): number {
+  const received = axis.received;
+  axis.received = 0;
+  if (
+    received !== 0 &&
+    (Math.sign(received) !== Math.sign(axis.rate) || Math.abs(received) > IMPULSE * Math.abs(axis.rate))
+  ) {
+    // Not the beat of a steady stream but a new push: the other way, or
+    // far harder than the stream was going. Averaged against the old
+    // rate it would trail behind, so it goes at once, with what was
+    // waiting, and becomes the rate.
+    const step = axis.pending + received;
+    axis.pending = 0;
+    axis.rate = received;
+    return step;
+  }
+  axis.pending += received;
+  axis.rate += PACE_SMOOTHING * (received - axis.rate);
+  if (axis.pending === 0) {
+    return 0;
+  }
+  if (flush) {
+    const step = axis.pending;
+    axis.pending = 0;
+    return step;
+  }
+  let step = 0;
+  // The average rate, but never more than a frame's worth behind: a
+  // flick that speeds up is followed within a frame.
+  const size = Math.abs(axis.pending);
+  const rate = Math.abs(axis.rate);
+  const move = Math.min(size, Math.max(rate, size - rate));
+  const signed = Math.sign(axis.pending) * move;
+  axis.pending -= signed;
+  if (Math.abs(axis.pending) < 1e-6) {
+    axis.pending = 0;
+  }
+  return step + signed;
+}

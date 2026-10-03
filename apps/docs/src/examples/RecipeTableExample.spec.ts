@@ -69,11 +69,17 @@ function detail(ui: Rendered): string {
   return line;
 }
 
+/**
+ * A wheel, and the frames that follow it until the table has settled:
+ * the window is measured on the frame the scroll lands and corrected on
+ * the next, as it is in a browser.
+ */
 function wheel(ui: Rendered, deltaY: number): void {
   const box = ui.getLayout(table(ui));
   ui.fireEvent.wheel({ x: box.x + box.width / 2, y: box.y + box.height / 2, deltaY });
-  ui.frame();
-  ui.frame();
+  for (let frame = 0; frame < 4; frame++) {
+    ui.frame();
+  }
 }
 
 const SLOWEST = REQUESTS.reduce((worst, request) => Math.max(worst, request.ms), 0);
@@ -120,12 +126,14 @@ describe('the large table recipe', () => {
     wheel(ui, 20000);
 
     // 20,000 px at 26 a row is row 769 or so, and the window that
-    // arrives there is the same size as the one that left.
+    // arrives there is a screenful, as the one that left was: a few rows
+    // more, for a top row cut part-way and the overscan below it, and
+    // nine nodes a row whichever rows they are.
     expect(topRow(ui)[0]).not.toBe(before);
     expect(Number(topRow(ui)[0].replace(/,/g, ''))).toBeGreaterThan(700);
-    expect(bodyRows(ui).length).toBe(17);
+    expect(bodyRows(ui).length).toBe(18);
     expect(bodyRows(ui).length).toBeLessThan(WINDOW_CEILING);
-    expect(nodesUnderTable(ui)).toBe(175);
+    expect(nodesUnderTable(ui)).toBe(184);
   });
 
   it('holds the header at the top of the table while the rows scroll under it', () => {

@@ -197,6 +197,54 @@ describe('UiWheelController', () => {
     expect(isNotchedWheel(UiWheelDeltaMode.Line, undefined)).toBe(true);
   });
 
+  describe('pacing a precision device over frames', () => {
+    // A trackpad sends on its own clock: at a steady speed a frame gets
+    // two of its steps, now and then one or three. Applied as they come
+    // the page moves 20, 20, 30, 10 pixels, which is judder.
+    function paced(arrivals: readonly number[][]) {
+      const { h, scroll, content } = setupVertical();
+      content.setProperty('height', 100_000);
+      h.layoutTree();
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => 0,
+        { pace: true }
+      );
+      const steps: number[] = [];
+      for (const frame of arrivals) {
+        for (const delta of frame) {
+          controller.wheel(50, 50, 0, delta, noKeyModifiers(), UiWheelDeltaMode.Pixel);
+        }
+        const before = scrollY(h, scroll);
+        controller.advance();
+        steps.push(scrollY(h, scroll) - before);
+      }
+      while (controller.advance()) {
+        // Until it has gone quiet.
+      }
+      return { steps, total: scrollY(h, scroll) };
+    }
+
+    it('moves a steady flick by even steps, and ends where the steps add up to', () => {
+      const beat = [[10, 10], [10, 10], [10, 10, 10], [10], [10, 10], [10, 10], [10, 10, 10], [10], [10, 10], [10, 10]];
+      const { steps, total } = paced(beat);
+      expect(total).toBe(200);
+      // After the first frame, nothing jumps by a whole step of input.
+      for (const step of steps.slice(1)) {
+        expect(step).toBeGreaterThan(14);
+        expect(step).toBeLessThan(26);
+      }
+    });
+
+    it('applies a lone step, and a push the other way, at once', () => {
+      expect(paced([[30]]).steps).toEqual([30]);
+      expect(paced([[10, 10], [10, 10], [-30]]).steps.at(-1)).toBe(-30);
+    });
+  });
+
   describe('a trackpad whose deltas look like detents', () => {
     // Chrome on a Mac reports a trackpad's legacy wheelDeltaY as three
     // times its pixel delta, so a 40-pixel step reads -120, a whole

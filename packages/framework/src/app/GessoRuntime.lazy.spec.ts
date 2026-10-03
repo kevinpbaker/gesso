@@ -127,12 +127,13 @@ describe('GessoRuntime lazy lists', () => {
   });
 
   it('keeps the total extent proportional to the row count so the scrollbar is honest', () => {
-    const { runtime, list } = mount(1000);
+    const { runtime, list, frame } = mount(1000);
     const rec = runtime.debugLayoutBox(list);
     expect(rec.height).toBe(200);
     runtime.input.wheel.wheel(100, 100, 0, 1_000_000, noKeyModifiers());
+    frame();
     // Clamped by the engine to content − viewport: 1000 × 20 − 200.
-    expect(list.getProperty('scrollY')).toBe(1_000_000);
+    expect(runtime['engine'].recordFor(list)!.scrollY).toBe(19_800);
     runtime.dispose();
   });
 });
