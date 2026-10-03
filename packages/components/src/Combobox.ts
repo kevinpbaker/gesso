@@ -297,7 +297,9 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
   const list = (): UiElement =>
     ScrollView(
       {
-        minWidth: field.pipe(map(box => Math.max(180, box.width))),
+        // A scroll view takes the width it's offered, which in the overlay
+        // layer is the window's; the list is as wide as the field instead.
+        width: field.pipe(map(box => Math.max(180, box.width))),
         maxHeight: listHeight,
         backgroundColor: 'surface',
         borderColor: 'border',
@@ -327,7 +329,17 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
       )
     );
 
+  /** Focus arrived and nothing has been typed or pressed since. */
+  let justFocused = false;
+  const selectAll = (): void => {
+    const node = focus.node();
+    if (node !== null && query.value !== '') {
+      editing.select({ node, offset: 0 }, { node, offset: query.value.length });
+    }
+  };
+
   const onKeyDown = (event: UiKeyboardEvent): void => {
+    justFocused = false;
     const isOpen = overlay.isOpen();
     const consume = (): void => {
       event.preventDefault();
@@ -444,14 +456,20 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
       },
       onKeyDown,
       // The label of what's chosen is selected on the way in, so typing
-      // starts a new search rather than adding to the name.
+      // starts a new search rather than adding to the name. A press
+      // focuses first and then puts the caret where it landed, so the
+      // press that focused the field selects it again once it's done.
       onFocus: () => {
-        const node = focus.node();
-        if (node !== null && query.value !== '') {
-          editing.select({ node, offset: 0 }, { node, offset: query.value.length });
-        }
+        selectAll();
+        justFocused = true;
       },
-      onClick: open
+      onClick: () => {
+        if (justFocused) {
+          justFocused = false;
+          selectAll();
+        }
+        open();
+      }
     }),
     controlMessage(error, description)
   );
