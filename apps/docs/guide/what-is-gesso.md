@@ -90,6 +90,19 @@ to the change rather than to the tree: a text change deep in a
 10,000-node tree re-measures three nodes, and CI asserts it stays that
 way.
 
+## Built for agents
+
+Two of those properties make a Gesso application unusually easy for an
+AI agent to use. Its state and its actions are already declared in one
+place, as [channels](/structure/channels-and-the-barrier) of plain data
+and typed commands, and its screen is already described as a semantics
+tree for assistive technology. So every Gesso app is an MCP server with
+nothing more written: an agent reads the channels, sends their commands,
+and operates the screen as a screen reader would, in development, in the
+browser through WebMCP, or from a server. [Built for AI
+agents](/guide/built-for-agents) has how, and how the same design makes
+a Gesso app easy for a coding agent to write.
+
 ## What you give up
 
 Everything the DOM gives for free, a canvas has to earn. Gesso has
