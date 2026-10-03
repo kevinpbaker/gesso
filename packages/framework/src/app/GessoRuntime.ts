@@ -1519,6 +1519,14 @@ export class GessoRuntime {
   }
 
   /**
+   * Reports whether a clipboard write landed, settling the promise
+   * `ShellService.copyText` returned.
+   */
+  settleClipboard(id: number, copied: boolean): void {
+    this.services.get(ShellService).settleClipboard(id, copied);
+  }
+
+  /**
    * Reports what the shell found in `localStorage`, settling the
    * promise `ShellService.requestStorage` returned.
    *

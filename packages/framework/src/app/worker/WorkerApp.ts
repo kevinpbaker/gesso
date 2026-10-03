@@ -842,7 +842,8 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'clipboard') {
-      writeClipboard(message.text);
+      // Answered on every path: `writeClipboard` never rejects.
+      void writeClipboard(message.text).then(copied => this.post({ type: 'clipboardResult', id: message.id, copied }));
       return;
     }
     if (message.type === 'openUrl') {

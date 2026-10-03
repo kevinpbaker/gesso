@@ -508,6 +508,9 @@ export class RenderWorkerApp {
       case 'popupResult':
         runtime.settlePopup(message.id, message.opened);
         break;
+      case 'clipboardResult':
+        runtime.settleClipboard(message.id, message.copied);
+        break;
       case 'storageResult':
         runtime.settleStorage(message.id, message.result);
         break;
@@ -661,7 +664,7 @@ export class RenderWorkerApp {
     });
     this.runtime.onShellRequest(request => {
       if (request.type === 'clipboard') {
-        this.host.postMessage({ type: 'clipboard', text: request.text });
+        this.host.postMessage({ type: 'clipboard', id: request.id, text: request.text });
       } else if (request.type === 'openUrl') {
         this.host.postMessage({ type: 'openUrl', url: request.url });
       } else if (request.type === 'fullscreen') {

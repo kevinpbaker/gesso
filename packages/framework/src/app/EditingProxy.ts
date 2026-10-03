@@ -493,20 +493,23 @@ export class EditingProxy {
 }
 
 /**
- * Writes text to the system clipboard from the main thread. The async
- * API needs a secure context and, in some browsers, a recent user
- * gesture; the `execCommand` fallback covers the rest.
+ * Writes text to the system clipboard from the main thread, and answers
+ * whether it got there. The async API needs a secure context and, in
+ * some browsers, a recent user gesture; the `execCommand` fallback
+ * covers the rest. False means both refused. It never rejects.
  */
-export function writeClipboard(text: string, doc: Document = document): void {
+export function writeClipboard(text: string, doc: Document = document): Promise<boolean> {
   const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
   if (clipboard !== undefined && typeof clipboard.writeText === 'function') {
-    clipboard.writeText(text).catch(() => copyWithExecCommand(text, doc));
-    return;
+    return clipboard.writeText(text).then(
+      () => true,
+      () => copyWithExecCommand(text, doc)
+    );
   }
-  copyWithExecCommand(text, doc);
+  return Promise.resolve(copyWithExecCommand(text, doc));
 }
 
-function copyWithExecCommand(text: string, doc: Document): void {
+function copyWithExecCommand(text: string, doc: Document): boolean {
   const previous = doc.activeElement as HTMLElement | null;
   const scratch = doc.createElement('textarea');
   scratch.value = text;
@@ -515,7 +518,11 @@ function copyWithExecCommand(text: string, doc: Document): void {
   doc.body.appendChild(scratch);
   scratch.select();
   try {
-    doc.execCommand('copy');
+    // False when the browser refused, which it says rather than throws;
+    // a document without the command at all throws.
+    return doc.execCommand('copy');
+  } catch {
+    return false;
   } finally {
     scratch.remove();
     previous?.focus?.({ preventScroll: true });

@@ -893,6 +893,7 @@ type ColorSchemePreference = ColorScheme | 'auto';
 declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
 type ShellRequest = {
   type: 'clipboard';
+  id: number;
   text: string;
 } | {
   type: 'openUrl';
@@ -997,6 +998,8 @@ declare class ShellService {
   private nextPopupId;
   private readonly stores;
   private nextStorageId;
+  private readonly copies;
+  private nextCopyId;
   private readonly files;
   private nextFileId;
   readonly colorScheme: ReadableCell<ColorScheme>;
@@ -1008,7 +1011,8 @@ declare class ShellService {
   applyColorScheme(scheme: ColorScheme): void;
   applyContrast(contrast: UiContrast): void;
   applyViewportInsets(insets: UiInsets): void;
-  copyText(text: string): void;
+  copyText(text: string): Promise<boolean>;
+  settleClipboard(id: number, copied: boolean): void;
   openUrl(url: string): void;
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
@@ -1483,6 +1487,7 @@ declare class GessoRuntime {
   setViewportInsets(insets: UiInsets): void;
   private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
+  settleClipboard(id: number, copied: boolean): void;
   settleStorage(id: number, result: ShellStorageResult): void;
   settleFile(id: number, result: ShellFileResult): void;
   get reducedMotion(): boolean;
@@ -1716,6 +1721,11 @@ type ShellToRuntimeMessage = {
   opened: boolean;
 } |
 {
+  type: 'clipboardResult';
+  id: number;
+  copied: boolean;
+} |
+{
   type: 'storageResult';
   id: number;
   result: ShellStorageResult;
@@ -1792,6 +1802,7 @@ type RuntimeToShellMessage = {
 } |
 {
   type: 'clipboard';
+  id: number;
   text: string;
 } |
 {
@@ -2562,7 +2573,7 @@ declare class EditingProxy {
   private mirror;
   private listen;
 }
-declare function writeClipboard(text: string, doc?: Document): void;
+declare function writeClipboard(text: string, doc?: Document): Promise<boolean>;
 interface SemanticsMirrorSink {
   action(action: UiSemanticsAction): void;
   keyDown?(event: KeyboardEvent): void;
@@ -3194,7 +3205,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-Br9Xv08_.js";
+} from "./index-DdjE-x7U.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3916,7 +3927,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-Br9Xv08_.js";
+} from "../index-DdjE-x7U.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

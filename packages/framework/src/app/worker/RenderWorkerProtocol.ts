@@ -212,6 +212,12 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'popupResult'; id: number; opened: boolean }
   /**
+   * Whether a `clipboard` request's text reached the clipboard, under
+   * the request's `id`. False when the browser refused both ways of
+   * writing it.
+   */
+  | { type: 'clipboardResult'; id: number; copied: boolean }
+  /**
    * What the shell found in `localStorage` for a `storage` request
    * (ShellStorage). The second reply on this protocol, and it carries
    * its request's `id` for the same reason `popupResult` does.
@@ -364,8 +370,11 @@ export type RuntimeToShellMessage =
    * editing proxy to mirror; null when no editable has focus.
    */
   | { type: 'editing'; state: EditingState | null }
-  /** Put text on the clipboard (ShellService.copyText). */
-  | { type: 'clipboard'; text: string }
+  /**
+   * Put text on the clipboard (ShellService.copyText). `id` pairs it
+   * with the `clipboardResult` that comes back, once.
+   */
+  | { type: 'clipboard'; id: number; text: string }
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
   | { type: 'fullscreen'; enter: boolean }

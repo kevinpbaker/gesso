@@ -73,7 +73,9 @@ describe('the docs selection example', () => {
 
     // A component's `copyText` and the copy shortcut make the same
     // request; the shell is the only thread that can answer it.
-    expect(requests).toEqual([{ type: 'clipboard', text: `${ARTICLE.heading}\n${ARTICLE.first}\n${ARTICLE.second}` }]);
+    expect(requests).toEqual([
+      { type: 'clipboard', id: 1, text: `${ARTICLE.heading}\n${ARTICLE.first}\n${ARTICLE.second}` }
+    ]);
   });
 
   it('sends the heading when the button asks the shell for it', () => {
@@ -84,7 +86,7 @@ describe('the docs selection example', () => {
     ui.fireEvent.click(ui.getByLabel('Copy the heading'));
     ui.frame();
 
-    expect(requests).toEqual([{ type: 'clipboard', text: ARTICLE.heading }]);
+    expect(requests).toEqual([{ type: 'clipboard', id: 1, text: ARTICLE.heading }]);
     expect(ui.getByText('Sent to the clipboard')).toBeDefined();
   });
 

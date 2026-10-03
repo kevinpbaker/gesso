@@ -545,11 +545,15 @@ export class GessoApp {
         this.runtime.settleStorage(request.id, shellStorageDenied());
       } else if (request.type === 'file') {
         this.runtime.settleFile(request.id, shellFilesUnsupported('There is no document to reach files through.'));
+      } else if (request.type === 'clipboard') {
+        this.runtime.settleClipboard(request.id, false);
       }
       return;
     }
     if (request.type === 'clipboard') {
-      writeClipboard(request.text, this.canvas.ownerDocument);
+      void writeClipboard(request.text, this.canvas.ownerDocument).then(copied =>
+        this.runtime.settleClipboard(request.id, copied)
+      );
       return;
     }
     if (request.type === 'fullscreen') {
