@@ -3132,6 +3132,7 @@ declare class UiEditingController {
   private afterTextChange;
   private notifySelection;
   private afterSelectionChange;
+  select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
   get spanning(): boolean;
   private setSpan;
   private clearSpan;
@@ -6870,7 +6871,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-IYYqrCb3.js";
+} from "./index-RpdXpm8m.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7802,7 +7803,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-IYYqrCb3.js";
+} from "./index-RpdXpm8m.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

@@ -309,6 +309,7 @@ import {
   UiShortcutRegistry,
   UiSpringSpec,
   UiSpringToken,
+  UiTextPosition,
   UiThemeExtension,
   UiTouchScroller,
   UiWheelController,
@@ -2353,6 +2354,7 @@ declare class EditingService {
   private controller;
   setController(controller: UiEditingController | null): void;
   caretRectOf(node: UiNode | null): CaretRect | null;
+  select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
 }
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
@@ -3036,7 +3038,7 @@ import {
   workerHandle,
   WorkerHandle,
   writeClipboard
-} from "./index-NlXolFvd.js";
+} from "./index-gJHA6Lfx.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3522,7 +3524,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-NlXolFvd.js";
+} from "../index-gJHA6Lfx.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

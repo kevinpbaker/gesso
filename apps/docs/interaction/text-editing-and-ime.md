@@ -283,7 +283,9 @@ inside one field is that field's, edited as always.
 first, and that field holds only its own part, so a group that runs
 its own commands over the whole selection (bold, a link, indenting
 every block in it) listens with `onSelectionChange`, which hears the
-selection begin, move and end.
+selection begin, move and end. To leave a selection selected after
+such a command, set it again with `EditingService.select(anchor, focus)`,
+which takes two positions in one field or across a group's fields.
 
 **Copy and cut take all of it.** The shell is handed the selected text
 while such a selection is up, so the browser's own copy and cut work on

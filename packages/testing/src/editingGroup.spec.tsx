@@ -145,6 +145,29 @@ describe('a selection across the fields of an editing group', () => {
     expect(selections.at(-1)).toBeNull();
   });
 
+  it('can be set from code, across fields or in one', async () => {
+    await mount();
+    expect(ui.runtime.input.editing.select({ node: field('p0'), offset: 2 }, { node: field('p2'), offset: 3 })).toBe(
+      true
+    );
+    await ui.settle();
+    expect(lit()).toEqual({
+      p0: { start: 2, end: TEXTS[0]!.length },
+      p1: { start: 0, end: TEXTS[1]!.length },
+      p2: { start: 0, end: 3 }
+    });
+    expect(editorFor(field('p2')).focused).toBe(true);
+    expect(ui.runtime.input.editing.select({ node: field('p1'), offset: 1 }, { node: field('p1'), offset: 4 })).toBe(
+      true
+    );
+    await ui.settle();
+    expect(lit()).toEqual({ p0: undefined, p1: undefined, p2: undefined });
+    expect([editorFor(field('p1')).start, editorFor(field('p1')).end]).toEqual([1, 4]);
+    expect(
+      ui.runtime.input.editing.select({ node: field('p0'), offset: 0 }, { node: field('outside'), offset: 1 })
+    ).toBe(false);
+  });
+
   it('selects the whole group with select all', async () => {
     await mount();
     await caretIn('p1', 0);
