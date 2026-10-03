@@ -138,11 +138,16 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     // written.
     enforce: 'pre',
 
-    config(): UserConfig | null {
-      if (options.workerConditions === false) {
-        return null;
-      }
-      return { resolve: { conditions: [...workerConditions] } };
+    config(config): UserConfig {
+      return {
+        ...(options.workerConditions === false ? {} : { resolve: { conditions: [...workerConditions] } }),
+        // Module workers, which is what the plugin constructs, so a worker
+        // can load a chunk on demand. Vite builds workers as IIFE unless
+        // told otherwise, and an IIFE cannot split: a dynamic import in
+        // the render worker was inlined, and a markdown editor's HTML
+        // parser, loaded only on a paste, went into every page load.
+        ...(config.worker?.format === undefined ? { worker: { format: 'es' as const } } : {})
+      };
     },
 
     configResolved(config) {
