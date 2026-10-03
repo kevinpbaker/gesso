@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as ts from 'typescript/unstable/sync';
 
-import { ContractReader, declaresChannel, describeCalls, type ContractReading } from './contracts.ts';
+import { ContractReader, declaresChannel, describeCalls, describedModule, type ContractReading } from './contracts.ts';
 
 /**
  * The real checker against a project held in memory: a directory that
@@ -251,5 +251,32 @@ describe('describeCalls', () => {
     const code = describeCalls(new Map([['Catalog', { view: {}, commands: {} }]]));
     expect(code).toContain("import { describeChannel as __gessoDescribeChannel } from 'gesso-framework';");
     expect(code).toContain('__gessoDescribeChannel(Catalog, {"view":{},"commands":{}});');
+  });
+});
+
+describe('describedModule', () => {
+  const schema = { view: {}, commands: {} };
+
+  it('imports each token from its contract, relative to where the module goes, and describes it', () => {
+    const module = describedModule(
+      [
+        { file: '/app/src/shared/Counter.ts', channels: new Map([['Counter', schema]]) },
+        {
+          file: '/app/src/notes/notes.contract.ts',
+          channels: new Map([
+            ['Notes', schema],
+            ['Tags', schema]
+          ])
+        },
+        { file: '/app/src/shared/empty.ts', channels: new Map() }
+      ],
+      '/app/src/shared/channels.described.ts'
+    );
+    expect(module).toContain("import { describeChannel } from 'gesso-framework';");
+    expect(module).toContain("import { Counter } from './Counter';");
+    expect(module).toContain("import { Notes, Tags } from '../notes/notes.contract';");
+    expect(module).not.toContain('empty');
+    expect(module).toContain('describeChannel(Counter, {');
+    expect(module.match(/describeChannel\(/g)).toHaveLength(3);
   });
 });

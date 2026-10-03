@@ -103,7 +103,12 @@ with [WebMCP](https://webmachinelearning.github.io/webmcp/), for an agent
 the browser runs. WebMCP is an origin trial in Chrome 149 to 156; where a
 browser does not have it, nothing is registered and nothing breaks.
 
-**On a server or a desktop**, `agentSurface` and `mcpHandler` from
+**On the desktop**, an app from `create-gesso-app --template electrobun`
+serves its channels to agents from the main process as soon as it
+starts, prints the line to connect, and asks the person with a native
+dialog before a `@confirm` command.
+
+**On a server**, `agentSurface` and `mcpHandler` from
 `gesso-framework/agent` serve the channels over MCP's HTTP transport from
 any process that holds them and can listen on a port: a Bun or Node
 server, or a desktop app's main process.
@@ -141,10 +146,9 @@ theme. Gesso meets that head on.
   there are no subscriptions yet.
 - **WebMCP has been checked against the spec, not inside a browser that
   ships it.** The browser used here had no trial token.
-- **Electrobun's main process** is built by its own bundler rather than
-  Vite, so its channels are offered undescribed unless it calls
-  `describeChannel` itself, and the handler has not yet been run inside
-  Electrobun's runtime.
+- **A desktop app offers its channels, not its screen.** The main
+  process serves the agent, and the screen is in each window's render
+  worker, out of its reach.
 
 ## Next
 

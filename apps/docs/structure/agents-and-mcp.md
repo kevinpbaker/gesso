@@ -207,6 +207,50 @@ for `createApp`, and the plugin turns it on in a dev server unless the
 app says otherwise. The agent sees the channels fed from the page, the
 ones any channel worker serves, and the screen.
 
+## On the desktop
+
+A desktop app's channels are served from its main process, so that is
+where an agent connects. `serveDesktopAgent` from
+`gesso-electrobun/desktop` serves them over MCP with `Bun.serve`, which
+Cottontail, Electrobun's main-process runtime, provides as Bun does:
+
+```ts
+const counter = serve(Counter, { view: { count }, commands: { increment } });
+
+createDesktopApp({ channels: window => [counter, windowsChannel(app, window)], ... });
+
+const agent = serveDesktopAgent([counter], {
+  name: 'my-app',
+  confirm: messageBoxConfirm(Utils.showMessageBox)
+});
+console.log(`claude mcp add --transport http my-app ${agent.url}`);
+```
+
+It listens on `127.0.0.1:7310`, or the next free port of the nine after
+it, and refuses any request a web page sends. `messageBoxConfirm` puts a
+`@confirm` command to the person with the operating system's own
+dialog, with Decline as the default. The channels are passed in rather
+than read from the app, because the per-window ones are about a window
+an agent does not have, and the screen tools are not offered: the
+screen is in each window's render worker, out of the main process's
+reach.
+
+Electrobun bundles the main process with its own build, which takes no
+plugins, so the Vite plugin never describes the contracts there.
+`gesso-channels`, a command in `gesso-vite-plugin`, describes them ahead
+of time instead:
+
+```bash
+gesso-channels src/shared/Counter.ts --out src/shared/channels.described.ts
+```
+
+It reads the contracts with the same checker and writes a module that
+attaches each schema when imported; the main process imports it once.
+`--check` writes nothing and fails when the module is out of date. A
+project from `create-gesso-app --template electrobun` has all of this
+wired: every script that builds runs `gesso-channels` first, and
+`hutch run typecheck` checks the module is current.
+
 ## The server
 
 `mcpHandler` is MCP's Streamable HTTP transport as a `fetch` handler,
@@ -239,14 +283,14 @@ for stdio, or to relay messages from somewhere else.
   A browser tab cannot listen on a port, so a web application in
   production cannot host this server itself; in development the dev
   server does it for the page.
-- **Descriptions come from the Vite plugin.** A process whose bundle
-  Vite does not build, such as an Electrobun main process, gets
-  undescribed channels unless it calls `describeChannel` itself.
+- **Descriptions come from the Vite plugin or `gesso-channels`.** A
+  bundle neither has seen offers its channels undescribed, with
+  arguments as a positional list.
 - **Nothing is pushed.** An agent that wants to know about a change
   reads the view again. Subscriptions are not offered.
-- **Not yet run inside Electrobun.** The handler has been checked over
-  real HTTP under Bun with the official MCP client. Cottontail, the
-  main process Electrobun 2 runs, has not been tried.
+- **A desktop app offers its channels, not its screen.** The screen
+  tools need the render worker, which is in the window, not the main
+  process.
 
 ## Next
 

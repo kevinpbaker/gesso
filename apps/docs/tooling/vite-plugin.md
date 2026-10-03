@@ -279,6 +279,20 @@ Without it the plugin says so once and the application runs
 undescribed. A build reads each worker's contracts too, through
 `worker.plugins`, which Vite adds to rather than replaces.
 
+## Describing a bundle Vite does not build
+
+An Electrobun main process is bundled by Electrobun, which takes no
+plugins, so the plugin never describes the contracts it imports. The
+package's `gesso-channels` command describes them ahead of time, by
+writing a module the main process imports once:
+
+```bash
+gesso-channels src/shared/Counter.ts --out src/shared/channels.described.ts
+```
+
+`--check` fails instead of writing when the module is out of date.
+[On the desktop](/structure/agents-and-mcp#on-the-desktop) has the rest.
+
 ## An endpoint for agents
 
 While the dev server runs, the plugin serves MCP at `/__gesso/mcp`, so

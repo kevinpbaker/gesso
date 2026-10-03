@@ -5,6 +5,7 @@ import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } fr
 import { transformRenderWorker } from './render.ts';
 import { findShellCall, transformShell, transformSyncShell, type WorkerEntries } from './shell.ts';
 
+export { ContractReader, describedModule, type ContractReading } from './contracts.ts';
 export { transformRenderWorker, type RenderWiring } from './render.ts';
 export {
   findShellCall,

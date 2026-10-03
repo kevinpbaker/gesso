@@ -112,6 +112,60 @@ export function describeCalls(channels: ReadonlyMap<string, ChannelSchemaOut>): 
 }
 
 /**
+ * A module that describes channels when it is imported, for a bundle
+ * this plugin never sees.
+ *
+ * The plugin describes a contract by appending to it as Vite bundles
+ * it. An Electrobun main process is bundled by Electrobun's own build,
+ * which takes no plugins, so there the description is written ahead of
+ * time instead: `gesso-channels` reads the contracts with the same
+ * checker and writes this module, and the main process imports it once.
+ * A token is imported from its contract, so the schema lands on the
+ * same object the application serves.
+ *
+ * `outFile` and every `file` are absolute POSIX paths.
+ */
+export function describedModule(
+  contracts: readonly { readonly file: string; readonly channels: ReadonlyMap<string, ChannelSchemaOut> }[],
+  outFile: string
+): string {
+  const lines = [
+    '// Written by gesso-channels from the channel contracts it names below.',
+    '// Run it again after changing a contract rather than editing this file.',
+    "import { describeChannel } from 'gesso-framework';"
+  ];
+  const from = outFile.slice(0, outFile.lastIndexOf('/'));
+  for (const contract of contracts) {
+    if (contract.channels.size > 0) {
+      const names = [...contract.channels.keys()].join(', ');
+      lines.push(`import { ${names} } from '${importPath(from, contract.file)}';`);
+    }
+  }
+  for (const contract of contracts) {
+    for (const [name, schema] of contract.channels) {
+      lines.push('', `describeChannel(${name}, ${JSON.stringify(schema, null, 2)});`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+/** `./Counter` from `/app/src/shared` to `/app/src/shared/Counter.ts`, without the extension. */
+function importPath(fromDir: string, file: string): string {
+  const from = fromDir.split('/').filter(Boolean);
+  const to = file
+    .replace(/\.[cm]?[jt]sx?$/, '')
+    .split('/')
+    .filter(Boolean);
+  let shared = 0;
+  while (shared < from.length && shared < to.length - 1 && from[shared] === to[shared]) {
+    shared++;
+  }
+  const up = from.length - shared;
+  const rest = to.slice(shared).join('/');
+  return up === 0 ? `./${rest}` : `${'../'.repeat(up)}${rest}`;
+}
+
+/**
  * The checker, held open across reads.
  *
  * Spawning it and loading a project costs about a hundred

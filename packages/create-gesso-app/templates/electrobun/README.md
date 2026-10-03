@@ -170,6 +170,27 @@ main process, that is the escape hatch: bundle `src/main/index.ts` to a
 plain `.js` file with `electrobun/main` left external, and point the
 `cottontail.entrypoint` at the bundle instead.
 
+## AI agents
+
+The main process serves the counter to AI agents over MCP as it starts,
+and prints the line to connect Claude Code:
+
+```sh
+claude mcp add --transport http {{name}} http://127.0.0.1:7310/mcp
+```
+
+An agent can then read the count and send `increment` and `setDark` the
+way a window does, and every window follows. Mark a command `@confirm`
+in `src/shared/Counter.ts` and the person is asked with a native dialog
+before an agent can send it.
+
+What an agent reads about each command is the JSDoc in the contract,
+which `hutch run channels` turns into `src/shared/channels.described.ts`.
+Every script that builds runs it first, and `hutch run typecheck` fails
+when a contract changed and that file did not, so you only run it by
+hand to see the result. Add a contract to the `channels` script in
+`hutch.config.ts` when you add one.
+
 ## Where to go next
 
 - `AGENTS.md` is the framework's rules in one page, written for a coding

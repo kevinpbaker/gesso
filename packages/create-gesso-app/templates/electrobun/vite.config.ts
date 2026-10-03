@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
-import { electrobunViteAliases } from './.hutch/devkit/api/config/electrobun-vite';
+import { electrobunViteAliases } from './.hutch/devkit/api/config/electrobun-vite.ts';
 
 /**
  * The window's assets: an ordinary Vite build with one alias list.
@@ -23,7 +23,7 @@ export default defineConfig({
   resolve: {
     // Spread rather than passed through, so an alias of your own has
     // somewhere obvious to go.
-    alias: [...electrobunViteAliases(resolve(__dirname, '.hutch/devkit'))]
+    alias: [...electrobunViteAliases(resolve(import.meta.dirname, '.hutch/devkit'))]
   },
   esbuild: { jsx: 'automatic', jsxImportSource: 'gesso-framework' },
   root: 'src/view',

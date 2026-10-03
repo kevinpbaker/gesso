@@ -32,15 +32,23 @@ export default {
   packageManager: 'npm',
   scripts: {
     install: ['hutch', 'install'],
-    start: 'hutch electrobun prepare && hutch pm exec -- vite build && hutch electrobun dev',
-    dev: 'hutch electrobun prepare && hutch pm exec -- vite build && hutch electrobun dev --watch',
+    // The main process is bundled by Electrobun, which gesso-vite-plugin
+    // never sees, so the channel contracts are described ahead of time:
+    // `gesso-channels` writes the module the main process imports, and
+    // every script that builds runs it first.
+    channels: 'hutch pm exec -- gesso-channels src/shared/Counter.ts --out src/shared/channels.described.ts',
+    start: 'hutch electrobun prepare && hutch run channels && hutch pm exec -- vite build && hutch electrobun dev',
+    dev: 'hutch electrobun prepare && hutch run channels && hutch pm exec -- vite build && hutch electrobun dev --watch',
     // The window's assets on Vite's dev server, and the application
     // around them, so a change to a component reloads the webview
     // without rebuilding the native side.
     'dev:hmr': ['hutch', 'pm', 'exec', '--', 'concurrently', 'hutch run hmr', 'hutch run start'],
     hmr: 'hutch electrobun prepare && hutch pm exec -- vite --port 5173',
-    build: 'hutch electrobun prepare && hutch pm exec -- vite build && hutch electrobun build --env=stable',
-    typecheck: 'hutch electrobun prepare && hutch pm exec -- tsc --noEmit'
+    build:
+      'hutch electrobun prepare && hutch run channels && hutch pm exec -- vite build && hutch electrobun build --env=stable',
+    // Fails when a contract changed and the described module did not.
+    typecheck:
+      'hutch electrobun prepare && hutch pm exec -- gesso-channels src/shared/Counter.ts --out src/shared/channels.described.ts --check && hutch pm exec -- tsc --noEmit'
   },
   electrobun: {
     version: '2.0.1'
