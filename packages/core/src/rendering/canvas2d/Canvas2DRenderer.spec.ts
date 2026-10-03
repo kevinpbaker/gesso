@@ -283,6 +283,29 @@ describe('Canvas2DRenderer scrolling and clipping', () => {
     ]);
   });
 
+  it('draws scrolled content on a whole device pixel, wherever the offset is', () => {
+    // A trackpad flick ends in steps of a fraction of a pixel. Drawn at
+    // the exact offset, text lands between pixels and rasterises
+    // differently each frame, which shimmers as it coasts to a stop.
+    // The offset itself stays exact, so small steps still add up.
+    for (const [dpr, scrollY, drawn] of [
+      [1, 10.3, -10],
+      [2, 10.3, -10.5],
+      [2, 10.2, -10]
+    ] as const) {
+      const h = new RenderHarness(800, 600, dpr);
+      const scroll = h.createNode('scroll', UiNodeType.ScrollView);
+      scroll.setProperty('width', 200);
+      scroll.setProperty('height', 100);
+      scroll.setProperty('scrollY', scrollY);
+      h.append(scroll, box(h, 'a', { width: 40, height: 300, backgroundColor: '#aaa', flexShrink: 0 }));
+      h.layout(scroll, Constraints.loose(800, 600));
+      h.render(scroll);
+      expect(h.engine.recordFor(scroll)!.scrollY).toBe(scrollY);
+      expect(callArgs(h.context, 'translate')).toEqual([[0, drawn]]);
+    }
+  });
+
   it('clamps scroll offsets beyond the content edge', () => {
     const { h } = scrollHarness(500);
     h.render(h.graph.requireNode('scroll'));

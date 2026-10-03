@@ -1,4 +1,5 @@
 import { UiNodeType } from '../../graph/UiNodeType';
+import { snapScroll } from '../ScrollSnap';
 import type { UiNode } from '../../graph/UiNode';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { Canvas2DContext, Canvas2DGradient } from './Canvas2DContext';
@@ -363,7 +364,7 @@ export class Canvas2DRenderer implements UiRenderer {
     if (!rec.scrollable || !this.renderScrolledThroughLayer(node, rec, context, ctx)) {
       if (rec.scrollable) {
         ctx.save();
-        ctx.translate(-rec.scrollX, -rec.scrollY);
+        ctx.translate(-snapScroll(rec.scrollX, this.surface.dpr), -snapScroll(rec.scrollY, this.surface.dpr));
       }
       // Culling works in record coordinates; a transform or a sticky
       // shift moves what is drawn away from them, so descendants are
@@ -520,7 +521,7 @@ export class Canvas2DRenderer implements UiRenderer {
         this.applyTransform(ctx, rec, paint);
       }
       if (rec.scrollable) {
-        ctx.translate(-rec.scrollX, -rec.scrollY);
+        ctx.translate(-snapScroll(rec.scrollX, this.surface.dpr), -snapScroll(rec.scrollY, this.surface.dpr));
       }
     }
   }

@@ -189,6 +189,11 @@ mouse wheel never sends an event that doesn't look notched, so once one
 arrives the wheel is taken to be precise for as long as events keep
 coming (400 ms after each), which covers a gesture and its momentum.
 
+A trackpad's steps can be a fraction of a pixel, and the offset keeps
+them exactly, so they add up. What's drawn lands on a whole device pixel,
+as a browser draws scrolled content: text drawn between pixels
+rasterises differently each frame and shimmers as a flick slows.
+
 `scrollBehavior="instant"` opts a container out; under a reduced-motion
 preference the animation snaps, which lands the same offset in one
 frame.

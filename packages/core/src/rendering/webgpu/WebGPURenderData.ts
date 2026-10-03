@@ -1,4 +1,5 @@
 import type { UiNode } from '../../graph/UiNode';
+import { snapScroll } from '../ScrollSnap';
 import { UiNodeType } from '../../graph/UiNodeType';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
@@ -933,7 +934,7 @@ export function buildRenderList(
       }
       // Scroll containers translate their content by the scroll offset.
       if (rec.scrollable) {
-        state.ctm = translateTransform(state.ctm, -rec.scrollX, -rec.scrollY);
+        state.ctm = translateTransform(state.ctm, -snapScroll(rec.scrollX, dpr), -snapScroll(rec.scrollY, dpr));
       }
 
       liftedFrom = liftedPass.length;
