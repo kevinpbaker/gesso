@@ -191,6 +191,22 @@ feature, has no `document.modelContext`, in which case nothing is
 registered and nothing fails. Before Chrome 150 the same API was
 `navigator.modelContext`, which is read when the new name is missing.
 
+## Single-thread apps
+
+An app made with `createSyncApp` has no render worker; the page draws,
+so the page answers the agent. Everything above works the same: the
+dev server endpoint, the screen tools, and WebMCP, which a
+single-thread app asks for on its builder:
+
+```ts
+createSyncApp(App).useChannel(Notes, { source }).useWebMcp().mountSync('#app');
+```
+
+`useWebMcp` takes `true`, `false` or `{ confirm }`, as `webmcp` does
+for `createApp`, and the plugin turns it on in a dev server unless the
+app says otherwise. The agent sees the channels fed from the page, the
+ones any channel worker serves, and the screen.
+
 ## The server
 
 `mcpHandler` is MCP's Streamable HTTP transport as a `fetch` handler,

@@ -43,3 +43,4 @@ export {
   type WebMcpOptions
 } from './webmcp';
 export { outline, resolveTarget, UiRefs, uiSurface, type UiHost, type UiSurfaceOptions } from './ui';
+export { serveApplicationAgent, type ApplicationAgentParts } from './app';

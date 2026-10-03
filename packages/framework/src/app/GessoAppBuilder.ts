@@ -3,7 +3,19 @@ import type { FrameworkChild } from '../ComponentElement';
 import type { ComponentType } from '../FunctionComponent';
 import type { WorkerHandle } from '../worker/WorkerPorts';
 import { ServiceRegistry } from '../service/ServiceRegistry';
-import { createChannelRegistry, type ChannelRegistration } from '../channel/createChannelRegistry';
+import {
+  createChannelRegistry,
+  type ChannelRegistration,
+  type ChannelRegistryHandle
+} from '../channel/createChannelRegistry';
+import type { ServedChannel } from '../channel/serveChannels';
+import { AGENT_PORT } from '../agent/remote';
+import type { AgentConfirmation } from '../agent/AgentSurface';
+
+/** What `useWebMcp` takes besides a boolean: the app's own way to ask the person. */
+export interface WebMcpChoice {
+  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+}
 import type { ChannelSource } from '../channel/provide';
 import type { ChannelToken } from '../channel/ChannelToken';
 import type { ColorSchemePreference } from './colorScheme';
@@ -34,6 +46,10 @@ export class GessoAppBuilder {
   private mediaOptions: MediaOptions | undefined;
   private fontDeclarations: readonly FontFamilyDeclaration[] | undefined;
   private app: GessoApp | undefined;
+  /** The mounted app's channel registry, for the workers an agent port asks. */
+  private channelHandle: ChannelRegistryHandle | undefined;
+  private webmcpChoice: boolean | WebMcpChoice = false;
+  private disconnectWebMcp: (() => void) | null = null;
   private colorSchemePreference: ColorSchemePreference = 'auto';
 
   constructor(private root: FrameworkChild | ComponentType) {}
@@ -252,12 +268,79 @@ export class GessoAppBuilder {
       app.onDevtools(this.devtoolsListener);
     }
     this.app = app;
+    this.channelHandle = channels;
     app.mount();
+    this.connectWebMcp(app);
     return () => {
+      this.disconnectWebMcp?.();
+      this.disconnectWebMcp = null;
       this.app = undefined;
+      this.channelHandle = undefined;
       app.dispose();
       channels.dispose();
     };
+  }
+
+  /**
+   * Offer the app's channels and screen to an AI agent in the browser,
+   * through WebMCP (default false). The single-thread form of
+   * `createApp({ webmcp })`: registered once `mountSync` has run,
+   * removed when the app is unmounted. Call before `mountSync`.
+   */
+  useWebMcp(choice: boolean | WebMcpChoice = true): this {
+    this.webmcpChoice = choice;
+    return this;
+  }
+
+  /**
+   * Opens a port to what this app serves under `key`, or returns
+   * undefined before `mountSync`.
+   *
+   * The same question `WorkerApp.openRenderPort` answers, asked of the
+   * page instead of a render worker, because in this configuration the
+   * page is the thread that draws. It serves one thing, `gesso:agent`:
+   * the channels fed here, the workers behind them, and the screen.
+   * The agent code is loaded the first time one is opened.
+   */
+  openRenderPort(key: string): MessagePort | undefined {
+    const app = this.app;
+    if (app === undefined || key !== AGENT_PORT) {
+      return undefined;
+    }
+    const pair = new MessageChannel();
+    const registrations = this.channelRegistrations;
+    void import('../agent/app').then(agent =>
+      agent.serveApplicationAgent(pair.port2, {
+        channels: () =>
+          registrations
+            .filter(registration => registration.source !== undefined)
+            .map(
+              registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
+            ),
+        workers: () => this.channelHandle?.workers ?? [],
+        ui: () => (this.app === app ? app.uiHost() : undefined)
+      })
+    );
+    return pair.port1;
+  }
+
+  private connectWebMcp(app: GessoApp): void {
+    const choice = this.webmcpChoice;
+    if (choice === false) {
+      return;
+    }
+    void import('../agent/webmcp')
+      .then(agent => agent.connectWebMcp(this, choice === true ? {} : choice))
+      .then(
+        disconnect => {
+          if (this.app === app) {
+            this.disconnectWebMcp = disconnect;
+          } else {
+            disconnect();
+          }
+        },
+        (error: unknown) => console.warn('[gesso] WebMCP could not register the channels:', error)
+      );
   }
 }
 

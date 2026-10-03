@@ -204,6 +204,11 @@ function rpcError(message: unknown, code: number, text: string): unknown {
  * Loaded on demand, so the page pays for it only in development.
  */
 export const SHELL_BRIDGE = `function __gessoAgent(app) {
+  if (typeof app.useWebMcp === 'function') {
+    // A single-thread builder: on by default here, as \`webmcp: true\`
+    // is for createApp, and a later useWebMcp(false) still decides.
+    app.useWebMcp(true);
+  }
   if (import.meta.hot) {
     void import('gesso-framework/agent').then(({ connectDevAgent }) => connectDevAgent(app, import.meta.hot));
   }

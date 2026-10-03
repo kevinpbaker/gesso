@@ -338,24 +338,22 @@ export class RenderWorkerApp {
    * handshake check.
    */
   private serveAgent(port: MessagePort): void {
-    void import('../../agent/index').then(agent =>
-      agent.serveAgentPort(port, confirm => {
-        const local = this.channelRegistrations
-          .filter(registration => registration.source !== undefined)
-          .map(
-            registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
-          );
-        const workers = new Set(this.channels?.workers ?? []);
-        if (this.appLogicWorker !== undefined) {
-          workers.add(this.appLogicWorker);
-        }
-        const remote = [...workers]
-          .filter(worker => worker.spawned)
-          .map(worker => agent.remoteSurface(worker.open(AGENT_PORT), { confirm }));
-        // The screen itself as well: for what no channel covers, an
-        // agent can read and operate the interface as a screen reader
-        // does. After the channels, so a channel tool keeps its name.
-        const ui = agent.uiSurface(() => {
+    void import('../../agent/app').then(agent =>
+      agent.serveApplicationAgent(port, {
+        channels: () =>
+          this.channelRegistrations
+            .filter(registration => registration.source !== undefined)
+            .map(
+              registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
+            ),
+        workers: () => {
+          const workers = new Set(this.channels?.workers ?? []);
+          if (this.appLogicWorker !== undefined) {
+            workers.add(this.appLogicWorker);
+          }
+          return workers;
+        },
+        ui: () => {
           const runtime = this.runtime;
           if (runtime === undefined) {
             return undefined;
@@ -370,8 +368,7 @@ export class RenderWorkerApp {
             },
             flush: () => this.clock?.tick(performance.now())
           };
-        });
-        return agent.combineSurfaces([agent.agentSurface(local, { confirm }), ...remote, ui]);
+        }
       })
     );
   }
