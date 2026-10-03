@@ -225,7 +225,7 @@ function parseArgs(argv: readonly string[]): Options {
 /** Looks a template up, and lists the ones that exist when it is not one. */
 function templateOf(name: string): Template {
   const template = TEMPLATES[name];
-  if (template === undefined || !existsSync(join(packageRoot, 'templates', name))) {
+  if (template === undefined || name === SHARED_DIR || !existsSync(join(packageRoot, 'templates', name))) {
     fail(`There is no "${name}" template. Available: ${Object.keys(TEMPLATES).join(', ')}.`);
   }
   return template;
@@ -313,11 +313,23 @@ function vendorPackages(options: Options, template: Template): Map<string, strin
   return specifiers;
 }
 
-/** Copies the template, renaming the files that had to be disguised. */
+/**
+ * Files every template gets: `AGENTS.md`, the framework's rules for a
+ * coding agent, and the `CLAUDE.md` that points Claude Code at it.
+ *
+ * Shared rather than copied into each template because the rules are
+ * the framework's, not the template's, and two copies of them would
+ * drift. A template that needs to say something different writes its
+ * own file of the same name, which wins because it is copied second.
+ */
+const SHARED_DIR = '_shared';
+
+/** Copies the shared files and then the template, renaming the files that had to be disguised. */
 function copyTemplate(from: string, options: Options): void {
   // `force` here is not the option of the same name: whether writing
   // into an occupied directory is allowed was settled by `prepareTarget`,
   // and a template file always wins over whatever it lands on.
+  cpSync(join(packageRoot, 'templates', SHARED_DIR), options.target, { recursive: true, force: true });
   cpSync(from, options.target, { recursive: true, force: true });
   for (const [disguised, real] of RENAMED) {
     const path = join(options.target, disguised);

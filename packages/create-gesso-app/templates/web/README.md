@@ -81,6 +81,9 @@ view has stopped arriving.
 
 ## Where to go next
 
+- `AGENTS.md` is the framework's rules in one page, written for a coding
+  agent and just as useful to read yourself. `CLAUDE.md` points Claude
+  Code at it.
 - `App.tsx` is commented with what each part of it is doing.
 - `gesso-components` has the controls: inputs, overlays, structure,
   data and media. `Switch` in `App.tsx` is one of them.

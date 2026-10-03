@@ -29,6 +29,8 @@ installs them from the registry like any other dependency.
 ## What it writes
 
 ```text
+AGENTS.md           the framework's rules, for a coding agent
+CLAUDE.md           one line pointing Claude Code at AGENTS.md
 index.html          a host element with a size, and nothing else
 tsconfig.json       bundler resolution, and the two lines that buy JSX
 vite.config.ts      one plugin: gesso-vite-plugin

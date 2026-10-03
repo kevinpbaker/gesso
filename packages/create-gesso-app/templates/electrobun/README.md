@@ -172,6 +172,9 @@ plain `.js` file with `electrobun/main` left external, and point the
 
 ## Where to go next
 
+- `AGENTS.md` is the framework's rules in one page, written for a coding
+  agent and just as useful to read yourself. `CLAUDE.md` points Claude
+  Code at it.
 - `src/render/App.tsx` is commented with what each part of it is doing.
 - A channel is the barrier: view keys out, typed commands in, plain
   data only. Add a key to `CounterView`, serve it in `src/main`, read it
