@@ -2395,6 +2395,11 @@ declare class EditingService {
   caretRectOf(node: UiNode | null): CaretRect | null;
   select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
 }
+declare class ScrollService {
+  private scroller;
+  setScroller(scroller: ((node: UiNode, padding: number) => void) | null): void;
+  scrollIntoView(node: UiNode, padding?: number): void;
+}
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
   readonly trapped: InternalState<boolean>;
@@ -2698,6 +2703,7 @@ export {
   RuntimeErrorSource,
   RuntimeInput,
   RuntimeToShellMessage,
+  ScrollService,
   select,
   SelectOptions,
   SemanticsMirror,
@@ -2763,10 +2769,10 @@ export {
   UndoStack,
   UndoStackOptions,
   UndoTransaction,
-  vn,
   WorkerApp,
   WorkerAppOptions,
-  writeClipboard
+  writeClipboard,
+  yn
 };
 // ==== index.d.ts ====
 import {
@@ -3002,6 +3008,7 @@ import {
   RuntimeErrorSource,
   RuntimeInput,
   RuntimeToShellMessage,
+  ScrollService,
   select,
   SelectOptions,
   SemanticsMirror,
@@ -3071,7 +3078,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index--sOWKwA3.js";
+} from "./index-eK9SB_3A.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3181,6 +3188,7 @@ export {
   RouterOutlet,
   RouterService,
   RouteState,
+  ScrollService,
   select,
   SemanticsMirror,
   serve,
@@ -3694,7 +3702,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index--sOWKwA3.js";
+} from "../index-eK9SB_3A.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

@@ -206,6 +206,7 @@ export {
 } from './app/FontService';
 export { TextService } from './app/TextService';
 export { EditingService } from './app/EditingService';
+export { ScrollService } from './app/ScrollService';
 export { FocusService } from './app/FocusService';
 export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';
