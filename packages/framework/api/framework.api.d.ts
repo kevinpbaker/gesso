@@ -4,67 +4,104 @@
 // comments stripped and chunk hashes normalised. Committed so that a change
 // to the public surface is a reviewable diff. Do not edit by hand.
 
-// ==== FunctionComponent.d.ts ====
+// ==== agent/index.d.ts ====
 import {
-  BehaviorSubject,
-  Observable,
-  Subject,
-  Subscription
-} from "rxjs";
-import {
-  LayoutBox,
-  Reactive,
-  UiChild,
-  UiModifier
-} from "gesso-core";
-declare abstract class Component {
-  onMount?(): void;
-  onUnmount?(): void;
-  abstract render(): UiChild;
-}
-declare class InternalState<T> extends BehaviorSubject<T> {
-  label: string | undefined;
-  constructor(initialValue: T);
-  get value(): T;
-  set value(next: T);
-}
-declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
-declare class InputCell<T> extends BehaviorSubject<T> {
-  label: string | undefined;
-  private snapshotBy;
-  private warnedStale;
-  private emitted;
-  constructor(initialValue: T);
-  emit(...args: EmitArgs<T>): void;
-  get events(): Observable<EmitValue<T>>;
-  get value(): T;
-  next(value: T): void;
-}
-interface ReadableCell<T> extends Observable<T> {
-  readonly value: T;
-}
-declare function input<T>(initialValue: T): InputCell<T>;
-declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
-type EmitArgs<T> = NonNullable<T> extends ((...args: infer A) => void) ? A : never;
-type EmitValue<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? V : void;
-type OutputCell<A extends unknown[]> = InputCell<((...args: A) => void) | undefined>;
-declare function output<A extends unknown[]>(): OutputCell<A>;
-declare const OUTPUT_TARGET: unique symbol;
-interface OutputTarget<V> {
-  readonly [OUTPUT_TARGET]: {
-    next(value: V): void;
+  JsonSchema,
+  ServedChannel
+} from "../serveChannels-C4s9xlxj.js";
+interface AgentTool {
+  readonly name: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
+  readonly outputSchema?: JsonSchema;
+  readonly annotations: {
+    readonly title?: string;
+    readonly readOnlyHint: boolean;
+    readonly destructiveHint?: boolean;
+    readonly idempotentHint?: boolean;
+    readonly openWorldHint: false;
   };
 }
-declare function into<V>(target: {
-  next(value: V): void;
-}): OutputTarget<V>;
-declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
-declare class BoundsCell extends InternalState<LayoutBox> {
-  readonly modifier: UiModifier<Subject<LayoutBox>>;
-  constructor();
-  next(box: LayoutBox): void;
+interface AgentResource {
+  readonly uri: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly mimeType: 'application/json';
 }
-declare function bounds(label?: string): BoundsCell;
+interface AgentToolResult {
+  readonly content: readonly {
+    readonly type: 'text';
+    readonly text: string;
+  }[];
+  readonly structuredContent?: Record<string, unknown>;
+  readonly isError: boolean;
+}
+interface AgentConfirmation {
+  readonly channel: string;
+  readonly command: string;
+  readonly description?: string;
+  readonly arguments: Readonly<Record<string, unknown>>;
+  readonly destructive: boolean;
+}
+interface AgentSurfaceOptions {
+  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  quietMs?: number;
+  settleMs?: number;
+}
+interface AgentSurface {
+  tools(): readonly AgentTool[];
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[];
+  read(uri: string): Record<string, unknown> | undefined;
+  dispose(): void;
+}
+declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
+declare function resourceUri(channel: string): string;
+declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
+interface McpServerInfo {
+  name?: string;
+  version?: string;
+  instructions?: string;
+}
+type JsonRpcId = string | number;
+type JsonRpcResponse = {
+  jsonrpc: '2.0';
+  id: JsonRpcId | null;
+  result: unknown;
+} | {
+  jsonrpc: '2.0';
+  id: JsonRpcId | null;
+  error: {
+    code: number;
+    message: string;
+  };
+};
+declare function handleMcpMessage(surface: AgentSurface, message: unknown, info?: McpServerInfo): Promise<JsonRpcResponse | null>;
+interface McpHandlerOptions extends McpServerInfo {
+  allowedOrigins?: readonly string[];
+  token?: string;
+}
+declare function mcpHandler(surface: AgentSurface, options?: McpHandlerOptions): (request: Request) => Promise<Response>;
+declare function validate(schema: JsonSchema, value: unknown, root?: JsonSchema, at?: string): string | null;
+export {
+  agentSurface,
+  handleMcpMessage,
+  MCP_PROTOCOL_VERSIONS,
+  mcpHandler,
+  resourceUri,
+  type AgentConfirmation,
+  type AgentResource,
+  type AgentSurface,
+  type AgentSurfaceOptions,
+  type AgentTool,
+  type AgentToolResult,
+  type JsonRpcResponse,
+  type McpHandlerOptions,
+  type McpServerInfo,
+  validate
+};
+// ==== ChannelProtocol.d.ts ====
 type Command = (...args: never[]) => void;
 type CommandMap = Record<string, Command>;
 interface ChannelToken<View extends object, Commands extends object = Record<string, never>> {
@@ -128,6 +165,93 @@ type ChannelHostMessage = {
 };
 declare function isChannelClientMessage(value: unknown): value is ChannelClientMessage;
 declare function isChannelHostMessage(value: unknown): value is ChannelHostMessage;
+export {
+  applyPatch,
+  applyPatches,
+  channel,
+  ChannelClientMessage,
+  ChannelHostMessage,
+  ChannelPort,
+  ChannelSpec,
+  ChannelToken,
+  Command,
+  CommandMap,
+  CommandsOf,
+  defineChannel,
+  diffProjection,
+  isChannelClientMessage,
+  isChannelHostMessage,
+  Patch,
+  PatchPath,
+  viewKeys,
+  ViewOf
+};
+// ==== FunctionComponent.d.ts ====
+import {
+  ChannelPort,
+  ChannelToken,
+  Patch
+} from "./ChannelProtocol-ByNoHujM.js";
+import {
+  BehaviorSubject,
+  Observable,
+  Subject,
+  Subscription
+} from "rxjs";
+import {
+  LayoutBox,
+  Reactive,
+  UiChild,
+  UiModifier
+} from "gesso-core";
+declare abstract class Component {
+  onMount?(): void;
+  onUnmount?(): void;
+  abstract render(): UiChild;
+}
+declare class InternalState<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  constructor(initialValue: T);
+  get value(): T;
+  set value(next: T);
+}
+declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
+declare class InputCell<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  private snapshotBy;
+  private warnedStale;
+  private emitted;
+  constructor(initialValue: T);
+  emit(...args: EmitArgs<T>): void;
+  get events(): Observable<EmitValue<T>>;
+  get value(): T;
+  next(value: T): void;
+}
+interface ReadableCell<T> extends Observable<T> {
+  readonly value: T;
+}
+declare function input<T>(initialValue: T): InputCell<T>;
+declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
+type EmitArgs<T> = NonNullable<T> extends ((...args: infer A) => void) ? A : never;
+type EmitValue<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? V : void;
+type OutputCell<A extends unknown[]> = InputCell<((...args: A) => void) | undefined>;
+declare function output<A extends unknown[]>(): OutputCell<A>;
+declare const OUTPUT_TARGET: unique symbol;
+interface OutputTarget<V> {
+  readonly [OUTPUT_TARGET]: {
+    next(value: V): void;
+  };
+}
+declare function into<V>(target: {
+  next(value: V): void;
+}): OutputTarget<V>;
+declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
+declare class BoundsCell extends InternalState<LayoutBox> {
+  readonly modifier: UiModifier<Subject<LayoutBox>>;
+  constructor();
+  next(box: LayoutBox): void;
+}
+declare function bounds(label?: string): BoundsCell;
 declare class ChannelReplica<View extends object, Commands extends object> {
   private readonly token;
   private readonly port;
@@ -177,28 +301,15 @@ type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K; }[
 type ComponentArgs<C> = RequiredKeys<ComponentProps<C>> extends never ? [inputs?: ComponentProps<C>, key?: string | number] : [inputs: ComponentProps<C>, key?: string | number];
 declare function isClassComponent(component: ComponentType): component is ClassComponent;
 export {
-  applyPatch,
-  applyPatches,
   bounds,
   BoundsCell,
-  channel,
-  ChannelClientMessage,
-  ChannelHostMessage,
-  ChannelPort,
   ChannelReplica,
-  ChannelSpec,
-  ChannelToken,
   ClassComponent,
-  Command,
-  CommandMap,
-  CommandsOf,
   Component,
   ComponentArgs,
   ComponentContext,
   ComponentProps,
   ComponentType,
-  defineChannel,
-  diffProjection,
   EmitArgs,
   EmitValue,
   FunctionComponent,
@@ -208,26 +319,27 @@ export {
   internalState,
   InternalState,
   into,
-  isChannelClientMessage,
-  isChannelHostMessage,
   isClassComponent,
   isOutputTarget,
   output,
   OutputCell,
   OutputTarget,
-  Patch,
-  PatchPath,
-  ReadableCell,
-  viewKeys,
-  ViewOf
+  ReadableCell
 };
 // ==== index.d.ts ====
 import {
   ChannelPort,
-  ChannelReplica,
   ChannelToken,
   Command,
   CommandMap,
+  Patch
+} from "./ChannelProtocol-ByNoHujM.js";
+import {
+  ChannelSource,
+  WorkerHandle
+} from "./serveChannels-C4s9xlxj.js";
+import {
+  ChannelReplica,
   Component,
   ComponentArgs,
   ComponentContext,
@@ -237,9 +349,8 @@ import {
   Inputs,
   InternalState,
   OutputCell,
-  Patch,
   ReadableCell
-} from "./FunctionComponent-CgwLKE5d.js";
+} from "./FunctionComponent-fYMdePtH.js";
 import {
   BehaviorSubject,
   Observable,
@@ -505,50 +616,6 @@ declare function Inject<T extends Function>(StoreClass: T): PropertyDecorator;
 declare function Channel(token: {
   name: string;
 }): PropertyDecorator;
-type JsonSchema = {
-  readonly [keyword: string]: unknown;
-};
-interface CommandSchema {
-  readonly description?: string;
-  readonly parameters: readonly string[];
-  readonly rest?: true;
-  readonly input: JsonSchema;
-  readonly destructive?: true;
-  readonly idempotent?: true;
-  readonly confirm?: true;
-  readonly hidden?: true;
-}
-interface ChannelSchema {
-  readonly description?: string;
-  readonly view: JsonSchema;
-  readonly commands: {
-    readonly [name: string]: CommandSchema;
-  };
-}
-declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
-declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
-interface ChannelSource<View extends object, Commands extends object> {
-  view: { readonly [K in keyof View]: Observable<View[K]>; };
-  commands?: Commands;
-}
-declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
-declare class ProvidedChannel {
-  private readonly token;
-  private readonly source;
-  private readonly port;
-  private readonly subscriptions;
-  private readonly previous;
-  private readonly checked;
-  private synced;
-  constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
-  private receive;
-  private runCommand;
-  private sync;
-  private publish;
-  private resend;
-  private post;
-  dispose(): void;
-}
 declare class ChannelRegistry {
   private readonly replicas;
   attach<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, port: ChannelPort): ChannelReplica<View, Commands>;
@@ -559,44 +626,6 @@ declare class ChannelRegistry {
 }
 declare function findUnplainPath(value: unknown, path?: readonly (string | number)[]): string | null;
 declare function requirePlainData(channelName: string, key: string, value: unknown): void;
-interface MessageEndpoint {
-  postMessage(message: unknown): void;
-  onmessage: ((event: {
-    data: unknown;
-  }) => void) | null;
-}
-interface PortHandshake {
-  type: 'gesso:port';
-  key: string;
-}
-declare function isPortHandshake(value: unknown): value is PortHandshake;
-interface WorkerHandle {
-  open(key: string): MessagePort;
-  readonly spawned: boolean;
-  terminate(): void;
-}
-declare const APPLICATION_WORKER: WorkerHandle;
-interface TransferTarget {
-  postMessage(message: unknown, transfer: Transferable[]): void;
-}
-declare function portHandle(endpoint: TransferTarget): WorkerHandle;
-interface HubMessage {
-  type: 'gesso:hub';
-}
-declare function isHubMessage(value: unknown): value is HubMessage;
-declare function workerHandle(factory: () => Worker): WorkerHandle;
-interface PortHost {
-  onmessage: ((event: {
-    data: unknown;
-    ports?: readonly MessagePort[];
-  }) => void) | null;
-}
-interface PortErrorMessage {
-  type: 'port:error';
-  message: string;
-}
-declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
-declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
 interface ChannelRegistration {
   token: {
     name: string;
@@ -613,18 +642,6 @@ interface ChannelRegistryHandle {
   dispose(): void;
 }
 declare function createChannelRegistry(registrations: readonly ChannelRegistration[], onError?: (channelName: string, message: string, stack?: string) => void): ChannelRegistryHandle;
-interface ServedChannel {
-  token: {
-    name: string;
-    initial: object;
-  };
-  source: {
-    view: Record<string, Observable<unknown>>;
-    commands?: Record<string, Command>;
-  };
-}
-declare function serve<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>): ServedChannel;
-declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
 declare function pick<T, K extends keyof T>(source: Observable<T>, key: K): Observable<T[K]>;
 declare function pickKeys<T extends object, K extends keyof T>(source: Observable<T>, keys: readonly K[]): { readonly [P in K]: Observable<T[P]>; };
 declare function structurallyEqual<T>(a: T, b: T): boolean;
@@ -2421,7 +2438,7 @@ declare class EditingProxy {
   update(state: EditingState | null): void;
   focus(): void;
   raiseKeyboard(): void;
-  describe(record: UiSemanticsRecord | null): void;
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void;
   dispose(): void;
   private position;
   private mirror;
@@ -2436,7 +2453,7 @@ interface SemanticsMirrorSink {
 }
 interface EditingMirrorTarget {
   readonly active: boolean;
-  describe(record: UiSemanticsRecord | null): void;
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void;
   focus(): void;
 }
 declare class SemanticsMirror {
@@ -2453,12 +2470,14 @@ declare class SemanticsMirror {
   private applying;
   private focusedId;
   private disposed;
+  private readonly idPrefix;
   constructor(canvas: HTMLCanvasElement, sink: SemanticsMirrorSink, editing?: EditingMirrorTarget | null);
   get element(): HTMLElement;
   elementFor(id: string): HTMLElement | undefined;
   apply(update: UiSemanticsUpdate): void;
   dispose(): void;
   private upsert;
+  private describeEditing;
   private createElement;
   private describe;
   private place;
@@ -2521,7 +2540,6 @@ export {
   ActionEntry,
   AnimateOptions,
   AnimationService,
-  APPLICATION_WORKER,
   AppLogicEndpoint,
   AudioAction,
   audioClock,
@@ -2543,14 +2561,10 @@ export {
   ChannelRegistration,
   ChannelRegistry,
   ChannelRegistryHandle,
-  channelSchema,
-  ChannelSchema,
-  ChannelSource,
   classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
-  CommandSchema,
   ComponentElement,
   ComponentHost,
   ComponentHostResolver,
@@ -2571,7 +2585,6 @@ export {
   Define,
   derive,
   DeriveOptions,
-  describeChannel,
   describeStream,
   DevtoolsEvent,
   DevtoolsRequest,
@@ -2619,10 +2632,6 @@ export {
   Inject,
   Input,
   isComponentElement,
-  isHubMessage,
-  isPortErrorMessage,
-  isPortHandshake,
-  JsonSchema,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -2631,7 +2640,6 @@ export {
   MediaService,
   MediaSessionLike,
   MemoryStorage,
-  MessageEndpoint,
   mutate,
   MutateOptions,
   Mutation,
@@ -2659,14 +2667,9 @@ export {
   PersistedState,
   pick,
   pickKeys,
-  portHandle,
-  PortHandshake,
-  PortHost,
   Presence,
   PresenceProps,
   printPropValue,
-  provide,
-  ProvidedChannel,
   ReadSource,
   registerUndoShortcuts,
   RendererChoice,
@@ -2699,10 +2702,6 @@ export {
   SelectOptions,
   SemanticsMirror,
   SemanticsMirrorSink,
-  serve,
-  serveChannels,
-  ServedChannel,
-  servePorts,
   ServiceRegistry,
   setPerformanceMarks$1,
   ShellFile,
@@ -2767,33 +2766,63 @@ export {
   vn,
   WorkerApp,
   WorkerAppOptions,
-  workerHandle,
-  WorkerHandle,
   writeClipboard
 };
 // ==== index.d.ts ====
 import {
   applyPatch,
   applyPatches,
-  bounds,
-  BoundsCell,
   channel,
   ChannelClientMessage,
   ChannelHostMessage,
   ChannelPort,
-  ChannelReplica,
   ChannelSpec,
   ChannelToken,
-  ClassComponent,
   Command,
   CommandMap,
   CommandsOf,
+  defineChannel,
+  diffProjection,
+  isChannelClientMessage,
+  isChannelHostMessage,
+  Patch,
+  PatchPath,
+  viewKeys,
+  ViewOf
+} from "./ChannelProtocol-ByNoHujM.js";
+import {
+  APPLICATION_WORKER,
+  channelSchema,
+  ChannelSchema,
+  ChannelSource,
+  CommandSchema,
+  describeChannel,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  JsonSchema,
+  MessageEndpoint,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  serve,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  workerHandle,
+  WorkerHandle
+} from "./serveChannels-C4s9xlxj.js";
+import {
+  bounds,
+  BoundsCell,
+  ChannelReplica,
+  ClassComponent,
   Component,
   ComponentContext,
   ComponentProps,
   ComponentType,
-  defineChannel,
-  diffProjection,
   EmitArgs,
   EmitValue,
   FunctionComponent,
@@ -2803,25 +2832,18 @@ import {
   internalState,
   InternalState,
   into,
-  isChannelClientMessage,
-  isChannelHostMessage,
   isClassComponent,
   isOutputTarget,
   output,
   OutputCell,
   OutputTarget,
-  Patch,
-  PatchPath,
-  ReadableCell,
-  viewKeys,
-  ViewOf
-} from "./FunctionComponent-CgwLKE5d.js";
+  ReadableCell
+} from "./FunctionComponent-fYMdePtH.js";
 import {
   ActionCause,
   ActionEntry,
   AnimateOptions,
   AnimationService,
-  APPLICATION_WORKER,
   AppLogicEndpoint,
   AudioAction,
   audioClock,
@@ -2843,14 +2865,10 @@ import {
   ChannelRegistration,
   ChannelRegistry,
   ChannelRegistryHandle,
-  channelSchema,
-  ChannelSchema,
-  ChannelSource,
   classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
-  CommandSchema,
   ComponentElement,
   ComponentHost,
   ComponentHostResolver,
@@ -2871,7 +2889,6 @@ import {
   Define,
   derive,
   DeriveOptions,
-  describeChannel,
   describeStream,
   DevtoolsEvent,
   DevtoolsRequest,
@@ -2919,10 +2936,6 @@ import {
   Inject,
   Input,
   isComponentElement,
-  isHubMessage,
-  isPortErrorMessage,
-  isPortHandshake,
-  JsonSchema,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -2931,7 +2944,6 @@ import {
   MediaService,
   MediaSessionLike,
   MemoryStorage,
-  MessageEndpoint,
   mutate,
   MutateOptions,
   Mutation,
@@ -2959,14 +2971,9 @@ import {
   PersistedState,
   pick,
   pickKeys,
-  portHandle,
-  PortHandshake,
-  PortHost,
   Presence,
   PresenceProps,
   printPropValue,
-  provide,
-  ProvidedChannel,
   ReadSource,
   registerUndoShortcuts,
   RendererChoice,
@@ -2999,10 +3006,6 @@ import {
   SelectOptions,
   SemanticsMirror,
   SemanticsMirrorSink,
-  serve,
-  serveChannels,
-  ServedChannel,
-  servePorts,
   ServiceRegistry,
   setPerformanceMarks,
   ShellFile,
@@ -3067,10 +3070,8 @@ import {
   UndoTransaction,
   WorkerApp,
   WorkerAppOptions,
-  workerHandle,
-  WorkerHandle,
   writeClipboard
-} from "./index-BdRgu-FB.js";
+} from "./index--sOWKwA3.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3391,7 +3392,7 @@ import {
   ComponentProps,
   ComponentType,
   InputCell
-} from "../FunctionComponent-CgwLKE5d.js";
+} from "../FunctionComponent-fYMdePtH.js";
 import {
   Observable
 } from "rxjs";
@@ -3479,6 +3480,134 @@ export {
   type Component,
   type ComponentContext
 };
+// ==== serveChannels.d.ts ====
+import {
+  ChannelPort,
+  ChannelToken,
+  Command,
+  CommandMap
+} from "./ChannelProtocol-ByNoHujM.js";
+import {
+  Observable
+} from "rxjs";
+type JsonSchema = {
+  readonly [keyword: string]: unknown;
+};
+interface CommandSchema {
+  readonly description?: string;
+  readonly parameters: readonly string[];
+  readonly rest?: true;
+  readonly input: JsonSchema;
+  readonly destructive?: true;
+  readonly idempotent?: true;
+  readonly confirm?: true;
+  readonly hidden?: true;
+}
+interface ChannelSchema {
+  readonly description?: string;
+  readonly view: JsonSchema;
+  readonly commands: {
+    readonly [name: string]: CommandSchema;
+  };
+}
+declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
+declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
+interface MessageEndpoint {
+  postMessage(message: unknown): void;
+  onmessage: ((event: {
+    data: unknown;
+  }) => void) | null;
+}
+interface PortHandshake {
+  type: 'gesso:port';
+  key: string;
+}
+declare function isPortHandshake(value: unknown): value is PortHandshake;
+interface WorkerHandle {
+  open(key: string): MessagePort;
+  readonly spawned: boolean;
+  terminate(): void;
+}
+declare const APPLICATION_WORKER: WorkerHandle;
+interface TransferTarget {
+  postMessage(message: unknown, transfer: Transferable[]): void;
+}
+declare function portHandle(endpoint: TransferTarget): WorkerHandle;
+interface HubMessage {
+  type: 'gesso:hub';
+}
+declare function isHubMessage(value: unknown): value is HubMessage;
+declare function workerHandle(factory: () => Worker): WorkerHandle;
+interface PortHost {
+  onmessage: ((event: {
+    data: unknown;
+    ports?: readonly MessagePort[];
+  }) => void) | null;
+}
+interface PortErrorMessage {
+  type: 'port:error';
+  message: string;
+}
+declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
+declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
+interface ChannelSource<View extends object, Commands extends object> {
+  view: { readonly [K in keyof View]: Observable<View[K]>; };
+  commands?: Commands;
+}
+declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
+declare class ProvidedChannel {
+  private readonly token;
+  private readonly source;
+  private readonly port;
+  private readonly subscriptions;
+  private readonly previous;
+  private readonly checked;
+  private synced;
+  constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
+  private receive;
+  private runCommand;
+  private sync;
+  private publish;
+  private resend;
+  private post;
+  dispose(): void;
+}
+interface ServedChannel {
+  token: {
+    name: string;
+    initial: object;
+  };
+  source: {
+    view: Record<string, Observable<unknown>>;
+    commands?: Record<string, Command>;
+  };
+}
+declare function serve<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>): ServedChannel;
+declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
+export {
+  APPLICATION_WORKER,
+  channelSchema,
+  ChannelSchema,
+  ChannelSource,
+  CommandSchema,
+  describeChannel,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  JsonSchema,
+  MessageEndpoint,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  serve,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  workerHandle,
+  WorkerHandle
+};
 // ==== worker/index.d.ts ====
 import {
   channel,
@@ -3491,17 +3620,32 @@ import {
   CommandMap,
   CommandsOf,
   defineChannel,
-  internalState,
-  InternalState,
   isChannelClientMessage,
   isChannelHostMessage,
-  ReadableCell,
   viewKeys,
   ViewOf
-} from "../FunctionComponent-CgwLKE5d.js";
+} from "../ChannelProtocol-ByNoHujM.js";
 import {
   APPLICATION_WORKER,
   ChannelSource,
+  isPortErrorMessage,
+  isPortHandshake,
+  MessageEndpoint,
+  portHandle,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  serve,
+  serveChannels,
+  ServedChannel,
+  servePorts
+} from "../serveChannels-C4s9xlxj.js";
+import {
+  internalState,
+  InternalState,
+  ReadableCell
+} from "../FunctionComponent-fYMdePtH.js";
+import {
   classifyStorageError,
   computed,
   ComputedCell,
@@ -3514,10 +3658,7 @@ import {
   findUnplainPath,
   IndexedDbStorage,
   IndexedDbStorageOptions,
-  isPortErrorMessage,
-  isPortHandshake,
   MemoryStorage,
-  MessageEndpoint,
   mutate,
   MutateOptions,
   Mutation,
@@ -3531,10 +3672,6 @@ import {
   PersistedState,
   pick,
   pickKeys,
-  portHandle,
-  PortHost,
-  provide,
-  ProvidedChannel,
   ReadSource,
   requirePlainData,
   resource,
@@ -3544,10 +3681,6 @@ import {
   ResourceStatus,
   select,
   SelectOptions,
-  serve,
-  serveChannels,
-  ServedChannel,
-  servePorts,
   StorageAdapter,
   storageErrorMessage,
   StorageOutcome,
@@ -3561,7 +3694,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-BdRgu-FB.js";
+} from "../index--sOWKwA3.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

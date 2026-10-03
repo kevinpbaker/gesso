@@ -38,7 +38,8 @@
     "./worker": "./src/worker/index.ts",
     "./jsx-runtime": "./src/jsx/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx/jsx-dev-runtime.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./agent": "./src/agent/index.ts"
   },
   "publishConfig": {
     "exports": {
@@ -57,6 +58,10 @@
       "./jsx-dev-runtime": {
         "types": "./dist/jsx/jsx-dev-runtime.d.ts",
         "default": "./dist/jsx/jsx-dev-runtime.js"
+      },
+      "./agent": {
+        "types": "./dist/agent/index.d.ts",
+        "default": "./dist/agent/index.js"
       }
     },
     "access": "public"
