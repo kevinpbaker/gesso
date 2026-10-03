@@ -2671,6 +2671,7 @@ declare class UiFocusManager {
   private readonly listeners;
   private readonly scopeListeners;
   private readonly scopes;
+  private readonly groupEntries;
   constructor(root: UiNode, dispatcher: UiInputDispatcher);
   setRoot(root: UiNode): void;
   get focusedNode(): UiNode | null;
@@ -2695,6 +2696,7 @@ declare class UiFocusManager {
   handleNodeRemoved(_node: UiNode): void;
   private moveFocus;
   private collectFocusable;
+  private groupOf;
   private withinScope;
   private isAttached;
   private isWithin;
@@ -6888,7 +6890,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-TxHSf-DF.js";
+} from "./index-BV3MbrEi.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7820,7 +7822,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-TxHSf-DF.js";
+} from "./index-BV3MbrEi.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;
