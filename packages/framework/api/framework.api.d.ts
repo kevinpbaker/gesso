@@ -6,65 +6,17 @@
 
 // ==== agent/index.d.ts ====
 import {
+  AgentConfirmation,
+  AgentResource,
+  agentSurface,
+  AgentSurface,
+  AgentSurfaceLike,
+  AgentSurfaceOptions,
+  AgentTool,
+  AgentToolResult,
   JsonSchema,
-  ServedChannel
-} from "../serveChannels-C4s9xlxj.js";
-interface AgentTool {
-  readonly name: string;
-  readonly title?: string;
-  readonly description: string;
-  readonly inputSchema: JsonSchema;
-  readonly outputSchema?: JsonSchema;
-  readonly annotations: {
-    readonly title?: string;
-    readonly readOnlyHint: boolean;
-    readonly destructiveHint?: boolean;
-    readonly idempotentHint?: boolean;
-    readonly openWorldHint: false;
-  };
-}
-interface AgentResource {
-  readonly uri: string;
-  readonly name: string;
-  readonly description?: string;
-  readonly mimeType: 'application/json';
-}
-interface AgentToolResult {
-  readonly content: readonly {
-    readonly type: 'text';
-    readonly text: string;
-  }[];
-  readonly structuredContent?: Record<string, unknown>;
-  readonly isError: boolean;
-}
-interface AgentConfirmation {
-  readonly channel: string;
-  readonly command: string;
-  readonly description?: string;
-  readonly arguments: Readonly<Record<string, unknown>>;
-  readonly destructive: boolean;
-}
-interface AgentSurfaceOptions {
-  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
-  quietMs?: number;
-  settleMs?: number;
-}
-interface AgentSurfaceLike {
-  tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
-  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
-  resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
-  read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
-  dispose?(): void;
-}
-interface AgentSurface extends AgentSurfaceLike {
-  tools(): readonly AgentTool[];
-  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
-  resources(): readonly AgentResource[];
-  read(uri: string): Record<string, unknown> | undefined;
-  dispose(): void;
-}
-declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
-declare function resourceUri(channel: string): string;
+  resourceUri
+} from "../AgentSurface-B1aIbMhb.js";
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
 interface McpServerInfo {
   name?: string;
@@ -144,15 +96,46 @@ declare const DEV_AGENT_EVENTS: {
   readonly response: 'gesso:agent:response';
 };
 declare function connectDevAgent(app: DevAgentApp, hot: DevAgentHot, info?: McpServerInfo): void;
+interface ModelContextLike {
+  registerTool(tool: {
+    name: string;
+    title?: string;
+    description: string;
+    inputSchema?: object;
+    annotations?: {
+      readOnlyHint?: boolean;
+      consequentialHint?: boolean;
+    };
+    execute: (input: Record<string, unknown>, options?: {
+      signal?: AbortSignal;
+    }) => Promise<unknown>;
+  }, options?: {
+    signal?: AbortSignal;
+  }): Promise<void>;
+}
+interface WebMcpOptions {
+  confirm?: AgentConfirm;
+  modelContext?: ModelContextLike;
+}
+declare function pageModelContext(): ModelContextLike | undefined;
+declare function registerWebMcpTools(surface: AgentSurfaceLike, modelContext?: ModelContextLike | undefined): Promise<() => void>;
+declare function connectWebMcp(app: {
+  openRenderPort(key: string): MessagePort | undefined;
+}, options?: WebMcpOptions): Promise<() => void>;
+declare function confirmInWindow(request: AgentConfirmation): boolean;
 export {
   AGENT_PORT,
   agentSurface,
   combineSurfaces,
+  confirmInWindow,
   connectDevAgent,
+  connectWebMcp,
   DEV_AGENT_EVENTS,
   handleMcpMessage,
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
+  pageModelContext,
+  registerWebMcpTools,
   remoteSurface,
   resourceUri,
   serveAgentPort,
@@ -172,7 +155,202 @@ export {
   type JsonRpcResponse,
   type McpHandlerOptions,
   type McpServerInfo,
+  type ModelContextLike,
+  type WebMcpOptions,
   validate
+};
+// ==== AgentSurface.d.ts ====
+import {
+  ChannelPort,
+  ChannelToken,
+  Command,
+  CommandMap
+} from "./ChannelProtocol-ByNoHujM.js";
+import {
+  Observable
+} from "rxjs";
+type JsonSchema = {
+  readonly [keyword: string]: unknown;
+};
+interface CommandSchema {
+  readonly description?: string;
+  readonly parameters: readonly string[];
+  readonly rest?: true;
+  readonly input: JsonSchema;
+  readonly destructive?: true;
+  readonly idempotent?: true;
+  readonly confirm?: true;
+  readonly hidden?: true;
+}
+interface ChannelSchema {
+  readonly description?: string;
+  readonly view: JsonSchema;
+  readonly commands: {
+    readonly [name: string]: CommandSchema;
+  };
+}
+declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
+declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
+interface MessageEndpoint {
+  postMessage(message: unknown): void;
+  onmessage: ((event: {
+    data: unknown;
+  }) => void) | null;
+}
+interface PortHandshake {
+  type: 'gesso:port';
+  key: string;
+}
+declare function isPortHandshake(value: unknown): value is PortHandshake;
+interface WorkerHandle {
+  open(key: string): MessagePort;
+  readonly spawned: boolean;
+  terminate(): void;
+}
+declare const APPLICATION_WORKER: WorkerHandle;
+interface TransferTarget {
+  postMessage(message: unknown, transfer: Transferable[]): void;
+}
+declare function portHandle(endpoint: TransferTarget): WorkerHandle;
+interface HubMessage {
+  type: 'gesso:hub';
+}
+declare function isHubMessage(value: unknown): value is HubMessage;
+declare function workerHandle(factory: () => Worker): WorkerHandle;
+interface PortHost {
+  onmessage: ((event: {
+    data: unknown;
+    ports?: readonly MessagePort[];
+  }) => void) | null;
+}
+interface PortErrorMessage {
+  type: 'port:error';
+  message: string;
+}
+declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
+declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
+interface ChannelSource<View extends object, Commands extends object> {
+  view: { readonly [K in keyof View]: Observable<View[K]>; };
+  commands?: Commands;
+}
+declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
+declare class ProvidedChannel {
+  private readonly token;
+  private readonly source;
+  private readonly port;
+  private readonly subscriptions;
+  private readonly previous;
+  private readonly checked;
+  private synced;
+  constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
+  private receive;
+  private runCommand;
+  private sync;
+  private publish;
+  private resend;
+  private post;
+  dispose(): void;
+}
+interface ServedChannel {
+  token: {
+    name: string;
+    initial: object;
+  };
+  source: {
+    view: Record<string, Observable<unknown>>;
+    commands?: Record<string, Command>;
+  };
+}
+declare function serve<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>): ServedChannel;
+declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
+interface AgentTool {
+  readonly name: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
+  readonly outputSchema?: JsonSchema;
+  readonly annotations: {
+    readonly title?: string;
+    readonly readOnlyHint: boolean;
+    readonly destructiveHint?: boolean;
+    readonly idempotentHint?: boolean;
+    readonly openWorldHint: false;
+  };
+}
+interface AgentResource {
+  readonly uri: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly mimeType: 'application/json';
+}
+interface AgentToolResult {
+  readonly content: readonly {
+    readonly type: 'text';
+    readonly text: string;
+  }[];
+  readonly structuredContent?: Record<string, unknown>;
+  readonly isError: boolean;
+}
+interface AgentConfirmation {
+  readonly channel: string;
+  readonly command: string;
+  readonly description?: string;
+  readonly arguments: Readonly<Record<string, unknown>>;
+  readonly destructive: boolean;
+}
+interface AgentSurfaceOptions {
+  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  quietMs?: number;
+  settleMs?: number;
+}
+interface AgentSurfaceLike {
+  tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
+  read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
+  dispose?(): void;
+}
+interface AgentSurface extends AgentSurfaceLike {
+  tools(): readonly AgentTool[];
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[];
+  read(uri: string): Record<string, unknown> | undefined;
+  dispose(): void;
+}
+declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
+declare function resourceUri(channel: string): string;
+export {
+  AgentConfirmation,
+  AgentResource,
+  agentSurface,
+  AgentSurface,
+  AgentSurfaceLike,
+  AgentSurfaceOptions,
+  AgentTool,
+  AgentToolResult,
+  APPLICATION_WORKER,
+  channelSchema,
+  ChannelSchema,
+  ChannelSource,
+  CommandSchema,
+  describeChannel,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  JsonSchema,
+  MessageEndpoint,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  resourceUri,
+  serve,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  workerHandle,
+  WorkerHandle
 };
 // ==== ChannelProtocol.d.ts ====
 type Command = (...args: never[]) => void;
@@ -408,9 +586,10 @@ import {
   Patch
 } from "./ChannelProtocol-ByNoHujM.js";
 import {
+  AgentConfirmation,
   ChannelSource,
   WorkerHandle
-} from "./serveChannels-C4s9xlxj.js";
+} from "./AgentSurface-B1aIbMhb.js";
 import {
   ChannelReplica,
   Component,
@@ -1989,6 +2168,9 @@ interface WorkerAppOptions {
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   onOpenUrl?: (url: string) => void;
+  webmcp?: boolean | {
+    confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  };
   onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
   onInspect?: (report: UiNodeReport | null) => void;
   interceptFind?: boolean;
@@ -2029,6 +2211,7 @@ declare class WorkerApp {
   get appLogic(): WorkerHandle | undefined;
   openRenderPort(key: string): MessagePort | undefined;
   mount(host: HTMLElement | string): () => void;
+  private disconnectWebMcp;
   private handleWorkerFailure;
   private report;
   private forwardKeyDown;
@@ -2896,7 +3079,7 @@ import {
   servePorts,
   workerHandle,
   WorkerHandle
-} from "./serveChannels-C4s9xlxj.js";
+} from "./AgentSurface-B1aIbMhb.js";
 import {
   bounds,
   BoundsCell,
@@ -3155,7 +3338,7 @@ import {
   WorkerApp,
   WorkerAppOptions,
   writeClipboard
-} from "./index-BrT0EHQz.js";
+} from "./index-CwOef2NN.js";
 export {
   AnimationService,
   APPLICATION_WORKER,
@@ -3565,134 +3748,6 @@ export {
   type Component,
   type ComponentContext
 };
-// ==== serveChannels.d.ts ====
-import {
-  ChannelPort,
-  ChannelToken,
-  Command,
-  CommandMap
-} from "./ChannelProtocol-ByNoHujM.js";
-import {
-  Observable
-} from "rxjs";
-type JsonSchema = {
-  readonly [keyword: string]: unknown;
-};
-interface CommandSchema {
-  readonly description?: string;
-  readonly parameters: readonly string[];
-  readonly rest?: true;
-  readonly input: JsonSchema;
-  readonly destructive?: true;
-  readonly idempotent?: true;
-  readonly confirm?: true;
-  readonly hidden?: true;
-}
-interface ChannelSchema {
-  readonly description?: string;
-  readonly view: JsonSchema;
-  readonly commands: {
-    readonly [name: string]: CommandSchema;
-  };
-}
-declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
-declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
-interface MessageEndpoint {
-  postMessage(message: unknown): void;
-  onmessage: ((event: {
-    data: unknown;
-  }) => void) | null;
-}
-interface PortHandshake {
-  type: 'gesso:port';
-  key: string;
-}
-declare function isPortHandshake(value: unknown): value is PortHandshake;
-interface WorkerHandle {
-  open(key: string): MessagePort;
-  readonly spawned: boolean;
-  terminate(): void;
-}
-declare const APPLICATION_WORKER: WorkerHandle;
-interface TransferTarget {
-  postMessage(message: unknown, transfer: Transferable[]): void;
-}
-declare function portHandle(endpoint: TransferTarget): WorkerHandle;
-interface HubMessage {
-  type: 'gesso:hub';
-}
-declare function isHubMessage(value: unknown): value is HubMessage;
-declare function workerHandle(factory: () => Worker): WorkerHandle;
-interface PortHost {
-  onmessage: ((event: {
-    data: unknown;
-    ports?: readonly MessagePort[];
-  }) => void) | null;
-}
-interface PortErrorMessage {
-  type: 'port:error';
-  message: string;
-}
-declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
-declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
-interface ChannelSource<View extends object, Commands extends object> {
-  view: { readonly [K in keyof View]: Observable<View[K]>; };
-  commands?: Commands;
-}
-declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
-declare class ProvidedChannel {
-  private readonly token;
-  private readonly source;
-  private readonly port;
-  private readonly subscriptions;
-  private readonly previous;
-  private readonly checked;
-  private synced;
-  constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
-  private receive;
-  private runCommand;
-  private sync;
-  private publish;
-  private resend;
-  private post;
-  dispose(): void;
-}
-interface ServedChannel {
-  token: {
-    name: string;
-    initial: object;
-  };
-  source: {
-    view: Record<string, Observable<unknown>>;
-    commands?: Record<string, Command>;
-  };
-}
-declare function serve<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>): ServedChannel;
-declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
-export {
-  APPLICATION_WORKER,
-  channelSchema,
-  ChannelSchema,
-  ChannelSource,
-  CommandSchema,
-  describeChannel,
-  isHubMessage,
-  isPortErrorMessage,
-  isPortHandshake,
-  JsonSchema,
-  MessageEndpoint,
-  portHandle,
-  PortHandshake,
-  PortHost,
-  provide,
-  ProvidedChannel,
-  serve,
-  serveChannels,
-  ServedChannel,
-  servePorts,
-  workerHandle,
-  WorkerHandle
-};
 // ==== worker/index.d.ts ====
 import {
   channel,
@@ -3724,7 +3779,7 @@ import {
   serveChannels,
   ServedChannel,
   servePorts
-} from "../serveChannels-C4s9xlxj.js";
+} from "../AgentSurface-B1aIbMhb.js";
 import {
   internalState,
   InternalState,
@@ -3779,7 +3834,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index-BrT0EHQz.js";
+} from "../index-CwOef2NN.js";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;

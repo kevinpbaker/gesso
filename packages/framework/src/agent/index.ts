@@ -34,3 +34,11 @@ export {
   type DevAgentRequest,
   type DevAgentResponse
 } from './dev';
+export {
+  confirmInWindow,
+  connectWebMcp,
+  pageModelContext,
+  registerWebMcpTools,
+  type ModelContextLike,
+  type WebMcpOptions
+} from './webmcp';

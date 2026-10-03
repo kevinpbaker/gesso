@@ -114,6 +114,42 @@ to the one before. With none open, the agent is told to open one. The
 endpoint refuses any request from a browser page, so a site you have
 open cannot reach it, and a build carries none of it.
 
+## In the browser, with WebMCP
+
+[WebMCP](https://webmachinelearning.github.io/webmcp/) is the other
+direction: the page registers tools with the browser, and an agent
+the browser runs or hosts calls them. No server, no port, and the tools
+last exactly as long as the page. One option offers every channel the
+page can reach:
+
+```ts
+createApp({ webmcp: true }).mount('#app');
+```
+
+Once the app mounts, each tool the surface offers is registered with
+`document.modelContext.registerTool`, and removed when the app is
+disposed. The view tools carry `readOnlyHint`, a command marked
+`@destructive` carries `consequentialHint`, and a call answers with the
+view it left, or fails with the sentence that says why.
+
+WebMCP has no way to ask the person, so a `@confirm` command is put to
+them with the browser's `window.confirm`. Pass your own to use the
+application's dialog:
+
+```ts
+createApp({ webmcp: { confirm: request => myDialog.ask(request) } });
+```
+
+The code loads on demand, only for an app that asked, so the shell
+stays the size it was. In a dev server the plugin turns it on for you;
+the app's own `webmcp` still decides.
+
+WebMCP is new. Chrome offers it as an origin trial from Chrome 149 to
+156, and a page without the trial token, or a browser without the
+feature, has no `document.modelContext`, in which case nothing is
+registered and nothing fails. Before Chrome 150 the same API was
+`navigator.modelContext`, which is read when the new name is missing.
+
 ## The server
 
 `mcpHandler` is MCP's Streamable HTTP transport as a `fetch` handler,
