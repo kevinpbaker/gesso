@@ -2984,7 +2984,7 @@ declare class UiShortcutRegistry {
   private isLive;
 }
 declare function parseShortcut(keys: string): readonly UiShortcutStep[];
-declare function formatShortcut(steps: readonly UiShortcutStep[]): string;
+declare function formatShortcut(steps: readonly UiShortcutStep[], platform?: EditingPlatform): string;
 interface UiDragPayload {
   readonly type: string;
   readonly data: unknown;
@@ -6888,7 +6888,7 @@ import {
   writeDeclaredProperty,
   writeOverrideProperty,
   ZoomState
-} from "./index-CIavOtyN.js";
+} from "./index-TxHSf-DF.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7820,7 +7820,7 @@ import {
   UiPointerController,
   UiTouchScroller,
   UiWheelController
-} from "./index-CIavOtyN.js";
+} from "./index-TxHSf-DF.js";
 declare class LayoutHarness {
   readonly graph: UiGraph;
   readonly engine: LayoutEngine;

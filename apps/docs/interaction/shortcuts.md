@@ -67,9 +67,12 @@ answer would be wrong for a Mac keyboard plugged into a Linux machine
 anyway. An application that genuinely wants one of the two spells it
 out: `Ctrl+S` or `Meta+S`.
 
-`formatShortcut` prints `Mod` as `Ctrl`, not as a platform glyph, for
-the same reason. An application that knows what it is running on can
-format the parsed `steps` itself.
+Printing is different: a person reads a shortcut the way their
+platform writes its own. `formatShortcut`, and every binding's
+`display`, prints `⇧⌘K` on a Mac and `Ctrl+Shift+K` elsewhere, by the
+same platform the editing keys follow (`detectEditingPlatform`, from the
+user agent, which a render worker can read too). Pass a platform to
+`formatShortcut` to print for another.
 
 ## Space
 
