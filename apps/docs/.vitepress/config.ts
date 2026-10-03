@@ -90,7 +90,8 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Remembering state', link: '/structure/persistence' },
       { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
       { text: 'Desktop windows', link: '/structure/desktop-windows' },
-      { text: 'Gesso on Electrobun', link: '/structure/gesso-on-electrobun' }
+      { text: 'Gesso on Electrobun', link: '/structure/gesso-on-electrobun' },
+      { text: 'Agents and MCP', link: '/structure/agents-and-mcp' }
     ]
   },
   {
