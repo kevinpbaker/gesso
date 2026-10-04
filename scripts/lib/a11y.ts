@@ -147,6 +147,15 @@ export interface RouteCheck {
   readonly press?: { readonly name: string; readonly role: string; readonly after: Expectation };
   /** Where one Tab from the top of the route must leave the platform's focus. */
   readonly focusAfterTab?: Expectation;
+  /**
+   * Controls left out of the Tab order on purpose, each with the keyboard
+   * way to what it does: a Previous button beside a page whose k key
+   * steps back. WCAG asks that everything work from the keyboard, not
+   * that every pointer target be a tab stop. Each one is printed in the
+   * report, and one that Tab reaches after all, or that is no longer on
+   * the route, fails the check, so the list can't outlive what it excuses.
+   */
+  readonly outOfTabOrder?: readonly { readonly role: string; readonly name: string; readonly keyboard: string }[];
 }
 
 /**
@@ -495,11 +504,18 @@ function describe(expectation: Expectation): string {
  * Writes or verifies the route's report, and returns the controls that
  * have no name, which fail the gate whether or not the report matched.
  */
-function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: readonly string[]): string[] {
-  const route = check.route;
-  const unnamed = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? '') && (node.name?.value ?? '') === '');
+/**
+ * The controls Tab doesn't reach, split into those the route excuses
+ * (`outOfTabOrder`) and those it doesn't, and the excuses that no longer
+ * match a control Tab misses.
+ */
+export function tabReach(
+  check: Pick<RouteCheck, 'outOfTabOrder'>,
+  nodes: readonly AxNode[],
+  tabOrder: readonly string[]
+): { unreachable: string[]; excused: string[]; stale: string[] } {
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
-  const unreachable = controls
+  const missed = controls
     .filter(
       node =>
         !isDisabled(node) &&
@@ -508,11 +524,39 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
     )
     .map(describeNode)
     .filter(name => !tabOrder.includes(name));
-  const content = renderReport(config.apps[check.app]!.url(check.path ?? route), nodes, unnamed, tabOrder, unreachable);
+  const excuses = (check.outOfTabOrder ?? []).map(entry => ({
+    name: `${entry.role} '${spoken(entry.name)}'`,
+    keyboard: entry.keyboard
+  }));
+  const excused = excuses.filter(excuse => missed.includes(excuse.name));
+  return {
+    unreachable: missed.filter(name => !excuses.some(excuse => excuse.name === name)),
+    excused: excused.map(excuse => `${excuse.name} (${excuse.keyboard})`),
+    stale: excuses.filter(excuse => !missed.includes(excuse.name)).map(excuse => excuse.name)
+  };
+}
+
+function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: readonly string[]): string[] {
+  const route = check.route;
+  const unnamed = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? '') && (node.name?.value ?? '') === '');
+  const { unreachable, excused, stale } = tabReach(check, nodes, tabOrder);
+  const content = renderReport(
+    config.apps[check.app]!.url(check.path ?? route),
+    nodes,
+    unnamed,
+    tabOrder,
+    unreachable,
+    excused
+  );
   const path = join(config.reportDir, `${route}.md`);
   const failures = unnamed.map(node => `${route}: a ${node.role?.value} with no accessible name`);
   for (const name of unreachable) {
     failures.push(`${route}: Tab never reaches the ${name}`);
+  }
+  for (const name of stale) {
+    failures.push(
+      `${route}: the ${name} is listed as out of the Tab order on purpose, but Tab reaches it or it isn't there`
+    );
   }
   const unnamedStop = tabOrder.find(entry => entry.startsWith(UNNAMED_STOP));
   if (unnamedStop !== undefined) {
@@ -584,7 +628,8 @@ function renderReport(
   nodes: readonly AxNode[],
   unnamed: readonly AxNode[],
   tabOrder: readonly string[],
-  unreachable: readonly string[]
+  unreachable: readonly string[],
+  excused: readonly string[]
 ): string {
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
   // InlineTextBox rows repeat their StaticText parent word for word;
@@ -629,8 +674,13 @@ function renderReport(
     ...tabOrder.map((name, index) => `${index + 1}. ${name}`),
     '',
     unreachable.length === 0
-      ? 'Every control above is in this list.'
+      ? excused.length === 0
+        ? 'Every control above is in this list.'
+        : 'Every control above is in this list, but for those below.'
       : `**Not reached by Tab**: ${unreachable.join(', ')}.`,
+    ...(excused.length === 0
+      ? []
+      : ['', `Left out of the Tab order on purpose, with the keyboard way to each: ${excused.join(', ')}.`]),
     ''
   ].join('\n');
 }
