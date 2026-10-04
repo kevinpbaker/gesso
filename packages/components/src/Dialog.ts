@@ -9,7 +9,7 @@ import {
   FocusService,
   internalState
 } from 'gesso-framework';
-import { Box, Column, percent, Row, Text, type UiChild, type UiNode } from 'gesso-core';
+import { Column, percent, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { keymap } from './internals';
 import { controlTokens } from './tokens';
 import { useOverlay } from './overlay';
@@ -26,6 +26,12 @@ import { useOverlay } from './overlay';
  * the dialog's own content, and focus is inside the innermost trap, so
  * the key never reaches a dialog underneath. Nothing has to know about
  * a stack.
+ *
+ * **It never leaves the screen.** Like a browser's modal `<dialog>`,
+ * it is at most as wide and as tall as the screen less a margin, and
+ * what doesn't fit of the body scrolls under the title. Content that
+ * can shrink (a scroll view with a height of its own and `minHeight`
+ * 0) is given the room there is instead, and scrolls itself.
  */
 export interface DialogProps {
   open?: boolean;
@@ -39,7 +45,7 @@ export interface DialogProps {
   width?: number;
 }
 
-/** The least room left between a dialog and each side of the screen, in pixels. */
+/** The least room left between a dialog and each edge of the screen, in pixels. */
 const SCREEN_MARGIN = 16;
 
 export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild {
@@ -85,7 +91,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
   ctx.onUnmount(release);
 
   const body = (): UiChild =>
-    Box(
+    Column(
       {
         // Taking the trap from the ref means it applies as soon as the
         // dialog is in the tree; the runtime settles focus into it once
@@ -100,7 +106,11 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         width: width.value,
         // `width` is what it wants; a screen narrower than that gets the
         // dialog at its own width, inside the margin the overlay keeps.
+        // The height is its content's, and the same goes for a screen
+        // shorter than that: the body below gives up the difference.
         maxWidth: percent(100),
+        maxHeight: percent(100),
+        gap: 12,
         opacity: enter,
         // `x` and `y` are the pivot, not a translation (see
         // `UiTransform`). Half the width puts it on the dialog's
@@ -139,14 +149,28 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         tabStop: false,
         onKeyDown: keymap(dismissible.value ? { Escape: close } : {})
       },
+      // The title and description keep their height; only the body
+      // gives way on a short screen, so what the dialog is stays in view.
+      title.pipe(
+        map(text =>
+          text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600, flexShrink: 0 })]
+        )
+      ),
+      description.pipe(
+        map(text => (text.length === 0 ? [] : [Text({ text, color: 'textMuted', fontSize: 13, flexShrink: 0 })]))
+      ),
       Column(
-        // The dialog's width, inside its padding: content that asks for
-        // 100% means the dialog, not whatever the title happens to need.
-        { gap: 12, width: percent(100) },
-        title.pipe(
-          map(text => (text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600 })]))
-        ),
-        description.pipe(map(text => (text.length === 0 ? [] : [Text({ text, color: 'textMuted', fontSize: 13 })]))),
+        {
+          // The dialog's width, inside its padding: content that asks for
+          // 100% means the dialog, not whatever the title happens to need.
+          width: percent(100),
+          // What's left of the dialog's height, scrolling what doesn't
+          // fit. A flex column rather than a scroll view, so content that
+          // may shrink is offered that height rather than all it asks for.
+          flexShrink: 1,
+          minHeight: 0,
+          overflow: 'auto'
+        },
         inputs.content.value ?? Row()
       )
     );
@@ -162,16 +186,16 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
       overlay.show(body(), {
         // Centred in the canvas on both axes.
         //
-        // A dialog that grows after it opens moves on the axis it is
-        // centred on, and one taller than the canvas overflows both
-        // ends rather than just the bottom — so the edges of a centred
-        // dialog are the caller's problem to keep modest. That is the
-        // trade for the position a modal is expected in.
+        // A dialog that grows after it opens moves on both axes, which
+        // is the trade for the position a modal is expected in.
         center: 'both',
-        // A margin on each side, which is what stops a dialog wider than
-        // a phone from meeting its edges.
-        left: SCREEN_MARGIN,
+        // A margin on every side, which is what stops a dialog wider
+        // than a phone, or taller than a short window, from meeting its
+        // edges: the dialog is at most the size of what's between.
+        top: SCREEN_MARGIN,
         right: SCREEN_MARGIN,
+        bottom: SCREEN_MARGIN,
+        left: SCREEN_MARGIN,
         environment: placeholder,
         dismissOnOutsidePress: dismissible.value,
         onClose: () => {
