@@ -217,16 +217,20 @@ function setup(editing: (EditingMirrorTarget & { described: UiSemanticsRecord | 
   return { doc, canvas, mirror, container, actions, keys, elementFor, apply };
 }
 
-function fakeEditing(
-  active: boolean
-): EditingMirrorTarget & { described: UiSemanticsRecord | null; activeDescendant?: string; focused: number } {
+function fakeEditing(active: boolean): EditingMirrorTarget & {
+  described: UiSemanticsRecord | null;
+  activeDescendant?: string;
+  controls?: string;
+  focused: number;
+} {
   return {
     active,
     described: null,
     focused: 0,
-    describe(next, activeDescendant) {
+    describe(next, activeDescendant, controls) {
       this.described = next;
       this.activeDescendant = activeDescendant;
+      this.controls = controls;
     },
     focus() {
       this.focused++;
@@ -526,6 +530,37 @@ describe('SemanticsMirror', () => {
     apply({ patches: [{ op: 'update', node: record('n1', { role: 'combobox', label: 'Assignee' }) }] });
     expect(elementFor('n1').getAttribute('aria-activedescendant')).toBeNull();
     expect(editing.activeDescendant).toBeUndefined();
+  });
+
+  it('names the list a combobox controls by DOM id, and says it suggests, from the element and from the proxy', () => {
+    const editing = fakeEditing(true);
+    const { elementFor, apply } = setup(editing);
+    const field = record('n1', {
+      role: 'combobox',
+      label: 'Assignee',
+      states: ['expanded'],
+      controls: 'n2',
+      autocomplete: 'list'
+    });
+    apply({
+      patches: [
+        { op: 'add', node: field },
+        { op: 'add', node: record('n2', { role: 'listbox', label: 'People', index: 1 }) }
+      ],
+      focused: 'n1'
+    });
+
+    const list = elementFor('n2');
+    expect(list.id).not.toBe('');
+    expect(elementFor('n1').getAttribute('aria-controls')).toBe(list.id);
+    expect(elementFor('n1').getAttribute('aria-autocomplete')).toBe('list');
+    expect(editing.controls).toBe(list.id);
+    expect(editing.described?.autocomplete).toBe('list');
+
+    apply({ patches: [{ op: 'update', node: record('n1', { role: 'combobox', label: 'Assignee' }) }] });
+    expect(elementFor('n1').getAttribute('aria-controls')).toBeNull();
+    expect(elementFor('n1').getAttribute('aria-autocomplete')).toBeNull();
+    expect(editing.controls).toBeUndefined();
   });
 
   it('clears the proxy description when focus leaves the field', () => {

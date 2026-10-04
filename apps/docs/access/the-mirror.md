@@ -73,7 +73,10 @@ magnifier and touch exploration the wrong answer.
 Each record becomes attributes on its element: `role`, `aria-label`,
 `aria-description`, `aria-disabled`, `aria-live`, the value and set attributes, and
 one attribute per state, so `checked` is `aria-checked="true"` and
-`collapsed` is `aria-expanded="false"`. Every attribute a record can
+`collapsed` is `aria-expanded="false"`. A relation, `activeDescendant`
+or `controls`, becomes `aria-activedescendant` or `aria-controls` naming
+the other record's element by its DOM id, and `autocomplete` becomes
+`aria-autocomplete`. Every attribute a record can
 write is cleared before the record is written, so an attribute a node
 stopped saying does not linger. Elements are nested under their parent
 at the index the record gives, because document order is the order a
@@ -133,7 +136,8 @@ input, because that is the only element an IME will compose into.
 
 So the mirror hands that element the record instead of taking focus
 from it: the proxy drops its `aria-hidden` and takes the field's role,
-label and states, and claims focus back from whichever mirrored element
+label and states, with its relations as the DOM ids of the mirrored
+elements they name, and claims focus back from whichever mirrored element
 had it. The element a screen reader reads and the element the person is
 typing into are then the same element, which is the only arrangement in
 which they cannot disagree. See

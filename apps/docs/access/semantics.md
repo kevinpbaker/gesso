@@ -37,6 +37,8 @@ mapping table.
 | `posInSet`, `setSize`              | A row's 1-based place in a set, including the items that are not mounted                                                  |
 | `level`                            | How deep a `treeitem` sits, 1 for a root                                                                                  |
 | `activeDescendant`                 | The node that's active while this one keeps focus, such as the highlighted option of a combobox whose field has the caret |
+| `controls`                         | The node this one shows or changes, such as the list a combobox's field has open                                          |
+| `autocomplete`                     | What a field offers as it's typed into: `list` for suggestions to pick from, `inline` for the rest of the word, or `both` |
 
 The states are `checked`, `mixed`, `expanded`, `collapsed`, `selected`,
 `pressed`, `busy`, `invalid`, `required`, `readonly`, `modal`,
@@ -47,6 +49,14 @@ the current item of a set, such as the navigation link for the page
 that's open; `selected` means a choice in a listbox, grid or tabs, and
 a screen reader ignores it on a link or a button. Order does not matter: the record sorts and de-duplicates them, so two
 spellings of the same set do not show up as a change.
+
+`activeDescendant` and `controls` are relations: their value is another
+node, which should be a record of its own, and the record holds that
+node's id. Set one to `null` while there's nothing to point at, such as
+a combobox whose list is closed. A field that opens a list of
+suggestions says all three: `controls` for the list while it's open,
+`activeDescendant` for the highlighted option, and `autocomplete:
+'list'` throughout.
 
 `disabled` is not among them, deliberately. It is already a property,
 already inherited by a whole subtree, and two ways to say the same

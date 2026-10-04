@@ -164,6 +164,23 @@ describe('buildSemanticsTree', () => {
     expect(t.build()[0]).toMatchObject({ role: 'combobox', activeDescendant: option.id });
   });
 
+  it('names the list a combobox controls, and says the list suggests', () => {
+    const t = new Tree();
+    const list = t.node(UiNodeType.Column, { role: 'listbox', label: 'People' });
+    const field = t.node(UiNodeType.EditableText, {
+      role: 'combobox',
+      label: 'Assignee',
+      controls: list,
+      autocomplete: 'list'
+    });
+    t.add(t.root, field, list);
+
+    expect(t.build()[0]).toMatchObject({ role: 'combobox', controls: list.id, autocomplete: 'list' });
+    // A list that isn't there yet is no relation at all.
+    field.setProperty('controls', null);
+    expect(t.build()[0]!.controls).toBeUndefined();
+  });
+
   it('claims the text inside a menu item, which is how the item is named', () => {
     const t = new Tree();
     const menu = t.node(UiNodeType.Column, { role: 'menu', label: 'Actions' });

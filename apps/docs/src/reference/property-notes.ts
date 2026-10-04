@@ -391,6 +391,14 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Semantics',
     note: "The node that's active while this one keeps focus, such as a combobox's highlighted option. Read as if it had focus."
   },
+  controls: {
+    group: 'Semantics',
+    note: "The node this one shows or changes, such as the list a combobox's field has open."
+  },
+  autocomplete: {
+    group: 'Semantics',
+    note: 'What a field offers as it is typed into: `list`, `inline` or `both`.'
+  },
 
   // Media
   image: { group: 'Media', note: 'A decoded bitmap drawn inside the box, clipped by `borderRadius`.' },

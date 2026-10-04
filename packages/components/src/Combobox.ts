@@ -66,7 +66,9 @@ export interface ComboboxOption {
  * Down and Up walk it, Enter chooses, Escape closes it (and, closed,
  * puts back the chosen label). In `multiple`, Backspace in an empty
  * field takes off the last value. The highlighted option is the field's
- * `activeDescendant`, so a screen reader announces it as it moves.
+ * `activeDescendant`, so a screen reader announces it as it moves; the
+ * open list is what the field `controls`, and the field's
+ * `autocomplete` is `list`.
  */
 export interface ComboboxProps extends ControlLayoutProps {
   options: readonly ComboboxOption[];
@@ -201,6 +203,8 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
   /** The option rows' nodes, by value, for `activeDescendant` and scrolling. */
   const rows = new Map<string, UiNode>();
   const rowsChanged = new BehaviorSubject(0);
+  /** The list's node while it's open, for the field's `controls`. */
+  const listNode = new BehaviorSubject<UiNode | null>(null);
 
   const close = (): void => {
     if (overlay.isOpen()) {
@@ -243,6 +247,10 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
 
   const activeNode = combineLatest([active, matches, overlay.open, rowsChanged]).pipe(
     map(([at, list, open]) => (open ? (rows.get(list[at]?.value ?? '') ?? null) : null)),
+    distinctUntilChanged()
+  );
+  const controlsNode = combineLatest([listNode, overlay.open]).pipe(
+    map(([node, open]) => (open ? node : null)),
     distinctUntilChanged()
   );
   ctx.effect(activeNode, node => {
@@ -310,7 +318,14 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
       Column(
         // A set of values says so, or the option the arrows are on is
         // announced as the one selected.
-        { padding: 4, gap: 2, role: 'listbox', label, states: multiple ? ['multiselectable'] : [] },
+        {
+          ref: (node: UiNode | null) => listNode.next(node),
+          padding: 4,
+          gap: 2,
+          role: 'listbox',
+          label,
+          states: multiple ? ['multiselectable'] : []
+        },
         combineLatest([matches, emptyText]).pipe(
           map(([options, nothing]) =>
             options.length === 0
@@ -433,6 +448,8 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
     description: controlDescription(error, description),
     states: fieldStates,
     activeDescendant: activeNode,
+    controls: controlsNode,
+    autocomplete: 'list',
     onInput: (event: UiTextChangeEvent) => {
       query.next(event.value);
       inputs.onQueryChange?.value?.(event.value);
