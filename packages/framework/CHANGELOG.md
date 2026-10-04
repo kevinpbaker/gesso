@@ -1,5 +1,19 @@
 # gesso-framework
 
+## 0.5.1
+
+### Patch Changes
+
+- 77195a4: Two more semantics properties, for a field that opens a list of suggestions. `controls` is a relation, like `activeDescendant`: the node this one shows or changes, such as the list a combobox's field has open, held on the record as that node's id and written by the mirror as `aria-controls` naming its element. `autocomplete` (`'list' | 'inline' | 'both'`, the new `UiAutocomplete`) says what a field offers as it's typed into, written as `aria-autocomplete`. The editing proxy writes both while a field has focus, so `EditingMirrorTarget.describe` takes the controlled element's DOM id after the active descendant's. `Combobox` uses them: its field controls the list while it's open, and its autocomplete is `list`.
+- 6b71716: An overlay can open beside a part of its anchor: `anchorRect` on an overlay entry (and on `useOverlay`'s options), and the layout property of the same name, is a rectangle in the anchor's own coordinates that the entry is placed against, with the same flip and shift, and that it follows through scrolling and layout as it follows the anchor. It can be an Observable, so it moves without the entry opening again. `EditingService.caretRectOf(node, offset)` (and `UiEditingController.caretRectOf`) answers for a character other than the caret's, so a list opened by `@` sits under the `@` as the name is typed, and goes to the next line with it when it wraps. A point opened beside the caret stayed behind when the page scrolled.
+- 581cf89: An open overlay now follows the theme of the place it was declared. The overlay layer read the theme, text style and content colour once, as the entry opened, so a dialog or menu open when the system turned dark, or when a theme the person chose arrived from another worker a moment after they opened it, stayed in the old theme over a page in the new one until it closed. Underneath, a modifier's `host.environment(key, of?)` and `host.onEnvironment(listener, of?)` can read and follow another node's environment, and an environment provided by a node whose own environment changed in the same frame is rebuilt in that frame.
+- Updated dependencies [77195a4]
+- Updated dependencies [6b71716]
+- Updated dependencies [581cf89]
+- Updated dependencies [13c096f]
+- Updated dependencies [db7040b]
+  - gesso-core@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
