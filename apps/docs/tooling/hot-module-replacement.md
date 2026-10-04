@@ -67,6 +67,14 @@ them, keeping the instances they already had:
 A service defined in a module the replacement did not touch keeps its
 class object and needs no mention.
 
+A page reloaded after a save runs one copy of each module. The worker
+entry accepts its services' modules, and Vite leaves a module that
+accepts an update importing the version from before it, while every
+other importer moves on to the new one; a reload then loaded the service
+twice, and the error above came back on every reload until the dev
+server restarted. The plugin keeps the entry's imports at the version
+the rest of the graph imports, so a reload is always clean.
+
 **The instance keeps the behaviour it was built with.** It was
 constructed from the old class, so its methods are the old code: a
 change to a service's own body needs a full reload to take effect.
