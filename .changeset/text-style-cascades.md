@@ -1,5 +1,0 @@
----
-'gesso-core': minor
----
-
-The text style properties cascade, as the property reference always said they did: `fontFamily`, `fontSize`, `fontWeight`, `lineHeight`, `letterSpacing`, `textAlign`, `textDirection`, `fontStyle`, `fontStretch`, `fontVariant`, `fontKerning` and `textDecoration` set on a container now reach the text below it. Until now they were inherited only from the nearest `textStyle`, so `<row fontSize={12}>` left every text in the row at the default 14. A container's fields are laid over the style in scope, so `<box textStyle="body" fontWeight={600}>` gives its text the body style in a heavier weight, and a text that sets a field itself keeps its own. A container that sets `fontSize` without `lineHeight` gives the text below it a normal line for that size, 1.2 times it, as it already did for itself. Text under a container that sets one of these now draws, and measures, with it. Changing a cascaded underline, alignment or direction repaints the subtree without laying it out again.

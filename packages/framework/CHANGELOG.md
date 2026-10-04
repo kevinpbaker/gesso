@@ -1,5 +1,38 @@
 # gesso-framework
 
+## 0.6.0
+
+### Minor Changes
+
+- bf21b17: A `Dialog` dims the page behind it, as a browser draws `<dialog>::backdrop`. Palettes have a new `scrim` token, a colour with alpha: the light page's ink at 40% in `lightColors`, black at 60% in `darkColors`, and left alone by high contrast. A custom palette written out in full needs one. Overlay entries take `scrim`, on by default for a `modal` entry and off for every other, so a menu or a list of suggestions never dims the page; the scrim takes its theme from the entry's `environment` and fades in at a dialog's pace, or appears at once under reduced motion. `Dialog` takes `scrim={false}` to leave the page undimmed; its backdrop still keeps the page from presses.
+- 684b59a: A `Dialog` that can't be dismissed now keeps the page from presses, as one that can does: every dialog has a backdrop over the whole page, positioned panels with a `zIndex` included, and `dismissible` decides only whether a press or a wheel on it closes the dialog. Before, a dialog with `dismissible={false}` had no backdrop, so a press beside it reached a button in the page under the modal. Overlay entries take a new `modal` option for the same backdrop.
+- b085707: `ShellService.redirect(url)` sends the page to a url, leaving the app: what a full-page sign-in or sign-out needs, which a component in a worker could not do. Relative urls resolve against the page, only `http:`, `https:` or the page's own scheme are followed (a `javascript:`, `data:` or `blob:` url is refused with a warning), and `createApp({ onRedirect })` lets a host such as a desktop window decide what a redirect means. It differs from the router's `navigate`, which moves within the app.
+
+### Patch Changes
+
+- e9f86a2: An anchored overlay (a tooltip, a menu, a popover) now opens beside where its anchor is drawn when an ancestor of the anchor has a `transform`. A card on a panned and zoomed canvas used to get its tooltip where the card would be at zoom 1 with no pan, often nowhere near it; the anchor is now carried through every ancestor's translate, scale and rotation, as well as the scroll offsets it already followed, and an overlay that lives under a transform of its own is placed in that space. The accessibility mirror puts its elements over the same drawn boxes, so a screen reader's outline and touch exploration find the card where it is. A node's own transform still takes no part, so a turning spinner neither shakes its tooltip nor moves its element. `LayoutEngine.screenBox(node)` answers the question for anything else that needs it.
+- b0233fa: A channel's `view` lists its declared keys: `Object.keys`, `in` and a spread now see them. With only a `get` trap, walking a view found nothing, and an app that snapshotted one by its keys got an empty object.
+- 013e064: `color` cascades, as the property reference always said it did: text that names no colour takes the `color` of the nearest ancestor that set one, unless a nearer `textStyle` brings its own. A theme token travels as a name and is resolved where the text is painted, so `<box theme={darkTheme} color="text">` draws its plain text in the dark palette's `text`, and a card inside it that provides another theme draws in that theme's. Until now a node's own `color` reached nothing below it, and plain text under a dark root drew in the default style's near-black on the dark background. Text that already names a colour or a role is unchanged; text that names neither, under a container that sets a `color`, now takes that colour. Changing a cascaded colour repaints the subtree without laying it out again. `UiEnvironmentKeys.color` is the new key the colour travels on, and an overlay carries it from where it was declared.
+- 820aee8: Everything that measures a node against the canvas now takes the `transform` of every ancestor into account, as painting and hit testing always have. Under a panned and zoomed parent (cards on a map inside a "camera" box) several things used to work from where the node would be drawn at zoom 1 with no pan:
+
+  - A press from the accessibility mirror or an automation tool, and Enter or Space on a focused button, now click the centre the node is drawn at rather than a point that could be off the node entirely.
+  - A modifier's `layoutBox()` and the box `onLayout` reports are the drawn box, so a slider, split pane or colour picker on a zoomed card turns a press into the right value, and `onLayout` hears when a pan above the node moves it on screen. Its size is the drawn size, so a fraction of it stays a fraction; `flowBox()` keeps the laid-out size, and the motion pivot, `breakpoint`, `sizeContainer` and `publishInset` now read that, so a zoom neither shifts a pivot nor crosses a breakpoint. The new `measureFlow` modifier is `measure` for the laid-out box; a virtual list's reveal and a `DataTable`'s sticky header use it, so they scroll by the right amount under a zoom.
+  - The caret rectangle handed to the shell, which positions the hidden text field and the IME candidate window, follows the caret where it is drawn.
+  - A press beside the fields of an editing group, a drag across them, and a text selection dragged past the end of a line find the field or line nearest the pointer on screen.
+  - The mirror's box for a focused node that is scrolled out of view, and the layout inspector's highlight and heatmap, are drawn over the node where it is.
+
+  `LayoutEngine.screenBox(node, part?)` takes an optional rectangle in the node's own coordinates and answers where that part of it is drawn. `EditingHost` and `SelectionHost` take an optional `screenBox`; a host without one behaves as before. With no transform above a node, every answer is the same as before.
+
+- cc9e62b: The router writes `match` before `url`, so a subscriber to `url` that reads `match` sees the match for the url it was handed, not the previous one.
+- Updated dependencies [bf21b17]
+- Updated dependencies [3b20918]
+- Updated dependencies [e9f86a2]
+- Updated dependencies [013e064]
+- Updated dependencies [a81d551]
+- Updated dependencies [820aee8]
+- Updated dependencies [684d68a]
+  - gesso-core@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
