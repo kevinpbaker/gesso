@@ -142,7 +142,10 @@ bottom, which the same sheet and a new issue form both did.
 
 The title and description keep their height and stay at the top. The
 body gets what is left, and scrolls whatever of `content` does not fit,
-so a long form is scrolled to its buttons rather than cut off.
+so a long form is scrolled to its buttons rather than cut off. The body
+keeps 4 pixels of its own round the content, inside the dialog's
+padding, so the focus ring drawn outside a field at its edge is not cut
+off where the body clips.
 
 Content that can give up height is given the room there is instead. A
 list in a scroll view of its own, with a height and `minHeight={0}`,

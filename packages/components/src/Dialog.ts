@@ -110,7 +110,11 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         // shorter than that: the body below gives up the difference.
         maxWidth: percent(100),
         maxHeight: percent(100),
-        gap: 12,
+        // 8 and not 12 between the parts, and 16 and not 20 at the sides
+        // and the bottom: the body below has 4 of its own all round, so
+        // a focus ring drawn outside a field in it isn't cut off where
+        // the body clips. The title and description make up the 4.
+        gap: 8,
         opacity: enter,
         // `x` and `y` are the pivot, not a translation (see
         // `UiTransform`). Half the width puts it on the dialog's
@@ -126,7 +130,9 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         transform: enter.pipe(
           map(t => ({ x: width.value / 2, y: 0, scaleX: 0.96 + 0.04 * t, scaleY: 0.96 + 0.04 * t }))
         ),
-        padding: 20,
+        paddingTop: 20,
+        paddingX: 16,
+        paddingBottom: 16,
         backgroundColor: 'surface',
         borderColor: 'border',
         borderWidth: 1,
@@ -153,11 +159,17 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
       // gives way on a short screen, so what the dialog is stays in view.
       title.pipe(
         map(text =>
-          text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600, flexShrink: 0 })]
+          text.length === 0
+            ? []
+            : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600, paddingX: 4, flexShrink: 0 })]
         )
       ),
       description.pipe(
-        map(text => (text.length === 0 ? [] : [Text({ text, color: 'textMuted', fontSize: 13, flexShrink: 0 })]))
+        map(text =>
+          text.length === 0
+            ? []
+            : [Text({ text, color: 'textMuted', fontSize: 13, paddingX: 4, paddingTop: 4, flexShrink: 0 })]
+        )
       ),
       Column(
         {
@@ -169,7 +181,8 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
           // may shrink is offered that height rather than all it asks for.
           flexShrink: 1,
           minHeight: 0,
-          overflow: 'auto'
+          overflow: 'auto',
+          padding: 4
         },
         inputs.content.value ?? Row()
       )
