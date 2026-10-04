@@ -1,5 +1,0 @@
----
-'gesso-core': minor
----
-
-Both renderers paint `boxShadows`, with CSS `box-shadow` semantics: offset, blur, spread, colour and `inset`, following the node's corner radius, with the first shadow on top. Until now the prop resolved and nothing drew it, so every theme's `shadows` scale did nothing. Canvas2D draws a shadow with the canvas's own blur, cast from a shape thrown outside the clip; WebGPU evaluates the blurred rounded rectangle in the fragment shader, one quad per shadow. A shadow's colour may now be a palette name (`boxShadow(0, 4, 8, 0, 'shadow')`), resolved against the node's theme like any other colour, so `UiBoxShadow.color` widens from `UiColor` to `UiColorValue` and `PaintState.boxShadows` holds the resolved `PaintBoxShadow`. A node's paint extent now takes in its outer shadows, so a card just off screen still casts its shadow on, and changing a shadow updates it without a layout pass. The WebGPU primitive instance grows from 20 to 24 floats, and its kind is read as the float it is written as.

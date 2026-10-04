@@ -1,6 +1,0 @@
----
-'gesso-core': minor
-'gesso-framework': minor
----
-
-A layout listener that changes layout is painted on the same frame. `breakpoint`, `sizeContainer` (and so `Responsive`), `autoFocus` and anything else on `host.onLayout` hear a box after layout, and what they wrote used to be laid out on the next frame, so a page whose breakpoint gave it wide padding was drawn with its narrow padding first and jumped. The runtime now lays out again before it paints, as a browser does after a `ResizeObserver` callback: only what the listeners dirtied, telling only the listeners whose boxes then changed, until they write nothing more that lays out. The loop is bounded at 8 layout passes a frame; past it the frame paints what it has and a warning says so once. A frame whose listeners write nothing that lays out runs one pass. A scroll into view asked for while the listeners run (an `autoFocus` revealing its node) waits until the boxes are final. `FrameMetrics.layoutPasses` counts the passes, and `measured` and `relayoutRoots` count every pass. A geometry `sharedElement` morph lands on the frame of the change instead of being covered by a transform for one frame. `UiScheduler.recollect`, `UiFrame.merged` and `DirtyNodeSet.anyFlags` are what the runtime builds this from.
