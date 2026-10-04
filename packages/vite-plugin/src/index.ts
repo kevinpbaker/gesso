@@ -1,4 +1,10 @@
-import { defaultClientConditions, type EnvironmentModuleNode, type Plugin, type UserConfig } from 'vite';
+import {
+  defaultClientConditions,
+  type EnvironmentModuleGraph,
+  type EnvironmentModuleNode,
+  type Plugin,
+  type UserConfig
+} from 'vite';
 
 import { AGENT_PATH, createAgentBridge, type BridgeRequest, type BridgeResponse, type BridgeSocket } from './agent.ts';
 import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
@@ -323,7 +329,10 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
      * restarts, and nothing anywhere says why. Both ends of the module
      * graph are known here, so the answer is one walk of the importers.
      */
-    hotUpdate({ modules, server }) {
+    hotUpdate({ modules, server, timestamp }) {
+      if (renderWorkerId !== null) {
+        refreshAcceptedImports(this.environment.moduleGraph, renderWorkerId, modules, timestamp);
+      }
       if (options.diagnostics === false || shellId === null || renderWorkerId === null) {
         return;
       }
@@ -351,6 +360,34 @@ export default gesso;
 /** A name for the MCP server: the project's directory, which is what a person calls the app. */
 function agentName(root: string): string {
   return (root.split('/').filter(Boolean).pop() ?? 'gesso').replace(/[^A-Za-z0-9_-]/g, '-');
+}
+
+/**
+ * Keeps the render worker importing what it accepted at the version
+ * the rest of the graph imports.
+ *
+ * Vite marks every importer of a saved module stale, so its next
+ * request re-imports the module at the save's timestamp, except an
+ * importer that accepts it: that one was handed the new module in the
+ * update and its served code still names the old timestamp. The render
+ * worker accepts its root's and its services' modules (the wiring
+ * above), so a page reloaded after a save imported a service at one
+ * timestamp from the worker and another from the screens: two modules,
+ * two classes, and an `inject` that found neither. Only a restart of
+ * the dev server got out of it.
+ *
+ * Marked stale softly, which redoes only the import timestamps.
+ */
+function refreshAcceptedImports(
+  graph: EnvironmentModuleGraph,
+  workerId: string,
+  modules: readonly EnvironmentModuleNode[],
+  timestamp: number
+): void {
+  const worker = graph.getModuleById(workerId);
+  if (worker !== undefined && modules.some(module => worker.acceptedHmrDeps.has(module))) {
+    graph.invalidateModule(worker, new Set(), timestamp, false, true);
+  }
 }
 
 /** Every module that transitively imports this one, plus this one. */
