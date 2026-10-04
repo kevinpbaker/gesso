@@ -341,6 +341,7 @@ interface SplitPaneProps extends ControlLayoutProps {
   min?: number;
   max?: number;
   label?: string;
+  show?: 'both' | 'first' | 'second';
 }
 declare function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild;
 interface FindBarProps {

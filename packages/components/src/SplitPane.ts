@@ -1,4 +1,4 @@
-import { BehaviorSubject, map } from 'rxjs';
+import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Box, Column, Row, type UiChild, type UiPointerEvent, type LayoutBox, percent, measure } from 'gesso-core';
@@ -38,6 +38,14 @@ export interface SplitPaneProps extends ControlLayoutProps {
   min?: number;
   max?: number;
   label?: string;
+  /**
+   * Which panes are on screen: both, with the divider between them, or
+   * only one, which takes the whole of the container. The other stays
+   * mounted, hidden and out of the way, so what is in it (a scroll
+   * position, a draft, an open dialog it declared) is still there when
+   * it comes back. Default `'both'`.
+   */
+  show?: 'both' | 'first' | 'second';
 }
 
 export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild {
@@ -45,6 +53,7 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
   const min = input(inputs.min, 0.1);
   const max = input(inputs.max, 0.9);
   const label = input(inputs.label, 'Resize panes');
+  const show = input(inputs.show, 'both');
   const focus = trackFocus(ctx);
   const track = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   const split = controlled<number>({
@@ -71,13 +80,20 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
     return clamp(along / extent);
   };
 
-  const firstSize = split.value.pipe(map(fraction => percent(fraction * 100)));
+  // A pane on its own is the whole container, and a hidden one is
+  // nothing; the divider goes with either.
+  const firstSize = combineLatest([split.value, show]).pipe(
+    map(([fraction, shown]) => percent(shown === 'first' ? 100 : shown === 'second' ? 0 : fraction * 100))
+  );
+  const both = show.pipe(map(shown => shown === 'both'));
+  const dividerSize = both.pipe(map(shown => (shown ? 6 : 0)));
   const divider = Box({
     ref: focus.ref,
     focusable: true,
     modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
-    width: horizontal() ? 6 : undefined,
-    height: horizontal() ? undefined : 6,
+    width: horizontal() ? dividerSize : undefined,
+    height: horizontal() ? undefined : dividerSize,
+    visible: both,
     // A divider is a fixed size. Left shrinkable, it gave up a sliver of
     // its six pixels whenever the second pane's content was wider than
     // the track, a different sliver for every content width, so every
@@ -86,7 +102,7 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
     flexShrink: 0,
     backgroundColor: 'controlBackground',
     borderColor: 'controlBorder',
-    borderWidth: 1,
+    borderWidth: both.pipe(map(shown => (shown ? 1 : 0))),
     cursor: horizontal() ? 'col-resize' : 'row-resize',
     role: 'separator',
     label,
@@ -137,6 +153,10 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
       height: horizontal() ? percent(100) : firstSize,
       // The fraction is a size, not an opening bid.
       flexShrink: 0,
+      // Hidden rather than taken out of the tree: hidden is no drawing,
+      // no presses, no focus and nothing for a screen reader, and the
+      // state inside is kept.
+      visible: show.pipe(map(shown => shown !== 'second')),
       ...shrinkable
     },
     inputs.first.value ?? Row()
@@ -145,7 +165,10 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
   // basis is zero rather than its content: with an automatic basis the
   // row measured everything in it at max-content first, on every pass,
   // to arrive at a size that never depended on that content.
-  const second = Box({ flexGrow: 1, flexBasis: 0, ...shrinkable }, inputs.second.value ?? Row());
+  const second = Box(
+    { flexGrow: 1, flexBasis: 0, visible: show.pipe(map(shown => shown !== 'first')), ...shrinkable },
+    inputs.second.value ?? Row()
+  );
 
   return horizontal() ? Row(container, first, divider, second) : Column(container, first, divider, second);
 }

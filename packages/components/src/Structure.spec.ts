@@ -6,6 +6,7 @@ import { renderTest } from 'gesso-testing';
 import {
   Box,
   Column,
+  ScrollView,
   Text,
   UiNodeType,
   defineModifier,
@@ -258,6 +259,51 @@ describe('SplitPane', () => {
     await ui.settle();
     // Only the text and what holds it, not the pane's whole subtree.
     expect(Math.max(...ui.frames.slice(from).map(frame => frame.measured))).toBeLessThan(6);
+  });
+
+  it('shows one pane alone, keeping the other where it was', async () => {
+    const show = new BehaviorSubject<'both' | 'first' | 'second'>('both');
+    const ui = mount(
+      createComponent(SplitPane, {
+        defaultSplit: 0.25,
+        show,
+        first: Box({ label: 'list', role: 'region' }),
+        second: ScrollView(
+          { label: 'detail', role: 'region', height: 100 },
+          Box({ height: 1000, focusable: true, label: 'field', role: 'textbox' })
+        )
+      })
+    );
+    await ui.settle();
+    const list = ui.getByLabel('list');
+    const detail = ui.getByLabel('detail');
+    const pane = (node: UiNode) => ui.getLayout(node.parent!);
+    ui.fireEvent.wheel({ x: 300, y: 50, deltaY: 300 });
+    await ui.settle();
+    const scrolled = ui.explain(detail).scroll!.scrollY;
+    expect(scrolled).toBeGreaterThan(0);
+
+    show.next('first');
+    await ui.settle();
+    expect(pane(list).width).toBe(400);
+    expect(ui.queryByRole('separator')).toBeNull();
+    expect(ui.queryByRole('region', { name: 'detail' })).toBeNull();
+
+    show.next('second');
+    await ui.settle();
+    expect(pane(detail)).toMatchObject({ x: 0, width: 400 });
+    expect(ui.queryByRole('region', { name: 'list' })).toBeNull();
+    ui.fireEvent.focus(ui.getByRole('textbox', { name: 'field' }));
+
+    // Back to both: the same nodes, the same scroll, the same focus.
+    show.next('both');
+    await ui.settle();
+    expect(ui.getByLabel('list')).toBe(list);
+    expect(ui.getByLabel('detail')).toBe(detail);
+    expect(ui.explain(detail).scroll!.scrollY).toBe(scrolled);
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('textbox', { name: 'field' }));
+    expect(pane(list).width).toBe(100);
+    expect(ui.getLayout(ui.getByRole('separator')).width).toBe(6);
   });
 
   it('puts the divider at the fraction even when a pane holds wider content', () => {
