@@ -24,6 +24,7 @@ import {
 import { AudioSink } from '../AudioSink';
 import { attachFileDrop } from '../fileDrop';
 import { browserFilesHost, fileResultTransfer, ShellFiles } from '../shellFiles';
+import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
@@ -128,6 +129,23 @@ export interface WorkerAppOptions {
    * reach. `gesso-electrobun`'s bridge is what goes here.
    */
   onOpenUrl?: (url: string) => void;
+  /**
+   * Replaces the page with a url the application asked for
+   * (`ShellService.redirect`), in place of `window.location.assign`.
+   *
+   * A page wants `location.assign`, which is the default, and it is
+   * usually right in a desktop window too: the webview navigates, the
+   * way a page would, and comes back when the server redirects it back.
+   * A host that has to do something else — reload the bundled app
+   * rather than leave it, or send a sign-in to the person's browser and
+   * wait for a deep link — handles it here.
+   *
+   * Called with the url resolved against the page, and only once the
+   * shell has admitted it: a `javascript:` url, or any scheme that is
+   * not http, https or the page's own, is refused before this is
+   * consulted, so a handler need not check again.
+   */
+  onRedirect?: (url: string) => void;
   /**
    * Offer the application's channels to an AI agent in the browser,
    * through WebMCP (default false). Each channel's view and commands
@@ -849,6 +867,10 @@ export class WorkerApp {
     }
     if (message.type === 'openUrl') {
       openUrlWith(this.options.onOpenUrl, message.url);
+      return;
+    }
+    if (message.type === 'redirect') {
+      redirectWith(this.options.onRedirect, message.url, window.location);
       return;
     }
     if (message.type === 'fullscreen') {

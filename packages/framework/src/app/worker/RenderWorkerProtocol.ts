@@ -378,6 +378,13 @@ export type RuntimeToShellMessage =
   | { type: 'clipboard'; id: number; text: string }
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
+  /**
+   * Replace the page with a url, leaving the app (ShellService.redirect).
+   * `url` is as the component gave it, relative or not; the shell
+   * resolves it against the page and refuses a scheme that is not
+   * http, https or the page's own.
+   */
+  | { type: 'redirect'; url: string }
   | { type: 'fullscreen'; enter: boolean }
   /**
    * Open a sized, named window and report back whether the browser

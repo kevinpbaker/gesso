@@ -910,6 +910,9 @@ type ShellRequest = {
   type: 'openUrl';
   url: string;
 } | {
+  type: 'redirect';
+  url: string;
+} | {
   type: 'fullscreen';
   enter: boolean;
 } | {
@@ -1025,6 +1028,7 @@ declare class ShellService {
   copyText(text: string): Promise<boolean>;
   settleClipboard(id: number, copied: boolean): void;
   openUrl(url: string): void;
+  redirect(url: string): void;
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
   applyFullscreen(active: boolean): void;
@@ -1827,6 +1831,10 @@ type RuntimeToShellMessage = {
 {
   type: 'openUrl';
   url: string;
+} |
+{
+  type: 'redirect';
+  url: string;
 } | {
   type: 'fullscreen';
   enter: boolean;
@@ -2037,6 +2045,7 @@ interface WorkerAppOptions {
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   onOpenUrl?: (url: string) => void;
+  onRedirect?: (url: string) => void;
   webmcp?: boolean | {
     confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
   };

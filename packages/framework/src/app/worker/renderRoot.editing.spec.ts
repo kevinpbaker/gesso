@@ -92,6 +92,7 @@ class EditingRoot extends Component {
         onClick: () => {
           void this.shell.copyText('copied!').then(copied => copies.push(copied));
           this.shell.openUrl('https://example.test/');
+          this.shell.redirect('/api/auth/login');
         }
       })
     );
@@ -187,7 +188,7 @@ describe('RenderWorkerApp editing', () => {
     expect(values).toEqual(['abx']);
   });
 
-  it('forwards ShellService requests as clipboard and openUrl messages', async () => {
+  it('forwards ShellService requests as clipboard, openUrl and redirect messages', async () => {
     const { sent, press } = start();
     await settle();
     // The button sits 10px below the 16.8px field.
@@ -195,6 +196,9 @@ describe('RenderWorkerApp editing', () => {
     await settle();
     expect(sent.filter(m => m.type === 'clipboard')).toEqual([{ type: 'clipboard', id: 1, text: 'copied!' }]);
     expect(sent.filter(m => m.type === 'openUrl')).toEqual([{ type: 'openUrl', url: 'https://example.test/' }]);
+    // Forwarded as given: resolving it, and refusing a bad scheme, is
+    // the shell's job, because only the shell knows the page's address.
+    expect(sent.filter(m => m.type === 'redirect')).toEqual([{ type: 'redirect', url: '/api/auth/login' }]);
   });
 
   it("settles a copy with the shell's answer to it", async () => {
