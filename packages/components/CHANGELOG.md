@@ -1,5 +1,21 @@
 # gesso-components
 
+## 0.5.1
+
+### Patch Changes
+
+- 77195a4: Two more semantics properties, for a field that opens a list of suggestions. `controls` is a relation, like `activeDescendant`: the node this one shows or changes, such as the list a combobox's field has open, held on the record as that node's id and written by the mirror as `aria-controls` naming its element. `autocomplete` (`'list' | 'inline' | 'both'`, the new `UiAutocomplete`) says what a field offers as it's typed into, written as `aria-autocomplete`. The editing proxy writes both while a field has focus, so `EditingMirrorTarget.describe` takes the controlled element's DOM id after the active descendant's. `Combobox` uses them: its field controls the list while it's open, and its autocomplete is `list`.
+- 3896cea: A `Dialog` wider than the screen now fits inside it, with 16 pixels to spare each side: `width` is the width it takes where there's room, and on a phone it narrows to the screen. A 520 pixel dialog on a 375 pixel phone used to run off both sides, title and all.
+- 28a971e: `MenuBar` takes `checkedOf`, for commands that are settings rather than actions. True draws a tick beside the label and false leaves its place empty; a menu with any setting in it keeps the tick column on every row so labels stay aligned. Those rows are `menuitemcheckbox` with the `checked` state, so a screen reader says whether the setting is on. Undefined, or no `checkedOf` at all, keeps a plain `menuitem` as before.
+- 6b71716: An overlay can open beside a part of its anchor: `anchorRect` on an overlay entry (and on `useOverlay`'s options), and the layout property of the same name, is a rectangle in the anchor's own coordinates that the entry is placed against, with the same flip and shift, and that it follows through scrolling and layout as it follows the anchor. It can be an Observable, so it moves without the entry opening again. `EditingService.caretRectOf(node, offset)` (and `UiEditingController.caretRectOf`) answers for a character other than the caret's, so a list opened by `@` sits under the `@` as the name is typed, and goes to the next line with it when it wraps. A point opened beside the caret stayed behind when the page scrolled.
+- Updated dependencies [77195a4]
+- Updated dependencies [6b71716]
+- Updated dependencies [581cf89]
+- Updated dependencies [13c096f]
+- Updated dependencies [db7040b]
+  - gesso-core@0.5.1
+  - gesso-framework@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
