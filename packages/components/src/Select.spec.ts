@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Column, shortcut, shortcuts, UiShortcutRegistry } from 'gesso-core';
+import { Column, Row, shortcut, shortcuts, UiShortcutRegistry } from 'gesso-core';
 import { Select } from './Select';
 
 /**
@@ -84,5 +84,43 @@ describe('a select and the page’s shortcuts', () => {
     registry.fireEvent.press('Enter');
     registry.frame();
     expect(registry.value.value).toBe('status');
+  });
+});
+
+/**
+ * Found in the issue tracker at 320 pixels wide: three selects sharing
+ * a row of a phone-width dialog, and the one showing "No priority" ran
+ * past the dialog's edge, because its value never truncated and so set
+ * its minimum width.
+ */
+describe('a select in a narrow row', () => {
+  it('gives way to the row, truncating its value rather than running past the edge', () => {
+    const select = (label: string, value: string) =>
+      createComponent(Select, {
+        label,
+        value,
+        flexGrow: 1,
+        flexBasis: 0,
+        options: [{ value, label: value }]
+      });
+    const ui = renderTest(
+      Row(
+        { width: 240, gap: 10 },
+        select('Team', 'Web'),
+        select('Status', 'Todo'),
+        select('Priority', 'No priority at all')
+      ),
+      { width: 400, height: 200 }
+    );
+    const boxes = ['Team', 'Status', 'Priority'].map(name => ui.getLayout(ui.getByRole('combobox', { name })));
+    for (const [i, box] of boxes.entries()) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(240);
+      if (i > 0) expect(box.x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width);
+    }
+    // The value is cut short inside the trigger, before the chevron.
+    const priority = boxes[2];
+    const value = ui.getLayout(ui.getByText('No priority at all'));
+    expect(value.x + value.width).toBeLessThanOrEqual(priority.x + priority.width - 16);
   });
 });

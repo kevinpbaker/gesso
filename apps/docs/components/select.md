@@ -68,6 +68,18 @@ A value that matches no option leaves the trigger blank rather than
 throwing, and blank is not the placeholder: the placeholder is for the
 empty string.
 
+## In a narrow row
+
+A select is as wide as its value where there's room, and gives way where
+there isn't, as a text field does: its least width is nothing, and the
+value is cut short with an ellipsis before the chevron. Three selects
+sharing a row with `flexGrow: 1` and `flexBasis: 0` share it however
+long a value one of them shows, rather than one pushing the row past its
+edge on a phone or in a window zoomed to 400%. A `minWidth` passed in
+still wins, for a select that has to keep a width. For a row that should
+wrap rather than squeeze, give it `flexWrap: 'wrap'` and each select a
+basis.
+
 ## Controlled and uncontrolled
 
 ```tsx

@@ -278,7 +278,11 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   };
 
   return Column(
-    { ...layoutOf(inputs), gap: 4 },
+    // A least width of nothing, as a text field has: in a row with less
+    // room than the select's value needs, the select gives way and its
+    // value truncates, rather than the row running past its edge. A
+    // `minWidth` passed in still wins.
+    { minWidth: 0, ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(text =>
         text.length === 0 || labelHidden
@@ -326,8 +330,14 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         ),
         color: foregroundToken(disabled),
         flexGrow: 1,
+        // One line, cut short with an ellipsis where the select is given
+        // less room than its value needs, before the chevron rather than
+        // over it.
+        flexShrink: 1,
+        minWidth: 0,
+        maxLines: 1,
+        textOverflow: 'ellipsis',
         fontSize,
-        textWrap: 'none',
         selectable: false
       }),
       chevron(CHEVRON_DOWN, foregroundToken(disabled))
