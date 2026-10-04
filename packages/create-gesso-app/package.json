@@ -30,7 +30,7 @@
   ],
   "type": "module",
   "bin": {
-    "create-gesso-app": "./dist/create-gesso-app.mjs"
+    "create-gesso-app": "dist/create-gesso-app.mjs"
   },
   "engines": {
     "node": ">=20.19.0"

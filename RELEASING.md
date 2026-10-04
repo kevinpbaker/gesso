@@ -22,6 +22,22 @@ separate. The release workflow skips it by looking for
 a `bin` does not; the first attempt at 0.2.0 failed because that check
 read an `exports` field it does not have.
 
+Publish it once the libraries are live, from its own directory, with
+**npm** rather than pnpm (it has no `publishConfig` for pnpm to rewrite,
+and npm handles the second factor itself, in the browser or with a
+passkey, so there is no code to type):
+
+```bash
+pnpm --filter create-gesso-app build
+cd packages/create-gesso-app && npm login && npm publish --access public
+```
+
+Its `bin` path is written without a leading `./`. npm 11 (11.19 at
+least) silently **removes** a `bin` entry that starts with `./` while
+publishing, printing only "script name … was invalid and removed", which
+would ship a `create-gesso-app` with no command for `npm create` to run.
+0.6.0 caught it; if that warning ever appears, stop and fix the path.
+
 ## Before
 
 `pnpm check` has to be green. It is format, lint, types, the whole test
