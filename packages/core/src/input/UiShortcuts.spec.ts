@@ -4,7 +4,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { noKeyModifiers, type UiKeyModifiers } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
-import { formatShortcut, parseShortcut, UiShortcutRegistry } from './UiShortcuts';
+import { describeShortcut, formatShortcut, parseShortcut, shortcutKeyCaps, UiShortcutRegistry } from './UiShortcuts';
 
 function mods(over: Partial<UiKeyModifiers> = {}): UiKeyModifiers {
   return { ...noKeyModifiers(), ...over };
@@ -329,6 +329,25 @@ describe('UiShortcutRegistry', () => {
       expect(formatShortcut(parseShortcut('Mod+Shift+K'), 'other')).toBe('Ctrl+Shift+K');
       expect(formatShortcut(parseShortcut('Shift+ArrowDown'), 'mac')).toBe('⇧↓');
       expect(formatShortcut(parseShortcut('Shift+ArrowDown'), 'other')).toBe('Shift+↓');
+    });
+
+    it('splits a shortcut into key caps, a press at a time', () => {
+      expect(shortcutKeyCaps(parseShortcut('Mod+Shift+K'), 'mac')).toEqual([['⇧', '⌘', 'K']]);
+      expect(shortcutKeyCaps(parseShortcut('Mod+Shift+K'), 'other')).toEqual([['Ctrl', 'Shift', 'K']]);
+      // The plus key is one cap, not a separator.
+      expect(shortcutKeyCaps(parseShortcut('Mod++'), 'other')).toEqual([['Ctrl', '+']]);
+      expect(shortcutKeyCaps(parseShortcut('g d'), 'mac')).toEqual([['G'], ['D']]);
+      expect(shortcutKeyCaps(parseShortcut('ArrowDown'), 'other')).toEqual([['↓']]);
+    });
+
+    it('says a shortcut in words a screen reader reads out', () => {
+      expect(describeShortcut(parseShortcut('Mod+Shift+K'), 'mac')).toBe('Shift Command K');
+      expect(describeShortcut(parseShortcut('Mod+Shift+K'), 'other')).toBe('Control Shift K');
+      expect(describeShortcut(parseShortcut('ArrowDown'), 'other')).toBe('Down arrow');
+      expect(describeShortcut(parseShortcut('j'), 'other')).toBe('j');
+      expect(describeShortcut(parseShortcut('?'), 'mac')).toBe('Question mark');
+      expect(describeShortcut(parseShortcut('Mod+\\'), 'mac')).toBe('Command Backslash');
+      expect(describeShortcut(parseShortcut('g d'), 'other')).toBe('g then d');
     });
   });
 });

@@ -157,6 +157,24 @@ Each binding carries `display`, the keys written the way they should be
 shown, and the `label` and `group` the application gave it, so a palette
 or a help sheet needs no second table of descriptions.
 
+## A help sheet
+
+```ts
+shortcutKeyCaps(binding.steps); // [['⇧', '⌘', 'K']] on a Mac, [['Ctrl', 'Shift', 'K']] elsewhere
+describeShortcut(binding.steps); // 'Shift Command K', 'Control Shift K'
+```
+
+A sheet that draws each key as a cap needs the keys apart, not joined
+into one string: `shortcutKeyCaps` gives one string per key, one array
+per press of a chord, and they are the pieces `display` is made of, so
+a sheet and a palette never disagree. `Mod++` is two caps, Ctrl and
+the plus key.
+
+A cap's `⌘` or `↓` is read out inconsistently, and a screen reader at
+its default verbosity skips punctuation, so `?` is silence.
+`describeShortcut` says the shortcut in words (`Down arrow`,
+`Question mark`, `g then d`), for the row's accessible name.
+
 The focused node is the one the palette lists against. Inside the
 handler it comes from the event's `target`, because the keyboard
 controller routes a key to the focused node and to the root when nothing

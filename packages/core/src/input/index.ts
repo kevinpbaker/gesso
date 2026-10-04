@@ -32,7 +32,7 @@ export type { ScrollContainerState, ScrollSink, UiScrollability, UiScrollBehavio
 export { UiGestureRecognizer } from './UiGestureRecognizer';
 export { UiPinchRecognizer } from './UiPinchRecognizer';
 export type { PinchRecognizerOptions } from './UiPinchRecognizer';
-export { UiShortcutRegistry, formatShortcut, parseShortcut } from './UiShortcuts';
+export { UiShortcutRegistry, describeShortcut, formatShortcut, parseShortcut, shortcutKeyCaps } from './UiShortcuts';
 export type { ShortcutRegistryOptions, UiShortcut, UiShortcutBinding, UiShortcutStep } from './UiShortcuts';
 export { dragSessionFor, EXTERNAL_FILES, UiDragSession } from './UiDragSession';
 export type {

@@ -3057,6 +3057,8 @@ interface UiDragPayload {
 }
 type UiDropEffect = 'move' | 'copy' | 'link' | 'none';
 interface UiDragState {
+declare function shortcutKeyCaps(steps: readonly UiShortcutStep[], platform?: EditingPlatform): readonly (readonly string[])[];
+declare function describeShortcut(steps: readonly UiShortcutStep[], platform?: EditingPlatform): string;
   readonly payload: UiDragPayload;
   readonly x: number;
   readonly y: number;
@@ -5324,6 +5326,7 @@ export {
   DirtyNodeSet,
   draggable,
   DraggableOptions,
+  describeShortcut,
   DragOffset,
   dragSessionFor,
   dragSource,
@@ -5751,6 +5754,7 @@ export {
   ShortcutsOptions,
   Size,
   sizeContainer,
+  shortcutKeyCaps,
   SizeContainerArgs,
   SizeDecision,
   sizeGridTracks,
@@ -6231,6 +6235,7 @@ import {
   DirtyNodeSet,
   draggable,
   DraggableOptions,
+  describeShortcut,
   DragOffset,
   dragSessionFor,
   dragSource,
@@ -6658,6 +6663,7 @@ import {
   ShortcutsOptions,
   Size,
   sizeContainer,
+  shortcutKeyCaps,
   SizeContainerArgs,
   SizeDecision,
   sizeGridTracks,
@@ -7100,6 +7106,7 @@ export {
   DirtyNodeSet,
   draggable,
   dragSessionFor,
+  describeShortcut,
   dragSource,
   drawOverlayShapes,
   drawText,
@@ -7365,6 +7372,7 @@ export {
   slideDown,
   slideFrom,
   slideUp,
+  shortcutKeyCaps,
   spacingEqual,
   spacingSteps,
   spanAtOffset,
