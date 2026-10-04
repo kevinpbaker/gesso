@@ -19,6 +19,7 @@ import type { ReadableCell } from '../Input';
 export type ShellRequest =
   | { type: 'clipboard'; id: number; text: string }
   | { type: 'openUrl'; url: string }
+  | { type: 'redirect'; url: string }
   | { type: 'fullscreen'; enter: boolean }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
@@ -322,6 +323,36 @@ export class ShellService {
   }
 
   /**
+   * Replaces the page with `url`, leaving the application.
+   *
+   * Not the router's `navigate`, which moves between screens *inside*
+   * the app and keeps it running: this unloads the page, and whatever
+   * the app held in memory goes with it. It is for the places a page
+   * has to be handed to somebody else's server and wait to be sent
+   * back — an OAuth sign-in that goes to `/api/auth/login`, is
+   * redirected to an identity provider and returns with a session, or
+   * a sign-out at `/api/auth/logout` that clears a cookie only the
+   * server can clear. It is also where a sign-in falls back to when
+   * `openPopup` reports the popup blocked.
+   *
+   * A request rather than a call because `window.location` belongs to
+   * the main thread and a render worker cannot reach it. A relative
+   * url resolves against the page, so `/api/auth/login` means the
+   * app's own server. The shell refuses anything that is not http,
+   * https or the page's own scheme — a `javascript:` url, above all,
+   * which would run in the page rather than go anywhere — so a url
+   * built from data cannot be turned into script.
+   *
+   * Nothing comes back, and there is nothing to wait for: if the
+   * redirect happens, the code that would have read the answer is
+   * gone. Leaving the page is not cancellable from here either, so a
+   * component with unsaved work should settle it before asking.
+   */
+  redirect(url: string): void {
+    this.handler?.({ type: 'redirect', url });
+  }
+
+  /**
    * Whether the application's surface is filling the screen.
    *
    * Read rather than assumed: the person can leave fullscreen with
@@ -365,8 +396,8 @@ export class ShellService {
    * The answer is a promise, the one place in the framework where a
    * shell request has a reply, because there is nothing useful an
    * application can do with a popup it cannot see the fate of. A sign-in
-   * flow that is blocked falls back to a full-page redirect, and it can
-   * only choose that if it is told.
+   * flow that is blocked falls back to a full-page redirect — `redirect`,
+   * below — and it can only choose that if it is told.
    *
    * Two browser rules shape the contract and both were measured in
    * Chrome before this existed:

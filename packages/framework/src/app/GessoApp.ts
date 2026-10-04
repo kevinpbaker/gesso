@@ -17,6 +17,7 @@ import { shellFilesUnsupported, type ShellRequest } from './ShellService';
 import { AudioSink } from './AudioSink';
 import { attachFileDrop } from './fileDrop';
 import { browserFilesHost, ShellFiles } from './shellFiles';
+import { redirectWith } from './shellRedirect';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
@@ -597,6 +598,15 @@ export class GessoApp {
         opened = false;
       }
       this.runtime.settlePopup(request.id, opened);
+      return;
+    }
+    if (request.type === 'redirect') {
+      // The same rule the worker configuration's shell applies, and
+      // through the same function: the scheme is checked before the
+      // page is replaced.
+      if (view !== null) {
+        redirectWith(undefined, request.url, view.location);
+      }
       return;
     }
     view?.open(request.url, '_blank', 'noopener,noreferrer');

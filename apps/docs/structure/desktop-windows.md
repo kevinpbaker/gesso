@@ -384,6 +384,27 @@ is an act, and which urls an application is willing to hand to the
 operating system is the application's decision, so the request arrives
 with the window that asked and stops there.
 
+### A redirect that leaves the app
+
+`ShellService.redirect` needs no bridge. Its default is
+`window.location.assign`, and in a webview that does what it does in a
+page: the window navigates to the url, and comes back when the server
+redirects it back. That is right for a sign-in against a server the
+window can reach. It is not always right for a desktop application,
+which is a bundle on `views://` rather than a page a server can send
+you back to, and whose sign-in more often belongs in the person's
+browser with a deep link to return through. A window that wants that
+passes `onRedirect` to `createApp` and decides there, given the
+resolved url and only once the shell has refused anything that is not
+http, https or `views://`:
+
+```ts
+createApp({ onRedirect: url => bridge.openUrl(url) /* … */ });
+```
+
+The adapter sends no `redirect` frame of its own, because nothing the
+main process can do with one is better than the two choices above.
+
 ## Menus are a component, and the command is the shared thing
 
 A native menu bound to the same handlers a command reaches is close to

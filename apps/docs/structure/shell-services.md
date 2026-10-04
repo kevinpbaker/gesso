@@ -25,14 +25,15 @@ means, and a request goes back out.
 
 ## Asking the shell for something
 
-`ShellService` has two actions an application calls:
+`ShellService` has three actions an application calls:
 
 | Action           | What the shell does with it                                                                                                         |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `copyText(text)` | Writes the text to the system clipboard through `navigator.clipboard`, or a hidden textarea and `execCommand` where that is refused |
 | `openUrl(url)`   | `window.open(url, '_blank', 'noopener,noreferrer')`                                                                                 |
+| `redirect(url)`  | `window.location.assign(url)`, once the url is resolved against the page and its scheme admitted                                    |
 
-`openUrl` returns `void`, and nothing comes back. `copyText` returns a
+`openUrl` and `redirect` return `void`, and nothing comes back. `copyText` returns a
 promise of whether the text reached the clipboard, and most callers
 ignore it: the text is on its way the moment the call returns, and
 nothing waits on the answer unless something asks for it. It is for the
@@ -57,6 +58,42 @@ with `runtime.settleClipboard(request.id, true)`.
 There is a third request on the same channel, `history`, and no
 component issues it: the router turns a navigation into one because the
 address bar is on the other thread.
+
+### Leaving the page
+
+`redirect` is the one action that ends the application. `openUrl` puts
+a url beside the app, in a tab of its own; the router's `navigate`
+moves between screens inside it; `redirect` replaces the page, and
+whatever the app held in memory goes with it. That is what a sign-in
+against a server needs. A button that sends the page to
+`/api/auth/login` hands it to the app's own server, which redirects to
+the identity provider, which sends it back signed in, and none of that
+can happen in a tab the app opened beside itself or a screen the
+router drew. Signing out is the same shape: `/api/auth/logout` clears a
+cookie only the server can clear and sends the page home.
+
+```ts
+signIn = () => this.shell.redirect('/api/auth/login');
+signOut = () => this.shell.redirect('/api/auth/logout');
+```
+
+A relative url resolves against the page, so those mean the app's own
+origin. It is also where a popup sign-in goes when `openPopup` reports
+the popup blocked.
+
+The shell refuses a url whose scheme is not http, https or the page's
+own, and warns on the console instead. `location.assign` given a
+`javascript:` url does not go anywhere; it runs the script in the page.
+A redirect target is often built from data, a `returnTo` from the
+address bar or a link from the server, and the check is what keeps such
+a url from becoming a way in. The page's own scheme is admitted so that
+a window loaded from something other than http, an Electrobun window
+on `views://`, can still redirect to a relative url of its own.
+
+`createApp({ onRedirect })` replaces `location.assign` for a host that
+wants something else, given the resolved url and only after the scheme
+check. A desktop window rarely needs it: the webview navigates the way a
+page does, and comes back when the server sends it back.
 
 ## What the shell reports
 
@@ -191,7 +228,9 @@ when it happens to have one.
 - `openUrl` is not demonstrated by the example above, because a
   documentation page that opened a new tab when you clicked it would
   take you off the page. What a browser shell does with it is the
-  `window.open` call in the table.
+  `window.open` call in the table. `redirect` is undemonstrated for the
+  same reason, more so, and the scheme check is specced rather than
+  driven in a browser.
 - The clipboard's `execCommand` fallback is in the source and has no
   test and no browser behind it. It is what runs when
   `navigator.clipboard` is missing or its promise rejects, which is a
