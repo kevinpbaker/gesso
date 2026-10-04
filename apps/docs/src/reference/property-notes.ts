@@ -229,6 +229,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Position',
     note: 'A point an absolute box is placed beside, for a menu opened where the pointer is. Flips and shifts as `anchor` does, so a point near an edge opens back towards the screen rather than off it.'
   },
+  anchorRect: {
+    group: 'Position',
+    note: "A rectangle in the anchor's own coordinates to sit beside instead of the whole anchor, such as one character in a field. Flips, shifts and follows the anchor as `anchor` does."
+  },
   placement: { group: 'Position', note: 'Which side of the anchor to sit on, and how to align along it.' },
   anchorOffset: { group: 'Position', note: 'Gap between the anchor and the anchored box.' },
   inset: { group: 'Position', note: 'Shorthand for top, right, bottom and left at once.' },
