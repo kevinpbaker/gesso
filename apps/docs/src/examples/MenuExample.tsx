@@ -69,6 +69,8 @@ export function Commands(_inputs: Inputs<{}>, _ctx: ComponentContext) {
           at.value = { x: event.x, y: event.y };
           noteOpen.value = true;
         }}
+        // A note reads as a paragraph: start-aligned, not centred as a button's label is.
+        x="start"
         padding={16}
         borderRadius={8}
         backgroundColor="surface"

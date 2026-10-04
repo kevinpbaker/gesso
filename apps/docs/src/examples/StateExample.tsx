@@ -131,6 +131,8 @@ function Line(inputs: Inputs<{ line: BasketLine }>, ctx: ComponentContext) {
         label={inputs.line.pipe(map(line => `Look at ${line.name}`))}
         onClick={() => (highlight.id.value = inputs.line.value.id)}
         flex={1}
+        // A list row, so its name starts at the left like the others rather than centring.
+        x="start"
         padding={6}
         borderRadius={6}
         backgroundColor={background}
