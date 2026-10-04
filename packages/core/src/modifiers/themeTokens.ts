@@ -46,8 +46,9 @@ export interface ThemeTokenTarget<T extends object> {
  * Unlike `host.set`, this reaches a *child*: the cell is an ordinary
  * Observable, so a component may bind its label's colour to it as
  * easily as its own padding. That matters because most controls are a
- * box with something inside it, and `color` does not cascade from a
- * parent node the way it would in CSS.
+ * box with something inside it, and a child that sets its own text
+ * style takes that style's colour over the one its parent's `color`
+ * would have given it.
  */
 const themeTokensKind = defineModifier<ThemeTokenTarget<object>>({
   name: 'themeTokens',

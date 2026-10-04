@@ -293,7 +293,7 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   // Text
   color: {
     group: 'Text',
-    note: 'Text colour. Inherited, and a theme token resolves against the theme in scope.',
+    note: 'Text colour. Inherited by text that sets none, unless a nearer `textStyle` provides its own, and a theme token resolves against the theme where the text is painted.',
     defaultValue: 'black'
   },
   fontFamily: { group: 'Text', note: 'Font stack, as a CSS family list.' },

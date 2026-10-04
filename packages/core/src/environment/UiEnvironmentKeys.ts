@@ -4,7 +4,8 @@ import type { UiTextStyle } from '../properties/UiTextStyle';
 import type { UiColor } from '../properties/UiColor';
 import { lightTheme, themesEqual } from './UiTheme';
 import { defaultTextStyle, textStylesEqual } from '../properties/UiTextStyle';
-import { UiBasicColors, colorsEqual } from '../properties/UiColor';
+import { UiBasicColors, colorValuesEqual, colorsEqual } from '../properties/UiColor';
+import type { UiColorValue } from '../properties/UiPropertyValues';
 import type { UiContainerSize } from './UiContainerSize';
 import { unknownContainerSize } from './UiContainerSize';
 import type { UiInsetSource } from './UiInsets';
@@ -28,6 +29,26 @@ export const UiEnvironmentKeys = {
     name: 'textStyle',
     defaultValue: defaultTextStyle,
     compare: textStylesEqual
+  }),
+
+  /**
+   * The text colour a subtree inherits: the `color` of the nearest
+   * ancestor that set one, or the colour of the nearest `textStyle`,
+   * whichever is closer.
+   *
+   * Its own key rather than a field of `textStyle`, because what an
+   * ancestor sets is often a palette name, and a name has to travel
+   * down unresolved: it is looked up against the theme where it is
+   * painted, so `color="text"` beside a `theme` means that theme's
+   * text, and a card under it that provides another theme gets that
+   * theme's. A `UiTextStyle` holds a resolved `UiColor`, which would
+   * have fixed the name to whichever theme was in scope where it was
+   * written.
+   */
+  color: createEnvironmentKey<UiColorValue>({
+    name: 'color',
+    defaultValue: defaultTextStyle.color,
+    compare: colorValuesEqual
   }),
 
   contentColor: createEnvironmentKey<UiColor>({

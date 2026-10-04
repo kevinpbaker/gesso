@@ -795,16 +795,22 @@ export const UiProperties = {
     validate: validateGradient
   }),
 
+  /**
+   * The text colour, inherited by everything below that sets none.
+   *
+   * It is a provider as well: `UiGraph` puts the value down
+   * `UiEnvironmentKeys.color`, which a text style also writes, so the
+   * nearer of the two wins. A palette name travels unresolved and is
+   * looked up where it is painted. `affects` stays `Paint`, because
+   * the graph re-provides it itself, and re-providing a colour costs
+   * the subtree a repaint and nothing more.
+   */
   color: defineProperty<UiColorValue>({
     name: 'color',
     defaultValue: UiBasicColors.black,
     inherited: true,
     affects: P,
-    environmentKey: UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>,
-    resolveFromEnvironment: (value: unknown) => {
-      const textStyle = value as UiTextStyle;
-      return textStyle.color;
-    },
+    environmentKey: UiEnvironmentKeys.color as UiEnvironmentKey<unknown>,
     compare: colorValuesEqual
   }),
 

@@ -167,6 +167,10 @@ function inheritedFrom(node: UiNode | null): Record<string, unknown> {
   return {
     theme: environment.get(UiEnvironmentKeys.theme),
     textStyle: environment.get(UiEnvironmentKeys.textStyle),
+    // As well as textStyle, which on its own would reset it to the
+    // style's: a menu's plain text inherits the colour of where it was
+    // declared.
+    color: environment.get(UiEnvironmentKeys.color),
     contentColor: environment.get(UiEnvironmentKeys.contentColor)
   };
 }
@@ -186,6 +190,7 @@ const followEnvironmentKind = defineModifier<UiNode>({
     host.onEnvironment(() => {
       host.set('theme', host.environment(UiEnvironmentKeys.theme, from));
       host.set('textStyle', host.environment(UiEnvironmentKeys.textStyle, from));
+      host.set('color', host.environment(UiEnvironmentKeys.color, from));
       host.set('contentColor', host.environment(UiEnvironmentKeys.contentColor, from));
     }, from);
   }

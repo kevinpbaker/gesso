@@ -158,10 +158,10 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
         // follow the theme, which is why this is the idiom.
         textStyle: tokens.select(t => t.button.sizes[size].textStyle),
         fontWeight: 600,
-        // Bound on the label, not provided from the root: `color` does
-        // not cascade from a parent node the way it does in CSS, so a
-        // token that reached only the root would leave the words at
-        // the theme's default ink.
+        // Bound on the label, not provided from the root: the label
+        // names a text style, and the nearer of a style and an
+        // inherited `color` wins, so a token that reached only the
+        // root would leave the words in the style's own ink.
         color: foreground(
           paint(p => p.foreground),
           disabled

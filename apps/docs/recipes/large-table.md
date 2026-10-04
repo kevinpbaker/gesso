@@ -57,10 +57,11 @@ decision rather than an agreement between rows.
 
 **Every cell binds the colour it is handed.** The third argument to
 `cell` is the control foreground, and the selection foreground while
-the row is chosen. A row cannot colour its cells itself, because
-`color` does not cascade from a parent node, so a cell that drew its
-text without it would keep the default colour on the selection
-background and, in a dark theme, would not be readable at all.
+the row is chosen. The row does not colour its cells itself, because a
+cell's text may name a text style, whose colour is nearer than the
+row's, so a cell that drew its text without it could keep the style's
+colour on the selection background and, in a dark theme, would not be
+readable at all.
 
 ## The screen
 
