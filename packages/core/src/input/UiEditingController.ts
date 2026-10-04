@@ -1200,13 +1200,20 @@ export class UiEditingController {
    * a second measurer that must never disagree with this one. Asking
    * is the only version that stays right.
    *
+   * `offset` asks where a caret at another character would be: where
+   * the word being typed began, for a list that stays under its start.
+   * It is clamped to the text.
+   *
    * Null when the node is not an editable, or has not been laid out.
    */
-  caretRectOf(node: UiNode): CaretRect | null {
+  caretRectOf(node: UiNode, offset?: number): CaretRect | null {
     if (!isEditableNode(node) || this.host.recordFor(node) === undefined) {
       return null;
     }
-    return this.layoutOf(node).caretRect();
+    const layout = this.layoutOf(node);
+    return offset === undefined
+      ? layout.caretRect()
+      : layout.caretRect(Math.max(0, Math.min(offset, layout.model.text.length)));
   }
 
   private layoutOf(node: UiNode): EditableLayout {

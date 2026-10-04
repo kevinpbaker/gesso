@@ -33,6 +33,20 @@ describe('EditingService', () => {
     expect(service.caretRectOf({} as never)).toBe(rect);
   });
 
+  it('passes on the character asked about', () => {
+    const service = new EditingService();
+    const asked: (number | undefined)[] = [];
+    service.setController({
+      caretRectOf: (_node: unknown, offset?: number) => {
+        asked.push(offset);
+        return null;
+      }
+    } as never);
+    service.caretRectOf({} as never, 4);
+    service.caretRectOf({} as never);
+    expect(asked).toEqual([4, undefined]);
+  });
+
   /** A field that is not an editable, or not laid out yet. */
   it('passes on the controller saying it cannot tell', () => {
     const service = new EditingService();

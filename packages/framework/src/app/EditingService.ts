@@ -36,16 +36,21 @@ export class EditingService {
    * scroll already applied: a popup placed under the caret adds the
    * node's position on screen and nothing else.
    *
+   * `offset` asks about a caret at another character than the one the
+   * caret is at: the start of the word being completed, so its list
+   * stays put as the word grows. With an overlay's `anchorRect` and the
+   * field as its anchor, the list follows the field from then on.
+   *
    * Null when the node is not an editable, when it has not been laid
    * out yet, or before the runtime has wired the controller — all
    * three of which are "ask again next frame" rather than errors, and
    * all three of which happen during the frame a field first appears.
    */
-  caretRectOf(node: UiNode | null): CaretRect | null {
+  caretRectOf(node: UiNode | null, offset?: number): CaretRect | null {
     if (node === null || this.controller === null) {
       return null;
     }
-    return this.controller.caretRectOf(node);
+    return this.controller.caretRectOf(node, offset);
   }
 
   /**

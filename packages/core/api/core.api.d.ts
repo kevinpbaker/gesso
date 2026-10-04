@@ -1781,6 +1781,12 @@ declare const UiProperties: {
     readonly x: number;
     readonly y: number;
   } | undefined>;
+  readonly anchorRect: UiPropertyDefinition<{
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  } | undefined>;
   readonly anchorOffset: UiPropertyDefinition<number | undefined>;
   readonly direction: UiPropertyDefinition<UiDirection | undefined>;
   readonly overflow: UiPropertyDefinition<UiOverflow | undefined>;
@@ -1910,7 +1916,7 @@ type IdentityProps = {
 type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'paddingStart' | 'paddingEnd' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'marginStart' | 'marginEnd' | 'aspectRatio'>;
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
-type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'placement' | 'anchorOffset'>;
+type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup'>;
@@ -3051,14 +3057,14 @@ declare class UiShortcutRegistry {
 }
 declare function parseShortcut(keys: string): readonly UiShortcutStep[];
 declare function formatShortcut(steps: readonly UiShortcutStep[], platform?: EditingPlatform): string;
+declare function shortcutKeyCaps(steps: readonly UiShortcutStep[], platform?: EditingPlatform): readonly (readonly string[])[];
+declare function describeShortcut(steps: readonly UiShortcutStep[], platform?: EditingPlatform): string;
 interface UiDragPayload {
   readonly type: string;
   readonly data: unknown;
 }
 type UiDropEffect = 'move' | 'copy' | 'link' | 'none';
 interface UiDragState {
-declare function shortcutKeyCaps(steps: readonly UiShortcutStep[], platform?: EditingPlatform): readonly (readonly string[])[];
-declare function describeShortcut(steps: readonly UiShortcutStep[], platform?: EditingPlatform): string;
   readonly payload: UiDragPayload;
   readonly x: number;
   readonly y: number;
@@ -3227,7 +3233,7 @@ declare class UiEditingController {
   private fieldAt;
   private focusField;
   private revealCaret;
-  caretRectOf(node: UiNode): CaretRect | null;
+  caretRectOf(node: UiNode, offset?: number): CaretRect | null;
   private layoutOf;
 }
 interface PlatformEventTarget {
@@ -5320,13 +5326,13 @@ export {
   densityFactors,
   describeLength,
   describeOverrides,
+  describeShortcut,
   detectEditingPlatform,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
   draggable,
   DraggableOptions,
-  describeShortcut,
   DragOffset,
   dragSessionFor,
   dragSource,
@@ -5748,13 +5754,13 @@ export {
   SheetSourceArgs,
   SheetViewport,
   shortcut,
+  shortcutKeyCaps,
   ShortcutOptions,
   ShortcutRegistryOptions,
   shortcuts,
   ShortcutsOptions,
   Size,
   sizeContainer,
-  shortcutKeyCaps,
   SizeContainerArgs,
   SizeDecision,
   sizeGridTracks,
@@ -6229,13 +6235,13 @@ import {
   densityFactors,
   describeLength,
   describeOverrides,
+  describeShortcut,
   detectEditingPlatform,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
   draggable,
   DraggableOptions,
-  describeShortcut,
   DragOffset,
   dragSessionFor,
   dragSource,
@@ -6657,13 +6663,13 @@ import {
   SheetSourceArgs,
   SheetViewport,
   shortcut,
+  shortcutKeyCaps,
   ShortcutOptions,
   ShortcutRegistryOptions,
   shortcuts,
   ShortcutsOptions,
   Size,
   sizeContainer,
-  shortcutKeyCaps,
   SizeContainerArgs,
   SizeDecision,
   sizeGridTracks,
@@ -7100,13 +7106,13 @@ export {
   densityFactors,
   describeLength,
   describeOverrides,
+  describeShortcut,
   detectEditingPlatform,
   diffSemantics,
   DirtyFlags,
   DirtyNodeSet,
   draggable,
   dragSessionFor,
-  describeShortcut,
   dragSource,
   drawOverlayShapes,
   drawText,
@@ -7366,13 +7372,13 @@ export {
   sharedElement,
   sheetSource,
   shortcut,
+  shortcutKeyCaps,
   shortcuts,
   sizeContainer,
   sizeGridTracks,
   slideDown,
   slideFrom,
   slideUp,
-  shortcutKeyCaps,
   spacingEqual,
   spacingSteps,
   spanAtOffset,

@@ -3205,6 +3205,15 @@ export class LayoutEngine {
     const stickyChild = this.stickyOffsetOf(child);
     const ax = anchorRec.x + stickyAnchor.x - scrollAnchor.x + scrollChild.x - stickyChild.x;
     const ay = anchorRec.y + stickyAnchor.y - scrollAnchor.y + scrollChild.y - stickyChild.y;
+    // A part of the anchor, when one is named: the same placement against
+    // a smaller box that moves with it.
+    const part = child.properties.get('anchorRect') as
+      | { x: number; y: number; width: number; height: number }
+      | undefined;
+    if (part !== undefined && part !== null) {
+      this.placeBeside(child, cRec, ax + part.x, ay + part.y, part.width, part.height, block);
+      return;
+    }
     this.placeBeside(child, cRec, ax, ay, anchorRec.width, anchorRec.height, block);
   }
 

@@ -1,12 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
-import { createComponent, OverlayService } from 'gesso-framework';
+import {
+  createComponent,
+  EditingService,
+  OverlayService,
+  type ComponentContext,
+  type OverlayRect
+} from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Button, Column, percent, Row, Text, type UiRole, type UiSemanticsRecord } from 'gesso-core';
+import {
+  Box,
+  Button,
+  Column,
+  EditableText,
+  percent,
+  Row,
+  Text,
+  type UiNode,
+  type UiRole,
+  type UiSemanticsRecord
+} from 'gesso-core';
 import { Dialog } from './Dialog';
 import { Menu } from './Menu';
 import { Select } from './Select';
+import { useOverlay, type OverlayHandle } from './overlay';
 
 function mount(root: Parameters<typeof renderTest>[0]) {
   const ui = renderTest(root, { width: 400, height: 400 });
@@ -339,6 +357,49 @@ describe('Select', () => {
     const entry = ui.entries()[0];
     expect(entry.anchor).toBe(ui.getByRole('combobox'));
     expect(entry.placement).toBe('bottom-start');
+  });
+});
+
+/**
+ * A list under the word being typed: `@ada` in a comment, the people
+ * it could be under the `@`. Under the whole field, it sat at the
+ * field's left edge whatever line the word was on; at a point, it
+ * stayed behind when the page scrolled. It is placed against a part of
+ * the field now, which can move without the list opening again.
+ */
+describe('an overlay at a character in a field', () => {
+  it('opens under the character and moves with it, without opening again', () => {
+    let field: UiNode | null = null;
+    let handle!: OverlayHandle;
+    function Host(_inputs: unknown, ctx: ComponentContext) {
+      handle = useOverlay(ctx, 'at-caret');
+      return Column(
+        { padding: 20, width: percent(100) },
+        EditableText({ value: 'ping @ada', width: 300, label: 'Comment', ref: (node: UiNode | null) => (field = node) })
+      );
+    }
+    const ui = mount(createComponent(Host, {}));
+    ui.frame();
+    const at = ui.runtime.services.get(EditingService).caretRectOf(field, 5)!;
+    expect(at.x).toBeGreaterThan(0);
+    const rect = new BehaviorSubject<OverlayRect | undefined>({ x: at.x, y: at.y, width: 0, height: at.height });
+    handle.show(Box({ role: 'listbox', label: 'People', width: 80, height: 30 }), {
+      anchor: field,
+      anchorRect: rect,
+      placement: 'bottom-start'
+    });
+    ui.frame();
+
+    const fieldBox = ui.getVisibleBox(field!);
+    const list = () => ui.getVisibleBox(ui.getByRole('listbox'));
+    expect(list().x).toBeCloseTo(fieldBox.x + at.x, 5);
+    expect(list().y).toBeCloseTo(fieldBox.y + at.y + at.height, 5);
+
+    const shown = ui.entries()[0];
+    rect.next({ x: 0, y: at.y, width: 0, height: at.height });
+    ui.frame();
+    expect(list().x).toBeCloseTo(fieldBox.x, 5);
+    expect(ui.entries()[0]).toBe(shown);
   });
 });
 

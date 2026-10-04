@@ -159,6 +159,16 @@ describe('UiEditingController.caretRectOf', () => {
     expect(later!.x).toBeGreaterThan(atStart!.x);
   });
 
+  it('answers for another character than the caret, clamped to the text', () => {
+    const h = laidOut('abcdef');
+    h.model.select(5);
+    const caret = h.editing.caretRectOf(h.node)!;
+    h.model.select(2);
+    expect(h.editing.caretRectOf(h.node, 5)).toEqual(caret);
+    expect(h.editing.caretRectOf(h.node, 99)).toEqual(h.editing.caretRectOf(h.node, 6));
+    expect(h.model.focus).toBe(2);
+  });
+
   it('is as tall as a line, and says which line it is on', () => {
     const h = laidOut('abc');
     const caret = h.editing.caretRectOf(h.node)!;

@@ -150,6 +150,7 @@ export type PositionProps = PropsOf<
   | 'liftBoundary'
   | 'anchor'
   | 'anchorPoint'
+  | 'anchorRect'
   | 'placement'
   | 'anchorOffset'
 >;

@@ -101,13 +101,21 @@ and hit testing therefore cannot disagree about who is on top.
 ## Anchored placement
 
 An absolute node given an `anchor`, which is a `UiNode`, is placed
-beside that node instead of by its edges. Three props say how:
+beside that node instead of by its edges. These props say how:
 
-| Prop           | Type      | What it does                                                      |
-| -------------- | --------- | ----------------------------------------------------------------- |
-| `anchor`       | `UiNode`  | The node to sit beside. Edge offsets are ignored while it is set. |
-| `placement`    | see below | The side, and the alignment along it. Default `bottom`.           |
-| `anchorOffset` | `number`  | The gap between the two boxes. Default 0.                         |
+| Prop           | Type                      | What it does                                                      |
+| -------------- | ------------------------- | ----------------------------------------------------------------- |
+| `anchor`       | `UiNode`                  | The node to sit beside. Edge offsets are ignored while it is set. |
+| `placement`    | see below                 | The side, and the alignment along it. Default `bottom`.           |
+| `anchorOffset` | `number`                  | The gap between the two boxes. Default 0.                         |
+| `anchorRect`   | `{ x, y, width, height }` | A part of the anchor to sit beside instead of all of it.          |
+
+`anchorRect` is in the anchor's own coordinates, from the top left of
+its border box. The node is placed against that rectangle exactly as
+it would be against the whole anchor, flip and shift included, and it
+follows the anchor in the same way. It is what puts a list under the
+word being typed in a paragraph as wide as the page: see
+[putting something at the caret](/components/text-input#putting-something-at-the-caret).
 
 `placement` is a side, optionally followed by an alignment:
 `'top'`, `'bottom'`, `'left'`, `'right'`, each also available as
@@ -191,6 +199,7 @@ An entry takes either an anchor or its own placement in the viewport:
 | Option                  | What it does                                                                                   |
 | ----------------------- | ---------------------------------------------------------------------------------------------- |
 | `anchor`                | The node to be placed beside, with `placement` and `offset`.                                   |
+| `anchorRect`            | A part of the anchor to be placed beside; a plain value or an Observable, which moves it open. |
 | `top`, `right`, …       | Edge offsets against the viewport, for an entry with no anchor.                                |
 | `center`                | `'x'`, `'y'` or `'both'`: keep an unanchored entry in the middle of the viewport on that axis. |
 | `dismissOnOutsidePress` | Put a backdrop underneath that closes the entry.                                               |
@@ -257,7 +266,8 @@ Anchored placement has no CSS equivalent that Chrome ships unflagged,
 so it is covered by engine specs instead: the side, the alignment, the
 offset, a flip on each axis, a shift, following a scroll, following an
 anchor pushed down by a sibling that grew, and following an anchor
-whose own offsets changed. Four cover sticky anchors: an overlay that
+whose own offsets changed, and one places a node beside a part of its
+anchor and follows it through a scroll. Four cover sticky anchors: an overlay that
 follows a header to the scrollport edge and back when it lets go, one
 anchored to a button inside such a header, one whose anchor is held in
 a new place by a layout frame that moved no box at all, and one that
