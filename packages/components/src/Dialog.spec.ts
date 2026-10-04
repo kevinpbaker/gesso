@@ -75,6 +75,14 @@ describe('Dialog on a short screen', () => {
     // Scrolled to the end, the last block's bottom is inside the dialog's padding.
     expect(last().y + last().height).toBe(dialog.y + dialog.height - 20);
 
+    // The body clips, so it keeps 4 pixels of its own round the content:
+    // room for the focus ring drawn outside a field at its edge. The
+    // content still starts 20 pixels in from the dialog's side.
+    const content = ui.getLayout(ui.getByLabel('First').parent!);
+    const body = ui.getLayout(ui.getByLabel('First').parent!.parent!);
+    expect(content.x - body.x).toBe(4);
+    expect(content.x - dialog.x).toBe(20);
+
     // Where there's room, it's its content's height, centred.
     ui.runtime.resize(375, 1000);
     ui.frame();
