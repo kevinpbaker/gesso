@@ -28,7 +28,7 @@ import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer } from './TextMeasurer';
 import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
-import { accumulatedOffsetTo } from './LayoutTransform';
+import { accumulatedOffsetTo, hasTransformedChain, transformPointsIn, transformPointsOut } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
 import { buildAxisExplanation, describeOverrides, labelNode, withOverrideSource } from './LayoutExplanation';
@@ -426,6 +426,8 @@ function stackDefault(node: UiNode): CrossAxisAlignment {
 
 export class LayoutEngine {
   private records = new Map<UiNode, LayoutRecord>();
+  /** A box's corners on their way through `projectBox` and `unprojectBox`. */
+  private readonly cornerScratch = new Float64Array(8);
   /**
    * The records the previous full layout ended with, held for the
    * length of the next one so their objects can be reused.
@@ -1268,6 +1270,8 @@ export class LayoutEngine {
    * scroll ancestor's offset and by the sticky offsets of the node and
    * its ancestors. Records stay in pre-scroll coordinates; this is the
    * projection renderers and hit testing agree on.
+   *
+   * Transforms are not applied; `screenBox` applies its ancestors'.
    */
   visibleBox(node: UiNode): LayoutBox {
     const rec = this.records.get(node);
@@ -1289,6 +1293,33 @@ export class LayoutEngine {
       }
     }
     return { x, y, width: rec.width, height: rec.height };
+  }
+
+  /**
+   * Where a node's box is drawn on the canvas: `visibleBox`, carried
+   * through the `transform` of every ancestor as well. A card under a
+   * panned and zoomed camera box is drawn far from its record, which a
+   * transform never moves, and this is the box beside which its tooltip
+   * belongs and over which its accessibility element goes. Under a
+   * rotation it is the box the turned corners span.
+   *
+   * The node's own transform is left out. It is what a node animates
+   * itself with — a spinner turning, a dialog scaling in — and a box
+   * that included it would wobble with the animation: the mirror's
+   * rectangle for a spinner grew and shrank on every step, and a
+   * tooltip on it shook. The ancestors' are where it is; its own is how
+   * it is drawn there. A tree with no transform above the node gets
+   * `visibleBox`'s answer exactly.
+   */
+  screenBox(node: UiNode): LayoutBox {
+    const rec = this.records.get(node);
+    if (rec === undefined) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    if (!hasTransformedChain(node.parent)) {
+      return this.visibleBox(node);
+    }
+    return this.projectBox(node, rec.x, rec.y, rec.width, rec.height);
   }
 
   /**
@@ -3270,6 +3301,28 @@ export class LayoutEngine {
   ): void {
     this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
 
+    const part = child.properties.get('anchorRect') as
+      | { x: number; y: number; width: number; height: number }
+      | undefined;
+    // A transform is paint-only, so the record of an anchor inside a
+    // panned or zoomed subtree is where it would be drawn untransformed:
+    // a tooltip placed against it stood where a map card would be at
+    // zoom 1, not beside the card. Where either chain has one, the
+    // anchor is carried onto the canvas and back into the child's
+    // parent's space through every transform, scroll and sticky shift.
+    // Neither node's own transform takes part, for the reason
+    // `screenBox` gives: the anchor's is its animation, and the child's
+    // moves it after it is placed, as an entrance animation does.
+    if (hasTransformedChain(anchor.parent) || hasTransformedChain(child.parent)) {
+      const seen =
+        part !== undefined && part !== null
+          ? this.projectBox(anchor, anchorRec.x + part.x, anchorRec.y + part.y, part.width, part.height)
+          : this.projectBox(anchor, anchorRec.x, anchorRec.y, anchorRec.width, anchorRec.height);
+      const local = this.unprojectBox(child, seen);
+      this.placeBeside(child, cRec, local.x, local.y, local.width, local.height, block);
+      return;
+    }
+
     // Anchor box in the child's coordinate space: where each of the two
     // is seen, which is its box less the scrolling above it and plus the
     // sticky shifts holding it, brought back into the child's own frame.
@@ -3281,9 +3334,6 @@ export class LayoutEngine {
     const ay = anchorRec.y + stickyAnchor.y - scrollAnchor.y + scrollChild.y - stickyChild.y;
     // A part of the anchor, when one is named: the same placement against
     // a smaller box that moves with it.
-    const part = child.properties.get('anchorRect') as
-      | { x: number; y: number; width: number; height: number }
-      | undefined;
     if (part !== undefined && part !== null) {
       this.placeBeside(child, cRec, ax + part.x, ay + part.y, part.width, part.height, block);
       return;
@@ -3473,6 +3523,96 @@ export class LayoutEngine {
       }
     }
     return { x, y };
+  }
+
+  /**
+   * Where a box in a node's record space is seen on the canvas: through
+   * the node's own sticky shift (not its transform; see `screenBox`),
+   * then, for each ancestor in turn, its scroll offset (which moves only
+   * what is inside it) and its transform and sticky shift. The same
+   * chain the renderer composes on the way down, walked up; a turned box
+   * is the box its corners span.
+   */
+  private projectBox(node: UiNode, x: number, y: number, width: number, height: number): LayoutBox {
+    const corners = this.cornersOf(x, y, width, height);
+    for (let current: UiNode | null = node; current !== null; current = current.parent) {
+      const rec = this.records.get(current);
+      if (rec === undefined) {
+        continue;
+      }
+      if (current !== node && rec.scrollable) {
+        for (let i = 0; i < corners.length; i += 2) {
+          corners[i] -= rec.scrollX;
+          corners[i + 1] -= rec.scrollY;
+        }
+      }
+      transformPointsOut(current, rec, corners, current !== node);
+    }
+    return this.boundsOfCorners(corners);
+  }
+
+  /**
+   * A canvas box brought into the space an absolute child's record is
+   * placed in: `projectBox` undone for each of its ancestors, outermost
+   * first, and the child's own sticky shift taken off. The child's own
+   * transform stays, because it applies on top of the box being placed.
+   */
+  private unprojectBox(child: UiNode, box: LayoutBox): LayoutBox {
+    const corners = this.cornersOf(box.x, box.y, box.width, box.height);
+    const chain: UiNode[] = [];
+    for (let current = child.parent; current !== null; current = current.parent) {
+      chain.push(current);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const ancestor = chain[i]!;
+      const rec = this.records.get(ancestor);
+      if (rec === undefined) {
+        continue;
+      }
+      transformPointsIn(ancestor, rec, corners);
+      if (rec.scrollable) {
+        for (let j = 0; j < corners.length; j += 2) {
+          corners[j] += rec.scrollX;
+          corners[j + 1] += rec.scrollY;
+        }
+      }
+    }
+    const own = this.records.get(child);
+    if (own !== undefined) {
+      for (let j = 0; j < corners.length; j += 2) {
+        corners[j] -= own.stickyOffsetX;
+        corners[j + 1] -= own.stickyOffsetY;
+      }
+    }
+    return this.boundsOfCorners(corners);
+  }
+
+  /** The four corners of a box as x, y pairs, in a scratch array the projections reuse. */
+  private cornersOf(x: number, y: number, width: number, height: number): Float64Array {
+    const corners = this.cornerScratch;
+    corners[0] = x;
+    corners[1] = y;
+    corners[2] = x + width;
+    corners[3] = y;
+    corners[4] = x;
+    corners[5] = y + height;
+    corners[6] = x + width;
+    corners[7] = y + height;
+    return corners;
+  }
+
+  private boundsOfCorners(corners: Float64Array): LayoutBox {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < corners.length; i += 2) {
+      minX = Math.min(minX, corners[i]!);
+      maxX = Math.max(maxX, corners[i]!);
+      minY = Math.min(minY, corners[i + 1]!);
+      maxY = Math.max(maxY, corners[i + 1]!);
+    }
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
   /**

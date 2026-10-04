@@ -3476,6 +3476,7 @@ interface ScrollAdjustment {
 }
 declare class LayoutEngine {
   private records;
+  private readonly cornerScratch;
   private retiredRecords;
   private readonly scrollNodes;
   private readonly textScrollNodes;
@@ -3524,6 +3525,7 @@ declare class LayoutEngine {
   worldBoxTo(node: UiNode, out: LayoutBox): LayoutBox;
   worldBox(node: UiNode): LayoutBox;
   visibleBox(node: UiNode): LayoutBox;
+  screenBox(node: UiNode): LayoutBox;
   revealAdjustments(node: UiNode, padding?: number, inner?: LayoutBox): ScrollAdjustment[];
   private textScrollAdjustment;
   revealScrollbars(node: UiNode): void;
@@ -3589,6 +3591,10 @@ declare class LayoutEngine {
   private parsePlacement;
   private stickyOffsetOf;
   private scrollOffsetOf;
+  private projectBox;
+  private unprojectBox;
+  private cornersOf;
+  private boundsOfCorners;
   private containingBlockOf;
   private updatePaintOrder;
   private placeFlex;

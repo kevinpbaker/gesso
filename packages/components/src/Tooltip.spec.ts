@@ -193,6 +193,53 @@ describe('the tooltip modifier', () => {
 
     expect(ui.entries()).toHaveLength(0);
   });
+
+  it('opens beside its element where a panned, zoomed parent draws it', () => {
+    // A map card under a camera box that pans and zooms by transform:
+    // the tooltip opened beside where the card would be at zoom 1 with
+    // no pan, which on a map moved anywhere is nowhere near the card.
+    function Card(_props: Record<string, never>, ctx: ComponentContext): UiChild {
+      return Button({
+        text: 'Epic',
+        label: 'Epic',
+        position: 'absolute',
+        left: 20,
+        top: 10,
+        width: 30,
+        height: 20,
+        modifiers: [tooltip(ctx, { text: 'Opens the epic' })]
+      });
+    }
+    const ui = mount(
+      Box(
+        { position: 'relative', overflow: 'hidden', width: 400, height: 400 },
+        Box(
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: 400,
+            height: 400,
+            transform: { x: 0, y: 0, translateX: 150, translateY: 200, scaleX: 2, scaleY: 2, rotation: 0 }
+          },
+          createComponent(Card, {})
+        )
+      )
+    );
+    // Drawn at 150 + 2 * 20 across and 200 + 2 * 10 down, twice its size.
+    const card = { x: 190, y: 220, width: 60, height: 40 };
+
+    ui.fireEvent.pointerMove(card.x + card.width / 2, card.y + card.height / 2);
+    vi.advanceTimersByTime(400);
+    expect(ui.entries()).toHaveLength(1);
+    ui.frame();
+
+    const tip = ui.getVisibleBox(ui.getByText('Opens the epic'));
+    // Above the card, as a tooltip opens, centred on it, and close.
+    expect(tip.x + tip.width / 2).toBeCloseTo(card.x + card.width / 2);
+    expect(tip.y + tip.height).toBeLessThanOrEqual(card.y);
+    expect(card.y - (tip.y + tip.height)).toBeLessThan(30);
+  });
 });
 
 describe('the Tooltip component', () => {

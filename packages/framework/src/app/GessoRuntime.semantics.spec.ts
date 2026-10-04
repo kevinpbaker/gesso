@@ -437,6 +437,33 @@ describe('GessoRuntime semantics', () => {
       expect(moved.boxes[0].box.y).toBe(42);
     });
 
+    it('sends the box a transformed ancestor draws a node in, and follows a pan', () => {
+      // A zoomable map: cards under a camera box that is panned and
+      // zoomed by its transform. The mirror's element for a card was put
+      // where the card's record is, which is where it would be drawn at
+      // zoom 1 with no pan: an assistive technology outlining the card,
+      // or touch exploration finding it, was somewhere else entirely.
+      const camera$ = new BehaviorSubject({ translateX: 100, translateY: 50, scaleX: 2, scaleY: 2 });
+      const updates: UiSemanticsUpdate[] = [];
+      const { frame } = mountRuntime(
+        Box(
+          { position: 'relative', overflow: 'hidden', width: 400, height: 300 },
+          Box(
+            { position: 'absolute', top: 0, left: 0, width: 400, height: 300, transform: camera$ },
+            Button({ text: 'Card', position: 'absolute', left: 20, top: 10, width: 30, height: 20 })
+          )
+        ),
+        { onCreate: runtime => runtime.onSemantics(update => updates.push(update)) }
+      );
+      frame(0);
+
+      expect(updates[0].boxes.map(entry => entry.box)).toEqual([{ x: 140, y: 70, width: 60, height: 40 }]);
+
+      camera$.next({ translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 });
+      frame();
+      expect(updates.at(-1)!.boxes.map(entry => entry.box)).toEqual([{ x: 20, y: 10, width: 30, height: 20 }]);
+    });
+
     it('looks only at what is on screen to find the boxes that moved', () => {
       // A long document, in groups as an editor renders one: thousands
       // of mirrored nodes, a screenful seen. Every node's box used to be
