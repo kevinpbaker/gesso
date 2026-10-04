@@ -212,6 +212,11 @@ a menu opened inside a dark panel comes out light. `environment` is the
 fix, and the node to pass is usually the trigger. This was not found by
 a test; it was found by opening the screen.
 
+The entry keeps following that node while it is open. A dialog open
+when the system turns dark, or when a theme the person picked arrives a
+moment after they opened it, turns dark with the page behind it rather
+than staying light until it closes.
+
 ## When to position, and when not to
 
 Reach for `position` and the overlay layer when you are building

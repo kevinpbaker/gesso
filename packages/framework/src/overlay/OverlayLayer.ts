@@ -1,6 +1,14 @@
 import { map } from 'rxjs';
 
-import { Box, UiEnvironmentKeys, type UiNode, type UiChild, type UiElement } from 'gesso-core';
+import {
+  Box,
+  defineModifier,
+  UiEnvironmentKeys,
+  type UiNode,
+  type UiChild,
+  type UiElement,
+  type UiModifier
+} from 'gesso-core';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { OverlayService, type OverlayEntry } from './OverlayService';
@@ -66,7 +74,8 @@ export class OverlayLayer extends Component {
             left: entry.left,
             zIndex: entry.zIndex,
             ...centering(entry),
-            ...inheritedFrom(entry.environment ?? entry.anchor ?? null)
+            ...inheritedFrom(entry.environment ?? entry.anchor ?? null),
+            modifiers: followEnvironment(entry.environment ?? entry.anchor ?? null)
           },
           entry.content as UiChild
         )
@@ -106,11 +115,7 @@ function centering(entry: OverlayEntry): Record<string, unknown> {
 
 /**
  * The scoped values an entry's content should keep, re-provided on the
- * box that holds it.
- *
- * Read once, when the entry opens. An overlay that outlives a theme
- * change re-opens; nothing here watches, because an entry's content is
- * built once too.
+ * box that holds it, as they are when the entry opens.
  */
 function inheritedFrom(node: UiNode | null): Record<string, unknown> {
   const environment = node?.environment;
@@ -122,4 +127,28 @@ function inheritedFrom(node: UiNode | null): Record<string, unknown> {
     textStyle: environment.get(UiEnvironmentKeys.textStyle),
     contentColor: environment.get(UiEnvironmentKeys.contentColor)
   };
+}
+
+/**
+ * The same values again whenever they change where the entry was
+ * declared, for as long as it is open.
+ *
+ * Reading them once let a dialog open while the page went dark (the
+ * system's setting changed, or the theme a person chose arrived from
+ * another worker a moment after they opened it) stay light over a dark
+ * page until it was closed.
+ */
+const followEnvironmentKind = defineModifier<UiNode>({
+  name: 'overlayEnvironment',
+  attach(host, from) {
+    host.onEnvironment(() => {
+      host.set('theme', host.environment(UiEnvironmentKeys.theme, from));
+      host.set('textStyle', host.environment(UiEnvironmentKeys.textStyle, from));
+      host.set('contentColor', host.environment(UiEnvironmentKeys.contentColor, from));
+    }, from);
+  }
+});
+
+function followEnvironment(node: UiNode | null): UiModifier<UiNode>[] {
+  return node === null ? [] : [followEnvironmentKind(node)];
 }

@@ -406,23 +406,23 @@ class Host implements UiModifierHost {
     this.own(layout.onLayout(this.node, listener));
   }
 
-  environment<T>(key: UiEnvironmentKey<T>): T {
+  environment<T>(key: UiEnvironmentKey<T>, of: UiNode = this.node): T {
     const environment = this.services.environment;
     if (environment === undefined) {
       // The default is what an unprovided key resolves to anyway, so a
       // headless build reads the same value the tree would.
       return key.defaultValue;
     }
-    return environment.read(this.node, key);
+    return environment.read(of, key);
   }
 
-  onEnvironment(listener: () => void): void {
+  onEnvironment(listener: () => void, of: UiNode = this.node): void {
     const environment = this.services.environment;
     if (environment === undefined) {
       warnMissing(this.name, 'follow its environment', 'environment');
       return;
     }
-    this.own(environment.onChange(this.node, listener));
+    this.own(environment.onChange(of, listener));
   }
 
   focus(options?: FocusOptions): void {

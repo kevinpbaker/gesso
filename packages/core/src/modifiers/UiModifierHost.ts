@@ -139,12 +139,20 @@ export interface UiModifierHost {
   /**
    * The value the node inherits for an environment key: what the
    * nearest provider above it supplies, else the key's default.
+   *
+   * `of` reads another node's instead, for a node whose environment
+   * belongs somewhere else: an overlay's content keeps the theme of
+   * the place it was declared, not of the layer it is drawn in.
    */
-  environment<T>(key: UiEnvironmentKey<T>): T;
+  environment<T>(key: UiEnvironmentKey<T>, of?: UiNode): T;
   /**
    * Called after the node's inherited environment changed — a theme
    * provider above it swapping palettes, or the node being mounted
    * into a tree that provides one. Removed on detach.
+   *
+   * `of` follows another node's environment instead, as `environment`
+   * reads it; the listener is still removed when this node's modifier
+   * detaches.
    *
    * Register this only when the modifier holds a value it read out of
    * the environment. A colour does not need it: a `UiColorValue` may
@@ -152,7 +160,7 @@ export interface UiModifierHost {
    * node inherits, which is why `focusRing` has no environment access
    * at all.
    */
-  onEnvironment(listener: () => void): void;
+  onEnvironment(listener: () => void, of?: UiNode): void;
   /**
    * Moves keyboard focus to the node, if it can take it. It is scrolled
    * into view as any focus from code is, unless `options.preventScroll`
