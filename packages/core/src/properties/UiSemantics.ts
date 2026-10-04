@@ -77,6 +77,13 @@ export type UiRole =
 /** How urgently a live region's changes are announced. */
 export type UiLiveRegion = 'polite' | 'assertive';
 
+/**
+ * What a field offers as it's typed into: a list of suggestions to pick
+ * from (`list`), the rest of the word filled in after the caret
+ * (`inline`), or both. See `aria-autocomplete`.
+ */
+export type UiAutocomplete = 'list' | 'inline' | 'both';
+
 export const UI_ROLES: readonly UiRole[] = [
   'button',
   'checkbox',

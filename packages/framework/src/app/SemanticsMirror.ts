@@ -46,10 +46,11 @@ export interface EditingMirrorTarget {
   readonly active: boolean;
   /**
    * Describes the focused editable on the proxy's element, or clears it.
-   * `activeDescendant` is the DOM id of the element its record's
-   * `activeDescendant` names, for `aria-activedescendant`.
+   * `activeDescendant` and `controls` are the DOM ids of the elements
+   * its record's `activeDescendant` and `controls` name, for
+   * `aria-activedescendant` and `aria-controls`.
    */
-  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void;
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string, controls?: string): void;
   /** Takes DOM focus back for the focused editable. */
   focus(): void;
 }
@@ -119,7 +120,9 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'aria-modal',
   'aria-multiselectable',
   'aria-current',
-  'aria-activedescendant'
+  'aria-activedescendant',
+  'aria-controls',
+  'aria-autocomplete'
 ];
 
 let mirrors = 0;
@@ -386,10 +389,15 @@ export class SemanticsMirror {
     }
   }
 
-  /** Hands the proxy the focused editable's record, with its active descendant's DOM id. */
+  /** Hands the proxy the focused editable's record, with the DOM ids of its active descendant and what it controls. */
   private describeEditing(record: UiSemanticsRecord | null): void {
     const active = record?.activeDescendant;
-    this.editing?.describe(record, active === undefined ? undefined : this.idPrefix + active);
+    const controls = record?.controls;
+    this.editing?.describe(
+      record,
+      active === undefined ? undefined : this.idPrefix + active,
+      controls === undefined ? undefined : this.idPrefix + controls
+    );
   }
 
   private createElement(): HTMLElement {
@@ -483,6 +491,13 @@ export class SemanticsMirror {
     }
     if (record.activeDescendant !== undefined) {
       element.setAttribute('aria-activedescendant', this.idPrefix + record.activeDescendant);
+    }
+    // A relation, like the active descendant: the id of another record's element.
+    if (record.controls !== undefined) {
+      element.setAttribute('aria-controls', this.idPrefix + record.controls);
+    }
+    if (record.autocomplete !== undefined) {
+      element.setAttribute('aria-autocomplete', record.autocomplete);
     }
   }
 

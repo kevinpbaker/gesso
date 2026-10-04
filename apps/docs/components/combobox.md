@@ -92,6 +92,9 @@ that keeps a value shown keeps its option in the list.
 The field is one tab stop, and focus never leaves it: the list is
 walked by a highlight, which the field names as its `activeDescendant`,
 so a screen reader announces each option as the highlight reaches it.
+While the list is open the field `controls` it, and the field's
+`autocomplete` is `list`, so the platform knows it suggests and which
+list holds the suggestions.
 
 | Key         | What it does                                                                |
 | ----------- | --------------------------------------------------------------------------- |

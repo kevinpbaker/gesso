@@ -1,6 +1,12 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
-import type { UiRole, UiSemanticState, UiSemanticStates, UiLiveRegion } from '../properties/UiSemantics';
+import type {
+  UiAutocomplete,
+  UiRole,
+  UiSemanticState,
+  UiSemanticStates,
+  UiLiveRegion
+} from '../properties/UiSemantics';
 import { normalizeStates } from '../properties/UiSemantics';
 import type { UiResolvedTextSpan, UiTextLink } from '../properties/UiTextStyle';
 import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
@@ -43,6 +49,10 @@ export interface UiSemanticsRecord {
   readonly level?: number;
   /** The record id of the descendant that's active while this one keeps focus. */
   readonly activeDescendant?: string;
+  /** The record id of what this one shows or changes, such as the list a combobox opens. */
+  readonly controls?: string;
+  /** What a field offers as it's typed into. */
+  readonly autocomplete?: UiAutocomplete;
 }
 
 /** Insertion-ordered: iterating the map walks the tree in document order. */
@@ -454,7 +464,9 @@ function describe(
     posInSet: node.properties.get('posInSet') as number | undefined,
     setSize: node.properties.get('setSize') as number | undefined,
     level: node.properties.get('level') as number | undefined,
-    activeDescendant: (node.properties.get('activeDescendant') as UiNode | null | undefined)?.id
+    activeDescendant: (node.properties.get('activeDescendant') as UiNode | null | undefined)?.id,
+    controls: (node.properties.get('controls') as UiNode | null | undefined)?.id,
+    autocomplete: node.properties.get('autocomplete') as UiAutocomplete | undefined
   });
 }
 

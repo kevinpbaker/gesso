@@ -92,6 +92,18 @@ describe('Combobox', () => {
     expect(highlighted()).toBe('Ada Okafor');
   });
 
+  it('names the list it controls while open, and says it suggests', async () => {
+    mount({ defaultValue: 'ada' });
+    expect(ui.getSemantics(field()).autocomplete).toBe('list');
+    expect(ui.getSemantics(field()).controls).toBeUndefined();
+    await focus();
+    await key('ArrowDown');
+    expect(ui.getSemantics(field()).controls).toBe(ui.getByRole('listbox', { name: 'Assignee' }).id);
+    await key('Escape');
+    expect(ui.getSemantics(field()).controls).toBeUndefined();
+    expect(ui.getSemantics(field()).autocomplete).toBe('list');
+  });
+
   it('filters as it is typed into, and chooses with Enter', async () => {
     const changes: string[] = [];
     mount({ defaultValue: '', onChange: (value: string) => changes.push(value) });

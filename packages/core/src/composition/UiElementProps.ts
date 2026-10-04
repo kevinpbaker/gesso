@@ -218,6 +218,8 @@ export type SemanticsProps = PropsOf<
   | 'setSize'
   | 'level'
   | 'activeDescendant'
+  | 'controls'
+  | 'autocomplete'
 >;
 
 /** Environment values an element provides to its subtree. */

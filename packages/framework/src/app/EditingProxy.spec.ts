@@ -417,6 +417,33 @@ describe('EditingProxy', () => {
     expect(textarea.attributes.has('aria-label')).toBe(false);
   });
 
+  it('says which list a combobox field opens, that it suggests, and which option is lit', () => {
+    const { proxy, textarea, state } = setup();
+    proxy.update(state());
+    const field = {
+      id: 'n1',
+      parent: null,
+      index: 0,
+      role: 'combobox',
+      label: 'Assignee',
+      states: ['expanded'],
+      autocomplete: 'list'
+    } as const;
+
+    proxy.describe(field, 'gesso-n3', 'gesso-n2');
+    expect(textarea.attributes.get('aria-controls')).toBe('gesso-n2');
+    expect(textarea.attributes.get('aria-activedescendant')).toBe('gesso-n3');
+    expect(textarea.attributes.get('aria-autocomplete')).toBe('list');
+
+    // Closed: no list to name, and still a field that suggests.
+    proxy.describe({ ...field, states: ['collapsed'] });
+    expect(textarea.attributes.has('aria-controls')).toBe(false);
+    expect(textarea.attributes.get('aria-autocomplete')).toBe('list');
+
+    proxy.describe(null);
+    expect(textarea.attributes.has('aria-autocomplete')).toBe(false);
+  });
+
   it('takes focus back from whatever the mirror had focused', () => {
     const { doc, proxy, textarea, state } = setup();
     const mirrored = doc.createElement('div');

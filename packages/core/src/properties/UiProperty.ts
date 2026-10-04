@@ -63,7 +63,7 @@ import { validateSubgrid } from './UiPropertyValues';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 import type { UiRole, UiSemanticStates } from './UiSemantics';
 import { statesEqual, validateRole, validateStates } from './UiSemantics';
-import type { UiLiveRegion } from './UiSemantics';
+import type { UiAutocomplete, UiLiveRegion } from './UiSemantics';
 
 const L = DirtyFlags.Layout;
 const P = DirtyFlags.Paint;
@@ -1309,6 +1309,30 @@ export const UiProperties = {
    */
   activeDescendant: defineProperty<UiNode | null | undefined>({
     name: 'activeDescendant',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * The node this one shows or changes: the list a combobox's field
+   * opens, the panel a tab switches to. The node should be a record of
+   * its own (a `listbox`, a `tabpanel`); see `aria-controls`.
+   */
+  controls: defineProperty<UiNode | null | undefined>({
+    name: 'controls',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * What a field offers as it's typed into: `list` for a combobox whose
+   * list suggests, `inline` for a field that fills in the rest of the
+   * word, `both`. See `aria-autocomplete`.
+   */
+  autocomplete: defineProperty<UiAutocomplete | undefined>({
+    name: 'autocomplete',
     defaultValue: undefined,
     inherited: false,
     affects: S

@@ -2584,7 +2584,7 @@ declare class EditingProxy {
   update(state: EditingState | null): void;
   focus(): void;
   raiseKeyboard(): void;
-  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void;
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string, controls?: string): void;
   dispose(): void;
   private position;
   private mirror;
@@ -2599,7 +2599,7 @@ interface SemanticsMirrorSink {
 }
 interface EditingMirrorTarget {
   readonly active: boolean;
-  describe(record: UiSemanticsRecord | null, activeDescendant?: string): void;
+  describe(record: UiSemanticsRecord | null, activeDescendant?: string, controls?: string): void;
   focus(): void;
 }
 declare class SemanticsMirror {
