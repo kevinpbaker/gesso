@@ -1,5 +1,84 @@
 # gesso-testing
 
+## 0.5.0
+
+### Minor Changes
+
+- b43ada6: A frame that throws now fails the test: `renderTest`'s `frame()` and `settle()` throw the error from the frame that ran it, where before the frame was abandoned as it is in an application and the test went on against the last good picture. `allowFrameErrors: true` keeps the old behaviour for a test about that recovery.
+- b7c9514: A paste carries the clipboard's HTML along with its text. The shell read only the plain text, so a copy from a web page or a document arrived without its headings, lists and links. `UiBeforeInputEvent`, `UiPasteEvent` and an editing group's edit now have `html` (null when the clipboard had none); the field still inserts the plain text, and an editor that keeps structure can cancel that and convert the HTML. `fireEvent.paste` takes the HTML as a second argument.
+
+### Patch Changes
+
+- Updated dependencies [5a27b40]
+- Updated dependencies [f265910]
+- Updated dependencies [d36a2fa]
+- Updated dependencies [c38f97e]
+- Updated dependencies [b90ecb2]
+- Updated dependencies [8d25c04]
+- Updated dependencies [20ac739]
+- Updated dependencies [303e85a]
+- Updated dependencies [96f4bdc]
+- Updated dependencies [0f02fc2]
+- Updated dependencies [88d93b3]
+- Updated dependencies [dc7f199]
+- Updated dependencies [8fb3607]
+- Updated dependencies [4450c5c]
+- Updated dependencies [53b4c46]
+- Updated dependencies [d356006]
+- Updated dependencies [101ea8a]
+- Updated dependencies [839011e]
+- Updated dependencies [f0ade22]
+- Updated dependencies [29a36ac]
+- Updated dependencies [7753bdc]
+- Updated dependencies [47aba08]
+- Updated dependencies [fac08c0]
+- Updated dependencies [8c1b8ed]
+- Updated dependencies [5b3508d]
+- Updated dependencies [fe0c1e0]
+- Updated dependencies [2ce079c]
+- Updated dependencies [b502e0e]
+- Updated dependencies [be3e274]
+- Updated dependencies [2bfedcd]
+- Updated dependencies [979053a]
+- Updated dependencies [b2dddbc]
+- Updated dependencies [ab0c1a6]
+- Updated dependencies [80a3577]
+- Updated dependencies [1dfb6c2]
+- Updated dependencies [47aba08]
+- Updated dependencies [99538fa]
+- Updated dependencies [fb2a6d8]
+- Updated dependencies [28f5b72]
+- Updated dependencies [94a9f13]
+- Updated dependencies [427ce99]
+- Updated dependencies [b7c9514]
+- Updated dependencies [d3ab865]
+- Updated dependencies [0bef08b]
+- Updated dependencies [aa33728]
+- Updated dependencies [af33f45]
+- Updated dependencies [6d51def]
+- Updated dependencies [8c4f475]
+- Updated dependencies [93d580b]
+- Updated dependencies [1d61bae]
+- Updated dependencies [68b01e0]
+- Updated dependencies [5d67836]
+- Updated dependencies [acad77f]
+- Updated dependencies [444371c]
+- Updated dependencies [62883e0]
+- Updated dependencies [d617d34]
+- Updated dependencies [6f03f61]
+- Updated dependencies [2c572e3]
+- Updated dependencies [84fe6d5]
+- Updated dependencies [e73a5fc]
+- Updated dependencies [1de054a]
+- Updated dependencies [f02740f]
+- Updated dependencies [9341d31]
+- Updated dependencies [2e3e56d]
+- Updated dependencies [cf3b16a]
+- Updated dependencies [5b59d13]
+- Updated dependencies [db1a6a1]
+  - gesso-core@0.5.0
+  - gesso-framework@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

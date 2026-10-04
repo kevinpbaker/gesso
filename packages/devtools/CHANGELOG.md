@@ -1,5 +1,43 @@
 # gesso-devtools
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [5a27b40]
+- Updated dependencies [f265910]
+- Updated dependencies [d36a2fa]
+- Updated dependencies [c38f97e]
+- Updated dependencies [b90ecb2]
+- Updated dependencies [96f4bdc]
+- Updated dependencies [88d93b3]
+- Updated dependencies [dc7f199]
+- Updated dependencies [8fb3607]
+- Updated dependencies [53b4c46]
+- Updated dependencies [f0ade22]
+- Updated dependencies [29a36ac]
+- Updated dependencies [fac08c0]
+- Updated dependencies [8c1b8ed]
+- Updated dependencies [2bfedcd]
+- Updated dependencies [979053a]
+- Updated dependencies [1dfb6c2]
+- Updated dependencies [99538fa]
+- Updated dependencies [fb2a6d8]
+- Updated dependencies [28f5b72]
+- Updated dependencies [b7c9514]
+- Updated dependencies [0bef08b]
+- Updated dependencies [af33f45]
+- Updated dependencies [93d580b]
+- Updated dependencies [68b01e0]
+- Updated dependencies [5d67836]
+- Updated dependencies [acad77f]
+- Updated dependencies [444371c]
+- Updated dependencies [62883e0]
+- Updated dependencies [f02740f]
+- Updated dependencies [cf3b16a]
+- Updated dependencies [5b59d13]
+  - gesso-framework@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

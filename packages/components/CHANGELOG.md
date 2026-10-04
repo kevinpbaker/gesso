@@ -1,5 +1,98 @@
 # gesso-components
 
+## 0.5.0
+
+### Minor Changes
+
+- d1fec43: `Button` takes `tabStop`, default true. False leaves the button out of the Tab order while a press, a screen reader and `focus()` still reach it: for a button that is the pointer's way to something the keyboard already has a key for, such as Previous and Next beside a page's j and k.
+- 5cae4b4: A `Combobox` can search somewhere else: `onQueryChange` hears the text as it's typed, and `filter={false}` shows `options` as given, already narrowed by the search, for a list too long to hand the component.
+- 08a7c30: `Combobox`: a value chosen by typing, a text field that filters a list. One value by default, several with `multiple` (each choice toggles one, the list stays open, chosen values sit in the field before its text, with remove buttons, and Backspace in the empty field takes the last off). Matches rank a label's start, then a word's start, then anywhere, then a keyword; `filterCombobox` is the same ranking, exported. Focus stays in the field while the highlight walks the list, which the field names as its `activeDescendant` so a screen reader follows it, and the list scrolls to keep the highlight in view.
+- 23b26f6: A `DataTable` hands each cell the colour its text should be drawn in, as the third argument to a column's `cell`: the control foreground, or the selection foreground while the row is chosen. The table set that colour on the row before, and `color` does not cascade from a parent node, so it reached no cell; a chosen row's text kept the default colour on the selection background, and in a dark theme the cells were black on a dark table. Bind it with `cell: (row, index, color) => <text text={...} color={color} />`. A cell that ignores it keeps the colour it names, as before.
+- a0b5560: `DatePicker`: a calendar date chosen from a month, held as a `YYYY-MM-DD` string so no time zone can put it a day out. The trigger shows the date in the reader's language and opens a calendar dialog whose grid of days holds focus, with the day under the cursor as its `activeDescendant`. Arrows move a day or a week, Home and End the week's ends, PageUp and PageDown a month (Shift, a year), Enter chooses, Escape closes. `min` and `max` bound it, `weekStart` and `locale` shape it, and `today` pins the date that counts as today. The date arithmetic is exported: `parseIsoDate`, `isoDate`, `todayIso`, `addDays`, `addMonths`, `monthGrid`, `formatDate`.
+- 47aba08: The stock theme is drawn the way current interfaces are. Text is set in `system-ui, sans-serif`, the platform's own face, on line heights from a 4-point grid (body is 14 on 20, not 14 on 16.8), and in a blue-black ink rather than black. The palettes use cool-tinted neutrals and a deeper accent, so white on `primary` and `controlAccent` clears WCAG AA, which the old bright blue did not; every stock text pair in both palettes is now held to AA by a test. A medium button is 36 high with 16 either side. Select, DatePicker, Accordion and Tree draw their disclosure arrows as Heroicons chevrons rather than as `▾` and `▸`, which every face set at a different size. An application on the stock theme reflows: text that names no size is taller, and a layout measured against 16.8 moves. A theme that sets its own typography and palette is unaffected except for the button padding, which is a `controlTokens` value it can set back.
+- ede6717: `Toast` takes an `action`: the text of a button that acts on the notice, such as Undo, calling `onAction` and closing the toast when pressed (the timer closing it doesn't call it). `placement` (`'bottom-start'`, `'bottom'` or `'bottom-end'`) and `offset` move where on the bottom edge it is pinned, so it can clear a toolbar or a panel an app keeps along the bottom of the window.
+
+### Patch Changes
+
+- a8ee079: A `Combobox` with `multiple` names its chosen values from the options as they are now, so values set before the options arrived (from a channel, say) are named when they do; they showed as nameless chips. The chosen values sit inside the field's box, before the text, wrapping as more are added, and the box shows focus.
+- 7e76ada: A `Combobox`'s list is as wide as its field and sits under it; it took the width of the whole overlay layer, the window's, and was pushed to the left edge. Focusing the field with a press now selects the chosen label as focusing it from the keyboard does, so typing starts a new search instead of adding to the name.
+- be422e9: A `Dialog`'s content is as wide as the dialog, inside its padding. The column holding it sized itself to its content, so a form asking for 100% got the width of its title, and a 600-pixel dialog drew its fields in the left half.
+- 6d141a5: `Select`'s type-ahead consumes the keys it uses, so a page's single-letter shortcut on the same key no longer runs as well. With the list open every printed character is the list's; closed, only a letter that picks an option is. A key held with Ctrl, Cmd or Alt is never type-ahead.
+- e08325a: `SplitPane`'s divider no longer shrinks, and its second pane takes the space the first one leaves without being measured for it first. When a pane's content was wider than the track, the divider gave up most of its six pixels (it could be drawn 1 px wide), and it gave up a different amount for every content width. So every keystroke in a pane moved the pane by a fraction of a pixel and re-measured everything in it.
+- 316da44: A `Tabs` given a height gives its panel the height the tab list leaves, and stretches the panel's child to fill it. Before, the panel stayed as tall as its content, so a tree or a scrolling list inside a sidebar of tabs could neither fill the column nor scroll within it.
+- e958805: A `Toast` declared already open takes the theme of the tree it's declared in. It used to open before its placeholder was in the tree, with nothing to take a theme from, so a toast mounted afresh for each notice drew in the light theme on a dark app; it now waits for the placeholder.
+- f02740f: A tooltip opens for focus the keyboard can see and not for the focus a press gives, so clicking a button no longer leaves its tooltip over whatever the click opened. A tooltip whose element is removed closes with it, even while the component that rendered the element stays, as when a Run button turns into Cancel. The `Tooltip` component now follows keyboard focus anywhere inside its wrapper, which it could not before because a focus event does not bubble. `FocusService.focusVisible` says whether the focus held is focus the keyboard can see.
+- 819df79: A `Tree` draws its labels and arrows in `controlForeground`, and a chosen row's in `selectionForeground`. The colour was set on the row, and `color` does not cascade from a parent node, so the text drew in the text style's colour instead: black, in a dark theme as in a light one, which left a dark tree's labels nearly invisible.
+- Updated dependencies [5a27b40]
+- Updated dependencies [f265910]
+- Updated dependencies [d36a2fa]
+- Updated dependencies [c38f97e]
+- Updated dependencies [b90ecb2]
+- Updated dependencies [8d25c04]
+- Updated dependencies [20ac739]
+- Updated dependencies [303e85a]
+- Updated dependencies [96f4bdc]
+- Updated dependencies [0f02fc2]
+- Updated dependencies [88d93b3]
+- Updated dependencies [dc7f199]
+- Updated dependencies [8fb3607]
+- Updated dependencies [4450c5c]
+- Updated dependencies [53b4c46]
+- Updated dependencies [d356006]
+- Updated dependencies [101ea8a]
+- Updated dependencies [839011e]
+- Updated dependencies [f0ade22]
+- Updated dependencies [29a36ac]
+- Updated dependencies [7753bdc]
+- Updated dependencies [47aba08]
+- Updated dependencies [fac08c0]
+- Updated dependencies [8c1b8ed]
+- Updated dependencies [5b3508d]
+- Updated dependencies [fe0c1e0]
+- Updated dependencies [2ce079c]
+- Updated dependencies [b502e0e]
+- Updated dependencies [be3e274]
+- Updated dependencies [2bfedcd]
+- Updated dependencies [979053a]
+- Updated dependencies [b2dddbc]
+- Updated dependencies [ab0c1a6]
+- Updated dependencies [80a3577]
+- Updated dependencies [1dfb6c2]
+- Updated dependencies [47aba08]
+- Updated dependencies [99538fa]
+- Updated dependencies [fb2a6d8]
+- Updated dependencies [28f5b72]
+- Updated dependencies [94a9f13]
+- Updated dependencies [427ce99]
+- Updated dependencies [b7c9514]
+- Updated dependencies [d3ab865]
+- Updated dependencies [0bef08b]
+- Updated dependencies [aa33728]
+- Updated dependencies [af33f45]
+- Updated dependencies [6d51def]
+- Updated dependencies [8c4f475]
+- Updated dependencies [93d580b]
+- Updated dependencies [1d61bae]
+- Updated dependencies [68b01e0]
+- Updated dependencies [5d67836]
+- Updated dependencies [acad77f]
+- Updated dependencies [444371c]
+- Updated dependencies [62883e0]
+- Updated dependencies [d617d34]
+- Updated dependencies [6f03f61]
+- Updated dependencies [2c572e3]
+- Updated dependencies [84fe6d5]
+- Updated dependencies [e73a5fc]
+- Updated dependencies [1de054a]
+- Updated dependencies [f02740f]
+- Updated dependencies [9341d31]
+- Updated dependencies [2e3e56d]
+- Updated dependencies [cf3b16a]
+- Updated dependencies [5b59d13]
+- Updated dependencies [db1a6a1]
+  - gesso-core@0.5.0
+  - gesso-framework@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

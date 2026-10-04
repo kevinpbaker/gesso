@@ -1,5 +1,111 @@
 # gesso-framework
 
+## 0.5.0
+
+### Minor Changes
+
+- 5a27b40: `activeDescendant` names the node that's active while another keeps focus, such as the highlighted option of a combobox whose field holds the caret, or the cell a grid's cursor is on. The semantics record carries it as the node's id, and the accessibility mirror writes `aria-activedescendant` from it, both on the node's element and on the editing proxy while a field has focus. Every mirrored element now has a DOM id for it to point at. The proxy also says `aria-expanded` for a field whose record is expanded or collapsed.
+- f265910: An AI agent can drive a web application while it runs in development. `gesso-vite-plugin` serves MCP at `/__gesso/mcp` on the dev server and prints the `claude mcp add` line to connect; the agent then sees every channel the open page can reach, the ones its render worker feeds and the ones its application and channel workers serve, and its commands change the page as a click would. Messages travel down the HMR socket to the page, which answers them against the render worker, which asks each worker behind it over a `gesso:agent` port. A command marked `@confirm` is put to the person with the browser's dialog first. The endpoint refuses requests from browser pages, the newest open tab answers, and `agent: false` turns it off. A build carries none of it.
+
+  `gesso-framework/agent` gains what the bridge is made of: `serveAgentPort`, `remoteSurface` and `combineSurfaces` for a surface across threads, `connectDevAgent` for the page's half, and `AgentSurfaceLike` for a surface whose answers are promises, which `handleMcpMessage` and `mcpHandler` now accept. `WorkerApp.openRenderPort(key)` opens a port to the render worker. The scaffolded `AGENTS.md` says how to connect.
+
+- d36a2fa: `gesso-framework/agent` hands an application to an AI agent. `agentSurface(channels)` takes the same `{ token, source }` registrations an application already serves and offers each channel as a resource holding its view, a read-only `<channel>_view` tool, and a `<channel>_<command>` tool per command that sends it and returns the view once it has settled. Tool descriptions, input schemas and hints come from the schema `gesso-vite-plugin` writes from the contract's JSDoc; arguments that do not fit are refused with a sentence naming the field, `@hidden` commands are not offered, and `@confirm` commands are sent only once the `confirm` option says the person approved.
+
+  `mcpHandler(surface)` serves it over MCP's Streamable HTTP transport as a `fetch` handler, ready for `Bun.serve`, refusing unknown browser origins and optionally requiring a bearer token. `handleMcpMessage` is the same server without the transport, for stdio or a relay.
+
+- c38f97e: A single-thread app can be driven by an AI agent too. `createSyncApp(...)` builders now answer `openRenderPort('gesso:agent')` from the page, with the channels fed there, whatever their channel workers serve, and the screen tools, so the dev server endpoint and WebMCP work exactly as they do for `createApp`. `useWebMcp(true | false | { confirm })` is the builder's form of `createApp({ webmcp })`. In a dev server, `gesso-vite-plugin` now hands a `createSyncApp` builder to the agent bridge and turns WebMCP on unless the app's own `useWebMcp(false)` says otherwise. The screen tools run a pending frame after each action on the main thread as they do in the render worker, so a background tab still reports what changed. `serveApplicationAgent` in `gesso-framework/agent` is the assembly both configurations share.
+- b90ecb2: An agent can operate the interface, not only the channels. Beside the channel tools, the page now offers `ui_snapshot`, the screen as an outline of what a screen reader announces with a short ref per control, and `ui_press`, `ui_type`, `ui_focus` and `ui_key`, which act on a control named by ref or by role and name and answer with the outline afterwards. They go through the accessibility mirror's own path, so a press is a click, a value is a keyboard edit, a disabled control refuses, and a focus trap holds. Available in the dev server endpoint and through WebMCP. `GessoRuntime.focusedNodeId()` reports which node holds focus.
+
+  The dev bridge also announces the page again whenever its HMR socket reconnects, so a restarted dev server no longer tells an agent that no page is open while one is.
+
+- 96f4bdc: A channel can describe itself. `describeChannel(token, schema)` attaches a JSON Schema of the channel's view and of each command, and `channelSchema(token)` reads it back, so anything that meets an application only at run time can ask a channel what it holds and what its commands take: an AI agent being handed the channel as tools, a devtools panel, a test that drives an app by its commands.
+
+  `gesso-vite-plugin` writes the schema for you. It reads each contract with TypeScript 7's checker and takes the descriptions from the JSDoc you already wrote: on the token, on each view key, on each command, and `@param` for its parameters. Four tags annotate a command for an agent: `@destructive`, `@idempotent`, `@confirm` and `@hidden`. A value that cannot cross a channel, such as a `Date`, a `Map` or an untyped `[]`, is reported as a build warning naming its path. The plugin needs `typescript` 7 or later installed, says so once if it is not, and `channelSchemas: false` turns the whole thing off.
+
+- 88d93b3: A command may carry bytes. An `ArrayBuffer` or a typed array in a command's parameters is no longer reported as unable to cross a channel, because a command's argument is structured-cloned and bytes clone as themselves; a file can be sent as its bytes, with no base64 pass on the render thread. The schema describes such a field as a base64 string tagged `x-gesso-binary` with the type it becomes, and the agent surface decodes an agent's base64 back into that type before the command is sent. Bytes in a view key are still a warning, since a view is diffed.
+- dc7f199: `ShellService.copyText` now returns a promise of whether the text reached the clipboard, so an application that says "Copied" after a command or a shortcut can say so only when it's true. Callers that ignore it are unaffected. The `clipboard` request carries an `id`, the shell answers it with a `clipboardResult` message, `GessoRuntime.settleClipboard` settles it, and `writeClipboard` resolves `false` when both the async clipboard and the `execCommand` fallback refuse. A runtime with no shell answers `false` at once.
+- 8fb3607: A `current` semantic state, mirrored as `aria-current`, for the current item of a set such as the navigation link to the open page. `selected` was the only way to say it, and on a link or a button a screen reader ignores `aria-selected`, so which page was open went unsaid.
+
+  `Pagination` marks the page you're on `current` instead of `selected`.
+
+- 53b4c46: A copy can put HTML on the clipboard beside the text. An editing group's new `copyHtml(start, end)` gives it, for a selection across fields or inside one field of the group, and `EditingState.html` carries it to the shell, whose copy and cut set `text/html` as well as `text/plain`. A rich editor's copy into a document or an email keeps its formatting. What a group makes of a selection is kept until the selection or its text changes, so `copyText` and `copyHtml` are no longer asked every frame.
+- f0ade22: Editables can select as one. Set `editingGroup` on a container and a selection can start in one field and end in another: arrows move between fields at their edges (up and down keep the column), Shift extends across them, a drag or a Shift and press reaches into other fields, and select all takes the whole group. Every field in the range draws its part. Typing, deleting, Enter, paste and cut over such a selection go to the group's `onEdit` with both ends, since only the application knows how its blocks join, and copy and cut take the whole selection, as the group's `copyText` if it gives one.
+- 29a36ac: `EditingService.select(anchor, focus)` sets a selection from code, in one field or across the fields of an editing group, and focuses the field its focus end is in. An editor needs it to leave a selection selected after a command over it, since its fields can only select their own text.
+- fac08c0: Focus from code can leave the page where it is, as `element.focus({ preventScroll: true })` does: `autoFocus({ preventScroll: true })`, `FocusService.focus(node, { preventScroll: true })` and `UiFocusManager.focus(node, source, { preventScroll: true })`. For focus placed for a screen reader, such as a page's content region focused as it opens, which a reveal scrolled to a few pixels short of its own top. The options reach `onFocusChange` listeners as a third argument, and a key pressed later that makes the focus visible doesn't scroll to it either. The default is unchanged.
+- 979053a: A layout listener that changes layout is painted on the same frame. `breakpoint`, `sizeContainer` (and so `Responsive`), `autoFocus` and anything else on `host.onLayout` hear a box after layout, and what they wrote used to be laid out on the next frame, so a page whose breakpoint gave it wide padding was drawn with its narrow padding first and jumped. The runtime now lays out again before it paints, as a browser does after a `ResizeObserver` callback: only what the listeners dirtied, telling only the listeners whose boxes then changed, until they write nothing more that lays out. The loop is bounded at 8 layout passes a frame; past it the frame paints what it has and a warning says so once. A frame whose listeners write nothing that lays out runs one pass. A scroll into view asked for while the listeners run (an `autoFocus` revealing its node) waits until the boxes are final. `FrameMetrics.layoutPasses` counts the passes, and `measured` and `relayoutRoots` count every pass. A geometry `sharedElement` morph lands on the frame of the change instead of being covered by a transform for one frame. `UiScheduler.recollect`, `UiFrame.merged` and `DirtyNodeSet.anyFlags` are what the runtime builds this from.
+- 99538fa: A `multiselectable` semantic state, mirrored as `aria-multiselectable`. A list whose rows are selected as a set had no way to say so, and Chrome took the option under its active descendant to be the selected one: a screen reader announced a row as selected that wasn't.
+- 28f5b72: `createApp({ pageKeys: true })` says the application is the page: a key pressed while nothing on the page has focus goes to the app, and the canvas takes focus. Keys only reached the app through its canvas, so a page that loads with focus on its body ignored every shortcut until the first click. The templates `create-gesso-app` writes turn it on; an app embedded in a larger page leaves it off.
+- b7c9514: A paste carries the clipboard's HTML along with its text. The shell read only the plain text, so a copy from a web page or a document arrived without its headings, lists and links. `UiBeforeInputEvent`, `UiPasteEvent` and an editing group's edit now have `html` (null when the clipboard had none); the field still inserts the plain text, and an editor that keeps structure can cancel that and convert the HTML. `fireEvent.paste` takes the HTML as a second argument.
+- 68b01e0: `ScrollService.scrollIntoView(node, padding?)` scrolls the containers above a node until it's in view, for a component whose highlight moves without focus: a combobox walking its list while the caret stays in the field, a grid's cursor. Focus moved from the keyboard already did this; a highlight had no way to.
+- 62883e0: `ShellService.contrast` reports the platform's contrast preference: `high` while the person has asked for more contrast (`prefers-contrast: more`) or turned on forced colours (Windows' contrast themes, which a canvas doesn't get from the browser), `standard` otherwise. Reported once at start and on every change, by both the worker and the single-thread shell. `withContrast(theme, contrast)` is the theme that answers it.
+- f02740f: A tooltip opens for focus the keyboard can see and not for the focus a press gives, so clicking a button no longer leaves its tooltip over whatever the click opened. A tooltip whose element is removed closes with it, even while the component that rendered the element stays, as when a Run button turns into Cancel. The `Tooltip` component now follows keyboard focus anywhere inside its wrapper, which it could not before because a focus event does not bubble. `FocusService.focusVisible` says whether the focus held is focus the keyboard can see.
+- cf3b16a: `createApp({ webmcp: true })` offers an application's channels to an AI agent in the browser through WebMCP. Once the app mounts, every tool the agent surface offers, a view tool per channel and a tool per command, is registered with `document.modelContext.registerTool` (or the older `navigator.modelContext`), and removed when the app is disposed. View tools carry `readOnlyHint`, `@destructive` commands carry `consequentialHint`, a call answers with the view it left or rejects with the sentence that says why, and a `@confirm` command is put to the person with `window.confirm` unless `webmcp: { confirm }` supplies the application's own dialog. In a browser without WebMCP nothing is registered and nothing fails. The code loads on demand, so the shell is no bigger for an app that does not ask.
+
+  `gesso-framework/agent` adds `registerWebMcpTools`, `connectWebMcp`, `pageModelContext` and `confirmInWindow`. `gesso-vite-plugin` turns `webmcp` on in a dev server; the app's own setting still decides.
+
+### Patch Changes
+
+- 8c1b8ed: `FrameMetrics.measured` and `relayoutRoots` are 0 for a frame that ran no layout. They used to repeat the last layout pass's numbers, so a caret blink or a scroll looked like a full re-measure to every profiler and proof panel that reads them.
+- 2bfedcd: A component no longer receives the same input value again when its parent re-renders. A prop built as a new Observable in the parent's render re-subscribed and replayed its current value, which re-ran every binding derived from that input even though nothing had changed. In a 2,868-block editor, inserting one block re-measured 12,912 nodes; it now re-measures 488. A changed value, or a new object, still arrives as before.
+- 1dfb6c2: The accessibility mirror can no longer be scrolled by the browser. A browser scrolls even an `overflow: hidden` box to bring something into view, as Tab focus, a screen reader or an automation tool does, and a region whose content reached past its box was left scrolled. Every element in it was then described tens of pixels from where it is drawn, so activating one by position activated its neighbour. The mirror now uses `overflow: clip`, which cannot be scrolled.
+- fb2a6d8: A precision device's wheel steps are paced over frames. A trackpad sends on its own clock, so a frame got one, two or three of its steps and a steady flick moved unevenly; the runtime now moves each frame by the rate the steps have been arriving at, never more than a frame behind, and applies the rest when the input stops. `UiWheelController` takes a `pace` option and an `advance()` a host calls once a frame; the runtime turns it on.
+- 0bef08b: A precision device's scroll is predicted to the frame rather than paced behind it. Each frame puts the page where the input will have reached when the frame is shown, from the steps' velocity and their timestamps, which the shells now pass with each wheel event; the page stays as even as pacing made it without trailing the hand by a frame. `UiWheelController.wheel` takes the event's time, and `advance` the frame's.
+- af33f45: `formatUrl` leaves `,` `:` `@` and `/` unencoded in a query, so a list of values reads as written (`?status=todo,done`, not `?status=todo%2Cdone`). What would change how the query parses (`&`, `=`, `+`, `#`) is still encoded, and `parseUrl` reads both forms the same.
+- 93d580b: `router.params(route)`, `router.observeParams(route)` and `router.isActive(route)` now recognise a route by its path as well as by identity. Under Vite's dev server, a route table that imports its screens, with screens that import the table, could load twice after a hot edit. The screens then held route objects the router had never seen, and every param read `null`, so a page for one team silently showed the default team.
+- 5d67836: The runtime keeps the accessibility tree as records by id plus each record's children in order, and works out a record's index only when it sends that record or the tree is asked for. A structural change used to renumber every record after it and rebuild the whole tree's order, a pass over the whole document on every Enter in a long editor. An Enter in a 5,000-line document now spends about 3 ms on semantics where it spent 7 to 10. The structural rebuild goes through `rewalkSemantics`, and `SemanticsMemory` is what each walk leaves for the next.
+- acad77f: Finding the accessibility boxes that moved after a layout now walks only what is on screen. It used to work out every mirrored node's box to learn whether it was visible, which cost a keystroke in a 5,000-line document 4 to 24 ms. Subtrees whose bounds are off screen are passed over whole.
+- 444371c: A change in the shape of the tree no longer rebuilds the whole accessibility tree, and no longer sends every later sibling an update. The tree is rebuilt from the nearest record above the change, and anything inside it that nothing touched is taken back as it was: renumbered if it moved, never described again, and a transparent subtree (a block of a long document) taken back as a run without being walked. Updates that only renumber a record whose siblings kept their order are no longer sent, since a mirror that applies removals and adds in order already has it in place: inserting a paragraph in a 5,000-line document sent 4,266 patches to the main thread, and now sends 2. `diffSemantics` gains a companion, `dropIndexShifts`.
+- 5b59d13: Every wheel step between two frames counts. Each was added to the offset the last layout settled on, so when a device sent faster than the display drew, as a trackpad does, each step overwrote the one before and a flick moved about half as far as it should, unevenly. A scroll now starts from where the container is going, clamped to its range.
+- Updated dependencies [5a27b40]
+- Updated dependencies [8d25c04]
+- Updated dependencies [20ac739]
+- Updated dependencies [303e85a]
+- Updated dependencies [0f02fc2]
+- Updated dependencies [8fb3607]
+- Updated dependencies [4450c5c]
+- Updated dependencies [53b4c46]
+- Updated dependencies [d356006]
+- Updated dependencies [101ea8a]
+- Updated dependencies [839011e]
+- Updated dependencies [f0ade22]
+- Updated dependencies [29a36ac]
+- Updated dependencies [7753bdc]
+- Updated dependencies [47aba08]
+- Updated dependencies [fac08c0]
+- Updated dependencies [5b3508d]
+- Updated dependencies [fe0c1e0]
+- Updated dependencies [2ce079c]
+- Updated dependencies [b502e0e]
+- Updated dependencies [be3e274]
+- Updated dependencies [979053a]
+- Updated dependencies [b2dddbc]
+- Updated dependencies [ab0c1a6]
+- Updated dependencies [80a3577]
+- Updated dependencies [47aba08]
+- Updated dependencies [99538fa]
+- Updated dependencies [fb2a6d8]
+- Updated dependencies [94a9f13]
+- Updated dependencies [427ce99]
+- Updated dependencies [b7c9514]
+- Updated dependencies [d3ab865]
+- Updated dependencies [0bef08b]
+- Updated dependencies [aa33728]
+- Updated dependencies [6d51def]
+- Updated dependencies [8c4f475]
+- Updated dependencies [1d61bae]
+- Updated dependencies [5d67836]
+- Updated dependencies [444371c]
+- Updated dependencies [d617d34]
+- Updated dependencies [6f03f61]
+- Updated dependencies [2c572e3]
+- Updated dependencies [84fe6d5]
+- Updated dependencies [e73a5fc]
+- Updated dependencies [1de054a]
+- Updated dependencies [9341d31]
+- Updated dependencies [2e3e56d]
+- Updated dependencies [db1a6a1]
+  - gesso-core@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes
