@@ -151,13 +151,17 @@ Everything, and only this:
 | Listen on the node | `on(type, listener, options?)`                               |
 | Listen at the root | `onRoot(type, listener, options?)`, capture by default       |
 | Where the node is  | `layoutBox()`, `flowBox()`, `scrollOffset()`, `onLayout(cb)` |
-| The environment    | `environment(key)`, `onEnvironment(cb)`                      |
+| The environment    | `environment(key, of?)`, `onEnvironment(cb, of?)`            |
 | Focus              | `focus()`, `isFocused()`, `onFocusChange(cb)`                |
 | Draw               | `decorate(shapes or null)`                                   |
 | Animate a cell     | `animate(cell, to, options)`, `spring(...)`, `stopAnimation` |
 | Shared elements    | `shared`                                                     |
 | Own a teardown     | `own(teardown)`, released in reverse order on detach         |
 | Ask for a frame    | `requestFrame()`                                             |
+
+`of` reads or follows another node's environment, for a node drawn
+somewhere other than where it belongs: the overlay layer uses it so an
+open menu or dialog keeps the theme of the place it was declared.
 
 That list is a budget, not a starting point. A capability that is not on
 it is a proposal against the design rather than a parameter added in

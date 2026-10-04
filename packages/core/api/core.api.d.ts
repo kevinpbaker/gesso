@@ -914,8 +914,8 @@ interface UiModifierHost {
     y: number;
   } | null;
   onLayout(listener: (box: LayoutBox) => void): void;
-  environment<T>(key: UiEnvironmentKey<T>): T;
-  onEnvironment(listener: () => void): void;
+  environment<T>(key: UiEnvironmentKey<T>, of?: UiNode): T;
+  onEnvironment(listener: () => void, of?: UiNode): void;
   focus(options?: FocusOptions): void;
   isFocused(): boolean;
   isFocusVisible(): boolean;

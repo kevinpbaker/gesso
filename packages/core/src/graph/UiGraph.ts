@@ -13,6 +13,14 @@ import { isTypographyRole } from '../environment/UiTypography';
 import { inheritedPropertyFlags } from '../properties/UiPropertyRegistry';
 import type { Observable } from 'rxjs';
 
+/**
+ * How many times one frame rebuilds environments that rebuilding others
+ * dirtied. One is the ordinary case and two is an overlay following its
+ * declaration; more means listeners answering each other, which a frame
+ * stops rather than hangs on.
+ */
+const MAX_ENVIRONMENT_PASSES = 8;
+
 export class UiGraph {
   constructor() {
     this.root = new UiNode('root', UiNodeType.Root);
@@ -832,20 +840,27 @@ export class UiGraph {
    * the change to descendants and clearing the flag.
    */
   public processEnvironmentDirty(): void {
-    this.environmentDirty = false;
-    const nodes = this.dirtyNodes.take();
     // This runs inside the frame that is about to collect the dirty
     // set, so the marks below belong to that frame; letting them reach
     // the listener would arm a redundant one behind it.
     this.suppressDirtyListener = true;
     try {
-      for (const node of nodes) {
-        if ((node.dirtyFlags & DirtyFlags.Environment) !== 0) {
-          node.dirtyFlags &= ~DirtyFlags.Environment;
-          this.rebuildEnvironment(node, inheritedPropertyFlags);
-        }
-        if (node.dirtyFlags !== DirtyFlags.None) {
-          this.dirtyNodes.mark(node);
+      // Again while a pass dirtied another environment: a listener told
+      // that one node's environment changed may provide the new value
+      // on another (an overlay re-provides the theme of the place it was
+      // declared), and that one has to be rebuilt in this frame too.
+      // Without the second pass its flag was collected with the rest of
+      // the frame's dirty set and the rebuild never happened.
+      for (let pass = 0; pass === 0 || (this.environmentDirty && pass < MAX_ENVIRONMENT_PASSES); pass++) {
+        this.environmentDirty = false;
+        for (const node of this.dirtyNodes.take()) {
+          if ((node.dirtyFlags & DirtyFlags.Environment) !== 0) {
+            node.dirtyFlags &= ~DirtyFlags.Environment;
+            this.rebuildEnvironment(node, inheritedPropertyFlags);
+          }
+          if (node.dirtyFlags !== DirtyFlags.None) {
+            this.dirtyNodes.mark(node);
+          }
         }
       }
     } finally {
