@@ -1,5 +1,41 @@
 # gesso-components
 
+## 0.6.0
+
+### Minor Changes
+
+- bf21b17: A `Dialog` dims the page behind it, as a browser draws `<dialog>::backdrop`. Palettes have a new `scrim` token, a colour with alpha: the light page's ink at 40% in `lightColors`, black at 60% in `darkColors`, and left alone by high contrast. A custom palette written out in full needs one. Overlay entries take `scrim`, on by default for a `modal` entry and off for every other, so a menu or a list of suggestions never dims the page; the scrim takes its theme from the entry's `environment` and fades in at a dialog's pace, or appears at once under reduced motion. `Dialog` takes `scrim={false}` to leave the page undimmed; its backdrop still keeps the page from presses.
+- feaf755: `SplitPane` takes `show`: `'both'` (the default), or `'first'` or `'second'` to put one pane on the whole container. The other is hidden, not unmounted, so its scroll, focus, drafts and any dialog it opened are still there when it comes back. An app that swapped a split for a single pane on a narrow window, or when its sidebar was put away, had to build the page again, which closed a dialog open over it.
+
+### Patch Changes
+
+- 684b59a: A `Dialog` that can't be dismissed now keeps the page from presses, as one that can does: every dialog has a backdrop over the whole page, positioned panels with a `zIndex` included, and `dismissible` decides only whether a press or a wheel on it closes the dialog. Before, a dialog with `dismissible={false}` had no backdrop, so a press beside it reached a button in the page under the modal. Overlay entries take a new `modal` option for the same backdrop.
+- e4d2483: A `Dialog` taller than the screen now fits inside it, with 16 pixels to spare top and bottom, as a browser's modal `<dialog>` does: the title and description stay in view and the body scrolls what doesn't fit. Content that can shrink, such as a scroll view with a height and `minHeight: 0`, is given the room there is instead, and a focus ring at the body's edge isn't clipped. A tall form in a short window used to run off the top and the bottom.
+- c30f60c: A dialog open from the moment it mounts takes the theme it was declared in. It opened before its placeholder was in the tree, inherited no theme, and drew in the light palette over a dark page; an opening asked for before mount now waits for it.
+- 820aee8: Everything that measures a node against the canvas now takes the `transform` of every ancestor into account, as painting and hit testing always have. Under a panned and zoomed parent (cards on a map inside a "camera" box) several things used to work from where the node would be drawn at zoom 1 with no pan:
+
+  - A press from the accessibility mirror or an automation tool, and Enter or Space on a focused button, now click the centre the node is drawn at rather than a point that could be off the node entirely.
+  - A modifier's `layoutBox()` and the box `onLayout` reports are the drawn box, so a slider, split pane or colour picker on a zoomed card turns a press into the right value, and `onLayout` hears when a pan above the node moves it on screen. Its size is the drawn size, so a fraction of it stays a fraction; `flowBox()` keeps the laid-out size, and the motion pivot, `breakpoint`, `sizeContainer` and `publishInset` now read that, so a zoom neither shifts a pivot nor crosses a breakpoint. The new `measureFlow` modifier is `measure` for the laid-out box; a virtual list's reveal and a `DataTable`'s sticky header use it, so they scroll by the right amount under a zoom.
+  - The caret rectangle handed to the shell, which positions the hidden text field and the IME candidate window, follows the caret where it is drawn.
+  - A press beside the fields of an editing group, a drag across them, and a text selection dragged past the end of a line find the field or line nearest the pointer on screen.
+  - The mirror's box for a focused node that is scrolled out of view, and the layout inspector's highlight and heatmap, are drawn over the node where it is.
+
+  `LayoutEngine.screenBox(node, part?)` takes an optional rectangle in the node's own coordinates and answers where that part of it is drawn. `EditingHost` and `SelectionHost` take an optional `screenBox`; a host without one behaves as before. With no transform above a node, every answer is the same as before.
+
+- 2486523: A `Select` gives way in a row with less room than its value needs, as a text field does: its least width is nothing, and its value is cut short with an ellipsis before the chevron. Its value used to set its minimum width, so in a narrow row (a phone, or a window zoomed to 400%) a select showing a long value ran past the row's edge. A `minWidth` passed in still wins.
+- Updated dependencies [bf21b17]
+- Updated dependencies [684b59a]
+- Updated dependencies [3b20918]
+- Updated dependencies [e9f86a2]
+- Updated dependencies [b0233fa]
+- Updated dependencies [013e064]
+- Updated dependencies [a81d551]
+- Updated dependencies [820aee8]
+- Updated dependencies [cc9e62b]
+- Updated dependencies [684d68a]
+  - gesso-core@0.6.0
+  - gesso-framework@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
