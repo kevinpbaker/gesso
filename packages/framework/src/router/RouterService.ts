@@ -376,8 +376,13 @@ export class RouterService {
     } else if (options.push) {
       this.history?.push(settled);
     }
-    this.url.value = settled;
+    // The match first: a subscriber to `url` that reads `match` (to pick
+    // a query param out of it, say) then sees the match for the url it
+    // was handed. Written the other way round, it saw the previous one,
+    // and an app that synced a selection to `?story=` reset it on every
+    // click. A `match` subscriber has the url on the match itself.
     this.match.value = match;
+    this.url.value = settled;
   }
 
   /** First declared route whose pattern describes this url wins. */

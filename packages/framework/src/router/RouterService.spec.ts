@@ -65,6 +65,16 @@ describe('RouterService', () => {
   });
 
   describe('resolving', () => {
+    it('has the new match in place by the time url subscribers hear of the url', () => {
+      const { router: service } = router();
+      service.navigate('/mail?story=A-1');
+      const seen: (string | undefined)[] = [];
+      service.url.subscribe(() => seen.push(service.match.value?.query.story));
+      service.navigate('/mail?story=B-2');
+      // The first entry is the subscription's own replay of the current url.
+      expect(seen).toEqual(['A-1', 'B-2']);
+    });
+
     it('matches a url to the first route that describes it, with its params', () => {
       const { router: service } = router();
       service.navigate('/mail/inbox/42');
