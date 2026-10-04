@@ -1,6 +1,7 @@
+import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, Text } from 'gesso-core';
+import { Box, Column, percent, Row, Text, type UiNode } from 'gesso-core';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
@@ -38,14 +39,6 @@ describe('what a resize re-measures', () => {
       );
     }
     return Column({}, ...rows);
-  }
-
-  /** Drains whatever the mount asked for, so what follows is a settled app. */
-  function settle(mounted: ReturnType<typeof mountRuntime>): void {
-    let guard = 0;
-    while (mounted.clock.isPending && guard++ < 100) {
-      mounted.frame();
-    }
   }
 
   it('re-measures almost nothing when only the height changes', () => {
@@ -105,3 +98,58 @@ describe('what a resize re-measures', () => {
     expect(report.box.width).toBe(500);
   });
 });
+
+describe('a resize and absolutely positioned content', () => {
+  it("places a panel pinned to the window's corner again, from inside a column that kept its size", () => {
+    // The panel is placed when its parent is, but its containing block
+    // is the window. The window grew and the column holding the panel
+    // didn't move, so nothing placed the panel again: a first-visit
+    // tour card stayed where the corner of a phone-sized window had
+    // been after the window was widened.
+    let panel: UiNode | null = null;
+    const mounted = mountRuntime(
+      Row(
+        { width: percent(100), height: percent(100) },
+        Column(Column({ position: 'absolute', right: 16, bottom: 72, width: 300, height: 50, ref: n => (panel = n) }))
+      ),
+      { width: 375, height: 500 }
+    );
+    settle(mounted);
+    expect(mounted.runtime.debugLayoutBox(panel!)).toMatchObject({ x: 375 - 16 - 300, y: 500 - 72 - 50 });
+
+    mounted.runtime.resize(1280, 500, 1);
+    settle(mounted);
+    expect(mounted.runtime.debugLayoutBox(panel!)).toMatchObject({ x: 1280 - 16 - 300, y: 500 - 72 - 50 });
+  });
+
+  it('places it again when a positioned ancestor, not the window, changes size', () => {
+    let pinned: UiNode | null = null;
+    let block: UiNode | null = null;
+    const width = new BehaviorSubject(100);
+    const mounted = mountRuntime(
+      Row(
+        { width: percent(100), height: percent(100) },
+        Box(
+          { position: 'relative', width, height: 80, ref: n => (block = n) },
+          Column(
+            { width: 50, height: 10 },
+            Box({ position: 'absolute', top: 0, right: 5, width: 20, height: 10, ref: n => (pinned = n) })
+          )
+        )
+      )
+    );
+    settle(mounted);
+    expect(mounted.runtime.debugLayoutBox(pinned!).x).toBe(mounted.runtime.debugLayoutBox(block!).x + 100 - 5 - 20);
+    width.next(200);
+    settle(mounted);
+    expect(mounted.runtime.debugLayoutBox(pinned!).x).toBe(mounted.runtime.debugLayoutBox(block!).x + 200 - 5 - 20);
+  });
+});
+
+/** Drains whatever the mount asked for, so what follows is a settled app. */
+function settle(mounted: ReturnType<typeof mountRuntime>): void {
+  let guard = 0;
+  while (mounted.clock.isPending && guard++ < 100) {
+    mounted.frame();
+  }
+}

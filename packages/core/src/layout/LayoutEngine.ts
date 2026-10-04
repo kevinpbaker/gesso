@@ -480,6 +480,22 @@ export class LayoutEngine {
   /** Anchored nodes whose anchor moved this frame, re-placed once it settles. */
   private readonly movedAnchored = new Set<UiNode>();
   /**
+   * Every absolutely positioned node placed by its edges or at a point,
+   * with the containing block it was placed against.
+   *
+   * Such a node is placed when its parent is, but its containing block
+   * can be an ancestor further up: a panel pinned to the window's
+   * corner from inside a column that keeps its size. When the window
+   * grew, the column didn't move, so nothing placed the panel again,
+   * and it stayed where the old corner was. A block that changes size
+   * says so (`blockResized`), and the nodes whose block is no longer
+   * the one they were placed against are placed again once the pass
+   * settles.
+   */
+  private readonly absoluteBlocks = new Map<UiNode, LayoutBox>();
+  /** A positioned node, or the root, took a new box this pass; see `absoluteBlocks`. */
+  private blockResized = false;
+  /**
    * The nodes asking for `lift`, in the order they asked.
    *
    * Kept as a set rather than rebuilt per pass because layout is
@@ -962,9 +978,11 @@ export class LayoutEngine {
     this.anchorOf.clear();
     this.anchorDependents.clear();
     this.movedAnchored.clear();
+    this.blockResized = false;
     this.resetStats();
     this.fullLayout(constraints);
     const rec = this.record(node);
+    this.replaceStaleAbsolute();
     this.applyScroll();
     // Placement is one top-down walk, so an overlay placed before its
     // anchor saw a box the anchor has since been given, and an anchor
@@ -1070,7 +1088,9 @@ export class LayoutEngine {
     // and its cached bounds are its own box. Work was done, so the
     // summary of it is thrown away.
     this.layoutVersion++;
+    this.blockResized = false;
     this.relayout(constraints);
+    this.replaceStaleAbsolute();
     this.applyScroll();
     this.replaceMovedAnchored();
   }
@@ -1447,6 +1467,7 @@ export class LayoutEngine {
       this.textScrollPending.delete(current);
       this.anchoredNodes.delete(current);
       this.movedAnchored.delete(current);
+      this.absoluteBlocks.delete(current);
       this.forgetAnchoring(current);
       this.stickyNodes.delete(current);
       this.stickyShifted.delete(current);
@@ -3104,8 +3125,13 @@ export class LayoutEngine {
    * the anchor instead.
    */
   private placeAbsoluteChildren(parent: UiNode): void {
+    this.forEachAbsoluteChild(parent, child => this.placeAbsolute(child));
+  }
+
+  /** Places one absolutely positioned node against its containing block; see `placeAbsoluteChildren`. */
+  private placeAbsolute(child: UiNode): void {
     const savedBase = this.percentBase;
-    this.forEachAbsoluteChild(parent, child => {
+    try {
       const cRec = this.record(child);
       const block = this.containingBlockOf(child);
       this.percentBase = { width: block.width, height: block.height };
@@ -3117,12 +3143,14 @@ export class LayoutEngine {
         this.trackAnchor(child, anchor as UiNode);
         const anchorRec = this.records.get(anchor as UiNode);
         if (anchorRec !== undefined) {
+          this.absoluteBlocks.delete(child);
           this.placeAnchored(child, cRec, anchorRec, anchor as UiNode, block);
           return;
         }
       } else if (point !== undefined && point !== null) {
         this.anchoredNodes.delete(child);
         this.trackAnchor(child, null);
+        this.absoluteBlocks.set(child, block);
         // A point is an anchor of no size, and is placed beside the same
         // way; it does not move, so there is nothing to follow.
         this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
@@ -3132,6 +3160,7 @@ export class LayoutEngine {
         this.anchoredNodes.delete(child);
         this.trackAnchor(child, null);
       }
+      this.absoluteBlocks.set(child, block);
 
       const marginH = cRec.marginLeft + cRec.marginRight;
       const marginV = cRec.marginTop + cRec.marginBottom;
@@ -3172,8 +3201,39 @@ export class LayoutEngine {
         y = block.y + cRec.marginTop;
       }
       this.assignBox(child, x, y, width, height);
-    });
-    this.percentBase = savedBase;
+    } finally {
+      this.percentBase = savedBase;
+    }
+  }
+
+  /**
+   * Places again the absolutely positioned nodes whose containing block
+   * is not the box they were placed against, once a pass has settled
+   * every box. Only after a pass in which a positioned node or the root
+   * took a new box, which is rare outside a resize; placing one can
+   * resize a block another is placed against, so it repeats, up to the
+   * limit that stops anchors spinning.
+   */
+  private replaceStaleAbsolute(): void {
+    for (let pass = 0; this.blockResized && pass < ANCHOR_CHAIN_LIMIT; pass++) {
+      this.blockResized = false;
+      for (const [child, was] of this.absoluteBlocks) {
+        if (!this.records.has(child)) {
+          // Not reached by a full layout, so no longer in the tree it laid out.
+          this.absoluteBlocks.delete(child);
+          continue;
+        }
+        const block = this.containingBlockOf(child);
+        if (block.x === was.x && block.y === was.y && block.width === was.width && block.height === was.height) {
+          continue;
+        }
+        this.placeAbsolute(child);
+        if (this.record(child).placeDirty) {
+          this.place(child);
+        }
+      }
+    }
+    this.blockResized = false;
   }
 
   /**
@@ -4464,6 +4524,11 @@ export class LayoutEngine {
       rec.extentMaxY = y + height + rec.paintReachBottom;
       this.growExtentUp(node);
       rec.placeDirty = true;
+      if (rec.positioned || node === this.layoutRoot) {
+        // It may be the containing block of an absolute node further
+        // down that nothing will place again; see `absoluteBlocks`.
+        this.blockResized = true;
+      }
       // Subtree bounds are a summary of these four numbers, so this is
       // the one place that can promise they are never stale: a box
       // written after a pass has ended, by an overlay following the

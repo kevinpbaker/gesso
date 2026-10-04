@@ -61,6 +61,17 @@ been laid out. That is the same order the CSS specification gives, and
 it is why a percentage offset resolves against a block whose size is
 already known.
 
+**A block that changes size places its absolutes again, wherever they
+are below it.** An absolute is placed when its parent is, and its
+parent can be some way under its containing block: a panel pinned to
+the window's corner from inside a column of the app. When only the
+block changes, as the window does on a resize, the column keeps its box
+and is not placed again, so the engine keeps the block each absolute
+was placed against and, after any pass in which a positioned node or the
+root took a new box, places again the ones whose block is not that box
+any more. Until it did, such a panel stayed at the corner of the window
+it was first laid out in.
+
 ## Stacks align their children
 
 A `<box>` (exported as `Stack` in the factory API, which says what the
