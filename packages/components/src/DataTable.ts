@@ -14,7 +14,7 @@ import {
   type UiNodeRef,
   fr,
   type UiTrackSize,
-  measure,
+  measureFlow,
   type LayoutBox,
   type UiSemanticState
 } from 'gesso-core';
@@ -209,7 +209,8 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
   const header = Grid(
     {
       subgrid: 'columns',
-      modifiers: [measure(headerBox)],
+      // Laid-out, for the reason `virtual` measures its viewport so.
+      modifiers: [measureFlow(headerBox)],
       // Sticky, so the header stays while the rows scroll under it, and
       // above them in paint order — it is the first child, so without a
       // zIndex the rows would be drawn over it.

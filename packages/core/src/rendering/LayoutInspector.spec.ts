@@ -86,6 +86,46 @@ describe('LayoutInspector', () => {
     expect(label?.args[0]).toBe("box 'card' 100×50");
   });
 
+  it('highlights a node where a panned, zoomed parent draws it', () => {
+    // A card on a zoomable canvas, under a camera box moved by its
+    // transform. The overlay is drawn over the finished frame with no
+    // transform of its own, and it drew the card's record: the box the
+    // card would have at zoom 1 with no pan, not the card.
+    const h = new LayoutHarness();
+    const top = node(h, 'top', UiNodeType.Box, { position: 'relative', width: 400, height: 300 });
+    const lens = node(h, 'camera', UiNodeType.Box, {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 300,
+      transform: { x: 0, y: 0, translateX: 100, translateY: 50, scaleX: 2, scaleY: 2, rotation: 0 }
+    });
+    const card = node(h, 'card', UiNodeType.Box, {
+      position: 'absolute',
+      left: 20,
+      top: 10,
+      width: 30,
+      height: 20,
+      padding: 5
+    });
+    h.append(lens, card);
+    h.append(top, lens);
+    h.layout(top, VIEWPORT);
+    const inspector = new LayoutInspector(h.engine);
+    inspector.setEnabled(true);
+    inspector.setHovered(card);
+
+    const { shapes } = inspector.overlay(0);
+
+    // Drawn at 100 + 2 * 20 across and 50 + 2 * 10 down, twice its size;
+    // its 5px padding is drawn 10 deep, and the label keeps its size.
+    expect(shapes).toContainEqual(expect.objectContaining({ kind: 'stroke', x: 140, y: 70, width: 60, height: 40 }));
+    expect(shapes).toContainEqual(expect.objectContaining({ kind: 'fill', x: 140, y: 70, width: 60, height: 10 }));
+    expect(shapes).toContainEqual(expect.objectContaining({ kind: 'fill', x: 150, y: 80, width: 40, height: 20 }));
+    expect(shapes.find(shape => shape.kind === 'label')).toMatchObject({ text: "box 'card' 30×20" });
+  });
+
   it('outlines the relayout root a change to the hovered node is laid out from', () => {
     const { h, tall, scroller } = scene();
     const inspector = new LayoutInspector(h.engine);

@@ -31,8 +31,15 @@ import {
  */
 export interface SelectionHost {
   recordFor(node: UiNode): LayoutRecord | undefined;
-  /** Where the node is seen, scroll offsets applied; for the nearest-node search. */
+  /** Where the node is seen, scroll offsets applied, in layout units. */
   visibleBox(node: UiNode): LayoutBox;
+  /**
+   * Where the node is drawn on the canvas (`LayoutEngine.screenBox`),
+   * for the nearest-node search, which measures from a pointer. A host
+   * without it is taken to have no transforms, and `visibleBox` stands
+   * in.
+   */
+  screenBox?(node: UiNode): LayoutBox;
   readonly measurer: TextMeasurer;
   markDirty(node: UiNode, flags: DirtyFlags): void;
   /** The subtree a selection may range over: the layout root. */
@@ -419,7 +426,10 @@ export class UiSelectionController {
       if (this.host.recordFor(node) === undefined) {
         continue;
       }
-      const box = this.host.visibleBox(node);
+      // Where it is drawn, because the point is a pointer's: under a
+      // zoomed parent the record is somewhere else, and a drag off the
+      // end of a line picked text that only the record was near.
+      const box = this.host.screenBox?.(node) ?? this.host.visibleBox(node);
       const dx = Math.max(box.x - x, 0, x - (box.x + box.width));
       const dy = Math.max(box.y - y, 0, y - (box.y + box.height));
       // Vertical distance dominates: a point beside a line belongs to

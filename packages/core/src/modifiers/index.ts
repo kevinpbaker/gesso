@@ -2,7 +2,15 @@ export { defineModifier, isUiModifier, type UiModifier, type UiModifierKind } fr
 export { bundle, noModifiers, type UiModifierBundle } from './bundle';
 export type { UiModifierHost, UiModifierTeardown } from './UiModifierHost';
 export { UiModifierSet, UiUnknownModifierPropertyError, assertModifierList } from './UiModifierSet';
-export { interactive, hoverable, pressable, measure, BUTTON_INTERACTION, type InteractiveOptions } from './interaction';
+export {
+  interactive,
+  hoverable,
+  pressable,
+  measure,
+  measureFlow,
+  BUTTON_INTERACTION,
+  type InteractiveOptions
+} from './interaction';
 export { borders, borderShapes, decorated, focusRing } from './decoration';
 export type { BorderEdge, BordersOptions, Decorations, FocusRingOptions } from './decoration';
 export { autoFocus } from './focus';

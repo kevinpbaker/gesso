@@ -48,6 +48,7 @@ interface Attached {
 
 /** Where a modifier's layout access comes from; the runtime supplies it. */
 export interface UiModifierLayout {
+  /** Where the node is drawn on the canvas; see `UiModifierHost.layoutBox`. */
   box(node: UiNode): LayoutBox | null;
   /** The same node in pre-scroll layout coordinates; see `UiModifierHost.flowBox`. */
   flowBox(node: UiNode): LayoutBox | null;

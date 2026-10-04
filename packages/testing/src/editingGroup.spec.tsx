@@ -20,7 +20,13 @@ afterEach(() => ui?.unmount());
 
 const TEXTS = ['First paragraph', 'Second paragraph', 'Third paragraph'];
 
-function Document(inputs: Inputs<{ copyText?: boolean; copyHtml?: boolean }>, _ctx: ComponentContext) {
+/** Panned by (100, 50) and zoomed to 2 about the document's top-left corner, the root's. */
+const CAMERA = { x: 0, y: 0, translateX: 100, translateY: 50, scaleX: 2, scaleY: 2, rotation: 0 };
+
+function Document(
+  inputs: Inputs<{ copyText?: boolean; copyHtml?: boolean; zoomed?: boolean }>,
+  _ctx: ComponentContext
+) {
   const group = {
     onEdit: (edit: UiGroupEdit) => void edits.push(edit),
     onSelectionChange: (selection: { start: { offset: number }; end: { offset: number } } | null) =>
@@ -38,7 +44,11 @@ function Document(inputs: Inputs<{ copyText?: boolean; copyHtml?: boolean }>, _c
       : {})
   };
   return (
-    <column width={percent(100)} height={percent(100)} gap={20}>
+    <column
+      width={percent(100)}
+      height={percent(100)}
+      gap={20}
+      {...(inputs.zoomed.value === true ? { transform: CAMERA } : {})}>
       <column gap={10} padding={10} width={300} editingGroup={group}>
         {TEXTS.map((text, i) => (
           <editabletext key={String(i)} value={text} label={`p${i}`} multiline={true} width={percent(100)} />
@@ -55,15 +65,20 @@ function Document(inputs: Inputs<{ copyText?: boolean; copyHtml?: boolean }>, _c
   );
 }
 
-async function mount(copyText = false, copyHtml = false): Promise<void> {
+async function mount(copyText = false, copyHtml = false, zoomed = false): Promise<void> {
   edits = [];
   selections = [];
   htmlCalls = 0;
-  ui = renderTest(createComponent(Document, { copyText, copyHtml }), { width: 600, height: 400 });
+  ui = renderTest(createComponent(Document, { copyText, copyHtml, zoomed }), { width: 600, height: 400 });
   await ui.settle();
 }
 
 const field = (label: string): UiNode => ui.getByLabel(label);
+
+/** Where `CAMERA` draws a laid-out box. */
+function drawn(box: { x: number; y: number; width: number; height: number }) {
+  return { x: 100 + 2 * box.x, y: 50 + 2 * box.y, width: 2 * box.width, height: 2 * box.height };
+}
 
 async function caretIn(label: string, offset: number): Promise<void> {
   ui.fireEvent.focus(field(label));
@@ -218,6 +233,22 @@ describe('a selection across the fields of an editing group', () => {
     expect(lit().p2?.end).toBeGreaterThan(0);
   });
 
+  it('drags into the field the pointer is over where the fields are drawn, under a panned, zoomed parent', async () => {
+    // The drag's height was compared with the fields' records, so over
+    // the middle field on screen it was past the last field's record and
+    // selected into the last field.
+    await mount(false, false, true);
+    const first = drawn(ui.getLayout(field('p0')));
+    const middle = drawn(ui.getLayout(field('p1')));
+    ui.fireEvent.pointerDown(first.x + 4, first.y + first.height / 2);
+    ui.fireEvent.pointerMove(middle.x + 60, middle.y + middle.height / 2, { buttons: 1 });
+    ui.fireEvent.pointerUp(middle.x + 60, middle.y + middle.height / 2);
+    await ui.settle();
+    expect(lit().p1?.start).toBe(0);
+    expect(lit().p1?.end).toBeLessThan(TEXTS[1]!.length);
+    expect(lit().p2).toBeUndefined();
+  });
+
   it('extends with Shift and a press in another field', async () => {
     await mount();
     await caretIn('p0', 3);
@@ -292,6 +323,17 @@ describe('a selection across the fields of an editing group', () => {
       await pressAt(p1!.x - 5, p1!.y + p1!.height / 2);
       expect(focused()).toBe('p1');
       expect(editorFor(field('p1')).focus).toBe(0);
+    });
+
+    it('lands in the field nearest where the fields are drawn, under a panned, zoomed parent', async () => {
+      // A press is in canvas space and the fields' records are where
+      // they would be drawn at zoom 1 with no pan, so measured against
+      // the records a press in the gap below the first field on screen
+      // was nearest the last field.
+      await mount(false, false, true);
+      const [p0] = ['p0'].map(label => drawn(ui.getLayout(field(label))));
+      await pressAt(p0!.x + 40, p0!.y + p0!.height + 6);
+      expect(focused()).toBe('p0');
     });
 
     it('leaves a press on something that answers presses itself, and one outside the group', async () => {

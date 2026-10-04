@@ -61,6 +61,14 @@ calls a modifier written from outside reaches for first are these:
 | Run a timer that dies with the node | `host.animate(cell, to, options)`                      |
 | Release something on detach         | `host.own(teardown)`                                   |
 
+`layoutBox()` is where the node is drawn on the canvas, in the same
+coordinates as a pointer event's `x` and `y`: every scroll above it and
+every `transform` above it applied, so under a parent zoomed to 2 it is
+twice the laid-out size and `(event.x - box.x) / box.width` is still the
+fraction of the node under the pointer. For the size the node was laid
+out at, which a zoom does not change (a pivot, a breakpoint), read
+`host.flowBox()`.
+
 Listeners, overrides, decorations and animations are all released by
 the host when the modifier detaches. `detach` is for anything the host
 does not know about, which is usually nothing: neither example on this

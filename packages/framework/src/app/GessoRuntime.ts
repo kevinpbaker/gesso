@@ -625,11 +625,16 @@ export class GessoRuntime {
         onChange: (node, listener) => this.environmentNotifier.add(node, listener)
       },
       layout: {
-        // The visible box, not the world box: a modifier that turns a
+        // The screen box, not the world box: a modifier that turns a
         // pointer position into a fraction of its node needs where the
         // node is *seen*, which is the world box after every scroll and
-        // sticky offset above it.
-        box: node => (this.engine.recordFor(node) === undefined ? null : this.engine.visibleBox(node)),
+        // sticky offset above it and every transform. Without the
+        // transforms a slider on a card under a zoomed camera box took
+        // a press on its middle for one far along its record, because
+        // the pointer is in canvas space and the record never moves.
+        // Its size is the drawn one too, so a fraction stays a fraction;
+        // a modifier that wants its own laid-out size reads `flowBox`.
+        box: node => (this.engine.recordFor(node) === undefined ? null : this.engine.screenBox(node)),
         // And the pre-scroll box, for a modifier asking where the node
         // sits in the layout rather than where it is seen — a layout
         // animation, which must not mistake a scroll for a move.
@@ -2029,6 +2034,7 @@ export class GessoRuntime {
       {
         recordFor: node => this.engine.recordFor(node),
         visibleBox: node => this.engine.visibleBox(node),
+        screenBox: (node, part) => this.engine.screenBox(node, part),
         toLocal: (node, x, y) => hitTester.toLocal(node, x, y),
         measurer: this.textMeasurer,
         markDirty: (node, flags) => this.graph.markDirty(node, flags),
@@ -2045,6 +2051,7 @@ export class GessoRuntime {
       {
         recordFor: node => this.engine.recordFor(node),
         visibleBox: node => this.engine.visibleBox(node),
+        screenBox: node => this.engine.screenBox(node),
         measurer: this.textMeasurer,
         markDirty: (node, flags) => this.graph.markDirty(node, flags),
         root: () => this.layoutRoot(),
@@ -2129,10 +2136,11 @@ export class GessoRuntime {
         selection,
         find,
         // Enter on a focused button clicks its centre, as an assistive
-        // technology's press does.
+        // technology's press does: the centre it is drawn at, for the
+        // reason `applySemanticsAction` gives.
         activation: {
           clickAt: node => {
-            const box = this.engine.visibleBox(node);
+            const box = this.engine.screenBox(node);
             return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
           }
         }
@@ -2304,7 +2312,13 @@ export class GessoRuntime {
       return;
     }
     this.focusManager.focus(node);
-    const box = this.engine.visibleBox(node);
+    // The centre the node is drawn at, which is where a pointer press
+    // on it would land and so what its handlers expect: a click is in
+    // canvas space. Its record's centre is where it would be drawn with
+    // no transform above it, so a press on a card under a zoomed map
+    // camera arrived somewhere off the card, and a handler that turns
+    // the point into a fraction of its `layoutBox` read nonsense.
+    const box = this.engine.screenBox(node);
     this.dispatcher.dispatch(
       new UiPointerEvent(UiEventType.Click, box.x + box.width / 2, box.y + box.height / 2, 1),
       node
@@ -2899,7 +2913,8 @@ export class GessoRuntime {
     // from its rectangle.
     if (focused !== null && focused !== undefined && !focusedSeen && this.semantics.has(focused.id)) {
       if (this.engine.recordFor(focused) !== undefined) {
-        offer(focused.id, this.engine.visibleBox(focused));
+        // Through any transform above it, as the walk would have.
+        offer(focused.id, this.engine.screenBox(focused));
       }
     }
     if (this.semanticsBoxes.size > this.semantics.size) {
@@ -3274,7 +3289,10 @@ export class GessoRuntime {
     const read = (node: UiNode) => {
       const record = this.engine.recordFor(node);
       return {
-        box: this.engine.visibleBox(node),
+        // The box `layoutBox` answers, so an `onLayout` listener is
+        // told when a transform above its node moves it on screen, as
+        // a scroll already does.
+        box: this.engine.screenBox(node),
         scrollX: record?.scrollX ?? 0,
         scrollY: record?.scrollY ?? 0
       };

@@ -153,6 +153,11 @@ function sameStates(a: UiVisualStateSet, b: ReadonlySet<UiVisualState>): boolean
  * element it renders and read the box back — which is how a split pane
  * turns a pointer position into a fraction of its own track without
  * reaching into the layout engine.
+ *
+ * The box is `layoutBox()`, where the node is drawn, in a pointer's
+ * coordinates: under a zoomed parent it is drawn, and reported, bigger
+ * than it was laid out. For a size to lay something else out by, use
+ * `measureFlow`.
  */
 export const measure = defineModifier<Subject<LayoutBox>>({
   name: 'measure',
@@ -162,5 +167,40 @@ export const measure = defineModifier<Subject<LayoutBox>>({
       target.next(box);
     }
     host.onLayout(next => target.next(next));
+  }
+});
+
+/**
+ * Reports the node's laid-out box, `flowBox()`, whenever it changes.
+ *
+ * `measure` reports where the node is drawn, which a pan or a zoom
+ * above it moves and scales; this is the size it was given, which they
+ * do not. It is the one to lay out or scroll by: a virtual list that
+ * read its viewport's height from `measure` under a parent zoomed to 2
+ * scrolled a row twice as far as it needed to reveal it. Only a change
+ * is reported, so a pan above the node, which `onLayout` hears, reports
+ * nothing here.
+ */
+export const measureFlow = defineModifier<Subject<LayoutBox>>({
+  name: 'measureFlow',
+  attach(host, target) {
+    let last: LayoutBox | null = null;
+    const report = (): void => {
+      const box = host.flowBox();
+      if (
+        box === null ||
+        (last !== null &&
+          last.x === box.x &&
+          last.y === box.y &&
+          last.width === box.width &&
+          last.height === box.height)
+      ) {
+        return;
+      }
+      last = box;
+      target.next(box);
+    };
+    report();
+    host.onLayout(report);
   }
 });
