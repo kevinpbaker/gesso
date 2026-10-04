@@ -3480,6 +3480,8 @@ declare class LayoutEngine {
   private readonly anchorOf;
   private readonly anchorDependents;
   private readonly movedAnchored;
+  private readonly absoluteBlocks;
+  private blockResized;
   private readonly liftedNodes;
   private readonly stickyNodes;
   private readonly stickyShifted;
@@ -3572,6 +3574,8 @@ declare class LayoutEngine {
   private place;
   private updateContentExtent;
   private placeAbsoluteChildren;
+  private placeAbsolute;
+  private replaceStaleAbsolute;
   private placeAnchored;
   private placeBeside;
   private trackAnchor;
