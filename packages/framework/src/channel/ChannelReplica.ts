@@ -73,6 +73,15 @@ export class ChannelReplica<View extends object, Commands extends object> {
         );
       }
       return cell;
+    },
+    // Enumerable, so `Object.keys(view)` and a spread list the declared
+    // keys. With only `get`, both silently found nothing: an app that
+    // snapshotted a view by walking its keys got an empty object.
+    has: (_target, property) => typeof property === 'string' && this.cells.has(property),
+    ownKeys: () => [...this.cells.keys()],
+    getOwnPropertyDescriptor: (_target, property) => {
+      const cell = typeof property === 'string' ? this.cells.get(property) : undefined;
+      return cell === undefined ? undefined : { value: cell, enumerable: true, configurable: true, writable: false };
     }
   });
 

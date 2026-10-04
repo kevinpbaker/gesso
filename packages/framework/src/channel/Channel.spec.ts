@@ -47,6 +47,22 @@ function createCatalogViewModel() {
   };
 }
 
+describe("a channel's view", () => {
+  it('lists its declared keys, so it can be walked or spread', () => {
+    const app = createCatalogViewModel();
+    const handle = createChannelRegistry([
+      { token: Catalog, source: { view: { products: app.products, status: app.status } } }
+    ]);
+    const view = handle.registry.get(Catalog).view;
+    expect(Object.keys(view).sort()).toEqual(['products', 'status']);
+    expect('status' in view).toBe(true);
+    expect('missing' in view).toBe(false);
+    const snapshot = Object.fromEntries(Object.entries(view).map(([key, cell]) => [key, cell.value]));
+    expect(snapshot).toEqual({ products: [], status: 'loading' });
+    handle.dispose();
+  });
+});
+
 describe('a channel across a real patch stream', () => {
   it('starts from the token, then follows the application', async () => {
     const app = createCatalogViewModel();
