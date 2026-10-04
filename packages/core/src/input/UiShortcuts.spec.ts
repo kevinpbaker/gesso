@@ -68,6 +68,30 @@ describe('UiShortcutRegistry', () => {
     expect(formatShortcut(parseShortcut('Shift+Space'))).toBe('Shift+Space');
   });
 
+  it('matches a symbol on the character, however the layout reaches it', () => {
+    // `?` is Shift+/ on a US keyboard and Shift+ß on a German one; some
+    // layouts type it with AltGr, which the browser reports as Control
+    // and Alt. Written as `?`, it matched none of them.
+    const registry = new UiShortcutRegistry();
+    const help = vi.fn();
+    registry.register({ keys: '?', label: 'Keyboard shortcuts', run: help });
+
+    expect(registry.handleKey('?', mods({ shift: true }), null)).toBe(true);
+    expect(registry.handleKey('?', mods(), null)).toBe(true);
+    expect(registry.handleKey('?', mods({ ctrl: true, alt: true }), null)).toBe(true);
+    expect(help).toHaveBeenCalledTimes(3);
+
+    // Written with its Shift, it is the same shortcut.
+    const shifted = new UiShortcutRegistry();
+    shifted.register({ keys: 'Shift+?', label: 'Keyboard shortcuts', run: help });
+    expect(shifted.handleKey('?', mods(), null)).toBe(true);
+
+    // Command still means something else, and a letter keeps its Shift.
+    expect(registry.handleKey('?', mods({ meta: true }), null)).toBe(false);
+    registry.register({ keys: 'l', label: 'Next column', run: help });
+    expect(registry.handleKey('l', mods({ shift: true }), null)).toBe(false);
+  });
+
   it('unregisters when the returned function is called', () => {
     const registry = new UiShortcutRegistry();
     const run = vi.fn();

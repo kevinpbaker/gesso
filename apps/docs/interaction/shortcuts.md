@@ -91,6 +91,22 @@ modifiers: `shortcut({ registry, keys: 'Space', … })` runs on the space
 bar, and `formatShortcut` prints it back as `Space`. Like any bare key,
 it is skipped while a text field has focus.
 
+## Symbols
+
+```ts
+shortcut({ registry, keys: '?', label: 'Keyboard shortcuts', scoped: false, run: openSheet });
+```
+
+A shortcut on punctuation, a digit or a symbol matches the character
+the press produced, not the key. `?` is Shift+/ on a US keyboard,
+Shift+ß on a German one and Shift+, on a French one, so Shift is not
+asked about: `?` and `Shift+?` are the same shortcut, and both work on
+every layout. A bare symbol also matches when AltGr typed it, which the
+browser reports as Control and Alt together (or Option on a Mac).
+Command still means something else, so `Mod+/` stays its own shortcut.
+
+Letters keep their Shift, which is what tells `Shift+L` from `l`.
+
 ## Scope
 
 ```ts

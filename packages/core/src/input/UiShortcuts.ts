@@ -28,7 +28,7 @@ export interface UiShortcutStep {
 /** What an application registers. */
 export interface UiShortcut {
   /**
-   * The keys, as `'Mod+K'`, `'Shift+?'`, or `'g d'` for a chord: a
+   * The keys, as `'Mod+K'`, `'?'`, or `'g d'` for a chord: a
    * sequence of presses, separated by spaces, that must arrive in
    * order and within the chord timeout.
    */
@@ -434,13 +434,38 @@ function matchesPrefix(steps: readonly UiShortcutStep[], sequence: readonly UiSh
 }
 
 function sameStep(want: UiShortcutStep, got: UiShortcutStep): boolean {
-  if (want.key !== got.key || want.shift !== got.shift || want.alt !== got.alt) {
+  if (want.key !== got.key) {
+    return false;
+  }
+  if (isSymbol(want.key)) {
+    // A character, not a key: `?` is Shift+/ on a US keyboard, Shift+ß
+    // on a German one and Shift+, on a French one, and AltGr on others.
+    // The character the press produced is the whole answer, so Shift is
+    // not asked about, and a bare symbol also takes AltGr (Control and
+    // Alt together, or Option on a Mac) as the way this layout types it.
+    if (isBare(want) && got.alt && !got.meta) {
+      return true;
+    }
+  } else if (want.shift !== got.shift) {
+    return false;
+  }
+  if (want.alt !== got.alt) {
     return false;
   }
   if (want.mod) {
     return got.ctrl || got.meta;
   }
   return want.ctrl === got.ctrl && want.meta === got.meta;
+}
+
+/**
+ * Whether a key is a character that isn't a letter: punctuation, a digit
+ * or a symbol, which different layouts put under different keys and
+ * reach with or without Shift. A letter keeps its Shift, which is what
+ * tells `Shift+L` from `l`.
+ */
+function isSymbol(key: string): boolean {
+  return key.length === 1 && key !== ' ' && key.toLowerCase() === key.toUpperCase();
 }
 
 /** The press the person actually made. */
