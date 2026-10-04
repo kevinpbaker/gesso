@@ -22,7 +22,8 @@ import { OverlayService, type OverlayEntry } from './OverlayService';
  * positioned box the layout engine places — beside its anchor, by its
  * edge offsets, or centred in the viewport — and, when the entry asks
  * for it, a full-size
- * backdrop beneath it that closes the entry on pointer down or wheel.
+ * backdrop beneath it that takes every press and wheel outside the
+ * entry, and closes the entry on them when it is dismissible.
  * Entries without a backdrop stay open and follow their anchor when
  * the content underneath scrolls.
  *
@@ -45,17 +46,26 @@ export class OverlayLayer extends Component {
   private renderEntries(entries: readonly OverlayEntry[]): UiElement[] {
     const elements: UiElement[] = [];
     for (const entry of entries) {
-      if (entry.dismissOnOutsidePress) {
+      if (entry.dismissOnOutsidePress === true || entry.modal === true) {
+        // A modal's backdrop is there whether or not it closes anything:
+        // it is what keeps a press beside the dialog from reaching the
+        // page under it. One that doesn't close takes the press and the
+        // wheel and does nothing with them.
+        const dismiss = entry.dismissOnOutsidePress === true;
         elements.push(
           Box({
             key: `${entry.id}\0backdrop`,
             position: 'absolute',
             inset: 0,
             zIndex: entry.zIndex,
-            onPointerDown: () => this.overlays.close(entry.id),
-            // A wheel over the backdrop is the user scrolling away; the
-            // menu closes rather than swallowing the scroll.
-            onWheel: () => this.overlays.close(entry.id)
+            ...(dismiss
+              ? {
+                  onPointerDown: () => this.overlays.close(entry.id),
+                  // A wheel over the backdrop is the user scrolling away;
+                  // the menu closes rather than swallowing the scroll.
+                  onWheel: () => this.overlays.close(entry.id)
+                }
+              : {})
           })
         );
       }

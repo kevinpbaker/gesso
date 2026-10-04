@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, percent, ScrollView } from 'gesso-core';
+import { Box, Button, Column, percent, ScrollView } from 'gesso-core';
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 
@@ -121,4 +121,65 @@ describe('Dialog on a short screen', () => {
     ui.frame();
     expect(ui.getLayout(ui.getByLabel('List')).height).toBe(420);
   });
+});
+
+describe('Dialog over the page', () => {
+  /** A panel in a corner of the page, lifted by a zIndex, with a button that counts its presses. */
+  function page(open: BehaviorSubject<boolean>, dismissible: boolean) {
+    let presses = 0;
+    const ui = renderTest(
+      Column(
+        { width: percent(100), height: percent(100) },
+        Box(
+          { position: 'absolute', right: 0, bottom: 0, width: 200, height: 120, zIndex: 5000, label: 'Tour' },
+          Button({ text: 'Next', label: 'Next', width: percent(100), height: percent(100), onClick: () => presses++ })
+        ),
+        createComponent(Dialog, {
+          open,
+          title: 'Working',
+          width: 360,
+          dismissible,
+          content: Box({ height: 300 }),
+          onClose: () => open.next(false)
+        })
+      ),
+      { width: 375, height: 500 }
+    );
+    open.next(true);
+    // Past the entrance: a dialog at opacity 0 takes no presses.
+    ui.frame();
+    ui.frame(1000);
+    return { ui, presses: () => presses };
+  }
+
+  /** A press and release at a point, through hit testing, as a pointer makes one. */
+  function pressAt(ui: ReturnType<typeof renderTest>, x: number, y: number): void {
+    ui.fireEvent.pointerDown(x, y);
+    ui.fireEvent.pointerUp(x, y);
+    ui.frame();
+  }
+
+  for (const dismissible of [true, false]) {
+    it(`covers a positioned panel with a zIndex, and takes its presses, when ${dismissible ? '' : 'not '}dismissible`, () => {
+      const open = new BehaviorSubject(false);
+      const { ui, presses } = page(open, dismissible);
+      const next = ui.getLayout(ui.getByLabel('Next'));
+      const dialog = ui.getLayout(ui.getByRole('dialog', { name: 'Working' }));
+      // The panel shows below the dialog, beside nothing but the backdrop.
+      const x = next.x + next.width / 2;
+      const y = next.y + next.height - 5;
+      expect(y).toBeGreaterThan(dialog.y + dialog.height);
+
+      // Painted under the dialog: its label is drawn before the title.
+      const texts = ui.draws.filter(call => call.name === 'fillText').map(call => call.args[0]);
+      expect(texts.lastIndexOf('Next')).toBeLessThan(texts.lastIndexOf('Working'));
+
+      // And pressed under it: the press is the backdrop's, never the
+      // panel's. A dialog that can't be dismissed had no backdrop, so the
+      // panel's button took the press through the modal.
+      pressAt(ui, x, y);
+      expect(presses()).toBe(0);
+      expect(open.value).toBe(!dismissible);
+    });
+  }
 });

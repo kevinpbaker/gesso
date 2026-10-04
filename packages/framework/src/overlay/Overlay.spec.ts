@@ -217,6 +217,21 @@ describe('overlays', () => {
     runtime.dispose();
   });
 
+  it('keeps the page from a press or a wheel beside a modal entry, which stays open', () => {
+    // An entry that doesn't close on an outside press had no backdrop at
+    // all, so a press beside a modal reached the page under it.
+    pressed.length = 0;
+    const { runtime, overlays, frame } = mount();
+    overlays.open({ id: 'modal', center: 'both', modal: true, content: Box({ width: 120, height: 60 }) });
+    frame();
+    runtime.input.pointer.pointerDown(300, 250, 1, noKeyModifiers());
+    runtime.input.pointer.pointerUp(300, 250, 0, noKeyModifiers());
+    runtime.input.wheel.wheel(300, 250, 0, 40, noKeyModifiers());
+    expect(pressed).toEqual([]);
+    expect(overlays.isOpen('modal')).toBe(true);
+    runtime.dispose();
+  });
+
   it('centres an unanchored entry in the viewport', () => {
     const { runtime, layer, overlays, frame } = mount();
     overlays.open({

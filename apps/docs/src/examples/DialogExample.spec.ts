@@ -110,11 +110,14 @@ describe('the docs dialog example', () => {
     expect(ui.runtime.input.focus.focusedNode).toBe(opener);
   });
 
-  it('ignores Escape, and takes no backdrop, when dismissible is false', () => {
+  it('ignores Escape, and a press outside, when dismissible is false', () => {
     const ui = mount();
     openWith(ui, 'Upload');
 
+    // A backdrop all the same, so the page takes no press, but one that
+    // closes nothing.
     expect(entries(ui)[0].dismissOnOutsidePress).toBe(false);
+    expect(entries(ui)[0].modal).toBe(true);
 
     ui.fireEvent.keyDown('Escape');
     ui.frame();

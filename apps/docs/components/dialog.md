@@ -27,8 +27,8 @@ merely reports what happened does not need the keyboard at all.
 Open either dialog and press Tab a few times: the ring stays on the
 buttons inside. `Delete this note?` is dismissible, so Escape closes it
 and the button that opened it takes the keyboard back. `Uploading` sets
-`dismissible={false}`, so Escape does nothing there and there is no
-backdrop to press.
+`dismissible={false}`, so Escape does nothing there and a press on the
+backdrop does nothing either.
 
 ## Props
 
@@ -81,12 +81,18 @@ does.
 
 ## `dismissible` is two things at once
 
-It decides whether Escape is bound, and it decides whether the entry
-gets a backdrop. A dismissible dialog has a full-size backdrop
-underneath it that closes it on a pointer press or a wheel, so nothing
-behind it scrolls while it is up. A dialog with `dismissible={false}`
-has no backdrop at all, which means a press outside it reaches whatever
-is underneath rather than being swallowed.
+It decides whether Escape is bound, and it decides what the backdrop
+does. Every dialog has a full-size backdrop underneath it, over the
+whole page, positioned panels with a `zIndex` included: nothing beneath
+it takes a press or a wheel while the dialog is up, as the page under a
+browser's modal `<dialog>` is inert. A dismissible dialog closes on a
+press or a wheel there; one with `dismissible={false}` stays open and
+the press goes nowhere.
+
+That was not always so. A dialog with `dismissible={false}` used to
+have no backdrop at all, so a press beside it reached whatever was
+underneath: a button on a panel in the page's corner could be pressed
+through the modal.
 
 The keyboard trap is not part of this. Both dialogs above trap focus,
 and both are modal; `dismissible` only decides how a user is allowed to
