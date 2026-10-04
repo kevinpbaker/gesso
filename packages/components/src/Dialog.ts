@@ -39,6 +39,9 @@ export interface DialogProps {
   width?: number;
 }
 
+/** The least room left between a dialog and each side of the screen, in pixels. */
+const SCREEN_MARGIN = 16;
+
 export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild {
   const title = input(inputs.title, '');
   const description = input(inputs.description, '');
@@ -95,6 +98,9 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
           }
         },
         width: width.value,
+        // `width` is what it wants; a screen narrower than that gets the
+        // dialog at its own width, inside the margin the overlay keeps.
+        maxWidth: percent(100),
         opacity: enter,
         // `x` and `y` are the pivot, not a translation (see
         // `UiTransform`). Half the width puts it on the dialog's
@@ -162,6 +168,10 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         // dialog are the caller's problem to keep modest. That is the
         // trade for the position a modal is expected in.
         center: 'both',
+        // A margin on each side, which is what stops a dialog wider than
+        // a phone from meeting its edges.
+        left: SCREEN_MARGIN,
+        right: SCREEN_MARGIN,
         environment: placeholder,
         dismissOnOutsidePress: dismissible.value,
         onClose: () => {
