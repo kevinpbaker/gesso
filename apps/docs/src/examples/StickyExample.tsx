@@ -58,6 +58,8 @@ function Region(
           onClick={() => inputs.onPick.value(place)}
           height={36}
           paddingLeft={10}
+          // A list row, so the place name starts at the left rather than centring.
+          x="start"
           y="center"
           backgroundColor="background"
           cursor="pointer"
