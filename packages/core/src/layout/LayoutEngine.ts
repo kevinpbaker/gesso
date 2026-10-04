@@ -1985,10 +1985,24 @@ export class LayoutEngine {
     // that then assigns a larger box (the layout root filling its
     // viewport, a stretched cross axis) gets the same resolution and
     // second pass from placeFlex.
+    //
+    // "Overflows" is measured by what the line would shrink-wrap to,
+    // not by its base sizes alone. A `flex: 1` item starts from zero
+    // but the container wraps around its content (`lineMaxContentMain`),
+    // and that can be wider than the space there is: a card's summary
+    // in a 248px button asked for 428. Comparing only the bases let the
+    // container come out at the content's width, past its own maximum,
+    // with nothing flexed — so a parent that centres it (a button does)
+    // pushed half the overflow off the start edge and the clip cut the
+    // first words. Wrapping around content is CSS's fit-content, which
+    // never exceeds the available space; past it, the line is resolved
+    // there and the growing item takes what is left, as it would in a
+    // definite container.
     let contentMain = 0;
     for (const line of lines) {
       const lineTotal = this.lineOuterMain(line, config.gapMain, 'hypothetical');
-      if (mainBounded && (mainDefinite || lineTotal > mainMax)) {
+      const lineWanted = this.lineMaxContentMain(line, config.gapMain);
+      if (mainBounded && (mainDefinite || lineTotal > mainMax || lineWanted > mainMax)) {
         this.resolveLine(line, mainMax - config.gapMain * (line.items.length - 1), config);
         this.measureFlexedItems(
           line.items,
@@ -2001,7 +2015,7 @@ export class LayoutEngine {
         for (const item of line.items) {
           item.finalMain = item.hypotheticalMain;
         }
-        contentMain = Math.max(contentMain, this.lineMaxContentMain(line, config.gapMain));
+        contentMain = Math.max(contentMain, lineWanted);
       }
     }
     if (mainDefinite) {

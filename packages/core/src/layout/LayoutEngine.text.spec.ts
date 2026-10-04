@@ -181,6 +181,51 @@ describe('LayoutEngine text', () => {
       expect(harness.box(rows[1])).toEqual({ x: 0, y: 12, width: 94, height: 12 });
       expect(harness.record(panel).measuredHeight).toBe(24);
     });
+
+    /**
+     * The other side of the panel above: wrapping around a flexible
+     * item's content is fit-content, and fit-content stops at the space
+     * there is.
+     *
+     * A map card: a fixed-size button holding a row of a colour band
+     * and a column that takes the rest, with a summary longer than the
+     * card. Measured around the summary's whole line the row came out
+     * wider than the button, nothing flexed, and the button — which
+     * centres its content — pushed half the excess off its left edge,
+     * where its clip cut the first words of every long summary.
+     */
+    it('shrink-wraps a row around a flexible column only as far as the space there is', () => {
+      const harness = new LayoutHarness();
+      const root = harness.createNode('app', UiNodeType.Box);
+      root.setProperty('width', 400);
+      root.setProperty('height', 200);
+      const card = harness.createNode('card', UiNodeType.Button);
+      card.setProperty('position', 'absolute');
+      card.setProperty('left', 20);
+      card.setProperty('top', 10);
+      card.setProperty('width', 100);
+      card.setProperty('height', 40);
+      card.setProperty('overflow', 'hidden');
+      const row = harness.createNode('row', UiNodeType.Row);
+      const band = leaf(harness, 'band', 6, 10);
+      const column = harness.createNode('column', UiNodeType.Column);
+      column.setProperty('flex', 1);
+      column.setProperty('minWidth', 0);
+      // 114 wide on one line, wider than the 94 the column can have.
+      const summary = text(harness, 'summary', 'abcd efgh ijkl mnop', { maxLines: 2, textOverflow: 'ellipsis' });
+      harness.append(column, summary);
+      harness.append(row, band, column);
+      harness.append(card, row);
+      harness.append(root, card);
+      harness.layout(root, Constraints.loose(400, 200));
+      // The row is the card's width and starts at its edge (centred down
+      // the card, as a button centres); the column grows into what the
+      // band leaves, and the summary wraps there.
+      expect(harness.box(row)).toEqual({ x: 20, y: 18, width: 100, height: 24 });
+      expect(harness.box(band)).toEqual({ x: 20, y: 18, width: 6, height: 10 });
+      expect(harness.box(column)).toEqual({ x: 26, y: 18, width: 94, height: 24 });
+      expect(harness.box(summary)).toEqual({ x: 26, y: 18, width: 94, height: 24 });
+    });
   });
 
   describe('baseline alignment', () => {
