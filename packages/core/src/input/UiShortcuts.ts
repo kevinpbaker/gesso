@@ -491,12 +491,78 @@ export function formatShortcut(
   steps: readonly UiShortcutStep[],
   platform: EditingPlatform = detectEditingPlatform()
 ): string {
-  return steps.map(step => (platform === 'mac' ? formatMacStep(step) : formatStep(step))).join(' ');
+  return shortcutKeyCaps(steps, platform)
+    .map(caps => caps.join(platform === 'mac' ? '' : '+'))
+    .join(' ');
 }
 
+/**
+ * The keys of each press, one string per key, for a help sheet that
+ * draws them as key caps: `[['⇧', '⌘', 'K']]` on a Mac and
+ * `[['Ctrl', 'Shift', 'K']]` elsewhere, and a chord is one array per
+ * press. They are the pieces `formatShortcut` joins, so a sheet and a
+ * palette print the same keys.
+ */
+export function shortcutKeyCaps(
+  steps: readonly UiShortcutStep[],
+  platform: EditingPlatform = detectEditingPlatform()
+): readonly (readonly string[])[] {
+  return steps.map(step => [...modifierNames(step, platform, MAC_CAPS, OTHER_CAPS), keyName(step.key)]);
+}
+
+/**
+ * The shortcut as a screen reader should say it: `Command Shift K` on a
+ * Mac and `Control Shift K` elsewhere, `Down arrow`, `Question mark`,
+ * and `g then d` for a chord.
+ *
+ * A key cap's `⌘` or `↓` is read out inconsistently or not at all, and
+ * punctuation is skipped at a screen reader's default verbosity, so a
+ * row that shows caps takes this as its name.
+ */
+export function describeShortcut(
+  steps: readonly UiShortcutStep[],
+  platform: EditingPlatform = detectEditingPlatform()
+): string {
+  return steps
+    .map(step => {
+      const modifiers = modifierNames(step, platform, MAC_WORDS, OTHER_WORDS);
+      return [...modifiers, spokenKey(step.key, modifiers.length > 0)].join(' ');
+    })
+    .join(' then ');
+}
+
+type ModifierNames = Readonly<Record<'ctrl' | 'alt' | 'shift' | 'meta', string>>;
+
 /** In the order the Mac's menus print them: Control, Option, Shift, Command. */
-function formatMacStep(step: UiShortcutStep): string {
-  return `${step.ctrl ? '⌃' : ''}${step.alt ? '⌥' : ''}${step.shift ? '⇧' : ''}${step.mod || step.meta ? '⌘' : ''}${keyName(step.key)}`;
+const MAC_CAPS: ModifierNames = { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' };
+const MAC_WORDS: ModifierNames = { ctrl: 'Control', alt: 'Option', shift: 'Shift', meta: 'Command' };
+const OTHER_CAPS: ModifierNames = { ctrl: 'Ctrl', meta: 'Meta', alt: 'Alt', shift: 'Shift' };
+const OTHER_WORDS: ModifierNames = { ctrl: 'Control', meta: 'Meta', alt: 'Alt', shift: 'Shift' };
+
+/**
+ * A press's modifiers, in the platform's order: Control, Option, Shift,
+ * Command on a Mac, where `Mod` is Command; Control, Meta, Alt, Shift
+ * elsewhere, where it is Control.
+ */
+function modifierNames(
+  step: UiShortcutStep,
+  platform: EditingPlatform,
+  mac: ModifierNames,
+  other: ModifierNames
+): string[] {
+  const names: string[] = [];
+  if (platform === 'mac') {
+    if (step.ctrl) names.push(mac.ctrl);
+    if (step.alt) names.push(mac.alt);
+    if (step.shift) names.push(mac.shift);
+    if (step.mod || step.meta) names.push(mac.meta);
+  } else {
+    if (step.mod || step.ctrl) names.push(other.ctrl);
+    if (step.meta) names.push(other.meta);
+    if (step.alt) names.push(other.alt);
+    if (step.shift) names.push(other.shift);
+  }
+  return names;
 }
 
 /** The arrows as arrows, which every keyboard prints them as. */
@@ -512,22 +578,34 @@ function keyName(key: string): string {
   return KEY_NAMES[key] ?? (key.length === 1 ? key.toUpperCase() : key);
 }
 
-function formatStep(step: UiShortcutStep): string {
-  const parts: string[] = [];
-  if (step.mod || step.ctrl) {
-    parts.push('Ctrl');
-  }
-  if (step.meta) {
-    parts.push('Meta');
-  }
-  if (step.alt) {
-    parts.push('Alt');
-  }
-  if (step.shift) {
-    parts.push('Shift');
-  }
-  parts.push(keyName(step.key));
-  return parts.join('+');
+/** What a screen reader should say for a key it would read as a symbol, or skip. */
+const SPOKEN_KEYS: Readonly<Record<string, string>> = {
+  ' ': 'Space',
+  ArrowUp: 'Up arrow',
+  ArrowDown: 'Down arrow',
+  ArrowLeft: 'Left arrow',
+  ArrowRight: 'Right arrow',
+  PageUp: 'Page up',
+  PageDown: 'Page down',
+  '?': 'Question mark',
+  '/': 'Slash',
+  '\\': 'Backslash',
+  '.': 'Period',
+  ',': 'Comma',
+  ';': 'Semicolon',
+  ':': 'Colon',
+  "'": 'Apostrophe',
+  '`': 'Backtick',
+  '[': 'Left bracket',
+  ']': 'Right bracket',
+  '-': 'Minus',
+  '=': 'Equals',
+  '+': 'Plus'
+};
+
+/** A letter as typed when it's pressed alone (`j`), and as its cap after a modifier (`Command K`). */
+function spokenKey(key: string, modified: boolean): string {
+  return SPOKEN_KEYS[key] ?? (key.length === 1 && !modified ? key : keyName(key));
 }
 
 function defaultClock(): number {
