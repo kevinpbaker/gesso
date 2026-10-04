@@ -336,7 +336,9 @@ what the spec imports.
   NVDA. This repository's `pnpm check:a11y` goes one step further and
   reads Chrome's own computed accessibility tree, because an element
   with the right attributes can still be ignored by the platform, and
-  that is still not a screen reader either.
+  that is still not a screen reader either. It fails a control that Tab
+  never reaches, unless the route lists it in `outOfTabOrder` with the
+  keyboard way to the same thing; the report prints each one.
 
 The discipline that follows from all of that: a passing suite is
 evidence that the tree, the events and the layout are right, and it is
