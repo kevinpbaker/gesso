@@ -215,6 +215,7 @@ An entry takes either an anchor or its own placement in the viewport:
 | `center`                | `'x'`, `'y'` or `'both'`: keep an unanchored entry in the middle of the viewport on that axis. |
 | `dismissOnOutsidePress` | Put a backdrop underneath that closes the entry.                                               |
 | `modal`                 | Put the backdrop underneath even when it doesn't close the entry, so the page takes no press.  |
+| `scrim`                 | Dim the page under the backdrop with the theme's `scrim`. On by default for a modal entry.     |
 | `environment`           | A node whose theme, text style and content colour the content should keep.                     |
 | `zIndex`                | Order among open entries. Later entries paint on top by default.                               |
 
@@ -235,6 +236,9 @@ lands on its backdrop and never on a panel drawn under it. `modal`
 gives an entry that doesn't close on an outside press that backdrop
 anyway; `Dialog` sets it, so a dialog that can't be dismissed still
 keeps the page from presses, as a browser's modal `<dialog>` does.
+A modal entry's backdrop is also dimmed with the theme's `scrim`, which
+fades in as it opens; `scrim: false` keeps it clear. A backdrop that is
+only there to close a menu is never dimmed.
 
 **An entry inherits nothing from the tree that opened it.** The layer
 is mounted above the application root, so the content is nowhere near

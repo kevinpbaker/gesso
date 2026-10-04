@@ -92,6 +92,16 @@ export interface OverlayEntry {
    * page.
    */
   readonly modal?: boolean;
+  /**
+   * Dim the page under the backdrop with the theme's `scrim` colour, as
+   * a browser draws `<dialog>::backdrop`. It fades in as the entry
+   * opens, or appears at once under reduced motion.
+   *
+   * On by default for a modal entry, and only there: a menu or a list
+   * of suggestions closes on a press outside it without saying the page
+   * can't be used. False keeps a modal's backdrop clear.
+   */
+  readonly scrim?: boolean;
   /** Order among open entries; later entries paint on top by default. */
   readonly zIndex?: number;
   /**

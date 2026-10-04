@@ -63,6 +63,12 @@ describe('highContrastColors', () => {
     expect(raised.controlBackgroundHovered).toBe(lightColors.controlBackgroundHovered);
   });
 
+  it('leaves the scrim, which dims the page rather than marking it, as it was', () => {
+    // Measured against the dark background, black would have come out grey.
+    expect(highContrastColors(lightColors).scrim).toBe(lightColors.scrim);
+    expect(highContrastColors(darkColors).scrim).toBe(darkColors.scrim);
+  });
+
   it('raises a name a custom palette added', () => {
     const custom = { ...lightColors, accentSoft: rgba(0.75, 0.7, 0.4) };
     const raised = highContrastColors(custom) as typeof custom;

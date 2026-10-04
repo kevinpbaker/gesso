@@ -1,8 +1,20 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Box, Button, Column, percent, ScrollView } from 'gesso-core';
-import { createComponent } from 'gesso-framework';
+import {
+  Box,
+  Button,
+  Column,
+  colorToCss,
+  darkColors,
+  darkTheme,
+  lightColors,
+  lightTheme,
+  percent,
+  ScrollView,
+  type UiNode
+} from 'gesso-core';
+import { AnimationService, createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 
 import { Dialog } from './Dialog';
@@ -182,4 +194,89 @@ describe('Dialog over the page', () => {
       expect(open.value).toBe(!dismissible);
     });
   }
+});
+
+describe("Dialog's scrim", () => {
+  /** The box in the overlay layer painted with the theme's scrim, if there is one. */
+  function scrimOf(root: UiNode): UiNode | undefined {
+    const stack: UiNode[] = [root];
+    while (stack.length > 0) {
+      const node = stack.pop()!;
+      if (node.properties.get('backgroundColor') === 'scrim') return node;
+      for (let child = node.firstChild; child !== null; child = child.nextSibling) stack.push(child);
+    }
+    return undefined;
+  }
+  function mount(props: { scrim?: boolean } = {}, theme = lightTheme) {
+    const open = new BehaviorSubject(false);
+    const ui = renderTest(
+      Box(
+        { width: 400, height: 300, theme },
+        createComponent(Dialog, { open, title: 'Rename', content: Box({ height: 10 }), ...props })
+      ),
+      { width: 400, height: 300 }
+    );
+    return { ui, open, scrim: () => scrimOf(ui.runtime.layoutRoot()) };
+  }
+  /** Every colour a frame filled with. */
+  function fills(ui: ReturnType<typeof renderTest>): string[] {
+    ui.clearDraws();
+    ui.runtime.resize(400, 301);
+    ui.frame();
+    return ui.draws.filter(call => call.name === 'set:fillStyle').map(call => String(call.args[0]));
+  }
+
+  it('dims the page behind it with the theme scrim, fading in with the dialog', () => {
+    const { ui, open, scrim } = mount();
+    expect(scrim()).toBeUndefined();
+    open.next(true);
+    ui.frame();
+    expect(scrim()!.properties.get('opacity')).toBeLessThan(0.5);
+    ui.frame(10_000);
+    // At rest, the motion lets go of the opacity.
+    expect(scrim()!.properties.get('opacity')).toBeUndefined();
+    expect(fills(ui)).toContain(colorToCss(lightColors.scrim));
+    open.next(false);
+    ui.frame();
+    expect(scrim()).toBeUndefined();
+  });
+
+  it("is the palette's the dialog was opened in", () => {
+    const { ui, open } = mount({}, darkTheme);
+    open.next(true);
+    ui.frame(10_000);
+    expect(fills(ui)).toContain(colorToCss(darkColors.scrim));
+  });
+
+  it('is there at once under reduced motion', () => {
+    const { ui, open, scrim } = mount();
+    ui.runtime.services.get(AnimationService).applyReducedMotion(true);
+    open.next(true);
+    ui.frame();
+    expect(scrim()!.properties.get('opacity') ?? 1).toBe(1);
+  });
+
+  it('is left off with scrim={false}, and the page is still kept from presses', () => {
+    const pressed: string[] = [];
+    const open = new BehaviorSubject(false);
+    const ui = renderTest(
+      Box(
+        { width: 400, height: 300, onPointerDown: () => pressed.push('page') },
+        createComponent(Dialog, {
+          open,
+          title: 'Rename',
+          scrim: false,
+          dismissible: false,
+          content: Box({ height: 10 })
+        })
+      ),
+      { width: 400, height: 300 }
+    );
+    open.next(true);
+    ui.frame(10_000);
+    expect(scrimOf(ui.runtime.layoutRoot())).toBeUndefined();
+    ui.fireEvent.pointerDown(5, 5);
+    ui.fireEvent.pointerUp(5, 5);
+    expect(pressed).toEqual([]);
+  });
 });

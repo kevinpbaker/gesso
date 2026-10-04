@@ -42,6 +42,13 @@ export interface DialogProps {
   content?: UiChild;
   /** Escape and the backdrop close it. Both default on. */
   dismissible?: boolean;
+  /**
+   * Dim the page behind it with the theme's `scrim` colour, fading in
+   * with the dialog. Default on. Off leaves the page as it was, still
+   * kept from presses; for a dialog that has to be read against what is
+   * behind it.
+   */
+  scrim?: boolean;
   width?: number;
 }
 
@@ -52,6 +59,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
   const title = input(inputs.title, '');
   const description = input(inputs.description, '');
   const dismissible = input(inputs.dismissible, true);
+  const scrim = input(inputs.scrim, true);
   const width = input(inputs.width, 360);
   const focus = ctx.inject(FocusService);
   const animations = ctx.inject(AnimationService);
@@ -215,6 +223,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         // whether a press on it closes the dialog. Without one, a press
         // beside a dialog that can't be dismissed reached the page.
         modal: true,
+        scrim: scrim.value,
         onClose: () => {
           release();
           inputs.onClose.value?.();

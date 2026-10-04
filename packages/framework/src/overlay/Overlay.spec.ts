@@ -232,6 +232,38 @@ describe('overlays', () => {
     runtime.dispose();
   });
 
+  it("dims the page under a modal entry with the theme's scrim, and under nothing else", () => {
+    const { runtime, overlays, layer, frame } = mount();
+    const scrims = (): number => {
+      let count = 0;
+      const stack: UiNode[] = [layer];
+      while (stack.length > 0) {
+        const node = stack.pop()!;
+        if (node.properties.get('backgroundColor') === 'scrim') count++;
+        for (let child = node.firstChild; child !== null; child = child.nextSibling) stack.push(child);
+      }
+      return count;
+    };
+    const content = () => Box({ width: 120, height: 60 });
+    // A menu closes on a press outside it, and leaves the page as it is.
+    overlays.open({ id: 'menu', dismissOnOutsidePress: true, content: content() });
+    frame();
+    expect(scrims()).toBe(0);
+    overlays.open({ id: 'modal', center: 'both', modal: true, content: content() });
+    frame();
+    expect(scrims()).toBe(1);
+    // Opting out keeps the backdrop, and the page from presses, but clear.
+    overlays.closeAll();
+    overlays.open({ id: 'clear', center: 'both', modal: true, scrim: false, content: content() });
+    frame();
+    expect(scrims()).toBe(0);
+    pressed.length = 0;
+    runtime.input.pointer.pointerDown(300, 250, 1, noKeyModifiers());
+    runtime.input.pointer.pointerUp(300, 250, 0, noKeyModifiers());
+    expect(pressed).toEqual([]);
+    runtime.dispose();
+  });
+
   it('centres an unanchored entry in the viewport', () => {
     const { runtime, layer, overlays, frame } = mount();
     overlays.open({
