@@ -2094,6 +2094,7 @@ declare class UiGraph {
   processEnvironmentDirty(): void;
   private rebuildEnvironment;
   private environmentChangeFlags;
+  private providedChangeFlags;
 }
 type BindingId = number;
 declare class UiBinding<T> {

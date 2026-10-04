@@ -90,8 +90,11 @@ without a prop on each line.
 Set a property beside the role when one value genuinely differs:
 resolution is per field, so `<text textStyle="title" color="primary">`
 takes the size, weight, line height and face of `title` and the palette
-for its colour. A number written on an element should be the exception
-that proves a role is missing from the scale.
+for its colour. On a container a property cascades as the role does,
+laid over the style in scope, so `<box textStyle="body" fontWeight={600}>`
+gives every text below it the body style in a heavier weight, and a text
+that sets its own weight keeps it. A number written on an element should
+be the exception that proves a role is missing from the scale.
 
 ## The scale's roles
 
@@ -122,7 +125,7 @@ in each theme, a blue-black in `lightTheme` and a near-white in
 A node that sets its own `fontSize` and no `lineHeight` gets 1.2 of
 that size, as CSS's `normal` would give it, rather than the 20 of a
 14-point body line: the scale's line heights belong to the scale's
-sizes.
+sizes. The text below it inherits that line along with the size.
 
 A scale lives on a theme, as `theme.typography`, and a role is an
 ordinary value, so `theme.typography.title` is what you hand to a
