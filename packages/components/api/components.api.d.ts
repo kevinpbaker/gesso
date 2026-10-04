@@ -463,6 +463,7 @@ interface MenuBarProps<T> {
   enabled?: (item: T) => boolean;
   labelOf: (item: T) => string;
   acceleratorOf?: (item: T) => string | undefined;
+  checkedOf?: (item: T) => boolean | undefined;
   onChoose?: (item: T) => void;
   onDismiss?: () => void;
   barRef?: (node: UiNode | null) => void;

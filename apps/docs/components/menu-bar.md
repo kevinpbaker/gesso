@@ -38,6 +38,7 @@ the titles are not stops of their own.
 | `labelOf`       | What a command is called, which a row shows and type-ahead matches                     |
 | `enabled`       | Whether a command can be chosen right now. Omitted means all of them are               |
 | `acceleratorOf` | A command's shortcut, already written the way it should be read                        |
+| `checkedOf`     | Whether a command that is a setting is on. Undefined for a plain action                |
 | `onChoose`      | Called with the command that was chosen                                                |
 | `onDismiss`     | Called when the bar is done with the keyboard                                          |
 | `barRef`        | The bar itself, for an application that focuses it from a shortcut                     |
@@ -52,6 +53,15 @@ because what a shortcut is _called_ depends on the platform and on what
 the application has decided to call its modifiers. A component that
 guessed would be wrong on somebody's machine in a way they could not
 correct.
+
+**A setting gets a tick.** `checkedOf` is for the commands that are
+switched on and off rather than done: show gridlines, or one of light,
+dark and match the system. True draws a tick, false leaves its place
+empty, and undefined says the command is a plain action. A menu with
+any setting in it keeps a column for ticks on every row, so its labels
+stay in one line. The row is a `menuitemcheckbox` with the `checked`
+state, which is what a screen reader needs to say "checked" rather than
+leave it to the tick. Like `labelOf`, it is read when the menu opens.
 
 **Choosing also dismisses.** `onChoose` is followed by `onDismiss`,
 because picking a command closes the bar and gives the keyboard back.

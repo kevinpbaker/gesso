@@ -23,6 +23,16 @@ export interface MenuBarProps<T> {
    * be wrong on somebody's machine in a way they cannot correct.
    */
   acceleratorOf?: (item: T) => string | undefined;
+  /**
+   * Whether a command is on, for one that is a setting rather than an
+   * action: true draws a tick and false leaves its place empty. A
+   * command it returns undefined for is a plain action and has no tick
+   * at all.
+   *
+   * Read when its menu opens, like `labelOf`, so it answers from the
+   * application's state rather than being kept in step with it.
+   */
+  checkedOf?: (item: T) => boolean | undefined;
   onChoose?: (item: T) => void;
   /** Called when the bar is done with the keyboard, so the page takes it back. */
   onDismiss?: () => void;
@@ -186,10 +196,23 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
           })
         ]
       },
-      ...(menus()[index]?.entries ?? []).map((entry, at) => item(entry, at, index))
+      ...(menus()[index]?.entries ?? []).map((entry, at) => item(entry, at, index, ticked(index)))
     );
 
-  const item = (entry: T | typeof MENU_SEPARATOR, at: number, menu: number): UiChild => {
+  /**
+   * Whether a menu has a column for ticks: every row in it does when
+   * any of its commands is a setting, so the labels stay in one line
+   * whether or not each one is on.
+   */
+  const ticked = (menu: number): boolean => {
+    const checkedOf = inputs.checkedOf.value;
+    return (
+      checkedOf !== undefined &&
+      (menus()[menu]?.entries ?? []).some(entry => entry !== MENU_SEPARATOR && checkedOf(entry as T) !== undefined)
+    );
+  };
+
+  const item = (entry: T | typeof MENU_SEPARATOR, at: number, menu: number, tickColumn: boolean): UiChild => {
     if (entry === MENU_SEPARATOR) {
       return Box({
         key: `rule-${at}`,
@@ -204,6 +227,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     const text = context.labelOf(command);
     const on = context.enabled(command);
     const accelerator = inputs.acceleratorOf.value?.(command) ?? '';
+    const checked = inputs.checkedOf.value?.(command);
     const highlighted: Observable<boolean> = state.pipe(
       map(current => current.open && current.focused === menu && current.active === at)
     );
@@ -219,8 +243,9 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         y: 'center',
         cursor: on ? 'pointer' : 'default',
         backgroundColor: highlighted.pipe(map(is => (is ? 'controlBackgroundHovered' : 'transparent'))),
-        role: 'menuitem',
+        role: checked === undefined ? 'menuitem' : 'menuitemcheckbox',
         label: text,
+        states: checked === true ? ['checked'] : undefined,
         disabled: !on,
         /**
          * Hovering moves the *same* highlight the arrows move.
@@ -238,14 +263,33 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         },
         onClick: () => choose(command)
       },
+      Row(
+        { flex: 1, gap: 6, y: 'center' },
+        ...(tickColumn
+          ? [
+              Text({
+                text: checked === true ? '✓' : '',
+                width: 12,
+                fontSize: 12,
+                color: on ? 'controlForeground' : 'controlForegroundDisabled',
+                selectable: false
+              })
+            ]
+          : []),
+        Text({
+          text,
+          flex: 1,
+          fontSize: 12,
+          color: on ? 'controlForeground' : 'controlForegroundDisabled',
+          selectable: false
+        })
+      ),
       Text({
-        text,
-        flex: 1,
-        fontSize: 12,
-        color: on ? 'controlForeground' : 'controlForegroundDisabled',
+        text: accelerator,
+        fontSize: 11,
+        color: 'textMuted',
         selectable: false
-      }),
-      Text({ text: accelerator, fontSize: 11, color: 'textMuted', selectable: false })
+      })
     );
   };
 
@@ -312,7 +356,12 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
             );
           }
         },
-        Text({ text: menu.label, fontSize: 12, color: 'text', selectable: false })
+        Text({
+          text: menu.label,
+          fontSize: 12,
+          color: 'text',
+          selectable: false
+        })
       )
     )
   );
