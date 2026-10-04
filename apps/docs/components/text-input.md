@@ -226,10 +226,28 @@ const caret = editing.caretRectOf(fieldNode);
 ```
 
 The rectangle is in the field's own coordinates, with the field's
-scroll already applied, so a popup adds the field's position on
-screen and nothing else. It is null for a node that is not a field
+scroll already applied. It is null for a node that is not a field
 and for one that has not been laid out yet. Both happen in the frame
 a field first appears, and both mean ask again next frame.
+
+A second argument asks about another character than the one the caret
+is on. A list of names opened by `@` belongs under the `@`, not under
+the caret, which moves on as the name is typed:
+
+```tsx
+const at = editing.caretRectOf(fieldNode, start); // where the @ is
+list.show(content, {
+  anchor: fieldNode,
+  anchorRect: { x: at.x, y: at.y, width: 0, height: at.height },
+  placement: 'bottom-start'
+});
+```
+
+Given as the overlay's `anchorRect`, with the field as its anchor, the
+list follows the field through scrolling like any anchored overlay. A
+point would stay where it was put. `anchorRect` can be an Observable
+too, so the list moves with its word when the word wraps onto the next
+line, without opening again.
 
 ## Next
 

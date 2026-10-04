@@ -10,6 +10,7 @@ import {
 } from "rxjs";
 import {
   ObjectFit,
+  Reactive,
   UiChild,
   UiColorValue,
   UiKeyboardEvent,
@@ -35,6 +36,7 @@ import {
   Inputs,
   InternalState,
   OverlayPlacement,
+  OverlayRect,
   ReadableCell,
   ResourceStatus
 } from "gesso-framework";
@@ -365,6 +367,7 @@ interface OverlayHandle {
 }
 interface OverlayOptions {
   readonly anchor?: UiNode | null;
+  readonly anchorRect?: Reactive<OverlayRect | undefined>;
   readonly placement?: OverlayPlacement;
   readonly offset?: number;
   readonly top?: number;

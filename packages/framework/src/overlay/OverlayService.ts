@@ -1,4 +1,4 @@
-import type { UiChild, UiNode } from 'gesso-core';
+import type { Reactive, UiChild, UiNode } from 'gesso-core';
 import { internalState } from '../InternalState';
 
 export type OverlayPlacement =
@@ -15,6 +15,14 @@ export type OverlayPlacement =
   | 'right-start'
   | 'right-end';
 
+/** A rectangle inside an anchor, from its border box's top left. */
+export interface OverlayRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 /**
  * One thing floating above the app: a menu, a tooltip, a dialog.
  *
@@ -30,6 +38,15 @@ export interface OverlayEntry {
   readonly id: string;
   readonly content: UiChild;
   readonly anchor?: UiNode | null;
+  /**
+   * The part of `anchor` to open beside, in the anchor's own
+   * coordinates: a character in a field, from
+   * `EditingService.caretRectOf(field, offset)`. The entry follows the
+   * anchor as it would without it, through scrolling and layout. It can
+   * be a stream, so a list under a word being typed moves with the word
+   * when it wraps to the next line, without being opened again.
+   */
+  readonly anchorRect?: Reactive<OverlayRect | undefined>;
   /** Default 'bottom'. */
   readonly placement?: OverlayPlacement;
   /** Gap between content and anchor. */

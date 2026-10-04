@@ -714,6 +714,22 @@ export const UiProperties = {
     affects: L
   }),
 
+  /**
+   * The part of the anchor to be placed beside, in the anchor's own
+   * coordinates (from its border box's top left): a character in a
+   * field, the word being typed. The node is placed against that
+   * rectangle as it would be against the whole anchor, and follows the
+   * anchor through scrolling in the same way. Ignored without `anchor`.
+   */
+  anchorRect: defineProperty<
+    { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined
+  >({
+    name: 'anchorRect',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
   /** Gap between an anchored node and its anchor. */
   anchorOffset: defineProperty<number | undefined>({
     name: 'anchorOffset',

@@ -357,6 +357,48 @@ describe('LayoutEngine positioning', () => {
     });
 
     /**
+     * A part of the anchor: the character a mention began at, in a
+     * paragraph as wide as the page. Placed under the whole field, the
+     * list sat at the paragraph's left edge whatever the line the `@`
+     * was on; at a point, it stayed behind when the page scrolled.
+     */
+    it('places beside a part of its anchor, and follows it through scrolling', () => {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const scroller = node(h, 'scroller', UiNodeType.ScrollView, { width: 300, height: 200 });
+      const spacer = box(h, 'spacer', { width: 50, height: 300 });
+      const field = box(h, 'field', { width: 280, height: 60 });
+      h.append(scroller, spacer, field);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor: field,
+        anchorRect: { x: 120, y: 20, width: 0, height: 18 },
+        placement: 'bottom-start',
+        anchorOffset: 4,
+        width: 100,
+        height: 40
+      });
+      h.append(layer, popup);
+      h.append(root, scroller, layer);
+      h.layout(root, Constraints.loose(300, 400));
+      // The field is at y 300; the part is 120 in and 20 down, 18 tall.
+      expect(h.box(popup)).toEqual({ x: 120, y: 342, width: 100, height: 40 });
+
+      scroller.setProperty('scrollY', 160);
+      h.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[scroller, DirtyFlags.Transform]])),
+        Constraints.loose(300, 400)
+      );
+      expect(h.box(popup).y).toBe(182);
+
+      // A later character moves it, and the right edge still holds it in.
+      popup.setProperty('anchorRect', { x: 250, y: 40, width: 0, height: 18 });
+      h.engine.layoutForFrame(new UiFrame(2, 0, new Map([[popup, DirtyFlags.Layout]])), Constraints.loose(300, 400));
+      expect(h.box(popup)).toEqual({ x: 200, y: 202, width: 100, height: 40 });
+    });
+
+    /**
      * A scene where the anchor can be moved by layout rather than by
      * scrolling: a spacer above it in the flow, and an overlay layer
      * that is a sibling of the whole app column, so nothing the anchor

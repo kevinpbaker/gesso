@@ -1,7 +1,13 @@
 import { distinctUntilChanged, map, type Observable } from 'rxjs';
 
-import { type ComponentContext, OverlayService, type OverlayEntry, type OverlayPlacement } from 'gesso-framework';
-import type { UiChild, UiNode } from 'gesso-core';
+import {
+  type ComponentContext,
+  OverlayService,
+  type OverlayEntry,
+  type OverlayPlacement,
+  type OverlayRect
+} from 'gesso-framework';
+import type { Reactive, UiChild, UiNode } from 'gesso-core';
 
 /**
  * One component's entry in the overlay layer.
@@ -22,6 +28,8 @@ export interface OverlayHandle {
 
 export interface OverlayOptions {
   readonly anchor?: UiNode | null;
+  /** The part of the anchor to open beside, such as a character in a field; see `OverlayEntry.anchorRect`. */
+  readonly anchorRect?: Reactive<OverlayRect | undefined>;
   readonly placement?: OverlayPlacement;
   readonly offset?: number;
   readonly top?: number;

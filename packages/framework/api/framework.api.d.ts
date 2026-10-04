@@ -459,6 +459,7 @@ import {
   MotionStateInput,
   MotionTiming,
   performanceMarksEnabled,
+  Reactive,
   RendererBackend,
   setPerformanceMarks as setPerformanceMarks$1,
   Size,
@@ -741,10 +742,17 @@ declare function isComponentElement(value: unknown): value is ComponentElement;
 type FrameworkChild = UiChild | ComponentElement;
 declare function createComponent<C extends ComponentType>(component: C, ...args: ComponentArgs<C>): ComponentElement<ComponentProps<C>>;
 type OverlayPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
+interface OverlayRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 interface OverlayEntry {
   readonly id: string;
   readonly content: UiChild;
   readonly anchor?: UiNode | null;
+  readonly anchorRect?: Reactive<OverlayRect | undefined>;
   readonly placement?: OverlayPlacement;
   readonly offset?: number;
   readonly top?: number;
@@ -2524,7 +2532,7 @@ declare class TextService {
 declare class EditingService {
   private controller;
   setController(controller: UiEditingController | null): void;
-  caretRectOf(node: UiNode | null): CaretRect | null;
+  caretRectOf(node: UiNode | null, offset?: number): CaretRect | null;
   select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
 }
 declare class ScrollService {
@@ -2796,6 +2804,7 @@ export {
   OverlayEntry,
   OverlayLayer,
   OverlayPlacement,
+  OverlayRect,
   OverlayService,
   parseUrl,
   PatchEntry,
@@ -3102,6 +3111,7 @@ import {
   OverlayEntry,
   OverlayLayer,
   OverlayPlacement,
+  OverlayRect,
   OverlayService,
   parseUrl,
   PatchEntry,
@@ -3431,6 +3441,7 @@ export {
   type OutputTarget,
   type OverlayEntry,
   type OverlayPlacement,
+  type OverlayRect,
   type Patch,
   type PatchEntry,
   type PatchPath,
