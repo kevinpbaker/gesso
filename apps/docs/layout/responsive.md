@@ -74,6 +74,14 @@ wider: the first layout reports the real size, the matching arm is
 built, and it is laid out before the frame paints, so the narrow arm is
 never on screen at 1400 px.
 
+A rebuilt arm is a new subtree, so whatever lived in the old one goes
+with it: a scroll position, focus, a field's draft, and a dialog
+declared there, which closes as its component unmounts. When the arms
+differ only in how the same parts are arranged (a sidebar beside the
+page or in place of it), keep one tree and change properties: a
+`breakpoint`, or a [split pane](/components/split-pane)'s `show`, which
+hides a pane without unmounting it.
+
 ## What a band costs
 
 Two numbers, both pinned by

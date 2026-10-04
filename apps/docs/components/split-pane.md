@@ -26,17 +26,18 @@ from.
 
 ## Props
 
-| Prop            | Type                      | Default          | What it does                                                        |
-| --------------- | ------------------------- | ---------------- | ------------------------------------------------------------------- |
-| `split`         | `number`                  | none             | Where the divider sits, 0 to 1. Supplying this makes it controlled. |
-| `defaultSplit`  | `number`                  | none             | The starting position, when the component owns it.                  |
-| `onSplitChange` | `(split: number) => void` | none             | Called with the clamped fraction, on a drag and on a key.           |
-| `first`         | `UiChild`                 | an empty row     | The left pane, or the top one.                                      |
-| `second`        | `UiChild`                 | an empty row     | The right pane, or the bottom one.                                  |
-| `direction`     | `'row' \| 'column'`       | `'row'`          | Whether the panes sit side by side or stacked.                      |
-| `min`           | `number`                  | `0.1`            | The smallest the first pane goes.                                   |
-| `max`           | `number`                  | `0.9`            | The largest it goes.                                                |
-| `label`         | `string`                  | `'Resize panes'` | The divider's accessible name. It is not drawn.                     |
+| Prop            | Type                            | Default          | What it does                                                        |
+| --------------- | ------------------------------- | ---------------- | ------------------------------------------------------------------- |
+| `split`         | `number`                        | none             | Where the divider sits, 0 to 1. Supplying this makes it controlled. |
+| `defaultSplit`  | `number`                        | none             | The starting position, when the component owns it.                  |
+| `onSplitChange` | `(split: number) => void`       | none             | Called with the clamped fraction, on a drag and on a key.           |
+| `first`         | `UiChild`                       | an empty row     | The left pane, or the top one.                                      |
+| `second`        | `UiChild`                       | an empty row     | The right pane, or the bottom one.                                  |
+| `direction`     | `'row' \| 'column'`             | `'row'`          | Whether the panes sit side by side or stacked.                      |
+| `min`           | `number`                        | `0.1`            | The smallest the first pane goes.                                   |
+| `max`           | `number`                        | `0.9`            | The largest it goes.                                                |
+| `label`         | `string`                        | `'Resize panes'` | The divider's accessible name. It is not drawn.                     |
+| `show`          | `'both' \| 'first' \| 'second'` | `'both'`         | Both panes, or one alone; see below.                                |
 
 Supplying neither `split` nor `defaultSplit` leaves the divider at
 `0.5` and self-managing. Supplying both throws, naming the component
@@ -63,6 +64,25 @@ keeping: it is one number, so a screen that restores where the user
 left the divider is a cell you save and hand back. As everywhere else
 in the library, a controlled component that is handed no `onSplitChange`
 never moves.
+
+## One pane at a time
+
+`show` puts one pane on the whole container and hides the other, with
+the divider: the sidebar put away, or a list and its detail on a phone,
+one after the other. It can be an Observable, so it can follow the
+width the split has.
+
+```tsx
+<SplitPane split={ratio} show={narrow.pipe(map(n => (n ? 'second' : 'both')))} first={nav} second={page} />
+```
+
+The pane that isn't shown is hidden, not taken out of the tree: it
+draws nothing, takes no press, has no tab stop and says nothing to a
+screen reader, and everything in it is kept. A scroll position, a half
+typed draft, focus that comes back to it, a dialog it opened: all of it
+is there when it is shown again. That is the point of it over choosing
+which pane to build. A screen built again for a narrower window is a new
+screen, and a dialog open in the old one closes with it.
 
 ## Sizing it
 
@@ -152,7 +172,9 @@ are asserted in the spec beside the example. The pan was verified
 against the real pointer controller and hit tester rather than by
 dispatching a pan event at the handler, because a component that asks
 for the wrong gesture passes that second test and fails in a browser,
-which is exactly what happened to this divider once.
+which is exactly what happened to this divider once. `Structure.spec.ts`
+shows each pane alone and both again, and checks the hidden one keeps
+its nodes, its scroll and the focus.
 
 ## Next
 
