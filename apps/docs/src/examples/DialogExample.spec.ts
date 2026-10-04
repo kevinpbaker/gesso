@@ -60,15 +60,13 @@ describe('the docs dialog example', () => {
     expect(record.states).toEqual(['modal']);
   });
 
-  it('opens centred in the canvas, pinned to no edge but a margin each side', () => {
+  it('opens centred in the canvas, pinned to no edge but a margin on each', () => {
     const ui = mount();
     openWith(ui, 'Delete note');
 
     const entry = entries(ui)[0];
     expect(entry.center).toBe('both');
-    expect(entry.top).toBeUndefined();
-    expect(entry.left).toBe(16);
-    expect(entry.right).toBe(16);
+    expect([entry.top, entry.right, entry.bottom, entry.left]).toEqual([16, 16, 16, 16]);
     expect(entry.anchor ?? null).toBeNull();
   });
 

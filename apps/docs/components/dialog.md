@@ -129,15 +129,51 @@ a real defect, found by opening the page rather than by any spec, and
 the decision record above is where it is written down.
 
 The entry is centred on both axes and pinned to no edge but a 16 pixel
-margin each side, so the box the layer gives it spans the viewport and
+margin on each, so the box the layer gives it spans the viewport and
 the dialog sits in the middle of it however tall the content turns out
-to be. The dialog's width is at most that box's, so a 520 pixel dialog
-on a 375 pixel phone is 343 wide rather than running off both sides,
-which is what it did until a keyboard shortcut sheet was opened on a
-phone. Two consequences
-are the caller's to keep modest: a dialog that grows after it opens
-moves on both axes, and one taller than the viewport overflows top and
-bottom rather than just the bottom.
+to be. The dialog is at most the size of that box, as a browser's modal
+`<dialog>` is: a 520 pixel dialog on a 375 pixel phone is 343 wide
+rather than running off both sides, which is what it did until a
+keyboard shortcut sheet was opened on a phone, and a form taller than a
+500 pixel window is 468 tall rather than running off the top and the
+bottom, which the same sheet and a new issue form both did.
+
+## On a short screen
+
+The title and description keep their height and stay at the top. The
+body gets what is left, and scrolls whatever of `content` does not fit,
+so a long form is scrolled to its buttons rather than cut off.
+
+Content that can give up height is given the room there is instead. A
+list in a scroll view of its own, with a height and `minHeight={0}`,
+under a field that filters it:
+
+```tsx
+<Dialog
+  open={open}
+  title="Keyboard shortcuts"
+  width={520}
+  content={
+    <column gap={12} width={percent(100)} minHeight={0}>
+      <editabletext label="Filter shortcuts" />
+      {/* 420 where there's room, less where there isn't. */}
+      <scrollview height={420} minHeight={0}>
+        {rows}
+      </scrollview>
+    </column>
+  }
+/>
+```
+
+Where the window has room, the list is 420 tall whatever the filter
+leaves in it, so the dialog doesn't move as it shortens; in a short
+window it is as tall as fits, the field stays in view, and the list
+scrolls on its own. Without `minHeight={0}` the column keeps the height
+its content asks for, as a flex item does in CSS, and the dialog's body
+scrolls the field away with the list.
+
+A dialog that grows after it opens still moves on both axes, since it
+stays centred.
 
 The entrance fades and scales from 0.96 to 1 through `AnimationService`,
 so it costs a repaint and no layout. Under reduced motion the animation
@@ -167,6 +203,10 @@ browsers are the extent of what any of this has been opened in. The
 centred placement and the theme carried into the layer were checked by
 hand on both renderers in the playground, and not on the single-thread
 route.
+
+The fit is asserted by `Dialog.spec.ts` in the package: a dialog wider
+than the screen, one taller, with its title held while the body
+scrolls, and a list that takes the room there is.
 
 ## Next
 

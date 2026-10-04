@@ -113,12 +113,11 @@ describe('Dialog', () => {
     // Centred on both axes and pinned to no edge but a margin each side,
     // so the box the layer gives it spans the canvas and the dialog sits
     // in the middle of it however tall the content turns out to be, and
-    // a dialog wider than a phone stays inside it.
+    // a dialog wider than a phone or taller than a short window stays
+    // inside it.
     const entry = ui.entries()[0];
     expect(entry.center).toBe('both');
-    expect(entry.top).toBeUndefined();
-    expect(entry.left).toBe(16);
-    expect(entry.right).toBe(16);
+    expect([entry.top, entry.right, entry.bottom, entry.left]).toEqual([16, 16, 16, 16]);
   });
 
   it('Escape closes it', () => {
