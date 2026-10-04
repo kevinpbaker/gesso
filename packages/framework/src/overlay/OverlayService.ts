@@ -82,6 +82,16 @@ export interface OverlayEntry {
    * stays open and follows its anchor through scrolling.
    */
   readonly dismissOnOutsidePress?: boolean;
+  /**
+   * Put the backdrop underneath even when a press outside doesn't close
+   * the entry, as a modal does: everything beneath it, positioned
+   * panels with a zIndex included, is drawn under the backdrop and takes
+   * no press or wheel through it, as the page under a browser's modal
+   * `<dialog>` is inert. Without it, an entry that doesn't close on an
+   * outside press has no backdrop, and a press beside it reaches the
+   * page.
+   */
+  readonly modal?: boolean;
   /** Order among open entries; later entries paint on top by default. */
   readonly zIndex?: number;
   /**

@@ -211,6 +211,10 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         left: SCREEN_MARGIN,
         environment: placeholder,
         dismissOnOutsidePress: dismissible.value,
+        // The backdrop is there either way: `dismissible` decides only
+        // whether a press on it closes the dialog. Without one, a press
+        // beside a dialog that can't be dismissed reached the page.
+        modal: true,
         onClose: () => {
           release();
           inputs.onClose.value?.();

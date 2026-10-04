@@ -41,6 +41,8 @@ export interface OverlayOptions {
   /** Keep the entry in the middle of the viewport along an axis. */
   readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;
+  /** A backdrop that takes presses outside even when they don't close it; see `OverlayEntry.modal`. */
+  readonly modal?: boolean;
   readonly zIndex?: number;
   /** A node whose theme and text style the content should keep. */
   readonly environment?: UiNode | null;

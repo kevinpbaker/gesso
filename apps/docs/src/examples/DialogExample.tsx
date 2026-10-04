@@ -13,8 +13,8 @@ import { HOVER_ACCENT, HOVER_CONTROL } from './interaction';
  * keyboard goes back to the button that opened it.
  *
  * **Uploading** sets `dismissible={false}`. Escape does nothing there
- * and the entry gets no backdrop at all, so the only way out is the
- * button inside it. The keyboard is still trapped either way: that is
+ * and a press on the backdrop does nothing either, so the only way out
+ * is the button inside it. The keyboard is still trapped either way: that is
  * what makes it modal, and it is not what `dismissible` controls.
  *
  * Neither dialog is rendered where it is written. Both leave an
@@ -104,7 +104,7 @@ export function Notes(_inputs: Inputs<{}>, _ctx: ComponentContext) {
         dismissible={false}
         width={300}
         title="Uploading"
-        description="Escape is ignored here, and there is no backdrop to press. Only this button closes it."
+        description="Escape is ignored here, and so is a press outside. Only this button closes it."
         onClose={() => (uploading.value = false)}
         content={
           <button

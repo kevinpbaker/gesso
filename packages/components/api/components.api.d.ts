@@ -380,6 +380,7 @@ interface OverlayOptions {
   };
   readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;
+  readonly modal?: boolean;
   readonly zIndex?: number;
   readonly environment?: UiNode | null;
   readonly onClose?: () => void;
