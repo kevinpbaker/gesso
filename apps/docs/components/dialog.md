@@ -40,7 +40,7 @@ backdrop to press.
 | `description` | `string`     | `''`      | Drawn under the title, and carried on the record as the description.                   |
 | `content`     | `UiChild`    | empty row | The body: buttons, fields, whatever the dialog is for.                                 |
 | `dismissible` | `boolean`    | `true`    | Whether Escape and a press outside close it. See below; it is more than one thing.     |
-| `width`       | `number`     | `360`     | The dialog's width in logical pixels. Read once, when it opens.                        |
+| `width`       | `number`     | `360`     | Its width in logical pixels, or less on a narrow screen. Read once, when it opens.     |
 
 `Dialog` does not take the shared layout props the rest of the library
 takes, and it has no `rootModifiers`. Nothing is drawn where it is
@@ -128,9 +128,13 @@ would come out light. `Dialog` passes the placeholder as the entry's
 a real defect, found by opening the page rather than by any spec, and
 the decision record above is where it is written down.
 
-The entry is centred on both axes and pinned to no edge, so the box the
-layer gives it spans the whole viewport and the dialog sits in the
-middle of it however tall the content turns out to be. Two consequences
+The entry is centred on both axes and pinned to no edge but a 16 pixel
+margin each side, so the box the layer gives it spans the viewport and
+the dialog sits in the middle of it however tall the content turns out
+to be. The dialog's width is at most that box's, so a 520 pixel dialog
+on a 375 pixel phone is 343 wide rather than running off both sides,
+which is what it did until a keyboard shortcut sheet was opened on a
+phone. Two consequences
 are the caller's to keep modest: a dialog that grows after it opens
 moves on both axes, and one taller than the viewport overflows top and
 bottom rather than just the bottom.
