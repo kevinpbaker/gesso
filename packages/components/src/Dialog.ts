@@ -198,46 +198,58 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
 
   // Opening and closing follow the `open` prop: a dialog is controlled
   // by whoever owns the reason it is open.
+  // Until the dialog has mounted, its placeholder is not in the tree and
+  // the overlay would inherit no theme: a dialog open from its first
+  // frame drew in the default light palette over a dark page. So an
+  // opening asked for before mount waits for it.
+  let mounted = false;
+  ctx.onMount(() => {
+    mounted = true;
+    if (inputs.open.value === true && !overlay.isOpen()) openDialog();
+  });
   inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
-      // Reset before the tree is built, so the first frame the dialog
-      // is on screen is the one it starts from rather than a frame of
-      // the previous opening's final state.
-      enter.value = 0;
-      overlay.show(body(), {
-        // Centred in the canvas on both axes.
-        //
-        // A dialog that grows after it opens moves on both axes, which
-        // is the trade for the position a modal is expected in.
-        center: 'both',
-        // A margin on every side, which is what stops a dialog wider
-        // than a phone, or taller than a short window, from meeting its
-        // edges: the dialog is at most the size of what's between.
-        top: SCREEN_MARGIN,
-        right: SCREEN_MARGIN,
-        bottom: SCREEN_MARGIN,
-        left: SCREEN_MARGIN,
-        environment: placeholder,
-        dismissOnOutsidePress: dismissible.value,
-        // The backdrop is there either way: `dismissible` decides only
-        // whether a press on it closes the dialog. Without one, a press
-        // beside a dialog that can't be dismissed reached the page.
-        modal: true,
-        scrim: scrim.value,
-        onClose: () => {
-          release();
-          inputs.onClose.value?.();
-        }
-      });
-      // Started after `show`, so the node the binding writes exists.
-      // Under reduced motion this writes 1 here and completes, and the
-      // dialog is simply present — the end state is identical, which
-      // is the whole argument for snapping rather than skipping.
-      animations.animate(enter, 1, { duration: 'slow', easing: 'decelerate' });
+      if (mounted) openDialog();
     } else if (isOpen !== true && overlay.isOpen()) {
       overlay.hide();
     }
   });
+  function openDialog(): void {
+    // Reset before the tree is built, so the first frame the dialog
+    // is on screen is the one it starts from rather than a frame of
+    // the previous opening's final state.
+    enter.value = 0;
+    overlay.show(body(), {
+      // Centred in the canvas on both axes.
+      //
+      // A dialog that grows after it opens moves on both axes, which
+      // is the trade for the position a modal is expected in.
+      center: 'both',
+      // A margin on every side, which is what stops a dialog wider
+      // than a phone, or taller than a short window, from meeting its
+      // edges: the dialog is at most the size of what's between.
+      top: SCREEN_MARGIN,
+      right: SCREEN_MARGIN,
+      bottom: SCREEN_MARGIN,
+      left: SCREEN_MARGIN,
+      environment: placeholder,
+      dismissOnOutsidePress: dismissible.value,
+      // The backdrop is there either way: `dismissible` decides only
+      // whether a press on it closes the dialog. Without one, a press
+      // beside a dialog that can't be dismissed reached the page.
+      modal: true,
+      scrim: scrim.value,
+      onClose: () => {
+        release();
+        inputs.onClose.value?.();
+      }
+    });
+    // Started after `show`, so the node the binding writes exists.
+    // Under reduced motion this writes 1 here and completes, and the
+    // dialog is simply present — the end state is identical, which
+    // is the whole argument for snapping rather than skipping.
+    animations.animate(enter, 1, { duration: 'slow', easing: 'decelerate' });
+  }
   // The cell outlives the overlay's nodes — the component owns it —
   // so the animation has to be stopped with the component and not with
   // the tree it was writing into.

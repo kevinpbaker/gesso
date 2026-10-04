@@ -248,6 +248,22 @@ describe("Dialog's scrim", () => {
     expect(fills(ui)).toContain(colorToCss(darkColors.scrim));
   });
 
+  it("is the palette's it was declared in when it is open from the moment it mounts", () => {
+    // Opened before its placeholder existed, it once inherited no theme
+    // and drew in the light palette over a dark page.
+    const ui = renderTest(
+      Box(
+        { width: 400, height: 300, theme: darkTheme },
+        createComponent(Dialog, { open: new BehaviorSubject(true), title: 'Guide', content: Box({ height: 10 }) })
+      ),
+      { width: 400, height: 300 }
+    );
+    ui.frame(10_000);
+    const drawn = fills(ui);
+    expect(drawn).toContain(colorToCss(darkColors.scrim));
+    expect(drawn).not.toContain(colorToCss(lightColors.scrim));
+  });
+
   it('is there at once under reduced motion', () => {
     const { ui, open, scrim } = mount();
     ui.runtime.services.get(AnimationService).applyReducedMotion(true);
