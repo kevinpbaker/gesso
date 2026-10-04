@@ -25,7 +25,7 @@ import { darkTheme, lightTheme, rgb8, type UiColor, type UiColors, type UiTextSt
  * is a ramp step, never a fresh colour, which is what stops a palette
  * drifting into forty unrelated hexes as it grows. It answers the
  * twenty-one names `UiColors` declares, so every stock component is
- * dressed, and adds twelve of its own for jobs the stock set has no
+ * dressed, and adds eleven of its own for jobs the stock set has no
  * name for. Extra names work because a colour token is looked up on
  * the palette the node inherits: see `themeColorFor` in
  * `UiThemeColor.ts`.
@@ -149,7 +149,7 @@ const CHALK_FAINT = rgb8(148, 142, 130);
 // #endregion ramps
 
 /**
- * The twelve roles the stock palette has no name for.
+ * The eleven roles the stock palette has no name for.
  *
  * Each is here because something on this site or in an application
  * built on it has to name the colour and would otherwise write a
@@ -173,8 +173,6 @@ export interface BrandColors extends UiColors {
   readonly warning: UiColor;
   readonly warningMuted: UiColor;
   readonly dangerMuted: UiColor;
-  /** What a dialog dims the screen behind it with. */
-  readonly scrim: UiColor;
 }
 
 const lightColors: BrandColors = {

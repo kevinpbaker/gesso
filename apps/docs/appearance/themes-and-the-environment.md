@@ -123,7 +123,9 @@ gradient, and each shadow in `boxShadows`.
 The names in the shipped palette, in the three groups they fall into:
 
 - **The surface and its content.** `background`, `surface`, `primary`,
-  `secondary`, `text`, `textMuted`, `border`, `shadow`.
+  `secondary`, `text`, `textMuted`, `border`, `shadow`, `placeholder`
+  (what stands in for content that hasn't arrived) and `scrim` (what a
+  modal dialog dims the page behind it with, a colour with alpha).
 - **Controls**, named for the role a control plays rather than for a
   widget, so one set serves the checkbox, the switch, the radio, the
   slider and the fields: `controlBackground`,

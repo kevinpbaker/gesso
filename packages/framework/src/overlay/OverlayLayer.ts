@@ -3,6 +3,8 @@ import { map } from 'rxjs';
 import {
   Box,
   defineModifier,
+  fade,
+  motion,
   UiEnvironmentKeys,
   type UiNode,
   type UiChild,
@@ -23,7 +25,9 @@ import { OverlayService, type OverlayEntry } from './OverlayService';
  * edge offsets, or centred in the viewport — and, when the entry asks
  * for it, a full-size
  * backdrop beneath it that takes every press and wheel outside the
- * entry, and closes the entry on them when it is dismissible.
+ * entry, and closes the entry on them when it is dismissible. A modal
+ * entry's backdrop is dimmed with the theme's `scrim` unless it asks
+ * for none.
  * Entries without a backdrop stay open and follow their anchor when
  * the content underneath scrolls.
  *
@@ -52,21 +56,29 @@ export class OverlayLayer extends Component {
         // page under it. One that doesn't close takes the press and the
         // wheel and does nothing with them.
         const dismiss = entry.dismissOnOutsidePress === true;
+        const environment = entry.environment ?? entry.anchor ?? null;
         elements.push(
-          Box({
-            key: `${entry.id}\0backdrop`,
-            position: 'absolute',
-            inset: 0,
-            zIndex: entry.zIndex,
-            ...(dismiss
-              ? {
-                  onPointerDown: () => this.overlays.close(entry.id),
-                  // A wheel over the backdrop is the user scrolling away;
-                  // the menu closes rather than swallowing the scroll.
-                  onWheel: () => this.overlays.close(entry.id)
-                }
-              : {})
-          })
+          Box(
+            {
+              key: `${entry.id}\0backdrop`,
+              position: 'absolute',
+              inset: 0,
+              zIndex: entry.zIndex,
+              // The theme the entry's content has, so the scrim is the
+              // colour of the palette the dialog was opened in.
+              ...inheritedFrom(environment),
+              modifiers: followEnvironment(environment),
+              ...(dismiss
+                ? {
+                    onPointerDown: () => this.overlays.close(entry.id),
+                    // A wheel over the backdrop is the user scrolling away;
+                    // the menu closes rather than swallowing the scroll.
+                    onWheel: () => this.overlays.close(entry.id)
+                  }
+                : {})
+            },
+            ...((entry.scrim ?? entry.modal === true) ? [scrim()] : [])
+          )
         );
       }
       elements.push(
@@ -94,6 +106,25 @@ export class OverlayLayer extends Component {
     }
     return elements;
   }
+}
+
+/**
+ * The dim over the page, inside the backdrop rather than on it.
+ *
+ * A node at opacity 0 takes no presses, so a backdrop fading in would
+ * let a press through to the page on the frame it opens. The fade is
+ * this child's; the backdrop under it is solid to input from the start,
+ * and the child takes none of its own. It comes in at the pace a
+ * `Dialog` does, and under reduced motion it is simply there.
+ */
+function scrim(): UiElement {
+  return Box({
+    position: 'absolute',
+    inset: 0,
+    hitTestable: false,
+    backgroundColor: 'scrim',
+    modifiers: [motion({ initial: fade, duration: 'slow', easing: 'decelerate' })]
+  });
 }
 
 /**

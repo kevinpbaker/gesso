@@ -32,15 +32,16 @@ backdrop does nothing either.
 
 ## Props
 
-| Prop          | Type         | Default   | What it does                                                                           |
-| ------------- | ------------ | --------- | -------------------------------------------------------------------------------------- |
-| `open`        | `boolean`    | none      | Whether the dialog is on screen. The application owns it; a dialog never opens itself. |
-| `onClose`     | `() => void` | none      | Called when the dialog closes, whatever closed it.                                     |
-| `title`       | `string`     | `''`      | Drawn at the top, and used as the accessible name. An empty title draws no heading.    |
-| `description` | `string`     | `''`      | Drawn under the title, and carried on the record as the description.                   |
-| `content`     | `UiChild`    | empty row | The body: buttons, fields, whatever the dialog is for.                                 |
-| `dismissible` | `boolean`    | `true`    | Whether Escape and a press outside close it. See below; it is more than one thing.     |
-| `width`       | `number`     | `360`     | Its width in logical pixels, or less on a narrow screen. Read once, when it opens.     |
+| Prop          | Type         | Default   | What it does                                                                             |
+| ------------- | ------------ | --------- | ---------------------------------------------------------------------------------------- |
+| `open`        | `boolean`    | none      | Whether the dialog is on screen. The application owns it; a dialog never opens itself.   |
+| `onClose`     | `() => void` | none      | Called when the dialog closes, whatever closed it.                                       |
+| `title`       | `string`     | `''`      | Drawn at the top, and used as the accessible name. An empty title draws no heading.      |
+| `description` | `string`     | `''`      | Drawn under the title, and carried on the record as the description.                     |
+| `content`     | `UiChild`    | empty row | The body: buttons, fields, whatever the dialog is for.                                   |
+| `dismissible` | `boolean`    | `true`    | Whether Escape and a press outside close it. See below; it is more than one thing.       |
+| `scrim`       | `boolean`    | `true`    | Whether the page behind it is dimmed with the theme's `scrim`. Read once, when it opens. |
+| `width`       | `number`     | `360`     | Its width in logical pixels, or less on a narrow screen. Read once, when it opens.       |
 
 `Dialog` does not take the shared layout props the rest of the library
 takes, and it has no `rootModifiers`. Nothing is drawn where it is
@@ -97,6 +98,27 @@ through the modal.
 The keyboard trap is not part of this. Both dialogs above trap focus,
 and both are modal; `dismissible` only decides how a user is allowed to
 back out.
+
+## The page behind it is dimmed
+
+The backdrop is filled with the theme's `scrim` colour, as a browser
+draws `<dialog>::backdrop`: the page shows through, dimmed, which says
+it can't be used until the dialog closes and lifts the dialog off it.
+The stock palettes make it the light page's ink at 40% and black at
+60% over the dark one; a theme sets its own like any other token, and
+high contrast leaves it alone, since it is a ground and not a mark. It
+is the palette of the tree the dialog was declared in, as the dialog's
+own surface is.
+
+It fades in with the dialog, at the same pace, and is simply there
+under reduced motion. It goes when the dialog does.
+
+`scrim={false}` leaves the page as it is, for a dialog that has to be
+read against what is behind it. The backdrop is still there and still
+keeps the page from presses; only the colour goes. The overlay layer
+dims under a modal entry and nothing else, so a menu, a popover or a
+list of suggestions that closes on a press outside never dims the page;
+see [the overlay layer](/layout/positioning-and-overlays#the-overlay-layer).
 
 ## Keyboard
 
@@ -215,7 +237,10 @@ route.
 
 The fit is asserted by `Dialog.spec.ts` in the package: a dialog wider
 than the screen, one taller, with its title held while the body
-scrolls, and a list that takes the room there is.
+scrolls, and a list that takes the room there is. So is the scrim: its
+colour in both palettes, its fade and reduced motion, and that a
+dialog without one still keeps the page from presses. It has not been
+compared against a screenshot.
 
 ## Next
 

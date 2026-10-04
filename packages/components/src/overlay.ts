@@ -43,6 +43,8 @@ export interface OverlayOptions {
   readonly dismissOnOutsidePress?: boolean;
   /** A backdrop that takes presses outside even when they don't close it; see `OverlayEntry.modal`. */
   readonly modal?: boolean;
+  /** Dim the page under the backdrop; on by default for a modal entry. See `OverlayEntry.scrim`. */
+  readonly scrim?: boolean;
   readonly zIndex?: number;
   /** A node whose theme and text style the content should keep. */
   readonly environment?: UiNode | null;

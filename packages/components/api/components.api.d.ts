@@ -356,6 +356,7 @@ interface DialogProps {
   description?: string;
   content?: UiChild;
   dismissible?: boolean;
+  scrim?: boolean;
   width?: number;
 }
 declare function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild;
@@ -382,6 +383,7 @@ interface OverlayOptions {
   readonly center?: 'x' | 'y' | 'both';
   readonly dismissOnOutsidePress?: boolean;
   readonly modal?: boolean;
+  readonly scrim?: boolean;
   readonly zIndex?: number;
   readonly environment?: UiNode | null;
   readonly onClose?: () => void;

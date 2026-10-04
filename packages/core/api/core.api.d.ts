@@ -408,6 +408,7 @@ interface UiColors {
   readonly border: UiColor;
   readonly shadow: UiColor;
   readonly placeholder: UiColor;
+  readonly scrim: UiColor;
   readonly controlBackground: UiColor;
   readonly controlBackgroundHovered: UiColor;
   readonly controlBackgroundPressed: UiColor;

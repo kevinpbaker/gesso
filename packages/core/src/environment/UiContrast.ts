@@ -151,6 +151,7 @@ const SURFACES: ReadonlySet<string> = new Set([
   'background',
   'surface',
   'shadow',
+  'scrim',
   'controlBackground',
   'controlBackgroundHovered',
   'controlBackgroundPressed',

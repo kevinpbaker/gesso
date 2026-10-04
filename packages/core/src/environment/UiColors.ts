@@ -28,6 +28,18 @@ export interface UiColors {
    * a button looks while held.
    */
   readonly placeholder: UiColor;
+  /**
+   * What a modal dialog lays over the page behind it, as a browser
+   * draws `<dialog>::backdrop`: a colour with alpha, so the page shows
+   * through dimmed. It says the page can't be used until the dialog is
+   * closed, and lifts the dialog off it.
+   *
+   * Darker than `shadow`, which only has to edge a panel, and darker in
+   * the dark palette than the light, as a shadow is: a dim the colour of
+   * the light page's ink reads on white, and over a page that is
+   * already dark only a deeper one shows.
+   */
+  readonly scrim: UiColor;
 
   // Control tokens. Named for the role a control plays, not for the
   // widget: one set serves the checkbox, the switch, the radio, the
@@ -85,6 +97,7 @@ export const lightColors: UiColors = {
   border: rgb8(229, 231, 235),
   shadow: rgb8(17, 24, 39, 41),
   placeholder: rgb8(240, 241, 244),
+  scrim: rgb8(17, 24, 39, 102),
   controlBackground: UiBasicColors.white,
   controlBackgroundHovered: rgb8(243, 244, 246),
   controlBackgroundPressed: rgb8(229, 231, 235),
@@ -108,6 +121,7 @@ export const darkColors: UiColors = {
   border: rgb8(42, 46, 54),
   shadow: rgb8(0, 0, 0, 128),
   placeholder: rgb8(37, 41, 48),
+  scrim: rgb8(0, 0, 0, 153),
   controlBackground: rgb8(26, 29, 35),
   controlBackgroundHovered: rgb8(35, 39, 46),
   controlBackgroundPressed: rgb8(44, 49, 57),
