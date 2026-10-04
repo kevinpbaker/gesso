@@ -65,10 +65,11 @@ export interface DataColumn<T> {
    *
    * `color` is what the cell's text should be drawn in: the control
    * foreground, or the selection foreground while the row is chosen.
-   * Bind it on every text the cell draws. A row cannot colour its cells
-   * itself, because `color` does not cascade from a parent node, and a
-   * cell that ignores it keeps its colour when the row is chosen, which
-   * on the selection background may not be readable.
+   * Bind it on every text the cell draws. The row does not colour its
+   * cells itself, because a cell's text may name a text style, which
+   * takes that style's colour over an inherited one, and a cell that
+   * ignores it keeps its colour when the row is chosen, which on the
+   * selection background may not be readable.
    */
   readonly cell: (row: T, index: number, color: Observable<UiColorValue>) => UiChild;
   readonly align?: 'start' | 'center' | 'end';

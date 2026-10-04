@@ -6,7 +6,6 @@ import { UiEnvironment } from '../environment/UiEnvironment';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { resolveProperty, resolvePropertyByName, resolveNumber, resolveString } from './UiPropertyResolver';
 import { UiProperties } from './UiProperty';
-import { rgba } from './UiColor';
 
 describe('resolveProperty', () => {
   it('resolves direct values from a node', () => {
@@ -34,7 +33,14 @@ describe('resolveProperty', () => {
     });
     const child = new UiNode('child', UiNodeType.Text);
     child.environment = environment;
-    expect(resolveProperty(child, UiProperties.color)).toEqual(rgba(1, 0, 0));
+    expect(resolveProperty(child, UiProperties.fontSize)).toBe(16);
+  });
+
+  it('resolves an inherited colour from its own key, which a text style and a color both provide', () => {
+    const environment = new UiEnvironment(null).set(UiEnvironmentKeys.color, 'text');
+    const child = new UiNode('child', UiNodeType.Text);
+    child.environment = environment;
+    expect(resolveProperty(child, UiProperties.color)).toBe('text');
   });
 
   it('prefers a local value over an inherited value', () => {

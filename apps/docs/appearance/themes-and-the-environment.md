@@ -301,24 +301,34 @@ element.
 
 Because the cell is an ordinary Observable it reaches a child, which is
 the case a modifier writing properties on its own node cannot serve. A
-control is usually a box with something inside it, and `color` does not
-cascade from a parent node the way it does in CSS, so a button's label
-binds its own colour to the same cell its box binds its padding to.
+control is usually a box with something inside it, and its label names
+a text style, whose colour is nearer than one the box would cascade, so
+a button's label binds its own colour to the same cell its box binds
+its padding to.
 
 ## The rest of the environment
 
-Three values travel this way, and they are the three provider props:
+Four values travel this way:
 
-| Prop           | Inherited by                                                  |
-| -------------- | ------------------------------------------------------------- |
-| `theme`        | Every colour token, in every descendant                       |
-| `textStyle`    | The eight inherited text properties, when a node names none   |
-| `contentColor` | Provided and inherited, and carried into an overlay's content |
+| Prop           | Inherited by                                                        |
+| -------------- | ------------------------------------------------------------------- |
+| `theme`        | Every colour token, in every descendant                             |
+| `textStyle`    | The eight inherited text properties, when a node names none         |
+| `color`        | Text that names no colour, unless a nearer `textStyle` provides one |
+| `contentColor` | Provided and inherited, and carried into an overlay's content       |
+
+`color` is a prop on every element and a provider as well: text below
+it that names no colour of its own takes it, the way CSS's `color`
+cascades. A `textStyle` carries a colour too, and the nearer of the
+two wins, so a role named below a `color` brings its own ink. A token
+travels as a name and is resolved where the text is painted, so
+`<box theme={darkTheme} color="text">` colours its text with the dark
+palette, and a card inside it that provides another theme repaints
+its text in that theme's.
 
 `contentColor` is the honest gap in that table: it is provided,
 inherited and re-provided onto overlay content, and no element that
-ships resolves a colour from it today. Text takes its colour from
-`textStyle`, and everything else takes it from a prop.
+ships resolves a colour from it today.
 
 Motion is deliberately not here. Durations, easings and springs are
 named the way colours are, but they are not a field on `UiTheme`,

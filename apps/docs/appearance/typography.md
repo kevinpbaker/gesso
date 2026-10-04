@@ -27,16 +27,17 @@ on a node:
 | `fontWeight`    | `fontWeight`    | `'normal'`, `'bold'`, or a number                                                               |
 | `lineHeight`    | `lineHeight`    | Logical pixels, not a multiplier                                                                |
 | `letterSpacing` | `letterSpacing` | Logical pixels of extra space per character                                                     |
-| `color`         | `color`         | Where text gets its colour, and not from the theme                                              |
+| `color`         | `color`         | Where text gets its colour when no nearer ancestor sets `color`                                 |
 | `textAlign`     | `textAlign`     | `start` (the default), `end`, `left`, `center` or `right`; start and end follow `textDirection` |
 | `textDirection` | `textDirection` | `ltr` or `rtl`                                                                                  |
 
 The style is the unit of inheritance, which is why it carries a colour.
 Providing a theme does not colour your text: the palette answers
-`color="text"` when a node names that token, and text that names
-nothing takes the colour out of the style in the environment instead.
-A root therefore provides both, which is exactly what the eight lines
-on [light and dark](/guide/appearance) do.
+`color="text"` when a node, or an ancestor nearer than any style,
+names that token, and text that names nothing takes the colour out of
+the style in the environment instead. A root therefore provides both,
+which is exactly what the eight lines on
+[light and dark](/guide/appearance) do.
 
 ## How a provided style reaches text that names nothing
 

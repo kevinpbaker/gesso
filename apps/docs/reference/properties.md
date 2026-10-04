@@ -159,7 +159,7 @@ The text style properties are the inherited ones. Set them on a container and ev
 
 | Property | Default | Inherited | Invalidates | What it does |
 | -------- | ------- | --------- | ----------- | ------------ |
-| `color` | black | yes | Paint | Text colour. Inherited, and a theme token resolves against the theme in scope. |
+| `color` | black | yes | Paint | Text colour. Inherited by text that sets none, unless a nearer `textStyle` provides its own, and a theme token resolves against the theme where the text is painted. |
 | `fontFamily` | `system-ui, sans-serif` | yes | Paint, Layout | Font stack, as a CSS family list. |
 | `fontSize` | `14` | yes | Paint, Layout | Size in pixels. |
 | `fontWeight` | `normal` | yes | Paint, Layout | A number, a numeric string, or a CSS keyword. |

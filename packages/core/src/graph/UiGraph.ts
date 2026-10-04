@@ -11,6 +11,7 @@ import { findEnvironmentKey, type UiEnvironmentKey } from '../environment/UiEnvi
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { isTypographyRole } from '../environment/UiTypography';
 import { inheritedPropertyFlags } from '../properties/UiPropertyRegistry';
+import type { UiTextStyle } from '../properties/UiTextStyle';
 import type { Observable } from 'rxjs';
 
 /**
@@ -633,7 +634,7 @@ export class UiGraph {
         return false;
       }
       node.properties.delete(property);
-      this.markDirty(node, dirtyFlags);
+      this.markDirty(node, this.withProvidedFlags(property, dirtyFlags));
       return true;
     }
     const previousValue = node.getProperty(property);
@@ -641,8 +642,24 @@ export class UiGraph {
       return false;
     }
     node.setProperty(property, value);
-    this.markDirty(node, dirtyFlags);
+    this.markDirty(node, this.withProvidedFlags(property, dirtyFlags));
     return true;
+  }
+
+  /**
+   * Adds the environment flag to a write of `color`, which a node
+   * provides to its subtree as well as paints with.
+   *
+   * Here rather than in the property's `affects`, because `affects`
+   * is also what the layout layer reads to classify a property, and
+   * `color` has to stay paint-only there: the rebuild this schedules
+   * dirties the subtree for paint alone when the colour is all that
+   * changed (see `environmentChangeFlags`). Marked for a childless
+   * node too, since a child appended later inherits from the
+   * environment this rebuilds.
+   */
+  private withProvidedFlags(property: NodeProperty, dirtyFlags: DirtyFlags): DirtyFlags {
+    return property === 'color' ? dirtyFlags | DirtyFlags.Environment : dirtyFlags;
   }
 
   // ---------------------------------------------------------------------------
@@ -737,15 +754,35 @@ export class UiGraph {
       // and a role that turned into a style anywhere later would be a
       // second resolution path for the same six numbers.
       const scale = env.get(UiEnvironmentKeys.theme).typography;
+      let style: UiTextStyle | undefined;
       if (isTypographyRole(textStyle, scale)) {
-        const style = (scale as unknown as Record<string, unknown>)[textStyle];
-        env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, style);
+        style = (scale as unknown as Record<string, UiTextStyle>)[textStyle];
       } else if (typeof textStyle !== 'string') {
-        env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, textStyle);
+        style = textStyle as UiTextStyle;
       }
       // A string the scale does not carry provides nothing: the
       // subtree keeps the type it inherited, which is quieter than
       // every word under it falling back to a default size.
+      if (style !== undefined) {
+        env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, style);
+        // A style carries a colour, and the nearer of a style and a
+        // `color` is the one that wins below it, as the nearer
+        // declaration does in CSS. So a style resets the inherited
+        // colour to its own, and a `color` on the same node, applied
+        // next, overrides it in turn.
+        env = env.set(UiEnvironmentKeys.color as UiEnvironmentKey<unknown>, style.color);
+      }
+    }
+
+    const color = node.getProperty<unknown>('color');
+    if (color !== undefined) {
+      // The value itself, a palette name unresolved, so it is looked up
+      // against the theme in scope where it is painted rather than here.
+      // Until this was provided, `color` was inherited in name only: a
+      // descendant read the colour of the nearest text style, and
+      // `<box theme={darkTheme} color="text">` drew its plain text in
+      // the default style's near-black on its own dark background.
+      env = env.set(UiEnvironmentKeys.color as UiEnvironmentKey<unknown>, color);
     }
 
     const contentColor = node.getProperty<unknown>('contentColor');
@@ -808,14 +845,16 @@ export class UiGraph {
     const visit = (node: UiNode): void => {
       const previous = node.environment;
       const next = this.buildNodeEnvironment(node);
-      if (previous === null || !this.environmentsEqual(previous, next)) {
+      const flags =
+        previous === null ? DirtyFlags.None : this.environmentChangeFlags(previous, next, inheritedPropertyFlags);
+      if (previous === null || flags !== DirtyFlags.None) {
         node.environment = next;
         // A node that already had an environment and now resolves a
         // different one has to repaint. A node that had none is new,
         // and its creation dirtied it already — marking it again would
         // only widen the flags a freshly built node reports.
         if (previous !== null) {
-          this.markDirty(node, inheritedPropertyFlags);
+          this.markDirty(node, flags);
         }
         this.environmentChangedListener?.(node);
       }
@@ -871,15 +910,15 @@ export class UiGraph {
   private rebuildEnvironment(node: UiNode, inheritedFlags: DirtyFlags): void {
     const previous = node.environment;
     const next = this.buildNodeEnvironment(node);
-    const changed = previous === null || !this.environmentsEqual(previous, next);
+    const flags = previous === null ? inheritedFlags : this.environmentChangeFlags(previous, next, inheritedFlags);
 
     // Keep the existing instance when the values match. Environments
     // are immutable snapshots, so holding identity steady is what lets
     // an unchanged subtree be recognised by a pointer compare instead
     // of a key-by-key walk on every propagation.
-    if (changed) {
+    if (flags !== DirtyFlags.None) {
       node.environment = next;
-      this.markDirty(node, inheritedFlags);
+      this.markDirty(node, flags);
       this.environmentChangedListener?.(node);
     }
 
@@ -890,18 +929,40 @@ export class UiGraph {
     }
   }
 
-  private environmentsEqual(a: UiEnvironment, b: UiEnvironment): boolean {
+  /**
+   * What a node whose environment went from `a` to `b` has to redo:
+   * nothing when they hold the same values, a repaint when the
+   * inherited text colour is the only difference, and otherwise
+   * everything an inherited property can affect.
+   *
+   * The colour is singled out because it is the one provided value
+   * that changes with a hover or a selection, and everything else
+   * provided — a theme, a text style — can move a line break, so a
+   * colour change counted as one of them re-laid out the subtree of
+   * every box whose colour was animated.
+   */
+  private environmentChangeFlags(a: UiEnvironment, b: UiEnvironment, inheritedFlags: DirtyFlags): DirtyFlags {
     // The common case by far: a node that provides nothing gets its
     // parent's environment handed straight back.
     if (a === b) {
-      return true;
+      return DirtyFlags.None;
     }
-    if (a.providedSize !== b.providedSize) {
-      return false;
+    // At most the colour can be provided on one side and not the
+    // other, which is a node gaining or losing its `color`.
+    if (Math.abs(a.providedSize - b.providedSize) > 1) {
+      return inheritedFlags;
+    }
+    const colorKey = UiEnvironmentKeys.color.name;
+    let flags = a.providesOwn(colorKey) === b.providesOwn(colorKey) ? DirtyFlags.None : DirtyFlags.Paint;
+    if (a.providedSize - (a.providesOwn(colorKey) ? 1 : 0) !== b.providedSize - (b.providesOwn(colorKey) ? 1 : 0)) {
+      return inheritedFlags;
     }
     for (const keyName of a.providedKeys()) {
       if (!b.providesOwn(keyName)) {
-        return false;
+        if (keyName === colorKey) {
+          continue;
+        }
+        return inheritedFlags;
       }
       const previousValue = a.getOwn(keyName);
       const nextValue = b.getOwn(keyName);
@@ -914,9 +975,12 @@ export class UiGraph {
       const key = findEnvironmentKey(keyName);
       const compare = key?.compare;
       if (compare === undefined || !compare(previousValue, nextValue)) {
-        return false;
+        if (keyName !== colorKey) {
+          return inheritedFlags;
+        }
+        flags = DirtyFlags.Paint;
       }
     }
-    return true;
+    return flags;
   }
 }

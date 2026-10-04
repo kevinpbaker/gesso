@@ -2082,6 +2082,7 @@ declare class UiGraph {
   removeNodeProperty(node: UiNode, property: string, dirtyFlags?: DirtyFlags): boolean;
   updateNodePropertyNow<T>(node: UiNode, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
   applyResolvedProperty(node: UiNode, property: NodeProperty, present: boolean, value: unknown, dirtyFlags: DirtyFlags): boolean;
+  private withProvidedFlags;
   processDirty(callback: (node: UiNode) => void): void;
   private traverseOnce;
   traverse(node: UiNode, callback: (node: UiNode) => void): void;
@@ -2092,7 +2093,7 @@ declare class UiGraph {
   propagateEnvironment(node: UiNode): void;
   processEnvironmentDirty(): void;
   private rebuildEnvironment;
-  private environmentsEqual;
+  private environmentChangeFlags;
 }
 type BindingId = number;
 declare class UiBinding<T> {
@@ -2534,6 +2535,7 @@ declare class EnvironmentNotifier {
 declare const UiEnvironmentKeys: {
   readonly theme: UiEnvironmentKey<UiTheme>;
   readonly textStyle: UiEnvironmentKey<UiTextStyle>;
+  readonly color: UiEnvironmentKey<UiColorValue>;
   readonly contentColor: UiEnvironmentKey<UiColor>;
   readonly containerSize: UiEnvironmentKey<UiContainerSize>;
   readonly insets: UiEnvironmentKey<UiInsetSource>;

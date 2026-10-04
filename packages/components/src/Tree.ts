@@ -175,10 +175,11 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
     const chosen = selected.value.pipe(map(current => current === row.node.key));
     const open = expanded.value.pipe(map(keys => keys.includes(row.node.key)));
     const branch = hasChildren(row.node);
-    // Bound on the text rather than on the row: `color` does not cascade
-    // from a parent node, so a row's colour reached neither its label
-    // nor its arrow, which drew in the text style's colour instead.
-    // That is black in a dark theme too, on a dark row.
+    // Bound on the text rather than on the row. A row's colour once
+    // reached neither its label nor its arrow, which drew in the text
+    // style's colour instead: black in a dark theme too, on a dark row.
+    // `color` cascades now, but binding it where it is drawn keeps the
+    // label right if it ever names a text style of its own.
     const ink = chosen.pipe(map(on => (on ? 'selectionForeground' : 'controlForeground')));
     return Row(
       {

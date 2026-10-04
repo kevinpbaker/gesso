@@ -45,9 +45,9 @@ describe('themeTokenCell', () => {
   });
 
   it('reaches a child, which is the case `host.set` cannot serve', () => {
-    // `color` does not cascade from a parent node, so a label's colour
-    // has to be bound on the label. The cell is an ordinary Observable,
-    // so it can be.
+    // A label that names a text style takes that style's colour over
+    // an inherited one, so its colour has to be bound on the label.
+    // The cell is an ordinary Observable, so it can be.
     const themed = withThemeExtension(lightTheme, metrics, { pad: 4, ink: 'danger' });
     const ui = renderTest(Box({ theme: themed }, createComponent(Padded)), { width: 200, height: 200 });
     expect(ui.getByText('inside').properties.get('color')).toBe('danger');

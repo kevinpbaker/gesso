@@ -84,9 +84,10 @@ different number of rows.
 ### Colouring a cell
 
 A cell's text is the application's, so the table cannot colour it, and
-a row cannot either: `color` does not cascade from a parent node. The
-table hands each cell its colour instead, as the third argument, and a
-cell binds it on the text it draws:
+a row cannot reliably either: text that names a text style takes that
+style's colour over one cascaded from the row. The table hands each
+cell its colour instead, as the third argument, and a cell binds it on
+the text it draws:
 
 ```tsx
 cell: (run, _index, color) => <text text={run.name} color={color} />;

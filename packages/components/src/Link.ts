@@ -233,9 +233,9 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
     inputs.children.value ??
       Text({
         text: label,
-        // Bound on the words rather than provided from the row: colour
-        // does not cascade from a parent node here, so a token set on
-        // the root would leave the text at the theme's default ink.
+        // Bound on the words rather than provided from the root, so
+        // the link keeps its accent under an ancestor that sets a
+        // `color` of its own, which would otherwise cascade into it.
         color: computed(() => (disabled.value ? 'controlForegroundDisabled' : 'controlAccent')),
         textDecoration: computed(() => decorationOf(underline.value, hovered.value, disabled.value)),
         selectable: false
