@@ -12,6 +12,7 @@ import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { isTypographyRole } from '../environment/UiTypography';
 import { inheritedPropertyFlags } from '../properties/UiPropertyRegistry';
 import type { UiTextStyle } from '../properties/UiTextStyle';
+import { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 import type { Observable } from 'rxjs';
 
 /**
@@ -647,19 +648,21 @@ export class UiGraph {
   }
 
   /**
-   * Adds the environment flag to a write of `color`, which a node
-   * provides to its subtree as well as paints with.
+   * Adds the environment flag to a write of `color` or of a text
+   * style field, which a node provides to its subtree as well as
+   * paints with.
    *
-   * Here rather than in the property's `affects`, because `affects`
+   * Here rather than in the properties' `affects`, because `affects`
    * is also what the layout layer reads to classify a property, and
-   * `color` has to stay paint-only there: the rebuild this schedules
-   * dirties the subtree for paint alone when the colour is all that
-   * changed (see `environmentChangeFlags`). Marked for a childless
-   * node too, since a child appended later inherits from the
-   * environment this rebuilds.
+   * these have to stay what they are there: `color` and
+   * `textDecoration` paint-only, `fontSize` layout and paint. The
+   * rebuild this schedules dirties the subtree for paint alone when
+   * only paint changed (see `environmentChangeFlags`). Marked for a
+   * childless node too, since a child appended later inherits from
+   * the environment this rebuilds.
    */
   private withProvidedFlags(property: NodeProperty, dirtyFlags: DirtyFlags): DirtyFlags {
-    return property === 'color' ? dirtyFlags | DirtyFlags.Environment : dirtyFlags;
+    return property === 'color' || textStyleFields.has(property) ? dirtyFlags | DirtyFlags.Environment : dirtyFlags;
   }
 
   // ---------------------------------------------------------------------------
@@ -783,6 +786,36 @@ export class UiGraph {
       // `<box theme={darkTheme} color="text">` drew its plain text in
       // the default style's near-black on its own dark background.
       env = env.set(UiEnvironmentKeys.color as UiEnvironmentKey<unknown>, color);
+    }
+
+    // The text style fields a node sets itself are provided too, laid
+    // over the style it inherits or provides, so `fontSize={12}` on a
+    // row reaches the text in it. Until this, the twelve properties
+    // were inherited only from the nearest `textStyle`, and a container
+    // that set one changed nothing below it although the reference
+    // said it did. After `textStyle`, so a node's own field beats its
+    // own style's, as a property beats the style it sits beside.
+    let own: Record<string, unknown> | null = null;
+    for (const field of textStyleFieldNames) {
+      const value = node.getProperty<unknown>(field);
+      if (value !== undefined) {
+        own ??= { ...env.get(UiEnvironmentKeys.textStyle) };
+        own[field] = value;
+      }
+    }
+    if (own !== null) {
+      // The line-height rule of `resolveFont`, carried down: a node
+      // that sets a size and no line height gets a normal line for
+      // that size, and so does the text under it, rather than the
+      // inherited pixel height that belonged to another size.
+      if (
+        positive(node.getProperty<unknown>('lineHeight')) === undefined &&
+        node.getProperty<unknown>('fontSize') !== undefined
+      ) {
+        own.lineHeight =
+          (positive(own.fontSize) ?? UiEnvironmentKeys.textStyle.defaultValue.fontSize) * DEFAULT_LINE_HEIGHT_FACTOR;
+      }
+      env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, own);
     }
 
     const contentColor = node.getProperty<unknown>('contentColor');
@@ -931,15 +964,15 @@ export class UiGraph {
 
   /**
    * What a node whose environment went from `a` to `b` has to redo:
-   * nothing when they hold the same values, a repaint when the
-   * inherited text colour is the only difference, and otherwise
+   * nothing when they hold the same values, a repaint when what
+   * differs can only change how text is painted, and otherwise
    * everything an inherited property can affect.
    *
-   * The colour is singled out because it is the one provided value
-   * that changes with a hover or a selection, and everything else
-   * provided — a theme, a text style — can move a line break, so a
-   * colour change counted as one of them re-laid out the subtree of
-   * every box whose colour was animated.
+   * Paint is singled out because the provided values that change with
+   * a hover or a selection are a colour or an underline, and
+   * everything else provided — a theme, a font size — can move a line
+   * break, so a colour change counted as one of them re-laid out the
+   * subtree of every box whose colour was animated.
    */
   private environmentChangeFlags(a: UiEnvironment, b: UiEnvironment, inheritedFlags: DirtyFlags): DirtyFlags {
     // The common case by far: a node that provides nothing gets its
@@ -947,40 +980,103 @@ export class UiGraph {
     if (a === b) {
       return DirtyFlags.None;
     }
-    // At most the colour can be provided on one side and not the
-    // other, which is a node gaining or losing its `color`.
-    if (Math.abs(a.providedSize - b.providedSize) > 1) {
-      return inheritedFlags;
-    }
-    const colorKey = UiEnvironmentKeys.color.name;
-    let flags = a.providesOwn(colorKey) === b.providesOwn(colorKey) ? DirtyFlags.None : DirtyFlags.Paint;
-    if (a.providedSize - (a.providesOwn(colorKey) ? 1 : 0) !== b.providedSize - (b.providesOwn(colorKey) ? 1 : 0)) {
-      return inheritedFlags;
-    }
+    let flags = DirtyFlags.None;
     for (const keyName of a.providedKeys()) {
-      if (!b.providesOwn(keyName)) {
-        if (keyName === colorKey) {
-          continue;
-        }
-        return inheritedFlags;
+      flags |= this.providedChangeFlags(keyName, a, b, inheritedFlags);
+      if (flags === inheritedFlags) {
+        return flags;
       }
-      const previousValue = a.getOwn(keyName);
-      const nextValue = b.getOwn(keyName);
-      if (Object.is(previousValue, nextValue)) {
-        continue;
-      }
-      // A key without a comparison function falls back to identity
-      // rather than counting as a change, which would have re-dirtied
-      // the whole subtree on every propagation.
-      const key = findEnvironmentKey(keyName);
-      const compare = key?.compare;
-      if (compare === undefined || !compare(previousValue, nextValue)) {
-        if (keyName !== colorKey) {
-          return inheritedFlags;
-        }
-        flags = DirtyFlags.Paint;
+    }
+    for (const keyName of b.providedKeys()) {
+      if (!a.providesOwn(keyName)) {
+        flags |= this.providedChangeFlags(keyName, a, b, inheritedFlags);
       }
     }
     return flags;
   }
+
+  /** `environmentChangeFlags` for one key either side provides. */
+  private providedChangeFlags(
+    keyName: string,
+    a: UiEnvironment,
+    b: UiEnvironment,
+    inheritedFlags: DirtyFlags
+  ): DirtyFlags {
+    const key = findEnvironmentKey(keyName);
+    // A key provided on one side only is a change whatever it holds,
+    // as it always was; its value is still compared with the default
+    // the other side resolves, so a node gaining a `color` or a
+    // `textDecoration` is classified as the paint it is.
+    const previouslyProvided = a.providesOwn(keyName);
+    const nextProvided = b.providesOwn(keyName);
+    const previousValue = previouslyProvided ? a.getOwn(keyName) : key?.defaultValue;
+    const nextValue = nextProvided ? b.getOwn(keyName) : key?.defaultValue;
+    if (previouslyProvided === nextProvided) {
+      if (Object.is(previousValue, nextValue)) {
+        return DirtyFlags.None;
+      }
+      // A key without a comparison function falls back to identity
+      // rather than counting as a change, which would have re-dirtied
+      // the whole subtree on every propagation.
+      const compare = key?.compare;
+      if (compare !== undefined && compare(previousValue, nextValue)) {
+        return DirtyFlags.None;
+      }
+    }
+    if (keyName === UiEnvironmentKeys.color.name) {
+      return DirtyFlags.Paint;
+    }
+    if (
+      keyName === UiEnvironmentKeys.textStyle.name &&
+      textStyleFontsEqual(previousValue as UiTextStyle, nextValue as UiTextStyle)
+    ) {
+      return DirtyFlags.Paint;
+    }
+    return inheritedFlags;
+  }
+}
+
+/**
+ * The properties a node provides to its subtree as fields of the text
+ * style, which are the ones that resolve through it.
+ */
+const textStyleFieldNames: readonly string[] = [
+  'fontFamily',
+  'fontSize',
+  'fontWeight',
+  'lineHeight',
+  'letterSpacing',
+  'textAlign',
+  'textDirection',
+  'fontStyle',
+  'fontStretch',
+  'fontVariant',
+  'fontKerning',
+  'textDecoration'
+];
+
+const textStyleFields: ReadonlySet<string> = new Set(textStyleFieldNames);
+
+/**
+ * Whether two text styles measure the same, so that a change between
+ * them repaints and lays out nothing: they differ at most in colour,
+ * alignment, direction or decoration, the fields whose properties are
+ * paint-only.
+ */
+function textStyleFontsEqual(a: UiTextStyle, b: UiTextStyle): boolean {
+  return (
+    a.fontFamily === b.fontFamily &&
+    a.fontSize === b.fontSize &&
+    a.fontWeight === b.fontWeight &&
+    a.lineHeight === b.lineHeight &&
+    a.letterSpacing === b.letterSpacing &&
+    a.fontStyle === b.fontStyle &&
+    a.fontStretch === b.fontStretch &&
+    a.fontVariant === b.fontVariant &&
+    a.fontKerning === b.fontKerning
+  );
+}
+
+function positive(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
