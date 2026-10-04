@@ -647,6 +647,135 @@ describe('LayoutEngine positioning', () => {
       expect(h.box(popup)).toEqual({ x: 0, y: 10, width: 40, height: 10 });
     });
 
+    /**
+     * A zoomable canvas: cards placed inside a "camera" box that is
+     * panned and zoomed by its transform. A transform is paint-only, so
+     * the card's record never moves; placed against the record, a
+     * card's tooltip stood where the card would be at zoom 1 with no
+     * pan, which on a map scrolled anywhere else is nowhere near it.
+     */
+    function cameraScene(camera: Record<string, unknown>, popupProps: Record<string, unknown> = {}) {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const viewport = box(h, 'viewport', { position: 'relative', overflow: 'hidden', width: 400, height: 300 });
+      const lens = box(h, 'camera', { position: 'absolute', top: 0, left: 0, width: 400, height: 300, ...camera });
+      const card = box(h, 'card', { position: 'absolute', left: 20, top: 10, width: 30, height: 20 });
+      h.append(lens, card);
+      h.append(viewport, lens);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor: card,
+        width: 40,
+        height: 10,
+        placement: 'bottom-start',
+        ...popupProps
+      });
+      h.append(layer, popup);
+      h.append(root, viewport, layer);
+      h.layout(root, Constraints.loose(400, 300));
+      return { h, lens, card, popup };
+    }
+
+    const panAndZoom = {
+      transform: { x: 0, y: 0, translateX: 100, translateY: 50, scaleX: 2, scaleY: 2, rotation: 0 }
+    };
+
+    it('places beside where a transformed ancestor draws its anchor', () => {
+      const { h, card, popup } = cameraScene(panAndZoom);
+      // The record is where layout put the card; the camera draws it at
+      // 100 + 2 * 20 across and 50 + 2 * 10 down, twice the size.
+      expect(h.box(card)).toEqual({ x: 20, y: 10, width: 30, height: 20 });
+      expect(h.engine.screenBox(card)).toEqual({ x: 140, y: 70, width: 60, height: 40 });
+      // With no transform of its own, still the box it would have untransformed.
+      expect(h.visibleBox(card)).toEqual({ x: 20, y: 10, width: 30, height: 20 });
+      expect(h.box(popup)).toEqual({ x: 140, y: 110, width: 40, height: 10 });
+    });
+
+    it('places beside a part of a transformed anchor, scaled with it', () => {
+      const { h, popup } = cameraScene(panAndZoom, { anchorRect: { x: 10, y: 5, width: 0, height: 10 } });
+      // The part's top is 5 down the card, 10 on screen, and it is 20 tall.
+      expect(h.box(popup)).toEqual({ x: 160, y: 100, width: 40, height: 10 });
+    });
+
+    it('follows the anchor when the transform above it pans and zooms', () => {
+      const { h, lens, popup } = cameraScene({});
+      expect(h.box(popup)).toEqual({ x: 20, y: 30, width: 40, height: 10 });
+
+      lens.setProperty('transform', panAndZoom.transform);
+      h.engine.layoutForFrame(new UiFrame(1, 0, new Map([[lens, DirtyFlags.Transform]])), Constraints.loose(400, 300));
+      expect(h.box(popup)).toEqual({ x: 140, y: 110, width: 40, height: 10 });
+      // A pan measures nothing, as a scroll measures nothing.
+      expect(h.engine.stats.measured).toBe(0);
+    });
+
+    it('takes the bounding box of an anchor under a rotated parent', () => {
+      // A quarter turn about the card's top-left corner (20, 10), which
+      // is its parent's too, swings it to span x 0..20 and y 10..40: the
+      // box it is seen in.
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const turned = box(h, 'turned', {
+        position: 'absolute',
+        left: 20,
+        top: 10,
+        width: 30,
+        height: 20,
+        transform: { x: 0, y: 0, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotation: Math.PI / 2 }
+      });
+      const card = box(h, 'card', { width: 30, height: 20 });
+      h.append(turned, card);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchor: card,
+        width: 40,
+        height: 10,
+        placement: 'right-start'
+      });
+      h.append(layer, popup);
+      h.append(root, turned, layer);
+      h.layout(root, Constraints.loose(400, 300));
+      const seen = h.engine.screenBox(card);
+      expect(seen.x).toBeCloseTo(0);
+      expect(seen.y).toBeCloseTo(10);
+      expect(seen.width).toBeCloseTo(20);
+      expect(seen.height).toBeCloseTo(30);
+      expect(h.box(popup).x).toBeCloseTo(20);
+      expect(h.box(popup).y).toBeCloseTo(10);
+    });
+
+    it("leaves out the anchor's own transform, which is how it is drawn and not where", () => {
+      // A spinner turns itself: a tooltip on it placed against the box
+      // its corners swept would shake on every step of the turn.
+      const { h, popup } = scene(
+        { transform: { x: 30, y: 10, translateX: 0, translateY: 0, scaleX: 1, scaleY: 1, rotation: 0.3 } },
+        { placement: 'bottom-start', anchorOffset: 4 }
+      );
+      expect(h.box(popup)).toEqual({ x: 20, y: 44, width: 100, height: 50 });
+    });
+
+    it('places into the space of a transformed overlay layer', () => {
+      // The layer the popup lives in is drawn at twice its size, so the
+      // popup's record has to be half the distance away for it to be
+      // drawn beside the anchor: the anchor ends at y 40 on screen.
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const app = column(h, 'app', { padding: 20 });
+      const anchor = box(h, 'anchor', { width: 60, height: 20 });
+      h.append(app, anchor);
+      const layer = box(h, 'layer', {
+        position: 'absolute',
+        inset: 0,
+        transform: { x: 0, y: 0, translateX: 0, translateY: 0, scaleX: 2, scaleY: 2, rotation: 0 }
+      });
+      const popup = box(h, 'popup', { position: 'absolute', anchor, width: 40, height: 10, placement: 'bottom-start' });
+      h.append(layer, popup);
+      h.append(root, app, layer);
+      h.layout(root, Constraints.loose(300, 200));
+      expect(h.box(popup)).toEqual({ x: 10, y: 20, width: 40, height: 10 });
+    });
+
     it('costs no placement when a scroll frame changes no sticky shift', () => {
       const { h, scroller, popup } = stickyScene(false);
       scrollTo(h, scroller, 70, 1);

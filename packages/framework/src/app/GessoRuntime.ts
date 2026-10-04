@@ -2813,7 +2813,9 @@ export class GessoRuntime {
    * goes down from the root carrying the scroll and sticky offsets that
    * `visibleBox` adds up per node, and passes over any subtree whose
    * bounds (the hit tester's, see `subtreeBoundsFor`) are off screen.
-   * A node it passes over is one this skipped before anyway.
+   * A node it passes over is one this skipped before anyway. Below a
+   * `transform` the walk asks `screenBox` instead, which carries the
+   * box through it.
    */
   private collectSemanticsBoxes(): UiSemanticsBox[] {
     const changed: UiSemanticsBox[] = [];
@@ -2831,13 +2833,33 @@ export class GessoRuntime {
     if (root !== undefined) {
       // Fills the bounds for every record, if anything moved since.
       this.engine.subtreeBoundsFor(root);
-      const stack: [UiNode, number, number][] = [[root, 0, 0]];
+      const stack: [UiNode, number, number, boolean][] = [[root, 0, 0, false]];
       while (stack.length > 0) {
-        const [node, dx, dy] = stack.pop()!;
+        const [node, dx, dy, inherited] = stack.pop()!;
         const rec = this.engine.recordFor(node);
         let childX = dx;
         let childY = dy;
-        if (rec !== undefined) {
+        const own = node.properties.get('transform');
+        const transformed = inherited || (typeof own === 'object' && own !== null);
+        if (rec !== undefined && inherited) {
+          // Under a transform the offsets carried down are not the whole
+          // story: a panned, zoomed map draws a card far from its record,
+          // and the mirror put the card's element at the record. The
+          // engine projects such a node through every transform above
+          // it, at a walk up per node; transformed subtrees are rare, and
+          // their bounds are in record space, so nothing is culled here.
+          // A node's own transform is not one of them (see `screenBox`),
+          // so a spinner's turning does not move its element every step.
+          if (this.semantics.has(node.id)) {
+            const box = this.engine.screenBox(node);
+            if (node === focused) {
+              focusedSeen = true;
+              offer(node.id, box);
+            } else if (this.onScreen(box)) {
+              offer(node.id, box);
+            }
+          }
+        } else if (rec !== undefined) {
           const x = dx + rec.stickyOffsetX;
           const y = dy + rec.stickyOffsetY;
           if (
@@ -2869,7 +2891,7 @@ export class GessoRuntime {
         }
         // Last child first, so the boxes come out in document order.
         for (let child = node.lastChild; child !== null; child = child.previousSibling) {
-          stack.push([child, childX, childY]);
+          stack.push([child, childX, childY, transformed]);
         }
       }
     }
