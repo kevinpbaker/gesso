@@ -183,7 +183,9 @@ class Hold {
  * the children, so the element's label stays readable on top of it.
  */
 function fillTo(host: UiModifierHost, fraction: number, color: UiColorValue): readonly DecorationShape[] | null {
-  const box = host.layoutBox();
+  // The laid-out box: a decoration is in the node's own coordinates,
+  // where a zoom above the node does not reach.
+  const box = host.flowBox();
   if (box === null || fraction <= 0) {
     return null;
   }
