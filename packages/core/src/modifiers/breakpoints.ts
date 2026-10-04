@@ -35,7 +35,9 @@ export const sizeContainer = defineModifier<SizeContainerArgs>({
   name: 'sizeContainer',
   attach(host, args) {
     const report = (): void => {
-      const box = host.layoutBox();
+      // The laid-out size, as a container query reads it: a container
+      // under a zoomed parent is drawn bigger without having more room.
+      const box = host.flowBox();
       if (box === null) {
         return;
       }
@@ -100,7 +102,8 @@ export const breakpoint = defineModifier<BreakpointArgs>({
     const bands = [0, ...args.at];
     let current = -1;
     const apply = (): void => {
-      const box = host.layoutBox();
+      // The laid-out width, for the reason `sizeContainer` gives.
+      const box = host.flowBox();
       if (box === null) {
         return;
       }

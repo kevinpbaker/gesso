@@ -448,14 +448,18 @@ class MotionController {
   }
 
   attach(): void {
-    this.layer.measure(this.host.layoutBox());
+    // The laid-out size, not the drawn one: the pivot is in the node's
+    // own coordinates, which a zoomed parent scales along with the
+    // pivot. Measured from `layoutBox`, a card under a camera at zoom 2
+    // turned about a point twice as far into it as its centre.
+    this.layer.measure(this.host.flowBox());
     if (this.args.initial !== undefined) {
       this.layer.snapTo(resolveMotionState(this.args.initial));
     }
     // The pivot is half the node's size, and the size is not known
     // until the first layout; until then a scale would grow out of the
     // corner. This also keeps the pivot right when the element resizes.
-    this.host.onLayout(box => this.layer.measure(box));
+    this.host.onLayout(() => this.layer.measure(this.host.flowBox()));
     this.aim();
   }
 
@@ -830,7 +834,7 @@ class SharedElementController {
       return;
     }
     this.host.shared?.report(this.args.name, this.host.node, box);
-    this.layer.measure(this.host.layoutBox());
+    this.layer.measure(this.host.flowBox());
     if (this.geometryTarget !== null) {
       // The layout after the geometry override landed: the element is
       // genuinely laid out at the departing element's box now, so the

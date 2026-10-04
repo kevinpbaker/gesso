@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Column, type UiNode, type UiRole, type UiSemanticsRecord, UiEventType, UiPointerEvent } from 'gesso-core';
+import { Box, Column, type UiNode, type UiRole, type UiSemanticsRecord, UiEventType, UiPointerEvent } from 'gesso-core';
 import { Checkbox } from './Checkbox';
 import { NumberInput } from './NumberInput';
 import { RadioGroup } from './Radio';
@@ -301,6 +301,46 @@ describe('Slider', () => {
     ui.runtime.input.dispatcher.dispatch(new UiPointerEvent(UiEventType.PanMove, 200, 30), strip);
 
     expect(changes).toEqual([75, 50]);
+  });
+
+  it('turns a press into a value where a panned, zoomed parent draws the track', () => {
+    // A slider on a card under a camera box that pans and zooms by its
+    // transform. The track's measured box was its record, which no
+    // transform moves, while the press is where the track is drawn: a
+    // press three quarters along the drawn track read as a fraction of
+    // the record, which it is nowhere near, and clamped to the end.
+    const changes: number[] = [];
+    const ui = mount(
+      Box(
+        { position: 'relative', width: 400, height: 400 },
+        Box(
+          {
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 100,
+            height: 100,
+            transform: { x: 0, y: 0, translateX: 100, translateY: 50, scaleX: 2, scaleY: 2, rotation: 0 }
+          },
+          createComponent(Slider, {
+            label: 'Volume',
+            min: 0,
+            max: 100,
+            step: 1,
+            defaultValue: 0,
+            onChange: v => changes.push(v)
+          })
+        )
+      )
+    );
+    ui.frame();
+
+    const laid = ui.getVisibleBox(trackOf(ui));
+    // Drawn at 100 + 2x across and 50 + 2y down, twice its size.
+    const drawn = { x: 100 + 2 * laid.x, y: 50 + 2 * laid.y, width: 2 * laid.width, height: 2 * laid.height };
+    ui.fireEvent.pointerDown(drawn.x + drawn.width * 0.75, drawn.y + drawn.height / 2);
+
+    expect(changes).toEqual([75]);
   });
 });
 

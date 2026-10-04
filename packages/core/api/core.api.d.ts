@@ -2648,6 +2648,7 @@ declare class UiHitTester implements HitTester {
 interface SelectionHost {
   recordFor(node: UiNode): LayoutRecord | undefined;
   visibleBox(node: UiNode): LayoutBox;
+  screenBox?(node: UiNode): LayoutBox;
   readonly measurer: TextMeasurer;
   markDirty(node: UiNode, flags: DirtyFlags): void;
   root(): UiNode;
@@ -3155,6 +3156,7 @@ declare class UiTouchScroller {
 interface EditingHost {
   recordFor(node: UiNode): LayoutRecord | undefined;
   visibleBox(node: UiNode): LayoutBox;
+  screenBox?(node: UiNode, part?: LayoutBox): LayoutBox;
   toLocal(node: UiNode, x: number, y: number): {
     x: number;
     y: number;
@@ -3241,6 +3243,7 @@ declare class UiEditingController {
   private focusField;
   private revealCaret;
   caretRectOf(node: UiNode, offset?: number): CaretRect | null;
+  private drawnBox;
   private layoutOf;
 }
 interface PlatformEventTarget {
@@ -3525,7 +3528,7 @@ declare class LayoutEngine {
   worldBoxTo(node: UiNode, out: LayoutBox): LayoutBox;
   worldBox(node: UiNode): LayoutBox;
   visibleBox(node: UiNode): LayoutBox;
-  screenBox(node: UiNode): LayoutBox;
+  screenBox(node: UiNode, part?: LayoutBox): LayoutBox;
   revealAdjustments(node: UiNode, padding?: number, inner?: LayoutBox): ScrollAdjustment[];
   private textScrollAdjustment;
   revealScrollbars(node: UiNode): void;
@@ -3775,6 +3778,9 @@ declare function hoverable(): UiModifier<InteractiveOptions>;
 declare function pressable(): UiModifier<InteractiveOptions>;
 declare const BUTTON_INTERACTION: UiModifier<InteractiveOptions>;
 declare const measure: ((args: Subject<LayoutBox>, key?: string | number) => UiModifier<Subject<LayoutBox>>) & {
+  readonly kind: UiModifierKind<Subject<LayoutBox>>;
+};
+declare const measureFlow: ((args: Subject<LayoutBox>, key?: string | number) => UiModifier<Subject<LayoutBox>>) & {
   readonly kind: UiModifierKind<Subject<LayoutBox>>;
 };
 type Decorations = readonly DecorationShape[] | Observable<readonly DecorationShape[]>;
@@ -5552,6 +5558,7 @@ export {
   MAX_GRADIENT_STOPS,
   MAX_MEASURES_PER_CHILD,
   measure,
+  measureFlow,
   measureSpan,
   minmax,
   MinMaxTrack,
@@ -6462,6 +6469,7 @@ import {
   MAX_GRADIENT_STOPS,
   MAX_MEASURES_PER_CHILD,
   measure,
+  measureFlow,
   measureSpan,
   minmax,
   MinMaxTrack,
@@ -7264,6 +7272,7 @@ export {
   MAX_GRADIENT_STOPS,
   MAX_MEASURES_PER_CHILD,
   measure,
+  measureFlow,
   measureSpan,
   minmax,
   motion,

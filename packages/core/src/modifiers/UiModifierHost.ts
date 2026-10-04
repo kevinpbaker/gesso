@@ -70,8 +70,15 @@ export interface UiModifierHost {
    */
   own(teardown: UiModifierTeardown): void;
   /**
-   * Where the node is now, in layout coordinates, or null before the
-   * first layout and for a node that has no record (a fragment).
+   * Where the node is now on the canvas, in the coordinates a pointer
+   * event's `x` and `y` are in, or null before the first layout and
+   * for a node that has no record (a fragment).
+   *
+   * Every scroll offset, sticky shift and transform above the node is
+   * applied, its own transform is not (see `LayoutEngine.screenBox`):
+   * under a parent zoomed to 2 this box is twice the laid-out size, so
+   * that `(event.x - box.x) / box.width` is still the fraction of the
+   * node under the pointer.
    */
   layoutBox(): LayoutBox | null;
   /**
@@ -82,7 +89,8 @@ export interface UiModifierHost {
    * it is in the flow, which is a different question and the one an
    * animation asks: a node whose page scrolled has not moved, and a
    * layout animation that thought it had would drag every row of every
-   * list behind the scroll.
+   * list behind the scroll. Its size is the laid-out one, which no
+   * transform changes: what a pivot or a breakpoint is measured in.
    */
   flowBox(): LayoutBox | null;
   /**
@@ -119,8 +127,9 @@ export interface UiModifierHost {
    */
   scrollOffset(): { x: number; y: number } | null;
   /**
-   * Called after any frame that moved the node's box — including a
-   * scroll, which moves everything under the scroller — or that
+   * Called after any frame that moved the node's `layoutBox` —
+   * including a scroll, which moves everything under the scroller, and
+   * a pan or zoom of a transform above the node — or that
    * changed the node's own scroll offset, which moves everything
    * inside it and leaves its box alone. Removed on detach.
    *

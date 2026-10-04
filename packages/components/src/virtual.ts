@@ -5,7 +5,7 @@ import {
   type UiNodeRef,
   type UiNode,
   type LayoutBox,
-  measure,
+  measureFlow,
   type UiModifier
 } from 'gesso-core';
 
@@ -17,7 +17,7 @@ import {
  * that happen to exist, so "scroll the active row into view" is asked
  * about an index with no node — and the engine's own reveal takes a
  * node. The window knows where any index sits (`offsetOf`), the
- * `measure` modifier reports how tall the viewport is, and the scroll
+ * `measureFlow` modifier reports how tall the viewport is, and the scroll
  * offset is written as a bound property so the write goes through the
  * graph with the right dirty flags rather than around it.
  */
@@ -32,7 +32,7 @@ export interface VirtualList {
   readonly scrollY: Observable<number>;
   /**
    * Extent of a sticky header above the rows, which the reveal has to
-   * keep a row clear of. Written from the header's own `measure`.
+   * keep a row clear of. Written from the header's own `measureFlow`.
    */
   setLead(extent: number): void;
   /** Scrolls until the row at `index` is inside the viewport. */
@@ -63,7 +63,8 @@ export function virtualList(): VirtualList {
     ref: value => {
       node = value;
     },
-    viewport: measure(box),
+    // The laid-out height, which is what a scroll offset is in.
+    viewport: measureFlow(box),
     scrollY: scroll,
     setLead: extent => {
       lead = extent;

@@ -89,6 +89,7 @@ export class InputTestHarness {
     const host: EditingHost = {
       recordFor: node => layout.engine.recordFor(node),
       visibleBox: node => layout.engine.visibleBox(node),
+      screenBox: (node, part) => layout.engine.screenBox(node, part),
       toLocal: (node, x, y) => hitTester.toLocal(node, x, y),
       // The controller measures only for caret geometry. A spec whose
       // tree has real text passes its own measurer to the harness; the

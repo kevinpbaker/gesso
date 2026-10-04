@@ -69,6 +69,7 @@ function scene(): Scene {
     {
       recordFor: target => engine.recordFor(target),
       visibleBox: target => engine.visibleBox(target),
+      screenBox: target => engine.screenBox(target),
       measurer,
       markDirty: target => dirty.push(target),
       root: () => root,

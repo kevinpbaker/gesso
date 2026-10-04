@@ -1310,16 +1310,28 @@ export class LayoutEngine {
    * tooltip on it shook. The ancestors' are where it is; its own is how
    * it is drawn there. A tree with no transform above the node gets
    * `visibleBox`'s answer exactly.
+   *
+   * `part`, when given, is a rectangle in the node's own coordinates
+   * (its box's top-left corner is 0, 0) and is answered instead of the
+   * whole box: a caret inside a text field, the padding strip around a
+   * node in the inspector. Adding its offset to the whole box's corner
+   * is right only at scale 1; under a zoomed parent the part is scaled
+   * with the node and sits twice as far into it.
    */
-  screenBox(node: UiNode): LayoutBox {
+  screenBox(node: UiNode, part?: LayoutBox): LayoutBox {
     const rec = this.records.get(node);
     if (rec === undefined) {
       return { x: 0, y: 0, width: 0, height: 0 };
     }
     if (!hasTransformedChain(node.parent)) {
-      return this.visibleBox(node);
+      const seen = this.visibleBox(node);
+      return part === undefined
+        ? seen
+        : { x: seen.x + part.x, y: seen.y + part.y, width: part.width, height: part.height };
     }
-    return this.projectBox(node, rec.x, rec.y, rec.width, rec.height);
+    return part === undefined
+      ? this.projectBox(node, rec.x, rec.y, rec.width, rec.height)
+      : this.projectBox(node, rec.x + part.x, rec.y + part.y, part.width, part.height);
   }
 
   /**

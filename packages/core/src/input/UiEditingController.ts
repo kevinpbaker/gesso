@@ -38,8 +38,19 @@ import {
  */
 export interface EditingHost {
   recordFor(node: UiNode): LayoutRecord | undefined;
-  /** Where the node is seen, scroll offsets applied; for the shell's caret rectangle. */
+  /**
+   * Where the node is seen, scroll offsets applied, in layout units: to
+   * carry a caret's column from one field into the next.
+   */
   visibleBox(node: UiNode): LayoutBox;
+  /**
+   * Where the node, or `part` of it in its own coordinates, is drawn on
+   * the canvas: `LayoutEngine.screenBox`. What a pointer position is
+   * compared with, and where the shell's caret rectangle goes. A host
+   * without it is taken to have no transforms, and `visibleBox` stands
+   * in.
+   */
+  screenBox?(node: UiNode, part?: LayoutBox): LayoutBox;
   /** A layout-root point in the node's own coordinates. */
   toLocal(node: UiNode, x: number, y: number): { x: number; y: number };
   readonly measurer: TextMeasurer;
@@ -602,8 +613,10 @@ export class UiEditingController {
     if (current === null) {
       return null;
     }
+    // The pointer is in canvas space, so the fields are measured where
+    // they are drawn; under a zoomed parent their records are elsewhere.
     const distance = (node: UiNode): number => {
-      const box = this.host.visibleBox(node);
+      const box = this.drawnBox(node);
       return y < box.y ? box.y - y : y > box.y + box.height ? y - box.y - box.height : 0;
     };
     for (;;) {
@@ -611,7 +624,7 @@ export class UiEditingController {
       if (here === 0) {
         return current;
       }
-      const box = this.host.visibleBox(current);
+      const box = this.drawnBox(current);
       const next = adjacentField(root, current, y < box.y ? -1 : 1);
       // A tie stays put, so two fields the same distance away can't
       // hand the press back and forth.
@@ -731,8 +744,12 @@ export class UiEditingController {
       return null;
     }
     const model = editorFor(node);
-    const caret = this.layoutOf(node).caretRect();
-    const visible = this.host.visibleBox(node);
+    const local = this.layoutOf(node).caretRect();
+    // Projected rather than added to the field's corner: under a zoomed
+    // parent the caret is drawn scaled and that much further into the
+    // field, and the shell's composition box and the IME candidate
+    // window opened where it would be at zoom 1.
+    const caret = this.drawnBox(node, { x: local.x, y: local.y, width: 1, height: local.height });
     if (this.span !== null) {
       // The shell is handed the whole selection, selected, so that its
       // native copy and cut take all of it; what is typed over it comes
@@ -742,7 +759,7 @@ export class UiEditingController {
         text,
         selectionStart: 0,
         selectionEnd: text.length,
-        caret: { x: visible.x + caret.x, y: visible.y + caret.y, width: 1, height: caret.height },
+        caret,
         multiline: true,
         composing: false,
         ...(html === undefined ? {} : { html })
@@ -753,7 +770,7 @@ export class UiEditingController {
       text: model.text,
       selectionStart: model.start,
       selectionEnd: model.end,
-      caret: { x: visible.x + caret.x, y: visible.y + caret.y, width: 1, height: caret.height },
+      caret,
       multiline: isMultiline(node),
       composing: model.composing,
       ...(html === undefined ? {} : { html })
@@ -1122,7 +1139,7 @@ export class UiEditingController {
   private fieldAt(root: UiNode, from: UiNode, y: number): UiNode {
     let current = from;
     for (;;) {
-      const box = this.host.visibleBox(current);
+      const box = this.drawnBox(current);
       const step = y < box.y ? -1 : y > box.y + box.height ? 1 : 0;
       if (step === 0) {
         return current;
@@ -1131,7 +1148,7 @@ export class UiEditingController {
       if (next === null) {
         return current;
       }
-      const nextBox = this.host.visibleBox(next);
+      const nextBox = this.drawnBox(next);
       if (step > 0 ? y < nextBox.y : y > nextBox.y + nextBox.height) {
         // In the gap: the next field, the way the drag is going.
         return next;
@@ -1214,6 +1231,15 @@ export class UiEditingController {
     return offset === undefined
       ? layout.caretRect()
       : layout.caretRect(Math.max(0, Math.min(offset, layout.model.text.length)));
+  }
+
+  /** Where a field, or a part of it in its own coordinates, is drawn; see `EditingHost.screenBox`. */
+  private drawnBox(node: UiNode, part?: LayoutBox): LayoutBox {
+    if (this.host.screenBox !== undefined) {
+      return this.host.screenBox(node, part);
+    }
+    const box = this.host.visibleBox(node);
+    return part === undefined ? box : { x: box.x + part.x, y: box.y + part.y, width: part.width, height: part.height };
   }
 
   private layoutOf(node: UiNode): EditableLayout {

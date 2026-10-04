@@ -258,32 +258,34 @@ export class LayoutInspector {
       }
     }
 
-    const box = this.engine.visibleBox(node);
-    const strip = (x: number, y: number, width: number, height: number, color: string): void => {
-      if (width > 0 && height > 0) {
-        out.push({ kind: 'fill', x, y, width, height, color });
+    // The overlay is drawn over the finished frame with no transform,
+    // so every strip is placed where the node is drawn: under a zoomed
+    // parent the highlight sat over the node's record, at zoom 1 and
+    // away from the node it named. Each strip is a part of the node in
+    // its own coordinates, projected, so a padding is drawn as wide as
+    // the zoom draws it; the label keeps the laid-out size.
+    const box = this.engine.screenBox(node);
+    const width = rec.width;
+    const height = rec.height;
+    const strip = (x: number, y: number, w: number, h: number, color: string): void => {
+      if (w > 0 && h > 0) {
+        out.push({ kind: 'fill', ...this.engine.screenBox(node, { x, y, width: w, height: h }), color });
       }
     };
     // Margin strips around the border box.
-    const marginWidth = box.width + rec.marginLeft + rec.marginRight;
-    strip(box.x - rec.marginLeft, box.y - rec.marginTop, marginWidth, rec.marginTop, MARGIN_FILL);
-    strip(box.x - rec.marginLeft, box.y + box.height, marginWidth, rec.marginBottom, MARGIN_FILL);
-    strip(box.x - rec.marginLeft, box.y, rec.marginLeft, box.height, MARGIN_FILL);
-    strip(box.x + box.width, box.y, rec.marginRight, box.height, MARGIN_FILL);
+    const marginWidth = width + rec.marginLeft + rec.marginRight;
+    strip(-rec.marginLeft, -rec.marginTop, marginWidth, rec.marginTop, MARGIN_FILL);
+    strip(-rec.marginLeft, height, marginWidth, rec.marginBottom, MARGIN_FILL);
+    strip(-rec.marginLeft, 0, rec.marginLeft, height, MARGIN_FILL);
+    strip(width, 0, rec.marginRight, height, MARGIN_FILL);
     // Padding strips inside it.
-    const innerHeight = box.height - rec.paddingTop - rec.paddingBottom;
-    strip(box.x, box.y, box.width, rec.paddingTop, PADDING_FILL);
-    strip(box.x, box.y + box.height - rec.paddingBottom, box.width, rec.paddingBottom, PADDING_FILL);
-    strip(box.x, box.y + rec.paddingTop, rec.paddingLeft, innerHeight, PADDING_FILL);
-    strip(box.x + box.width - rec.paddingRight, box.y + rec.paddingTop, rec.paddingRight, innerHeight, PADDING_FILL);
+    const innerHeight = height - rec.paddingTop - rec.paddingBottom;
+    strip(0, 0, width, rec.paddingTop, PADDING_FILL);
+    strip(0, height - rec.paddingBottom, width, rec.paddingBottom, PADDING_FILL);
+    strip(0, rec.paddingTop, rec.paddingLeft, innerHeight, PADDING_FILL);
+    strip(width - rec.paddingRight, rec.paddingTop, rec.paddingRight, innerHeight, PADDING_FILL);
     // Content box.
-    strip(
-      box.x + rec.paddingLeft,
-      box.y + rec.paddingTop,
-      box.width - rec.paddingLeft - rec.paddingRight,
-      innerHeight,
-      CONTENT_FILL
-    );
+    strip(rec.paddingLeft, rec.paddingTop, width - rec.paddingLeft - rec.paddingRight, innerHeight, CONTENT_FILL);
     // Border box outline, drawn even for a zero-sized node so it can be found.
     out.push({ kind: 'stroke', ...box, color: HOVER_STROKE, lineWidth: 1 });
     // Decorations in their own colour, because the whole point of one
@@ -293,10 +295,12 @@ export class LayoutInspector {
       const outset = shape.outset ?? 0;
       out.push({
         kind: 'stroke',
-        x: box.x + (shape.x ?? 0) - outset,
-        y: box.y + (shape.y ?? 0) - outset,
-        width: (shape.width ?? box.width) + outset * 2,
-        height: (shape.height ?? box.height) + outset * 2,
+        ...this.engine.screenBox(node, {
+          x: (shape.x ?? 0) - outset,
+          y: (shape.y ?? 0) - outset,
+          width: (shape.width ?? width) + outset * 2,
+          height: (shape.height ?? height) + outset * 2
+        }),
         color: DECORATION_STROKE,
         lineWidth: 1
       });
@@ -306,7 +310,7 @@ export class LayoutInspector {
     out.push({
       kind: 'label',
       box,
-      text: `${labelNode(node)} ${formatNumber(box.width)}×${formatNumber(box.height)}${
+      text: `${labelNode(node)} ${formatNumber(width)}×${formatNumber(height)}${
         modifiers.length === 0 ? '' : ` · ${modifiers.join(', ')}`
       }`,
       font: LABEL_FONT,
@@ -319,11 +323,12 @@ export class LayoutInspector {
   }
 
   /**
-   * Where a node is seen, intersected with every clipping ancestor's
-   * visible box; null when nothing of it is visible.
+   * Where a node is drawn, intersected with every clipping ancestor's
+   * drawn box; null when nothing of it is visible. Drawn rather than
+   * visible boxes, for the reason `hoveredShapes` gives.
    */
   private clippedVisibleBox(node: UiNode): LayoutBox | null {
-    const box = this.engine.visibleBox(node);
+    const box = this.engine.screenBox(node);
     let x = box.x;
     let y = box.y;
     let right = box.x + box.width;
@@ -334,7 +339,7 @@ export class LayoutInspector {
       if (rec === undefined || !rec.clips) {
         continue;
       }
-      const clip = this.engine.visibleBox(current);
+      const clip = this.engine.screenBox(current);
       x = Math.max(x, clip.x);
       y = Math.max(y, clip.y);
       right = Math.min(right, clip.x + clip.width);

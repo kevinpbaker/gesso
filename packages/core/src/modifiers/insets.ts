@@ -51,7 +51,9 @@ export const publishInset = defineModifier<PublishInsetArgs>({
     }
     let write: ((next?: Partial<UiInsets>) => void) | null = null;
     const publish = (): void => {
-      const box = host.layoutBox();
+      // The laid-out extent: an inset is room taken out of the layout,
+      // which a transform above the bar does not change.
+      const box = host.flowBox();
       if (box === null) {
         return;
       }
