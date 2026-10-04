@@ -15,6 +15,8 @@
  * `DataTable` in a render worker. The section under it is the agent pitch,
  * which replaced the block-the-main-thread demo there; that demo lives
  * on `/guide/why-gesso` and `/guide/workers`.
+ * `Built on Gesso` links out to the example apps that are deployed, each
+ * its own repository; one that has no public deployment is left off.
  * The counter's source is the file the test suite asserts on, included
  * by `index.md` and slotted in below through `<Content />`, so the one
  * code sample on the site's front page cannot drift from the code.
@@ -164,6 +166,80 @@
             technology without you doing anything.
           </p>
           <a class="card-link" href="/components/">Browse the library</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <div class="section-head section-head-wide">
+        <p class="eyebrow">Built on Gesso</p>
+        <h2>Apps, not demos</h2>
+        <p class="lede">
+          Three applications written with the framework, each picked because the DOM would struggle with it. Open one,
+          then try to make it drop a frame.
+        </p>
+      </div>
+      <div class="pillar-grid">
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>8,559 gates</span>
+            <span>8-bit CPU, playing Pong</span>
+            <span>clocked at 18 kHz <em>while you edit</em></span>
+          </div>
+          <h3>gessologic</h3>
+          <p>
+            A CPU made of logic gates, playing Pong on an LED matrix. Double-click into it, rewire it, scrub the
+            waveforms, and the game keeps its frame.
+          </p>
+          <div class="card-links">
+            <a class="card-link card-link-out" href="https://gesso-logic.vercel.app/" target="_blank" rel="noopener">
+              Open the simulator
+            </a>
+            <a class="source-link" href="https://github.com/kevinpbaker/gesso-logic" target="_blank" rel="noopener">
+              Source
+            </a>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>1,000,000 cells</span>
+            <span>=SUM(A1:A200000)</span>
+            <span>recalculates <em>while frozen</em></span>
+          </div>
+          <h3>gessosheet</h3>
+          <p>
+            A spreadsheet you would keep a budget in. Block the main thread for five seconds and the formula engine
+            finishes recalculating behind the freeze.
+          </p>
+          <div class="card-links">
+            <a class="card-link card-link-out" href="https://gesso-sheets.vercel.app/" target="_blank" rel="noopener">
+              Open the spreadsheet
+            </a>
+            <a class="source-link" href="https://github.com/kevinpbaker/gesso-sheets" target="_blank" rel="noopener">
+              Source
+            </a>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="figure figure-tools">
+            <span>SELECT * FROM trips</span>
+            <span>5,000,000 rows</span>
+            <span>DuckDB-WASM <em>in its own worker</em></span>
+          </div>
+          <h3>Gesso SQL</h3>
+          <p>
+            A SQL workbench with a real code editor and a results grid that keeps scrolling while the next query runs.
+          </p>
+          <div class="card-links">
+            <a class="card-link card-link-out" href="https://gesso-sql.vercel.app/" target="_blank" rel="noopener">
+              Open the workbench
+            </a>
+            <a class="source-link" href="https://github.com/kevinpbaker/gesso-sql" target="_blank" rel="noopener">
+              Source
+            </a>
+          </div>
         </article>
       </div>
     </section>
@@ -723,6 +799,37 @@ h3 {
   color: var(--gesso-linen);
 }
 
+/* Built on Gesso */
+
+.showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-bottom: 100px;
+}
+
+.card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: center;
+}
+
+.card-link-out::after {
+  content: '↗';
+}
+
+.source-link {
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+}
+
+.source-link:hover {
+  color: var(--vp-c-brand-1);
+}
+
 /* The model */
 
 .model {
@@ -990,6 +1097,7 @@ h3 {
   }
 
   .pillars,
+  .showcase,
   .model,
   .fit,
   .start {
