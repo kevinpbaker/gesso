@@ -104,4 +104,41 @@ describe('visibility', () => {
     }
     expect(mounted.frames.length).toBeGreaterThan(0);
   });
+
+  it('redraws a canvas the browser emptied and handed back', () => {
+    // Chrome takes a hidden tab's canvas memory back, and a GPU restart
+    // on wake from sleep empties every canvas. Nothing in the tree
+    // changed, so without this nothing was dirty and the app stayed a
+    // blank rectangle until something happened to repaint it.
+    const mounted = mountRuntime(Column({ width: 200, height: 200 }, Box({ width: 10, height: 10 })));
+    drain(mounted);
+    const drawn = mounted.frames.length;
+
+    mounted.canvas.dispatchEvent(new Event('contextrestored'));
+    drain(mounted);
+    expect(mounted.frames.length).toBeGreaterThan(drawn);
+  });
+
+  it('repaints everything on the way back from hidden, which is when a canvas is taken', () => {
+    const mounted = mountRuntime(Column({ width: 200, height: 200 }, Box({ width: 10, height: 10 })));
+    drain(mounted);
+    mounted.runtime.setVisible(false);
+    drain(mounted);
+    const before = mounted.canvas.ctx.fillRect.mock.calls.length + mounted.canvas.ctx.clearRect.mock.calls.length;
+
+    mounted.runtime.setVisible(true);
+    drain(mounted);
+    const after = mounted.canvas.ctx.fillRect.mock.calls.length + mounted.canvas.ctx.clearRect.mock.calls.length;
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it('stops listening for the canvas once disposed', () => {
+    const mounted = mountRuntime(Column({ width: 200, height: 200 }, Box({ width: 10, height: 10 })));
+    drain(mounted);
+    mounted.runtime.dispose();
+    const drawn = mounted.frames.length;
+    mounted.canvas.dispatchEvent(new Event('contextrestored'));
+    drain(mounted);
+    expect(mounted.frames.length).toBe(drawn);
+  });
 });
