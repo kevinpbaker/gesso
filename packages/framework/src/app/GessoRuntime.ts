@@ -372,6 +372,8 @@ export class GessoRuntime {
   private viewportInsetWrite: ((next?: Partial<UiInsets>) => void) | null = null;
   /** Stops watching the app root's environment for a change of registry. */
   private detachViewportInsetEnvironment: (() => void) | null = null;
+  /** Stops listening for the browser handing back a canvas it had thrown away. */
+  private detachContextRestored: (() => void) | null = null;
   private constraints: Constraints;
   private pixelRatio: number;
   private lastFrameMs = 0;
@@ -580,6 +582,7 @@ export class GessoRuntime {
           return 'canvas2d';
         });
     }
+    this.detachContextRestored = watchContextRestored(this.canvas, () => this.surfaceRestored());
 
     this.engine = new LayoutEngine(this.textMeasurer);
     this.inspector = new LayoutInspector(this.engine, {
@@ -950,6 +953,21 @@ export class GessoRuntime {
     this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
     this.rendererState = 'canvas2d';
     this.renderer.resize(this.width, this.height, this.pixelRatio);
+    this.requestRepaint();
+  }
+
+  /**
+   * The browser threw the canvas's pixels away and has handed it back
+   * empty. Chrome does this to a canvas in a tab left hidden long
+   * enough to be asked for its memory back, and to every canvas when
+   * the GPU process restarts — which is what a Mac waking from sleep
+   * often does. Nothing in the tree changed, so nothing is dirty and
+   * no frame would ever come: the app sat there as a blank rectangle
+   * until something happened to repaint it. Any layer the renderer
+   * keeps was emptied with it, and reports itself as healthy again.
+   */
+  private surfaceRestored(): void {
+    this.renderer.surfaceRestored?.();
     this.requestRepaint();
   }
 
@@ -1399,6 +1417,10 @@ export class GessoRuntime {
     // One frame on the way back, whether or not anything is dirty: an
     // animation the driver kept running while hidden is still in it,
     // and `scheduleAnimationTick` only re-arms from inside a frame.
+    // And a whole repaint rather than whatever is dirty, because a
+    // hidden canvas is the one a browser takes back, and not every
+    // engine says so with `contextrestored`.
+    this.surfaceRestored();
     this.scheduler.wake();
   }
 
@@ -1960,6 +1982,8 @@ export class GessoRuntime {
     // reference; a disposed runtime must not keep either alive.
     this.input.touchScroll.dispose();
     this.resolver.dispose();
+    this.detachContextRestored?.();
+    this.detachContextRestored = null;
     this.renderer.dispose();
   }
 
@@ -4006,4 +4030,18 @@ function frameChangedTree(frame: UiFrame): boolean {
 
 function frameNeedsSemantics(frame: UiFrame): boolean {
   return frame.anyFlags(DirtyFlags.Semantics | DirtyFlags.Children);
+}
+
+/**
+ * Calls `restored` whenever the browser hands the canvas back after
+ * losing it. Both canvas types are event targets; a test double that is
+ * not one simply never hears.
+ */
+function watchContextRestored(canvas: CanvasHost, restored: () => void): () => void {
+  const target = canvas as Partial<EventTarget>;
+  if (typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function') {
+    return () => {};
+  }
+  target.addEventListener('contextrestored', restored);
+  return () => target.removeEventListener?.('contextrestored', restored);
 }

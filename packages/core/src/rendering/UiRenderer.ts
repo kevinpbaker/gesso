@@ -33,5 +33,11 @@ export interface UiRenderer {
    * with the fallback. Canvas2D keeps none and need not implement it.
    */
   fontsChanged?(): void;
+  /**
+   * The browser emptied the canvas and handed it back. A renderer that
+   * keeps pixels of its own in canvases drops them, since those were
+   * emptied too and will not say so. The next frame redraws everything.
+   */
+  surfaceRestored?(): void;
   dispose(): void;
 }

@@ -21,7 +21,8 @@ import { GessoRuntime, type FrameMetrics, type GessoRuntimeOptions } from './Ges
 /** Every 2D context method, as a mock; assert on `ctx.fillText.mock.calls`. */
 export type MockContext = Record<string, ReturnType<typeof vi.fn>>;
 
-export interface MockCanvas extends CanvasHost {
+export interface MockCanvas
+  extends CanvasHost, Pick<EventTarget, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'> {
   /** The context every `getContext` call returns, for asserting draws. */
   readonly ctx: MockContext;
 }
@@ -80,7 +81,18 @@ export function mockCanvas(width = 800, height = 600): MockCanvas {
       return true;
     }
   }) as unknown as MockContext;
-  return { width, height, ctx, getContext: () => ctx as unknown as CanvasRenderingContext2D };
+  // An event target as both real canvases are, so a spec can hand the
+  // runtime a `contextrestored`.
+  const events = new EventTarget();
+  return {
+    width,
+    height,
+    ctx,
+    getContext: () => ctx as unknown as CanvasRenderingContext2D,
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+    dispatchEvent: events.dispatchEvent.bind(events)
+  };
 }
 
 export interface MountedRuntime {

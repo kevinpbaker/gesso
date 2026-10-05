@@ -208,6 +208,11 @@ export class Canvas2DRenderer implements UiRenderer {
     this.layers.dropAll();
   }
 
+  /** A restored scroll layer reads as healthy and holds nothing. */
+  surfaceRestored(): void {
+    this.layers.dropAll();
+  }
+
   dispose(): void {
     this.disposed = true;
     this.scaledImages.dispose();

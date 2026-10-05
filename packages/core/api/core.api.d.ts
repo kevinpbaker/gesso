@@ -4236,6 +4236,7 @@ interface UiRenderer {
   render(root: UiNode, context: RenderContext): void;
   resize(width: number, height: number, dpr: number): void;
   fontsChanged?(): void;
+  surfaceRestored?(): void;
   dispose(): void;
 }
 type LayerCanvasFactory = (width: number, height: number) => CanvasHost | null;
@@ -4276,6 +4277,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   initialize(): Promise<void>;
   get isReady(): boolean;
   resize(width: number, height: number, dpr: number): void;
+  surfaceRestored(): void;
   dispose(): void;
   render(root: UiNode, context: RenderContext): void;
   private resolvePaint;
