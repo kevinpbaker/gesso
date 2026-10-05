@@ -324,4 +324,55 @@ describe('GessoRuntime renderer option', () => {
     expect((device.queue.submit as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
     runtime.dispose();
   });
+
+  it('gets a new device when the GPU is lost, rather than asking a WebGPU canvas for 2D', async () => {
+    // A GPU process restart — a Mac waking from sleep — loses the
+    // device. The canvas keeps its WebGPU context, so `getContext('2d')`
+    // on it answers null, and the old Canvas2D fallback threw on every
+    // frame and left a blank rectangle.
+    let lose: (info: GPUDeviceLostInfo) => void = () => {};
+    const first = { ...createMockDevice(), lost: new Promise<GPUDeviceLostInfo>(resolve => (lose = resolve)) };
+    const second = createMockDevice();
+    const devices = [first as unknown as GPUDevice, second];
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        gpu: {
+          requestAdapter: vi.fn(async () => ({ requestDevice: vi.fn(async () => devices.shift()) })),
+          getPreferredCanvasFormat: vi.fn(() => 'bgra8unorm')
+        }
+      },
+      configurable: true
+    });
+    const canvas = mockCanvas(mockGPUContext());
+    const clock = manualClock();
+    const frames: FrameMetrics[] = [];
+    const errors: string[] = [];
+    const runtime = new GessoRuntime({
+      root,
+      canvas,
+      renderer: 'webgpu',
+      measureCanvas: mockCanvas(),
+      clock: clock.factory,
+      width: 200,
+      height: 100
+    });
+    runtime.onFrame(metrics => frames.push(metrics));
+    runtime.onRendererError(message => errors.push(message));
+    runtime.start();
+    await runtime.rendererReady;
+    clock.tick();
+
+    lose({ reason: 'unknown', message: 'GPU process restarted' } as GPUDeviceLostInfo);
+    await vi.waitFor(() => expect(errors.some(message => message.includes('device lost'))).toBe(true));
+    // The loss asks for a frame by itself: nobody has to touch the page.
+    clock.tick();
+    await vi.waitFor(() => expect(second.createRenderPipeline).toHaveBeenCalled());
+    clock.tick();
+
+    expect(runtime.rendererBackend).toBe('webgpu');
+    expect(frames.at(-1)?.renderer).toBe('webgpu');
+    expect((second.queue.submit as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
+    expect(canvas.contexts).not.toContain('2d');
+    runtime.dispose();
+  });
 });

@@ -1404,6 +1404,7 @@ declare class GessoRuntime {
   private viewportInsetRegistry;
   private viewportInsetWrite;
   private detachViewportInsetEnvironment;
+  private webgpuRecovery;
   private detachContextRestored;
   private constraints;
   private pixelRatio;
@@ -1471,6 +1472,7 @@ declare class GessoRuntime {
   onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
   private reportRendererError;
   private fallBackToCanvas2D;
+  private recoverWebGPU;
   private surfaceRestored;
   private requestRepaint;
   private fontsChanged;

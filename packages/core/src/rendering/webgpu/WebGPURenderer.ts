@@ -3,7 +3,7 @@ import type { UiNode } from '../../graph/UiNode';
 import type { RenderContext } from '../RenderContext';
 import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import type { WebGPUSurface } from './WebGPUSurface';
-import { initializeWebGPU, onDeviceLost } from './WebGPUDevice';
+import { initializeWebGPU } from './WebGPUDevice';
 import { WebGPUError } from './WebGPUError';
 import {
   createFrameBindGroupLayout,
@@ -39,6 +39,12 @@ export interface WebGPURendererOptions {
    * console is out of sight, so the runtime forwards these to the shell.
    */
   onError?: (message: string) => void;
+  /**
+   * The device was lost — the GPU process restarted, which a Mac waking
+   * from sleep often does, or the driver was updated. Frames are skipped
+   * from here until `recover()` brings a new device.
+   */
+  onLost?: () => void;
 }
 
 export interface RenderHooks {
@@ -112,19 +118,15 @@ export class WebGPURenderer implements UiRenderer {
   private pendingCapture: PendingCapture | null = null;
   private lost = false;
   private disposed = false;
-  private readonly removeLostListener: () => void;
-
   private readonly onError: (message: string) => void;
+  private readonly onLost: () => void;
 
   constructor(options: WebGPURendererOptions) {
     this.surface = options.surface;
     this.hooks = options.hooks ?? {};
     // eslint-disable-next-line no-console
     this.onError = options.onError ?? (message => console.error(message));
-    this.removeLostListener = onDeviceLost(info => {
-      this.lost = true;
-      this.onError(`WebGPU device lost: ${info.reason} ${info.message}`);
-    });
+    this.onLost = options.onLost ?? (() => {});
   }
 
   /**
@@ -150,6 +152,16 @@ export class WebGPURenderer implements UiRenderer {
     }
     this.device = init.device;
     this.format = init.format;
+    // This device's loss only: one page can hold several renderers, and
+    // a device recovery replaced is not news when it finally goes.
+    void init.device.lost.then(info => {
+      if (this.device !== init.device || this.disposed) {
+        return;
+      }
+      this.lost = true;
+      this.onError(`WebGPU device lost: ${info.reason} ${info.message}`);
+      this.onLost();
+    });
     init.device.onuncapturederror = event => {
       this.onError(`WebGPU error: ${event.error.message}`);
     };
@@ -477,13 +489,32 @@ export class WebGPURenderer implements UiRenderer {
     this.glyphPages?.dispose();
   }
 
+  /**
+   * Draws again after the device was lost, on a new one.
+   *
+   * Everything made on the old device went with it; the canvas keeps
+   * its WebGPU context, so a lost renderer cannot hand the canvas to
+   * Canvas2D, and getting a new device is the only way back to pixels.
+   * Rejects as `initialize` does when no adapter can be had.
+   */
+  async recover(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    this.releaseDeviceResources();
+    await this.initialize();
+  }
+
   dispose(): void {
     if (this.disposed) {
       return;
     }
     this.disposed = true;
-    this.removeLostListener();
     this.surface.unconfigure();
+    this.releaseDeviceResources();
+  }
+
+  private releaseDeviceResources(): void {
     this.textures?.dispose();
     this.textures = null;
     this.glyphPages?.dispose();
@@ -493,6 +524,7 @@ export class WebGPURenderer implements UiRenderer {
     this.textCache.atlas.reset();
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
+    this.cachedInstanceData = null;
     this.texturedBuffer?.destroy();
     this.texturedBuffer = null;
     this.clipBuffer?.destroy();
