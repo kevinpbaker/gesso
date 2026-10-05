@@ -1,6 +1,6 @@
 {
   "name": "gesso-framework",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "SwiftUI and Compose, for the web: declarative components, stores and a frame runtime that keeps the whole interface off the main thread.",
   "license": "MIT",
   "author": "Kevin Baker",

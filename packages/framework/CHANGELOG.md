@@ -1,9 +1,18 @@
 # gesso-framework
 
+## 0.6.3
+
+### Patch Changes
+
+- An app whose WebGPU device is lost gets a new one and carries on. The fallback it used to take, Canvas2D on the same canvas, could never work: that canvas already holds a WebGPU context, so `getContext('2d')` answers null and the fallback threw on every frame. The runtime now asks the renderer to recover on a new device, and the loss itself requests the frame that starts it. Each renderer listens to its own device's loss rather than to every device on the page. `WebGPURenderer` gains `recover()` and an `onLost` option.
+- Updated dependencies
+  - gesso-core@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes
 
+- 0304a05: A canvas the browser empties and hands back is repainted. Chrome reclaims the canvas of a tab left hidden long enough, and a GPU process restart (a Mac waking from sleep) empties every canvas; nothing in the tree had changed, so no frame came and the app sat as a blank rectangle. The runtime now repaints the whole tree on `contextrestored`, and on the way back from hidden for engines that do not fire it. `UiRenderer` gains an optional `surfaceRestored()`, which `Canvas2DRenderer` implements by dropping its scroll layers.
 - gesso-core@0.6.2
 
 ## 0.6.1
