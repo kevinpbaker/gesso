@@ -1,6 +1,6 @@
 {
   "name": "create-gesso-app",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Scaffolds a Gesso app: a native-grade web application built from declarative components, with its interface in a render worker.",
   "license": "MIT",
   "author": "Kevin Baker",

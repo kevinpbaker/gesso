@@ -1,5 +1,11 @@
 # create-gesso-app
 
+## 0.6.1
+
+### Patch Changes
+
+- The `create-gesso-app` command is in the published package again. npm 11 dropped a `bin` path written with a leading `./`, so `npm create gesso-app` found nothing to run.
+
 ## 0.6.0
 
 ## 0.5.1
