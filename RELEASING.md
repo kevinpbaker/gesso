@@ -74,12 +74,17 @@ on 0.2.0 it was talked past.
 
 Read what it wrote before going on: the version it chose, the template
 ranges it moved, and every changelog entry, which is the only account
-of this release most people will ever read. Commit that, push it, and
-tag it `v<version>`.
+of this release most people will ever read. Commit that and push it.
+Wait for CI to go green on that commit, then tag it `v<version>` and
+push the tag.
 
-Pushing the tag runs `.github/workflows/release.yml`, which reruns the
-whole gate suite against the tagged commit, packs, proves each tarball
-was rewritten, and publishes. `workflow_dispatch` runs the same thing
+Pushing the tag runs `.github/workflows/release.yml`. It does not rerun
+the gates: it waits for CI's run on the tagged commit and refuses to
+publish unless that run passed, then packs, proves each tarball was
+rewritten, and publishes. If CI on the commit failed for a reason that
+is not the code (a runner too slow for Chrome, a push that cancelled
+it), rerun CI's failed jobs, then rerun the release workflow; the tag
+does not need to move. `workflow_dispatch` runs the same thing
 with a dry run by default, which packs and verifies and uploads nothing.
 
 Publishing by hand still works and is the fallback if Actions is down:

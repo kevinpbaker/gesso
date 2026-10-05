@@ -37,46 +37,65 @@ env:
   NODE_VERSION: '24'
 
 jobs:
-  # Everything CI runs on a pull request, again, against the exact commit
-  # being published. A release is the one moment where "it passed on main"
-  # is not good enough: the tag may not be what main is.
-  gates:
-    name: the full gate suite
+  # The commit being published has to have passed CI already: every job in
+  # ci.yml, on this exact commit, in its latest attempt. This job waits for
+  # that run rather than repeating it.
+  #
+  # It used to rerun `pnpm check` and `pnpm check:install` here. That
+  # proved nothing CI had not, and doubled the chances of a shared runner
+  # being too slow for a browser to start: v0.6.1 failed twice in this
+  # workflow on a commit whose CI was green. The guarantee is the same one
+  # as before, "the gates passed on what is tagged", read from the run
+  # that already established it.
+  #
+  # A tag on a commit CI never ran (one not pushed to main or a pull
+  # request), or whose run was cancelled by a later push, fails here with
+  # what to do about it. Push the commit, or rerun its CI, then rerun this.
+  ci:
+    name: CI passed on this commit
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - run: corepack enable
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-
-  # Packs with pnpm, installs the tarballs into a fresh project with npm,
-  # typechecks that project against the published declarations, runs a
-  # component test through the packed testing package, builds it and
-  # drives it in Chrome. It is the publish path end to end minus the
-  # upload, and the only gate that catches a package that is wrong only
-  # once packed.
-  packed:
-    name: the packed packages install and run
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: corepack enable
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check:install
+      - name: Wait for CI on ${{ github.sha }}
         env:
-          CHROME_BIN: google-chrome
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 80 * 60 ))
+          while :; do
+            # Newest CI run for the commit; a rerun updates its conclusion in place.
+            run=$(gh run list --workflow ci.yml --commit "$SHA" --limit 1 \
+              --json databaseId,status,conclusion,url \
+              -q '.[0] // empty | "\(.databaseId) \(.status) \(.conclusion) \(.url)"')
+            if [ -z "$run" ]; then
+              echo "::error::CI has not run on $SHA. Push it to main or open a pull request, let CI pass, then rerun this workflow."
+              exit 1
+            fi
+            read -r id status conclusion url <<< "$run"
+            if [ "$status" = "completed" ]; then
+              if [ "$conclusion" = "success" ]; then
+                echo "CI passed on $SHA: $url"
+                exit 0
+              fi
+              echo "::error::CI on $SHA finished as '$conclusion': $url. Rerun its failed jobs; once it is green, rerun this workflow."
+              exit 1
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::CI on $SHA was still $status after 80 minutes: $url"
+              exit 1
+            fi
+            echo "CI on $SHA is $status; waiting. $url"
+            sleep 30
+          done
 
   publish:
     name: publish to npm
-    needs: [gates, packed]
+    needs: [ci]
     runs-on: ubuntu-latest
     permissions:
       # The OIDC token npm exchanges for a short-lived publish credential,
