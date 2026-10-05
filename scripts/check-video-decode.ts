@@ -28,7 +28,9 @@
  *   - a picture was decoded at all;
  *   - *new* pictures kept arriving, rather than one being presented
  *     over and over — which is what a decoder that stalled after its
- *     first keyframe looks like;
+ *     first keyframe looks like. Counted over the second after the
+ *     first picture, not the second after load: see the fixture for
+ *     the cold start that made the difference;
  *   - a seek to four fifths in changed the picture, within a budget.
  *
  * And one thing is reported rather than asserted: whether the
@@ -87,6 +89,7 @@ interface SourceReport {
   width?: number;
   height?: number;
   frameDurationMs?: number;
+  firstPictureMs?: number;
   picturesDrawn?: number;
   drewSomething?: boolean;
   seekChangedPicture?: boolean;
@@ -184,7 +187,9 @@ function problemsWith(report: SourceReport): string[] {
   // decoder that produced its first keyframe and then stalled scores
   // exactly one, and every other assertion here would still pass.
   if ((report.picturesDrawn ?? 0) < 5) {
-    problems.push(`only ${report.picturesDrawn} distinct pictures over the first second; the clip is not advancing`);
+    problems.push(
+      `only ${report.picturesDrawn} distinct pictures in the second after the first picture; the clip is not advancing`
+    );
   }
   if (report.seekChangedPicture !== true) {
     problems.push('seeking to four fifths of the way in did not change the picture');
@@ -247,11 +252,18 @@ async function main(): Promise<void> {
         console.log(
           `      ${report.width}x${report.height}, ${report.duration?.toFixed(2)}s, ` +
             `${report.frameDurationMs?.toFixed(1)}ms per frame; ` +
-            `${report.picturesDrawn} pictures in the first second; seek ${report.seekMs}ms`
+            `first picture ${report.firstPictureMs}ms, then ${report.picturesDrawn} pictures in a second; ` +
+            `seek ${report.seekMs}ms`
         );
       } else {
         failed++;
         console.log(`  ✗ ${report.name}`);
+        // How long the first picture took, even on a failure: it is
+        // what tells a decoder that never started from one that was
+        // slow to.
+        if (report.firstPictureMs !== undefined) {
+          console.log(`      waited ${report.firstPictureMs}ms for a first picture`);
+        }
         for (const problem of problems) {
           console.log(`      ${problem}`);
         }
