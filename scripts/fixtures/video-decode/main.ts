@@ -47,7 +47,9 @@ interface SourceReport {
   width?: number;
   height?: number;
   frameDurationMs?: number;
-  /** How many distinct pictures reached the surface over the first second. */
+  /** How long the first picture took to reach the surface, in milliseconds. */
+  firstPictureMs?: number;
+  /** How many distinct pictures reached the surface in the second after the first one. */
   picturesDrawn?: number;
   /** Whether anything was ever on the surface. */
   drewSomething?: boolean;
@@ -86,6 +88,27 @@ async function exercise(playback: VideoPlayback, report: SourceReport): Promise<
   report.height = playback.height;
   report.frameDurationMs = playback.frameDurationMs;
 
+  // Wait for the first picture before the first second starts, rather
+  // than starting the clock at load. The first decoder a browser
+  // process opens pays for setting the platform's decoder up, and on a
+  // slow shared CI runner that took longer than the whole loop below —
+  // which runs a second of video in about half a second of wall time.
+  // The source checked first absorbed it every time: "nothing was ever
+  // drawn" and one distinct picture, while the same clip from three
+  // other sources drew twenty-four, and the seek straight after it
+  // landed within budget on the very decoder that had supposedly
+  // stalled. That is a slow start, not a stall, and the assertion
+  // below is about stalls. So the start gets the same bounded patience
+  // the seek and the ranged read already get, is reported rather than
+  // hidden, and a decoder that draws nothing within it still fails.
+  const startedAt = performance.now();
+  playback.present(0);
+  const firstPictureBy = startedAt + 5000;
+  while (playback.surface.frame === null && performance.now() < firstPictureBy) {
+    await settle(8);
+  }
+  report.firstPictureMs = Math.round(performance.now() - startedAt);
+
   const seen = new Set<number>();
   for (let at = 0; at < 1000; at += playback.frameDurationMs) {
     playback.present(at);
@@ -102,16 +125,16 @@ async function exercise(playback: VideoPlayback, report: SourceReport): Promise<
   // the keyframe before the target, decoding forward through it, and
   // showing one picture rather than the whole gap.
   const before = playback.surface.version;
-  const startedAt = performance.now();
+  const seekStartedAt = performance.now();
   playback.present(playback.duration * 1000 * 0.8);
   // Polled rather than slept on. The first version of this waited a
   // flat 500ms and then measured, which reported 505ms every time for
   // every source: it was timing the sleep, not the seek.
-  const deadline = startedAt + 5000;
+  const deadline = seekStartedAt + 5000;
   while (playback.surface.version === before && performance.now() < deadline) {
     await settle(8);
   }
-  report.seekMs = Math.round(performance.now() - startedAt);
+  report.seekMs = Math.round(performance.now() - seekStartedAt);
   report.seekChangedPicture = playback.surface.version > before;
 }
 
