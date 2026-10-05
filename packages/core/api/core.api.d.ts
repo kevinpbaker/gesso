@@ -4661,6 +4661,7 @@ interface WebGPURendererOptions {
   surface: WebGPUSurface;
   hooks?: RenderHooks;
   onError?: (message: string) => void;
+  onLost?: () => void;
 }
 interface RenderHooks {
   onPrepareStart?(): void;
@@ -4702,8 +4703,8 @@ declare class WebGPURenderer implements UiRenderer {
   private pendingCapture;
   private lost;
   private disposed;
-  private readonly removeLostListener;
   private readonly onError;
+  private readonly onLost;
   constructor(options: WebGPURendererOptions);
   setHooks(hooks: RenderHooks): void;
   initialize(): Promise<void>;
@@ -4715,7 +4716,9 @@ declare class WebGPURenderer implements UiRenderer {
   private clearFrame;
   resize(width: number, height: number, dpr?: number): void;
   fontsChanged(): void;
+  recover(): Promise<void>;
   dispose(): void;
+  private releaseDeviceResources;
   private uploadInstanceData;
   private ensureBuffer;
 }

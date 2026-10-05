@@ -372,6 +372,8 @@ export class GessoRuntime {
   private viewportInsetWrite: ((next?: Partial<UiInsets>) => void) | null = null;
   /** Stops watching the app root's environment for a change of registry. */
   private detachViewportInsetEnvironment: (() => void) | null = null;
+  /** A WebGPU device being asked for after the last one was lost. */
+  private webgpuRecovery: Promise<void> | null = null;
   /** Stops listening for the browser handing back a canvas it had thrown away. */
   private detachContextRestored: (() => void) | null = null;
   private constraints: Constraints;
@@ -554,6 +556,9 @@ export class GessoRuntime {
       const webgpu = new WebGPURenderer({
         surface: createWebGPUSurface(options.canvas as unknown as WebGPUCanvasHost),
         onError: message => this.reportRendererError(message),
+        // A frame is what notices and starts the recovery, and a page
+        // nobody is touching would otherwise not have one.
+        onLost: () => this.requestRepaint(),
         hooks: {
           onPrepareEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), prepare: ms }),
           onUploadEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), upload: ms }),
@@ -954,6 +959,35 @@ export class GessoRuntime {
     this.rendererState = 'canvas2d';
     this.renderer.resize(this.width, this.height, this.pixelRatio);
     this.requestRepaint();
+  }
+
+  /**
+   * Asks for a new device for a renderer whose device was lost.
+   *
+   * Not a fall back to Canvas2D, which is what this once did: the
+   * canvas already holds a WebGPU context, `getContext('2d')` on it
+   * answers null, and the fallback threw on every frame from then on.
+   * One request at a time; a failed one is reported, and the next frame
+   * asks again.
+   */
+  private recoverWebGPU(renderer: WebGPURenderer): void {
+    if (this.webgpuRecovery !== null) {
+      return;
+    }
+    this.webgpuRecovery = renderer
+      .recover()
+      .then(() => {
+        if (this.renderer === renderer) {
+          renderer.resize(this.width, this.height, this.pixelRatio);
+          this.requestRepaint();
+        }
+      })
+      .catch((error: unknown) => {
+        this.reportRendererError(`WebGPU could not get a new device: ${String(error)}`);
+      })
+      .finally(() => {
+        this.webgpuRecovery = null;
+      });
   }
 
   /**
@@ -3463,9 +3497,9 @@ export class GessoRuntime {
     // Render is unconditional once the backend is ready: both backends
     // redraw the whole scene, so any frame that got this far changes
     // pixels. Before WebGPU has a device there is nothing to draw with;
-    // a lost device falls back to Canvas2D and repaints.
+    // a lost device is replaced, and the frame after it repaints.
     if (this.renderer.backend === 'webgpu' && (this.renderer as WebGPURenderer).isLost) {
-      this.fallBackToCanvas2D(this.renderer);
+      this.recoverWebGPU(this.renderer as WebGPURenderer);
     }
     // The inspector's overlay rides along with the frame, so either
     // backend draws it over the finished scene. The hovered node's
