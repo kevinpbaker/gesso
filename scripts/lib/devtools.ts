@@ -222,7 +222,9 @@ export async function openPage(
         }[];
         return targets.find(t => t.type === 'page' && t.url.startsWith(origin));
       },
-      15_000
+      // A cold Chrome on a busy CI runner has taken longer than 15 s to open
+      // its endpoint without anything being wrong (v0.6.1's first release run).
+      45_000
     );
   } catch (error) {
     browser.kill();
