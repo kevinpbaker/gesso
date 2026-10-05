@@ -37,7 +37,11 @@ interface Scene {
   drag(x: number, y: number): void;
 }
 
-function scene(): Scene {
+/**
+ * `first` replaces the first paragraph's properties, so a case can make
+ * it clamped or ellipsised without building a page of its own.
+ */
+function scene(options: { first?: Record<string, unknown> } = {}): Scene {
   const graph = new UiGraph();
   const engine = new LayoutEngine(measurer);
   let ids = 0;
@@ -51,7 +55,7 @@ function scene(): Scene {
 
   const font = { fontSize: 10, lineHeight: 12 };
   const root = node(UiNodeType.Column, { width: 200, height: 200 });
-  const first = node(UiNodeType.Text, { text: 'hello world', ...font });
+  const first = node(UiNodeType.Text, { text: 'hello world', ...font, ...options.first });
   const second = node(UiNodeType.Text, { text: 'second line', ...font });
   const button = node(UiNodeType.Button);
   const label = node(UiNodeType.Text, { text: 'Save', ...font });
@@ -211,6 +215,98 @@ describe('UiSelectionController', () => {
       s.drag(30, 17);
       // The first paragraph grew to its end and the second gained a head.
       expect(s.dirty).toEqual([s.first, s.second]);
+    });
+  });
+
+  /**
+   * `text-overflow` is presentation: the text the ellipsis stands for is
+   * still the node's, and a browser copies it once a selection reaches
+   * the ellipsis. The page here is 200 wide, so the first paragraph
+   * draws 'Brand Story & Brand…' — nineteen glyphs, x 0..190, and the
+   * ellipsis at 190..200 — and hides the rest.
+   */
+  describe('truncated text', () => {
+    const ctrl = { ...noKeyModifiers(), ctrl: true };
+    const TITLE = 'Brand Story & Brand Attribute Management';
+    const ellipsised = { text: TITLE, maxLines: 1, textOverflow: 'ellipsis' };
+
+    function copy(s: Scene): string | undefined {
+      s.controller.handleKey('c', ctrl);
+      return s.copied.at(-1);
+    }
+
+    it('copies the hidden tail once a drag reaches the ellipsis', () => {
+      const s = scene({ first: ellipsised });
+      s.press(s.first, 2, 5);
+      s.drag(197, 5);
+      expect(copy(s)).toBe(TITLE);
+    });
+
+    it('copies the hidden tail when the drag runs on past the ellipsis', () => {
+      const s = scene({ first: ellipsised });
+      s.press(s.first, 62, 5);
+      // Off the right edge of the page, beside the line.
+      s.drag(400, 5);
+      expect(copy(s)).toBe('Story & Brand Attribute Management');
+    });
+
+    it('copies only what is drawn when the drag stops short of the ellipsis', () => {
+      const s = scene({ first: ellipsised });
+      s.press(s.first, 2, 5);
+      // The right half of the last drawn glyph: the boundary before the
+      // ellipsis, not the text behind it.
+      s.drag(188, 5);
+      expect(copy(s)).toBe('Brand Story & Brand');
+    });
+
+    it('copies the hidden tail from an anchor on the ellipsis dragged backwards', () => {
+      const s = scene({ first: ellipsised });
+      s.press(s.first, 198, 5);
+      expect(s.controller.hasSelection).toBe(false);
+      s.drag(142, 5);
+      expect(copy(s)).toBe('Brand Attribute Management');
+    });
+
+    it('takes the whole truncated node when a drag runs on into the next one', () => {
+      const s = scene({ first: ellipsised });
+      s.press(s.first, 142, 5);
+      s.drag(30, 17);
+      expect(copy(s)).toBe('Brand Attribute Management\nsec');
+    });
+
+    it('selects all of the text, the hidden tail included', () => {
+      const s = scene({ first: ellipsised });
+      s.controller.handleKey('a', ctrl);
+      expect(copy(s)).toBe(`${TITLE}\nsecond line`);
+    });
+
+    it('takes a whole word when the ellipsis cuts it, and the whole line on a third press', () => {
+      // Unwrapped, the line is cut mid-word: 'Brand Story & Brand…' with
+      // 'name Management' hidden.
+      const s = scene({
+        first: { text: 'Brand Story & Brandname Management', maxLines: 1, textWrap: 'none', textOverflow: 'ellipsis' }
+      });
+      s.press(s.first, 165, 5);
+      s.press(s.first, 165, 5);
+      expect(copy(s)).toBe('Brandname');
+      s.press(s.first, 165, 5);
+      expect(copy(s)).toBe('Brand Story & Brandname Management');
+    });
+
+    it('takes a visible word whole without reaching into the hidden tail', () => {
+      const s = scene({ first: ellipsised });
+      s.press(s.first, 165, 5);
+      s.press(s.first, 165, 5);
+      expect(copy(s)).toBe('Brand');
+    });
+
+    it('copies the lines maxLines dropped once a drag passes the last kept line', () => {
+      // 70 wide: 'Brand', 'Story &' and 'Brand…', with the ellipsis at
+      // 50..60 on the third line and everything after it dropped.
+      const s = scene({ first: { text: TITLE, width: 70, maxLines: 3, textOverflow: 'ellipsis' } });
+      s.press(s.first, 2, 17);
+      s.drag(58, 29);
+      expect(copy(s)).toBe('Story & Brand Attribute Management');
     });
   });
 

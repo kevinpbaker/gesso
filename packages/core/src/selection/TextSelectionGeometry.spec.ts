@@ -68,17 +68,79 @@ describe('TextSelectionGeometry', () => {
   });
 
   /**
-   * A clamped paragraph is the case an editable never has: only what is
-   * on screen can be selected, and the geometry has to stop where the
-   * glyphs do rather than measure the text that was cut.
+   * A clamped paragraph is the case an editable never has: the lines
+   * stop before the text does. The geometry measures only what is
+   * drawn, but the text that was cut is still the node's, as it is in
+   * a browser, so a point past the last drawn glyph stands for the end
+   * of the source.
    */
-  it('stops at the last drawn line when maxLines clamps the text', () => {
+  it('stops measuring at the last drawn line when maxLines clamps the text', () => {
     const geometry = paragraphGeometry('hello world again', box, state({ maxLines: 1 }), measurer);
     expect(geometry.lines.map(line => line.text)).toEqual(['hello']);
     expect(geometry.end).toBe(5);
     expect(geometry.text).toBe('hello');
-    expect(offsetAtPointIn(geometry, 200, 0)).toBe(5);
+    expect(geometry.source).toBe('hello world again');
+    expect(geometry.sourceEnd).toBe(17);
+    expect(offsetAtPointIn(geometry, 45, 0)).toBe(5);
+    expect(offsetAtPointIn(geometry, 200, 0)).toBe(17);
     expect(selectionRectsIn(geometry, 0, 17)).toEqual([{ x: 0, y: 0, width: 50, height: 12 }]);
+  });
+
+  /**
+   * The ellipsis is one glyph standing for the hidden tail, so the
+   * caret rule applies to it as to any other: the near half is the
+   * boundary before it, the far half the end of the source.
+   */
+  it('maps the far half of an ellipsis to the end of the hidden text', () => {
+    // 'hello', 'worl…': the ellipsis is at 40..50 on the second line.
+    const geometry = paragraphGeometry(
+      'hello world again',
+      box,
+      state({ maxLines: 2, textOverflow: 'ellipsis' }),
+      measurer
+    );
+    expect(geometry.lines.map(line => line.text)).toEqual(['hello', 'worl…']);
+    expect(geometry.end).toBe(10);
+    expect(geometry.sourceEnd).toBe(17);
+    expect(offsetAtPointIn(geometry, 38, 13)).toBe(10);
+    expect(offsetAtPointIn(geometry, 44, 13)).toBe(10);
+    expect(offsetAtPointIn(geometry, 46, 13)).toBe(17);
+    // Only the last kept line hides anything: past the end of the first
+    // is still the end of the first.
+    expect(offsetAtPointIn(geometry, 200, 0)).toBe(5);
+  });
+
+  it('lights the ellipsis when a range reaches the text behind it', () => {
+    const geometry = paragraphGeometry(
+      'hello world again',
+      box,
+      state({ maxLines: 2, textOverflow: 'ellipsis' }),
+      measurer
+    );
+    // Up to the ellipsis: the glyphs only.
+    expect(selectionRectsIn(geometry, 6, 10)).toEqual([{ x: 0, y: 12, width: 40, height: 12 }]);
+    // Into the hidden tail: the ellipsis as well, as one box with the glyphs.
+    expect(selectionRectsIn(geometry, 6, 17)).toEqual([{ x: 0, y: 12, width: 50, height: 12 }]);
+    // Hidden text only: the ellipsis alone.
+    expect(selectionRectsIn(geometry, 12, 15)).toEqual([{ x: 40, y: 12, width: 10, height: 12 }]);
+  });
+
+  it('lights a right-to-left ellipsis on the left', () => {
+    const geometry = paragraphGeometry(
+      'hello world',
+      box,
+      state({ maxLines: 1, textOverflow: 'ellipsis', rtl: true }),
+      measurer
+    );
+    expect(geometry.lines[0].text).toBe('hell…');
+    expect(selectionRectsIn(geometry, 0, 11)).toEqual([{ x: 0, y: 0, width: 50, height: 12 }]);
+    expect(offsetAtPointIn(geometry, 2, 0)).toBe(11);
+    expect(offsetAtPointIn(geometry, 8, 0)).toBe(4);
+  });
+
+  it('takes a word the ellipsis cuts whole, from the source', () => {
+    const geometry = paragraphGeometry('hello world', box, state({ maxLines: 1, textOverflow: 'ellipsis' }), measurer);
+    expect(wordRangeIn(geometry, 2)).toEqual({ start: 0, end: 5 });
   });
 
   it('ignores the ellipsis, which is drawn but is not in the source', () => {
