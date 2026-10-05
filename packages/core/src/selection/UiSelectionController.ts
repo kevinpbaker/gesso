@@ -188,8 +188,10 @@ export class UiSelectionController {
       this.anchor = { node, offset: word.start };
       this.focus = { node, offset: word.end };
     } else if (count >= 3) {
-      this.anchor = { node, offset: lineStartAt(geometry.text, offset) };
-      this.focus = { node, offset: lineEndAt(geometry.text, offset) };
+      // From the source, so a line an ellipsis cuts is taken through
+      // the text it hides; `apply` clamps to what may be selected.
+      this.anchor = { node, offset: lineStartAt(geometry.source, offset) };
+      this.focus = { node, offset: lineEndAt(geometry.source, offset) };
     } else {
       this.anchor = { node, offset };
       this.focus = { node, offset };
@@ -306,7 +308,7 @@ export class UiSelectionController {
     const last = order[order.length - 1];
     this.order = order;
     this.anchor = { node: first, offset: 0 };
-    this.focus = { node: last, offset: this.geometryOf(last).end };
+    this.focus = { node: last, offset: this.geometryOf(last).sourceEnd };
     this.apply();
     return true;
   }
@@ -470,7 +472,10 @@ export class UiSelectionController {
     const next: UiNode[] = [];
     for (let i = first; i <= last; i++) {
       const node = this.order[i];
-      const end = this.geometryOf(node).end;
+      // `sourceEnd`, not the drawn end: a node the range runs through,
+      // or one it reaches the ellipsis of, gives up the text the
+      // ellipsis hides as well, which is what a browser copies.
+      const end = this.geometryOf(node).sourceEnd;
       const start = i === first ? Math.min(from.offset, end) : 0;
       const stop = i === last ? Math.min(to.offset, end) : end;
       if (stop <= start) {

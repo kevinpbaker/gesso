@@ -5095,6 +5095,8 @@ interface ParagraphGeometry {
   readonly text: string;
   readonly start: number;
   readonly end: number;
+  readonly source: string;
+  readonly sourceEnd: number;
   readonly measure: RunMeasure;
   readonly rtl: boolean;
   readonly hidden: readonly UiTextRange[];

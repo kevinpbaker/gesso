@@ -92,6 +92,18 @@ The text is the selected nodes joined by a single newline, which is the
 paragraph break a reader expects when they paste a heading and the text
 under it.
 
+Truncation is presentation, as `text-overflow` is in CSS: a `<text>`
+cut short by `maxLines` or ellipsised still holds the whole string, and
+copy takes it the way a browser does. A selection that stays inside
+the drawn glyphs copies those. One that reaches the end of a truncated
+line, onto the far half of the `…` or past the last glyph where nothing
+is drawn in its place, copies through the end of the hidden text, and
+so do select all, a node the selection runs through on its way to the
+next, and a third press on the line. A double press on a word the
+ellipsis cuts takes the whole word. The `…` itself is never copied, and
+it is lit whenever the range includes text it hides, since that is
+where the text is on screen.
+
 Application code puts its own text on the clipboard through the same
 request, `ShellService.copyText`:
 
@@ -133,12 +145,6 @@ The colour is the theme's `primary` at 0.35 opacity. `selectionColor`
 on the node, or on any container above it, overrides that.
 
 ## Limits
-
-**Only what is drawn can be selected.** A `<text>` capped by `maxLines`
-shows part of itself, and the geometry truncates the source to the last
-drawn line before answering anything, so a selection over an ellipsised
-paragraph stops at the last visible character. What copy yields is the
-real source text up to there, never the `…` standing in for the rest.
 
 **There is no keyboard selection.** Arrow keys do not extend a canvas
 selection; copy, select all and clear are the whole keyboard surface.
