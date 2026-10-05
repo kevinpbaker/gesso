@@ -224,9 +224,10 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     // written.
     enforce: 'pre',
 
-    config(config): UserConfig {
+    config(config, env): UserConfig {
       return {
         ...(options.workerConditions === false ? {} : { resolve: { conditions: [...workerConditions] } }),
+        ...(env.command === 'serve' ? { optimizeDeps: { rolldownOptions: { plugins: [scanShell(options)] } } } : {}),
         // Module workers, which is what the plugin constructs, so a worker
         // can load a chunk on demand. Vite builds workers as IIFE unless
         // told otherwise, and an IIFE cannot split: a dynamic import in
@@ -357,6 +358,55 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
 
 export default gesso;
 
+/**
+ * Shows Vite's dependency scan what the dev server will actually load.
+ *
+ * Vite pre-bundles a dev server's dependencies from a scan that starts
+ * at the HTML and follows imports. It runs none of the plugin's
+ * transforms, so it never sees the workers the shell constructs, nor
+ * the `gesso-devtools` overlay and `gesso-framework/agent` bridge the
+ * shell loads lazily. Every Gesso package a worker imports was found
+ * only when the page asked for it, which re-optimized, invalidated the
+ * modules already served, and reloaded the page: on the first start of
+ * any app installed from the registry, the first page load failed with
+ * "504 (Outdated Optimize Dep)" and the overlay that would have
+ * reported it failed the same way. A workspace that links Gesso from
+ * source never met it, because linked packages are not pre-bundled.
+ *
+ * So the scan gets the shell as the dev server serves it, plus a plain
+ * import of each worker entry, which is enough for it to walk into the
+ * workers. Nothing here reaches the served code.
+ */
+function scanShell(options: GessoPluginOptions) {
+  return {
+    name: 'gesso:scan-shell',
+    async transform(this: ScanResolver, code: string, id: string) {
+      if (!SOURCE.test(id) || id.includes('/node_modules/')) {
+        return null;
+      }
+      const call = findShellCall(code);
+      if (call === null) {
+        return null;
+      }
+      // The scan resolves a file that does not exist to an external id
+      // rather than to null, so as it stands every candidate name would
+      // "resolve" and the first, `./RenderWorker.ts`, would win over the
+      // `./worker.ts` that is actually there.
+      const resolver: Resolver = {
+        resolve: async (source, importer) => {
+          const resolved = await this.resolve(source, importer);
+          return resolved === null || resolved.external === true ? null : resolved;
+        }
+      };
+      const entries = call.needsWorkers ? await resolveEntries(resolver, id, options).catch(() => null) : null;
+      const shell =
+        transformShell(code, { entries, overlay: options.overlay !== false, agent: options.agent !== false }) ?? code;
+      const workers = [entries?.renderWorker, entries?.appLogicWorker].filter(entry => typeof entry === 'string');
+      return { code: `${shell}\n${workers.map(entry => `import ${JSON.stringify(entry)};`).join('\n')}\n`, map: null };
+    }
+  };
+}
+
 /** A name for the MCP server: the project's directory, which is what a person calls the app. */
 function agentName(root: string): string {
   return (root.split('/').filter(Boolean).pop() ?? 'gesso').replace(/[^A-Za-z0-9_-]/g, '-');
@@ -413,6 +463,11 @@ function short(id: string, root: string): string {
 /** What the plugin resolves against, so a spec can hand it a fake. */
 interface Resolver {
   resolve(source: string, importer: string): Promise<{ id: string } | null>;
+}
+
+/** The dependency scan's resolver, which can answer with an external id. */
+interface ScanResolver {
+  resolve(source: string, importer: string): Promise<{ id: string; external?: boolean | string } | null>;
 }
 
 /**
