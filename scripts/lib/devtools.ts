@@ -175,11 +175,42 @@ export interface BrowserOptions {
   readonly profileDir: string;
 }
 
-/** Starts Chrome on `url` and returns the process with a client attached to its page. */
+/**
+ * Starts Chrome on `url` and returns the process with a client attached to its page.
+ *
+ * A start that never opens its DevTools endpoint is tried once more with a
+ * fresh process. On a shared CI runner one cold start can take longer than
+ * any sensible limit while the next is quick (v0.6.1's release failed twice
+ * that way with nothing wrong), and a gate that fails on a slow runner
+ * trains people to rerun gates until they pass. A browser that exits or
+ * fails the same way twice still fails, with what it said.
+ */
 export async function openPage(
   chrome: string,
   options: BrowserOptions
 ): Promise<{ browser: ChildProcess; devtools: DevTools }> {
+  try {
+    return await launch(chrome, options);
+  } catch (error) {
+    if (!(error instanceof SlowStart)) throw error;
+    console.warn(`${error.message.split('\n')[0]} Starting Chrome again.`);
+    await error.exited;
+    return await launch(chrome, options);
+  }
+}
+
+/** Chrome was still running but had not opened its endpoint in time. */
+class SlowStart extends Error {
+  /** Settles once the killed process is gone and its port is free. */
+  readonly exited: Promise<void>;
+
+  constructor(message: string, exited: Promise<void>) {
+    super(message);
+    this.exited = exited;
+  }
+}
+
+async function launch(chrome: string, options: BrowserOptions): Promise<{ browser: ChildProcess; devtools: DevTools }> {
   const browser = spawn(
     chrome,
     [
@@ -205,9 +236,12 @@ export async function openPage(
     said = (said + chunk).slice(-4000);
   });
   let exited: string | undefined;
-  browser.on('exit', (code, signal) => {
-    exited = signal === null ? `exited with code ${code}` : `was killed by ${signal}`;
-  });
+  const gone = new Promise<void>(resolve =>
+    browser.on('exit', (code, signal) => {
+      exited = signal === null ? `exited with code ${code}` : `was killed by ${signal}`;
+      resolve();
+    })
+  );
 
   const origin = new URL(options.url).origin;
   let target: { webSocketDebuggerUrl: string };
@@ -227,12 +261,13 @@ export async function openPage(
       45_000
     );
   } catch (error) {
+    const stillRunning = exited === undefined;
     browser.kill();
-    throw new Error(
+    const message =
       `${error instanceof Error ? error.message : String(error)}` +
-        (exited === undefined ? '' : ` Chrome ${exited}.`) +
-        (said.trim() === '' ? '' : `\nChrome said:\n${said.trim()}`)
-    );
+      (exited === undefined ? '' : ` Chrome ${exited}.`) +
+      (said.trim() === '' ? '' : `\nChrome said:\n${said.trim()}`);
+    throw stillRunning ? new SlowStart(message, gone) : new Error(message);
   }
   return { browser, devtools: await DevTools.connect(target.webSocketDebuggerUrl) };
 }
