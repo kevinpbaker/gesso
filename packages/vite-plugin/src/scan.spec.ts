@@ -25,6 +25,7 @@ interface Files {
   mkdirSync(path: string, options: { recursive: true }): unknown;
   writeFileSync(path: string, contents: string): void;
   rmSync(path: string, options: { recursive: true; force: true }): void;
+  existsSync(path: string): boolean;
 }
 const NODE_FS: string = 'node:fs';
 const NODE_OS: string = 'node:os';
@@ -75,7 +76,16 @@ async function scanned(files: Record<string, string>, options: GessoPluginOption
     metadata: { discovered: Record<string, unknown>; optimized: Record<string, unknown> };
   };
   await optimizer.scanProcessing;
-  return Object.keys({ ...optimizer.metadata.discovered, ...optimizer.metadata.optimized }).sort();
+  const found = Object.keys({ ...optimizer.metadata.discovered, ...optimizer.metadata.optimized }).sort();
+  // The scan is done, but Vite goes on to bundle what it found, reading
+  // the stand-ins as it goes. Deleting them first failed that bundle, an
+  // unhandled rejection that failed the run on CI. It is finished when
+  // the cache's metadata is written.
+  const deadline = Date.now() + 10_000;
+  while (!fs.existsSync(`${root}/node_modules/.vite/deps/_metadata.json`) && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  return found;
 }
 
 const PACKAGES = {
