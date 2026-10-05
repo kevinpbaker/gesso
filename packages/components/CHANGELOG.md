@@ -1,5 +1,12 @@
 # gesso-components
 
+## 0.6.2
+
+### Patch Changes
+
+- gesso-core@0.6.2
+  - gesso-framework@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes
