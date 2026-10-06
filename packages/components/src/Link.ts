@@ -1,9 +1,19 @@
 import { Row, Text, type UiChild, type UiNodeRef, type UiTextDecoration } from 'gesso-core';
 
-import { computed, input, internalState, ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
+import {
+  computed,
+  input,
+  internalState,
+  RouterService,
+  ShellService,
+  type ComponentContext,
+  type Inputs,
+  type RouteTarget
+} from 'gesso-framework';
 
 import { CONTROL_FOCUS_RING, keymap, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { trackFocus } from './focus';
+import { followRoute, middlePress, opensElsewhere } from './follow';
 
 /**
  * A link: a control whose press takes you somewhere else.
@@ -25,8 +35,8 @@ import { trackFocus } from './focus';
  * Everything below follows from one fact about the runtime: the tree is
  * painted onto a canvas, in a worker, and there is no `<a>` in it. No
  * element the browser will navigate for us, no default action to
- * prevent, no middle-click, no status bar showing the target, and no
- * href the platform has already decided is safe. A link here is an
+ * prevent, no status bar showing the target, and no href the platform
+ * has already decided is safe. A link here is an
  * ordinary focusable control whose activation asks the shell to open a
  * URL: `ctx.inject(ShellService)`, then `shell.openUrl(href)`, which
  * the runtime forwards to whichever host it has. The host opens the tab
@@ -34,20 +44,55 @@ import { trackFocus } from './focus';
  * the gesture crosses a thread boundary and the component never touches
  * `window`.
  *
- * `href` and `onPress` are two separate questions and both may be
- * answered:
+ * Where it goes is one of two props, and `onPress` may sit beside
+ * either:
  *
- *   - **`href` alone** is the outbound link: somewhere the shell owns,
- *     off this application.
- *   - **`onPress` alone** is the in-app link: routing. The destination
- *     is a screen this application draws, so nothing leaves and
- *     `RouterService` does the work inside the handler. It is still a
- *     link, and still says so, because what the reader does with it is
- *     go somewhere.
- *   - **Both** is the case where an in-app record has to be written
- *     before the tab opens. `onPress` runs first, then the URL, so a
- *     handler that logs the click has logged it before the shell is
- *     asked.
+ *   - **`href`** is the outbound link: somewhere the shell owns, off
+ *     this application.
+ *   - **`to`** is the in-app link: a url of this application's own,
+ *     `/epic/BUD-12?story=BUD-13`, or a `RouteTarget` built with
+ *     `to(route, params)`. Activating it navigates through
+ *     `RouterService`, in place, as `router.navigate(to)` would. It is
+ *     still a link, and still says so, because what the reader does
+ *     with it is go somewhere.
+ *   - **`onPress`** runs first, before either, so a handler that
+ *     records the click has recorded it before anything moves. Alone,
+ *     it is the in-app link the older way, with the routing inside the
+ *     handler, and it still works; what it cannot do is be opened
+ *     somewhere new, because the destination is inside a function the
+ *     link cannot see into. That is the reason `to` exists.
+ *   - **`to` and `href` together** is a mistake with an answer rather
+ *     than an error: `to` wins. A link goes to one place, and the one
+ *     the application can route to is the one it most likely meant.
+ *
+ * ## Somewhere new: Cmd-click, Ctrl-click and the middle button
+ *
+ * A browser opens an anchor in a new tab when it is clicked with
+ * Command (macOS) or Control (elsewhere) held, or with the middle
+ * button, and people expect the same of anything that announces itself
+ * as a link. This one does it for `to`:
+ *
+ *   - A click with **Command or Control** held, either one on any
+ *     platform (see `opensElsewhere` for why the worker does not guess
+ *     which machine it is on), or a press of the **middle button**,
+ *     runs `onPress` and then asks the shell to open the app at `to`
+ *     somewhere new: `ShellService.openRoute`. The current screen does
+ *     not navigate. What "somewhere new" is belongs to the shell: a
+ *     browser tab at the app's own address, a tab in the product an
+ *     embedded app lives in, or a new desktop window.
+ *   - **Command-Enter or Control-Enter** on a focused link does the
+ *     same from the keyboard. Enter is the key the component binds, so
+ *     reading its modifiers costs nothing.
+ *   - An **`href`** link behaves exactly as it does on a plain click,
+ *     with a modifier or without: `openUrl` already opens outside the
+ *     application, so there is nowhere newer to send it.
+ *   - An **`onPress`-only** link runs `onPress` and nothing else.
+ *
+ * The middle button is recognised by the press, not the click: a Click
+ * is dispatched on release and carries the buttons held then, which is
+ * none, so the link notes the PointerDown's buttons and the click that
+ * follows reads them. Space, and an assistive technology's activation,
+ * arrive as a click with no modifiers, and follow the link in place.
  *
  * ## Enter is the component's key. Space is the runtime's
  *
@@ -130,7 +175,7 @@ import { trackFocus } from './focus';
  * colour prop on this component and there will not be one; restyling a
  * link is a theme provider around it.
  *
- * `disabled` refuses everything: no `onPress`, no `openUrl`, no rule on
+ * `disabled` refuses everything: no `onPress`, no navigation, no rule on
  * hover, and the disabled ink. It stays focusable, as every disabled
  * control in this library does, because a control the keyboard cannot
  * reach is a control whose disabled state nobody is told about. It is
@@ -160,14 +205,29 @@ export interface LinkProps extends ControlLayoutProps {
    * There is no anchor and no browser-managed navigation here, so this
    * is a request the render thread hands to the shell rather than a
    * target the platform already knows about. Leave it off for an in-app
-   * link and route from `onPress`.
+   * link and give `to` instead. A modified click opens it the same way
+   * a plain one does.
    */
   href?: string;
   /**
-   * Called on activation, before `href` is opened.
+   * Where in this application it goes: a url of the router's,
+   * `/epic/BUD-12?story=BUD-13`, or a `RouteTarget` from `to(route,
+   * params)`.
    *
-   * Alone, it is how an in-app link navigates. Beside `href`, it is the
-   * hook that runs before the tab opens.
+   * Activated plainly, the router navigates there in place. With
+   * Command or Control held, with the middle button, or with
+   * Command-Enter or Control-Enter, the shell is asked to open the app
+   * there somewhere new (`ShellService.openRoute`), and the current
+   * screen stays. Wins over `href` when both are given.
+   */
+  to?: string | RouteTarget;
+  /**
+   * Called on activation, before `to` is followed or `href` opened,
+   * whichever way the link was activated.
+   *
+   * Beside `to` or `href`, it is the hook that runs before anything
+   * moves. Alone, it is an in-app link that routes inside the handler,
+   * which cannot be opened somewhere new; prefer `to`.
    */
   onPress?: () => void;
   /** Refuses activation, and paints the words in the disabled ink. */
@@ -183,7 +243,9 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
   const disabled = input(inputs.disabled, false);
   const underline = input(inputs.underline, 'hover');
   const shell = ctx.inject(ShellService);
+  const router = ctx.inject(RouterService);
   const focus = trackFocus(ctx, inputs.ref);
+  const middle = middlePress();
 
   // The pointer, held here rather than read back from `interactive`'s
   // `visualState`. See the note in the header: a modifier can only
@@ -191,13 +253,20 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
   // land on the text inside this one.
   const hovered = internalState(false);
 
-  const activate = (): void => {
+  /** `elsewhere`: the press asked for the destination somewhere new. */
+  const activate = (elsewhere: boolean): void => {
     if (disabled.value) {
       return;
     }
-    // Before the URL, so a handler that records the click has recorded
-    // it by the time the shell is asked to open anything.
+    // Before anything moves, so a handler that records the click has
+    // recorded it by the time the router or the shell is asked.
     inputs.onPress.emit();
+    const to = inputs.to.value;
+    if (to !== undefined) {
+      followRoute(to, elsewhere, router, shell);
+      return;
+    }
+    // Outbound: already outside the application, however it was asked.
     const url = inputs.href.value;
     if (url !== undefined) {
       shell.openUrl(url);
@@ -218,11 +287,14 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
       disabled,
       role: 'link',
       label,
-      onClick: activate,
-      // One key: Enter, which is what activates an anchor. Space is
-      // deliberately unbound, so it falls through to the runtime's own
-      // default for a focused `link`, which presses it. See the header.
-      onKeyDown: keymap({ Enter: activate }),
+      onPointerDown: middle.onPointerDown,
+      onClick: event => activate(middle.take() || opensElsewhere(event.modifiers)),
+      // One key: Enter, which is what activates an anchor, and with
+      // Command or Control held it opens the destination somewhere new.
+      // Space is deliberately unbound, so it falls through to the
+      // runtime's own default for a focused `link`, which presses it.
+      // See the header.
+      onKeyDown: keymap({ Enter: event => activate(opensElsewhere(event.modifiers)) }),
       onPointerEnter: () => {
         hovered.value = true;
       },

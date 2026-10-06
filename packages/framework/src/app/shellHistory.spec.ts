@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createShellHistory,
+  openRouteWith,
   releaseShellHistory,
   resolveShellHistory,
   type HistoryWindow,
@@ -281,5 +282,94 @@ describe('resolveShellHistory', () => {
     releaseShellHistory(history, true);
 
     expect(history.disposed).toHaveBeenCalledOnce();
+  });
+});
+
+/**
+ * Opening the app at a url somewhere new: the shell's answer to
+ * `ShellService.openRoute`, which a Cmd-click on an in-app link sends.
+ *
+ * The address is the part that goes quietly wrong, because a wrong one
+ * still opens a tab: the app's root, or the playground instead of the
+ * example, and nobody is told.
+ */
+describe('openRouteWith', () => {
+  function run(handler: ((url: string) => void) | undefined, history: ShellHistory | null, url: string) {
+    const opened: string[] = [];
+    const followed: string[] = [];
+    openRouteWith(
+      handler,
+      url,
+      history,
+      address => opened.push(address),
+      next => followed.push(next)
+    );
+    return { opened, followed };
+  }
+
+  it('opens a path-mode app at its own path on the same origin', () => {
+    const history = createShellHistory({ mode: 'path' }, fakeWindow('/'));
+
+    expect(run(undefined, history, '/epic/BUD-12?story=BUD-13')).toEqual({
+      opened: ['/epic/BUD-12?story=BUD-13'],
+      followed: []
+    });
+  });
+
+  it('opens a hash-mode app at the same page with the fragment set, after the base', () => {
+    const history = createShellHistory({ mode: 'hash', base: 'example-router' }, fakeWindow('/playground?debug=1'));
+
+    expect(run(undefined, history, '/mail/2').opened).toEqual(['/playground?debug=1#example-router/mail/2']);
+  });
+
+  it('opens a hash-mode app with no base at the fragment alone', () => {
+    const history = createShellHistory({ mode: 'hash' }, fakeWindow('/app'));
+
+    expect(run(undefined, history, '/mail/2').opened).toEqual(['/app#/mail/2']);
+  });
+
+  it('follows the url in place in memory mode, which has no address to open', () => {
+    const history = createShellHistory({ mode: 'memory' });
+
+    expect(run(undefined, history, '/epic/BUD-12')).toEqual({ opened: [], followed: ['/epic/BUD-12'] });
+  });
+
+  it('follows it in place for a handed-in history with no href', () => {
+    const handed: ShellHistory = {
+      url: '/',
+      push: () => {},
+      replace: () => {},
+      back: () => {},
+      forward: () => {},
+      onChange: () => {},
+      dispose: () => {}
+    };
+
+    expect(run(undefined, handed, '/epic/BUD-12').followed).toEqual(['/epic/BUD-12']);
+  });
+
+  it("asks a handed-in history's href when it has one", () => {
+    const handed: ShellHistory = {
+      url: '/',
+      push: () => {},
+      replace: () => {},
+      back: () => {},
+      forward: () => {},
+      onChange: () => {},
+      dispose: () => {},
+      href: url => `https://jira.example.test/apps/epic-map${url}`
+    };
+
+    expect(run(undefined, handed, '/epic/BUD-12').opened).toEqual([
+      'https://jira.example.test/apps/epic-map/epic/BUD-12'
+    ]);
+  });
+
+  it("hands the url to the host's handler before anything else, untouched", () => {
+    const handled: string[] = [];
+    const history = createShellHistory({ mode: 'path' }, fakeWindow('/'));
+
+    expect(run(url => handled.push(url), history, '/epic/BUD-12')).toEqual({ opened: [], followed: [] });
+    expect(handled).toEqual(['/epic/BUD-12']);
   });
 });

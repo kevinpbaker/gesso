@@ -136,7 +136,7 @@ the window.
 // main/index.ts
 import { BrowserView, BrowserWindow, Utils } from 'electrobun/main';
 import type { GessoFrame } from 'gesso-electrobun';
-import { createDesktopApp, windowsChannel } from 'gesso-electrobun/desktop';
+import { createDesktopApp, windowsChannel, withWindowRoute } from 'gesso-electrobun/desktop';
 
 import { Notes } from '../shared/notes.contract';
 import type { GessoWindowRPC } from '../shared/rpc';
@@ -153,7 +153,8 @@ const app = createDesktopApp({
     });
     const window = new BrowserWindow({
       title: 'Notes',
-      url: 'views://mainview/index.html',
+      // The route this window was asked to open at, if any; see below.
+      url: withWindowRoute('views://mainview/index.html', handle.route),
       frame: { width: 980, height: 660, x: 90 + handle.id * 40, y: 90 + handle.id * 40 },
       rpc
     });
@@ -186,22 +187,23 @@ has returned. The observables it hands back are ordinarily the same
 ones every time, and that is the arrangement rather than an oversight:
 sharing a source between windows is what makes them agree.
 
-| On `DesktopApp` | Is                                                        |
-| --------------- | --------------------------------------------------------- |
-| `openWindow()`  | Opens a window, serves it every channel, returns a handle |
-| `windows`       | The windows open now, in the order they were opened       |
-| `windowCount`   | How many, as an `Observable` a channel can publish        |
-| `dispose()`     | Closes every window and stops serving                     |
+| On `DesktopApp`        | Is                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `openWindow(options?)` | Opens a window, serves it every channel, returns a handle; at `options.route` if given |
+| `windows`              | The windows open now, in the order they were opened                                    |
+| `windowCount`          | How many, as an `Observable` a channel can publish                                     |
+| `dispose()`            | Closes every window and stops serving                                                  |
 
 A `DesktopWindowHandle` is an `id` that is stable for the life of the
-window and never reused, and a `close()`.
+window and never reused, the `route` it was asked to open at (or null),
+and a `close()`.
 
 ### The window's main thread
 
 ```ts
 // view/main.ts
 import type { GessoFrame } from 'gesso-electrobun';
-import { createElectrobunBridge } from 'gesso-electrobun/view';
+import { createElectrobunBridge, windowRoute } from 'gesso-electrobun/view';
 import { createApp } from 'gesso-framework';
 import { Electroview } from 'electrobun/view';
 
@@ -224,8 +226,9 @@ const view = new Electroview({ rpc });
 const shell = createApp({
   renderWorker: () => new Worker(new URL('./app.render.worker.ts', import.meta.url), { type: 'module' }),
   appLogicWorker: bridge.endpoint,
-  history: { mode: 'memory' },
+  history: { mode: 'memory', initialUrl: windowRoute() },
   onOpenUrl: url => bridge.openUrl(url),
+  onOpenRoute: url => bridge.openRoute(url),
   onError: (message, stack, source) => console.error(`[gesso ${source}] ${message}`, stack)
 });
 shell.mount('#app');
@@ -236,9 +239,10 @@ web. `appLogicWorker` takes an endpoint as well as a worker, and the
 shell treats one exactly as it treats a worker it was handed rather
 than one it spawned: it wires it up, and it never closes it.
 
-The rest of the bridge is three methods. `receive(frame)` is what the
+The rest of the bridge is four methods. `receive(frame)` is what the
 RPC handler feeds. `openUrl(url)` hands a url out to be opened outside
-the window. `dispose()` closes every stream.
+the window. `openRoute(url)` asks for a new window of the application
+at one of its own urls. `dispose()` closes every stream.
 
 ### The render worker
 
@@ -384,6 +388,43 @@ is an act, and which urls an application is willing to hand to the
 operating system is the application's decision, so the request arrives
 with the window that asked and stops there.
 
+### A link that opens another window
+
+A Cmd-click or a Ctrl-click on an in-app [Link](/components/link) asks
+the shell to open the application at that link's route somewhere new
+(`ShellService.openRoute`). A window has no tabs, so in a desktop
+application somewhere new is another window, at that route:
+
+```ts
+// in the window
+createApp({
+  history: { mode: 'memory', initialUrl: windowRoute() },
+  onOpenRoute: url => bridge.openRoute(url)
+  /* … */
+});
+
+// in the main process: nothing to add. The default is
+//   onOpenRoute: (url, window) => app.openWindow({ route: url })
+```
+
+`createDesktopApp` answers the request with `app.openWindow({ route })`
+unless the application passes an `onOpenRoute(url, window)` of its own,
+which receives the url and the window that asked, as `onOpenUrl` does.
+An outbound url never comes this way: an `href` link sends `openUrl`
+however it is clicked, and that still goes to the person's browser.
+
+**How the new window learns its route.** The window keeps its routes in
+memory, so there is no address to open it at, and a frame sent after it
+has spoken would arrive once its shell had already drawn the root. So
+the route rides on the page the window loads. `open` is handed the
+window, and `window.route` is the route or null; `withWindowRoute`
+writes it into the view url's fragment, and `windowRoute()` in the
+window reads it back before `createApp` starts its memory history
+there. The fragment rather than a query, because the fragment never
+reaches Electrobun's `views://` handler. An `open` that ignores
+`window.route` keeps working, and opens every window at the
+application's start.
+
 ### A redirect that leaves the app
 
 `ShellService.redirect` needs no bridge. Its default is
@@ -426,9 +467,11 @@ statement of the whole platform surface and is repeated under Limits.
 A window has no address bar, so its routes are its own:
 
 ```ts
-createApp({ history: { mode: 'memory' } /* … */ });
+createApp({ history: { mode: 'memory', initialUrl: windowRoute() } /* … */ });
 ```
 
+`initialUrl` is where a window opened at a route starts; see
+[a link that opens another window](#a-link-that-opens-another-window).
 `memory` mode is not degraded. The router keeps its own stack, `Back`
 and `Forward` walk it, and nothing crosses to a window to ask.
 [Routing](/structure/routing) has the three modes and what each costs.
@@ -535,6 +578,11 @@ project:
 - **No sustained load has been measured.** Every figure above is a
   burst measured once. Nothing here says what an hour of patches does
   to memory or to the socket.
+- **A window opened at a route has not been opened natively.** The
+  frame, the default `openWindow({ route })` and the route carried in
+  the view url's fragment are specced; that `views://` keeps the
+  fragment and `windowRoute()` reads it in a real webview is the
+  reasoning above, not something run.
 - **The application process has no console forwarding.** Errors thrown
   in the render worker reach `onError` as they do on the web. What the
   main process logs, it logs to its own output.

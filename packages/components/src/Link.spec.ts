@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createComponent, type ShellRequest } from 'gesso-framework';
+import { createComponent, route, RouterService, to, type ShellRequest } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
 import { Column, Text, type UiChild, type UiNode } from 'gesso-core';
@@ -41,6 +41,28 @@ function unhover(ui: ReturnType<typeof mount>): void {
   ui.fireEvent.pointerMove(399, 199);
   ui.frame();
 }
+
+/** The router the link navigates through, to read where it went. */
+function routerOf(ui: ReturnType<typeof mount>): RouterService {
+  return ui.runtime.services.get(RouterService);
+}
+
+/** The requests that open something, leaving out the router's own history writes. */
+function opens(requests: readonly ShellRequest[]): ShellRequest[] {
+  return requests.filter(request => request.type === 'openRoute' || request.type === 'openUrl');
+}
+
+/** A press of the middle button alone, through the pointer controller, released where it landed. */
+function middleClick(ui: ReturnType<typeof mount>, node: UiNode): void {
+  const box = ui.getLayout(node);
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  ui.fireEvent.pointerDown(x, y, { buttons: 4 });
+  ui.fireEvent.pointerUp(x, y);
+  ui.frame();
+}
+
+const EPIC = '/epic/BUD-12?story=BUD-13';
 
 function decorationOn(ui: ReturnType<typeof mount>, text: string): unknown {
   return ui.getByText(text).properties.get('textDecoration');
@@ -180,6 +202,156 @@ describe('Link', () => {
     expect(ui.getByRole('link')).toHaveSemantics({ role: 'link', name: 'Read the docs' });
     expect(ui.getByText('docs')).toBeTruthy();
     expect(ui.queryByText('Read the docs')).toBeNull();
+  });
+
+  describe('with to, an in-app destination', () => {
+    it('navigates in place on a plain click, and asks the shell to open nothing', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC });
+      const requests = shellRequests(ui);
+
+      ui.fireEvent.click(ui.getByRole('link'));
+      ui.frame();
+
+      expect(routerOf(ui).url.value).toBe(EPIC);
+      expect(opens(requests)).toEqual([]);
+    });
+
+    it('asks the shell to open the route somewhere new on a Cmd-click, and does not navigate', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC });
+      const requests = shellRequests(ui);
+
+      ui.fireEvent.click(ui.getByRole('link'), { modifiers: { meta: true } });
+      ui.frame();
+
+      expect(opens(requests)).toEqual([{ type: 'openRoute', url: EPIC }]);
+      expect(routerOf(ui).url.value).toBe('/');
+      // Nothing written to the address bar either.
+      expect(requests.filter(request => request.type === 'history')).toEqual([]);
+    });
+
+    it('treats Ctrl-click the same, on any platform', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC });
+      const requests = shellRequests(ui);
+
+      ui.fireEvent.click(ui.getByRole('link'), { modifiers: { ctrl: true } });
+      ui.frame();
+
+      expect(opens(requests)).toEqual([{ type: 'openRoute', url: EPIC }]);
+      expect(routerOf(ui).url.value).toBe('/');
+    });
+
+    it('opens the route somewhere new on a middle click, which the click itself cannot report', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC });
+      const requests = shellRequests(ui);
+
+      middleClick(ui, ui.getByRole('link'));
+
+      expect(opens(requests)).toEqual([{ type: 'openRoute', url: EPIC }]);
+      expect(routerOf(ui).url.value).toBe('/');
+
+      // And the middle press is forgotten: the next plain click navigates.
+      ui.fireEvent.click(ui.getByRole('link'));
+      ui.frame();
+      expect(routerOf(ui).url.value).toBe(EPIC);
+    });
+
+    it('opens it somewhere new on Cmd-Enter, and follows it in place on a plain Enter', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC });
+      const requests = shellRequests(ui);
+      ui.fireEvent.focus(ui.getByRole('link'));
+
+      ui.fireEvent.press('Enter', { meta: true });
+      ui.frame();
+      expect(opens(requests)).toEqual([{ type: 'openRoute', url: EPIC }]);
+      expect(routerOf(ui).url.value).toBe('/');
+
+      ui.fireEvent.press('Enter');
+      ui.frame();
+      expect(routerOf(ui).url.value).toBe(EPIC);
+    });
+
+    it('runs onPress first, whichever way it was activated', () => {
+      const order: string[] = [];
+      const ui = mount({ label: 'BUD-12', to: EPIC, onPress: () => order.push('onPress') });
+      ui.runtime.onShellRequest(request => order.push(request.type));
+      routerOf(ui).url.subscribe(url => order.push(`url ${url}`));
+      order.length = 0;
+
+      ui.fireEvent.click(ui.getByRole('link'), { modifiers: { meta: true } });
+      ui.fireEvent.click(ui.getByRole('link'));
+      ui.frame();
+
+      expect(order).toEqual(['onPress', 'openRoute', 'onPress', 'history', `url ${EPIC}`]);
+    });
+
+    it('takes a RouteTarget, built the way the router builds one', () => {
+      const Story = route({ path: '/epic/:epic/story/:story', component: () => Text({ text: 'Story' }) });
+      const ui = mount({
+        label: 'BUD-13',
+        to: to(Story, { epic: 'BUD-12', story: 'BUD-13' }, { query: { tab: 'steps' } })
+      });
+      const requests = shellRequests(ui);
+
+      ui.fireEvent.click(ui.getByRole('link'), { modifiers: { meta: true } });
+      ui.frame();
+
+      expect(opens(requests)).toEqual([{ type: 'openRoute', url: '/epic/BUD-12/story/BUD-13?tab=steps' }]);
+    });
+
+    it('wins over href when both are given', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC, href: 'https://example.test/' });
+      const requests = shellRequests(ui);
+
+      ui.fireEvent.click(ui.getByRole('link'));
+      ui.frame();
+
+      expect(routerOf(ui).url.value).toBe(EPIC);
+      expect(opens(requests)).toEqual([]);
+    });
+
+    it('refuses a modified click when disabled', () => {
+      const ui = mount({ label: 'BUD-12', to: EPIC, disabled: true });
+      const requests = shellRequests(ui);
+
+      ui.fireEvent.click(ui.getByRole('link'), { modifiers: { meta: true } });
+      ui.fireEvent.click(ui.getByRole('link'));
+      ui.frame();
+
+      expect(requests).toEqual([]);
+      expect(routerOf(ui).url.value).toBe('/');
+    });
+  });
+
+  it('opens an href exactly as a plain click does when a modifier is held, or the middle button pressed', () => {
+    const onPress = vi.fn();
+    const ui = mount({ label: 'Read the docs', href: 'https://gesso.dev', onPress });
+    const requests = shellRequests(ui);
+
+    ui.fireEvent.click(ui.getByRole('link'), { modifiers: { meta: true } });
+    ui.fireEvent.click(ui.getByRole('link'), { modifiers: { ctrl: true } });
+    middleClick(ui, ui.getByRole('link'));
+    ui.frame();
+
+    // Already outside the application: there is nowhere newer to send it.
+    expect(requests).toEqual([
+      { type: 'openUrl', url: 'https://gesso.dev' },
+      { type: 'openUrl', url: 'https://gesso.dev' },
+      { type: 'openUrl', url: 'https://gesso.dev' }
+    ]);
+    expect(onPress).toHaveBeenCalledTimes(3);
+  });
+
+  it('runs onPress alone on a modified click when it has neither to nor href', () => {
+    const onPress = vi.fn();
+    const ui = mount({ label: 'Settings', onPress });
+    const requests = shellRequests(ui);
+
+    ui.fireEvent.click(ui.getByRole('link'), { modifiers: { meta: true } });
+    ui.frame();
+
+    // The destination is inside the handler, where the link cannot see it.
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(requests).toEqual([]);
   });
 
   it('passes the caller its layout props', () => {

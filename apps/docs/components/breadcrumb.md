@@ -9,9 +9,9 @@ with a mark between them, at the top of a page that sits inside
 something that sits inside something.
 
 It holds no state an application would recognise. The trail is the
-caller's, and following a crumb is reported through `onSelect` rather
-than acted on, because only the application knows what "go to Projects"
-means. That leaves two decisions, and they are the whole of this page:
+caller's, and following a crumb is reported through `onSelect`, and
+acted on only when the crumb says where it goes with `to`, because
+otherwise only the application knows what "go to Projects" means. That leaves two decisions, and they are the whole of this page:
 which crumb is not a link, and what a trail too long for its strip does
 instead.
 
@@ -38,19 +38,43 @@ root and the file and folds the three between them into one crumb.
 
 ## Props
 
-| Prop        | Type                        | Default        | What it does                                                              |
-| ----------- | --------------------------- | -------------- | ------------------------------------------------------------------------- |
-| `items`     | `readonly BreadcrumbItem[]` | required       | The trail, root first and this page last. Each is a `value` and a `label` |
-| `onSelect`  | `(value: string) => void`   | none           | The crumb that was followed, by value. The last crumb never reports       |
-| `label`     | `string`                    | `'Breadcrumb'` | The landmark's accessible name                                            |
-| `separator` | `string`                    | `'/'`          | What is drawn between crumbs, never after the last                        |
-| `maxItems`  | `number`                    | `0`            | Fold the middle once the trail is longer than this. 0 never folds         |
+| Prop        | Type                        | Default        | What it does                                                                                 |
+| ----------- | --------------------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| `items`     | `readonly BreadcrumbItem[]` | required       | The trail, root first and this page last. Each is a `value`, a `label` and optionally a `to` |
+| `onSelect`  | `(value: string) => void`   | none           | The crumb that was followed, by value. The last crumb never reports                          |
+| `label`     | `string`                    | `'Breadcrumb'` | The landmark's accessible name                                                               |
+| `separator` | `string`                    | `'/'`          | What is drawn between crumbs, never after the last                                           |
+| `maxItems`  | `number`                    | `0`            | Fold the middle once the trail is longer than this. 0 never folds                            |
 
 Every prop takes a plain value or an Observable of one, and the layout
 props on [the library page](/components/) apply here too. Nothing here
 is read once: `items` in particular is bound, because a breadcrumb is
 the one component whose input changes every time the person navigates,
 and a trail read at build time would never move again.
+
+## Crumbs that say where they go
+
+An item may carry `to`, an in-app url or a `RouteTarget`, as
+[Link](/components/link) takes it:
+
+```tsx
+<Breadcrumb
+  items={[
+    { value: 'home', label: 'Home', to: '/' },
+    { value: 'epic', label: 'BUD-12', to: '/epic/BUD-12' },
+    { value: 'story', label: 'BUD-13' }
+  ]}
+/>
+```
+
+`onSelect` still runs first. Then a plain press navigates the router
+there in place, and a Cmd-click, a Ctrl-click, a middle click or
+Cmd-Enter asks the shell to open the application there somewhere new
+and leaves this page where it is, exactly as a `Link` would. The rules
+are `Link`'s, shared rather than copied, so the two never answer the
+same click differently. A trail with no `to` behaves as it always did,
+and the application routes from `onSelect`. The last crumb's `to` is
+ignored, because the last crumb is never a link.
 
 ## The last crumb
 
@@ -126,16 +150,19 @@ can and stops, and it never draws a mark standing for no crumbs:
 | `Shift+Tab` | Moves to the previous crumb                                       |
 | `Enter`     | Follows the focused crumb, or unfolds the trail on the folded one |
 | `Space`     | The same. A focused `link` or `button` is pressed by either key   |
+| `Cmd-Enter` | Opens a crumb's `to` somewhere new; `Ctrl-Enter` does the same    |
 
-Neither key is bound by the component, and that is the decision rather
-than an omission: the runtime presses any focused node whose role is
+Neither plain key is bound by the component, and that is the decision
+rather than an omission: the runtime presses any focused node whose role is
 `button` or `link` by synthesising a click, so a crumb answers the
 keyboard through the same `onClick` the pointer and an assistive
 technology's activation go through. HTML's rule is narrower, Enter for
 a link and Space for a button, and reimposing it here would mean
 binding Space to a handler that swallows it. That would make the crumb
 the one pressable thing in the library that ignores a key every other
-one answers.
+one answers. Cmd-Enter and Ctrl-Enter are read by the crumb itself,
+and only on a crumb with a `to`, because the click the runtime
+synthesises for a key carries no modifiers.
 
 ## Semantics
 
@@ -190,7 +217,10 @@ under it is read either. Same mechanism
 asserts that the last crumb is not among the links, takes no tab stop
 and never reaches `onSelect`, that it is heavier than the crumbs before
 it in the same colour token, that a click and a key both report the
-crumb by value, that the strip is a named landmark holding a list of
+crumb by value, that a crumb with `to` reports first and then navigates
+in place on a plain click and on Enter, and opens its destination
+somewhere new on Cmd-click, Ctrl-click and Cmd-Enter without moving the
+router, that the last crumb's `to` is never followed, that the strip is a named landmark holding a list of
 listitems, that a crumb is named once rather than twice, that each
 listitem carries its real position in the whole trail even when the
 middle is folded, that the separators are drawn and announce nothing,
