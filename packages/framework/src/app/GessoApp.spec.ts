@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
 import { createComponent } from '../createComponent';
-import { GessoApp } from './GessoApp';
+import { GessoApp, type GessoAppOptions } from './GessoApp';
 import { ServiceRegistry } from '../service/ServiceRegistry';
 import { internalState } from '../InternalState';
 import {
@@ -23,6 +23,9 @@ import { internalState as cell } from '../InternalState';
 import { input } from '../Input';
 import { Input } from '../decorators';
 import { map } from 'rxjs/operators';
+import { route } from '../router/RouteDefinition';
+import { RouterService } from '../router/RouterService';
+import type { ShellHistory } from './shellHistory';
 
 function createMockCanvas(width = 600, height = 600): CanvasHost {
   const ctx = {
@@ -331,6 +334,115 @@ describe('GessoApp', () => {
       app.resize(900, 700);
 
       expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * A history the app was handed rather than one it made from options:
+   * what an app embedded in another product's page passes, because the
+   * address bar belongs to the host and is reachable only through the
+   * host's own history object.
+   */
+  describe('a history passed in ready-made', () => {
+    const Inbox = route({ path: '/mail', component: () => Text({ text: 'Inbox' }) });
+    const Message = route({ path: '/mail/:id', component: () => Text({ text: 'Message' }) });
+    const routes = { routes: [Inbox, Message] };
+
+    /** A host's history: records what it was asked, and can report a change. */
+    function hostHistory(initialUrl: string) {
+      let current = initialUrl;
+      let listener: ((url: string) => void) | null = null;
+      const calls: string[] = [];
+      const history: ShellHistory = {
+        get url() {
+          return current;
+        },
+        push: url => {
+          calls.push(`push ${url}`);
+          current = url;
+        },
+        replace: url => {
+          calls.push(`replace ${url}`);
+          current = url;
+        },
+        back: () => calls.push('back'),
+        forward: () => calls.push('forward'),
+        onChange: next => {
+          listener = next;
+        },
+        dispose: () => calls.push('dispose')
+      };
+      return {
+        history,
+        calls,
+        /** What the host does when the person presses its back button. */
+        report: (url: string) => {
+          current = url;
+          listener?.(url);
+        }
+      };
+    }
+
+    function mountWith(history: GessoAppOptions['history']) {
+      const app = new GessoApp({
+        host: createMockHost(),
+        canvas: createMockCanvas(),
+        root: Text({ text: 'App' }),
+        routes,
+        history,
+        clock: callback => new UiTimerFrameClock(callback)
+      });
+      app.mount();
+      return { app, router: app.services.get(RouterService) };
+    }
+
+    it('starts the router at the url the host reports', () => {
+      const host = hostHistory('/mail/7');
+      const { app, router } = mountWith(host.history);
+
+      expect(router.url.value).toBe('/mail/7');
+      expect(router.match.value?.params).toEqual({ id: '7' });
+      app.dispose();
+    });
+
+    it('writes navigation to the host, pushing or replacing as the router asked', () => {
+      const host = hostHistory('/mail');
+      const { app, router } = mountWith(host.history);
+
+      router.go(Message, { id: '3' });
+      router.navigate('/mail/4', { replace: true });
+      router.back();
+
+      expect(host.calls).toEqual(['push /mail/3', 'replace /mail/4', 'back']);
+      app.dispose();
+    });
+
+    it('follows the urls the host reports', () => {
+      const host = hostHistory('/mail/3');
+      const { app, router } = mountWith(host.history);
+
+      host.report('/mail');
+
+      expect(router.url.value).toBe('/mail');
+      app.dispose();
+    });
+
+    it('leaves it undisposed, and stops listening to it, when the app goes', () => {
+      const host = hostHistory('/mail');
+      const { app, router } = mountWith(host.history);
+
+      app.dispose();
+      host.report('/mail/9');
+
+      expect(host.calls).not.toContain('dispose');
+      expect(router.url.value).toBe('/mail');
+    });
+
+    it('still makes its own from options', () => {
+      const { app, router } = mountWith({ mode: 'memory', initialUrl: '/mail/5' });
+
+      expect(router.url.value).toBe('/mail/5');
+      app.dispose();
     });
   });
 });
