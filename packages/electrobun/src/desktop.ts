@@ -15,11 +15,15 @@
  *       { token: Catalogue, source: catalogue },
  *       windowsChannel(app, window)
  *     ],
- *     open: receive => {
+ *     open: (receive, handle) => {
  *       const rpc = BrowserView.defineRPC<GessoWindowRPC>({
  *         handlers: { requests: {}, messages: { gessoFrame: receive } }
  *       });
- *       const window = new BrowserWindow({ title: 'Notes', url: 'views://mainview/index.html', rpc });
+ *       const window = new BrowserWindow({
+ *         title: 'Notes',
+ *         url: withWindowRoute('views://mainview/index.html', handle.route),
+ *         rpc
+ *       });
  *       return {
  *         send: frame => window.webview.rpc.send.gessoFrame(frame),
  *         close: () => window.close()
@@ -38,6 +42,8 @@ import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { GessoFrame } from './frames';
 import { serveChannelsToWindow, type ChannelHost } from './main';
 
+export { withWindowRoute } from './route';
+
 /** What the application does with the window it opened. */
 export interface DesktopWindowTransport {
   /** Sends one frame to this window, over its own RPC. */
@@ -50,8 +56,28 @@ export interface DesktopWindowTransport {
 export interface DesktopWindowHandle {
   /** Stable for the life of the window, and never reused. */
   readonly id: number;
+  /**
+   * The application url the window was asked to open at, or null for
+   * wherever the application starts.
+   *
+   * Set by `openWindow({ route })`, which is what a Cmd-click on an
+   * in-app link comes to by default. The window cannot be told it
+   * through a frame in time to start there, so `open` puts it on the
+   * view's url, with `withWindowRoute`, and the window reads it back
+   * with `windowRoute` before its shell starts.
+   */
+  readonly route: string | null;
   /** Closes the window and disposes the channels it was served. */
   close(): void;
+}
+
+/** What `openWindow` may be told about the window it opens. */
+export interface DesktopWindowOptions {
+  /**
+   * The application url to open at, `/epic/BUD-12?story=BUD-13`. Carried
+   * to `open` as `window.route`; see `DesktopWindowHandle.route`.
+   */
+  readonly route?: string;
 }
 
 export interface DesktopAppOptions {
@@ -72,6 +98,11 @@ export interface DesktopAppOptions {
    * `receive` is what the window's frames must be fed into: wire it to
    * the RPC message the window sends frames on, before the window
    * opens, or the first handshake is lost.
+   *
+   * `window.route` is the application url the window should start at,
+   * or null. Put it on the view's url with `withWindowRoute`, and read
+   * it in the window with `windowRoute`; an `open` that ignores it
+   * opens every window at the application's start, as before.
    */
   open: (receive: (frame: GessoFrame) => void, window: DesktopWindowHandle) => DesktopWindowTransport;
   /**
@@ -80,6 +111,17 @@ export interface DesktopAppOptions {
    * application passes here.
    */
   onOpenUrl?: (url: string, window: DesktopWindowHandle) => void;
+  /**
+   * One of the application's own urls a window asked to have opened
+   * somewhere new (a Cmd-click or a Ctrl-click on an in-app link), with
+   * the window that asked.
+   *
+   * Defaults to `app.openWindow({ route: url })`: a new window of this
+   * application, at that route, which is what a new tab is in an
+   * application whose windows have none. An outbound url never comes
+   * here; it is `onOpenUrl`'s, and goes to the person's browser.
+   */
+  onOpenRoute?: (url: string, window: DesktopWindowHandle) => void;
   /**
    * The appearance the platform is in, pushed to every window as it
    * changes and to a new window as it opens.
@@ -103,8 +145,11 @@ export interface DesktopAppOptions {
 }
 
 export interface DesktopApp {
-  /** Opens a window, serves it every channel, and returns its handle. */
-  openWindow(): DesktopWindowHandle;
+  /**
+   * Opens a window, serves it every channel, and returns its handle;
+   * at `options.route` when one is given.
+   */
+  openWindow(options?: DesktopWindowOptions): DesktopWindowHandle;
   /** The windows open now, in the order they were opened. */
   readonly windows: readonly DesktopWindowHandle[];
   /** How many windows are open, as something a channel can publish. */
@@ -150,13 +195,14 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
   };
 
   const app: DesktopApp = {
-    openWindow(): DesktopWindowHandle {
+    openWindow(windowOptions: DesktopWindowOptions = {}): DesktopWindowHandle {
       if (disposed) {
         throw new Error('This desktop application has been disposed; it cannot open a window.');
       }
       const id = nextId++;
       const handle: DesktopWindowHandle = {
         id,
+        route: windowOptions.route ?? null,
         close: () => forget(id, true)
       };
 
@@ -169,7 +215,14 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
         {
           send: frame => transport?.send(frame),
           chunkBytes: options.chunkBytes,
-          onOpenUrl: url => options.onOpenUrl?.(url, handle)
+          onOpenUrl: url => options.onOpenUrl?.(url, handle),
+          onOpenRoute: url => {
+            if (options.onOpenRoute !== undefined) {
+              options.onOpenRoute(url, handle);
+            } else if (!disposed) {
+              app.openWindow({ route: url });
+            }
+          }
         }
       );
       entries.set(id, { handle, transport: { send: () => {}, close: () => {} }, host });

@@ -25,7 +25,13 @@ import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { observeContrast } from './contrast';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from './fullscreen';
-import { releaseShellHistory, resolveShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
+import {
+  openRouteWith,
+  releaseShellHistory,
+  resolveShellHistory,
+  type ShellHistory,
+  type ShellHistoryOptions
+} from './shellHistory';
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
@@ -53,6 +59,12 @@ export interface GessoAppOptions {
    * because it belongs to whoever passed it.
    */
   history?: ShellHistoryOptions | ShellHistory;
+  /**
+   * Opens the app at one of its own urls somewhere new
+   * (`ShellService.openRoute`), in place of a new browser tab. The
+   * same option, and the same fallbacks, as `WorkerAppOptions.onOpenRoute`.
+   */
+  onOpenRoute?: (url: string) => void;
   canvas?: CanvasHost;
   /** The rendering backend; see RendererChoice. Defaults to `auto`. */
   renderer?: RendererChoice;
@@ -123,6 +135,7 @@ export class GessoApp {
   private readonly accessibilityEnabled: boolean;
   private readonly adapter: UiPlatformAdapter;
   private readonly historyOptions: ShellHistoryOptions | ShellHistory | undefined;
+  private readonly onOpenRoute: ((url: string) => void) | undefined;
 
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
@@ -154,6 +167,7 @@ export class GessoApp {
     this.inputEnabled = options.input ?? true;
     this.accessibilityEnabled = options.accessibility ?? true;
     this.historyOptions = options.history;
+    this.onOpenRoute = options.onOpenRoute;
     this.colorSchemePreference = options.colorScheme ?? 'auto';
 
     this.runtime = new GessoRuntime({
@@ -545,6 +559,23 @@ export class GessoApp {
       } else {
         history.forward();
       }
+      return;
+    }
+    if (request.type === 'openRoute') {
+      // Before the canvas check: a host's handler needs no document,
+      // and an app with no window to open a tab from still follows the
+      // link in place rather than dropping it.
+      const view = isCanvasElement(this.canvas) ? this.canvas.ownerDocument.defaultView : null;
+      openRouteWith(
+        this.onOpenRoute,
+        request.url,
+        view === null ? null : history,
+        address => view?.open(address, '_blank', 'noopener'),
+        url => {
+          history.push(url);
+          this.runtime.setUrl(url);
+        }
+      );
       return;
     }
     if (!isCanvasElement(this.canvas)) {

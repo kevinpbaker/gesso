@@ -26,6 +26,7 @@ import { map } from 'rxjs/operators';
 import { route } from '../router/RouteDefinition';
 import { RouterService } from '../router/RouterService';
 import type { ShellHistory } from './shellHistory';
+import { ShellService } from './ShellService';
 
 function createMockCanvas(width = 600, height = 600): CanvasHost {
   const ctx = {
@@ -383,14 +384,15 @@ describe('GessoApp', () => {
       };
     }
 
-    function mountWith(history: GessoAppOptions['history']) {
+    function mountWith(history: GessoAppOptions['history'], extra: Partial<GessoAppOptions> = {}) {
       const app = new GessoApp({
         host: createMockHost(),
         canvas: createMockCanvas(),
         root: Text({ text: 'App' }),
         routes,
         history,
-        clock: callback => new UiTimerFrameClock(callback)
+        clock: callback => new UiTimerFrameClock(callback),
+        ...extra
       });
       app.mount();
       return { app, router: app.services.get(RouterService) };
@@ -442,6 +444,30 @@ describe('GessoApp', () => {
       const { app, router } = mountWith({ mode: 'memory', initialUrl: '/mail/5' });
 
       expect(router.url.value).toBe('/mail/5');
+      app.dispose();
+    });
+
+    it("hands an openRoute to the host's onOpenRoute, and stays where it is", () => {
+      const host = hostHistory('/mail');
+      const opened: string[] = [];
+      const { app, router } = mountWith(host.history, { onOpenRoute: url => opened.push(url) });
+
+      app.services.get(ShellService).openRoute('/mail/3');
+
+      expect(opened).toEqual(['/mail/3']);
+      expect(router.url.value).toBe('/mail');
+      expect(host.calls).toEqual([]);
+      app.dispose();
+    });
+
+    it('follows an openRoute in place when there is no window to open a tab from', () => {
+      const host = hostHistory('/mail');
+      const { app, router } = mountWith(host.history);
+
+      app.services.get(ShellService).openRoute('/mail/3');
+
+      expect(host.calls).toEqual(['push /mail/3']);
+      expect(router.url.value).toBe('/mail/3');
       app.dispose();
     });
   });

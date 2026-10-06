@@ -142,6 +142,7 @@ out.
 | `editing`       | The focused editable's text, selection or caret box changed                                                                         | an `EditingState`, or null when no editable has focus; the editing proxy mirrors it                                                              |
 | `clipboard`     | A component called `ShellService.copyText`                                                                                          | `id` and `text`; written to the system clipboard, and answered with `clipboardResult`                                                            |
 | `openUrl`       | A component called `ShellService.openUrl`                                                                                           | `url`; opened with `window.open(url, '_blank', 'noopener,noreferrer')`                                                                           |
+| `openRoute`     | A component called `ShellService.openRoute` (a Cmd-click on an in-app link)                                                         | `url`, the router's; the shell's `onOpenRoute`, else a tab at `ShellHistory.href(url)`, else followed in place                                   |
 | `redirect`      | A component called `ShellService.redirect`                                                                                          | `url`, as the component gave it; resolved against the page, refused unless http, https or the page's scheme, then `window.location.assign(url)`  |
 | `history`       | `RouterService` navigated                                                                                                           | `action` (`push`, `replace`, `back` or `forward`) and `url`; applied to the address bar                                                          |
 | `semantics`     | Per frame with changes, and only while the shell attached a mirror                                                                  | a `UiSemanticsUpdate`: the semantics patches, the boxes that moved, and the focused node when focus moved                                        |
@@ -199,7 +200,7 @@ above it has to.
   optional fields above are the whole of its compatibility story, and
   they only help in one direction: an older shell against a newer
   worker.
-- `openUrl`, `redirect`, `fullscreen` and `history` go out and nothing
+- `openUrl`, `openRoute`, `redirect`, `fullscreen` and `history` go out and nothing
   comes back. A `redirect` the shell refuses is a console warning on the
   main thread, and the component that asked never hears of it.
 - A page with no example: the protocol has no visual behaviour of its

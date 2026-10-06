@@ -9,6 +9,9 @@ import {
   GessoFrame
 } from "./frames.js";
 import {
+  withWindowRoute
+} from "./route.js";
+import {
   ChannelToken,
   ServedChannel
 } from "gesso-framework";
@@ -57,18 +60,23 @@ interface DesktopWindowTransport {
 }
 interface DesktopWindowHandle {
   readonly id: number;
+  readonly route: string | null;
   close(): void;
+}
+interface DesktopWindowOptions {
+  readonly route?: string;
 }
 interface DesktopAppOptions {
   channels: readonly ServedChannel[] | ((window: DesktopWindowHandle) => readonly ServedChannel[]);
   open: (receive: (frame: GessoFrame) => void, window: DesktopWindowHandle) => DesktopWindowTransport;
   onOpenUrl?: (url: string, window: DesktopWindowHandle) => void;
+  onOpenRoute?: (url: string, window: DesktopWindowHandle) => void;
   colorScheme?: Observable<'light' | 'dark'>;
   onLastWindowClosed?: () => void;
   chunkBytes?: number;
 }
 interface DesktopApp {
-  openWindow(): DesktopWindowHandle;
+  openWindow(options?: DesktopWindowOptions): DesktopWindowHandle;
   readonly windows: readonly DesktopWindowHandle[];
   readonly windowCount: Observable<number>;
   dispose(): void;
@@ -89,6 +97,7 @@ export {
   DesktopApp,
   DesktopAppOptions,
   DesktopWindowHandle,
+  DesktopWindowOptions,
   DesktopWindows,
   DesktopWindowsCommands,
   DesktopWindowsView,
@@ -99,7 +108,8 @@ export {
   type DesktopAgentOptions,
   type DesktopServe,
   type ShowMessageBox,
-  windowsChannel
+  windowsChannel,
+  withWindowRoute
 };
 // ==== frames.d.ts ====
 declare const DEFAULT_CHUNK_BYTES = 1048576;
@@ -164,6 +174,7 @@ interface ChannelHostOptions {
   send: (frame: GessoFrame) => void;
   chunkBytes?: number;
   onOpenUrl?: (url: string) => void;
+  onOpenRoute?: (url: string) => void;
 }
 interface ChannelHost {
   receive(frame: GessoFrame): void;
@@ -176,10 +187,20 @@ export {
   ChannelHostOptions,
   serveChannelsToWindow
 };
+// ==== route.d.ts ====
+declare function withWindowRoute(viewUrl: string, route: string | null | undefined): string;
+declare function windowRoute(hash?: string): string;
+export {
+  windowRoute,
+  withWindowRoute
+};
 // ==== view.d.ts ====
 import {
   GessoFrame
 } from "./frames.js";
+import {
+  windowRoute
+} from "./route.js";
 import {
   AppLogicEndpoint
 } from "gesso-framework";
@@ -192,11 +213,13 @@ interface ElectrobunBridge {
   readonly endpoint: AppLogicEndpoint;
   receive(frame: GessoFrame): void;
   openUrl(url: string): void;
+  openRoute(url: string): void;
   dispose(): void;
 }
 declare function createElectrobunBridge(options: ElectrobunBridgeOptions): ElectrobunBridge;
 export {
   createElectrobunBridge,
   ElectrobunBridge,
-  ElectrobunBridgeOptions
+  ElectrobunBridgeOptions,
+  windowRoute
 };

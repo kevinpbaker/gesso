@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import type { ShellHistory } from '../shellHistory';
 import { WorkerApp, type WorkerAppOptions } from './WorkerApp';
@@ -63,8 +63,8 @@ function fakeWorker(post: (message: ShellToRuntimeMessage) => void): Internals['
   };
 }
 
-function shell(history: WorkerAppOptions['history']) {
-  const app = new WorkerApp({ renderWorker: () => ({}) as unknown as Worker, history });
+function shell(history: WorkerAppOptions['history'], extra: Partial<WorkerAppOptions> = {}) {
+  const app = new WorkerApp({ renderWorker: () => ({}) as unknown as Worker, history, ...extra });
   const internals = app as unknown as Internals;
   const posts: ShellToRuntimeMessage[] = [];
   internals.renderWorker = fakeWorker(message => posts.push(message));
@@ -138,5 +138,68 @@ describe('WorkerApp with a history passed in', () => {
     internals.attachHistory();
 
     expect(urls()).toEqual(['/issues']);
+  });
+});
+
+/**
+ * `ShellService.openRoute` arriving at the shell: what a Cmd-click on an
+ * in-app link becomes once it has crossed from the render worker.
+ */
+describe('WorkerApp opening a route somewhere new', () => {
+  const originalWindow = (globalThis as { window?: unknown }).window;
+
+  afterEach(() => {
+    if (originalWindow === undefined) {
+      delete (globalThis as { window?: unknown }).window;
+    } else {
+      (globalThis as { window?: unknown }).window = originalWindow;
+    }
+  });
+
+  /** A window whose `open` records its arguments. */
+  function recordOpens(): unknown[][] {
+    const calls: unknown[][] = [];
+    (globalThis as { window?: unknown }).window = { open: (...args: unknown[]) => calls.push(args) };
+    return calls;
+  }
+
+  it("hands the router's url to the host's onOpenRoute, and opens no tab", () => {
+    const opens = recordOpens();
+    const handled: string[] = [];
+    const host = hostHistory('/');
+    const { internals, fromWorker, urls } = shell(host.history, { onOpenRoute: url => handled.push(url) });
+    internals.attachHistory();
+
+    fromWorker({ type: 'openRoute', url: '/epic/BUD-12?story=BUD-13' });
+
+    expect(handled).toEqual(['/epic/BUD-12?story=BUD-13']);
+    expect(opens).toEqual([]);
+    // The current screen stays where it is.
+    expect(host.calls).toEqual([]);
+    expect(urls()).toEqual(['/']);
+  });
+
+  it('opens a new tab at the address the history gives, keeping the opener out of it', () => {
+    const opens = recordOpens();
+    const host = hostHistory('/');
+    const history = { ...host.history, href: (url: string) => `/app#${url}` };
+    const { internals, fromWorker } = shell(history);
+    internals.attachHistory();
+
+    fromWorker({ type: 'openRoute', url: '/epic/BUD-12' });
+
+    expect(opens).toEqual([['/app#/epic/BUD-12', '_blank', 'noopener']]);
+    expect(host.calls).toEqual([]);
+  });
+
+  it('follows the url in place in memory mode, through the history and back to the worker', () => {
+    const opens = recordOpens();
+    const { internals, fromWorker, urls } = shell({ mode: 'memory', initialUrl: '/' });
+    internals.attachHistory();
+
+    fromWorker({ type: 'openRoute', url: '/epic/BUD-12' });
+
+    expect(opens).toEqual([]);
+    expect(urls()).toEqual(['/', '/epic/BUD-12']);
   });
 });
