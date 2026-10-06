@@ -32,7 +32,7 @@ import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeContrast } from '../contrast';
 import { observeReducedMotion } from '../reducedMotion';
-import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
+import { releaseShellHistory, resolveShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
 
 /**
@@ -242,8 +242,18 @@ export interface WorkerAppOptions {
    * routes, resolves nothing, and could not — a route names a
    * component class, which never leaves the worker. It reports the url
    * the window is at and performs the pushes the worker asks for.
+   *
+   * Or a `ShellHistory` made elsewhere, for a page whose address the
+   * app does not own. An app embedded in another product — an
+   * Atlassian Forge Custom UI app is an iframe inside Jira — reaches
+   * the address bar only through the history object its host hands
+   * out, so it adapts that object to `ShellHistory` and passes it here,
+   * and the router and the host's address stay one url. A history
+   * passed this way is used as it is and survives the app: unmount
+   * stops listening to it but does not dispose it, by the rule
+   * `appLogicWorker` follows, and a remount picks the same one up.
    */
-  history?: ShellHistoryOptions;
+  history?: ShellHistoryOptions | ShellHistory;
 }
 
 /**
@@ -337,6 +347,8 @@ export class WorkerApp {
    */
   private scrollability: UiScrollability = { up: false, down: false, left: false, right: false };
   private history: ShellHistory | null = null;
+  /** True only when the history was made here from options; see `resolveShellHistory`. */
+  private ownsHistory = false;
   /** True once the render worker has answered `ready` at least once. */
   private ready = false;
   /** The running `requestAnimationFrame` handle, when ticks are wanted. */
@@ -749,8 +761,11 @@ export class WorkerApp {
     this.proxy = null;
     this.mirror?.dispose();
     this.mirror = null;
-    this.history?.dispose();
+    if (this.history !== null) {
+      releaseShellHistory(this.history, this.ownsHistory);
+    }
     this.history = null;
+    this.ownsHistory = false;
     this.detachInput?.();
     this.detachInput = null;
     this.audio?.dispose();
@@ -927,8 +942,9 @@ export class WorkerApp {
    * the screen that url names, not on its root.
    */
   private attachHistory(): void {
-    const history = createShellHistory(this.options.history);
+    const { history, owned } = resolveShellHistory(this.options.history);
     this.history = history;
+    this.ownsHistory = owned;
     history.onChange(url => this.post({ type: 'url', url }));
     this.post({ type: 'url', url: history.url });
   }

@@ -2060,7 +2060,7 @@ interface WorkerAppOptions {
   interceptKey?: (event: KeyboardEvent) => boolean;
   colorScheme?: ColorSchemePreference;
   accessibility?: boolean;
-  history?: ShellHistoryOptions;
+  history?: ShellHistoryOptions | ShellHistory;
 }
 declare class WorkerApp {
   private readonly options;
@@ -2079,6 +2079,7 @@ declare class WorkerApp {
   private audio;
   private scrollability;
   private history;
+  private ownsHistory;
   private ready;
   private frameHandle;
   private detachColorScheme;
@@ -2155,7 +2156,7 @@ declare class GessoAppBuilder {
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
-  useHistory(history: ShellHistoryOptions): this;
+  useHistory(history: ShellHistoryOptions | ShellHistory): this;
   renderer(choice: RendererChoice): this;
   onFrame(listener: (metrics: FrameMetrics) => void): this;
   onInspect(listener: (report: UiNodeReport | null) => void): this;
@@ -2177,7 +2178,7 @@ interface GessoAppOptions {
   services?: ServiceRegistry;
   channels?: ChannelRegistry;
   routes?: RouterRoutes;
-  history?: ShellHistoryOptions;
+  history?: ShellHistoryOptions | ShellHistory;
   canvas?: CanvasHost;
   renderer?: RendererChoice;
   clock?: UiFrameClockFactory;
@@ -2204,6 +2205,7 @@ declare class GessoApp {
   private audio;
   private mirror;
   private history;
+  private ownsHistory;
   private detachVisibility;
   private detachFileDrop;
   private files;

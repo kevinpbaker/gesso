@@ -37,7 +37,13 @@ function historyFor(page: ReturnType<typeof docsPage>) {
     colorScheme: 'light' as const,
     onError: () => {}
   };
-  return createShellHistory(embeddedAppOptions(example).history, page);
+  const history = embeddedAppOptions(example).history;
+  // The option also takes a ready-made `ShellHistory`, which would
+  // ignore the fake page entirely; the harness has to be giving options.
+  if (history !== undefined && 'push' in history) {
+    throw new Error('the harness passed a ready-made history rather than options');
+  }
+  return createShellHistory(history, page);
 }
 
 /**
