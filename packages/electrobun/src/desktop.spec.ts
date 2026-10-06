@@ -14,10 +14,17 @@ import { describe, expect, it } from 'vitest';
 
 import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from 'gesso-framework';
 
-import { createDesktopApp, DesktopWindows, windowsChannel, type DesktopApp, type DesktopWindowHandle } from './desktop';
+import {
+  createDesktopApp,
+  DesktopWindows,
+  windowsChannel,
+  withWindowRoute,
+  type DesktopApp,
+  type DesktopWindowHandle
+} from './desktop';
 import type { GessoFrame } from './frames';
-import { createElectrobunBridge } from './view';
-import type { ChannelHost } from './main';
+import { createElectrobunBridge, windowRoute } from './view';
+import { serveChannelsToWindow, type ChannelHost } from './main';
 
 interface CounterView {
   count: number;
@@ -267,6 +274,82 @@ describe('the shell adaptations a window needs', () => {
 
     expect(opened).toEqual([{ url: 'https://example.test/docs', id: handle.id }]);
     expect(host).toBeDefined();
+  });
+
+  it('hands a route from a window to the main process, apart from an outbound url', () => {
+    const urls: string[] = [];
+    const routes: string[] = [];
+    let bridge!: ReturnType<typeof createElectrobunBridge>;
+    const host = serveChannelsToWindow([], {
+      send: frame => bridge.receive(frame),
+      onOpenUrl: url => urls.push(url),
+      onOpenRoute: url => routes.push(url)
+    });
+    bridge = createElectrobunBridge({ send: frame => host.receive(frame) });
+
+    bridge.openRoute('/epic/BUD-12?story=BUD-13');
+    bridge.openUrl('https://example.test/docs');
+
+    expect(routes).toEqual(['/epic/BUD-12?story=BUD-13']);
+    expect(urls).toEqual(['https://example.test/docs']);
+    host.dispose();
+  });
+
+  it('opens a new window at the route a window asked for, by default', () => {
+    const opened: Array<string | null> = [];
+    const outbound: string[] = [];
+    const views = new Map<number, ReturnType<typeof createElectrobunBridge>>();
+    const app = createDesktopApp({
+      channels: [],
+      open: (receive, handle) => {
+        opened.push(handle.route);
+        views.set(handle.id, createElectrobunBridge({ send: frame => receive(frame) }));
+        return { send: () => {}, close: () => {} };
+      },
+      onOpenUrl: url => outbound.push(url)
+    });
+    const first = app.openWindow();
+
+    views.get(first.id)!.openRoute('/epic/BUD-12');
+
+    expect(opened).toEqual([null, '/epic/BUD-12']);
+    expect(app.windows.map(window => window.route)).toEqual([null, '/epic/BUD-12']);
+
+    // An outbound url is still the person's browser's, never a window.
+    views.get(first.id)!.openUrl('https://example.test/docs');
+    expect(outbound).toEqual(['https://example.test/docs']);
+    expect(app.windows).toHaveLength(2);
+    app.dispose();
+  });
+
+  it("hands the route to the application's onOpenRoute instead, with the window that asked", () => {
+    const asked: Array<{ url: string; id: number }> = [];
+    let bridge!: ReturnType<typeof createElectrobunBridge>;
+    const app = createDesktopApp({
+      channels: [],
+      open: receive => {
+        bridge = createElectrobunBridge({ send: frame => receive(frame) });
+        return { send: () => {}, close: () => {} };
+      },
+      onOpenRoute: (url, window) => asked.push({ url, id: window.id })
+    });
+    const handle = app.openWindow();
+
+    bridge.openRoute('/epic/BUD-12');
+
+    expect(asked).toEqual([{ url: '/epic/BUD-12', id: handle.id }]);
+    expect(app.windows).toHaveLength(1);
+    app.dispose();
+  });
+
+  it("carries the route on the view's url, for the window to start its memory history there", () => {
+    const viewUrl = withWindowRoute('views://mainview/index.html', '/epic/BUD-12?story=BUD-13');
+
+    expect(viewUrl).toBe('views://mainview/index.html#gesso-route=%2Fepic%2FBUD-12%3Fstory%3DBUD-13');
+    expect(windowRoute(viewUrl.slice(viewUrl.indexOf('#')))).toBe('/epic/BUD-12?story=BUD-13');
+    // No route: the url is untouched, and the window starts at its root.
+    expect(withWindowRoute('views://mainview/index.html', null)).toBe('views://mainview/index.html');
+    expect(windowRoute('')).toBe('/');
   });
 
   it('waits for the window to speak before telling it the appearance', async () => {

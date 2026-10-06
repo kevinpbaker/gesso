@@ -25,15 +25,23 @@ means, and a request goes back out.
 
 ## Asking the shell for something
 
-`ShellService` has three actions an application calls:
+`ShellService` has four actions an application calls:
 
 | Action           | What the shell does with it                                                                                                         |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `copyText(text)` | Writes the text to the system clipboard through `navigator.clipboard`, or a hidden textarea and `execCommand` where that is refused |
 | `openUrl(url)`   | `window.open(url, '_blank', 'noopener,noreferrer')`                                                                                 |
+| `openRoute(url)` | Opens the app at one of its own urls somewhere new: the host's `onOpenRoute`, else a tab at the history's address, else in place    |
 | `redirect(url)`  | `window.location.assign(url)`, once the url is resolved against the page and its scheme admitted                                    |
 
-`openUrl` and `redirect` return `void`, and nothing comes back. `copyText` returns a
+`openRoute` is what a Cmd-click on an in-app [Link](/components/link)
+sends. Its url is the router's, not an address, and turning it into one
+is the shell's job, because only the shell knows whether the app lives
+at a path, in a fragment, inside another product or in a desktop
+window. [Routing](/structure/routing#links-and-opening-a-screen-somewhere-new)
+has the order the shell tries things in.
+
+`openUrl`, `openRoute` and `redirect` return `void`, and nothing comes back. `copyText` returns a
 promise of whether the text reached the clipboard, and most callers
 ignore it: the text is on its way the moment the call returns, and
 nothing waits on the answer unless something asks for it. It is for the

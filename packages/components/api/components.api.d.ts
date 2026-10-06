@@ -38,7 +38,8 @@ import {
   OverlayPlacement,
   OverlayRect,
   ReadableCell,
-  ResourceStatus
+  ResourceStatus,
+  RouteTarget
 } from "gesso-framework";
 type Keymap = Readonly<Record<string, (event: UiKeyboardEvent) => void>>;
 declare function keymap(bindings: Keymap): (event: UiKeyboardEvent) => void;
@@ -125,6 +126,7 @@ interface LinkProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   label?: string;
   href?: string;
+  to?: string | RouteTarget;
   onPress?: () => void;
   disabled?: boolean;
   underline?: LinkUnderline;
@@ -172,6 +174,7 @@ declare function SegmentedControl(inputs: Inputs<SegmentedControlProps>, ctx: Co
 interface BreadcrumbItem {
   readonly value: string;
   readonly label: string;
+  readonly to?: string | RouteTarget;
 }
 interface BreadcrumbProps extends ControlLayoutProps {
   items: readonly BreadcrumbItem[];

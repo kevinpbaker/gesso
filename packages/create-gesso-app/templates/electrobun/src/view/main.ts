@@ -8,7 +8,7 @@
  * a transport rather than a router.
  */
 import type { GessoFrame } from 'gesso-electrobun';
-import { createElectrobunBridge } from 'gesso-electrobun/view';
+import { createElectrobunBridge, windowRoute } from 'gesso-electrobun/view';
 import { createApp } from 'gesso-framework';
 import { Electroview } from 'electrobun/view';
 
@@ -43,11 +43,15 @@ const shell = createApp({
   // The application layer is in another process, so this is the bridge
   // rather than a data worker. The render worker cannot tell.
   appLogicWorker: bridge.endpoint,
-  // A window has no address bar, so its routes are its own.
-  history: { mode: 'memory' },
+  // A window has no address bar, so its routes are its own. It starts
+  // at the route the main process opened it at, if it was given one.
+  history: { mode: 'memory', initialUrl: windowRoute() },
   // A link in a desktop application belongs in the person's browser,
   // which only the process outside this window can reach.
   onOpenUrl: url => bridge.openUrl(url),
+  // A Cmd-click on an in-app link opens another window of this
+  // application, at that route.
+  onOpenRoute: url => bridge.openRoute(url),
   // The window is all app: a key pressed before anything is clicked is its.
   pageKeys: true,
   onError: (message, stack, source) => console.error(`[gesso ${source}] ${message}`, stack)

@@ -36,8 +36,9 @@ export type GessoFrame =
   | { readonly kind: 'close'; readonly stream: number }
   /**
    * The adapter's own traffic, which is not a channel: the appearance
-   * the platform is in, and a url the application wants opened
-   * outside the window. It carries a name and a serialized payload for
+   * the platform is in, a url the application wants opened outside the
+   * window, and one of its own routes it wants opened in a new window.
+   * It carries a name and a serialized payload for
    * the same reason a `data` frame carries a body, and it is a
    * separate kind so that nothing has to reserve a stream number.
    */

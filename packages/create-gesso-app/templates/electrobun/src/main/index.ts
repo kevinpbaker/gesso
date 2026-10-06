@@ -15,7 +15,13 @@ import { BrowserView, BrowserWindow, Utils } from 'electrobun/main';
 import { BehaviorSubject, map } from 'rxjs';
 
 import type { GessoFrame } from 'gesso-electrobun';
-import { createDesktopApp, messageBoxConfirm, serveDesktopAgent, windowsChannel } from 'gesso-electrobun/desktop';
+import {
+  createDesktopApp,
+  messageBoxConfirm,
+  serveDesktopAgent,
+  windowsChannel,
+  withWindowRoute
+} from 'gesso-electrobun/desktop';
 import { serve } from 'gesso-framework';
 
 import { Counter } from '../shared/Counter';
@@ -65,7 +71,9 @@ const app = createDesktopApp({
     });
     const window = new BrowserWindow({
       title: '{{name}}',
-      url: 'views://mainview/index.html',
+      // The route a Cmd-click asked for, if any, for the window to
+      // start at; see `windowRoute` in the view.
+      url: withWindowRoute('views://mainview/index.html', handle.route),
       frame: { width: 460, height: 360, x: 100 + handle.id * 60, y: 120 + handle.id * 40 },
       rpc
     });

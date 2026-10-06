@@ -910,6 +910,9 @@ type ShellRequest = {
   type: 'openUrl';
   url: string;
 } | {
+  type: 'openRoute';
+  url: string;
+} | {
   type: 'redirect';
   url: string;
 } | {
@@ -1028,6 +1031,7 @@ declare class ShellService {
   copyText(text: string): Promise<boolean>;
   settleClipboard(id: number, copied: boolean): void;
   openUrl(url: string): void;
+  openRoute(url: string): void;
   redirect(url: string): void;
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
@@ -1837,6 +1841,10 @@ type RuntimeToShellMessage = {
   url: string;
 } |
 {
+  type: 'openRoute';
+  url: string;
+} |
+{
   type: 'redirect';
   url: string;
 } | {
@@ -2020,6 +2028,7 @@ interface ShellHistory {
   forward(): void;
   onChange(listener: (url: string) => void): void;
   dispose(): void;
+  href?(url: string): string | null;
 }
 interface HistoryWindow {
   readonly location: {
@@ -2049,6 +2058,7 @@ interface WorkerAppOptions {
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   onOpenUrl?: (url: string) => void;
+  onOpenRoute?: (url: string) => void;
   onRedirect?: (url: string) => void;
   webmcp?: boolean | {
     confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
@@ -2179,6 +2189,7 @@ interface GessoAppOptions {
   channels?: ChannelRegistry;
   routes?: RouterRoutes;
   history?: ShellHistoryOptions | ShellHistory;
+  onOpenRoute?: (url: string) => void;
   canvas?: CanvasHost;
   renderer?: RendererChoice;
   clock?: UiFrameClockFactory;
@@ -2199,6 +2210,7 @@ declare class GessoApp {
   private readonly accessibilityEnabled;
   private readonly adapter;
   private readonly historyOptions;
+  private readonly onOpenRoute;
   private running;
   private resizeObserver;
   private proxy;
