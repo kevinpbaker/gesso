@@ -290,7 +290,14 @@ const history: ShellHistory = {
   forward: () => host.forward(),
   onChange: listener => {
     unlisten?.();
-    unlisten = host.listen(location => listener(`${location.pathname}${location.search}`));
+    // Forge documents `listen((location, action) => …)` but types it as history 5's
+    // `listen(({ action, location }) => …)`; reading either keeps it working.
+    unlisten = host.listen((update: unknown) => {
+      const { location } = (update as { location?: Location }).location
+        ? (update as { location: Location })
+        : { location: update as Location };
+      listener(`${location.pathname}${location.search}`);
+    });
   },
   dispose: () => unlisten?.()
 };
