@@ -11,8 +11,9 @@ const SECTIONS = ['Overview', 'Components', 'Appearance'] as const;
  *
  * The row along the top is in-app navigation. Each of those links has
  * an `onPress` and no `href`, because the destination is a screen this
- * application draws: nothing leaves, and a real app would call
- * `RouterService` inside the handler rather than move a cell. They are
+ * application draws: nothing leaves, and a real app would give each one
+ * a `to` and let `RouterService` navigate, which is also what lets a
+ * Cmd-click open it somewhere new, rather than move a cell. They are
  * still links and still say `role: 'link'`, because what the reader
  * does with them is go somewhere. `underline="none"` suits them,
  * since a navigation row is already obviously navigation.

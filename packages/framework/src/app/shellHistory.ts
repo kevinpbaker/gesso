@@ -66,6 +66,21 @@ export interface ShellHistory {
    */
   onChange(listener: (url: string) => void): void;
   dispose(): void;
+  /**
+   * The address a new tab would open to show the app at `url`, or null
+   * when this history has none to give.
+   *
+   * Asked when a link is followed somewhere new (`ShellService.openRoute`,
+   * a Cmd-click or a Ctrl-click). The browser modes answer with the
+   * document address that holds `url`, which is what `push` would have
+   * written; `memory` answers null, because a url kept in memory names
+   * no page anything else could load. Optional, because a history an
+   * embedder wrote may have no such answer either, and leaving it out
+   * says exactly that: the shell then follows the link in place. A
+   * host that can open its own kind of tab (Jira's, through Forge's
+   * `router.open`) says so with the shell's `onOpenRoute` instead.
+   */
+  href?(url: string): string | null;
 }
 
 /**
@@ -136,6 +151,42 @@ function isShellHistory(value: ShellHistoryOptions | ShellHistory | undefined): 
 }
 
 /**
+ * Opens the app at `url` somewhere new, as the shell's answer to
+ * `ShellService.openRoute`.
+ *
+ * In this order, and the order is the decision. A host's own handler
+ * wins, because an app embedded in another product or in a desktop
+ * window knows what a new tab means there and a browser default would
+ * be wrong in both. Without one, the history is asked for the address
+ * that holds `url`, and that address is opened. Without an address,
+ * which is `memory` mode and any handed-in history with no `href`, the
+ * link is followed in place: a Cmd-click that did nothing at all would
+ * read as a broken link, and arriving at the destination in the window
+ * already open is what a browser does with a modifier it cannot honour.
+ *
+ * Shared by `WorkerApp` and `GessoApp`, which differ only in how a url
+ * reaches the router, so it is passed in.
+ */
+export function openRouteWith(
+  handler: ((url: string) => void) | undefined,
+  url: string,
+  history: ShellHistory | null,
+  open: (address: string) => void,
+  followInPlace: (url: string) => void
+): void {
+  if (handler !== undefined) {
+    handler(url);
+    return;
+  }
+  const address = history?.href?.(url) ?? null;
+  if (address !== null) {
+    open(address);
+    return;
+  }
+  followInPlace(url);
+}
+
+/**
  * Stops an app hearing about a history it is done with.
  *
  * A history the app made is disposed, which drops its listeners and
@@ -189,6 +240,11 @@ class MemoryHistory implements ShellHistory {
 
   dispose(): void {
     this.listener = null;
+  }
+
+  /** No address: a url kept here names no page another tab could load. */
+  href(): string | null {
+    return null;
   }
 
   private step(delta: number): void {
@@ -270,6 +326,18 @@ class BrowserHistory implements ShellHistory {
     this.listener = null;
     this.host.removeEventListener('popstate', this.onPopState);
     this.host.removeEventListener('hashchange', this.onHashChange);
+  }
+
+  /**
+   * The address `push` would write for `url`, for a new tab to open.
+   *
+   * Relative, as `pushState` takes it, and resolved against the page by
+   * whatever opens it: `/epic/2` in `path` mode, and the page's own
+   * path and query with the fragment set in `hash` mode, so the new tab
+   * loads the same document and starts on the same screen.
+   */
+  href(url: string): string | null {
+    return this.toHref(url);
   }
 
   private report(): void {

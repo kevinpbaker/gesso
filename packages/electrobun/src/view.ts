@@ -18,6 +18,8 @@ import { isHubMessage, isPortHandshake, type AppLogicEndpoint } from 'gesso-fram
 
 import { DEFAULT_CHUNK_BYTES, FrameAssembler, frameControl, frameData, type GessoFrame } from './frames';
 
+export { windowRoute } from './route';
+
 export interface ElectrobunBridgeOptions {
   /**
    * Sends one frame to the main process, which is
@@ -61,6 +63,17 @@ export interface ElectrobunBridge {
    * application belongs in the person's browser.
    */
   openUrl(url: string): void;
+  /**
+   * Asks the main process to open this application at one of its own
+   * urls in a new window.
+   *
+   * Pass it as `onOpenRoute` to the shell. It is what a Cmd-click on an
+   * in-app link means in a desktop application: a window has no tabs,
+   * and a `window.open` here would open a bare webview the application
+   * does not serve. `createDesktopApp` opens the window, at that route,
+   * unless the application said otherwise.
+   */
+  openRoute(url: string): void;
   /** Closes every stream and stops pumping. */
   dispose(): void;
 }
@@ -129,6 +142,11 @@ export function createElectrobunBridge(options: ElectrobunBridgeOptions): Electr
     openUrl(url: string): void {
       if (!disposed) {
         options.send(frameControl('openUrl', { url }));
+      }
+    },
+    openRoute(url: string): void {
+      if (!disposed) {
+        options.send(frameControl('openRoute', { url }));
       }
     },
     receive(frame: GessoFrame): void {

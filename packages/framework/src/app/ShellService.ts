@@ -19,6 +19,7 @@ import type { ReadableCell } from '../Input';
 export type ShellRequest =
   | { type: 'clipboard'; id: number; text: string }
   | { type: 'openUrl'; url: string }
+  | { type: 'openRoute'; url: string }
   | { type: 'redirect'; url: string }
   | { type: 'fullscreen'; enter: boolean }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
@@ -320,6 +321,33 @@ export class ShellService {
   /** Opens a URL in the user's browser, in a new tab or window. */
   openUrl(url: string): void {
     this.handler?.({ type: 'openUrl', url });
+  }
+
+  /**
+   * Opens this application at one of its own urls, somewhere new: what
+   * a Cmd-click or a Ctrl-click on an in-app link asks for.
+   *
+   * Not `openUrl`, because the two urls are different kinds of thing.
+   * `openUrl` takes an address that already means something to the
+   * browser. This takes the router's url, `/epic/BUD-12?story=BUD-13`,
+   * which means something only to this application, and only the
+   * shell knows what address shows the application at it: a path on
+   * the page's origin, a fragment on the page's own address, a tab in
+   * the product the app is embedded in, or a new native window. The
+   * render thread cannot know which, so it names the route and the
+   * shell decides.
+   *
+   * What each shell does, in order: the host's `onOpenRoute` if it gave
+   * one; otherwise a new tab at the address the history gives for the
+   * url (`ShellHistory.href`); otherwise, where there is no address,
+   * which is `memory` mode, the shell follows the url in place, exactly
+   * as `RouterService.navigate` would, rather than doing nothing.
+   *
+   * The current screen does not navigate. Nothing comes back, as with
+   * `openUrl`. With no shell installed the request is dropped.
+   */
+  openRoute(url: string): void {
+    this.handler?.({ type: 'openRoute', url });
   }
 
   /**

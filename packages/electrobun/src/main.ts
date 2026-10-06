@@ -35,6 +35,16 @@ export interface ChannelHostOptions {
    * operating system is the application's decision.
    */
   onOpenUrl?: (url: string) => void;
+  /**
+   * One of the application's own urls the window asked to have opened
+   * in a new window: a Cmd-click on an in-app link, sent by the view
+   * bridge's `openRoute`.
+   *
+   * Not called for the application either. `createDesktopApp` answers
+   * it by opening a window at that route; a host built on this alone
+   * decides for itself.
+   */
+  onOpenRoute?: (url: string) => void;
 }
 
 export interface ChannelHost {
@@ -72,10 +82,10 @@ export function serveChannelsToWindow(channels: readonly ServedChannel[], option
     },
     receive(frame: GessoFrame): void {
       if (frame.kind === 'control') {
-        if (frame.name === 'openUrl') {
+        if (frame.name === 'openUrl' || frame.name === 'openRoute') {
           const payload = JSON.parse(frame.body) as { url?: string };
           if (typeof payload.url === 'string') {
-            options.onOpenUrl?.(payload.url);
+            (frame.name === 'openUrl' ? options.onOpenUrl : options.onOpenRoute)?.(payload.url);
           }
         }
         return;

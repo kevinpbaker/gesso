@@ -112,6 +112,67 @@ A match's `query` is the query decoded, as a record of strings, and
 change how the query parses, so a list of values joined by commas reads
 as written: `?status=todo,done`.
 
+## Links, and opening a screen somewhere new
+
+A [Link](/components/link) with `to` navigates to one of the
+application's own urls, and a [Breadcrumb](/components/breadcrumb)
+item takes the same `to`:
+
+```tsx
+<Link label="BUD-12" to="/epic/BUD-12" />
+<Link label="BUD-13" to={to(Story, { epic: 'BUD-12', story: 'BUD-13' })} />
+```
+
+A plain click navigates in place, exactly as `router.navigate` would. A
+Cmd-click, a Ctrl-click, a middle click or Cmd-Enter leaves the current
+screen alone and calls `ShellService.openRoute(url)` instead, which asks
+the shell to open the application at that url somewhere new. The url
+crossing is the router's, not an address, because only the shell knows
+which address shows the application at a route.
+
+What the shell does with it, in order:
+
+1. **The host's `onOpenRoute`**, when `createApp` or `GessoApp` was
+   given one. It is called with the url as it is, and nothing else
+   happens. This is the place for a host whose idea of a new tab is not
+   the browser's.
+2. **A new tab at the address the history gives**, through
+   `ShellHistory.href(url)`. In `path` mode that is the url itself,
+   resolved against the page's origin; in `hash` mode it is the page's
+   own path and query with the fragment set to `base` and the url, so
+   the new tab loads the same document and starts on the same screen.
+   The tab is opened with `window.open(address, '_blank', 'noopener')`.
+3. **In place**, when there is no address: in `memory` mode, and with a
+   handed-in history that has no `href`. A Cmd-click that did nothing
+   would read as a broken link, and arriving at the destination in the
+   window already open is what a browser does with a modifier it cannot
+   honour.
+
+An app embedded in another product usually wants the first. Inside
+Jira, a new tab is one of Jira's, opened through Forge's bridge:
+
+```ts
+import { router } from '@forge/bridge';
+
+createApp({
+  history,
+  // The address of this app's page in Jira, with the url after it:
+  // build the one your module is served at.
+  onOpenRoute: url => void router.open(`${appPageAddress}${url}`)
+}).mount('#app');
+```
+
+A handed-in `ShellHistory` can instead answer `href(url)` with the host
+address for a url, and the shell opens it in a browser tab. Use
+`onOpenRoute` when the host has its own way to open a tab, and `href`
+when a plain address will do.
+
+Like `openUrl`, the request reaches the main thread one message after
+the click, and the tab is opened there. A browser allows a new window
+only while the click that asked for it is fresh, and `openPopup` was
+measured in Chrome to be fast enough across that hop; `openRoute` takes
+the same path and has not been measured on its own.
+
 ## What a route change does to the tree
 
 The outlet compares chains of route objects, not urls, and three
@@ -307,6 +368,12 @@ createApp({ history }).mount('#app');
 A history passed in is the caller's, not the app's. Disposing the app
 stops it listening but does not dispose the history, and a remount
 picks the same one up again.
+
+`href(url)` is optional on a handed-in history. Give it when the host
+address for a url can be written down, and a Cmd-clicked link opens a
+browser tab there; leave it out and such a link is followed in place,
+unless the shell was given an `onOpenRoute`. See
+[links, and opening a screen somewhere new](#links-and-opening-a-screen-somewhere-new).
 
 Which mode an app runs in is the shell's decision, made once where the
 app is created, and the example on this page is a case of it. A live

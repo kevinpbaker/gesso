@@ -379,6 +379,13 @@ export type RuntimeToShellMessage =
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
   /**
+   * Open the app at one of its own urls somewhere new
+   * (ShellService.openRoute). `url` is the router's, not an address:
+   * the shell turns it into one, through its `onOpenRoute` or its
+   * history, or follows it in place when it has neither.
+   */
+  | { type: 'openRoute'; url: string }
+  /**
    * Replace the page with a url, leaving the app (ShellService.redirect).
    * `url` is as the component gave it, relative or not; the shell
    * resolves it against the page and refuses a scheme that is not

@@ -32,7 +32,13 @@ import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeContrast } from '../contrast';
 import { observeReducedMotion } from '../reducedMotion';
-import { releaseShellHistory, resolveShellHistory, type ShellHistory, type ShellHistoryOptions } from '../shellHistory';
+import {
+  openRouteWith,
+  releaseShellHistory,
+  resolveShellHistory,
+  type ShellHistory,
+  type ShellHistoryOptions
+} from '../shellHistory';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
 
 /**
@@ -129,6 +135,25 @@ export interface WorkerAppOptions {
    * reach. `gesso-electrobun`'s bridge is what goes here.
    */
   onOpenUrl?: (url: string) => void;
+  /**
+   * Opens the app at one of its own urls somewhere new
+   * (`ShellService.openRoute`, a Cmd-click or a Ctrl-click on an in-app
+   * `Link`), in place of a new browser tab.
+   *
+   * `url` is the router's, `/epic/BUD-12?story=BUD-13`, not an address.
+   * Without this the shell opens a new tab at the address its history
+   * gives for it (`ShellHistory.href`): the origin and the path in
+   * `path` mode, the page with that fragment in `hash` mode. With no
+   * address to give, in `memory` mode or with a history that has no
+   * `href`, it follows the url in place.
+   *
+   * A host whose idea of a new tab is not the browser's goes here: an
+   * app embedded in another product opens one of that product's tabs
+   * (an Atlassian Forge app, Forge's `router.open`), and a desktop
+   * window asks for another window (`gesso-electrobun`'s bridge,
+   * `openRoute`).
+   */
+  onOpenRoute?: (url: string) => void;
   /**
    * Replaces the page with a url the application asked for
    * (`ShellService.redirect`), in place of `window.location.assign`.
@@ -882,6 +907,25 @@ export class WorkerApp {
     }
     if (message.type === 'openUrl') {
       openUrlWith(this.options.onOpenUrl, message.url);
+      return;
+    }
+    if (message.type === 'openRoute') {
+      openRouteWith(
+        this.options.onOpenRoute,
+        message.url,
+        this.history,
+        // `noopener` for the reason `openUrl` has it, and no
+        // `noreferrer`: the tab is this application's own page, and
+        // its server is owed the referrer as much as any of its pages.
+        address => window.open(address, '_blank', 'noopener'),
+        // No address to open, so the link is followed here: written to
+        // the history as the router would have, and reported back as
+        // the url the window is now at, which the router resolves.
+        url => {
+          this.history?.push(url);
+          this.post({ type: 'url', url });
+        }
+      );
       return;
     }
     if (message.type === 'redirect') {

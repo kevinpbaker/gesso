@@ -1,14 +1,44 @@
 import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
-import { Row, Text, defaultSpacing, type UiChild, type UiElement, type UiNode, type UiSemanticState } from 'gesso-core';
+import {
+  Row,
+  Text,
+  defaultSpacing,
+  type UiChild,
+  type UiElement,
+  type UiKeyboardEvent,
+  type UiNode,
+  type UiSemanticState
+} from 'gesso-core';
 
-import { FocusService, input, type ComponentContext, type InputCell, type Inputs } from 'gesso-framework';
+import {
+  FocusService,
+  input,
+  RouterService,
+  ShellService,
+  type ComponentContext,
+  type InputCell,
+  type Inputs,
+  type RouteTarget
+} from 'gesso-framework';
 
 import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
+import { followRoute, middlePress, opensElsewhere } from './follow';
 
 export interface BreadcrumbItem {
   readonly value: string;
   readonly label: string;
+  /**
+   * Where in this application the crumb goes, as `Link`'s `to` takes
+   * it: a url of the router's, or a `RouteTarget`.
+   *
+   * Pressed plainly, the router navigates there after `onSelect` has
+   * run; with Command or Control held, with the middle button, or with
+   * Command-Enter or Control-Enter, the shell opens the app there
+   * somewhere new and this page stays. Ignored on the last crumb,
+   * which is never a link.
+   */
+  readonly to?: string | RouteTarget;
 }
 
 /**
@@ -17,8 +47,9 @@ export interface BreadcrumbItem {
  * A row of crumbs with a mark between them, at the top of a page that
  * sits inside something that sits inside something. It holds no state
  * an application would recognise — the trail is the caller's, and a
- * press on a crumb is reported rather than acted on — so the whole of
- * the design is two decisions: which crumb is not a link, and what
+ * press on a crumb is reported, and followed only when the crumb's item
+ * says where it goes — so the whole of the design is two decisions:
+ * which crumb is not a link, and what
  * happens to a trail too long for the strip it is drawn in.
  *
  * ## The last crumb is not a link
@@ -106,6 +137,12 @@ export interface BreadcrumbItem {
  * go through, and there is no second path to keep in step with the
  * first.
  *
+ * The one key a crumb reads itself is Enter with Command or Control
+ * held, on a crumb with a `to`: that opens its destination somewhere
+ * new, the keyboard's Cmd-click, which the runtime's synthesised click
+ * could not say because it carries no modifiers. A plain Enter is
+ * left to the default.
+ *
  * HTML's rule is narrower — Enter follows a link, Space presses a
  * button and scrolls everything else — and this component does not
  * reimpose it. Doing so would mean binding Space to a handler that
@@ -162,6 +199,17 @@ export interface BreadcrumbItem {
  *
  * ## Deviations, and what lands next
  *
+ * ## Following a crumb
+ *
+ * A press is reported through `onSelect`, always and first. A crumb
+ * whose item has a `to` is then followed as `Link` follows one: the
+ * router navigates there in place, or, for a Cmd-click, a Ctrl-click,
+ * a middle click or Cmd-Enter, the shell opens the app there somewhere
+ * new and the page stays (`ShellService.openRoute`). The rules are
+ * `Link`'s, kept in one place (`follow.ts`), so the two cannot answer
+ * the same click differently. A trail with no `to` anywhere behaves
+ * exactly as it did, and routes from `onSelect`.
+ *
  * A crumb is drawn here rather than delegated. `Link` was written
  * beside this component, in the same batch and in parallel, so neither
  * could build on the other: the activatable crumb is a focusable row
@@ -192,6 +240,8 @@ export function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContex
   const separator = input(inputs.separator, SOLIDUS);
   const maxItems = input(inputs.maxItems, 0);
   const focus = ctx.inject(FocusService);
+  const router = ctx.inject(RouterService);
+  const shell = ctx.inject(ShellService);
 
   /**
    * The crumbs that exist right now, by value, so expanding can put
@@ -221,8 +271,12 @@ export function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContex
    */
   const expandedFor = new BehaviorSubject<string | null>(null);
 
-  const activate = (item: BreadcrumbItem): void => {
+  /** `elsewhere`: the press asked for the destination somewhere new. */
+  const activate = (item: BreadcrumbItem, elsewhere: boolean): void => {
     inputs.onSelect.value?.(item.value);
+    if (item.to !== undefined) {
+      followRoute(item.to, elsewhere, router, shell);
+    }
   };
 
   const expand = (): void => {
@@ -316,7 +370,7 @@ function listItem(
   total: number,
   separated: boolean,
   separator: InputCell<string>,
-  activate: (item: BreadcrumbItem) => void,
+  activate: (item: BreadcrumbItem, elsewhere: boolean) => void,
   expand: () => void,
   track: (value: string, node: UiNode | null) => void
 ): UiElement {
@@ -350,7 +404,7 @@ function listItem(
 
 function body(
   crumb: Crumb,
-  activate: (item: BreadcrumbItem) => void,
+  activate: (item: BreadcrumbItem, elsewhere: boolean) => void,
   expand: () => void,
   track: (value: string, node: UiNode | null) => void
 ): UiElement {
@@ -358,6 +412,7 @@ function body(
     return fold(crumb.hidden ?? 0, expand);
   }
   const item = crumb.item as BreadcrumbItem;
+  const middle = middlePress();
   if (crumb.kind === 'current') {
     return Text({
       key: crumb.kind,
@@ -395,7 +450,18 @@ function body(
       // `button` or `link` by synthesising a click, so `onClick` is the
       // one handler for the pointer, the keyboard and an assistive
       // technology's activation alike.
-      onClick: () => activate(item)
+      onPointerDown: middle.onPointerDown,
+      onClick: event => activate(item, middle.take() || opensElsewhere(event.modifiers)),
+      // Except Cmd-Enter on a crumb that goes somewhere: the synthesised
+      // click carries no modifiers, so the one chord that means
+      // "somewhere new" is read here. See the header.
+      onKeyDown: (event: UiKeyboardEvent) => {
+        if (event.key === 'Enter' && item.to !== undefined && opensElsewhere(event.modifiers)) {
+          activate(item, true);
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
     },
     Text({ text: item.label, color: 'controlForeground', textWrap: 'none', selectable: false })
   );

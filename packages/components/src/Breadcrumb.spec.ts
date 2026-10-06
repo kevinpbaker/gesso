@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createComponent, internalState, type ComponentProps } from 'gesso-framework';
+import { createComponent, internalState, RouterService, type ComponentProps, type ShellRequest } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
 import { Column, type UiChild } from 'gesso-core';
@@ -79,6 +79,71 @@ describe('Breadcrumb: the last crumb', () => {
     ui.fireEvent.press(' ');
     expect(onSelect).toHaveBeenLastCalledWith('home');
     expect(onSelect).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('Breadcrumb: crumbs that say where they go', () => {
+  const ROUTED: BreadcrumbItem[] = [
+    { value: 'home', label: 'Home', to: '/' },
+    { value: 'epic', label: 'BUD-12', to: '/epic/BUD-12' },
+    { value: 'story', label: 'BUD-13', to: '/epic/BUD-12?story=BUD-13' }
+  ];
+
+  function follow(ui: ReturnType<typeof mount>) {
+    const requests: ShellRequest[] = [];
+    ui.runtime.onShellRequest(request => requests.push(request));
+    const router = ui.runtime.services.get(RouterService);
+    return { requests, router };
+  }
+
+  it('reports the crumb and then navigates to it in place on a plain click', () => {
+    const order: string[] = [];
+    const ui = mount({ items: ROUTED, onSelect: value => order.push(`select ${value}`) });
+    const { requests, router } = follow(ui);
+    router.url.subscribe(url => order.push(`url ${url}`));
+    order.length = 0;
+
+    ui.fireEvent.click(ui.getByRole('link', { name: 'BUD-12' }));
+
+    expect(order).toEqual(['select epic', 'url /epic/BUD-12']);
+    expect(requests.filter(request => request.type === 'openRoute')).toEqual([]);
+  });
+
+  it('opens it somewhere new on a Cmd-click or a Ctrl-click, and stays on this page', () => {
+    const onSelect = vi.fn();
+    const ui = mount({ items: ROUTED, onSelect });
+    const { requests, router } = follow(ui);
+
+    ui.fireEvent.click(ui.getByRole('link', { name: 'BUD-12' }), { modifiers: { meta: true } });
+    ui.fireEvent.click(ui.getByRole('link', { name: 'Home' }), { modifiers: { ctrl: true } });
+
+    expect(requests).toEqual([
+      { type: 'openRoute', url: '/epic/BUD-12' },
+      { type: 'openRoute', url: '/' }
+    ]);
+    expect(router.url.value).toBe('/');
+    expect(onSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens it somewhere new on Cmd-Enter, and leaves a plain Enter to the runtime', () => {
+    const ui = mount({ items: ROUTED });
+    const { requests, router } = follow(ui);
+    ui.fireEvent.focus(ui.getByRole('link', { name: 'BUD-12' }));
+
+    ui.fireEvent.press('Enter', { meta: true });
+    expect(requests).toEqual([{ type: 'openRoute', url: '/epic/BUD-12' }]);
+    expect(router.url.value).toBe('/');
+
+    ui.fireEvent.press('Enter');
+    expect(router.url.value).toBe('/epic/BUD-12');
+  });
+
+  it('never follows the last crumb, whatever it says', () => {
+    const ui = mount({ items: ROUTED });
+    const { requests } = follow(ui);
+
+    expect(ui.queryByRole('link', { name: 'BUD-13' })).toBeNull();
+    expect(requests).toEqual([]);
   });
 });
 
