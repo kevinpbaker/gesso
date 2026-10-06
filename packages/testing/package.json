@@ -1,6 +1,6 @@
 {
   "name": "gesso-testing",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Mount a component without a browser, query it the way a screen reader would, and read back why a box is the size it is.",
   "license": "MIT",
   "author": "Kevin Baker",
