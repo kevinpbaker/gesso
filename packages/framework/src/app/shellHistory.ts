@@ -37,6 +37,18 @@ export interface ShellHistoryOptions {
   readonly initialUrl?: string;
 }
 
+/**
+ * A url kept somewhere, which the shell reads, writes and listens to.
+ *
+ * `createShellHistory` makes one from `ShellHistoryOptions`, and that
+ * covers every window the app owns the address of. An app embedded in
+ * a page whose address belongs to something else does not own it: an
+ * Atlassian Forge Custom UI app runs in an iframe inside Jira, and the
+ * only way to Jira's address bar is the history object Forge's bridge
+ * hands out. Such a host implements this interface over whatever it
+ * has, and passes the object as the app's `history` option in place of
+ * options, so the router and the host's address bar stay one url.
+ */
 export interface ShellHistory {
   /** The url the window is at now. */
   readonly url: string;
@@ -44,7 +56,14 @@ export interface ShellHistory {
   replace(url: string): void;
   back(): void;
   forward(): void;
-  /** Reports urls the person produced: back, forward, or a typed address. */
+  /**
+   * Reports urls the person produced: back, forward, or a typed address.
+   *
+   * There is one listener, and a second call replaces the first. An
+   * app that was handed its history and is being taken down relies on
+   * that to stop listening, since disposing a history it did not make
+   * is not its decision.
+   */
   onChange(listener: (url: string) => void): void;
   dispose(): void;
 }
@@ -77,6 +96,60 @@ export function createShellHistory(
     return new MemoryHistory(options.initialUrl ?? '/');
   }
   return new BrowserHistory(host, mode, options.base ?? '');
+}
+
+/**
+ * The history an app runs against, and whether the app may dispose it.
+ *
+ * Options are turned into a history here, and that history is the
+ * app's to dispose with everything else it made. A history passed in
+ * ready-made is used as it is and left alone at the end, by the rule
+ * `appLogicWorker` already follows: what the app made, it disposes;
+ * what it was handed, it leaves to whoever handed it. That is also
+ * what keeps a host's history alive across a remount, which disposes
+ * the app and builds it again around the same object.
+ */
+export function resolveShellHistory(source: ShellHistoryOptions | ShellHistory | undefined): {
+  readonly history: ShellHistory;
+  readonly owned: boolean;
+} {
+  if (isShellHistory(source)) {
+    return { history: source, owned: false };
+  }
+  return { history: createShellHistory(source), owned: true };
+}
+
+/**
+ * Tells a ready-made history from options by its methods.
+ *
+ * Options are plain data and never carry a function, so the presence of
+ * `push` and `onChange` as functions is unambiguous. It is checked by
+ * behaviour rather than by `instanceof` because the histories worth
+ * passing are adapters an embedder wrote, not classes from here.
+ */
+function isShellHistory(value: ShellHistoryOptions | ShellHistory | undefined): value is ShellHistory {
+  return (
+    value !== undefined &&
+    typeof (value as Partial<ShellHistory>).push === 'function' &&
+    typeof (value as Partial<ShellHistory>).onChange === 'function'
+  );
+}
+
+/**
+ * Stops an app hearing about a history it is done with.
+ *
+ * A history the app made is disposed, which drops its listeners and
+ * its window events with it. One it was handed is not the app's to
+ * dispose, so the listener is replaced with one that does nothing:
+ * the host's history goes on working, and a back button pressed after
+ * the app is gone no longer reaches it.
+ */
+export function releaseShellHistory(history: ShellHistory, owned: boolean): void {
+  if (owned) {
+    history.dispose();
+  } else {
+    history.onChange(() => {});
+  }
 }
 
 class MemoryHistory implements ShellHistory {

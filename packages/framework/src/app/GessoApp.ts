@@ -25,7 +25,7 @@ import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { observeContrast } from './contrast';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from './fullscreen';
-import { createShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
+import { releaseShellHistory, resolveShellHistory, type ShellHistory, type ShellHistoryOptions } from './shellHistory';
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
@@ -45,8 +45,14 @@ export interface GessoAppOptions {
   /**
    * How the app's url is kept: `path` (pushState, the default in a
    * browser), `hash`, or `memory`. See `shellHistory`.
+   *
+   * Or a `ShellHistory` made elsewhere, for a page whose address the
+   * app does not own: an iframe inside another product, where the
+   * host's own history object is the only way to its address bar. It
+   * is used as it is, and left undisposed when the app is disposed,
+   * because it belongs to whoever passed it.
    */
-  history?: ShellHistoryOptions;
+  history?: ShellHistoryOptions | ShellHistory;
   canvas?: CanvasHost;
   /** The rendering backend; see RendererChoice. Defaults to `auto`. */
   renderer?: RendererChoice;
@@ -116,7 +122,7 @@ export class GessoApp {
   private readonly inputEnabled: boolean;
   private readonly accessibilityEnabled: boolean;
   private readonly adapter: UiPlatformAdapter;
-  private readonly historyOptions: ShellHistoryOptions | undefined;
+  private readonly historyOptions: ShellHistoryOptions | ShellHistory | undefined;
 
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
@@ -125,6 +131,8 @@ export class GessoApp {
   private audio: AudioSink | null = null;
   private mirror: SemanticsMirror | null = null;
   private history: ShellHistory | null = null;
+  /** True only when the history was made here from options; see `resolveShellHistory`. */
+  private ownsHistory = false;
   private detachVisibility: (() => void) | null = null;
   private detachFileDrop: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
@@ -383,8 +391,11 @@ export class GessoApp {
     this.detachColorScheme = null;
     this.detachViewportInsets?.();
     this.detachViewportInsets = null;
-    this.history?.dispose();
+    if (this.history !== null) {
+      releaseShellHistory(this.history, this.ownsHistory);
+    }
     this.history = null;
+    this.ownsHistory = false;
     this.adapter.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
@@ -501,8 +512,9 @@ export class GessoApp {
    * be a difference between the two hosts that nothing declared.
    */
   private attachHistory(): void {
-    const history = createShellHistory(this.historyOptions);
+    const { history, owned } = resolveShellHistory(this.historyOptions);
     this.history = history;
+    this.ownsHistory = owned;
     this.runtime.onShellRequest(request => this.handleShellRequest(request, history));
     history.onChange(url => this.runtime.setUrl(url));
     this.runtime.setUrl(history.url);

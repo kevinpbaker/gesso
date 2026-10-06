@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createShellHistory, type HistoryWindow } from './shellHistory';
+import {
+  createShellHistory,
+  releaseShellHistory,
+  resolveShellHistory,
+  type HistoryWindow,
+  type ShellHistory
+} from './shellHistory';
 
 /**
  * Just enough window for the two browser modes: a location the fake
@@ -206,5 +212,74 @@ describe('shellHistory', () => {
       host.fire('hashchange');
       expect(seen).toEqual([]);
     });
+  });
+});
+
+/**
+ * Whose history it is, which decides who may dispose it.
+ *
+ * Made from options, it is the app's and goes with the app. Handed in,
+ * it belongs to the host that made it — an embedding page whose
+ * address bar the app does not own — and outlives the app.
+ */
+describe('resolveShellHistory', () => {
+  function given(): ShellHistory & { readonly disposed: ReturnType<typeof vi.fn> } {
+    let listener: ((url: string) => void) | null = null;
+    const disposed = vi.fn();
+    return {
+      url: '/given',
+      push: () => {},
+      replace: () => {},
+      back: () => listener?.('/back'),
+      forward: () => {},
+      onChange: next => {
+        listener = next;
+      },
+      dispose: disposed,
+      disposed
+    };
+  }
+
+  it('makes a history from options, and owns it', () => {
+    const resolved = resolveShellHistory({ mode: 'memory', initialUrl: '/made' });
+
+    expect(resolved.history.url).toBe('/made');
+    expect(resolved.owned).toBe(true);
+  });
+
+  it('makes one from nothing at all, as before', () => {
+    const resolved = resolveShellHistory(undefined);
+
+    expect(resolved.history.url).toBe('/');
+    expect(resolved.owned).toBe(true);
+  });
+
+  it('uses a history it was handed as it is, and does not own it', () => {
+    const history = given();
+
+    const resolved = resolveShellHistory(history);
+
+    expect(resolved.history).toBe(history);
+    expect(resolved.owned).toBe(false);
+  });
+
+  it('releases a handed-in history by silencing it rather than disposing it', () => {
+    const history = given();
+    const seen: string[] = [];
+    history.onChange(url => seen.push(url));
+
+    releaseShellHistory(history, false);
+    history.back();
+
+    expect(history.disposed).not.toHaveBeenCalled();
+    expect(seen).toEqual([]);
+  });
+
+  it('disposes a history it made', () => {
+    const history = given();
+
+    releaseShellHistory(history, true);
+
+    expect(history.disposed).toHaveBeenCalledOnce();
   });
 });

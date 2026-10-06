@@ -268,6 +268,46 @@ createApp({ renderWorker: () => new Worker(/* … */), history: { mode: 'hash', 
 `router.back()` and `router.forward()` ask the shell to walk its
 history, and the url that comes back is resolved like any other.
 
+An app embedded in a page whose address belongs to someone else, such
+as an iframe inside another product, cannot use any of the three
+modes. The host owns the address bar, and the only way to it is a
+history object the host hands out. Atlassian Forge's
+`view.createHistory()` is one. Adapt that object to `ShellHistory` and
+pass it as `history` instead of options. The shell then reads, pushes
+and listens through it, so the router and the host's address bar stay
+on the same url:
+
+```ts
+const host = await view.createHistory();
+let unlisten: (() => void) | undefined;
+const history: ShellHistory = {
+  get url() {
+    return `${host.location.pathname}${host.location.search}`;
+  },
+  push: url => host.push(url),
+  replace: url => host.replace(url),
+  back: () => host.back(),
+  forward: () => host.forward(),
+  onChange: listener => {
+    unlisten?.();
+    // Forge documents `listen((location, action) => …)` but types it as history 5's
+    // `listen(({ action, location }) => …)`; reading either keeps it working.
+    unlisten = host.listen((update: unknown) => {
+      const { location } = (update as { location?: Location }).location
+        ? (update as { location: Location })
+        : { location: update as Location };
+      listener(`${location.pathname}${location.search}`);
+    });
+  },
+  dispose: () => unlisten?.()
+};
+createApp({ history }).mount('#app');
+```
+
+A history passed in is the caller's, not the app's. Disposing the app
+stops it listening but does not dispose the history, and a remount
+picks the same one up again.
+
 Which mode an app runs in is the shell's decision, made once where the
 app is created, and the example on this page is a case of it. A live
 example is a guest on a documentation page whose address bar belongs to
