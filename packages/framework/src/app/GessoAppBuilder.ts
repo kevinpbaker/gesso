@@ -21,7 +21,7 @@ import type { ChannelToken } from '../channel/ChannelToken';
 import type { ColorSchemePreference } from './colorScheme';
 import { GessoApp } from './GessoApp';
 import type { RouterRoutes } from '../router/RouterService';
-import type { ShellHistoryOptions } from './shellHistory';
+import type { ShellHistory, ShellHistoryOptions } from './shellHistory';
 import type { FrameMetrics, RendererChoice } from './GessoRuntime';
 import type { MediaOptions } from './MediaService';
 import type { FontFamilyDeclaration } from './FontService';
@@ -42,7 +42,7 @@ export class GessoAppBuilder {
     | undefined;
   private rendererChoice: RendererChoice | undefined;
   private routes: RouterRoutes | undefined;
-  private historyOptions: ShellHistoryOptions | undefined;
+  private historyOptions: ShellHistoryOptions | ShellHistory | undefined;
   private mediaOptions: MediaOptions | undefined;
   private fontDeclarations: readonly FontFamilyDeclaration[] | undefined;
   private app: GessoApp | undefined;
@@ -132,8 +132,11 @@ export class GessoAppBuilder {
   /**
    * How the app's url is kept: `path` (pushState, the default in a
    * browser), `hash`, or `memory`. See `shellHistory`.
+   *
+   * Or a `ShellHistory` made elsewhere, for an app embedded in a page
+   * whose address belongs to its host; see `GessoAppOptions.history`.
    */
-  useHistory(history: ShellHistoryOptions): this {
+  useHistory(history: ShellHistoryOptions | ShellHistory): this {
     this.historyOptions = history;
     return this;
   }
