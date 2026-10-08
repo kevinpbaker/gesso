@@ -1,5 +1,11 @@
 # gesso-devtools
 
+## 0.6.6
+
+### Patch Changes
+
+- gesso-framework@0.6.6
+
 ## 0.6.5
 
 ### Patch Changes
