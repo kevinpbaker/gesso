@@ -29,6 +29,8 @@ import { blankLiterals, findCalls, importSources } from './source.ts';
  *   - `@param name text` describes a parameter.
  *   - `@destructive`, `@idempotent`, `@confirm` and `@hidden` on a
  *     command are its annotations; `CommandSchema` says what each means.
+ *   - `@hidden` on a view key keeps that key from an agent; see
+ *     `ChannelSchema.hidden`.
  *
  * And what it will not describe: a value that is not plain data, which
  * cannot cross a channel anyway. A function, a `Date`, a `Map`, a class
@@ -43,6 +45,7 @@ export type TypeScriptApi = typeof TsApi;
 export interface ChannelSchemaOut {
   description?: string;
   view: JsonSchema;
+  hidden?: string[];
   commands: Record<string, CommandSchemaOut>;
 }
 
@@ -339,6 +342,13 @@ class Describer {
     const description = this.checker.getDocumentationCommentOfSymbol(token);
     if (description !== '') {
       out.description = description;
+    }
+    const hidden = this.checker
+      .getPropertiesOfType(view)
+      .filter(key => this.checker.getJsDocTagsOfSymbol(key).some(tag => tag.name === 'hidden'))
+      .map(key => key.name);
+    if (hidden.length > 0) {
+      out.hidden = hidden;
     }
     if (commands !== undefined) {
       for (const command of this.checker.getPropertiesOfType(commands)) {

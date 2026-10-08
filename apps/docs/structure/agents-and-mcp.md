@@ -61,7 +61,9 @@ channel's schema from its types and JSDoc, and the surface uses it:
   field and why, before the command is sent;
 - `@destructive` and `@idempotent` become the hints a client shows
   beside the tool;
-- `@hidden` keeps a command away from agents altogether;
+- `@hidden` keeps a command away from agents altogether, and on a view
+  key keeps that key out of every view an agent reads: its tool
+  results, its resource and its output schema;
 - `@confirm` asks the person first;
 - a parameter that takes bytes, an `ArrayBuffer` or a typed array, is a
   base64 string in the tool's input, tagged with the type it becomes,

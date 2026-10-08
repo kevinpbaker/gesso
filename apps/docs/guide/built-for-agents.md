@@ -60,6 +60,11 @@ Four tags decide how far an agent may go:
 | `@idempotent`  | The tool is marked safe to repeat                                     |
 | `@hidden`      | The command is not offered to agents at all                           |
 
+`@hidden` on a view key keeps that key out of everything an agent
+reads: geometry for the screen, a clipboard, the text of a file being
+saved. An agent is handed the rest of the view after every command, so
+bulk only a screen can use is better kept from it.
+
 ## And the screen, as a screen reader hears it
 
 Not everything is in a channel: a dialog's buttons, a tab, a field the

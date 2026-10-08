@@ -306,6 +306,39 @@ describe('an agent surface', () => {
     expect(result.structuredContent).toEqual({ count: 5 });
   });
 
+  it('keeps a view key marked @hidden out of every view an agent reads', async () => {
+    const Board = defineChannel('board', {
+      view: { score: 0, tiles: [] as readonly number[] },
+      commands: {} as { bump(): void }
+    });
+    describeChannel(Board, {
+      view: {
+        type: 'object',
+        properties: { score: { type: 'number' }, tiles: { type: 'array' } },
+        required: ['score', 'tiles']
+      },
+      hidden: ['tiles'],
+      commands: { bump: { parameters: [], input: { type: 'object', properties: {}, additionalProperties: false } } }
+    });
+    const score = new BehaviorSubject(0);
+    const served = serve(Board, {
+      view: { score, tiles: new BehaviorSubject<readonly number[]>([1, 2, 3]) },
+      commands: { bump: () => score.next(score.value + 1) }
+    });
+    const surface = agentSurface([served], fast);
+    const [view, bump] = surface.tools();
+    expect(view.outputSchema).toEqual({
+      type: 'object',
+      properties: { score: { type: 'number' } },
+      required: ['score']
+    });
+    expect(bump.outputSchema).toEqual(view.outputSchema);
+    const result = await surface.call('board_bump', {});
+    expect(result.structuredContent).toEqual({ score: 1 });
+    expect(result.content[0]!.text).toBe('Sent bump to board. The view afterwards:\n{"score":1}');
+    expect(surface.read(resourceUri('board'))).toEqual({ score: 1 });
+  });
+
   it('reads a view as a resource', () => {
     const app = notesApp();
     app.rows.next([{ id: '1', title: 'A' }]);

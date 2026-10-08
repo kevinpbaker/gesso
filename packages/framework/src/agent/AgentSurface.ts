@@ -29,7 +29,8 @@ import { validate } from './validate';
  *
  * The descriptions come from `channelSchema(token)`, which
  * `gesso-vite-plugin` writes from the contract's JSDoc. A command
- * marked `@hidden` is not offered; `@destructive` and `@idempotent`
+ * marked `@hidden` is not offered, nor is a view key marked so, in
+ * anything the agent reads; `@destructive` and `@idempotent`
  * become hints a client shows; `@confirm` means the person is asked,
  * through `confirm`, before the command is sent, and a surface given
  * no way to ask refuses it. A channel nobody described is still
@@ -133,6 +134,8 @@ interface Entry {
   readonly description?: string;
   readonly viewSchema?: JsonSchema;
   readonly view: Record<string, unknown>;
+  /** View keys kept from the agent. */
+  readonly hidden: ReadonlySet<string>;
   readonly commands: ReadonlyMap<string, CommandSchema | null>;
 }
 
@@ -221,8 +224,9 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       served,
       name,
       description: schema?.description,
-      viewSchema: schema?.view,
+      viewSchema: schema === undefined ? undefined : withoutKeys(schema.view, schema.hidden ?? []),
       view: { ...(served.token.initial as Record<string, unknown>) },
+      hidden: new Set(schema?.hidden ?? []),
       commands
     };
     entries.push(entry);
@@ -337,7 +341,7 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
         return undefined;
       }
       follow();
-      return { ...entry.view };
+      return shown(entry);
     },
     dispose: () => {
       for (const subscription of subscriptions) {
@@ -403,10 +407,32 @@ function toolName(raw: string): string {
   return name;
 }
 
+/** The view as an agent is given it: without its hidden keys. */
+function shown(entry: Entry): Record<string, unknown> {
+  const view: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(entry.view)) {
+    if (!entry.hidden.has(key)) view[key] = value;
+  }
+  return view;
+}
+
+/** An object schema without some of its properties. */
+function withoutKeys(schema: JsonSchema, keys: readonly string[]): JsonSchema {
+  if (keys.length === 0) return schema;
+  const properties = { ...(schema.properties as Record<string, JsonSchema> | undefined) };
+  for (const key of keys) delete properties[key];
+  const required = Array.isArray(schema.required)
+    ? (schema.required as string[]).filter(key => !keys.includes(key))
+    : undefined;
+  return { ...schema, properties, ...(required === undefined ? {} : { required }) };
+}
+
 function viewResult(entry: Entry, lead: string): AgentToolResult {
-  const view = { ...entry.view };
+  const view = shown(entry);
   return {
-    content: [{ type: 'text', text: `${lead}\n${JSON.stringify(view, null, 2)}` }],
+    // Compact: the same view is in structuredContent, and indenting a
+    // large one doubles what the agent reads for nothing.
+    content: [{ type: 'text', text: `${lead}\n${JSON.stringify(view)}` }],
     structuredContent: view,
     isError: false
   };

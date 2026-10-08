@@ -3773,6 +3773,7 @@ interface CommandSchema {
 interface ChannelSchema {
   readonly description?: string;
   readonly view: JsonSchema;
+  readonly hidden?: readonly string[];
   readonly commands: {
     readonly [name: string]: CommandSchema;
   };
