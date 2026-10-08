@@ -1,5 +1,16 @@
 # gesso-framework
 
+## 0.6.7
+
+### Patch Changes
+
+- 6493881: An agent that sends a command now gets the view after the command's effect, even when that effect takes longer than `quietMs` to arrive. Before, the call returned as soon as the view had been quiet for `quietMs` (50 ms by default), and a command that waits on a request (a fetch, a subprocess, a database) had usually changed nothing by then, so the agent was handed the view from before its own command and could conclude it had done nothing. Quiet now counts only once the view has changed since the command was sent. The cost is that a command which changes nothing in the view at all now returns at `settleMs` (1000 ms by default) rather than at `quietMs`.
+- 4f622ec: Channels can now be served from another process without Electrobun. The bridge that carried a desktop window's channels to and from the main process has moved to `gesso-framework/remote`, under names that say what it is: `createRemoteBridge` in the page and `serveRemoteChannels` in the process that owns the data, with the frame format (`GessoFrame`, `frameData`, `FrameAssembler`, `isGessoFrame`, `DEFAULT_CHUNK_BYTES`) beside them. Neither half knows its transport; each takes a `send` function and has a `receive` method, so a web application whose data lives in a server on the person's machine can carry its channels over a WebSocket. The new page "Channels from another process" shows it end to end.
+
+  `gesso-electrobun` keeps every name it had: `createElectrobunBridge`, `serveChannelsToWindow`, `ChannelHost`, `ElectrobunBridge` and the frame exports are now re-exports of the same code, so a desktop application needs no change.
+
+- gesso-core@0.6.7
+
 ## 0.6.6
 
 ### Patch Changes
