@@ -12,11 +12,15 @@
 import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from 'gesso-framework';
+import { ChannelReplica } from '../channel/ChannelReplica';
+import type { ChannelPort } from '../channel/ChannelProtocol';
+import { channel } from '../channel/ChannelToken';
+import type { ServedChannel } from '../channel/serveChannels';
+import { portHandle } from '../worker/WorkerPorts';
 
 import type { GessoFrame } from './frames';
-import { serveChannelsToWindow, type ChannelHost } from './main';
-import { createElectrobunBridge, type ElectrobunBridge } from './view';
+import { createRemoteBridge, type RemoteBridge } from './bridge';
+import { serveRemoteChannels, type RemoteChannelHost } from './host';
 
 interface CatalogueView {
   title: string;
@@ -76,20 +80,20 @@ describe('the bridge, end to end', () => {
     replica: ChannelReplica<CatalogueView, CatalogueCommands>;
     settle: () => Promise<void>;
     frames: { toWindow: GessoFrame[]; toMain: GessoFrame[] };
-    host: ChannelHost;
-    bridge: ElectrobunBridge;
+    host: RemoteChannelHost;
+    bridge: RemoteBridge;
   }> {
     const pair = rpcPair();
-    let host!: ChannelHost;
-    let bridge!: ElectrobunBridge;
-    bridge = createElectrobunBridge({
+    let host!: RemoteChannelHost;
+    let bridge!: RemoteBridge;
+    bridge = createRemoteBridge({
       send: frame => {
         pair.toMain.push(frame);
         host.receive(frame);
       },
       chunkBytes
     });
-    host = serveChannelsToWindow(served, {
+    host = serveRemoteChannels(served, {
       send: frame => {
         pair.toWindow.push(frame);
         bridge.receive(frame);
@@ -169,7 +173,7 @@ describe('the bridge, end to end', () => {
     // itself, so a misspelled channel name is as loud here as it is in
     // a worker. That answer has to come back over a stream.
     const sent: GessoFrame[] = [];
-    const host = serveChannelsToWindow(served, { send: frame => sent.push(frame) });
+    const host = serveRemoteChannels(served, { send: frame => sent.push(frame) });
     host.receive({ kind: 'open', stream: 9, name: 'catalog' });
 
     const answers = sent.filter(frame => frame.kind === 'data' && frame.stream === 9);

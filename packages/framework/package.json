@@ -39,7 +39,8 @@
     "./jsx-runtime": "./src/jsx/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx/jsx-dev-runtime.ts",
     "./testing": "./src/testing.ts",
-    "./agent": "./src/agent/index.ts"
+    "./agent": "./src/agent/index.ts",
+    "./remote": "./src/remote/index.ts"
   },
   "publishConfig": {
     "exports": {
@@ -62,6 +63,10 @@
       "./agent": {
         "types": "./dist/agent/index.d.ts",
         "default": "./dist/agent/index.js"
+      },
+      "./remote": {
+        "types": "./dist/remote/index.d.ts",
+        "default": "./dist/remote/index.js"
       }
     },
     "access": "public"

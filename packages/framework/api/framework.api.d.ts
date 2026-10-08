@@ -3665,6 +3665,80 @@ export {
   type Component,
   type ComponentContext
 };
+// ==== remote/index.d.ts ====
+import {
+  ServedChannel
+} from "../ui.js";
+import {
+  AppLogicEndpoint
+} from "../index.js";
+declare const DEFAULT_CHUNK_BYTES = 1048576;
+type GessoFrame = {
+  readonly kind: 'open';
+  readonly stream: number;
+  readonly name: string;
+} | {
+  readonly kind: 'data';
+  readonly stream: number;
+  readonly body: string;
+  readonly part?: number;
+  readonly parts?: number;
+} | {
+  readonly kind: 'close';
+  readonly stream: number;
+} |
+{
+  readonly kind: 'control';
+  readonly name: string;
+  readonly body: string;
+};
+declare function isGessoFrame(value: unknown): value is GessoFrame;
+declare function frameData(stream: number, value: unknown, chunkBytes?: number): GessoFrame[];
+declare class FrameAssembler {
+  private readonly partial;
+  take(frame: GessoFrame & {
+    kind: 'data';
+  }): unknown;
+  forget(stream: number): void;
+}
+interface RemoteBridgeOptions {
+  send: (frame: GessoFrame) => void;
+  chunkBytes?: number;
+  onColorScheme?: (scheme: 'light' | 'dark') => void;
+}
+interface RemoteBridge {
+  readonly endpoint: AppLogicEndpoint;
+  receive(frame: GessoFrame): void;
+  openUrl(url: string): void;
+  openRoute(url: string): void;
+  dispose(): void;
+}
+declare function createRemoteBridge(options: RemoteBridgeOptions): RemoteBridge;
+interface RemoteChannelHostOptions {
+  send: (frame: GessoFrame) => void;
+  chunkBytes?: number;
+  onOpenUrl?: (url: string) => void;
+  onOpenRoute?: (url: string) => void;
+}
+interface RemoteChannelHost {
+  receive(frame: GessoFrame): void;
+  setColorScheme(scheme: 'light' | 'dark'): void;
+  dispose(): void;
+}
+declare function serveRemoteChannels(channels: readonly ServedChannel[], options: RemoteChannelHostOptions): RemoteChannelHost;
+export {
+  createRemoteBridge,
+  DEFAULT_CHUNK_BYTES,
+  FrameAssembler,
+  frameData,
+  isGessoFrame,
+  serveRemoteChannels,
+  type GessoFrame,
+  type RemoteBridge,
+  type RemoteBridgeOptions,
+  type RemoteChannelHost,
+  type RemoteChannelHostOptions
+};
 // ==== ui.d.ts ====
 import {
   ChannelPort,

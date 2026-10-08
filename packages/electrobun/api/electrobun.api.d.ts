@@ -112,35 +112,13 @@ export {
   withWindowRoute
 };
 // ==== frames.d.ts ====
-declare const DEFAULT_CHUNK_BYTES = 1048576;
-type GessoFrame = {
-  readonly kind: 'open';
-  readonly stream: number;
-  readonly name: string;
-} | {
-  readonly kind: 'data';
-  readonly stream: number;
-  readonly body: string;
-  readonly part?: number;
-  readonly parts?: number;
-} | {
-  readonly kind: 'close';
-  readonly stream: number;
-} |
-{
-  readonly kind: 'control';
-  readonly name: string;
-  readonly body: string;
-};
-declare function isGessoFrame(value: unknown): value is GessoFrame;
-declare function frameData(stream: number, value: unknown, chunkBytes?: number): GessoFrame[];
-declare class FrameAssembler {
-  private readonly partial;
-  take(frame: GessoFrame & {
-    kind: 'data';
-  }): unknown;
-  forget(stream: number): void;
-}
+import {
+  DEFAULT_CHUNK_BYTES,
+  FrameAssembler,
+  frameData,
+  GessoFrame,
+  isGessoFrame
+} from "gesso-framework/remote";
 export {
   DEFAULT_CHUNK_BYTES,
   FrameAssembler,
@@ -165,23 +143,15 @@ export {
 };
 // ==== main.d.ts ====
 import {
-  GessoFrame
-} from "./frames.js";
+  RemoteChannelHost,
+  RemoteChannelHostOptions
+} from "gesso-framework/remote";
 import {
   ServedChannel
 } from "gesso-framework";
-interface ChannelHostOptions {
-  send: (frame: GessoFrame) => void;
-  chunkBytes?: number;
-  onOpenUrl?: (url: string) => void;
-  onOpenRoute?: (url: string) => void;
-}
-interface ChannelHost {
-  receive(frame: GessoFrame): void;
-  setColorScheme(scheme: 'light' | 'dark'): void;
-  dispose(): void;
-}
-declare function serveChannelsToWindow(channels: readonly ServedChannel[], options: ChannelHostOptions): ChannelHost;
+type ChannelHostOptions = RemoteChannelHostOptions;
+type ChannelHost = RemoteChannelHost;
+declare const serveChannelsToWindow: (channels: readonly ServedChannel[], options: ChannelHostOptions) => ChannelHost;
 export {
   ChannelHost,
   ChannelHostOptions,
@@ -196,27 +166,15 @@ export {
 };
 // ==== view.d.ts ====
 import {
-  GessoFrame
-} from "./frames.js";
-import {
   windowRoute
 } from "./route.js";
 import {
-  AppLogicEndpoint
-} from "gesso-framework";
-interface ElectrobunBridgeOptions {
-  send: (frame: GessoFrame) => void;
-  chunkBytes?: number;
-  onColorScheme?: (scheme: 'light' | 'dark') => void;
-}
-interface ElectrobunBridge {
-  readonly endpoint: AppLogicEndpoint;
-  receive(frame: GessoFrame): void;
-  openUrl(url: string): void;
-  openRoute(url: string): void;
-  dispose(): void;
-}
-declare function createElectrobunBridge(options: ElectrobunBridgeOptions): ElectrobunBridge;
+  RemoteBridge,
+  RemoteBridgeOptions
+} from "gesso-framework/remote";
+type ElectrobunBridgeOptions = RemoteBridgeOptions;
+type ElectrobunBridge = RemoteBridge;
+declare const createElectrobunBridge: (options: ElectrobunBridgeOptions) => ElectrobunBridge;
 export {
   createElectrobunBridge,
   ElectrobunBridge,

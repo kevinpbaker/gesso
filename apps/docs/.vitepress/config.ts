@@ -86,6 +86,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     items: [
       { text: 'Routing', link: '/structure/routing' },
       { text: 'Channels and the barrier', link: '/structure/channels-and-the-barrier' },
+      { text: 'Channels from another process', link: '/structure/channels-from-another-process' },
       { text: 'Shell services', link: '/structure/shell-services' },
       { text: 'Undo and redo', link: '/structure/undo' },
       { text: 'Remembering state', link: '/structure/persistence' },
