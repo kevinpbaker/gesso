@@ -1,5 +1,13 @@
 # gesso-components
 
+## 0.6.9
+
+### Patch Changes
+
+- Updated dependencies [7af6f56]
+  - gesso-framework@0.6.9
+  - gesso-core@0.6.9
+
 ## 0.6.8
 
 ### Patch Changes

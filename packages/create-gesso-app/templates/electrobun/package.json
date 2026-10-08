@@ -5,16 +5,16 @@
   "type": "module",
   "description": "A Gesso application in a native Electrobun window.",
   "dependencies": {
-    "gesso-components": "^0.6.8",
-    "gesso-core": "^0.6.8",
-    "gesso-electrobun": "^0.6.8",
-    "gesso-framework": "^0.6.8",
+    "gesso-components": "^0.6.9",
+    "gesso-core": "^0.6.9",
+    "gesso-electrobun": "^0.6.9",
+    "gesso-framework": "^0.6.9",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "concurrently": "^9.1.0",
-    "gesso-vite-plugin": "^0.6.8",
+    "gesso-vite-plugin": "^0.6.9",
     "typescript": "~7.0.2",
     "vite": "^8.2.0"
   }
