@@ -303,7 +303,10 @@ list while its editor stays where the person left it.
 
 `createDesktopApp` is the ordinary way in, and it is built on a smaller
 one. `serveChannelsToWindow` serves a set of channels to one window and
-knows nothing about opening or closing any:
+knows nothing about opening or closing any. It is `serveRemoteChannels`
+from `gesso-framework/remote` under the name this package has always
+used, and the same pair carries channels over a WebSocket just as well:
+[channels from another process](/structure/channels-from-another-process).
 
 ```ts
 import { serveChannelsToWindow } from 'gesso-electrobun/main';
