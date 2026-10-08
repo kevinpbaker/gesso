@@ -1,5 +1,12 @@
 # gesso-framework
 
+## 0.6.8
+
+### Patch Changes
+
+- a7bb34e: `ShellService.saveFile` takes `remember: false`, for a file made to keep rather than to open again — an exported picture, a report. It is written where the picker says, as any save is, but does not join the recent files, and its answer has no handle to save back to.
+- gesso-core@0.6.8
+
 ## 0.6.7
 
 ### Patch Changes
