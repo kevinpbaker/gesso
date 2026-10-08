@@ -1,6 +1,6 @@
 {
   "name": "gesso-core",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "The retained UI graph, the layout engine, the two renderers and input \u2014 everything below a component.",
   "license": "MIT",
   "author": "Kevin Baker",
