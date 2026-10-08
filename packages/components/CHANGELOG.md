@@ -1,5 +1,13 @@
 # gesso-components
 
+## 0.6.6
+
+### Patch Changes
+
+- `Menu` and `Select` close before acting on a choice. A choice that opened a dialog — a context menu's Rename…, a select's "another value…" — ran while the menu or list was still open: its focus trap was released after the dialog had taken its own, which popped the dialog's and left the keyboard nowhere, and `Menu`'s close went unreported, so `onOpenChange(false)` never came, the caller's `open` stayed true, and the next right-click only closed the menu. The menu or list now closes, reports it, and gives focus back first, and the choice is acted on after.
+- gesso-core@0.6.6
+  - gesso-framework@0.6.6
+
 ## 0.6.5
 
 ### Patch Changes
