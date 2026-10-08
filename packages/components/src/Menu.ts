@@ -102,8 +102,13 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     if (item === undefined || item.disabled === true) {
       return;
     }
-    inputs.onSelect.value?.(item.value);
+    // Closed first: a choice that opens something of its own — a dialog,
+    // another menu — opens it over a page the menu has left, with the
+    // menu's focus trap released and its close reported. Closed after,
+    // the release popped the new dialog's trap, and the close went
+    // unreported, leaving the caller's `open` true.
     close();
+    inputs.onSelect.value?.(item.value);
   };
 
   const body = (): UiElement =>
