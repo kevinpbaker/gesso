@@ -73,6 +73,13 @@ export type ShellFileRequest =
       readonly bytes?: Uint8Array<ArrayBuffer>;
       readonly handle?: number;
       readonly accept: readonly ShellFileType[];
+      /**
+       * Whether a file saved through the picker joins the recent files
+       * and gets a handle to save back to. Absent is true; an export —
+       * a picture, a report — is false, so it is not offered for
+       * opening as though it were a document.
+       */
+      readonly remember?: boolean;
     }
   /** The files the shell remembers, most recently used first. */
   | { readonly op: 'recent' }
@@ -595,6 +602,13 @@ export class ShellService {
     readonly mediaType?: string;
     readonly handle?: number;
     readonly accept?: readonly ShellFileType[];
+    /**
+     * Whether the file joins the recent files, with a handle to save
+     * back to. True unless said otherwise; false for a file made to
+     * keep rather than to open again — an exported picture — whose
+     * answer then has no handle.
+     */
+    readonly remember?: boolean;
   }): Promise<ShellFileResult> {
     return this.requestFile({
       op: 'save',
@@ -603,7 +617,8 @@ export class ShellService {
       ...(options.bytes === undefined ? {} : { bytes: options.bytes }),
       mediaType: options.mediaType ?? 'application/octet-stream',
       accept: options.accept ?? [],
-      ...(options.handle === undefined ? {} : { handle: options.handle })
+      ...(options.handle === undefined ? {} : { handle: options.handle }),
+      ...(options.remember === false ? { remember: false } : {})
     });
   }
 

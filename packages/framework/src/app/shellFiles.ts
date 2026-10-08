@@ -164,7 +164,7 @@ export class ShellFiles {
         suggestedName: request.name
       });
       await write(handle, request.bytes ?? request.text);
-      const id = await this.remember(handle);
+      const id = request.remember === false ? null : await this.remember(handle);
       return ok({ saved: { name: handle.name, handle: id, via: 'file' } });
     }
     if (this.host.download !== undefined) {
