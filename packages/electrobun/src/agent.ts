@@ -124,27 +124,37 @@ export type ShowMessageBox = (options: {
  *
  * Takes Electrobun's `Utils.showMessageBox` rather than importing it,
  * because Electrobun is a toolchain a project is projected into, not a
- * package this one can depend on. The safe answer is the default one:
- * Escape, closing the dialog, and Enter all decline.
+ * package this one can depend on.
+ *
+ * Everything the person needs to decide is in `message`, the command's
+ * description and its arguments included, because macOS shows no
+ * `detail`: a dialog that asked there showed only "wants to
+ * createBranch in workspace", with nothing to say which branch.
+ *
+ * Decline is the first button. macOS makes the first button the
+ * default, whatever `defaultId` says, so with Allow first, Enter
+ * approved; first is also what `defaultId` and `cancelId` name, so
+ * Enter, Escape and closing the dialog decline on every platform.
  */
 export function messageBoxConfirm(showMessageBox: ShowMessageBox): (request: AgentConfirmation) => Promise<boolean> {
   return async request => {
-    const details = [
+    const argumentLines = Object.entries(request.arguments).map(([name, value]) => `${name}: ${JSON.stringify(value)}`);
+    const message = [
+      `An AI agent wants to ${request.command} in ${request.channel}.${request.destructive ? ' This cannot be undone.' : ''}`,
       request.description,
-      Object.keys(request.arguments).length > 0 ? JSON.stringify(request.arguments, null, 2) : undefined
+      argumentLines.join('\n')
     ]
       .filter((part): part is string => part !== undefined && part !== '')
       .join('\n\n');
     const { response } = await showMessageBox({
       type: request.destructive ? 'warning' : 'question',
       title: 'An AI agent is asking',
-      message: `An AI agent wants to ${request.command} in ${request.channel}.${request.destructive ? ' This cannot be undone.' : ''}`,
-      detail: details,
-      buttons: ['Allow', 'Decline'],
-      defaultId: 1,
-      cancelId: 1
+      message,
+      buttons: ['Decline', 'Allow'],
+      defaultId: 0,
+      cancelId: 0
     });
-    return response === 0;
+    return response === 1;
   };
 }
 

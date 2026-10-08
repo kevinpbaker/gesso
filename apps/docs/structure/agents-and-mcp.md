@@ -231,7 +231,9 @@ console.log(`claude mcp add --transport http my-app ${agent.url}`);
 It listens on `127.0.0.1:7310`, or the next free port of the nine after
 it, and refuses any request a web page sends. `messageBoxConfirm` puts a
 `@confirm` command to the person with the operating system's own
-dialog, with Decline as the default. The channels are passed in rather
+dialog: what the command does and the arguments the agent sent, with
+Decline as the first button and the default, so Enter and Escape both
+decline. The channels are passed in rather
 than read from the app, because the per-window ones are about a window
 an agent does not have, and the screen tools are not offered: the
 screen is in each window's render worker, out of the main process's
