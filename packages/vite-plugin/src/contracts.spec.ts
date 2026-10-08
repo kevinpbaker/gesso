@@ -80,6 +80,11 @@ export interface CounterView {
   /** The application's whole state. */
   count: number;
   dark: boolean;
+  /**
+   * Where each digit is drawn, for the page.
+   * @hidden
+   */
+  layout: readonly number[];
 }
 
 export interface CounterCommands {
@@ -87,7 +92,7 @@ export interface CounterCommands {
   increment: (by: number) => void;
 }
 
-export const Counter = channel<CounterView, CounterCommands>('counter', { count: 0, dark: true });
+export const Counter = channel<CounterView, CounterCommands>('counter', { count: 0, dark: true, layout: [] });
 `;
 
 let reader: ContractReader;
@@ -221,16 +226,19 @@ describe('a contract, read by the checker', () => {
     ]);
   });
 
-  it('reads the older two-interface form, and @param on a command written as a property', () => {
+  it('reads the older two-interface form, @param on a command written as a property, and a view key kept from agents', () => {
     const counter = legacy.channels.get('Counter')!;
     expect(counter.view).toEqual({
       type: 'object',
       properties: {
         count: { type: 'number', description: "The application's whole state." },
-        dark: { type: 'boolean' }
+        dark: { type: 'boolean' },
+        layout: { type: 'array', items: { type: 'number' }, description: 'Where each digit is drawn, for the page.' }
       },
-      required: ['count', 'dark']
+      required: ['count', 'dark', 'layout']
     });
+    expect(counter.hidden).toEqual(['layout']);
+    expect(catalog.channels.get('Catalog')!.hidden).toBeUndefined();
     expect(counter.commands.increment.input.properties).toEqual({
       by: { type: 'number', description: 'How far to count.' }
     });
@@ -242,7 +250,7 @@ describe('a contract, read by the checker', () => {
     files.set(file, LEGACY.replace('dark: boolean;', 'dark: boolean;\n  label: string;'));
     reader.invalidate(file);
     const view = reader.read(file).channels.get('Counter')!.view as { properties: Record<string, unknown> };
-    expect(Object.keys(view.properties)).toEqual(['count', 'dark', 'label']);
+    expect(Object.keys(view.properties)).toEqual(['count', 'dark', 'label', 'layout']);
   });
 });
 

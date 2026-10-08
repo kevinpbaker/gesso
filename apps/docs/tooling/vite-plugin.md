@@ -261,6 +261,10 @@ four tags annotate a command:
 | `@confirm`     | A person should approve it before anything else sends it |
 | `@hidden`      | For the application's own components, not for an agent   |
 
+`@hidden` on a view key is read too: the key stays in the schema, and
+`ChannelSchema.hidden` lists it, so an agent is given the view without
+it.
+
 So write those comments for a reader who has never seen the code. A
 comment explaining why two keys are separate is useful to a maintainer
 and noise to an agent deciding what to send.

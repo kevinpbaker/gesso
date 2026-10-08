@@ -57,6 +57,13 @@ export interface ChannelSchema {
   readonly description?: string;
   /** An object schema, one property per view key. */
   readonly view: JsonSchema;
+  /**
+   * `@hidden` view keys: the application's own plumbing, or bulk only a
+   * screen can use — geometry, a clipboard, a file's text. An agent is
+   * given the view without them, in its tools' results, its resource
+   * and its output schema, so what it reads is what it can act on.
+   */
+  readonly hidden?: readonly string[];
   readonly commands: { readonly [name: string]: CommandSchema };
 }
 
