@@ -967,6 +967,7 @@ type ShellFileRequest =
   readonly bytes?: Uint8Array<ArrayBuffer>;
   readonly handle?: number;
   readonly accept: readonly ShellFileType[];
+  readonly remember?: boolean;
 } |
 {
   readonly op: 'recent';
@@ -1061,6 +1062,7 @@ declare class ShellService {
     readonly mediaType?: string;
     readonly handle?: number;
     readonly accept?: readonly ShellFileType[];
+    readonly remember?: boolean;
   }): Promise<ShellFileResult>;
   recentFiles(): Promise<ShellFileResult>;
   forgetFile(handle: number): Promise<ShellFileResult>;

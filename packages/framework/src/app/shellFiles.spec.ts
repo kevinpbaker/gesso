@@ -188,6 +188,24 @@ describe('saving files', () => {
     expect(recent.recent.map(file => [file.handle, file.name])).toEqual([[result.saved!.handle, 'book.gsheet']]);
   });
 
+  it('keeps a file saved not to be remembered out of the recent files, with no handle', async () => {
+    const { files, disk, saves } = host();
+    saves.push('chart.png');
+    const result = await files.perform({
+      op: 'save',
+      name: 'chart.png',
+      mediaType: 'image/png',
+      text: '',
+      bytes: new Uint8Array([1, 2, 3]),
+      accept: [],
+      remember: false
+    });
+
+    expect(result.saved).toEqual({ name: 'chart.png', handle: null, via: 'file' });
+    expect(disk.contents.get('chart.png')).toEqual(new Uint8Array([1, 2, 3]));
+    expect((await files.perform({ op: 'recent' })).recent).toEqual([]);
+  });
+
   it('saves back to a handle without a picker', async () => {
     const { files, disk, saves } = host();
     saves.push('book.gsheet');
