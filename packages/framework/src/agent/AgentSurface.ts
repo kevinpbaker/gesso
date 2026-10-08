@@ -93,7 +93,8 @@ export interface AgentSurfaceOptions {
    * How long the view must be quiet after a command before the call
    * returns it, in milliseconds (default 50). A command whose effect is
    * synchronous settles at once; one that waits on a request settles
-   * when the patch lands, or at `settleMs`.
+   * when the patch lands, or at `settleMs`. A command that changes
+   * nothing in the view returns at `settleMs`.
    */
   quietMs?: number;
   /** The longest a call waits for the view to settle (default 1000). */
@@ -145,6 +146,8 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   const tools: AgentTool[] = [];
   const handlers = new Map<string, Handler>();
   let lastChange = 0;
+  /** Every change the view has seen, so a command can tell its own from what came before it. */
+  let changes = 0;
   let following = false;
 
   /**
@@ -163,18 +166,31 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
           observable.subscribe(value => {
             entry.view[key] = value;
             lastChange = Date.now();
+            changes++;
           })
         );
       }
     }
   };
 
-  const settle = async () => {
+  /**
+   * Waits for what a command sent when the view had seen `before`
+   * changes to reach the view.
+   *
+   * Quiet counts only once the view has changed since the command: a
+   * command that answers after a request has changed nothing yet when
+   * the first quiet window ends, and returning then would hand the
+   * agent the view from before it. A command that changes nothing at
+   * all waits out `settleMs`, which is the price of not being able to
+   * tell it from one that is still working.
+   */
+  const settle = async (before: number) => {
     const start = Date.now();
     for (;;) {
       await new Promise(resolve => setTimeout(resolve, quietMs));
       const now = Date.now();
-      if (now - lastChange >= quietMs || now - start >= settleMs) {
+      const changed = changes > before;
+      if ((changed && now - lastChange >= quietMs) || now - start >= settleMs) {
         return;
       }
     }
@@ -289,12 +305,13 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
     if (handler === undefined) {
       return failure(`${channel} has no command ${command}.`);
     }
+    const before = changes;
     try {
       handler(...positional);
     } catch (error) {
       return failure(`${channel}.${command} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    await settle();
+    await settle(before);
     return viewResult(entry, `Sent ${command} to ${channel}. The view afterwards:`);
   };
 
