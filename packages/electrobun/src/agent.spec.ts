@@ -107,31 +107,37 @@ describe('serveDesktopAgent', () => {
 });
 
 describe('messageBoxConfirm', () => {
-  it('asks with the native dialog, defaulting to decline, and allows only on the first button', async () => {
+  const request = {
+    channel: 'notes',
+    command: 'remove',
+    description: 'Deletes a note for good.',
+    arguments: { id: '7' },
+    destructive: true
+  };
+
+  it('allows only on Allow, and makes Decline the first button, which macOS treats as the default', async () => {
     const shown: Parameters<ShowMessageBox>[0][] = [];
-    let response = 1;
+    let response = 0;
     const confirm = messageBoxConfirm(async options => {
       shown.push(options);
       return { response };
     });
-    const request = {
-      channel: 'notes',
-      command: 'remove',
-      description: 'Deletes a note for good.',
-      arguments: { id: '7' },
-      destructive: true
-    };
 
     expect(await confirm(request)).toBe(false);
-    response = 0;
+    response = 1;
     expect(await confirm(request)).toBe(true);
-    expect(shown[0]).toMatchObject({
-      type: 'warning',
-      message: 'An AI agent wants to remove in notes. This cannot be undone.',
-      buttons: ['Allow', 'Decline'],
-      defaultId: 1,
-      cancelId: 1
-    });
-    expect(shown[0].detail).toContain('Deletes a note for good.');
+    expect(shown[0]).toMatchObject({ type: 'warning', buttons: ['Decline', 'Allow'], defaultId: 0, cancelId: 0 });
+  });
+
+  it('puts the description and the arguments in the message, which every platform shows', async () => {
+    const shown: Parameters<ShowMessageBox>[0][] = [];
+    await messageBoxConfirm(async options => {
+      shown.push(options);
+      return { response: 0 };
+    })(request);
+
+    expect(shown[0].message).toBe(
+      'An AI agent wants to remove in notes. This cannot be undone.\n\nDeletes a note for good.\n\nid: "7"'
+    );
   });
 });
