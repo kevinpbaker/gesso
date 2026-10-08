@@ -162,8 +162,11 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
     if (option === undefined || option.disabled === true) {
       return;
     }
-    value.change(chosen);
+    // Closed first, as `Menu` is: a change that opens a dialog opens it
+    // after the list has released its focus trap, rather than having the
+    // release pop the dialog's.
     close();
+    value.change(chosen);
   };
 
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));

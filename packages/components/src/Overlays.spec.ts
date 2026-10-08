@@ -291,6 +291,38 @@ describe('Select', () => {
     expect(ui.entries()).toHaveLength(0);
   });
 
+  /**
+   * A choice that opens a dialog — another rate… — had the list release
+   * its focus trap after the dialog had taken its own, which popped the
+   * dialog's, and the keyboard was left in a list no longer on screen.
+   */
+  it('closes before a choice that opens a dialog, which keeps the keyboard', () => {
+    const dialog = new BehaviorSubject(false);
+    const ui = mount(
+      Column(
+        createComponent(Select, { label: 'Payment', options, defaultValue: 'card', onChange: () => dialog.next(true) }),
+        createComponent(Dialog, {
+          open: dialog,
+          title: 'Details',
+          content: Button({ text: 'Cancel', label: 'Cancel' }),
+          onClose: () => dialog.next(false)
+        })
+      )
+    );
+    ui.fireEvent.focus(ui.getByRole('combobox'));
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(dialog.value).toBe(true);
+    expect(ui.entries()).toHaveLength(1);
+
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(dialog.value).toBe(false);
+  });
+
   it('Escape closes without choosing and gives the trigger back', () => {
     const changes: string[] = [];
     const ui = mount(selectApp(changes));
@@ -461,5 +493,47 @@ describe('Menu', () => {
     expect(chosen).toEqual(['duplicate']);
     expect(ui.entries()).toHaveLength(0);
     expect(open.value).toBe(false);
+  });
+
+  /**
+   * A choice that opens a dialog — Rename… — left the menu open behind
+   * it, unreported, so the next right-click only closed it; and the
+   * menu's focus trap, released after the dialog had taken its own,
+   * popped the dialog's. The menu closes before the choice is acted on.
+   */
+  it('closes, and says so, before a choice that opens a dialog, which keeps the keyboard', () => {
+    const open = new BehaviorSubject(false);
+    const dialog = new BehaviorSubject(false);
+    const ui = mount(
+      Column(
+        createComponent(Menu, {
+          open,
+          at: { x: 20, y: 20 },
+          items: [{ value: 'rename', label: 'Rename…' }],
+          onSelect: () => dialog.next(true),
+          onOpenChange: (next: boolean) => open.next(next)
+        }),
+        createComponent(Dialog, {
+          open: dialog,
+          title: 'Rename',
+          content: Button({ text: 'Cancel', label: 'Cancel' }),
+          onClose: () => dialog.next(false)
+        })
+      )
+    );
+    open.next(true);
+    ui.frame();
+
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(open.value).toBe(false);
+    expect(dialog.value).toBe(true);
+    expect(ui.entries()).toHaveLength(1);
+
+    // The keyboard is the dialog's: Escape closes it.
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(dialog.value).toBe(false);
+    expect(ui.entries()).toHaveLength(0);
   });
 });
