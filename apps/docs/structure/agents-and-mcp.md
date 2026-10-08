@@ -44,9 +44,11 @@ For each channel:
 | A tool for each command | `<channel>_<command>`    | Sends the command and returns the view once it has settled      |
 
 Returning the view after a command means an agent sees what its call
-did without asking again. The call waits until the view has been quiet
-for `quietMs` (50 by default) or for at most `settleMs` (1000), so a
-command whose effect waits on a request still comes back with it.
+did without asking again. The call waits for the view to change and
+then to be quiet for `quietMs` (50 by default), or for at most
+`settleMs` (1000), so a command whose effect waits on a request still
+comes back with it. A command that changes nothing in the view returns
+at `settleMs`, since nothing distinguishes it from one still working.
 
 Everything an agent reads about a tool comes from the contract.
 [The Vite plugin](/tooling/vite-plugin#channels-described) writes each

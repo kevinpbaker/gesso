@@ -159,6 +159,43 @@ describe('an agent surface', () => {
     expect(result.content[0].text).toContain('Sent create to notes');
   });
 
+  it('waits for the effect of a command that answers after a request, rather than the first quiet moment', async () => {
+    // A command whose work outlasts the quiet window: a fetch, a
+    // subprocess. Nothing changes until it answers, and the view the
+    // agent is given must be the one after it, not the one before.
+    const rows = new BehaviorSubject<readonly Row[]>([]);
+    const status = new BehaviorSubject<'loading' | 'ready'>('ready');
+    const served = serve(Notes, {
+      view: { rows, status },
+      commands: {
+        create: (title: string) => {
+          setTimeout(() => rows.next([{ id: '1', title }]), 40);
+        },
+        remove: () => {},
+        tag: () => {},
+        attach: () => {},
+        debugReset: () => {}
+      }
+    });
+
+    const result = await agentSurface([served], { quietMs: 5, settleMs: 1000 }).call('notes_create', {
+      title: 'Later'
+    });
+
+    expect(result.structuredContent).toEqual({ rows: [{ id: '1', title: 'Later' }], status: 'ready' });
+  });
+
+  it('returns at settleMs from a command that changes nothing in the view', async () => {
+    const app = notesApp();
+    const surface = agentSurface([app.served], { quietMs: 5, settleMs: 60 });
+    const started = Date.now();
+
+    const result = await surface.call('notes_tag', { id: '1', tags: ['home'] });
+
+    expect(result.isError).toBe(false);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(55);
+  });
+
   it('spreads a rest parameter into the call', async () => {
     const app = notesApp();
     await agentSurface([app.served], fast).call('notes_tag', { id: '1', tags: ['home', 'urgent'] });
