@@ -14,6 +14,7 @@ export {
   mcpHandler,
   MCP_PROTOCOL_VERSIONS,
   type JsonRpcResponse,
+  type McpCaller,
   type McpHandlerOptions,
   type McpServerInfo
 } from './mcp';
