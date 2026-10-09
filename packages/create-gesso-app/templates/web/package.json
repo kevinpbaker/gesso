@@ -10,14 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "gesso-components": "^0.6.9",
-    "gesso-core": "^0.6.9",
-    "gesso-framework": "^0.6.9",
+    "gesso-components": "^0.6.10",
+    "gesso-core": "^0.6.10",
+    "gesso-framework": "^0.6.10",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "gesso-devtools": "^0.6.9",
-    "gesso-vite-plugin": "^0.6.9",
+    "gesso-devtools": "^0.6.10",
+    "gesso-vite-plugin": "^0.6.10",
     "typescript": "~7.0.2",
     "vite": "^8.2.0"
   }
