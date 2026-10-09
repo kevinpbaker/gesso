@@ -143,6 +143,7 @@ That leaves the shell with this, and nothing else:
 | Observes the host's size and the pixel ratio      | `ResizeObserver` and `devicePixelRatio` are the window's                                              |
 | Forwards display refreshes, where it must         | A dedicated worker has its own frame callback and uses it; this is the fallback for where it does not |
 | Watches `prefers-color-scheme` and reduced motion | A media query needs a window; each is reported once at start and again on every change                |
+| Watches whether the window is in use              | Focus and visibility are the window's; `ShellService.windowActive` is true while it is shown and focused |
 | Sets the cursor and `touch-action` on the canvas  | The worker decides what the pointer is over; only the DOM can show it                                 |
 | Writes the clipboard and opens urls               | `ShellService` requests them, and the request is answered on the thread that can perform it           |
 | Reports the url and performs history moves        | The address bar is the window's; the routes never leave the worker                                    |

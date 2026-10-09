@@ -172,6 +172,8 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'colorScheme'; scheme: ColorScheme }
   | { type: 'contrast'; contrast: UiContrast }
+  /** Whether the window is shown and holds the focus; once at start-up and on every change. See `ShellService.windowActive`. */
+  | { type: 'windowActive'; active: boolean }
   /**
    * What the window's own chrome is covering on each edge: the safe
    * area a notch or a home indicator takes, and the strip a soft

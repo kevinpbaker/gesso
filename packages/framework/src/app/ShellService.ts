@@ -160,6 +160,7 @@ export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
   private readonly contrastState = internalState<UiContrast>('standard');
+  private readonly activeState = internalState(true);
   private readonly insets = internalState<UiInsets>(noInsets);
   private readonly isFullscreen = internalState<boolean>(false);
   /** Popups asked for and not yet answered, by the id sent with each. */
@@ -218,6 +219,18 @@ export class ShellService {
    */
   readonly contrast: ReadableCell<UiContrast> = this.contrastState;
 
+  /**
+   * Whether the window is the one the person is using: shown, and holding
+   * the keyboard focus. False while it is behind another window,
+   * minimised, or in a background tab. True until a shell says otherwise.
+   *
+   * For work that should happen when the person comes back rather than
+   * on a clock: reading again what may have changed while they were away.
+   *
+   *   ctx.effect(shell.windowActive.pipe(filter(Boolean)), () => channel.send.refresh());
+   */
+  readonly windowActive: ReadableCell<boolean> = this.activeState;
+
   /** The current appearance, for code that needs it without subscribing. */
   get currentColorScheme(): ColorScheme {
     return this.scheme.value;
@@ -261,6 +274,13 @@ export class ShellService {
   applyColorScheme(scheme: ColorScheme): void {
     if (this.scheme.value !== scheme) {
       this.scheme.value = scheme;
+    }
+  }
+
+  /** Called by the runtime when the shell reports whether the window is active; not for applications. */
+  applyWindowActive(active: boolean): void {
+    if (this.activeState.value !== active) {
+      this.activeState.value = active;
     }
   }
 

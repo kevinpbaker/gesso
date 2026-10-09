@@ -1010,6 +1010,7 @@ declare class ShellService {
   private handler;
   private readonly scheme;
   private readonly contrastState;
+  private readonly activeState;
   private readonly insets;
   private readonly isFullscreen;
   private readonly popups;
@@ -1022,11 +1023,13 @@ declare class ShellService {
   private nextFileId;
   readonly colorScheme: ReadableCell<ColorScheme>;
   readonly contrast: ReadableCell<UiContrast>;
+  readonly windowActive: ReadableCell<boolean>;
   get currentColorScheme(): ColorScheme;
   readonly viewportInsets: ReadableCell<UiInsets>;
   get currentViewportInsets(): UiInsets;
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
+  applyWindowActive(active: boolean): void;
   applyContrast(contrast: UiContrast): void;
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): Promise<boolean>;
@@ -1510,6 +1513,7 @@ declare class GessoRuntime {
   setReducedMotion(reduced: boolean): void;
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
+  setWindowActive(active: boolean): void;
   setContrast(contrast: UiContrast): void;
   setViewportInsets(insets: UiInsets): void;
   private publishViewportInsets;
@@ -1738,6 +1742,10 @@ type ShellToRuntimeMessage = {
 } | {
   type: 'contrast';
   contrast: UiContrast;
+} |
+{
+  type: 'windowActive';
+  active: boolean;
 } |
 {
   type: 'viewportInsets';
@@ -2227,6 +2235,7 @@ declare class GessoApp {
   private fullscreen;
   private detachReducedMotion;
   private detachContrast;
+  private detachWindowActive;
   private detachColorScheme;
   private detachViewportInsets;
   private colorSchemePreference;
