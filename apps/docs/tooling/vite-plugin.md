@@ -157,6 +157,11 @@ lazy in both directions: a page that never throws never fetches the
 package, and a production build contains no reference to it, because
 the plugin emits none of this outside a dev server.
 
+An `onError` the application passes to `createApp` is kept: in a dev
+server the plugin calls the overlay's reporter first and then the
+application's, so an application that records its own failures records
+them in development too, and still gets the overlay.
+
 The overlay covers the element the application was mounted into, found
 as the canvas's parent. A page hosting several applications should turn
 this off and mount its own, since one canvas is a guess:

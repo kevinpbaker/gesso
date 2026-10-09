@@ -126,12 +126,19 @@ function prelude(options: ShellTransformOptions): string {
       : [
           `    appLogicWorker: () => new Worker(new URL(${JSON.stringify(entries.appLogicWorker)}, import.meta.url), { type: 'module', name: options.workerName }),`
         ]),
-    ...(options.overlay ? ['    onError: __gessoReportError,'] : []),
     // In a dev server the channels are offered to an agent in the
     // browser too, where the browser has WebMCP; the app's own
     // `webmcp`, spread below, still decides.
     ...(options.agent === true ? ['    webmcp: true,'] : []),
-    '    ...options',
+    '    ...options,',
+    // After the app's options, and calling the app's own `onError` as
+    // well: an app that keeps its errors still gets the overlay in
+    // development, rather than replacing it.
+    ...(options.overlay
+      ? [
+          '    onError: options.onError === undefined ? __gessoReportError : (message, stack, source) => { __gessoReportError(message, stack, source); options.onError(message, stack, source); },'
+        ]
+      : []),
     '  };',
     '}'
   ];

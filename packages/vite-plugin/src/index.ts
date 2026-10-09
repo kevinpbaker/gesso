@@ -73,7 +73,9 @@ export interface GessoPluginOptions {
   /**
    * Wire `gesso-devtools`'s error overlay into `onError` (default
    * true). Only ever in a dev server: a build carries no reference to
-   * the package.
+   * the package. An `onError` the app passes is called too, after the
+   * overlay, so an app that keeps its own errors keeps them in
+   * development as well.
    */
   readonly overlay?: boolean;
   /** Emit the `import.meta.hot.accept` wiring (default true). */

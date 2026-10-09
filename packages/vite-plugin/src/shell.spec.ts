@@ -67,8 +67,23 @@ describe('transformShell', () => {
   it('wires the overlay only when asked', () => {
     expect(build(SHELL, false)).not.toContain('gesso-devtools');
     const dev = build(SHELL, true);
-    expect(dev).toContain('onError: __gessoReportError');
+    expect(dev).toContain('onError: options.onError === undefined ? __gessoReportError');
     expect(dev).toContain("import('gesso-devtools')");
+  });
+
+  it("calls the app's own onError as well as the overlay's, never instead of it", () => {
+    const dev = build(SHELL, true);
+    const start = dev.indexOf('function __gessoOptions');
+    // Only the options function, with the module-only `import.meta` it names for the workers made plain.
+    const source = dev.slice(start, dev.indexOf('\n}', start) + 2).replaceAll('import.meta.url', "'http://localhost/'");
+    const options = new Function('__gessoReportError', `${source}\nreturn __gessoOptions;`);
+    const seen: string[] = [];
+    const make = options((message: string) => seen.push(`overlay: ${message}`)) as (given?: object) => {
+      onError: (message: string, stack: string | undefined, source: string) => void;
+    };
+    make({ onError: (message: string) => seen.push(`app: ${message}`) }).onError('boom', undefined, 'renderer');
+    make().onError('alone', undefined, 'renderer');
+    expect(seen).toEqual(['overlay: boom', 'app: boom', 'overlay: alone']);
   });
 
   it('does not rewrite a module it has already rewritten', () => {
