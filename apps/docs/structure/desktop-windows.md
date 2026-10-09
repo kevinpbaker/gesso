@@ -462,6 +462,24 @@ menu from the component library, bind it to the same commands, and add
 a native menu on the platforms that have one, calling those same
 handlers.
 
+On macOS one native menu is not optional. Without an **Edit** menu,
+macOS sends ⌘V, ⌘C, ⌘X, ⌘A and ⌘Z nowhere, so a text field in the
+window cannot be pasted into or copied from. `standardMenu` from
+`gesso-electrobun/desktop` is the menu every Mac application has, as the
+plain data Electrobun takes; its Edit items are roles, which macOS hands
+to whatever has focus, so they reach Gesso's text editing as the
+keyboard would. The template installs it:
+
+```ts
+import { ApplicationMenu } from 'electrobun/main';
+import { standardMenu } from 'gesso-electrobun/desktop';
+
+ApplicationMenu.setApplicationMenu(standardMenu('My App'));
+```
+
+An application's own menus go in its second argument, between Edit and
+Window.
+
 Only Linux and WebKitGTK have been run at all, which is the honest
 statement of the whole platform surface and is repeated under Limits.
 

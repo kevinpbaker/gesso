@@ -17,6 +17,7 @@ import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChann
 import {
   createDesktopApp,
   DesktopWindows,
+  standardMenu,
   windowsChannel,
   withWindowRoute,
   type DesktopApp,
@@ -442,5 +443,25 @@ describe('the shell adaptations a window needs', () => {
 
     scheme.next('light');
     expect(seen).toEqual(['dark']);
+  });
+});
+
+describe('standardMenu', () => {
+  it('gives the window an Edit menu, so the keys for paste, copy, cut, select all and undo reach its text fields', () => {
+    const menu = standardMenu('Espalier');
+    const edit = menu.find(item => 'label' in item && item.label === 'Edit');
+    const roles =
+      edit !== undefined && 'submenu' in edit
+        ? (edit.submenu ?? []).flatMap(item => ('role' in item && item.role !== undefined ? [item.role] : []))
+        : [];
+    expect(roles).toEqual(expect.arrayContaining(['paste', 'copy', 'cut', 'selectAll', 'undo', 'redo']));
+    expect(menu[0]).toMatchObject({ label: 'Espalier' });
+  });
+
+  it('puts an application’s own menus between Edit and Window', () => {
+    const labels = standardMenu('App', [{ label: 'View', submenu: [] }]).map(item =>
+      'label' in item ? item.label : ''
+    );
+    expect(labels).toEqual(['App', 'Edit', 'View', 'Window']);
   });
 });
