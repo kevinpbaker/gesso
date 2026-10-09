@@ -1,5 +1,12 @@
 # gesso-devtools
 
+## 0.6.13
+
+### Patch Changes
+
+- Updated dependencies [0020afa]
+  - gesso-framework@0.6.13
+
 ## 0.6.12
 
 ### Patch Changes

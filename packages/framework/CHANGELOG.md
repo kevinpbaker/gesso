@@ -1,5 +1,12 @@
 # gesso-framework
 
+## 0.6.13
+
+### Patch Changes
+
+- 0020afa: `mcpHandler` keeps sessions: `initialize` is answered with an `Mcp-Session-Id`, which remembers the client's `clientInfo`, and a new `around` option runs around every request with that caller (`McpCaller`), so an application can tell which agent asked. `DELETE` with the id ends a session. The bearer token is now compared in constant time.
+- gesso-core@0.6.13
+
 ## 0.6.12
 
 ### Patch Changes
