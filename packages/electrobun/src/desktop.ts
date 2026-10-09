@@ -334,3 +334,61 @@ export {
   type DesktopServe,
   type ShowMessageBox
 } from './agent';
+
+/** One item of an application menu, in the shape Electrobun's `ApplicationMenu.setApplicationMenu` takes. */
+export type MenuItem =
+  | { type: 'divider' }
+  | { label?: string; role?: string; action?: string; accelerator?: string; submenu?: MenuItem[] };
+
+/**
+ * The menu every macOS application is expected to have, for
+ * `ApplicationMenu.setApplicationMenu` from `electrobun/main`:
+ *
+ * ```ts
+ * ApplicationMenu.setApplicationMenu(standardMenu('My App'));
+ * ```
+ *
+ * Without an Edit menu, macOS sends ⌘V, ⌘C, ⌘X, ⌘A and ⌘Z nowhere, and
+ * a text field in the window cannot be pasted into or copied from:
+ * keys a person expects to work, and does not think to blame the app's
+ * menu for. Each item here is a role, which macOS hands to whatever has
+ * focus, so they reach Gesso's text editing as the keyboard would. The
+ * application menu brings ⌘Q and ⌘H, and the Window menu ⌘M.
+ *
+ * `extra` goes after the Edit menu: an application's own menus.
+ */
+export function standardMenu(appName: string, extra: readonly MenuItem[] = []): MenuItem[] {
+  return [
+    {
+      label: appName,
+      submenu: [
+        { role: 'about' },
+        { type: 'divider' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'showAll' },
+        { type: 'divider' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'divider' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' }
+      ]
+    },
+    ...extra,
+    {
+      label: 'Window',
+      submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'divider' }, { role: 'bringAllToFront' }]
+    }
+  ];
+}

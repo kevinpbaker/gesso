@@ -11,7 +11,7 @@
  * what that window has already seen, so two windows agree by
  * construction rather than by synchronising.
  */
-import { BrowserView, BrowserWindow, Utils } from 'electrobun/main';
+import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/main';
 import { BehaviorSubject, map } from 'rxjs';
 
 import type { GessoFrame } from 'gesso-electrobun';
@@ -19,6 +19,7 @@ import {
   createDesktopApp,
   messageBoxConfirm,
   serveDesktopAgent,
+  standardMenu,
   windowsChannel,
   withWindowRoute
 } from 'gesso-electrobun/desktop';
@@ -28,6 +29,9 @@ import { Counter } from '../shared/Counter';
 // Describes the channels for agents. Written by `hutch run channels`.
 import '../shared/channels.described';
 import type { GessoWindowRPC } from '../shared/rpc';
+
+// Without an Edit menu, macOS sends ⌘V and ⌘C nowhere, and text fields cannot be pasted into.
+ApplicationMenu.setApplicationMenu(standardMenu('Gesso app'));
 
 /** The application's whole state, in the process that owns it. */
 const count = new BehaviorSubject(0);
