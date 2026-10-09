@@ -1,5 +1,13 @@
 # gesso-framework
 
+## 0.6.11
+
+### Patch Changes
+
+- `ShellService.windowActive` says whether the window is the one the person is using: shown, and holding the keyboard focus. It is false while the window is behind another, minimised or in a background tab, and the shell reports it once at start-up and on every focus, blur and visibility change, on the main thread and over the render worker protocol (a new `windowActive` message). It is for work that should happen when the person comes back rather than on a clock, such as reading again what may have changed while they were away: `ctx.effect(shell.windowActive.pipe(filter(Boolean)), () => channel.send.refresh())`. A document that cannot say where the focus is is taken to have it.
+- Updated dependencies
+  - gesso-core@0.6.11
+
 ## 0.6.10
 
 ### Patch Changes
