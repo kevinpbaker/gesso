@@ -217,6 +217,13 @@ describe('TextInput', () => {
     expect(record.description).toBe('We only use it to sign you in.');
   });
 
+  it('keeps a hidden label as its name, and draws none', () => {
+    const ui = mount(createComponent(TextInput, { label: 'Search stacks', placeholder: 'Search', labelHidden: true }));
+
+    expect(ui.allNodes().filter(node => node.properties.get('text') === 'Search stacks')).toHaveLength(0);
+    expect(ui.getByRole('textbox', { name: 'Search stacks' })).toBeDefined();
+  });
+
   it('is invalid, and says so, when it has an error', () => {
     const ui = mount(createComponent(TextInput, { label: 'Email', error: 'Enter an email address' }));
 

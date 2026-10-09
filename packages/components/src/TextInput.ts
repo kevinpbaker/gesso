@@ -58,6 +58,12 @@ export interface TextInputProps extends ControlLayoutProps {
   multiline?: boolean;
   /** Enter in a single-line field. */
   onSubmit?: () => void;
+  /**
+   * The label is the field's name and is not drawn above it: for a
+   * search field whose placeholder and place already say what it is.
+   * It is still what a screen reader announces, as `Select`'s is.
+   */
+  labelHidden?: boolean;
 }
 
 export function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext): UiChild {
@@ -72,6 +78,7 @@ export function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): 
 
 function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceMultiline: boolean): UiChild {
   const label = input(inputs.label, '');
+  const labelHidden = inputs.labelHidden?.value === true;
   const description = input(inputs.description, '');
   const error = input(inputs.error, '');
   const disabled = input(inputs.disabled, false);
@@ -98,7 +105,9 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
     { ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(text =>
-        text.length === 0 ? [] : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+        text.length === 0 || labelHidden
+          ? []
+          : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
       )
     ),
     EditableText({
