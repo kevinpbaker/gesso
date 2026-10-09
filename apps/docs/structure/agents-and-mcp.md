@@ -275,7 +275,40 @@ Two options guard it:
   `Authorization: Bearer` and the token. Set it whenever the port is
   reachable by anything but the person's own agents.
 
-Bind to `127.0.0.1`, not to every interface, unless you mean it.
+Bind to `127.0.0.1`, not to every interface, unless you mean it. The
+token is compared in constant time, so it cannot be guessed a character
+at a time from how quickly a wrong one is refused.
+
+### Which agent is asking
+
+A command is called with its arguments and nothing else, so it cannot
+tell one agent from another. The server can: `initialize` begins a
+session, answered with an `Mcp-Session-Id` that the client sends on
+every request after, and the session remembers the `clientInfo` the
+client gave. `around` runs around each request with that caller, or
+null for a request outside any session, so an application can keep it
+where its commands will find it:
+
+```ts
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { McpCaller } from 'gesso-framework/agent';
+
+const asking = new AsyncLocalStorage<McpCaller | null>();
+
+mcpHandler(surface, {
+  token,
+  around: (caller, handle) => asking.run(caller, handle)
+});
+
+// In a command, as it runs:
+const who = asking.getStore();
+// { session: '9f…', number: 2, client: { name: 'claude-code', version: '2.1.0' } }
+```
+
+`number` counts sessions from 1 as they begin, a short way to tell two
+sessions of one client apart. `DELETE` with the session's id ends it. A
+request naming a session the server has forgotten is still answered, as
+one from an unknown caller. `serveDesktopAgent` takes `around` too.
 
 `handleMcpMessage(surface, message)` is the same server without the
 transport: one JSON-RPC message in, one answer out. It is what to wrap

@@ -16,6 +16,14 @@ import type { AgentSurfaceLike } from './AgentSurface';
  * transport allows, and the GET stream for server-initiated messages
  * is declined with 405, which it also allows: nothing here sends one,
  * so the capabilities say neither `listChanged` nor `subscribe`.
+ *
+ * `mcpHandler` keeps sessions, as the transport describes: `initialize`
+ * is answered with an `Mcp-Session-Id`, the client sends it back on
+ * every request after, and `DELETE` with it ends the session. A session
+ * remembers the client's `clientInfo`, so an application can tell one
+ * agent from another while a request runs (`McpHandlerOptions.around`).
+ * A request without a session, or with one the server has forgotten, is
+ * still answered, as one from an unknown caller.
  */
 
 /** The protocol revisions this server speaks, newest first. */
@@ -112,6 +120,22 @@ export async function handleMcpMessage(
   }
 }
 
+/**
+ * Who sent a request: the session `initialize` began, and the client it
+ * said it was. Handed to `McpHandlerOptions.around` for each request.
+ */
+export interface McpCaller {
+  /** The session's id, as sent in `Mcp-Session-Id`. */
+  readonly session: string;
+  /** The order sessions began in since the handler was made, from 1: a short way to tell two of one client apart. */
+  readonly number: number;
+  /** What the client said it was in `initialize`'s `clientInfo`; an empty name when it said nothing. */
+  readonly client: { readonly name: string; readonly version: string };
+}
+
+/** The most sessions remembered at once; the oldest is forgotten first, and its requests are then from an unknown caller. */
+const MAX_SESSIONS = 256;
+
 export interface McpHandlerOptions extends McpServerInfo {
   /**
    * Origins a browser may call from. A request carrying any other
@@ -127,6 +151,17 @@ export interface McpHandlerOptions extends McpServerInfo {
    * other than the person's own agents.
    */
   token?: string;
+  /**
+   * Runs around every request, told who sent it: the session and the
+   * client it belongs to, or null for a request outside any session. A
+   * place to keep the caller in an `AsyncLocalStorage`, say, so the
+   * commands a tool call runs can tell which agent asked:
+   *
+   *   around: (caller, handle) => agents.run(caller, handle)
+   *
+   * It must call `handle` and return what it returns.
+   */
+  around?: (caller: McpCaller | null, handle: () => Promise<JsonRpcResponse | null>) => Promise<JsonRpcResponse | null>;
 }
 
 /**
@@ -140,23 +175,32 @@ export function mcpHandler(
   surface: AgentSurfaceLike,
   options: McpHandlerOptions = {}
 ): (request: Request) => Promise<Response> {
+  const sessions = new Map<string, McpCaller>();
+  let begun = 0;
   return async request => {
     const origin = request.headers.get('origin');
     if (origin !== null && !(options.allowedOrigins ?? []).includes(origin)) {
       return text(403, `Requests from ${origin} are not allowed.`);
     }
-    if (options.token !== undefined && request.headers.get('authorization') !== `Bearer ${options.token}`) {
+    if (
+      options.token !== undefined &&
+      !sameText(request.headers.get('authorization') ?? '', `Bearer ${options.token}`)
+    ) {
       return text(401, 'This server needs a bearer token.');
+    }
+    const sessionId = request.headers.get('mcp-session-id');
+    if (request.method === 'DELETE' && sessionId !== null) {
+      sessions.delete(sessionId);
+      return new Response(null, { status: 204 });
     }
     const version = request.headers.get('mcp-protocol-version');
     if (version !== null && !(MCP_PROTOCOL_VERSIONS as readonly string[]).includes(version)) {
       return text(400, `Unsupported MCP protocol version ${version}.`);
     }
     if (request.method !== 'POST') {
-      // GET is the optional stream for messages the server starts, and
-      // DELETE ends a session. There are no such messages and no
-      // sessions, and 405 is how the transport says so.
-      return new Response(null, { status: 405, headers: { allow: 'POST' } });
+      // GET is the optional stream for messages the server starts. There
+      // are no such messages, and 405 is how the transport says so.
+      return new Response(null, { status: 405, headers: { allow: 'POST, DELETE' } });
     }
     let message: unknown;
     try {
@@ -164,9 +208,46 @@ export function mcpHandler(
     } catch {
       return json(400, error(null, PARSE_ERROR, 'The body is not JSON.'));
     }
-    const response = await handleMcpMessage(surface, message, options);
-    return response === null ? new Response(null, { status: 202 }) : json(200, response);
+    // `initialize` begins a session; anything else belongs to the one it names, if it is known.
+    let started: McpCaller | null = null;
+    if (isRequest(message) && message.method === 'initialize' && message.id !== undefined) {
+      const info = (message.params?.clientInfo ?? {}) as { name?: unknown; version?: unknown };
+      started = {
+        session: newSessionId(),
+        number: ++begun,
+        client: {
+          name: typeof info.name === 'string' ? info.name : '',
+          version: typeof info.version === 'string' ? info.version : ''
+        }
+      };
+      sessions.set(started.session, started);
+      if (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
+    }
+    const caller = started ?? (sessionId === null ? null : (sessions.get(sessionId) ?? null));
+    const handle = () => handleMcpMessage(surface, message, options);
+    const response = await (options.around === undefined ? handle() : options.around(caller, handle));
+    if (response === null) return new Response(null, { status: 202 });
+    const answered = json(200, response);
+    if (started !== null) answered.headers.set('mcp-session-id', started.session);
+    return answered;
   };
+}
+
+/** A session id no one can guess: 128 random bits, as hex. */
+function newSessionId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Whether two strings are the same, taking as long however early they
+ * differ, so a token cannot be guessed a character at a time from how
+ * quickly it is refused.
+ */
+function sameText(a: string, b: string): boolean {
+  let differs = a.length ^ b.length;
+  for (let i = 0; i < b.length; i++) differs |= (a.charCodeAt(i % Math.max(a.length, 1)) || 0) ^ b.charCodeAt(i);
+  return differs === 0;
 }
 
 function isRequest(message: unknown): message is JsonRpcRequest {

@@ -45,9 +45,18 @@ type JsonRpcResponse = {
   };
 };
 declare function handleMcpMessage(surface: AgentSurfaceLike, message: unknown, info?: McpServerInfo): Promise<JsonRpcResponse | null>;
+interface McpCaller {
+  readonly session: string;
+  readonly number: number;
+  readonly client: {
+    readonly name: string;
+    readonly version: string;
+  };
+}
 interface McpHandlerOptions extends McpServerInfo {
   allowedOrigins?: readonly string[];
   token?: string;
+  around?: (caller: McpCaller | null, handle: () => Promise<JsonRpcResponse | null>) => Promise<JsonRpcResponse | null>;
 }
 declare function mcpHandler(surface: AgentSurfaceLike, options?: McpHandlerOptions): (request: Request) => Promise<Response>;
 declare function validate(schema: JsonSchema, value: unknown, root?: JsonSchema, at?: string): string | null;
@@ -171,6 +180,7 @@ export {
   type DevAgentRequest,
   type DevAgentResponse,
   type JsonRpcResponse,
+  type McpCaller,
   type McpHandlerOptions,
   type McpServerInfo,
   type ModelContextLike,

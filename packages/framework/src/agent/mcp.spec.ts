@@ -98,6 +98,44 @@ describe('mcpHandler', () => {
     expect((await handler(post(rpc(1, 'ping'), { authorization: 'Bearer sesame' }))).status).toBe(200);
   });
 
+  it('begins a session at initialize, and tells around who sent each request after', async () => {
+    const seen: (string | null)[] = [];
+    const handler = mcpHandler(surface(), {
+      around: (caller, handle) => {
+        seen.push(caller === null ? null : `${caller.client.name} ${caller.client.version} #${caller.number}`);
+        return handle();
+      }
+    });
+    const first = await handler(
+      post(rpc(1, 'initialize', { protocolVersion: '2025-06-18', clientInfo: { name: 'claude-code', version: '2.1' } }))
+    );
+    const session = first.headers.get('mcp-session-id')!;
+    expect(session).toMatch(/^[0-9a-f]{32}$/);
+    const second = await handler(post(rpc(1, 'initialize', { clientInfo: { name: 'claude-code', version: '2.1' } })));
+    expect(second.headers.get('mcp-session-id')).not.toBe(session);
+
+    await handler(
+      post(rpc(2, 'tools/call', { name: 'counter_add', arguments: { arguments: [1] } }), { 'mcp-session-id': session })
+    );
+    await handler(post(rpc(3, 'ping')));
+    await handler(post(rpc(4, 'ping'), { 'mcp-session-id': 'forgotten' }));
+    expect(seen).toEqual(['claude-code 2.1 #1', 'claude-code 2.1 #2', 'claude-code 2.1 #1', null, null]);
+
+    expect(
+      (await handler(new Request('http://127.0.0.1/mcp', { method: 'DELETE', headers: { 'mcp-session-id': session } })))
+        .status
+    ).toBe(204);
+    await handler(post(rpc(5, 'ping'), { 'mcp-session-id': session }));
+    expect(seen.at(-1)).toBeNull();
+  });
+
+  it('refuses a token that differs anywhere, or in length', async () => {
+    const handler = mcpHandler(surface(), { token: 'sesame' });
+    for (const wrong of ['Bearer sesamE', 'Bearer sesam', 'Bearer sesame!', '', 'sesame']) {
+      expect((await handler(post(rpc(1, 'ping'), { authorization: wrong }))).status).toBe(401);
+    }
+  });
+
   it('declines the server-sent stream, a protocol it does not speak, and a body that is not JSON', async () => {
     const handler = mcpHandler(surface());
     expect((await handler(new Request('http://127.0.0.1/mcp', { method: 'GET' }))).status).toBe(405);
