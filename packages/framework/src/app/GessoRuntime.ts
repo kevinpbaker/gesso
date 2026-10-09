@@ -1504,6 +1504,11 @@ export class GessoRuntime {
     this.services.get(ShellService).applyColorScheme(scheme);
   }
 
+  /** Whether the window is the one in use, passed straight to `ShellService`; see `ShellService.windowActive`. */
+  setWindowActive(active: boolean): void {
+    this.services.get(ShellService).applyWindowActive(active);
+  }
+
   /** The contrast the platform asks for, passed straight to `ShellService`; see `ShellService.contrast`. */
   setContrast(contrast: UiContrast): void {
     this.services.get(ShellService).applyContrast(contrast);

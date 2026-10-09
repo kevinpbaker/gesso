@@ -24,6 +24,7 @@ import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { observeContrast } from './contrast';
+import { observeWindowActive } from './windowActive';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from './fullscreen';
 import {
   openRouteWith,
@@ -154,6 +155,7 @@ export class GessoApp {
   private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
   private detachContrast: (() => void) | null = null;
+  private detachWindowActive: (() => void) | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
   private detachColorScheme: (() => void) | null = null;
   /** Stops watching `visualViewport` for the safe area and the keyboard. */
@@ -401,6 +403,8 @@ export class GessoApp {
     this.detachReducedMotion = null;
     this.detachContrast?.();
     this.detachContrast = null;
+    this.detachWindowActive?.();
+    this.detachWindowActive = null;
     this.detachColorScheme?.();
     this.detachColorScheme = null;
     this.detachViewportInsets?.();
@@ -486,6 +490,7 @@ export class GessoApp {
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
     this.detachContrast = observeContrast(contrast => this.runtime.setContrast(contrast));
+    this.detachWindowActive = observeWindowActive(active => this.runtime.setWindowActive(active));
     this.setColorScheme(this.colorSchemePreference);
   }
 
