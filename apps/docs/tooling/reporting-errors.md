@@ -11,7 +11,8 @@ dev server is running. A production build contains no reference to
 
 That leaves a question a shipped application has to answer, and the
 answer is one function. `onError` is the whole of it, in both
-configurations, and it is the same callback the overlay is:
+configurations. In a dev server the plugin calls the overlay as well as
+yours, so the same code runs in development and in production:
 
 ```ts
 createApp({
