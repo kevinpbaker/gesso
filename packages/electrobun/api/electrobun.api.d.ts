@@ -9,8 +9,15 @@ import {
   GessoFrame
 } from "./frames.js";
 import {
+  ScreenAgentMessage,
   withWindowRoute
-} from "./route.js";
+} from "./view.js";
+import {
+  AgentConfirmation,
+  AgentSurface,
+  AgentSurfaceLike,
+  McpHandlerOptions
+} from "gesso-framework/agent";
 import {
   ChannelToken,
   ServedChannel
@@ -18,11 +25,14 @@ import {
 import {
   Observable
 } from "rxjs";
-import {
-  AgentConfirmation,
-  AgentSurface,
-  McpHandlerOptions
-} from "gesso-framework/agent";
+interface ScreenAgent {
+  readonly surface: AgentSurfaceLike;
+  attach(send: (message: ScreenAgentMessage) => void): {
+    receive(message: ScreenAgentMessage): void;
+    detach(): void;
+  };
+}
+declare function createScreenAgent(): ScreenAgent;
 type DesktopServe = (options: {
   hostname: string;
   port: number;
@@ -35,6 +45,7 @@ interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOrigins'> 
   hostname?: string;
   confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
   serve?: DesktopServe;
+  screen?: AgentSurfaceLike;
 }
 interface DesktopAgent {
   readonly url: string;
@@ -94,6 +105,7 @@ declare const DesktopWindows: ChannelToken<DesktopWindowsView, DesktopWindowsCom
 declare function windowsChannel(app: DesktopApp, window: DesktopWindowHandle): ServedChannel;
 export {
   createDesktopApp,
+  createScreenAgent,
   DesktopApp,
   DesktopAppOptions,
   DesktopWindowHandle,
@@ -107,6 +119,7 @@ export {
   type DesktopAgent,
   type DesktopAgentOptions,
   type DesktopServe,
+  type ScreenAgent,
   type ShowMessageBox,
   windowsChannel,
   withWindowRoute
@@ -157,27 +170,43 @@ export {
   ChannelHostOptions,
   serveChannelsToWindow
 };
-// ==== route.d.ts ====
+// ==== view.d.ts ====
+import {
+  RemoteBridge,
+  RemoteBridgeOptions
+} from "gesso-framework/remote";
 declare function withWindowRoute(viewUrl: string, route: string | null | undefined): string;
 declare function windowRoute(hash?: string): string;
+type ElectrobunBridgeOptions = RemoteBridgeOptions;
+type ElectrobunBridge = RemoteBridge;
+declare const createElectrobunBridge: (options: ElectrobunBridgeOptions) => ElectrobunBridge;
+type ScreenAgentMessage = unknown;
+declare function relayScreenAgent(app: {
+  openRenderPort(key: string): MessagePort | undefined;
+}, send: (message: ScreenAgentMessage) => void): (message: ScreenAgentMessage) => void;
 export {
+  createElectrobunBridge,
+  ElectrobunBridge,
+  ElectrobunBridgeOptions,
+  relayScreenAgent,
+  ScreenAgentMessage,
   windowRoute,
   withWindowRoute
 };
 // ==== view.d.ts ====
 import {
+  createElectrobunBridge,
+  ElectrobunBridge,
+  ElectrobunBridgeOptions,
+  relayScreenAgent,
+  ScreenAgentMessage,
   windowRoute
-} from "./route.js";
-import {
-  RemoteBridge,
-  RemoteBridgeOptions
-} from "gesso-framework/remote";
-type ElectrobunBridgeOptions = RemoteBridgeOptions;
-type ElectrobunBridge = RemoteBridge;
-declare const createElectrobunBridge: (options: ElectrobunBridgeOptions) => ElectrobunBridge;
+} from "./view.js";
 export {
   createElectrobunBridge,
   ElectrobunBridge,
   ElectrobunBridgeOptions,
+  relayScreenAgent,
+  ScreenAgentMessage,
   windowRoute
 };

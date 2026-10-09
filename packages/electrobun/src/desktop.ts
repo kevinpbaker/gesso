@@ -325,6 +325,7 @@ export function windowsChannel(app: DesktopApp, window: DesktopWindowHandle): Se
   };
 }
 
+export { createScreenAgent, type ScreenAgent } from './screen';
 export {
   messageBoxConfirm,
   serveDesktopAgent,
