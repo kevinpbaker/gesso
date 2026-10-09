@@ -256,6 +256,7 @@ interface TextInputProps extends ControlLayoutProps {
   required?: boolean;
   multiline?: boolean;
   onSubmit?: () => void;
+  labelHidden?: boolean;
 }
 declare function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext): UiChild;
 type TextAreaProps = Omit<TextInputProps, 'multiline'>;
