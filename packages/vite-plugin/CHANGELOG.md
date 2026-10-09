@@ -1,5 +1,11 @@
 # gesso-vite-plugin
 
+## 0.6.12
+
+### Patch Changes
+
+- In a dev server, an `onError` the application passes to `createApp` is now called as well as the error overlay's reporter, overlay first, instead of replacing it. An application that records its own failures keeps recording them in development and still gets the overlay.
+
 ## 0.6.11
 
 ## 0.6.10
