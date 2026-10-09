@@ -237,9 +237,38 @@ dialog: what the command does and the arguments the agent sent, with
 Decline as the first button and the default, so Enter and Escape both
 decline. The channels are passed in rather
 than read from the app, because the per-window ones are about a window
-an agent does not have, and the screen tools are not offered: the
-screen is in each window's render worker, out of the main process's
-reach.
+an agent does not have.
+
+### The window's screen, in development
+
+The screen tools (`ui_snapshot`, `ui_press`, `ui_type`, `ui_focus`,
+`ui_key`) are served by each window's render worker, out of the main
+process's reach. The window's page can reach it, and already talks to
+the main process over the RPC, so it relays them:
+
+```ts
+// The window's page
+import { relayScreenAgent } from 'gesso-electrobun/view';
+
+const app = createApp({ ... });
+const relay = relayScreenAgent(app, message => view.rpc?.send.screenAgent(message));
+// in the RPC's message handlers: screenAgent: message => relay(message)
+app.mount(host);
+
+// The main process
+import { createScreenAgent } from 'gesso-electrobun/desktop';
+
+const screen = createScreenAgent();
+// for each window: const relayed = screen.attach(message => window.webview.rpc?.send.screenAgent(message));
+// in its RPC's message handlers: screenAgent: message => relayed.receive(message)
+const agent = serveDesktopAgent(channels, { screen: dev ? screen.surface : undefined });
+```
+
+Only the screen tools cross; the channels the render worker replicates
+are already served by the main process. Agents operate the window
+attached last. Pressing the screen's buttons is everything the person
+can do, including clicking through a confirmation drawn on the screen,
+so offer it in development, not to every agent holding the token.
 
 Electrobun bundles the main process with its own build, which takes no
 plugins, so the Vite plugin never describes the contracts there.
@@ -327,9 +356,9 @@ for stdio, or to relay messages from somewhere else.
   arguments as a positional list.
 - **Nothing is pushed.** An agent that wants to know about a change
   reads the view again. Subscriptions are not offered.
-- **A desktop app offers its channels, not its screen.** The screen
-  tools need the render worker, which is in the window, not the main
-  process.
+- **A desktop app offers its screen only when the window relays it.**
+  The screen tools need the render worker, which is in the window; see
+  [The window's screen, in development](#the-window-s-screen-in-development).
 
 ## Next
 

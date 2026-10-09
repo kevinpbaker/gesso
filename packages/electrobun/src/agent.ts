@@ -1,7 +1,9 @@
 import type { ServedChannel } from 'gesso-framework';
 import {
   agentSurface,
+  combineSurfaces,
   mcpHandler,
+  type AgentSurfaceLike,
   type AgentConfirmation,
   type AgentSurface,
   type McpHandlerOptions
@@ -24,9 +26,10 @@ import {
  * `createDesktopApp` takes them per window, and the per-window ones
  * (`windowsChannel`) are about a window an agent does not have.
  *
- * What it offers is the channel tools only. The screen is in each
- * window's render worker, out of the main process's reach, so the
- * screen tools a web app offers are not here.
+ * What it offers is the channel tools, and the screen tools of a window
+ * when it is given `screen`: the screen is in each window's render
+ * worker, out of the main process's reach, so the window relays it
+ * (`createScreenAgent`).
  *
  * The descriptions come from `channelSchema`. A main process is bundled
  * by Electrobun's own build, which `gesso-vite-plugin` never sees, so
@@ -58,6 +61,12 @@ export interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOri
   confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
   /** The server to start. Defaults to the runtime's `Bun.serve`. */
   serve?: DesktopServe;
+  /**
+   * A window's screen tools to offer beside the channels:
+   * `createScreenAgent().surface`. Pressing the screen's buttons is
+   * everything the person can do, so offer it in development.
+   */
+  screen?: AgentSurfaceLike;
 }
 
 export interface DesktopAgent {
@@ -79,7 +88,10 @@ export function serveDesktopAgent(channels: readonly ServedChannel[], options: D
   // A desktop app has no browser pages of its own to let in, so every
   // request carrying an Origin is refused: that is a web page the person
   // has open, reaching for their machine.
-  const fetch = mcpHandler(surface, { ...options, allowedOrigins: [] });
+  const fetch = mcpHandler(options.screen === undefined ? surface : combineSurfaces([surface, options.screen]), {
+    ...options,
+    allowedOrigins: []
+  });
 
   let lastError: unknown;
   for (let port = first; port < first + PORTS_TRIED; port++) {
