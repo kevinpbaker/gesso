@@ -192,12 +192,14 @@ invalidates the subtree that reads it exactly as a shipped one does.
 ## Fonts, and what is not here
 
 A family is a string handed to the renderer, so the faces available are
-the ones the page has already loaded. Loading a font is the shell's
-job, not the render worker's, and there is no font loading API in these
-packages: the site's own examples ask for `sans-serif` and `Georgia,
-serif` because those need no loading at all. A family that is not
-available falls back the way it would in CSS, and text is measured with
-whatever the browser actually resolved, so nothing is misplaced by the
+the ones the render worker can see. A web font the page loaded is not
+one of them: declare it with `renderRoot().useFonts([...])`, which loads
+it into the worker and lays the tree out again when it arrives, and a
+scale can then name the family in each role. [Fonts](/appearance/fonts)
+covers declaring one. The site's own examples ask for `sans-serif` and
+`Georgia, serif` because those need no loading at all. A family that is
+not available falls back the way it would in CSS, and text is measured
+with whatever was actually resolved, so nothing is misplaced by the
 substitution.
 
 Wrapping, clamping and baseline alignment are [text](/guide/text)'s
