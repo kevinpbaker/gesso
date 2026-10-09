@@ -41,6 +41,7 @@ import {
   type ShellHistoryOptions
 } from '../shellHistory';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
+import { watchPixelRatio } from '../pixelRatio';
 
 /**
  * What the shell needs to spawn and drive a render worker.
@@ -354,6 +355,9 @@ export class WorkerApp {
   private canvas: HTMLCanvasElement | undefined;
   private host: HTMLElement | undefined;
   private resizeObserver: ResizeObserver | null = null;
+  /** The host's last size, for a pixel ratio that changes on its own; see `watchPixelRatio`. */
+  private hostSize: { width: number; height: number } | null = null;
+  private stopPixelRatio: (() => void) | null = null;
   private detachInput: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
   private files: ShellFiles | null = null;
@@ -798,6 +802,8 @@ export class WorkerApp {
     this.audio = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.stopPixelRatio?.();
+    this.stopPixelRatio = null;
     // A remount starts from nothing in flight. The new worker is told
     // its size in `init`, and an acknowledgement from the old one
     // would be about a canvas that no longer exists.
@@ -1074,10 +1080,17 @@ export class WorkerApp {
       }
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
+        this.hostSize = { width, height };
         this.requestResize({ width, height, dpr: window.devicePixelRatio || 1 });
       }
     });
     this.resizeObserver.observe(element);
+    // Moved to a display of another density: the same size, in more or fewer device pixels.
+    this.stopPixelRatio = watchPixelRatio(dpr => {
+      if (this.hostSize !== null && !this.fullscreen) {
+        this.requestResize({ ...this.hostSize, dpr });
+      }
+    });
   }
 
   /**

@@ -40,6 +40,7 @@ import type { RouterRoutes } from '../router/RouterService';
 import type { MediaOptions } from './MediaService';
 import type { FontFamilyDeclaration } from './FontService';
 import type { UiHost } from '../agent/ui';
+import { watchPixelRatio } from './pixelRatio';
 
 export interface GessoAppOptions {
   host: HTMLElement;
@@ -140,6 +141,9 @@ export class GessoApp {
 
   private running = false;
   private resizeObserver: ResizeObserver | null = null;
+  /** The host's last size, for a pixel ratio that changes on its own; see `watchPixelRatio`. */
+  private hostSize: { width: number; height: number } | null = null;
+  private stopPixelRatio: (() => void) | null = null;
   private proxy: EditingProxy | null = null;
   /** The one audio element, behind `AudioService`; see `AudioSink`. */
   private audio: AudioSink | null = null;
@@ -417,6 +421,8 @@ export class GessoApp {
     this.adapter.detach();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.stopPixelRatio?.();
+    this.stopPixelRatio = null;
     if (isCanvasElement(this.canvas) && this.canvas.parentElement === this.host) {
       this.host.removeChild(this.canvas);
     }
@@ -678,9 +684,16 @@ export class GessoApp {
         // host's flow; see the fullscreen listener above.
         return;
       }
+      this.hostSize = { width: entry.contentRect.width, height: entry.contentRect.height };
       this.resize(entry.contentRect.width, entry.contentRect.height);
     });
     this.resizeObserver.observe(this.host);
+    // Moved to a display of another density: the same size, in more or fewer device pixels.
+    this.stopPixelRatio = watchPixelRatio(() => {
+      if (this.hostSize !== null && !this.fullscreen) {
+        this.resize(this.hostSize.width, this.hostSize.height);
+      }
+    });
   }
 }
 
