@@ -1,5 +1,11 @@
 # gesso-core
 
+## 0.6.11
+
+### Patch Changes
+
+- The `pointerEvents` property's documentation now says what it does: `'none'` takes a node and its whole subtree out of hit testing, and, unlike CSS, a descendant's `'auto'` does not bring it back. A container that should let presses through to what is beside it while its own children take theirs, such as a toolbar laid over a canvas, sets `hitTestable={false}` instead. The docs had called it CSS-like.
+
 ## 0.6.10
 
 ## 0.6.9

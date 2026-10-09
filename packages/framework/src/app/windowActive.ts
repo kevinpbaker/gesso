@@ -10,7 +10,9 @@
 export function observeWindowActive(onChange: (active: boolean) => void): () => void {
   let last: boolean | null = null;
   const report = (): void => {
-    const active = document.visibilityState === 'visible' && document.hasFocus();
+    // A document that cannot say where the focus is (some embedded webviews, a test's stand-in) is taken to have it.
+    const focused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+    const active = document.visibilityState === 'visible' && focused;
     if (active !== last) {
       last = active;
       onChange(active);
