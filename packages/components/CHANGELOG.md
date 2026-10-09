@@ -1,5 +1,13 @@
 # gesso-components
 
+## 0.6.10
+
+### Patch Changes
+
+- `TextInput` and `TextArea` take `labelHidden`, as `Select` does: the label still names the field for a screen reader but is not drawn above it, for a search field whose placeholder already says what it is.
+- gesso-core@0.6.10
+  - gesso-framework@0.6.10
+
 ## 0.6.9
 
 ### Patch Changes
