@@ -30,6 +30,7 @@ else on this table is shared.
 | `defaultValue` | `string`                  | `''`    | The text to start with, for a field that owns its own value. Supplying both throws, naming the component.                                               |
 | `onChange`     | `(value: string) => void` | none    | Called with the whole new text after every edit.                                                                                                        |
 | `label`        | `string`                  | `''`    | Drawn above the field and used as its accessible name. An empty label draws nothing.                                                                    |
+| `labelHidden`  | `boolean`                 | `false` | The label still names the field but is not drawn: for a search field whose placeholder and place already say what it is.                                |
 | `placeholder`  | `string`                  | none    | Drawn in the field while it is empty, and measured: an empty field is at least as wide as its placeholder.                                              |
 | `description`  | `string`                  | `''`    | Drawn under the field, and announced after the name. An `error` replaces what is drawn.                                                                 |
 | `error`        | `string`                  | `''`    | A non-empty string marks the field `invalid`, turns its border to the `danger` token, and shows this message under it in place of the description.      |
