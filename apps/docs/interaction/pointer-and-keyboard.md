@@ -88,13 +88,15 @@ Four props decide whether a node takes part at all:
 | Prop                             | Effect                                                                 |
 | -------------------------------- | ---------------------------------------------------------------------- |
 | `disabled`                       | The node and its whole subtree are inert: no hit, no focus, no keys    |
-| `pointerEvents="none"`           | The node and its whole subtree are skipped by hit testing, as in CSS   |
+| `pointerEvents="none"`           | The node and its whole subtree are skipped by hit testing              |
 | `hitTestable={false}`            | The node itself cannot be a target; its children still can             |
 | `visible={false}`, `opacity={0}` | The subtree is skipped, matching the renderer, which paints none of it |
 
 `hitTestable` is the one worth remembering: a decorative wrapper that
 must not swallow presses meant for what is drawn inside it sets that,
-not `pointerEvents`.
+not `pointerEvents`. Unlike CSS, a child's `pointerEvents="auto"` does
+not bring it back under a `"none"` ancestor, so an overlay holding a
+toolbar is `hitTestable={false}` with the toolbar left as it is.
 
 ## Capture, click and cancel
 
