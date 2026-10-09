@@ -1176,6 +1176,14 @@ export const UiProperties = {
     affects: DirtyFlags.Properties
   }),
 
+  /**
+   * `'none'` takes the node and its whole subtree out of hit testing, to
+   * block a region. Unlike CSS, a descendant cannot opt back in: its own
+   * `'auto'` is ignored under a `'none'` ancestor. For a container that
+   * should let presses through while its children still take them (an
+   * overlay with a toolbar in it), set `hitTestable={false}` on the
+   * container instead.
+   */
   pointerEvents: defineProperty<UiPointerEvents | undefined>({
     name: 'pointerEvents',
     defaultValue: undefined,

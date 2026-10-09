@@ -109,6 +109,7 @@ export type UiVerticalAlign = 'top' | 'middle' | 'bottom';
 
 export type UiObjectFit = 'fill' | 'cover' | 'contain' | 'none';
 
+/** `'none'` blocks the node and its subtree; `'auto'` cannot re-enable a node under a `'none'` ancestor. See the `pointerEvents` property. */
 export type UiPointerEvents = 'auto' | 'none';
 
 /** A CSS font weight: a number, a numeric string, or a keyword. */
