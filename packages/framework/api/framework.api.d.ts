@@ -373,7 +373,8 @@ interface ComponentContext {
   effect<T>(source: Observable<T>, run: (value: T) => void): Subscription;
   bounds(label?: string): BoundsCell;
 }
-type Inputs<P> = { readonly [K in keyof P]-?: InputCell<P[K]>; };
+type Inputs<P> = { readonly [K in keyof P]-?: InputCell<InputValue<P[K]>>; };
+type InputValue<V> = [Exclude<V, undefined>] extends [Observable<infer T>] ? T | Extract<V, undefined> : V;
 type FunctionComponent<P = {}> = (inputs: Inputs<P>, context: ComponentContext) => UiChild;
 type ClassComponent = new () => Component;
 type ComponentType = ClassComponent | ((inputs: any, context: ComponentContext) => UiChild);
@@ -406,6 +407,7 @@ export {
   input,
   InputCell,
   Inputs,
+  InputValue,
   internalState,
   InternalState,
   into,
@@ -2129,6 +2131,7 @@ declare class WorkerApp {
   mount(host: HTMLElement | string): () => void;
   private disconnectWebMcp;
   private handleWorkerFailure;
+  private handleAppWorkerFailure;
   private report;
   private forwardKeyDown;
   private forwardKeyUp;
@@ -3033,6 +3036,7 @@ import {
   input,
   InputCell,
   Inputs,
+  InputValue,
   internalState,
   InternalState,
   into,
@@ -3479,6 +3483,7 @@ export {
   type GessoRuntimeOptions,
   type IndexedDbStorageOptions,
   type Inputs,
+  type InputValue,
   type JsonSchema,
   type MediaOptions,
   type MediaSessionLike,

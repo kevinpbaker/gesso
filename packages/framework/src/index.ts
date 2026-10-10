@@ -51,6 +51,7 @@ export {
   type ClassComponent,
   type FunctionComponent,
   type Inputs,
+  type InputValue,
   type ComponentProps
 } from './FunctionComponent';
 export { OverlayService, type OverlayEntry, type OverlayPlacement, type OverlayRect } from './overlay/OverlayService';
