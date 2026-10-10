@@ -1,7 +1,7 @@
-import { BehaviorSubject, map, type Observable } from 'rxjs';
+import { BehaviorSubject, map, Subject, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FocusService } from 'gesso-framework';
-import { Column, Row, Text, type UiChild, type UiElement, type UiNode } from 'gesso-core';
+import { input, type ComponentContext, type Inputs, FocusService, ScrollService } from 'gesso-framework';
+import { Column, Row, Text, measureFlow, type LayoutBox, type UiChild, type UiElement, type UiNode } from 'gesso-core';
 import { CONTROL_INTERACTION, keymap } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
 
@@ -37,8 +37,13 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   const label = input(inputs.label, 'Menu');
   const placement = input(inputs.placement, 'bottom-start');
   const focus = ctx.inject(FocusService);
+  const scroll = ctx.inject(ScrollService);
   const overlay = useOverlay(ctx, 'menu');
   const active = new BehaviorSubject(0);
+  /** The rows' nodes, by index, so the highlighted one can be scrolled to. */
+  const rows = new Map<number, UiNode>();
+  /** The scroller, whenever it is given a new box. */
+  const scrollerBox = new Subject<LayoutBox>();
   let trapped = false;
   let placeholder: UiNode | null = null;
 
@@ -111,6 +116,51 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     inputs.onSelect.value?.(item.value);
   };
 
+  /**
+   * The highlighted row is kept on screen, the way a combobox keeps its
+   * option: a menu longer than the room it is given scrolls, and the
+   * arrows walking past its edge would otherwise walk the highlight out
+   * of sight. Only the keys move `active` here, so following it is
+   * following the keyboard.
+   *
+   * Again whenever the scroller is given a new box, because the row a
+   * menu opens on has not been laid out when it is chosen, and there is
+   * nowhere to scroll it to until the menu's first box arrives — which
+   * is reported from inside the frame's layout, where the runtime holds
+   * a reveal until every box has settled. The box and not the scroll
+   * position, so the wheel is not pulled back to the highlight.
+   */
+  const reveal = (): void => {
+    const node = overlay.isOpen() ? rows.get(active.value) : undefined;
+    if (node !== undefined) {
+      scroll.scrollIntoView(node, 4);
+    }
+  };
+  ctx.effect(active, reveal);
+  ctx.effect(scrollerBox, reveal);
+
+  /**
+   * A row arriving or leaving. A leaving row takes out only its own
+   * entry: a list that changes while the menu is open can mount the
+   * row now at an index before the row that was there has gone.
+   */
+  const track = (index: number, node: UiNode, present: boolean): void => {
+    if (present) {
+      rows.set(index, node);
+    } else if (rows.get(index) === node) {
+      rows.delete(index);
+    }
+  };
+
+  /**
+   * A frame around a column that scrolls. The frame is the menu — its
+   * role, its label, its keys and the focus trap — and keeps the border
+   * and background still while the rows move under it, when a menu is
+   * given less height than it has rows for. The scroller is a column
+   * and not a `ScrollView` so the menu stays as wide as its longest
+   * item: a scroll view fills the width it is offered, which in the
+   * overlay layer is the window's.
+   */
   const body = (): UiElement =>
     Column(
       {
@@ -123,7 +173,6 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
         focusable: true,
         minWidth: 160,
         padding: 4,
-        gap: 2,
         backgroundColor: 'surface',
         borderColor: 'border',
         borderWidth: 1,
@@ -140,7 +189,10 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
           Escape: close
         })
       },
-      inputs.items.pipe(map(items => items.map((item, index) => row(item, index, active, choose))))
+      Column(
+        { overflow: 'auto', minHeight: 0, gap: 2, modifiers: [measureFlow(scrollerBox)] },
+        inputs.items.pipe(map(items => items.map((item, index) => row(item, index, active, choose, track))))
+      )
     );
 
   inputs.open.subscribe(isOpen => {
@@ -175,10 +227,29 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
  * highlight rather than focus, which is what keeps Escape and Enter
  * arriving at the menu itself.
  */
-function row(item: MenuItem, index: number, active: Observable<number>, choose: (value: string) => void): UiElement {
+function row(
+  item: MenuItem,
+  index: number,
+  active: Observable<number>,
+  choose: (value: string) => void,
+  track: (index: number, node: UiNode, present: boolean) => void
+): UiElement {
+  let mounted: UiNode | null = null;
   return Row(
     {
       key: item.value,
+      ref: (node: UiNode | null) => {
+        if (node !== null) {
+          mounted = node;
+          track(index, node, true);
+        } else if (mounted !== null) {
+          track(index, mounted, false);
+          mounted = null;
+        }
+      },
+      // Its own height, in a menu given less room than its rows want:
+      // the column scrolls them rather than shrinking them to fit.
+      flexShrink: 0,
       modifiers: [CONTROL_INTERACTION],
       padding: 8,
       borderRadius: 4,

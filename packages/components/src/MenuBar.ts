@@ -1,7 +1,18 @@
-import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
+import { BehaviorSubject, combineLatest, map, Subject, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs } from 'gesso-framework';
-import { Box, Column, Row, Text, clickOutside, type UiChild, type UiKeyboardEvent, type UiNode } from 'gesso-core';
+import { input, ScrollService, type ComponentContext, type Inputs } from 'gesso-framework';
+import {
+  Box,
+  Column,
+  Row,
+  Text,
+  clickOutside,
+  measureFlow,
+  type LayoutBox,
+  type UiChild,
+  type UiKeyboardEvent,
+  type UiNode
+} from 'gesso-core';
 
 import { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep, type MenuBarMenu, type MenuBarState } from './menuBarModel';
 import { useOverlay } from './overlay';
@@ -63,11 +74,36 @@ export interface MenuBarProps<T> {
 export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Main menu');
   const overlay = useOverlay(ctx, 'menubar');
+  const scroll = ctx.inject(ScrollService);
   const state = new BehaviorSubject<MenuBarState>(MENU_BAR_CLOSED);
   const menus = (): readonly MenuBarMenu<T>[] => inputs.menus.value;
 
   /** The node each title is drawn as, so a panel can sit under it. */
   const titles: (UiNode | null)[] = [];
+
+  /**
+   * The open panel's rows, by menu and index, so the row the keyboard
+   * moves to can be scrolled to. Keyed by the menu as well because
+   * walking along the bar unmounts one panel as the next mounts, and in
+   * whichever order the two arrive, the rows going cannot take out the
+   * rows coming that share their indices.
+   */
+  const rows = new Map<string, UiNode>();
+  /** The open panel's scroller, whenever it is given a new box. */
+  const scrollerBox = new Subject<LayoutBox>();
+
+  /**
+   * The row the keyboard last put the highlight on, as a menu and an
+   * index, or null.
+   *
+   * Written by the keys and not derived from the state, because the
+   * pointer moves the same highlight: a row half under the panel's
+   * edge that the pointer brushed would otherwise jump the list under
+   * it, which is the one thing a list being read with the pointer must
+   * not do. A fresh object each time, so pressing a key always reveals
+   * the row again, even after the wheel has scrolled it away.
+   */
+  const revealed = new BehaviorSubject<{ readonly menu: number; readonly at: number } | null>(null);
 
   /**
    * The title the pointer is over, or -1.
@@ -110,6 +146,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     const was = state.value;
     state.next(next);
     if (!next.open) {
+      revealed.next(null);
       if (overlay.isOpen()) {
         overlay.hide();
       }
@@ -168,6 +205,9 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     event.preventDefault();
     event.stopPropagation();
     show(step.state);
+    if (step.state.open && step.state.active !== -1) {
+      revealed.next({ menu: step.state.focused, at: step.state.active });
+    }
     if (step.choose !== undefined) {
       inputs.onChoose.value?.(step.choose);
     }
@@ -176,13 +216,58 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     }
   };
 
-  /** The panel for one menu: its commands, their keys, and the rules between. */
+  /**
+   * Keeps the row the keyboard is on in view, when it still is.
+   *
+   * Run when a key moves the highlight, and again whenever the panel's
+   * scroller is given a new box. The second is not a nicety: the key
+   * that opens a menu also picks its row — ArrowUp on the bar opens it
+   * on the last — and that row has not been laid out, so there is
+   * nowhere to scroll it to, until the panel's first box arrives. A box
+   * is reported from inside the frame's layout, where the runtime holds
+   * a reveal until every box has settled. It is the scroller's box and
+   * not its scroll position, so turning the wheel does not drag the
+   * list back to the highlight; a window resized shorter does.
+   */
+  const reveal = (): void => {
+    const target = revealed.value;
+    const current = state.value;
+    if (target === null || !current.open || current.focused !== target.menu || current.active !== target.at) {
+      return;
+    }
+    const node = rows.get(`${target.menu}:${target.at}`);
+    if (node !== undefined) {
+      scroll.scrollIntoView(node, 4);
+    }
+  };
+  ctx.effect(revealed, reveal);
+  ctx.effect(scrollerBox, reveal);
+
+  /**
+   * The panel for one menu: its commands, their keys, and the rules
+   * between.
+   *
+   * **A frame around a scroller, not one column.** A menu longer than
+   * the window is given only the room under its title, and the rows
+   * scroll inside that rather than running off the screen. The border,
+   * the background, the radius and the padding stay on the frame, so
+   * they hold still while the rows move, and so do the role and the
+   * label: the frame is the menu, and the scroller is only how its rows
+   * are laid out.
+   *
+   * The scroller is a column that scrolls, not a `ScrollView`, for the
+   * reason the dialog's body is: a scroll view fills the width it is
+   * offered, which in the overlay layer is the window's, and a panel is
+   * as wide as its longest command. `minHeight: 0` lets it be shorter
+   * than its rows, which is what scrolling is, and every row keeps its
+   * own height rather than being shrunk to fit — a rule is a one-pixel
+   * box with nothing in it, and would be the first to go.
+   */
   const panel = (index: number): UiChild =>
     Column(
       {
         minWidth: 232,
         padding: 4,
-        gap: 1,
         backgroundColor: 'surface',
         borderColor: 'border',
         borderWidth: 1,
@@ -196,8 +281,32 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
           })
         ]
       },
-      ...(menus()[index]?.entries ?? []).map((entry, at) => item(entry, at, index, ticked(index)))
+      Column(
+        { overflow: 'auto', minHeight: 0, gap: 1, modifiers: [measureFlow(scrollerBox)] },
+        ...(menus()[index]?.entries ?? []).map((entry, at) => item(entry, at, index, ticked(index)))
+      )
     );
+
+  /**
+   * Keeps `rows` to the open panel's, so the highlight can be scrolled
+   * to. A row leaving takes out only its own entry, so a panel reopened
+   * before the last one's rows have gone keeps the rows it mounted.
+   */
+  const trackRow = (menu: number, at: number): ((node: UiNode | null) => void) => {
+    const key = `${menu}:${at}`;
+    let mounted: UiNode | null = null;
+    return node => {
+      if (node !== null) {
+        mounted = node;
+        rows.set(key, node);
+      } else if (mounted !== null) {
+        if (rows.get(key) === mounted) {
+          rows.delete(key);
+        }
+        mounted = null;
+      }
+    };
+  };
 
   /**
    * Whether a menu has a column for ticks: every row in it does when
@@ -217,6 +326,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       return Box({
         key: `rule-${at}`,
         height: 1,
+        flexShrink: 0,
         marginTop: 3,
         marginBottom: 3,
         backgroundColor: 'border',
@@ -234,6 +344,8 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     return Row(
       {
         key: text,
+        ref: trackRow(menu, at),
+        flexShrink: 0,
         gap: 24,
         paddingLeft: 10,
         paddingRight: 10,

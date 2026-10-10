@@ -466,6 +466,66 @@ describe('Menu', () => {
     expect(menu.x).toBe(20);
   });
 
+  /**
+   * A context menu opened halfway down a window with room for it on
+   * neither side of the pointer. It flipped above and started off the
+   * top of the screen; it slides now, whole, until it fits.
+   */
+  it('stays wholly inside the window when it fits on neither side of the point', () => {
+    const open = new BehaviorSubject(false);
+    const items = Array.from({ length: 8 }, (_, at) => ({ value: String(at), label: `Item ${at + 1}` }));
+    const ui = mount(
+      createComponent(Menu, { open, at: { x: 20, y: 200 }, items, onOpenChange: (next: boolean) => open.next(next) })
+    );
+    open.next(true);
+    ui.frame();
+
+    const menu = ui.getLayout(ui.getByRole('menu'));
+    expect(menu.height).toBeGreaterThan(200);
+    expect(menu.y).toBeGreaterThanOrEqual(0);
+    expect(menu.y + menu.height).toBeLessThanOrEqual(400);
+    // Whole: nothing in it is cut off, so nothing needs scrolling to.
+    const last = ui.getVisibleBox(ui.getByLabel('Item 8'));
+    expect(last.y + last.height).toBeLessThanOrEqual(menu.y + menu.height);
+  });
+
+  /**
+   * A menu with more items than the window has room for, under the
+   * button that opened it: cut to the room below, scrolling the rest,
+   * with the highlight kept in view as the keys walk it.
+   */
+  it('scrolls when it is longer than the room below its anchor, and keeps the highlight in view', () => {
+    const open = new BehaviorSubject(false);
+    const items = Array.from({ length: 30 }, (_, at) => ({ value: String(at), label: `Item ${at + 1}` }));
+    let trigger: UiNode | null = null;
+    const anchor = new BehaviorSubject<UiNode | null>(null);
+    const ui = mount(
+      Column(
+        Button({ text: 'Open', ref: (node: UiNode | null) => (trigger = node) }),
+        createComponent(Menu, { open, anchor, items, onOpenChange: (next: boolean) => open.next(next) })
+      )
+    );
+    ui.frame();
+    anchor.next(trigger);
+    open.next(true);
+    ui.frame();
+
+    const menu = () => ui.getLayout(ui.getByRole('menu'));
+    const button = ui.getLayout(trigger!);
+    expect(menu().y).toBe(button.y + button.height + 4);
+    expect(menu().y + menu().height).toBe(400);
+    expect(ui.getVisibleBox(ui.getByLabel('Item 30')).y).toBeGreaterThan(400);
+
+    ui.fireEvent.keyDown('End');
+    ui.frame();
+    const last = ui.getVisibleBox(ui.getByLabel('Item 30'));
+    expect(last.y + last.height).toBeLessThanOrEqual(menu().y + menu().height);
+
+    ui.fireEvent.keyDown('Home');
+    ui.frame();
+    expect(ui.getVisibleBox(ui.getByLabel('Item 1')).y).toBeGreaterThanOrEqual(menu().y);
+  });
+
   it('walks its items and chooses one, then closes', () => {
     const open = new BehaviorSubject(false);
     const chosen: string[] = [];
