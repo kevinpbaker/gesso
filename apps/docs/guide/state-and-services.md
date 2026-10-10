@@ -173,7 +173,9 @@ that looks like it did would be lying about the thread model.
   so it would report a change on every update and rebuild the subtree
   bound to it forever. The first value of each key is checked and the
   channel reports an error naming the key and the path inside it.
-  Flatten it in the layer that owns it.
+  Flatten it in the layer that owns it. A `SharedArrayBuffer` is the
+  exception: it is shared memory, compared by identity, and crosses
+  without being copied.
 - **Declare keys finely.** A key holding a large array is re-diffed
   whenever it changes. The differ trims a common prefix and suffix, so
   an append or an edit in place stays small, while a re-sort degrades

@@ -19,6 +19,12 @@ describe('frameData', () => {
   it('refuses a value it cannot serialize, naming the rule that was broken', () => {
     expect(() => frameData(1, () => 'a function')).toThrow(/plain data/);
   });
+
+  it('refuses shared memory rather than sending it as an empty object', () => {
+    expect(() => frameData(1, { patches: [{ value: new SharedArrayBuffer(4) }] })).toThrow(
+      /SharedArrayBuffer at 'value', which cannot cross to another process/
+    );
+  });
 });
 
 describe('FrameAssembler', () => {

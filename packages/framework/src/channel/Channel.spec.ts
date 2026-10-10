@@ -224,6 +224,49 @@ describe('a channel across a real patch stream', () => {
     stop();
   });
 
+  it('carries shared memory out of an application worker without copying it', async () => {
+    // Over a real MessageChannel, so the message is structured-cloned the
+    // way a worker's is: a copy would show up as two separate memories.
+    const Shared = channel<{ text: SharedArrayBuffer | null }, { write(at: number): void }>('shared', { text: null });
+    const memory = new SharedArrayBuffer(8);
+    const host: PortHost = { onmessage: null };
+    const stop = serveChannels(
+      [
+        {
+          token: Shared,
+          source: {
+            view: { text: new BehaviorSubject<SharedArrayBuffer | null>(memory) },
+            commands: { write: (at: number) => void (new Uint8Array(memory)[at] = 42) }
+          }
+        }
+      ],
+      host
+    );
+    const wire = new MessageChannel();
+    wire.port2.onmessage = event => host.onmessage?.({ data: event.data, ports: [...event.ports] });
+    const fakeWorker = () =>
+      ({
+        postMessage: (message: unknown, transfer?: Transferable[]) => wire.port1.postMessage(message, transfer ?? []),
+        terminate: () => {}
+      }) as unknown as Worker;
+
+    const handle = createChannelRegistry([{ token: Shared, worker: workerHandle(fakeWorker) }]);
+    const shared = handle.registry.get(Shared);
+    await waitFor(() => shared.view.text.value !== null, 'the shared memory');
+    const received = shared.view.text.value!;
+
+    expect(received).toBeInstanceOf(SharedArrayBuffer);
+    new Uint8Array(received)[0] = 7;
+    expect(new Uint8Array(memory)[0]).toBe(7);
+    shared.send.write(1);
+    await waitFor(() => new Uint8Array(received)[1] === 42, 'the write made on the other side');
+
+    handle.dispose();
+    stop();
+    wire.port1.close();
+    wire.port2.close();
+  });
+
   it('reports a view key nothing was provided for', async () => {
     const errors: string[] = [];
     const handle = createChannelRegistry(

@@ -110,7 +110,8 @@ export const Notes = defineChannel('notes', {
 
 - Only **plain data** crosses: primitives, arrays and plain objects.
   No `Date`, `Map`, `Set` or class instances. Flatten them where they
-  are made.
+  are made. The one exception is a `SharedArrayBuffer`, which both
+  threads read without copying (the page must be cross-origin isolated).
 - Commands return `void`. The effect comes back as a change to the view,
   never as a return value.
 - A component reads `ctx.channel(Notes).view.rows` like any other cell

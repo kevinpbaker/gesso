@@ -49,6 +49,21 @@ export function isGessoFrame(value: unknown): value is GessoFrame {
   return kind === 'open' || kind === 'data' || kind === 'close' || kind === 'control';
 }
 
+/**
+ * A `SharedArrayBuffer` is memory two threads of one page read at once,
+ * and another process cannot read it. JSON would quietly turn it into
+ * `{}`, so it is refused here, by name.
+ */
+function refuseSharedMemory(this: unknown, key: string, value: unknown): unknown {
+  if (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer) {
+    throw new Error(
+      `A channel message holds a SharedArrayBuffer${key === '' ? '' : ` at '${key}'`}, which cannot cross to another process. ` +
+        'Shared memory works between the workers of one page; across a process boundary send the bytes as data.'
+    );
+  }
+  return value;
+}
+
 /** Wraps one control message. Never split: these are small by construction. */
 export function frameControl(name: string, payload: unknown): GessoFrame {
   return { kind: 'control', name, body: JSON.stringify(payload ?? null) ?? 'null' };
@@ -64,7 +79,7 @@ export function frameControl(name: string, payload: unknown): GessoFrame {
  * this module, and which a view key cannot rely on anyway.
  */
 export function frameData(stream: number, value: unknown, chunkBytes = DEFAULT_CHUNK_BYTES): GessoFrame[] {
-  const body = JSON.stringify(value);
+  const body = JSON.stringify(value, refuseSharedMemory);
   if (body === undefined) {
     throw new Error(
       `A channel message for stream ${stream} could not be serialized. Only plain data crosses a channel; see requirePlainData.`

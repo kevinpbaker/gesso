@@ -1,3 +1,4 @@
+import { describeSharedMemory } from '../channel/plainData';
 import type { Subscription } from 'rxjs';
 
 import { channelSchema, type CommandSchema, type JsonSchema } from '../channel/ChannelSchema';
@@ -411,7 +412,9 @@ function toolName(raw: string): string {
 function shown(entry: Entry): Record<string, unknown> {
   const view: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(entry.view)) {
-    if (!entry.hidden.has(key)) view[key] = value;
+    // Shared memory is a handle the agent can do nothing with, and JSON
+    // would show it as `{}`; it is described instead.
+    if (!entry.hidden.has(key)) view[key] = describeSharedMemory(value);
   }
   return view;
 }

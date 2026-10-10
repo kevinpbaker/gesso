@@ -581,6 +581,13 @@ class Describer {
     if (symbolName !== undefined && this.inCommand && BINARY.has(symbolName)) {
       return { type: 'string', contentEncoding: 'base64', 'x-gesso-binary': symbolName };
     }
+    // Shared memory may sit in a view: it compares by identity, which is
+    // right for a handle on memory, and an agent is shown its size (see
+    // `describeSharedMemory`). A command cannot take it from an agent,
+    // which has no memory to share, so there it stays unplain.
+    if (symbolName === 'SharedArrayBuffer' && !this.inCommand) {
+      return { type: 'string', description: 'Shared memory, shown as its size.', 'x-gesso-shared': true };
+    }
     if (symbolName !== undefined && NOT_PLAIN.has(symbolName)) {
       return this.unplain(path, `a ${symbolName}`);
     }
