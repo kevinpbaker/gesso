@@ -1058,6 +1058,7 @@ interface UiPropertyDefinition<T> {
   readonly environmentKey?: UiEnvironmentKey<unknown>;
   readonly resolveFromEnvironment?: (value: unknown) => T;
   readonly validate?: (value: T) => string | undefined;
+  readonly narrowEffects?: (previous: T, next: T, flags: DirtyFlags) => DirtyFlags;
 }
 declare function defineProperty<T>(options: Omit<UiPropertyDefinition<T>, 'name'> & {
   name: string;
@@ -3749,6 +3750,7 @@ interface GridTrackSizingResult {
 declare function sizeGridTracks(input: GridTrackSizingInput): GridTrackSizingResult;
 declare function findPropertyDefinition<T>(name: string): UiPropertyDefinition<T> | undefined;
 declare function getPropertyNames(): string[];
+declare const propertyNarrowers: ReadonlyMap<string, (previous: unknown, next: unknown, flags: DirtyFlags) => DirtyFlags>;
 declare function propertyEffects(name: string): DirtyFlags;
 declare function closestPropertyName(name: string, candidates?: Iterable<string>): string | undefined;
 declare function propertyIsInherited(name: string): boolean;
@@ -5676,6 +5678,7 @@ export {
   PrimitiveKind,
   propertyEffects,
   propertyIsInherited,
+  propertyNarrowers,
   propertyValuesEqual,
   propertyValuesEqualByName,
   proportionalFontMetrics,
@@ -6587,6 +6590,7 @@ import {
   PrimitiveKind,
   propertyEffects,
   propertyIsInherited,
+  propertyNarrowers,
   propertyValuesEqual,
   propertyValuesEqualByName,
   proportionalFontMetrics,
@@ -7340,6 +7344,7 @@ export {
   PrimitiveKind,
   propertyEffects,
   propertyIsInherited,
+  propertyNarrowers,
   propertyValuesEqual,
   propertyValuesEqualByName,
   proportionalFontMetrics,
