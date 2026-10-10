@@ -103,6 +103,16 @@ interface DesktopWindowsCommands {
 }
 declare const DesktopWindows: ChannelToken<DesktopWindowsView, DesktopWindowsCommands>;
 declare function windowsChannel(app: DesktopApp, window: DesktopWindowHandle): ServedChannel;
+type MenuItem = {
+  type: 'divider';
+} | {
+  label?: string;
+  role?: string;
+  action?: string;
+  accelerator?: string;
+  submenu?: MenuItem[];
+};
+declare function standardMenu(appName: string, extra?: readonly MenuItem[]): MenuItem[];
 export {
   createDesktopApp,
   createScreenAgent,
@@ -114,8 +124,10 @@ export {
   DesktopWindowsCommands,
   DesktopWindowsView,
   DesktopWindowTransport,
+  MenuItem,
   messageBoxConfirm,
   serveDesktopAgent,
+  standardMenu,
   type DesktopAgent,
   type DesktopAgentOptions,
   type DesktopServe,
