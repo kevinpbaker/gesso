@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Column, Paint, percent, Row, Text, type PaintSurface, type UiPaint } from 'gesso-core';
+import { Column, Paint, percent, Row, Text, type PaintSurface, type UiPaint, type UiTextSpan } from 'gesso-core';
 import { createComponent, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { renderTest } from './renderTest';
@@ -66,5 +66,47 @@ describe('changing what a painted node draws', () => {
     ui.frame();
 
     expect(ui.getLayout(after).x).toBe(50);
+  });
+});
+
+/**
+ * Recolouring text is a repaint.
+ *
+ * Found by gesso-code's syntax highlighting: a line's colours arrive a
+ * frame after its text, and each change of `spans` laid the line out
+ * again although only colours had changed.
+ */
+describe('recolouring the runs of a text', () => {
+  it('re-measures nothing when only colours change, and re-measures when the text does', () => {
+    const spans = new BehaviorSubject<UiTextSpan[]>([{ text: 'const ' }, { text: 'x' }]);
+    function Screen(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+      return Column({ width: percent(100) }, Text({ spans }), Text({ text: 'below' }));
+    }
+    const ui = renderTest(createComponent(Screen, {}), { width: 400, height: 300 });
+    ui.frame();
+
+    ui.clearDraws();
+    spans.next([
+      { text: 'const ', color: 'primary' },
+      { text: 'x', color: 'danger' }
+    ]);
+    ui.frame();
+    expect(ui.frames[ui.frames.length - 1].measured).toBe(0);
+    // And drawn in the new colours.
+    let style = '';
+    const inks = new Map<string, string>();
+    for (const call of ui.draws) {
+      if (call.name === 'set:fillStyle') style = String(call.args[0]);
+      else if (call.name === 'fillText') inks.set(String(call.args[0]), style);
+    }
+    expect(inks.get('const ')).not.toBe(inks.get('below'));
+    expect(inks.get('x')).not.toBe(inks.get('const '));
+
+    spans.next([
+      { text: 'const ', color: 'primary' },
+      { text: 'xy', color: 'danger' }
+    ]);
+    ui.frame();
+    expect(ui.frames[ui.frames.length - 1].measured).toBeGreaterThan(0);
   });
 });
