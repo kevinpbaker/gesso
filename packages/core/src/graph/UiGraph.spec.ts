@@ -330,6 +330,36 @@ describe('UiGraph', () => {
       expect(grandchild.parent).toBeNull();
     });
 
+    it('tells the removal listener while what was removed is still a tree', () => {
+      const graph = new UiGraph();
+      const parent = graph.createNode('parent', UiNodeType.Column);
+      const child = graph.createNode('child', UiNodeType.Column);
+      const grandchild = graph.createNode('grandchild', UiNodeType.Column);
+      const leaf = graph.createNode('leaf', UiNodeType.Text);
+      graph.appendChild(parent, child);
+      graph.appendChild(child, grandchild);
+      graph.appendChild(grandchild, leaf);
+      const seen: string[] = [];
+      let detached = false;
+      graph.setNodeRemovedListener(removed => {
+        detached = removed.parent === null;
+        const stack = [removed];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          seen.push(current.id);
+          for (let c = current.firstChild; c !== null; c = c.nextSibling) {
+            stack.push(c);
+          }
+        }
+      });
+      graph.removeNode(child);
+      expect(detached).toBe(true);
+      expect(seen).toEqual(['child', 'grandchild', 'leaf']);
+      expect(grandchild.parent).toBeNull();
+      expect(leaf.parent).toBeNull();
+      expect(child.firstChild).toBeNull();
+    });
+
     it('clears dirty state of removed descendants', () => {
       const graph = new UiGraph();
       const parent = graph.createNode('parent', UiNodeType.Column);

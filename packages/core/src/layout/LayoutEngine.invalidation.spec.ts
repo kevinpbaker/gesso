@@ -169,6 +169,41 @@ describe('LayoutEngine invalidation', () => {
     });
   });
 
+  describe('removal', () => {
+    /**
+     * The engine is told about a removal once, with the root of what
+     * was removed, and walks down from there to drop every record under
+     * it. It used to be told only after the graph had unlinked each
+     * removed node from its parent, so the walk found no children and
+     * dropped the root's record alone. A virtualised list leaked the
+     * records of every row's cells, and the sticky and absolute nodes
+     * among them were walked on every frame after: gessosheet's frame
+     * cost rose half a millisecond with each scroll through its grid.
+     */
+    it('drops the record of every node under a removed one', () => {
+      const h = createHarness();
+      h.root = h.builder.build(
+        Column(
+          Row(Text({ text: 'A', fontSize: 10 }), Box({ width: 10, height: 10, position: 'sticky', top: 0 })),
+          Text({ text: 'B', fontSize: 10 })
+        )
+      );
+      firstFrame(h);
+      const row = h.root.firstChild!;
+      const text = row.firstChild!;
+      const sticky = row.lastChild!;
+      expect(h.engine.recordFor(text)).toBeDefined();
+      expect(h.engine.recordFor(sticky)).toBeDefined();
+
+      h.graph.removeNode(row);
+      h.clock.tick(0);
+
+      expect(h.engine.recordFor(row)).toBeUndefined();
+      expect(h.engine.recordFor(text)).toBeUndefined();
+      expect(h.engine.recordFor(sticky)).toBeUndefined();
+    });
+  });
+
   describe('declarative props', () => {
     it('lays out a Column built with gap and padding props', () => {
       const h = createHarness();
