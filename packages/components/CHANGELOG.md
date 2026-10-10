@@ -1,5 +1,14 @@
 # gesso-components
 
+## 0.6.17
+
+### Patch Changes
+
+- 762a2b8: `Menu` and `MenuBar` panels scroll when they are longer than the room they are given. A menu bar's thirty-item Format menu in a short window used to run off the bottom, with nothing past the edge reachable; it now stops at the window's edge and its rows scroll inside the frame with the wheel, while the arrow keys, Home and End keep the highlighted row in view. Hovering a row does not scroll the list.
+- Updated dependencies [fcf0d04]
+  - gesso-core@0.6.17
+  - gesso-framework@0.6.17
+
 ## 0.6.16
 
 ### Patch Changes
