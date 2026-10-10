@@ -225,6 +225,8 @@ export class UiPointerController {
   }
 
   private lastPosition: { x: number; y: number } | null = null;
+  /** The pressed node and its ancestors when the press began, deepest first. */
+  private downPath: UiNode[] = [];
 
   get hoveredNode(): UiNode | null {
     return this.hoverNode;
@@ -233,6 +235,23 @@ export class UiPointerController {
   /** The node the current press started on, or null when idle. */
   get pressedNode(): UiNode | null {
     return this.downTarget;
+  }
+
+  /**
+   * Where the press's events go: the node it started on, or, once that
+   * has been taken out of the tree, the nearest of its ancestors at the
+   * time that is still in it. A row of a virtual list that scrolls out
+   * of view in the middle of a drag-select is unmounted, and without
+   * this the rest of the drag went to a node nothing could hear from;
+   * the list it was in, and whoever is listening above it, still are.
+   */
+  private captured(): UiNode {
+    const path = this.downPath;
+    const root = path[path.length - 1];
+    for (const node of path) {
+      if (topOf(node) === root) return node;
+    }
+    return this.downTarget!;
   }
 
   /** The scroll container whose thumb is being dragged, or null. */
@@ -315,6 +334,7 @@ export class UiPointerController {
       this.selection?.pointerDown(null, x, y, modifiers);
     }
     this.downTarget = target;
+    this.downPath = pathOf(target);
     this.downX = x;
     this.downY = y;
     this.downDefaultPrevented = event.defaultPrevented;
@@ -346,11 +366,12 @@ export class UiPointerController {
     }
     if (this.downTarget !== null) {
       const event = new UiPointerEvent(UiEventType.PointerMove, x, y, buttons, modifiers, pointer);
-      this.dispatcher.dispatch(event, this.downTarget);
-      this.gestures?.pointerMove(event, this.downTarget);
+      const captured = this.captured();
+      this.dispatcher.dispatch(event, captured);
+      this.gestures?.pointerMove(event, captured);
       if (!event.defaultPrevented) {
-        if (this.editing !== undefined && this.editing.isEditable(this.downTarget)) {
-          this.editing.pointerMove(this.downTarget, x, y);
+        if (this.editing !== undefined && this.editing.isEditable(captured)) {
+          this.editing.pointerMove(captured, x, y);
         } else if (!this.downDefaultPrevented) {
           // A press the app cancelled started no selection, so the
           // moves after it are not extending one either.
@@ -400,11 +421,12 @@ export class UiPointerController {
       this.activePointer = null;
       return null;
     }
-    const target = this.downTarget;
-    if (target === null) {
+    if (this.downTarget === null) {
       return null;
     }
+    const target = this.captured();
     this.downTarget = null;
+    this.downPath = [];
     this.activePointer = null;
     this.editing?.pointerUp();
     this.selection?.pointerUp();
@@ -479,12 +501,14 @@ export class UiPointerController {
     this.scrollbarDrag = null;
     this.editing?.pointerUp();
     this.selection?.pointerUp();
-    const target = this.downTarget;
-    this.downTarget = null;
-    this.activePointer = null;
-    if (target === null) {
+    if (this.downTarget === null) {
+      this.activePointer = null;
       return;
     }
+    const target = this.captured();
+    this.downTarget = null;
+    this.downPath = [];
+    this.activePointer = null;
     const event = new UiPointerEvent(UiEventType.PointerCancel, this.downX, this.downY, 0, noKeyModifiers(), pointer);
     this.dispatcher.dispatch(event, target);
     this.gestures?.pointerCancel();
@@ -695,4 +719,18 @@ const MULTI_CLICK_SLOP = 4;
 
 function defaultClock(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+/** A node and its ancestors, deepest first. */
+function pathOf(node: UiNode | null): UiNode[] {
+  const path: UiNode[] = [];
+  for (let at = node; at !== null; at = at.parent) path.push(at);
+  return path;
+}
+
+/** The top of the tree a node is in now. */
+function topOf(node: UiNode): UiNode {
+  let at = node;
+  while (at.parent !== null) at = at.parent;
+  return at;
 }
