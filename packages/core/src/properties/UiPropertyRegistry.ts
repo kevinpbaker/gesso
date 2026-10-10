@@ -27,6 +27,23 @@ export function getPropertyNames(): string[] {
 }
 
 /**
+ * The properties that narrow their effects for a particular change,
+ * by name: few, so the graph's write path pays one map lookup and finds
+ * nothing for nearly every property. See `narrowEffects`.
+ */
+export const propertyNarrowers: ReadonlyMap<
+  string,
+  (previous: unknown, next: unknown, flags: DirtyFlags) => DirtyFlags
+> = new Map(
+  [...registry.values()]
+    .filter(definition => definition.narrowEffects !== undefined)
+    .map(definition => [
+      definition.name,
+      definition.narrowEffects as (previous: unknown, next: unknown, flags: DirtyFlags) => DirtyFlags
+    ])
+);
+
+/**
  * Returns the dirty flags caused by changing the named property.
  *
  * Unknown properties are treated as generic property changes so

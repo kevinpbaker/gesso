@@ -1664,9 +1664,10 @@ export const UiProperties = {
    *
    * Layout as well as paint, for the reason `text` carries layout: a
    * painter may declare an intrinsic size, and a node sized by its
-   * content has to be measured again when that content changes. A
-   * painted node with an explicit width and height is a relayout
-   * boundary, so a chart repainting on a stream re-measures one leaf.
+   * content has to be measured again when that content changes. Only
+   * then, though: a new picture that declares the same intrinsic size
+   * as the old one (usually none) is a repaint and re-measures nothing,
+   * however the node is sized (`narrowEffects`).
    *
    * See `rendering/PaintSurface.ts` for the vocabulary.
    */
@@ -1675,7 +1676,13 @@ export const UiProperties = {
     defaultValue: undefined,
     inherited: false,
     affects: L | P,
-    compare: paintValuesEqual
+    compare: paintValuesEqual,
+    // A new picture that declares the same intrinsic size cannot move
+    // anything: repaint it and lay out nothing.
+    narrowEffects: (previous, next, flags) =>
+      previous?.intrinsicWidth === next?.intrinsicWidth && previous?.intrinsicHeight === next?.intrinsicHeight
+        ? flags & ~L
+        : flags
   }),
 
   /** A static vector shape: `rendering/PaintSurface.ts`'s `UiPath`. */

@@ -10,7 +10,7 @@ import { UiEnvironment } from '../environment/UiEnvironment';
 import { findEnvironmentKey, type UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { isTypographyRole } from '../environment/UiTypography';
-import { inheritedPropertyFlags } from '../properties/UiPropertyRegistry';
+import { inheritedPropertyFlags, propertyNarrowers } from '../properties/UiPropertyRegistry';
 import type { UiTextStyle } from '../properties/UiTextStyle';
 import { DEFAULT_LINE_HEIGHT_FACTOR } from '../properties/UiTextFont';
 import type { Observable } from 'rxjs';
@@ -656,7 +656,10 @@ export class UiGraph {
       return false;
     }
     node.setProperty(property, value);
-    this.markDirty(node, this.withProvidedFlags(property, dirtyFlags));
+    // One lookup that finds nothing for nearly every property; see `narrowEffects`.
+    const narrow = propertyNarrowers.get(property);
+    const flags = narrow === undefined ? dirtyFlags : narrow(previousValue, value, dirtyFlags);
+    this.markDirty(node, this.withProvidedFlags(property, flags));
     return true;
   }
 

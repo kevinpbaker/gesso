@@ -34,6 +34,20 @@ export interface UiPropertyDefinition<T> {
    * whatever reads it, as a bound length is checked at layout.
    */
   readonly validate?: (value: T) => string | undefined;
+  /**
+   * Narrows `affects` for one particular change, when what changed
+   * shows that less is invalid than the property's worst case.
+   *
+   * `paint` is the reason it exists. A painter may declare an intrinsic
+   * size, so a new painter can change layout, and `affects` has to say
+   * so; but a new picture with the same declared size (usually none)
+   * cannot, and marking layout for it laid the tree out again up to the
+   * nearest relayout boundary on every repaint, which for a painted
+   * node sized by its parent was the root, every frame of a scroll.
+   * Given the old and new values and the flags `affects` gives, it
+   * returns the flags this change actually needs.
+   */
+  readonly narrowEffects?: (previous: T, next: T, flags: DirtyFlags) => DirtyFlags;
 }
 
 /**
@@ -52,7 +66,8 @@ export function defineProperty<T>(
     compare: options.compare,
     environmentKey: options.environmentKey,
     resolveFromEnvironment: options.resolveFromEnvironment,
-    validate: options.validate
+    validate: options.validate,
+    narrowEffects: options.narrowEffects
   };
 }
 
