@@ -64,11 +64,15 @@ function keyEvent(props: {
   type: 'keydown' | 'keyup';
   key?: string;
   shiftKey?: boolean;
+  isComposing?: boolean;
+  keyCode?: number;
   preventDefault?: () => void;
 }): Event {
   return {
     type: props.type,
     key: props.key ?? 'a',
+    isComposing: props.isComposing ?? false,
+    keyCode: props.keyCode ?? 0,
     shiftKey: props.shiftKey ?? false,
     ctrlKey: false,
     altKey: false,
@@ -214,6 +218,19 @@ describe('UiPlatformAdapter', () => {
     expect(down).toHaveBeenCalledTimes(1);
     expect(down.mock.calls[0]![0].key).toBe('Tab');
     expect(up).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves an IME's keys to the IME", () => {
+    // The Enter that commits a candidate, and the key that opens a
+    // composition (keyCode 229): handled as keys too, the Enter would
+    // also insert a line.
+    const { h, surface } = setup();
+    const down = vi.fn();
+    h.dispatcher.addEventListener(h.root, UiEventType.KeyDown, down);
+    surface.keyboardTarget.emit('keydown', keyEvent({ type: 'keydown', key: 'Enter', isComposing: true }));
+    surface.keyboardTarget.emit('keydown', keyEvent({ type: 'keydown', key: 'n', keyCode: 229 }));
+    surface.keyboardTarget.emit('keydown', keyEvent({ type: 'keydown', key: 'Enter', keyCode: 13 }));
+    expect(down.mock.calls.map(call => call[0].key)).toEqual(['Enter']);
   });
 
   it('maps DOM modifier keys to UiKeyModifiers', () => {

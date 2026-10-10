@@ -1698,12 +1698,14 @@ type ShellToRuntimeMessage = {
 {
   type: 'keyDown';
   key: string;
+  code?: string;
   modifiers: UiKeyModifiers;
   at?: number;
   textFollows?: boolean;
 } | {
   type: 'keyUp';
   key: string;
+  code?: string;
   modifiers: UiKeyModifiers;
   at?: number;
 } |

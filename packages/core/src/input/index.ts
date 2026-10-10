@@ -4,6 +4,7 @@ export {
   MOUSE_POINTER,
   noKeyModifiers,
   UiBeforeInputEvent,
+  UiCompositionEvent,
   UiEventType,
   UiFocusEvent,
   UiGestureEvent,
@@ -51,6 +52,7 @@ export type { EditingControllerOptions, EditingHost, EditingState } from './UiEd
 export {
   CanvasPlatformSurface,
   capturePointer,
+  isImeKey,
   pointerDeviceOf,
   prepareInputSurface,
   touchActionFor,

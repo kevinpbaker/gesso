@@ -3942,6 +3942,7 @@ function editingStatesEqual(a: EditingState | null, b: EditingState | null): boo
     a.multiline === b.multiline &&
     a.composing === b.composing &&
     a.html === b.html &&
+    a.clipboard === b.clipboard &&
     a.caret.x === b.caret.x &&
     a.caret.y === b.caret.y &&
     a.caret.width === b.caret.width &&
