@@ -201,8 +201,7 @@ styling and its hidden text through the composition.
 Keys that belong to the IME are not forwarded at all: one pressed while
 a composition is open (the arrows that move through candidates, the
 Enter that commits one, the Backspace that edits the reading) and the
-key that opens a composition, which browsers report with `keyCode`
-229. Their effect arrives as composition events. Forwarded as keys too,
+key that opens a composition, which browsers report with `keyCode` 229. Their effect arrives as composition events. Forwarded as keys too,
 the Enter that commits a candidate would also insert a line.
 
 A key a listener cancels keeps its text out, as in a browser: an
@@ -277,11 +276,11 @@ gets those while it has focus:
 />
 ```
 
-| Event                                                         | What it carries                                                      |
-| ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `onBeforeInput`                                               | Typed text (`insertText`), a dictation or a correction, `deleteByCut` |
-| `onCompositionStart`, `onCompositionUpdate`, `onCompositionEnd` | The IME's text so far and its caret, then what it committed          |
-| `onPaste`                                                     | The clipboard's text and HTML                                        |
+| Event                                                           | What it carries                                                       |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `onBeforeInput`                                                 | Typed text (`insertText`), a dictation or a correction, `deleteByCut` |
+| `onCompositionStart`, `onCompositionUpdate`, `onCompositionEnd` | The IME's text so far and its caret, then what it committed           |
+| `onPaste`                                                       | The clipboard's text and HTML                                         |
 
 Nothing is applied for it. The function is asked for every frame the
 surface has focus, so it should read what it already knows rather than

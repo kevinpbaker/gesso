@@ -3001,8 +3001,10 @@ declare class UiPointerController {
     readonly y: number;
   } | null;
   private lastPosition;
+  private downPath;
   get hoveredNode(): UiNode | null;
   get pressedNode(): UiNode | null;
+  private captured;
   get draggingScrollbarOf(): UiNode | null;
   pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent;
   pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;

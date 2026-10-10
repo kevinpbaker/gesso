@@ -171,7 +171,8 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
 
     keyDown: (key, modifiers, options = {}) =>
       void runtime.input.keyboard.keyDown(key, modifiersOf(modifiers), options.textFollows, options.code),
-    keyUp: (key, modifiers, options = {}) => void runtime.input.keyboard.keyUp(key, modifiersOf(modifiers), options.code),
+    keyUp: (key, modifiers, options = {}) =>
+      void runtime.input.keyboard.keyUp(key, modifiersOf(modifiers), options.code),
     press: (key, modifiers, options = {}) => {
       runtime.input.keyboard.keyDown(key, modifiersOf(modifiers), options.textFollows, options.code);
       runtime.input.keyboard.keyUp(key, modifiersOf(modifiers), options.code);

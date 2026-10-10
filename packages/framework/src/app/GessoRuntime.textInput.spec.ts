@@ -25,8 +25,32 @@ import { GessoRuntime } from './GessoRuntime';
  */
 function mockCanvas(): CanvasHost {
   const ctx: Record<string, unknown> = {};
-  for (const m of ['save', 'restore', 'translate', 'scale', 'rotate', 'setTransform', 'clearRect', 'fillRect', 'strokeRect']) ctx[m] = vi.fn();
-  for (const m of ['beginPath', 'moveTo', 'lineTo', 'arcTo', 'closePath', 'rect', 'clip', 'fill', 'stroke', 'fillText', 'drawImage']) ctx[m] = vi.fn();
+  for (const m of [
+    'save',
+    'restore',
+    'translate',
+    'scale',
+    'rotate',
+    'setTransform',
+    'clearRect',
+    'fillRect',
+    'strokeRect'
+  ])
+    ctx[m] = vi.fn();
+  for (const m of [
+    'beginPath',
+    'moveTo',
+    'lineTo',
+    'arcTo',
+    'closePath',
+    'rect',
+    'clip',
+    'fill',
+    'stroke',
+    'fillText',
+    'drawImage'
+  ])
+    ctx[m] = vi.fn();
   ctx.measureText = vi.fn((t: string) => ({ width: String(t).length * 7 }));
   Object.assign(ctx, { fillStyle: '#000', strokeStyle: '#000', lineWidth: 1, globalAlpha: 1, font: '14px sans-serif' });
   return { width: 800, height: 600, getContext: () => ctx as unknown as CanvasRenderingContext2D };
@@ -65,7 +89,13 @@ function surface(state: Partial<UiTextInputState> = {}, onKeyDown?: (event: UiKe
         width: 300,
         height: 200,
         focusable: true,
-        textInput: () => ({ text: 'line', selectionStart: 2, selectionEnd: 2, caret: { x: 14, y: 20, width: 1, height: 20 }, ...state }),
+        textInput: () => ({
+          text: 'line',
+          selectionStart: 2,
+          selectionEnd: 2,
+          caret: { x: 14, y: 20, width: 1, height: 20 },
+          ...state
+        }),
         onKeyDown: (event: UiKeyboardEvent) => {
           heard.push(`key ${event.key}${event.textFollows ? ' (text follows)' : ''}`);
           onKeyDown?.(event);
@@ -91,7 +121,14 @@ describe('a textInput surface', () => {
     runtime.input.focus.focus(node());
     tick();
     const state = runtime.input.editing.state()!;
-    expect(state).toMatchObject({ text: 'line', selectionStart: 2, selectionEnd: 2, multiline: true, composing: false, clipboard: 'line\n' });
+    expect(state).toMatchObject({
+      text: 'line',
+      selectionStart: 2,
+      selectionEnd: 2,
+      multiline: true,
+      composing: false,
+      clipboard: 'line\n'
+    });
     // The node is at (40, 40); its caret is at (14, 20) inside it.
     expect(state.caret).toMatchObject({ x: 54, y: 60, height: 20 });
   });
@@ -160,7 +197,13 @@ describe('a textInput surface', () => {
   it('carries the physical key, which a modifier does not change', () => {
     const codes: string[] = [];
     const { runtime, node } = mount(ref =>
-      Box({ ref, width: 10, height: 10, focusable: true, onKeyDown: (event: UiKeyboardEvent) => codes.push(`${event.key} ${event.code}`) })
+      Box({
+        ref,
+        width: 10,
+        height: 10,
+        focusable: true,
+        onKeyDown: (event: UiKeyboardEvent) => codes.push(`${event.key} ${event.code}`)
+      })
     );
     runtime.input.focus.focus(node());
     runtime.input.keyboard.keyDown('Ω', mods({ alt: true }), true, 'KeyZ');

@@ -744,7 +744,13 @@ export class WorkerApp {
       return;
     }
     this.flushPendingMove();
-    this.post({ type: 'keyUp', key: event.key, code: event.code, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
+    this.post({
+      type: 'keyUp',
+      key: event.key,
+      code: event.code,
+      modifiers: modifiersFrom(event),
+      at: epochFromEvent(event)
+    });
   }
 
   /**
