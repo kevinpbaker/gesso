@@ -38,7 +38,7 @@ branch and steps out of a leaf.
 | `selectedKey`        | `string \| null`                        | none     | The chosen row, by key. Supplying it makes the selection controlled.                               |
 | `defaultSelectedKey` | `string \| null`                        | none     | The row to start on. `null`, meaning nothing chosen, when neither prop is given.                   |
 | `onSelect`           | `(key: string \| null) => void`         | none     | Called with the key of the row a press or a key chose.                                             |
-| `onActivate`         | `(key: string) => void`                 | none     | Called on Enter or Space with the chosen row's key. Nothing happens when nothing is chosen.        |
+| `onActivate`         | `(key: string) => void`                 | none     | Called on Enter or Space with the chosen row's key, and on a double click with that row's.         |
 | `rowHeight`          | `number`                                | `24`     | The height the window expects of a row it has not measured yet.                                    |
 | `label`              | `string`                                | `'Tree'` | The tree's accessible name.                                                                        |
 | `ref`                | `UiNodeRef`                             | none     | Receives the node that is the tree, for focusing it or reading where it is scrolled to.            |
@@ -49,7 +49,8 @@ branch and steps out of a leaf.
 | ---------- | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `key`      | `string`              | required | The node's identity: what the open set holds, what the selection holds, and what a row keeps its node by. Unique across the whole tree, not only among siblings. |
 | `label`    | `string`              | required | The row's text, and its accessible name.                                                                                                                         |
-| `children` | `readonly TreeNode[]` | none     | Makes the node a branch. An absent or empty array is a leaf, and a leaf has no arrow.                                                                            |
+| `children` | `readonly TreeNode[]` | none     | Makes the node a branch. An absent or empty array is a leaf, and a leaf has no arrow, unless `branch` says otherwise.                                            |
+| `branch`   | `boolean`             | `false`  | Makes the node a branch without children: an empty folder, or one whose children are fetched when it opens. It has an arrow and says whether it is open.         |
 | `disabled` | `boolean`             | `false`  | Marks the row and everything in it unavailable: it takes no press, and it is announced as disabled rather than hidden.                                           |
 
 Every prop takes a plain value or an Observable of one, and the layout
@@ -60,6 +61,24 @@ is read once, when the tree is built; `nodes`, `expanded` and
 The indent a row is drawn at and the `level` it reports come from the
 same number, so what a reader sees and what a screen reader is told
 cannot disagree.
+
+## Children fetched when a branch opens
+
+A file explorer does not read a folder until it is opened. Give such a
+node `branch: true` and no `children`, listen to `onExpandedChange`,
+and put the children in the model when they arrive: the branch opens
+at once, empty, and fills in when `nodes` changes.
+
+```tsx
+<Tree
+  nodes={nodes} // a folder not read yet is { key, label, branch: true }
+  expanded={expanded}
+  onExpandedChange={next => {
+    expanded.value = next;
+    for (const key of next) if (!listed.has(key)) files.send.list(key);
+  }}
+/>
+```
 
 ## Controlled and uncontrolled
 

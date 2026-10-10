@@ -439,6 +439,33 @@ describe('Tree', () => {
     expect(opened).toEqual([['src'], []]);
   });
 
+  it('takes a branch with no children yet as a branch, so it can be opened and its children fetched', () => {
+    const opened: string[][] = [];
+    const ui = tree({
+      nodes: [
+        { key: 'lazy', label: 'lazy', branch: true },
+        { key: 'empty', label: 'empty', branch: true, children: [] },
+        { key: 'file', label: 'file' }
+      ],
+      onExpandedChange: (next: readonly string[]) => opened.push([...next])
+    });
+    const items = ui.recordsFor('treeitem');
+    expect(items.map(record => record.states)).toEqual([['collapsed'], ['collapsed'], undefined]);
+    ui.fireEvent.click(ui.getAllByRole('treeitem')[0]);
+    ui.frame();
+    expect(opened).toEqual([['lazy']]);
+    // Open with nothing in it yet: no rows under it, and no throw.
+    expect(ui.recordsFor('treeitem').map(record => record.label)).toEqual(['lazy', 'empty', 'file']);
+    expect(ui.recordsFor('treeitem')[0].states).toEqual(['expanded', 'selected']);
+  });
+
+  it('activates a row on a double click, as Enter does', () => {
+    const activated: string[] = [];
+    const ui = tree({ onActivate: (key: string) => activated.push(key) });
+    ui.fireEvent.doubleClick(ui.getAllByRole('treeitem')[1]);
+    expect(activated).toEqual(['docs']);
+  });
+
   it('refuses both a value and a default, naming the component', () => {
     expect(() => tree({ expanded: [], defaultExpanded: ['src'] })).toThrow(
       /Tree was given both 'expanded' and 'defaultExpanded'/

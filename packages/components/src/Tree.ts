@@ -37,6 +37,12 @@ export interface TreeNode {
   readonly key: string;
   readonly label: string;
   readonly children?: readonly TreeNode[];
+  /**
+   * A branch whether or not it has children yet: an empty folder, or one
+   * whose children are fetched when it is opened (`onExpandedChange`
+   * says when). A node with children is a branch without saying so.
+   */
+  readonly branch?: boolean;
   readonly disabled?: boolean;
 }
 
@@ -52,7 +58,7 @@ export interface TreeProps extends ControlLayoutProps {
   selectedKey?: string | null;
   defaultSelectedKey?: string | null;
   onSelect?: (key: string | null) => void;
-  /** Enter or Space on the chosen row. */
+  /** Enter or Space on the chosen row, or a double click on any. */
   onActivate?: (key: string) => void;
   /** Expected row height, for the rows that have not been measured. */
   rowHeight?: number;
@@ -216,6 +222,12 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
           if (branch) {
             setOpen(row.node.key, !expanded.current().includes(row.node.key));
           }
+        },
+        // A file browser's open-for-good: VS Code's explorer keeps a preview tab on a double click.
+        onDoubleClick: () => {
+          if (row.node.disabled !== true) {
+            inputs.onActivate.value?.(row.node.key);
+          }
         }
       },
       // A leaf keeps the arrow's width, so its label lines up with its
@@ -262,7 +274,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
 }
 
 function hasChildren(node: TreeNode): boolean {
-  return node.children !== undefined && node.children.length > 0;
+  return node.branch === true || (node.children !== undefined && node.children.length > 0);
 }
 
 /**
@@ -277,8 +289,8 @@ function flatten(nodes: readonly TreeNode[], open: ReadonlySet<string>): TreeRow
   const visit = (siblings: readonly TreeNode[], level: number, parent: string | null): void => {
     siblings.forEach((node, position) => {
       rows.push({ node, level, position, siblings: siblings.length, parent });
-      if (hasChildren(node) && open.has(node.key)) {
-        visit(node.children!, level + 1, node.key);
+      if (hasChildren(node) && open.has(node.key) && node.children !== undefined) {
+        visit(node.children, level + 1, node.key);
       }
     });
   };

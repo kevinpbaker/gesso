@@ -641,6 +641,7 @@ interface TreeNode {
   readonly key: string;
   readonly label: string;
   readonly children?: readonly TreeNode[];
+  readonly branch?: boolean;
   readonly disabled?: boolean;
 }
 interface TreeProps extends ControlLayoutProps {
