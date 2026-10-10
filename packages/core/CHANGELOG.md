@@ -1,5 +1,16 @@
 # gesso-core
 
+## 0.6.16
+
+### Patch Changes
+
+- dd5c789: A painted node whose picture changes is repainted without being laid out again, unless the new picture declares a different intrinsic size. Before, every new picture marked layout, which for a painted node sized by its parent (`height: percent(100)`, say) laid the tree out again up to the root on every repaint: a minimap redrawn on each frame of a scroll re-measured thirteen nodes a frame for nothing. Property definitions gain `narrowEffects`, which lets a property mark less than its worst case for a particular change.
+- b681046: A press whose node is taken out of the tree mid-drag goes on to the nearest of that node's ancestors still in it. A drag-select in a virtual list whose row scrolled out of view, and was unmounted, sent the rest of the drag to a node nothing could hear from; the list, and whatever listens above it, now gets it.
+- 8149ae2: What a `textInput` surface draws is left out of the semantics tree: the editing proxy already carries its text as the field's value, so a screen reader heard it twice, and a keystroke in a code editor that redrew hundreds of runs rewrote as many elements of the accessibility mirror on the main thread.
+- 4eed2fd: A node can take text without being a field: `textInput` makes it a surface that keeps and draws its own text, such as a code editor, and receives typed text through `onBeforeInput`, IME composition through the new `onCompositionStart`, `onCompositionUpdate` and `onCompositionEnd`, and the clipboard through `onPaste` and its state's `clipboard`. Keys belonging to an open IME composition (the Enter that commits a candidate, the arrows that choose one) are no longer forwarded as keys, which inserted a line on commit in a field too. A key whose `onKeyDown` called `preventDefault()` now keeps its text out, as in a browser; `UiKeyboardEvent.textFollows` says whether text follows a key at all. `fireEvent` gains `beforeInput`, the composition events, `copy` and `cut`.
+
+  Key events carry `code`, the physical key (`KeyZ`), so a shortcut can match Option+Z on a Mac, where the key is `Ω`.
+
 ## 0.6.15
 
 ### Patch Changes

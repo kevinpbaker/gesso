@@ -1,5 +1,22 @@
 # gesso-framework
 
+## 0.6.16
+
+### Patch Changes
+
+- d67e80b: `Inputs` types a member declared as an Observable by the values it holds. The host subscribes to an Observable a parent passes and feeds the cell its values, so a cell never holds the stream; `Inputs<{ items: Observable<Item[]> }>` used to type `inputs.items.value` as the Observable, and `inputs.items.value.pipe(...)` compiled and then threw on mount. It is now typed as `Item[]`, and the new `InputValue` type says how. A member that mixes values and streams, such as `UiChild` or `Reactive<T>`, is unchanged.
+- 1f60081: A channel's view may hold a `SharedArrayBuffer`. It is a handle on memory, so reference equality is the right comparison for it, and posted to another thread it is shared rather than copied: the app worker and the render worker can read one large document without sending it, and what changes is a small plain value saying which version to read. It needs a cross-origin isolated page. A desktop window's channels refuse it by name rather than sending `{}`, an agent is shown its size, and `gesso-vite-plugin` describes it in a view's schema instead of warning. A command still may not take one from an agent.
+- 4eed2fd: A node can take text without being a field: `textInput` makes it a surface that keeps and draws its own text, such as a code editor, and receives typed text through `onBeforeInput`, IME composition through the new `onCompositionStart`, `onCompositionUpdate` and `onCompositionEnd`, and the clipboard through `onPaste` and its state's `clipboard`. Keys belonging to an open IME composition (the Enter that commits a candidate, the arrows that choose one) are no longer forwarded as keys, which inserted a line on commit in a field too. A key whose `onKeyDown` called `preventDefault()` now keeps its text out, as in a browser; `UiKeyboardEvent.textFollows` says whether text follows a key at all. `fireEvent` gains `beforeInput`, the composition events, `copy` and `cut`.
+
+  Key events carry `code`, the physical key (`KeyZ`), so a shortcut can match Option+Z on a Mac, where the key is `Ω`.
+
+- 548a3b0: A worker whose script never loads is now reported with the reason to look for. A render worker refused by the browser (a 404, a MIME type, or the page's `Cross-Origin-Embedder-Policy`, including a copy cached before the policy was turned on) used to be reported as "the render worker failed to start: undefined"; it now says the script did not load, that the network panel has the reason, and what the usual reasons are. An app worker that never loaded used to say nothing at all and leave the screen waiting on its channels; it is now reported the same way.
+- Updated dependencies [dd5c789]
+- Updated dependencies [b681046]
+- Updated dependencies [8149ae2]
+- Updated dependencies [4eed2fd]
+  - gesso-core@0.6.16
+
 ## 0.6.15
 
 ### Patch Changes
