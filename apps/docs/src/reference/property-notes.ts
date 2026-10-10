@@ -351,6 +351,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Interaction',
     note: 'Makes the editables inside select as one, with edits over a selection across them going to `onEdit`. See text editing.'
   },
+  textInput: {
+    group: 'Interaction',
+    note: 'Makes the node a surface that keeps its own text: typed text, IME composition and the clipboard reach it as events through the editing proxy. See text editing.'
+  },
   pointerEvents: {
     group: 'Interaction',
     note: 'Whether the node takes pointer input, or lets it through to what is behind.'
