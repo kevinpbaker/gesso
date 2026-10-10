@@ -445,6 +445,77 @@ describe('the files the shell remembers', () => {
   });
 });
 
+describe('a store that will not remember', () => {
+  /**
+   * IndexedDB refusing a write: blocked storage, a spent quota, a
+   * private window, a handle it cannot clone. Remembering is for the
+   * recent files; the file itself was read or written either way.
+   */
+  class RefusingStore extends MemoryHandleStore {
+    override put(): Promise<number> {
+      return Promise.reject(new DOMException('The quota has been exceeded.', 'QuotaExceededError'));
+    }
+  }
+
+  it('still opens the file, with no handle to reopen it by', async () => {
+    const { files, disk, picks } = host({ store: new RefusingStore() });
+    disk.contents.set('a.csv', 'x,y');
+    picks.push(['a.csv']);
+    const result = await files.perform({ op: 'open', accept: CSV, multiple: false });
+
+    expect(result.outcome).toBe('ok');
+    expect(result.files.map(file => [file.name, file.handle])).toEqual([['a.csv', null]]);
+    expect(new TextDecoder().decode(result.files[0].bytes)).toBe('x,y');
+  });
+
+  it('calls a save-as that wrote the file saved, with no handle', async () => {
+    const { files, disk, saves } = host({ store: new RefusingStore() });
+    saves.push('book.gsheet');
+    const result = await files.perform({
+      op: 'save',
+      name: 'book.gsheet',
+      mediaType: 'application/json',
+      text: '{}',
+      accept: []
+    });
+
+    expect(disk.contents.get('book.gsheet')).toBe('{}');
+    expect(result.outcome).toBe('ok');
+    expect(result.saved).toMatchObject({ name: 'book.gsheet', handle: null, via: 'file' });
+  });
+
+  it('reopens and saves back to a remembered file when it cannot note the time it was used', async () => {
+    const store = new MemoryHandleStore();
+    const { files, disk } = host({ store });
+    disk.contents.set('old.csv', 'kept');
+    const id = await store.put({ handle: new FakeHandle('old.csv', disk), name: 'old.csv', used: 1 });
+    store.put = () => Promise.reject(new DOMException('The quota has been exceeded.', 'QuotaExceededError'));
+
+    const reopened = await files.perform({ op: 'reopen', handle: id });
+    expect(reopened.outcome).toBe('ok');
+    expect(new TextDecoder().decode(reopened.files[0].bytes)).toBe('kept');
+
+    const saved = await files.perform({
+      op: 'save',
+      handle: id,
+      name: 'old.csv',
+      mediaType: 'text/csv',
+      text: 'new',
+      accept: []
+    });
+    expect(saved.outcome).toBe('ok');
+    expect(disk.contents.get('old.csv')).toBe('new');
+  });
+
+  it('still fails to open a folder, which is only reachable by the number it is remembered under', async () => {
+    const { files } = host({
+      store: new RefusingStore(),
+      showDirectoryPicker: () => Promise.resolve({ kind: 'directory', name: 'photos' } as ShellDirectoryHandle)
+    });
+    expect((await files.perform({ op: 'openDirectory', mode: 'read' })).outcome).toBe('failed');
+  });
+});
+
 describe('what the shell refuses', () => {
   it('calls a browser refusal denied', async () => {
     const refusal = new Error('Must be handling a user gesture to show a file picker.');

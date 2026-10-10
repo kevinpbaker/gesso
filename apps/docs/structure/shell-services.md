@@ -213,6 +213,13 @@ which the browser asks for again, and asking needs a gesture; so a
 `reopenFile` or a `saveFile` to a handle belongs in a click handler as
 much as a picker does.
 
+Keeping a handle is a convenience, and a browser can refuse it: storage
+blocked for the site, a spent quota, a private window. A file opened or
+saved then still is, and arrives with `handle: null`, as a file from a
+file input does; it just won't be in the recent files. A folder is the
+exception, since its number is the only way a worker can reach it, so a
+folder that can't be kept fails to open.
+
 Every answer is one `ShellFileResult`. `cancelled` is a person closing
 a picker, which is a decision rather than a failure; `denied` is the
 browser refusing, most often for want of a gesture; `unsupported` is a
