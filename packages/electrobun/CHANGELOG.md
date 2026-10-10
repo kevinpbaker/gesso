@@ -1,5 +1,13 @@
 # gesso-electrobun
 
+## 0.6.15
+
+### Patch Changes
+
+- 2cc396a: `standardMenu(appName)` in `gesso-electrobun/desktop`: the application, Edit and Window menus every Mac application has, for `ApplicationMenu.setApplicationMenu`. Without an Edit menu macOS sends ⌘V and ⌘C nowhere, so text fields in a desktop window could not be pasted into or copied from. The Electrobun template installs it.
+- Updated dependencies [dd812b3]
+  - gesso-framework@0.6.15
+
 ## 0.6.14
 
 ### Patch Changes
