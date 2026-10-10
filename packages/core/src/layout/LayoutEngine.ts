@@ -3211,7 +3211,7 @@ export class LayoutEngine {
         // A point is an anchor of no size, and is placed beside the same
         // way; it does not move, so there is nothing to follow.
         this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
-        this.placeBeside(child, cRec, block.x + point.x, block.y + point.y, 0, 0, block);
+        this.placeBeside(child, cRec, block.x + point.x, block.y + point.y, 0, 0, block, true);
         return;
       } else {
         this.anchoredNodes.delete(child);
@@ -3358,6 +3358,39 @@ export class LayoutEngine {
    * no size — flipping to the opposite side when the named one would
    * overflow the block and the other has more room, and clamping along
    * the side to stay inside it.
+   *
+   * **A node taller than the room on its side is measured again into
+   * that room.** Flipping picks the side with more space, and that was
+   * all it did: a thirty-command Format menu under a title 44 pixels
+   * down ran off the bottom of an 813-pixel window, and a 424-pixel
+   * context menu opened at y 410 flipped above the point and started
+   * at -14, its first rows off the top of the screen. Neither could be
+   * scrolled, because nothing ever told the menu it had less height
+   * than it asked for.
+   *
+   * The room is a loose bound and not a smaller painted rect, so it
+   * reaches the node's layout the way a `maxHeight` would: a scroller
+   * inside it is offered the height that is left and scrolls the rest,
+   * a scroll view is capped at it, and a plain column, which cannot
+   * shrink, still overflows as it always did. The side was chosen on
+   * the height asked for, before the cap, so a menu that fits on
+   * neither side still opens on the roomier one.
+   *
+   * A node placed at a `point` slides instead, when it fits in the block
+   * at all: a context menu that has room on neither side of the pointer
+   * opens on the side asked for and moves back over the pointer until
+   * it is inside, whole, as a native one does, rather than being
+   * cut short and made to scroll with half the screen free. Covering a
+   * point hides nothing; covering an anchor would hide the very title
+   * or button the panel belongs to, so an anchored node is capped.
+   *
+   * An anchored node that still does not fit, because what it holds
+   * cannot shrink, is kept from starting before the block's edge, so
+   * its first rows are on the screen; it is not pushed back over its
+   * anchor, and runs past the far edge as it always did. A node that
+   * fits is placed exactly as before, against an anchor scrolled out
+   * of view included: a tooltip follows its anchor off the screen
+   * rather than sticking to the edge without it.
    */
   private placeBeside(
     child: UiNode,
@@ -3366,15 +3399,17 @@ export class LayoutEngine {
     ay: number,
     aw: number,
     ah: number,
-    block: LayoutBox
+    block: LayoutBox,
+    point = false
   ): void {
-    const width = cRec.measuredWidth;
-    const height = cRec.measuredHeight;
+    let width = cRec.measuredWidth;
+    let height = cRec.measuredHeight;
     const gap = this.numberProp(child, 'anchorOffset') ?? 0;
     const { side, align } = this.parsePlacement(child.properties.get('placement'));
 
     const vertical = side === 'top' || side === 'bottom';
     let resolvedSide = side;
+    let room: number;
     if (vertical) {
       const roomBelow = block.y + block.height - (ay + ah + gap);
       const roomAbove = ay - gap - block.y;
@@ -3383,6 +3418,7 @@ export class LayoutEngine {
       } else if (side === 'top' && height > roomAbove && roomBelow > roomAbove) {
         resolvedSide = 'bottom';
       }
+      room = resolvedSide === 'bottom' ? roomBelow : roomAbove;
     } else {
       const roomRight = block.x + block.width - (ax + aw + gap);
       const roomLeft = ax - gap - block.x;
@@ -3391,16 +3427,46 @@ export class LayoutEngine {
       } else if (side === 'left' && width > roomLeft && roomRight > roomLeft) {
         resolvedSide = 'right';
       }
+      room = resolvedSide === 'right' ? roomRight : roomLeft;
+    }
+
+    const overflows = (vertical ? height : width) > room;
+    const slides = overflows && point && (vertical ? height <= block.height : width <= block.width);
+    if (slides) {
+      // From the side asked for, as a native menu slides: the bottom of
+      // a context menu meets the bottom of the window rather than its
+      // top meeting the top, where the menu bar and the toolbar are.
+      resolvedSide = side;
+    } else if (overflows) {
+      const limit = Math.max(0, room);
+      this.measure(
+        child,
+        vertical
+          ? new Constraints(0, Math.max(0, block.width), 0, limit)
+          : new Constraints(0, limit, 0, Math.max(0, block.height))
+      );
+      width = cRec.measuredWidth;
+      height = cRec.measuredHeight;
     }
 
     let x: number;
     let y: number;
     if (vertical) {
       y = resolvedSide === 'bottom' ? ay + ah + gap : ay - gap - height;
+      if (slides) {
+        y = this.clamp(y, block.y, Math.max(block.y, block.y + block.height - height));
+      } else if (overflows) {
+        y = Math.max(y, block.y);
+      }
       x = align === 'start' ? ax : align === 'end' ? ax + aw - width : ax + (aw - width) / 2;
       x = this.clamp(x, block.x, Math.max(block.x, block.x + block.width - width));
     } else {
       x = resolvedSide === 'right' ? ax + aw + gap : ax - gap - width;
+      if (slides) {
+        x = this.clamp(x, block.x, Math.max(block.x, block.x + block.width - width));
+      } else if (overflows) {
+        x = Math.max(x, block.x);
+      }
       y = align === 'start' ? ay : align === 'end' ? ay + ah - height : ay + (ah - height) / 2;
       y = this.clamp(y, block.y, Math.max(block.y, block.y + block.height - height));
     }
