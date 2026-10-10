@@ -200,15 +200,15 @@ export class UiGraph {
     // Remove the whole subtree, not just the node itself: a
     // detached child would otherwise stay indexed with stale
     // dirty state and live bindings.
+    const removed: UiNode[] = [];
     const stack: UiNode[] = [node];
     while (stack.length > 0) {
       const current = stack.pop()!;
+      removed.push(current);
       // First stop all reactive subscriptions.
       this.unbindNode(current);
       this.unbindChildren(current);
       this.unbindEvents(current);
-      // Then remove it from the tree.
-      this.detachNode(current);
       // Remove it from the node index.
       this.nodes.delete(current.id);
       // Remove any dirty state.
@@ -217,14 +217,24 @@ export class UiGraph {
         stack.push(child);
       }
     }
+    // Out of the tree at its root, so the listener sees it detached.
+    this.detachNode(node);
     // Structure change: the parent must be re-laid out.
     if (parent !== null) {
       this.markDirty(parent, DirtyFlags.Children);
     }
-    // Notify projection consumers (layout engine) last. The
-    // engine's detachNode walks the subtree itself, so a single
-    // notification covers every removed record.
+    // Notify projection consumers (layout engine) once, with the root,
+    // while what was removed is still linked below it: the engine's
+    // detachNode walks the subtree itself to drop every record in it.
+    // This used to run after every node had been unlinked from its
+    // parent, which left the walk nothing to find under the root, and
+    // the engine kept the records — sticky and absolute registrations
+    // included — of every descendant of every node ever removed.
     this.nodeRemovedListener?.(node);
+    // Then unlink the rest, so nothing removed points at a parent.
+    for (let i = removed.length - 1; i > 0; i--) {
+      this.detachNode(removed[i]);
+    }
   }
 
   public detachNode(node: UiNode): void {
@@ -518,8 +528,11 @@ export class UiGraph {
   /**
    * Subscribes to node removals.
    *
-   * The listener is invoked once per removed node. Pass null to
-   * clear the subscription.
+   * The listener is invoked once per removal, with the root of the
+   * removed subtree. It is already out of the tree, and everything
+   * that was under it is still linked under it, so a listener that
+   * keeps state per node walks down from it. Pass null to clear the
+   * subscription.
    */
   public setNodeRemovedListener(listener: ((node: UiNode) => void) | null): void {
     this.nodeRemovedListener = listener;
