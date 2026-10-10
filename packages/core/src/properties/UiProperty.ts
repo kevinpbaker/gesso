@@ -1,4 +1,5 @@
 import type { UiEditingGroup } from '../editing/UiEditingGroup';
+import type { UiTextInput } from '../editing/UiTextInput';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import type { UiContainerSize } from '../environment/UiContainerSize';
@@ -1171,6 +1172,19 @@ export const UiProperties = {
    */
   editingGroup: defineProperty<UiEditingGroup | undefined>({
     name: 'editingGroup',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /**
+   * Makes the node a text input surface: it keeps and draws its own
+   * text, and takes typed text, IME composition and the clipboard
+   * through the shell's editing proxy while it has focus. The function
+   * says what the proxy mirrors. See `UiTextInput`.
+   */
+  textInput: defineProperty<UiTextInput | undefined>({
+    name: 'textInput',
     defaultValue: undefined,
     inherited: false,
     affects: DirtyFlags.Properties

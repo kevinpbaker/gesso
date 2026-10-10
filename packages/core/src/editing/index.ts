@@ -52,3 +52,4 @@ export {
   type UiGroupEdit,
   type UiTextPosition
 } from './UiEditingGroup';
+export { textInputOf, type UiTextInput, type UiTextInputState } from './UiTextInput';

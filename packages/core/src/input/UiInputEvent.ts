@@ -51,6 +51,14 @@ export enum UiEventType {
    * `preventDefault()` says it was taken.
    */
   Paste = 'paste',
+  /**
+   * An IME composition on a `textInput` surface: opened, its text so
+   * far, and committed. A field's composition is the field's own and
+   * never reaches here.
+   */
+  CompositionStart = 'compositionstart',
+  CompositionUpdate = 'compositionupdate',
+  CompositionEnd = 'compositionend',
   Click = 'click',
   /**
    * A second Click on the same node, soon enough after the first and
@@ -326,7 +334,25 @@ export class UiKeyboardEvent extends UiInputEvent {
   constructor(
     type: UiEventType.KeyDown | UiEventType.KeyUp,
     readonly key: string,
-    readonly modifiers: UiKeyModifiers = noKeyModifiers()
+    readonly modifiers: UiKeyModifiers = noKeyModifiers(),
+    /**
+     * Whether the key's text will follow it as a `beforeinput`, from the
+     * shell's editing proxy, which has resolved the keyboard layout,
+     * dead keys and any IME. False means nothing follows: a test, a
+     * runtime without a proxy, or a key typed before the proxy took
+     * focus, and a `textInput` surface inserts a printable key itself.
+     * `preventDefault()` on a key whose text follows drops that text,
+     * as it does in a browser.
+     */
+    readonly textFollows: boolean = false,
+    /**
+     * The physical key, in the DOM's `code` vocabulary (`KeyZ`,
+     * `BracketLeft`, `Digit1`), whatever the layout makes of it; empty
+     * when the source does not say. What a shortcut matches when a
+     * modifier changes the character: Option+Z is `Ω` on a Mac, and
+     * still `KeyZ`.
+     */
+    readonly code: string = ''
   ) {
     super(type);
   }
@@ -378,6 +404,24 @@ export class UiPasteEvent extends UiInputEvent {
     readonly html: string | null = null
   ) {
     super(UiEventType.Paste);
+  }
+}
+
+/**
+ * An IME composition on a focused `textInput` surface.
+ *
+ * `text` is the composition so far (the committed text at
+ * `CompositionEnd`, empty when it was cancelled) and `caret` the
+ * IME's caret within it. The surface draws the composition where its
+ * carets are and replaces it with the committed text at the end.
+ */
+export class UiCompositionEvent extends UiInputEvent {
+  constructor(
+    type: UiEventType.CompositionStart | UiEventType.CompositionUpdate | UiEventType.CompositionEnd,
+    readonly text: string = '',
+    readonly caret: number = text.length
+  ) {
+    super(type);
   }
 }
 

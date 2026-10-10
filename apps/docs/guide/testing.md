@@ -152,6 +152,8 @@ Keys go to whatever has focus, so a keyboard test focuses first:
 | `press(key)`, `keyDown`, `keyUp`               | A key at whatever has focus                   |
 | `focus(node)`, `blur()`, `tab()`, `shiftTab()` | Focus, and the tab order                      |
 | `type(text)`, `paste(text)`                    | An insertion into the focused editable        |
+| `beforeInput(type, data)`, `composition*`      | An edit or a composition, as the proxy sends  |
+| `copy()`, `cut()`                              | What a copy or a cut would take               |
 
 All of them take modifiers where a real event would carry them:
 `ui.fireEvent.press('a', { meta: true })`.
@@ -327,8 +329,8 @@ what the spec imports.
   than pixel counts that only hold under this measurer.
 - **No IME.** `type()` and `paste()` deliver an insertion the way the
   editing proxy's `beforeinput` would. A composition can be driven
-  through `ui.runtime.input.editing`, which has `compositionStart`,
-  `compositionUpdate` and `compositionEnd`, but a real input method and
+  with `compositionStart`, `compositionUpdate` and `compositionEnd`,
+  but a real input method and
   the browser's own composition events are not here. See
   [text editing and IME](/interaction/text-editing-and-ime).
 - **Still no screen reader.** Querying the semantics tree is querying

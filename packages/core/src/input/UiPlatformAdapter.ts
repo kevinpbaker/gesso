@@ -160,14 +160,20 @@ export class UiPlatformAdapter {
     };
     this.keyDownHandler = e => {
       const k = e as KeyboardEvent;
-      const event = this.keyboard.keyDown(k.key, modifiersFromEvent(k));
+      if (isImeKey(k)) {
+        return;
+      }
+      const event = this.keyboard.keyDown(k.key, modifiersFromEvent(k), undefined, k.code ?? '');
       if (event.defaultPrevented) {
         k.preventDefault();
       }
     };
     this.keyUpHandler = e => {
       const k = e as KeyboardEvent;
-      this.keyboard.keyUp(k.key, modifiersFromEvent(k));
+      if (isImeKey(k)) {
+        return;
+      }
+      this.keyboard.keyUp(k.key, modifiersFromEvent(k), k.code ?? '');
     };
 
     surface.pointerTarget.addEventListener('pointerdown', this.pointerDownHandler);
@@ -274,6 +280,18 @@ export function capturePointer(target: EventTarget | null, pointerId: number): v
   } catch {
     // The contact ended first; the press will end with it.
   }
+}
+
+/**
+ * Whether a key belongs to an IME rather than to the application: one
+ * pressed while a composition is open (the arrows that move through
+ * candidates, the Enter that commits one, the Backspace that edits the
+ * reading) or the key that opens one, which browsers report with
+ * `keyCode` 229. Its effect arrives as composition events; handled as a
+ * key too, the Enter that commits a candidate would also insert a line.
+ */
+export function isImeKey(event: { readonly isComposing?: boolean; readonly keyCode?: number }): boolean {
+  return event.isComposing === true || event.keyCode === 229;
 }
 
 function modifiersFromEvent(event: {

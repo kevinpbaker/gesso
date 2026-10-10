@@ -467,10 +467,10 @@ export class RenderWorkerApp {
         );
         break;
       case 'keyDown':
-        runtime.input.keyboard.keyDown(message.key, message.modifiers, message.textFollows);
+        runtime.input.keyboard.keyDown(message.key, message.modifiers, message.textFollows, message.code);
         break;
       case 'keyUp':
-        runtime.input.keyboard.keyUp(message.key, message.modifiers);
+        runtime.input.keyboard.keyUp(message.key, message.modifiers, message.code);
         break;
       case 'beforeInput':
         runtime.input.editing.beforeInput(message.inputType, message.data);

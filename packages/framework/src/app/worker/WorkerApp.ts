@@ -14,6 +14,7 @@ import {
 } from './RenderWorkerProtocol';
 import {
   capturePointer,
+  isImeKey,
   observeViewportInsets,
   pointerDeviceOf,
   prepareInputSurface,
@@ -708,6 +709,10 @@ export class WorkerApp {
    * the first letter opens lives in exactly that gap.
    */
   private forwardKeyDown(event: KeyboardEvent, viaProxy = false): void {
+    if (isImeKey(event)) {
+      // The IME's, not the app's: see `isImeKey`.
+      return;
+    }
     // Whatever hover the shell is holding happened before this key
     // and has to be posted before it; see `flushPendingMove`. Keys
     // reach here from the canvas, the editing proxy and the semantics
@@ -727,6 +732,7 @@ export class WorkerApp {
     this.post({
       type: 'keyDown',
       key: event.key,
+      code: event.code,
       modifiers: modifiersFrom(event),
       at: epochFromEvent(event),
       textFollows: viaProxy
@@ -734,8 +740,11 @@ export class WorkerApp {
   }
 
   private forwardKeyUp(event: KeyboardEvent): void {
+    if (isImeKey(event)) {
+      return;
+    }
     this.flushPendingMove();
-    this.post({ type: 'keyUp', key: event.key, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
+    this.post({ type: 'keyUp', key: event.key, code: event.code, modifiers: modifiersFrom(event), at: epochFromEvent(event) });
   }
 
   /**

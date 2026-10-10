@@ -16,7 +16,16 @@ export interface KeyboardControllerOptions {
    * after the app's KeyDown listeners and only if none called
    * preventDefault(); a key it handles is marked default-prevented.
    */
-  editing?: { handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean };
+  editing?: {
+    handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean;
+    /** False when a shell's proxy delivers text, so a key with no word on it is taken to have text following. */
+    readonly textFromKeys?: boolean;
+    /**
+     * Each key down, whether its text, which follows it, is to be
+     * dropped: a listener cancelled the key. See `UiKeyboardEvent.textFollows`.
+     */
+    noteKey?(cancelled: boolean): void;
+  };
   /**
    * Default keyboard behaviour for a canvas text selection: copy it,
    * select everything, or clear it. Runs only when no focused editable
@@ -96,17 +105,22 @@ export class UiKeyboardController {
    * an editable held the focus — has the key inserted here, whatever the
    * text source; absent leaves it to the editing controller's setting.
    */
-  keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers(), textFollows?: boolean): UiKeyboardEvent {
+  keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers(), textFollows?: boolean, code = ''): UiKeyboardEvent {
     // A key makes focus visible again after a mouse press, as
     // `:focus-visible` does. A modifier on its own does not count: it is
     // held for a click as often as for a shortcut.
     if (!MODIFIER_KEYS.has(key)) {
       this.focusManager.noteInput('keyboard');
     }
-    const event = new UiKeyboardEvent(UiEventType.KeyDown, key, modifiers);
+    const follows = textFollows ?? this.editing?.textFromKeys === false;
+    const event = new UiKeyboardEvent(UiEventType.KeyDown, key, modifiers, follows, code);
     const focused = this.focusManager.focusedNode;
     const target = focused ?? this.root();
     this.dispatcher.dispatch(event, target);
+    // A browser drops a key's text when its keydown is cancelled. In a
+    // worker the shell cannot wait to hear whether it was, so the text
+    // arrives regardless, and is dropped here instead.
+    this.editing?.noteKey?.(follows && event.defaultPrevented);
     if (
       !event.defaultPrevented &&
       focused !== null &&
@@ -145,8 +159,11 @@ export class UiKeyboardController {
     return event;
   }
 
-  keyUp(key: string, modifiers: UiKeyModifiers = noKeyModifiers()): UiKeyboardEvent {
-    const event = new UiKeyboardEvent(UiEventType.KeyUp, key, modifiers);
+  keyUp(key: string, modifiers: UiKeyModifiers = noKeyModifiers(), code = ''): UiKeyboardEvent {
+    // The text a cancelled key would have produced came before its key
+    // up, if at all; after it, nothing more is the key's.
+    this.editing?.noteKey?.(false);
+    const event = new UiKeyboardEvent(UiEventType.KeyUp, key, modifiers, false, code);
     const target = this.focusManager.focusedNode ?? this.root();
     this.dispatcher.dispatch(event, target);
     return event;

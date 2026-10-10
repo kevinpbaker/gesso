@@ -301,6 +301,24 @@ describe('EditingProxy', () => {
     expect(sink.calls.at(-1)).toEqual(['beforeInput', 'deleteByCut', null]);
   });
 
+  it('copies and cuts what a surface says, with or without a selection', () => {
+    // A code editor copies its whole line when nothing is selected, and
+    // several selections joined; Chrome fires copy and cut either way.
+    const { proxy, textarea, sink, state } = setup();
+    const written: string[] = [];
+    const clipboardData = { getData: () => '', setData: (_type: string, value: string) => void written.push(value) };
+    proxy.update(state({ selectionStart: 2, selectionEnd: 2, clipboard: 'hello world\n' }));
+    textarea.dispatch('copy', { clipboardData });
+    textarea.dispatch('cut', { clipboardData });
+    expect(written).toEqual(['hello world\n', 'hello world\n']);
+    expect(sink.calls.at(-1)).toEqual(['beforeInput', 'deleteByCut', null]);
+    const calls = sink.calls.length;
+    proxy.update(state({ selectionStart: 0, selectionEnd: 5, clipboard: '' }));
+    textarea.dispatch('cut', { clipboardData });
+    // Nothing to take, so nothing to delete.
+    expect(sink.calls.length).toBe(calls);
+  });
+
   it("copies the selection's HTML beside its text when the state has some", () => {
     const { proxy, textarea, state } = setup();
     const written: [string, string][] = [];

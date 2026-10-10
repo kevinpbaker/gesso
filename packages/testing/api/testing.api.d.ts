@@ -52,17 +52,27 @@ interface FireEvent {
     deltaY?: number;
     modifiers?: Partial<UiKeyModifiers>;
   }): void;
-  keyDown(key: string, modifiers?: Partial<UiKeyModifiers>): void;
-  keyUp(key: string, modifiers?: Partial<UiKeyModifiers>): void;
-  press(key: string, modifiers?: Partial<UiKeyModifiers>): void;
+  keyDown(key: string, modifiers?: Partial<UiKeyModifiers>, options?: KeyOptions): void;
+  keyUp(key: string, modifiers?: Partial<UiKeyModifiers>, options?: KeyOptions): void;
+  press(key: string, modifiers?: Partial<UiKeyModifiers>, options?: KeyOptions): void;
   focus(node: UiNode): boolean;
   blur(): void;
   tab(): boolean;
   shiftTab(): boolean;
   type(text: string): void;
   paste(text: string, html?: string): void;
+  beforeInput(inputType: string, data?: string | null): void;
+  compositionStart(): void;
+  compositionUpdate(text: string, caret?: number): void;
+  compositionEnd(text: string): void;
+  copy(): string | null;
+  cut(): string | null;
 }
 declare function createFireEvent(runtime: GessoRuntime): FireEvent;
+interface KeyOptions {
+  readonly code?: string;
+  readonly textFollows?: boolean;
+}
 interface PointerOptions {
   readonly buttons?: number;
   readonly modifiers?: Partial<UiKeyModifiers>;
@@ -145,6 +155,7 @@ export {
   serveForTest,
   textProperty,
   type FireEvent,
+  type KeyOptions,
   type PointAt,
   type PointerOptions,
   type Queries,

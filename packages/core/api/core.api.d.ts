@@ -682,6 +682,9 @@ declare enum UiEventType {
   Input = "input",
   SelectionChange = "selectionchange",
   Paste = "paste",
+  CompositionStart = "compositionstart",
+  CompositionUpdate = "compositionupdate",
+  CompositionEnd = "compositionend",
   Click = "click",
   DoubleClick = "doubleclick",
   LongPress = "longpress",
@@ -758,7 +761,11 @@ declare class UiPinchEvent extends UiInputEvent {
 declare class UiKeyboardEvent extends UiInputEvent {
   readonly key: string;
   readonly modifiers: UiKeyModifiers;
-  constructor(type: UiEventType.KeyDown | UiEventType.KeyUp, key: string, modifiers?: UiKeyModifiers);
+  readonly textFollows: boolean;
+  readonly code: string;
+  constructor(type: UiEventType.KeyDown | UiEventType.KeyUp, key: string, modifiers?: UiKeyModifiers,
+  textFollows?: boolean,
+  code?: string);
 }
 declare class UiBeforeInputEvent extends UiInputEvent {
   readonly inputType: string;
@@ -772,6 +779,11 @@ declare class UiPasteEvent extends UiInputEvent {
   readonly html: string | null;
   constructor(text: string,
   html?: string | null);
+}
+declare class UiCompositionEvent extends UiInputEvent {
+  readonly text: string;
+  readonly caret: number;
+  constructor(type: UiEventType.CompositionStart | UiEventType.CompositionUpdate | UiEventType.CompositionEnd, text?: string, caret?: number);
 }
 declare class UiTextChangeEvent extends UiInputEvent {
   readonly value: string;
@@ -1014,6 +1026,16 @@ declare function editingGroupOf(node: UiNode): {
 declare function adjacentField(root: UiNode, from: UiNode, direction: 1 | -1): UiNode | null;
 declare function edgeField(root: UiNode, direction: 1 | -1): UiNode | null;
 declare function comparePositions(a: UiTextPosition, b: UiTextPosition): number;
+type UiTextInput = () => UiTextInputState;
+interface UiTextInputState {
+  readonly text: string;
+  readonly selectionStart: number;
+  readonly selectionEnd: number;
+  readonly caret: LayoutBox;
+  readonly multiline?: boolean;
+  readonly clipboard?: string;
+}
+declare function textInputOf(node: UiNode): UiTextInput | undefined;
 interface UiContainerSize {
   readonly current: Size;
   readonly changes: Observable<Size>;
@@ -1832,6 +1854,7 @@ declare const UiProperties: {
   readonly cursor: UiPropertyDefinition<UiCursor | undefined>;
   readonly selectable: UiPropertyDefinition<boolean | undefined>;
   readonly editingGroup: UiPropertyDefinition<UiEditingGroup | undefined>;
+  readonly textInput: UiPropertyDefinition<UiTextInput | undefined>;
   readonly pointerEvents: UiPropertyDefinition<UiPointerEvents | undefined>;
   readonly focusable: UiPropertyDefinition<boolean | undefined>;
   readonly tabStop: UiPropertyDefinition<boolean | undefined>;
@@ -1913,6 +1936,9 @@ type UiEventProps = {
   onInput?: (event: UiTextChangeEvent) => void;
   onSelectionChange?: (event: UiSelectionChangeEvent) => void;
   onPaste?: (event: UiPasteEvent) => void;
+  onCompositionStart?: (event: UiCompositionEvent) => void;
+  onCompositionUpdate?: (event: UiCompositionEvent) => void;
+  onCompositionEnd?: (event: UiCompositionEvent) => void;
 };
 type IdentityProps = {
   key?: string | number;
@@ -1924,7 +1950,7 @@ type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
-type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup'>;
+type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'activeDescendant' | 'controls' | 'autocomplete'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
@@ -2996,6 +3022,8 @@ interface KeyboardControllerOptions {
   tabNavigation?: boolean;
   editing?: {
     handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean;
+    readonly textFromKeys?: boolean;
+    noteKey?(cancelled: boolean): void;
   };
   selection?: {
     handleKey(key: string, modifiers: UiKeyModifiers): boolean;
@@ -3020,8 +3048,8 @@ declare class UiKeyboardController {
   private readonly activation;
   private readonly root;
   constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode | (() => UiNode), options?: KeyboardControllerOptions);
-  keyDown(key: string, modifiers?: UiKeyModifiers, textFollows?: boolean): UiKeyboardEvent;
-  keyUp(key: string, modifiers?: UiKeyModifiers): UiKeyboardEvent;
+  keyDown(key: string, modifiers?: UiKeyModifiers, textFollows?: boolean, code?: string): UiKeyboardEvent;
+  keyUp(key: string, modifiers?: UiKeyModifiers, code?: string): UiKeyboardEvent;
 }
 interface UiShortcutStep {
   readonly key: string;
@@ -3174,6 +3202,7 @@ interface EditingState {
   readonly caret: LayoutBox;
   readonly multiline: boolean;
   readonly composing: boolean;
+  readonly clipboard?: string;
   readonly html?: string;
 }
 interface EditingControllerOptions {
@@ -3187,6 +3216,9 @@ declare class UiEditingController {
   private readonly platform;
   private readonly paint;
   private focusedEditable;
+  private surface;
+  private surfaceComposition;
+  private textCancelled;
   private visible;
   private verticalGoalX;
   private dragging;
@@ -3199,6 +3231,8 @@ declare class UiEditingController {
   private pressedFrom;
   constructor(host: EditingHost, dispatcher: UiInputDispatcher, focus: UiFocusManager, options?: EditingControllerOptions);
   get focused(): UiNode | null;
+  get focusedSurface(): UiNode | null;
+  noteKey(cancelled: boolean): void;
   isEditable(node: UiNode): boolean;
   handleKey(node: UiNode, key: string, modifiers: UiKeyModifiers, textFromKeys?: boolean): boolean;
   private execute;
@@ -3225,6 +3259,8 @@ declare class UiEditingController {
   setVisible(visible: boolean): void;
   get caretEnabled(): boolean;
   private handleFocusChange;
+  private toSurface;
+  private surfaceState;
   private applyEdit;
   private history;
   private afterTextChange;
@@ -3286,6 +3322,10 @@ declare class UiPlatformAdapter {
 }
 declare function pointerDeviceOf(event: PointerEvent): UiPointerDevice;
 declare function capturePointer(target: EventTarget | null, pointerId: number): void;
+declare function isImeKey(event: {
+  readonly isComposing?: boolean;
+  readonly keyCode?: number;
+}): boolean;
 declare function prepareInputSurface(element: HTMLElement): void;
 declare class CanvasPlatformSurface implements PlatformSurface {
   private readonly element;
@@ -5492,6 +5532,7 @@ export {
   isComponentLikeElement,
   isEditableNode,
   isFrLength,
+  isImeKey,
   isLayoutProtocol,
   isMinMaxTrack,
   isMotionRest,
@@ -5825,6 +5866,7 @@ export {
   TextAlign,
   textContentOf,
   TextContentProps,
+  textInputOf,
   TextLine,
   TextLinePlacement,
   TextLineRun,
@@ -5885,6 +5927,7 @@ export {
   UiColor,
   UiColors,
   UiColorValue,
+  UiCompositionEvent,
   UiContainerSize,
   UiContainerSizeSource,
   UiContentDistribution,
@@ -6039,6 +6082,8 @@ export {
   UiTextChangeEvent,
   UiTextDecoration,
   UiTextDirection,
+  UiTextInput,
+  UiTextInputState,
   UiTextLink,
   UiTextMetrics,
   UiTextOverflowValue,
@@ -6404,6 +6449,7 @@ import {
   isComponentLikeElement,
   isEditableNode,
   isFrLength,
+  isImeKey,
   isLayoutProtocol,
   isMinMaxTrack,
   isMotionRest,
@@ -6737,6 +6783,7 @@ import {
   TextAlign,
   textContentOf,
   TextContentProps,
+  textInputOf,
   TextLine,
   TextLinePlacement,
   TextLineRun,
@@ -6797,6 +6844,7 @@ import {
   UiColor,
   UiColors,
   UiColorValue,
+  UiCompositionEvent,
   UiContainerSize,
   UiContainerSizeSource,
   UiContentDistribution,
@@ -6951,6 +6999,8 @@ import {
   UiTextChangeEvent,
   UiTextDecoration,
   UiTextDirection,
+  UiTextInput,
+  UiTextInputState,
   UiTextLink,
   UiTextMetrics,
   UiTextOverflowValue,
@@ -7225,6 +7275,7 @@ export {
   isComponentLikeElement,
   isEditableNode,
   isFrLength,
+  isImeKey,
   isLayoutProtocol,
   isMinMaxTrack,
   isMotionRest,
@@ -7437,6 +7488,7 @@ export {
   TEXT_RUN_ID_SEPARATOR,
   TEXT_SELECTION_PROP,
   textContentOf,
+  textInputOf,
   textRunBackgrounds,
   textRunDecorations,
   textRunOfRecordId,
@@ -7750,6 +7802,8 @@ export {
   type UiShortcutBinding,
   type UiShortcutStep,
   type UiSpringOptions,
+  type UiTextInput,
+  type UiTextInputState,
   type UiTextPosition,
   type UiTimerFrameClockOptions,
   type UiTrackSize,
@@ -7792,6 +7846,7 @@ export {
   UiColor,
   UiColors,
   UiColorValue,
+  UiCompositionEvent,
   UiContainerSize,
   UiContainerSizeSource,
   UiContentDistribution,

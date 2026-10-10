@@ -198,6 +198,20 @@ the application last heard of, so while a composition is open they are
 moved to make room for it rather than dropped, and the field keeps its
 styling and its hidden text through the composition.
 
+Keys that belong to the IME are not forwarded at all: one pressed while
+a composition is open (the arrows that move through candidates, the
+Enter that commits one, the Backspace that edits the reading) and the
+key that opens a composition, which browsers report with `keyCode`
+229. Their effect arrives as composition events. Forwarded as keys too,
+the Enter that commits a candidate would also insert a line.
+
+A key a listener cancels keeps its text out, as in a browser: an
+`onKeyDown` that calls `preventDefault()` on Option+Z, which types Ω on
+a Mac, gets no Ω. In a worker the shell cannot wait to hear whether the
+key was cancelled, so it sends the text regardless and the runtime
+drops it; `event.textFollows` says whether text will follow a key at
+all.
+
 Deletes, newlines, undo and redo are deliberately **not** forwarded from
 the textarea. They reach the runtime as key presses and are applied
 there; the element fires their `beforeinput` too, but only when its
@@ -223,6 +237,59 @@ applied every such edit twice.
   handler rather than a gesture. The shell re-takes focus from the
   `pointerup` of the press that started editing, and only that press:
   asking again while the keyboard is up makes it blink.
+
+## A surface that keeps its own text
+
+Some text cannot live in a field. A code editor holds a window of a
+file that is in shared memory, has many carets, and draws every line
+itself. What it needs from the platform is only what a canvas cannot
+get alone: text resolved from the keyboard layout and an IME, the
+clipboard, and a candidate window beside its caret. Give its node
+`textInput`, a function saying what the shell should mirror, and it
+gets those while it has focus:
+
+```tsx
+<box
+  focusable={true}
+  role="textbox"
+  textInput={() => ({
+    text: lineText, // context for the IME, and the value a screen reader reads
+    selectionStart: column,
+    selectionEnd: column,
+    caret: { x: caretX, y: caretY, width: 1, height: lineHeight }, // in the node's coordinates
+    clipboard: selectedText || lineText + '\n' // what copy and cut take
+  })}
+  onKeyDown={event => {
+    if (isCommand(event)) {
+      run(event);
+      event.preventDefault(); // and its text, if any, is dropped
+    } else if (!event.textFollows && event.key.length === 1) {
+      insert(event.key); // no proxy: a test, or a key before it took focus
+    }
+  }}
+  onBeforeInput={event => event.data !== null && insert(event.data)}
+  onCompositionUpdate={event => drawComposition(event.text, event.caret)}
+  onCompositionEnd={event => commit(event.text)}
+  onPaste={event => {
+    insert(event.text);
+    event.preventDefault();
+  }}
+/>
+```
+
+| Event                                                         | What it carries                                                      |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `onBeforeInput`                                               | Typed text (`insertText`), a dictation or a correction, `deleteByCut` |
+| `onCompositionStart`, `onCompositionUpdate`, `onCompositionEnd` | The IME's text so far and its caret, then what it committed          |
+| `onPaste`                                                     | The clipboard's text and HTML                                        |
+
+Nothing is applied for it. The function is asked for every frame the
+surface has focus, so it should read what it already knows rather than
+compute. `clipboard` is what a copy or a cut takes when that is not the
+selected part of `text`: a whole line with nothing selected, or several
+selections joined. A cut is offered as `deleteByCut` whenever it is
+non-empty. A surface that loses focus with a composition open hears it
+committed, as a browser commits one.
 
 ## A field is a window on its text
 

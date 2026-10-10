@@ -5,6 +5,7 @@ import type { UiTransitionValue } from '../animation/UiTransition';
 import type { UiNode } from '../graph/UiNode';
 import type {
   UiBeforeInputEvent,
+  UiCompositionEvent,
   UiFocusEvent,
   UiKeyboardEvent,
   UiPinchEvent,
@@ -94,6 +95,16 @@ export type UiEventProps = {
    * belongs to the text and never reaches here.
    */
   onPaste?: (event: UiPasteEvent) => void;
+  /**
+   * An IME opened a composition on a `textInput` surface. Its text
+   * arrives as `onCompositionUpdate` and is committed (or abandoned,
+   * as empty text) at `onCompositionEnd`.
+   */
+  onCompositionStart?: (event: UiCompositionEvent) => void;
+  /** The composition's text so far, and the caret within it. */
+  onCompositionUpdate?: (event: UiCompositionEvent) => void;
+  /** The IME committed `text`; empty when the composition was cancelled. */
+  onCompositionEnd?: (event: UiCompositionEvent) => void;
 };
 
 /** Reconciliation identity and node access; never stored on the node. */
@@ -197,6 +208,7 @@ export type InteractionProps = PropsOf<
   | 'visualState'
   | 'selectable'
   | 'editingGroup'
+  | 'textInput'
 >;
 
 /**

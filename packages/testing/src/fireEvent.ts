@@ -77,10 +77,10 @@ export interface FireEvent {
   }): void;
 
   /** A key press at whatever has focus. */
-  keyDown(key: string, modifiers?: Partial<UiKeyModifiers>): void;
-  keyUp(key: string, modifiers?: Partial<UiKeyModifiers>): void;
+  keyDown(key: string, modifiers?: Partial<UiKeyModifiers>, options?: KeyOptions): void;
+  keyUp(key: string, modifiers?: Partial<UiKeyModifiers>, options?: KeyOptions): void;
   /** Down then up, which is what pressing a key is. */
-  press(key: string, modifiers?: Partial<UiKeyModifiers>): void;
+  press(key: string, modifiers?: Partial<UiKeyModifiers>, options?: KeyOptions): void;
 
   focus(node: UiNode): boolean;
   blur(): void;
@@ -93,6 +93,23 @@ export interface FireEvent {
    */
   type(text: string): void;
   paste(text: string, html?: string): void;
+  /**
+   * An edit as the editing proxy's `beforeinput` delivers it:
+   * `insertText`, `insertReplacementText`, `deleteByCut`, ...
+   */
+  beforeInput(inputType: string, data?: string | null): void;
+  /** An IME composition, as the proxy delivers it: opened, its text so far, committed. */
+  compositionStart(): void;
+  compositionUpdate(text: string, caret?: number): void;
+  compositionEnd(text: string): void;
+  /**
+   * What a copy would put on the clipboard now, as the proxy takes it
+   * from the focused editable or surface; null when nothing editable
+   * has focus.
+   */
+  copy(): string | null;
+  /** A cut: what it puts on the clipboard, and the delete it sends. */
+  cut(): string | null;
 }
 
 function modifiersOf(partial: Partial<UiKeyModifiers> | undefined): UiKeyModifiers {
@@ -152,11 +169,12 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
         modifiersOf(options.modifiers)
       ),
 
-    keyDown: (key, modifiers) => void runtime.input.keyboard.keyDown(key, modifiersOf(modifiers)),
-    keyUp: (key, modifiers) => void runtime.input.keyboard.keyUp(key, modifiersOf(modifiers)),
-    press: (key, modifiers) => {
-      runtime.input.keyboard.keyDown(key, modifiersOf(modifiers));
-      runtime.input.keyboard.keyUp(key, modifiersOf(modifiers));
+    keyDown: (key, modifiers, options = {}) =>
+      void runtime.input.keyboard.keyDown(key, modifiersOf(modifiers), options.textFollows, options.code),
+    keyUp: (key, modifiers, options = {}) => void runtime.input.keyboard.keyUp(key, modifiersOf(modifiers), options.code),
+    press: (key, modifiers, options = {}) => {
+      runtime.input.keyboard.keyDown(key, modifiersOf(modifiers), options.textFollows, options.code);
+      runtime.input.keyboard.keyUp(key, modifiersOf(modifiers), options.code);
     },
 
     focus: node => runtime.input.focus.focus(node),
@@ -165,8 +183,34 @@ export function createFireEvent(runtime: GessoRuntime): FireEvent {
     shiftTab: () => runtime.input.focus.focusPrevious(),
 
     type: text => void runtime.input.editing.insertText(text),
+    beforeInput: (inputType, data) => void runtime.input.editing.beforeInput(inputType, data ?? null),
+    compositionStart: () => runtime.input.editing.compositionStart(),
+    compositionUpdate: (text, caret) => runtime.input.editing.compositionUpdate(text, caret),
+    compositionEnd: text => runtime.input.editing.compositionEnd(text),
+    copy: () => clipboardOf(runtime),
+    cut: () => {
+      const text = clipboardOf(runtime);
+      if (text !== null && text.length > 0) {
+        runtime.input.editing.beforeInput('deleteByCut', null);
+      }
+      return text;
+    },
     paste: (text, html) => void runtime.input.editing.paste(text, html ?? null)
   };
+}
+
+/** What the editing proxy's copy handler would take; see `EditingProxy`. */
+function clipboardOf(runtime: GessoRuntime): string | null {
+  const state = runtime.input.editing.state();
+  return state === null ? null : (state.clipboard ?? state.text.slice(state.selectionStart, state.selectionEnd));
+}
+
+/** What a key carries beyond its name and modifiers. */
+export interface KeyOptions {
+  /** The physical key, as the DOM's `code` (`KeyZ`); see `UiKeyboardEvent.code`. */
+  readonly code?: string;
+  /** Whether the key's text follows it as a `beforeinput`; see `UiKeyboardEvent.textFollows`. */
+  readonly textFollows?: boolean;
 }
 
 /** What `pointerDown`, `pointerMove` and `pointerUp` take. */

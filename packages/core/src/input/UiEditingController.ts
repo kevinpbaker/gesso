@@ -10,6 +10,7 @@ import { commandForKey, detectEditingPlatform, type EditCommand, type EditingPla
 import { lineStartAt, lineEndAt } from '../editing/TextBoundaries';
 import { visibleWordRange } from '../editing/HiddenText';
 import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
+import { textInputOf } from '../editing/UiTextInput';
 import {
   adjacentField,
   comparePositions,
@@ -25,6 +26,8 @@ import type { UiFocusManager } from './UiFocusManager';
 import { isNodeFocusable } from './UiInteraction';
 import {
   UiBeforeInputEvent,
+  UiCompositionEvent,
+  UiEventType,
   UiPasteEvent,
   UiSelectionChangeEvent,
   UiTextChangeEvent,
@@ -74,6 +77,11 @@ export interface EditingState {
   readonly multiline: boolean;
   readonly composing: boolean;
   /**
+   * What a copy or a cut takes, when it is not the selected part of
+   * `text`; from a `textInput` surface (`UiTextInputState.clipboard`).
+   */
+  readonly clipboard?: string;
+  /**
    * The selection as HTML, which a copy puts on the clipboard beside
    * the text, when the field's editing group gives some (see
    * `UiEditingGroup.copyHtml`). Absent otherwise.
@@ -117,6 +125,15 @@ export class UiEditingController {
   private readonly platform: EditingPlatform;
   private readonly paint = createPaintState();
   private focusedEditable: UiNode | null = null;
+  /**
+   * The focused `textInput` surface, which keeps its own text: input is
+   * dispatched to it as events rather than applied here. See `UiTextInput`.
+   */
+  private surface: UiNode | null = null;
+  /** The surface's open composition's text, or null while none is open. */
+  private surfaceComposition: string | null = null;
+  /** The last key was cancelled, so the text that follows it is dropped. See `noteKey`. */
+  private textCancelled = false;
   private visible = true;
   /** x the current run of vertical moves keeps returning to. */
   private verticalGoalX: number | undefined = undefined;
@@ -176,6 +193,22 @@ export class UiEditingController {
   /** The editable that holds focus, or null. */
   get focused(): UiNode | null {
     return this.focusedEditable;
+  }
+
+  /** The `textInput` surface that holds focus, or null. */
+  get focusedSurface(): UiNode | null {
+    return this.surface;
+  }
+
+  /**
+   * Each key down says whether a listener cancelled it, and each key up
+   * that it is over. A cancelled key's text, which the shell's proxy
+   * sends after it whatever happened (it cannot wait for the worker's
+   * answer), is dropped when it arrives, as a browser drops the text of
+   * a keydown whose default was prevented.
+   */
+  noteKey(cancelled: boolean): void {
+    this.textCancelled = cancelled;
   }
 
   /** Whether the pointer controller should hand presses on the node to this controller. */
@@ -393,6 +426,14 @@ export class UiEditingController {
    * twice.
    */
   beforeInput(inputType: string, data: string | null): boolean {
+    if (this.textCancelled && inputType.startsWith('insert')) {
+      this.textCancelled = false;
+      return true;
+    }
+    if (this.surface !== null) {
+      this.toSurface(new UiBeforeInputEvent(inputType, data));
+      return true;
+    }
     const node = this.focusedEditable;
     if (node === null) {
       return false;
@@ -455,6 +496,10 @@ export class UiEditingController {
 
   /** Inserts text at the selection of the focused editable, as typing would. */
   insertText(text: string): boolean {
+    if (this.surface !== null) {
+      this.toSurface(new UiBeforeInputEvent('insertText', text));
+      return true;
+    }
     const node = this.focusedEditable;
     if (node === null || isReadOnly(node)) {
       return false;
@@ -526,6 +571,11 @@ export class UiEditingController {
   // ---------------------------------------------------------------------------
 
   compositionStart(): void {
+    if (this.surface !== null) {
+      this.surfaceComposition = '';
+      this.toSurface(new UiCompositionEvent(UiEventType.CompositionStart));
+      return;
+    }
     if (this.span !== null) {
       // Composing over a selection replaces it, as typing does.
       this.spanEdit('deleteContent', null);
@@ -543,6 +593,16 @@ export class UiEditingController {
 
   /** The composition text so far and the caret within it. */
   compositionUpdate(text: string, caret: number = text.length): void {
+    if (this.surface !== null) {
+      if (this.surfaceComposition === null) {
+        // An update with no start: some engines skip it after a commit
+        // that continues straight into the next composition.
+        this.toSurface(new UiCompositionEvent(UiEventType.CompositionStart));
+      }
+      this.surfaceComposition = text;
+      this.toSurface(new UiCompositionEvent(UiEventType.CompositionUpdate, text, caret));
+      return;
+    }
     const node = this.focusedEditable;
     if (node === null || isReadOnly(node)) {
       return;
@@ -555,6 +615,11 @@ export class UiEditingController {
 
   /** The IME committed `text` (possibly empty: the composition was cancelled). */
   compositionEnd(text: string): void {
+    if (this.surface !== null) {
+      this.surfaceComposition = null;
+      this.toSurface(new UiCompositionEvent(UiEventType.CompositionEnd, text));
+      return;
+    }
     const node = this.focusedEditable;
     this.compositionOpen = false;
     if (node === null || isReadOnly(node)) {
@@ -739,6 +804,9 @@ export class UiEditingController {
 
   /** The focused editable's state for the shell to mirror, or null. */
   state(): EditingState | null {
+    if (this.surface !== null) {
+      return this.surfaceState(this.surface);
+    }
     const node = this.focusedEditable;
     if (node === null || this.host.recordFor(node) === undefined) {
       return null;
@@ -823,6 +891,17 @@ export class UiEditingController {
     if (this.span !== null && !this.spanFocusing && node !== this.span.focus.node) {
       this.clearSpan();
     }
+    const surface = node !== null && !isEditableNode(node) && textInputOf(node) !== undefined ? node : null;
+    if (surface !== this.surface) {
+      const left = this.surface;
+      const open = this.surfaceComposition;
+      this.surface = surface;
+      this.surfaceComposition = null;
+      if (left !== null && open !== null) {
+        // Leaving with a composition open commits it, as a browser does.
+        this.dispatcher.dispatch(new UiCompositionEvent(UiEventType.CompositionEnd, open), left);
+      }
+    }
     const previous = this.focusedEditable;
     const next = node !== null && isEditableNode(node) ? node : null;
     if (previous === next) {
@@ -847,6 +926,31 @@ export class UiEditingController {
       model.blinkOrigin = this.host.now();
       this.host.markDirty(next, DirtyFlags.Paint);
     }
+  }
+
+  /** Hands an input event to the focused surface. */
+  private toSurface(event: UiBeforeInputEvent | UiCompositionEvent): void {
+    if (this.surface !== null) {
+      this.dispatcher.dispatch(event, this.surface);
+    }
+  }
+
+  /** What the shell mirrors for a focused surface: what it says, with its caret placed on the canvas. */
+  private surfaceState(node: UiNode): EditingState | null {
+    const source = textInputOf(node);
+    if (source === undefined || this.host.recordFor(node) === undefined) {
+      return null;
+    }
+    const surface = source();
+    return {
+      text: surface.text,
+      selectionStart: surface.selectionStart,
+      selectionEnd: surface.selectionEnd,
+      caret: this.drawnBox(node, surface.caret),
+      multiline: surface.multiline ?? true,
+      composing: this.surfaceComposition !== null,
+      ...(surface.clipboard === undefined ? {} : { clipboard: surface.clipboard })
+    };
   }
 
   /**
