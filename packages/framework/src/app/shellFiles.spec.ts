@@ -7,6 +7,8 @@ import {
   RECENT_FILE_LIMIT,
   ShellFiles,
   fileResultTransfer,
+  rememberedDirectory,
+  type ShellDirectoryHandle,
   type ShellFileHandle,
   type ShellFilesHost
 } from './shellFiles';
@@ -305,6 +307,96 @@ describe('saving files', () => {
   });
 });
 
+/** A folder on the same disk, as a picker hands one back. */
+class FakeDirectory implements ShellDirectoryHandle {
+  readonly kind = 'directory' as const;
+  permission: PermissionState = 'granted';
+  asked: ('read' | 'readwrite')[] = [];
+
+  constructor(readonly name: string) {}
+
+  queryPermission(): Promise<PermissionState> {
+    return Promise.resolve(this.permission);
+  }
+
+  requestPermission(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState> {
+    this.asked.push(descriptor.mode);
+    this.permission = 'granted';
+    return Promise.resolve('granted');
+  }
+
+  isSameEntry(other: ShellFileHandle | ShellDirectoryHandle): Promise<boolean> {
+    return Promise.resolve(other.kind === 'directory' && other.name === this.name);
+  }
+}
+
+describe('folders', () => {
+  it('remembers the folder picked, reads none of it, and lists it as a folder', async () => {
+    const picked: { mode: string }[] = [];
+    const { files } = host({
+      showDirectoryPicker: options => {
+        picked.push(options);
+        return Promise.resolve(new FakeDirectory('project'));
+      }
+    });
+    const result = await files.perform({ op: 'openDirectory', mode: 'readwrite' });
+    expect(picked).toEqual([{ mode: 'readwrite' }]);
+    expect(result.outcome).toBe('ok');
+    expect(result.files).toEqual([]);
+    expect(result.directory?.name).toBe('project');
+    // The same folder picked again is the same number.
+    const again = await files.perform({ op: 'openDirectory', mode: 'readwrite' });
+    expect(again.directory?.handle).toBe(result.directory?.handle);
+    const recent = await files.perform({ op: 'recent' });
+    expect(recent.recent.map(entry => [entry.name, entry.kind])).toEqual([['project', 'directory']]);
+  });
+
+  it('asks again for a folder from an earlier session, in the mode asked for', async () => {
+    const folder = new FakeDirectory('project');
+    const { files } = host({ showDirectoryPicker: () => Promise.resolve(folder) });
+    const { directory } = await files.perform({ op: 'openDirectory', mode: 'read' });
+    folder.permission = 'prompt';
+    const reopened = await files.perform({ op: 'reopen', handle: directory!.handle, mode: 'readwrite' });
+    expect(folder.asked).toEqual(['readwrite']);
+    expect(reopened.directory).toEqual(directory);
+    expect(reopened.files).toEqual([]);
+  });
+
+  it('will not save a file over a folder', async () => {
+    const { files } = host({ showDirectoryPicker: () => Promise.resolve(new FakeDirectory('project')) });
+    const { directory } = await files.perform({ op: 'openDirectory', mode: 'readwrite' });
+    const saved = await files.perform({
+      op: 'save',
+      name: 'x',
+      mediaType: 'text/plain',
+      text: 'x',
+      accept: [],
+      handle: directory!.handle
+    });
+    expect(saved.outcome).toBe('failed');
+  });
+
+  it('says it cannot where the browser has no folder picker', async () => {
+    const { files } = host();
+    expect((await files.perform({ op: 'openDirectory', mode: 'read' })).outcome).toBe('unsupported');
+  });
+
+  it('hands a worker the folder by its number, from the same store', async () => {
+    const idb = new FakeIdb();
+    const files = new ShellFiles({
+      store: new IndexedDbHandleStore(idb as unknown as IDBFactory),
+      now: () => 1,
+      showDirectoryPicker: () => Promise.resolve(new FakeDirectory('project'))
+    });
+    const { directory } = await files.perform({ op: 'openDirectory', mode: 'read' });
+    // Another thread: its own store over the same database.
+    const handle = await rememberedDirectory(directory!.handle, idb as unknown as IDBFactory);
+    expect(handle?.name).toBe('project');
+    expect(await rememberedDirectory(directory!.handle + 1, idb as unknown as IDBFactory)).toBeNull();
+    expect(await rememberedDirectory(directory!.handle, undefined)).toBeNull();
+  });
+});
+
 describe('the files the shell remembers', () => {
   it('reopens one, asking again when the permission lapsed', async () => {
     const { files, store, disk } = host();
@@ -366,7 +458,14 @@ describe('what the shell refuses', () => {
   it('calls anything else failed, and never rejects', async () => {
     const { files } = host({ showOpenFilePicker: () => Promise.reject(new Error('disk on fire')) });
     const result = await files.perform({ op: 'open', accept: [], multiple: false });
-    expect(result).toEqual({ outcome: 'failed', files: [], saved: null, recent: [], error: 'disk on fire' });
+    expect(result).toEqual({
+      outcome: 'failed',
+      files: [],
+      directory: null,
+      saved: null,
+      recent: [],
+      error: 'disk on fire'
+    });
   });
 });
 
@@ -388,7 +487,7 @@ describe('ShellService file requests', () => {
     const save = service.saveFile({ name: 'a.csv', text: 'x', mediaType: 'text/csv', handle: 3 });
     expect(sent.map(each => each.op)).toEqual(['open', 'save']);
 
-    const empty = { files: [], saved: null, recent: [], error: null };
+    const empty = { files: [], directory: null, saved: null, recent: [], error: null };
     service.settleFile(sent[1].id, { ...empty, outcome: 'ok', saved: { name: 'a.csv', handle: 3, via: 'file' } });
     service.settleFile(sent[0].id, { ...empty, outcome: 'cancelled' });
     expect((await save).saved?.handle).toBe(3);

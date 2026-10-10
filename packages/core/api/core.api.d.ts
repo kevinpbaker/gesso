@@ -1328,6 +1328,7 @@ type HiddenSpan = Pick<UiResolvedTextSpan, 'start' | 'end' | 'hidden'>;
 declare function hiddenRangesOf(spans: readonly HiddenSpan[]): readonly UiTextRange[];
 declare function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined;
 declare function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
+declare function spansDifferOnlyInPaint(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
 declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
 declare enum UiVisualState {
   Normal = "normal",
@@ -5853,6 +5854,7 @@ export {
   spannedRunsFor,
   spannedTextOf,
   SpanPaint,
+  spansDifferOnlyInPaint,
   splitMp3Frames,
   spring,
   Stack,
@@ -6770,6 +6772,7 @@ import {
   spannedRunsFor,
   spannedTextOf,
   SpanPaint,
+  spansDifferOnlyInPaint,
   splitMp3Frames,
   spring,
   Stack,
@@ -7479,6 +7482,7 @@ export {
   spanAtOffset,
   spannedRunsFor,
   spannedTextOf,
+  spansDifferOnlyInPaint,
   splitMp3Frames,
   spring,
   Stack,
