@@ -2102,6 +2102,8 @@ declare class WorkerApp {
   private canvas;
   private host;
   private resizeObserver;
+  private hostSize;
+  private stopPixelRatio;
   private detachInput;
   private files;
   private proxy;
@@ -2233,6 +2235,8 @@ declare class GessoApp {
   private readonly onOpenRoute;
   private running;
   private resizeObserver;
+  private hostSize;
+  private stopPixelRatio;
   private proxy;
   private audio;
   private mirror;
