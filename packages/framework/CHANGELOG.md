@@ -1,5 +1,13 @@
 # gesso-framework
 
+## 0.6.15
+
+### Patch Changes
+
+- dd812b3: A window moved to a display of another density is redrawn sharp. Its size in CSS pixels does not change, so no resize was heard, and the canvas kept the old device pixel ratio, blurred or scaled, until something else resized it. Both app shells now listen for the ratio itself (`watchPixelRatio`).
+- Updated dependencies [9872957]
+  - gesso-core@0.6.15
+
 ## 0.6.14
 
 ### Patch Changes
