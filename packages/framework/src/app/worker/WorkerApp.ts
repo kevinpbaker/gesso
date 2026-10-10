@@ -323,6 +323,42 @@ export function openUrlWith(handler: ((url: string) => void) | undefined, url: s
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+/**
+ * What to say when the browser fails a worker at the worker object,
+ * before the worker could say anything itself.
+ *
+ * Two different failures arrive this way. An exception thrown while the
+ * worker's modules were evaluating is an `ErrorEvent` with a message,
+ * and the message is the useful part. A script that never loaded at all
+ * is a plain `Event` with no message and no filename, and the browser
+ * says nothing more about it anywhere a script can read: the reason is
+ * only in the network panel. That case used to be reported as "failed
+ * to start: undefined", so it now says where to look and what the
+ * usual reasons are. The last one is easy to hit: turn on
+ * `Cross-Origin-Embedder-Policy` and a worker script the browser cached
+ * before is refused, because a dev server's 304 does not repeat the
+ * header.
+ */
+export function workerFailureMessage(worker: 'render' | 'app', event: Event): string {
+  const name = worker === 'render' ? 'the render worker' : 'the app worker';
+  if (hasMessage(event)) {
+    const filename = (event as Partial<ErrorEvent>).filename;
+    const where = filename === undefined || filename === '' ? '' : ` (${filename})`;
+    return `${name} failed to start: ${(event as ErrorEvent).message}${where}`;
+  }
+  return (
+    `${name} failed to start: its script did not load. The browser's network panel has the reason; ` +
+    'usually the file is missing (404), is served with a MIME type that is not JavaScript, or was refused ' +
+    "under the page's Cross-Origin-Embedder-Policy (including a copy cached before the policy was turned on; " +
+    'a hard reload clears it).'
+  );
+}
+
+function hasMessage(event: Event): boolean {
+  const message = (event as Partial<ErrorEvent>).message;
+  return typeof message === 'string' && message !== '';
+}
+
 export function resolveAppLogic(spec: NonNullable<WorkerAppOptions['appLogicWorker']>): {
   endpoint: AppLogicEndpoint;
   owned: boolean;
@@ -500,6 +536,9 @@ export class WorkerApp {
       this.appLogicWorker = application;
       this.ownsAppLogicWorker = resolved.owned;
       application.addEventListener('message', this.handleAppWorkerMessage);
+      if (resolved.owned) {
+        (application as Worker).addEventListener('error', this.handleAppWorkerFailure);
+      }
       // A port delivers nothing until it is started, and a worker has
       // no such method. Calling it here rather than asking the caller
       // to is what makes a port a drop-in for a worker.
@@ -620,13 +659,30 @@ export class WorkerApp {
    * nothing else will ever report this. A module that fails to load,
    * or fails to parse, arrives this way and no other.
    */
-  private handleWorkerFailure = (event: ErrorEvent): void => {
+  private handleWorkerFailure = (event: Event): void => {
     event.preventDefault();
     if (this.ready) {
       return;
     }
-    const where = event.filename === undefined || event.filename === '' ? '' : ` (${event.filename})`;
-    this.report(`the render worker failed to start: ${event.message}${where}`, undefined, 'uncaught');
+    this.report(workerFailureMessage('render', event), undefined, 'uncaught');
+  };
+
+  /**
+   * The app worker's counterpart, for the one failure nothing else
+   * reports: a script that never loaded. Without this, an app worker
+   * blocked by a 404 or by the page's embedder policy left the screen
+   * waiting on channels that would never arrive, and said nothing.
+   *
+   * An exception inside the app worker arrives here too, with a
+   * message, and is left alone: the browser reports it from inside the
+   * worker with its stack, which is better than anything said here.
+   */
+  private handleAppWorkerFailure = (event: Event): void => {
+    if (hasMessage(event)) {
+      return;
+    }
+    event.preventDefault();
+    this.report(workerFailureMessage('app', event), undefined, 'uncaught');
   };
 
   /** Reports an error, to `onError` or to the console it defaults to. */
@@ -820,6 +876,7 @@ export class WorkerApp {
     }
     this.appLogicWorker?.removeEventListener('message', this.handleAppWorkerMessage);
     if (this.ownsAppLogicWorker) {
+      (this.appLogicWorker as Worker | undefined)?.removeEventListener('error', this.handleAppWorkerFailure);
       (this.appLogicWorker as Worker | undefined)?.terminate();
     }
     this.appLogicWorker = undefined;
