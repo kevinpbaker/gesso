@@ -103,6 +103,12 @@ on screen. It follows its anchor when the content underneath scrolls.
 `placement` accepts `top`, `bottom`, `left` and `right`, each with a
 `-start` and `-end` variant, and defaults to `'bottom-start'`.
 
+A menu longer than the room on the side it opens on is cut to that
+room, and its items scroll inside the frame: with the wheel, and with
+the keys, which keep the highlighted item in view. A context menu that
+fits on neither side of its point but fits in the window slides over
+the point instead, whole, the way a native one does.
+
 The entry always takes a backdrop, so a press or a wheel anywhere
 outside closes the menu and nothing behind it scrolls while it is up.
 

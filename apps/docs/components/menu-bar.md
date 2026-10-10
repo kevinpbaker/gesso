@@ -102,6 +102,16 @@ With a menu already open, moving the pointer along the bar opens the
 one underneath it. Without that, a bar is something you have to click
 four times to read.
 
+## A menu longer than the window
+
+A panel is given the room under its title and no more. A menu with
+thirty commands in a short window is cut at the window's edge, and its
+rows scroll inside the frame, which holds still. The wheel scrolls it;
+the keys keep the highlighted row in view as they walk past the edge,
+including the last row that ArrowUp on the bar opens on. Hovering does
+not scroll: a row half under the edge that the pointer brushes does not
+pull the list out from under it.
+
 ## The keyboard without the chrome
 
 `menuBarStep` is the state machine underneath, exported on its own. It
