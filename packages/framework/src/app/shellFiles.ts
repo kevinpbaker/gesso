@@ -132,7 +132,7 @@ export class ShellFiles {
       const handles = await this.host.showOpenFilePicker({ ...pickerTypes(accept), multiple });
       const files: ShellFile[] = [];
       for (const handle of handles) {
-        const id = await this.remember(handle);
+        const id = await this.rememberIfPossible(handle);
         files.push(await read(await handle.getFile(), id));
       }
       return ok({ files });
@@ -152,6 +152,9 @@ export class ShellFiles {
       return shellFilesUnsupported('This browser cannot open folders.');
     }
     const handle = await this.host.showDirectoryPicker({ mode });
+    // Not `rememberIfPossible`: a folder is only reachable by the number
+    // it is remembered under, so a folder that cannot be remembered
+    // cannot be opened, and that is a failure.
     const id = await this.remember(handle);
     return ok({ directory: { name: handle.name, handle: id } });
   }
@@ -165,11 +168,11 @@ export class ShellFiles {
       return denied();
     }
     if (entry.handle.kind === 'directory') {
-      await this.host.store.put({ ...entry, used: this.host.now() });
+      await this.touch(entry);
       return ok({ directory: { name: entry.handle.name, handle: id } });
     }
     const file = await entry.handle.getFile();
-    await this.host.store.put({ ...entry, used: this.host.now() });
+    await this.touch(entry);
     return ok({ files: [await read(file, id)] });
   }
 
@@ -186,7 +189,7 @@ export class ShellFiles {
         return denied();
       }
       await write(entry.handle, request.bytes ?? request.text);
-      await this.host.store.put({ ...entry, used: this.host.now() });
+      await this.touch(entry);
       return ok({ saved: { name: entry.handle.name, handle: entry.id, via: 'file' } });
     }
     if (this.host.showSaveFilePicker !== undefined) {
@@ -195,7 +198,7 @@ export class ShellFiles {
         suggestedName: request.name
       });
       await write(handle, request.bytes ?? request.text);
-      const id = request.remember === false ? null : await this.remember(handle);
+      const id = request.remember === false ? null : await this.rememberIfPossible(handle);
       return ok({ saved: { name: handle.name, handle: id, via: 'file' } });
     }
     if (this.host.download !== undefined) {
@@ -219,6 +222,32 @@ export class ShellFiles {
 
   private async find(id: number): Promise<StoredFileHandle | null> {
     return (await this.host.store.all()).find(entry => entry.id === id) ?? null;
+  }
+
+  /**
+   * `remember`, for a file that has already been read or written.
+   *
+   * Remembering is what the recent files and a later Save are made of,
+   * and a store can refuse it for reasons that have nothing to do with
+   * the file: storage blocked for the site, a spent quota, a private
+   * window. The file was opened or saved all the same, so that is the
+   * answer, with no handle, exactly as a file input's file has none.
+   */
+  private async rememberIfPossible(handle: AnyHandle): Promise<number | null> {
+    try {
+      return await this.remember(handle);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Notes that a remembered file was used, for the recent list's order. Best effort, as above. */
+  private async touch(entry: StoredFileHandle): Promise<void> {
+    try {
+      await this.host.store.put({ ...entry, used: this.host.now() });
+    } catch {
+      // The order of the recent files is the only thing lost.
+    }
   }
 
   /**
