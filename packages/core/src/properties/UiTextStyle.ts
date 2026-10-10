@@ -424,6 +424,40 @@ export function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly
   return true;
 }
 
+/**
+ * Whether two lists of runs are the same text, set the same way, and
+ * differ at most in colour, background and decoration, which are drawn
+ * rather than measured.
+ */
+export function spansDifferOnlyInPaint(
+  a: readonly UiTextSpan[] | undefined,
+  b: readonly UiTextSpan[] | undefined
+): boolean {
+  if (a === undefined || b === undefined || a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.text !== y.text ||
+      x.fontFamily !== y.fontFamily ||
+      x.fontSize !== y.fontSize ||
+      x.fontWeight !== y.fontWeight ||
+      x.fontStyle !== y.fontStyle ||
+      x.fontStretch !== y.fontStretch ||
+      x.fontVariant !== y.fontVariant ||
+      x.fontKerning !== y.fontKerning ||
+      x.letterSpacing !== y.letterSpacing ||
+      x.hidden !== y.hidden ||
+      x.link !== y.link
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function spansEqual(a: UiTextSpan, b: UiTextSpan): boolean {
   return (
     a.text === b.text &&

@@ -25,7 +25,7 @@ import type {
   UiTextSpan,
   UiTextStyle
 } from './UiTextStyle';
-import { defaultTextStyle, textSpansEqual } from './UiTextStyle';
+import { defaultTextStyle, spansDifferOnlyInPaint, textSpansEqual } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
 import type { UiLayoutProtocol } from '../layout/CustomLayout';
 import type { UiLength, UiTrackSize } from '../layout/UiLength';
@@ -1009,7 +1009,12 @@ export const UiProperties = {
     defaultValue: undefined,
     inherited: false,
     affects: C | L | S,
-    compare: textSpansEqual
+    compare: textSpansEqual,
+    // Runs that differ only in how they are coloured, underlined or
+    // highlighted are the same text in the same places: a code editor
+    // recolouring a line it has just highlighted repaints it and
+    // measures nothing.
+    narrowEffects: (previous, next, flags) => (spansDifferOnlyInPaint(previous, next) ? P : flags)
   }),
 
   verticalAlign: defineProperty<UiVerticalAlign | undefined>({
