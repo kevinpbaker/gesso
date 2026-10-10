@@ -291,6 +291,12 @@ selections joined. A cut is offered as `deleteByCut` whenever it is
 non-empty. A surface that loses focus with a composition open hears it
 committed, as a browser commits one.
 
+What the surface draws inside itself is not in the semantics tree: the
+editing proxy's element is the field a screen reader reads, and its
+value is the text the surface mirrors. Say what matters in that text,
+the caret's line for a code editor, and give the node a `role` and a
+`label`.
+
 ## A field is a window on its text
 
 A field shrinks to the space it is given and scrolls or wraps inside,

@@ -63,6 +63,16 @@ describe('buildSemanticsTree', () => {
     ]);
   });
 
+  it("leaves out what a textInput surface draws, which the editing proxy carries as its value", () => {
+    const t = new Tree();
+    const surface = t.node(UiNodeType.Box, { role: 'textbox', label: 'Editor', focusable: true, textInput: () => ({ text: '', selectionStart: 0, selectionEnd: 0, caret: { x: 0, y: 0, width: 1, height: 1 } }) });
+    const row = t.node(UiNodeType.Row);
+    t.add(row, t.node(UiNodeType.Text, { text: 'const a = 1;' }), t.node(UiNodeType.Text, { text: '12' }));
+    t.add(surface, row);
+    t.add(t.root, surface);
+    expect(t.build().map(record => [record.role, record.label])).toEqual([['textbox', 'Editor']]);
+  });
+
   it('sees through the boxes a layout needs', () => {
     const t = new Tree();
     const outer = t.node(UiNodeType.Box);

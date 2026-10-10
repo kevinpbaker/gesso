@@ -7,6 +7,7 @@ import type {
   UiSemanticStates,
   UiLiveRegion
 } from '../properties/UiSemantics';
+import { textInputOf } from '../editing/UiTextInput';
 import { normalizeStates } from '../properties/UiSemantics';
 import type { UiResolvedTextSpan, UiTextLink } from '../properties/UiTextStyle';
 import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
@@ -532,13 +533,22 @@ function namesItsParent(child: UiNode): boolean {
  *
  * Either because the parent's name was built from its text, or because
  * the parent's role makes its whole subtree presentational — a labelled
- * button still hides the glyph inside it. A labelled *container*
+ * button still hides the glyph inside it — or because the parent is a
+ * `textInput` surface, whose text the editing proxy carries. A labelled *container*
  * (a form, a list, a dialog) claims nothing: its label names it, and
  * its children are the content that label introduces.
  */
 function claimedByName(parent: UiNode, child: UiNode): boolean {
   const role = (parent.properties.get('role') as UiRole | undefined) ?? IMPLICIT_ROLES[parent.type as UiNodeType];
   if (role !== undefined && PRESENTATIONAL_CHILDREN.has(role)) {
+    return true;
+  }
+  if (textInputOf(parent) !== undefined) {
+    // A surface that keeps its own text (`textInput`) is read through the
+    // editing proxy, whose value is that text; what it draws is the same
+    // text again, as a code editor's lines are, and announcing both says
+    // everything twice. It also keeps a keystroke that redraws hundreds
+    // of runs from rewriting as many elements of the mirror.
     return true;
   }
   if (parent.properties.get('label') !== undefined) {
