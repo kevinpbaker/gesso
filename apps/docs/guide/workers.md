@@ -168,6 +168,9 @@ This is worth knowing before you pick a dependency, not after.
 A `Date`, a `Map`, a class instance or a domain object compares by
 reference across the barrier, which reports "changed" every time it is
 evaluated, so view models flatten to plain shapes before they publish.
+The one exception is a `SharedArrayBuffer`, which is shared rather than
+copied, so two threads can read one large document without sending it
+([Channels and the barrier](/structure/channels-and-the-barrier#only-plain-data-crosses)).
 Nothing else ever crosses at all: elements, components, observables and
 nodes are built in the render worker and stay there.
 

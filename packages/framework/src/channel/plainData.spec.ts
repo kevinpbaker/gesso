@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findUnplainPath, requirePlainData } from './plainData';
+import { describeSharedMemory, findUnplainPath, requirePlainData } from './plainData';
 
 class Product {
   constructor(readonly id: string) {}
@@ -23,6 +23,22 @@ describe('findUnplainPath', () => {
     expect(findUnplainPath({ byId: new Map() })).toBe('.byId');
     expect(findUnplainPath({ tags: new Set() })).toBe('.tags');
     expect(findUnplainPath({ onPick: () => {} })).toBe('.onPick');
+  });
+
+  it('accepts shared memory, which is a handle compared by identity', () => {
+    expect(findUnplainPath({ text: new SharedArrayBuffer(16), version: 3 })).toBeNull();
+    expect(findUnplainPath({ text: new ArrayBuffer(16) })).toBe('.text');
+  });
+
+  it('describes shared memory to a reader that only gets JSON', () => {
+    const memory = new SharedArrayBuffer(16);
+    expect(describeSharedMemory({ text: memory, version: 3, lines: [1, 2] })).toEqual({
+      text: '[shared memory, 16 bytes]',
+      version: 3,
+      lines: [1, 2]
+    });
+    const plain = { version: 3 };
+    expect(describeSharedMemory(plain)).toBe(plain);
   });
 
   it('accepts a null-prototype object, which compares structurally', () => {

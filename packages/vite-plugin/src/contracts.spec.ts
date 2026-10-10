@@ -39,7 +39,8 @@ export const Catalog = defineChannel('catalog', {
     open: null as string | null,
     filters: {} as Record<string, boolean>,
     forgotten: [],
-    when: null as Date | null
+    when: null as Date | null,
+    text: null as SharedArrayBuffer | null
   },
   commands: {} as {
     /**
@@ -154,6 +155,13 @@ describe('a contract, read by the checker', () => {
     };
     expect(view.properties.status).toEqual({ enum: ['error', 'loading', 'ready'] });
     expect(view.properties.open).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] });
+    // Shared memory is allowed in a view, and not a warning.
+    expect(view.properties.text).toEqual({
+      anyOf: [
+        { type: 'string', description: 'Shared memory, shown as its size.', 'x-gesso-shared': true },
+        { type: 'null' }
+      ]
+    });
     expect(view.properties.filters).toEqual({
       type: 'object',
       properties: {},

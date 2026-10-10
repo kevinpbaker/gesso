@@ -199,6 +199,18 @@ with no base64 pass on the render thread and no third more to copy. A
 view key still may not hold them; the plugin warns there and not in a
 command.
 
+**A view may hold shared memory.** A `SharedArrayBuffer` is the one
+object a view key may carry, because reference equality is the right
+comparison for it: it is a handle on memory, and posted to another
+thread it is not copied, so both threads read the same bytes. That is
+how something too large to send is shared instead, a document of
+hundreds of megabytes say: the view carries the handle once, and what
+changes after that is a small plain value saying which version to read.
+It needs a [cross-origin isolated](https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated)
+page, it cannot cross to another process (a desktop window's channels
+refuse it by name), and an agent is shown its size rather than its
+bytes.
+
 ## What must not cross
 
 Every channel hop is a message. View state that round-trips to another
