@@ -35,6 +35,7 @@ import { shellFilesUnsupported } from './ShellService';
 
 /** The slice of a `FileSystemFileHandle` used here. */
 export interface ShellFileHandle {
+  readonly kind?: 'file';
   readonly name: string;
   getFile(): Promise<File>;
   createWritable?(): Promise<{ write(data: string | Uint8Array<ArrayBuffer>): Promise<void>; close(): Promise<void> }>;
@@ -43,10 +44,21 @@ export interface ShellFileHandle {
   isSameEntry?(other: ShellFileHandle): Promise<boolean>;
 }
 
+/** The slice of a `FileSystemDirectoryHandle` used here. */
+export interface ShellDirectoryHandle {
+  readonly kind: 'directory';
+  readonly name: string;
+  queryPermission?(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+  requestPermission?(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+  isSameEntry?(other: ShellFileHandle | ShellDirectoryHandle): Promise<boolean>;
+}
+
+type AnyHandle = ShellFileHandle | ShellDirectoryHandle;
+
 /** A remembered handle, as the store keeps it. */
 export interface StoredFileHandle {
   readonly id: number;
-  readonly handle: ShellFileHandle;
+  readonly handle: AnyHandle;
   readonly name: string;
   readonly used: number;
 }
@@ -57,7 +69,7 @@ export interface ShellHandleStore {
   /** Stores an entry, allocating an id when it has none, and answers the id. */
   put(entry: {
     readonly id?: number;
-    readonly handle: ShellFileHandle;
+    readonly handle: AnyHandle;
     readonly name: string;
     readonly used: number;
   }): Promise<number>;
@@ -70,6 +82,7 @@ export interface ShellFilesHost {
   now(): number;
   showOpenFilePicker?(options: PickerOptions & { multiple: boolean }): Promise<ShellFileHandle[]>;
   showSaveFilePicker?(options: PickerOptions & { suggestedName: string }): Promise<ShellFileHandle>;
+  showDirectoryPicker?(options: { mode: 'read' | 'readwrite' }): Promise<ShellDirectoryHandle>;
   /** A file input, clicked. Null when it was dismissed. */
   pickWithInput?(accept: string, multiple: boolean): Promise<File[] | null>;
   /** Hands a file to the browser's downloads. */
@@ -98,7 +111,9 @@ export class ShellFiles {
         case 'open':
           return await this.open(request.accept, request.multiple);
         case 'reopen':
-          return await this.reopen(request.handle);
+          return await this.reopen(request.handle, request.mode ?? 'read');
+        case 'openDirectory':
+          return await this.openDirectory(request.mode);
         case 'save':
           return await this.save(request);
         case 'recent':
@@ -132,13 +147,26 @@ export class ShellFiles {
     return shellFilesUnsupported('This browser cannot open files.');
   }
 
-  private async reopen(id: number): Promise<ShellFileResult> {
+  private async openDirectory(mode: 'read' | 'readwrite'): Promise<ShellFileResult> {
+    if (this.host.showDirectoryPicker === undefined) {
+      return shellFilesUnsupported('This browser cannot open folders.');
+    }
+    const handle = await this.host.showDirectoryPicker({ mode });
+    const id = await this.remember(handle);
+    return ok({ directory: { name: handle.name, handle: id } });
+  }
+
+  private async reopen(id: number, mode: 'read' | 'readwrite'): Promise<ShellFileResult> {
     const entry = await this.find(id);
     if (entry === null) {
       return { ...failure(null), error: 'The shell has no file under that handle.' };
     }
-    if (!(await permitted(entry.handle, 'read'))) {
+    if (!(await permitted(entry.handle, entry.handle.kind === 'directory' ? mode : 'read'))) {
       return denied();
+    }
+    if (entry.handle.kind === 'directory') {
+      await this.host.store.put({ ...entry, used: this.host.now() });
+      return ok({ directory: { name: entry.handle.name, handle: id } });
     }
     const file = await entry.handle.getFile();
     await this.host.store.put({ ...entry, used: this.host.now() });
@@ -150,6 +178,9 @@ export class ShellFiles {
       const entry = await this.find(request.handle);
       if (entry === null) {
         return { ...failure(null), error: 'The shell has no file under that handle.' };
+      }
+      if (entry.handle.kind === 'directory') {
+        return { ...failure(null), error: 'That handle is a folder, which cannot be written to as a file.' };
       }
       if (!(await permitted(entry.handle, 'readwrite'))) {
         return denied();
@@ -176,7 +207,14 @@ export class ShellFiles {
 
   private async recent(): Promise<ShellRecentFile[]> {
     const all = await this.host.store.all();
-    return all.sort((a, b) => b.used - a.used).map(entry => ({ handle: entry.id, name: entry.name, used: entry.used }));
+    return all
+      .sort((a, b) => b.used - a.used)
+      .map(entry => ({
+        handle: entry.id,
+        name: entry.name,
+        kind: entry.handle.kind === 'directory' ? 'directory' : 'file',
+        used: entry.used
+      }));
   }
 
   private async find(id: number): Promise<StoredFileHandle | null> {
@@ -191,11 +229,14 @@ export class ShellFiles {
    * `isSameEntry` rather than identity. Past `RECENT_FILE_LIMIT` the
    * least recently used is let go.
    */
-  private async remember(handle: ShellFileHandle): Promise<number> {
+  private async remember(handle: AnyHandle): Promise<number> {
     const all = await this.host.store.all();
     const now = this.host.now();
     for (const entry of all) {
-      if (entry.handle.isSameEntry !== undefined && (await entry.handle.isSameEntry(handle))) {
+      if (
+        entry.handle.isSameEntry !== undefined &&
+        (await (entry.handle.isSameEntry as (other: AnyHandle) => Promise<boolean>)(handle))
+      ) {
         return this.host.store.put({ id: entry.id, handle, name: handle.name, used: now });
       }
     }
@@ -235,7 +276,7 @@ async function write(handle: ShellFileHandle, data: string | Uint8Array<ArrayBuf
  * browser's own question. A handle with neither method is from a
  * browser that does not ask, and is taken as granted.
  */
-async function permitted(handle: ShellFileHandle, mode: 'read' | 'readwrite'): Promise<boolean> {
+async function permitted(handle: AnyHandle, mode: 'read' | 'readwrite'): Promise<boolean> {
   if (handle.queryPermission === undefined) {
     return true;
   }
@@ -259,16 +300,23 @@ function inputAccept(accept: readonly ShellFileType[]): string {
   return accept.flatMap(type => [...type.extensions, type.mediaType]).join(',');
 }
 
-function ok(fields: Partial<Pick<ShellFileResult, 'files' | 'saved' | 'recent'>>): ShellFileResult {
-  return { outcome: 'ok', files: [], saved: null, recent: [], error: null, ...fields };
+function ok(fields: Partial<Pick<ShellFileResult, 'files' | 'directory' | 'saved' | 'recent'>>): ShellFileResult {
+  return { outcome: 'ok', files: [], directory: null, saved: null, recent: [], error: null, ...fields };
 }
 
 function cancelled(): ShellFileResult {
-  return { outcome: 'cancelled', files: [], saved: null, recent: [], error: null };
+  return { outcome: 'cancelled', files: [], directory: null, saved: null, recent: [], error: null };
 }
 
 function denied(): ShellFileResult {
-  return { outcome: 'denied', files: [], saved: null, recent: [], error: 'Permission to use the file was refused.' };
+  return {
+    outcome: 'denied',
+    files: [],
+    directory: null,
+    saved: null,
+    recent: [],
+    error: 'Permission to use the file was refused.'
+  };
 }
 
 /**
@@ -288,7 +336,7 @@ function failure(error: unknown): ShellFileResult {
   if (name === 'NotAllowedError' || name === 'SecurityError') {
     return { ...denied(), error: message };
   }
-  return { outcome: 'failed', files: [], saved: null, recent: [], error: message };
+  return { outcome: 'failed', files: [], directory: null, saved: null, recent: [], error: message };
 }
 
 /** Every buffer in an answer, for a shell that posts it across and can move them. */
@@ -320,7 +368,7 @@ export class IndexedDbHandleStore implements ShellHandleStore {
     return request(db.transaction(HANDLES, 'readonly').objectStore(HANDLES).getAll()) as Promise<StoredFileHandle[]>;
   }
 
-  async put(entry: { id?: number; handle: ShellFileHandle; name: string; used: number }): Promise<number> {
+  async put(entry: { id?: number; handle: AnyHandle; name: string; used: number }): Promise<number> {
     const db = await this.database();
     const key = await request(db.transaction(HANDLES, 'readwrite').objectStore(HANDLES).put(entry));
     return key as number;
@@ -358,7 +406,7 @@ export class MemoryHandleStore implements ShellHandleStore {
     return Promise.resolve([...this.entries.values()]);
   }
 
-  put(entry: { id?: number; handle: ShellFileHandle; name: string; used: number }): Promise<number> {
+  put(entry: { id?: number; handle: AnyHandle; name: string; used: number }): Promise<number> {
     const id = entry.id ?? this.next++;
     this.entries.set(id, { id, handle: entry.handle, name: entry.name, used: entry.used });
     return Promise.resolve(id);
@@ -378,6 +426,7 @@ export function browserFilesHost(view: Window & typeof globalThis): ShellFilesHo
   const pickers = view as unknown as {
     showOpenFilePicker?: ShellFilesHost['showOpenFilePicker'];
     showSaveFilePicker?: ShellFilesHost['showSaveFilePicker'];
+    showDirectoryPicker?: ShellFilesHost['showDirectoryPicker'];
   };
   const document = view.document;
   return {
@@ -389,6 +438,9 @@ export function browserFilesHost(view: Window & typeof globalThis): ShellFilesHo
     ...(pickers.showSaveFilePicker === undefined
       ? {}
       : { showSaveFilePicker: options => pickers.showSaveFilePicker!.call(view, options) }),
+    ...(pickers.showDirectoryPicker === undefined
+      ? {}
+      : { showDirectoryPicker: options => pickers.showDirectoryPicker!.call(view, options) }),
     pickWithInput: (accept, multiple) =>
       new Promise(resolve => {
         const input = document.createElement('input');
@@ -413,4 +465,30 @@ export function browserFilesHost(view: Window & typeof globalThis): ShellFilesHo
       view.setTimeout(() => view.URL.revokeObjectURL(url), 60_000);
     }
   };
+}
+
+/**
+ * A folder the shell remembers, by its number, for the thread that reads
+ * it: null when there is no such folder, or IndexedDB is not here.
+ *
+ * The shell keeps handles on the page's own thread and hands out
+ * numbers, which suits a file read once. A folder is different: an
+ * editor or a photo library reads it a file at a time, a hundred
+ * thousand times, and each read crossing to the page and back would be
+ * the whole cost. IndexedDB is shared by every thread of an origin, so
+ * the worker that owns the work takes the handle from the shell's store
+ * and reads the folder itself, with the permission the picker (or
+ * `reopenDirectory`) granted.
+ */
+export async function rememberedDirectory(
+  handle: number,
+  factory: IDBFactory | undefined = globalThis.indexedDB
+): Promise<FileSystemDirectoryHandle | null> {
+  if (factory === undefined) {
+    return null;
+  }
+  const entry = (await new IndexedDbHandleStore(factory).all()).find(stored => stored.id === handle);
+  return entry !== undefined && entry.handle.kind === 'directory'
+    ? (entry.handle as unknown as FileSystemDirectoryHandle)
+    : null;
 }

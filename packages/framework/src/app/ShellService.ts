@@ -54,8 +54,18 @@ export interface ShellFileType {
 export type ShellFileRequest =
   /** Show an open picker. */
   | { readonly op: 'open'; readonly accept: readonly ShellFileType[]; readonly multiple: boolean }
-  /** Read a file the shell already has a handle to, asking permission again if it lapsed. */
-  | { readonly op: 'reopen'; readonly handle: number }
+  /**
+   * Read a file the shell already has a handle to, asking permission
+   * again if it lapsed; or, for a folder, ask again and read nothing.
+   * `mode` is what a folder is asked for. Default `'read'`.
+   */
+  | { readonly op: 'reopen'; readonly handle: number; readonly mode?: 'read' | 'readwrite' }
+  /**
+   * Show a folder picker. The folder is remembered under a number like
+   * a file; its contents are read by whoever needs them, with
+   * `rememberedDirectory`, in any thread of the page.
+   */
+  | { readonly op: 'openDirectory'; readonly mode: 'read' | 'readwrite' }
   /**
    * Write a file: to `handle` when given, and otherwise to wherever a
    * save picker says — or, where there is no picker, as a download.
@@ -96,10 +106,11 @@ export interface ShellFile {
   readonly handle: number | null;
 }
 
-/** A file the shell remembers. */
+/** A file, or a folder, the shell remembers. */
 export interface ShellRecentFile {
   readonly handle: number;
   readonly name: string;
+  readonly kind: 'file' | 'directory';
   /** When it was last opened or saved, in epoch milliseconds. */
   readonly used: number;
 }
@@ -118,6 +129,8 @@ export interface ShellFileResult {
   readonly outcome: 'ok' | 'cancelled' | 'denied' | 'unsupported' | 'failed';
   /** What `open` and `reopen` read. */
   readonly files: readonly ShellFile[];
+  /** The folder `openDirectory` was given, or `reopen` was allowed to use again. */
+  readonly directory: { readonly name: string; readonly handle: number } | null;
   /** Where `save` wrote: `'file'` through a handle, `'download'` without one. */
   readonly saved: { readonly name: string; readonly handle: number | null; readonly via: 'file' | 'download' } | null;
   /** What `recent` lists. */
@@ -647,13 +660,35 @@ export class ShellService {
     return this.requestFile({ op: 'recent' });
   }
 
+  /**
+   * Shows a folder picker and remembers the folder chosen, under a
+   * number, as `openFiles` does a file. Nothing in it is read: a folder
+   * can hold a hundred thousand files, and the worker that wants them
+   * takes the handle itself with `rememberedDirectory` and reads what
+   * it needs, rather than every byte crossing to the render worker.
+   * `outcome` is `unsupported` in a browser with no folder picker. Call
+   * it from a click handler, as `openFiles`.
+   */
+  openDirectory(options: { readonly mode?: 'read' | 'readwrite' } = {}): Promise<ShellFileResult> {
+    return this.requestFile({ op: 'openDirectory', mode: options.mode ?? 'read' });
+  }
+
+  /**
+   * Asks again for a folder remembered from an earlier session, which a
+   * browser lets lapse across a reload. Asking needs a gesture: a click
+   * handler.
+   */
+  reopenDirectory(handle: number, options: { readonly mode?: 'read' | 'readwrite' } = {}): Promise<ShellFileResult> {
+    return this.requestFile({ op: 'reopen', handle, mode: options.mode ?? 'read' });
+  }
+
   /** Stops remembering a file. Its handle means nothing afterwards. */
   forgetFile(handle: number): Promise<ShellFileResult> {
     return this.requestFile({ op: 'forget', handle });
   }
 
   /**
-   * The wire under the five above. With no shell installed the answer
+   * The wire under the methods above. With no shell installed the answer
    * is `unsupported`, for the reason a storage request's is `denied`:
    * a promise left unsettled would hang whatever was waiting on it.
    */
@@ -686,5 +721,5 @@ export class ShellService {
 
 /** The answer for a shell that cannot do anything with files. */
 export function shellFilesUnsupported(error = 'There is no shell to reach files through.'): ShellFileResult {
-  return { outcome: 'unsupported', files: [], saved: null, recent: [], error };
+  return { outcome: 'unsupported', files: [], directory: null, saved: null, recent: [], error };
 }

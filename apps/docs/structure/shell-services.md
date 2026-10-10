@@ -194,13 +194,15 @@ const saved = await shell.saveFile({ name: 'book.csv', text, mediaType: 'text/cs
 // saved.saved: { name, handle, via: 'file' | 'download' }
 ```
 
-| Action               | What the shell does with it                                                                   |
-| -------------------- | --------------------------------------------------------------------------------------------- |
-| `openFiles(options)` | `showOpenFilePicker`, or a file input where there is no picker; reads each file's bytes       |
-| `saveFile(options)`  | writes to `handle` when given (Save); otherwise `showSaveFilePicker` (Save As), or a download |
-| `reopenFile(handle)` | reads a remembered file, asking the browser for permission again if it lapsed                 |
-| `recentFiles()`      | lists the remembered files, most recently used first                                          |
-| `forgetFile(handle)` | stops remembering one                                                                         |
+| Action                             | What the shell does with it                                                                   |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| `openFiles(options)`               | `showOpenFilePicker`, or a file input where there is no picker; reads each file's bytes       |
+| `saveFile(options)`                | writes to `handle` when given (Save); otherwise `showSaveFilePicker` (Save As), or a download |
+| `reopenFile(handle)`               | reads a remembered file, asking the browser for permission again if it lapsed                 |
+| `recentFiles()`                    | lists the remembered files, most recently used first                                          |
+| `forgetFile(handle)`               | stops remembering one                                                                         |
+| `openDirectory(options)`           | `showDirectoryPicker`; remembers the folder and reads nothing in it                           |
+| `reopenDirectory(handle, options)` | asks the browser again for a remembered folder, in `read` or `readwrite` mode                 |
 
 A handle is a **number**. The `FileSystemFileHandle` behind it is not
 plain data and cannot cross the barrier, so the shell keeps it (in
@@ -219,6 +221,35 @@ as in Firefox and Safari, files come back with `handle: null` and a save is
 a download, and the answer says so rather than leaving an application
 to feature-test for itself. A file read in the worker configuration
 arrives with its buffer transferred, not copied.
+
+### Folders
+
+A folder is not read through the shell. An editor, a photo library or
+a static site generator opens a folder to read thousands of files from
+it, one at a time, and every one of those crossing to the page and back
+would be the whole cost. So `openDirectory` answers only a number and
+a name, and the thread that does the work takes the handle itself:
+
+```ts
+// Render worker, in the click handler:
+const { directory } = await shell.openDirectory({ mode: 'readwrite' });
+if (directory !== null) files.send.openFolder(directory.handle);
+
+// App worker (or any thread of the page):
+import { rememberedDirectory } from 'gesso-framework';
+const folder = await rememberedDirectory(handle); // a FileSystemDirectoryHandle, or null
+for await (const [name, entry] of folder.entries()) {
+  /* ... */
+}
+```
+
+The handle comes from the IndexedDB store the shell keeps its handles
+in, which every thread of an origin shares, and brings the permission
+the picker granted. After a reload the permission has to be asked for
+again, from a click: `reopenDirectory(handle, { mode })`, and then the
+worker can read the folder again. `recentFiles` lists folders too, with
+`kind: 'directory'`. Browsers without the File System Access API have
+no folder picker, and the answer is `unsupported`.
 
 ## The single-thread configuration
 

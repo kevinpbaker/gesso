@@ -970,6 +970,11 @@ type ShellFileRequest =
 {
   readonly op: 'reopen';
   readonly handle: number;
+  readonly mode?: 'read' | 'readwrite';
+} |
+{
+  readonly op: 'openDirectory';
+  readonly mode: 'read' | 'readwrite';
 } |
 {
   readonly op: 'save';
@@ -998,11 +1003,16 @@ interface ShellFile {
 interface ShellRecentFile {
   readonly handle: number;
   readonly name: string;
+  readonly kind: 'file' | 'directory';
   readonly used: number;
 }
 interface ShellFileResult {
   readonly outcome: 'ok' | 'cancelled' | 'denied' | 'unsupported' | 'failed';
   readonly files: readonly ShellFile[];
+  readonly directory: {
+    readonly name: string;
+    readonly handle: number;
+  } | null;
   readonly saved: {
     readonly name: string;
     readonly handle: number | null;
@@ -1080,6 +1090,12 @@ declare class ShellService {
     readonly remember?: boolean;
   }): Promise<ShellFileResult>;
   recentFiles(): Promise<ShellFileResult>;
+  openDirectory(options?: {
+    readonly mode?: 'read' | 'readwrite';
+  }): Promise<ShellFileResult>;
+  reopenDirectory(handle: number, options?: {
+    readonly mode?: 'read' | 'readwrite';
+  }): Promise<ShellFileResult>;
   forgetFile(handle: number): Promise<ShellFileResult>;
   requestFile(request: ShellFileRequest): Promise<ShellFileResult>;
   settleFile(id: number, result: ShellFileResult): void;
@@ -2296,6 +2312,7 @@ declare function performShellStorage(request: {
   readonly value?: string;
 }, open: () => ShellLocalStore | null | undefined): ShellStorageResult;
 declare function shellStorageDenied(): ShellStorageResult;
+declare function rememberedDirectory(handle: number, factory?: IDBFactory | undefined): Promise<FileSystemDirectoryHandle | null>;
 interface UndoTransaction {
   readonly label: string;
   readonly undo: () => void;
@@ -2879,6 +2896,7 @@ export {
   printPropValue,
   ReadSource,
   registerUndoShortcuts,
+  rememberedDirectory,
   RendererChoice,
   renderRoot,
   RenderWorkerApp,
@@ -3187,6 +3205,7 @@ import {
   printPropValue,
   ReadSource,
   registerUndoShortcuts,
+  rememberedDirectory,
   RendererChoice,
   renderRoot,
   RenderWorkerApp,
@@ -3385,6 +3404,7 @@ export {
   provide,
   ProvidedChannel,
   registerUndoShortcuts,
+  rememberedDirectory,
   renderRoot,
   RenderWorkerApp,
   requirePlainData,

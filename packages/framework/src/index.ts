@@ -117,6 +117,7 @@ export {
   type ShellStorageResult
 } from './app/ShellService';
 export { performShellStorage, shellStorageDenied, type ShellLocalStore } from './app/shellStorage';
+export { rememberedDirectory } from './app/shellFiles';
 export { UndoStack, type UndoStackOptions, type UndoTransaction } from './undo/UndoStack';
 export { undoable, type UndoableOptions } from './undo/undoable';
 export { registerUndoShortcuts, type UndoShortcutOptions } from './undo/undoShortcuts';
