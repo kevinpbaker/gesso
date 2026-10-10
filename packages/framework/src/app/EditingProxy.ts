@@ -435,7 +435,10 @@ export class EditingProxy {
     const onCut = (event: Event): void => {
       const state = this.state;
       onCopy(event);
-      if (state !== null && (state.clipboard !== undefined ? state.clipboard.length > 0 : state.selectionEnd > state.selectionStart)) {
+      if (
+        state !== null &&
+        (state.clipboard !== undefined ? state.clipboard.length > 0 : state.selectionEnd > state.selectionStart)
+      ) {
         this.sink.beforeInput('deleteByCut', null);
       }
     };

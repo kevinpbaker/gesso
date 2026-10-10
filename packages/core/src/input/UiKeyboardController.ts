@@ -105,7 +105,12 @@ export class UiKeyboardController {
    * an editable held the focus — has the key inserted here, whatever the
    * text source; absent leaves it to the editing controller's setting.
    */
-  keyDown(key: string, modifiers: UiKeyModifiers = noKeyModifiers(), textFollows?: boolean, code = ''): UiKeyboardEvent {
+  keyDown(
+    key: string,
+    modifiers: UiKeyModifiers = noKeyModifiers(),
+    textFollows?: boolean,
+    code = ''
+  ): UiKeyboardEvent {
     // A key makes focus visible again after a mouse press, as
     // `:focus-visible` does. A modifier on its own does not count: it is
     // held for a click as often as for a shortcut.
