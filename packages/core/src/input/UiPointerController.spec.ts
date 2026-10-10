@@ -32,6 +32,22 @@ function setupRow(): {
 }
 
 describe('UiPointerController', () => {
+  it("goes on to the pressed node's nearest ancestor still in the tree when the node is taken out", () => {
+    // A row of a virtual list scrolled out of view mid-drag is unmounted;
+    // the list above it still hears the rest of the drag.
+    const { h, row, a, controller } = setupRow();
+    const heard: string[] = [];
+    for (const type of [UiEventType.PointerMove, UiEventType.PointerUp]) {
+      h.dispatcher.addEventListener(row, type, event => heard.push(`${event.type} at row`));
+    }
+    controller.pointerDown(50, 50);
+    controller.pointerMove(60, 50, 1);
+    h.layout.graph.detachNode(a);
+    controller.pointerMove(60, 300, 1);
+    controller.pointerUp(60, 300);
+    expect(heard).toEqual(['pointermove at row', 'pointermove at row', 'pointerup at row']);
+  });
+
   it('routes pointerdown to the deepest node under the point and bubbles', () => {
     const { h, row, a, controller } = setupRow();
     const target = vi.fn();
