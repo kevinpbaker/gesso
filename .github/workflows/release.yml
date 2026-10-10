@@ -138,12 +138,10 @@ jobs:
 
             # The seven libraries declare `publishConfig.exports`, which is
             # the rewrite this step exists to prove happened. A package
-            # without one has no rewrite to verify and is not part of a
-            # release here: `create-gesso-app` is a CLI with a `bin` and no
-            # `exports` at all, and RELEASING.md publishes it by hand and
-            # afterwards, because it vendors packages it cannot name before
-            # they exist. Reading its missing `exports` is what failed the
-            # first 0.2.0 release.
+            # without one has no rewrite to verify: `create-gesso-app` is a
+            # CLI with a `bin` and no `exports` at all, and is packed by the
+            # next step instead. Reading its missing `exports` is what
+            # failed the first 0.2.0 release.
             rewrites=$(node -p "Boolean(require('./$dir/package.json').publishConfig?.exports)")
             [ "$rewrites" = "true" ] || { echo "skipping $name (no publishConfig.exports; not a library)"; continue; }
 
@@ -162,6 +160,68 @@ jobs:
             esac
           done
 
+      # The CLI is packed by npm, not pnpm: it has no `publishConfig` for
+      # pnpm to apply, and npm is what will publish it. Two things are
+      # proved before anything is uploaded, because each would ship a
+      # scaffolder that does nothing.
+      #
+      # Its `bin` will survive. npm 11 silently drops a `bin` entry it
+      # thinks is invalid (one that starts with `./`, for one), printing
+      # only "script name … was invalid and removed", and a
+      # `create-gesso-app` with no command is a package `npm create`
+      # cannot run. The file it names has to be in the tarball, too.
+      #
+      # Its templates ask for the version being released. They are data
+      # the CLI copies, not workspace members, so `changeset version`
+      # alone would leave them on the last release; a scaffold built on
+      # that is a new app on the previous framework.
+      - name: Pack create-gesso-app, and prove its command and templates
+        run: |
+          set -euo pipefail
+          dir=packages/create-gesso-app
+          version=$(node -p "require('./$dir/package.json').version")
+          mkdir -p "$RUNNER_TEMP/cli"
+          out=$(cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/cli" 2>&1)
+          echo "$out"
+          if grep -q "was invalid and removed" <<< "$out"; then
+            echo "REFUSING: npm removed a bin entry from create-gesso-app. Fix its path in package.json." >&2
+            exit 1
+          fi
+          tgz="$RUNNER_TEMP/cli/create-gesso-app-$version.tgz"
+          bin=$(tar -xzOf "$tgz" package/package.json \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                process.stdout.write(JSON.parse(s).bin?.['create-gesso-app'] ?? '');
+              })")
+          if [ -z "$bin" ]; then
+            echo "REFUSING: the packed create-gesso-app has no create-gesso-app command." >&2
+            exit 1
+          fi
+          # Refused here and not left to the warning above: npm drops a
+          # `./` entry when it publishes, not when it packs, so the pack
+          # prints nothing and the upload would be the first to know.
+          case "$bin" in
+            ./*) echo "REFUSING: create-gesso-app's bin is '$bin'; npm removes a bin that starts with ./ on publish. Write it without the ./." >&2
+                 exit 1 ;;
+          esac
+          # Listed once into a variable: `grep -q` stops at its first match,
+          # and under pipefail the tar it stopped reading from fails the step.
+          listing=$(tar -tzf "$tgz")
+          grep -qxF "package/$bin" <<< "$listing" || {
+            echo "REFUSING: the packed create-gesso-app's bin names $bin, which is not in the tarball." >&2
+            exit 1
+          }
+          echo "ok   create-gesso-app bin -> $bin"
+          for manifest in $(grep -E '^package/templates/[^/]+/package\.json$' <<< "$listing"); do
+            tar -xzOf "$tgz" "$manifest" | VERSION="$version" WHERE="$manifest" node -e "
+              let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                const m=JSON.parse(s);
+                const deps={...m.dependencies,...m.devDependencies};
+                const off=Object.entries(deps).filter(([n,r])=>n.startsWith('gesso-')&&r!=='^'+process.env.VERSION);
+                if(off.length){console.error('REFUSING: '+process.env.WHERE+' asks for '+off.map(([n,r])=>n+'@'+r).join(', ')+', not ^'+process.env.VERSION+'.');process.exit(1);}
+                console.log('ok   '+process.env.WHERE+' -> ^'+process.env.VERSION);
+              })"
+          done
+
       # npm's half: the upload, the OIDC exchange and the provenance
       # attestation. Publishing a tarball reads the manifest from inside
       # it, so what pnpm rewrote is what the registry receives.
@@ -170,6 +230,22 @@ jobs:
         run: |
           set -euo pipefail
           for tgz in "$RUNNER_TEMP"/tarballs/*.tgz; do
+            echo "publishing $(basename "$tgz")"
+            npm publish "$tgz" --provenance --access public
+          done
+
+          # The CLI last, and only once every library has been accepted:
+          # its templates name this version of them, and a scaffold run
+          # in between would ask for packages the registry does not have.
+          # A version already there is skipped rather than failed, so a
+          # CLI published by hand, as releases before this step were,
+          # does not fail the run.
+          for tgz in "$RUNNER_TEMP"/cli/*.tgz; do
+            version=$(node -p "require('./packages/create-gesso-app/package.json').version")
+            if npm view "create-gesso-app@$version" version >/dev/null 2>&1; then
+              echo "create-gesso-app@$version is already on the registry; skipping"
+              continue
+            fi
             echo "publishing $(basename "$tgz")"
             npm publish "$tgz" --provenance --access public
           done
@@ -182,4 +258,4 @@ jobs:
 
       - name: What a dry run would have sent
         if: github.event_name == 'workflow_dispatch' && inputs.dry-run
-        run: ls -la "$RUNNER_TEMP/tarballs"
+        run: ls -la "$RUNNER_TEMP/tarballs" "$RUNNER_TEMP"/cli/*.tgz

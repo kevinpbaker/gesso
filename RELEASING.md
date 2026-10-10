@@ -13,30 +13,38 @@ Seven packages at one version: `gesso-core`, `gesso-framework`,
 `.changeset/README.md` has the reasoning and the pre-1.0 policy: a
 breaking change bumps the minor, everything else the patch.
 
-`create-gesso-app` is published by hand and on its own, because it
-vendors the packages it scaffolds with and cannot name a version of them
-that does not exist yet. It is in the `fixed` group all the same, so
-`changeset version` moves it with the others and only the publish is
-separate. The release workflow skips it by looking for
-`publishConfig.exports`, which the seven libraries have and a CLI with
-a `bin` does not; the first attempt at 0.2.0 failed because that check
-read an `exports` field it does not have.
+`create-gesso-app` is in the `fixed` group as well, so `changeset
+version` moves it with the others, and the release workflow publishes
+it too, by a route of its own and last. Its templates name the version
+being released, so a scaffold run before the libraries were on the
+registry would ask for packages that are not there; the workflow uploads
+it only once all seven have been accepted, and skips it if that version
+is already published.
 
-Publish it once the libraries are live, from its own directory, with
-**npm** rather than pnpm (it has no `publishConfig` for pnpm to rewrite,
-and npm handles the second factor itself, in the browser or with a
-passkey, so there is no code to type):
-
-```bash
-pnpm --filter create-gesso-app build
-cd packages/create-gesso-app && npm login && npm publish --access public
-```
+It is packed with **npm** rather than pnpm, because it has no
+`publishConfig` for pnpm to rewrite, and the workflow finds the libraries
+by that field, which a CLI with a `bin` and no `exports` does not have;
+the first attempt at 0.2.0 failed reading an `exports` field it does not
+have. Before anything is uploaded, the workflow refuses a packed CLI whose
+`bin` is missing, starts with `./`, or names a file not in the tarball,
+and one whose templates ask for any `gesso-*` other than `^<version>`.
 
 Its `bin` path is written without a leading `./`. npm 11 (11.19 at
 least) silently **removes** a `bin` entry that starts with `./` while
 publishing, printing only "script name … was invalid and removed", which
 would ship a `create-gesso-app` with no command for `npm create` to run.
-0.6.0 caught it; if that warning ever appears, stop and fix the path.
+0.6.0 caught it, by hand; the workflow now refuses it before the upload.
+
+Releases up to 0.6.17 published it by hand, and most of them did not:
+the registry had 0.6.3 when this step was added. Publishing by hand
+still works, from its own directory with npm, once the libraries are
+live (npm handles the second factor itself, in the browser or with a
+passkey):
+
+```bash
+pnpm --filter create-gesso-app build
+cd packages/create-gesso-app && npm login && npm publish --access public
+```
 
 ## Before
 
@@ -165,8 +173,9 @@ with `--provenance`, so the pieces are in place. What is not done yet is
 the registry side: until a trusted publisher is configured, the workflow
 authenticates with the `NPM_TOKEN` secret.
 
-To finish it, for each of the seven packages on npmjs.com, add a trusted
-publisher pointing at `kevinpbaker/gesso` and `release.yml`. Then delete
+To finish it, for each of the seven packages and `create-gesso-app` on
+npmjs.com, add a trusted publisher pointing at `kevinpbaker/gesso` and
+`release.yml`. Then delete
 the `NPM_TOKEN` secret and revoke the token. After that no long-lived
 credential exists anywhere: the registry accepts a short-lived OIDC
 token from this repository's workflow and nothing else, and each package
