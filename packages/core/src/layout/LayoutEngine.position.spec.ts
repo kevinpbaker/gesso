@@ -282,6 +282,157 @@ describe('LayoutEngine positioning', () => {
     });
   });
 
+  /**
+   * An overlay taller than the room on the side it opens on. A Format
+   * menu of thirty commands under a title near the top of the window
+   * ran off the bottom, and a context menu opened halfway down flipped
+   * above the pointer and started off the top: placement chose a side
+   * and never told the overlay how much of it there was.
+   */
+  describe('room on the chosen side', () => {
+    /**
+     * A menu as the components build one: a framed column whose rows
+     * sit in a scrolling column, `count` rows of 20 that keep their
+     * height rather than being shrunk to fit.
+     */
+    function menu(h: LayoutHarness, count: number, props: Record<string, unknown>) {
+      const frame = column(h, 'frame', { position: 'absolute', padding: 4, ...props });
+      const rows = column(h, 'rows', { overflow: 'auto', minHeight: 0 });
+      for (let at = 0; at < count; at++) {
+        h.append(rows, box(h, `row-${at}`, { width: 120, height: 20, flexShrink: 0 }));
+      }
+      h.append(frame, rows);
+      return { frame, rows };
+    }
+
+    function underAnchor(count: number, anchorTop: number) {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const app = column(h, 'app');
+      const anchor = box(h, 'anchor', { width: 60, height: 20, marginTop: anchorTop });
+      h.append(app, anchor);
+      const layer = box(h, 'layer', { position: 'absolute', inset: 0 });
+      const { frame, rows } = menu(h, count, { anchor, placement: 'bottom-start', anchorOffset: 2 });
+      h.append(layer, frame);
+      h.append(root, app, layer);
+      h.layout(root, Constraints.loose(300, 200));
+      return { h, frame, rows };
+    }
+
+    it('places a short overlay exactly as before', () => {
+      // 3 rows: 60 and 8 of padding, below the anchor at 20.
+      const { h, frame } = underAnchor(3, 0);
+      expect(h.box(frame)).toEqual({ x: 0, y: 22, width: 128, height: 68 });
+    });
+
+    it('caps a long overlay to the room below its anchor, and its rows scroll inside', () => {
+      // 20 rows want 410; below the anchor (y 0..20, offset 2) are 178.
+      const { h, frame, rows } = underAnchor(20, 0);
+      expect(h.box(frame)).toEqual({ x: 0, y: 22, width: 128, height: 178 });
+      // The cap is the box the rows lay out in, not a smaller clip: the
+      // scroller is what is left inside the frame, and holds them all.
+      const scroller = h.record(rows);
+      expect(scroller.height).toBe(170);
+      expect(scroller.contentHeight).toBe(400);
+      expect(scroller.scrollable).toBe(true);
+    });
+
+    it('caps to the room above when it flips', () => {
+      // Anchor at y 150..170: 28 below, 148 above.
+      const { h, frame, rows } = underAnchor(20, 150);
+      expect(h.box(frame)).toEqual({ x: 0, y: 0, width: 128, height: 148 });
+      expect(h.record(rows).height).toBe(140);
+    });
+
+    it('caps a scroll view placed as the overlay itself', () => {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const anchor = box(h, 'anchor', { width: 60, height: 20 });
+      const list = node(h, 'list', UiNodeType.ScrollView, {
+        position: 'absolute',
+        anchor,
+        placement: 'bottom-start',
+        width: 100
+      });
+      for (let at = 0; at < 20; at++) {
+        h.append(list, box(h, `row-${at}`, { height: 20 }));
+      }
+      h.append(root, anchor, list);
+      h.layout(root, Constraints.loose(300, 200));
+      expect(h.box(list)).toEqual({ x: 0, y: 20, width: 100, height: 180 });
+      expect(h.record(list).contentHeight).toBe(400);
+    });
+
+    it('starts inside the block when what it holds cannot shrink', () => {
+      // A plain column of 12 rows, 240 tall, flipped above an anchor at
+      // 110: there are 110 above, and it starts at the top edge rather
+      // than at -130.
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const anchor = box(h, 'anchor', { width: 60, height: 20, marginTop: 110 });
+      const plain = column(h, 'plain', { position: 'absolute', anchor, placement: 'bottom-start' });
+      for (let at = 0; at < 12; at++) {
+        h.append(plain, box(h, `row-${at}`, { width: 50, height: 20 }));
+      }
+      h.append(root, anchor, plain);
+      h.layout(root, Constraints.loose(300, 200));
+      expect(h.box(plain).y).toBe(0);
+    });
+
+    it('caps the width to the room on a horizontal side', () => {
+      const h = new LayoutHarness();
+      const root = box(h, 'top', { position: 'relative' });
+      const anchor = box(h, 'anchor', { width: 60, height: 20, marginLeft: 100 });
+      const wide = node(h, 'wide', UiNodeType.ScrollView, {
+        position: 'absolute',
+        anchor,
+        placement: 'right-start',
+        direction: 'row',
+        height: 20
+      });
+      h.append(wide, box(h, 'content', { width: 400, height: 20 }));
+      h.append(root, anchor, wide);
+      h.layout(root, Constraints.loose(300, 200));
+      // 140 to the right of the anchor, 100 to the left.
+      expect(h.box(wide)).toEqual({ x: 160, y: 0, width: 140, height: 20 });
+    });
+
+    /**
+     * The case that was found: 424 pixels of context menu opened at
+     * y 410 in an 813-pixel window, placed at y -14.
+     */
+    it('slides a context menu that fits on neither side of the point, whole, into the block', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'block', { width: 1440, height: 813 });
+      const popup = box(h, 'popup', {
+        position: 'absolute',
+        anchorPoint: { x: 600, y: 410 },
+        placement: 'bottom-start',
+        width: 200,
+        height: 424
+      });
+      h.append(root, popup);
+      h.layout(root, Constraints.loose(1440, 813));
+      // Below the point, as asked, and up until its bottom is the
+      // window's: over the pointer, all of it on the screen.
+      expect(h.box(popup)).toEqual({ x: 600, y: 389, width: 200, height: 424 });
+    });
+
+    it('gives a context menu taller than the block the whole of it, scrolling the rest', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'block', { width: 300, height: 200 });
+      const { frame, rows } = menu(h, 20, { anchorPoint: { x: 40, y: 120 }, placement: 'bottom-start' });
+      h.append(root, frame);
+      h.layout(root, Constraints.loose(300, 200));
+      // 80 below the point and 120 above, and it wants 408: neither
+      // side holds it, the block does once it is capped there, so it
+      // slides over the point and fills it.
+      expect(h.box(frame)).toEqual({ x: 40, y: 0, width: 128, height: 200 });
+      expect(h.record(rows).height).toBe(192);
+      expect(h.record(rows).contentHeight).toBe(400);
+    });
+  });
+
   describe('anchored placement', () => {
     function scene(anchorProps: Record<string, unknown>, popupProps: Record<string, unknown>) {
       const h = new LayoutHarness();
