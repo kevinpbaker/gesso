@@ -101,8 +101,25 @@ export interface ComponentContext {
  * `Input.optional.spec.ts` is that case written down.
  */
 export type Inputs<P> = {
-  readonly [K in keyof P]-?: InputCell<P[K]>;
+  readonly [K in keyof P]-?: InputCell<InputValue<P[K]>>;
 };
+
+/**
+ * What an input cell holds for a member declared as `P[K]`.
+ *
+ * The host subscribes to an Observable a parent passes and feeds the
+ * cell its values, so a cell never holds an Observable. A member
+ * declared as `Observable<T>` therefore holds `T`, and saying so here
+ * turns `inputs.items.value.pipe(...)`, which used to compile and then
+ * throw "pipe is not a function" on mount, into a type error. Declare
+ * the member as `T`: a parent may pass a `T` or an `Observable<T>`
+ * either way.
+ *
+ * Only a member that is nothing but an Observable (or one that may be
+ * left out) is unwrapped. A union that mixes values and streams, such
+ * as `UiChild` or `Reactive<T>`, is left as it was declared.
+ */
+export type InputValue<V> = [Exclude<V, undefined>] extends [Observable<infer T>] ? T | Extract<V, undefined> : V;
 
 /**
  * A component written as a function.
