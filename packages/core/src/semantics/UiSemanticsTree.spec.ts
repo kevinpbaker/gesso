@@ -105,6 +105,23 @@ describe('buildSemanticsTree', () => {
     expect(records[0].label).toBe('Delete note');
   });
 
+  it('drops a text that only repeats its labelled parent, and keeps one that says more', () => {
+    // A tree row labelled with its name, drawing the name: one record. A
+    // labelled region's own text is content, and stays.
+    const t = new Tree();
+    const row = t.node(UiNodeType.Row, { role: 'treeitem', label: 'src' });
+    t.add(row, t.node(UiNodeType.Text, { text: 'src' }));
+    const region = t.node(UiNodeType.Column, { role: 'region', label: 'Problems' });
+    t.add(region, t.node(UiNodeType.Text, { text: 'No problems found.' }));
+    t.add(t.root, row, region);
+
+    expect(t.build().map(record => [record.role, record.label])).toEqual([
+      ['treeitem', 'src'],
+      ['region', 'Problems'],
+      [undefined, 'No problems found.']
+    ]);
+  });
+
   it('makes prose a record of its own so a page can be read', () => {
     const t = new Tree();
     t.add(t.root, t.node(UiNodeType.Text, { text: 'Hello' }), t.node(UiNodeType.Text, { text: 'World' }));
