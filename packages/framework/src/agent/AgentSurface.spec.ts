@@ -339,6 +339,26 @@ describe('an agent surface', () => {
     expect(surface.read(resourceUri('board'))).toEqual({ score: 1 });
   });
 
+  it('offers nothing of a channel whose token is marked @hidden', async () => {
+    const Plumbing = defineChannel('plumbing', {
+      view: { memory: 0 },
+      commands: {} as { poke(): void }
+    });
+    describeChannel(Plumbing, {
+      internal: true,
+      view: { type: 'object', properties: { memory: { type: 'number' } }, required: ['memory'] },
+      commands: { poke: { parameters: [], input: { type: 'object', properties: {}, additionalProperties: false } } }
+    });
+    let poked = 0;
+    const plumbing = serve(Plumbing, { view: { memory: new BehaviorSubject(0) }, commands: { poke: () => poked++ } });
+    const surface = agentSurface([plumbing, notesApp().served], fast);
+    expect(surface.tools().some(tool => tool.name.startsWith('plumbing_'))).toBe(false);
+    expect(surface.resources().map(resource => resource.uri)).toEqual([resourceUri('notes')]);
+    expect(surface.read(resourceUri('plumbing'))).toBeUndefined();
+    expect((await surface.call('plumbing_poke', {})).isError).toBe(true);
+    expect(poked).toBe(0);
+  });
+
   it('reads a view as a resource', () => {
     const app = notesApp();
     app.rows.next([{ id: '1', title: 'A' }]);

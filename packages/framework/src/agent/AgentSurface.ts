@@ -31,7 +31,7 @@ import { validate } from './validate';
  * The descriptions come from `channelSchema(token)`, which
  * `gesso-vite-plugin` writes from the contract's JSDoc. A command
  * marked `@hidden` is not offered, nor is a view key marked so, in
- * anything the agent reads; `@destructive` and `@idempotent`
+ * anything the agent reads, nor any of a channel whose token is; `@destructive` and `@idempotent`
  * become hints a client shows; `@confirm` means the person is asked,
  * through `confirm`, before the command is sent, and a surface given
  * no way to ask refuses it. A channel nobody described is still
@@ -213,6 +213,9 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
 
   for (const served of channels) {
     const schema = channelSchema(served.token as never);
+    if (schema?.internal === true) {
+      continue;
+    }
     const name = toolName(served.token.name);
     const commands = new Map<string, CommandSchema | null>();
     for (const command of Object.keys(served.source.commands ?? {})) {

@@ -94,6 +94,12 @@ export interface CounterCommands {
 }
 
 export const Counter = channel<CounterView, CounterCommands>('counter', { count: 0, dark: true, layout: [] });
+
+/**
+ * The barrier between the page's threads, for its own components.
+ * @hidden
+ */
+export const Plumbing = channel<{ memory: number }, { poke(): void }>('plumbing', { memory: 0 });
 `;
 
 let reader: ContractReader;
@@ -246,6 +252,11 @@ describe('a contract, read by the checker', () => {
       required: ['count', 'dark', 'layout']
     });
     expect(counter.hidden).toEqual(['layout']);
+    expect(counter.internal).toBeUndefined();
+    expect(legacy.channels.get('Plumbing')).toMatchObject({
+      internal: true,
+      description: "The barrier between the page's threads, for its own components."
+    });
     expect(catalog.channels.get('Catalog')!.hidden).toBeUndefined();
     expect(counter.commands.increment.input.properties).toEqual({
       by: { type: 'number', description: 'How far to count.' }

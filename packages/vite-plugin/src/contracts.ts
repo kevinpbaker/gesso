@@ -30,7 +30,8 @@ import { blankLiterals, findCalls, importSources } from './source.ts';
  *   - `@destructive`, `@idempotent`, `@confirm` and `@hidden` on a
  *     command are its annotations; `CommandSchema` says what each means.
  *   - `@hidden` on a view key keeps that key from an agent; see
- *     `ChannelSchema.hidden`.
+ *     `ChannelSchema.hidden`. On the token, it keeps the whole channel
+ *     from one; see `ChannelSchema.internal`.
  *
  * And what it will not describe: a value that is not plain data, which
  * cannot cross a channel anyway. A function, a `Date`, a `Map`, a class
@@ -44,6 +45,7 @@ export type TypeScriptApi = typeof TsApi;
 /** A channel's description, in the shape `describeChannel` takes. */
 export interface ChannelSchemaOut {
   description?: string;
+  internal?: true;
   view: JsonSchema;
   hidden?: string[];
   commands: Record<string, CommandSchemaOut>;
@@ -342,6 +344,9 @@ class Describer {
     const description = this.checker.getDocumentationCommentOfSymbol(token);
     if (description !== '') {
       out.description = description;
+    }
+    if (this.checker.getJsDocTagsOfSymbol(token).some(tag => tag.name === 'hidden')) {
+      out.internal = true;
     }
     const hidden = this.checker
       .getPropertiesOfType(view)

@@ -64,6 +64,14 @@ export interface ChannelSchema {
    * and its output schema, so what it reads is what it can act on.
    */
   readonly hidden?: readonly string[];
+  /**
+   * `@hidden` on the token: the channel is the application's own
+   * plumbing as a whole, the barrier between its threads, say, whose
+   * commands are a screen's and whose view holds shared memory. An agent
+   * is offered nothing of it: no view tool, no command, no resource. The
+   * application reaches it as before.
+   */
+  readonly internal?: true;
   readonly commands: { readonly [name: string]: CommandSchema };
 }
 
