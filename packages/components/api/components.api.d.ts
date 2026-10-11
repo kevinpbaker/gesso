@@ -286,6 +286,7 @@ interface NumberInputProps extends ControlLayoutProps {
   max?: number;
   step?: number;
   label?: string;
+  labelHidden?: boolean;
   error?: string;
   disabled?: boolean;
   required?: boolean;
@@ -607,6 +608,7 @@ interface LazyListProps extends ControlLayoutProps {
   onSelect?: (index: number) => void;
   onActivate?: (index: number) => void;
   label?: string;
+  description?: string;
 }
 declare function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild;
 interface DataColumn<T> {
@@ -656,6 +658,7 @@ interface TreeProps extends ControlLayoutProps {
   onActivate?: (key: string) => void;
   rowHeight?: number;
   label?: string;
+  leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;
 }
 declare function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
 interface VideoControlsOptions {

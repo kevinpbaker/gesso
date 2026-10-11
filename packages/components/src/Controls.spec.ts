@@ -352,6 +352,13 @@ describe('Slider', () => {
 });
 
 describe('NumberInput', () => {
+  it('keeps a hidden label as its name, and draws none', () => {
+    const ui = mount(createComponent(NumberInput, { label: 'Font size', labelHidden: true, defaultValue: 13 }));
+
+    expect(ui.allNodes().filter(node => node.properties.get('text') === 'Font size')).toHaveLength(0);
+    expect(ui.getByRole('spinbutton', { name: 'Font size' })).toBeDefined();
+  });
+
   it('steps with the arrows, bounded by its range', () => {
     const changes: number[] = [];
     const ui = mount(
