@@ -29,19 +29,20 @@ branch and steps out of a leaf.
 
 ## Props
 
-| Prop                 | Type                                    | Default  | What it does                                                                                       |
-| -------------------- | --------------------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `nodes`              | `readonly TreeNode[]`                   | required | The model, nested. Bound, so a new array is a new tree.                                            |
-| `expanded`           | `readonly string[]`                     | none     | The open branches, by key, when the application owns them. Supplying it makes the tree controlled. |
-| `defaultExpanded`    | `readonly string[]`                     | none     | The branches to start open, for a tree that owns its own set. Supplying both throws.               |
-| `onExpandedChange`   | `(expanded: readonly string[]) => void` | none     | Called with the whole new set whenever a branch opens or closes.                                   |
-| `selectedKey`        | `string \| null`                        | none     | The chosen row, by key. Supplying it makes the selection controlled.                               |
-| `defaultSelectedKey` | `string \| null`                        | none     | The row to start on. `null`, meaning nothing chosen, when neither prop is given.                   |
-| `onSelect`           | `(key: string \| null) => void`         | none     | Called with the key of the row a press or a key chose.                                             |
-| `onActivate`         | `(key: string) => void`                 | none     | Called on Enter or Space with the chosen row's key, and on a double click with that row's.         |
-| `rowHeight`          | `number`                                | `24`     | The height the window expects of a row it has not measured yet.                                    |
-| `label`              | `string`                                | `'Tree'` | The tree's accessible name.                                                                        |
-| `ref`                | `UiNodeRef`                             | none     | Receives the node that is the tree, for focusing it or reading where it is scrolled to.            |
+| Prop                 | Type                                           | Default  | What it does                                                                                                                                      |
+| -------------------- | ---------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nodes`              | `readonly TreeNode[]`                          | required | The model, nested. Bound, so a new array is a new tree.                                                                                           |
+| `expanded`           | `readonly string[]`                            | none     | The open branches, by key, when the application owns them. Supplying it makes the tree controlled.                                                |
+| `defaultExpanded`    | `readonly string[]`                            | none     | The branches to start open, for a tree that owns its own set. Supplying both throws.                                                              |
+| `onExpandedChange`   | `(expanded: readonly string[]) => void`        | none     | Called with the whole new set whenever a branch opens or closes.                                                                                  |
+| `selectedKey`        | `string \| null`                               | none     | The chosen row, by key. Supplying it makes the selection controlled.                                                                              |
+| `defaultSelectedKey` | `string \| null`                               | none     | The row to start on. `null`, meaning nothing chosen, when neither prop is given.                                                                  |
+| `onSelect`           | `(key: string \| null) => void`                | none     | Called with the key of the row a press or a key chose.                                                                                            |
+| `onActivate`         | `(key: string) => void`                        | none     | Called on Enter or Space with the chosen row's key, and on a double click with that row's.                                                        |
+| `rowHeight`          | `number`                                       | `24`     | The height the window expects of a row it has not measured yet.                                                                                   |
+| `label`              | `string`                                       | `'Tree'` | The tree's accessible name.                                                                                                                       |
+| `leading`            | `(node, open: Observable<boolean>) => UiChild` | none     | Drawn between a row's arrow and its label, such as a file's icon, open or shut with its folder. Only drawn: the label is still what is announced. |
+| `ref`                | `UiNodeRef`                                    | none     | Receives the node that is the tree, for focusing it or reading where it is scrolled to.                                                           |
 
 ### `TreeNode`
 
