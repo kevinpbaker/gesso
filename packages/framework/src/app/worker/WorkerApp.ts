@@ -25,6 +25,7 @@ import {
 import { AudioSink } from '../AudioSink';
 import { attachFileDrop } from '../fileDrop';
 import { browserFilesHost, fileResultTransfer, ShellFiles } from '../shellFiles';
+import { setLeaveWarning } from '../shellLeaveWarning';
 import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, writeClipboard } from '../EditingProxy';
@@ -852,6 +853,10 @@ export class WorkerApp {
   dispose(): void {
     this.disconnectWebMcp?.();
     this.disconnectWebMcp = null;
+    // An app that is gone has no work to lose.
+    if (typeof window !== 'undefined') {
+      setLeaveWarning(window, false);
+    }
     this.ready = false;
     this.setFrameLoop(false);
     this.detachColorScheme?.();
@@ -1009,6 +1014,10 @@ export class WorkerApp {
     }
     if (message.type === 'redirect') {
       redirectWith(this.options.onRedirect, message.url, window.location);
+      return;
+    }
+    if (message.type === 'leaveWarning') {
+      setLeaveWarning(window, message.on);
       return;
     }
     if (message.type === 'fullscreen') {

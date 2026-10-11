@@ -94,6 +94,8 @@ class EditingRoot extends Component {
           this.shell.openUrl('https://example.test/');
           this.shell.openRoute('/epic/BUD-12?story=BUD-13');
           this.shell.redirect('/api/auth/login');
+          this.shell.warnOnLeave(true);
+          this.shell.warnOnLeave(true);
         }
       })
     );
@@ -189,7 +191,7 @@ describe('RenderWorkerApp editing', () => {
     expect(values).toEqual(['abx']);
   });
 
-  it('forwards ShellService requests as clipboard, openUrl, openRoute and redirect messages', async () => {
+  it('forwards ShellService requests as clipboard, openUrl, openRoute, redirect and leaveWarning messages', async () => {
     const { sent, press } = start();
     await settle();
     // The button sits 10px below the 16.8px field.
@@ -203,6 +205,8 @@ describe('RenderWorkerApp editing', () => {
     // Forwarded as given: resolving it, and refusing a bad scheme, is
     // the shell's job, because only the shell knows the page's address.
     expect(sent.filter(m => m.type === 'redirect')).toEqual([{ type: 'redirect', url: '/api/auth/login' }]);
+    // A state, so said once however many times it is set.
+    expect(sent.filter(m => m.type === 'leaveWarning')).toEqual([{ type: 'leaveWarning', on: true }]);
   });
 
   it("settles a copy with the shell's answer to it", async () => {

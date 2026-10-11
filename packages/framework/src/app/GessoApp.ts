@@ -17,6 +17,7 @@ import { shellFilesUnsupported, type ShellRequest } from './ShellService';
 import { AudioSink } from './AudioSink';
 import { attachFileDrop } from './fileDrop';
 import { browserFilesHost, ShellFiles } from './shellFiles';
+import { setLeaveWarning } from './shellLeaveWarning';
 import { redirectWith } from './shellRedirect';
 import { EditingProxy, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
@@ -390,6 +391,10 @@ export class GessoApp {
    */
   dispose(): void {
     this.running = false;
+    // An app that is gone has no work to lose.
+    if (isCanvasElement(this.canvas)) {
+      setLeaveWarning(this.canvas.ownerDocument.defaultView, false);
+    }
     this.audio?.dispose();
     this.audio = null;
     this.runtime.onAudioRequest(null);
@@ -652,6 +657,10 @@ export class GessoApp {
         opened = false;
       }
       this.runtime.settlePopup(request.id, opened);
+      return;
+    }
+    if (request.type === 'leaveWarning') {
+      setLeaveWarning(view, request.on);
       return;
     }
     if (request.type === 'redirect') {
