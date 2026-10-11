@@ -169,15 +169,24 @@ export interface RouteCheck {
    * pressed first, as a keyboard user would press it. The report says
    * which keys, so it is plain what the walk assumes.
    */
-  readonly keysFirst?: readonly {
-    readonly key: string;
-    readonly code: string;
-    readonly keyCode: number;
-    /** Alt 1, Ctrl 2, Meta 4, Shift 8. */
-    readonly modifiers?: number;
-    /** How the report names it: `Ctrl+M`. */
-    readonly name: string;
-  }[];
+  readonly keysFirst?: readonly RouteKey[];
+  /**
+   * Keys that open the screen being checked, pressed before anything is
+   * read: a panel or a dialog the address does not hold, which only a
+   * key shows. The report says which keys, as it says `keysFirst`.
+   */
+  readonly keysToOpen?: readonly RouteKey[];
+}
+
+/** A key a check presses. */
+export interface RouteKey {
+  readonly key: string;
+  readonly code: string;
+  readonly keyCode: number;
+  /** Alt 1, Ctrl 2, Meta 4, Shift 8. */
+  readonly modifiers?: number;
+  /** How the report names it: `Ctrl+M`. */
+  readonly name: string;
 }
 
 /**
@@ -313,6 +322,17 @@ async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string
     },
     READY_TIMEOUT_MS
   );
+
+  // A screen only a key shows (a panel, a dialog) is opened before
+  // anything is read, so the tree, the expectations and the report are
+  // all of it.
+  if ((check.keysToOpen ?? []).length > 0) {
+    await devtools.evaluate<void>(`document.querySelector('canvas').focus()`);
+    for (const key of check.keysToOpen ?? []) {
+      await devtools.pressKey(key.key, key.code, key.keyCode, key.modifiers ?? 0);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
 
   // The expectations are the wait condition, not something checked
   // once: a route whose data arrives from a worker (the notes example
@@ -574,7 +594,8 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
     tabOrder.map(steady),
     unreachable,
     excused,
-    (check.keysFirst ?? []).map(key => key.name)
+    (check.keysFirst ?? []).map(key => key.name),
+    (check.keysToOpen ?? []).map(key => key.name)
   );
   const path = join(config.reportDir, `${route}.md`);
   const failures = unnamed.map(node => `${route}: a ${node.role?.value} with no accessible name`);
@@ -658,7 +679,8 @@ function renderReport(
   tabOrder: readonly string[],
   unreachable: readonly string[],
   excused: readonly string[],
-  keysFirst: readonly string[] = []
+  keysFirst: readonly string[] = [],
+  keysToOpen: readonly string[] = []
 ): string {
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
   // InlineTextBox rows repeat their StaticText parent word for word;
@@ -684,6 +706,7 @@ function renderReport(
     'change to the route and review the diff.',
     '',
     ...(config.reportNote === '' ? [] : [config.reportNote, '']),
+    ...(keysToOpen.length === 0 ? [] : [`Opened with: ${keysToOpen.join(', ')}.`, '']),
     '| Role | Name | States | Value |',
     '| --- | --- | --- | --- |',
     ...rows,
