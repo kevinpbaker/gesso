@@ -88,6 +88,9 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
   const row = (index: number): UiChild =>
     Box(
       {
+        // A box lays its child at the start, at its own width; a row of a
+        // list goes across it, so what it puts at its end is at the end.
+        x: 'stretch',
         role: 'listitem',
         posInSet: index + 1,
         setSize: inputs.count,

@@ -6,6 +6,7 @@ import { renderTest } from 'gesso-testing';
 import {
   Box,
   Column,
+  Row,
   Text,
   UiEnvironmentKeys,
   darkTheme,
@@ -107,6 +108,25 @@ describe('LazyList', () => {
     expect(list.properties.get('scrollY')).toBe(19900);
     // And the rows that exist are the ones at the end.
     expect(ui.textOf(list)).toContain('file 999');
+  });
+
+  it("lays each row across the list's whole width, as a row of any column is", () => {
+    const ui = mount(
+      createComponent(LazyList, {
+        label: 'Files',
+        count: 3,
+        width: 300,
+        height: 100,
+        // A name that takes what is left, and a count kept at the end: a
+        // row sized to its content would put the count beside the name.
+        item: (index: number) => Row({ height: 20 }, Text({ text: `file ${index}`, flex: 1 }), Text({ text: `${index}` }))
+      })
+    );
+    const list = ui.getLayout(ui.getAllByRole('list')[0]);
+    const row = ui.getLayout(ui.getAllByRole('listitem')[0]);
+    const count = ui.getLayout(ui.getByText('0'));
+    expect(row.width).toBeGreaterThan(list.width - 8);
+    expect(count.x + count.width).toBeGreaterThan(list.x + list.width - 8);
   });
 });
 
