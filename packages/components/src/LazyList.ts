@@ -48,6 +48,11 @@ export interface LazyListProps extends ControlLayoutProps {
   /** Enter or Space on the chosen item. */
   onActivate?: (index: number) => void;
   label?: string;
+  /**
+   * Said after the list's name when it takes focus: what its keys do,
+   * where a list has keys beyond its arrows.
+   */
+  description?: string;
 }
 
 export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild {
@@ -114,6 +119,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
       itemKey: inputs.itemKey.value,
       role: 'list',
       label,
+      description: inputs.description,
       backgroundColor: 'controlBackground',
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
       // chosen row's own background would be painted over it.
