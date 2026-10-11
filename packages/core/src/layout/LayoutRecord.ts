@@ -121,6 +121,17 @@ export class LayoutRecord {
    */
   positioned = false;
   absolute = false;
+
+  /**
+   * Absolute or sticky: where the node goes depends on more than its
+   * parent's flow (its containing block, or the scroll), so it is never
+   * a relayout boundary. A relative node is in flow and only drawn
+   * offset, so one with a fixed size is: a change inside it is laid out
+   * from it, as from any other.
+   */
+  get displaced(): boolean {
+    return this.absolute || this.sticky;
+  }
   top: number | undefined = undefined;
   right: number | undefined = undefined;
   bottom: number | undefined = undefined;

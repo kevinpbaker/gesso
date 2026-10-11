@@ -186,6 +186,55 @@ describe('LayoutEngine budgets', () => {
     expect(ms).toBeLessThan(50);
   });
 
+  it('lays out a relative row that gains a child from the row, its absolute children too', () => {
+    // A relative node is in flow and only drawn offset: with a fixed
+    // size it is a boundary like any other. An editor's lines are
+    // relative (a mark is placed absolutely over each), and every key
+    // re-measured the scroller around them until it was.
+    const build = (h: LayoutHarness) => {
+      const built = buildTree(h);
+      const rows: UiNode[] = [];
+      for (let row = built.list.firstChild; row !== null; row = row.nextSibling) rows.push(row);
+      const marks = rows.map((row, r) => {
+        row.setProperty('position', 'relative');
+        row.setProperty('top', 2);
+        const mark = node(h, `mark${r}`, UiNodeType.Box, { position: 'absolute', right: 0, top: 0, width: 3, height: percent(100) });
+        h.append(row, mark);
+        return mark;
+      });
+      return { ...built, rows, marks };
+    };
+    const grow = (h: LayoutHarness, row: UiNode) => h.append(row, node(h, `extra-${row.id}`, UiNodeType.Box, { width: 20, height: 20 }));
+
+    const h = new LayoutHarness();
+    const { root, rows, marks } = build(h);
+    h.layout(root, VIEWPORT);
+    const index = 7;
+    const row = rows[index];
+    const before = h.box(row);
+    grow(h, row);
+    h.engine.trace = true;
+    frame(h, [[row, DirtyFlags.Children]]);
+    const { relayoutRoots, fullLayout, measuredNodes } = h.engine.stats;
+    expect(fullLayout).toBe(false);
+    expect(relayoutRoots).toBe(1);
+    for (const n of measuredNodes) {
+      let inRow = n === row;
+      for (let p = n.parent; p !== null && !inRow; p = p.parent) inRow = p === row;
+      expect(inRow, `${n.id} is outside the row`).toBe(true);
+    }
+    expect(h.box(row)).toEqual(before);
+
+    // The same as a full layout of the changed tree: the row offset, its mark against it.
+    const fresh = new LayoutHarness();
+    const built = build(fresh);
+    grow(fresh, built.rows[index]);
+    fresh.layout(built.root, VIEWPORT);
+    expect(h.box(row)).toEqual(fresh.box(built.rows[index]));
+    expect(h.box(marks[index])).toEqual(fresh.box(built.marks[index]));
+    expect(h.box(row.lastChild!)).toEqual(fresh.box(built.rows[index].lastChild!));
+  });
+
   it('re-measures nothing for a scroll-only frame', () => {
     const h = new LayoutHarness();
     const { root, list } = buildTree(h);
