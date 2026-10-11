@@ -148,14 +148,16 @@ export class DevTools {
   }
 
   /** One key, down then up, as a raw key event the platform adapter sees. */
-  async pressKey(key: string, code: string, windowsVirtualKeyCode: number): Promise<void> {
+  /** `modifiers` as the protocol counts them: Alt 1, Ctrl 2, Meta 4, Shift 8. */
+  async pressKey(key: string, code: string, windowsVirtualKeyCode: number, modifiers = 0): Promise<void> {
     for (const type of ['keyDown', 'keyUp'] as const) {
       await this.send('Input.dispatchKeyEvent', {
         type,
         key,
         code,
         windowsVirtualKeyCode,
-        nativeVirtualKeyCode: windowsVirtualKeyCode
+        nativeVirtualKeyCode: windowsVirtualKeyCode,
+        modifiers
       });
     }
   }
