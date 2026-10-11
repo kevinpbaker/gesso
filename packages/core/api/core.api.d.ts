@@ -341,6 +341,7 @@ declare class LayoutRecord {
   flexMinAuto: boolean;
   positioned: boolean;
   absolute: boolean;
+  get displaced(): boolean;
   top: number | undefined;
   right: number | undefined;
   bottom: number | undefined;
@@ -1031,6 +1032,7 @@ interface UiTextInputState {
   readonly text: string;
   readonly selectionStart: number;
   readonly selectionEnd: number;
+  readonly selectionDirection?: 'forward' | 'backward';
   readonly caret: LayoutBox;
   readonly multiline?: boolean;
   readonly clipboard?: string;
@@ -1410,7 +1412,10 @@ type UiContrast = 'standard' | 'high';
 declare function relativeLuminance(color: UiColor): number;
 declare function contrastRatio(a: UiColor, b: UiColor): number;
 declare function raiseContrast(color: UiColor, against: UiColor, ratio: number): UiColor;
-declare function highContrastColors(colors: UiColors): UiColors;
+interface HighContrastOptions {
+  readonly surfaces?: Iterable<string>;
+}
+declare function highContrastColors(colors: UiColors, options?: HighContrastOptions): UiColors;
 interface UiThemeExtension<T extends object> {
   readonly key: symbol;
   readonly name: string;
@@ -1449,7 +1454,7 @@ declare const lightTheme: UiTheme;
 declare const darkTheme: UiTheme;
 declare function themesEqual(a: UiTheme, b: UiTheme): boolean;
 declare function withDensity(theme: UiTheme, density: UiDensity): UiTheme;
-declare function withContrast(theme: UiTheme, contrast: UiContrast): UiTheme;
+declare function withContrast(theme: UiTheme, contrast: UiContrast, options?: HighContrastOptions): UiTheme;
 interface UiVideoSurface {
   readonly frame: VideoFrame | ImageBitmap | null;
   readonly version: number;
@@ -3202,6 +3207,7 @@ interface EditingState {
   readonly text: string;
   readonly selectionStart: number;
   readonly selectionEnd: number;
+  readonly selectionDirection?: 'forward' | 'backward';
   readonly caret: LayoutBox;
   readonly multiline: boolean;
   readonly composing: boolean;
@@ -5495,6 +5501,7 @@ export {
   hasVisualState,
   hiddenRangesOf,
   highContrastColors,
+  HighContrastOptions,
   HitTester,
   HitTestLayoutReader,
   HitTestResult,
@@ -6413,6 +6420,7 @@ import {
   hasVisualState,
   hiddenRangesOf,
   highContrastColors,
+  HighContrastOptions,
   HitTester,
   HitTestLayoutReader,
   HitTestResult,
@@ -7257,6 +7265,7 @@ export {
   hasVisualState,
   hiddenRangesOf,
   highContrastColors,
+  HighContrastOptions,
   hoverable,
   iconKey,
   IconRasterizer,

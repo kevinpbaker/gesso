@@ -100,7 +100,10 @@ a typography one.
 foreground pushed away from the surface it is drawn on until it clears
 a 7:1 ratio. A control's own text is measured against the control
 rather than against the page, the grounds are left where they were, and
-a name a custom palette added is raised too. There is no way back: the
+a name a custom palette added is raised too, unless it is a ground of
+its own: a code editor's selection or a diff's filled lines, named in
+`surfaces`, are left as the stock grounds are, so what is drawn on them
+can still be read. There is no way back: the
 raising loses what the palette was, so keep the standard theme and
 derive the high one from it, which is what an application following the
 operating system's setting does anyway.
@@ -110,6 +113,9 @@ const theme = derive([scheme, wantsContrast], (dark, high) => {
   const base = dark ? appDarkTheme : appLightTheme;
   return high ? withContrast(base, 'high') : base;
 });
+
+// A palette with grounds of its own says which they are.
+const editorHigh = withContrast(editorTheme, 'high', { surfaces: ['editorSelection', 'diffInsertedLine'] });
 ```
 
 ## What a colour token resolves against

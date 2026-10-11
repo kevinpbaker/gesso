@@ -119,21 +119,35 @@ const FOREGROUNDS: Readonly<Record<string, keyof UiColors>> = {
   selectionForeground: 'selectionBackground'
 } as const;
 
+/** What a high-contrast palette needs to know of an application's own names. */
+export interface HighContrastOptions {
+  /**
+   * Names a custom palette added that are grounds, not marks, and are
+   * left alone as the stock grounds are: a code editor's selection, its
+   * current line, a diff's filled lines. Raised as foregrounds, they
+   * would turn bright enough against the page that what is drawn on them
+   * could not be read.
+   */
+  readonly surfaces?: Iterable<string>;
+}
+
 /**
  * A palette at high contrast.
  *
  * Every extra name a custom palette added is raised too, against the
  * page background, because a palette that grew a token for its own
  * accent should not be the one thing that stays quiet when the setting
- * is turned on. The named foregrounds above override that default with
- * the surface they are really drawn on.
+ * is turned on; unless it says it is a ground (`surfaces`). The named
+ * foregrounds above override that default with the surface they are
+ * really drawn on.
  */
-export function highContrastColors(colors: UiColors): UiColors {
+export function highContrastColors(colors: UiColors, options: HighContrastOptions = {}): UiColors {
+  const surfaces = new Set([...SURFACES, ...(options.surfaces ?? [])]);
   const source = colors as unknown as Readonly<Record<string, UiColor | undefined>>;
   const raised: Record<string, UiColor> = { ...(source as Record<string, UiColor>) };
   for (const name of Object.keys(source)) {
     const value = source[name];
-    if (value === undefined || SURFACES.has(name)) {
+    if (value === undefined || surfaces.has(name)) {
       continue;
     }
     const againstName = FOREGROUNDS[name] ?? 'background';

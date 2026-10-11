@@ -74,4 +74,12 @@ describe('highContrastColors', () => {
     const raised = highContrastColors(custom) as typeof custom;
     expect(contrastRatio(raised.accentSoft, custom.background)).toBeGreaterThanOrEqual(7);
   });
+
+  it('leaves a name a custom palette says is a ground, as it leaves the stock grounds', () => {
+    const custom = { ...darkColors, editorSelection: rgba(0.15, 0.31, 0.47), editorCaret: rgba(0.3, 0.3, 0.3) };
+    const raised = highContrastColors(custom, { surfaces: ['editorSelection'] }) as typeof custom;
+    expect(raised.editorSelection).toBe(custom.editorSelection);
+    // A mark beside it is still raised.
+    expect(contrastRatio(raised.editorCaret, custom.background)).toBeGreaterThanOrEqual(7);
+  });
 });
