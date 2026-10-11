@@ -12,7 +12,7 @@ import { shapesEqual } from './UiShapes';
 import { shadowsEqual } from './UiShadows';
 import { defaultSpacing, scaleSpacing, spacingEqual } from './UiSpacing';
 import { densityFactors } from './UiDensity';
-import { highContrastColors } from './UiContrast';
+import { highContrastColors, type HighContrastOptions } from './UiContrast';
 import { themeExtensionsEqual } from './UiThemeExtension';
 import { boxShadow } from '../properties/UiBoxShadow';
 
@@ -151,12 +151,12 @@ export function withDensity(theme: UiTheme, density: UiDensity): UiTheme {
  * application does anyway, since the setting it follows is a cell and
  * both themes exist for the life of the application.
  */
-export function withContrast(theme: UiTheme, contrast: UiContrast): UiTheme {
+export function withContrast(theme: UiTheme, contrast: UiContrast, options: HighContrastOptions = {}): UiTheme {
   if (theme.contrast === contrast) {
     return theme;
   }
   if (contrast === 'standard') {
     throw new Error('withContrast cannot lower a raised palette; keep the standard theme and derive the high one.');
   }
-  return { ...theme, contrast, colors: highContrastColors(theme.colors) };
+  return { ...theme, contrast, colors: highContrastColors(theme.colors, options) };
 }
