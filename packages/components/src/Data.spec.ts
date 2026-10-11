@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BehaviorSubject, type Observable } from 'rxjs';
+import { BehaviorSubject, map, type Observable } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
@@ -392,6 +392,21 @@ describe('Tree', () => {
     );
     expect(textColour(ui, 'src')).toBe(hex(darkTheme.colors.controlForeground));
     expect(textColour(ui, 'docs')).toBe(hex(darkTheme.colors.selectionForeground));
+  });
+
+  it('draws what leading gives before each label, open or not, and still announces only the label', () => {
+    const ui = tree({
+      defaultExpanded: ['src'],
+      leading: (node: TreeNode, open: Observable<boolean>) =>
+        Text({
+          text: open.pipe(
+            map(on => (node.children === undefined ? `file:${node.key}` : on ? `open:${node.key}` : `shut:${node.key}`))
+          )
+        })
+    });
+    const drawn = [...textColours(ui).keys()];
+    expect(drawn).toEqual(expect.arrayContaining(['open:src', 'shut:ui', 'file:components', 'file:docs']));
+    expect(ui.recordsFor('treeitem').map(record => record.label)).toEqual(['src', 'ui', 'components', 'docs']);
   });
 
   it('renders only the open part of the model, and says how deep each row is', () => {

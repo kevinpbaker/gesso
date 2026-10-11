@@ -1,4 +1,4 @@
-import { combineLatest, map } from 'rxjs';
+import { combineLatest, map, type Observable } from 'rxjs';
 
 import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
@@ -63,6 +63,13 @@ export interface TreeProps extends ControlLayoutProps {
   /** Expected row height, for the rows that have not been measured. */
   rowHeight?: number;
   label?: string;
+  /**
+   * Something drawn between a row's arrow and its label: a file's icon,
+   * in a file tree, which depends on the node and, for a folder, on
+   * whether it is open. Only drawn: the row's label is what a screen
+   * reader says, so it should name the node without it.
+   */
+  leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;
 }
 
 /** One visible row: a node, how deep it sits, and where among its siblings. */
@@ -233,6 +240,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       // A leaf keeps the arrow's width, so its label lines up with its
       // siblings' under the branch.
       branch ? chevron(open.pipe(map(on => (on ? CHEVRON_DOWN : CHEVRON_RIGHT))), ink, 14) : Box({ width: 14 }),
+      ...(inputs.leading.value === undefined ? [] : [inputs.leading.value(row.node, open)]),
       Text({ text: row.node.label, fontSize: 13, color: ink, selectable: false, maxLines: 1, textOverflow: 'ellipsis' })
     );
   };
