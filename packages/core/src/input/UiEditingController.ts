@@ -72,6 +72,8 @@ export interface EditingState {
   readonly text: string;
   readonly selectionStart: number;
   readonly selectionEnd: number;
+  /** Which end the caret is at; forward when left out. See `UiTextInputState.selectionDirection`. */
+  readonly selectionDirection?: 'forward' | 'backward';
   /** Caret box in canvas (layout root) pixels. */
   readonly caret: LayoutBox;
   readonly multiline: boolean;
@@ -946,6 +948,7 @@ export class UiEditingController {
       text: surface.text,
       selectionStart: surface.selectionStart,
       selectionEnd: surface.selectionEnd,
+      ...(surface.selectionDirection === undefined ? {} : { selectionDirection: surface.selectionDirection }),
       caret: this.drawnBox(node, surface.caret),
       multiline: surface.multiline ?? true,
       composing: this.surfaceComposition !== null,

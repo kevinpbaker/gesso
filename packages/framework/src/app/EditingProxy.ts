@@ -322,9 +322,14 @@ export class EditingProxy {
     if (textarea.value !== state.text) {
       textarea.value = state.text;
     }
-    if (textarea.selectionStart !== state.selectionStart || textarea.selectionEnd !== state.selectionEnd) {
+    const direction = state.selectionDirection ?? 'forward';
+    if (
+      textarea.selectionStart !== state.selectionStart ||
+      textarea.selectionEnd !== state.selectionEnd ||
+      (state.selectionEnd > state.selectionStart && textarea.selectionDirection !== direction)
+    ) {
       try {
-        textarea.setSelectionRange(state.selectionStart, state.selectionEnd);
+        textarea.setSelectionRange(state.selectionStart, state.selectionEnd, direction);
       } catch {
         // Some engines throw for an offset past the value; the next
         // state will be consistent.

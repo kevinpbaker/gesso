@@ -43,6 +43,14 @@ export interface UiTextInputState {
   readonly text: string;
   readonly selectionStart: number;
   readonly selectionEnd: number;
+  /**
+   * Which end of the selection the caret is at: `backward` for a
+   * selection made from its end towards its start, as Shift+Up makes
+   * one. A screen reader reads the line the caret is on, so a selection
+   * mirrored forward when it was made backward reads the wrong line.
+   * Forward when left out.
+   */
+  readonly selectionDirection?: 'forward' | 'backward';
   /** The caret, in the node's own coordinates: where the IME's candidate window opens. */
   readonly caret: LayoutBox;
   /** True (the default) when Enter inserts a line rather than submitting. */
