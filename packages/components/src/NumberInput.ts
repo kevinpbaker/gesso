@@ -45,6 +45,12 @@ export interface NumberInputProps extends ControlLayoutProps {
   max?: number;
   step?: number;
   label?: string;
+  /**
+   * The label is the field's name and is not drawn above it: for a field
+   * whose heading and place already say what it is, as `TextInput`'s
+   * and `Select`'s can be. It is still what a screen reader announces.
+   */
+  labelHidden?: boolean;
   error?: string;
   disabled?: boolean;
   required?: boolean;
@@ -52,6 +58,7 @@ export interface NumberInputProps extends ControlLayoutProps {
 
 export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
+  const labelHidden = inputs.labelHidden?.value === true;
   const error = input(inputs.error, '');
   const disabled = input(inputs.disabled, false);
   const required = input(inputs.required, false);
@@ -100,7 +107,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
     { ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(name =>
-        name.length === 0
+        name.length === 0 || labelHidden
           ? []
           : [Text({ text: name, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
       )
