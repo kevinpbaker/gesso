@@ -138,6 +138,15 @@ interface Entry {
   /** View keys kept from the agent. */
   readonly hidden: ReadonlySet<string>;
   readonly commands: ReadonlyMap<string, CommandSchema | null>;
+  /**
+   * Every change this channel's view has seen, and when the last was,
+   * so a command can tell its own effect from what came before it.
+   * Counted per channel: a call returns its own channel's view, and
+   * another channel that never goes quiet (a clock, a status that
+   * follows the person's typing) must not hold it up.
+   */
+  changes: number;
+  lastChange: number;
 }
 
 type Handler = (request: Readonly<Record<string, unknown>> | undefined) => Promise<AgentToolResult>;
@@ -149,9 +158,6 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   const entries: Entry[] = [];
   const tools: AgentTool[] = [];
   const handlers = new Map<string, Handler>();
-  let lastChange = 0;
-  /** Every change the view has seen, so a command can tell its own from what came before it. */
-  let changes = 0;
   let following = false;
 
   /**
@@ -169,8 +175,8 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
         subscriptions.push(
           observable.subscribe(value => {
             entry.view[key] = value;
-            lastChange = Date.now();
-            changes++;
+            entry.lastChange = Date.now();
+            entry.changes++;
           })
         );
       }
@@ -178,8 +184,8 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   };
 
   /**
-   * Waits for what a command sent when the view had seen `before`
-   * changes to reach the view.
+   * Waits for what a command sent when its channel's view had seen
+   * `before` changes to reach that view.
    *
    * Quiet counts only once the view has changed since the command: a
    * command that answers after a request has changed nothing yet when
@@ -188,13 +194,13 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
    * all waits out `settleMs`, which is the price of not being able to
    * tell it from one that is still working.
    */
-  const settle = async (before: number) => {
+  const settle = async (entry: Entry, before: number) => {
     const start = Date.now();
     for (;;) {
       await new Promise(resolve => setTimeout(resolve, quietMs));
       const now = Date.now();
-      const changed = changes > before;
-      if ((changed && now - lastChange >= quietMs) || now - start >= settleMs) {
+      const changed = entry.changes > before;
+      if ((changed && now - entry.lastChange >= quietMs) || now - start >= settleMs) {
         return;
       }
     }
@@ -231,7 +237,9 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       viewSchema: schema === undefined ? undefined : withoutKeys(schema.view, schema.hidden ?? []),
       view: { ...(served.token.initial as Record<string, unknown>) },
       hidden: new Set(schema?.hidden ?? []),
-      commands
+      commands,
+      changes: 0,
+      lastChange: 0
     };
     entries.push(entry);
 
@@ -313,13 +321,13 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
     if (handler === undefined) {
       return failure(`${channel} has no command ${command}.`);
     }
-    const before = changes;
+    const before = entry.changes;
     try {
       handler(...positional);
     } catch (error) {
       return failure(`${channel}.${command} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    await settle(before);
+    await settle(entry, before);
     return viewResult(entry, `Sent ${command} to ${channel}. The view afterwards:`);
   };
 

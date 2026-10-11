@@ -185,6 +185,28 @@ describe('an agent surface', () => {
     expect(result.structuredContent).toEqual({ rows: [{ id: '1', title: 'Later' }], status: 'ready' });
   });
 
+  it("returns once its own channel's view is quiet, however busy another channel's is", async () => {
+    // Another channel that never goes quiet: a clock, or a status that
+    // follows the person typing. The call returns its own channel's view,
+    // so only that view's quiet counts.
+    const Clock = defineChannel('clock', { view: { ticks: 0 }, commands: {} as Record<never, never> });
+    const ticks = new BehaviorSubject(0);
+    const timer = setInterval(() => ticks.next(ticks.value + 1), 2);
+    try {
+      const app = notesApp();
+      const surface = agentSurface([serve(Clock, { view: { ticks }, commands: {} }), app.served], {
+        quietMs: 10,
+        settleMs: 1000
+      });
+      const started = Date.now();
+      const result = await surface.call('notes_create', { title: 'Soon' });
+      expect(result.structuredContent).toEqual({ rows: [{ id: '1', title: 'Soon' }], status: 'ready' });
+      expect(Date.now() - started).toBeLessThan(200);
+    } finally {
+      clearInterval(timer);
+    }
+  });
+
   it('returns at settleMs from a command that changes nothing in the view', async () => {
     const app = notesApp();
     const surface = agentSurface([app.served], { quietMs: 5, settleMs: 60 });
