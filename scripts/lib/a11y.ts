@@ -40,6 +40,13 @@ export interface A11yRun {
   readonly devtoolsPort?: number;
   /** A paragraph every report carries under its heading, about how the app was run. */
   readonly reportNote?: string;
+  /**
+   * Text that cannot be the same from one run to the next, a timing or a
+   * clock, put in a fixed form before a report is written or compared,
+   * so the report changes only when what a screen reader hears does:
+   * `{ pattern: /[\d,.]+ ms/g, as: '# ms' }`. Each pattern is global.
+   */
+  readonly volatile?: readonly { readonly pattern: RegExp; readonly as: string }[];
 }
 
 let config: Required<A11yRun>;
@@ -163,7 +170,7 @@ export interface RouteCheck {
  * failed. A caller prints the failures and fails the build on them.
  */
 export async function runA11yChecks(run: A11yRun): Promise<string[]> {
-  config = { devtoolsPort: 9342, reportNote: '', ...run };
+  config = { devtoolsPort: 9342, reportNote: '', volatile: [], ...run };
   const CHECKS = run.checks;
   const chrome = findChrome();
   const profiles: string[] = [];
@@ -536,6 +543,11 @@ export function tabReach(
   };
 }
 
+/** A name or value as the report gives it: `volatile` text in its fixed form. */
+function steady(text: string): string {
+  return config.volatile.reduce((out, { pattern, as }) => out.replace(pattern, as), text);
+}
+
 function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: readonly string[]): string[] {
   const route = check.route;
   const unnamed = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? '') && (node.name?.value ?? '') === '');
@@ -544,7 +556,7 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
     config.apps[check.app]!.url(check.path ?? route),
     nodes,
     unnamed,
-    tabOrder,
+    tabOrder.map(steady),
     unreachable,
     excused
   );
@@ -638,12 +650,12 @@ function renderReport(
     .filter(node => !['generic', 'none', 'InlineTextBox'].includes(node.role?.value ?? ''))
     .map(node => {
       const role = node.role?.value ?? '?';
-      const name = node.name?.value ?? '';
+      const name = steady(node.name?.value ?? '');
       const states = (node.properties ?? [])
         .filter(property => !['focusable', 'editable', 'settable', 'multiline', 'readonly'].includes(property.name))
         .map(property => describeProperty(property, nodes))
         .join(', ');
-      const value = valueOf(node) ?? '';
+      const value = steady(valueOf(node) ?? '');
       return `| ${cell(role)} | ${cell(name)} | ${cell(states)} | ${cell(value)} |`;
     });
   return [
