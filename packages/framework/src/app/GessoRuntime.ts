@@ -3939,6 +3939,7 @@ function editingStatesEqual(a: EditingState | null, b: EditingState | null): boo
     a.text === b.text &&
     a.selectionStart === b.selectionStart &&
     a.selectionEnd === b.selectionEnd &&
+    a.selectionDirection === b.selectionDirection &&
     a.multiline === b.multiline &&
     a.composing === b.composing &&
     a.html === b.html &&

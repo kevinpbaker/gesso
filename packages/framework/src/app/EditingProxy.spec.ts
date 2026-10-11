@@ -75,9 +75,12 @@ class FakeElement {
     return this.rect;
   }
 
-  setSelectionRange(start: number, end: number): void {
+  selectionDirection: 'forward' | 'backward' | 'none' = 'none';
+
+  setSelectionRange(start: number, end: number, direction: 'forward' | 'backward' | 'none' = 'none'): void {
     this.selectionStart = start;
     this.selectionEnd = end;
+    this.selectionDirection = direction;
   }
 
   focus(): void {
@@ -198,6 +201,16 @@ describe('EditingProxy', () => {
     expect(textarea.style.left).toBe('140px');
     expect(textarea.style.top).toBe('70px');
     expect(textarea.style.height).toBe('17px');
+  });
+
+  it("puts the textarea's caret at the end of the selection the runtime's caret is at", () => {
+    // A screen reader reads the line the caret is on: a selection made
+    // upwards has its caret at the start.
+    const { proxy, textarea, state } = setup();
+    proxy.update(state({ selectionStart: 2, selectionEnd: 8, selectionDirection: 'backward' }));
+    expect([textarea.selectionStart, textarea.selectionEnd, textarea.selectionDirection]).toEqual([2, 8, 'backward']);
+    proxy.update(state({ selectionStart: 2, selectionEnd: 8 }));
+    expect(textarea.selectionDirection).toBe('forward');
   });
 
   it('does not steal focus from page chrome', () => {
