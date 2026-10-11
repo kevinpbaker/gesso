@@ -883,7 +883,7 @@ export class LayoutEngine {
         break;
       }
       const cRec = this.records.get(current);
-      if (current !== node && cRec?.relayoutBoundary && !cRec.positioned) {
+      if (current !== node && cRec?.relayoutBoundary && !cRec.displaced) {
         break;
       }
       current = current.parent;
@@ -1764,7 +1764,7 @@ export class LayoutEngine {
       cRec.contentMatters = gridRec.contentMatters || !explicitBoth;
       this.measure(placement.item, new Constraints(0, Infinity, 0, Infinity));
       cRec.relayoutBoundary =
-        explicitBoth && !cRec.contentMatters && cRec.aspectRatio === undefined && !cRec.positioned;
+        explicitBoth && !cRec.contentMatters && cRec.aspectRatio === undefined && !cRec.displaced;
       const marginH = cRec.marginLeft + cRec.marginRight;
       const contribution: GridContribution = {
         min: this.minContentContribution(placement.item, cRec) + marginH,
@@ -2236,7 +2236,7 @@ export class LayoutEngine {
         (explicitMain !== undefined || (basis !== undefined && !minFromContent)) &&
         (explicitCross || (align === CrossAxisAlignment.Stretch && crossTightForStretch)) &&
         cRec.aspectRatio === undefined &&
-        !cRec.positioned;
+        !cRec.displaced;
       // Along a mirrored main axis (rtl, *-reverse) the physical start
       // margin is the logical end margin; positions are mirrored back
       // at placement, so the swap lands each margin on its own side.
@@ -2741,7 +2741,7 @@ export class LayoutEngine {
         (explicitWidth || stretchX) &&
         (explicitHeight || stretchY) &&
         cRec.aspectRatio === undefined &&
-        !cRec.positioned &&
+        !cRec.displaced &&
         !cRec.contentMatters;
       maxWidth = Math.max(maxWidth, cRec.outerWidth);
       maxHeight = Math.max(maxHeight, cRec.outerHeight);
@@ -2835,7 +2835,7 @@ export class LayoutEngine {
         explicitMain !== undefined &&
         (explicitCross || crossTight) &&
         cRec.aspectRatio === undefined &&
-        !cRec.positioned;
+        !cRec.displaced;
       const measuredMain = vertical ? cRec.measuredHeight : cRec.measuredWidth;
       const measuredCross = vertical ? cRec.measuredWidth : cRec.measuredHeight;
       const marginMain = vertical ? cRec.marginTop + cRec.marginBottom : cRec.marginLeft + cRec.marginRight;
@@ -4162,7 +4162,7 @@ export class LayoutEngine {
         }
         return;
       }
-      if (!bounded && rec?.relayoutBoundary && !rec.positioned && (current !== node || selfCanBound)) {
+      if (!bounded && rec?.relayoutBoundary && !rec.displaced && (current !== node || selfCanBound)) {
         this.relayoutRoots.add(current);
         /**
          * The boundary is where the *relayout* starts, and the walk
