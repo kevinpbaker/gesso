@@ -163,6 +163,21 @@ export interface RouteCheck {
    * the route, fails the check, so the list can't outlive what it excuses.
    */
   readonly outOfTabOrder?: readonly { readonly role: string; readonly name: string; readonly keyboard: string }[];
+  /**
+   * Keys pressed before the Tab walk, after the canvas has focus: a code
+   * editor whose Tab indents is walked with its "Tab moves focus" key
+   * pressed first, as a keyboard user would press it. The report says
+   * which keys, so it is plain what the walk assumes.
+   */
+  readonly keysFirst?: readonly {
+    readonly key: string;
+    readonly code: string;
+    readonly keyCode: number;
+    /** Alt 1, Ctrl 2, Meta 4, Shift 8. */
+    readonly modifiers?: number;
+    /** How the report names it: `Ctrl+M`. */
+    readonly name: string;
+  }[];
 }
 
 /**
@@ -322,7 +337,7 @@ async function checkRoute(devtools: DevTools, check: RouteCheck): Promise<string
   nodes = await stillTree(devtools, nodes);
   report(check.route, nodes);
   const failures: string[] = [];
-  const tabOrder = await tabThrough(devtools, nodes);
+  const tabOrder = await tabThrough(devtools, nodes, check.keysFirst ?? []);
   failures.push(...reportFile(check, nodes, tabOrder));
   if (!settledTree) {
     for (const expectation of check.expect) {
@@ -558,7 +573,8 @@ function reportFile(check: RouteCheck, nodes: readonly AxNode[], tabOrder: reado
     unnamed,
     tabOrder.map(steady),
     unreachable,
-    excused
+    excused,
+    (check.keysFirst ?? []).map(key => key.name)
   );
   const path = join(config.reportDir, `${route}.md`);
   const failures = unnamed.map(node => `${route}: a ${node.role?.value} with no accessible name`);
@@ -641,7 +657,8 @@ function renderReport(
   unnamed: readonly AxNode[],
   tabOrder: readonly string[],
   unreachable: readonly string[],
-  excused: readonly string[]
+  excused: readonly string[],
+  keysFirst: readonly string[] = []
 ): string {
   const controls = nodes.filter(node => CONTROL_ROLES.has(node.role?.value ?? ''));
   // InlineTextBox rows repeat their StaticText parent word for word;
@@ -683,6 +700,7 @@ function renderReport(
     'What the Tab key reaches from the top of the route, in order, as the',
     'accessibility tree reports focus after each press.',
     '',
+    ...(keysFirst.length === 0 ? [] : [`Pressed first: ${keysFirst.join(', ')}.`, '']),
     ...tabOrder.map((name, index) => `${index + 1}. ${name}`),
     '',
     unreachable.length === 0
@@ -794,9 +812,17 @@ function spoken(name: string): string {
  * forwards the key, the render worker moves focus, and the mirror or
  * the proxy takes the platform's.
  */
-async function tabThrough(devtools: DevTools, before: readonly AxNode[]): Promise<string[]> {
+async function tabThrough(
+  devtools: DevTools,
+  before: readonly AxNode[],
+  keysFirst: NonNullable<RouteCheck['keysFirst']>
+): Promise<string[]> {
   const controls = before.filter(node => CONTROL_ROLES.has(node.role?.value ?? '')).length;
   await devtools.evaluate<void>(`document.querySelector('canvas').focus()`);
+  for (const key of keysFirst) {
+    await devtools.pressKey(key.key, key.code, key.keyCode, key.modifiers ?? 0);
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   const visited: string[] = [];
   let previous = await activeElement(devtools);
   let unnamedStops = 0;
