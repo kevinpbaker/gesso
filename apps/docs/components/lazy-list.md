@@ -68,20 +68,21 @@ for a row nobody can see.
 
 ## Props
 
-| Prop                   | Type                                  | Default   | What it does                                                                            |
-| ---------------------- | ------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
-| `count`                | `number`                              | required  | How many rows there are. An Observable when the data changes.                           |
-| `item`                 | `(index: number) => UiChild`          | required  | The content of one row. Called once per mount, and again on a new `revision`.           |
-| `estimatedItemExtent`  | `number`                              | `28`      | The height the window assumes for a row it has not measured.                            |
-| `overscan`             | `number`                              | `3`       | Rows mounted beyond each edge of the viewport.                                          |
-| `itemKey`              | `(index: number) => string \| number` | the index | Stable identity per row, so a row keeps its node when the list shifts.                  |
-| `revision`             | `unknown`                             | none      | Changes when what an index means changes. The mounted rows are rendered again.          |
-| `selectedIndex`        | `number`                              | none      | The chosen row. Supplying it makes the selection controlled.                            |
-| `defaultSelectedIndex` | `number`                              | none      | The row to start on. `-1`, meaning nothing chosen, when neither prop is given.          |
-| `onSelect`             | `(index: number) => void`             | none      | Called with the index a click or a key chose.                                           |
-| `onActivate`           | `(index: number) => void`             | none      | Called on Enter or Space with the chosen index. Nothing happens when nothing is chosen. |
-| `label`                | `string`                              | `'List'`  | The list's accessible name.                                                             |
-| `ref`                  | `UiNodeRef`                           | none      | Receives the node that is the list, for focusing it or reading where it is scrolled to. |
+| Prop                   | Type                                  | Default   | What it does                                                                                          |
+| ---------------------- | ------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------- |
+| `count`                | `number`                              | required  | How many rows there are. An Observable when the data changes.                                         |
+| `item`                 | `(index: number) => UiChild`          | required  | The content of one row. Called once per mount, and again on a new `revision`.                         |
+| `estimatedItemExtent`  | `number`                              | `28`      | The height the window assumes for a row it has not measured.                                          |
+| `overscan`             | `number`                              | `3`       | Rows mounted beyond each edge of the viewport.                                                        |
+| `itemKey`              | `(index: number) => string \| number` | the index | Stable identity per row, so a row keeps its node when the list shifts.                                |
+| `revision`             | `unknown`                             | none      | Changes when what an index means changes. The mounted rows are rendered again.                        |
+| `selectedIndex`        | `number`                              | none      | The chosen row. Supplying it makes the selection controlled.                                          |
+| `defaultSelectedIndex` | `number`                              | none      | The row to start on. `-1`, meaning nothing chosen, when neither prop is given.                        |
+| `onSelect`             | `(index: number) => void`             | none      | Called with the index a click or a key chose.                                                         |
+| `onActivate`           | `(index: number) => void`             | none      | Called on Enter or Space with the chosen index. Nothing happens when nothing is chosen.               |
+| `label`                | `string`                              | `'List'`  | The list's accessible name.                                                                           |
+| `description`          | `string`                              | none      | Said after the name when the list takes focus: what its keys do, where it has keys beyond its arrows. |
+| `ref`                  | `UiNodeRef`                           | none      | Receives the node that is the list, for focusing it or reading where it is scrolled to.               |
 
 Every prop takes a plain value or an Observable of one, and the layout
 props on [the library page](/components/) apply here too. The list needs

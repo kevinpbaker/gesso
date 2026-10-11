@@ -61,6 +61,7 @@ describe('LazyList', () => {
     const ui = mount(
       createComponent(LazyList, {
         label: 'Files',
+        description: 'Delete removes a file.',
         count: 100000,
         height: 100,
         estimatedItemExtent: 20,
@@ -76,6 +77,7 @@ describe('LazyList', () => {
     expect(items[0].posInSet).toBe(1);
     expect(items[0].setSize).toBe(100000);
     expect(ui.recordsFor('list')[0].label).toBe('Files');
+    expect(ui.recordsFor('list')[0].description).toBe('Delete removes a file.');
   });
 
   it('walks the whole list from the keyboard and scrolls to keep up', () => {
