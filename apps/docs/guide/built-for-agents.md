@@ -65,6 +65,11 @@ reads: geometry for the screen, a clipboard, the text of a file being
 saved. An agent is handed the rest of the view after every command, so
 bulk only a screen can use is better kept from it.
 
+`@hidden` on the token itself keeps the whole channel from agents: no
+view tool, no commands, no resource. It is for a channel that is the
+application's own plumbing, such as the barrier between its threads,
+when a channel written for agents sits beside it.
+
 ## And the screen, as a screen reader hears it
 
 Not everything is in a channel: a dialog's buttons, a tab, a field the
