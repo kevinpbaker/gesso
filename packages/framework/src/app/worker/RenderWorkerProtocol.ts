@@ -396,6 +396,12 @@ export type RuntimeToShellMessage =
   | { type: 'redirect'; url: string }
   | { type: 'fullscreen'; enter: boolean }
   /**
+   * Whether leaving the page would lose work (ShellService.warnOnLeave):
+   * the shell listens for `beforeunload` while it is on, and not at all
+   * otherwise.
+   */
+  | { type: 'leaveWarning'; on: boolean }
+  /**
    * Open a sized, named window and report back whether the browser
    * allowed it (ShellService.openPopup).
    *

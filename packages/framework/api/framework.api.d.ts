@@ -931,6 +931,9 @@ type ShellRequest = {
   type: 'fullscreen';
   enter: boolean;
 } | {
+  type: 'leaveWarning';
+  on: boolean;
+} | {
   type: 'popup';
   id: number;
   url: string;
@@ -1030,6 +1033,7 @@ interface ShellStorageResult {
 }
 declare class ShellService {
   private handler;
+  private leaving;
   private readonly scheme;
   private readonly contrastState;
   private readonly activeState;
@@ -1061,6 +1065,7 @@ declare class ShellService {
   redirect(url: string): void;
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
+  warnOnLeave(on: boolean): void;
   applyFullscreen(active: boolean): void;
   openPopup(request: {
     readonly url: string;
@@ -1890,6 +1895,10 @@ type RuntimeToShellMessage = {
 } | {
   type: 'fullscreen';
   enter: boolean;
+} |
+{
+  type: 'leaveWarning';
+  on: boolean;
 } |
 {
   type: 'popup';
@@ -3824,6 +3833,7 @@ interface ChannelSchema {
   readonly description?: string;
   readonly view: JsonSchema;
   readonly hidden?: readonly string[];
+  readonly internal?: true;
   readonly commands: {
     readonly [name: string]: CommandSchema;
   };

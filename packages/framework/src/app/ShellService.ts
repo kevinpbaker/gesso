@@ -22,6 +22,7 @@ export type ShellRequest =
   | { type: 'openRoute'; url: string }
   | { type: 'redirect'; url: string }
   | { type: 'fullscreen'; enter: boolean }
+  | { type: 'leaveWarning'; on: boolean }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
   | { type: 'file'; id: number; request: ShellFileRequest }
@@ -171,6 +172,8 @@ export interface ShellStorageResult {
  */
 export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
+  /** What `warnOnLeave` last said. */
+  private leaving = false;
   private readonly scheme = internalState<ColorScheme>('light');
   private readonly contrastState = internalState<UiContrast>('standard');
   private readonly activeState = internalState(true);
@@ -273,9 +276,16 @@ export class ShellService {
     return this.insets.value;
   }
 
-  /** Installed by the runtime; a request with no handler is dropped. */
+  /**
+   * Installed by the runtime; a request with no handler is dropped,
+   * except the leave warning, which is a state rather than an event: a
+   * shell that arrives after it was turned on is told.
+   */
   setHandler(handler: ((request: ShellRequest) => void) | null): void {
     this.handler = handler;
+    if (handler !== null && this.leaving) {
+      handler({ type: 'leaveWarning', on: true });
+    }
   }
 
   /**
@@ -442,6 +452,27 @@ export class ShellService {
    */
   requestFullscreen(enter: boolean): void {
     this.handler?.({ type: 'fullscreen', enter });
+  }
+
+  /**
+   * Whether leaving the page now would lose work: edits not yet saved,
+   * an upload half done. While it is on, the shell has the browser ask
+   * before the page is closed, reloaded or left (`beforeunload`), in the
+   * browser's own words, which a page cannot set.
+   *
+   * A request rather than a call because `beforeunload` is the window's,
+   * and the thread this runs on may not have one. Turn it off as soon as
+   * the work is safe: the browser will not keep a page that has a
+   * `beforeunload` listener in its back/forward cache, so the shell
+   * listens only while this is on. Saying the same thing twice sends
+   * nothing.
+   */
+  warnOnLeave(on: boolean): void {
+    if (on === this.leaving) {
+      return;
+    }
+    this.leaving = on;
+    this.handler?.({ type: 'leaveWarning', on });
   }
 
   /** Called by the runtime when the shell reports the state. Not for applications. */
