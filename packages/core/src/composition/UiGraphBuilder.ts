@@ -214,6 +214,15 @@ interface UnkeyedMatchState {
  */
 export class UiGraphBuilder {
   private readonly refs = new Map<UiNode, UiNodeRef>();
+  /**
+   * The definition each node was last reconciled from. A definition is
+   * a description that is never changed once made, so the same object
+   * again has nothing new to say: a lazy list hands back the row it made
+   * for an index on every scroll, and reconciling seventy unchanged rows
+   * (their props, then every node of each row's component) to mount the
+   * four that scrolled in cost a 165 Hz frame its budget.
+   */
+  private readonly reconciledFrom = new WeakMap<UiNode, UiElement | ComponentLikeElement>();
   private readonly modifiers = new Map<UiNode, UiModifierSet>();
   private nextChildrenBindingId = 0;
 
@@ -397,11 +406,14 @@ export class UiGraphBuilder {
         changed = true;
       } else {
         matched.add(node);
-        this.reconcileProps(node, definition.props);
-        if (this.reconcileChildren(node, definition.children).changed) {
-          changed = true;
+        if (this.reconciledFrom.get(node) !== definition) {
+          this.reconcileProps(node, definition.props);
+          if (this.reconcileChildren(node, definition.children).changed) {
+            changed = true;
+          }
         }
       }
+      this.reconciledFrom.set(node, definition);
       if (this.moveBefore(parent, node, cursor)) {
         changed = true;
       }
@@ -526,9 +538,13 @@ export class UiGraphBuilder {
       this.graph.insertBefore(parent, anchor, cursor);
     } else {
       matched.add(anchor);
+      if (this.reconciledFrom.get(anchor) === element) {
+        return anchor;
+      }
     }
 
     this.reconcileChildren(anchor, [resolver.resolve(element, anchorId)]);
+    this.reconciledFrom.set(anchor, element);
     return anchor;
   }
 
