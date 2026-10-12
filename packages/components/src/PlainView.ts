@@ -331,6 +331,15 @@ function field<T>(node$: BehaviorSubject<PlainNode>, of: (node: PlainNode) => T)
   );
 }
 
+/** Whether a node takes the room its parent has left: a list or a scroll does, and a column or row that says so. */
+function takesRoom(node: PlainNode): boolean {
+  return (
+    node.type === 'list' ||
+    node.type === 'scroll' ||
+    ((node.type === 'column' || node.type === 'row') && node.grow === true)
+  );
+}
+
 const MONO = 'ui-monospace, Menlo, Consolas, monospace';
 
 /** What a node is drawn as: its type, and for text whether it is monospace. A change of it draws the node again. */
@@ -379,10 +388,17 @@ function childrenOf(node$: BehaviorSubject<PlainNode>, draw: Draw): Observable<r
       }),
       distinctUntilChanged((a, b) => a.length === b.length && a.every((key, i) => key === b[i]))
     );
+    // A keyed row is an element, so each child has a box of its own, which passes the room on: a
+    // box that did not shrink gave a list all its rows' height, so it mounted every one, and a
+    // thousand were rebuilt each time the tree came again.
     return each(
       keys$,
       key => key,
-      key => Column({ flexShrink: 0 }, nodeView(held.get(key)!, draw))
+      key => {
+        const child$ = held.get(key)!;
+        const room = field(child$, node => (takesRoom(node) ? 1 : 0));
+        return Column({ flexGrow: room, flexShrink: room, minHeight: 0, minWidth: 0 }, nodeView(child$, draw));
+      }
     );
   });
 }
