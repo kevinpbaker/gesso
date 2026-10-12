@@ -519,7 +519,8 @@ export class UiWheelController {
           dirX: 0,
           dirY: 0,
           quiet: 0,
-          fresh: false
+          fresh: false,
+          fitted: false
         };
         this.pacing.set(container, paced);
       }
@@ -568,16 +569,15 @@ export class UiWheelController {
    * comes a varying time after the last step: applied as they arrive, a
    * steady flick moves the page by uneven amounts, which reads as
    * judder. Evening that out by waiting for steps puts the page behind
-   * the hand. So this does what a browser does for its own scrolling:
-   * it puts the page where the input will have reached when the frame is
-   * shown, the steps so far plus their velocity times the time since the
-   * last one, never more than a frame and a half ahead. Steps come out
-   * even, and nothing trails.
+   * the hand. So this does what a browser does for its own scrolling: it
+   * resamples the steps at the frame's time, reading a line fitted through
+   * the last `VELOCITY_WINDOW_MS` of them. Frames come out even, and
+   * nothing trails.
    *
-   * A gesture's first step, with no velocity yet, goes as it is. Once the
-   * steps stop, the prediction is withdrawn and the page settles exactly
-   * where they add up to; a trackpad's momentum slows to nothing first,
-   * so there is next to nothing to withdraw.
+   * A gesture's first step, with no line yet, goes as it is. Once the
+   * steps stop, the page eases over a few frames to exactly where they add
+   * up to; a trackpad's momentum slows to nothing first, so there is next
+   * to nothing to take up.
    *
    * True while a gesture is still being paced, so the host keeps frames
    * coming until it has settled.
@@ -599,30 +599,54 @@ export class UiWheelController {
       let y = paced.totalY;
       const samples = paced.samples;
       const last = samples[samples.length - 1];
-      // The velocity of the last few steps only: read further back, a flick
-      // that is slowing is predicted at the speed it had, runs ahead, and
-      // has to step back.
-      let first = last;
-      let gaps = 0;
-      for (let k = samples.length - 2; k >= 0 && last !== undefined && samples[k]!.t >= last.t - RECENT_MS; k--) {
-        first = samples[k];
-        gaps++;
-      }
+      const first = samples[0];
       const since = time === undefined || last === undefined ? -1 : time - last.t;
       // Only on one clock, and only while the steps are recent: a time
       // that doesn't fit is a host that didn't say when, and goes exact.
-      if (last !== undefined && first !== undefined && since >= -1 && since < STALE_MS && last.t - first.t >= 2) {
-        const span = last.t - first.t;
-        // As far as a step's gap past a frame's lead. Capped at a frame and
-        // a half, a display faster than the trackpad (120 Hz of steps on a
-        // 165 Hz screen) often draws a frame more than half a frame after
-        // the last step: the cap cut that frame's prediction short, the
-        // next step's frame was held from going back, and the page went
-        // in a stutter of short and full moves.
-        const gap = Math.max(span / gaps, this.frameInterval * (MAX_AHEAD_FRAMES - 1));
-        const ahead = Math.min(Math.max(since, 0) + this.frameInterval, this.frameInterval + gap);
-        x += ((last.x - first.x) / span) * ahead;
-        y += ((last.y - first.y) / span) * ahead;
+      if (time !== undefined && last !== undefined && first !== undefined && since >= -1 && since < STALE_MS && last.t - first.t >= 2) {
+        // A line through the window's steps, read at the frame's time. A Mac
+        // trackpad reaches the page as whole pixels at uneven times (13, 11,
+        // 21, 11, 15 on a steady flick, 6 to 13 ms apart): a velocity read
+        // off the last two or three steps carried all of that into the
+        // frames, which moved 2.5, 1, 0, 3 on a slow scroll. Fitted, the
+        // rounding and the uneven timing average out, and read at the
+        // frame's time the line is as far on as the hand.
+        //
+        // Read as far past the last step as the frame is, within `STALE_MS`:
+        // a step reaches the page 6 to 14 ms after it happened, so a frame
+        // is usually further past it than a step's gap, and a line held
+        // short of the frame fell behind and caught up in turn.
+        const at = time;
+        let meanT = 0;
+        let meanX = 0;
+        let meanY = 0;
+        for (const sample of samples) {
+          meanT += sample.t;
+          meanX += sample.x;
+          meanY += sample.y;
+        }
+        meanT /= samples.length;
+        meanX /= samples.length;
+        meanY /= samples.length;
+        let varT = 0;
+        let covX = 0;
+        let covY = 0;
+        for (const sample of samples) {
+          const dt = sample.t - meanT;
+          varT += dt * dt;
+          covX += dt * (sample.x - meanX);
+          covY += dt * (sample.y - meanY);
+        }
+        x = meanX + (covX / varT) * (at - meanT);
+        y = meanY + (covY / varT) * (at - meanT);
+        paced.fitted = true;
+      } else if (paced.fitted) {
+        // The steps have stopped: the line is let go of over a few frames
+        // rather than at once, which would be the very jump it smoothed.
+        const drawnX = paced.lastX - paced.baseX;
+        const drawnY = paced.lastY - paced.baseY;
+        x = Math.abs(x - drawnX) < SETTLED_PX ? x : drawnX + (x - drawnX) * SETTLE_RATE;
+        y = Math.abs(y - drawnY) < SETTLED_PX ? y : drawnY + (y - drawnY) * SETTLE_RATE;
       }
       // Where the container goes: where the gesture started, plus the
       // steps (and the prediction), clamped to its range. A position, not
@@ -668,7 +692,10 @@ export class UiWheelController {
       const settled =
         toX === Math.min(Math.max(paced.baseX + paced.totalX, 0), state.maxScrollX) &&
         toY === Math.min(Math.max(paced.baseY + paced.totalY, 0), state.maxScrollY);
-      if (settled && paced.quiet >= QUIET_FRAMES) {
+      // Over once the steps are stale, not after a count of frames: a slow
+      // scroll's steps come 20 ms apart, two frames at 165 Hz were less, and
+      // each step began a gesture of its own and went unfitted.
+      if (settled && paced.quiet >= QUIET_FRAMES && (since < 0 || since >= STALE_MS)) {
         this.pacing.delete(container);
       }
     }
@@ -768,20 +795,24 @@ interface PacedScroll {
   quiet: number;
   /** Whether a step arrived since the last frame. */
   fresh: boolean;
+  /** Whether a frame has been drawn from the fitted line, which is let go of gently. */
+  fitted: boolean;
 }
 
-/** How far back the velocity is read: a few of a trackpad's steps. */
-const VELOCITY_WINDOW_MS = 40;
-/** How long after the last step its velocity is still trusted. */
-const STALE_MS = 40;
 /**
- * The furthest ahead a frame predicts, in frames: a frame's lead, for the
- * frame it takes to be shown, plus the time since the last step, which is
- * what evens out where each frame falls between steps.
+ * How far back the steps are fitted: five or six of a trackpad's. Less, and
+ * the line follows each step's rounding; more, and it lags a flick that is
+ * speeding up or slowing down. Measured on a real flick on a Mac, 48 ms left
+ * a sixth of the frame-to-frame variation of the last-few-steps velocity,
+ * with no frame standing still and the page no further behind the hand.
  */
-const MAX_AHEAD_FRAMES = 1.5;
-/** How far back the velocity is read for a prediction. */
-const RECENT_MS = 20;
+const VELOCITY_WINDOW_MS = 48;
+/** How long after the last step its line is still trusted. */
+const STALE_MS = 40;
+/** How much of the way to where the steps add up to a frame goes once they stop. */
+const SETTLE_RATE = 0.35;
+/** Close enough to where the steps add up to, to go the rest at once. */
+const SETTLED_PX = 0.25;
 /** The display's interval before one has been measured. */
 const DEFAULT_FRAME_MS = 1000 / 60;
 /** Quiet frames, once settled, after which a gesture is over. */
