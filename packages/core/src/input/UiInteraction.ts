@@ -15,9 +15,14 @@ import type { UiNode } from '../graph/UiNode';
  *                    testing. This is the same shape as the CSS
  *                    `inert` attribute: a disabled Button stays
  *                    inert even when it wraps Text children.
- *   pointerEvents  — 'none' makes the node AND its subtree skipped
- *                    by hit testing (CSS-like). Use it to block a
- *                    whole region.
+ *   pointerEvents  — inherited, as in CSS: 'none' makes the node and
+ *                    its subtree skipped by hit testing, except where
+ *                    a descendant sets 'auto', which takes presses
+ *                    again. An overlay that lets presses through to
+ *                    what is under it, with popups on it that take
+ *                    them, is 'none' with 'auto' on each popup.
+ *                    'none' on the node itself also keeps it from
+ *                    focus and keyboard, as before.
  *   hitTestable    — false skips only the node itself; children are
  *                    still tested. Use it for decorative containers
  *                    that must not swallow clicks.
@@ -30,10 +35,19 @@ import type { UiNode } from '../graph/UiNode';
 
 /** The node and its whole subtree are excluded from pointer input. */
 export function isNodeInert(node: UiNode): boolean {
-  if (node.properties.get('disabled') === true) {
+  if (node.properties.get('pointerEvents') === 'none') {
     return true;
   }
-  if (node.properties.get('pointerEvents') === 'none') {
+  return isSubtreeInert(node);
+}
+
+/**
+ * Disabled or hidden: the node and everything under it, with no way
+ * back for a descendant. `pointerEvents: 'none'` is not this, since a
+ * descendant can set 'auto'; the hit tester follows that itself.
+ */
+export function isSubtreeInert(node: UiNode): boolean {
+  if (node.properties.get('disabled') === true) {
     return true;
   }
   if (node.properties.get('visible') === false) {
@@ -44,6 +58,17 @@ export function isNodeInert(node: UiNode): boolean {
     return true;
   }
   return false;
+}
+
+/** `pointerEvents` as CSS inherits it: the nearest value set from the node up, 'auto' when none is. */
+export function pointerEventsOf(node: UiNode | null): 'auto' | 'none' {
+  for (let current = node; current !== null; current = current.parent) {
+    const value = current.properties.get('pointerEvents');
+    if (value === 'auto' || value === 'none') {
+      return value;
+    }
+  }
+  return 'auto';
 }
 
 /** The node itself cannot be the target of a hit, but children can. */

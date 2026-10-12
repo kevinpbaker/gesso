@@ -65,5 +65,7 @@ export {
   isNodeInert,
   isNodeSelectable,
   isNodeTabStop,
+  isSubtreeInert,
+  pointerEventsOf,
   resolveCursor
 } from './UiInteraction';

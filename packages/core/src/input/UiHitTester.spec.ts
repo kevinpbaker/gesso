@@ -371,6 +371,43 @@ describe('UiHitTester', () => {
       expect(tester.hitTest(50, 50)).toBeNull();
     });
 
+    it("hits a descendant that sets pointer-events:auto under a 'none', as CSS does", () => {
+      // An overlay that lets presses through, with a popup on it that takes them.
+      const h = new InputTestHarness();
+      const under = h.node('under', UiNodeType.Box, { position: 'absolute', left: 0, top: 0, width: 200, height: 200 });
+      const overlay = h.node('overlay', UiNodeType.Box, {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: 200,
+        height: 200,
+        pointerEvents: 'none'
+      });
+      const popup = h.node('popup', UiNodeType.Box, {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: 100,
+        height: 100,
+        pointerEvents: 'auto'
+      });
+      const row = h.node('row', UiNodeType.Box, { width: 100, height: 50 });
+      const inert = h.node('inert', UiNodeType.Box, { position: 'absolute', left: 120, top: 0, width: 60, height: 60 });
+      h.add(popup, row);
+      h.add(overlay, popup, inert);
+      h.add(h.root, under, overlay);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      // The popup's row, its own box below it, and what the overlay lets through everywhere else.
+      expect(tester.hitTest(50, 25)?.node).toBe(row);
+      expect(tester.hitTest(50, 75)?.node).toBe(popup);
+      expect(tester.hitTest(150, 30)?.node).toBe(under);
+      expect(tester.hitTest(150, 150)?.node).toBe(under);
+      expect(tester.hitStack(50, 25)).toEqual([row, popup, under]);
+    });
+
     it('skips disabled subtrees', () => {
       const h = new InputTestHarness();
       const disabled = h.node('disabled', UiNodeType.Button, { width: 100, height: 50, disabled: true });
