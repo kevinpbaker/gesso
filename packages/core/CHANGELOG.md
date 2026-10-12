@@ -1,5 +1,16 @@
 # gesso-core
 
+## 0.6.18
+
+### Patch Changes
+
+- 3ca92f7: `withContrast(theme, 'high', { surfaces })` and `highContrastColors(colors, { surfaces })` leave the names a custom palette says are grounds as they leave the stock ones. Every name a palette added was raised as a foreground against the page, so a code editor's selection or a diff's filled lines turned bright enough that what was drawn on them could not be read.
+- 7da31d2: A text with `textOverflow: 'ellipsis'` that has no room for even the ellipsis draws nothing, as a hidden overflow clips it in CSS. Squeezed to nothing beside other text (a folder's name after a long file name, in a row that shrinks it first), it drew whole, since a zero width is measured as no limit, or as an ellipsis wider than its box, over whatever came after it. Both renderers place text through `layoutTextLines`, so both agree.
+- 32f00f4: A hard line that fits whole is not broken. Line breaking added up its pieces' widths, which a font that kerns across a join ("grid-" and "test.ts") makes wider than the line measured whole, the width a box sized to its own text is given; such a line broke at the hyphen and drew "grid-…" with room to spare.
+- 4a73051: `orientation` says which way a tablist, toolbar, list or separator runs when it is not the way its role assumes, and the semantics mirror sets `aria-orientation` from it. A column of tabs, as an activity bar is, was announced as horizontal, so a screen reader told its user to press Left and Right; with `orientation: 'vertical'` it says Up and Down.
+- 95a6503: A focusable node inside a role whose children are presentational (a button inside a button) is warned of, once, in the console. ARIA hides it, so it has no record in the mirror and Tab stops on it in silence; nothing said so until a Tab walk found the silence.
+- 1b6e6a7: Recolouring a text's runs is a repaint. A change to `spans` that keeps every run's text and font and changes only its colour, background or decoration marks paint and nothing else; before, it measured the text again and rebuilt its semantics, which is what a code editor colouring a line a frame after drawing it paid on every line, on every keystroke.
+
 ## 0.6.17
 
 ### Patch Changes

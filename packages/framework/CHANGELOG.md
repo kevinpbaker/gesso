@@ -1,5 +1,23 @@
 # gesso-framework
 
+## 0.6.18
+
+### Patch Changes
+
+- cd5b2c2: The semantics mirror keeps the words of a container with no role in step with its label. A labelled row whose label was written before its children arrived kept its first words as text beside them, and the mirror, which leaves a container's children alone, never wrote them again: a list's header said "Changes, 0 files" to a screen reader while drawing 18. Its leading text node is now updated in place.
+- 70d3f9e: A file opens even when the shell can't remember it. Opening a file, or saving one through the save picker, kept its handle for the recent files first, and a store that refused (storage blocked for the site, a spent quota, a private window) failed the whole request though the file had been read, or already written. Such a file now arrives with `handle: null`, as a file input's does, and reopening or saving to a remembered file no longer fails when only noting the time it was used does. A folder still fails to open if it can't be kept, since its number is the only way a worker reaches it.
+- 4a73051: `orientation` says which way a tablist, toolbar, list or separator runs when it is not the way its role assumes, and the semantics mirror sets `aria-orientation` from it. A column of tabs, as an activity bar is, was announced as horizontal, so a screen reader told its user to press Left and Right; with `orientation: 'vertical'` it says Up and Down.
+- de60c5e: The shell opens folders. `ShellService.openDirectory` shows the folder picker and remembers the folder under a number, as it does a file, and `reopenDirectory` asks for it again after a reload. Nothing in the folder crosses the barrier: the thread that reads it (an app worker, typically) takes the handle with the new `rememberedDirectory(handle)`, from the IndexedDB store every thread of the page shares. `ShellFileResult` gains `directory`, and `ShellRecentFile` gains `kind`.
+- 72a8dc3: `SupervisedWorker` and `superviseSelf`, from `gesso-framework/worker`, run a worker whose code the application does not trust to behave: a plugin, a user's script, a parser fed whatever a file holds. The starting side asks the worker every second whether it is there, and ends it if it has not answered for five seconds or not said it is ready within ten, so a loop in it costs a core and holds up no thread; `status$` says where it is and why it stopped. The worker's side answers as messages come, says when it is ready or that it could not start, and reports what nothing in it caught. Their own messages carry a field of their own, so the application's protocol passes through `post` and `onMessage` untouched.
+- c7dd7d2: `ShellService.warnOnLeave(on)` says whether leaving the page would lose work. While it is on, the shell has the browser ask before the page is closed, reloaded or left, in both the worker and the single-thread configurations; the `beforeunload` listener exists only while it is on, so the page stays in the back/forward cache otherwise. A shell that connects after it was turned on is told, and an app that is disposed takes the warning with it. The render worker sends it as a new `leaveWarning` message.
+- Updated dependencies [3ca92f7]
+- Updated dependencies [7da31d2]
+- Updated dependencies [32f00f4]
+- Updated dependencies [4a73051]
+- Updated dependencies [95a6503]
+- Updated dependencies [1b6e6a7]
+  - gesso-core@0.6.18
+
 ## 0.6.17
 
 ### Patch Changes

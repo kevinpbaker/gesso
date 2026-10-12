@@ -1,5 +1,32 @@
 # gesso-components
 
+## 0.6.18
+
+### Patch Changes
+
+- 927a601: `Tooltip`, `Button`, `Link`, `Alert`, `Card`, `Toolbar` and a tab panel follow their children. A component runs once, but its parent can draw it again in place, as a `LazyList` does with a row whose data changed, and its new children then arrive on the same component; each of these read its children once, at mount, and kept showing the first. A count wrapped in a `Tooltip` in a list's row said 0 over eighteen while the row's own text beside it was right.
+- d4579d4: `LazyList` lays each row across the list's whole width, as a row of any column is. Its rows were placed at their content's width, so a row with something at its end (a count, a time, a close button after a name that takes `flex: 1`) had it beside the name instead of at the right edge.
+- f6b730d: `Tree` and `LazyList` take `flush`: drawn as part of the surface they sit in, with no border, no background of their own and square corners. A sidebar's file tree is the case, where a framed box inside the panel reads as a form field. The focus ring is kept.
+- d794279: `NumberInput` takes `labelHidden`, as `TextInput` and `Select` do: the label still names the field for a screen reader, and is not drawn above it, for a field whose heading already says what it is.
+- 2c2872e: A `NumberInput`'s − and + are centred in their buttons, which are as tall as the field and light up under the pointer. The glyph was the button's `text`, drawn from its top corner, so it sat at the top left of a button a few pixels shorter than the field beside it.
+- 895f431: `PlainView` draws a screen described as plain data, for code that cannot run in the render worker: a plugin in a worker of its own, a server, another process. It sends a tree of `PlainNode`s (columns and rows, scrolling, text, headings, buttons, text fields, checkboxes, selects, lists and dividers), which cross a thread as any channel's data does, and hears back what the person did as `PlainAction`s. Sending the tree again changes it: nodes are matched by `key`, and one that stays keeps its controls, focus and scroll, with only its changed fields written. What arrives is checked by `plainNodeOf` (also exported) and held to limits on nodes, depth and string length; anything the view cannot draw is left out and reported through `onProblem` rather than thrown.
+- cff73b4: `SplitPane` takes `divider: 'line'`: a one-pixel rule in the middle of the same six-pixel grab area, for panes that meet edge to edge, as an editor's sidebar and panel do. The framed bar, still the default, read there as two lines with a gap between.
+- 2e0fcb6: `Tree` has branches whose children come later. A `TreeNode` with `branch: true` is a branch with no children yet (an empty folder, or one read when it opens): it has an arrow, says whether it is open, and opens empty until `nodes` brings its children. A double click on a row calls `onActivate`, as Enter does, which is a file explorer's open-for-good.
+- `Tree` takes `revealKey`: the row with that key is scrolled into view as soon as it is one of the rows, waiting for its folders to open and their children to arrive. A fresh object asks again, so a row scrolled away is brought back. Writing `selectedKey` from outside still does not scroll, so a file tree whose selection follows an editor does not jump unless it is asked to; a "select opened file" button, or a reveal on every tab change, is a `revealKey`.
+- Updated dependencies [3ca92f7]
+- Updated dependencies [7da31d2]
+- Updated dependencies [32f00f4]
+- Updated dependencies [cd5b2c2]
+- Updated dependencies [70d3f9e]
+- Updated dependencies [4a73051]
+- Updated dependencies [95a6503]
+- Updated dependencies [1b6e6a7]
+- Updated dependencies [de60c5e]
+- Updated dependencies [72a8dc3]
+- Updated dependencies [c7dd7d2]
+  - gesso-core@0.6.18
+  - gesso-framework@0.6.18
+
 ## 0.6.17
 
 ### Patch Changes
