@@ -38,6 +38,7 @@ from.
 | `max`           | `number`                        | `0.9`            | The largest it goes.                                                |
 | `label`         | `string`                        | `'Resize panes'` | The divider's accessible name. It is not drawn.                     |
 | `show`          | `'both' \| 'first' \| 'second'` | `'both'`         | Both panes, or one alone; see below.                                |
+| `divider` | `'bar' \| 'line'` | `'bar'` | A framed handle, or a one-pixel rule in the same grab area for panes that meet edge to edge. Read once. |
 
 Supplying neither `split` nor `defaultSplit` leaves the divider at
 `0.5` and self-managing. Supplying both throws, naming the component
