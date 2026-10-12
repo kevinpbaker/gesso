@@ -4114,9 +4114,71 @@ import {
   UndoStackOptions,
   UndoTransaction
 } from "../index.js";
+import {
+  BehaviorSubject
+} from "rxjs";
 type ConsoleLevel = ConsoleEntry['level'];
 type ConsoleEntryBody = Omit<ConsoleEntry, 'thread'>;
 declare function captureConsole(sink: (entry: ConsoleEntryBody) => void, target?: Console): () => void;
+type SupervisedState = 'starting' | 'running' | 'failed' | 'stopped';
+interface SupervisedStatus {
+  readonly state: SupervisedState;
+  readonly message: string;
+  readonly stack: string;
+}
+interface SupervisedError {
+  readonly message: string;
+  readonly stack: string;
+}
+interface SupervisableWorker {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  terminate(): void;
+  onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: ErrorEvent) => void) | null;
+}
+interface SupervisedWorkerOptions {
+  readonly unansweredMs?: number;
+  readonly startMs?: number;
+  readonly pingMs?: number;
+  readonly onMessage?: (data: unknown) => void;
+  readonly onError?: (error: SupervisedError) => void;
+  readonly now?: () => number;
+  readonly schedule?: (check: () => void, everyMs: number) => () => void;
+}
+declare class SupervisedWorker {
+  private readonly worker;
+  private readonly options;
+  readonly status$: BehaviorSubject<SupervisedStatus>;
+  private readonly started;
+  private lastAnswer;
+  private pinged;
+  private readonly cancel;
+  private readonly now;
+  private readonly unansweredMs;
+  private readonly startMs;
+  constructor(worker: SupervisableWorker, options?: SupervisedWorkerOptions);
+  get state(): SupervisedState;
+  get alive(): boolean;
+  post(message: unknown, transfer?: Transferable[]): void;
+  stop(message?: string): void;
+  fail(message: string): void;
+  check(): void;
+  private receive;
+  private end;
+}
+interface SupervisedScope {
+  postMessage(message: unknown): void;
+  addEventListener(type: 'message', listener: (event: MessageEvent) => void): void;
+  addEventListener(type: 'error', listener: (event: ErrorEvent) => void): void;
+  addEventListener(type: 'unhandledrejection', listener: (event: PromiseRejectionEvent) => void): void;
+}
+interface SupervisedSelf {
+  ready(): void;
+  failed(error: unknown): void;
+  report(error: unknown): void;
+}
+declare function superviseSelf(onMessage?: (data: unknown) => void, scope?: SupervisedScope): SupervisedSelf;
+declare function isSupervisionMessage(data: unknown): boolean;
 export {
   APPLICATION_WORKER,
   captureConsole,
@@ -4135,6 +4197,7 @@ export {
   isChannelHostMessage,
   isPortErrorMessage,
   isPortHandshake,
+  isSupervisionMessage,
   MemoryStorage,
   mutate,
   OpfsStorage,
@@ -4156,6 +4219,8 @@ export {
   storageReadFailure,
   storageReadValue,
   structurallyEqual,
+  SupervisedWorker,
+  superviseSelf,
   throttled,
   type ChannelClientMessage,
   type ChannelHostMessage,
@@ -4191,6 +4256,13 @@ export {
   type StorageAdapter,
   type StorageOutcome,
   type StorageRead,
+  type SupervisableWorker,
+  type SupervisedError,
+  type SupervisedScope,
+  type SupervisedSelf,
+  type SupervisedState,
+  type SupervisedStatus,
+  type SupervisedWorkerOptions,
   type UndoableOptions,
   type UndoStackOptions,
   type UndoTransaction,
