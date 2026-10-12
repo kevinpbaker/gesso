@@ -222,6 +222,36 @@ describe('UiHostFrameClock', () => {
     };
   }
 
+  it("gives its own refreshes up for the host's when they are slower than the display", () => {
+    // WebKit's worker refreshes stay at 60 Hz with the page let up to 120
+    // on a ProMotion MacBook: Easel's editor drew every other refresh.
+    const { clock, frames, active, refresh, armed } = local();
+    clock.displayInterval(8.3);
+    // Six refreshes 16.7 ms apart: five gaps, enough to compare.
+    for (let frame = 0; frame < 6; frame++) {
+      clock.requestFrame();
+      refresh(1000 + frame * 16.7);
+    }
+    expect(clock.isLocal).toBe(false);
+    // Every frame asked for was drawn, and the next is the host's to time.
+    expect(frames).toHaveLength(6);
+    clock.requestFrame();
+    expect(active).toEqual([true]);
+    expect(armed()).toBe(0);
+    clock.tick(1108.3);
+    expect(frames).toHaveLength(7);
+  });
+
+  it('keeps its own refreshes when they keep up with the display', () => {
+    const { clock, refresh } = local();
+    clock.displayInterval(8.3);
+    for (let frame = 0; frame <= 10; frame++) {
+      clock.requestFrame();
+      refresh(1000 + frame * 8.4);
+    }
+    expect(clock.isLocal).toBe(true);
+  });
+
   it('drives itself from the compositor where the thread has one', () => {
     // A dedicated worker has had `requestAnimationFrame` since Chrome
     // 69, Firefox 99 and Safari 16.4. Where it does, the host is not

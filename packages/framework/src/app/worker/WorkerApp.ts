@@ -285,6 +285,9 @@ export interface WorkerAppOptions {
   history?: ShellHistoryOptions | ShellHistory;
 }
 
+/** Refreshes timed to tell the worker the display's interval. */
+const DISPLAY_SAMPLES = 12;
+
 /**
  * Main-thread half of a worker-hosted Gesso application.
  *
@@ -850,6 +853,31 @@ export class WorkerApp {
     this.frameHandle = requestAnimationFrame(step);
   }
 
+  /**
+   * Measures the display's interval on this thread's refreshes and tells
+   * the worker, whose own may be slower; see `displayInterval` in the
+   * protocol. A dozen refreshes, once, at start: a fifth of a second.
+   */
+  private measureDisplay(): void {
+    if (typeof requestAnimationFrame !== 'function') {
+      return;
+    }
+    const times: number[] = [];
+    const step = (time: number): void => {
+      times.push(time);
+      if (times.length < DISPLAY_SAMPLES) {
+        requestAnimationFrame(step);
+        return;
+      }
+      const gaps = times
+        .slice(1)
+        .map((value, index) => value - times[index]!)
+        .sort((a, b) => a - b);
+      this.post({ type: 'displayInterval', ms: gaps[Math.floor(gaps.length / 2)]! });
+    };
+    requestAnimationFrame(step);
+  }
+
   dispose(): void {
     this.disconnectWebMcp?.();
     this.disconnectWebMcp = null;
@@ -946,6 +974,7 @@ export class WorkerApp {
     }
     if (message.type === 'ready') {
       this.ready = true;
+      this.measureDisplay();
       return;
     }
     if (message.type === 'frameLoop') {
