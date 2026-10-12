@@ -609,29 +609,32 @@ export class UiWheelController {
       const last = samples[samples.length - 1];
       const first = samples[0];
       const since = time === undefined || last === undefined ? -1 : time - last.t;
+      // A line through the window's steps, read a little before the frame.
+      // A Mac trackpad reaches the page as whole pixels at uneven times (13,
+      // 11, 21, 11, 15 on a steady flick, 6 to 13 ms apart): a velocity read
+      // off the last two or three steps carried all of that into the frames,
+      // which moved 2.5, 1, 0, 3 on a slow scroll. Fitted, the rounding and
+      // the uneven timing average out.
+      //
+      // Read `RESAMPLE_MS` before the frame rather than at it, as a browser
+      // resamples its own scrolling: a step reaches the page 6 to 14 ms
+      // after it happened, so a line read at the frame is a guess past every
+      // step there is, and on a fast flick the guesses went 66, 19, 88, 140
+      // pixels a frame. Read earlier, the line runs through steps that have
+      // arrived, and the page is still no further behind the hand than steps
+      // applied as they come.
+      const at = time === undefined ? undefined : time - RESAMPLE_MS;
       // Only on one clock, and only while the steps are recent: a time
       // that doesn't fit is a host that didn't say when, and goes exact.
       if (
-        time !== undefined &&
+        at !== undefined &&
         last !== undefined &&
         first !== undefined &&
         since >= -1 &&
-        since < STALE_MS &&
+        at - last.t < STALE_MS &&
+        samples.length >= MIN_FIT_STEPS &&
         last.t - first.t >= 2
       ) {
-        // A line through the window's steps, read at the frame's time. A Mac
-        // trackpad reaches the page as whole pixels at uneven times (13, 11,
-        // 21, 11, 15 on a steady flick, 6 to 13 ms apart): a velocity read
-        // off the last two or three steps carried all of that into the
-        // frames, which moved 2.5, 1, 0, 3 on a slow scroll. Fitted, the
-        // rounding and the uneven timing average out, and read at the
-        // frame's time the line is as far on as the hand.
-        //
-        // Read as far past the last step as the frame is, within `STALE_MS`:
-        // a step reaches the page 6 to 14 ms after it happened, so a frame
-        // is usually further past it than a step's gap, and a line held
-        // short of the frame fell behind and caught up in turn.
-        const at = time;
         let meanT = 0;
         let meanX = 0;
         let meanY = 0;
@@ -655,9 +658,12 @@ export class UiWheelController {
         x = meanX + (covX / varT) * (at - meanT);
         y = meanY + (covY / varT) * (at - meanT);
         paced.fitted = true;
-      } else if (paced.fitted) {
-        // The steps have stopped: the line is let go of over a few frames
-        // rather than at once, which would be the very jump it smoothed.
+      } else if (paced.fitted || at !== undefined) {
+        // Before there is a line, and once the steps have stopped, the page
+        // eases to where they add up to over a few frames rather than at
+        // once: a gesture's first steps jumped and then waited for a line
+        // read behind them, and letting go of the line at once would be the
+        // very jump it smoothed.
         const drawnX = paced.lastX - paced.baseX;
         const drawnY = paced.lastY - paced.baseY;
         x = Math.abs(x - drawnX) < SETTLED_PX ? x : drawnX + (x - drawnX) * SETTLE_RATE;
@@ -824,6 +830,15 @@ interface PacedScroll {
 const VELOCITY_WINDOW_MS = 48;
 /** How long after the last step its line is still trusted. */
 const STALE_MS = 40;
+/**
+ * How long before the frame the line is read. Each millisecond is one more
+ * of lag and less of a guess: measured on recorded flicks, 12 left the
+ * worst frames a third as uneven as reading at the frame, and the page
+ * about 11 ms behind the hand, against 15 for steps applied as they come.
+ */
+const RESAMPLE_MS = 12;
+/** Steps a line is fitted through: two are a line through their rounding. */
+const MIN_FIT_STEPS = 3;
 /** How much of the way to where the steps add up to a frame goes once they stop. */
 const SETTLE_RATE = 0.35;
 /** Close enough to where the steps add up to, to go the rest at once. */
