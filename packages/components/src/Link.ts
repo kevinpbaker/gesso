@@ -11,7 +11,14 @@ import {
   type RouteTarget
 } from 'gesso-framework';
 
-import { CONTROL_FOCUS_RING, keymap, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
+import {
+  CONTROL_FOCUS_RING,
+  followedChildren,
+  keymap,
+  layoutOf,
+  modifiersOf,
+  type ControlLayoutProps
+} from './internals';
 import { trackFocus } from './focus';
 import { followRoute, middlePress, opensElsewhere } from './follow';
 
@@ -302,7 +309,7 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
         hovered.value = false;
       }
     },
-    inputs.children.value ??
+    followedChildren(inputs.children, () =>
       Text({
         text: label,
         // Bound on the words rather than provided from the root, so
@@ -312,6 +319,7 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
         textDecoration: computed(() => decorationOf(underline.value, hovered.value, disabled.value)),
         selectable: false
       })
+    )
   );
 }
 

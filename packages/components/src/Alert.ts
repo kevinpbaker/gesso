@@ -11,7 +11,7 @@ import {
 
 import { computed, createComponent, input, type ComponentContext, type Inputs } from 'gesso-framework';
 
-import { layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
+import { followedChildren, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { Button } from './Button';
 
 /**
@@ -257,9 +257,9 @@ export function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChi
       })
     );
   }
-  const content = inputs.children.value;
-  if (content !== undefined) {
-    lines.push(content);
+  // Followed, so an alert drawn again in place shows its new content; given none at first, it keeps none.
+  if (inputs.children.value !== undefined) {
+    lines.push(followedChildren(inputs.children, () => Row()));
   }
 
   const children: UiChild[] = [Column({ gap: LINE_GAP, flexGrow: 1 }, ...lines)];

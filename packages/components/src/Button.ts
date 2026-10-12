@@ -11,7 +11,7 @@ import {
 
 import { input, themeTokenCell, type ComponentContext, type Inputs, type ThemeTokenCell } from 'gesso-framework';
 import { trackFocus } from './focus';
-import { CONTROL_FOCUS_RING, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
+import { CONTROL_FOCUS_RING, followedChildren, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import {
   controlTokens,
   type ButtonPaint,
@@ -150,7 +150,7 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
       states: states(busy),
       onClick: press
     },
-    inputs.children.value ??
+    followedChildren(inputs.children, () =>
       Text({
         text: label,
         // A role rather than a size and a weight, so the words on a
@@ -168,6 +168,7 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
         ),
         selectable: false
       })
+    )
   );
 }
 

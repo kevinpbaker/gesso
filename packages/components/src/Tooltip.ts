@@ -3,6 +3,7 @@ import { combineLatest } from 'rxjs';
 import { FocusService, input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Box, Text, UiEventType, defineModifier, type UiChild, type UiModifier, type UiNode } from 'gesso-core';
 import { useOverlay, type OverlayHandle, type OverlayPlacement } from './overlay';
+import { followedChildren } from './internals';
 
 /**
  * The box a tooltip is, wherever it is opened from.
@@ -108,7 +109,7 @@ export function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): Ui
       onPointerLeave: hide,
       onPointerDown: hide
     },
-    inputs.children.value ?? Text({ text: '' })
+    followedChildren(inputs.children, () => Text({ text: '' }))
   );
 }
 
