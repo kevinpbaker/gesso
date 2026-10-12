@@ -120,6 +120,18 @@ describe('PlainView', () => {
     expect(['a.ts:3', 'b.ts:9']).toContain(actions.at(-1)?.value);
   });
 
+  it('gives a text field a width of its own, not that of what it holds', () => {
+    const { ui } = mount(
+      view(
+        { type: 'textInput', label: 'Filter', value: 'a', action: 'filter' },
+        { type: 'textInput', label: 'Wide', width: 5000, action: 'wide' }
+      )
+    );
+    const [narrow, wide] = ui.getAllByRole('textbox');
+    expect(ui.getLayout(narrow).width).toBeGreaterThanOrEqual(200);
+    expect(ui.getLayout(wide).width).toBeLessThanOrEqual(800);
+  });
+
   it('leaves out what it cannot draw, says so, and draws the rest', () => {
     const { ui, problems } = mount(
       view(
