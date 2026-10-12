@@ -198,13 +198,20 @@ describe('LayoutEngine budgets', () => {
       const marks = rows.map((row, r) => {
         row.setProperty('position', 'relative');
         row.setProperty('top', 2);
-        const mark = node(h, `mark${r}`, UiNodeType.Box, { position: 'absolute', right: 0, top: 0, width: 3, height: percent(100) });
+        const mark = node(h, `mark${r}`, UiNodeType.Box, {
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          width: 3,
+          height: percent(100)
+        });
         h.append(row, mark);
         return mark;
       });
       return { ...built, rows, marks };
     };
-    const grow = (h: LayoutHarness, row: UiNode) => h.append(row, node(h, `extra-${row.id}`, UiNodeType.Box, { width: 20, height: 20 }));
+    const grow = (h: LayoutHarness, row: UiNode) =>
+      h.append(row, node(h, `extra-${row.id}`, UiNodeType.Box, { width: 20, height: 20 }));
 
     const h = new LayoutHarness();
     const { root, rows, marks } = build(h);

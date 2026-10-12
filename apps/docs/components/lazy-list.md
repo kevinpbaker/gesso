@@ -82,7 +82,7 @@ for a row nobody can see.
 | `onActivate`           | `(index: number) => void`             | none      | Called on Enter or Space with the chosen index. Nothing happens when nothing is chosen.               |
 | `label`                | `string`                              | `'List'`  | The list's accessible name.                                                                           |
 | `description`          | `string`                              | none      | Said after the name when the list takes focus: what its keys do, where it has keys beyond its arrows. |
-| `flush` | `boolean` | `false` | Drawn as part of the surface it sits in: no border, no background, square corners. Read once. |
+| `flush`                | `boolean`                             | `false`   | Drawn as part of the surface it sits in: no border, no background, square corners. Read once.         |
 | `ref`                  | `UiNodeRef`                           | none      | Receives the node that is the list, for focusing it or reading where it is scrolled to.               |
 
 Every prop takes a plain value or an Observable of one, and the layout

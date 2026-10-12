@@ -130,7 +130,13 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     const paragraph = text.slice(paragraphStart, paragraphEnd);
     if (memo !== undefined) {
       const cached = hardLine(memo, style, paragraph, wrap, measure);
-      paragraphs.push({ start: paragraphStart, text: paragraph, segments: cached.segments, whole: cached.maxContentWidth, cached });
+      paragraphs.push({
+        start: paragraphStart,
+        text: paragraph,
+        segments: cached.segments,
+        whole: cached.maxContentWidth,
+        cached
+      });
       maxContentWidth = Math.max(maxContentWidth, cached.maxContentWidth);
       minContentWidth = Math.max(minContentWidth, cached.minContentWidth);
     } else {

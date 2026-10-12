@@ -173,7 +173,10 @@ describe('a line as wide as its own text', () => {
   it('is not broken where its pieces added up are wider than it is', () => {
     const kerned = new Kerned();
     const natural = layoutParagraph({ text: 'grid-test.ts', fontSize: 10 }, kerned).width;
-    const laid = layoutParagraph({ text: 'grid-test.ts', fontSize: 10, maxWidth: natural, maxLines: 1, overflow: 'ellipsis' }, kerned);
+    const laid = layoutParagraph(
+      { text: 'grid-test.ts', fontSize: 10, maxWidth: natural, maxLines: 1, overflow: 'ellipsis' },
+      kerned
+    );
     expect(laid.lines.map(line => line.text)).toEqual(['grid-test.ts']);
   });
 });

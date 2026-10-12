@@ -119,7 +119,8 @@ describe('LazyList', () => {
         height: 100,
         // A name that takes what is left, and a count kept at the end: a
         // row sized to its content would put the count beside the name.
-        item: (index: number) => Row({ height: 20 }, Text({ text: `file ${index}`, flex: 1 }), Text({ text: `${index}` }))
+        item: (index: number) =>
+          Row({ height: 20 }, Text({ text: `file ${index}`, flex: 1 }), Text({ text: `${index}` }))
       })
     );
     const list = ui.getLayout(ui.getAllByRole('list')[0]);
@@ -420,7 +421,8 @@ describe('Tree', () => {
     const framed = tree().getByRole('tree');
     const flush = tree({ flush: true }).getByRole('tree');
     expect(framed.properties.get('backgroundColor')).toBe('controlBackground');
-    const edge = (node: UiNode) => (node.decorations ?? []).some(shape => shape.kind === 'stroke' && shape.color === 'controlBorder');
+    const edge = (node: UiNode) =>
+      (node.decorations ?? []).some(shape => shape.kind === 'stroke' && shape.color === 'controlBorder');
     expect(edge(framed)).toBe(true);
     expect(edge(flush)).toBe(false);
     expect(flush.properties.get('backgroundColor')).toBe('transparent');
@@ -521,7 +523,8 @@ describe('Tree', () => {
   });
 
   it('scrolls to the row revealKey names, waiting for its folder to open and its children to arrive', () => {
-    const many = (folder: string): TreeNode[] => Array.from({ length: 100 }, (_, i) => ({ key: `${folder}/${i}`, label: `${folder} ${i}` }));
+    const many = (folder: string): TreeNode[] =>
+      Array.from({ length: 100 }, (_, i) => ({ key: `${folder}/${i}`, label: `${folder} ${i}` }));
     const nodes = new BehaviorSubject<readonly TreeNode[]>([{ key: 'a', label: 'a', branch: true }]);
     const expanded = new BehaviorSubject<readonly string[]>([]);
     const reveal = new BehaviorSubject<{ readonly key: string } | null>(null);
@@ -552,7 +555,14 @@ describe('Tree', () => {
   });
 
   it('does not scroll when only its selection is written from outside', () => {
-    const ui = tree({ nodes: [{ key: 'a', label: 'a', children: Array.from({ length: 100 }, (_, i) => ({ key: `a/${i}`, label: `a ${i}` })) }], expanded: ['a'], selectedKey: 'a/80', height: 100 });
+    const ui = tree({
+      nodes: [
+        { key: 'a', label: 'a', children: Array.from({ length: 100 }, (_, i) => ({ key: `a/${i}`, label: `a ${i}` })) }
+      ],
+      expanded: ['a'],
+      selectedKey: 'a/80',
+      height: 100
+    });
     ui.frame();
     expect(Number(ui.getAllByRole('tree')[0].properties.get('scrollY') ?? 0)).toBe(0);
   });

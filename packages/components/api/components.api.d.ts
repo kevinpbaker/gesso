@@ -9,6 +9,7 @@ import {
   Observable
 } from "rxjs";
 import {
+  LayoutBox,
   ObjectFit,
   Reactive,
   UiChild,
@@ -347,6 +348,7 @@ interface SplitPaneProps extends ControlLayoutProps {
   max?: number;
   label?: string;
   show?: 'both' | 'first' | 'second';
+  divider?: 'bar' | 'line';
 }
 declare function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild;
 interface FindBarProps {
@@ -609,6 +611,7 @@ interface LazyListProps extends ControlLayoutProps {
   onActivate?: (index: number) => void;
   label?: string;
   description?: string;
+  flush?: boolean;
 }
 declare function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild;
 type Space = number;
@@ -744,10 +747,14 @@ interface TreeProps extends ControlLayoutProps {
   selectedKey?: string | null;
   defaultSelectedKey?: string | null;
   onSelect?: (key: string | null) => void;
+  revealKey?: {
+    readonly key: string;
+  } | null;
   onActivate?: (key: string) => void;
   rowHeight?: number;
   label?: string;
   leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;
+  flush?: boolean;
 }
 declare function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
 interface VideoControlsOptions {
@@ -885,8 +892,9 @@ interface VirtualList {
   readonly ref: UiNodeRef;
   readonly viewport: UiModifier;
   readonly scrollY: Observable<number>;
+  readonly size: Observable<LayoutBox>;
   setLead(extent: number): void;
-  reveal(index: number): void;
+  reveal(index: number): boolean;
 }
 declare function virtualList(): VirtualList;
 declare function stepIndex(current: number, by: number, count: number): number;

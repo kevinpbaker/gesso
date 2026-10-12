@@ -26,19 +26,19 @@ from.
 
 ## Props
 
-| Prop            | Type                            | Default          | What it does                                                        |
-| --------------- | ------------------------------- | ---------------- | ------------------------------------------------------------------- |
-| `split`         | `number`                        | none             | Where the divider sits, 0 to 1. Supplying this makes it controlled. |
-| `defaultSplit`  | `number`                        | none             | The starting position, when the component owns it.                  |
-| `onSplitChange` | `(split: number) => void`       | none             | Called with the clamped fraction, on a drag and on a key.           |
-| `first`         | `UiChild`                       | an empty row     | The left pane, or the top one.                                      |
-| `second`        | `UiChild`                       | an empty row     | The right pane, or the bottom one.                                  |
-| `direction`     | `'row' \| 'column'`             | `'row'`          | Whether the panes sit side by side or stacked.                      |
-| `min`           | `number`                        | `0.1`            | The smallest the first pane goes.                                   |
-| `max`           | `number`                        | `0.9`            | The largest it goes.                                                |
-| `label`         | `string`                        | `'Resize panes'` | The divider's accessible name. It is not drawn.                     |
-| `show`          | `'both' \| 'first' \| 'second'` | `'both'`         | Both panes, or one alone; see below.                                |
-| `divider` | `'bar' \| 'line'` | `'bar'` | A framed handle, or a one-pixel rule in the same grab area for panes that meet edge to edge. Read once. |
+| Prop            | Type                            | Default          | What it does                                                                                            |
+| --------------- | ------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `split`         | `number`                        | none             | Where the divider sits, 0 to 1. Supplying this makes it controlled.                                     |
+| `defaultSplit`  | `number`                        | none             | The starting position, when the component owns it.                                                      |
+| `onSplitChange` | `(split: number) => void`       | none             | Called with the clamped fraction, on a drag and on a key.                                               |
+| `first`         | `UiChild`                       | an empty row     | The left pane, or the top one.                                                                          |
+| `second`        | `UiChild`                       | an empty row     | The right pane, or the bottom one.                                                                      |
+| `direction`     | `'row' \| 'column'`             | `'row'`          | Whether the panes sit side by side or stacked.                                                          |
+| `min`           | `number`                        | `0.1`            | The smallest the first pane goes.                                                                       |
+| `max`           | `number`                        | `0.9`            | The largest it goes.                                                                                    |
+| `label`         | `string`                        | `'Resize panes'` | The divider's accessible name. It is not drawn.                                                         |
+| `show`          | `'both' \| 'first' \| 'second'` | `'both'`         | Both panes, or one alone; see below.                                                                    |
+| `divider`       | `'bar' \| 'line'`               | `'bar'`          | A framed handle, or a one-pixel rule in the same grab area for panes that meet edge to edge. Read once. |
 
 Supplying neither `split` nor `defaultSplit` leaves the divider at
 `0.5` and self-managing. Supplying both throws, naming the component
