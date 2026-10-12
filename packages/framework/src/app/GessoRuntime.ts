@@ -379,6 +379,8 @@ export class GessoRuntime {
   private constraints: Constraints;
   private pixelRatio: number;
   private lastFrameMs = 0;
+  /** The display time the frame being drawn is for; see `FrameMetrics.time`. */
+  private frameTime: number | null = null;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
   private rendererErrorListener: ((message: string) => void) | null = null;
   private frameErrorListener: ((message: string, stack?: string) => void) | null = null;
@@ -3107,6 +3109,13 @@ export class GessoRuntime {
     };
   }
 
+  /** Where the container the wheel last scrolled is; see `FrameMetrics.wheelScroll`. */
+  private wheelScroll(): { readonly x: number; readonly y: number } | null {
+    const node = this.input.wheel.lastScrolled;
+    const record = node === null ? undefined : this.engine.recordFor(node);
+    return record === undefined ? null : { x: record.scrollX, y: record.scrollY };
+  }
+
   /**
    * Work that must happen before the frame's dirty set is snapshotted.
    *
@@ -3127,6 +3136,7 @@ export class GessoRuntime {
    */
   private runPreCollectPhases(time: number): void {
     this.phaseTimings = emptyPhaseTimings();
+    this.frameTime = time;
 
     // Animation first: every phase after this one reads values a tick
     // may have just written. `hasWork` is a set's size, so an app with
@@ -3564,6 +3574,8 @@ export class GessoRuntime {
       layoutPasses: settled.passes,
       at: finished,
       inputLatencyMs: this.inputLatency.take(epochAt(finished)),
+      time: this.frameTime,
+      wheelScroll: this.wheelScroll(),
       phases: this.phaseTimings,
       renderer: this.rendererState,
       gpu: this.gpuTimings
@@ -3904,6 +3916,17 @@ export interface FrameMetrics {
    * input — see `GessoRuntime.noteInput`.
    */
   inputLatencyMs: number | null;
+  /**
+   * The display time the frame was drawn for: the refresh's timestamp,
+   * on the same clock as `at`, or null for a frame with none.
+   */
+  time: number | null;
+  /**
+   * Where the container the wheel last scrolled is scrolled to after this
+   * frame, or null before the wheel has scrolled anything. Read with
+   * `time`, it says how evenly scrolling moves from frame to frame.
+   */
+  wheelScroll: { readonly x: number; readonly y: number } | null;
 }
 
 function now(): number {

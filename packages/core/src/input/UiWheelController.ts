@@ -286,6 +286,12 @@ export class UiWheelController {
    */
   lastWheelTarget: UiNode | null = null;
 
+  /**
+   * The container the wheel last scrolled, for a frame's report of where
+   * scrolling put it. Null until the wheel has scrolled something.
+   */
+  lastScrolled: UiNode | null = null;
+
   wheel(
     x: number,
     y: number,
@@ -535,9 +541,11 @@ export class UiWheelController {
       }
       // Applied on the next frame: see `advance`.
       this.scrollSink.scrollBy(container, 0, 0, 'instant');
+      this.lastScrolled = container;
       return;
     }
     this.scrollSink.scrollBy(container, dx, dy, behavior);
+    this.lastScrolled = container;
   }
 
   /**
@@ -603,7 +611,14 @@ export class UiWheelController {
       const since = time === undefined || last === undefined ? -1 : time - last.t;
       // Only on one clock, and only while the steps are recent: a time
       // that doesn't fit is a host that didn't say when, and goes exact.
-      if (time !== undefined && last !== undefined && first !== undefined && since >= -1 && since < STALE_MS && last.t - first.t >= 2) {
+      if (
+        time !== undefined &&
+        last !== undefined &&
+        first !== undefined &&
+        since >= -1 &&
+        since < STALE_MS &&
+        last.t - first.t >= 2
+      ) {
         // A line through the window's steps, read at the frame's time. A Mac
         // trackpad reaches the page as whole pixels at uneven times (13, 11,
         // 21, 11, 15 on a steady flick, 6 to 13 ms apart): a velocity read

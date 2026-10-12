@@ -732,6 +732,8 @@ export class RenderWorkerApp {
         layoutPasses: metrics.layoutPasses,
         at: metrics.at,
         inputLatencyMs: metrics.inputLatencyMs,
+        time: metrics.time,
+        wheelScroll: metrics.wheelScroll,
         phases: metrics.phases,
         renderer: metrics.renderer,
         gpu: metrics.gpu
