@@ -107,6 +107,28 @@ describe('layoutTextLines', () => {
     expect(clamped.map(line => line.text)).toEqual(['ab cd…']);
   });
 
+  it('draws nothing of an ellipsised text with no room for even the ellipsis, as a hidden overflow clips it', () => {
+    const squeezed = (width: number) =>
+      layoutTextLines(
+        { x: 0, y: 0, width, height: 12 },
+        state({ text: 'gesso-code/src/app', fontSize: 10, maxLines: 1, textWrap: 'none', textOverflow: 'ellipsis' }),
+        measurer
+      );
+    // A zero width is measured as no limit: it drew the whole text over what followed.
+    expect(squeezed(0)).toEqual([]);
+    // Narrower than the ellipsis: it drew the ellipsis, wider than its box.
+    expect(squeezed(3)).toEqual([]);
+    expect(squeezed(40).map(line => line.text)).toEqual(['gesso…']);
+    // Without an ellipsis, a text overflows as before.
+    expect(
+      layoutTextLines(
+        { x: 0, y: 0, width: 0, height: 12 },
+        state({ text: 'gesso', fontSize: 10, textWrap: 'none' }),
+        measurer
+      ).map(line => line.text)
+    ).toEqual(['gesso']);
+  });
+
   it('returns no lines for empty text or non-positive font size', () => {
     expect(
       layoutTextLines({ x: 0, y: 0, width: 100, height: 20 }, state({ text: undefined, fontSize: 10 }), measurer)
