@@ -519,4 +519,41 @@ describe('Tree', () => {
       /Tree was given both 'expanded' and 'defaultExpanded'/
     );
   });
+
+  it('scrolls to the row revealKey names, waiting for its folder to open and its children to arrive', () => {
+    const many = (folder: string): TreeNode[] => Array.from({ length: 100 }, (_, i) => ({ key: `${folder}/${i}`, label: `${folder} ${i}` }));
+    const nodes = new BehaviorSubject<readonly TreeNode[]>([{ key: 'a', label: 'a', branch: true }]);
+    const expanded = new BehaviorSubject<readonly string[]>([]);
+    const reveal = new BehaviorSubject<{ readonly key: string } | null>(null);
+    const ui = tree({ nodes, expanded, revealKey: reveal, height: 100 });
+    const list = ui.getAllByRole('tree')[0];
+    const scrolled = (): number => Number(list.properties.get('scrollY') ?? 0);
+
+    // Asked for before the row exists: nothing moves yet.
+    reveal.next({ key: 'a/80' });
+    ui.frame();
+    expect(scrolled()).toBe(0);
+
+    // The folder opens and its children arrive: the row is brought into view.
+    expanded.next(['a']);
+    nodes.next([{ key: 'a', label: 'a', children: many('a') }]);
+    ui.frame();
+    ui.frame();
+    expect(scrolled()).toBeGreaterThan(0);
+    expect(ui.textOf(list)).toContain('a 80');
+
+    // Scrolled away, a fresh request for the same row brings it back.
+    list.properties.set('scrollY', 0);
+    ui.frame();
+    reveal.next({ key: 'a/80' });
+    ui.frame();
+    ui.frame();
+    expect(ui.textOf(list)).toContain('a 80');
+  });
+
+  it('does not scroll when only its selection is written from outside', () => {
+    const ui = tree({ nodes: [{ key: 'a', label: 'a', children: Array.from({ length: 100 }, (_, i) => ({ key: `a/${i}`, label: `a ${i}` })) }], expanded: ['a'], selectedKey: 'a/80', height: 100 });
+    ui.frame();
+    expect(Number(ui.getAllByRole('tree')[0].properties.get('scrollY') ?? 0)).toBe(0);
+  });
 });

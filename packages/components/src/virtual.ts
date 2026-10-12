@@ -30,13 +30,18 @@ export interface VirtualList {
   readonly viewport: UiModifier;
   /** Bind to the element's `scrollY`. */
   readonly scrollY: Observable<number>;
+  /** The viewport as last laid out: a reveal asked before it had a height can be asked again when it has one. */
+  readonly size: Observable<LayoutBox>;
   /**
    * Extent of a sticky header above the rows, which the reveal has to
    * keep a row clear of. Written from the header's own `measureFlow`.
    */
   setLead(extent: number): void;
-  /** Scrolls until the row at `index` is inside the viewport. */
-  reveal(index: number): void;
+  /**
+   * Scrolls until the row at `index` is inside the viewport. False when
+   * it could not yet: the list is not mounted or has no height.
+   */
+  reveal(index: number): boolean;
 }
 
 export function virtualList(): VirtualList {
@@ -66,13 +71,14 @@ export function virtualList(): VirtualList {
     // The laid-out height, which is what a scroll offset is in.
     viewport: measureFlow(box),
     scrollY: scroll,
+    size: box,
     setLead: extent => {
       lead = extent;
     },
     reveal: index => {
       const height = box.value.height;
       if (window === null || height <= 0) {
-        return;
+        return false;
       }
       const top = lead + window.offsetOf(index);
       const bottom = top + window.extentOf(index);
@@ -84,6 +90,7 @@ export function virtualList(): VirtualList {
       } else if (bottom > now + height) {
         scroll.next(Math.max(0, bottom - height));
       }
+      return true;
     }
   };
 }
