@@ -2659,11 +2659,13 @@ declare class UiHitTester implements HitTester {
   private readonly path;
   private readonly liftedScratch;
   private inLifted;
+  private pointerNone;
   constructor(layout: HitTestLayoutReader, root: UiNode);
   setRoot(root: UiNode): void;
   hitTest(x: number, y: number): HitTestResult | null;
   hitStack(x: number, y: number): UiNode[];
   private collectNode;
+  private collectOwn;
   private collectChildren;
   scrollbarZoneAt(x: number, y: number): {
     node: UiNode;
@@ -2674,6 +2676,9 @@ declare class UiHitTester implements HitTester {
   private forEachLifted;
   private pointInParentSpace;
   private hitTestNode;
+  private inheritsNone;
+  private targetable;
+  private hitTestOwn;
   private hitTestChildren;
   private outsideSubtree;
   private recordHit;
@@ -3358,6 +3363,8 @@ declare class CanvasPlatformSurface implements PlatformSurface {
 }
 declare function touchActionFor(scrollsAnything: boolean): string;
 declare function isNodeInert(node: UiNode): boolean;
+declare function isSubtreeInert(node: UiNode): boolean;
+declare function pointerEventsOf(node: UiNode | null): 'auto' | 'none';
 declare function isNodeHitTestable(node: UiNode): boolean;
 declare function isNodeFocusable(node: UiNode): boolean;
 declare function isNodeTabStop(node: UiNode): boolean;
@@ -5562,6 +5569,7 @@ export {
   isReadOnly,
   isScrollContainer,
   isShapeName,
+  isSubtreeInert,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -5722,6 +5730,7 @@ export {
   PlatformSurface,
   PointerControllerOptions,
   pointerDeviceOf,
+  pointerEventsOf,
   pop,
   PositionProps,
   prepareInputSurface,
@@ -6482,6 +6491,7 @@ import {
   isReadOnly,
   isScrollContainer,
   isShapeName,
+  isSubtreeInert,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -6642,6 +6652,7 @@ import {
   PlatformSurface,
   PointerControllerOptions,
   pointerDeviceOf,
+  pointerEventsOf,
   pop,
   PositionProps,
   prepareInputSurface,
@@ -7311,6 +7322,7 @@ export {
   isReadOnly,
   isScrollContainer,
   isShapeName,
+  isSubtreeInert,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -7406,6 +7418,7 @@ export {
   pinchable,
   placeGridItems,
   pointerDeviceOf,
+  pointerEventsOf,
   pop,
   prepareInputSurface,
   pressable,
