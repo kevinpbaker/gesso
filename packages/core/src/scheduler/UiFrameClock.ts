@@ -226,11 +226,6 @@ export class UiTimerFrameClock implements UiFrameClock {
  * has had one for years, and a *nested* worker on Chromium has not.
  * The feature test is the whole guard; there is no version to compare.
  */
-/** This thread's refreshes seen before they are compared with the host's. */
-const LOCAL_SAMPLES_TO_COMPARE = CADENCE_SAMPLES;
-/** How much slower than the host's this thread's refreshes must be to be given up: 120 Hz against 60 is twice. */
-const SLOWER_THAN_HOST = 1.4;
-
 function localAnimationFrame(): ((callback: (time: number) => void) => number) | null {
   const host = globalThis as { requestAnimationFrame?: (callback: (time: number) => void) => number };
   return typeof host.requestAnimationFrame === 'function' ? host.requestAnimationFrame.bind(host) : null;
@@ -273,13 +268,8 @@ export class UiHostFrameClock implements UiFrameClock {
   private readonly minStallMs: number;
   private readonly now: () => UiFrameTime;
   /** This thread's own `requestAnimationFrame`, or null where there is none. */
-  private local: ((callback: (time: number) => void) => number) | null;
+  private readonly local: ((callback: (time: number) => void) => number) | null;
   private localHandle: number | null = null;
-  /** The gaps between this thread's own refreshes while frames ran back to back. */
-  private readonly localIntervals: number[] = [];
-  private lastLocalTime: number | null = null;
-  /** The host's display interval, once it has said; see `displayInterval`. */
-  private hostInterval: number | null = null;
 
   constructor(
     private readonly onFrame: (time: UiFrameTime) => void,
@@ -309,12 +299,6 @@ export class UiHostFrameClock implements UiFrameClock {
       if (this.localHandle === null) {
         this.localHandle = this.local(time => {
           this.localHandle = null;
-          if (this.local === null) {
-            // Given up for the host's ticks since this was armed.
-            return;
-          }
-          // A frame given up on here is still drawn; the next is the host's.
-          this.recordLocal(time);
           if (this.pending) {
             this.deliver(time);
           }
@@ -444,53 +428,6 @@ export class UiHostFrameClock implements UiFrameClock {
   private selfPaceMs(): number {
     const cadence = this.cadenceMs();
     return cadence === null ? this.fallbackMs : Math.max(1, Math.min(this.fallbackMs, cadence));
-  }
-
-  /**
-   * Tells the clock the host's display interval, measured on the host's
-   * own `requestAnimationFrame`.
-   *
-   * A worker's own refreshes are not always the display's. WebKit's run
-   * at 60 Hz whatever the display does, and a page there can be let up
-   * to 120 on a ProMotion MacBook while its worker stays at 60: Easel's
-   * editor drew every other refresh, and a scroll moved in steps of two.
-   * Once this thread's refreshes have shown themselves clearly slower
-   * than the host's, the clock gives them up for the host's ticks.
-   */
-  displayInterval(ms: number): void {
-    if (ms > 0 && ms < MAX_CADENCE_MS) {
-      this.hostInterval = ms;
-      this.compareLocal();
-    }
-  }
-
-  private recordLocal(time: number): void {
-    const previous = this.lastLocalTime;
-    this.lastLocalTime = time;
-    // Only gaps between frames that ran back to back measure the
-    // refresh: a gap across an idle stretch measures the idleness.
-    if (previous !== null && this.pending) {
-      const interval = time - previous;
-      if (interval > 0 && interval < MAX_CADENCE_MS) {
-        this.localIntervals.push(interval);
-        if (this.localIntervals.length > CADENCE_SAMPLES) {
-          this.localIntervals.shift();
-        }
-      }
-    }
-    this.compareLocal();
-  }
-
-  private compareLocal(): void {
-    if (this.local === null || this.hostInterval === null || this.localIntervals.length < LOCAL_SAMPLES_TO_COMPARE) {
-      return;
-    }
-    const sorted = [...this.localIntervals].sort((a, b) => a - b);
-    const local = sorted[Math.floor(sorted.length / 2)]!;
-    if (local > this.hostInterval * SLOWER_THAN_HOST) {
-      this.local = null;
-      this.lastLocalTime = null;
-    }
   }
 
   cancelFrame(): void {

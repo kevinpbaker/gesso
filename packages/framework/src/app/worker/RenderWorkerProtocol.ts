@@ -280,13 +280,6 @@ export type ShellToRuntimeMessage =
    * app exchanges nothing.
    */
   | { type: 'tick'; time: number }
-  /**
-   * The display's interval as the shell's `requestAnimationFrame` sees
-   * it, sent once the worker is ready. The worker's own refreshes can
-   * be slower (WebKit's are 60 Hz on a 120 Hz display), and the frame
-   * clock gives them up for the shell's ticks when they are.
-   */
-  | { type: 'displayInterval'; ms: number }
   | { type: 'dispose' };
 
 /**
