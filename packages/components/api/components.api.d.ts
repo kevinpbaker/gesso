@@ -649,6 +649,7 @@ type PlainNode = (Keyed & {
   readonly label: string;
   readonly value?: string;
   readonly placeholder?: string;
+  readonly width?: number;
   readonly action: string;
 }) | (Keyed & {
   readonly type: 'checkbox';
@@ -663,6 +664,7 @@ type PlainNode = (Keyed & {
     readonly value: string;
     readonly label: string;
   }[];
+  readonly width?: number;
   readonly action: string;
 }) | (Keyed & {
   readonly type: 'list';

@@ -78,6 +78,8 @@ export type PlainNode =
       /** What it holds when it first appears. It keeps what the person types; a new `key` sets it again. */
       readonly value?: string;
       readonly placeholder?: string;
+      /** Its width in pixels, 40 to 800: 220 when left out, rather than as wide as what it holds. */
+      readonly width?: number;
       /** Sent with the text on every change, and with no value on Enter, as `${action}:submit`. */
       readonly action: string;
     })
@@ -87,6 +89,8 @@ export type PlainNode =
       readonly label: string;
       readonly value: string;
       readonly options: readonly { readonly value: string; readonly label: string }[];
+      /** Its width in pixels, 40 to 800. */
+      readonly width?: number;
       readonly action: string;
     })
   | (Keyed & {
@@ -163,6 +167,8 @@ export function plainNodeOf(
     typeof value === 'string' ? value.slice(0, chars) : typeof value === 'number' ? String(value) : fallback;
   const space = (value: unknown): Space | undefined =>
     typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(64, Math.round(value))) : undefined;
+  const width = (value: unknown): number | undefined =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.max(40, Math.min(800, Math.round(value))) : undefined;
   const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
     allowed.includes(value as T) ? (value as T) : undefined;
 
@@ -248,6 +254,7 @@ export function plainNodeOf(
           label: str(raw.label, 'Text'),
           value: str(raw.value),
           ...optional('placeholder', typeof raw.placeholder === 'string' ? str(raw.placeholder) : undefined),
+          ...optional('width', width(raw.width)),
           action: action()
         };
       case 'checkbox':
@@ -260,21 +267,19 @@ export function plainNodeOf(
         };
       case 'select': {
         const options = Array.isArray(raw.options)
-          ? raw.options
-              .slice(0, maxNodes)
-              .flatMap(option =>
-                typeof option === 'object' && option !== null
-                  ? [
-                      {
-                        value: str((option as Record<string, unknown>).value),
-                        label: str(
-                          (option as Record<string, unknown>).label,
-                          str((option as Record<string, unknown>).value)
-                        )
-                      }
-                    ]
-                  : []
-              )
+          ? raw.options.slice(0, maxNodes).flatMap(option =>
+              typeof option === 'object' && option !== null
+                ? [
+                    {
+                      value: str((option as Record<string, unknown>).value),
+                      label: str(
+                        (option as Record<string, unknown>).label,
+                        str((option as Record<string, unknown>).value)
+                      )
+                    }
+                  ]
+                : []
+            )
           : [];
         if (options.length === 0) say(`${where}: a select with no options.`);
         return {
@@ -283,6 +288,7 @@ export function plainNodeOf(
           label: str(raw.label, 'Choice'),
           value: str(raw.value, options[0]?.value ?? ''),
           options,
+          ...optional('width', width(raw.width)),
           action: action()
         };
       }
@@ -455,6 +461,7 @@ function element(type: PlainNodeType, node$: BehaviorSubject<PlainNode>, draw: D
       return createComponent(TextInput, {
         label: field(node$, n => as(n, 'textInput').label),
         placeholder: field(node$, n => as(n, 'textInput').placeholder ?? ''),
+        width: field(node$, n => as(n, 'textInput').width ?? 220),
         defaultValue: current('textInput').value ?? '',
         onChange: (value: string) => draw.emit(current('textInput').action, value),
         onSubmit: () => draw.emit(`${current('textInput').action}:submit`, null)
@@ -477,6 +484,10 @@ function element(type: PlainNodeType, node$: BehaviorSubject<PlainNode>, draw: D
       return createComponent(Select, {
         label: field(node$, n => as(n, 'select').label),
         options: field(node$, n => as(n, 'select').options),
+        // A select is as wide as its longest choice unless told otherwise, which is what a choice wants.
+        ...(as(node$.value, 'select').width === undefined
+          ? {}
+          : { width: field(node$, n => as(n, 'select').width ?? 160) }),
         value: shown,
         onChange: (value: string) => {
           shown.next(value);
