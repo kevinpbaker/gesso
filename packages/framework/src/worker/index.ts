@@ -65,6 +65,18 @@ export {
   type PortHost
 } from './WorkerPorts';
 export { captureConsole, type ConsoleEntryBody, type ConsoleLevel } from './captureConsole';
+export {
+  SupervisedWorker,
+  isSupervisionMessage,
+  superviseSelf,
+  type SupervisableWorker,
+  type SupervisedError,
+  type SupervisedScope,
+  type SupervisedSelf,
+  type SupervisedState,
+  type SupervisedStatus,
+  type SupervisedWorkerOptions
+} from './supervise';
 export { UndoStack, type UndoStackOptions, type UndoTransaction } from '../undo/UndoStack';
 export { undoable, type UndoableOptions } from '../undo/undoable';
 export {
