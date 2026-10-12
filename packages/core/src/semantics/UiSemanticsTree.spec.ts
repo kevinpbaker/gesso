@@ -213,6 +213,16 @@ describe('buildSemanticsTree', () => {
     expect(t.build()[0]!.controls).toBeUndefined();
   });
 
+  it('says which way a tablist runs, when the node says', () => {
+    const t = new Tree();
+    const tabs = t.node(UiNodeType.Column, { role: 'tablist', label: 'Sidebar views', orientation: 'vertical' });
+    const row = t.node(UiNodeType.Row, { role: 'tablist', label: 'Open editors' });
+    t.add(t.root, tabs, row);
+    const [first, second] = t.build();
+    expect(first).toMatchObject({ role: 'tablist', orientation: 'vertical' });
+    expect(second!.orientation).toBeUndefined();
+  });
+
   it('claims the text inside a menu item, which is how the item is named', () => {
     const t = new Tree();
     const menu = t.node(UiNodeType.Column, { role: 'menu', label: 'Actions' });

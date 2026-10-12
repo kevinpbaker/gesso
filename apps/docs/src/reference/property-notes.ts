@@ -403,6 +403,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Semantics',
     note: 'What a field offers as it is typed into: `list`, `inline` or `both`.'
   },
+  orientation: {
+    group: 'Semantics',
+    note: 'Which way a tablist, toolbar, list or separator runs, when not the way its role assumes: a column of tabs is `vertical`.'
+  },
 
   // Media
   image: { group: 'Media', note: 'A decoded bitmap drawn inside the box, clipped by `borderRadius`.' },

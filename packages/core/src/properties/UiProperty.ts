@@ -64,7 +64,7 @@ import { validateSubgrid } from './UiPropertyValues';
 import { defaultVisualState, visualStatesEqual } from './UiVisualState';
 import type { UiRole, UiSemanticStates } from './UiSemantics';
 import { statesEqual, validateRole, validateStates } from './UiSemantics';
-import type { UiAutocomplete, UiLiveRegion } from './UiSemantics';
+import type { UiAutocomplete, UiLiveRegion, UiOrientation } from './UiSemantics';
 
 const L = DirtyFlags.Layout;
 const P = DirtyFlags.Paint;
@@ -1366,6 +1366,17 @@ export const UiProperties = {
    */
   autocomplete: defineProperty<UiAutocomplete | undefined>({
     name: 'autocomplete',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * Which way a tablist, toolbar, list or separator runs, when not the
+   * way its role assumes: a column of tabs. See `aria-orientation`.
+   */
+  orientation: defineProperty<UiOrientation | undefined>({
+    name: 'orientation',
     defaultValue: undefined,
     inherited: false,
     affects: S

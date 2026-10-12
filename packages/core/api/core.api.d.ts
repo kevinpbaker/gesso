@@ -1734,6 +1734,7 @@ type UiRole = 'button' | 'checkbox' | 'switch' | 'radio' | 'radiogroup' | 'slide
 'gridcell' | 'group' | 'separator' | 'toolbar' | 'heading' | 'image' | 'paragraph' | 'dialog' | 'alertdialog' | 'tooltip' | 'alert' | 'status' | 'banner' | 'navigation' | 'main' | 'region' | 'form' | 'search' | 'contentinfo';
 type UiLiveRegion = 'polite' | 'assertive';
 type UiAutocomplete = 'list' | 'inline' | 'both';
+type UiOrientation = 'horizontal' | 'vertical';
 declare const UI_ROLES: readonly UiRole[];
 declare function isUiRole(value: unknown): value is UiRole;
 type UiSemanticState = 'checked' | 'mixed' | 'expanded' | 'collapsed' | 'selected' | 'pressed' | 'busy' | 'invalid' | 'required' | 'readonly' | 'modal' |
@@ -1879,6 +1880,7 @@ declare const UiProperties: {
   readonly activeDescendant: UiPropertyDefinition<UiNode | null | undefined>;
   readonly controls: UiPropertyDefinition<UiNode | null | undefined>;
   readonly autocomplete: UiPropertyDefinition<UiAutocomplete | undefined>;
+  readonly orientation: UiPropertyDefinition<UiOrientation | undefined>;
   readonly level: UiPropertyDefinition<number | undefined>;
   readonly transform: UiPropertyDefinition<Partial<UiTransform> | undefined>;
   readonly text: UiPropertyDefinition<string | undefined>;
@@ -1957,7 +1959,7 @@ type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
-type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'activeDescendant' | 'controls' | 'autocomplete'>;
+type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
@@ -5192,6 +5194,7 @@ interface UiSemanticsRecord {
   readonly activeDescendant?: string;
   readonly controls?: string;
   readonly autocomplete?: UiAutocomplete;
+  readonly orientation?: UiOrientation;
 }
 type UiSemanticsMap = ReadonlyMap<string, UiSemanticsRecord>;
 declare function buildSemanticsTree(root: UiNode, memory?: SemanticsMemory): Map<string, UiSemanticsRecord>;
@@ -6029,6 +6032,7 @@ export {
   UiNodeTransitions,
   UiNodeType,
   UiObjectFit,
+  UiOrientation,
   UiOverflow,
   UiPaint,
   UiPasteEvent,
@@ -6948,6 +6952,7 @@ import {
   UiNodeTransitions,
   UiNodeType,
   UiObjectFit,
+  UiOrientation,
   UiOverflow,
   UiPaint,
   UiPasteEvent,
@@ -7915,6 +7920,7 @@ export {
   UiNode,
   UiNodeType,
   UiObjectFit,
+  UiOrientation,
   UiOverflow,
   UiPasteEvent,
   UiPinchEvent,

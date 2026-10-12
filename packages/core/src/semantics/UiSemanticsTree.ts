@@ -2,6 +2,7 @@ import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import type {
   UiAutocomplete,
+  UiOrientation,
   UiRole,
   UiSemanticState,
   UiSemanticStates,
@@ -54,6 +55,8 @@ export interface UiSemanticsRecord {
   readonly controls?: string;
   /** What a field offers as it's typed into. */
   readonly autocomplete?: UiAutocomplete;
+  /** Which way it runs, when not the way its role assumes. */
+  readonly orientation?: UiOrientation;
 }
 
 /** Insertion-ordered: iterating the map walks the tree in document order. */
@@ -467,7 +470,8 @@ function describe(
     level: node.properties.get('level') as number | undefined,
     activeDescendant: (node.properties.get('activeDescendant') as UiNode | null | undefined)?.id,
     controls: (node.properties.get('controls') as UiNode | null | undefined)?.id,
-    autocomplete: node.properties.get('autocomplete') as UiAutocomplete | undefined
+    autocomplete: node.properties.get('autocomplete') as UiAutocomplete | undefined,
+    orientation: node.properties.get('orientation') as UiOrientation | undefined
   });
 }
 
