@@ -58,6 +58,15 @@ export interface TreeProps extends ControlLayoutProps {
   selectedKey?: string | null;
   defaultSelectedKey?: string | null;
   onSelect?: (key: string | null) => void;
+  /**
+   * Scrolls the row with this key into view, as soon as it is one of the
+   * rows: its folders may still be opening, or their children still
+   * being fetched. A fresh object asks again, so a row scrolled away is
+   * brought back. Choosing a row from outside does not scroll by itself,
+   * because a file tree that jumped whenever its selection was written
+   * would take the reader's place away.
+   */
+  revealKey?: { readonly key: string } | null;
   /** Enter or Space on the chosen row, or a double click on any. */
   onActivate?: (key: string) => void;
   /** Expected row height, for the rows that have not been measured. */
@@ -140,6 +149,23 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
     selected.change(all[index].node.key);
     list.reveal(index);
   };
+  /** The row asked for by `revealKey` and not shown yet. */
+  let pending: string | null = null;
+  const revealPending = (): void => {
+    if (pending === null) {
+      return;
+    }
+    const index = rows().findIndex(row => row.node.key === pending);
+    if (index >= 0 && list.reveal(index)) {
+      pending = null;
+    }
+  };
+  ctx.effect(inputs.revealKey, request => {
+    pending = request?.key ?? null;
+    revealPending();
+  });
+  ctx.effect(combineLatest([revision, list.size]), revealPending);
+
   const step = (by: number): void => choose(stepIndex(indexOfSelected(), by, rows().length));
   const setOpen = (key: string, open: boolean): void => {
     const current = expanded.current();
