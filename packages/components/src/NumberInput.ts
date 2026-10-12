@@ -170,27 +170,27 @@ function stepper(
 ) {
   return Button(
     {
-    width: 28,
-    // As tall as the field: the row stretches it, so the two edges line up.
-    selfY: 'stretch',
-    // The field beside it grows and these do not shrink. Without this
-    // a number field narrow enough to matter, which is what a form
-    // puts one in, squeezes the two buttons into each other.
-    flexShrink: 0,
-    // The glyph a child rather than the button's `text`, which is drawn
-    // from the top corner and ignores these: a − sat at the top left.
-    x: 'center',
-    y: 'center',
-    disabled,
-    modifiers: [CONTROL_INTERACTION],
-    backgroundColor: 'controlBackground',
-    color: 'controlForeground',
-    borderWidth: 1,
-    borderColor: 'controlBorder',
-    borderRadius: tokens.select(t => t.radius.field),
-    role: 'button',
-    label: glyph === '+' ? 'Increase' : 'Decrease',
-    onClick: press
+      width: 28,
+      // As tall as the field: the row stretches it, so the two edges line up.
+      selfY: 'stretch',
+      // The field beside it grows and these do not shrink. Without this
+      // a number field narrow enough to matter, which is what a form
+      // puts one in, squeezes the two buttons into each other.
+      flexShrink: 0,
+      // The glyph a child rather than the button's `text`, which is drawn
+      // from the top corner and ignores these: a − sat at the top left.
+      x: 'center',
+      y: 'center',
+      disabled,
+      modifiers: [CONTROL_INTERACTION],
+      backgroundColor: 'controlBackground',
+      color: 'controlForeground',
+      borderWidth: 1,
+      borderColor: 'controlBorder',
+      borderRadius: tokens.select(t => t.radius.field),
+      role: 'button',
+      label: glyph === '+' ? 'Increase' : 'Decrease',
+      onClick: press
     },
     Text({ text: glyph, color: foregroundToken(disabled), fontSize: 14, selectable: false })
   );

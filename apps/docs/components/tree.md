@@ -42,7 +42,7 @@ branch and steps out of a leaf.
 | `rowHeight`          | `number`                                       | `24`     | The height the window expects of a row it has not measured yet.                                                                                   |
 | `label`              | `string`                                       | `'Tree'` | The tree's accessible name.                                                                                                                       |
 | `leading`            | `(node, open: Observable<boolean>) => UiChild` | none     | Drawn between a row's arrow and its label, such as a file's icon, open or shut with its folder. Only drawn: the label is still what is announced. |
-| `flush` | `boolean` | `false` | Drawn as part of the surface it sits in: no border, no background, square corners, as a sidebar's file tree. Read once. |
+| `flush`              | `boolean`                                      | `false`  | Drawn as part of the surface it sits in: no border, no background, square corners, as a sidebar's file tree. Read once.                           |
 | `ref`                | `UiNodeRef`                                    | none     | Receives the node that is the tree, for focusing it or reading where it is scrolled to.                                                           |
 
 ### `TreeNode`

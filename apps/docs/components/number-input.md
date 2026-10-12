@@ -32,7 +32,7 @@ watch the field tidy itself up.
 | `max`          | `number`                  | unbounded | The top of the range. Left out, nothing clamps upwards.                                                                |
 | `step`         | `number`                  | `1`       | What an arrow key and each button move by, and the grid a value is snapped to, counted from `min`.                     |
 | `label`        | `string`                  | `''`      | Drawn above the field and used as its accessible name.                                                                 |
-| `labelHidden` | `boolean` | `false` | The label still names the field but is not drawn: for a field whose heading already says what it is. |
+| `labelHidden`  | `boolean`                 | `false`   | The label still names the field but is not drawn: for a field whose heading already says what it is.                   |
 | `error`        | `string`                  | `''`      | A non-empty string marks the field `invalid`, turns its border to the `danger` token, and draws this message under it. |
 | `disabled`     | `boolean`                 | `false`   | Refuses focus, ignores the arrows, and disables both buttons.                                                          |
 | `required`     | `boolean`                 | `false`   | Announced as `required`. It validates nothing on its own; the message is `error`'s job.                                |

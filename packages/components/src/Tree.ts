@@ -288,7 +288,13 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, ...(flush ? [] : [CONTROL_EDGE])),
+      modifiers: modifiersOf(
+        inputs,
+        list.viewport,
+        tokens.modifier,
+        CONTROL_FOCUS_RING,
+        ...(flush ? [] : [CONTROL_EDGE])
+      ),
       scrollY: list.scrollY,
       focusable: true,
       count,

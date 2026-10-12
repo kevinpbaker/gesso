@@ -97,48 +97,59 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
   const both = show.pipe(map(shown => shown === 'both'));
   const dividerSize = both.pipe(map(shown => (shown ? 6 : 0)));
   const line = inputs.divider.value === 'line';
-  const divider = Box({
-    ref: focus.ref,
-    focusable: true,
-    modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
-    width: horizontal() ? dividerSize : undefined,
-    height: horizontal() ? undefined : dividerSize,
-    visible: both,
-    // A divider is a fixed size. Left shrinkable, it gave up a sliver of
-    // its six pixels whenever the second pane's content was wider than
-    // the track, a different sliver for every content width, so every
-    // keystroke in a pane moved the pane by a fraction of a pixel and
-    // re-measured everything in it.
-    flexShrink: 0,
-    backgroundColor: line ? 'transparent' : 'controlBackground',
-    borderColor: 'controlBorder',
-    borderWidth: line ? 0 : both.pipe(map(shown => (shown ? 1 : 0))),
-    x: 'center',
-    y: 'center',
-    cursor: horizontal() ? 'col-resize' : 'row-resize',
-    role: 'separator',
-    label,
-    valueNow: split.value.pipe(map(fraction => Math.round(fraction * 100))),
-    valueMin: min.pipe(map(fraction => Math.round(fraction * 100))),
-    valueMax: max.pipe(map(fraction => Math.round(fraction * 100))),
-    // Pan, not Drag: in this input model a drag is a long press
-    // followed by a move, and a divider has to follow the pointer from
-    // the first pixel. Stopping propagation keeps a scroll container
-    // above from panning at the same time.
-    onPanMove: (event: UiPointerEvent) => {
-      event.stopPropagation();
-      split.change(toFraction(event));
+  const divider = Box(
+    {
+      ref: focus.ref,
+      focusable: true,
+      modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
+      width: horizontal() ? dividerSize : undefined,
+      height: horizontal() ? undefined : dividerSize,
+      visible: both,
+      // A divider is a fixed size. Left shrinkable, it gave up a sliver of
+      // its six pixels whenever the second pane's content was wider than
+      // the track, a different sliver for every content width, so every
+      // keystroke in a pane moved the pane by a fraction of a pixel and
+      // re-measured everything in it.
+      flexShrink: 0,
+      backgroundColor: line ? 'transparent' : 'controlBackground',
+      borderColor: 'controlBorder',
+      borderWidth: line ? 0 : both.pipe(map(shown => (shown ? 1 : 0))),
+      x: 'center',
+      y: 'center',
+      cursor: horizontal() ? 'col-resize' : 'row-resize',
+      role: 'separator',
+      label,
+      valueNow: split.value.pipe(map(fraction => Math.round(fraction * 100))),
+      valueMin: min.pipe(map(fraction => Math.round(fraction * 100))),
+      valueMax: max.pipe(map(fraction => Math.round(fraction * 100))),
+      // Pan, not Drag: in this input model a drag is a long press
+      // followed by a move, and a divider has to follow the pointer from
+      // the first pixel. Stopping propagation keeps a scroll container
+      // above from panning at the same time.
+      onPanMove: (event: UiPointerEvent) => {
+        event.stopPropagation();
+        split.change(toFraction(event));
+      },
+      onPanStart: (event: UiPointerEvent) => event.stopPropagation(),
+      onKeyDown: keymap({
+        ArrowLeft: () => move(horizontal() ? -0.02 : 0),
+        ArrowRight: () => move(horizontal() ? 0.02 : 0),
+        ArrowUp: () => move(horizontal() ? 0 : -0.02),
+        ArrowDown: () => move(horizontal() ? 0 : 0.02),
+        Home: () => split.change(min.value),
+        End: () => split.change(max.value)
+      })
     },
-    onPanStart: (event: UiPointerEvent) => event.stopPropagation(),
-    onKeyDown: keymap({
-      ArrowLeft: () => move(horizontal() ? -0.02 : 0),
-      ArrowRight: () => move(horizontal() ? 0.02 : 0),
-      ArrowUp: () => move(horizontal() ? 0 : -0.02),
-      ArrowDown: () => move(horizontal() ? 0 : 0.02),
-      Home: () => split.change(min.value),
-      End: () => split.change(max.value)
-    })
-  }, ...(line ? [Box({ width: horizontal() ? 1 : percent(100), height: horizontal() ? percent(100) : 1, backgroundColor: 'border' })] : []));
+    ...(line
+      ? [
+          Box({
+            width: horizontal() ? 1 : percent(100),
+            height: horizontal() ? percent(100) : 1,
+            backgroundColor: 'border'
+          })
+        ]
+      : [])
+  );
 
   const container = {
     ...layoutOf(inputs),

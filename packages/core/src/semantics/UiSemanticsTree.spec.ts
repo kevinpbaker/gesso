@@ -62,7 +62,9 @@ describe('buildSemanticsTree', () => {
     } finally {
       console.warn = warn;
     }
-    expect(warnings).toEqual([expect.stringContaining("A focusable node ('Refresh') is inside a button ('SRC folder')")]);
+    expect(warnings).toEqual([
+      expect.stringContaining("A focusable node ('Refresh') is inside a button ('SRC folder')")
+    ]);
   });
 
   it('carries a live region setting so changing text can be announced', () => {

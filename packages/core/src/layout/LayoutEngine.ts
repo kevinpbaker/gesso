@@ -1763,8 +1763,7 @@ export class LayoutEngine {
         this.lengthProp(placement.item, 'height', undefined) !== undefined;
       cRec.contentMatters = gridRec.contentMatters || !explicitBoth;
       this.measure(placement.item, new Constraints(0, Infinity, 0, Infinity));
-      cRec.relayoutBoundary =
-        explicitBoth && !cRec.contentMatters && cRec.aspectRatio === undefined && !cRec.displaced;
+      cRec.relayoutBoundary = explicitBoth && !cRec.contentMatters && cRec.aspectRatio === undefined && !cRec.displaced;
       const marginH = cRec.marginLeft + cRec.marginRight;
       const contribution: GridContribution = {
         min: this.minContentContribution(placement.item, cRec) + marginH,
