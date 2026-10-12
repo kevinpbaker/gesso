@@ -232,7 +232,7 @@ describe('UiWheelController', () => {
       return { moves, behind, total: scrollY(h, scroll) };
     }
 
-    it('moves a steady flick by even steps, never behind it and never backwards', () => {
+    it('moves a steady flick by even steps, a resample behind it and never backwards', () => {
       const { moves, behind, total } = flick(80, 7.5, 1000 / 60);
       // It ends within a frame's travel past where the steps add up to:
       // a prediction that ran ahead stays, since pulling it back is the
@@ -246,8 +246,10 @@ describe('UiWheelController', () => {
         expect(move).toBeGreaterThan(19);
         expect(move).toBeLessThan(25.5);
       }
-      // And the page is never behind the steps that have arrived.
-      expect(Math.max(...behind.slice(0, 30))).toBeLessThanOrEqual(0);
+      // And the page is no further behind the steps that have arrived than
+      // the line is read before the frame: 12 ms of a flick of 10 pixels
+      // every 7.5 ms is 16 pixels.
+      expect(Math.max(...behind.slice(0, 30))).toBeLessThanOrEqual(16.5);
     });
 
     it('moves a steady flick by even steps on a display faster than the trackpad', () => {
