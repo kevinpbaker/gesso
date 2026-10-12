@@ -82,8 +82,22 @@ export function layoutTextLines(box: LayoutBox, state: PaintState, measurer: Tex
   if (text === undefined || text.length === 0 || state.fontSize <= 0) {
     return [];
   }
-  return placeLines(box, state, measurer.layout(textMeasureRequest(text, state, box)));
+  // An ellipsis is CSS's for a box whose overflow is hidden: what does not
+  // fit in it, the ellipsis itself included, is not seen. A text squeezed
+  // to nothing beside others (a folder's name after a long file name) drew
+  // whole, since a zero width is measured as no limit, or as a lone
+  // ellipsis wider than its box, over whatever came after it.
+  if (state.textOverflow === 'ellipsis' && box.width <= 0) {
+    return [];
+  }
+  const placements = placeLines(box, state, measurer.layout(textMeasureRequest(text, state, box)));
+  return state.textOverflow === 'ellipsis'
+    ? placements.filter(placement => placement.width <= box.width + FIT_TOLERANCE)
+    : placements;
 }
+
+/** How far past its box a line may measure and still be drawn: rounding, not overflow. */
+const FIT_TOLERANCE = 0.5;
 
 /** The measure request paint makes for a node's text: the one layout made too. */
 export function textMeasureRequest(
