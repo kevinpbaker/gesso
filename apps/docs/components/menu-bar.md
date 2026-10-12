@@ -23,6 +23,17 @@ this when a window has a permanent row of them.
 
 <<< @/src/examples/MenuBarExample.tsx#menu-bar
 
+## Naming the command type in JSX
+
+`MenuBar` is generic over what a command is. In JSX, write the type
+with an instantiation expression first, `const CommandBar =
+MenuBar<Command>`, and use `<CommandBar ... />`. Written inline,
+`<MenuBar<Command> ... />` types the command as `unknown`: TypeScript
+hands a JSX library the component without its type argument, so the
+attributes are computed from the uninstantiated function and every
+callback that takes a `Command` is refused. `createComponent(MenuBar<Command>, ...)`,
+as above, is the same instantiation expression.
+
 ## One tab stop, not one per menu
 
 A bar is a single stop with a roving highlight inside it, so Tab past
