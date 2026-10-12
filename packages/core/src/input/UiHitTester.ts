@@ -2,7 +2,7 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import type { SubtreeBounds } from '../layout/SubtreeBounds';
-import { isNodeHitTestable, isNodeInert } from './UiInteraction';
+import { isNodeHitTestable, isSubtreeInert, pointerEventsOf } from './UiInteraction';
 import {
   pointInBox,
   scrollbarGrabBox,
@@ -148,6 +148,13 @@ export class UiHitTester implements HitTester {
   private readonly liftedScratch: UiNode[] = [];
   /** True while testing inside a lifted subtree, so it is not skipped again. */
   private inLifted = false;
+  /**
+   * `pointerEvents` as the node being tested has it, inherited: true
+   * under a 'none' that nothing nearer has set back to 'auto'. Such a
+   * node is passed over, but its children are still tested, since one
+   * of them may say 'auto'.
+   */
+  private pointerNone = false;
 
   constructor(
     private layout: HitTestLayoutReader,
@@ -186,7 +193,9 @@ export class UiHitTester implements HitTester {
     const out: UiNode[] = [];
     this.forEachLifted(x, y, (node, px, py) => {
       this.inLifted = true;
+      this.pointerNone = pointerEventsOf(node.parent) === 'none';
       this.collectNode(node, px, py, out);
+      this.pointerNone = false;
       this.inLifted = false;
       return false;
     });
@@ -195,9 +204,19 @@ export class UiHitTester implements HitTester {
   }
 
   private collectNode(node: UiNode, x: number, y: number, out: UiNode[]): void {
-    if (isNodeInert(node)) {
+    if (isSubtreeInert(node)) {
       return;
     }
+    const outer = this.pointerNone;
+    this.pointerNone = this.inheritsNone(node, outer);
+    try {
+      this.collectOwn(node, x, y, out);
+    } finally {
+      this.pointerNone = outer;
+    }
+  }
+
+  private collectOwn(node: UiNode, x: number, y: number, out: UiNode[]): void {
     const rec = this.layout.recordFor(node);
     if (rec === undefined || !this.invertPoint(node, rec, x, y)) {
       return;
@@ -215,7 +234,7 @@ export class UiHitTester implements HitTester {
     const shiftX = rec.clips && rec.scrollable ? rec.scrollX : 0;
     const shiftY = rec.clips && rec.scrollable ? rec.scrollY : 0;
     this.collectChildren(node, px + shiftX, py + shiftY, out);
-    if (inside && isNodeHitTestable(node)) {
+    if (inside && this.targetable(node)) {
       out.push(node);
     }
   }
@@ -319,7 +338,10 @@ export class UiHitTester implements HitTester {
   private hitTestLifted(x: number, y: number): boolean {
     return this.forEachLifted(x, y, (node, px, py) => {
       this.inLifted = true;
+      // Its ancestors are not walked to reach it: what they set is looked up.
+      this.pointerNone = pointerEventsOf(node.parent) === 'none';
       const hit = this.hitTestNode(node, px, py);
+      this.pointerNone = false;
       this.inLifted = false;
       return hit;
     });
@@ -404,9 +426,30 @@ export class UiHitTester implements HitTester {
   // -------------------------------------------------------------------------
 
   private hitTestNode(node: UiNode, x: number, y: number): boolean {
-    if (isNodeInert(node)) {
+    if (isSubtreeInert(node)) {
       return false;
     }
+    const outer = this.pointerNone;
+    this.pointerNone = this.inheritsNone(node, outer);
+    try {
+      return this.hitTestOwn(node, x, y);
+    } finally {
+      this.pointerNone = outer;
+    }
+  }
+
+  /** Whether a node is under a 'none': its own value, else its parent's. */
+  private inheritsNone(node: UiNode, parentNone: boolean): boolean {
+    const own = node.properties.get('pointerEvents');
+    return own === 'none' ? true : own === 'auto' ? false : parentNone;
+  }
+
+  /** Whether a press may land on the node itself. */
+  private targetable(node: UiNode): boolean {
+    return !this.pointerNone && isNodeHitTestable(node);
+  }
+
+  private hitTestOwn(node: UiNode, x: number, y: number): boolean {
     const rec = this.layout.recordFor(node);
     if (rec === undefined) {
       return false;
@@ -437,6 +480,7 @@ export class UiHitTester implements HitTester {
       }
       // A follower has no bar of its own: the node it follows is what scrolls.
       if (
+        !this.pointerNone &&
         (rec.scrollable || rec.textScrollbars) &&
         scrollLeaderOf(node) === null &&
         this.hitScrollbar(node, rec, px, py)
@@ -454,7 +498,7 @@ export class UiHitTester implements HitTester {
       if (this.hitTestChildren(node, px + shiftX, py + shiftY)) {
         return true;
       }
-      return isNodeHitTestable(node) && this.recordHit(node, rec, px, py);
+      return this.targetable(node) && this.recordHit(node, rec, px, py);
     }
 
     // Non-clipping nodes let children paint outside them, so children
@@ -465,7 +509,7 @@ export class UiHitTester implements HitTester {
     if (this.hitTestChildren(node, px, py)) {
       return true;
     }
-    if (this.zoneOnly || !isNodeHitTestable(node)) {
+    if (this.zoneOnly || !this.targetable(node)) {
       return false;
     }
     if (px < rec.x || px >= rec.x + rec.width || py < rec.y || py >= rec.y + rec.height) {
