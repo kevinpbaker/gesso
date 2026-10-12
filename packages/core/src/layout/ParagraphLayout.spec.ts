@@ -161,3 +161,19 @@ describe('layoutParagraph', () => {
     });
   });
 });
+
+describe('a line as wide as its own text', () => {
+  /** A font that kerns "-t" a unit tighter, so the whole is narrower than its pieces. */
+  class Kerned extends CharacterCountTextMeasurer {
+    override measureRunWidth(text: string, request: TextMeasureRequest): number {
+      return super.measureRunWidth(text, request) - (text.includes('-t') ? 1 : 0);
+    }
+  }
+
+  it('is not broken where its pieces added up are wider than it is', () => {
+    const kerned = new Kerned();
+    const natural = layoutParagraph({ text: 'grid-test.ts', fontSize: 10 }, kerned).width;
+    const laid = layoutParagraph({ text: 'grid-test.ts', fontSize: 10, maxWidth: natural, maxLines: 1, overflow: 'ellipsis' }, kerned);
+    expect(laid.lines.map(line => line.text)).toEqual(['grid-test.ts']);
+  });
+});

@@ -118,7 +118,7 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
   // they always took.
   const memo = spanned === undefined ? hardLinesFor(runs) : undefined;
   const style = memo === undefined ? '' : styleKey(request);
-  const paragraphs: { start: number; text: string; segments: TextSegment[]; cached?: HardLine }[] = [];
+  const paragraphs: { start: number; text: string; segments: TextSegment[]; whole: number; cached?: HardLine }[] = [];
   let maxContentWidth = 0;
   let minContentWidth = 0;
   let paragraphStart = 0;
@@ -130,13 +130,14 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     const paragraph = text.slice(paragraphStart, paragraphEnd);
     if (memo !== undefined) {
       const cached = hardLine(memo, style, paragraph, wrap, measure);
-      paragraphs.push({ start: paragraphStart, text: paragraph, segments: cached.segments, cached });
+      paragraphs.push({ start: paragraphStart, text: paragraph, segments: cached.segments, whole: cached.maxContentWidth, cached });
       maxContentWidth = Math.max(maxContentWidth, cached.maxContentWidth);
       minContentWidth = Math.max(minContentWidth, cached.minContentWidth);
     } else {
       const segments = segmentParagraph(paragraph, wrap);
-      paragraphs.push({ start: paragraphStart, text: paragraph, segments });
-      maxContentWidth = Math.max(maxContentWidth, measure(paragraph, paragraphStart, paragraphEnd));
+      const whole = measure(paragraph, paragraphStart, paragraphEnd);
+      paragraphs.push({ start: paragraphStart, text: paragraph, segments, whole });
+      maxContentWidth = Math.max(maxContentWidth, whole);
       for (const segment of segments) {
         minContentWidth = Math.max(
           minContentWidth,
@@ -158,13 +159,20 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
 
   const lines: TextLine[] = [];
   for (const paragraph of paragraphs) {
+    // A hard line that fits whole is not broken. Its pieces' widths added
+    // up are not its width: a font kerns across the joins ("grid-" and
+    // "test.ts"), so the sum can be wider than the line measured whole,
+    // which is what a box sized to its own text is given. Broken by the
+    // sum, the line split at the hyphen and drew half a file name.
+    const fits = paragraph.whole <= available + FIT_EPSILON;
+    const width = fits ? Infinity : available;
     if (paragraph.cached !== undefined) {
       // Broken once per width, relative to the line's own start, and
       // moved to where the line sits in this text.
       const key = unwrapped ? -1 : available;
       let relative = paragraph.cached.lines.get(key);
       if (relative === undefined) {
-        relative = breakHardLine(paragraph.text, paragraph.segments, available, unwrapped, measure);
+        relative = breakHardLine(paragraph.text, paragraph.segments, width, unwrapped, measure);
         if (paragraph.cached.lines.size >= WIDTHS_PER_LINE) {
           paragraph.cached.lines.clear();
         }
@@ -184,7 +192,7 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     if (unwrapped) {
       pushLine(text, paragraph.text, paragraph.start, 0, paragraph.text.length, measure, spanned, lines);
     } else {
-      breakGreedy(text, paragraph.text, paragraph.start, paragraph.segments, available, measure, spanned, lines);
+      breakGreedy(text, paragraph.text, paragraph.start, paragraph.segments, width, measure, spanned, lines);
     }
     if (lines.length === before) {
       // A blank or all-space paragraph still occupies a line.
