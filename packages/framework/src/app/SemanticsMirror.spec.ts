@@ -58,6 +58,26 @@ class FakeElement {
     return this.text;
   }
 
+  /**
+   * The first child node: the text, when there is some, as a text node
+   * written before any child element is first in a real document.
+   */
+  get firstChild(): { nodeType: number; nodeValue: string } | FakeElement | null {
+    if (this.text !== '') {
+      const self = this;
+      return {
+        nodeType: 3,
+        get nodeValue() {
+          return self.text;
+        },
+        set nodeValue(value: string) {
+          self.text = value;
+        }
+      };
+    }
+    return this.children[0] ?? null;
+  }
+
   set textContent(value: string) {
     this.text = value;
     for (const child of this.children.splice(0)) {
@@ -530,6 +550,19 @@ describe('SemanticsMirror', () => {
     apply({ patches: [{ op: 'update', node: record('n1', { role: 'combobox', label: 'Assignee' }) }] });
     expect(elementFor('n1').getAttribute('aria-activedescendant')).toBeNull();
     expect(editing.activeDescendant).toBeUndefined();
+  });
+
+  it('keeps the words of a container with no role in step with its label, and its children', () => {
+    const { elementFor, apply } = setup(fakeEditing(false));
+    apply({
+      patches: [
+        { op: 'add', node: record('row', { label: 'Changes, 0 files' }) },
+        { op: 'add', node: record('count', { parent: 'row', index: 0, label: '0' }) }
+      ]
+    });
+    apply({ patches: [{ op: 'update', node: record('row', { label: 'Changes, 18 files' }) }] });
+    expect(elementFor('row').textContent).toBe('Changes, 18 files');
+    expect(elementFor('count').parent).toBe(elementFor('row'));
   });
 
   it('says which way a tablist runs when it is not the way its role assumes, and stops saying it', () => {
