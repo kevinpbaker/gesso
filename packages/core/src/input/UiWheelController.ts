@@ -658,12 +658,9 @@ export class UiWheelController {
         x = meanX + (covX / varT) * (at - meanT);
         y = meanY + (covY / varT) * (at - meanT);
         paced.fitted = true;
-      } else if (paced.fitted || at !== undefined) {
-        // Before there is a line, and once the steps have stopped, the page
-        // eases to where they add up to over a few frames rather than at
-        // once: a gesture's first steps jumped and then waited for a line
-        // read behind them, and letting go of the line at once would be the
-        // very jump it smoothed.
+      } else if (paced.fitted) {
+        // The steps have stopped: the line is let go of over a few frames
+        // rather than at once, which would be the very jump it smoothed.
         const drawnX = paced.lastX - paced.baseX;
         const drawnY = paced.lastY - paced.baseY;
         x = Math.abs(x - drawnX) < SETTLED_PX ? x : drawnX + (x - drawnX) * SETTLE_RATE;
