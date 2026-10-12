@@ -11,7 +11,8 @@ import {
   keymap,
   layoutOf,
   type ControlLayoutProps,
-  modifiersOf
+  modifiersOf,
+  followedChildren
 } from './internals';
 
 /**
@@ -59,7 +60,7 @@ export function Card(inputs: Inputs<CardProps>, _ctx: ComponentContext): UiChild
         text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 15, fontWeight: 600, selectable: false })]
       )
     ),
-    inputs.children.value ?? Row()
+    followedChildren(inputs.children, () => Row())
   );
 }
 
@@ -117,7 +118,7 @@ export function Toolbar(inputs: Inputs<ToolbarProps>, _ctx: ComponentContext): U
       role: 'toolbar',
       label
     },
-    inputs.children.value ?? Row()
+    followedChildren(inputs.children, () => Row())
   );
 }
 
@@ -223,7 +224,7 @@ export function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild 
         minHeight: 0,
         y: 'stretch'
       },
-      inputs.children.value ?? Row()
+      followedChildren(inputs.children, () => Row())
     )
   );
 }

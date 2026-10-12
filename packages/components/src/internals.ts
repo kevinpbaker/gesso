@@ -9,7 +9,8 @@ import {
   decorated,
   focusRing,
   interactive,
-  type UiModifier
+  type UiModifier,
+  type UiChild
 } from 'gesso-core';
 
 /**
@@ -247,4 +248,21 @@ export function layoutOf(inputs: Inputs<ControlLayoutProps>): Record<string, unk
     }
   }
   return passed;
+}
+
+/**
+ * A component's children, followed rather than read once.
+ *
+ * A component runs once, but its parent can draw it again in place: a
+ * list's row rendered again when its data changes, a tree sent again.
+ * Its new children then arrive on the same component, and one that read
+ * `inputs.children.value` at mount kept showing the first: a count in a
+ * `Tooltip` in a list's row said 0 over eighteen, the row's own text
+ * beside it right. `fallback` is what it shows without children.
+ */
+export function followedChildren(
+  children: InputCell<UiChild | undefined>,
+  fallback: () => UiChild
+): Observable<UiChild[]> {
+  return children.pipe(map(child => [child ?? fallback()]));
 }
