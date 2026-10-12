@@ -126,6 +126,12 @@ export namespace JSX {
    * signature. That looks like a functional component, so the check
    * is on the parameter: only a record of input cells is one. Anything
    * else keeps `P`, the attributes TypeScript already found.
+   *
+   * A generic component's type argument written in the tag
+   * (`<MenuBar<Command> />`) does not reach here: TypeScript passes the
+   * uninstantiated component, so its parameter is `unknown`. Name the
+   * instantiation first (`const CommandBar = MenuBar<Command>`) and use
+   * that tag.
    */
   export type LibraryManagedAttributes<C, P> = C extends ClassComponent
     ? ComponentProps<C>
