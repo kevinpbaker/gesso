@@ -1,5 +1,12 @@
 # gesso-core
 
+## 0.6.19
+
+### Patch Changes
+
+- c047559: An empty lazy list laid out at no size, as one not shown yet is, no longer counts toward the warning that a list's viewport is the size of its content. Zero against zero said nothing about the list, but it was one of the two landings the warning waits for, so a single resize that happened to match the content later was enough to warn about a list that was bounded all along.
+- `pointerEvents` now inherits the way CSS's `pointer-events` does. A node under `pointerEvents: 'none'` is passed over by hit testing, but its children are still tested, and one that sets `pointerEvents: 'auto'` takes presses again. Before, `'none'` cut the whole subtree out with no way back, so a popup set to `'auto'` inside an overlay set to `'none'` (to let presses through to what is under it) could never be clicked: the press went through it to whatever was beneath. Focus and the keyboard are unchanged: `'none'` on a node itself still keeps it from both. `pointerEventsOf(node)` gives a node's inherited value.
+
 ## 0.6.18
 
 ### Patch Changes
