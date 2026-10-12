@@ -132,6 +132,23 @@ describe('PlainView', () => {
     expect(ui.getLayout(wide).width).toBeLessThanOrEqual(800);
   });
 
+  it('mounts only the rows of a long list that are in view, however often the tree comes again', () => {
+    const items = (n: number) => Array.from({ length: 1000 }, (_, i) => ({ id: String(i), label: `TODO ${i} (${n})` }));
+    const tree = (n: number) => ({
+      type: 'column',
+      grow: true,
+      children: [
+        { type: 'text', text: 'Comments' },
+        { type: 'list', label: 'Comments', items: items(n), action: 'open' }
+      ]
+    });
+    const { ui, send } = mount(tree(0));
+    expect(ui.getAllByRole('listitem').length).toBeLessThan(40);
+    send(tree(1));
+    expect(ui.getAllByRole('listitem').length).toBeLessThan(40);
+    expect(ui.getLayout(ui.getByRole('list', { name: 'Comments' })).height).toBeLessThanOrEqual(300);
+  });
+
   it('leaves out what it cannot draw, says so, and draws the rest', () => {
     const { ui, problems } = mount(
       view(
