@@ -335,7 +335,8 @@ export class UiVirtualWindow {
    */
   private checkViewport(extent: number, content: number): void {
     if (!this.warnedAboutViewport && extent !== this.lastViewportExtent) {
-      if (this.recentContentExtents.some(recent => Math.abs(recent - extent) < 0.5)) {
+      // A viewport of nothing is a list not shown yet, or one with nothing in it: it lands on an empty content's zero and says nothing.
+      if (extent > 0 && this.recentContentExtents.some(recent => Math.abs(recent - extent) < 0.5)) {
         this.viewportLandedOnContent++;
         if (this.viewportLandedOnContent >= 2) {
           this.warnedAboutViewport = true;

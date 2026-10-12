@@ -169,5 +169,24 @@ describe('UiVirtualWindow', () => {
       window.update({ scroll: 0, extent: 200 }, []);
       expect(warn).not.toHaveBeenCalled();
     });
+
+    it('does not count an empty list laid out at no size, as one not shown yet is', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const window = new UiVirtualWindow(
+        'column',
+        { count: 0, estimatedExtent: 20, overscan: 1, initialViewportExtent: 500 },
+        renderItem
+      );
+      // Nothing in it and nowhere to show it: zero is both extents, and says nothing.
+      window.update({ scroll: 0, extent: 0 }, []);
+      window.setCount(10);
+      window.update({ scroll: 0, extent: 500 }, []);
+      window.setCount(30);
+      // Shown, bounded, then a resize that happens to land on a content extent.
+      window.update({ scroll: 0, extent: 200 }, []);
+      window.setCount(40);
+      window.update({ scroll: 0, extent: 200 }, []);
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 });
