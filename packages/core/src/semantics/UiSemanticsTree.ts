@@ -387,6 +387,7 @@ function walk(
     }
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
       if (claimedByName(node, child)) {
+        warnIfFocusableInside(node, child);
         continue;
       }
       visit(child, record.id, disabled);
@@ -563,6 +564,45 @@ function claimedByName(parent: UiNode, child: UiNode): boolean {
     return child.type === UiNodeType.Text && accessibleText(child) === label;
   }
   return namesItsParent(child) && accessibleText(child) !== undefined;
+}
+
+/** The parents already warned about, so a tree built every frame says it once. */
+const warnedPresentational = new WeakSet<UiNode>();
+/** How much of a presentational subtree is looked through for a focusable node. */
+const PRESENTATIONAL_LOOK = 64;
+
+/**
+ * Warns, once, of a focusable node inside a role whose children are
+ * presentational: a button inside a button. ARIA hides it, so it gets
+ * no record, and Tab stops on it with nothing for a screen reader to
+ * say, which nothing else reports until a Tab walk finds the silence.
+ * The fix is to make the two siblings: the outer control beside the
+ * inner ones rather than around them.
+ */
+function warnIfFocusableInside(parent: UiNode, child: UiNode): void {
+  if (warnedPresentational.has(parent)) {
+    return;
+  }
+  const role = parent.properties.get('role') as UiRole | undefined;
+  if (role === undefined || !PRESENTATIONAL_CHILDREN.has(role)) {
+    return;
+  }
+  const stack: UiNode[] = [child];
+  for (let looked = 0; stack.length > 0 && looked < PRESENTATIONAL_LOOK; looked++) {
+    const node = stack.pop()!;
+    if (node.properties.get('focusable') === true) {
+      warnedPresentational.add(parent);
+      const name = (parent.properties.get('label') as string | undefined) ?? '';
+      const inner = (node.properties.get('label') as string | undefined) ?? '';
+      console.warn(
+        `A focusable node${inner === '' ? '' : ` ('${inner}')`} is inside a ${role}${name === '' ? '' : ` ('${name}')`}, whose children are presentational: it gets no semantics, and Tab stops on it in silence. Make it a sibling of the ${role} instead.`
+      );
+      return;
+    }
+    for (let next = node.firstChild; next !== null; next = next.nextSibling) {
+      stack.push(next);
+    }
+  }
 }
 
 /** Drops the undefined members, so records compare and serialise small. */
