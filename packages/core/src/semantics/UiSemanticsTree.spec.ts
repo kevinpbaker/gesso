@@ -47,6 +47,24 @@ describe('buildSemanticsTree', () => {
     expect(records).toEqual([{ id: button.id, parent: null, index: 0, role: 'button', label: 'Save' }]);
   });
 
+  it('warns once of a focusable node inside a button, which ARIA hides', () => {
+    const t = new Tree();
+    const outer = t.node(UiNodeType.Row, { role: 'button', label: 'SRC folder', focusable: true });
+    const inner = t.node(UiNodeType.Box, { role: 'button', label: 'Refresh', focusable: true });
+    t.add(outer, inner);
+    t.add(t.root, outer);
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (message: string) => warnings.push(message);
+    try {
+      expect(t.build().map(record => record.label)).toEqual(['SRC folder']);
+      t.build();
+    } finally {
+      console.warn = warn;
+    }
+    expect(warnings).toEqual([expect.stringContaining("A focusable node ('Refresh') is inside a button ('SRC folder')")]);
+  });
+
   it('carries a live region setting so changing text can be announced', () => {
     const t = new Tree();
     const status = t.node(UiNodeType.Row, { role: 'status', label: 'Passcode, 1 of 6 digits entered', live: 'polite' });
