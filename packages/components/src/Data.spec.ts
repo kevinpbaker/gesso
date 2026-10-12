@@ -416,6 +416,17 @@ describe('Tree', () => {
     expect(textColour(ui, 'docs')).toBe(hex(darkTheme.colors.selectionForeground));
   });
 
+  it('sits flush in what holds it when asked: no frame, no background, square corners', () => {
+    const framed = tree().getByRole('tree');
+    const flush = tree({ flush: true }).getByRole('tree');
+    expect(framed.properties.get('backgroundColor')).toBe('controlBackground');
+    const edge = (node: UiNode) => (node.decorations ?? []).some(shape => shape.kind === 'stroke' && shape.color === 'controlBorder');
+    expect(edge(framed)).toBe(true);
+    expect(edge(flush)).toBe(false);
+    expect(flush.properties.get('backgroundColor')).toBe('transparent');
+    expect(flush.properties.get('borderRadius')).toBe(0);
+  });
+
   it('draws what leading gives before each label, open or not, and still announces only the label', () => {
     const ui = tree({
       defaultExpanded: ['src'],
