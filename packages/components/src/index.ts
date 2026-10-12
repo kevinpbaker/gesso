@@ -66,6 +66,15 @@ export {
 } from './Tooltip';
 export { Toast, type ToastProps, type ToastPlacement } from './Toast';
 export { LazyList, type LazyListProps } from './LazyList';
+export {
+  PlainView,
+  plainNodeOf,
+  type PlainAction,
+  type PlainLimits,
+  type PlainNode,
+  type PlainNodeType,
+  type PlainViewProps
+} from './PlainView';
 export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';
 export { Tree, type TreeNode, type TreeProps } from './Tree';
 export {
