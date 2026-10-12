@@ -70,6 +70,14 @@ export interface TreeProps extends ControlLayoutProps {
    * reader says, so it should name the node without it.
    */
   leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;
+  /**
+   * Drawn as part of the surface it sits in rather than as a field on
+   * it: no border, no background of its own, square corners. A sidebar's
+   * file tree is the case, where a framed box inside the panel reads as
+   * a form. The focus ring is kept, so the keyboard is still shown.
+   * Read once, when the list mounts.
+   */
+  flush?: boolean;
 }
 
 /** One visible row: a node, how deep it sits, and where among its siblings. */
@@ -83,6 +91,7 @@ interface TreeRow {
 
 export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Tree');
+  const flush = inputs.flush.value === true;
   const rowHeight = input(inputs.rowHeight, 24);
   const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
@@ -253,7 +262,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, ...(flush ? [] : [CONTROL_EDGE])),
       scrollY: list.scrollY,
       focusable: true,
       count,
@@ -262,10 +271,10 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       itemKey: index => rows()[index]?.node.key ?? index,
       role: 'tree',
       label,
-      backgroundColor: 'controlBackground',
+      backgroundColor: flush ? 'transparent' : 'controlBackground',
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
       // chosen row's own background would be painted over it.
-      borderRadius: tokens.select(t => t.radius.scroller),
+      borderRadius: flush ? 0 : tokens.select(t => t.radius.scroller),
       onKeyDown: keymap({
         ArrowDown: () => step(1),
         ArrowUp: () => step(-1),

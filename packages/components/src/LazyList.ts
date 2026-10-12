@@ -53,10 +53,19 @@ export interface LazyListProps extends ControlLayoutProps {
    * where a list has keys beyond its arrows.
    */
   description?: string;
+  /**
+   * Drawn as part of the surface it sits in rather than as a field on
+   * it: no border, no background of its own, square corners. A sidebar's
+   * file tree is the case, where a framed box inside the panel reads as
+   * a form. The focus ring is kept, so the keyboard is still shown.
+   * Read once, when the list mounts.
+   */
+  flush?: boolean;
 }
 
 export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'List');
+  const flush = inputs.flush.value === true;
   const estimated = input(inputs.estimatedItemExtent, 28);
   const focus = trackFocus(ctx, inputs.ref);
   const list = virtualList();
@@ -112,7 +121,7 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
         focus.ref(node);
       },
       windowRef: list.windowRef,
-      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, CONTROL_EDGE),
+      modifiers: modifiersOf(inputs, list.viewport, tokens.modifier, CONTROL_FOCUS_RING, ...(flush ? [] : [CONTROL_EDGE])),
       scrollY: list.scrollY,
       focusable: true,
       count: inputs.count,
@@ -123,10 +132,10 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
       role: 'list',
       label,
       description: inputs.description,
-      backgroundColor: 'controlBackground',
+      backgroundColor: flush ? 'transparent' : 'controlBackground',
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
       // chosen row's own background would be painted over it.
-      borderRadius: tokens.select(t => t.radius.scroller),
+      borderRadius: flush ? 0 : tokens.select(t => t.radius.scroller),
       onKeyDown: keymap({
         ArrowDown: () => step(1),
         ArrowUp: () => step(-1),
