@@ -232,6 +232,7 @@ export type SemanticsProps = PropsOf<
   | 'activeDescendant'
   | 'controls'
   | 'autocomplete'
+  | 'orientation'
 >;
 
 /** Environment values an element provides to its subtree. */

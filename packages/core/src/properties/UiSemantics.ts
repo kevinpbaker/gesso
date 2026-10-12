@@ -84,6 +84,14 @@ export type UiLiveRegion = 'polite' | 'assertive';
  */
 export type UiAutocomplete = 'list' | 'inline' | 'both';
 
+/**
+ * Which way a tablist, toolbar, list or separator runs, where it is not
+ * the way its role assumes: a column of tabs is `vertical`, which a
+ * screen reader says, so the person presses Up and Down rather than
+ * Left and Right. See `aria-orientation`.
+ */
+export type UiOrientation = 'horizontal' | 'vertical';
+
 export const UI_ROLES: readonly UiRole[] = [
   'button',
   'checkbox',

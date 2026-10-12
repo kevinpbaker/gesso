@@ -532,6 +532,16 @@ describe('SemanticsMirror', () => {
     expect(editing.activeDescendant).toBeUndefined();
   });
 
+  it('says which way a tablist runs when it is not the way its role assumes, and stops saying it', () => {
+    const { elementFor, apply } = setup(fakeEditing(false));
+    apply({
+      patches: [{ op: 'add', node: record('n1', { role: 'tablist', label: 'Sidebar views', orientation: 'vertical' }) }]
+    });
+    expect(elementFor('n1').getAttribute('aria-orientation')).toBe('vertical');
+    apply({ patches: [{ op: 'update', node: record('n1', { role: 'tablist', label: 'Sidebar views' }) }] });
+    expect(elementFor('n1').getAttribute('aria-orientation')).toBeNull();
+  });
+
   it('names the list a combobox controls by DOM id, and says it suggests, from the element and from the proxy', () => {
     const editing = fakeEditing(true);
     const { elementFor, apply } = setup(editing);

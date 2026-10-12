@@ -122,7 +122,8 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'aria-current',
   'aria-activedescendant',
   'aria-controls',
-  'aria-autocomplete'
+  'aria-autocomplete',
+  'aria-orientation'
 ];
 
 let mirrors = 0;
@@ -495,6 +496,9 @@ export class SemanticsMirror {
     // A relation, like the active descendant: the id of another record's element.
     if (record.controls !== undefined) {
       element.setAttribute('aria-controls', this.idPrefix + record.controls);
+    }
+    if (record.orientation !== undefined) {
+      element.setAttribute('aria-orientation', record.orientation);
     }
     if (record.autocomplete !== undefined) {
       element.setAttribute('aria-autocomplete', record.autocomplete);
