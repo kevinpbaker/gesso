@@ -359,6 +359,20 @@ describe('NumberInput', () => {
     expect(ui.getByRole('spinbutton', { name: 'Font size' })).toBeDefined();
   });
 
+  it('draws its step buttons as tall as the field, each glyph in the middle', () => {
+    const ui = mount(createComponent(NumberInput, { label: 'Size', labelHidden: true, defaultValue: 13 }));
+    ui.frame();
+    const field = ui.getLayout(ui.getByRole('spinbutton'))!;
+    for (const name of ['Decrease', 'Increase']) {
+      const button = ui.getByRole('button', { name });
+      const box = ui.getLayout(button)!;
+      const glyph = ui.getLayout(button.firstChild!)!;
+      expect(box.height).toBe(field.height);
+      expect(Math.abs(glyph.x + glyph.width / 2 - (box.x + box.width / 2))).toBeLessThanOrEqual(1);
+      expect(Math.abs(glyph.y + glyph.height / 2 - (box.y + box.height / 2))).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('steps with the arrows, bounded by its range', () => {
     const changes: number[] = [];
     const ui = mount(
