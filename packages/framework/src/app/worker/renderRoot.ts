@@ -523,9 +523,6 @@ export class RenderWorkerApp {
       case 'tick':
         this.clock?.tick(message.time);
         break;
-      case 'displayInterval':
-        this.clock?.displayInterval(message.ms);
-        break;
       case 'fullscreenChanged':
         runtime.setFullscreen(message.active);
         return;
