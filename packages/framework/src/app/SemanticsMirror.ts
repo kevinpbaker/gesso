@@ -781,9 +781,20 @@ function setNumber(element: HTMLElement, attribute: string, value: number | unde
  */
 function setText(element: HTMLElement, text: string): void {
   if (element.children.length > 0) {
+    // Its own words, written before its children arrived, are its first
+    // text node: kept in step, or a label that changed went on being read
+    // as the first one. A list's header, a row with no role, said
+    // "Changes, 0 files" over eighteen while drawing 18.
+    const own = element.firstChild;
+    if (own !== null && own.nodeType === TEXT_NODE && own.nodeValue !== text) {
+      own.nodeValue = text;
+    }
     return;
   }
   if (element.textContent !== text) {
     element.textContent = text;
   }
 }
+
+/** `Node.TEXT_NODE`, which a worker-free page has but a spec's fake document does not. */
+const TEXT_NODE = 3;
