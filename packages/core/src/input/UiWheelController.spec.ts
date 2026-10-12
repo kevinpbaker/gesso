@@ -263,6 +263,43 @@ describe('UiWheelController', () => {
       }
     });
 
+    it('moves a slow scroll of whole-pixel steps at uneven times by even steps', () => {
+      // A Mac trackpad's slow scroll as Chrome delivers it, recorded: a
+      // pixel 6 ms after the last step, then two pixels 12 ms after that.
+      // Read off the last two or three steps, the frames moved 2, 1, 0, 3.
+      const { h, scroll, content } = setupVertical();
+      content.setProperty('height', 100_000);
+      h.layoutTree();
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => 0,
+        { pace: true }
+      );
+      const frameMs = 1000 / 165;
+      const moves: number[] = [];
+      let at = 0;
+      let next = 0;
+      for (let frame = frameMs; frame < 600; frame += frameMs) {
+        // Each step reaches the page 8 ms after it happened.
+        while (at + 8 <= frame) {
+          controller.wheel(50, 50, 0, next % 2 === 0 ? 1 : 2, noKeyModifiers(), UiWheelDeltaMode.Pixel, undefined, at);
+          at += next % 2 === 0 ? 12 : 6;
+          next++;
+        }
+        const before = scrollY(h, scroll);
+        controller.advance(frame);
+        moves.push(scrollY(h, scroll) - before);
+      }
+      // Three pixels every 18 ms is a pixel a frame.
+      for (const move of moves.slice(20, 80)) {
+        expect(move).toBeGreaterThan(0.75);
+        expect(move).toBeLessThan(1.3);
+      }
+    });
+
     it('stops at the edge a flick runs into, without springing back off it', () => {
       // A flick up into the top: the prediction reaches past it, the list
       // stops at 0, and withdrawing the prediction must not move it down
