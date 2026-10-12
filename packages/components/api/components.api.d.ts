@@ -611,6 +611,93 @@ interface LazyListProps extends ControlLayoutProps {
   description?: string;
 }
 declare function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild;
+type Space = number;
+interface Keyed {
+  readonly key?: string;
+}
+type PlainNode = (Keyed & {
+  readonly type: 'column' | 'row';
+  readonly children?: readonly PlainNode[];
+  readonly gap?: Space;
+  readonly padding?: Space;
+  readonly align?: 'start' | 'center' | 'end' | 'stretch';
+  readonly grow?: boolean;
+}) | (Keyed & {
+  readonly type: 'scroll';
+  readonly label?: string;
+  readonly children?: readonly PlainNode[];
+  readonly gap?: Space;
+  readonly padding?: Space;
+}) | (Keyed & {
+  readonly type: 'text';
+  readonly text: string;
+  readonly style?: 'body' | 'bodySmall' | 'label' | 'title';
+  readonly tone?: 'default' | 'muted' | 'danger' | 'primary';
+  readonly mono?: boolean;
+  readonly oneLine?: boolean;
+}) | (Keyed & {
+  readonly type: 'heading';
+  readonly text: string;
+}) | (Keyed & {
+  readonly type: 'button';
+  readonly label: string;
+  readonly action: string;
+  readonly variant?: 'filled' | 'outlined' | 'plain';
+  readonly disabled?: boolean;
+}) | (Keyed & {
+  readonly type: 'textInput';
+  readonly label: string;
+  readonly value?: string;
+  readonly placeholder?: string;
+  readonly action: string;
+}) | (Keyed & {
+  readonly type: 'checkbox';
+  readonly label: string;
+  readonly checked: boolean;
+  readonly action: string;
+}) | (Keyed & {
+  readonly type: 'select';
+  readonly label: string;
+  readonly value: string;
+  readonly options: readonly {
+    readonly value: string;
+    readonly label: string;
+  }[];
+  readonly action: string;
+}) | (Keyed & {
+  readonly type: 'list';
+  readonly label: string;
+  readonly items: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly detail?: string;
+  }[];
+  readonly action: string;
+}) | (Keyed & {
+  readonly type: 'divider';
+});
+type PlainNodeType = PlainNode['type'];
+interface PlainAction {
+  readonly action: string;
+  readonly value: string | boolean | null;
+}
+interface PlainLimits {
+  readonly nodes?: number;
+  readonly depth?: number;
+  readonly chars?: number;
+}
+interface PlainViewProps {
+  node: unknown;
+  onAction?: (action: PlainAction) => void;
+  onProblem?: (problems: readonly string[]) => void;
+  limits?: PlainLimits;
+  label?: string;
+}
+declare function plainNodeOf(raw: unknown, limits?: PlainLimits): {
+  readonly node: PlainNode;
+  readonly problems: readonly string[];
+};
+declare function PlainView(inputs: Inputs<PlainViewProps>, ctx: ComponentContext): UiChild;
 interface DataColumn<T> {
   readonly key: string;
   readonly header: string;
@@ -992,6 +1079,8 @@ export {
   PALETTE,
   parseIsoDate,
   pattern,
+  plainNodeOf,
+  PlainView,
   ProgressBar,
   quantize,
   RadioGroup,
@@ -1093,6 +1182,11 @@ export {
   type OverlayOptions,
   type PaginationProps,
   type PaletteColor,
+  type PlainAction,
+  type PlainLimits,
+  type PlainNode,
+  type PlainNodeType,
+  type PlainViewProps,
   type Problems,
   type ProgressBarProps,
   type RadioGroupProps,
