@@ -362,6 +362,22 @@ describe('SplitPane', () => {
     expect(dividerX()).toBeGreaterThan(at40);
   });
 
+  it('draws its divider as a one-pixel line when asked, in the same grab area', () => {
+    const ui = mount(createComponent(SplitPane, { divider: 'line', first: Box({}), second: Box({}) }));
+    ui.frame();
+    const divider = ui.getByRole('separator');
+    expect(divider.properties.get('backgroundColor')).toBe('transparent');
+    expect(divider.properties.get('borderWidth')).toBe(0);
+    expect(ui.getLayout(divider)!.width).toBe(6);
+    const rule = divider.firstChild!;
+    expect(rule.properties.get('backgroundColor')).toBe('border');
+    expect(ui.getLayout(rule)!.width).toBe(1);
+    // The default is the framed bar, with nothing inside it.
+    const bar = mount(createComponent(SplitPane, { first: Box({}), second: Box({}) })).getByRole('separator');
+    expect(bar.properties.get('backgroundColor')).toBe('controlBackground');
+    expect(bar.firstChild).toBeNull();
+  });
+
   it('reports where the divider is, as a percentage', () => {
     const ui = mount(createComponent(SplitPane, { defaultSplit: 0.35, first: Box({}), second: Box({}) }));
     const record = ui.recordsFor('separator')[0];

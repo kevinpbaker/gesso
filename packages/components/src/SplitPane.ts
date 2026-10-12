@@ -46,6 +46,15 @@ export interface SplitPaneProps extends ControlLayoutProps {
    * it comes back. Default `'both'`.
    */
   show?: 'both' | 'first' | 'second';
+  /**
+   * How the divider is drawn. `'bar'`, the default, is a framed handle
+   * that reads as a control. `'line'` is a one-pixel rule in the middle
+   * of the same grab area, for an application whose panes meet edge to
+   * edge, as an editor's sidebar and panel do, where a framed bar reads
+   * as two lines with a gap. It lights up under the pointer and shows
+   * focus as the bar does. Read once, when the split mounts.
+   */
+  divider?: 'bar' | 'line';
 }
 
 export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild {
@@ -87,6 +96,7 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
   );
   const both = show.pipe(map(shown => shown === 'both'));
   const dividerSize = both.pipe(map(shown => (shown ? 6 : 0)));
+  const line = inputs.divider.value === 'line';
   const divider = Box({
     ref: focus.ref,
     focusable: true,
@@ -100,9 +110,11 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
     // keystroke in a pane moved the pane by a fraction of a pixel and
     // re-measured everything in it.
     flexShrink: 0,
-    backgroundColor: 'controlBackground',
+    backgroundColor: line ? 'transparent' : 'controlBackground',
     borderColor: 'controlBorder',
-    borderWidth: both.pipe(map(shown => (shown ? 1 : 0))),
+    borderWidth: line ? 0 : both.pipe(map(shown => (shown ? 1 : 0))),
+    x: 'center',
+    y: 'center',
     cursor: horizontal() ? 'col-resize' : 'row-resize',
     role: 'separator',
     label,
@@ -126,7 +138,7 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
       Home: () => split.change(min.value),
       End: () => split.change(max.value)
     })
-  });
+  }, ...(line ? [Box({ width: horizontal() ? 1 : percent(100), height: horizontal() ? percent(100) : 1, backgroundColor: 'border' })] : []));
 
   const container = {
     ...layoutOf(inputs),
