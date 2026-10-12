@@ -64,6 +64,10 @@ export interface ProofFrame {
   readonly measured: number;
   readonly nodes: number;
   readonly inputLatencyMs: number | null;
+  /** The display time the frame was drawn for, on the render worker's clock. */
+  readonly time: number | null;
+  /** Where the wheel's last container was scrolled to after the frame. */
+  readonly wheelScroll: { readonly x: number; readonly y: number } | null;
   /** Which backend drew, and where the frame's time went. */
   readonly renderer: string;
   readonly phases: Record<string, number>;
@@ -135,6 +139,8 @@ export class ProofRecording implements ProofHandle {
       measured: metrics.measured,
       nodes: metrics.nodes,
       inputLatencyMs: metrics.inputLatencyMs,
+      time: metrics.time,
+      wheelScroll: metrics.wheelScroll,
       renderer: metrics.renderer,
       phases: { ...metrics.phases },
       gpu: metrics.gpu === null ? null : { ...metrics.gpu }

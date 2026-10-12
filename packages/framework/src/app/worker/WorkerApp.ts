@@ -932,6 +932,8 @@ export class WorkerApp {
         layoutPasses: message.layoutPasses,
         at: message.at,
         inputLatencyMs: message.inputLatencyMs,
+        time: message.time,
+        wheelScroll: message.wheelScroll,
         phases: message.phases,
         renderer: message.renderer,
         gpu: message.gpu

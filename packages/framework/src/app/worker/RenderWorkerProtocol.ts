@@ -342,6 +342,8 @@ export type RuntimeToShellMessage =
       layoutPasses: number;
       at: number;
       inputLatencyMs: number | null;
+      time: number | null;
+      wheelScroll: { readonly x: number; readonly y: number } | null;
       phases: FramePhaseTimings;
       renderer: RendererBackend | 'pending';
       gpu: GpuStageTimings | null;
