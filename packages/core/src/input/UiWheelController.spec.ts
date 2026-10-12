@@ -250,6 +250,19 @@ describe('UiWheelController', () => {
       expect(Math.max(...behind.slice(0, 30))).toBeLessThanOrEqual(0);
     });
 
+    it('moves a steady flick by even steps on a display faster than the trackpad', () => {
+      // 120 Hz of steps on a 165 Hz screen: a frame often comes more than
+      // half a frame after the last step. Capped at a frame and a half
+      // ahead, those frames moved two pixels between frames of sixteen.
+      const { moves } = flick(80, 1000 / 120, 1000 / 165);
+      // Once the display's rate is measured, each frame moves by what the
+      // input moves in a frame (7.3 pixels).
+      for (const move of moves.slice(15, 100)) {
+        expect(move).toBeGreaterThan(6);
+        expect(move).toBeLessThan(8.5);
+      }
+    });
+
     it('stops at the edge a flick runs into, without springing back off it', () => {
       // A flick up into the top: the prediction reaches past it, the list
       // stops at 0, and withdrawing the prediction must not move it down

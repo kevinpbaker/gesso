@@ -603,15 +603,24 @@ export class UiWheelController {
       // that is slowing is predicted at the speed it had, runs ahead, and
       // has to step back.
       let first = last;
+      let gaps = 0;
       for (let k = samples.length - 2; k >= 0 && last !== undefined && samples[k]!.t >= last.t - RECENT_MS; k--) {
         first = samples[k];
+        gaps++;
       }
       const since = time === undefined || last === undefined ? -1 : time - last.t;
       // Only on one clock, and only while the steps are recent: a time
       // that doesn't fit is a host that didn't say when, and goes exact.
       if (last !== undefined && first !== undefined && since >= -1 && since < STALE_MS && last.t - first.t >= 2) {
         const span = last.t - first.t;
-        const ahead = Math.min(Math.max(since, 0) + this.frameInterval, this.frameInterval * MAX_AHEAD_FRAMES);
+        // As far as a step's gap past a frame's lead. Capped at a frame and
+        // a half, a display faster than the trackpad (120 Hz of steps on a
+        // 165 Hz screen) often draws a frame more than half a frame after
+        // the last step: the cap cut that frame's prediction short, the
+        // next step's frame was held from going back, and the page went
+        // in a stutter of short and full moves.
+        const gap = Math.max(span / gaps, this.frameInterval * (MAX_AHEAD_FRAMES - 1));
+        const ahead = Math.min(Math.max(since, 0) + this.frameInterval, this.frameInterval + gap);
         x += ((last.x - first.x) / span) * ahead;
         y += ((last.y - first.y) / span) * ahead;
       }
