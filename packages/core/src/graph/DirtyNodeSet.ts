@@ -36,6 +36,11 @@ export class DirtyNodeSet {
     return this.nodes.size === 0;
   }
 
+  /** The nodes in the set, without draining it. Not to be changed while walked. */
+  values(): IterableIterator<UiNode> {
+    return this.nodes.values();
+  }
+
   /**
    * Whether any node in the set carries one of `flags`, without
    * draining it.

@@ -102,6 +102,8 @@ describe('scroll layers', () => {
     renderer = new Canvas2DRenderer({
       surface,
       scrollLayers: options.scrollLayers,
+      // Text drawn directly, so every canvas made here is a layer's.
+      textCache: false,
       // These specs are about what a layer does once it exists; when to
       // build one is the settle spec's, at the default.
       scrollLayerSettleFrames: options.settle ?? 1,
@@ -146,6 +148,9 @@ describe('scroll layers', () => {
   }
 
   function drain(): UiFrame {
+    // As the runtime does before collecting: an inherited value set on a
+    // node is passed down, marking the descendants that read it.
+    graph.processEnvironmentDirty();
     const dirty = new Map<UiNode, DirtyFlags>();
     for (const node of graph.getDirtyNodes().take()) {
       dirty.set(node, node.dirtyFlags);
@@ -213,15 +218,17 @@ describe('scroll layers', () => {
     expect(renderer.scrollLayerStats.built).toBe(1);
   });
 
-  it('builds none for a scroll that mounts rows as it goes, where each would be dropped on the next frame', () => {
-    // A virtualised list: every frame of its scroll adds a row. A layer
-    // built on each scroll frame was two viewport canvases made, filled
-    // and thrown away per frame — gessosheet's scroll, three times
-    // slower in software rendering, and a render worker that stalled on
-    // the allocations whenever the page was blocked.
+  it('keeps one layer through a scroll that mounts rows as it goes', () => {
+    // A virtualised list: every frame of its scroll adds a row past the
+    // end. A layer that dropped on every such frame was two viewport
+    // canvases made, filled and thrown away per frame (gessosheet's
+    // scroll, three times slower in software rendering). The rows it
+    // adds are off the viewport, so the layer keeps what it holds and
+    // paints only the strip each scroll brings into view.
     setup({ settle: SCROLL_LAYER_SETTLE_FRAMES });
     frame();
     let built = 0;
+    let dropped = 0;
     for (let step = 1; step <= 20; step++) {
       const row = graph.createNode(`more${step}`, UiNodeType.Box);
       row.setProperty('height', ROW);
@@ -230,9 +237,11 @@ describe('scroll layers', () => {
       graph.markDirty(scroll, DirtyFlags.Children | DirtyFlags.Layout);
       scrollTo(step * 2);
       built += renderer.scrollLayerStats.built;
+      dropped += renderer.scrollLayerStats.dropped;
     }
-    expect(built).toBe(0);
-    expect(layers).toEqual([]);
+    expect(built).toBe(1);
+    expect(dropped).toBe(0);
+    expect(directRowFills()).toEqual([]);
   });
 
   it('on a frame that only scrolled, shifts the pixels and paints only the strip that came into view', () => {
@@ -272,23 +281,47 @@ describe('scroll layers', () => {
     expect(directRowFills()).toEqual([]);
   });
 
-  it('drops the layer and draws directly when something inside the container changes', () => {
+  it('repaints only the item that changed inside the container', () => {
     scrollTo(10);
     set(rows[1], 'backgroundColor', '#abcdef');
     frame();
 
-    expect(renderer.scrollLayerStats.dropped).toBe(1);
-    expect(composites()).toEqual([]);
-    expect(directRowFills().length).toBe(4);
+    expect(renderer.scrollLayerStats.dropped).toBe(0);
+    expect(composites().length).toBe(1);
+    expect(directRowFills()).toEqual([]);
+    // Row 1 is 30..60 of the content, 20..50 of the viewport at a scroll
+    // of 10, widened by what a row may paint past its box.
+    expect(callArgs(layers[0]!.context, 'rect')).toEqual([[0, 12, 200, 46]]);
   });
 
-  it('drops the layer when an ancestor is dirtied, since inherited paint reaches the subtree without dirtying it', () => {
+  it('keeps the layer when the runtime asks for a frame at the root', () => {
+    // A scrollbar fading or an inspector outline marks the root for paint
+    // and nothing else: nothing inside the container changed.
     scrollTo(10);
     graph.markDirty(root, DirtyFlags.Paint);
     frame();
 
-    expect(renderer.scrollLayerStats.dropped).toBe(1);
-    expect(directRowFills().length).toBe(4);
+    expect(renderer.scrollLayerStats.dropped).toBe(0);
+    expect(composites().length).toBe(1);
+    expect(directRowFills()).toEqual([]);
+  });
+
+  it('draws again what reads an inherited value changed above it', () => {
+    // Set on an ancestor, an inherited colour marks the text that reads
+    // it, and the layer draws that text's row again.
+    const label = graph.createNode('label', UiNodeType.Text);
+    set(label, 'text', 'row one');
+    graph.appendChild(rows[1]!, label);
+    frame();
+    scrollTo(10);
+    scrollTo(10.000001);
+    // Through the graph, as the runtime sets a property, which is what
+    // passes an inherited value down.
+    graph.updateNodeProperty(root, 'color', '#123456', propertyEffects('color'));
+    frame();
+
+    expect(renderer.scrollLayerStats.dropped).toBe(0);
+    expect(callArgs(layers[0]!.context, 'rect').length).toBeGreaterThan(0);
   });
 
   it('drops the layer when layout moves anything', () => {
@@ -300,13 +333,15 @@ describe('scroll layers', () => {
     expect(directRowFills().length).toBe(4);
   });
 
-  it('drops the layer for a scroll that is not a whole number of device pixels', () => {
+  it('follows a scroll of a fraction of a pixel to the pixel the frame draws it at', () => {
+    // A trackpad's paced offset is almost never whole; the frame draws it
+    // snapped to a device pixel, and the layer follows the snapped one.
     scrollTo(10);
     scrollTo(12.5);
 
-    expect(renderer.scrollLayerStats.dropped).toBe(1);
-    expect(composites()).toEqual([]);
-    expect(directRowFills().length).toBe(4);
+    expect(renderer.scrollLayerStats.dropped).toBe(0);
+    expect(renderer.scrollLayerStats.shifted).toBe(1);
+    expect(directRowFills()).toEqual([]);
   });
 
   it('follows a scroll that floating point made nearly whole, and keeps the pixels true to the whole one', () => {

@@ -35,7 +35,7 @@ import { ScaledImageCache } from '../ScaledImageCache';
 import { paintPictures } from '../PaintPicture';
 import type { PaintContext2D } from '../PaintTarget';
 import { PreciseContext } from './PreciseContext';
-import { offscreenLayerCanvas, placeLayer, ScrollLayerCache } from './ScrollLayers';
+import { offscreenLayerCanvas, placeLayer, ScrollLayerCache, SPILL } from './ScrollLayers';
 import { TextRasterCache } from './TextRasterCache';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
 
@@ -1051,10 +1051,22 @@ export class Canvas2DRenderer implements UiRenderer {
         layers.drop(node);
         return false;
       }
-      for (const strip of strips) {
-        this.paintLayer(layer, strip, node, rec, context);
+      // Changed items' old pixels go first; a strip a scroll exposed is
+      // clear already.
+      const damage = layers.damage(layer, node, context.layout);
+      const wrong = damage === 'all' ? [{ x: 0, y: 0, width: layer.width, height: layer.height }] : damage;
+      if (wrong.length > 0) {
+        const front = layer.frontContext;
+        front.setTransform(1, 0, 0, 1, 0, 0);
+        for (const rect of wrong) {
+          front.clearRect(rect.x, rect.y, rect.width, rect.height);
+        }
+      }
+      if (strips.length > 0 || wrong.length > 0) {
+        this.paintLayer(layer, [...strips, ...wrong], node, rec, context);
       }
     }
+    layers.remember(layer, node, context.layout);
 
     layer.used = true;
     layers.stats.composited++;
@@ -1088,7 +1100,7 @@ export class Canvas2DRenderer implements UiRenderer {
    */
   private paintLayer(
     layer: ScrollLayer,
-    strip: LayerRect | null,
+    strips: readonly LayerRect[] | null,
     node: UiNode,
     rec: LayoutRecord,
     context: RenderContext
@@ -1097,10 +1109,14 @@ export class Canvas2DRenderer implements UiRenderer {
     // still in the middle of its walk, so they cannot share a wrapper.
     const lctx = new PreciseContext(layer.frontContext);
     lctx.save();
-    if (strip !== null) {
+    if (strips !== null) {
+      // Every strip in one walk: the strip a scroll exposed, and the items
+      // something changed (see \`ScrollLayerCache.damage\`).
       lctx.setTransform(1, 0, 0, 1, 0, 0);
       lctx.beginPath();
-      lctx.rect(strip.x, strip.y, strip.width, strip.height);
+      for (const strip of strips) {
+        lctx.rect(strip.x, strip.y, strip.width, strip.height);
+      }
       lctx.clip();
     }
     const dpr = layer.dpr;
@@ -1120,6 +1136,31 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullY = rec.y + layer.scrollY;
     this.cullWidth = rec.width;
     this.cullHeight = rec.height;
+    if (strips !== null && strips.length > 0) {
+      // Only what reaches the strips, a spill's width past them, is
+      // walked: a scroll's strip is a row or two, and walking every row on
+      // screen to paint it cost what a direct draw's walk would. What
+      // paints further past its box than a spill (see \`SPILL\`) is not
+      // caught, here or by the damage that names the strips.
+      let left = Infinity;
+      let top = Infinity;
+      let right = -Infinity;
+      let bottom = -Infinity;
+      for (const strip of strips) {
+        left = Math.min(left, strip.x);
+        top = Math.min(top, strip.y);
+        right = Math.max(right, strip.x + strip.width);
+        bottom = Math.max(bottom, strip.y + strip.height);
+      }
+      const x0 = Math.max(this.cullX, (left - layer.offsetX) / dpr + layer.scrollX - SPILL);
+      const y0 = Math.max(this.cullY, (top - layer.offsetY) / dpr + layer.scrollY - SPILL);
+      const x1 = Math.min(this.cullX + this.cullWidth, (right - layer.offsetX) / dpr + layer.scrollX + SPILL);
+      const y1 = Math.min(this.cullY + this.cullHeight, (bottom - layer.offsetY) / dpr + layer.scrollY + SPILL);
+      this.cullX = x0;
+      this.cullY = y0;
+      this.cullWidth = Math.max(0, x1 - x0);
+      this.cullHeight = Math.max(0, y1 - y0);
+    }
     this.layerDepth++;
     try {
       this.renderChildren(node, context, lctx, true);
