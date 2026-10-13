@@ -46,7 +46,7 @@ describe('render changes', () => {
     expect(context.changes!.geometryVersion).toBe(before.changes!.geometryVersion);
   });
 
-  it('withholds the changes on a frame where something was dirtied after they were collected', () => {
+  it('tells the renderer of what was dirtied after the changes were collected, too', () => {
     const render = vi.spyOn(Canvas2DRenderer.prototype, 'render');
     const offset = internalState(0);
     const color = internalState('#fff');
@@ -72,6 +72,12 @@ describe('render changes', () => {
     offset.value = 40;
     mounted.frame();
     const context = render.mock.calls.at(-1)![1] as RenderContext;
-    expect(context.changes).toBeUndefined();
+    // The box the listener recoloured is drawn in its new colour now, so
+    // the renderer is told it changed, as well as what the frame took.
+    expect(context.changes).toBeDefined();
+    const recoloured = [...context.changes!.frame.entries()].some(
+      ([node, flags]) => node.properties.get('width') === 20 && (flags & DirtyFlags.Paint) !== 0
+    );
+    expect(recoloured).toBe(true);
   });
 });

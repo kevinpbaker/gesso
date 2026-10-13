@@ -1,7 +1,9 @@
 import { DirtyFlags } from '../../graph/DirtyFlags';
 import type { UiNode } from '../../graph/UiNode';
+import { UiNodeType } from '../../graph/UiNodeType';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
-import type { RenderChanges } from '../RenderContext';
+import type { LayoutReader, RenderChanges } from '../RenderContext';
+import { snapScroll } from '../ScrollSnap';
 import type { Canvas2DContext } from './Canvas2DContext';
 import type { CanvasHost } from './CanvasSurface';
 
@@ -35,26 +37,33 @@ import type { CanvasHost } from './CanvasSurface';
  * subtree changed.
  *
  * **When one is trusted.** Only when the caller vouches for what
- * changed (`RenderContext.changes`), and only while all of these hold:
+ * changed (\`RenderContext.changes\`), and only while all of these hold:
  *
- *   - no box moved anywhere (`geometryVersion` is unchanged), and the
- *     frame dirtied nothing but paint, scroll and semantics;
- *   - nothing in the container's subtree, and none of its ancestors,
- *     was dirtied, except the container's own scroll offset — an
- *     ancestor because inherited paint (a text colour, a font) reaches
- *     the subtree without dirtying it, and because the runtime marks
- *     the root to ask for a repaint and says nothing about what for;
+ *   - no ancestor's properties or environment changed: an inherited
+ *     value set above marks the descendants that read it, which is
+ *     damage like any other, and this keeps the old caution for the
+ *     rest. An ancestor marked for paint alone is the runtime asking
+ *     for a frame; one laid out again either leaves the container where
+ *     it was or moves it, which the next rule hears about;
  *   - the container lands on the same device-pixel phase, at the same
  *     device scale, with no rotation, skew or scale above it and no
  *     opacity in force, so a copy is exact rather than resampled;
- *   - the scroll moved it by a whole number of device pixels;
  *   - nothing the layer drew depends on the clock (a caret, a fading
  *     scrollbar, a video frame) or escaped it (a lifted node).
+ *
+ * **What a frame redraws in it.** The strip a scroll brought into view
+ * (the scroll as the frame draws it, snapped to a device pixel), and the
+ * items something changed (see \`damage\`): an item, one of the
+ * container's children through any fragments, is wrong where it was and
+ * where it is when it is added, removed, moved, or changed inside. A
+ * lazy list scrolling mounts and unmounts rows in its overscan and grows
+ * and shrinks spacers off screen, so what it redraws is the strip. Only
+ * what reaches the strips is walked, a \`SPILL\` past them.
  *
  * Anything else, and the container is drawn directly, exactly as it
  * was before layers existed. The first frame a container scrolls on
  * pays for the layer — its content drawn into it, then the copy onto
- * the frame — and every scroll-only frame after that is repaid.
+ * the frame — and every frame after that is repaid.
  *
  * **What it cannot help.** A frame where the content itself changes —
  * a live layer redrawn every tick, a zoom that resizes every tile — is
@@ -113,9 +122,6 @@ const MAX_LAYERS = 4;
  */
 export const SCROLL_LAYER_SETTLE_FRAMES = 3;
 
-/** Dirt that says only what was painted, scrolled or meant — nothing moved. */
-const RETAINABLE = DirtyFlags.Paint | DirtyFlags.Properties | DirtyFlags.Transform | DirtyFlags.Semantics;
-
 /** Where a container's viewport lands in device pixels this frame. */
 export interface LayerPlacement {
   /** The whole-pixel rectangle the layer covers on the surface. */
@@ -159,6 +165,20 @@ export interface ScrollLayer {
   scrollX: number;
   scrollY: number;
   used: boolean;
+  /**
+   * Where each of the container's items (its children, through any
+   * fragments) was when the layer was last drawn, in the children's
+   * coordinates: what an item added, removed or moved is judged by.
+   */
+  items: Map<UiNode, ItemBox>;
+}
+
+/** An item's box in the container's children's coordinates. */
+interface ItemBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 /** What the layers did, for `ScrollLayers.budget.spec.ts`. */
@@ -183,15 +203,10 @@ export class ScrollLayerCache {
    * is how every one of those ends.
    */
   private readonly refused = new Set<UiNode>();
-  private geometryVersion = Number.NaN;
   private dpr = 0;
   private surfaceWidth = 0;
   private surfaceHeight = 0;
   private frame: RenderChanges['frame'] | null = null;
-  /** Whether this frame changed nothing a layer could not absorb: no layout, children, content or environment. */
-  private calm = false;
-  /** Nodes this frame dirtied, and every ancestor of each, less a container that only scrolled. */
-  private readonly disturbed = new Set<UiNode>();
   /** Consecutive frames each container without a layer has scrolled quietly. See `SCROLL_LAYER_SETTLE_FRAMES`. */
   private readonly streaks = new WeakMap<UiNode, number>();
   /**
@@ -222,76 +237,50 @@ export class ScrollLayerCache {
   /**
    * Settles which layers this frame's changes leave standing, before
    * anything is drawn. Every rule here drops; none keeps. A frame the
-   * caller could not vouch for drops them all.
+   * caller could not vouch for drops them all. What changed inside a
+   * container is not settled here but drawn over: see \`damage\`.
    */
   beginFrame(changes: RenderChanges | undefined, dpr: number, surfaceWidth: number, surfaceHeight: number): void {
     const interrupted = this.open;
     this.open = true;
-    this.disturbed.clear();
-    // What this frame disturbed, worked out whether or not any layer
-    // exists yet: it is also the evidence `wants` builds on.
-    this.calm = changes !== undefined;
-    for (const [node, flags] of changes?.frame.entries() ?? []) {
-      if ((flags & ~RETAINABLE) !== 0) {
-        this.calm = false;
-        break;
-      }
-      // A container that scrolled disturbs what is above it, not its own
-      // layer, which holds its children and absorbs the scroll; whatever
-      // else it repainted of itself is drawn outside the layer.
-      for (
-        let current = (flags & DirtyFlags.Transform) !== 0 ? node.parent : node;
-        current !== null;
-        current = current.parent
-      ) {
-        this.disturbed.add(current);
-      }
-    }
     if (
       interrupted ||
       changes === undefined ||
       dpr !== this.dpr ||
       surfaceWidth !== this.surfaceWidth ||
-      surfaceHeight !== this.surfaceHeight ||
-      changes.geometryVersion !== this.geometryVersion
+      surfaceHeight !== this.surfaceHeight
     ) {
       this.dropAll();
       this.dpr = dpr;
       this.surfaceWidth = surfaceWidth;
       this.surfaceHeight = surfaceHeight;
-      this.geometryVersion = changes?.geometryVersion ?? Number.NaN;
       this.frame = changes?.frame ?? null;
       return;
     }
     const frame = changes.frame;
     this.frame = frame;
-    if (this.layers.size === 0 && this.refused.size === 0) {
-      return;
+    // What changed inside a container is the layer's to absorb, item by
+    // item (see \`damage\`); a box moving anywhere else moves the layer on
+    // the surface, which \`fits\` hears about. What an ancestor changed is
+    // another matter: inherited paint reaches the subtree without
+    // dirtying it, so a dirty ancestor is a dirty subtree. An ancestor
+    // that only scrolled moves the layer, which \`fits\` hears about too.
+    for (const node of this.layers.keys()) {
+      if (dirtyAbove(frame, node)) {
+        this.forget(node);
+      }
     }
+    // A refused container is tried again once anything in or above it
+    // changes, which is how a caret or a fading scrollbar inside it ends:
+    // the blink or the fade timer marks the root.
     for (const [node, flags] of frame.entries()) {
-      if ((flags & ~RETAINABLE) !== 0) {
-        // Layout, children, content or environment: something may have
-        // moved or restyled without a box saying so. The version would
-        // usually have caught it; this does not depend on "usually".
-        this.dropAll();
-        return;
+      // Its own scroll, or an ancestor's, changes nothing it holds.
+      if (flags === DirtyFlags.Transform) {
+        continue;
       }
-      // A container's own scroll is the one change its layer absorbs.
-      // Its ancestors' layers are another matter: they hold its pixels.
-      const scrolledOnly = flags === DirtyFlags.Transform;
-      for (let current = scrolledOnly ? node.parent : node; current !== null; current = current.parent) {
-        this.forget(current);
-      }
-    }
-    // Inherited paint reaches a subtree without dirtying it, so a dirty
-    // ancestor is a dirty subtree. An ancestor that only scrolled moves
-    // the layer on the surface, which the placement check hears about.
-    for (const node of [...this.layers.keys(), ...this.refused]) {
-      for (let ancestor = node.parent; ancestor !== null; ancestor = ancestor.parent) {
-        const flags = frame.dirtyFlagsFor(ancestor);
-        if (flags !== DirtyFlags.None && flags !== DirtyFlags.Transform) {
-          this.forget(node);
-          break;
+      for (const refused of this.refused) {
+        if (node === refused || contains(node, refused) || contains(refused, node)) {
+          this.refused.delete(refused);
         }
       }
     }
@@ -315,16 +304,18 @@ export class ScrollLayerCache {
 
   /**
    * Whether a container with no layer should get one now: it has
-   * scrolled on the last few frames running with nothing else in or
-   * above it changing, which is the evidence a layer would be kept, and
-   * it has not just shown it holds something a layer cannot.
+   * scrolled on the last few frames running with nothing above it
+   * changing, which is the evidence a layer would be kept, and it has
+   * not just shown it holds something a layer cannot. What changes
+   * inside it is absorbed item by item (see \`damage\`), so a lazy list
+   * mounting rows as it scrolls keeps its layer.
    */
   wants(node: UiNode): boolean {
     const frame = this.frame;
     if (frame === null || this.layers.size >= MAX_LAYERS || this.refused.has(node)) {
       return false;
     }
-    if (!this.calm || this.disturbed.has(node) || dirtyAbove(frame, node)) {
+    if (dirtyAbove(frame, node)) {
       this.streaks.delete(node);
       return false;
     }
@@ -359,9 +350,10 @@ export class ScrollLayerCache {
       offsetX: placement.offsetX,
       offsetY: placement.offsetY,
       dpr: this.dpr,
-      scrollX: rec.scrollX,
-      scrollY: rec.scrollY,
-      used: true
+      scrollX: snapScroll(rec.scrollX, this.dpr),
+      scrollY: snapScroll(rec.scrollY, this.dpr),
+      used: true,
+      items: new Map()
     };
     this.layers.set(node, layer);
     this.stats.built++;
@@ -392,8 +384,11 @@ export class ScrollLayerCache {
    * device pixels, which a copy cannot follow without resampling.
    */
   shift(layer: ScrollLayer, rec: LayoutRecord): LayerRect[] | null {
-    const exactX = (layer.scrollX - rec.scrollX) * layer.dpr;
-    const exactY = (layer.scrollY - rec.scrollY) * layer.dpr;
+    // The offset as the frame draws it, on a whole device pixel (see
+    // \`snapScroll\`): a trackpad's paced offset is almost never one, and
+    // the direct draw it stands in for is snapped too.
+    const exactX = (layer.scrollX - snapScroll(rec.scrollX, layer.dpr)) * layer.dpr;
+    const exactY = (layer.scrollY - snapScroll(rec.scrollY, layer.dpr)) * layer.dpr;
     const dx = Math.round(exactX);
     const dy = Math.round(exactY);
     if (Math.abs(exactX - dx) > EPSILON || Math.abs(exactY - dy) > EPSILON) {
@@ -438,6 +433,107 @@ export class ScrollLayerCache {
     return strips;
   }
 
+  /**
+   * The parts of a layer this frame's changes inside the container left
+   * wrong, in the layer's pixels, or \`'all'\` when that is most of it.
+   * Called after \`shift\`, so the layer's offset is the frame's.
+   *
+   * Judged item by item, an item being one of the container's children
+   * (through any fragments): a lazy list's row, say. An item added,
+   * removed or moved is wrong where it was and where it is; an item with
+   * anything changed inside it is wrong where it is. Whatever none of
+   * that touches is right already, which in a lazy list scrolling is
+   * everything on screen: the rows it mounts and unmounts are in its
+   * overscan, and the spacers that stand for the rest only grow and
+   * shrink off the top and bottom.
+   */
+  damage(layer: ScrollLayer, container: UiNode, layout: LayoutReader): LayerRect[] | 'all' {
+    const frame = this.frame;
+    if (frame === null) {
+      return 'all';
+    }
+    const boxes: ItemBox[] = [];
+    // Changed inside an item: wrong where the item was and is.
+    for (const [node, flags] of frame.entries()) {
+      if (node === container) {
+        // Its own paint is drawn outside the layer, its children are
+        // compared below and its size is \`fits\`'s; but inherited style
+        // reaches every item without dirtying one.
+        if ((flags & DirtyFlags.Environment) !== 0) {
+          return 'all';
+        }
+        continue;
+      }
+      const item = itemHolding(container, node);
+      if (item === null) {
+        continue;
+      }
+      const was = layer.items.get(item);
+      const now = boxOf(layout, item);
+      if (was !== undefined) {
+        boxes.push(was);
+      }
+      if (now !== undefined && (was === undefined || !sameBox(was, now))) {
+        boxes.push(now);
+      }
+    }
+    // Added, removed or moved: wrong where it was and where it is.
+    const seen = new Set<UiNode>();
+    for (const item of itemsOf(container)) {
+      seen.add(item);
+      const now = boxOf(layout, item);
+      const was = layer.items.get(item);
+      if (now === undefined) {
+        continue;
+      }
+      if (was === undefined) {
+        boxes.push(now);
+      } else if (!sameBox(was, now)) {
+        boxes.push(was, now);
+      }
+    }
+    for (const [item, was] of layer.items) {
+      if (!seen.has(item)) {
+        boxes.push(was);
+      }
+    }
+    const rects: LayerRect[] = [];
+    let area = 0;
+    for (const box of boxes) {
+      const rect = this.toLayer(layer, box);
+      // An item changed inside and moved is named twice; drawn once.
+      if (rect !== null && !rects.some(other => sameBox(other, rect))) {
+        rects.push(rect);
+        area += rect.width * rect.height;
+      }
+    }
+    return area > layer.width * layer.height * MOSTLY ? 'all' : rects;
+  }
+
+  /** Notes where the container's items are, for the next frame's \`damage\`. */
+  remember(layer: ScrollLayer, container: UiNode, layout: LayoutReader): void {
+    layer.items.clear();
+    for (const item of itemsOf(container)) {
+      const box = boxOf(layout, item);
+      if (box !== undefined) {
+        layer.items.set(item, box);
+      }
+    }
+  }
+
+  /** An item's box in the layer's pixels, widened for what paints past it, or null off the layer. */
+  private toLayer(layer: ScrollLayer, box: ItemBox): LayerRect | null {
+    const dpr = layer.dpr;
+    const left = Math.max(0, Math.floor(layer.offsetX + dpr * (box.x - layer.scrollX - SPILL)));
+    const top = Math.max(0, Math.floor(layer.offsetY + dpr * (box.y - layer.scrollY - SPILL)));
+    const right = Math.min(layer.width, Math.ceil(layer.offsetX + dpr * (box.x + box.width - layer.scrollX + SPILL)));
+    const bottom = Math.min(
+      layer.height,
+      Math.ceil(layer.offsetY + dpr * (box.y + box.height - layer.scrollY + SPILL))
+    );
+    return right > left && bottom > top ? { x: left, y: top, width: right - left, height: bottom - top } : null;
+  }
+
   /** Stops building layers for a container until its subtree is next dirtied. */
   refuse(node: UiNode): void {
     this.drop(node);
@@ -472,16 +568,88 @@ export class ScrollLayerCache {
   }
 }
 
-/** Whether an ancestor was dirtied by more than its own scroll: inherited paint reaches the subtree without saying so. */
+/**
+ * Whether an ancestor's properties or environment changed. An inherited
+ * value set on an ancestor marks every descendant that reads it as well
+ * (the graph re-provides it), so what it changes inside the container
+ * is damage like any other; this keeps the old caution for the rest.
+ * An ancestor marked for paint alone is the runtime asking for a frame
+ * (a scrollbar fading, an inspector outline), which nothing inside the
+ * container hears; one laid out again either leaves the container where
+ * it was or moves it, which \`fits\` hears about; one whose children
+ * changed has changed nothing inside this one. The last two happen on
+ * every frame a lazy list mounts a row, since a layout need is marked
+ * all the way up.
+ */
 function dirtyAbove(frame: RenderChanges['frame'], node: UiNode): boolean {
   for (let ancestor = node.parent; ancestor !== null; ancestor = ancestor.parent) {
-    const flags = frame.dirtyFlagsFor(ancestor);
-    if (flags !== DirtyFlags.None && flags !== DirtyFlags.Transform) {
+    if ((frame.dirtyFlagsFor(ancestor) & INHERITED) !== 0) {
       return true;
     }
   }
   return false;
 }
+
+/** What an ancestor's dirt can say about how its descendants look. */
+const INHERITED = DirtyFlags.Properties | DirtyFlags.Environment;
+
+/** Whether \`ancestor\` is above \`node\` in the tree. */
+function contains(ancestor: UiNode, node: UiNode): boolean {
+  for (let current = node.parent; current !== null; current = current.parent) {
+    if (current === ancestor) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** A container's items: its children, and the children of any fragment among them, in order. */
+function itemsOf(container: UiNode): UiNode[] {
+  const items: UiNode[] = [];
+  const visit = (parent: UiNode): void => {
+    for (let child = parent.firstChild; child !== null; child = child.nextSibling) {
+      if (child.type === UiNodeType.Fragment) {
+        visit(child);
+      } else {
+        items.push(child);
+      }
+    }
+  };
+  visit(container);
+  return items;
+}
+
+/** The item of a container that holds a node, the node itself if it is one, or null outside the container or above its items. */
+function itemHolding(container: UiNode, node: UiNode): UiNode | null {
+  let item: UiNode | null = null;
+  for (let current: UiNode | null = node; current !== null; current = current.parent) {
+    if (current === container) {
+      return item;
+    }
+    if (current.type !== UiNodeType.Fragment) {
+      item = current;
+    }
+  }
+  return null;
+}
+
+function sameBox(a: ItemBox, b: ItemBox): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+function boxOf(layout: LayoutReader, node: UiNode): ItemBox | undefined {
+  const rec = layout.recordFor(node);
+  return rec === undefined ? undefined : { x: rec.x, y: rec.y, width: rec.width, height: rec.height };
+}
+
+/**
+ * How far past its box, in layout pixels, an item may paint: a focus
+ * ring, a shadow, a glyph's overhang. What a damaged item is widened by,
+ * and how far past a strip the walk that paints it looks.
+ */
+export const SPILL = 8;
+/** Damage over this share of a layer repaints all of it in one walk. */
+const MOSTLY = 0.5;
 
 /**
  * Where a scroll container's viewport lands in device pixels, or null

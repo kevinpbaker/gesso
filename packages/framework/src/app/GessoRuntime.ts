@@ -112,7 +112,8 @@ import {
   type WebGPUCanvasHost,
   UiScheduler,
   UiTimerFrameClock,
-  type UiFrame,
+  UiFrame,
+  type DirtyNodeSet,
   type UiFrameClockFactory,
   type UiContrast
 } from 'gesso-core';
@@ -3523,14 +3524,18 @@ export class GessoRuntime {
     const overlay = this.inspector.hasOverlay ? this.inspector.overlay(started) : null;
     this.gpuTimings = null;
     // What changed, for a renderer that keeps pixels across frames
-    // (Canvas2D's scroll layers). Only offered when it is the whole
-    // truth: a node dirtied since the frame was collected — by a layout
-    // listener, a focus settling, anything in the phases above — may
-    // already show in what is drawn and is not in `frame`, so the
-    // renderer is told nothing and draws from scratch.
-    const changes: RenderChanges | undefined = this.graph.getDirtyNodes().isEmpty()
-      ? { frame, geometryVersion: this.engine.geometryVersion }
-      : undefined;
+    // (Canvas2D's scroll layers). A node dirtied since the frame was
+    // collected (by a layout listener, a focus settling, a scroll
+    // listener writing a cell) may already show in what is drawn and is
+    // not in \`frame\`, so it is added to what the renderer is told, with
+    // its flags as they stand: drawn again now, and again next frame,
+    // when it is collected. Leaving the frame unvouched instead dropped
+    // every kept layer on every frame of an editor's scroll, whose
+    // scroll listener writes on each one.
+    const changes: RenderChanges = {
+      frame: withPending(frame, this.graph.getDirtyNodes()),
+      geometryVersion: this.engine.geometryVersion
+    };
     this.phaseTimings.render = this.timePhase(
       () => this.renderer.isReady,
       () =>
@@ -4108,4 +4113,16 @@ function watchContextRestored(canvas: CanvasHost, restored: () => void): () => v
   }
   target.addEventListener('contextrestored', restored);
   return () => target.removeEventListener?.('contextrestored', restored);
+}
+
+/** A frame's changes and those made since it was collected, together. */
+function withPending(frame: UiFrame, pending: DirtyNodeSet): UiFrame {
+  if (pending.isEmpty()) {
+    return frame;
+  }
+  const merged = new Map<UiNode, DirtyFlags>(frame.entries());
+  for (const node of pending.values()) {
+    merged.set(node, (merged.get(node) ?? DirtyFlags.None) | node.dirtyFlags);
+  }
+  return new UiFrame(frame.id, frame.time, merged);
 }
