@@ -3435,6 +3435,7 @@ declare class UiHostFrameClock implements UiFrameClock {
   private readonly now;
   private local;
   private localHandle;
+  private hidden;
   private readonly timeOrigin;
   private readonly localIntervals;
   private lastLocalTime;
@@ -3449,6 +3450,7 @@ declare class UiHostFrameClock implements UiFrameClock {
   onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
   get isLocal(): boolean;
   requestFrame(): void;
+  setHidden(hidden: boolean): void;
   displayInterval(ms: number, origin: number): void;
   get isDisplayLocked(): boolean;
   private recordLocal;

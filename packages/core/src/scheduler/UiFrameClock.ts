@@ -206,10 +206,16 @@ export class UiTimerFrameClock implements UiFrameClock {
  * way, which is why the choice can be made at construction and
  * forgotten.
  *
- * Both paths stop for a hidden tab, and that is not a coincidence: a
- * worker's animation frames are serviced by its **owner window's**
- * rendering, and a window that is not rendering services none. So the
- * battery properties the runtime relies on hold whichever path runs.
+ * Neither path's refreshes come for a hidden tab: a worker's animation
+ * frames are serviced by its **owner window's** rendering, and a window
+ * that is not rendering services none. A frame asked for then is paced
+ * by a timer instead (`setHidden`). The battery properties hold anyway,
+ * because the runtime asks for nothing on a hidden page's account (no
+ * caret blink, no animation ticks); what it still asks for is a real
+ * change, such as a channel's patch, and a frame that never came left
+ * that change unapplied: an answer the application thread had sent
+ * never reached the code awaiting it, for as long as the tab stayed
+ * hidden or behind another window.
  *
  * **Ticks are free-running while frames are wanted, not requested one
  * at a time.** A tick per request would cost a round trip inside every
@@ -296,6 +302,8 @@ export class UiHostFrameClock implements UiFrameClock {
   /** This thread's own `requestAnimationFrame`, or null where there is none. */
   private local: ((callback: (time: number) => void) => number) | null;
   private localHandle: number | null = null;
+  /** Whether the page is hidden, when this thread's refreshes do not come. */
+  private hidden = false;
   private readonly timeOrigin: number;
   /** Gaps between this thread's own refreshes while frames ran back to back. */
   private readonly localIntervals: number[] = [];
@@ -341,10 +349,15 @@ export class UiHostFrameClock implements UiFrameClock {
   requestFrame(): void {
     this.pending = true;
     if (this.local !== null) {
+      if (this.hidden) {
+        // No refresh is coming; a timer stands in for it.
+        this.armTimer();
+        return;
+      }
       // The compositor is answering directly, so there is no host to
-      // tell and no timer to arm: no message per refresh, and no
-      // fallback to pace, because a missing frame here would mean the
-      // display itself had stopped.
+      // tell and no timer to arm: no message per refresh, and, on a page
+      // that is shown, no fallback to pace, because a missing frame here
+      // would mean the display itself had stopped.
       if (this.localHandle === null) {
         this.localHandle = this.local(time => {
           this.localHandle = null;
@@ -360,6 +373,19 @@ export class UiHostFrameClock implements UiFrameClock {
     }
     this.setActive(true);
     this.armTimer();
+  }
+
+  /**
+   * The page was hidden or shown. While it is hidden this thread's own
+   * refreshes stop, so a frame asked for is paced by the timer, as a
+   * hosted clock is when its host stops ticking; one already waiting
+   * for a refresh that will not come is handed to the timer.
+   */
+  setHidden(hidden: boolean): void {
+    this.hidden = hidden;
+    if (hidden && this.pending && this.local !== null) {
+      this.armTimer();
+    }
   }
 
   /**

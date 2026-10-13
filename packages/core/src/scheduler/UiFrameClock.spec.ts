@@ -333,6 +333,56 @@ describe('UiHostFrameClock', () => {
     }
   });
 
+  it('paces a frame by a timer on a hidden page, whose refreshes do not come', () => {
+    // Found in Easel with Chrome behind another window: the language
+    // worker answered a request in a tenth of a second, and the answer,
+    // a channel patch waiting for a frame, never reached the code
+    // awaiting it, because the worker's refreshes had stopped.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      const active: boolean[] = [];
+      const callbacks: ((time: number) => void)[] = [];
+      const clock = new UiHostFrameClock(
+        time => frames.push(time),
+        running => active.push(running),
+        {
+          fallbackMs: 16,
+          now: () => Date.now(),
+          requestAnimationFrame: callback => {
+            callbacks.push(callback);
+            return callbacks.length;
+          }
+        }
+      );
+
+      // Asked for while shown, and hidden before the refresh came.
+      clock.requestFrame();
+      clock.setHidden(true);
+      vi.advanceTimersByTime(16);
+      expect(frames).toHaveLength(1);
+
+      // Asked for while hidden.
+      clock.requestFrame();
+      vi.advanceTimersByTime(16);
+      expect(frames).toHaveLength(2);
+      // The host is not asked to tick: its refreshes stop as well.
+      expect(active).toEqual([]);
+
+      // Shown again: the refreshes are the clock once more, the one asked
+      // for before the page was hidden drawing what is asked for now.
+      clock.setHidden(false);
+      clock.requestFrame();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(callbacks).toHaveLength(1);
+      callbacks.shift()!(5000);
+      expect(frames).toHaveLength(3);
+      expect(frames[2]).toBe(5000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('falls back to the host where the thread has no compositor of its own', () => {
     // An older browser, or a nested worker on Chromium.
     const { clock, frames, active } = hosted();
