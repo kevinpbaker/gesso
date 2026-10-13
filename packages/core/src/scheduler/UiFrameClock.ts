@@ -112,6 +112,8 @@ export interface UiHostFrameClockOptions {
    * turn out to be worse than its host's.
    */
   requestAnimationFrame?: ((callback: (time: number) => void) => number) | null;
+  /** This thread's `performance.timeOrigin`, to read the host's times on this clock. Injectable for specs. */
+  timeOrigin?: number;
   /** How long to wait for a host tick before pacing a frame anyway. */
   fallbackMs?: number;
   /**
@@ -226,6 +228,30 @@ export class UiTimerFrameClock implements UiFrameClock {
  * has had one for years, and a *nested* worker on Chromium has not.
  * The feature test is the whole guard; there is no version to compare.
  */
+/** This thread's refreshes seen before they are compared with the display's. */
+const LOCAL_SAMPLES = 8;
+/** How much slower than the display's this thread's refreshes may be and still be kept, as a fraction. */
+const OFF_BEAT = 0.06;
+/** The host's refreshes the beat's phase is read from: about a sixth of a second at 120 Hz. */
+const BEAT_SAMPLES = 20;
+
+/** Frames whose cost decides the stride. */
+const COST_SAMPLES = 12;
+/** A frame costing more than this share of its refreshes is too slow for them. */
+const SLOW_FRAME = 0.6;
+/** And less than this share of one fewer is cheap enough to take one fewer. */
+const FAST_FRAME = 0.4;
+/** How far off the measured interval the refreshes must come to be another display's, as a fraction. */
+const NEW_DISPLAY = 0.15;
+/** Times the interval is read again on its own result. */
+const BEAT_PASSES = 3;
+/** Refreshes apart the two an interval is read between must be, at least. */
+const MIN_BEAT_SPAN = 6;
+/** Cheap frames in a row before a frame is given one refresh fewer: a second or so. */
+const CHEAP_FRAMES_TO_SPEED_UP = 90;
+/** The most refreshes a frame is given: two, sixty at 120 Hz; slower than that is no smoother. */
+const MAX_STRIDE = 2;
+
 function localAnimationFrame(): ((callback: (time: number) => void) => number) | null {
   const host = globalThis as { requestAnimationFrame?: (callback: (time: number) => void) => number };
   return typeof host.requestAnimationFrame === 'function' ? host.requestAnimationFrame.bind(host) : null;
@@ -268,8 +294,32 @@ export class UiHostFrameClock implements UiFrameClock {
   private readonly minStallMs: number;
   private readonly now: () => UiFrameTime;
   /** This thread's own `requestAnimationFrame`, or null where there is none. */
-  private readonly local: ((callback: (time: number) => void) => number) | null;
+  private local: ((callback: (time: number) => void) => number) | null;
   private localHandle: number | null = null;
+  private readonly timeOrigin: number;
+  /** Gaps between this thread's own refreshes while frames ran back to back. */
+  private readonly localIntervals: number[] = [];
+  private lastLocalTime: number | null = null;
+  /** The display's interval and the host's time origin, once the host has said. */
+  private display: { readonly interval: number; readonly origin: number } | null = null;
+  /**
+   * Set once this thread's refreshes have shown they keep no display's
+   * time: frames are then timed here, on the beat the host's refreshes
+   * show (see \`displayInterval\`).
+   */
+  private locked = false;
+  /** The host's recent refresh times, which give the beat its phase. */
+  private readonly refreshes: number[] = [];
+  /** Host refreshes since the last frame drawn on the beat. */
+  private refreshesSinceFrame = 0;
+  /** The refresh the last frame here was drawn for: a frame is never drawn for one twice. */
+  private lastLocked = -Infinity;
+  /** How long recent frames took here, which decides how many refreshes each one gets. */
+  private readonly costs: number[] = [];
+  /** Refreshes per frame on the beat: 1, or more when frames cost more than a refresh can hold. */
+  private stride = 1;
+  /** Frames in a row cheap enough for a smaller stride. */
+  private cheapFrames = 0;
 
   constructor(
     private readonly onFrame: (time: UiFrameTime) => void,
@@ -282,6 +332,7 @@ export class UiHostFrameClock implements UiFrameClock {
     this.minStallMs = options.minStallMs ?? 12;
     this.now = options.now ?? (() => performance.now());
     this.local = options.requestAnimationFrame === undefined ? localAnimationFrame() : options.requestAnimationFrame;
+    this.timeOrigin = options.timeOrigin ?? (typeof performance !== 'undefined' ? performance.timeOrigin : 0);
   }
 
   /** Whether this clock is driving itself from the compositor. */
@@ -299,6 +350,9 @@ export class UiHostFrameClock implements UiFrameClock {
       if (this.localHandle === null) {
         this.localHandle = this.local(time => {
           this.localHandle = null;
+          // Drawn either way; the next frame is timed by the display's beat
+          // if this refresh showed it keeps none.
+          this.recordLocal(time);
           if (this.pending) {
             this.deliver(time);
           }
@@ -308,6 +362,199 @@ export class UiHostFrameClock implements UiFrameClock {
     }
     this.setActive(true);
     this.armTimer();
+  }
+
+  /**
+   * Tells the clock the display's interval, measured on the host's own
+   * refreshes, and the host's \`timeOrigin\`, which puts the host's frame
+   * times on this thread's clock.
+   *
+   * A worker's own refreshes are not always the display's. WebKit's come
+   * from a timer near 65 Hz that keeps no display's time: on a 120 Hz
+   * MacBook its frames fell 15 to 16.4 ms apart, so each was shown after
+   * one refresh, two or three, and a scroll juddered at a steady sixty.
+   * Driving frames from the host's ticks instead put the host's thread in
+   * every frame, and WebKit's is uneven while scrolling: at 120 a seventh
+   * of the frames missed their refresh. So once this thread's refreshes
+   * have shown they keep no display's time, frames follow the host's
+   * refreshes, which are the only ones a worker's canvas is shown on in
+   * WebKit anyway, with two differences from a plain hosted clock: each
+   * frame is stamped with its refresh on the display's beat and on this
+   * thread's clock, which is the clock a wheel step's time is on; and
+   * frames too costly for one refresh are given an even two (see
+   * \`recordCost\`).
+   */
+  displayInterval(ms: number, origin: number): void {
+    if (ms > 0 && ms < MAX_CADENCE_MS) {
+      this.display = { interval: ms, origin };
+      this.compareLocal();
+    }
+  }
+
+  /** Whether frames are timed here on the display's beat; see \`displayInterval\`. */
+  get isDisplayLocked(): boolean {
+    return this.locked;
+  }
+
+  private recordLocal(time: number): void {
+    const previous = this.lastLocalTime;
+    this.lastLocalTime = time;
+    // Only gaps between frames that ran back to back measure the
+    // refresh: a gap across an idle stretch measures the idleness.
+    if (previous !== null && this.pending) {
+      const interval = time - previous;
+      if (interval > 0 && interval < MAX_CADENCE_MS) {
+        this.localIntervals.push(interval);
+        if (this.localIntervals.length > LOCAL_SAMPLES) {
+          this.localIntervals.shift();
+        }
+      }
+    }
+    this.compareLocal();
+  }
+
+  /**
+   * Gives this thread's refreshes up when they come well slower than the
+   * display's: they cost frames, and in WebKit keep no display's beat
+   * either. Faster than the display is left alone, because that is the
+   * display the measurement was taken on going stale (a window dragged to
+   * a faster screen), not a worker failing to keep up with it.
+   */
+  private compareLocal(): void {
+    if (this.local === null || this.display === null || this.localIntervals.length < LOCAL_SAMPLES) {
+      return;
+    }
+    const sorted = [...this.localIntervals].sort((a, b) => a - b);
+    const ratio = sorted[Math.floor(sorted.length / 2)]! / this.display.interval;
+    if (ratio <= 1 + OFF_BEAT) {
+      return;
+    }
+    this.local = null;
+    this.locked = true;
+  }
+
+  /** A time on the host's clock, on this thread's. */
+  private toLocal(host: number): number {
+    return this.display === null ? host : host - this.timeOrigin + this.display.origin;
+  }
+
+  /**
+   * When the display's refreshes start, on the host's clock: the earliest
+   * in phase of the host's recent refresh times, since a host's callback
+   * can only run late, never early.
+   */
+  private beat(): { readonly start: number; readonly interval: number } | null {
+    if (this.display === null || this.refreshes.length === 0) {
+      return null;
+    }
+    // Roughly: the interval measured at start, unless the refreshes now come
+    // at another rate (a window dragged from a 120 Hz screen to a 165 Hz one).
+    const cadence = this.cadenceMs();
+    let interval =
+      cadence !== null && Math.abs(cadence - this.display.interval) > this.display.interval * NEW_DISPLAY
+        ? cadence
+        : this.display.interval;
+    // Exactly: between the most punctual refresh of the older half and of the
+    // newer, a callback that ran late being the only kind there is. Which is
+    // most punctual depends on the interval it is judged by, so the reading
+    // is taken again on its own result until it settles.
+    for (let pass = 0; pass < BEAT_PASSES; pass++) {
+      interval = this.refineInterval(interval);
+    }
+    const latest = this.refreshes[this.refreshes.length - 1]!;
+    let earliest = Infinity;
+    for (const time of this.refreshes) {
+      let residual = (((time - latest) % interval) + interval) % interval;
+      // Past half an interval is earlier in phase, not later.
+      if (residual > interval / 2) {
+        residual -= interval;
+      }
+      earliest = Math.min(earliest, residual);
+    }
+    return { start: latest + earliest, interval };
+  }
+
+  /** The interval between the most punctual early and late refreshes, judged by `rough`. */
+  private refineInterval(rough: number): number {
+    // Each refresh is counted from the one before it, which a rough interval
+    // gets right; counted from the first, its error would add up.
+    const half = Math.floor(this.refreshes.length / 2);
+    const first = this.refreshes[0]!;
+    let early: { index: number; residual: number; time: number } | null = null;
+    let late: { index: number; residual: number; time: number } | null = null;
+    let index = 0;
+    for (let i = 0; i < this.refreshes.length; i++) {
+      const time = this.refreshes[i]!;
+      if (i > 0) {
+        index += Math.max(1, Math.round((time - this.refreshes[i - 1]!) / rough));
+      }
+      const residual = time - first - index * rough;
+      if (i < half) {
+        if (early === null || residual < early.residual) early = { index, residual, time };
+      } else if (late === null || residual < late.residual) {
+        late = { index, residual, time };
+      }
+    }
+    return early !== null && late !== null && late.index - early.index >= MIN_BEAT_SPAN
+      ? (late.time - early.time) / (late.index - early.index)
+      : rough;
+  }
+
+  /**
+   * Draws the frame a host refresh asked for, stamped with that refresh on
+   * the display's beat rather than with when its callback happened to run,
+   * and on this thread's clock.
+   */
+  private deliverOnBeat(time: number): void {
+    const beat = this.beat()!;
+    const since = (((time - beat.start) % beat.interval) + beat.interval) % beat.interval;
+    let refresh = time - since;
+    // Never a refresh already drawn for, nor fewer than a stride after it.
+    while (refresh < this.lastLocked + (this.stride - 0.5) * beat.interval) {
+      refresh += beat.interval;
+    }
+    this.lastLocked = refresh;
+    this.refreshesSinceFrame = 0;
+    const started = this.now();
+    this.deliver(this.toLocal(refresh));
+    this.recordCost(this.now() - started, beat.interval);
+  }
+
+  /**
+   * Keeps the stride to what frames cost. A frame takes a refresh only while
+   * frames fit in most of one: drawn late, a frame misses its refresh and is
+   * shown a refresh after its neighbours, which is the judder this clock is
+   * here to remove. An even two refreshes a frame is the smoother of the two.
+   */
+  private recordCost(cost: number, interval: number): void {
+    this.costs.push(cost);
+    if (this.costs.length > COST_SAMPLES) {
+      this.costs.shift();
+    }
+    // Cheap enough for one refresh fewer: only after a long run of it, so a
+    // cost near the line does not swap rates back and forth mid-scroll,
+    // which is a change of pace the eye sees.
+    this.cheapFrames = this.stride > 1 && cost < interval * (this.stride - 1) * FAST_FRAME ? this.cheapFrames + 1 : 0;
+    if (this.cheapFrames >= CHEAP_FRAMES_TO_SPEED_UP) {
+      this.stride--;
+      this.cheapFrames = 0;
+      this.costs.length = 0;
+      return;
+    }
+    if (this.costs.length < COST_SAMPLES) {
+      return;
+    }
+    const sorted = [...this.costs].sort((a, b) => a - b);
+    const typical = sorted[Math.floor(sorted.length * 0.75)]!;
+    if (typical > interval * this.stride * SLOW_FRAME && this.stride < MAX_STRIDE) {
+      this.stride++;
+      this.costs.length = 0;
+    }
+  }
+
+  /** Refreshes per frame while timed on the display's beat; see \`recordCost\`. */
+  get displayStride(): number {
+    return this.stride;
   }
 
   /**
@@ -343,7 +590,7 @@ export class UiHostFrameClock implements UiFrameClock {
         // A tick would have cleared this timer, so its firing is the
         // evidence that none came.
         this.stalled = this.hosted;
-        this.deliver(this.hostTime());
+        this.deliver(this.locked ? this.now() : this.hostTime());
       },
       watching ? this.watchMs() : this.selfPaceMs()
     );
@@ -468,6 +715,21 @@ export class UiHostFrameClock implements UiFrameClock {
     // frame on the same timeline as the ticks around it.
     this.hostOffset = time - this.now();
     this.recordCadence(time);
+    if (this.locked && this.display !== null) {
+      this.refreshes.push(time);
+      if (this.refreshes.length > BEAT_SAMPLES) {
+        this.refreshes.shift();
+      }
+      this.refreshesSinceFrame++;
+      if (this.pending) {
+        this.clearFallback();
+        this.idleTicks = 0;
+        if (this.refreshesSinceFrame >= this.stride) {
+          this.deliverOnBeat(time);
+        }
+        return;
+      }
+    }
     this.clearFallback();
     if (!this.pending) {
       // Not wanted *yet* is not the same as not wanted. Something
