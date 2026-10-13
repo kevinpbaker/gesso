@@ -763,6 +763,20 @@ export const UiProperties = {
     affects: L | P
   }),
 
+  /**
+   * Whether a scroll container shows its overlay scrollbars: \`'auto'\`
+   * (the default) while scrolling, \`'none'\` never, and then they cannot
+   * be grabbed either. For a container scrolled by something else, as a
+   * picture is moved inside a window onto it, where a bar would claim
+   * the person could scroll it.
+   */
+  scrollbars: defineProperty<'auto' | 'none' | undefined>({
+    name: 'scrollbars',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L | P
+  }),
+
   inset: defineProperty<UiLength | undefined>({
     name: 'inset',
     defaultValue: undefined,

@@ -242,6 +242,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Overflow and scrolling',
     note: '`visible`, `hidden`, or `scroll` and `auto`, which make the box a scroll container.'
   },
+  scrollbars: {
+    group: 'Overflow and scrolling',
+    note: '`auto` (the default) shows a scroll container\'s overlay scrollbars while it scrolls; `none` never shows them, for a container scrolled by something else.'
+  },
   scrollX: { group: 'Overflow and scrolling', note: 'Current horizontal scroll offset. Readable and writable.' },
   scrollY: { group: 'Overflow and scrolling', note: 'Current vertical scroll offset. Readable and writable.' },
   scrollWith: {

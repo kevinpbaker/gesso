@@ -202,6 +202,9 @@ export class LayoutRecord {
    */
   scrollsText = false;
 
+  /** A scroll container set to show no scrollbars (\`scrollbars: 'none'\`). */
+  hidesScrollbars = false;
+
   /**
    * A multiline editable, which shows the overlay scrollbars a scroll
    * container does over its own text. A single-line field scrolls
@@ -504,6 +507,7 @@ export class LayoutRecord {
     this.paintReachBottom = 0;
     this.scrollable = false;
     this.scrollsText = false;
+    this.hidesScrollbars = false;
     this.textScrollbars = false;
     this.mirrored = false;
     this.sticky = false;
