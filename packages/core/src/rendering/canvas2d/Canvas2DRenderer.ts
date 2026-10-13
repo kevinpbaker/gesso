@@ -36,6 +36,7 @@ import { paintPictures } from '../PaintPicture';
 import type { PaintContext2D } from '../PaintTarget';
 import { PreciseContext } from './PreciseContext';
 import { offscreenLayerCanvas, placeLayer, ScrollLayerCache } from './ScrollLayers';
+import { TextRasterCache } from './TextRasterCache';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
 
 export interface Canvas2DRendererOptions {
@@ -59,10 +60,16 @@ export interface Canvas2DRendererOptions {
    */
   scrollLayers?: boolean;
   /**
-   * Makes the canvases scroll layers are kept in. Defaults to an
-   * `OffscreenCanvas`; a spec passes a double.
+   * Makes the canvases scroll layers and kept text are held in. Defaults
+   * to an `OffscreenCanvas`; a spec passes a double.
    */
   createLayerCanvas?: LayerCanvasFactory;
+  /**
+   * Whether text is kept as pixels across frames and copied rather than
+   * drawn again while it has not changed. Defaults to true; false draws
+   * every glyph every frame, as before. See `TextRasterCache.ts`.
+   */
+  textCache?: boolean;
   /**
    * How many frames in a row a container must scroll quietly before it
    * gets a layer. Defaults to `SCROLL_LAYER_SETTLE_FRAMES`; a spec of
@@ -179,6 +186,16 @@ export class Canvas2DRenderer implements UiRenderer {
       options.createLayerCanvas ?? offscreenLayerCanvas,
       options.scrollLayerSettleFrames
     );
+    this.textCache =
+      options.textCache === false ? null : new TextRasterCache(options.createLayerCanvas ?? offscreenLayerCanvas);
+  }
+
+  /** Text kept as pixels; see `TextRasterCache.ts`. */
+  private readonly textCache: TextRasterCache | null;
+
+  /** What the text cache did since the last reset, or null with it off. For budget specs. */
+  get textCacheStats(): TextRasterCache['stats'] | null {
+    return this.textCache?.stats ?? null;
   }
 
   /** What the scroll layers did since the last reset. For budget specs. */
@@ -211,12 +228,14 @@ export class Canvas2DRenderer implements UiRenderer {
   /** A restored scroll layer reads as healthy and holds nothing. */
   surfaceRestored(): void {
     this.layers.dropAll();
+    this.textCache?.dropAll();
   }
 
   dispose(): void {
     this.disposed = true;
     this.scaledImages.dispose();
     this.layers.dropAll();
+    this.textCache?.dropAll();
   }
 
   render(root: UiNode, context: RenderContext): void {
@@ -239,6 +258,7 @@ export class Canvas2DRenderer implements UiRenderer {
     // a true statement about the wrong frame.
     this.paintOwner = null;
     this.layerDepth = 0;
+    this.textCache?.beginFrame();
     this.layers.beginFrame(
       this.options.scrollLayers === false ? undefined : context.changes,
       this.surface.dpr,
@@ -251,6 +271,7 @@ export class Canvas2DRenderer implements UiRenderer {
       drawOverlayShapes(ctx, context.overlay);
     }
     this.layers.endFrame();
+    this.textCache?.endFrame();
   }
 
   /**
@@ -403,7 +424,7 @@ export class Canvas2DRenderer implements UiRenderer {
       if (this.paintOwner !== node) {
         this.resolvePaint(node);
       }
-      this.paintContent(ctx, rec, this.paint, context);
+      this.paintContent(ctx, node, rec, this.paint, context);
     }
     if (rec.liftBoundary && this.liftedPass.length > liftedBefore) {
       // A boundary: everything the subtree lifted is drawn here, over
@@ -829,7 +850,13 @@ export class Canvas2DRenderer implements UiRenderer {
     }
   }
 
-  private paintContent(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, context: RenderContext): void {
+  private paintContent(
+    ctx: Canvas2DContext,
+    node: UiNode,
+    rec: LayoutRecord,
+    paint: PaintState,
+    context: RenderContext
+  ): void {
     if (paint.text !== undefined) {
       // Text lives in the content box: layout sized the paragraph inside
       // the padding, so paint must place it there too. A field also
@@ -846,6 +873,9 @@ export class Canvas2DRenderer implements UiRenderer {
       }
       if (paint.textSelection !== undefined || paint.textMatches !== undefined) {
         this.paintHighlightedText(ctx, paint, context);
+        return;
+      }
+      if (this.textCache?.draw(ctx, node, this.contentBox, paint, context.text) === true) {
         return;
       }
       drawText(ctx, this.contentBox, paint, context.text);
