@@ -1,5 +1,14 @@
 # gesso-devtools
 
+## 0.6.20
+
+### Patch Changes
+
+- `FrameMetrics`, the worker's frame message and the proof recording carry the display time a frame was drawn for and the scroll offset of the container the wheel last scrolled, which together show how evenly a scroll moves from one refresh to the next. `durationMs` now counts the phases before a frame's changes are collected (ticks, patches, trackpad pacing, lazy-list mounting); a frame that mounted rows for four milliseconds reported two.
+- Updated dependencies
+- Updated dependencies
+  - gesso-framework@0.6.20
+
 ## 0.6.19
 
 ### Patch Changes

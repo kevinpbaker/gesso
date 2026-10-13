@@ -1,5 +1,13 @@
 # gesso-electrobun
 
+## 0.6.20
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - gesso-framework@0.6.20
+
 ## 0.6.19
 
 ### Patch Changes
