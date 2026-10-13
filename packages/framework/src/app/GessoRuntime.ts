@@ -382,6 +382,8 @@ export class GessoRuntime {
   private lastFrameMs = 0;
   /** The display time the frame being drawn is for; see `FrameMetrics.time`. */
   private frameTime: number | null = null;
+  /** When the frame's first phase began, before its changes were collected; see `FrameMetrics.durationMs`. */
+  private frameBegan: number | null = null;
   private frameListener: ((metrics: FrameMetrics) => void) | null = null;
   private rendererErrorListener: ((message: string) => void) | null = null;
   private frameErrorListener: ((message: string, stack?: string) => void) | null = null;
@@ -3136,6 +3138,7 @@ export class GessoRuntime {
    * silently did nothing, so a theme change never reached descendants.
    */
   private runPreCollectPhases(time: number): void {
+    this.frameBegan = now();
     this.phaseTimings = emptyPhaseTimings();
     this.frameTime = time;
 
@@ -3556,7 +3559,12 @@ export class GessoRuntime {
     this.sendDevtoolsUpdates(frame);
 
     const finished = now();
-    const elapsed = finished - started;
+    // From the frame's first phase, before collection: the ticks, the
+    // patches, the trackpad's pacing and the lazy lists' mounting are the
+    // frame's too. Measured from collection, a frame that mounted rows for
+    // four milliseconds reported two.
+    const elapsed = finished - (this.frameBegan ?? started);
+    this.frameBegan = null;
     this.lastFrameMs = elapsed;
     this.scheduleScrollbarFade(finished);
     this.scheduleCaretBlink(finished);
@@ -3877,6 +3885,11 @@ export interface PatchSource {
 
 export interface FrameMetrics {
   frame: number;
+  /**
+   * How long the frame took, from its first phase (the ticks, the
+   * patches, the lazy lists' mounting, which run before its changes are
+   * collected) to its end.
+   */
   durationMs: number;
   nodes: number;
   /** Nodes the layout phase measured (memo hits excluded). */
