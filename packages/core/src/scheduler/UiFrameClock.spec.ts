@@ -822,10 +822,10 @@ describe('UiHostFrameClock on the display beat', () => {
     vi.setSystemTime(1000);
     frames.length = 0;
     scroll();
-    // Each frame takes 6 ms of an 8.3 ms refresh.
+    // Each frame takes 7 ms of an 8.3 ms refresh.
     const costly = frames.push.bind(frames);
     frames.push = (...times: number[]) => {
-      vi.setSystemTime(Date.now() + 6);
+      vi.setSystemTime(Date.now() + 7);
       return costly(...times);
     };
     clock.requestFrame();
@@ -859,5 +859,27 @@ describe('UiHostFrameClock on the display beat', () => {
       const gap = (settled[k]! - settled[k - 1]!) / now165;
       expect(Math.abs(gap - 1)).toBeLessThan(0.05);
     }
+  });
+
+  it('keeps every refresh while the typical frame fits, though a few do not', () => {
+    // A scroll at 165 Hz: most frames take half a refresh; every fifth
+    // mounts rows and takes more than one.
+    const { clock, frames, scroll } = lockedClock();
+    const refresh = 1000 / 165;
+    vi.setSystemTime(1000);
+    frames.length = 0;
+    scroll();
+    let count = 0;
+    const timed = frames.push.bind(frames);
+    frames.push = (...times: number[]) => {
+      vi.setSystemTime(Date.now() + (count++ % 5 === 4 ? 7 : 3));
+      return timed(...times);
+    };
+    clock.requestFrame();
+    for (let k = 0; k < 120; k++) {
+      vi.advanceTimersByTime(Math.max(0, 1000 + k * refresh - Date.now()));
+      clock.tick(1000 + k * refresh);
+    }
+    expect(clock.displayStride).toBe(1);
   });
 });
