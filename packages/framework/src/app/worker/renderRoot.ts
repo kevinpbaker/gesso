@@ -530,6 +530,7 @@ export class RenderWorkerApp {
         runtime.setFullscreen(message.active);
         return;
       case 'visibility':
+        this.clock?.setHidden(!message.visible);
         runtime.setVisible(message.visible);
         break;
       case 'inspector':
