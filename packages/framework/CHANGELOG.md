@@ -1,5 +1,23 @@
 # gesso-framework
 
+## 0.6.20
+
+### Patch Changes
+
+- `FrameMetrics`, the worker's frame message and the proof recording carry the display time a frame was drawn for and the scroll offset of the container the wheel last scrolled, which together show how evenly a scroll moves from one refresh to the next. `durationMs` now counts the phases before a frame's changes are collected (ticks, patches, trackpad pacing, lazy-list mounting); a frame that mounted rows for four milliseconds reported two.
+- A render worker whose own refreshes keep no display's time draws on the display's beat. WebKit gives a worker a `requestAnimationFrame` from a timer near 65 Hz, so on a 120 Hz display frames fell 15 to 16.4 ms apart and a scroll juddered. The shell now measures the display's interval and sends it to the worker; once the worker's refreshes show themselves slower, the frame clock follows the shell's refreshes, stamps each frame with its refresh on the worker's own clock, and gives a frame too costly for one refresh an even two, so the pace does not change mid-scroll.
+
+  The stride between refreshes also follows the typical frame rather than the slow ones: it lengthens when the median frame passes three quarters of its refreshes and shortens once the median of the last thirty fits in six tenths of one fewer. It held Easel at 82 frames a second on a 165 Hz display whose typical frame took under half a refresh; measured since, 861 of 1,018 frames come a refresh apart, against 15.
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.6.20
+
 ## 0.6.19
 
 ### Patch Changes
