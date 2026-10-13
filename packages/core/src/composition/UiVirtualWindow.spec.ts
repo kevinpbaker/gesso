@@ -196,7 +196,7 @@ describe('UiVirtualWindow recycling', () => {
   const keys = (window: UiVirtualWindow): string[] =>
     (window.children$.value as UiElement[])
       .filter(child => typeof child.props[VIRTUAL_INDEX_PROP] === 'number')
-      .map(child => String(child.key ?? child.props.key));
+      .map(child => String(child.props.key));
 
   it('hands the slot of an item scrolling out to the one scrolling in', () => {
     const window = new UiVirtualWindow(
