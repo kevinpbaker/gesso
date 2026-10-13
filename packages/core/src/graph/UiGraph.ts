@@ -237,6 +237,49 @@ export class UiGraph {
     }
   }
 
+  /**
+   * Moves a child before \`reference\` among its own siblings, or to the
+   * end when that is null. Its parent is unchanged, and so is everything
+   * it inherits, so its subtree is not visited: a lazy list recycling its
+   * rows moves one from end to end on every frame of a scroll, and
+   * re-inheriting walked the whole row each time.
+   */
+  public moveWithin(child: UiNode, reference: UiNode | null): void {
+    const parent = child.parent;
+    if (parent === null) {
+      throw new Error(`Node '${child.id}' has no parent to move within.`);
+    }
+    if (reference !== null && reference.parent !== parent) {
+      throw new Error(`Reference node '${reference.id}' is not a sibling of '${child.id}'.`);
+    }
+    if (child === reference || child.nextSibling === reference) {
+      return;
+    }
+    this.detachNode(child);
+    parent.childOrderVersion++;
+    child.parent = parent;
+    if (reference === null) {
+      const last = parent.lastChild;
+      child.previousSibling = last;
+      if (last !== null) {
+        last.nextSibling = child;
+      } else {
+        parent.firstChild = child;
+      }
+      parent.lastChild = child;
+      return;
+    }
+    const previous = reference.previousSibling;
+    if (previous !== null) {
+      previous.nextSibling = child;
+    } else {
+      parent.firstChild = child;
+    }
+    child.previousSibling = previous;
+    child.nextSibling = reference;
+    reference.previousSibling = child;
+  }
+
   public detachNode(node: UiNode): void {
     const parent = node.parent;
     if (!parent) {

@@ -26,6 +26,19 @@ export interface LazyListOptions {
   readonly estimatedExtent: number;
   /** Items mounted beyond each edge of the viewport. Default 3. */
   readonly overscan?: number;
+  /**
+   * Reuse an item's node for the item that takes its place, as a native
+   * list recycles its cells: an item scrolling out of the window hands its
+   * node, and its component, to the one scrolling in, which is given the
+   * new index. Nothing is built or torn down as the list scrolls, only
+   * updated, which is most of what a scroll through rows of many nodes
+   * costs.
+   *
+   * \`key\` is not used: items are keyed by their slot. The component an
+   * item renders must follow its inputs as they change, since one keeps
+   * its instance from item to item.
+   */
+  readonly recycle?: boolean;
   /** Identity of an item, for reconciliation. Default: its index. */
   readonly key?: (index: number) => string | number;
   /**
@@ -138,6 +151,15 @@ export class UiVirtualWindow {
   private count: number;
   private readonly estimate: number;
   private readonly overscan: number;
+  private readonly recycle: boolean;
+  /**
+   * The slot each mounted item is keyed by, when recycling: an item keeps
+   * its slot while it stays, and one leaving gives its slot to the next
+   * one to come, whose element then matches the node it leaves behind.
+   */
+  private readonly slotOf = new Map<number, number>();
+  private readonly freeSlots: number[] = [];
+  private nextSlot = 0;
   private readonly keyOf: (index: number) => string | number;
   private readonly renderItem: LazyItemRenderer;
   private readonly grid: LazyGridOptions | undefined;
@@ -173,6 +195,7 @@ export class UiVirtualWindow {
     this.count = count;
     this.estimate = options.estimatedExtent;
     this.overscan = options.overscan ?? 3;
+    this.recycle = options.recycle === true;
     this.keyOf = options.key ?? (index => index);
     this.renderItem = renderItem;
     this.grid = options.grid;
@@ -401,6 +424,20 @@ export class UiVirtualWindow {
   }
 
   private buildChildren(): UiElement[] {
+    if (this.recycle) {
+      // Slots of the items leaving first, so those coming in take them.
+      for (const [index, slot] of this.slotOf) {
+        if (index < this.first || index > this.last) {
+          this.slotOf.delete(index);
+          this.freeSlots.push(slot);
+        }
+      }
+      for (let index = this.first; index <= this.last; index++) {
+        if (!this.slotOf.has(index)) {
+          this.slotOf.set(index, this.freeSlots.pop() ?? this.nextSlot++);
+        }
+      }
+    }
     const children: UiElement[] = [];
     if (this.grid?.header !== undefined) {
       children.push(markRow(this.grid.header, { key: 'lazy:header', [VIRTUAL_LEAD_PROP]: true }, 'The header of'));
@@ -463,7 +500,7 @@ export class UiVirtualWindow {
    * wrapper, and the index is written onto it.
    */
   private wrap(index: number, item: UiChild): UiElement {
-    const key = `lazy:${String(this.keyOf(index))}`;
+    const key = this.recycle ? `lazy:slot:${this.slotOf.get(index)!}` : `lazy:${String(this.keyOf(index))}`;
     const props = { key, [VIRTUAL_INDEX_PROP]: index };
     if (this.grid !== undefined) {
       return markRow(item, props, `Row ${index} of`);

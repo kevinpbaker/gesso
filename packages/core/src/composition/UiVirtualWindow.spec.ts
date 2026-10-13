@@ -190,3 +190,38 @@ describe('UiVirtualWindow', () => {
     });
   });
 });
+
+describe('UiVirtualWindow recycling', () => {
+  const render = (index: number): UiElement => Text({ text: `row ${index}` });
+  const keys = (window: UiVirtualWindow): string[] =>
+    (window.children$.value as UiElement[])
+      .filter(child => typeof child.props[VIRTUAL_INDEX_PROP] === 'number')
+      .map(child => String(child.key ?? child.props.key));
+
+  it('hands the slot of an item scrolling out to the one scrolling in', () => {
+    const window = new UiVirtualWindow(
+      'column',
+      { count: 1000, estimatedExtent: 20, overscan: 2, recycle: true, initialViewportExtent: 100 },
+      render
+    );
+    window.update({ scroll: 200, extent: 100 }, []);
+    const before = new Set(keys(window));
+    // One row on: one row leaves the top and one comes in at the bottom.
+    window.update({ scroll: 220, extent: 100 }, []);
+    const after = keys(window);
+    expect(new Set(after)).toEqual(before);
+    expect(mounted(window)[0]).toBe(9);
+  });
+
+  it('keys an item that stays by the same slot', () => {
+    const window = new UiVirtualWindow(
+      'column',
+      { count: 1000, estimatedExtent: 20, overscan: 2, recycle: true, initialViewportExtent: 100 },
+      render
+    );
+    window.update({ scroll: 200, extent: 100 }, []);
+    const slotOf12 = keys(window)[mounted(window).indexOf(12)];
+    window.update({ scroll: 220, extent: 100 }, []);
+    expect(keys(window)[mounted(window).indexOf(12)]).toBe(slotOf12);
+  });
+});

@@ -80,11 +80,21 @@ function lazyList(
   renderItem: LazyItemRenderer,
   grid?: LazyGridOptions
 ): UiElement {
-  const { count, estimatedExtent, overscan, itemKey, initialViewportExtent, revision, modifiers, windowRef, ...rest } =
-    props;
+  const {
+    count,
+    estimatedExtent,
+    overscan,
+    recycle,
+    itemKey,
+    initialViewportExtent,
+    revision,
+    modifiers,
+    windowRef,
+    ...rest
+  } = props;
   const window = new UiVirtualWindow(
     axis,
-    { count, estimatedExtent, overscan, key: itemKey, initialViewportExtent, revision, grid },
+    { count, estimatedExtent, overscan, recycle, key: itemKey, initialViewportExtent, revision, grid },
     renderItem
   );
   windowRef?.(window);

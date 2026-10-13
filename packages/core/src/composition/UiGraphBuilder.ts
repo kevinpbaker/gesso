@@ -708,8 +708,7 @@ export class UiGraphBuilder {
     if (node === reference || node.nextSibling === reference) {
       return false;
     }
-    this.graph.detachNode(node);
-    this.graph.insertBefore(parent, node, reference);
+    this.graph.moveWithin(node, reference);
     return true;
   }
 
