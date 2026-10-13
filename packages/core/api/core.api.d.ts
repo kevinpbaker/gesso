@@ -360,6 +360,7 @@ declare class LayoutRecord {
   paintReachBottom: number;
   scrollable: boolean;
   scrollsText: boolean;
+  hidesScrollbars: boolean;
   textScrollbars: boolean;
   mirrored: boolean;
   sticky: boolean;
@@ -662,6 +663,7 @@ declare class DirtyNodeSet {
   delete(node: UiNode): boolean;
   get size(): number;
   isEmpty(): boolean;
+  values(): IterableIterator<UiNode>;
   anyFlags(flags: DirtyFlags): boolean;
   take(): UiNode[];
   drainInto(buffer: UiNode[]): number;
@@ -1471,6 +1473,7 @@ interface LazyListOptions {
   readonly count: Reactive<number>;
   readonly estimatedExtent: number;
   readonly overscan?: number;
+  readonly recycle?: boolean;
   readonly key?: (index: number) => string | number;
   readonly initialViewportExtent?: number;
   readonly revision?: Reactive<unknown>;
@@ -1503,6 +1506,10 @@ declare class UiVirtualWindow {
   private count;
   private readonly estimate;
   private readonly overscan;
+  private readonly recycle;
+  private readonly slotOf;
+  private readonly freeSlots;
+  private nextSlot;
   private readonly keyOf;
   private readonly renderItem;
   private readonly grid;
@@ -1822,6 +1829,7 @@ declare const UiProperties: {
   readonly anchorOffset: UiPropertyDefinition<number | undefined>;
   readonly direction: UiPropertyDefinition<UiDirection | undefined>;
   readonly overflow: UiPropertyDefinition<UiOverflow | undefined>;
+  readonly scrollbars: UiPropertyDefinition<"auto" | "none" | undefined>;
   readonly inset: UiPropertyDefinition<UiLength | undefined>;
   readonly backgroundColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly backgroundGradient: UiPropertyDefinition<UiGradient | undefined>;
@@ -1968,7 +1976,7 @@ type TransitionProps = {
   transition?: Partial<Record<UiPropertyName, UiTransitionValue>>;
 };
 type CommonProps = IdentityProps & UiEventProps & BoxModelProps & FlexItemProps & GridItemProps & PositionProps & PaintProps & TypographyProps & InteractionProps & SemanticsProps & ModifierProps & TransitionProps & EnvironmentProps;
-type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollX' | 'scrollY' | 'scrollWith' | 'scrollWithAxis' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
+type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollbars' | 'scrollX' | 'scrollY' | 'scrollWith' | 'scrollWithAxis' | 'scrollBehavior' | 'overscrollBehavior' | 'layout'>;
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
@@ -1993,6 +2001,7 @@ interface UiGraphBuilderOptions {
 declare class UiGraphBuilder {
   private readonly graph;
   private readonly refs;
+  private readonly reconciledFrom;
   private readonly modifiers;
   private nextChildrenBindingId;
   private reconcileDepth;
@@ -2086,6 +2095,7 @@ declare class UiGraph {
   appendChild(parent: UiNode, child: UiNode): void;
   insertBefore(parent: UiNode, child: UiNode, reference: UiNode | null): void;
   removeNode(node: UiNode): void;
+  moveWithin(child: UiNode, reference: UiNode | null): void;
   detachNode(node: UiNode): void;
   getBindingForProperty(node: UiNode, property: NodeProperty): UiBinding<unknown> | undefined;
   bind(node: UiNode, property: NodeProperty, observable: Observable<unknown>, dirtyFlags: DirtyFlags): UiBinding<unknown>;
@@ -2947,6 +2957,7 @@ declare class UiWheelController {
   private frameInterval;
   private preciseUntil;
   lastWheelTarget: UiNode | null;
+  lastScrolled: UiNode | null;
   wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number,
   at?: number): UiWheelEvent;
   scrollabilityAt(x: number, y: number): UiScrollability;
@@ -3391,6 +3402,7 @@ interface UiTimerFrameClockOptions {
 }
 interface UiHostFrameClockOptions {
   requestAnimationFrame?: ((callback: (time: number) => void) => number) | null;
+  timeOrigin?: number;
   fallbackMs?: number;
   stallMs?: number;
   minStallMs?: number;
@@ -3421,12 +3433,32 @@ declare class UiHostFrameClock implements UiFrameClock {
   private readonly stallMs;
   private readonly minStallMs;
   private readonly now;
-  private readonly local;
+  private local;
   private localHandle;
+  private readonly timeOrigin;
+  private readonly localIntervals;
+  private lastLocalTime;
+  private display;
+  private locked;
+  private readonly refreshes;
+  private refreshesSinceFrame;
+  private lastLocked;
+  private readonly costs;
+  private stride;
   constructor(onFrame: (time: UiFrameTime) => void,
   onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
   get isLocal(): boolean;
   requestFrame(): void;
+  displayInterval(ms: number, origin: number): void;
+  get isDisplayLocked(): boolean;
+  private recordLocal;
+  private compareLocal;
+  private toLocal;
+  private beat;
+  private refineInterval;
+  private deliverOnBeat;
+  private recordCost;
+  get displayStride(): number;
   private armTimer;
   private watchMs;
   private hostTime;
@@ -4306,10 +4338,31 @@ interface ScrollLayerStats {
   shifted: number;
   dropped: number;
 }
+declare class TextRasterCache {
+  private readonly createCanvas;
+  private readonly entries;
+  private frame;
+  private pixels;
+  readonly stats: {
+    copied: number;
+    drawn: number;
+    direct: number;
+  };
+  constructor(createCanvas: LayerCanvasFactory);
+  beginFrame(): void;
+  endFrame(): void;
+  dropAll(): void;
+  resetStats(): void;
+  draw(ctx: Canvas2DContext, node: UiNode, box: LayoutBox, paint: PaintState, measurer: TextMeasurer): boolean;
+  private redraw;
+  private make;
+  private drop;
+}
 interface Canvas2DRendererOptions {
   surface: CanvasSurface;
   scrollLayers?: boolean;
   createLayerCanvas?: LayerCanvasFactory;
+  textCache?: boolean;
   scrollLayerSettleFrames?: number;
 }
 declare class Canvas2DRenderer implements UiRenderer {
@@ -4331,6 +4384,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private layerDepth;
   private volatileDraws;
   constructor(options: Canvas2DRendererOptions);
+  private readonly textCache;
+  get textCacheStats(): TextRasterCache['stats'] | null;
   get scrollLayerStats(): ScrollLayerStats;
   resetScrollLayerStats(): void;
   private get surface();

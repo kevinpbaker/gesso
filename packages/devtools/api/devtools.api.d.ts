@@ -350,6 +350,11 @@ interface ProofFrame {
   readonly measured: number;
   readonly nodes: number;
   readonly inputLatencyMs: number | null;
+  readonly time: number | null;
+  readonly wheelScroll: {
+    readonly x: number;
+    readonly y: number;
+  } | null;
   readonly renderer: string;
   readonly phases: Record<string, number>;
   readonly gpu: Record<string, number> | null;

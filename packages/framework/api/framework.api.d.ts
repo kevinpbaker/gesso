@@ -1451,6 +1451,8 @@ declare class GessoRuntime {
   private constraints;
   private pixelRatio;
   private lastFrameMs;
+  private frameTime;
+  private frameBegan;
   private frameListener;
   private rendererErrorListener;
   private frameErrorListener;
@@ -1608,6 +1610,7 @@ declare class GessoRuntime {
   private revealBox;
   private handleHoverChange;
   private createScrollSink;
+  private wheelScroll;
   private runPreCollectPhases;
   private hasVirtualWindows;
   private updateVirtualWindows;
@@ -1650,6 +1653,11 @@ interface FrameMetrics {
   gpu: GpuStageTimings | null;
   at: number;
   inputLatencyMs: number | null;
+  time: number | null;
+  wheelScroll: {
+    readonly x: number;
+    readonly y: number;
+  } | null;
 }
 interface GpuStageTimings {
   prepare: number;
@@ -1829,6 +1837,11 @@ UiFileDropMessage |
 {
   type: 'tick';
   time: number;
+} |
+{
+  type: 'displayInterval';
+  ms: number;
+  origin: number;
 } | {
   type: 'dispose';
 };
@@ -1846,6 +1859,11 @@ type RuntimeToShellMessage = {
   layoutPasses: number;
   at: number;
   inputLatencyMs: number | null;
+  time: number | null;
+  wheelScroll: {
+    readonly x: number;
+    readonly y: number;
+  } | null;
   phases: FramePhaseTimings;
   renderer: RendererBackend | 'pending';
   gpu: GpuStageTimings | null;
@@ -2167,6 +2185,7 @@ declare class WorkerApp {
   devtools(request: DevtoolsRequest): void;
   setColorScheme(preference: ColorSchemePreference): void;
   private setFrameLoop;
+  private measureDisplay;
   dispose(): void;
   private readonly handleAppWorkerMessage;
   private readonly handleWorkerMessage;
