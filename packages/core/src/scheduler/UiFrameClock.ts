@@ -236,19 +236,19 @@ const OFF_BEAT = 0.06;
 const BEAT_SAMPLES = 20;
 
 /** Frames whose cost decides the stride. */
-const COST_SAMPLES = 12;
+const COST_SAMPLES = 30;
+/** Frames seen before the stride is lengthened. */
+const SLOW_SAMPLES = 12;
 /** A frame costing more than this share of its refreshes is too slow for them. */
-const SLOW_FRAME = 0.6;
+const SLOW_FRAME = 0.75;
 /** And less than this share of one fewer is cheap enough to take one fewer. */
-const FAST_FRAME = 0.4;
+const FAST_FRAME = 0.6;
 /** How far off the measured interval the refreshes must come to be another display's, as a fraction. */
 const NEW_DISPLAY = 0.15;
 /** Times the interval is read again on its own result. */
 const BEAT_PASSES = 3;
 /** Refreshes apart the two an interval is read between must be, at least. */
 const MIN_BEAT_SPAN = 6;
-/** Cheap frames in a row before a frame is given one refresh fewer: a second or so. */
-const CHEAP_FRAMES_TO_SPEED_UP = 90;
 /** The most refreshes a frame is given: two, sixty at 120 Hz; slower than that is no smoother. */
 const MAX_STRIDE = 2;
 
@@ -318,8 +318,6 @@ export class UiHostFrameClock implements UiFrameClock {
   private readonly costs: number[] = [];
   /** Refreshes per frame on the beat: 1, or more when frames cost more than a refresh can hold. */
   private stride = 1;
-  /** Frames in a row cheap enough for a smaller stride. */
-  private cheapFrames = 0;
 
   constructor(
     private readonly onFrame: (time: UiFrameTime) => void,
@@ -521,33 +519,35 @@ export class UiHostFrameClock implements UiFrameClock {
   }
 
   /**
-   * Keeps the stride to what frames cost. A frame takes a refresh only while
-   * frames fit in most of one: drawn late, a frame misses its refresh and is
-   * shown a refresh after its neighbours, which is the judder this clock is
-   * here to remove. An even two refreshes a frame is the smoother of the two.
+   * Keeps the stride to what frames cost: every refresh while the typical
+   * frame fits in most of one, two once it no longer does. Decided by the
+   * typical frame, not the slow ones: a slow frame (a few rows mounted at
+   * once) shown a refresh late is a moment's hitch, where two refreshes a
+   * frame for a whole scroll halves the rate. Ruled by the slow quarter,
+   * a 165 Hz display drew at 82 with its typical frame in half a refresh.
    */
   private recordCost(cost: number, interval: number): void {
     this.costs.push(cost);
     if (this.costs.length > COST_SAMPLES) {
       this.costs.shift();
     }
-    // Cheap enough for one refresh fewer: only after a long run of it, so a
-    // cost near the line does not swap rates back and forth mid-scroll,
-    // which is a change of pace the eye sees.
-    this.cheapFrames = this.stride > 1 && cost < interval * (this.stride - 1) * FAST_FRAME ? this.cheapFrames + 1 : 0;
-    if (this.cheapFrames >= CHEAP_FRAMES_TO_SPEED_UP) {
-      this.stride--;
-      this.cheapFrames = 0;
-      this.costs.length = 0;
-      return;
-    }
-    if (this.costs.length < COST_SAMPLES) {
+    if (this.costs.length < SLOW_SAMPLES) {
       return;
     }
     const sorted = [...this.costs].sort((a, b) => a - b);
-    const typical = sorted[Math.floor(sorted.length * 0.75)]!;
+    const typical = sorted[Math.floor(sorted.length / 2)]!;
     if (typical > interval * this.stride * SLOW_FRAME && this.stride < MAX_STRIDE) {
       this.stride++;
+      this.costs.length = 0;
+    } else if (
+      this.stride > 1 &&
+      this.costs.length >= COST_SAMPLES &&
+      typical < interval * (this.stride - 1) * FAST_FRAME
+    ) {
+      // Back to one fewer once the typical frame has fitted for a while:
+      // a cost near the line would otherwise change the pace back and
+      // forth mid-scroll.
+      this.stride--;
       this.costs.length = 0;
     }
   }
