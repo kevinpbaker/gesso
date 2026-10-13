@@ -24,9 +24,10 @@ export type UiTransitionSpec =
 /**
  * What an element may write for one property of a `transition`.
  *
- * A bare number is a duration in milliseconds, which is what makes
- * `transition: { opacity: 200, transform: spring() }` read the way
- * That is how it was written.
+ * A bare number is a duration in milliseconds, so the common case,
+ * `transition: { opacity: 200, transform: 120 }`, reads the way a CSS
+ * transition does. A spring is for a property that is one number, like
+ * `opacity`: a transform only tweens (see `spring`).
  */
 export type UiTransitionValue = number | UiTransitionSpec;
 
