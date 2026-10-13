@@ -77,6 +77,9 @@ export function scrollbarThumb(rec: LayoutRecord, axis: ScrollbarAxis): Scrollba
 }
 
 function thumbFor(rec: LayoutRecord, axis: ScrollbarAxis): ScrollbarThumb | null {
+  if (rec.hidesScrollbars) {
+    return null;
+  }
   const viewport = axis === 'y' ? rec.height : rec.width;
   const content = axis === 'y' ? rec.contentHeight : rec.contentWidth;
   if (!(content > viewport) || viewport <= 0) {

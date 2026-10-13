@@ -4548,6 +4548,7 @@ export class LayoutEngine {
       overflow === 'auto' ||
       (overflow === 'hidden' && scrollLeaderOf(node) !== null);
     rec.scrollsText = node.type === UiNodeType.EditableText;
+    rec.hidesScrollbars = props.get('scrollbars') === 'none';
     rec.textScrollbars = rec.scrollsText && props.get('multiline') === true;
     // Only something with scrollbars asks, and there are few of them,
     // so this resolution is not on the path every box takes.

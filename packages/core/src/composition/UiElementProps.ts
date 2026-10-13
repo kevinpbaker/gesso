@@ -287,6 +287,7 @@ export type CommonProps = IdentityProps &
 export type ContainerProps = CommonProps &
   PropsOf<
     | 'overflow'
+    | 'scrollbars'
     | 'scrollX'
     | 'scrollY'
     | 'scrollWith'
