@@ -719,3 +719,145 @@ describe('UiHostFrameClock', () => {
     }
   });
 });
+
+describe('UiHostFrameClock on the display beat', () => {
+  // WebKit: a worker's refreshes come from a timer near 65 Hz that keeps no
+  // display's time, while the page's refreshes follow a 120 Hz display.
+  const INTERVAL = 1000 / 120;
+
+  function lockedClock() {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const frames: number[] = [];
+    const callbacks: ((time: number) => void)[] = [];
+    let continuous = false;
+    const clock: UiHostFrameClock = new UiHostFrameClock(
+      time => {
+        frames.push(time);
+        // A scroll under way asks for its next frame while drawing this one.
+        if (continuous) clock.requestFrame();
+      },
+      () => {},
+      {
+        fallbackMs: 100000,
+        now: () => Date.now(),
+        timeOrigin: 0,
+        requestAnimationFrame: callback => {
+          callbacks.push(callback);
+          return callbacks.length;
+        }
+      }
+    );
+    clock.displayInterval(INTERVAL, 0);
+    // Nine of the worker's own refreshes, 15.4 ms apart, frames back to back.
+    for (let k = 0; k < 9; k++) {
+      clock.requestFrame();
+      vi.setSystemTime(100 + k * 15.4);
+      callbacks.shift()?.(100 + k * 15.4);
+    }
+    return { clock, frames, scroll: () => (continuous = true) };
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it("gives up a worker's refreshes that keep no display's time", () => {
+    const { clock } = lockedClock();
+    expect(clock.isLocal).toBe(false);
+    expect(clock.isDisplayLocked).toBe(true);
+  });
+
+  it('draws a frame just after every display refresh, however late the host says so', () => {
+    const { clock, frames, scroll } = lockedClock();
+    vi.setSystemTime(1000);
+    frames.length = 0;
+    scroll();
+    clock.requestFrame();
+    // The display refreshes at 1000 + k * INTERVAL; the host's callback for
+    // each runs up to 3 ms late.
+    for (let k = 0; k < 40; k++) {
+      const late = (k * 7) % 4 === 0 ? 3 : (k % 3) * 0.4;
+      vi.advanceTimersByTime(Math.max(0, 1000 + k * INTERVAL + late - Date.now()));
+      clock.tick(1000 + k * INTERVAL + late);
+    }
+    // Once the beat is known, each frame is stamped with a refresh's time,
+    // one refresh after the last: never a late callback's, none skipped.
+    const settled = frames.slice(6);
+    expect(settled.length).toBeGreaterThan(30);
+    for (const time of settled) {
+      const phase = (time - 1000) / INTERVAL;
+      expect(Math.abs(phase - Math.round(phase))).toBeLessThan(0.02);
+    }
+    for (let k = 1; k < settled.length; k++) {
+      expect(Math.round((settled[k]! - settled[k - 1]!) / INTERVAL)).toBe(1);
+    }
+  });
+
+  it('keeps its own refreshes when they are faster than the display it was told of', () => {
+    // A window dragged from a 60 Hz screen to a 165 Hz one: the measurement is stale, not the worker slow.
+    vi.useFakeTimers();
+    const callbacks: ((time: number) => void)[] = [];
+    const clock = new UiHostFrameClock(
+      () => {},
+      () => {},
+      {
+        now: () => Date.now(),
+        timeOrigin: 0,
+        requestAnimationFrame: callback => {
+          callbacks.push(callback);
+          return callbacks.length;
+        }
+      }
+    );
+    clock.displayInterval(1000 / 60, 0);
+    for (let k = 0; k < 12; k++) {
+      clock.requestFrame();
+      callbacks.shift()?.(100 + k * (1000 / 165));
+    }
+    expect(clock.isLocal).toBe(true);
+    expect(clock.isDisplayLocked).toBe(false);
+  });
+
+  it('gives frames too costly for one refresh an even two', () => {
+    const { clock, frames, scroll } = lockedClock();
+    vi.setSystemTime(1000);
+    frames.length = 0;
+    scroll();
+    // Each frame takes 6 ms of an 8.3 ms refresh.
+    const costly = frames.push.bind(frames);
+    frames.push = (...times: number[]) => {
+      vi.setSystemTime(Date.now() + 6);
+      return costly(...times);
+    };
+    clock.requestFrame();
+    for (let k = 0; k < 80; k++) {
+      vi.advanceTimersByTime(Math.max(0, 1000 + k * INTERVAL - Date.now()));
+      clock.tick(1000 + k * INTERVAL);
+    }
+    expect(clock.displayStride).toBe(2);
+    const late = frames.slice(-20);
+    for (let k = 1; k < late.length; k++) {
+      expect(Math.round((late[k]! - late[k - 1]!) / INTERVAL)).toBe(2);
+    }
+  });
+
+  it('follows the display it is on now, not the one it was measured on', () => {
+    // Measured at 120 Hz as the app started; the window is now on a 165 Hz screen.
+    const { clock, frames, scroll } = lockedClock();
+    const now165 = 1000 / 165;
+    vi.setSystemTime(1000);
+    frames.length = 0;
+    scroll();
+    clock.requestFrame();
+    for (let k = 0; k < 60; k++) {
+      const late = (k * 7) % 4 === 0 ? 2 : (k % 3) * 0.3;
+      vi.advanceTimersByTime(Math.max(0, 1000 + k * now165 + late - Date.now()));
+      clock.tick(1000 + k * now165 + late);
+    }
+    const settled = frames.slice(15);
+    expect(settled.length).toBeGreaterThan(30);
+    for (let k = 1; k < settled.length; k++) {
+      const gap = (settled[k]! - settled[k - 1]!) / now165;
+      expect(Math.abs(gap - 1)).toBeLessThan(0.05);
+    }
+  });
+});

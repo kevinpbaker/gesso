@@ -280,6 +280,17 @@ export type ShellToRuntimeMessage =
    * app exchanges nothing.
    */
   | { type: 'tick'; time: number }
+  /**
+   * The display's interval as the shell's \`requestAnimationFrame\` sees
+   * it, sent once the worker is ready, with the shell's \`timeOrigin\` so
+   * the worker can read the shell's frame times on its own clock.
+   *
+   * A worker's own refreshes can be no display's at all: WebKit's come
+   * from a timer near 65 Hz, on no display's beat. The frame clock then
+   * keeps time by the shell's refreshes instead; see
+   * \`UiHostFrameClock.displayInterval\`.
+   */
+  | { type: 'displayInterval'; ms: number; origin: number }
   | { type: 'dispose' };
 
 /**
