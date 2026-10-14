@@ -467,6 +467,39 @@ describe('Menu', () => {
   });
 
   /**
+   * A menu whose place and whose being open come from one change, as a
+   * row's ⋯ gives both at once. `open` bound before `at`, it opened
+   * where it had last been told, or, the first time, in the corner of
+   * the window. It follows its place while open now, in whatever order
+   * its inputs arrive.
+   */
+  it('opens at the point given with it, whichever input arrives first', () => {
+    const menu$ = new BehaviorSubject<{ readonly at: { readonly x: number; readonly y: number } } | null>(null);
+    const ui = mount(
+      createComponent(Menu, {
+        open: menu$.pipe(map(menu => menu !== null)),
+        at: menu$.pipe(map(menu => menu?.at)),
+        items: [{ value: 'a', label: 'First' }],
+        onOpenChange: (next: boolean) => {
+          if (!next) menu$.next(null);
+        }
+      })
+    );
+    menu$.next({ at: { x: 120, y: 80 } });
+    ui.frame();
+    let menu = ui.getLayout(ui.getByRole('menu'));
+    expect([menu.x, menu.y]).toEqual([120, 80]);
+
+    // Closed, and opened again somewhere else: there, not where it was.
+    menu$.next(null);
+    ui.frame();
+    menu$.next({ at: { x: 200, y: 150 } });
+    ui.frame();
+    menu = ui.getLayout(ui.getByRole('menu'));
+    expect([menu.x, menu.y]).toEqual([200, 150]);
+  });
+
+  /**
    * A context menu opened halfway down a window with room for it on
    * neither side of the pointer. It flipped above and started off the
    * top of the screen; it slides now, whole, until it fits.
