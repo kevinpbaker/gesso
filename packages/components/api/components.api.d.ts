@@ -607,6 +607,7 @@ interface LazyListProps extends ControlLayoutProps {
   revision?: unknown;
   selectedIndex?: number;
   defaultSelectedIndex?: number;
+  revealSelected?: boolean;
   onSelect?: (index: number) => void;
   onActivate?: (index: number) => void;
   label?: string;
