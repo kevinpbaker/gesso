@@ -4,7 +4,16 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Box, Column, type UiNode, type UiRole, type UiSemanticsRecord, UiEventType, UiPointerEvent } from 'gesso-core';
+import {
+  Box,
+  Column,
+  editorFor,
+  type UiNode,
+  type UiRole,
+  type UiSemanticsRecord,
+  UiEventType,
+  UiPointerEvent
+} from 'gesso-core';
 import { Checkbox } from './Checkbox';
 import { NumberInput } from './NumberInput';
 import { RadioGroup } from './Radio';
@@ -240,6 +249,46 @@ describe('TextInput', () => {
     const multi = mount(createComponent(TextArea, { label: 'Notes', onSubmit: submits }));
     multi.focusRole('textbox');
     multi.fireEvent.keyDown('Enter');
+    expect(submits).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * A password or a passphrase: the app gets what was typed, and
+   * nothing else does. Not the screen, not the clipboard, not the
+   * semantics that cross to the page.
+   */
+  it('keeps a secret: reports the text, draws bullets, copies nothing', () => {
+    const changes: string[] = [];
+    const submits = vi.fn();
+    const ui = mount(
+      createComponent(TextInput, {
+        label: 'Passphrase',
+        secret: true,
+        multiline: true,
+        defaultValue: '',
+        onChange: v => changes.push(v),
+        onSubmit: submits
+      })
+    );
+    const field = ui.getByRole('textbox');
+    expect(field.properties.get('secret')).toBe(true);
+
+    ui.fireEvent.focus(field);
+    ui.fireEvent.type('correct horse');
+    ui.frame();
+    expect(changes).toEqual(['correct horse']);
+    expect(ui.recordFor('textbox').valueText).toBe('•'.repeat(13));
+
+    // Everything selected, from the end back to the start.
+    ui.fireEvent.keyDown('Home', { shift: true });
+    expect([editorFor(field).start, editorFor(field).end]).toEqual([0, 13]);
+    expect(ui.fireEvent.copy()).toBe('');
+    expect(ui.fireEvent.cut()).toBe('');
+    ui.frame();
+    expect(changes).toEqual(['correct horse']);
+
+    // One line, whatever `multiline` said: Enter submits.
+    ui.fireEvent.keyDown('Enter');
     expect(submits).toHaveBeenCalledTimes(1);
   });
 });

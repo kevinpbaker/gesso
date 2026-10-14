@@ -1111,6 +1111,19 @@ export const UiProperties = {
     affects: DirtyFlags.Properties
   }),
 
+  /**
+   * A password field: every character is drawn as a bullet, copy and
+   * cut take nothing, and the shell edits it through a password input.
+   * The value itself is unchanged. Single-line only.
+   */
+  secret: defineProperty<boolean | undefined>({
+    name: 'secret',
+    defaultValue: undefined,
+    inherited: false,
+    // Layout and paint draw the mask; semantics stops carrying the text.
+    affects: L | P | S
+  }),
+
   /** Colour of the caret; defaults to the text colour. */
   caretColor: defineProperty<UiColorValue | undefined>({
     name: 'caretColor',

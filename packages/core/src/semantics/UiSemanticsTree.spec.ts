@@ -165,6 +165,21 @@ describe('buildSemanticsTree', () => {
     ]);
   });
 
+  /**
+   * The record goes to the main thread and into the DOM; a secret
+   * field's says how long its value is, as a password input does in the
+   * browser's own tree, and never what it is.
+   */
+  it("reports a secret editable's value as its mask", () => {
+    const t = new Tree();
+    const field = t.node(UiNodeType.EditableText, { value: 'hunter2', label: 'Password', secret: true });
+    t.add(t.root, field);
+
+    expect(t.build()).toEqual([
+      { id: field.id, parent: null, index: 0, role: 'textbox', label: 'Password', valueText: '•••••••' }
+    ]);
+  });
+
   it('nests records under the nearest semantic ancestor and numbers them there', () => {
     const t = new Tree();
     const list = t.node(UiNodeType.Column, { role: 'list' });

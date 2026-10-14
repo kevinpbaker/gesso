@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import { CARET_BLINK_MS, editorFor } from '../editing/UiEditable';
+import { EditableLayout } from '../editing/EditableLayout';
+import { createPaintState, resolvePaintState } from './PaintState';
 import { RenderHarness, callArgs, callsOf } from './RenderTestUtils';
 import {
   buildRenderList,
@@ -239,5 +241,75 @@ describe('an editable with runs', () => {
     h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 1000 });
 
     expect(callsOf(h.context, 'fillRect').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A secret field draws a bullet for every UTF-16 code unit of its
+ * text, and lays out, places its caret and hit-tests on the bullets.
+ * The harness measures a code point as one glyph, so 'a😀b' is three
+ * glyphs of text and four of mask: drawn on the text, the field would
+ * be a glyph narrower and its caret a glyph short of where it is.
+ */
+describe('a secret editable', () => {
+  it('draws one bullet per code unit and keeps the text in the model', () => {
+    const h = new RenderHarness();
+    const { root, field, model } = scene(h, { value: 'a😀b', secret: true });
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+
+    expect(callArgs(h.context, 'fillText')).toEqual([['••••', 0, expect.any(Number)]]);
+    expect(model.text).toBe('a😀b');
+    expect(h.box(field).width).toBeCloseTo(4 * 8.4, 5);
+  });
+
+  it('places the caret, the selection and a click on the bullets', () => {
+    const h = new RenderHarness();
+    const { root, field, model } = scene(h, { value: 'a😀b', secret: true });
+    model.focused = true;
+    model.blinkOrigin = 1000;
+    model.select(3);
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 1000 });
+    // After three bullets, 25.2px, not after two glyphs.
+    expect(callArgs(h.context, 'fillRect')).toEqual([[25, 0, 1, expect.closeTo(20, 5)]]);
+
+    h.context.calls.length = 0;
+    model.select(1, 3);
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 1000 });
+    const fills = callArgs(h.context, 'fillRect');
+    expect(fills[0][0]).toBeCloseTo(8.4, 5);
+    expect(fills[0][2]).toBeCloseTo(16.8, 5);
+
+    // A click just short of the fourth bullet's middle lands before it.
+    const state = resolvePaintState(field, createPaintState());
+    const layout = new EditableLayout(model, { x: 0, y: 0, width: 800, height: 20 }, state, h.measurer);
+    expect(layout.offsetAt(3.5 * 8.4 - 1, 5)).toBe(3);
+  });
+
+  it('shows its placeholder as it is while empty', () => {
+    const h = new RenderHarness();
+    const { root } = scene(h, { value: '', secret: true, placeholder: 'Password' });
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+    expect(callArgs(h.context, 'fillText')).toEqual([['Password', 0, expect.any(Number)]]);
+  });
+
+  it('draws no runs, which would show where its words are', () => {
+    const h = new RenderHarness();
+    const { root } = scene(h, {
+      value: 'ab',
+      secret: true,
+      spans: [
+        { text: 'a', color: '#000000' },
+        { text: 'b', color: '#d93025' }
+      ]
+    });
+    h.renderer.render(root, { layout: h.engine, text: h.measurer, now: 0 });
+    expect(callArgs(h.context, 'fillText').map(call => call[0])).toEqual(['••']);
+  });
+
+  it('is drawn as bullets by WebGPU too', () => {
+    const h = new RenderHarness();
+    const { root } = scene(h, { value: 'a😀b', secret: true });
+    const list = buildRenderList(root, h.engine, h.measurer, 800, 600, 1, 0);
+    expect(textRuns(list).map(run => run.text)).toEqual(['••••']);
   });
 });

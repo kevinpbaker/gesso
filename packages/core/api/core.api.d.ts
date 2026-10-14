@@ -1861,6 +1861,7 @@ declare const UiProperties: {
   readonly placeholder: UiPropertyDefinition<string | undefined>;
   readonly multiline: UiPropertyDefinition<boolean | undefined>;
   readonly readOnly: UiPropertyDefinition<boolean | undefined>;
+  readonly secret: UiPropertyDefinition<boolean | undefined>;
   readonly caretColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly selectionColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly matchColor: UiPropertyDefinition<UiColorValue | undefined>;
@@ -1980,7 +1981,7 @@ type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollbars' | 'scrollX
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
-type EditableTextProps = CommonProps & PropsOf<'value' | 'spans' | 'placeholder' | 'multiline' | 'readOnly' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
+type EditableTextProps = CommonProps & PropsOf<'value' | 'spans' | 'placeholder' | 'multiline' | 'readOnly' | 'secret' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
 type BoxProps = ContainerProps & PropsOf<'x' | 'y' | 'image' | 'objectFit'>;
 type StackProps = BoxProps;
 type PaintElementProps = BoxProps & PropsOf<'paint' | 'path' | 'clipPath' | 'blur'>;
@@ -2523,6 +2524,7 @@ declare class EditableLayout {
   readonly placeholderLines: readonly TextLinePlacement[];
   readonly measure: RunMeasure;
   readonly rtl: boolean;
+  readonly text: string;
   constructor(model: EditableTextModel, box: LayoutBox, state: PaintState, measurer: TextMeasurer);
   caretRect(offset?: number): CaretRect;
   offsetAt(x: number, y: number): number;
@@ -3232,6 +3234,7 @@ interface EditingState {
   readonly composing: boolean;
   readonly clipboard?: string;
   readonly html?: string;
+  readonly secret?: true;
 }
 interface EditingControllerOptions {
   platform?: EditingPlatform;

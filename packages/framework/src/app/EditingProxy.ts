@@ -72,9 +72,25 @@ const KEY_INPUT_TYPES = new Set([
  *
  * Nothing here reads the textarea's content as truth except the
  * composition string, which is the one thing only the browser knows.
+ *
+ * A secret field (`EditingState.secret`) is edited through an
+ * `<input type="password">` in the textarea's place, made the first
+ * time one takes focus. Only a password input makes the browser and the
+ * OS treat what is typed as a password: macOS turns on secure input, so
+ * no other application can read the keys; nothing autocorrects, learns
+ * or spell-checks it; a screen reader calls it a secure text field and
+ * does not echo the characters. Every listener the textarea has, the
+ * input has too. Its value is the state's text, which for a secret
+ * field is already the mask, so the value reaches no element.
  */
 export class EditingProxy {
   private readonly textarea: HTMLTextAreaElement;
+  /** The password input, once a secret field has had focus. */
+  private password: HTMLInputElement | null = null;
+  /** Whichever of the two the focused editable is edited through. */
+  private field: HTMLTextAreaElement | HTMLInputElement;
+  /** What `describe` was last given, so a swap of element carries it across. */
+  private described: Parameters<EditingProxy['describe']> = [null];
   private readonly doc: Document;
   private readonly view: Window | null;
   private state: EditingState | null = null;
@@ -82,7 +98,7 @@ export class EditingProxy {
   private disposed = false;
   /** Set while `raiseKeyboard` drops focus on purpose; see there. */
   private refocusing = false;
-  private readonly detach: () => void;
+  private detach: () => void;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -92,14 +108,25 @@ export class EditingProxy {
     this.view = this.doc.defaultView;
     const textarea = this.doc.createElement('textarea');
     this.textarea = textarea;
-    textarea.setAttribute('aria-hidden', 'true');
-    textarea.setAttribute('autocomplete', 'off');
-    textarea.setAttribute('autocorrect', 'off');
-    textarea.setAttribute('autocapitalize', 'off');
-    textarea.setAttribute('spellcheck', 'false');
+    this.field = textarea;
     textarea.setAttribute('wrap', 'off');
-    textarea.tabIndex = -1;
-    Object.assign(textarea.style, {
+    const detachTextarea = this.prepare(textarea);
+    const detachWindow = this.listenWindow();
+    this.detach = () => {
+      detachTextarea();
+      detachWindow();
+    };
+  }
+
+  /** Hides an element, puts it over the canvas and listens to it. */
+  private prepare(field: HTMLTextAreaElement | HTMLInputElement): () => void {
+    field.setAttribute('aria-hidden', 'true');
+    field.setAttribute('autocomplete', 'off');
+    field.setAttribute('autocorrect', 'off');
+    field.setAttribute('autocapitalize', 'off');
+    field.setAttribute('spellcheck', 'false');
+    field.tabIndex = -1;
+    Object.assign(field.style, {
       position: 'fixed',
       left: '0px',
       top: '0px',
@@ -116,8 +143,62 @@ export class EditingProxy {
       pointerEvents: 'none',
       zIndex: '2147483647'
     } as Partial<CSSStyleDeclaration>);
-    this.doc.body.appendChild(textarea);
-    this.detach = this.listen();
+    this.doc.body.appendChild(field);
+    return this.listen(field);
+  }
+
+  /** The password input, made the first time a secret field needs it. */
+  private passwordField(): HTMLInputElement {
+    if (this.password === null) {
+      const input = this.doc.createElement('input');
+      input.setAttribute('type', 'password');
+      const detach = this.prepare(input);
+      // `off`, not `current-password`: a password manager filling it
+      // would set a value the runtime never hears (no `beforeinput`),
+      // and offering to save one would offer to save the mask. The data
+      // attributes ask the managers that ignore `autocomplete` on a
+      // password input not to put their icon on a one-pixel element.
+      input.setAttribute('data-1p-ignore', '');
+      input.setAttribute('data-lpignore', 'true');
+      this.password = input;
+      const previous = this.detach;
+      this.detach = () => {
+        previous();
+        detach();
+      };
+    }
+    return this.password;
+  }
+
+  /** Whether an element is one this proxy edits through. */
+  private owns(element: unknown): boolean {
+    return element !== null && (element === this.textarea || element === this.password);
+  }
+
+  /**
+   * Moves editing to the other element: the focused editable became, or
+   * stopped being, a secret one. Focus follows if the old element had
+   * it; the blur that causes is ours, not the person leaving the field.
+   */
+  private swapTo(next: HTMLTextAreaElement | HTMLInputElement): void {
+    const previous = this.field;
+    const hadFocus = this.doc.activeElement === previous;
+    this.field = next;
+    // A composition open in the old element ends with it.
+    this.composing = false;
+    this.write(previous, null);
+    this.write(next, ...this.described);
+    if (previous === this.password) {
+      previous.value = '';
+    }
+    if (hadFocus) {
+      this.refocusing = true;
+      try {
+        next.focus({ preventScroll: true });
+      } finally {
+        this.refocusing = false;
+      }
+    }
   }
 
   /** True while an editable in the runtime has focus. */
@@ -125,9 +206,12 @@ export class EditingProxy {
     return this.state !== null;
   }
 
-  /** The hidden element, for tests. */
-  get element(): HTMLTextAreaElement {
-    return this.textarea;
+  /**
+   * The hidden element editing goes through: the textarea, or the
+   * password input while a secret field has focus. For tests.
+   */
+  get element(): HTMLTextAreaElement | HTMLInputElement {
+    return this.field;
   }
 
   /**
@@ -143,25 +227,32 @@ export class EditingProxy {
     this.state = state;
     if (state === null) {
       if (wasActive) {
-        if (this.doc.activeElement === this.textarea) {
-          this.textarea.blur();
+        if (this.doc.activeElement === this.field) {
+          this.field.blur();
           this.canvas.focus({ preventScroll: true });
+        }
+        if (this.password !== null) {
+          this.password.value = '';
         }
       }
       return;
+    }
+    const wanted = state.secret === true ? this.passwordField() : this.textarea;
+    if (wanted !== this.field) {
+      this.swapTo(wanted);
     }
     this.position(state);
     this.mirror(state);
     // What the phone's Return key should say. A single-line field has
     // nothing to insert a newline into, and a keyboard offering one is
     // offering a key that does nothing.
-    this.textarea.setAttribute('enterkeyhint', state.multiline ? 'enter' : 'done');
-    if (!wasActive || this.doc.activeElement !== this.textarea) {
+    this.field.setAttribute('enterkeyhint', state.multiline ? 'enter' : 'done');
+    if (!wasActive || this.doc.activeElement !== this.field) {
       const active = this.doc.activeElement;
       // Take focus only from the canvas or from nothing: an editable
       // gaining focus in the app must not steal it from page chrome.
-      if (active === null || active === this.doc.body || active === this.canvas || active === this.textarea) {
-        this.textarea.focus({ preventScroll: true });
+      if (active === null || active === this.doc.body || active === this.canvas || this.owns(active)) {
+        this.field.focus({ preventScroll: true });
       }
     }
   }
@@ -178,10 +269,10 @@ export class EditingProxy {
    * IME with nothing to compose into.
    */
   focus(): void {
-    if (this.disposed || this.state === null || this.doc.activeElement === this.textarea) {
+    if (this.disposed || this.state === null || this.doc.activeElement === this.field) {
       return;
     }
-    this.textarea.focus({ preventScroll: true });
+    this.field.focus({ preventScroll: true });
   }
 
   /**
@@ -216,15 +307,15 @@ export class EditingProxy {
     if (this.disposed || this.state === null) {
       return;
     }
-    const textarea = this.textarea;
-    if (this.doc.activeElement !== textarea) {
-      textarea.focus({ preventScroll: true });
+    const field = this.field;
+    if (this.doc.activeElement !== field) {
+      field.focus({ preventScroll: true });
       return;
     }
     this.refocusing = true;
     try {
-      textarea.blur();
-      textarea.focus({ preventScroll: true });
+      field.blur();
+      field.focus({ preventScroll: true });
     } finally {
       this.refocusing = false;
     }
@@ -241,12 +332,25 @@ export class EditingProxy {
    * the person is really typing into. That the two cannot disagree is
    * the reason the field's semantics live here rather than on a second
    * element beside it.
+   *
+   * Nothing of the record's value is written: the element's own value
+   * is the field's text (a secret field's mask), and that is what a
+   * screen reader reads.
    */
   describe(record: UiSemanticsRecord | null, activeDescendant?: string, controls?: string): void {
     if (this.disposed) {
       return;
     }
-    const textarea = this.textarea;
+    this.described = [record, activeDescendant, controls];
+    this.write(this.field, record, activeDescendant, controls);
+  }
+
+  private write(
+    textarea: HTMLTextAreaElement | HTMLInputElement,
+    record: UiSemanticsRecord | null,
+    activeDescendant?: string,
+    controls?: string
+  ): void {
     if (record === null) {
       textarea.setAttribute('aria-hidden', 'true');
       for (const attribute of [
@@ -297,6 +401,7 @@ export class EditingProxy {
     this.detach();
     this.state = null;
     this.textarea.remove();
+    this.password?.remove();
   }
 
   /** Puts the element where the caret is, so the IME window opens there. */
@@ -305,7 +410,7 @@ export class EditingProxy {
     const height = Math.max(1, state.caret.height);
     const left = rect.left + Math.min(Math.max(0, state.caret.x), Math.max(0, rect.width - 1));
     const top = rect.top + Math.min(Math.max(0, state.caret.y), Math.max(0, rect.height - height));
-    const style = this.textarea.style;
+    const style = this.field.style;
     style.left = `${left}px`;
     style.top = `${top}px`;
     style.height = `${height}px`;
@@ -318,7 +423,7 @@ export class EditingProxy {
     if (this.composing) {
       return;
     }
-    const textarea = this.textarea;
+    const textarea = this.field;
     if (textarea.value !== state.text) {
       textarea.value = state.text;
     }
@@ -337,9 +442,8 @@ export class EditingProxy {
     }
   }
 
-  private listen(): () => void {
-    const textarea = this.textarea;
-
+  /** Listens to one of the two elements; each has the same listeners. */
+  private listen(textarea: HTMLTextAreaElement | HTMLInputElement): () => void {
     const onBeforeInput = (event: Event): void => {
       const input = event as InputEvent;
       const type = input.inputType;
@@ -385,39 +489,6 @@ export class EditingProxy {
       }
     };
 
-    const onPaste = (event: Event): void => {
-      const clipboard = (event as ClipboardEvent).clipboardData;
-      event.preventDefault();
-      const text = clipboard?.getData('text/plain') ?? '';
-      // The HTML as well, when the clipboard has it: a copy from a web
-      // page or a document carries headings, lists and links there, and
-      // an editor that keeps structure wants them.
-      const html = clipboard?.getData('text/html') ?? '';
-      if (text.length > 0 || html.length > 0) {
-        this.sink.paste(text, html.length > 0 ? html : null);
-      }
-    };
-
-    /**
-     * A paste aimed at the canvas rather than at the field.
-     *
-     * When no editable has focus this proxy blurs and hands focus back
-     * to the canvas, so the browser fires `paste` there — and the
-     * listener above, which is on the textarea, never hears it. The
-     * text was dropped before it reached the application at all, which
-     * is half of why a grid could not be pasted into; the other half
-     * was `UiEditingController.paste` having nowhere to send it.
-     *
-     * The two listeners cannot both fire for one paste: the event goes
-     * to whichever element has focus, and only one of them ever does.
-     */
-    const onCanvasPaste = (event: Event): void => {
-      if (this.doc.activeElement === textarea) {
-        return;
-      }
-      onPaste(event);
-    };
-
     const onCopy = (event: Event): void => {
       const clipboard = (event as ClipboardEvent).clipboardData;
       const state = this.state;
@@ -425,6 +496,11 @@ export class EditingProxy {
         return;
       }
       event.preventDefault();
+      if (state.secret === true) {
+        // A secret field gives the clipboard nothing, and leaves what
+        // was on it there, as a password input does.
+        return;
+      }
       // A surface may say what a copy takes (its whole line, with
       // nothing selected; several selections joined); else the
       // selected text.
@@ -442,6 +518,7 @@ export class EditingProxy {
       onCopy(event);
       if (
         state !== null &&
+        state.secret !== true &&
         (state.clipboard !== undefined ? state.clipboard.length > 0 : state.selectionEnd > state.selectionStart)
       ) {
         this.sink.beforeInput('deleteByCut', null);
@@ -465,14 +542,8 @@ export class EditingProxy {
       // also blurs) to something other than the canvas: the app's
       // editable should stop showing a caret.
       const related = (event as FocusEvent).relatedTarget;
-      if (this.state !== null && this.doc.hasFocus() && related !== this.canvas) {
+      if (this.state !== null && this.doc.hasFocus() && related !== this.canvas && !this.owns(related)) {
         this.sink.blur();
-      }
-    };
-
-    const onReposition = (): void => {
-      if (this.state !== null) {
-        this.position(this.state);
       }
     };
 
@@ -480,28 +551,71 @@ export class EditingProxy {
     textarea.addEventListener('compositionstart', onCompositionStart);
     textarea.addEventListener('input', onInput);
     textarea.addEventListener('compositionend', onCompositionEnd);
-    textarea.addEventListener('paste', onPaste);
+    textarea.addEventListener('paste', this.onPaste);
     textarea.addEventListener('copy', onCopy);
     textarea.addEventListener('cut', onCut);
     textarea.addEventListener('keydown', onKeyDown);
-    this.canvas.addEventListener('paste', onCanvasPaste);
     textarea.addEventListener('keyup', onKeyUp);
     textarea.addEventListener('blur', onBlur);
-    this.view?.addEventListener('scroll', onReposition, { capture: true, passive: true });
-    this.view?.addEventListener('resize', onReposition);
 
     return () => {
       textarea.removeEventListener('beforeinput', onBeforeInput);
       textarea.removeEventListener('compositionstart', onCompositionStart);
       textarea.removeEventListener('input', onInput);
       textarea.removeEventListener('compositionend', onCompositionEnd);
-      textarea.removeEventListener('paste', onPaste);
+      textarea.removeEventListener('paste', this.onPaste);
       textarea.removeEventListener('copy', onCopy);
       textarea.removeEventListener('cut', onCut);
       textarea.removeEventListener('keydown', onKeyDown);
-      this.canvas.removeEventListener('paste', onCanvasPaste);
       textarea.removeEventListener('keyup', onKeyUp);
       textarea.removeEventListener('blur', onBlur);
+    };
+  }
+
+  private readonly onPaste = (event: Event): void => {
+    const clipboard = (event as ClipboardEvent).clipboardData;
+    event.preventDefault();
+    const text = clipboard?.getData('text/plain') ?? '';
+    // The HTML as well, when the clipboard has it: a copy from a web
+    // page or a document carries headings, lists and links there, and
+    // an editor that keeps structure wants them.
+    const html = clipboard?.getData('text/html') ?? '';
+    if (text.length > 0 || html.length > 0) {
+      this.sink.paste(text, html.length > 0 ? html : null);
+    }
+  };
+
+  private listenWindow(): () => void {
+    /**
+     * A paste aimed at the canvas rather than at the field.
+     *
+     * When no editable has focus this proxy blurs and hands focus back
+     * to the canvas, so the browser fires `paste` there — and the
+     * listener on the field's element never hears it. The
+     * text was dropped before it reached the application at all, which
+     * is half of why a grid could not be pasted into; the other half
+     * was `UiEditingController.paste` having nowhere to send it.
+     *
+     * The two listeners cannot both fire for one paste: the event goes
+     * to whichever element has focus, and only one of them ever does.
+     */
+    const onCanvasPaste = (event: Event): void => {
+      if (this.owns(this.doc.activeElement)) {
+        return;
+      }
+      this.onPaste(event);
+    };
+
+    const onReposition = (): void => {
+      if (this.state !== null) {
+        this.position(this.state);
+      }
+    };
+    this.view?.addEventListener('scroll', onReposition, { capture: true, passive: true });
+    this.view?.addEventListener('resize', onReposition);
+    this.canvas.addEventListener('paste', onCanvasPaste);
+    return () => {
+      this.canvas.removeEventListener('paste', onCanvasPaste);
       this.view?.removeEventListener('scroll', onReposition, { capture: true });
       this.view?.removeEventListener('resize', onReposition);
     };

@@ -2675,24 +2675,34 @@ declare class EditingProxy {
   private readonly canvas;
   private readonly sink;
   private readonly textarea;
+  private password;
+  private field;
+  private described;
   private readonly doc;
   private readonly view;
   private state;
   private composing;
   private disposed;
   private refocusing;
-  private readonly detach;
+  private detach;
   constructor(canvas: HTMLCanvasElement, sink: EditingProxySink);
+  private prepare;
+  private passwordField;
+  private owns;
+  private swapTo;
   get active(): boolean;
-  get element(): HTMLTextAreaElement;
+  get element(): HTMLTextAreaElement | HTMLInputElement;
   update(state: EditingState | null): void;
   focus(): void;
   raiseKeyboard(): void;
   describe(record: UiSemanticsRecord | null, activeDescendant?: string, controls?: string): void;
+  private write;
   dispose(): void;
   private position;
   private mirror;
   private listen;
+  private readonly onPaste;
+  private listenWindow;
 }
 declare function writeClipboard(text: string, doc?: Document): Promise<boolean>;
 interface SemanticsMirrorSink {

@@ -9,6 +9,7 @@ import type {
   UiLiveRegion
 } from '../properties/UiSemantics';
 import { textInputOf } from '../editing/UiTextInput';
+import { maskText } from '../editing/UiEditable';
 import { normalizeStates } from '../properties/UiSemantics';
 import type { UiResolvedTextSpan, UiTextLink } from '../properties/UiTextStyle';
 import { resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
@@ -487,7 +488,12 @@ function valueTextOf(node: UiNode): string | undefined {
     return declared;
   }
   if (node.type === UiNodeType.EditableText) {
-    return (node.properties.get('value') as string | undefined) ?? '';
+    const value = (node.properties.get('value') as string | undefined) ?? '';
+    // A secret field's value is the mask it draws, as a password
+    // input's is in the browser's own accessibility tree: how long it
+    // is, never what it says. The record crosses to the main thread
+    // and into the DOM, and the text must reach neither.
+    return node.properties.get('secret') === true ? maskText(value) : value;
   }
   return undefined;
 }

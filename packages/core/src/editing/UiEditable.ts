@@ -71,12 +71,39 @@ export function isEditableNode(node: UiNode): boolean {
   return node.type === UiNodeType.EditableText;
 }
 
+/** Whether Enter inserts a newline. Never in a secret field, which is one line, as a password input is. */
 export function isMultiline(node: UiNode): boolean {
-  return node.properties.get('multiline') === true;
+  return node.properties.get('multiline') === true && !isSecret(node);
 }
 
 export function isReadOnly(node: UiNode): boolean {
   return node.properties.get('readOnly') === true;
+}
+
+export function isSecret(node: UiNode): boolean {
+  return node.properties.get('secret') === true;
+}
+
+/** What a secret field draws for each character. */
+export const SECRET_BULLET = '\u2022';
+
+/**
+ * A secret field's text as it is drawn: one bullet per UTF-16 code
+ * unit, not per character. Every offset the editor works in (caret,
+ * selection, hit-testing, the shell's mirror) is a code unit offset
+ * into the model's text, and a mask of the same length keeps each of
+ * them meaning the same position in both strings. A character outside
+ * the BMP draws as two bullets, which says a little about it; counting
+ * graphemes instead would need a map between the two strings' offsets
+ * in every one of those places.
+ */
+export function maskText(text: string): string {
+  return SECRET_BULLET.repeat(text.length);
+}
+
+/** The text an editable draws and measures: its model's, masked when it is secret. */
+export function shownTextOf(node: UiNode, model: EditableTextModel): string {
+  return isSecret(node) ? maskText(model.text) : model.text;
 }
 
 /**

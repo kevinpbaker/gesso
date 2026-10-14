@@ -21,8 +21,8 @@ bound to, and the field follows without anything having been typed.
 
 ## Props
 
-`TextAreaProps` is `TextInputProps` without `multiline`; everything
-else on this table is shared.
+`TextAreaProps` is `TextInputProps` without `multiline` and `secret`;
+everything else on this table is shared.
 
 | Prop           | Type                      | Default | What it does                                                                                                                                            |
 | -------------- | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -38,6 +38,7 @@ else on this table is shared.
 | `readOnly`     | `boolean`                 | `false` | Takes focus, and allows the caret, selection and copying, but refuses every edit. Announced as `readonly`.                                              |
 | `required`     | `boolean`                 | `false` | Announced as `required`. It validates nothing on its own; the message is `error`'s job.                                                                 |
 | `multiline`    | `boolean`                 | `false` | Wraps the text instead of scrolling it, raises the field's minimum height from 32 to 72, and hands Enter to the text. `TextArea` sets it, and drops it. |
+| `secret`       | `boolean`                 | `false` | A password field. See [Secret fields](#secret-fields).                                                                                                  |
 | `onSubmit`     | `() => void`              | none    | Called when Enter is pressed in a single-line field.                                                                                                    |
 | `ref`          | `UiNodeRef`               | none    | Receives the node that _is_ the field, which is what a form focuses and an overlay anchors to, rather than the component's outer column.                |
 
@@ -118,9 +119,7 @@ this arrives with the component and none of it is yours to write:
   without moving the caret, and a multiline one shows an overlay
   scrollbar while it scrolls.
 
-What is not here: password masking, a `maxLength`, and drag-and-drop of
-text. There is no `type` prop, so a field that must hide what it holds
-is not this component yet.
+What is not here: a `maxLength`, and drag-and-drop of text.
 
 **Where this was checked.** The editing path was verified by hand in
 Chrome on Linux. WKWebView and WebView2 are not covered, and mixed
@@ -131,6 +130,35 @@ shell re-asserts focus on the `pointerup` of the press that opened a
 field, which is the gesture a phone raises its keyboard for; that path
 is covered by unit tests against a fake DOM and by synthetic touch
 pointers in Chrome, and has not been run on a physical device.
+
+## Secret fields
+
+`secret` makes the field a password field, for a password, a passphrase
+or a token:
+
+```tsx
+<TextInput label="Passphrase" secret={true} value={passphrase} onChange={next => (passphrase.value = next)} />
+```
+
+It behaves as a browser's `<input type="password">` does. Every
+character is drawn as a bullet, one for each UTF-16 code unit, so a
+character outside the Basic Multilingual Plane draws as two; the caret,
+the selection and a click all work on the bullets. The placeholder is
+drawn as it is. `onChange` gets the real text. Copy and cut take nothing
+and leave the clipboard as it was; paste works. A word move or delete
+goes to the end of the text, and a double click selects all of it, so
+the caret shows nowhere a word ends.
+
+While the field has focus the shell edits it through a hidden
+`<input type="password">` in place of the textarea, so the browser and
+the platform treat it as a password: macOS turns on secure input,
+nothing autocorrects or remembers it, and a screen reader calls it a
+secure text field. The text itself stays in the render worker. The
+shell's element, the semantics record and the accessibility mirror hold
+only the bullets.
+
+A secret field is one line. `multiline` is ignored while `secret` is
+on, and Enter calls `onSubmit`.
 
 ## Keyboard
 
@@ -174,7 +202,8 @@ It emits:
 - **`description`**: the `description` prop.
 - **`valueText`**: the text in the field, taken from the node's `value`
   rather than declared, because an editable's content is its value and
-  not its name.
+  not its name. A `secret` field's is its bullets, which say how long
+  the text is and nothing else.
 - **`states`**: `invalid` while `error` is a non-empty string,
   `required` while `required` is set, `readonly` while `readOnly` is.
   Disabled is not a state but a flag of its own on the record.
