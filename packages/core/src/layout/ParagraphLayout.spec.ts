@@ -44,6 +44,14 @@ describe('layoutParagraph', () => {
       expect(paragraph.width).toBe(48);
     });
 
+    it("wraps the rest against a width of its own, not the wide word, when the width is the box's", () => {
+      // 'ij kl' (30) fits the 48 a fit-content paragraph grows to, and not the 24 asked for.
+      expect(lines('abcdefgh ij kl', { maxWidth: 24 })).toEqual(['abcdefgh', 'ij kl']);
+      const exact = layout('abcdefgh ij kl', { maxWidth: 24, exactWidth: true });
+      expect(exact.lines.map(line => line.text)).toEqual(['abcdefgh', 'ij', 'kl']);
+      expect(exact.lines[0].width).toBe(48);
+    });
+
     it('collapses runs of spaces at breaks and ignores leading spaces on new lines', () => {
       expect(lines('ab   cd', { maxWidth: 12 })).toEqual(['ab', 'cd']);
     });

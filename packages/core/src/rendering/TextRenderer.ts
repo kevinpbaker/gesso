@@ -136,6 +136,8 @@ export function textMeasureRequest(
     fontVariant: state.fontVariant,
     fontKerning: state.fontKerning,
     maxWidth: box.width > 0 ? box.width : undefined,
+    // The box layout settled on, grown to a wide word already if it was fit-content: the lines are drawn in it.
+    exactWidth: box.width > 0,
     wrap: state.textWrap,
     maxLines: state.maxLines,
     overflow: state.textOverflow,

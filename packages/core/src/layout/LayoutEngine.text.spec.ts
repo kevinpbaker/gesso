@@ -63,6 +63,22 @@ describe('LayoutEngine text', () => {
       expect(harness.box(paragraph)).toEqual({ x: 0, y: 0, width: 48, height: 24 });
     });
 
+    it('wraps against a width of its own, a wider word overflowing it, rather than widening every line', () => {
+      const harness = new LayoutHarness();
+      const column = harness.createNode('column', UiNodeType.Column);
+      column.setProperty('width', 24);
+      column.setProperty('x', 'start');
+      // 'abcdefgh' is 48 wide. Fit-content, the paragraph grows to it and 'ij kl' (30) shares a line;
+      // at a width of 24 set on it, 'ij' and 'kl' each take one, and the word overflows the box.
+      const fit = text(harness, 'fit', 'abcdefgh ij kl');
+      const fixed = text(harness, 'fixed', 'abcdefgh ij kl', { width: 24 });
+      harness.append(column, fit);
+      harness.append(column, fixed);
+      harness.layout(column, Constraints.unbounded());
+      expect(harness.box(fit)).toEqual({ x: 0, y: 0, width: 48, height: 24 });
+      expect(harness.box(fixed)).toEqual({ x: 0, y: 24, width: 24, height: 36 });
+    });
+
     it('wraps a stretched child at the full column width', () => {
       const harness = new LayoutHarness();
       const column = harness.createNode('column', UiNodeType.Column);
