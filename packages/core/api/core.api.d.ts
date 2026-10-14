@@ -2248,6 +2248,7 @@ interface TextMeasureRequest {
   text: string;
   fontSize: number;
   maxWidth?: number;
+  exactWidth?: boolean;
   fontFamily?: string;
   fontWeight?: string | number;
   lineHeight?: number;
