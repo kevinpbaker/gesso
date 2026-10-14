@@ -1,4 +1,4 @@
-import { BehaviorSubject, map, Subject, type Observable } from 'rxjs';
+import { BehaviorSubject, map, skip, Subject, type Observable } from 'rxjs';
 
 import { input, type ComponentContext, type Inputs, FocusService, ScrollService } from 'gesso-framework';
 import { Column, Row, Text, measureFlow, type LayoutBox, type UiChild, type UiElement, type UiNode } from 'gesso-core';
@@ -195,27 +195,48 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
       )
     );
 
+  /** What the menu shows while it is open: made when it opens, kept while it is moved. */
+  let shown: UiChild | null = null;
+  /** Shows the menu where its inputs say now, beside its anchor or at its point. */
+  const place = (content: UiChild): void => {
+    overlay.show(content, {
+      anchor: inputs.anchor.value ?? null,
+      environment: inputs.anchor.value ?? placeholder,
+      // At a point, a menu opens below and to the right of it, and
+      // above or to the left when that would run off the screen.
+      placement: inputs.at.value === undefined ? placement.value : (placement.value ?? 'bottom-start'),
+      offset: inputs.at.value === undefined ? 4 : 0,
+      ...(inputs.at.value === undefined ? {} : { point: inputs.at.value }),
+      dismissOnOutsidePress: true,
+      onClose: () => {
+        shown = null;
+        release();
+        inputs.onOpenChange.value?.(false);
+      }
+    });
+  };
+
   inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
       active.next(Math.max(0, from(0)));
-      overlay.show(body(), {
-        anchor: inputs.anchor.value ?? null,
-        environment: inputs.anchor.value ?? placeholder,
-        // At a point, a menu opens below and to the right of it, and
-        // above or to the left when that would run off the screen.
-        placement: inputs.at.value === undefined ? placement.value : (placement.value ?? 'bottom-start'),
-        offset: inputs.at.value === undefined ? 4 : 0,
-        ...(inputs.at.value === undefined ? {} : { point: inputs.at.value }),
-        dismissOnOutsidePress: true,
-        onClose: () => {
-          release();
-          inputs.onOpenChange.value?.(false);
-        }
-      });
+      shown = body();
+      place(shown);
     } else if (isOpen !== true && overlay.isOpen()) {
       overlay.hide();
     }
   });
+  // Where it is, followed while it is open. A caller that opens it and
+  // says where from one change (a row's ⋯, a right-click) cannot say in
+  // which order its inputs arrive, and `open` read first used the place
+  // it had been given before, or none: the corner of the window.
+  const follow = (where: Observable<unknown>): void => {
+    where.pipe(skip(1)).subscribe(() => {
+      if (shown !== null && overlay.isOpen()) place(shown);
+    });
+  };
+  follow(inputs.at);
+  follow(inputs.anchor);
+  follow(inputs.placement);
 
   // The placeholder stays where the component was declared, which
   // is how the overlay's content inherits this tree's theme.
