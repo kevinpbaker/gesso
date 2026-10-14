@@ -56,6 +56,14 @@ export interface TextInputProps extends ControlLayoutProps {
   required?: boolean;
   /** Enter inserts a newline instead of submitting. */
   multiline?: boolean;
+  /**
+   * A password field: what is typed is drawn as bullets, copy and cut
+   * take nothing, and the browser edits it as a password input, so the
+   * platform does not autocorrect, remember or read out the text.
+   * `onChange` still receives the real value. A secret field is one
+   * line, whatever `multiline` says.
+   */
+  secret?: boolean;
   /** Enter in a single-line field. */
   onSubmit?: () => void;
   /**
@@ -70,7 +78,7 @@ export function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext)
   return textField(inputs, ctx, false);
 }
 
-export type TextAreaProps = Omit<TextInputProps, 'multiline'>;
+export type TextAreaProps = Omit<TextInputProps, 'multiline' | 'secret'>;
 
 export function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild {
   return textField(inputs as Inputs<TextInputProps>, ctx, true);
@@ -84,7 +92,9 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
   const disabled = input(inputs.disabled, false);
   const readOnly = input(inputs.readOnly, false);
   const required = input(inputs.required, false);
-  const multiline = forceMultiline ? new BehaviorSubject(true) : input(inputs.multiline, false);
+  const secret = forceMultiline ? new BehaviorSubject(false) : input(inputs.secret, false);
+  const lines = forceMultiline ? new BehaviorSubject(true) : input(inputs.multiline, false);
+  const multiline = combineLatest([lines, secret]).pipe(map(([many, hidden]) => many && !hidden));
   const invalid = error.pipe(map(text => text.length > 0));
   const focus = trackFocus(ctx, inputs.ref);
   const value = controlled<string>({
@@ -118,6 +128,7 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       disabled,
       readOnly,
       multiline,
+      secret,
       // A single-line field scrolls its text rather than wrapping it.
       textWrap: multiline.pipe(map(on => (on ? 'word' : 'none'))),
       backgroundColor: 'controlBackground',
@@ -137,7 +148,7 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       // Enter belongs to the app in a single-line field; in a
       // multiline one it belongs to the text.
       onKeyDown: (event: UiKeyboardEvent) => {
-        if (!multiline.value) {
+        if (!lines.value || secret.value) {
           submit(event);
         }
       }

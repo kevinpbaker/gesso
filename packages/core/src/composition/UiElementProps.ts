@@ -335,6 +335,7 @@ export type EditableTextProps = CommonProps &
     | 'placeholder'
     | 'multiline'
     | 'readOnly'
+    | 'secret'
     | 'textWrap'
     | 'verticalAlign'
     | 'caretColor'

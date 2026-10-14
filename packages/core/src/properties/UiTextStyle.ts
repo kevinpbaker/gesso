@@ -286,6 +286,12 @@ export function editableSpansOf(
   text: string,
   composition?: UiTextRange | null
 ): readonly UiResolvedTextSpan[] {
+  // A secret field draws a mask, which no runs describe: runs styled
+  // over it would show where the words are, and hidden runs would hide
+  // characters of a value the person cannot see to check.
+  if (node.properties.get('secret') === true) {
+    return EMPTY_SPANS;
+  }
   const spanned = spannedTextOf(node);
   if (spanned === undefined) {
     return EMPTY_SPANS;

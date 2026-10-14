@@ -336,6 +336,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   placeholder: { group: 'Editing', note: 'Shown while the value is empty.' },
   multiline: { group: 'Editing', note: 'Whether Enter inserts a newline or is left for the app.' },
   readOnly: { group: 'Editing', note: 'Selectable and focusable, but not editable.' },
+  secret: {
+    group: 'Editing',
+    note: 'A password field: drawn as bullets, copies nothing, and is edited through a password input. Single-line.'
+  },
   caretColor: { group: 'Editing', note: 'Colour of the caret. Falls back to the text colour.' },
   selectionColor: { group: 'Editing', note: 'Fill behind selected text.' },
   matchColor: { group: 'Editing', note: 'Fill behind a find match.' },

@@ -256,11 +256,12 @@ interface TextInputProps extends ControlLayoutProps {
   readOnly?: boolean;
   required?: boolean;
   multiline?: boolean;
+  secret?: boolean;
   onSubmit?: () => void;
   labelHidden?: boolean;
 }
 declare function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext): UiChild;
-type TextAreaProps = Omit<TextInputProps, 'multiline'>;
+type TextAreaProps = Omit<TextInputProps, 'multiline' | 'secret'>;
 declare function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild;
 interface SliderProps extends ControlLayoutProps {
   ref?: UiNodeRef;

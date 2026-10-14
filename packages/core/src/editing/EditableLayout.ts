@@ -34,6 +34,13 @@ export class EditableLayout {
   readonly placeholderLines: readonly TextLinePlacement[];
   readonly measure: RunMeasure;
   readonly rtl: boolean;
+  /**
+   * The text as drawn: the model's, or a secret field's mask of it
+   * (see `maskText`). The geometry is the drawing's, so it is measured
+   * from this; the two are the same length, so its offsets are the
+   * model's.
+   */
+  readonly text: string;
 
   constructor(
     readonly model: EditableTextModel,
@@ -41,7 +48,9 @@ export class EditableLayout {
     state: PaintState,
     measurer: TextMeasurer
   ) {
-    const request = textMeasureRequest(model.text, state, box);
+    const text = state.text ?? model.text;
+    this.text = text;
+    const request = textMeasureRequest(text, state, box);
     // An editable never ellipsises or clamps: every character the user
     // typed has a caret position.
     request.maxLines = undefined;
@@ -57,16 +66,16 @@ export class EditableLayout {
         ? 0
         : spanned === undefined || start === undefined
           ? measurer.measureRunWidth(text, request)
-          : spanned.width(model.text, start, start + text.length);
+          : spanned.width(this.text, start, start + text.length);
     this.rtl = state.rtl;
     this.placeholderLines =
-      model.text.length === 0 && state.placeholder !== undefined && state.placeholder.length > 0
+      text.length === 0 && state.placeholder !== undefined && state.placeholder.length > 0
         ? placeLines(box, state, measurer.layout({ ...request, text: state.placeholder }))
         : [];
   }
 
   caretRect(offset: number = this.model.focus): CaretRect {
-    return caretRectFor(this.lines, this.model.text, offset, this.measure, this.rtl);
+    return caretRectFor(this.lines, this.text, offset, this.measure, this.rtl);
   }
 
   /**
@@ -78,11 +87,11 @@ export class EditableLayout {
    * apart. Never inside hidden text.
    */
   offsetAt(x: number, y: number): number {
-    return this.model.caretOffsetNear(offsetAtPoint(this.lines, this.model.text, x, y, this.measure, this.rtl));
+    return this.model.caretOffsetNear(offsetAtPoint(this.lines, this.text, x, y, this.measure, this.rtl));
   }
 
   verticalMove(offset: number, direction: -1 | 1, goalX?: number): { offset: number; x: number } | null {
-    const move = offsetForVerticalMove(this.lines, this.model.text, offset, direction, this.measure, this.rtl, goalX);
+    const move = offsetForVerticalMove(this.lines, this.text, offset, direction, this.measure, this.rtl, goalX);
     return move === null ? null : { offset: this.model.caretOffsetNear(move.offset), x: move.x };
   }
 
@@ -93,7 +102,7 @@ export class EditableLayout {
   selectionBoxes(range?: { readonly start: number; readonly end: number }): LayoutBox[] {
     const start = range?.start ?? this.model.start;
     const end = range?.end ?? this.model.end;
-    return selectionRects(this.lines, this.model.text, start, end, this.measure, this.rtl);
+    return selectionRects(this.lines, this.text, start, end, this.measure, this.rtl);
   }
 
   /** Boxes under the text the IME is composing, for its underline. */
@@ -102,6 +111,6 @@ export class EditableLayout {
     if (range === null) {
       return [];
     }
-    return selectionRects(this.lines, this.model.text, range.start, range.end, this.measure, this.rtl);
+    return selectionRects(this.lines, this.text, range.start, range.end, this.measure, this.rtl);
   }
 }

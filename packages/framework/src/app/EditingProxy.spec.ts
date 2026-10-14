@@ -537,6 +537,106 @@ describe('EditingProxy', () => {
     });
   });
 
+  /**
+   * A secret field is edited through a password input, the one element
+   * the browser and the OS treat as a password: secure input on macOS,
+   * no autocorrect, a "secure text field" to a screen reader.
+   */
+  describe('a secret field', () => {
+    const secret = { text: '••••••••', selectionStart: 8, selectionEnd: 8, clipboard: '', secret: true } as const;
+
+    it('is edited through a password input that holds only the mask', () => {
+      const { doc, proxy, textarea, state } = setup();
+      proxy.update(state(secret));
+      const input = proxy.element as unknown as FakeElement;
+      expect(input).not.toBe(textarea);
+      expect(input.tag).toBe('input');
+      expect(input.attributes.get('type')).toBe('password');
+      expect(input.attributes.get('autocomplete')).toBe('off');
+      expect(input.attributes.get('spellcheck')).toBe('false');
+      expect(input.parent).toBe(doc.body);
+      expect(input.tabIndex).toBe(-1);
+      expect(input.style.opacity).toBe('0');
+      expect(doc.activeElement).toBe(input);
+      expect(input.value).toBe('••••••••');
+      expect(input.selectionStart).toBe(8);
+      expect(input.style.left).toBe('140px');
+    });
+
+    it('hears everything the textarea hears', () => {
+      const { proxy, sink, state } = setup();
+      proxy.update(state(secret));
+      const input = proxy.element as unknown as FakeElement;
+      expect(input.dispatch('beforeinput', { inputType: 'insertText', data: 'x' }).defaultPrevented).toBe(true);
+      input.dispatch('keydown', { key: 'a' });
+      input.dispatch('keyup', { key: 'a' });
+      input.dispatch('compositionstart');
+      input.value = 'n';
+      input.selectionStart = 1;
+      input.dispatch('input');
+      input.dispatch('compositionend', { data: 'n' } as Partial<FakeEvent>);
+      const clipboardData = { getData: (type: string) => (type === 'text/plain' ? 'pasted' : ''), setData: () => {} };
+      input.dispatch('paste', { clipboardData });
+      expect(sink.calls).toEqual([
+        ['beforeInput', 'insertText', 'x'],
+        ['keyDown', expect.anything()],
+        ['keyUp', expect.anything()],
+        ['compositionStart'],
+        ['compositionUpdate', 'n', 1],
+        ['compositionEnd', 'n'],
+        ['paste', 'pasted', null]
+      ]);
+    });
+
+    it('gives a copy or a cut nothing and deletes nothing', () => {
+      const { proxy, sink, state } = setup();
+      proxy.update(state({ ...secret, selectionStart: 0 }));
+      const input = proxy.element as unknown as FakeElement;
+      const written: string[] = [];
+      const clipboardData = { getData: () => '', setData: (_type: string, value: string) => void written.push(value) };
+      expect(input.dispatch('copy', { clipboardData }).defaultPrevented).toBe(true);
+      expect(input.dispatch('cut', { clipboardData }).defaultPrevented).toBe(true);
+      expect(written).toEqual([]);
+      expect(sink.calls).toEqual([]);
+    });
+
+    it('moves focus and the semantics between the two elements without reporting a blur', () => {
+      const { doc, proxy, textarea, sink, state } = setup();
+      proxy.update(state());
+      proxy.describe({ id: 'n1', parent: null, index: 0, role: 'textbox', label: 'Name' });
+
+      proxy.update(state(secret));
+      proxy.describe({ id: 'n2', parent: null, index: 0, role: 'textbox', label: 'Password', valueText: '••••••••' });
+      const input = proxy.element as unknown as FakeElement;
+      expect(doc.activeElement).toBe(input);
+      expect(input.attributes.get('aria-label')).toBe('Password');
+      expect(input.attributes.has('aria-hidden')).toBe(false);
+      expect(textarea.attributes.get('aria-hidden')).toBe('true');
+      expect(textarea.attributes.has('aria-label')).toBe(false);
+      // The record's value is not copied onto the element: its own
+      // value is what a screen reader reads, and here that is the mask.
+      expect([...input.attributes.values()].some(value => value.includes('•'))).toBe(false);
+
+      proxy.update(state());
+      expect(proxy.element).toBe(textarea as unknown);
+      expect(doc.activeElement).toBe(textarea);
+      expect(textarea.attributes.get('aria-label')).toBe('Password');
+      expect(input.value).toBe('');
+      expect(sink.calls.filter(call => call[0] === 'blur')).toEqual([]);
+    });
+
+    it('is emptied when editing ends, and removed on dispose', () => {
+      const { doc, canvas, proxy, state } = setup();
+      proxy.update(state(secret));
+      const input = proxy.element as unknown as FakeElement;
+      proxy.update(null);
+      expect(input.value).toBe('');
+      expect(doc.activeElement).toBe(canvas);
+      proxy.dispose();
+      expect(input.parent).toBeNull();
+    });
+  });
+
   it('removes the element and listeners on dispose', () => {
     const { doc, proxy, textarea, state } = setup();
     proxy.update(state());

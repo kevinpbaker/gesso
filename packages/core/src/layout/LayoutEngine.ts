@@ -3,7 +3,7 @@ import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import { resolveFont } from '../properties/UiTextFont';
 import { editableSpansOf, resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
-import { editorFor } from '../editing/UiEditable';
+import { editorFor, shownTextOf } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
 import {
   AlignContent,
@@ -2901,7 +2901,8 @@ export class LayoutEngine {
       // supplying it, so the text is read first and the runs are
       // accepted only if they describe that string; see
       // `editableSpansOf`.
-      const typed = editable ? editorFor(node).text : '';
+      // A secret field is measured as the bullets it draws.
+      const typed = editable ? shownTextOf(node, editorFor(node)) : '';
       const spans = editable ? editableSpansOf(node, typed, editorFor(node).composition) : resolvedSpansOf(node);
       const text = editable
         ? typed

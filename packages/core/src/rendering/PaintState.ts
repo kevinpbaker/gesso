@@ -15,7 +15,7 @@ import { resolveColor, resolveColorValue, resolveGradient, themeColor } from '..
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import type { ResolvedGradient } from '../properties/UiGradient';
 import type { EditableTextModel } from '../editing/EditableTextModel';
-import { editorFor, isEditableNode } from '../editing/UiEditable';
+import { editorFor, isEditableNode, shownTextOf } from '../editing/UiEditable';
 import { selectionRangeOf, type TextRange } from '../selection/UiSelectable';
 import { matchRangesOf } from '../find/UiTextMatches';
 import { resolveFontInto } from '../properties/UiTextFont';
@@ -275,7 +275,9 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
     // paints its caret and placeholder.
     const model = editorFor(node);
     out.editor = model;
-    out.text = model.text;
+    // A secret field's mask, which is the same length as the model's
+    // text: every offset into one is the same position in the other.
+    out.text = shownTextOf(node, model);
     out.placeholder = resolveString(node, 'placeholder');
     out.placeholderColor =
       resolveColor(node, UiProperties.placeholderColor) ?? themeColor(node, 'textMuted') ?? DEFAULT_PLACEHOLDER_COLOR;

@@ -9,7 +9,15 @@ import type { EditableTextModel, EditUnit } from '../editing/EditableTextModel';
 import { commandForKey, detectEditingPlatform, type EditCommand, type EditingPlatform } from '../editing/EditingKeymap';
 import { lineStartAt, lineEndAt } from '../editing/TextBoundaries';
 import { visibleWordRange } from '../editing/HiddenText';
-import { editorFor, isEditableNode, isMultiline, isReadOnly, nextCaretToggle } from '../editing/UiEditable';
+import {
+  editorFor,
+  isEditableNode,
+  isMultiline,
+  isReadOnly,
+  isSecret,
+  maskText,
+  nextCaretToggle
+} from '../editing/UiEditable';
 import { textInputOf } from '../editing/UiTextInput';
 import {
   adjacentField,
@@ -89,6 +97,14 @@ export interface EditingState {
    * `UiEditingGroup.copyHtml`). Absent otherwise.
    */
   readonly html?: string;
+  /**
+   * A secret field (`UiProperties.secret`). `text` is then its mask,
+   * not its value, so the value never leaves the runtime; `clipboard`
+   * is empty, so a copy or a cut takes nothing. A shell edits it
+   * through a password input, which is what tells the platform not to
+   * learn, correct or read out what is typed.
+   */
+  readonly secret?: true;
 }
 
 export interface EditingControllerOptions {
@@ -239,9 +255,13 @@ export class UiEditingController {
     return this.execute(node, command);
   }
 
-  private execute(node: UiNode, command: EditCommand): boolean {
+  private execute(node: UiNode, keyed: EditCommand): boolean {
     const model = editorFor(node);
     const readOnly = isReadOnly(node);
+    const command =
+      (keyed.kind === 'move' || keyed.kind === 'delete') && keyed.unit === 'word'
+        ? { ...keyed, unit: secretWordUnit(node) }
+        : keyed;
     switch (command.kind) {
       case 'move':
         if (this.span !== null && !command.extend) {
@@ -473,7 +493,16 @@ export class UiEditingController {
         if (readOnly) {
           return true;
         }
-        const unit: EditUnit = /Word/.test(inputType) ? 'word' : /Line/.test(inputType) ? 'line' : 'grapheme';
+        if (inputType === 'deleteByCut' && isSecret(node)) {
+          // A cut that copied nothing (see `state`) must not delete
+          // either: the text would be gone and on no clipboard.
+          return true;
+        }
+        const unit: EditUnit = /Word/.test(inputType)
+          ? secretWordUnit(node)
+          : /Line/.test(inputType)
+            ? 'line'
+            : 'grapheme';
         const forward = /Forward/.test(inputType);
         return this.applyEdit(node, model, inputType, null, () => {
           if (inputType === 'deleteContent' || inputType === 'deleteByCut' || inputType === 'deleteByDrag') {
@@ -757,6 +786,10 @@ export class UiEditingController {
 
     if (modifiers.shift) {
       model.moveTo(offset, true);
+    } else if (count === 2 && isSecret(node)) {
+      // Where the words are is part of what is hidden: a double click
+      // selects everything, as a password input's does.
+      model.selectAll();
     } else if (count === 2) {
       const word = visibleWordRange(model.text, model.hidden, offset);
       model.select(word.start, word.end);
@@ -833,6 +866,18 @@ export class UiEditingController {
         multiline: true,
         composing: false,
         ...(html === undefined ? {} : { html })
+      };
+    }
+    if (isSecret(node)) {
+      return {
+        text: maskText(model.text),
+        selectionStart: model.start,
+        selectionEnd: model.end,
+        caret,
+        multiline: false,
+        composing: model.composing,
+        clipboard: '',
+        secret: true
       };
     }
     const html = model.collapsed || model.composing ? undefined : this.fieldHtml(node, model.start, model.end);
@@ -1190,13 +1235,16 @@ export class UiEditingController {
     for (const node of span.lit) {
       key.push(editorFor(node).text);
     }
+    // A selection across fields that crosses a secret one copies its
+    // mask, as it draws, and never its value.
+    const textOf = (node: UiNode): string => (isSecret(node) ? maskText(editorFor(node).text) : editorFor(node).text);
     return this.cachedCopy(key, () => {
       const text =
         span.group.copyText !== undefined
           ? span.group.copyText(start, end)
           : span.lit
               .map(node => {
-                const text = editorFor(node).text;
+                const text = textOf(node);
                 return text.slice(node === start.node ? start.offset : 0, node === end.node ? end.offset : text.length);
               })
               .join('\n');
@@ -1363,6 +1411,14 @@ export class UiEditingController {
           };
     return new EditableLayout(state.editor!, box, state, this.host.measurer);
   }
+}
+
+/**
+ * The unit a word move or delete takes in a field: the whole text in a
+ * secret one, whose word boundaries the caret stopping at would show.
+ */
+function secretWordUnit(node: UiNode): EditUnit {
+  return isSecret(node) ? 'document' : 'word';
 }
 
 function deleteInputType(unit: EditUnit, direction: -1 | 1): string {
