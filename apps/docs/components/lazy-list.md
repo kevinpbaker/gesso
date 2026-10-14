@@ -78,6 +78,7 @@ for a row nobody can see.
 | `revision`             | `unknown`                             | none      | Changes when what an index means changes. The mounted rows are rendered again.                        |
 | `selectedIndex`        | `number`                              | none      | The chosen row. Supplying it makes the selection controlled.                                          |
 | `defaultSelectedIndex` | `number`                              | none      | The row to start on. `-1`, meaning nothing chosen, when neither prop is given.                        |
+| `revealSelected`       | `boolean`                             | `false`   | Scroll to a row the application chooses, as to one the keyboard reached. Read once.                   |
 | `onSelect`             | `(index: number) => void`             | none      | Called with the index a click or a key chose.                                                         |
 | `onActivate`           | `(index: number) => void`             | none      | Called on Enter or Space with the chosen index. Nothing happens when nothing is chosen.               |
 | `label`                | `string`                              | `'List'`  | The list's accessible name.                                                                           |
@@ -110,9 +111,11 @@ request: if nothing writes it back, the highlight does not move. One
 thing to know about the controlled form is that writing the index from
 the application marks that row chosen and does nothing else. The list
 scrolls to a row the keyboard or a click reached, not to one the
-application wrote, and the spec beside the example proves it. To put a
-particular row on screen from the application, scroll the container the
-way [overflow and scrolling](/layout/overflow-and-scrolling) describes.
+application wrote, and the spec beside the example proves it. To have
+it scroll to the rows the application chooses as well (a result found,
+an item shown from elsewhere), pass `revealSelected`. It follows the
+item, by `itemKey`, rather than the index: rows arriving above a chosen
+one that the reader scrolled away from do not pull the list back to it.
 
 ## Keyboard
 

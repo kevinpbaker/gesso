@@ -44,6 +44,15 @@ export interface LazyListProps extends ControlLayoutProps {
   /** The chosen item, or -1 for none. */
   selectedIndex?: number;
   defaultSelectedIndex?: number;
+  /**
+   * Scroll to an item the application chooses through `selectedIndex`,
+   * as the list does to one the keyboard reached: a commit shown from
+   * elsewhere, a search's result. The same item at another index (by
+   * `itemKey`), as the list around it changes, is not followed. Off by
+   * default: a written index is drawn as chosen and nothing more. Read
+   * once, when the list mounts.
+   */
+  revealSelected?: boolean;
   onSelect?: (index: number) => void;
   /** Enter or Space on the chosen item. */
   onActivate?: (index: number) => void;
@@ -93,6 +102,21 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
     list.reveal(index);
   };
   const step = (by: number): void => choose(stepIndex(selected.current(), by, inputs.count.value));
+
+  if (inputs.revealSelected.value === true) {
+    // Followed by item, not by index: one the person scrolled away from stays where they left it as rows arrive.
+    let revealed: string | number | null = null;
+    ctx.effect(selected.value, index => {
+      if (index < 0) {
+        revealed = null;
+        return;
+      }
+      const key = inputs.itemKey.value?.(index) ?? index;
+      if (key === revealed) return;
+      revealed = key;
+      list.reveal(index);
+    });
+  }
 
   const row = (index: number): UiChild =>
     Box(

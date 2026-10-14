@@ -110,6 +110,37 @@ describe('LazyList', () => {
     expect(ui.textOf(list)).toContain('file 999');
   });
 
+  it('with revealSelected, scrolls to an item the application chooses, and not after it as the list shifts', () => {
+    const selected = new BehaviorSubject(0);
+    // Keys that move with the data: an item added at the top shifts every index by one.
+    let shift = 0;
+    const ui = mount(
+      createComponent(LazyList, {
+        label: 'Commits',
+        count: 1000,
+        height: 100,
+        estimatedItemExtent: 20,
+        selectedIndex: selected,
+        revealSelected: true,
+        itemKey: (index: number) => index - shift,
+        item: (index: number) => Box({ height: 20 }, Text({ text: `commit ${index}` }))
+      })
+    );
+    const list = ui.getAllByRole('list')[0];
+    ui.frame();
+    selected.next(500);
+    ui.frame();
+    expect(ui.textOf(list)).toContain('commit 500');
+    const scrolled = list.properties.get('scrollY') as number;
+    expect(scrolled).toBeGreaterThan(9000);
+
+    // A new item at the top: the same item, one further down, is not scrolled to again.
+    shift = 1;
+    selected.next(501);
+    ui.frame();
+    expect(list.properties.get('scrollY')).toBe(scrolled);
+  });
+
   it("lays each row across the list's whole width, as a row of any column is", () => {
     const ui = mount(
       createComponent(LazyList, {
