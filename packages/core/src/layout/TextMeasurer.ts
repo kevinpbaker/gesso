@@ -40,6 +40,15 @@ export interface TextMeasureRequest {
   /** Available width. Wrapping and fit-content sizing happen against it. */
   maxWidth?: number;
   /**
+   * `maxWidth` is the box's own width, fixed from outside (a width
+   * set, or the box being painted): lines wrap against it, and a word
+   * wider than it overflows on a line of its own. Otherwise the
+   * paragraph is fit-content, and a word wider than `maxWidth` widens
+   * it, every line wrapping against that wider box, as CSS lays out a
+   * box sized by its content.
+   */
+  exactWidth?: boolean;
+  /**
    * Font family for platforms that can shape text.
    *
    * Deterministic measurers may ignore every style field; they
@@ -383,7 +392,7 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
 
 /** Every field of a request, in a fixed order; two requests that lay out alike share a key. */
 function paragraphKey(request: TextMeasureRequest): string {
-  return `${request.fontSize}\0${request.maxWidth ?? ''}\0${request.fontFamily ?? ''}\0${request.fontWeight ?? ''}\0${
+  return `${request.fontSize}\0${request.maxWidth ?? ''}\0${request.exactWidth === true ? 1 : ''}\0${request.fontFamily ?? ''}\0${request.fontWeight ?? ''}\0${
     request.lineHeight ?? ''
   }\0${request.letterSpacing ?? ''}\0${request.wrap ?? ''}\0${request.maxLines ?? ''}\0${request.overflow ?? ''}\0${
     request.fontStyle ?? ''

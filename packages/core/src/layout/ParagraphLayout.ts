@@ -69,7 +69,10 @@ const FIT_EPSILON = 1 / 64;
  * narrower than the widest segment. When a segment is wider than the
  * available width the paragraph grows to it, and every line wraps
  * against that grown width rather than the one asked for, because that
- * is the box the lines will be painted in.
+ * is the box the lines will be painted in. When the width is the box's
+ * own (`exactWidth`: a width set from outside, or the box being
+ * painted), it does not grow: the lines wrap against it and the wide
+ * segment overflows alone, as CSS wraps text in a box of a fixed width.
  *
  * The first baseline sits half the leading below the line top, plus the
  * ascent, with the half-leading floored to a whole pixel. That floor is
@@ -160,7 +163,7 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
     }
     paragraphStart = paragraphEnd + 1;
   }
-  const available = Math.max(maxWidth, minContentWidth);
+  const available = request.exactWidth === true ? maxWidth : Math.max(maxWidth, minContentWidth);
   const unwrapped = wrap === 'none' || !isFinite(available);
 
   const lines: TextLine[] = [];

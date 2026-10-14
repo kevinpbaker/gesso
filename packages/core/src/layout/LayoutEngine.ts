@@ -2927,6 +2927,8 @@ export class LayoutEngine {
         fontVariant: font.fontVariant,
         fontKerning: font.fontKerning,
         maxWidth: isFinite(effective.maxWidth) ? Math.max(0, effective.maxWidth - paddingH) : undefined,
+        // A width set from outside (tight) is the box's: its lines wrap against it, and a wider word overflows rather than widening them.
+        exactWidth: isFinite(effective.maxWidth) && effective.minWidth === effective.maxWidth,
         wrap: this.textWrapProp(node),
         maxLines: maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined,
         overflow: editable ? ('clip' as const) : this.textOverflowProp(node),
