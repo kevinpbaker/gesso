@@ -34,7 +34,7 @@ export function editorFor(node: UiNode): EditableTextModel {
   let model = node.properties.get(EDITOR_PROP) as EditableTextModel | undefined;
   if (!(model instanceof EditableTextModel)) {
     model = new EditableTextModel();
-    node.properties.set(EDITOR_PROP, model);
+    node.setProperty(EDITOR_PROP, model);
   }
   syncEditorValue(node, model);
   syncEditorHidden(node, model);

@@ -690,7 +690,7 @@ export class UiGraph {
       if (!node.properties.has(property)) {
         return false;
       }
-      node.properties.delete(property);
+      node.removeProperty(property);
       this.markDirty(node, this.withProvidedFlags(property, dirtyFlags));
       return true;
     }

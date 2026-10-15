@@ -451,6 +451,20 @@ export class LayoutRecord {
   propsPass = 0;
   propsBaseWidth: number | undefined = undefined;
   propsBaseHeight: number | undefined = undefined;
+  /**
+   * The node's `propertyVersion` when its layout properties were last
+   * resolved, and whether that resolution read the node and nothing
+   * else (no inherited direction, no scroll leader). Together with the
+   * percentage base they let a later pass, a full one included, keep
+   * what the last one resolved instead of reading forty properties
+   * again; see `LayoutEngine.resolveLayoutProps`.
+   *
+   * **Not reset,** with the fields they vouch for: `reset()` leaves
+   * every field `resolveLayoutProps` writes as it was, because these
+   * say whether it is still right.
+   */
+  propsVersion = -1;
+  propsFromNodeAlone = false;
 
   /**
    * Returns the record to the state a freshly constructed one is in,
@@ -466,8 +480,9 @@ export class LayoutRecord {
    * never reused across.
    *
    * **Every field above has to appear here, with the value it is
-   * declared with,** but the two text memos, which check themselves
-   * and are kept across passes on purpose. A field that is added and not reset would carry
+   * declared with,** but the two text memos and the resolved layout
+   * properties, which check themselves and are kept across passes on
+   * purpose. A field that is added and not reset would carry
    * one pass's answer into the next, which is the kind of fault that
    * shows as a stale box on a screen and as nothing at all in a test
    * that lays out once. `LayoutRecord.spec.ts` compares a reset record
@@ -482,28 +497,6 @@ export class LayoutRecord {
     this.measuredHeight = 0;
     this.outerWidth = 0;
     this.outerHeight = 0;
-    this.paddingLeft = 0;
-    this.paddingRight = 0;
-    this.paddingTop = 0;
-    this.paddingBottom = 0;
-    this.marginLeft = 0;
-    this.marginRight = 0;
-    this.marginTop = 0;
-    this.marginBottom = 0;
-    this.minWidth = 0;
-    this.maxWidth = Infinity;
-    this.minHeight = 0;
-    this.maxHeight = Infinity;
-    this.flexGrow = 0;
-    this.flexShrink = 1;
-    this.flexBasisZero = false;
-    this.minWidthAuto = true;
-    this.minHeightAuto = true;
-    this.marginLeftAuto = false;
-    this.marginRightAuto = false;
-    this.marginTopAuto = false;
-    this.marginBottomAuto = false;
-    this.aspectRatio = undefined;
     this.hasBaseline = false;
     this.baseline = 0;
     this.minContentWidth = 0;
@@ -516,16 +509,6 @@ export class LayoutRecord {
     this.flexMin = 0;
     this.flexMax = Infinity;
     this.flexMinAuto = false;
-    this.positioned = false;
-    this.absolute = false;
-    this.top = undefined;
-    this.right = undefined;
-    this.bottom = undefined;
-    this.left = undefined;
-    this.zIndex = 0;
-    this.lifted = false;
-    this.liftBoundary = false;
-    this.clips = false;
     this.extentMinX = 0;
     this.extentMinY = 0;
     this.extentMaxX = 0;
@@ -534,12 +517,6 @@ export class LayoutRecord {
     this.paintReachTop = 0;
     this.paintReachRight = 0;
     this.paintReachBottom = 0;
-    this.scrollable = false;
-    this.scrollsText = false;
-    this.hidesScrollbars = false;
-    this.textScrollbars = false;
-    this.mirrored = false;
-    this.sticky = false;
     this.stickyOffsetX = 0;
     this.stickyOffsetY = 0;
     this.scrollbarVisibleUntil = 0;
@@ -558,8 +535,6 @@ export class LayoutRecord {
     this.lastConstraints = NEVER_MEASURED;
     this.lastBaseWidth = undefined;
     this.lastBaseHeight = undefined;
-    this.percentWidth = false;
-    this.percentHeight = false;
     this.alternates = null;
     this.contentMatters = true;
     this.relayoutBoundary = false;
@@ -568,8 +543,6 @@ export class LayoutRecord {
     this.placeDirty = true;
     this.transformDirty = false;
     this.propsPass = 0;
-    this.propsBaseWidth = undefined;
-    this.propsBaseHeight = undefined;
   }
 }
 

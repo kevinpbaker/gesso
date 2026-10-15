@@ -77,8 +77,24 @@ export class UiNode {
    *   opacity  → 0.5
    *   visible  → true
    *   width    → 200
+   *
+   * Read it directly; write it through `setProperty` and
+   * `removeProperty`, which count the change in `propertyVersion`.
    */
   public readonly properties = new Map<NodeProperty, unknown>();
+
+  /**
+   * Counts writes to `properties`.
+   *
+   * Lets something derived from a node's own properties tell that it
+   * is still right without reading them again. The layout engine
+   * resolves forty of them into each record, and on a full pass over a
+   * tree where nothing changed that reading was most of a sixth of the
+   * pass. A counter is exact where a dirty flag is not: flags are
+   * cleared by whichever pass runs next, and a record is resolved by
+   * whichever pass reaches it.
+   */
+  public propertyVersion = 0;
 
   /**
    * Values a modifier has written over the element's own.
@@ -133,5 +149,15 @@ export class UiNode {
 
   setProperty<T>(property: NodeProperty, value: T): void {
     this.properties.set(property, value);
+    this.propertyVersion++;
+  }
+
+  /** Removes a property; whether it was there. */
+  removeProperty(property: NodeProperty): boolean {
+    if (!this.properties.delete(property)) {
+      return false;
+    }
+    this.propertyVersion++;
+    return true;
   }
 }
