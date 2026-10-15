@@ -167,6 +167,8 @@ function radio(
       {
         width: 18,
         height: 18,
+        // Its own size beside a label long enough to wrap: the label gives way, not the circle.
+        flexShrink: 0,
         borderRadius: 9,
         borderWidth: 1,
         borderColor: active.pipe(map(on => (on ? 'controlAccent' : 'controlBorder'))),

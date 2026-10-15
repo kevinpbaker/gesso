@@ -98,6 +98,8 @@ export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): 
         {
           width: 18,
           height: 18,
+          // Its own size beside a label long enough to wrap: the label gives way, not the box.
+          flexShrink: 0,
           borderRadius: tokens.select(t => t.radius.checkbox),
           borderWidth: 1,
           borderColor: borderToken(invalid),
