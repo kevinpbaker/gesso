@@ -541,6 +541,22 @@ describe('Menu', () => {
     expect(ui.runtime.input.focus.trapped).toBe(true);
     expect(chosen).toEqual([]);
 
+    // The pointer resting on an item highlights it, and on the submenu's item opens it; then on another, closes it.
+    const over = (name: string) => {
+      const box = ui.getLayout(ui.getByRole('menuitem', { name }));
+      ui.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
+      ui.frame();
+    };
+    over('Reset to Here');
+    expect(ui.getAllByRole('menu')).toHaveLength(2);
+    over('Copy');
+    expect(ui.getAllByRole('menu')).toHaveLength(1);
+    expect(ui.getByRole('menuitem', { name: 'Copy' }).properties.get('backgroundColor')).toBe(
+      'controlBackgroundHovered'
+    );
+    expect(ui.getByRole('menuitem', { name: 'Reset to Here' }).properties.get('backgroundColor')).toBe('transparent');
+    ui.fireEvent.keyDown('ArrowDown');
+
     // Enter on it opens it too; a choice there is the menu's, and both close.
     ui.fireEvent.keyDown('Enter');
     ui.frame();
