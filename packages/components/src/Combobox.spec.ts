@@ -211,7 +211,9 @@ describe('Combobox', () => {
     value.next('kim');
     await ui.settle();
     expect(ui.getSemantics(field()).valueText).toBe('Kim Lee');
+    // Selected whole, as a label is on the way in: typing replaces it.
     await type('gr');
+    expect(options()).toEqual(['Grace Hopper']);
     value.next('ada');
     await ui.settle();
     expect(ui.getSemantics(field()).valueText).toBe('gr');

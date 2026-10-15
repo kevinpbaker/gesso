@@ -228,6 +228,9 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
     }
     if (!typing && query.value !== resting()) {
       query.next(resting());
+      // Still focused, the new label is selected whole, as the chosen one is on the way in: a selection left from the
+      // old one would cover part of it.
+      if (focused) queueMicrotask(() => selectAll());
     }
   });
   ctx.effect(focus.focused.pipe(distinctUntilChanged()), focused => {
