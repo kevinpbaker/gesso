@@ -18,6 +18,7 @@ import type { ReadableCell } from '../Input';
  */
 export type ShellRequest =
   | { type: 'clipboard'; id: number; text: string }
+  | { type: 'clipboardRead'; id: number }
   | { type: 'openUrl'; url: string }
   | { type: 'openRoute'; url: string }
   | { type: 'redirect'; url: string }
@@ -188,6 +189,9 @@ export class ShellService {
   /** Clipboard writes asked for and not yet answered, by the id sent with each. */
   private readonly copies = new Map<number, (copied: boolean) => void>();
   private nextCopyId = 1;
+  /** Clipboard reads asked for and not yet answered, by the id sent with each. */
+  private readonly reads = new Map<number, (text: string | null) => void>();
+  private nextReadId = 1;
   /** File requests asked for and not yet answered, by the id sent with each. */
   private readonly files = new Map<number, (result: ShellFileResult) => void>();
   private nextFileId = 1;
@@ -366,6 +370,40 @@ export class ShellService {
     }
     this.copies.delete(id);
     resolve(copied);
+  }
+
+  /**
+   * The text on the system clipboard, for a Paste chosen from a menu
+   * rather than typed: a key's paste comes with its text, a menu's has
+   * to ask. Null when there is none to give: the browser refused (it
+   * wants a secure context, a focused document, and in some browsers
+   * the person's say-so, which it asks for itself), or no shell is
+   * installed. It never rejects.
+   */
+  readText(): Promise<string | null> {
+    const handler = this.handler;
+    if (handler === undefined || handler === null) {
+      return Promise.resolve(null);
+    }
+    const id = this.nextReadId++;
+    const settled = new Promise<string | null>(resolve => {
+      this.reads.set(id, resolve);
+    });
+    handler({ type: 'clipboardRead', id });
+    return settled;
+  }
+
+  /**
+   * Called by the runtime with what a clipboard read found. Not for
+   * applications. An unknown id is ignored, on `settlePopup`'s terms.
+   */
+  settleClipboardRead(id: number, text: string | null): void {
+    const resolve = this.reads.get(id);
+    if (resolve === undefined) {
+      return;
+    }
+    this.reads.delete(id);
+    resolve(text);
   }
 
   /** Opens a URL in the user's browser, in a new tab or window. */

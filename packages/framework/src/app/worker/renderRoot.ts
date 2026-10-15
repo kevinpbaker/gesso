@@ -514,6 +514,9 @@ export class RenderWorkerApp {
       case 'clipboardResult':
         runtime.settleClipboard(message.id, message.copied);
         break;
+      case 'clipboardReadResult':
+        runtime.settleClipboardRead(message.id, message.text);
+        break;
       case 'storageResult':
         runtime.settleStorage(message.id, message.result);
         break;
@@ -675,6 +678,8 @@ export class RenderWorkerApp {
       } else if (request.type === 'openUrl') {
         this.host.postMessage({ type: 'openUrl', url: request.url });
       } else if (request.type === 'openRoute') {
+      } else if (request.type === 'clipboardRead') {
+        this.host.postMessage({ type: 'clipboardRead', id: request.id });
         this.host.postMessage({ type: 'openRoute', url: request.url });
       } else if (request.type === 'redirect') {
         this.host.postMessage({ type: 'redirect', url: request.url });

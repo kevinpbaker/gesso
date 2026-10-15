@@ -219,6 +219,8 @@ export type ShellToRuntimeMessage =
    * writing it.
    */
   | { type: 'clipboardResult'; id: number; copied: boolean }
+  /** What a `clipboardRead` request found, under its `id`: null when the browser would not say. */
+  | { type: 'clipboardReadResult'; id: number; text: string | null }
   /**
    * What the shell found in `localStorage` for a `storage` request
    * (ShellStorage). The second reply on this protocol, and it carries
@@ -391,6 +393,8 @@ export type RuntimeToShellMessage =
    * with the `clipboardResult` that comes back, once.
    */
   | { type: 'clipboard'; id: number; text: string }
+  /** Read the clipboard's text (ShellService.readText). `id` pairs it with the `clipboardReadResult` that comes back. */
+  | { type: 'clipboardRead'; id: number }
   /** Open a URL in a new tab (ShellService.openUrl). */
   | { type: 'openUrl'; url: string }
   /**

@@ -623,6 +623,22 @@ export class EditingProxy {
 }
 
 /**
+ * Reads the system clipboard's text from the main thread; null where
+ * the browser has no async clipboard or refuses (no secure context, no
+ * focus, or the person said no to its prompt). It never rejects.
+ */
+export function readClipboard(): Promise<string | null> {
+  const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
+  if (clipboard === undefined || typeof clipboard.readText !== 'function') {
+    return Promise.resolve(null);
+  }
+  return clipboard.readText().then(
+    text => text,
+    () => null
+  );
+}
+
+/**
  * Writes text to the system clipboard from the main thread, and answers
  * whether it got there. The async API needs a secure context and, in
  * some browsers, a recent user gesture; the `execCommand` fallback
