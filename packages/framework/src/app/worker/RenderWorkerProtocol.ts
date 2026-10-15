@@ -521,6 +521,25 @@ export function isInputMessage(message: ShellToRuntimeMessage): message is Shell
 }
 
 /**
+ * The inputs a person makes one at a time, whose frame is drawn as soon
+ * as they are routed (`GessoRuntime.answerInput`). Pointer moves and the
+ * wheel come in streams, and wait for the refresh that coalesces them.
+ */
+const DISCRETE_INPUT_TYPES: ReadonlySet<string> = new Set([
+  'pointerDown',
+  'pointerUp',
+  'keyDown',
+  'beforeInput',
+  'compositionUpdate',
+  'compositionEnd',
+  'paste'
+]);
+
+export function isDiscreteInputMessage(message: ShellToRuntimeMessage): boolean {
+  return DISCRETE_INPUT_TYPES.has(message.type);
+}
+
+/**
  * Milliseconds since the Unix epoch, at `performance.now()`'s
  * resolution.
  *

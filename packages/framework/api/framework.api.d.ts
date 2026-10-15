@@ -1458,6 +1458,9 @@ declare class GessoRuntime {
   private constraints;
   private pixelRatio;
   private lastFrameMs;
+  private earlyFrame;
+  private lastEarlyFrame;
+  private lastDiscreteInput;
   private frameTime;
   private frameBegan;
   private frameListener;
@@ -1530,6 +1533,8 @@ declare class GessoRuntime {
   resize(width: number, height: number, dpr?: number): void;
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
   noteInput(at: number | undefined): void;
+  answerInput(): void;
+  private drawEarly;
   setInspectorEnabled(enabled: boolean): void;
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
   onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;

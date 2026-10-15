@@ -19,7 +19,12 @@ import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { MediaOptions } from '../MediaService';
 import type { FontFamilyDeclaration } from '../FontService';
 import type { RouterRoutes } from '../../router/RouterService';
-import { isInputMessage, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
+import {
+  isDiscreteInputMessage,
+  isInputMessage,
+  type RuntimeToShellMessage,
+  type ShellToRuntimeMessage
+} from './RenderWorkerProtocol';
 
 /**
  * An `error` event as this module needs it: the thrown value when the
@@ -573,6 +578,9 @@ export class RenderWorkerApp {
     // lifecycle message is an input, so the guard is enough.
     if (this.runtime !== undefined && isInputMessage(message)) {
       this.runtime.noteInput(message.at);
+      if (isDiscreteInputMessage(message)) {
+        this.runtime.answerInput();
+      }
     }
   }
 
@@ -675,10 +683,10 @@ export class RenderWorkerApp {
     this.runtime.onShellRequest(request => {
       if (request.type === 'clipboard') {
         this.host.postMessage({ type: 'clipboard', id: request.id, text: request.text });
-      } else if (request.type === 'openUrl') {
-        this.host.postMessage({ type: 'openUrl', url: request.url });
       } else if (request.type === 'clipboardRead') {
         this.host.postMessage({ type: 'clipboardRead', id: request.id });
+      } else if (request.type === 'openUrl') {
+        this.host.postMessage({ type: 'openUrl', url: request.url });
       } else if (request.type === 'openRoute') {
         this.host.postMessage({ type: 'openRoute', url: request.url });
       } else if (request.type === 'redirect') {
