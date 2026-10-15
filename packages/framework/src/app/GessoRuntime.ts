@@ -332,6 +332,12 @@ export interface GessoRuntimeOptions {
  */
 /** How many shell requests are held for a listener that has not attached, before the rest are dropped. */
 const HELD_SHELL_REQUESTS = 256;
+/** The longest last frame after which an input's frame is still drawn early: half a 60 Hz refresh. See `GessoRuntime.answerInput`. */
+const EARLY_FRAME_MAX_MS = 8;
+/** The least time between two early frames: about half a refresh at 60 Hz. See `GessoRuntime.answerInput`. */
+const EARLY_FRAME_GAP_MS = 8;
+/** How long after a discrete input a channel's patch counts as its answer, and is drawn early. See `GessoRuntime.answerInput`. */
+const ANSWER_WINDOW_MS = 500;
 
 export class GessoRuntime {
   readonly services: ServiceRegistry;
@@ -380,6 +386,12 @@ export class GessoRuntime {
   private constraints: Constraints;
   private pixelRatio: number;
   private lastFrameMs = 0;
+  /** The timer that draws an input's frame early; see `answerInput`. */
+  private earlyFrame: ReturnType<typeof setTimeout> | null = null;
+  /** When the last early frame was drawn, on this thread's clock. */
+  private lastEarlyFrame = -Infinity;
+  /** When the last discrete input was routed; see `answerInput`. */
+  private lastDiscreteInput = -Infinity;
   /** The display time the frame being drawn is for; see `FrameMetrics.time`. */
   private frameTime: number | null = null;
   /** When the frame's first phase began, before its changes were collected; see `FrameMetrics.durationMs`. */
@@ -868,7 +880,12 @@ export class GessoRuntime {
   deferPatchesFrom(sources: readonly PatchSource[]): void {
     this.replicas = sources;
     for (const source of sources) {
-      source.deferPatches(() => this.scheduler.notifyDirty());
+      source.deferPatches(() => {
+        this.scheduler.notifyDirty();
+        if (now() - this.lastDiscreteInput < ANSWER_WINDOW_MS) {
+          this.drawEarly();
+        }
+      });
     }
   }
 
@@ -1116,6 +1133,59 @@ export class GessoRuntime {
    */
   noteInput(at: number | undefined): void {
     this.inputLatency.mark(at, this.scheduler.framePending);
+  }
+
+  /**
+   * Draws the frame a discrete input armed (a key, a character typed, a
+   * paste, a press) as soon as the input has been routed, rather than at
+   * the next refresh.
+   *
+   * Waiting for the refresh is what typing cost. With keys at random
+   * points in the frame, a key waited half a refresh on average and
+   * nearly a whole one at worst before its frame began, so keystroke to
+   * frame was p50 12.5 ms and p95 20.7 ms for about 5 ms of work:
+   * a quarter of all keys over a frame at 60 Hz. A frame drawn in its
+   * own task is committed when the task ends, and shown at the next
+   * refresh the compositor has not yet taken, which is never later than
+   * the frame the refresh would have drawn.
+   *
+   * It runs in a task of its own, a zero timer, not in the input's: a
+   * key arrives as `keyDown` and then `beforeInput`, two messages posted
+   * together, and one frame for both is the point. Continuous input
+   * (pointer moves, the wheel) is left to the refresh, which already
+   * coalesces it. Two guards keep it from costing more than it saves:
+   * nothing early while the last frame took more than half a refresh,
+   * when a second frame in the same refresh would take time the next
+   * one needs; and no early frame within `EARLY_FRAME_GAP_MS` of the
+   * last, so a burst of keys is still one frame per refresh or so.
+   *
+   * The answer to an input often comes later, from another thread: quick
+   * open's results, a completion list. A channel's patch that arrives
+   * within `ANSWER_WINDOW_MS` of a discrete input is drawn early the same
+   * way (see `deferPatchesFrom`), so the answer does not wait for a
+   * refresh either.
+   */
+  answerInput(): void {
+    this.lastDiscreteInput = now();
+    this.drawEarly();
+  }
+
+  /** Draws the pending frame in a task of its own, if the guards in `answerInput` allow. */
+  private drawEarly(): void {
+    if (!this.started || !this.visible || this.earlyFrame !== null || !this.scheduler.framePending) {
+      return;
+    }
+    if (this.lastFrameMs > EARLY_FRAME_MAX_MS || now() - this.lastEarlyFrame < EARLY_FRAME_GAP_MS) {
+      return;
+    }
+    this.earlyFrame = setTimeout(() => {
+      this.earlyFrame = null;
+      if (!this.started || !this.scheduler.framePending) {
+        return;
+      }
+      this.lastEarlyFrame = now();
+      this.scheduler.flush(now());
+    }, 0);
   }
 
   /**
@@ -1975,6 +2045,10 @@ export class GessoRuntime {
   }
 
   dispose(): void {
+    if (this.earlyFrame !== null) {
+      clearTimeout(this.earlyFrame);
+      this.earlyFrame = null;
+    }
     if (this.scrollbarTimer !== null) {
       clearTimeout(this.scrollbarTimer);
       this.scrollbarTimer = null;
