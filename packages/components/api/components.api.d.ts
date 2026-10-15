@@ -435,6 +435,9 @@ interface MenuItem {
   readonly value: string;
   readonly label: string;
   readonly disabled?: boolean;
+  readonly separator?: boolean;
+  readonly shortcut?: string;
+  readonly danger?: boolean;
 }
 interface MenuProps {
   open?: boolean;

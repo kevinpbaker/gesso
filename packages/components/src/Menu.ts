@@ -9,6 +9,12 @@ export interface MenuItem {
   readonly value: string;
   readonly label: string;
   readonly disabled?: boolean;
+  /** A rule above this item, starting a group of its own. Ignored on the first. */
+  readonly separator?: boolean;
+  /** The keys that do the same from anywhere, said at the row's end: `⌘C`, `Ctrl+Shift+K`. */
+  readonly shortcut?: string;
+  /** It cannot be undone: its label in the danger colour. */
+  readonly danger?: boolean;
 }
 
 /**
@@ -256,7 +262,7 @@ function row(
   track: (index: number, node: UiNode, present: boolean) => void
 ): UiElement {
   let mounted: UiNode | null = null;
-  return Row(
+  const command = Row(
     {
       key: item.value,
       ref: (node: UiNode | null) => {
@@ -277,13 +283,25 @@ function row(
       disabled: item.disabled === true,
       backgroundColor: active.pipe(map(current => (current === index ? 'controlBackgroundHovered' : 'transparent'))),
       role: 'menuitem',
-      label: item.label,
+      label: item.shortcut === undefined ? item.label : `${item.label}, ${item.shortcut}`,
+      gap: 24,
       onClick: () => choose(item.value)
     },
     Text({
       text: item.label,
-      color: item.disabled === true ? 'controlForegroundDisabled' : 'controlForeground',
-      selectable: false
-    })
+      color: item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
+      selectable: false,
+      flex: 1
+    }),
+    ...(item.shortcut === undefined ? [] : [Text({ text: item.shortcut, color: 'controlForegroundDisabled', selectable: false, flexShrink: 0 })])
+  );
+  if (item.separator !== true || index === 0) {
+    return command;
+  }
+  // The rule goes with the item after it, so the rows stay one a command and the arrows walk them as before.
+  return Column(
+    { key: `${item.value}:group`, flexShrink: 0, gap: 2 },
+    Row({ paddingY: 2, flexShrink: 0, role: 'separator' }, Row({ height: 1, flex: 1, backgroundColor: 'border' })),
+    command
   );
 }

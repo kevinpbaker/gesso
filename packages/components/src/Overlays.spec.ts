@@ -467,6 +467,38 @@ describe('Menu', () => {
   });
 
   /**
+   * A long context menu, as an editor's log has: its commands in groups
+   * with a rule between them, and the keys that do the same said at each
+   * row's end. The rules are not commands: the arrows walk past them.
+   */
+  it('draws a rule above an item that starts a group, says its shortcut, and walks past the rule', () => {
+    const open = new BehaviorSubject(false);
+    const chosen: string[] = [];
+    const ui = mount(
+      createComponent(Menu, {
+        open,
+        at: { x: 20, y: 20 },
+        items: [
+          { value: 'copy', label: 'Copy Hash', shortcut: '⌘C' },
+          { value: 'reset', label: 'Reset to Here', separator: true },
+          { value: 'drop', label: 'Drop', separator: true, danger: true }
+        ],
+        onSelect: (value: string) => chosen.push(value),
+        onOpenChange: (next: boolean) => open.next(next)
+      })
+    );
+    open.next(true);
+    ui.frame();
+
+    expect(ui.getAllByRole('separator')).toHaveLength(2);
+    expect(ui.getByRole('menuitem', { name: 'Copy Hash, ⌘C' })).toBeDefined();
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(chosen).toEqual(['reset']);
+  });
+
+  /**
    * A menu whose place and whose being open come from one change, as a
    * row's ⋯ gives both at once. `open` bound before `at`, it opened
    * where it had last been told, or, the first time, in the corner of
