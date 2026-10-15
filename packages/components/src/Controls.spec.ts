@@ -456,6 +456,28 @@ describe('NumberInput', () => {
   });
 });
 
+describe('a long label', () => {
+  // Long enough to wrap onto three lines in 200 pixels: the row has no room for the control's
+  // glyph at its own size, and the label is what gives way, not the glyph.
+  const LONG = 'Runs the project’s own linter, with its config, on each open file as it is edited, its problems beside the others.';
+  const narrow = (root: Parameters<typeof renderTest>[0]) => renderTest(root, { width: 200, height: 400 });
+
+  it('leaves the switch’s track its own size, and wraps the label beside it', () => {
+    const ui = narrow(createComponent(Switch, { label: LONG }));
+    const track = ui.getByRole('switch').firstChild!;
+    expect(ui.getLayout(track).width).toBe(40);
+    expect(ui.getLayout(track).height).toBe(22);
+    expect(ui.getLayout(track.firstChild!).width).toBe(16);
+  });
+
+  it('leaves the checkbox’s box and the radio’s circle their own size', () => {
+    const checkbox = narrow(createComponent(Checkbox, { label: LONG }));
+    expect(checkbox.getLayout(checkbox.getByRole('checkbox').firstChild!).width).toBe(18);
+    const radio = narrow(createComponent(RadioGroup, { label: 'Linting', options: [{ value: 'on', label: LONG }] }));
+    expect(radio.getLayout(radio.getByRole('radio').firstChild!).width).toBe(18);
+  });
+});
+
 describe('the tier as a whole', () => {
   it('emits a role, a name and states for every control on one form', () => {
     const ui = mount(

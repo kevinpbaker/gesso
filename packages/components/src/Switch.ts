@@ -79,6 +79,8 @@ export function Switch(inputs: Inputs<SwitchProps>, ctx: ComponentContext): UiCh
       {
         width: 40,
         height: 22,
+        // Its own size beside a label long enough to wrap: the label gives way, not the track.
+        flexShrink: 0,
         padding: 2,
         borderRadius: 11,
         borderWidth: 1,
