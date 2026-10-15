@@ -325,8 +325,68 @@ export function spannedRunsFor(
   };
 }
 
-/** Paragraphs remembered before the least recently asked for is forgotten. */
-const PARAGRAPH_CACHE_ENTRIES = 4096;
+/**
+ * How much the paragraph cache holds before the least recently asked
+ * for is forgotten: a number of paragraphs, and their text counted in
+ * UTF-16 code units, whichever runs out first.
+ *
+ * A count alone treated a two-word label and a whole document as the
+ * same size. Every keystroke in a long field is a new request, its key
+ * the whole text, so 4,096 edits to a 115 KB field held 4,096 copies of
+ * it, keys and lines: 1.1 GB of heap, for paragraphs nobody would ask
+ * for again. The text budget keeps a handful of those; the count is
+ * what bounds a screen of labels, and is larger than it was, since a
+ * label costs a few hundred bytes and a list that remounts its rows
+ * should find them still here.
+ */
+const PARAGRAPH_CACHE_ENTRIES = 16_384;
+const PARAGRAPH_CACHE_TEXT = 1 << 20;
+
+/** A least-recently-used map of paragraphs, bounded by count and by text; see `PARAGRAPH_CACHE_ENTRIES`. */
+class ParagraphCache {
+  private readonly entries = new Map<string, { paragraph: ParagraphLayout; text: number }>();
+  private text = 0;
+
+  get size(): number {
+    return this.entries.size;
+  }
+
+  get(key: string): ParagraphLayout | undefined {
+    const entry = this.entries.get(key);
+    if (entry === undefined) {
+      return undefined;
+    }
+    // Re-inserted so the map's order is recency, which eviction reads.
+    this.entries.delete(key);
+    this.entries.set(key, entry);
+    return entry.paragraph;
+  }
+
+  set(key: string, paragraph: ParagraphLayout, text: number): void {
+    const previous = this.entries.get(key);
+    if (previous !== undefined) {
+      this.entries.delete(key);
+      this.text -= previous.text;
+    }
+    // The newest entry is kept even when it alone is over the budget:
+    // it is the one about to be asked for again (paint follows layout).
+    while (
+      this.entries.size > 0 &&
+      (this.entries.size >= PARAGRAPH_CACHE_ENTRIES || this.text + text > PARAGRAPH_CACHE_TEXT)
+    ) {
+      const [oldest, entry] = this.entries.entries().next().value!;
+      this.entries.delete(oldest);
+      this.text -= entry.text;
+    }
+    this.entries.set(key, { paragraph, text });
+    this.text += text;
+  }
+
+  clear(): void {
+    this.entries.clear();
+    this.text = 0;
+  }
+}
 
 /**
  * Base class for measurers: implement the two primitives and the
@@ -349,7 +409,7 @@ const PARAGRAPH_CACHE_ENTRIES = 4096;
  * The result is shared between callers and must not be mutated.
  */
 export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
-  private readonly paragraphs = new Map<string, ParagraphLayout>();
+  private readonly paragraphs = new ParagraphCache();
   /**
    * Paragraphs that came out the same at every width they fit in, by
    * their key without the width; see `layoutFitsAnyWidth`.
@@ -362,7 +422,7 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
    * box it was then painted in (its own width, exact) missed once
    * more.
    */
-  private readonly fitting = new Map<string, ParagraphLayout>();
+  private readonly fitting = new ParagraphCache();
   private generations = 0;
 
   abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
@@ -373,22 +433,16 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
     const key = `${request.maxWidth ?? ''}\0${request.exactWidth === true ? 1 : ''}\0${style}`;
     const cached = this.paragraphs.get(key);
     if (cached !== undefined) {
-      // Re-inserted so the map's order is recency, which is what the
-      // eviction below reads.
-      this.paragraphs.delete(key);
-      this.paragraphs.set(key, cached);
       return cached;
     }
     const fitted = this.fitting.get(style);
     if (fitted !== undefined && fitsWidth(fitted, request.maxWidth)) {
-      this.fitting.delete(style);
-      this.fitting.set(style, fitted);
       return fitted;
     }
     const paragraph = layoutParagraph(request, this);
-    remember(this.paragraphs, key, paragraph);
+    this.paragraphs.set(key, paragraph, request.text.length);
     if (layoutFitsAnyWidth(request, paragraph)) {
-      remember(this.fitting, style, paragraph);
+      this.fitting.set(style, paragraph, request.text.length);
     }
     return paragraph;
   }
@@ -419,17 +473,6 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
     this.fitting.clear();
     forgetHardLines(this);
   }
-}
-
-/** Keeps `value` as the most recent entry, forgetting the least recent past the cap. */
-function remember(map: Map<string, ParagraphLayout>, key: string, value: ParagraphLayout): void {
-  if (map.size >= PARAGRAPH_CACHE_ENTRIES) {
-    const oldest = map.keys().next().value;
-    if (oldest !== undefined) {
-      map.delete(oldest);
-    }
-  }
-  map.set(key, value);
 }
 
 /**

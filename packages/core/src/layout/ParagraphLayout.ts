@@ -181,7 +181,7 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
       const key = unwrapped ? -1 : available;
       let relative = paragraph.cached.lines.get(key);
       if (relative === undefined) {
-        relative = breakHardLine(paragraph.text, paragraph.segments, width, unwrapped, measure);
+        relative = breakHardLine(paragraph.cached.text, paragraph.segments, width, unwrapped, measure);
         if (paragraph.cached.lines.size >= WIDTHS_PER_LINE) {
           paragraph.cached.lines.clear();
         }
@@ -243,6 +243,11 @@ export function layoutParagraph(request: TextMeasureRequest, runs: TextRunMeasur
 
 /** One hard line (the text between two `\n`) of a paragraph without runs, as measured and broken. */
 interface HardLine {
+  /**
+   * The line's text, a copy of its own rather than the slice of the
+   * paragraph it was found in; see `ownCopy`.
+   */
+  readonly text: string;
   readonly segments: TextSegment[];
   readonly maxContentWidth: number;
   readonly minContentWidth: number;
@@ -298,17 +303,19 @@ function hardLine(
     memo.set(key, cached);
     return cached;
   }
-  const segments = segmentParagraph(text, wrap);
+  const own = ownCopy(text);
+  const segments = segmentParagraph(own, wrap);
   let minContentWidth = 0;
   for (const segment of segments) {
     minContentWidth = Math.max(
       minContentWidth,
-      measure(text.slice(segment.start, segment.end), segment.start, segment.end)
+      measure(own.slice(segment.start, segment.end), segment.start, segment.end)
     );
   }
   const entry: HardLine = {
+    text: own,
     segments,
-    maxContentWidth: measure(text, 0, text.length),
+    maxContentWidth: measure(own, 0, own.length),
     minContentWidth,
     lines: new Map()
   };
@@ -320,6 +327,24 @@ function hardLine(
   }
   memo.set(key, entry);
   return entry;
+}
+
+/**
+ * `text` in a string of its own.
+ *
+ * A hard line arrives as a slice of the whole paragraph, and a slice
+ * in V8 is a view that keeps the string it was cut from alive. The
+ * memo outlives the paragraph — it is what a later edit finds the
+ * unchanged lines in — so each line it remembered, and every line
+ * broken from it, held on to the whole text it came from. Typing into
+ * a 115 KB field kept every version of it: 100 MB over 4,096 edits.
+ * Prefixing a character makes a new string that has to be flattened
+ * before it can be sliced, and the slice is then of that copy. A short
+ * line is copied by `slice` anyway, and an engine that copies every
+ * slice loses nothing.
+ */
+function ownCopy(text: string): string {
+  return text.length < 16 ? text : (' ' + text).slice(1);
 }
 
 /** Breaks one hard line on its own, as if it were the whole text. */

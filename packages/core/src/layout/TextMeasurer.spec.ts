@@ -89,12 +89,12 @@ describe('ParagraphTextMeasurer', () => {
     measurer.invalidate();
     measurer.layout({ text: 'a', fontSize: 10 });
     expect(measurer.runs).toBeGreaterThan(runs);
-    for (let n = 0; n < 4200; n++) {
+    for (let n = 0; n < 16_500; n++) {
       measurer.layout({ text: `row ${n}`, fontSize: 10 });
     }
-    expect(measurer.cachedParagraphs).toBe(4096);
+    expect(measurer.cachedParagraphs).toBe(16_384);
     const before = measurer.runs;
-    const kept = measurer.layout({ text: 'row 4199', fontSize: 10 });
+    const kept = measurer.layout({ text: 'row 16499', fontSize: 10 });
     expect(measurer.runs).toBe(before);
     // The oldest paragraph was forgotten, so it is laid out again and is
     // a new object. Its one line's widths are still remembered by the
@@ -107,6 +107,25 @@ describe('ParagraphTextMeasurer', () => {
     measurer.invalidate();
     measurer.layout({ text: 'row 0', fontSize: 10 });
     expect(measurer.runs).toBeGreaterThan(before);
+  });
+
+  it('remembers long texts by their length, not their number', () => {
+    const measurer = new CountingMeasurer();
+    // Each one a keystroke into a 100,000-character field: a new
+    // request whose key is the whole text.
+    const field = 'a word '.repeat(100_000 / 7);
+    for (let n = 0; n < 40; n++) {
+      measurer.layout({ text: `${n} ${field}`, fontSize: 10, maxWidth: 400 });
+    }
+    // A million characters' worth, not forty copies.
+    expect(measurer.cachedParagraphs).toBeLessThanOrEqual(11);
+    expect(measurer.cachedParagraphs).toBeGreaterThan(0);
+    // The newest is kept even when it alone is over the budget, since
+    // paint is about to ask for it again.
+    const huge = 'x '.repeat(600_000);
+    const first = measurer.layout({ text: huge, fontSize: 10, maxWidth: 400 });
+    expect(measurer.cachedParagraphs).toBe(1);
+    expect(measurer.layout({ text: huge, fontSize: 10, maxWidth: 400 })).toBe(first);
   });
 
   it('re-breaks only the hard line an edit changed', () => {
