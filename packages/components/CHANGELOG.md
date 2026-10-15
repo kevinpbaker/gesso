@@ -1,5 +1,31 @@
 # gesso-components
 
+## 0.6.21
+
+### Patch Changes
+
+- 2f1b7d7: `Combobox` shows a value the application changes while it has focus but nobody is typing in it. Focus alone held the old label, so a picker whose value was changed from elsewhere, just after a choice in it, said the old choice until it lost focus. A search under way is still left alone.
+- bcb42b3: A combobox's label changed by the application while it has focus is selected whole, as a chosen label is on the way in, rather than left under part of the old one's selection.
+- 0796ea7: `LazyList` takes `hover`: its rows light up under the pointer (`controlBackgroundHovered`), as a log's or a file tree's do, while the chosen row keeps the selection's colour.
+- 8cf9bd5: `MenuItem` takes `separator`, `shortcut` and `danger`. A separator draws a rule above its item, starting a group (the arrows walk past it, as they do past nothing); a shortcut is said at the row's end, muted, and in the item's accessible name; a danger item's label is in the danger colour, for one that cannot be undone.
+- 43be6dd: A menu's highlight follows the pointer: the item it rests on is the one Enter chooses, and an item left for another is no longer lit beside it.
+- 4e98848: A menu opens its submenus when its items arrive after it was told to open, as they do when both come from one change with `open` bound first. The submenu was only made if the items had one at the moment the menu opened.
+- c99b972: `MenuItem` takes `items`, a submenu: it opens beside its item on a press, the pointer resting on it, Enter or Right, Left or Escape goes back, and a choice in it is the menu's own, closing both. `Menu` takes `compact`, for shorter rows in a long context menu, as `Select`'s.
+
+  `FocusService.releaseTrap` (and `UiFocusManager.popScope`) take the node trapped in, and end only that trap: none, when it ended already. A trap ends by itself when its subtree is removed, and a menu that released its trap after closing ended the trap under it as well, a submenu's menu's, leaving the keyboard nowhere.
+
+- 856bc51: `TextInput` takes `secret`, and `EditableText` a `secret` property, for a password or a passphrase. The field draws a bullet for every character, copy and cut take nothing from it, and while it has focus the shell edits it through a hidden `<input type="password">`, so the browser and the platform treat it as a password: secure input on macOS, no autocorrect, and a screen reader that calls it a secure text field. The value still reaches `onChange`; the shell's element, the semantics record and the accessibility mirror only ever hold the bullets. A secret field is one line.
+- 03fee9c: `Tree` takes `onContextMenu`: a right click on a row chooses it and asks for its menu, with where the pointer was; the menu key or Shift+F10 asks for the chosen row's, with no point. A file tree's New File, Copy Path and the rest have somewhere to be.
+- Updated dependencies [499d7ae]
+- Updated dependencies [42c06c1]
+- Updated dependencies [c99b972]
+- Updated dependencies [e612a33]
+- Updated dependencies [856bc51]
+- Updated dependencies [47d9cc1]
+- Updated dependencies [211e791]
+  - gesso-core@0.6.21
+  - gesso-framework@0.6.21
+
 ## 0.6.20
 
 ### Patch Changes

@@ -1,5 +1,24 @@
 # gesso-framework
 
+## 0.6.21
+
+### Patch Changes
+
+- 42c06c1: A render worker draws the frames it asks for while its page is hidden or behind another window, paced by a timer, rather than waiting for a refresh that a hidden page never gets. A channel's patches are applied on a frame, so until now an answer the application thread sent while the page was hidden reached nothing: a request awaiting it never settled, and the screen and its semantics mirror kept what they last showed, until the page was shown again. The runtime still asks for no frame on a hidden page's account, so no caret blink or animation runs there.
+- c99b972: `MenuItem` takes `items`, a submenu: it opens beside its item on a press, the pointer resting on it, Enter or Right, Left or Escape goes back, and a choice in it is the menu's own, closing both. `Menu` takes `compact`, for shorter rows in a long context menu, as `Select`'s.
+
+  `FocusService.releaseTrap` (and `UiFocusManager.popScope`) take the node trapped in, and end only that trap: none, when it ended already. A trap ends by itself when its subtree is removed, and a menu that released its trap after closing ended the trap under it as well, a submenu's menu's, leaving the keyboard nowhere.
+
+- 856bc51: `TextInput` takes `secret`, and `EditableText` a `secret` property, for a password or a passphrase. The field draws a bullet for every character, copy and cut take nothing from it, and while it has focus the shell edits it through a hidden `<input type="password">`, so the browser and the platform treat it as a password: secure input on macOS, no autocorrect, and a screen reader that calls it a secure text field. The value still reaches `onChange`; the shell's element, the semantics record and the accessibility mirror only ever hold the bullets. A secret field is one line.
+- 47d9cc1: `ShellService.readText()` reads the system clipboard's text, for a Paste chosen from a menu: a key's paste brings its text with it, a menu's has to ask. It resolves to null where the browser refuses (it wants a secure context and focus, and may ask the person first) or no shell is installed, and never rejects. Both shells answer it, the worker's through a `clipboardRead` message and its `clipboardReadResult`.
+- Updated dependencies [499d7ae]
+- Updated dependencies [42c06c1]
+- Updated dependencies [c99b972]
+- Updated dependencies [e612a33]
+- Updated dependencies [856bc51]
+- Updated dependencies [211e791]
+  - gesso-core@0.6.21
+
 ## 0.6.20
 
 ### Patch Changes
