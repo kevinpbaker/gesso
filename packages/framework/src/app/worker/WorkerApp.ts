@@ -28,7 +28,7 @@ import { browserFilesHost, fileResultTransfer, ShellFiles } from '../shellFiles'
 import { setLeaveWarning } from '../shellLeaveWarning';
 import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
-import { EditingProxy, writeClipboard } from '../EditingProxy';
+import { EditingProxy, readClipboard, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
@@ -1018,6 +1018,11 @@ export class WorkerApp {
     if (message.type === 'clipboard') {
       // Answered on every path: `writeClipboard` never rejects.
       void writeClipboard(message.text).then(copied => this.post({ type: 'clipboardResult', id: message.id, copied }));
+      return;
+    }
+    if (message.type === 'clipboardRead') {
+      // Answered on every path: `readClipboard` never rejects.
+      void readClipboard().then(text => this.post({ type: 'clipboardReadResult', id: message.id, text }));
       return;
     }
     if (message.type === 'openUrl') {

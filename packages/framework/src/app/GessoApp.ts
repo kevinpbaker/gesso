@@ -19,7 +19,7 @@ import { attachFileDrop } from './fileDrop';
 import { browserFilesHost, ShellFiles } from './shellFiles';
 import { setLeaveWarning } from './shellLeaveWarning';
 import { redirectWith } from './shellRedirect';
-import { EditingProxy, writeClipboard } from './EditingProxy';
+import { EditingProxy, readClipboard, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
@@ -607,7 +607,13 @@ export class GessoApp {
         this.runtime.settleFile(request.id, shellFilesUnsupported('There is no document to reach files through.'));
       } else if (request.type === 'clipboard') {
         this.runtime.settleClipboard(request.id, false);
+      } else if (request.type === 'clipboardRead') {
+        this.runtime.settleClipboardRead(request.id, null);
       }
+      return;
+    }
+    if (request.type === 'clipboardRead') {
+      void readClipboard().then(text => this.runtime.settleClipboardRead(request.id, text));
       return;
     }
     if (request.type === 'clipboard') {

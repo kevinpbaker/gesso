@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { writeClipboard } from './EditingProxy';
+import { readClipboard, writeClipboard } from './EditingProxy';
 import { ShellService, type ShellRequest } from './ShellService';
 
 /**
@@ -82,5 +82,41 @@ describe('writeClipboard', () => {
       throw new Error('not supported');
     };
     await expect(writeClipboard('hello', doc)).resolves.toBe(false);
+  });
+});
+
+/**
+ * `readText`: the clipboard's text for a Paste chosen from a menu, which,
+ * unlike a key's, comes with no text of its own. Found by an editor's
+ * right-click menu and its Edit menu, whose Paste did nothing.
+ */
+describe('ShellService.readText', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks the shell, and resolves with what it read, or null', async () => {
+    const service = new ShellService();
+    const requests: ShellRequest[] = [];
+    service.setHandler(request => requests.push(request));
+    const first = service.readText();
+    const second = service.readText();
+    expect(requests).toEqual([
+      { type: 'clipboardRead', id: 1 },
+      { type: 'clipboardRead', id: 2 }
+    ]);
+    service.settleClipboardRead(2, null);
+    service.settleClipboardRead(1, 'pasted');
+    expect(() => service.settleClipboardRead(1, 'again')).not.toThrow();
+    await expect(first).resolves.toBe('pasted');
+    await expect(second).resolves.toBeNull();
+    await expect(new ShellService().readText()).resolves.toBeNull();
+  });
+
+  it('reads through the async clipboard, and is null where it refuses or is missing', async () => {
+    vi.stubGlobal('navigator', { clipboard: { readText: async () => 'text' } });
+    await expect(readClipboard()).resolves.toBe('text');
+    vi.stubGlobal('navigator', { clipboard: { readText: async () => Promise.reject(new Error('NotAllowedError')) } });
+    await expect(readClipboard()).resolves.toBeNull();
+    vi.stubGlobal('navigator', {});
+    await expect(readClipboard()).resolves.toBeNull();
   });
 });

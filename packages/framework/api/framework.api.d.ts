@@ -919,6 +919,9 @@ type ShellRequest = {
   id: number;
   text: string;
 } | {
+  type: 'clipboardRead';
+  id: number;
+} | {
   type: 'openUrl';
   url: string;
 } | {
@@ -1045,6 +1048,8 @@ declare class ShellService {
   private nextStorageId;
   private readonly copies;
   private nextCopyId;
+  private readonly reads;
+  private nextReadId;
   private readonly files;
   private nextFileId;
   readonly colorScheme: ReadableCell<ColorScheme>;
@@ -1060,6 +1065,8 @@ declare class ShellService {
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): Promise<boolean>;
   settleClipboard(id: number, copied: boolean): void;
+  readText(): Promise<string | null>;
+  settleClipboardRead(id: number, text: string | null): void;
   openUrl(url: string): void;
   openRoute(url: string): void;
   redirect(url: string): void;
@@ -1554,6 +1561,7 @@ declare class GessoRuntime {
   private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
   settleClipboard(id: number, copied: boolean): void;
+  settleClipboardRead(id: number, text: string | null): void;
   settleStorage(id: number, result: ShellStorageResult): void;
   settleFile(id: number, result: ShellFileResult): void;
   get reducedMotion(): boolean;
@@ -1809,6 +1817,11 @@ type ShellToRuntimeMessage = {
   copied: boolean;
 } |
 {
+  type: 'clipboardReadResult';
+  id: number;
+  text: string | null;
+} |
+{
   type: 'storageResult';
   id: number;
   result: ShellStorageResult;
@@ -1898,6 +1911,10 @@ type RuntimeToShellMessage = {
   type: 'clipboard';
   id: number;
   text: string;
+} |
+{
+  type: 'clipboardRead';
+  id: number;
 } |
 {
   type: 'openUrl';
