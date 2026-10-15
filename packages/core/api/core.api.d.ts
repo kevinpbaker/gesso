@@ -294,6 +294,123 @@ declare class UiEnvironment {
   getOwn(name: string): unknown;
   providesOwn(name: string): boolean;
 }
+type TextWrap = 'word' | 'char' | 'none';
+type TextOverflow = 'clip' | 'ellipsis';
+interface TextRunStyle {
+  fontFamily?: string;
+  fontWeight?: string | number;
+  fontSize?: number;
+  fontStyle?: string;
+  fontStretch?: string;
+  fontVariant?: string;
+  fontKerning?: string;
+  letterSpacing?: number;
+}
+interface TextRunSpan extends TextRunStyle {
+  readonly start: number;
+  readonly end: number;
+  readonly hidden?: boolean;
+}
+interface TextMeasureRequest {
+  text: string;
+  fontSize: number;
+  maxWidth?: number;
+  exactWidth?: boolean;
+  fontFamily?: string;
+  fontWeight?: string | number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  fontStyle?: string;
+  fontStretch?: string;
+  fontVariant?: string;
+  fontKerning?: string;
+  wrap?: TextWrap;
+  maxLines?: number;
+  overflow?: TextOverflow;
+  spans?: readonly TextRunSpan[];
+}
+interface TextLineRun {
+  span: number;
+  start: number;
+  end: number;
+  text: string;
+  x: number;
+  width: number;
+}
+interface TextLine {
+  start: number;
+  end: number;
+  text: string;
+  width: number;
+  runs?: readonly TextLineRun[];
+}
+interface FontMetrics {
+  ascent: number;
+  descent: number;
+}
+interface ParagraphLayout {
+  lines: TextLine[];
+  width: number;
+  height: number;
+  lineHeight: number;
+  ascent: number;
+  descent: number;
+  firstBaseline: number;
+  minContentWidth: number;
+  maxContentWidth: number;
+}
+interface TextMeasurer {
+  measure(request: TextMeasureRequest): Size;
+  layout(request: TextMeasureRequest): ParagraphLayout;
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  invalidate?(): void;
+  readonly generation?: number;
+}
+interface TextRunMeasurer {
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  fontMetrics(request: TextMeasureRequest): FontMetrics;
+}
+interface SpannedRuns {
+  readonly spans: readonly TextRunSpan[];
+  indexAt(offset: number): number;
+  requestAt(offset: number): TextMeasureRequest;
+  hiddenAt(offset: number): boolean;
+  width(text: string, start: number, end: number): number;
+  widthOf(run: string, offset: number): number;
+  cut(text: string, start: number, end: number, x: number): TextLineRun[];
+}
+declare function spannedRunsFor(request: TextMeasureRequest, runs: Pick<TextRunMeasurer, 'measureRunWidth'>): SpannedRuns | undefined;
+declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
+  private readonly paragraphs;
+  private readonly fitting;
+  private generations;
+  abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
+  abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
+  layout(request: TextMeasureRequest): ParagraphLayout;
+  measure(request: TextMeasureRequest): Size;
+  get cachedParagraphs(): number;
+  get generation(): number;
+  invalidate(): void;
+}
+interface FixedMetricsOptions {
+  glyphWidth?: number;
+  ascent?: number;
+  descent?: number;
+}
+declare class CharacterCountTextMeasurer extends ParagraphTextMeasurer {
+  private readonly glyphWidth;
+  private readonly ascentFactor;
+  private readonly descentFactor;
+  constructor(options?: FixedMetricsOptions);
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  fontMetrics(request: TextMeasureRequest): FontMetrics;
+}
+interface TextMemo {
+  readonly request: TextMeasureRequest;
+  readonly paragraph: ParagraphLayout;
+  readonly generation: number;
+  readonly fitsAnyWidth: boolean;
+}
 declare class LayoutRecord {
   readonly node: UiNode;
   constructor(node: UiNode);
@@ -380,6 +497,8 @@ declare class LayoutRecord {
   contentWidth: number;
   contentHeight: number;
   lastConstraints: Constraints;
+  textBounded: TextMemo | null;
+  textUnbounded: TextMemo | null;
   lastBaseWidth: number | undefined;
   lastBaseHeight: number | undefined;
   percentWidth: boolean;
@@ -398,6 +517,8 @@ declare class LayoutRecord {
   propsPass: number;
   propsBaseWidth: number | undefined;
   propsBaseHeight: number | undefined;
+  propsVersion: number;
+  propsFromNodeAlone: boolean;
   reset(): void;
 }
 interface UiColors {
@@ -548,6 +669,7 @@ declare class UiNode {
   nextSibling: UiNode | null;
   dirtyFlags: DirtyFlags;
   readonly properties: Map<string, unknown>;
+  propertyVersion: number;
   overrides: Map<NodeProperty, UiPropertyOverrides> | null;
   environment: UiEnvironment | null;
   decorations: readonly DecorationShape[] | null;
@@ -556,6 +678,7 @@ declare class UiNode {
   isDirty(): boolean;
   getProperty<T>(property: NodeProperty): T | undefined;
   setProperty<T>(property: NodeProperty, value: T): void;
+  removeProperty(property: NodeProperty): boolean;
 }
 interface Size {
   width: number;
@@ -2228,113 +2351,6 @@ declare function offsetForVerticalMove(lines: readonly PlacedLine[], text: strin
   x: number;
 } | null;
 declare function selectionRects(lines: readonly PlacedLine[], text: string, start: number, end: number, measure: RunMeasure, rtl: boolean): LayoutBox[];
-type TextWrap = 'word' | 'char' | 'none';
-type TextOverflow = 'clip' | 'ellipsis';
-interface TextRunStyle {
-  fontFamily?: string;
-  fontWeight?: string | number;
-  fontSize?: number;
-  fontStyle?: string;
-  fontStretch?: string;
-  fontVariant?: string;
-  fontKerning?: string;
-  letterSpacing?: number;
-}
-interface TextRunSpan extends TextRunStyle {
-  readonly start: number;
-  readonly end: number;
-  readonly hidden?: boolean;
-}
-interface TextMeasureRequest {
-  text: string;
-  fontSize: number;
-  maxWidth?: number;
-  exactWidth?: boolean;
-  fontFamily?: string;
-  fontWeight?: string | number;
-  lineHeight?: number;
-  letterSpacing?: number;
-  fontStyle?: string;
-  fontStretch?: string;
-  fontVariant?: string;
-  fontKerning?: string;
-  wrap?: TextWrap;
-  maxLines?: number;
-  overflow?: TextOverflow;
-  spans?: readonly TextRunSpan[];
-}
-interface TextLineRun {
-  span: number;
-  start: number;
-  end: number;
-  text: string;
-  x: number;
-  width: number;
-}
-interface TextLine {
-  start: number;
-  end: number;
-  text: string;
-  width: number;
-  runs?: readonly TextLineRun[];
-}
-interface FontMetrics {
-  ascent: number;
-  descent: number;
-}
-interface ParagraphLayout {
-  lines: TextLine[];
-  width: number;
-  height: number;
-  lineHeight: number;
-  ascent: number;
-  descent: number;
-  firstBaseline: number;
-  minContentWidth: number;
-  maxContentWidth: number;
-}
-interface TextMeasurer {
-  measure(request: TextMeasureRequest): Size;
-  layout(request: TextMeasureRequest): ParagraphLayout;
-  measureRunWidth(text: string, request: TextMeasureRequest): number;
-  invalidate?(): void;
-}
-interface TextRunMeasurer {
-  measureRunWidth(text: string, request: TextMeasureRequest): number;
-  fontMetrics(request: TextMeasureRequest): FontMetrics;
-}
-interface SpannedRuns {
-  readonly spans: readonly TextRunSpan[];
-  indexAt(offset: number): number;
-  requestAt(offset: number): TextMeasureRequest;
-  hiddenAt(offset: number): boolean;
-  width(text: string, start: number, end: number): number;
-  widthOf(run: string, offset: number): number;
-  cut(text: string, start: number, end: number, x: number): TextLineRun[];
-}
-declare function spannedRunsFor(request: TextMeasureRequest, runs: Pick<TextRunMeasurer, 'measureRunWidth'>): SpannedRuns | undefined;
-declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
-  private readonly paragraphs;
-  abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
-  abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
-  layout(request: TextMeasureRequest): ParagraphLayout;
-  measure(request: TextMeasureRequest): Size;
-  get cachedParagraphs(): number;
-  invalidate(): void;
-}
-interface FixedMetricsOptions {
-  glyphWidth?: number;
-  ascent?: number;
-  descent?: number;
-}
-declare class CharacterCountTextMeasurer extends ParagraphTextMeasurer {
-  private readonly glyphWidth;
-  private readonly ascentFactor;
-  private readonly descentFactor;
-  constructor(options?: FixedMetricsOptions);
-  measureRunWidth(text: string, request: TextMeasureRequest): number;
-  fontMetrics(request: TextMeasureRequest): FontMetrics;
-}
 declare const TEXT_SELECTION_PROP = "textSelection";
 interface TextRange {
   readonly start: number;
@@ -3591,6 +3607,7 @@ declare class LayoutEngine {
   private readonly stickyNodes;
   private readonly stickyShifted;
   private readonly textMeasurer;
+  private readonly fontScratch;
   private percentBase;
   private layoutPass;
   private layoutRoot;
