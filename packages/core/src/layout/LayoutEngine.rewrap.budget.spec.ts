@@ -19,7 +19,7 @@ import type { FontMetrics, TextMeasureRequest } from './TextMeasurer';
  *      once. The cache is keyed on the request and the width is in the
  *      request, so it cannot answer a width it has
  *      not seen; and the engine's several asks for one node in one
- *      pass are answered from the cache after the first.
+ *      pass are answered by the node's own memo, without the measurer.
  *   2. Text measured at its own width, a caption in a row, is the same
  *      request at every viewport width and is never laid out again.
  *   3. A width the cache has seen is answered from it: the return leg
@@ -119,16 +119,17 @@ describe('re-wrap budgets', () => {
     }
   });
 
-  it('asks the measurer a bounded number of times per text node per pass, and the cache answers the rest', () => {
+  it('asks the measurer once per text node whose width changed, and never for one whose did not', () => {
     const { steps } = sweep();
-    const textNodes = CARDS * 4;
     for (const step of steps) {
-      expect(step.calls, `calls at ${step.width}px`).toBeGreaterThanOrEqual(textNodes);
-      // Flex measures an item loose and then at its size, so a text
-      // node is asked for two or three times a pass. Every ask after
-      // the first is a hit, and a fourth would mean a pass had started
-      // measuring something it already had.
-      expect(step.calls, `calls at ${step.width}px`).toBeLessThanOrEqual(textNodes * 3);
+      // Each node remembers the paragraph it was last measured as, one
+      // asked with a width and one without, so flex's loose ask and its
+      // ask at the final size are answered there. The captions fit at
+      // every width and are not asked at all; the title and the body
+      // of each card are asked once, at the width that is new. Before
+      // the node kept its own, every text node was asked two or three
+      // times a pass and the measurer built a key for each.
+      expect(step.calls, `calls at ${step.width}px`).toBe(CARDS * 2);
     }
   });
 

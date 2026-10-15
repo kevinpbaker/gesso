@@ -12,6 +12,9 @@ import { UiNodeType } from '../graph/UiNodeType';
  * stale box on a screen. These two compare the record generically, so
  * the omission fails here instead.
  */
+/** Kept across a reset on purpose: each checks itself before it is used; see `LayoutRecord.textBounded`. */
+const CARRIED = new Set(['textBounded', 'textUnbounded']);
+
 describe('LayoutRecord.reset', () => {
   const graph = new UiGraph();
   const node = graph.createNode('n', UiNodeType.Box);
@@ -33,6 +36,12 @@ describe('LayoutRecord.reset', () => {
 
     const fresh = new LayoutRecord(node);
     for (const key of Object.keys(fresh)) {
+      if (CARRIED.has(key)) {
+        expect((used as unknown as Record<string, unknown>)[key], `LayoutRecord.reset() drops '${key}'`).toEqual({
+          touched: true
+        });
+        continue;
+      }
       expect(
         (used as unknown as Record<string, unknown>)[key],
         `LayoutRecord.reset() does not restore '${key}'`

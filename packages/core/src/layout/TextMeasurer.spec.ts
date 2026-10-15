@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { CharacterCountTextMeasurer } from './TextMeasurer';
+import { CharacterCountTextMeasurer, layoutFitsAnyWidth } from './TextMeasurer';
+import type { TextMeasureRequest } from './TextMeasurer';
 
 describe('CharacterCountTextMeasurer', () => {
   it('sizes text by character count and font size', () => {
@@ -126,5 +127,93 @@ describe('ParagraphTextMeasurer', () => {
       cold.minContentWidth,
       cold.maxContentWidth
     ]);
+  });
+});
+
+/**
+ * A paragraph that fits is handed out at other widths without being
+ * laid out again, by the measurer and by the layout engine's per-node
+ * memo. That is only sound if laying it out again would have produced
+ * the same thing, so this does lay it out again, in a measurer that has
+ * never seen it, at every width it is reused at, over the shapes most
+ * likely to tell two widths apart: hanging and leading blanks, hard
+ * lines, a line limit with and without an ellipsis, runs in other
+ * fonts, and a box that is exact.
+ */
+describe('a paragraph that fits at any width', () => {
+  const texts = [
+    'Track number 1',
+    'trailing blanks   ',
+    '   leading blanks',
+    'two\nhard lines',
+    'three\nhard\nlines',
+    '',
+    'a',
+    '\n',
+    'mixed\tblank and　ideographic'
+  ];
+  const variants: Partial<TextMeasureRequest>[] = [
+    {},
+    { exactWidth: true },
+    { wrap: 'none' },
+    { wrap: 'char' },
+    { maxLines: 1 },
+    { maxLines: 1, overflow: 'ellipsis' },
+    { maxLines: 2, overflow: 'ellipsis' },
+    { overflow: 'ellipsis' },
+    { letterSpacing: 1.5 },
+    { spans: [{ start: 0, end: 3, fontSize: 20 }] },
+    { spans: [{ start: 1, end: 4, hidden: true }] }
+  ];
+
+  it('is laid out the same at every wider width it is handed out at', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    let reused = 0;
+    for (const text of texts) {
+      for (const variant of variants) {
+        const base: TextMeasureRequest = { text, fontSize: 10, ...variant };
+        const natural = measurer.layout(base).maxContentWidth;
+        for (const at of [natural, natural + 0.25, natural + 37]) {
+          const first = { ...base, maxWidth: at };
+          const paragraph = measurer.layout(first);
+          if (!layoutFitsAnyWidth(first, paragraph)) {
+            continue;
+          }
+          for (const later of [natural, natural + 1 / 128, natural + 5, natural + 400]) {
+            for (const exactWidth of [false, true]) {
+              const request = { ...base, maxWidth: later, exactWidth };
+              const fresh = new CharacterCountTextMeasurer().layout(request);
+              expect(fresh, `${JSON.stringify(text)} ${JSON.stringify(variant)} ${at} → ${later}`).toEqual(paragraph);
+              expect(measurer.layout(request)).toEqual(fresh);
+              reused++;
+            }
+          }
+        }
+      }
+    }
+    // Every shape but the cut one fits, so this is not vacuous.
+    expect(reused).toBeGreaterThan(500);
+  });
+
+  it('is not handed out narrower than its natural width', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    const request: TextMeasureRequest = { text: 'Track number 1', fontSize: 10, maxWidth: 400 };
+    const wide = measurer.layout(request);
+    expect(layoutFitsAnyWidth(request, wide)).toBe(true);
+    const narrow = measurer.layout({ ...request, maxWidth: wide.maxContentWidth - 1 });
+    expect(narrow).not.toBe(wide);
+    expect(narrow.lines.length).toBe(2);
+  });
+
+  it('does not count a paragraph cut short by an ellipsised line limit as fitting', () => {
+    const measurer = new CharacterCountTextMeasurer();
+    const request: TextMeasureRequest = {
+      text: 'one\ntwo\nthree',
+      fontSize: 10,
+      maxWidth: 400,
+      maxLines: 2,
+      overflow: 'ellipsis'
+    };
+    expect(layoutFitsAnyWidth(request, measurer.layout(request))).toBe(false);
   });
 });
