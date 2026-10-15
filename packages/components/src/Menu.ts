@@ -257,28 +257,26 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
           map(items => items.map((item, index) => row(item, index, active, sub, choose, pointAt, track, compact)))
         )
       ),
-      // The submenu, a menu of its own beside its item: its choice is this menu's, and closes both.
-      ...(inputs.items.value.some(item => item.items !== undefined)
-        ? [
-            createComponent(Menu, {
-              open: sub.pipe(map(open => open !== null)),
-              anchor: sub.pipe(map(open => open?.node ?? null)),
-              items: sub.pipe(map(open => open?.item.items ?? [])),
-              label: sub.pipe(map(open => open?.item.label ?? 'Submenu')),
-              placement: 'right-start',
-              compact,
-              submenu: true,
-              onOpenChange: (isOpen: boolean) => {
-                if (!isOpen && sub.value !== null) sub.next(null);
-              },
-              onSelect: (value: string) => {
-                sub.next(null);
-                close();
-                inputs.onSelect.value?.(value);
-              }
-            })
-          ]
-        : [])
+      // The submenu, a menu of its own beside its item: its choice is this menu's, and closes both. Always here, an
+      // empty placeholder until it opens, rather than only when the items have a submenu as the menu opens: a caller
+      // whose open and items change together may give it the open before the items.
+      createComponent(Menu, {
+        open: sub.pipe(map(open => open !== null)),
+        anchor: sub.pipe(map(open => open?.node ?? null)),
+        items: sub.pipe(map(open => open?.item.items ?? [])),
+        label: sub.pipe(map(open => open?.item.label ?? 'Submenu')),
+        placement: 'right-start',
+        compact,
+        submenu: true,
+        onOpenChange: (isOpen: boolean) => {
+          if (!isOpen && sub.value !== null) sub.next(null);
+        },
+        onSelect: (value: string) => {
+          sub.next(null);
+          close();
+          inputs.onSelect.value?.(value);
+        }
+      })
     );
 
   /** What the menu shows while it is open: made when it opens, kept while it is moved. */
