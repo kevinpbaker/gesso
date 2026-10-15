@@ -81,6 +81,34 @@ describe('LazyList', () => {
     expect(ui.recordsFor('list')[0].description).toBe('Delete removes a file.');
   });
 
+  it('with hover, lights the row under the pointer, and leaves the chosen row its own colour', () => {
+    const ui = mount(
+      createComponent(LazyList, {
+        label: 'Commits',
+        count: 10,
+        height: 100,
+        hover: true,
+        defaultSelectedIndex: 0,
+        estimatedItemExtent: 20,
+        item: (index: number) => Box({ height: 20 }, Text({ text: `commit ${index}` }))
+      })
+    );
+    ui.frame();
+    const items = ui.getAllByRole('listitem');
+    const background = (index: number) => items[index]!.properties.get('backgroundColor');
+    const over = (index: number) => {
+      const box = ui.getLayout(items[index]!);
+      ui.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
+      ui.frame();
+    };
+    over(2);
+    expect(background(2)).toBe('controlBackgroundHovered');
+    expect(background(1)).toBe('transparent');
+    over(0);
+    expect(background(0)).toBe('selectionBackground');
+    expect(background(2)).toBe('transparent');
+  });
+
   it('walks the whole list from the keyboard and scrolls to keep up', () => {
     const chosen: number[] = [];
     const ui = mount(

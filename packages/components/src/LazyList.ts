@@ -1,4 +1,4 @@
-import { map } from 'rxjs';
+import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
 import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
@@ -70,6 +70,12 @@ export interface LazyListProps extends ControlLayoutProps {
    * Read once, when the list mounts.
    */
   flush?: boolean;
+  /**
+   * Rows light up under the pointer, as a log's or a file tree's do, so
+   * the row a click will choose is plain before it is pressed. The
+   * chosen row keeps its own colour. Read once, when the list mounts.
+   */
+  hover?: boolean;
 }
 
 export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild {
@@ -118,6 +124,16 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
     });
   }
 
+  /** The row under the pointer, for `hover`; -1 for none. */
+  const hovered = new BehaviorSubject(-1);
+  const hover = inputs.hover.value === true;
+  const rowBackground = (index: number) =>
+    hover
+      ? combineLatest([selected.value, hovered]).pipe(
+          map(([current, under]) => (current === index ? 'selectionBackground' : under === index ? 'controlBackgroundHovered' : 'transparent'))
+        )
+      : selected.value.pipe(map(current => (current === index ? 'selectionBackground' : 'transparent')));
+
   const row = (index: number): UiChild =>
     Box(
       {
@@ -128,11 +144,17 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
         posInSet: index + 1,
         setSize: inputs.count,
         states: selected.value.pipe(map(current => (current === index ? (['selected'] as UiSemanticState[]) : []))),
-        backgroundColor: selected.value.pipe(
-          map(current => (current === index ? 'selectionBackground' : 'transparent'))
-        ),
+        backgroundColor: rowBackground(index),
         color: selected.value.pipe(map(current => (current === index ? 'selectionForeground' : 'controlForeground'))),
-        onClick: () => choose(index)
+        onClick: () => choose(index),
+        ...(hover
+          ? {
+              onPointerEnter: () => hovered.next(index),
+              onPointerLeave: () => {
+                if (hovered.value === index) hovered.next(-1);
+              }
+            }
+          : {})
       },
       inputs.item.value(index)
     );
