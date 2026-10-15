@@ -1,6 +1,13 @@
 import { BehaviorSubject, map, skip, Subject, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FocusService, ScrollService } from 'gesso-framework';
+import {
+  createComponent,
+  input,
+  type ComponentContext,
+  type Inputs,
+  FocusService,
+  ScrollService
+} from 'gesso-framework';
 import { Column, Row, Text, measureFlow, type LayoutBox, type UiChild, type UiElement, type UiNode } from 'gesso-core';
 import { CONTROL_INTERACTION, keymap } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
@@ -15,6 +22,12 @@ export interface MenuItem {
   readonly shortcut?: string;
   /** It cannot be undone: its label in the danger colour. */
   readonly danger?: boolean;
+  /**
+   * A submenu: the item opens these beside it rather than being chosen
+   * (on a press, the pointer resting on it, Enter or Right), and one of
+   * them chosen is `onSelect`'s value. Left or Escape goes back.
+   */
+  readonly items?: readonly MenuItem[];
 }
 
 /**
@@ -37,6 +50,15 @@ export interface MenuProps {
   label?: string;
   /** For a context menu: where the pointer was. */
   at?: { readonly x: number; readonly y: number };
+  /**
+   * Smaller rows, for a long context menu in an application dense with
+   * them, as an editor's is: the text of a 12px line and four pixels
+   * above and below, as `Select`'s `compact` has. A submenu is as its
+   * menu is. Read once, when the menu mounts.
+   */
+  compact?: boolean;
+  /** A submenu, opened from another menu's item: Left closes it, back to that item. Set by `Menu` itself. */
+  submenu?: boolean;
 }
 
 export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
@@ -45,12 +67,18 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   const focus = ctx.inject(FocusService);
   const scroll = ctx.inject(ScrollService);
   const overlay = useOverlay(ctx, 'menu');
+  const compact = inputs.compact.value === true;
   const active = new BehaviorSubject(0);
+  /** The submenu open, by its item's index, with the item's row to open beside; null for none. */
+  const sub = new BehaviorSubject<{ readonly index: number; readonly node: UiNode; readonly item: MenuItem } | null>(
+    null
+  );
   /** The rows' nodes, by index, so the highlighted one can be scrolled to. */
   const rows = new Map<number, UiNode>();
   /** The scroller, whenever it is given a new box. */
   const scrollerBox = new Subject<LayoutBox>();
-  let trapped = false;
+  /** The menu's node while focus is trapped in it. */
+  let trapped: UiNode | null = null;
   let placeholder: UiNode | null = null;
 
   /**
@@ -77,9 +105,11 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   const last = (): number => seek(inputs.items.value.length - 1, -1);
 
   const release = (): void => {
-    if (trapped) {
-      trapped = false;
-      focus.releaseTrap();
+    if (trapped !== null) {
+      const scope = trapped;
+      trapped = null;
+      // Its own trap only: closing took the menu out of the tree, which may have ended it already.
+      focus.releaseTrap(scope);
     }
   };
   ctx.onUnmount(release);
@@ -105,12 +135,30 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
+  /** Opens an item's submenu beside its row, or closes the one open (`index` -1). */
+  const openSub = (index: number): void => {
+    const item = inputs.items.value[index];
+    const node = rows.get(index);
+    if (item?.items === undefined || item.disabled === true || node === undefined) {
+      if (sub.value !== null) sub.next(null);
+      return;
+    }
+    if (sub.value?.index === index) return;
+    active.next(index);
+    sub.next({ index, node, item });
+  };
+
   const choose = (value?: string): void => {
     const items = inputs.items.value;
     const item = value === undefined ? items[active.value] : items.find(entry => entry.value === value);
     // A disabled item is not a command: neither Enter on the highlight
     // nor a press on the row itself can choose one.
     if (item === undefined || item.disabled === true) {
+      return;
+    }
+    // An item with a submenu opens it: it is a way to commands, not one.
+    if (item.items !== undefined) {
+      openSub(items.indexOf(item));
       return;
     }
     // Closed first: a choice that opens something of its own — a dialog,
@@ -171,8 +219,8 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     Column(
       {
         ref: (node: UiNode | null) => {
-          if (node !== null && !trapped) {
-            trapped = true;
+          if (node !== null && trapped === null) {
+            trapped = node;
             focus.trap(node);
           }
         },
@@ -192,13 +240,39 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
           End: () => moveTo(last()),
           Enter: () => choose(),
           ' ': () => choose(),
+          ArrowRight: () => openSub(active.value),
+          ...(inputs.submenu.value === true ? { ArrowLeft: close } : {}),
           Escape: close
         })
       },
       Column(
-        { overflow: 'auto', minHeight: 0, gap: 2, modifiers: [measureFlow(scrollerBox)] },
-        inputs.items.pipe(map(items => items.map((item, index) => row(item, index, active, choose, track))))
-      )
+        { overflow: 'auto', minHeight: 0, gap: compact ? 0 : 2, modifiers: [measureFlow(scrollerBox)] },
+        inputs.items.pipe(
+          map(items => items.map((item, index) => row(item, index, active, sub, choose, openSub, track, compact)))
+        )
+      ),
+      // The submenu, a menu of its own beside its item: its choice is this menu's, and closes both.
+      ...(inputs.items.value.some(item => item.items !== undefined)
+        ? [
+            createComponent(Menu, {
+              open: sub.pipe(map(open => open !== null)),
+              anchor: sub.pipe(map(open => open?.node ?? null)),
+              items: sub.pipe(map(open => open?.item.items ?? [])),
+              label: sub.pipe(map(open => open?.item.label ?? 'Submenu')),
+              placement: 'right-start',
+              compact,
+              submenu: true,
+              onOpenChange: (isOpen: boolean) => {
+                if (!isOpen && sub.value !== null) sub.next(null);
+              },
+              onSelect: (value: string) => {
+                sub.next(null);
+                close();
+                inputs.onSelect.value?.(value);
+              }
+            })
+          ]
+        : [])
     );
 
   /** What the menu shows while it is open: made when it opens, kept while it is moved. */
@@ -213,9 +287,12 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
       placement: inputs.at.value === undefined ? placement.value : (placement.value ?? 'bottom-start'),
       offset: inputs.at.value === undefined ? 4 : 0,
       ...(inputs.at.value === undefined ? {} : { point: inputs.at.value }),
-      dismissOnOutsidePress: true,
+      // A submenu leaves presses outside it to its menu, whose backdrop under both closes the two; one of its own would
+      // keep the pointer from its menu's other items.
+      dismissOnOutsidePress: inputs.submenu.value !== true,
       onClose: () => {
         shown = null;
+        if (sub.value !== null) sub.next(null);
         release();
         inputs.onOpenChange.value?.(false);
       }
@@ -258,10 +335,15 @@ function row(
   item: MenuItem,
   index: number,
   active: Observable<number>,
+  sub: Observable<{ readonly index: number } | null>,
   choose: (value: string) => void,
-  track: (index: number, node: UiNode, present: boolean) => void
+  openSub: (index: number) => void,
+  track: (index: number, node: UiNode, present: boolean) => void,
+  compact: boolean
 ): UiElement {
   let mounted: UiNode | null = null;
+  const nested = item.items !== undefined;
+  const trailing = nested ? '›' : item.shortcut;
   const command = Row(
     {
       key: item.value,
@@ -278,30 +360,48 @@ function row(
       // the column scrolls them rather than shrinking them to fit.
       flexShrink: 0,
       modifiers: [CONTROL_INTERACTION],
-      padding: 8,
+      ...(compact ? { paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 } : { padding: 8 }),
       borderRadius: 4,
       disabled: item.disabled === true,
       backgroundColor: active.pipe(map(current => (current === index ? 'controlBackgroundHovered' : 'transparent'))),
       role: 'menuitem',
-      label: item.shortcut === undefined ? item.label : `${item.label}, ${item.shortcut}`,
+      label: item.shortcut === undefined || nested ? item.label : `${item.label}, ${item.shortcut}`,
+      ...(nested ? { states: sub.pipe(map(open => (open?.index === index ? (['expanded'] as const) : []))) } : {}),
       gap: 24,
-      onClick: () => choose(item.value)
+      onClick: () => choose(item.value),
+      // The pointer resting on an item opens its submenu, and on another closes it, as a desktop's menus do.
+      onPointerEnter: () => openSub(index)
     },
     Text({
       text: item.label,
-      color: item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
+      color:
+        item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
       selectable: false,
-      flex: 1
+      flex: 1,
+      ...(compact ? { fontSize: 12 } : {})
     }),
-    ...(item.shortcut === undefined ? [] : [Text({ text: item.shortcut, color: 'controlForegroundDisabled', selectable: false, flexShrink: 0 })])
+    ...(trailing === undefined
+      ? []
+      : [
+          Text({
+            text: trailing,
+            color: 'controlForegroundDisabled',
+            selectable: false,
+            flexShrink: 0,
+            ...(compact ? { fontSize: 12 } : {})
+          })
+        ])
   );
   if (item.separator !== true || index === 0) {
     return command;
   }
   // The rule goes with the item after it, so the rows stay one a command and the arrows walk them as before.
   return Column(
-    { key: `${item.value}:group`, flexShrink: 0, gap: 2 },
-    Row({ paddingY: 2, flexShrink: 0, role: 'separator' }, Row({ height: 1, flex: 1, backgroundColor: 'border' })),
+    { key: `${item.value}:group`, flexShrink: 0, gap: compact ? 0 : 2 },
+    Row(
+      { paddingY: compact ? 4 : 2, flexShrink: 0, role: 'separator' },
+      Row({ height: 1, flex: 1, backgroundColor: 'border' })
+    ),
     command
   );
 }

@@ -2657,7 +2657,7 @@ declare class FocusService {
   focusNext(): void;
   focusPrevious(): void;
   trap(scope: UiNode): void;
-  releaseTrap(): void;
+  releaseTrap(scope?: UiNode): void;
   private run;
   private sync;
 }

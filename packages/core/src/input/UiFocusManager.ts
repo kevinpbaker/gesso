@@ -338,8 +338,21 @@ export class UiFocusManager {
    * when that scope was pushed, when that node is still in the tree
    * and still focusable. Otherwise focus is dropped rather than left
    * on a node the scope was hiding.
+   *
+   * Given its root, only that scope ends: none, when it has gone already
+   * (its subtree removed, which pops it), so a trap released after its
+   * content was taken away cannot end the one under it, a submenu's
+   * menu's; and one under another is taken out where it is.
    */
-  popScope(): void {
+  popScope(root?: UiNode): void {
+    if (root !== undefined && this.scopes.at(-1)?.root !== root) {
+      const at = this.scopes.findIndex(each => each.root === root);
+      if (at >= 0) {
+        this.scopes.splice(at, 1);
+        this.notifyScope();
+      }
+      return;
+    }
     const scope = this.scopes.pop();
     if (scope === undefined) {
       return;

@@ -107,10 +107,13 @@ export class FocusService {
 
   /**
    * Ends the innermost trap and returns focus to whatever held it when
-   * the trap was taken — the button that opened the dialog.
+   * the trap was taken — the button that opened the dialog. Given the
+   * node trapped in, only that trap ends, and nothing when it ended
+   * already: a trap's subtree removed releases it, and a release after
+   * that would otherwise end the trap under it.
    */
-  releaseTrap(): void {
-    this.run(manager => manager.popScope());
+  releaseTrap(scope?: UiNode): void {
+    this.run(manager => manager.popScope(scope));
   }
 
   private run(action: (manager: UiFocusManager) => void): void {
