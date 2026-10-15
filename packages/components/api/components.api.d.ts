@@ -617,6 +617,7 @@ interface LazyListProps extends ControlLayoutProps {
   label?: string;
   description?: string;
   flush?: boolean;
+  hover?: boolean;
 }
 declare function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild;
 type Space = number;
