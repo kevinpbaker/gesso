@@ -1,7 +1,8 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
-import { resolveFont } from '../properties/UiTextFont';
+import { resolveFontInto } from '../properties/UiTextFont';
+import type { UiFontFields } from '../properties/UiTextFont';
 import { editableSpansOf, resolvedSpansOf, textContentOf } from '../properties/UiTextStyle';
 import { editorFor, shownTextOf } from '../editing/UiEditable';
 import type { UiFrame } from '../scheduler/UiFrame';
@@ -23,11 +24,12 @@ import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
 import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 import { LayoutRecord } from './LayoutRecord';
+import type { TextMemo } from './LayoutRecord';
 import { scrollLeaderOf, scrollRange } from './Scrollbars';
 import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
-import { CharacterCountTextMeasurer } from './TextMeasurer';
-import type { TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
+import { CharacterCountTextMeasurer, fitsWidth, layoutFitsAnyWidth } from './TextMeasurer';
+import type { ParagraphLayout, TextMeasureRequest, TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
 import { accumulatedOffsetTo, hasTransformedChain, transformPointsIn, transformPointsOut } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
@@ -518,6 +520,18 @@ export class LayoutEngine {
    */
   private readonly stickyShifted = new Set<UiNode>();
   private readonly textMeasurer: TextMeasurer;
+  /** Where `measureLeaf` resolves a text node's font; read before anything else can resolve one. */
+  private readonly fontScratch: UiFontFields = {
+    fontSize: 0,
+    fontFamily: '',
+    fontWeight: 'normal',
+    lineHeight: 0,
+    letterSpacing: 0,
+    fontStyle: 'normal',
+    fontStretch: 'normal',
+    fontVariant: 'normal',
+    fontKerning: 'auto'
+  };
   /**
    * The definite size percentages resolve against while a container's
    * children are measured: its content box. Undefined on an axis whose
@@ -2914,33 +2928,98 @@ export class LayoutEngine {
         editable && text.length === 0 && typeof placeholderProp === 'string' ? placeholderProp : undefined;
       // The same resolution paint uses, so the line box measured here is
       // the one the glyphs are drawn in.
-      const font = resolveFont(node);
+      const font = this.fontScratch;
+      resolveFontInto(node, font);
       const maxLines = editable ? undefined : this.numberProp(node, 'maxLines');
-      const request = {
-        text,
-        fontSize: font.fontSize,
-        fontFamily: font.fontFamily,
-        fontWeight: font.fontWeight,
-        lineHeight: font.lineHeight,
-        letterSpacing: font.letterSpacing,
-        fontStyle: font.fontStyle,
-        fontStretch: font.fontStretch,
-        fontVariant: font.fontVariant,
-        fontKerning: font.fontKerning,
-        maxWidth: isFinite(effective.maxWidth) ? Math.max(0, effective.maxWidth - paddingH) : undefined,
-        // A width set from outside (tight) is the box's: its lines wrap against it, and a wider word overflows rather than widening them.
-        exactWidth: isFinite(effective.maxWidth) && effective.minWidth === effective.maxWidth,
-        wrap: this.textWrapProp(node),
-        maxLines: maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined,
-        overflow: editable ? ('clip' as const) : this.textOverflowProp(node),
-        spans: spans.length > 0 ? spans : undefined
-      };
-      const paragraph = this.textMeasurer.layout(request);
+      const maxWidth = isFinite(effective.maxWidth) ? Math.max(0, effective.maxWidth - paddingH) : undefined;
+      // A width set from outside (tight) is the box's: its lines wrap against it, and a wider word overflows rather than widening them.
+      const exactWidth = isFinite(effective.maxWidth) && effective.minWidth === effective.maxWidth;
+      const wrap = this.textWrapProp(node);
+      const lines = maxLines !== undefined && maxLines >= 1 ? Math.floor(maxLines) : undefined;
+      const overflow = editable ? ('clip' as const) : this.textOverflowProp(node);
+      const runs = spans.length > 0 ? spans : undefined;
+      /**
+       * The node's own last paragraph, when nothing it was laid out
+       * from has changed.
+       *
+       * Flex asks a text leaf three or four questions a pass (its
+       * basis, its min- and max-content sizes, its final size), and
+       * each one went to the measurer as a new request, whose cache
+       * key spells out every field and the whole text before it can
+       * look anything up. That was a fifth of a full layout pass over
+       * the benchmark list with every answer already cached. Compared
+       * field by field here it is a handful of identity checks, and a
+       * paragraph that fits at the width it was laid out at also
+       * answers any wider question, which is most of the questions a
+       * row of labels is asked.
+       */
+      const generation = this.textMeasurer.generation;
+      const memo = maxWidth === undefined ? rec.textUnbounded : rec.textBounded;
+      const last = memo?.request;
+      let paragraph: ParagraphLayout;
+      let asked: TextMeasureRequest;
+      if (
+        memo !== null &&
+        last !== undefined &&
+        generation !== undefined &&
+        memo.generation === generation &&
+        last.text === text &&
+        last.fontSize === font.fontSize &&
+        last.fontFamily === font.fontFamily &&
+        last.fontWeight === font.fontWeight &&
+        last.lineHeight === font.lineHeight &&
+        last.letterSpacing === font.letterSpacing &&
+        last.fontStyle === font.fontStyle &&
+        last.fontStretch === font.fontStretch &&
+        last.fontVariant === font.fontVariant &&
+        last.fontKerning === font.fontKerning &&
+        last.wrap === wrap &&
+        last.maxLines === lines &&
+        last.overflow === overflow &&
+        last.spans === runs &&
+        ((last.maxWidth === maxWidth && last.exactWidth === exactWidth) ||
+          (memo.fitsAnyWidth && fitsWidth(memo.paragraph, maxWidth)))
+      ) {
+        paragraph = memo.paragraph;
+        asked = last;
+      } else {
+        const request: TextMeasureRequest = {
+          text,
+          fontSize: font.fontSize,
+          fontFamily: font.fontFamily,
+          fontWeight: font.fontWeight,
+          lineHeight: font.lineHeight,
+          letterSpacing: font.letterSpacing,
+          fontStyle: font.fontStyle,
+          fontStretch: font.fontStretch,
+          fontVariant: font.fontVariant,
+          fontKerning: font.fontKerning,
+          maxWidth,
+          exactWidth,
+          wrap,
+          maxLines: lines,
+          overflow,
+          spans: runs
+        };
+        paragraph = this.textMeasurer.layout(request);
+        asked = request;
+        const fresh: TextMemo = {
+          request,
+          paragraph,
+          generation: generation ?? -1,
+          fitsAnyWidth: layoutFitsAnyWidth(request, paragraph)
+        };
+        if (maxWidth === undefined) {
+          rec.textUnbounded = fresh;
+        } else {
+          rec.textBounded = fresh;
+        }
+      }
       let width = paragraph.width;
       let minContentWidth = paragraph.minContentWidth;
       let maxContentWidth = paragraph.maxContentWidth;
       if (placeholder !== undefined && placeholder.length > 0) {
-        const hint = this.textMeasurer.layout({ ...request, text: placeholder });
+        const hint = this.textMeasurer.layout({ ...asked, text: placeholder });
         width = Math.max(width, hint.width);
         minContentWidth = Math.max(minContentWidth, hint.minContentWidth);
         maxContentWidth = Math.max(maxContentWidth, hint.maxContentWidth);

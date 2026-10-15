@@ -1,5 +1,6 @@
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { UiNode } from '../graph/UiNode';
+import type { ParagraphLayout, TextMeasureRequest } from './TextMeasurer';
 
 /**
  * The constraints a record has before anything has measured it.
@@ -9,6 +10,15 @@ import type { UiNode } from '../graph/UiNode';
  * against, never written through.
  */
 const NEVER_MEASURED = Constraints.unbounded();
+
+/** A text leaf's paragraph, the request it was laid out for, and the measurer generation it was laid out under. */
+export interface TextMemo {
+  readonly request: TextMeasureRequest;
+  readonly paragraph: ParagraphLayout;
+  readonly generation: number;
+  /** The paragraph is the same at any width it fits in; see `layoutFitsAnyWidth`. */
+  readonly fitsAnyWidth: boolean;
+}
 
 /**
  * Mutable per-node layout projection owned by LayoutEngine.
@@ -280,6 +290,24 @@ export class LayoutRecord {
   lastConstraints: Constraints = NEVER_MEASURED;
 
   /**
+   * The paragraphs a text leaf was last measured as, one asked with a
+   * width and one without; see `LayoutEngine.measureLeaf`. Flex asks
+   * an item both questions every pass (its max-content basis, then its
+   * final width), so one slot would be overwritten by the other every
+   * time. Null until the node is measured as text that way.
+   *
+   * **Not reset.** These are the one thing a record carries from one
+   * full pass into the next, on purpose: a full pass re-asks every
+   * text leaf, and a memo that every pass cleared would answer
+   * nothing a resize asks. They are safe to keep because they check
+   * themselves — a memo is used only when every field of the request
+   * it was laid out for matches and the measurer has not been
+   * invalidated since — rather than trusting that nothing changed.
+   */
+  textBounded: TextMemo | null = null;
+  textUnbounded: TextMemo | null = null;
+
+  /**
    * The percentage base the current measurement resolved against, and
    * whether the node has a length that resolves against one.
    *
@@ -438,7 +466,8 @@ export class LayoutRecord {
    * never reused across.
    *
    * **Every field above has to appear here, with the value it is
-   * declared with.** A field that is added and not reset would carry
+   * declared with,** but the two text memos, which check themselves
+   * and are kept across passes on purpose. A field that is added and not reset would carry
    * one pass's answer into the next, which is the kind of fault that
    * shows as a stale box on a screen and as nothing at all in a test
    * that lays out once. `LayoutRecord.spec.ts` compares a reset record

@@ -161,6 +161,13 @@ export interface TextMeasurer {
    * nothing cached need not implement it.
    */
   invalidate?(): void;
+  /**
+   * Counts `invalidate` calls. A caller that keeps a paragraph past the
+   * call that returned it (the layout engine keeps each node's last
+   * one) may trust it only while this is unchanged. A measurer that
+   * leaves it out is asked again every time.
+   */
+  readonly generation?: number;
 }
 
 /**
@@ -343,12 +350,27 @@ const PARAGRAPH_CACHE_ENTRIES = 4096;
  */
 export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
   private readonly paragraphs = new Map<string, ParagraphLayout>();
+  /**
+   * Paragraphs that came out the same at every width they fit in, by
+   * their key without the width; see `layoutFitsAnyWidth`.
+   *
+   * A resize asks every paragraph again at a width a few pixels from
+   * the last, and a title, a caption or a label that fitted before
+   * fits still: its lines, its box and everything else are what they
+   * were. Keyed by its width as well, each of those missed on every
+   * step of a dragged window edge and was laid out again, and the
+   * box it was then painted in (its own width, exact) missed once
+   * more.
+   */
+  private readonly fitting = new Map<string, ParagraphLayout>();
+  private generations = 0;
 
   abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
   abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
 
   layout(request: TextMeasureRequest): ParagraphLayout {
-    const key = paragraphKey(request);
+    const style = paragraphStyleKey(request);
+    const key = `${request.maxWidth ?? ''}\0${request.exactWidth === true ? 1 : ''}\0${style}`;
     const cached = this.paragraphs.get(key);
     if (cached !== undefined) {
       // Re-inserted so the map's order is recency, which is what the
@@ -357,14 +379,17 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
       this.paragraphs.set(key, cached);
       return cached;
     }
-    const paragraph = layoutParagraph(request, this);
-    if (this.paragraphs.size >= PARAGRAPH_CACHE_ENTRIES) {
-      const oldest = this.paragraphs.keys().next().value;
-      if (oldest !== undefined) {
-        this.paragraphs.delete(oldest);
-      }
+    const fitted = this.fitting.get(style);
+    if (fitted !== undefined && fitsWidth(fitted, request.maxWidth)) {
+      this.fitting.delete(style);
+      this.fitting.set(style, fitted);
+      return fitted;
     }
-    this.paragraphs.set(key, paragraph);
+    const paragraph = layoutParagraph(request, this);
+    remember(this.paragraphs, key, paragraph);
+    if (layoutFitsAnyWidth(request, paragraph)) {
+      remember(this.fitting, style, paragraph);
+    }
     return paragraph;
   }
 
@@ -378,6 +403,10 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
     return this.paragraphs.size;
   }
 
+  get generation(): number {
+    return this.generations;
+  }
+
   /**
    * Forgets every laid-out paragraph. A subclass that caches its own
    * primitives overrides this and calls it, so a font that finished
@@ -385,14 +414,71 @@ export abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeas
    * built from.
    */
   invalidate(): void {
+    this.generations++;
     this.paragraphs.clear();
+    this.fitting.clear();
     forgetHardLines(this);
   }
 }
 
-/** Every field of a request, in a fixed order; two requests that lay out alike share a key. */
-function paragraphKey(request: TextMeasureRequest): string {
-  return `${request.fontSize}\0${request.maxWidth ?? ''}\0${request.exactWidth === true ? 1 : ''}\0${request.fontFamily ?? ''}\0${request.fontWeight ?? ''}\0${
+/** Keeps `value` as the most recent entry, forgetting the least recent past the cap. */
+function remember(map: Map<string, ParagraphLayout>, key: string, value: ParagraphLayout): void {
+  if (map.size >= PARAGRAPH_CACHE_ENTRIES) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) {
+      map.delete(oldest);
+    }
+  }
+  map.set(key, value);
+}
+
+/**
+ * Whether `paragraph`, laid out for `request`, is what a request
+ * differing only in its width would get at any width it fits in.
+ *
+ * A paragraph's width enters its layout in four places, and none of
+ * them can tell two widths apart once every hard line fits whole:
+ * nothing breaks (a line that fits is not broken, `exactWidth` or
+ * not); the box is fit-content, which is the natural width; no line is
+ * wider than the box, so none is ellipsised in place; and the one
+ * ellipsis that is fitted to the width — the last line kept by
+ * `maxLines` — is excluded here, because it is only drawn when there
+ * were more hard lines than that. An unbounded request is left out:
+ * it is laid out unwrapped, which is a different path, and it has a
+ * key of its own that never changes anyway.
+ */
+export function layoutFitsAnyWidth(request: TextMeasureRequest, paragraph: ParagraphLayout): boolean {
+  if (!fitsWidth(paragraph, request.maxWidth)) {
+    return false;
+  }
+  const maxLines = request.maxLines;
+  return (
+    request.overflow !== 'ellipsis' ||
+    maxLines === undefined ||
+    maxLines < 1 ||
+    !hasMoreHardLines(request.text, maxLines)
+  );
+}
+
+/** Whether a paragraph with nothing in it that depends on the width fits at `maxWidth`. */
+export function fitsWidth(paragraph: ParagraphLayout, maxWidth: number | undefined): boolean {
+  return maxWidth !== undefined && maxWidth >= 0 && paragraph.maxContentWidth <= maxWidth;
+}
+
+function hasMoreHardLines(text: string, count: number): boolean {
+  let at = -1;
+  for (let i = 0; i < count; i++) {
+    at = text.indexOf('\n', at + 1);
+    if (at < 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Every field of a request but its width, in a fixed order; two requests that lay out alike at one width share a key. */
+function paragraphStyleKey(request: TextMeasureRequest): string {
+  return `${request.fontSize}\0${request.fontFamily ?? ''}\0${request.fontWeight ?? ''}\0${
     request.lineHeight ?? ''
   }\0${request.letterSpacing ?? ''}\0${request.wrap ?? ''}\0${request.maxLines ?? ''}\0${request.overflow ?? ''}\0${
     request.fontStyle ?? ''
