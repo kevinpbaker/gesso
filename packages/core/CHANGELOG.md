@@ -1,5 +1,19 @@
 # gesso-core
 
+## 0.6.21
+
+### Patch Changes
+
+- 499d7ae: A layout pass no longer reads every node's layout properties again when none of them changed. `UiNode` counts writes in a new `propertyVersion` and gains `removeProperty`; write `properties` through `setProperty` and `removeProperty` so the count stays exact. A full layout pass over a 5,000-node list is about 20% faster again, and a window-resize step over 500 paragraphs now fits a 16 ms frame.
+- 42c06c1: A render worker draws the frames it asks for while its page is hidden or behind another window, paced by a timer, rather than waiting for a refresh that a hidden page never gets. A channel's patches are applied on a frame, so until now an answer the application thread sent while the page was hidden reached nothing: a request awaiting it never settled, and the screen and its semantics mirror kept what they last showed, until the page was shown again. The runtime still asks for no frame on a hidden page's account, so no caret blink or animation runs there.
+- c99b972: `MenuItem` takes `items`, a submenu: it opens beside its item on a press, the pointer resting on it, Enter or Right, Left or Escape goes back, and a choice in it is the menu's own, closing both. `Menu` takes `compact`, for shorter rows in a long context menu, as `Select`'s.
+
+  `FocusService.releaseTrap` (and `UiFocusManager.popScope`) take the node trapped in, and end only that trap: none, when it ended already. A trap ends by itself when its subtree is removed, and a menu that released its trap after closing ended the trap under it as well, a submenu's menu's, leaving the keyboard nowhere.
+
+- e612a33: Typing into a long text field no longer grows memory without bound. The paragraph cache is bounded by the length of the text it holds as well as by count (now 16,384 paragraphs and a million characters), and the memo of a paragraph's hard lines no longer keeps every earlier version of the text alive. 4,096 edits to a 115 KB field used to keep 1.1 GB on the heap; they now keep 3 MB.
+- 856bc51: `TextInput` takes `secret`, and `EditableText` a `secret` property, for a password or a passphrase. The field draws a bullet for every character, copy and cut take nothing from it, and while it has focus the shell edits it through a hidden `<input type="password">`, so the browser and the platform treat it as a password: secure input on macOS, no autocorrect, and a screen reader that calls it a secure text field. The value still reaches `onChange`; the shell's element, the semantics record and the accessibility mirror only ever hold the bullets. A secret field is one line.
+- 211e791: Layout asks the text measurer far less often. A text node remembers the paragraph it was last measured as, and a paragraph that fits at its width is reused at any wider width, by the node and by the measurer, instead of being laid out again. A full layout pass over a 5,000-node list is about 20% faster and a step of a window resize over 500 paragraphs about 26% faster. `TextMeasurer` gains an optional `generation`, which `ParagraphTextMeasurer` counts up on every `invalidate()`.
+
 ## 0.6.20
 
 ### Patch Changes
