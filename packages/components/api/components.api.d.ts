@@ -760,6 +760,10 @@ interface TreeProps extends ControlLayoutProps {
     readonly key: string;
   } | null;
   onActivate?: (key: string) => void;
+  onContextMenu?: (key: string, at?: {
+    readonly x: number;
+    readonly y: number;
+  }) => void;
   rowHeight?: number;
   label?: string;
   leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;

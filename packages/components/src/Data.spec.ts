@@ -476,6 +476,25 @@ describe('Tree', () => {
     expect(textColour(ui, 'docs')).toBe(hex(darkTheme.colors.selectionForeground));
   });
 
+  it('asks for a row’s menu on a right click, choosing it, and on Shift+F10 for the chosen one', () => {
+    const asked: [string, { x: number; y: number } | undefined][] = [];
+    const chosen: (string | null)[] = [];
+    const ui = tree({
+      onContextMenu: (key: string, at?: { x: number; y: number }) => asked.push([key, at]),
+      onSelect: (key: string | null) => chosen.push(key)
+    });
+    ui.frame();
+    const docs = ui.getByRole('treeitem', { name: 'docs' });
+    const box = ui.getLayout(docs);
+    ui.fireEvent.contextMenu(docs, { x: box.x + 4, y: box.y + 4 });
+    ui.frame();
+    expect(asked).toEqual([['docs', { x: box.x + 4, y: box.y + 4 }]]);
+    expect(chosen.at(-1)).toBe('docs');
+    ui.fireEvent.focus(ui.getByRole('tree'));
+    ui.fireEvent.keyDown('F10', { shift: true });
+    expect(asked.at(-1)).toEqual(['docs', undefined]);
+  });
+
   it('sits flush in what holds it when asked: no frame, no background, square corners', () => {
     const framed = tree().getByRole('tree');
     const flush = tree({ flush: true }).getByRole('tree');

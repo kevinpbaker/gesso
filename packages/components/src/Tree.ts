@@ -2,7 +2,17 @@ import { combineLatest, map, type Observable } from 'rxjs';
 
 import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
-import { Box, Row, Text, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from 'gesso-core';
+import {
+  Box,
+  Row,
+  Text,
+  LazyColumn,
+  type UiChild,
+  type UiKeyboardEvent,
+  type UiNodeRef,
+  type UiPointerEvent,
+  type UiSemanticState
+} from 'gesso-core';
 import { chevron, CHEVRON_DOWN, CHEVRON_RIGHT } from './chevron';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
@@ -69,6 +79,13 @@ export interface TreeProps extends ControlLayoutProps {
   revealKey?: { readonly key: string } | null;
   /** Enter or Space on the chosen row, or a double click on any. */
   onActivate?: (key: string) => void;
+  /**
+   * A row's menu asked for: a right click on it (which chooses it, with
+   * where the pointer was), or the menu key or Shift+F10 on the chosen
+   * row (with no point: the menu goes beside the row). Without it, a
+   * right click is the page's.
+   */
+  onContextMenu?: (key: string, at?: { readonly x: number; readonly y: number }) => void;
   /** Expected row height, for the rows that have not been measured. */
   rowHeight?: number;
   label?: string;
@@ -270,7 +287,19 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
           if (row.node.disabled !== true) {
             inputs.onActivate.value?.(row.node.key);
           }
-        }
+        },
+        ...(inputs.onContextMenu.value === undefined
+          ? {}
+          : {
+              onContextMenu: (event: UiPointerEvent) => {
+                if (row.node.disabled === true) {
+                  return;
+                }
+                event.preventDefault();
+                choose(index);
+                inputs.onContextMenu.value?.(row.node.key, { x: event.x, y: event.y });
+              }
+            })
       },
       // A leaf keeps the arrow's width, so its label lines up with its
       // siblings' under the branch.
@@ -279,6 +308,17 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       Text({ text: row.node.label, fontSize: 13, color: ink, selectable: false, maxLines: 1, textOverflow: 'ellipsis' })
     );
   };
+
+  const keys = keymap({
+    ArrowDown: () => step(1),
+    ArrowUp: () => step(-1),
+    ArrowRight: forward,
+    ArrowLeft: back,
+    Home: () => choose(0),
+    End: () => choose(rows().length - 1),
+    Enter: activate,
+    ' ': activate
+  });
 
   return LazyColumn(
     {
@@ -307,16 +347,18 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       // The border is `CONTROL_EDGE` rather than a `borderWidth`: a
       // chosen row's own background would be painted over it.
       borderRadius: flush ? 0 : tokens.select(t => t.radius.scroller),
-      onKeyDown: keymap({
-        ArrowDown: () => step(1),
-        ArrowUp: () => step(-1),
-        ArrowRight: forward,
-        ArrowLeft: back,
-        Home: () => choose(0),
-        End: () => choose(rows().length - 1),
-        Enter: activate,
-        ' ': activate
-      })
+      onKeyDown: (event: UiKeyboardEvent) => {
+        // The menu key, or Shift+F10: the chosen row's menu, as a right click on it would open.
+        const menu = event.key === 'ContextMenu' || (event.key === 'F10' && event.modifiers.shift === true);
+        const key = selected.current();
+        if (menu && key !== null && inputs.onContextMenu.value !== undefined) {
+          event.preventDefault();
+          event.stopPropagation();
+          inputs.onContextMenu.value(key);
+          return;
+        }
+        keys(event);
+      }
     },
     item
   );
