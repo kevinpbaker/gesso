@@ -42,13 +42,13 @@ export function setSelectionRange(node: UiNode, start: number, end: number): boo
   if (current !== undefined && current.start === start && current.end === end) {
     return false;
   }
-  node.properties.set(TEXT_SELECTION_PROP, { start, end });
+  node.setProperty(TEXT_SELECTION_PROP, { start, end });
   return true;
 }
 
 /** Clears a node's selected range. Returns whether it had one. */
 export function clearSelectionRange(node: UiNode): boolean {
-  return node.properties.delete(TEXT_SELECTION_PROP);
+  return node.removeProperty(TEXT_SELECTION_PROP);
 }
 
 /**

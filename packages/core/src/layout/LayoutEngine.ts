@@ -4577,7 +4577,36 @@ export class LayoutEngine {
     if (rec.propsPass === this.layoutPass && rec.propsBaseWidth === base.width && rec.propsBaseHeight === base.height) {
       return;
     }
+    /**
+     * What an earlier pass resolved, when none of what it read has
+     * changed: the node's own properties (`propertyVersion`), and the
+     * percentage base only on an axis that has a percentage.
+     *
+     * Each pass used to read every property below again for every node
+     * it reached, and a full pass reaches all of them: a sixth of a full
+     * pass over the benchmark list, where nothing had changed since the
+     * last. A node whose resolution read anything inherited (a logical
+     * edge or a scroll container's direction) or another node (a scroll
+     * leader) is resolved again every pass, as it always was; they are
+     * few. The record keeps these fields across `reset()` for this.
+     */
+    if (
+      rec.propsFromNodeAlone &&
+      rec.propsVersion === node.propertyVersion &&
+      (!rec.percentWidth || rec.propsBaseWidth === base.width) &&
+      (!rec.percentHeight || rec.propsBaseHeight === base.height)
+    ) {
+      rec.propsPass = this.layoutPass;
+      rec.propsBaseWidth = base.width;
+      rec.propsBaseHeight = base.height;
+      if (rec.lifted) {
+        // The set is rebuilt by every full pass; see `layout`.
+        this.liftedNodes.add(node);
+      }
+      return;
+    }
     rec.propsPass = this.layoutPass;
+    rec.propsVersion = node.propertyVersion;
     rec.propsBaseWidth = base.width;
     rec.propsBaseHeight = base.height;
     rec.percentWidth = hasPercentLength(props, WIDTH_RELATIVE);
@@ -4648,9 +4677,16 @@ export class LayoutEngine {
     rec.left = this.lengthProp(node, 'left', base.width) ?? insetH;
     rec.zIndex = this.numberProp(node, 'zIndex') ?? 0;
     this.setLifted(node, rec, node.properties.get('lift') === true);
+    if (rec.lifted) {
+      // A record carried through a full pass may say lifted already, so
+      // `setLifted` did nothing, and the set it belongs in was cleared.
+      this.liftedNodes.add(node);
+    }
     rec.liftBoundary = node.properties.get('liftBoundary') === true;
     const ratio = this.numberProp(node, 'aspectRatio');
     rec.aspectRatio = ratio !== undefined && ratio > 0 ? ratio : undefined;
+    rec.propsFromNodeAlone =
+      !hasLogicalSpacing(props) && !rec.scrollable && !rec.textScrollbars && overflow !== 'hidden';
   }
 
   /**

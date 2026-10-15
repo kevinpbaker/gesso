@@ -12,8 +12,60 @@ import { UiNodeType } from '../graph/UiNodeType';
  * stale box on a screen. These two compare the record generically, so
  * the omission fails here instead.
  */
-/** Kept across a reset on purpose: each checks itself before it is used; see `LayoutRecord.textBounded`. */
-const CARRIED = new Set(['textBounded', 'textUnbounded']);
+/**
+ * Kept across a reset on purpose: each is checked before it is used.
+ * The text memos check their own requests (`LayoutRecord.textBounded`);
+ * the resolved layout properties are vouched for by `propsVersion`
+ * (`LayoutEngine.resolveLayoutProps`).
+ */
+const CARRIED = new Set([
+  'textBounded',
+  'textUnbounded',
+  'propsVersion',
+  'propsFromNodeAlone',
+  'paddingLeft',
+  'paddingRight',
+  'paddingTop',
+  'paddingBottom',
+  'marginLeft',
+  'marginRight',
+  'marginTop',
+  'marginBottom',
+  'minWidth',
+  'maxWidth',
+  'minHeight',
+  'maxHeight',
+  'flexGrow',
+  'flexShrink',
+  'flexBasisZero',
+  'minWidthAuto',
+  'minHeightAuto',
+  'marginLeftAuto',
+  'marginRightAuto',
+  'marginTopAuto',
+  'marginBottomAuto',
+  'aspectRatio',
+  'positioned',
+  'absolute',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'zIndex',
+  'lifted',
+  'liftBoundary',
+  'clips',
+  'scrollable',
+  'scrollsText',
+  'hidesScrollbars',
+  'textScrollbars',
+  'mirrored',
+  'sticky',
+  'percentWidth',
+  'percentHeight',
+  'propsBaseWidth',
+  'propsBaseHeight'
+]);
 
 describe('LayoutRecord.reset', () => {
   const graph = new UiGraph();
@@ -32,14 +84,15 @@ describe('LayoutRecord.reset', () => {
         typeof value === 'number' ? value + 7 : typeof value === 'boolean' ? !value : { touched: true };
     }
     used.lastConstraints = Constraints.tight(3, 4);
+    const written: Record<string, unknown> = { ...used };
     used.reset();
 
     const fresh = new LayoutRecord(node);
     for (const key of Object.keys(fresh)) {
       if (CARRIED.has(key)) {
-        expect((used as unknown as Record<string, unknown>)[key], `LayoutRecord.reset() drops '${key}'`).toEqual({
-          touched: true
-        });
+        expect((used as unknown as Record<string, unknown>)[key], `LayoutRecord.reset() drops '${key}'`).toBe(
+          written[key]
+        );
         continue;
       }
       expect(

@@ -29,13 +29,13 @@ export function setMatchRanges(node: UiNode, ranges: readonly TextRange[]): bool
   if (ranges.length === 0) {
     return clearMatchRanges(node);
   }
-  node.properties.set(TEXT_MATCHES_PROP, ranges);
+  node.setProperty(TEXT_MATCHES_PROP, ranges);
   return true;
 }
 
 /** Clears a node's matched ranges. Returns whether it had any. */
 export function clearMatchRanges(node: UiNode): boolean {
-  return node.properties.delete(TEXT_MATCHES_PROP);
+  return node.removeProperty(TEXT_MATCHES_PROP);
 }
 
 function rangesEqual(a: readonly TextRange[], b: readonly TextRange[]): boolean {

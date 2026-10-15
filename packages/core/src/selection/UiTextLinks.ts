@@ -28,9 +28,9 @@ export function setLinkHover(node: UiNode, index: number): boolean {
     return false;
   }
   if (index < 0) {
-    node.properties.delete(TEXT_LINK_HOVER_PROP);
+    node.removeProperty(TEXT_LINK_HOVER_PROP);
   } else {
-    node.properties.set(TEXT_LINK_HOVER_PROP, index);
+    node.setProperty(TEXT_LINK_HOVER_PROP, index);
   }
   return true;
 }
