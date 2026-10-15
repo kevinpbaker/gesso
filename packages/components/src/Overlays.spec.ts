@@ -22,7 +22,7 @@ import {
   type UiSemanticsRecord
 } from 'gesso-core';
 import { Dialog } from './Dialog';
-import { Menu } from './Menu';
+import { Menu, type MenuItem } from './Menu';
 import { Select } from './Select';
 import { useOverlay, type OverlayHandle } from './overlay';
 
@@ -555,6 +555,15 @@ describe('Menu', () => {
       'controlBackgroundHovered'
     );
     expect(ui.getByRole('menuitem', { name: 'Reset to Here' }).properties.get('backgroundColor')).toBe('transparent');
+    // The pointer moved from the item into its submenu keeps it open, and a press there chooses, as the keys do.
+    over('Reset to Here');
+    over('Soft');
+    expect(ui.getAllByRole('menu')).toHaveLength(2);
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'Soft' }));
+    ui.frame();
+    expect(chosen).toEqual(['soft']);
+    open.next(true);
+    ui.frame();
     ui.fireEvent.keyDown('ArrowDown');
 
     // Enter on it opens it too; a choice there is the menu's, and both close.
@@ -565,9 +574,35 @@ describe('Menu', () => {
     ui.frame();
     ui.fireEvent.keyDown('Enter');
     ui.frame();
-    expect(chosen).toEqual(['hard']);
+    expect(chosen).toEqual(['soft', 'hard']);
     expect(ui.queryByRole('menu')).toBeNull();
     expect(open.value).toBe(false);
+  });
+
+  /**
+   * An editor's text menu: whether it is open, where, and its items all
+   * from one change, its open bound before its items. The submenu was
+   * only made when the items had one as the menu opened, which they had
+   * not yet, so Git ▸ opened nothing.
+   */
+  it('opens a submenu whose items arrived with the menu, after its open', () => {
+    const menu$ = new BehaviorSubject<{ readonly items: readonly MenuItem[] } | null>(null);
+    const ui = mount(
+      createComponent(Menu, {
+        open: menu$.pipe(map(menu => menu !== null)),
+        at: { x: 20, y: 20 },
+        items: menu$.pipe(map(menu => menu?.items ?? [])),
+        onOpenChange: (next: boolean) => {
+          if (!next) menu$.next(null);
+        }
+      })
+    );
+    menu$.next({ items: [{ value: 'git', label: 'Git', items: [{ value: 'blame', label: 'Annotate' }] }] });
+    ui.frame();
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(ui.getAllByRole('menu')).toHaveLength(2);
+    expect(ui.getByRole('menuitem', { name: 'Annotate' })).toBeDefined();
   });
 
   /**
