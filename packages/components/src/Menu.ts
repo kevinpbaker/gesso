@@ -135,6 +135,12 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
+  /** The pointer on an item: the highlight follows it, as the keys move it, and its submenu opens (another's closes). */
+  const pointAt = (index: number): void => {
+    if (inputs.items.value[index]?.disabled !== true) active.next(index);
+    openSub(index);
+  };
+
   /** Opens an item's submenu beside its row, or closes the one open (`index` -1). */
   const openSub = (index: number): void => {
     const item = inputs.items.value[index];
@@ -248,7 +254,7 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
       Column(
         { overflow: 'auto', minHeight: 0, gap: compact ? 0 : 2, modifiers: [measureFlow(scrollerBox)] },
         inputs.items.pipe(
-          map(items => items.map((item, index) => row(item, index, active, sub, choose, openSub, track, compact)))
+          map(items => items.map((item, index) => row(item, index, active, sub, choose, pointAt, track, compact)))
         )
       ),
       // The submenu, a menu of its own beside its item: its choice is this menu's, and closes both.
@@ -337,7 +343,7 @@ function row(
   active: Observable<number>,
   sub: Observable<{ readonly index: number } | null>,
   choose: (value: string) => void,
-  openSub: (index: number) => void,
+  pointAt: (index: number) => void,
   track: (index: number, node: UiNode, present: boolean) => void,
   compact: boolean
 ): UiElement {
@@ -369,8 +375,9 @@ function row(
       ...(nested ? { states: sub.pipe(map(open => (open?.index === index ? (['expanded'] as const) : []))) } : {}),
       gap: 24,
       onClick: () => choose(item.value),
-      // The pointer resting on an item opens its submenu, and on another closes it, as a desktop's menus do.
-      onPointerEnter: () => openSub(index)
+      // The pointer resting on an item highlights it and opens its submenu, and on another closes it, as a desktop's
+      // menus do.
+      onPointerEnter: () => pointAt(index)
     },
     Text({
       text: item.label,
