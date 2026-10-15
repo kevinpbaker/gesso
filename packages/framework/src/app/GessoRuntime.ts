@@ -1606,6 +1606,11 @@ export class GessoRuntime {
     this.services.get(ShellService).settleClipboard(id, copied);
   }
 
+  /** Reports what a clipboard read found, settling the promise `ShellService.readText` returned. */
+  settleClipboardRead(id: number, text: string | null): void {
+    this.services.get(ShellService).settleClipboardRead(id, text);
+  }
+
   /**
    * Reports what the shell found in `localStorage`, settling the
    * promise `ShellService.requestStorage` returned.
@@ -1655,11 +1660,6 @@ export class GessoRuntime {
    *.
    *
    * Built here rather than in `gesso-devtools` because every source
-  /** Reports what a clipboard read found, settling the promise `ShellService.readText` returned. */
-  settleClipboardRead(id: number, text: string | null): void {
-    this.services.get(ShellService).settleClipboardRead(id, text);
-  }
-
    * it reads is private to the render thread and most of it cannot
    * cross a thread boundary at all: the graph's bindings, the
    * builder's modifier sets, the resolver's component hosts. The

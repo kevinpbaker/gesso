@@ -677,9 +677,9 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'clipboard', id: request.id, text: request.text });
       } else if (request.type === 'openUrl') {
         this.host.postMessage({ type: 'openUrl', url: request.url });
-      } else if (request.type === 'openRoute') {
       } else if (request.type === 'clipboardRead') {
         this.host.postMessage({ type: 'clipboardRead', id: request.id });
+      } else if (request.type === 'openRoute') {
         this.host.postMessage({ type: 'openRoute', url: request.url });
       } else if (request.type === 'redirect') {
         this.host.postMessage({ type: 'redirect', url: request.url });
