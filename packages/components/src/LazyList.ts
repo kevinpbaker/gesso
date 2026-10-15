@@ -130,7 +130,9 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
   const rowBackground = (index: number) =>
     hover
       ? combineLatest([selected.value, hovered]).pipe(
-          map(([current, under]) => (current === index ? 'selectionBackground' : under === index ? 'controlBackgroundHovered' : 'transparent'))
+          map(([current, under]) =>
+            current === index ? 'selectionBackground' : under === index ? 'controlBackgroundHovered' : 'transparent'
+          )
         )
       : selected.value.pipe(map(current => (current === index ? 'selectionBackground' : 'transparent')));
 

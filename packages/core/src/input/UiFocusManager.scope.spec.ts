@@ -126,6 +126,33 @@ describe('UiFocusManager scopes', () => {
     expect(focusManager.trapped).toBe(false);
   });
 
+  it('pops a named scope only: none once it has gone, and one under another where it is', () => {
+    const { h, open, dialog, close, focusManager } = setup();
+    const confirm = h.node('confirm', UiNodeType.Box, { width: 200, height: 40 });
+    const yes = h.node('yes', UiNodeType.Button, { width: 200, height: 40 });
+    h.add(confirm, yes);
+    h.add(h.root, confirm);
+    focusManager.focus(open);
+    focusManager.pushScope(dialog);
+    focusManager.focus(close);
+    focusManager.pushScope(confirm);
+
+    // A submenu closed: its scope ended (its subtree went), and the release that follows names it.
+    focusManager.popScope(confirm);
+    expect(focusManager.scopeRoot).toBe(dialog);
+    expect(focusManager.focusedNode).toBe(close);
+    focusManager.popScope(confirm);
+    expect(focusManager.scopeRoot).toBe(dialog);
+    expect(focusManager.trapped).toBe(true);
+
+    // One under the innermost, taken out where it is, the innermost kept.
+    focusManager.pushScope(confirm);
+    focusManager.popScope(dialog);
+    expect(focusManager.scopeRoot).toBe(confirm);
+    focusManager.popScope(confirm);
+    expect(focusManager.trapped).toBe(false);
+  });
+
   it('ends the trap and restores the opener when the scope leaves the tree', () => {
     const { h, open, other, dialog, focusManager } = setup();
     focusManager.focus(open);

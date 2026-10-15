@@ -901,7 +901,7 @@ declare class UiFocusManager {
   focusPrevious(): boolean;
   pushScope(root: UiNode): void;
   settleScope(): void;
-  popScope(): void;
+  popScope(root?: UiNode): void;
   handleNodeRemoved(_node: UiNode): void;
   private moveFocus;
   private collectFocusable;

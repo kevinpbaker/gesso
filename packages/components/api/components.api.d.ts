@@ -438,6 +438,7 @@ interface MenuItem {
   readonly separator?: boolean;
   readonly shortcut?: string;
   readonly danger?: boolean;
+  readonly items?: readonly MenuItem[];
 }
 interface MenuProps {
   open?: boolean;
@@ -451,6 +452,8 @@ interface MenuProps {
     readonly x: number;
     readonly y: number;
   };
+  compact?: boolean;
+  submenu?: boolean;
 }
 declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
 declare const MENU_SEPARATOR: '-';

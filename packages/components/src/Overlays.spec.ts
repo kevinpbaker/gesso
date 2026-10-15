@@ -499,6 +499,62 @@ describe('Menu', () => {
   });
 
   /**
+   * A menu with a submenu, as an editor's Reset ▸ Soft, Mixed, Hard:
+   * Right opens it beside its item, Left goes back, and a choice in it
+   * is the menu's, closing both. Compact, its rows are shorter.
+   */
+  it('opens a submenu beside its item, goes back with Left, and chooses from it as the menu', () => {
+    const open = new BehaviorSubject(false);
+    const chosen: string[] = [];
+    const ui = mount(
+      createComponent(Menu, {
+        open,
+        at: { x: 20, y: 20 },
+        compact: true,
+        items: [
+          { value: 'copy', label: 'Copy' },
+          {
+            value: 'reset',
+            label: 'Reset to Here',
+            items: [
+              { value: 'soft', label: 'Soft' },
+              { value: 'hard', label: 'Hard', danger: true }
+            ]
+          }
+        ],
+        onSelect: (value: string) => chosen.push(value),
+        onOpenChange: (next: boolean) => open.next(next)
+      })
+    );
+    open.next(true);
+    ui.frame();
+    expect(ui.getLayout(ui.getByRole('menuitem', { name: 'Copy' })).height).toBeLessThan(26);
+
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(ui.getAllByRole('menu')).toHaveLength(2);
+    ui.fireEvent.keyDown('ArrowLeft');
+    ui.frame();
+    expect(ui.getAllByRole('menu')).toHaveLength(1);
+    // Back in the menu, with the keyboard: closing the submenu ended its own focus trap, not the menu's as well.
+    expect(ui.runtime.input.focus.trapped).toBe(true);
+    expect(chosen).toEqual([]);
+
+    // Enter on it opens it too; a choice there is the menu's, and both close.
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(ui.getAllByRole('menu')).toHaveLength(2);
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(chosen).toEqual(['hard']);
+    expect(ui.queryByRole('menu')).toBeNull();
+    expect(open.value).toBe(false);
+  });
+
+  /**
    * A menu whose place and whose being open come from one change, as a
    * row's ⋯ gives both at once. `open` bound before `at`, it opened
    * where it had last been told, or, the first time, in the corner of
