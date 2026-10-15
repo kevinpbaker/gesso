@@ -212,11 +212,21 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
     }
   };
 
+  /**
+   * Someone is typing a search: from their first keystroke until they
+   * choose, leave or press Escape. Focus alone is not typing: a value
+   * the application changes while the field still has focus (from the
+   * choice just made, say, and then a command elsewhere) shows at once.
+   */
+  let typing = false;
   // What the field says while nobody types in it follows the value, so
   // a value the application changes shows; once someone types, it's
   // theirs until they choose, leave or press Escape.
   ctx.effect(combineLatest([chosen, inputs.options, focus.focused]), ([, , focused]) => {
     if (!focused) {
+      typing = false;
+    }
+    if (!typing && query.value !== resting()) {
       query.next(resting());
     }
   });
@@ -273,6 +283,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
       return;
     }
     single.change(option.value);
+    typing = false;
     query.next(option.label);
     close();
   };
@@ -393,6 +404,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
           close();
           consume();
         } else if (query.value !== resting()) {
+          typing = false;
           query.next(resting());
           consume();
         }
@@ -451,6 +463,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
     controls: controlsNode,
     autocomplete: 'list',
     onInput: (event: UiTextChangeEvent) => {
+      typing = true;
       query.next(event.value);
       inputs.onQueryChange?.value?.(event.value);
       open();

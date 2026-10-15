@@ -198,6 +198,25 @@ describe('Combobox', () => {
     expect(ui.getSemantics(field()).valueText).toBe('Kim Lee');
   });
 
+  /**
+   * A log's branch picker: a branch chosen, focus left in the field, and
+   * then a command elsewhere shows another branch's log. The field said
+   * the old choice until it lost focus; focus is not typing, so it says
+   * the new one at once, and only a search under way is left alone.
+   */
+  it('shows a value the application changes while it has focus but nobody is typing', async () => {
+    const value = new BehaviorSubject('ada');
+    mount({ value, onChange: (next: string) => value.next(next) });
+    await focus();
+    value.next('kim');
+    await ui.settle();
+    expect(ui.getSemantics(field()).valueText).toBe('Kim Lee');
+    await type('gr');
+    value.next('ada');
+    await ui.settle();
+    expect(ui.getSemantics(field()).valueText).toBe('gr');
+  });
+
   it('chooses with a press on an option, keeping focus in the field', async () => {
     mount({ defaultValue: '' });
     await focus();
