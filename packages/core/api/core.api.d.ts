@@ -3616,6 +3616,7 @@ declare class LayoutEngine {
   private boundsVersion;
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
+  allStickyNodes(): ReadonlySet<UiNode>;
   subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined;
   get geometryVersion(): number;
   get root(): UiNode | null;
@@ -4331,6 +4332,7 @@ declare const LABEL_PADDING_X = 4;
 declare function drawOverlayShapes(ctx: Canvas2DContext, shapes: readonly OverlayShape[]): void;
 interface LayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
+  allStickyNodes?(): ReadonlySet<UiNode>;
 }
 interface RenderContext {
   readonly layout: LayoutReader;

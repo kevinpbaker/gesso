@@ -263,6 +263,31 @@ describe('scroll layers', () => {
     expect(callArgs(layers[1].context, 'clip').length).toBe(1);
   });
 
+  it('paints a sticky item out of where the scroll carried it and into where it sticks', () => {
+    // A spreadsheet's header row: sticky, so a scroll moves it without
+    // moving its box or dirtying it. The copy carried its pixels up with
+    // the content and only the strip at the bottom was painted, which
+    // left a header drawn over the rows at every step of the scroll.
+    set(rows[0], 'position', 'sticky');
+    set(rows[0], 'top', 0);
+    set(rows[0], 'height', 10);
+    frame();
+    scrollTo(10);
+    scrollTo(25);
+
+    expect(renderer.scrollLayerStats.shifted).toBe(1);
+    expect(renderer.scrollLayerStats.dropped).toBe(0);
+    // The strip, then the header as it was drawn at a scroll of 10
+    // (content 10..20, carried to -15..-5) and as it sticks now (content
+    // 25..35, viewport 0..10), each widened by what it may paint past
+    // its box.
+    expect(callArgs(layers[1].context, 'rect')).toEqual([
+      [0, 85, 200, 15],
+      [0, 0, 200, 3],
+      [0, 0, 200, 18]
+    ]);
+  });
+
   it('reuses the layer untouched on a frame that changed something beside it', () => {
     const other = graph.createNode('other', UiNodeType.Box);
     set(other, 'height', 20);
