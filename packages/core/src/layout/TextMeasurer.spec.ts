@@ -149,6 +149,9 @@ describe('ParagraphTextMeasurer', () => {
     const before = measurer.runs;
     expect(measurer.layout({ ...request })).toBe(label);
     expect(measurer.runs).toBe(before);
+    // And the field's own versions are held to the large paragraphs'
+    // budget, not the labels': only the newest is asked for again.
+    expect(measurer.cachedParagraphs).toBeLessThanOrEqual(1 + 8);
   });
 
   it('remembers hard lines by their length as well as their number', () => {
@@ -160,9 +163,9 @@ describe('ParagraphTextMeasurer', () => {
       measurer.layout({ text: `${n} ${line}\nA short line`, fontSize: 10, maxWidth: 400 });
     }
     const memo = hardLineMemoSize(measurer);
-    // The memo's text budget, two million code units.
-    expect(memo.text).toBeLessThanOrEqual(1 << 21);
-    expect(memo.lines).toBeLessThan(30);
+    // The memo's text budget, a million code units: ten of these lines.
+    expect(memo.text).toBeLessThanOrEqual(1 << 20);
+    expect(memo.lines).toBeLessThanOrEqual(11);
     // The short line, asked for every time, is still remembered.
     const before = measurer.runs;
     measurer.layout({ text: 'A short line', fontSize: 10, maxWidth: 400 });
