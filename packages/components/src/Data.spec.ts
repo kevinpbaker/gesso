@@ -522,6 +522,32 @@ describe('Tree', () => {
     expect(ui.recordsFor('treeitem').map(record => record.label)).toEqual(['src', 'ui', 'components', 'docs']);
   });
 
+  it('colours a decorated row and its badge, says what they mean, and follows a change', () => {
+    const marks = new BehaviorSubject<Record<string, { color?: UiColorValue; badge?: string; description?: string }>>({
+      docs: { color: 'danger', badge: '2', description: '2 errors' }
+    });
+    const ui = mount(
+      Column(
+        { theme: darkTheme, height: 200 },
+        createComponent(Tree, {
+          label: 'Files',
+          nodes: FOLDERS,
+          height: 200,
+          decoration: (node: TreeNode) => marks.pipe(map(all => all[node.key] ?? null))
+        })
+      )
+    );
+    expect(textColours(ui).get('docs')).toBe(hex(darkTheme.colors.danger));
+    expect(textColours(ui).get('2')).toBe(hex(darkTheme.colors.danger));
+    expect(textColours(ui).get('src')).toBe(hex(darkTheme.colors.controlForeground));
+    expect(ui.recordsFor('treeitem').map(record => record.label)).toEqual(['src', 'docs, 2 errors']);
+
+    marks.next({});
+    ui.frame();
+    expect(textColours(ui).get('docs')).toBe(hex(darkTheme.colors.controlForeground));
+    expect(ui.recordsFor('treeitem').map(record => record.label)).toEqual(['src', 'docs']);
+  });
+
   it('renders only the open part of the model, and says how deep each row is', () => {
     const ui = tree({ defaultExpanded: ['src'] });
 

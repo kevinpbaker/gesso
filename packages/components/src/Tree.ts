@@ -10,6 +10,7 @@ import {
   type UiChild,
   type UiKeyboardEvent,
   type UiNodeRef,
+  type UiColorValue,
   type UiPointerEvent,
   type UiSemanticState
 } from 'gesso-core';
@@ -67,6 +68,20 @@ export interface TreeNode {
   readonly disabled?: boolean;
 }
 
+/**
+ * What a row says beside its label: a file tree's git status and
+ * problems, as VS Code's explorer colours a changed file's name and puts
+ * an `M` or a count of errors after it.
+ */
+export interface TreeDecoration {
+  /** The label's colour, and the badge's, while the row is not the chosen one. */
+  readonly color?: UiColorValue;
+  /** A short mark at the row's end: `M`, `U`, `2`. */
+  readonly badge?: string;
+  /** What the decoration means, said after the label to a screen reader: `modified, 2 errors`. */
+  readonly description?: string;
+}
+
 export interface TreeProps extends ControlLayoutProps {
   /** Receives the node that *is* the tree, for focus and scrolling. */
   ref?: UiNodeRef;
@@ -107,6 +122,12 @@ export interface TreeProps extends ControlLayoutProps {
    * reader says, so it should name the node without it.
    */
   leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;
+  /**
+   * A row's decoration, as it changes: its label's colour, a badge at
+   * its end and what they mean. A file tree's git status and problems
+   * are the case. Null leaves the row as it is.
+   */
+  decoration?: (node: TreeNode) => Observable<TreeDecoration | null>;
   /**
    * Drawn as part of the surface it sits in rather than as a field on
    * it: no border, no background of its own, square corners. A sidebar's
@@ -264,7 +285,13 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
     // style's colour instead: black in a dark theme too, on a dark row.
     // `color` cascades now, but binding it where it is drawn keeps the
     // label right if it ever names a text style of its own.
-    const ink = chosen.pipe(map(on => (on ? 'selectionForeground' : 'controlForeground')));
+    const decoration = inputs.decoration.value?.(row.node);
+    const ink: Observable<UiColorValue> =
+      decoration === undefined
+        ? chosen.pipe(map(on => (on ? 'selectionForeground' : 'controlForeground')))
+        : combineLatest([chosen, decoration]).pipe(
+            map(([on, marks]) => (on ? 'selectionForeground' : (marks?.color ?? 'controlForeground')))
+          );
     return Row(
       {
         modifiers: [CONTROL_INTERACTION],
@@ -278,7 +305,14 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         paddingLeft: 8 + (row.level - 1) * 14,
         disabled: row.node.disabled === true,
         role: 'treeitem',
-        label: row.node.label,
+        label:
+          decoration === undefined
+            ? row.node.label
+            : decoration.pipe(
+                map(marks =>
+                  marks?.description === undefined ? row.node.label : `${row.node.label}, ${marks.description}`
+                )
+              ),
         level: row.level,
         posInSet: row.position + 1,
         setSize: row.siblings,
@@ -317,7 +351,27 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       // siblings' under the branch.
       branch ? chevron(open.pipe(map(on => (on ? CHEVRON_DOWN : CHEVRON_RIGHT))), ink, 14) : Box({ width: 14 }),
       ...(inputs.leading.value === undefined ? [] : [inputs.leading.value(row.node, open)]),
-      Text({ text: row.node.label, fontSize: 13, color: ink, selectable: false, maxLines: 1, textOverflow: 'ellipsis' })
+      Text({
+        text: row.node.label,
+        fontSize: 13,
+        color: ink,
+        selectable: false,
+        maxLines: 1,
+        textOverflow: 'ellipsis',
+        ...(decoration === undefined ? {} : { flex: 1, minWidth: 0 })
+      }),
+      ...(decoration === undefined
+        ? []
+        : [
+            Text({
+              text: decoration.pipe(map(marks => marks?.badge ?? '')),
+              fontSize: 12,
+              color: ink,
+              selectable: false,
+              maxLines: 1,
+              flexShrink: 0
+            })
+          ])
     );
   };
 

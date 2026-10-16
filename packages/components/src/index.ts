@@ -76,7 +76,7 @@ export {
   type PlainViewProps
 } from './PlainView';
 export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';
-export { Tree, type TreeNode, type TreeProps } from './Tree';
+export { Tree, type TreeDecoration, type TreeNode, type TreeProps } from './Tree';
 export {
   Image,
   Video,
