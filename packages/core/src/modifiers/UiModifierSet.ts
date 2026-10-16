@@ -292,6 +292,8 @@ class Host implements UiModifierHost {
   private readonly written = new Set<string>();
   private readonly subscriptions = new Map<string, Subscription>();
   private order = 0;
+  /** The record `write` hands the cascade, allocated on the first write. */
+  private override: { source: symbol; name: string; order: number; value: unknown } | null = null;
   private decorated = false;
   /** Cells this modifier is driving, stopped when it detaches. */
   private readonly animated = new Set<AnimatedCell<unknown>>();
@@ -515,13 +517,14 @@ class Host implements UiModifierHost {
 
   private write(property: string, value: unknown): void {
     this.written.add(property);
-    writeOverrideProperty(
-      this.graph,
-      this.node,
-      property,
-      { source: this.source, name: this.name, order: this.order, value },
-      propertyEffects(property)
-    );
+    // One record reused for every write: the cascade reads it and copies
+    // it when it inserts, and never keeps the record itself.
+    const override = (this.override ??= { source: this.source, name: this.name, order: 0, value: undefined });
+    override.order = this.order;
+    override.value = value;
+    writeOverrideProperty(this.graph, this.node, property, override, propertyEffects(property));
+    // Not left holding the last value written.
+    override.value = undefined;
   }
 
   /**

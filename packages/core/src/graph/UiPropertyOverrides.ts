@@ -68,16 +68,34 @@ export function writeOverrideProperty(
   flags: DirtyFlags
 ): boolean {
   const overrides = overridesFor(node, property);
-  const existing = overrides.entries.find(entry => entry.source === override.source);
+  const entries = overrides.entries;
+  const existing = entries.find(entry => entry.source === override.source);
   if (existing !== undefined) {
     existing.value = override.value;
-    existing.order = override.order;
+    if (existing.order !== override.order) {
+      // Rare (the element reordered its modifiers): a stable sort keeps
+      // equal orders in the position they already had.
+      existing.order = override.order;
+      entries.sort((a, b) => a.order - b.order);
+    }
   } else {
-    warnOnConflict(node, property, overrides.entries, override);
-    overrides.entries.push({ ...override });
+    warnOnConflict(node, property, entries, override);
+    entries.splice(insertionIndex(entries, override.order), 0, { ...override });
   }
-  overrides.entries.sort((a, b) => a.order - b.order);
   return applyEffective(graph, node, property, overrides, flags);
+}
+
+/**
+ * Where a new entry goes in the sorted list: after every entry whose
+ * order is at most its own, which is where a push followed by a stable
+ * sort would have put it.
+ */
+function insertionIndex(entries: readonly UiPropertyOverride[], order: number): number {
+  let index = entries.length;
+  while (index > 0 && entries[index - 1]!.order > order) {
+    index--;
+  }
+  return index;
 }
 
 /** Removes one modifier's write, restoring whatever was under it. */
