@@ -342,8 +342,61 @@ export function spannedRunsFor(
 const PARAGRAPH_CACHE_ENTRIES = 16_384;
 const PARAGRAPH_CACHE_TEXT = 1 << 20;
 
-/** A least-recently-used map of paragraphs, bounded by count and by text; see `PARAGRAPH_CACHE_ENTRIES`. */
+/**
+ * The key length, in UTF-16 code units, from which a paragraph is
+ * remembered apart from the rest; see `ParagraphCache`.
+ */
+const LARGE_PARAGRAPH = 1 << 14;
+
+/**
+ * The paragraph cache: two least-recently-used maps, one for large
+ * paragraphs (a key of `LARGE_PARAGRAPH` code units or more) and one
+ * for the rest, each with the whole budget of `PARAGRAPH_CACHE_ENTRIES`.
+ *
+ * A keystroke in a long field is a new request keyed by its whole
+ * text, and both the layout engine and paint ask for it. In one map a
+ * 100 KB field spent the text budget in about ten keystrokes, and
+ * every label on screen was laid out again on the next frame. Apart,
+ * the field's versions only push out each other's and those of other
+ * long texts, which is what they did among themselves before, and the
+ * labels are not touched. A paragraph's map is chosen by its key, so a
+ * request finds it again without being told which it is.
+ *
+ * Editable text is not singled out instead: the layout engine's
+ * request does not say whether it is for an editable, and paint (the
+ * caret, the selection) asks for the field's paragraph again on every
+ * frame it is drawn, so it does need remembering somewhere. A short
+ * field still shares the map with labels, but one keystroke there
+ * costs at most `LARGE_PARAGRAPH` of a million code units.
+ */
 class ParagraphCache {
+  private readonly small = new ParagraphLru();
+  private readonly large = new ParagraphLru();
+
+  get size(): number {
+    return this.small.size + this.large.size;
+  }
+
+  get(key: string): ParagraphLayout | undefined {
+    return this.mapFor(key).get(key);
+  }
+
+  set(key: string, paragraph: ParagraphLayout, text: number): void {
+    this.mapFor(key).set(key, paragraph, text);
+  }
+
+  clear(): void {
+    this.small.clear();
+    this.large.clear();
+  }
+
+  private mapFor(key: string): ParagraphLru {
+    return key.length >= LARGE_PARAGRAPH ? this.large : this.small;
+  }
+}
+
+/** A least-recently-used map of paragraphs, bounded by count and by text; see `PARAGRAPH_CACHE_ENTRIES`. */
+class ParagraphLru {
   private readonly entries = new Map<string, { paragraph: ParagraphLayout; text: number }>();
   private text = 0;
 

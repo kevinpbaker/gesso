@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { hardLineMemoSize } from './ParagraphLayout';
 import { CharacterCountTextMeasurer, layoutFitsAnyWidth } from './TextMeasurer';
 import type { TextMeasureRequest } from './TextMeasurer';
 
@@ -126,6 +127,46 @@ describe('ParagraphTextMeasurer', () => {
     const first = measurer.layout({ text: huge, fontSize: 10, maxWidth: 400 });
     expect(measurer.cachedParagraphs).toBe(1);
     expect(measurer.layout({ text: huge, fontSize: 10, maxWidth: 400 })).toBe(first);
+  });
+
+  it('keeps a long field being edited from pushing labels out of the cache', () => {
+    const measurer = new CountingMeasurer();
+    // A label that wraps, so only the paragraph cache can answer for it
+    // (one that fits is found in the fits-any-width cache as well).
+    const request = { text: 'Save all of the changes', fontSize: 10, maxWidth: 60 };
+    const label = measurer.layout(request);
+    expect(label.lines.length).toBeGreaterThan(1);
+    const field = 'a word '.repeat(100_000 / 7);
+    // Each keystroke asked for as layout asks (with a width and without)
+    // and as paint does (the box's own width): 120 paragraphs of 100,000
+    // characters, twelve times the text budget.
+    for (let n = 0; n < 40; n++) {
+      const text = `${n} ${field}`;
+      measurer.layout({ text, fontSize: 10, maxWidth: 400 });
+      measurer.layout({ text, fontSize: 10 });
+      measurer.layout({ text, fontSize: 10, maxWidth: 400, exactWidth: true });
+    }
+    const before = measurer.runs;
+    expect(measurer.layout({ ...request })).toBe(label);
+    expect(measurer.runs).toBe(before);
+  });
+
+  it('remembers hard lines by their length as well as their number', () => {
+    const measurer = new CountingMeasurer();
+    // One 100,000-character hard line, edited thirty times: three million
+    // characters of distinct lines.
+    const line = 'a word '.repeat(100_000 / 7);
+    for (let n = 0; n < 30; n++) {
+      measurer.layout({ text: `${n} ${line}\nA short line`, fontSize: 10, maxWidth: 400 });
+    }
+    const memo = hardLineMemoSize(measurer);
+    // The memo's text budget, two million code units.
+    expect(memo.text).toBeLessThanOrEqual(1 << 21);
+    expect(memo.lines).toBeLessThan(30);
+    // The short line, asked for every time, is still remembered.
+    const before = measurer.runs;
+    measurer.layout({ text: 'A short line', fontSize: 10, maxWidth: 400 });
+    expect(measurer.runs).toBe(before);
   });
 
   it('re-breaks only the hard line an edit changed', () => {
