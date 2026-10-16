@@ -1,5 +1,14 @@
 # gesso-core
 
+## 0.6.23
+
+### Patch Changes
+
+- ae5a84e: A flex or grid container placed in the box its measurement already used no longer lays its children out a second time: placement takes the lines (or the tracks and placements) that measurement worked out. A full layout pass of five thousand nodes is about 7% faster.
+- 62e3bd4: A lazy list's scroll no longer slows down as more rows are measured. Row offsets are kept in a Fenwick tree, so finding a row and recording a row's height cost the logarithm of the list's length rather than the number of rows measured so far: 2,000 scroll frames over 100,000 measured rows went from 7 seconds to 38 ms.
+- 2aecc54: A modifier writing a property it already holds no longer sorts the property's overrides or allocates, which an animated modifier did on every frame.
+- 72f7b90, 4b92a02: Typing into a long text field no longer pushes every label's laid-out paragraph out of the cache: paragraphs of 16K characters or more are remembered apart, in a small budget of their own (eight paragraphs, half a million characters). The memo of a paragraph's hard lines is bounded by the length of the text it holds (a million characters) as well as by count, so a long line edited many times keeps about ten versions rather than twenty thousand: 300 edits of a 100 KB field keep 15 MB.
+
 ## 0.6.22
 
 ### Patch Changes

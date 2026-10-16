@@ -1,5 +1,23 @@
 # gesso-components
 
+## 0.6.23
+
+### Patch Changes
+
+- fd6cc5c: Moving the selection or the pointer in a lazy list, data table, tree or combobox now updates the two rows it moved between, not every row on screen.
+- c88eb25: A number input typed past its bound shows the bound, whether the app or the input owns the value. A controlled input used to keep showing what was typed ("39" for a maximum of 3).
+- 87003bd: Video controls stop following a transport when it is replaced and when they unmount. They used to keep listening, piling up listeners and restarting the seek bar's readout for a clip nobody was showing.
+- Updated dependencies [9ce5d36]
+- Updated dependencies [3b6ecc0]
+- Updated dependencies [ae5a84e]
+- Updated dependencies [504fe2c]
+- Updated dependencies [62e3bd4]
+- Updated dependencies [4b92a02]
+- Updated dependencies [2aecc54]
+- Updated dependencies [72f7b90]
+  - gesso-framework@0.6.23
+  - gesso-core@0.6.23
+
 ## 0.6.22
 
 ### Patch Changes

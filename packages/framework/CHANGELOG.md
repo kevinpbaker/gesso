@@ -1,5 +1,19 @@
 # gesso-framework
 
+## 0.6.23
+
+### Patch Changes
+
+- 9ce5d36: Everything one turn of the application thread publishes to a channel now crosses as one message, and the replica tells each view key once per message. A command that moved five view keys used to post five messages and re-render between them.
+- 3b6ecc0: A computed cell no longer allocates a set of its sources on every change.
+- 504fe2c: An input cell handed the value it already holds no longer tells its subscribers, so a component's bindings do not run again for a value that did not change.
+- Updated dependencies [ae5a84e]
+- Updated dependencies [62e3bd4]
+- Updated dependencies [4b92a02]
+- Updated dependencies [2aecc54]
+- Updated dependencies [72f7b90]
+  - gesso-core@0.6.23
+
 ## 0.6.22
 
 ### Patch Changes
