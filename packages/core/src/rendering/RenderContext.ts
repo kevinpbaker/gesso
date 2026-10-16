@@ -14,6 +14,12 @@ import type { UiFrame } from '../scheduler/UiFrame';
  */
 export interface LayoutReader {
   recordFor(node: UiNode): LayoutRecord | undefined;
+  /**
+   * Every `position: 'sticky'` node. A scroll layer reads it to repaint
+   * where a sticky node was and is, since a scroll moves one without
+   * moving its box. A reader without it gets no scroll layers.
+   */
+  allStickyNodes?(): ReadonlySet<UiNode>;
 }
 
 /**

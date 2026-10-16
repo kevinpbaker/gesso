@@ -171,6 +171,14 @@ export interface ScrollLayer {
    * coordinates: what an item added, removed or moved is judged by.
    */
   items: Map<UiNode, ItemBox>;
+  /**
+   * Where each sticky node inside the container was drawn when the
+   * layer was last drawn: its box moved by its own sticky shift and its
+   * sticky ancestors'. A scroll moves a sticky node without moving its
+   * box or dirtying it, so \`items\` cannot see it; the copy carries its
+   * pixels off with the content and leaves them there.
+   */
+  stuck: Map<UiNode, ItemBox>;
 }
 
 /** An item's box in the container's children's coordinates. */
@@ -353,7 +361,8 @@ export class ScrollLayerCache {
       scrollX: snapScroll(rec.scrollX, this.dpr),
       scrollY: snapScroll(rec.scrollY, this.dpr),
       used: true,
-      items: new Map()
+      items: new Map(),
+      stuck: new Map()
     };
     this.layers.set(node, layer);
     this.stats.built++;
@@ -497,6 +506,25 @@ export class ScrollLayerCache {
         boxes.push(was);
       }
     }
+    // Stuck or let go, or scrolled while stuck: wrong where it was drawn
+    // and where it is drawn now.
+    const stuck = stuckIn(container, layout);
+    if (stuck === null) {
+      return 'all';
+    }
+    for (const [node, now] of stuck) {
+      const was = layer.stuck.get(node);
+      if (was === undefined) {
+        boxes.push(now);
+      } else if (!sameBox(was, now)) {
+        boxes.push(was, now);
+      }
+    }
+    for (const [node, was] of layer.stuck) {
+      if (!stuck.has(node)) {
+        boxes.push(was);
+      }
+    }
     const rects: LayerRect[] = [];
     let area = 0;
     for (const box of boxes) {
@@ -519,6 +547,7 @@ export class ScrollLayerCache {
         layer.items.set(item, box);
       }
     }
+    layer.stuck = stuckIn(container, layout) ?? new Map();
   }
 
   /** An item's box in the layer's pixels, widened for what paints past it, or null off the layer. */
@@ -631,6 +660,44 @@ function itemHolding(container: UiNode, node: UiNode): UiNode | null {
     }
   }
   return null;
+}
+
+/**
+ * Where each sticky node inside a container is drawn, in the
+ * container's children's coordinates: its box moved by its own shift
+ * and by every sticky ancestor's up to the container. Null when the
+ * reader cannot say which nodes are sticky, which no layer can survive.
+ */
+function stuckIn(container: UiNode, layout: LayoutReader): Map<UiNode, ItemBox> | null {
+  const sticky = layout.allStickyNodes?.();
+  if (sticky === undefined) {
+    return null;
+  }
+  const drawn = new Map<UiNode, ItemBox>();
+  for (const node of sticky) {
+    const rec = layout.recordFor(node);
+    if (rec === undefined) {
+      continue;
+    }
+    let x = rec.x + rec.stickyOffsetX;
+    let y = rec.y + rec.stickyOffsetY;
+    let inside = false;
+    for (let current = node.parent; current !== null; current = current.parent) {
+      if (current === container) {
+        inside = true;
+        break;
+      }
+      const above = layout.recordFor(current);
+      if (above !== undefined) {
+        x += above.stickyOffsetX;
+        y += above.stickyOffsetY;
+      }
+    }
+    if (inside) {
+      drawn.set(node, { x, y, width: rec.width, height: rec.height });
+    }
+  }
+  return drawn;
 }
 
 function sameBox(a: ItemBox, b: ItemBox): boolean {

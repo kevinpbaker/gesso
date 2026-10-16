@@ -580,6 +580,15 @@ export class LayoutEngine {
   }
 
   /**
+   * Every `position: 'sticky'` node in the tree. A sticky node moves
+   * with a scroll without its box moving, so a renderer keeping a
+   * scroll container's pixels has to be told where they are.
+   */
+  allStickyNodes(): ReadonlySet<UiNode> {
+    return this.stickyNodes;
+  }
+
+  /**
    * A box around everything in a node's subtree that could take a
    * point, so a hit test can pass the subtree over instead of
    * descending into it. Undefined for a node with no record, and
