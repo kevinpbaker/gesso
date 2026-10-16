@@ -79,9 +79,17 @@ export class InputCell<T> extends BehaviorSubject<T> {
    * So a cell remembers being read while a body ran, and if it later
    * changes with nobody subscribed to it, it says so once. A cell that
    * something is following is fine: the follower carries the change.
+   *
+   * The value it already holds is not a change, and tells nobody: values
+   * that cross into a component are treated as immutable, so the same
+   * reference is the same value.
    */
   override next(value: T): void {
-    if (this.snapshotBy !== null && !this.warnedStale && !this.observed && !Object.is(value, super.getValue())) {
+    // `getValue` throws for a cell that has errored; `next` there is a no-op either way.
+    if (!this.hasError && Object.is(value, super.getValue())) {
+      return;
+    }
+    if (this.snapshotBy !== null && !this.warnedStale && !this.observed) {
       this.warnedStale = true;
       warnStaleRead(this.snapshotBy, this.label, super.getValue(), value);
     }
