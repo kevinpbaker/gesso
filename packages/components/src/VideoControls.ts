@@ -164,13 +164,27 @@ export function followTransport(ctx: ComponentContext, transport: Observable<Vid
     });
   };
 
-  transport.subscribe(next => {
+  // The listener is let go when the transport is replaced and when the
+  // component leaves, or a clip that outlived either would go on
+  // resyncing a readout nobody draws and restarting its tween.
+  let release: (() => void) | null = null;
+  const detach = (): void => {
+    release?.();
+    release = null;
+  };
+  ctx.effect(transport, next => {
+    detach();
     current = next;
     if (next === null) {
       return;
     }
-    next.onChange(resync);
+    release = next.onChange(resync);
     resync();
+  });
+  ctx.onUnmount(() => {
+    detach();
+    current = null;
+    animations.stop(readout.position);
   });
 
   return readout;
