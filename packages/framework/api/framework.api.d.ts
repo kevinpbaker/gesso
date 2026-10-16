@@ -548,6 +548,9 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private readonly equal;
   private readonly changes;
   private sources;
+  private collecting;
+  private sourcesChanged;
+  private recomputing;
   private cached;
   private hasValue;
   private upstream;
@@ -3941,12 +3944,16 @@ declare class ProvidedChannel {
   private readonly subscriptions;
   private readonly previous;
   private readonly checked;
+  private pending;
+  private flushQueued;
   private synced;
   constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
   private receive;
   private runCommand;
   private sync;
   private publish;
+  private readonly flushPending;
+  private sendPending;
   private resend;
   private post;
   dispose(): void;
