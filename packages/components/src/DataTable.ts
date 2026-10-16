@@ -15,8 +15,7 @@ import {
   fr,
   type UiTrackSize,
   measureFlow,
-  type LayoutBox,
-  type UiSemanticState
+  type LayoutBox
 } from 'gesso-core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
@@ -29,6 +28,7 @@ import {
   type ControlLayoutProps,
   modifiersOf
 } from './internals';
+import { movedBetween, NO_STATES, rowCells, SELECTED_STATES } from './rowCells';
 import { stepIndex, virtualList } from './virtual';
 
 /**
@@ -224,11 +224,19 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
     ...columns.map(column => headerCell(column, sort.value, () => toggleSort(column)))
   );
 
+  // Keyed by the row's own index, which is what the selection holds, so
+  // a move tells the two rows it moved between and no others.
+  const isSelected = rowCells(selected.value, (current: number, rowIndex) => current === rowIndex, {
+    initial: false,
+    changed: movedBetween,
+    label: 'DataTable.selected'
+  });
+
   const row = (position: number): UiElement => {
     const { order } = view();
     const rowIndex = order[position];
     const data = inputs.rows.value[rowIndex];
-    const chosen = selected.value.pipe(map(current => current === rowIndex));
+    const chosen = isSelected(rowIndex);
     // Handed to every cell rather than set on the row, which would reach
     // no text: see `DataColumn.cell`.
     const color = chosen.pipe(map((on): UiColorValue => (on ? 'selectionForeground' : 'controlForeground')));
@@ -239,7 +247,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
         role: 'row',
         posInSet: position + 1,
         setSize: count,
-        states: chosen.pipe(map(on => (on ? (['selected'] as UiSemanticState[]) : []))),
+        states: chosen.pipe(map(on => (on ? SELECTED_STATES : NO_STATES))),
         backgroundColor: chosen.pipe(map(on => (on ? 'selectionBackground' : 'transparent'))),
         onClick: () => choose(position)
       },

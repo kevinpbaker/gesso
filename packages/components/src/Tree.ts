@@ -25,7 +25,18 @@ import {
   type ControlLayoutProps,
   modifiersOf
 } from './internals';
+import { movedBetween, NO_STATES, rowCells, SELECTED_STATES } from './rowCells';
 import { stepIndex, virtualList } from './virtual';
+
+/**
+ * A branch row's `states`, by open and then by chosen, shared for the
+ * reason `SELECTED_STATES` is: a row whose states did not change hands
+ * the graph the same array, and the write ends at its equality test.
+ */
+const BRANCH_STATES: readonly (readonly (readonly UiSemanticState[])[])[] = [
+  [['collapsed'], ['collapsed', 'selected']],
+  [['expanded'], ['expanded', 'selected']]
+];
 
 /**
  * A tree, rendered as the flat list it has to be to be virtualized.
@@ -232,12 +243,20 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
     }
   };
 
+  // Keyed by the node's key, which is what the selection holds, so a
+  // move tells the two rows it moved between and no others.
+  const isSelected = rowCells(selected.value, (current: string | null, key) => current === key, {
+    initial: false,
+    changed: movedBetween,
+    label: 'Tree.selected'
+  });
+
   const item = (index: number): UiChild => {
     const row = rows()[index];
     if (row === undefined) {
       return Row();
     }
-    const chosen = selected.value.pipe(map(current => current === row.node.key));
+    const chosen = isSelected(row.node.key);
     const open = expanded.value.pipe(map(keys => keys.includes(row.node.key)));
     const branch = hasChildren(row.node);
     // Bound on the text rather than on the row. A row's colour once
@@ -263,18 +282,11 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         level: row.level,
         posInSet: row.position + 1,
         setSize: row.siblings,
-        states: combineLatest([chosen, open]).pipe(
-          map(([isChosen, isOpen]) => {
-            const states: UiSemanticState[] = [];
-            if (branch) {
-              states.push(isOpen ? 'expanded' : 'collapsed');
-            }
-            if (isChosen) {
-              states.push('selected');
-            }
-            return states;
-          })
-        ),
+        states: branch
+          ? combineLatest([chosen, open]).pipe(
+              map(([isChosen, isOpen]) => BRANCH_STATES[isOpen ? 1 : 0][isChosen ? 1 : 0])
+            )
+          : chosen.pipe(map(isChosen => (isChosen ? SELECTED_STATES : NO_STATES))),
         backgroundColor: chosen.pipe(map(on => (on ? 'selectionBackground' : 'transparent'))),
         onClick: () => {
           choose(index);

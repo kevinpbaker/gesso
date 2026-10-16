@@ -36,6 +36,7 @@ import {
   modifiersOf
 } from './internals';
 import { useOverlay } from './overlay';
+import { movedBetween, NO_STATES, rowCells, SELECTED_STATES } from './rowCells';
 
 export interface ComboboxOption {
   readonly value: string;
@@ -272,6 +273,23 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
     }
   });
 
+  // Each option row is told only when the highlight or the choice moves
+  // onto or off it: keyed by the index the highlight holds and by the
+  // value the choice holds.
+  const isActive = rowCells(active, (at: number, index) => at === index, {
+    initial: false,
+    changed: movedBetween,
+    label: 'Combobox.active'
+  });
+  const isChosen = rowCells(chosen, (values: readonly string[], value) => values.includes(value as string), {
+    initial: false,
+    changed: (next, previous) =>
+      previous === undefined
+        ? undefined
+        : [...next.filter(value => !previous.includes(value)), ...previous.filter(value => !next.includes(value))],
+    label: 'Combobox.chosen'
+  });
+
   const choose = (option: ComboboxOption): void => {
     if (option.disabled === true) {
       return;
@@ -345,16 +363,24 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
             options.length === 0
               ? [Text({ key: '∅', text: nothing, color: 'textMuted', padding: 8, selectable: false })]
               : options.map((option, index) =>
-                  optionRow(option, index, options.length, active, chosen, choose, (value, node) => {
-                    if (node === null) {
-                      if (rows.get(value) !== undefined) {
-                        rows.delete(value);
+                  optionRow(
+                    option,
+                    index,
+                    options.length,
+                    isActive(index),
+                    isChosen(option.value),
+                    choose,
+                    (value, node) => {
+                      if (node === null) {
+                        if (rows.get(value) !== undefined) {
+                          rows.delete(value);
+                        }
+                      } else {
+                        rows.set(value, node);
                       }
-                    } else {
-                      rows.set(value, node);
+                      rowsChanged.next(rowsChanged.value + 1);
                     }
-                    rowsChanged.next(rowsChanged.value + 1);
-                  })
+                  )
                 )
           )
         )
@@ -564,12 +590,11 @@ function optionRow(
   option: ComboboxOption,
   index: number,
   total: number,
-  active: Observable<number>,
-  chosen: Observable<readonly string[]>,
+  active: Observable<boolean>,
+  selected: Observable<boolean>,
   choose: (option: ComboboxOption) => void,
   track: (value: string, node: UiNode | null) => void
 ): UiElement {
-  const selected = chosen.pipe(map(values => values.includes(option.value)));
   const foreground = option.disabled === true ? 'controlForegroundDisabled' : 'controlForeground';
   return Row(
     {
@@ -581,11 +606,11 @@ function optionRow(
       y: 'center',
       borderRadius: 4,
       disabled: option.disabled === true,
-      backgroundColor: active.pipe(map(at => (at === index ? 'controlBackgroundHovered' : 'transparent'))),
+      backgroundColor: active.pipe(map(on => (on ? 'controlBackgroundHovered' : 'transparent'))),
       role: 'option',
       label: option.label,
       description: option.detail,
-      states: selected.pipe(map(on => (on ? (['selected'] as UiSemanticState[]) : []))),
+      states: selected.pipe(map(on => (on ? SELECTED_STATES : NO_STATES))),
       posInSet: index + 1,
       setSize: total,
       onClick: () => choose(option)
