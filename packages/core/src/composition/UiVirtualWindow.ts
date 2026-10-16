@@ -135,10 +135,10 @@ export const VIRTUAL_WINDOW_PROP = 'virtualWindow';
  * rest is two spacer boxes whose extents come from an estimate per item,
  * corrected by the real extent of every item that has been measured, so
  * the total extent (and the scrollbar) settle toward the truth as the
- * user scrolls. Corrections are sparse — one entry per measured item
- * whose extent differs from the estimate — so a 100k-row list costs
- * memory proportional to what was seen, and offsets are estimate ×
- * index plus the corrections before that index.
+ * user scrolls. Offsets are estimate × index plus the corrections
+ * before that index, which a Fenwick tree sums in log time — so a frame
+ * costs the same after scrolling through 100k measured rows as before
+ * the first one was seen.
  *
  * Children are emitted through a BehaviorSubject and reconciled by the
  * graph builder like any observable child: item identity is the key,
@@ -169,8 +169,8 @@ export class UiVirtualWindow {
   private leadExtent = -1;
   private trailExtent = -1;
   private readonly measured = new Map<number, number>();
-  /** Sorted by index: measured extent minus the estimate. */
-  private corrections: Array<{ index: number; delta: number }> = [];
+  /** Measured extent minus the estimate, per index; zero for one not measured. */
+  private readonly corrections: CorrectionTree;
   /** Wrappers of the items currently mounted, so a row that stays is not re-rendered. */
   private readonly mountedItems = new Map<number, UiElement>();
   /**
@@ -194,6 +194,7 @@ export class UiVirtualWindow {
     this.axis = axis;
     this.count = count;
     this.estimate = options.estimatedExtent;
+    this.corrections = new CorrectionTree(count);
     this.overscan = options.overscan ?? 3;
     this.recycle = options.recycle === true;
     this.keyOf = options.key ?? (index => index);
@@ -230,12 +231,13 @@ export class UiVirtualWindow {
       return;
     }
     this.count = count;
-    for (const index of this.measured.keys()) {
+    for (const [index, extent] of this.measured) {
       if (index >= count) {
         this.measured.delete(index);
+        this.corrections.add(index, this.estimate - extent);
       }
     }
-    this.corrections = this.corrections.filter(correction => correction.index < count);
+    this.corrections.resize(count, this.measured, this.estimate);
     this.mountedItems.clear();
     this.refresh();
   }
@@ -250,7 +252,7 @@ export class UiVirtualWindow {
    */
   invalidate(): void {
     this.measured.clear();
-    this.corrections = [];
+    this.corrections.clear();
     this.mountedItems.clear();
     this.refresh();
   }
@@ -262,14 +264,9 @@ export class UiVirtualWindow {
 
   /** Offset of an item's leading edge from the start of the content. */
   offsetOf(index: number): number {
-    let offset = index * this.estimate;
-    for (const correction of this.corrections) {
-      if (correction.index >= index) {
-        break;
-      }
-      offset += correction.delta;
-    }
-    return offset;
+    // The corrections before an index are those of the list's indices
+    // below it, so one past either end, or between two, is rounded into it.
+    return index * this.estimate + this.corrections.before(clamp(Math.ceil(index), 0, this.count));
   }
 
   totalExtent(): number {
@@ -285,17 +282,7 @@ export class UiVirtualWindow {
     if (this.count === 0) {
       return 0;
     }
-    let low = 0;
-    let high = this.count - 1;
-    while (low < high) {
-      const mid = (low + high + 1) >> 1;
-      if (this.offsetOf(mid) <= offset) {
-        low = mid;
-      } else {
-        high = mid - 1;
-      }
-    }
-    return low;
+    return Math.min(this.count - 1, this.corrections.lastAtOrBefore(offset, this.estimate));
   }
 
   /**
@@ -402,25 +389,12 @@ export class UiVirtualWindow {
     if (index < 0 || index >= this.count || !(extent >= 0)) {
       return;
     }
-    if (this.measured.get(index) === extent) {
+    const previous = this.measured.get(index);
+    if (previous === extent) {
       return;
     }
     this.measured.set(index, extent);
-    const delta = extent - this.estimate;
-    let position = 0;
-    while (position < this.corrections.length && this.corrections[position].index < index) {
-      position++;
-    }
-    const existing = this.corrections[position];
-    if (existing !== undefined && existing.index === index) {
-      if (delta === 0) {
-        this.corrections.splice(position, 1);
-      } else {
-        existing.delta = delta;
-      }
-    } else if (delta !== 0) {
-      this.corrections.splice(position, 0, { index, delta });
-    }
+    this.corrections.add(index, extent - (previous ?? this.estimate));
   }
 
   private buildChildren(): UiElement[] {
@@ -523,6 +497,117 @@ function markRow(row: UiChild, props: Record<string, unknown>, subject: string):
     throw new Error(`${subject} a lazy grid must be a Grid with subgrid: 'columns', so its cells share the tracks.`);
   }
   return { ...row, props: { ...row.props, ...props } };
+}
+
+/**
+ * The corrections behind a window's offsets, as a Fenwick tree.
+ *
+ * They were a sorted array once, walked from the start for every
+ * offset. That was cheap while few rows were measured, but every row
+ * scrolled past is measured, and the binary search for the row at the
+ * top of the viewport asks for an offset at every step — so a frame
+ * after scrolling through 10k rows of text walked tens of thousands of
+ * corrections a few times over. The tree answers "the corrections
+ * before this index" and "the last index at or before this offset" in
+ * log time whatever has been measured.
+ *
+ * It is sized to a power of two at least the count and holds zero past
+ * the count, so a list that grows within it moves nothing; one that
+ * outgrows it, or shrinks to a quarter of it, is rebuilt from what was
+ * measured. Both queries add the same nodes in the same order, so an
+ * index `lastAtOrBefore` returns has exactly the offset `before` gives
+ * it, not one an ulp away.
+ */
+class CorrectionTree {
+  /** One-based: node `i` sums the corrections of indices `i - (i & -i)` up to `i - 1`. */
+  private tree: Float64Array;
+  /** The largest power of two that fits, where a descent starts. */
+  private top: number;
+
+  constructor(count: number) {
+    this.tree = new Float64Array(capacityFor(count) + 1);
+    this.top = this.tree.length - 1;
+  }
+
+  /** Adds `delta` to the correction at `index`. */
+  add(index: number, delta: number): void {
+    const size = this.tree.length - 1;
+    for (let node = index + 1; node <= size; node += node & -node) {
+      this.tree[node] += delta;
+    }
+  }
+
+  /** Sum of the corrections of every index below `index`. */
+  before(index: number): number {
+    let sum = 0;
+    let node = 0;
+    for (let step = this.top; step > 0; step >>= 1) {
+      if ((index & step) !== 0) {
+        node += step;
+        sum += this.tree[node];
+      }
+    }
+    return sum;
+  }
+
+  /**
+   * The last index whose offset — `index × estimate` plus the
+   * corrections before it — is at or before `offset`; zero when none
+   * is. Offsets never decrease along the list, since no extent is
+   * negative, so one descent from the top of the tree finds it. The
+   * answer may be past the count; the caller clamps it.
+   */
+  lastAtOrBefore(offset: number, estimate: number): number {
+    let sum = 0;
+    let node = 0;
+    for (let step = this.top; step > 0; step >>= 1) {
+      const next = node + step;
+      const candidate = sum + this.tree[next];
+      if (next * estimate + candidate <= offset) {
+        node = next;
+        sum = candidate;
+      }
+    }
+    return node;
+  }
+
+  /**
+   * Fits the tree to a new count, once the measurements past it are
+   * gone. Within the capacity nothing moves; outside it the tree is
+   * rebuilt from the measurements left.
+   */
+  resize(count: number, measured: ReadonlyMap<number, number>, estimate: number): void {
+    const capacity = capacityFor(count);
+    const size = this.tree.length - 1;
+    if (capacity <= size && capacity * 4 > size) {
+      return;
+    }
+    this.tree = new Float64Array(capacity + 1);
+    this.top = capacity;
+    for (const [index, extent] of measured) {
+      this.tree[index + 1] = extent - estimate;
+    }
+    // The linear build: each node hands its sum to the one that covers it.
+    for (let node = 1; node <= capacity; node++) {
+      const parent = node + (node & -node);
+      if (parent <= capacity) {
+        this.tree[parent] += this.tree[node];
+      }
+    }
+  }
+
+  clear(): void {
+    this.tree.fill(0);
+  }
+}
+
+/** A power of two at least `count`, and at least one. */
+function capacityFor(count: number): number {
+  let capacity = 1;
+  while (capacity < count) {
+    capacity *= 2;
+  }
+  return capacity;
 }
 
 function clamp(value: number, min: number, max: number): number {
