@@ -225,3 +225,144 @@ describe('UiVirtualWindow recycling', () => {
     expect(keys(window)[mounted(window).indexOf(12)]).toBe(slotOf12);
   });
 });
+
+/**
+ * The window's offsets against the plainest model of them: a sum, from
+ * the start, of every item's measured extent or the estimate. The
+ * window keeps its corrections in a tree, which is only right if every
+ * path that changes them — a measurement, a count that grows past the
+ * tree or shrinks under it, an invalidation — leaves the same sums.
+ */
+describe('UiVirtualWindow offsets against a reference', () => {
+  /** Mulberry32: the sequence is the same on every run, so a failure can be replayed. */
+  function random(seed: number): () => number {
+    let state = seed;
+    return () => {
+      state = (state + 0x6d2b79f5) | 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  class Reference {
+    readonly measured = new Map<number, number>();
+    constructor(
+      public count: number,
+      readonly estimate: number
+    ) {}
+
+    record(index: number, extent: number): void {
+      if (index >= 0 && index < this.count && extent >= 0) {
+        this.measured.set(index, extent);
+      }
+    }
+
+    setCount(count: number): void {
+      this.count = count;
+      for (const index of this.measured.keys()) {
+        if (index >= count) {
+          this.measured.delete(index);
+        }
+      }
+    }
+
+    offsetOf(index: number): number {
+      let offset = 0;
+      for (let item = 0; item < index; item++) {
+        offset += item < this.count ? (this.measured.get(item) ?? this.estimate) : this.estimate;
+      }
+      return offset;
+    }
+
+    indexAt(offset: number): number {
+      let found = 0;
+      let edge = 0;
+      for (let index = 0; index < this.count; index++) {
+        if (edge <= offset) {
+          found = index;
+        }
+        edge += this.measured.get(index) ?? this.estimate;
+      }
+      return found;
+    }
+  }
+
+  it('agrees on every offset and every index through measurements, count changes and invalidations', () => {
+    const next = random(7);
+    const pick = (below: number): number => Math.floor(next() * below);
+    const estimate = 20;
+    const window = new UiVirtualWindow('column', { count: 50, estimatedExtent: estimate, overscan: 2 }, () =>
+      Text({ text: 'row' })
+    );
+    const reference = new Reference(50, estimate);
+
+    for (let step = 0; step < 400; step++) {
+      const roll = next();
+      if (roll < 0.1) {
+        // Grows past the tree as often as it stays inside it, and shrinks to nothing now and then.
+        const count = next() < 0.15 ? 0 : pick(300);
+        window.setCount(count);
+        reference.setCount(count);
+      } else if (roll < 0.13) {
+        window.invalidate();
+        reference.measured.clear();
+      } else {
+        // Whole and half pixels, zero among them so offsets tie, and a
+        // few the window must ignore: past the end, before the start, negative.
+        const measures = Array.from({ length: 1 + pick(40) }, () => ({
+          index: pick(reference.count + 5) - 2,
+          extent: next() < 0.05 ? -1 : next() < 0.1 ? 0 : pick(120) / 2
+        }));
+        window.update({ scroll: pick(reference.offsetOf(reference.count) + 1), extent: 200 }, measures);
+        for (const measure of measures) {
+          reference.record(measure.index, measure.extent);
+        }
+      }
+
+      const total = reference.offsetOf(reference.count);
+      expect(window.totalExtent()).toBe(total);
+      let edge = 0;
+      for (let index = 0; index <= reference.count; index++) {
+        expect(window.offsetOf(index)).toBe(edge);
+        edge += reference.measured.get(index) ?? estimate;
+      }
+      for (let probe = 0; probe < 20; probe++) {
+        const offset = next() * (total + 100) - 50;
+        expect(window.indexAt(offset)).toBe(reference.indexAt(offset));
+      }
+      // Exactly on an item's edge, where the search has to pick the last of any that tie.
+      const onEdge = reference.offsetOf(pick(reference.count + 1));
+      expect(window.indexAt(onEdge)).toBe(reference.indexAt(onEdge));
+    }
+  });
+
+  it('forgets what was measured past a shorter count when the list grows back', () => {
+    const window = new UiVirtualWindow('column', { count: 100, estimatedExtent: 20, overscan: 0 }, () =>
+      Text({ text: 'row' })
+    );
+    window.update(
+      { scroll: 0, extent: 100 },
+      Array.from({ length: 10 }, (_, item) => ({ index: 90 + item, extent: 50 }))
+    );
+    expect(window.totalExtent()).toBe(100 * 20 + 10 * 30);
+    window.setCount(60);
+    window.setCount(100);
+    expect(window.totalExtent()).toBe(100 * 20);
+    expect(window.offsetOf(95)).toBe(95 * 20);
+  });
+
+  it('counts the corrections below an index outside the list or between two', () => {
+    const window = new UiVirtualWindow('column', { count: 4, estimatedExtent: 20, overscan: 0 }, () =>
+      Text({ text: 'row' })
+    );
+    window.update({ scroll: 0, extent: 100 }, [
+      { index: 0, extent: 50 },
+      { index: 3, extent: 10 }
+    ]);
+    expect(window.offsetOf(-2)).toBe(-40);
+    expect(window.offsetOf(0.5)).toBe(10 + 30);
+    expect(window.offsetOf(4)).toBe(50 + 20 + 20 + 10);
+    expect(window.offsetOf(6)).toBe(6 * 20 + 30 - 10);
+  });
+});
