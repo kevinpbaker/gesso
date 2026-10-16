@@ -100,7 +100,13 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
     text.next(event.value);
     const parsed = Number(event.value);
     if (event.value.trim() !== '' && Number.isFinite(parsed)) {
-      value.change(clamp(parsed, min.value, max.value, step.value));
+      const bounded = clamp(parsed, min.value, max.value, step.value);
+      // Typed past a bound, the field shows the bound. The value may not
+      // move (it is often already there), so this cannot wait for it to.
+      if (bounded !== parsed) {
+        text.next(String(bounded));
+      }
+      value.change(bounded);
     }
   };
 
