@@ -24,7 +24,7 @@ import { FlexDirection, parseFlexDirection } from './FlexDirection';
 import { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
 import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 import { LayoutRecord } from './LayoutRecord';
-import type { TextMemo } from './LayoutRecord';
+import type { ArrangementMemo, TextMemo } from './LayoutRecord';
 import { scrollLeaderOf, scrollRange } from './Scrollbars';
 import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
@@ -303,6 +303,36 @@ interface FlexConfig {
   alignContent: AlignContent;
   paddingMainStart: number;
   paddingCrossStart: number;
+}
+
+/** What `layoutGrid` works out: both axes' tracks, and where each item sits in them. */
+interface GridResult {
+  columns: GridTrackSizingResult;
+  rows: GridTrackSizingResult;
+  placements: GridPlacement<UiNode>[];
+}
+
+/**
+ * A flex container's lines as its measurement left them: flexed,
+ * measured at their final main sizes, each with its cross size and the
+ * free space its resolution left (`FlexLine.free`). See
+ * `LayoutRecord.arrangement`.
+ */
+interface FlexArrangement extends ArrangementMemo {
+  readonly kind: 'flex';
+  readonly lines: FlexLine[];
+}
+
+/** A grid's tracks and placements as its measurement sized them; see `LayoutRecord.arrangement`. */
+interface GridArrangement extends ArrangementMemo {
+  readonly kind: 'grid';
+  /**
+   * The parent's tracks a subgrid was laid out in. `publishSubgridTracks`
+   * writes a new array whenever they move, so the same array is the
+   * same tracks.
+   */
+  readonly subgridColumns: number[] | undefined;
+  readonly grid: GridResult;
 }
 
 /**
@@ -1659,12 +1689,23 @@ export class LayoutEngine {
   private measureGrid(node: UiNode, rec: LayoutRecord, content: Constraints): Size {
     const paddingH = rec.paddingLeft + rec.paddingRight;
     const paddingV = rec.paddingTop + rec.paddingBottom;
-    const grid = this.layoutGrid(
-      node,
-      content,
-      this.definiteAxis(content, 'width'),
-      this.definiteAxis(content, 'height')
-    );
+    const availableWidth = this.definiteAxis(content, 'width');
+    const availableHeight = this.definiteAxis(content, 'height');
+    const grid = this.layoutGrid(node, content, availableWidth, availableHeight);
+    // Placement sizes the tracks against a definite box, so only a
+    // measurement that had one can have done its work for it.
+    let arrangement: GridArrangement | null = null;
+    if (availableWidth !== undefined && availableHeight !== undefined) {
+      arrangement = {
+        kind: 'grid',
+        pass: this.layoutPass,
+        content,
+        contentMatters: rec.contentMatters,
+        subgridColumns: rec.subgridColumns,
+        grid
+      };
+    }
+    rec.arrangement = arrangement;
     rec.minContentWidth = paddingH + grid.columns.minTotal;
     const first = grid.placements[0];
     if (first !== undefined) {
@@ -1686,7 +1727,11 @@ export class LayoutEngine {
     const contentHeight = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
     // The box is final: tracks are sized against it, percentages resolve.
     const content = new Constraints(contentWidth, contentWidth, contentHeight, contentHeight);
-    const grid = this.layoutGrid(node, content, contentWidth, contentHeight);
+    const kept = this.takeArrangement(rec, 'grid', content) as GridArrangement | null;
+    const grid =
+      kept !== null && kept.subgridColumns === rec.subgridColumns
+        ? kept.grid
+        : this.layoutGrid(node, content, contentWidth, contentHeight);
     const gridX = parseCrossAxisAlignment(node.properties.get('x')) ?? CrossAxisAlignment.Stretch;
     const gridY = parseCrossAxisAlignment(node.properties.get('y')) ?? CrossAxisAlignment.Stretch;
     // Under rtl the first column line is the right edge. The tracks are
@@ -1739,7 +1784,7 @@ export class LayoutEngine {
     content: Constraints,
     availableWidth: number | undefined,
     availableHeight: number | undefined
-  ): { columns: GridTrackSizingResult; rows: GridTrackSizingResult; placements: GridPlacement<UiNode>[] } {
+  ): GridResult {
     const columnsProp = this.trackList(node, 'columns');
     const rowsProp = this.trackList(node, 'rows');
     const autoColumns = this.trackSize(node, 'autoColumns');
@@ -2022,6 +2067,46 @@ export class LayoutEngine {
     );
   }
 
+  /**
+   * The arrangement a container's measurement kept, when placing it in
+   * `content` would work out the same one again; null otherwise.
+   * Cleared from the record either way, so it is used at most once:
+   * placement shares auto margins out and stretches items in the lines
+   * it is handed, and a second placement in the same pass (a relayout
+   * root inside one already laid out) must start from fresh ones.
+   *
+   * What it is checked against is everything the work reads that is
+   * not fixed for the length of a pass. The pass number stands for the
+   * tree and every property in it, which a pass never changes, and so
+   * for the children, their order and the container's own settings.
+   * The content box is the constraints the children were measured
+   * under and the base their percentages resolved against. The
+   * container's `contentMatters` decided its items' flags, and a parent
+   * can change it between the two (`clearBoundaries`). The children's
+   * records need no check: only this container measures them, so they
+   * are still as its last run left them, which is the run kept. (A
+   * subgrid's cells are the exception, measured unbounded by the grid
+   * around it as well, but `placeGrid` measures each item again before
+   * it reads anything off its record.)
+   */
+  private takeArrangement(
+    rec: LayoutRecord,
+    kind: ArrangementMemo['kind'],
+    content: Constraints
+  ): ArrangementMemo | null {
+    const kept = rec.arrangement;
+    if (kept === null) {
+      return null;
+    }
+    rec.arrangement = null;
+    return kept.kind === kind &&
+      kept.pass === this.layoutPass &&
+      kept.contentMatters === rec.contentMatters &&
+      constraintsEqual(kept.content, content)
+      ? kept
+      : null;
+  }
+
   private measureFlex(node: UiNode, rec: LayoutRecord, content: Constraints, direction: FlexDirection): Size {
     const row = direction === FlexDirection.Row;
     const paddingMain = row ? rec.paddingLeft + rec.paddingRight : rec.paddingTop + rec.paddingBottom;
@@ -2035,6 +2120,9 @@ export class LayoutEngine {
       ? isFinite(content.maxHeight) && content.minHeight === content.maxHeight
       : isFinite(content.maxWidth) && content.minWidth === content.maxWidth;
 
+    // Cleared first: whatever happens below, the last arrangement kept
+    // must be this run's, the one the children were last measured by.
+    rec.arrangement = null;
     const items = this.collectFlexItems(node, content, direction, config, crossDefinite && !config.wrap);
     if (items.length === 0) {
       rec.minContentWidth = rec.paddingLeft + rec.paddingRight;
@@ -2068,7 +2156,7 @@ export class LayoutEngine {
       const lineTotal = this.lineOuterMain(line, config.gapMain, 'hypothetical');
       const lineWanted = this.lineMaxContentMain(line, config.gapMain);
       if (mainBounded && (mainDefinite || lineTotal > mainMax || lineWanted > mainMax)) {
-        this.resolveLine(line, mainMax - config.gapMain * (line.items.length - 1), config);
+        line.free = this.resolveLine(line, mainMax - config.gapMain * (line.items.length - 1), config);
         this.measureFlexedItems(
           line.items,
           content,
@@ -2094,6 +2182,21 @@ export class LayoutEngine {
       contentCross += line.cross;
     }
     contentCross += config.gapLine * (lines.length - 1);
+
+    // A box definite on both axes is what placement will lay the items
+    // out in, if this measurement's size is the one the container gets:
+    // its lines are then exactly what `placeFlex` would flex again,
+    // and it takes them instead.
+    if (mainDefinite && crossDefinite) {
+      const arrangement: FlexArrangement = {
+        kind: 'flex',
+        pass: this.layoutPass,
+        content,
+        contentMatters: rec.contentMatters,
+        lines
+      };
+      rec.arrangement = arrangement;
+    }
 
     this.setFlexBaseline(rec, lines[0].items, row);
     rec.minContentWidth = this.flexMinContentWidth(rec, items, row, config);
@@ -3845,20 +3948,33 @@ export class LayoutEngine {
     const content = row
       ? new Constraints(contentMain, contentMain, contentCross, contentCross)
       : new Constraints(contentCross, contentCross, contentMain, contentMain);
-    const items = this.collectFlexItems(node, content, direction, config, !config.wrap);
-    if (items.length === 0) {
-      return;
-    }
-    const lines = this.breakLines(items, config, contentMain);
+    const kept = this.takeArrangement(rec, 'flex', content) as FlexArrangement | null;
+    let lines: FlexLine[];
+    if (kept !== null) {
+      // Measured in this very box: the lines are flexed, their items
+      // measured at their final main sizes and their cross sizes known,
+      // all from the same inputs the steps below would read. Only the
+      // auto margins are left, which measurement does not share out.
+      lines = kept.lines;
+      for (const line of lines) {
+        this.distributeAutoMargins(line);
+      }
+    } else {
+      const items = this.collectFlexItems(node, content, direction, config, !config.wrap);
+      if (items.length === 0) {
+        return;
+      }
+      lines = this.breakLines(items, config, contentMain);
 
-    // Main axis, per line: flex, let auto margins take what is left,
-    // then measure items at their final main size so cross sizes that
-    // depend on it — wrapped text — are right before boxes are assigned.
-    for (const line of lines) {
-      line.free = this.resolveLine(line, contentMain - config.gapMain * (line.items.length - 1), config);
-      this.distributeAutoMargins(line);
-      this.measureFlexedItems(line.items, content, direction, config.wrap ? undefined : contentCross);
-      line.cross = this.flexLineCross(line.items, row);
+      // Main axis, per line: flex, let auto margins take what is left,
+      // then measure items at their final main size so cross sizes that
+      // depend on it — wrapped text — are right before boxes are assigned.
+      for (const line of lines) {
+        line.free = this.resolveLine(line, contentMain - config.gapMain * (line.items.length - 1), config);
+        this.distributeAutoMargins(line);
+        this.measureFlexedItems(line.items, content, direction, config.wrap ? undefined : contentCross);
+        line.cross = this.flexLineCross(line.items, row);
+      }
     }
     this.markFlexBoundaries(lines);
 

@@ -21,6 +21,22 @@ export interface TextMemo {
 }
 
 /**
+ * The key a container's kept arrangement is checked against before its
+ * placement reuses it; see `LayoutRecord.arrangement`. The engine
+ * extends it with the items or tracks themselves, which are its own
+ * types.
+ */
+export interface ArrangementMemo {
+  readonly kind: 'flex' | 'grid';
+  /** The layout pass that measured it: the tree cannot change inside one. */
+  readonly pass: number;
+  /** The content box it was worked out in. */
+  readonly content: Constraints;
+  /** The container's `contentMatters` then, which its items' flags were decided from. */
+  readonly contentMatters: boolean;
+}
+
+/**
  * Mutable per-node layout projection owned by LayoutEngine.
  *
  * Records are keyed by UiNode identity and survive graph
@@ -290,6 +306,25 @@ export class LayoutRecord {
   lastConstraints: Constraints = NEVER_MEASURED;
 
   /**
+   * What a flex or grid container's last measurement worked out about
+   * its children — the flexed items and their lines, or the sized
+   * tracks — kept for its placement to take over. Placement used to
+   * work it all out again, a FlexItem and a set of constraints per
+   * child, even when the box it was placing in was the very one the
+   * measurement had been given; a container's last measurement is
+   * usually its final one, so that was most of them.
+   *
+   * Only the last measurement that actually ran is kept, because it is
+   * the one its children's records still describe: a measurement
+   * recalled from an alternate leaves the children as the last run
+   * left them. Null when that run's content box was not definite on
+   * both axes, since placement's always is. Placement takes it and
+   * clears it whatever it decides, so nothing uses one twice; see
+   * `LayoutEngine.takeArrangement`.
+   */
+  arrangement: ArrangementMemo | null = null;
+
+  /**
    * The paragraphs a text leaf was last measured as, one asked with a
    * width and one without; see `LayoutEngine.measureLeaf`. Flex asks
    * an item both questions every pass (its max-content basis, then its
@@ -533,6 +568,7 @@ export class LayoutRecord {
     this.contentWidth = 0;
     this.contentHeight = 0;
     this.lastConstraints = NEVER_MEASURED;
+    this.arrangement = null;
     this.lastBaseWidth = undefined;
     this.lastBaseHeight = undefined;
     this.alternates = null;
