@@ -88,7 +88,29 @@ describe('computed', () => {
     expect(seen).toEqual([20, 68, 70]);
   });
 
-  it('composes: a computed reading a computed follows the cells underneath', () => {
+  it('follows the branch taken however often it switches, and keeps its sources when it does not', () => {
+    const useMetric = internalState(true);
+    const celsius = internalState(20);
+    const fahrenheit = internalState(68);
+    const shown = computed(() => (useMetric.value ? celsius.value : fahrenheit.value));
+    const seen: number[] = [];
+    shown.subscribe(value => seen.push(value));
+
+    celsius.value = 21; // same cells read: still following both
+    expect(celsius.observed).toBe(true);
+    expect(useMetric.observed).toBe(true);
+    for (const metric of [false, true, false]) {
+      useMetric.value = metric;
+      expect(celsius.observed).toBe(metric);
+      expect(fahrenheit.observed).toBe(!metric);
+      expect(useMetric.observed).toBe(true);
+    }
+    fahrenheit.value = 70;
+    celsius.value = 25; // not a source now
+    expect(seen).toEqual([20, 21, 68, 21, 68, 70]);
+  });
+
+  it('composes:a computed reading a computed follows the cells underneath', () => {
     const count = internalState(1);
     const doubled = computed(() => count.value * 2);
     const label = computed(() => `${doubled.value} items`);
