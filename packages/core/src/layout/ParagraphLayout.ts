@@ -255,8 +255,21 @@ interface HardLine {
   readonly lines: Map<number, readonly TextLine[]>;
 }
 
-/** Hard lines remembered per measurer before the least recently used is forgotten. */
+/**
+ * How much a measurer's hard-line memo holds before the least recently
+ * used line is forgotten: a number of lines, and their text counted in
+ * UTF-16 code units, whichever runs out first; the same two bounds as
+ * the paragraph cache (`PARAGRAPH_CACHE_ENTRIES`), for the same reason.
+ *
+ * A count alone let one long hard line, edited over and over, keep a
+ * copy of every version of itself (twice: in its key and in `ownCopy`)
+ * up to the count, 20,000 copies of a line however long. The text
+ * budget is twice the paragraph cache's, so every line of the longest
+ * text that cache keeps is still here for the next edit to find, with
+ * room left for the lines an edit replaced.
+ */
 const HARD_LINE_ENTRIES = 20_000;
+const HARD_LINE_TEXT = 1 << 21;
 /** Widths a hard line keeps its breaking for: a resize sweeps through many, an edit asks for one. */
 const WIDTHS_PER_LINE = 4;
 
@@ -265,17 +278,69 @@ const WIDTHS_PER_LINE = 4;
  * two runtimes with different fonts must not share answers. A WeakMap,
  * so a measurer that is dropped takes its lines with it.
  */
-const hardLineMemos = new WeakMap<TextRunMeasurer, Map<string, HardLine>>();
+const hardLineMemos = new WeakMap<TextRunMeasurer, HardLineMemo>();
+
+/** A least-recently-used map of hard lines, bounded by count and by text; see `HARD_LINE_ENTRIES`. */
+class HardLineMemo {
+  private readonly entries = new Map<string, HardLine>();
+  private text = 0;
+
+  get size(): number {
+    return this.entries.size;
+  }
+
+  /** The code units of text remembered, for specs. */
+  get textLength(): number {
+    return this.text;
+  }
+
+  get(key: string): HardLine | undefined {
+    const entry = this.entries.get(key);
+    if (entry === undefined) {
+      return undefined;
+    }
+    // Re-inserted so the map's order is recency, which eviction reads.
+    this.entries.delete(key);
+    this.entries.set(key, entry);
+    return entry;
+  }
+
+  set(key: string, line: HardLine): void {
+    const previous = this.entries.get(key);
+    if (previous !== undefined) {
+      this.entries.delete(key);
+      this.text -= previous.text.length;
+    }
+    // The newest line is kept even when it alone is over the budget: the
+    // paragraph being laid out is about to break it.
+    while (
+      this.entries.size > 0 &&
+      (this.entries.size >= HARD_LINE_ENTRIES || this.text + line.text.length > HARD_LINE_TEXT)
+    ) {
+      const [oldest, entry] = this.entries.entries().next().value!;
+      this.entries.delete(oldest);
+      this.text -= entry.text.length;
+    }
+    this.entries.set(key, line);
+    this.text += line.text.length;
+  }
+}
 
 /** Forgets a measurer's hard lines: what its widths mean has changed, as when a font face arrives. */
 export function forgetHardLines(runs: TextRunMeasurer): void {
   hardLineMemos.delete(runs);
 }
 
-function hardLinesFor(runs: TextRunMeasurer): Map<string, HardLine> {
+/** How many hard lines a measurer remembers and their text in code units; for specs. */
+export function hardLineMemoSize(runs: TextRunMeasurer): { lines: number; text: number } {
+  const memo = hardLineMemos.get(runs);
+  return { lines: memo?.size ?? 0, text: memo?.textLength ?? 0 };
+}
+
+function hardLinesFor(runs: TextRunMeasurer): HardLineMemo {
   let memo = hardLineMemos.get(runs);
   if (memo === undefined) {
-    memo = new Map();
+    memo = new HardLineMemo();
     hardLineMemos.set(runs, memo);
   }
   return memo;
@@ -288,19 +353,10 @@ function styleKey(request: TextMeasureRequest): string {
   }\0${request.fontStretch ?? ''}\0${request.fontVariant ?? ''}\0${request.fontKerning ?? ''}`;
 }
 
-function hardLine(
-  memo: Map<string, HardLine>,
-  style: string,
-  text: string,
-  wrap: TextWrap,
-  measure: Measure
-): HardLine {
+function hardLine(memo: HardLineMemo, style: string, text: string, wrap: TextWrap, measure: Measure): HardLine {
   const key = `${style}\0${wrap}\0${text}`;
   const cached = memo.get(key);
   if (cached !== undefined) {
-    // Re-inserted so the map's order is recency, which eviction reads.
-    memo.delete(key);
-    memo.set(key, cached);
     return cached;
   }
   const own = ownCopy(text);
@@ -319,12 +375,6 @@ function hardLine(
     minContentWidth,
     lines: new Map()
   };
-  if (memo.size >= HARD_LINE_ENTRIES) {
-    const oldest = memo.keys().next().value;
-    if (oldest !== undefined) {
-      memo.delete(oldest);
-    }
-  }
   memo.set(key, entry);
   return entry;
 }
