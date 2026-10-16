@@ -411,6 +411,12 @@ interface TextMemo {
   readonly generation: number;
   readonly fitsAnyWidth: boolean;
 }
+interface ArrangementMemo {
+  readonly kind: 'flex' | 'grid';
+  readonly pass: number;
+  readonly content: Constraints;
+  readonly contentMatters: boolean;
+}
 declare class LayoutRecord {
   readonly node: UiNode;
   constructor(node: UiNode);
@@ -497,6 +503,7 @@ declare class LayoutRecord {
   contentWidth: number;
   contentHeight: number;
   lastConstraints: Constraints;
+  arrangement: ArrangementMemo | null;
   textBounded: TextMemo | null;
   textUnbounded: TextMemo | null;
   lastBaseWidth: number | undefined;
@@ -1641,7 +1648,7 @@ declare class UiVirtualWindow {
   private leadExtent;
   private trailExtent;
   private readonly measured;
-  private corrections;
+  private readonly corrections;
   private readonly mountedItems;
   private viewport;
   private readonly recentContentExtents;
@@ -3669,6 +3676,7 @@ declare class LayoutEngine {
   private trackSize;
   private lineProp;
   private contentConstraints;
+  private takeArrangement;
   private measureFlex;
   private flexConfig;
   private collectFlexItems;
