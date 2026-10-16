@@ -264,12 +264,14 @@ interface HardLine {
  * A count alone let one long hard line, edited over and over, keep a
  * copy of every version of itself (twice: in its key and in `ownCopy`)
  * up to the count, 20,000 copies of a line however long. The text
- * budget is twice the paragraph cache's, so every line of the longest
- * text that cache keeps is still here for the next edit to find, with
- * room left for the lines an edit replaced.
+ * budget is a million code units, so every line of a document that
+ * long is still here for the next edit to find; a longer one is broken
+ * again whole. A line held costs far more than its text, since its
+ * breaking at each width is kept with it: 300 edits of one 100 KB line
+ * held 32 MB at twice this budget and hold 15 MB at it.
  */
 const HARD_LINE_ENTRIES = 20_000;
-const HARD_LINE_TEXT = 1 << 21;
+const HARD_LINE_TEXT = 1 << 20;
 /** Widths a hard line keeps its breaking for: a resize sweeps through many, an edit asks for one. */
 const WIDTHS_PER_LINE = 4;
 

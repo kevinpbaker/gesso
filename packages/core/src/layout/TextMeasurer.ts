@@ -349,9 +349,22 @@ const PARAGRAPH_CACHE_TEXT = 1 << 20;
 const LARGE_PARAGRAPH = 1 << 14;
 
 /**
+ * The large map's budget, far below the labels': what it mostly holds
+ * is the versions of a field being edited, and only the newest is asked
+ * for again. A version costs much more than its text, since its lines
+ * are kept with it: 300 edits of a 100 KB field held 33 MB in a map
+ * with the labels' budget. Half a million code units still holds every
+ * request for two documents of 250K drawn side by side, so neither
+ * pushes the other out on each frame.
+ */
+const LARGE_PARAGRAPH_ENTRIES = 8;
+const LARGE_PARAGRAPH_TEXT = 1 << 19;
+
+/**
  * The paragraph cache: two least-recently-used maps, one for large
- * paragraphs (a key of `LARGE_PARAGRAPH` code units or more) and one
- * for the rest, each with the whole budget of `PARAGRAPH_CACHE_ENTRIES`.
+ * paragraphs (a key of `LARGE_PARAGRAPH` code units or more), with a
+ * budget of its own (`LARGE_PARAGRAPH_ENTRIES`), and one for the rest,
+ * with the whole budget of `PARAGRAPH_CACHE_ENTRIES`.
  *
  * A keystroke in a long field is a new request keyed by its whole
  * text, and both the layout engine and paint ask for it. In one map a
@@ -370,8 +383,8 @@ const LARGE_PARAGRAPH = 1 << 14;
  * costs at most `LARGE_PARAGRAPH` of a million code units.
  */
 class ParagraphCache {
-  private readonly small = new ParagraphLru();
-  private readonly large = new ParagraphLru();
+  private readonly small = new ParagraphLru(PARAGRAPH_CACHE_ENTRIES, PARAGRAPH_CACHE_TEXT);
+  private readonly large = new ParagraphLru(LARGE_PARAGRAPH_ENTRIES, LARGE_PARAGRAPH_TEXT);
 
   get size(): number {
     return this.small.size + this.large.size;
@@ -400,6 +413,11 @@ class ParagraphLru {
   private readonly entries = new Map<string, { paragraph: ParagraphLayout; text: number }>();
   private text = 0;
 
+  constructor(
+    private readonly maxEntries: number,
+    private readonly maxText: number
+  ) {}
+
   get size(): number {
     return this.entries.size;
   }
@@ -425,7 +443,7 @@ class ParagraphLru {
     // it is the one about to be asked for again (paint follows layout).
     while (
       this.entries.size > 0 &&
-      (this.entries.size >= PARAGRAPH_CACHE_ENTRIES || this.text + text > PARAGRAPH_CACHE_TEXT)
+      (this.entries.size >= this.maxEntries || this.text + text > this.maxText)
     ) {
       const [oldest, entry] = this.entries.entries().next().value!;
       this.entries.delete(oldest);
