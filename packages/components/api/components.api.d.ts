@@ -747,6 +747,11 @@ interface TreeNode {
   readonly branch?: boolean;
   readonly disabled?: boolean;
 }
+interface TreeDecoration {
+  readonly color?: UiColorValue;
+  readonly badge?: string;
+  readonly description?: string;
+}
 interface TreeProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   nodes: readonly TreeNode[];
@@ -767,6 +772,7 @@ interface TreeProps extends ControlLayoutProps {
   rowHeight?: number;
   label?: string;
   leading?: (node: TreeNode, open: Observable<boolean>) => UiChild;
+  decoration?: (node: TreeNode) => Observable<TreeDecoration | null>;
   flush?: boolean;
 }
 declare function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild;
@@ -1235,6 +1241,7 @@ export {
   type TooltipArgs,
   type TooltipModifierOptions,
   type TooltipProps,
+  type TreeDecoration,
   type TreeNode,
   type TreeProps,
   type Validator,
