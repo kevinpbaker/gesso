@@ -441,10 +441,7 @@ class ParagraphLru {
     }
     // The newest entry is kept even when it alone is over the budget:
     // it is the one about to be asked for again (paint follows layout).
-    while (
-      this.entries.size > 0 &&
-      (this.entries.size >= this.maxEntries || this.text + text > this.maxText)
-    ) {
+    while (this.entries.size > 0 && (this.entries.size >= this.maxEntries || this.text + text > this.maxText)) {
       const [oldest, entry] = this.entries.entries().next().value!;
       this.entries.delete(oldest);
       this.text -= entry.text;
