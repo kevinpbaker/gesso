@@ -66,10 +66,9 @@ describe('the docs barrier example', () => {
     expect(traffic).toContain('↑ toggle("wrap")');
     // What came back is a patch at the path that changed, not a
     // resend of the list: one differ, and it trims what it can. Keys
-    // are diffed and posted one at a time, so the derived summary is
-    // a batch of its own.
-    expect(traffic).toContain('↓ set tasks[1].done');
-    expect(traffic).toContain('↓ set remaining');
+    // are diffed one at a time, and what one turn published crosses
+    // together, so the derived summary rides in the same message.
+    expect(traffic).toContain('↓ set tasks[1].done, set remaining');
     // Nothing else crosses. Every line is a command out or a patch in.
     expect(traffic.every(line => line.startsWith('↑') || line.startsWith('↓'))).toBe(true);
   });

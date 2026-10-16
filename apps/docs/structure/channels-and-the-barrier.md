@@ -136,8 +136,9 @@ and `remaining` separately, never one `state` object. A key holding a
 large array is re-diffed whenever any part of it changes, and two
 values that change for different reasons are two keys. In the panel
 above, toggling one task posts `set tasks[1].done` and not a resend of
-the list, and the derived summary arrives as a batch of its own
-because keys are diffed and posted one at a time.
+the list, and the derived summary's `set remaining` rides in the same
+message: keys are diffed one at a time, but everything one turn of the
+application thread publishes crosses together, as one message.
 
 Patches are queued on arrival and applied in the frame's first phase.
 A chatty application thread can deliver many between two frames, and

@@ -44,6 +44,14 @@ export class ProvidedChannel {
    */
   private readonly previous = new Map<string, unknown>();
   private readonly checked = new Set<string>();
+  /**
+   * Patches published this turn and not yet sent. A command that moves
+   * five view keys used to post five messages, each cloned across the
+   * barrier and applied by the replica on its own; they now leave
+   * together, as one message, when the turn's synchronous work is done.
+   */
+  private pending: Patch[] = [];
+  private flushQueued = false;
 
   private synced = false;
 
@@ -154,8 +162,30 @@ export class ProvidedChannel {
     const patches = diffProjection(key, this.previous.get(key), value);
     this.previous.set(key, value);
     if (patches.length > 0) {
-      this.post({ type: 'channel:patch', patches });
+      for (const patch of patches) {
+        this.pending.push(patch);
+      }
+      if (!this.flushQueued) {
+        this.flushQueued = true;
+        queueMicrotask(this.flushPending);
+      }
     }
+  }
+
+  private readonly flushPending = (): void => {
+    this.flushQueued = false;
+    this.sendPending();
+  };
+
+  /** Puts the patches waiting for the end of the turn on the wire now. */
+  private sendPending(): void {
+    if (this.pending.length === 0) {
+      return;
+    }
+    const patches = this.pending;
+    this.pending = [];
+    const message: ChannelHostMessage = { type: 'channel:patch', patches };
+    this.port.postMessage(message);
   }
 
   /** Re-sends every key in full, for a client that reattached. */
@@ -169,11 +199,19 @@ export class ProvidedChannel {
     }
   }
 
+  /**
+   * Sends any other message, after the patches published before it: the
+   * order on the wire is the order things happened in, batched or not.
+   */
   private post(message: ChannelHostMessage): void {
+    this.sendPending();
     this.port.postMessage(message);
   }
 
   dispose(): void {
+    // What was published before the end is delivered, as it was when
+    // every patch left at once.
+    this.sendPending();
     this.subscriptions.unsubscribe();
     this.port.onmessage = null;
   }
