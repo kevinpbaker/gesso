@@ -459,7 +459,8 @@ describe('NumberInput', () => {
 describe('a long label', () => {
   // Long enough to wrap onto three lines in 200 pixels: the row has no room for the control's
   // glyph at its own size, and the label is what gives way, not the glyph.
-  const LONG = 'Runs the project’s own linter, with its config, on each open file as it is edited, its problems beside the others.';
+  const LONG =
+    'Runs the project’s own linter, with its config, on each open file as it is edited, its problems beside the others.';
   const narrow = (root: Parameters<typeof renderTest>[0]) => renderTest(root, { width: 200, height: 400 });
 
   it('leaves the switch’s track its own size, and wraps the label beside it', () => {
