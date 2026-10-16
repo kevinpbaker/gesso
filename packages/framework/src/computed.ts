@@ -62,6 +62,15 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private readonly equal: (a: T, b: T) => boolean;
   private readonly changes = new Subject<T>();
   private sources = new Set<ReadableCell<unknown>>();
+  /**
+   * The set the next run collects its reads into. It trades places with
+   * `sources` after the run, so following a cell allocates nothing per
+   * change; the two sets are simply reused.
+   */
+  private collecting = new Set<ReadableCell<unknown>>();
+  /** Whether the last run read different cells from the run before it. */
+  private sourcesChanged = false;
+  private recomputing = false;
   private cached!: T;
   private hasValue = false;
   private upstream: Subscription | null = null;
@@ -157,8 +166,23 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
 
   /** Runs the function, watching what it reads; true when the result changed. */
   private recompute(): boolean {
-    const touched = new Set<ReadableCell<unknown>>();
-    const next = withTracking(touched, () => this.compute(readSource));
+    // A run started from inside a run (a read that synchronously changes
+    // a source) gets a set of its own, so it cannot clear the one the
+    // outer run is still filling.
+    const nested = this.recomputing;
+    const touched = nested ? new Set<ReadableCell<unknown>>() : this.collecting;
+    touched.clear();
+    this.recomputing = true;
+    let next: T;
+    try {
+      next = withTracking(touched, () => this.compute(readSource));
+    } finally {
+      this.recomputing = nested;
+    }
+    this.sourcesChanged = !sameSet(touched, this.sources);
+    if (!nested) {
+      this.collecting = this.sources;
+    }
     this.sources = touched;
     const changed = !this.hasValue || !this.equal(this.cached, next);
     this.hasValue = true;
@@ -186,9 +210,8 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
     if (this.attaching) {
       return; // a cell replays its current value on subscribe; that is not a change
     }
-    const before = new Set(this.sources);
     const changed = this.recompute();
-    if (!sameSet(before, this.sources)) {
+    if (this.sourcesChanged) {
       // The function read different cells this time: follow those.
       this.detach();
       this.attaching = true;
