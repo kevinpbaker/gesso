@@ -172,7 +172,10 @@ export class ChannelReplica<View extends object, Commands extends object> {
    * Applies a batch, emitting once per affected key.
    *
    * Grouping matters: a batch touching one key three times must not
-   * push three values through the bindings watching it.
+   * push three values through the bindings watching it. And every key's
+   * patches are applied before any cell is told, so a batch that fails
+   * part way tells nobody, rather than leaving the screen showing the
+   * first keys of a change and not the rest.
    */
   applyPatches(patches: readonly Patch[]): void {
     const byKey = new Map<string, Patch[]>();
@@ -184,6 +187,8 @@ export class ChannelReplica<View extends object, Commands extends object> {
         existing.push(patch);
       }
     }
+    const cells: InputCell<unknown>[] = [];
+    const values: unknown[] = [];
     for (const [key, group] of byKey) {
       const cell = this.cells.get(key);
       if (cell === undefined) {
@@ -191,7 +196,11 @@ export class ChannelReplica<View extends object, Commands extends object> {
         // newer application thread talk to an older view.
         continue;
       }
-      cell.next(applyPatches(cell.value, group));
+      cells.push(cell);
+      values.push(applyPatches(cell.value, group));
+    }
+    for (let index = 0; index < cells.length; index++) {
+      cells[index].next(values[index]);
     }
   }
 

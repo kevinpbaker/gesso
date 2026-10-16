@@ -108,7 +108,7 @@ describe('the devtools hook', () => {
     expect(two.heard).toHaveLength(2);
   });
 
-  it('forwards each new action log entry once, and starts over after a clear', () => {
+  it('forwards each new action log entry once, and starts over after a clear', async () => {
     const hook = getDevtoolsHook(null);
     const { heard } = attachPanel(hook);
     const log = createActionLog();
@@ -117,6 +117,7 @@ describe('the devtools hook', () => {
     const replica = tickerReplica(log);
 
     replica.send.step(1);
+    await Promise.resolve(); // a channel's patches leave at the end of the turn
 
     // One command and the patch it caused, each forwarded as it was recorded.
     const actions = heard.filter(message => message.type === 'action');
@@ -125,6 +126,7 @@ describe('the devtools hook', () => {
 
     log.clear();
     replica.send.step(2);
+    await Promise.resolve();
     const after = heard.filter(message => message.type === 'action');
     expect(after).toHaveLength(4);
     expect(after[2]).toMatchObject({ entry: { command: 'step', payload: 2 } });

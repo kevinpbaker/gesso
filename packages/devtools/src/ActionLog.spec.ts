@@ -35,6 +35,14 @@ function portPair(): readonly [ChannelPort, ChannelPort] {
   return [left, right];
 }
 
+/**
+ * Lets the turn end, which is when a provided channel sends what it
+ * published: the port is synchronous, the batching in front of it is not.
+ */
+function endOfTurn(): Promise<void> {
+  return Promise.resolve();
+}
+
 async function waitFor(condition: () => boolean, what: string): Promise<void> {
   const deadline = Date.now() + 2000;
   while (!condition()) {
@@ -74,11 +82,13 @@ function setup(limit?: number): {
 }
 
 describe('the action log', () => {
-  it('records commands and patches on one timeline, in order', () => {
+  it('records commands and patches on one timeline, in order', async () => {
     const { log, replica } = setup();
 
     replica.send.step(2);
+    await endOfTurn();
     replica.send.step(3);
+    await endOfTurn();
 
     expect(log.entries.map(entry => `${entry.kind} ${entry.kind === 'command' ? entry.command : ''}`.trim())).toEqual([
       'command step',
@@ -89,11 +99,13 @@ describe('the action log', () => {
     expect(replica.view.ticks.value).toBe(5);
   });
 
-  it('names the command, its payload and the projections a patch touched', () => {
+  it('names the command, its payload and the projections a patch touched', async () => {
     const { log, replica, label } = setup();
 
     replica.send.step(4);
+    await endOfTurn();
     label.next('running');
+    await endOfTurn();
 
     const command = log.entries[0];
     expect(command.kind).toBe('command');
@@ -111,11 +123,12 @@ describe('the action log', () => {
     expect(log.channels).toEqual(['ticker']);
   });
 
-  it('puts the view back to an earlier step', () => {
+  it('puts the view back to an earlier step', async () => {
     const { log, replica } = setup();
-    replica.send.step(1);
-    replica.send.step(1);
-    replica.send.step(1);
+    for (let i = 0; i < 3; i++) {
+      replica.send.step(1);
+      await endOfTurn();
+    }
     expect(replica.view.ticks.value).toBe(3);
 
     const secondPatch = log.entries.filter(entry => entry.kind === 'patch')[1];
@@ -125,10 +138,12 @@ describe('the action log', () => {
     expect(log.pinnedTo).toBe(secondPatch.seq);
   });
 
-  it('rewinds the view and not the application', () => {
+  it('rewinds the view and not the application', async () => {
     const { log, replica, ticks } = setup();
     replica.send.step(1);
+    await endOfTurn();
     replica.send.step(1);
+    await endOfTurn();
 
     const first = log.entries.filter(entry => entry.kind === 'patch')[0];
     log.jumpTo(first.seq);
@@ -139,13 +154,15 @@ describe('the action log', () => {
     expect(ticks.value).toBe(2);
   });
 
-  it('holds patches while pinned, and catches the view up on going live', () => {
+  it('holds patches while pinned, and catches the view up on going live', async () => {
     const { log, replica, ticks } = setup();
     replica.send.step(1);
+    await endOfTurn();
     const first = log.entries.filter(entry => entry.kind === 'patch')[0];
     log.jumpTo(first.seq);
 
     ticks.next(9);
+    await endOfTurn();
     // Recorded, so the step exists on the timeline.
     expect(log.entries.filter(entry => entry.kind === 'patch')).toHaveLength(2);
     // Held, so the view stayed where it was put.
@@ -168,10 +185,11 @@ describe('the action log', () => {
     expect(log.entries.filter(entry => entry.kind === 'command')).toHaveLength(2);
   });
 
-  it('reconstructs a step exactly after older ones fell off the log', () => {
+  it('reconstructs a step exactly after older ones fell off the log', async () => {
     const { log, replica } = setup(4);
     for (let i = 0; i < 10; i++) {
       replica.send.step(1);
+      await endOfTurn();
     }
     expect(log.entries).toHaveLength(4);
     expect(replica.view.ticks.value).toBe(10);
@@ -184,10 +202,12 @@ describe('the action log', () => {
     expect(replica.view.ticks.value).toBe(9);
   });
 
-  it('keeps a projection the patch did not touch', () => {
+  it('keeps a projection the patch did not touch', async () => {
     const { log, replica, label } = setup();
     label.next('running');
+    await endOfTurn();
     replica.send.step(3);
+    await endOfTurn();
 
     const labelPatch = log.entries.filter(entry => entry.kind === 'patch')[0];
     log.jumpTo(labelPatch.seq);
@@ -196,9 +216,10 @@ describe('the action log', () => {
     expect(replica.view.ticks.value).toBe(0);
   });
 
-  it('empties the timeline and goes live', () => {
+  it('empties the timeline and goes live', async () => {
     const { log, replica } = setup();
     replica.send.step(1);
+    await endOfTurn();
     log.jumpTo(log.entries[0].seq);
 
     log.clear();
@@ -236,12 +257,13 @@ describe('the action log', () => {
     expect(structuredClone(log.entries)).toEqual(log.entries);
   });
 
-  it('lets the channel through untouched once disposed', () => {
+  it('lets the channel through untouched once disposed', async () => {
     const { log, replica, ticks } = setup();
     log.dispose();
 
     ticks.next(7);
     replica.send.step(1);
+    await endOfTurn();
 
     expect(replica.view.ticks.value).toBe(8);
     expect(log.entries).toEqual([]);
@@ -273,7 +295,7 @@ describe('the action log', () => {
     expect(log.entries.map(entry => entry.kind)).toEqual(['command', 'patch']);
   });
 
-  it('gives everything one input caused the same cause, and mints nothing for an input that caused nothing', () => {
+  it('gives everything one input caused the same cause, and mints nothing for an input that caused nothing', async () => {
     const { log, replica } = setup();
 
     // An input that sends nothing: the label is opened and dropped,
@@ -282,21 +304,24 @@ describe('the action log', () => {
     const close = log.cause('pointerUp (40, 40)');
     replica.send.step(2);
     close();
+    await endOfTurn();
 
     expect(log.entries.map(entry => entry.cause?.id)).toEqual([1, 1]);
     expect(log.entries[0]?.cause?.label).toBe('pointerUp (40, 40)');
   });
 
-  it('stops handing a command out as the cause once a frame has drawn its answer', () => {
+  it('stops handing a command out as the cause once a frame has drawn its answer', async () => {
     const { log, replica, ticks } = setup();
 
     const close = log.cause('pointerUp (40, 40)');
     replica.send.step(2);
     close();
+    await endOfTurn();
     log.frame(11);
     // Whatever the channel says next is its own doing: nobody pressed
     // anything, and the frame that drew the answer closed the click.
     ticks.next(9);
+    await endOfTurn();
 
     const kinds = log.entries.map(entry => `${entry.kind}${entry.cause === undefined ? '' : ` #${entry.cause.id}`}`);
     expect(kinds).toEqual(['command #1', 'patch #1', 'frame #1', 'patch']);
