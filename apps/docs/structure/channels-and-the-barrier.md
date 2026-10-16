@@ -137,8 +137,10 @@ large array is re-diffed whenever any part of it changes, and two
 values that change for different reasons are two keys. In the panel
 above, toggling one task posts `set tasks[1].done` and not a resend of
 the list, and the derived summary's `set remaining` rides in the same
-message: keys are diffed one at a time, but everything one turn of the
-application thread publishes crosses together, as one message.
+message: keys are diffed one at a time, but everything one command
+publishes crosses together, as one message, when the command returns.
+A change made anywhere else (a timer, a fetch landing) is posted as it
+is made.
 
 Patches are queued on arrival and applied in the frame's first phase.
 A chatty application thread can deliver many between two frames, and

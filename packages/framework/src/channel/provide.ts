@@ -45,13 +45,21 @@ export class ProvidedChannel {
   private readonly previous = new Map<string, unknown>();
   private readonly checked = new Set<string>();
   /**
-   * Patches published this turn and not yet sent. A command that moves
-   * five view keys used to post five messages, each cloned across the
-   * barrier and applied by the replica on its own; they now leave
-   * together, as one message, when the turn's synchronous work is done.
+   * Patches a running command has published and not yet sent. A command
+   * that moves five view keys used to post five messages, each cloned
+   * across the barrier and applied by the replica on its own; they now
+   * leave together, as one message, the moment the command returns.
+   *
+   * Only a command's: a patch published anywhere else (a timer, a
+   * recalculation the application thread schedules) is posted at once,
+   * because nothing marks where that work ends but the end of the turn,
+   * and waiting for that would leave a caller that has just run it
+   * synchronously, a test above all, looking at a port with nothing on
+   * it yet.
    */
   private pending: Patch[] = [];
-  private flushQueued = false;
+  /** How many commands are running, nested ones counted. */
+  private commanding = 0;
 
   private synced = false;
 
@@ -75,7 +83,17 @@ export class ProvidedChannel {
         this.sync();
         return;
       }
-      this.runCommand(data.command, data.payload, data.rest);
+      this.commanding++;
+      try {
+        this.runCommand(data.command, data.payload, data.rest);
+      } finally {
+        // Before an error is reported below: the patches it published
+        // happened first, and the wire says so.
+        this.commanding--;
+        if (this.commanding === 0) {
+          this.sendPending();
+        }
+      }
     } catch (error) {
       // Reported rather than thrown: this runs on the thread that owns
       // the data, and a throw here would leave the view waiting for a
@@ -161,23 +179,19 @@ export class ProvidedChannel {
     }
     const patches = diffProjection(key, this.previous.get(key), value);
     this.previous.set(key, value);
-    if (patches.length > 0) {
-      for (const patch of patches) {
-        this.pending.push(patch);
-      }
-      if (!this.flushQueued) {
-        this.flushQueued = true;
-        queueMicrotask(this.flushPending);
-      }
+    if (patches.length === 0) {
+      return;
+    }
+    if (this.commanding === 0) {
+      this.post({ type: 'channel:patch', patches });
+      return;
+    }
+    for (const patch of patches) {
+      this.pending.push(patch);
     }
   }
 
-  private readonly flushPending = (): void => {
-    this.flushQueued = false;
-    this.sendPending();
-  };
-
-  /** Puts the patches waiting for the end of the turn on the wire now. */
+  /** Puts the patches a command has published so far on the wire now. */
   private sendPending(): void {
     if (this.pending.length === 0) {
       return;

@@ -3945,14 +3945,13 @@ declare class ProvidedChannel {
   private readonly previous;
   private readonly checked;
   private pending;
-  private flushQueued;
+  private commanding;
   private synced;
   constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
   private receive;
   private runCommand;
   private sync;
   private publish;
-  private readonly flushPending;
   private sendPending;
   private resend;
   private post;

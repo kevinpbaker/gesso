@@ -52,13 +52,13 @@ async function providePanel() {
 const typesOf = (sent: readonly unknown[]): string[] => sent.map(message => (message as { type: string }).type);
 
 describe('a provided channel', () => {
-  it('sends a command that moves several view keys as one message, at the end of the turn', async () => {
+  it('sends a command that moves several view keys as one message, as the command returns', async () => {
     const { sent, deliver } = await providePanel();
 
     deliver({ type: 'channel:command', command: 'update', payload: 'Inbox' });
-    expect(sent).toEqual([]); // nothing until the synchronous work is done
 
-    await Promise.resolve();
+    // On the wire already: a caller that ran the command synchronously
+    // can look at once, without waiting for the turn to end.
     expect(sent).toEqual([
       {
         type: 'channel:patch',
@@ -71,7 +71,40 @@ describe('a provided channel', () => {
     ]);
   });
 
-  it('sends the patches published before any other message ahead of it', async () => {
+  it('posts a change made outside a command at once, as it is made', async () => {
+    const { title, count, sent } = await providePanel();
+
+    title.next('Drafts');
+    expect(typesOf(sent)).toEqual(['channel:patch']);
+    count.next(4);
+    expect(typesOf(sent)).toEqual(['channel:patch', 'channel:patch']);
+  });
+
+  it('puts what a failing command published on the wire ahead of its error', () => {
+    const title = new BehaviorSubject('');
+    const { port, sent, deliver } = recordingPort();
+    const commands: PanelCommands = {
+      update() {},
+      fail() {
+        title.next('Half done');
+        throw new Error('no');
+      }
+    };
+    const provided = provide(
+      Panel,
+      { view: { title, count: new BehaviorSubject(0), open: new BehaviorSubject(false) }, commands },
+      port
+    );
+    deliver({ type: 'channel:sync' });
+    sent.length = 0;
+
+    deliver({ type: 'channel:command', command: 'fail', payload: undefined });
+
+    expect(typesOf(sent)).toEqual(['channel:patch', 'channel:error']);
+    provided.dispose();
+  });
+
+  it('keeps the order things happened in across commands, errors and a resend', async () => {
     const { title, sent, deliver } = await providePanel();
 
     title.next('Drafts');
@@ -79,7 +112,6 @@ describe('a provided channel', () => {
     title.next('Sent');
     deliver({ type: 'channel:sync' }); // a client that reattached: everything again, in full
     title.next('Archive');
-    await Promise.resolve();
 
     expect(typesOf(sent)).toEqual([
       'channel:patch',
@@ -97,16 +129,6 @@ describe('a provided channel', () => {
       ['open', false]
     ]);
     expect(patches[3].patches).toEqual([{ op: 'set', projection: 'title', path: [], value: 'Archive' }]);
-  });
-
-  it('delivers what was published before it was disposed', async () => {
-    const { title, sent, provided } = await providePanel();
-
-    title.next('Last');
-    provided.dispose();
-    expect(typesOf(sent)).toEqual(['channel:patch']);
-    await Promise.resolve();
-    expect(sent).toHaveLength(1);
   });
 });
 
