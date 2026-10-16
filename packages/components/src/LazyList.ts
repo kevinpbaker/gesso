@@ -2,10 +2,11 @@ import { BehaviorSubject, combineLatest, map } from 'rxjs';
 
 import { input, themeTokenCell, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlTokens } from './tokens';
-import { Box, LazyColumn, type UiChild, type UiNodeRef, type UiSemanticState } from 'gesso-core';
+import { Box, LazyColumn, type UiChild, type UiNodeRef } from 'gesso-core';
 import { controlled } from './controlled';
 import { trackFocus } from './focus';
 import { CONTROL_EDGE, CONTROL_FOCUS_RING, keymap, layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
+import { NO_STATES, rowCells, SELECTED_STATES } from './rowCells';
 import { stepIndex, virtualList } from './virtual';
 
 /**
@@ -78,6 +79,9 @@ export interface LazyListProps extends ControlLayoutProps {
   hover?: boolean;
 }
 
+/** What a row is drawn as: chosen, under the pointer, or neither. Chosen wins. */
+type RowState = 'selected' | 'hovered' | 'plain';
+
 export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'List');
   const flush = inputs.flush.value === true;
@@ -127,14 +131,20 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
   /** The row under the pointer, for `hover`; -1 for none. */
   const hovered = new BehaviorSubject(-1);
   const hover = inputs.hover.value === true;
-  const rowBackground = (index: number) =>
-    hover
-      ? combineLatest([selected.value, hovered]).pipe(
-          map(([current, under]) =>
-            current === index ? 'selectionBackground' : under === index ? 'controlBackgroundHovered' : 'transparent'
-          )
-        )
-      : selected.value.pipe(map(current => (current === index ? 'selectionBackground' : 'transparent')));
+  /**
+   * What each row is, told only to the rows a move touched: the one the
+   * selection or the pointer left and the one it arrived at. The keys
+   * are indices, which is what both hold; -1 is never a row.
+   */
+  const rowState = rowCells(
+    combineLatest([selected.value, hovered]),
+    ([current, under], index): RowState => (current === index ? 'selected' : under === index ? 'hovered' : 'plain'),
+    {
+      initial: 'plain',
+      changed: (next, previous) => (previous === undefined ? undefined : [previous[0], next[0], previous[1], next[1]]),
+      label: 'LazyList.row'
+    }
+  );
 
   const row = (index: number): UiChild =>
     Box(
@@ -145,9 +155,17 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
         role: 'listitem',
         posInSet: index + 1,
         setSize: inputs.count,
-        states: selected.value.pipe(map(current => (current === index ? (['selected'] as UiSemanticState[]) : []))),
-        backgroundColor: rowBackground(index),
-        color: selected.value.pipe(map(current => (current === index ? 'selectionForeground' : 'controlForeground'))),
+        states: rowState(index).pipe(map(state => (state === 'selected' ? SELECTED_STATES : NO_STATES))),
+        backgroundColor: rowState(index).pipe(
+          map(state =>
+            state === 'selected'
+              ? 'selectionBackground'
+              : state === 'hovered'
+                ? 'controlBackgroundHovered'
+                : 'transparent'
+          )
+        ),
+        color: rowState(index).pipe(map(state => (state === 'selected' ? 'selectionForeground' : 'controlForeground'))),
         onClick: () => choose(index),
         ...(hover
           ? {
