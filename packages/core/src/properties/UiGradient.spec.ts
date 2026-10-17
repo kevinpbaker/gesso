@@ -67,6 +67,48 @@ describe('gradient values', () => {
     );
   });
 
+  it('refuses numeric offsets that all read as fractions, and says how a fraction is written', () => {
+    // A number is pixels along the ramp, so these two stops sit within
+    // the first pixel and the gradient paints nothing visible.
+    expect(() =>
+      radialGradient([
+        { color: '#000000', offset: 0.45 },
+        { color: '#ffffff', offset: 1 }
+      ])
+    ).toThrow(/0\.45, 1 all lie within 0 to 1.*pixel length along the ramp.*percent\(45\)/);
+    expect(() =>
+      linearGradient(0, [
+        { color: '#000000', offset: 0 },
+        { color: '#ffffff', offset: 1 }
+      ])
+    ).toThrow(/pixel length along the ramp/);
+  });
+
+  it('keeps a stop at a pixel or less when the other offsets are plainly pixels', () => {
+    const gradient = linearGradient(0, [
+      { color: '#000000', offset: 1 },
+      { color: '#ffffff', offset: 24 },
+      { color: '#000000', offset: 0.5 }
+    ]);
+    expect(gradient.stops.map(stop => stop.offset)).toEqual([1, 24, 0.5]);
+    // One numeric offset beside percentages is a position, not a fraction.
+    expect(
+      linearGradient(0, [
+        { color: '#000000', offset: 0 },
+        { color: '#ffffff', offset: percent(100) }
+      ]).stops
+    ).toHaveLength(2);
+  });
+
+  it('takes fractions as percent(n) without complaint', () => {
+    const gradient = radialGradient([
+      { color: '#000000', offset: percent(0) },
+      { color: '#ffffff', offset: percent(45) },
+      { color: '#000000', offset: percent(100) }
+    ]);
+    expect(gradient.stops.map(stop => stop.offset)).toEqual([percent(0), percent(45), percent(100)]);
+  });
+
   it('rejects an angle that is not a number, and an unknown kind', () => {
     expect(validateGradient({ kind: 'linear', angle: Number.NaN, stops: [] })).toMatch(/finite angle/);
     expect(validateGradient({ kind: 'conic', stops: [] })).toMatch(/unknown gradient kind/);

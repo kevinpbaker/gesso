@@ -269,7 +269,7 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   backgroundColor: { group: 'Paint', note: 'Fill behind the content. Takes a theme token as well as a colour.' },
   backgroundGradient: {
     group: 'Paint',
-    note: 'A gradient over the background colour and under the image. Built with `linearGradient` or `radialGradient`.'
+    note: 'A gradient over the background colour and under the image. Built with `linearGradient` or `radialGradient`. A numeric stop offset is a pixel length along the ramp, not a fraction of it; a fraction is `percent(45)`, and a gradient whose numeric offsets all lie within 0 to 1 is refused.'
   },
   borderColor: { group: 'Paint', note: 'Colour of the border, drawn inside the box.', defaultValue: 'black' },
   borderWidth: { group: 'Paint', note: 'Thickness of that border, in pixels.' },

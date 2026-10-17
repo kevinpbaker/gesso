@@ -141,7 +141,7 @@ Fills, borders, shadows and everything else that changes pixels without changing
 | Property | Default | Inherited | Invalidates | What it does |
 | -------- | ------- | --------- | ----------- | ------------ |
 | `backgroundColor` | `unset` | no | Paint | Fill behind the content. Takes a theme token as well as a colour. |
-| `backgroundGradient` | `unset` | no | Paint | A gradient over the background colour and under the image. Built with `linearGradient` or `radialGradient`. |
+| `backgroundGradient` | `unset` | no | Paint | A gradient over the background colour and under the image. Built with `linearGradient` or `radialGradient`. A numeric stop offset is a pixel length along the ramp, not a fraction of it; a fraction is `percent(45)`, and a gradient whose numeric offsets all lie within 0 to 1 is refused. |
 | `borderColor` | black | no | Paint | Colour of the border, drawn inside the box. |
 | `borderWidth` | `unset` | no | Paint | Thickness of that border, in pixels. |
 | `borderRadius` | no rounding | no | Paint | Corner rounding: one number, four, or a name in the theme's shape scale (`borderRadius="medium"`), resolved at paint against the theme the element is under. Clips the background, the image and `overflow: hidden`. |
