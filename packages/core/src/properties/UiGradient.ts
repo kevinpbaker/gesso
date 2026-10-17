@@ -30,6 +30,15 @@ export interface UiGradientStop {
    * which is what almost every gradient wants. Omitted on only some of
    * them is an error rather than a guess: CSS's rule for filling the
    * gaps is subtle enough that a reader could not predict the result.
+   *
+   * A number is a pixel length along the ramp, never a fraction of it:
+   * `{ offset: 0.45 }` is under half a pixel in, and a gradient whose
+   * stops all sit within the first pixel paints a one-pixel ramp that
+   * reads as nothing at all. A fraction is `percent(45)`. So
+   * `validateGradient` refuses a gradient whose numeric offsets all lie
+   * within 0 to 1 when there are two or more of them; one stop at a
+   * pixel or less among larger pixel offsets is a real position and is
+   * left alone.
    */
   readonly offset?: UiGradientOffset;
   /**
@@ -159,6 +168,16 @@ export function validateGradient(value: unknown): string | undefined {
     return (
       `backgroundGradient: ${placed} of ${stops.length} stops carry an offset. ` +
       'Give every stop an offset, or none of them, in which case they spread evenly.'
+    );
+  }
+  const pixelOffsets = (stops as readonly UiGradientStop[])
+    .map(stop => stop.offset)
+    .filter((offset): offset is number => typeof offset === 'number');
+  if (pixelOffsets.length > 1 && pixelOffsets.every(offset => offset >= 0 && offset <= 1)) {
+    return (
+      `backgroundGradient: the stop offsets ${pixelOffsets.join(', ')} all lie within 0 to 1, which reads as ` +
+      'fractions, but a number is a pixel length along the ramp, so this gradient would be one pixel wide. ' +
+      'Write a fraction as percent(45).'
     );
   }
   if (gradient.kind === 'radial') {

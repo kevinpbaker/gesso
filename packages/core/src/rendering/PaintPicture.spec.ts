@@ -5,6 +5,7 @@ import type { UiNode } from '../graph/UiNode';
 import { darkTheme, lightTheme } from '../environment/UiTheme';
 import { linearGradient } from '../properties/UiGradient';
 import { Constraints } from '../layout/LayoutTypes';
+import { percent } from '../layout/UiLength';
 import { PaintPictureCache } from './PaintPicture';
 import type { PaintSurface, UiPaint, UiPath } from './PaintSurface';
 import { FakePaintCanvases, RenderHarness } from './RenderTestUtils';
@@ -131,8 +132,8 @@ describe('PaintPictureCache', () => {
 
   it('places a gradient in the rectangle it was given, not in the node box', () => {
     const ramp = linearGradient(90, [
-      { offset: 0, color: '#000000' },
-      { offset: 1, color: '#ffffff' }
+      { offset: percent(0), color: '#000000' },
+      { offset: percent(100), color: '#ffffff' }
     ]);
     const node = paintNode({
       width: 100,
