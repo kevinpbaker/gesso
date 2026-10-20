@@ -180,6 +180,19 @@ const CANNOT_SETTLE: Record<string, string> = {
 };
 
 /**
+ * Routes that could hold still but are deliberately not gated.
+ *
+ * Different from `CANNOT_SETTLE`: a baseline could exist, and nobody
+ * wants one. The workbench is a page for a person to walk through each
+ * component's states by hand, and it changes every time a fixture is
+ * added or edited, so a baseline would be churn that checks nothing a
+ * component's own spec and its docs page do not already.
+ */
+const NOT_GATED: Record<string, string> = {
+  workbench: 'a page for checking components by hand; its fixtures change too often for a baseline to mean anything'
+};
+
+/**
  * Known headroom, so the next person to see one of these is not
  * surprised by it.
  *
@@ -618,7 +631,9 @@ async function main(): Promise<void> {
   const failures: string[] = [];
   let captured = 0;
   for (const [name, app] of wanted) {
-    const all: Route[] = ROUTES.filter(route => CANNOT_SETTLE[route.id] === undefined).map(route => ({
+    const all: Route[] = ROUTES.filter(
+      route => CANNOT_SETTLE[route.id] === undefined && NOT_GATED[route.id] === undefined
+    ).map(route => ({
       id: route.id,
       address: route.id
     }));
@@ -638,7 +653,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const excluded = Object.entries(CANNOT_SETTLE)
+  const excluded = Object.entries({ ...CANNOT_SETTLE, ...NOT_GATED })
     .map(([id, why]) => `  ${id}: ${why}`)
     .join('\n');
   if (failures.length > 0) {
