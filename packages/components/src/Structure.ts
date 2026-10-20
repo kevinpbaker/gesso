@@ -1,4 +1,4 @@
-import { map, type Observable } from 'rxjs';
+import { combineLatest, map, type Observable } from 'rxjs';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Box, Column, Row, Text, type UiChild, type UiElement, type UiSemanticState } from 'gesso-core';
@@ -46,7 +46,9 @@ export function Card(inputs: Inputs<CardProps>, _ctx: ComponentContext): UiChild
     {
       ...layoutOf(inputs),
       modifiers: modifiersOf(inputs),
-      padding: padding.value,
+      // Bound rather than read once, as every other prop here is: a
+      // card handed a cell for its padding kept the first value.
+      padding,
       gap: 12,
       backgroundColor: 'surface',
       borderColor: 'border',
@@ -72,12 +74,26 @@ export interface DividerProps extends ControlLayoutProps {
 export function Divider(inputs: Inputs<DividerProps>, _ctx: ComponentContext): UiChild {
   const direction = input(inputs.direction, 'row');
   const horizontal = direction.value === 'row';
+  // A rule has to find its length from whatever it sits in, without
+  // knowing whether that is a row or a column. So it asks both ways:
+  // it grows along a parent's main axis and stretches across a
+  // parent's cross axis, and its thickness is pinned with a maximum as
+  // well as a size, so growing along a column cannot swell a
+  // horizontal rule into a bar. Before this a horizontal rule in a
+  // column that aligned to the start was zero wide and as tall as the
+  // column, and an upright one in a centred row had no height at all:
+  // both vanished. The caller's own layout props still win.
   return Box({
+    width: horizontal ? undefined : 1,
+    maxWidth: horizontal ? undefined : 1,
+    height: horizontal ? 1 : undefined,
+    maxHeight: horizontal ? 1 : undefined,
+    flexGrow: 1,
+    flexShrink: 0,
+    selfX: horizontal ? 'stretch' : undefined,
+    selfY: horizontal ? undefined : 'stretch',
     ...layoutOf(inputs),
     modifiers: modifiersOf(inputs),
-    width: horizontal ? undefined : 1,
-    height: horizontal ? 1 : undefined,
-    flexGrow: horizontal ? 1 : undefined,
     backgroundColor: 'border',
     role: 'separator',
     // No name and no focus: a rule is furniture, and announcing it by
@@ -149,6 +165,17 @@ export interface TabsProps extends ControlLayoutProps {
  * pattern `RadioGroup` uses and for the same reason: walking five tabs
  * with Tab to reach the content behind them is worse than walking them
  * with the arrows.
+ *
+ * More tabs than the strip is wide wrap onto a second line rather than
+ * running past whatever holds them, so every tab, the selected one
+ * included, is always on screen.
+ *
+ * Removing the selected tab from `tabs` leaves `value` where it was:
+ * nothing is selected, the panel is unnamed, and an arrow key starts
+ * again from the first tab. Moving the selection on the caller's
+ * behalf would report a change nobody made, which `Pagination` refuses
+ * for the same reason, and the panel is the caller's, drawn from the
+ * value it holds, so whoever removes the tab picks the next one.
  */
 export function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Tabs');
@@ -181,6 +208,7 @@ export function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild 
         focusable: true,
         modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
         gap: 4,
+        flexWrap: 'wrap',
         role: 'tablist',
         label,
         onKeyDown: keymap({
@@ -205,7 +233,8 @@ export function Tabs(inputs: Inputs<TabsProps>, ctx: ComponentContext): UiChild 
     Box(
       {
         role: 'tabpanel',
-        label: value.value.pipe(map(current => labelOf(inputs.tabs.value, current))),
+        // From both, so a panel whose tab was taken away stops naming it.
+        label: combineLatest([inputs.tabs, value.value]).pipe(map(([tabs, current]) => labelOf(tabs, current))),
         // A panel is as wide as the tabs above it, and so is what it
         // holds. A Box is a Stack, whose children are aligned rather
         // than stretched, so without this the panel's content shrinks

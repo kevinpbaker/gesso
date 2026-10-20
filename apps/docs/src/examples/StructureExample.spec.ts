@@ -101,10 +101,10 @@ describe('the docs structure example', () => {
     expect(horizontal?.width).toBeGreaterThan(1);
   });
 
-  it('sizes a rule itself, whatever the caller asked for', () => {
-    // A horizontal rule writes its own height, width and flexGrow
-    // after the caller's layout props, so those three do not reach it.
-    // Margins are not among them and do.
+  it('sizes a rule itself, and lets the caller say otherwise', () => {
+    // The caller's layout props come after the rule's own, so a width
+    // that does not grow makes a short rule. The thickness is pinned by a maximum as well,
+    // so a height asked for does not make it a bar.
     const ui = renderTest(
       Row({ width: 300, height: 200 }, createComponent(Divider, { width: 50, height: 9, flexGrow: 0, marginLeft: 8 })),
       SIZE
@@ -112,11 +112,11 @@ describe('the docs structure example', () => {
     ui.frame();
     const box = ui.getLayout(ui.getByRole('separator'));
     expect(box.height).toBe(1);
-    expect(box.width).toBe(292);
+    expect(box.width).toBe(50);
     expect(box.x).toBe(8);
 
-    // A vertical rule takes its height from the row, so a row that
-    // centres its children leaves it none.
+    // A vertical rule stretches across its row, so a row that centres
+    // its children, as a toolbar does, still gives it the full height.
     const centred = renderTest(
       Row(
         { width: 300, height: 40, y: 'center' },
@@ -126,24 +126,31 @@ describe('the docs structure example', () => {
       SIZE
     );
     centred.frame();
-    expect(centred.getLayout(centred.getByRole('separator')).height).toBe(0);
+    expect(centred.getLayout(centred.getByRole('separator')).height).toBe(40);
   });
 
-  it('grows a horizontal rule on the main axis, spare space and all', () => {
-    // `flexGrow: 1` is what spans a rule across a row. In a column it
-    // is the vertical axis that grows, so a column with free height
-    // hands that height to the rule.
+  it('spans a column one pixel thick, whatever the column does with its room', () => {
+    // Growth along a column with free height is capped at the rule's
+    // thickness, so the rule spans the column rather than filling it.
     const roomy = renderTest(Column({ width: 300, height: 200 }, createComponent(Divider, {})), SIZE);
     roomy.frame();
-    expect(roomy.getLayout(roomy.getByRole('separator')).height).toBe(200);
+    const spread = roomy.getLayout(roomy.getByRole('separator'));
+    expect(spread.height).toBe(1);
+    expect(spread.width).toBe(300);
 
-    // A column sized by its content has nothing spare to give it.
-    const snug = renderTest(
-      Box({ width: 300, height: 200 }, Column({ width: 300, selfY: 'start' }, createComponent(Divider, {}))),
+    // A column that aligns its children to the start still gets a rule
+    // its full width, not one as wide as nothing.
+    const start = renderTest(
+      Box(
+        { width: 300, height: 200 },
+        Column({ width: 300, x: 'start', selfY: 'start' }, createComponent(Divider, {}))
+      ),
       SIZE
     );
-    snug.frame();
-    expect(snug.getLayout(snug.getByRole('separator')).height).toBe(1);
+    start.frame();
+    const snug = start.getLayout(start.getByRole('separator'));
+    expect(snug.height).toBe(1);
+    expect(snug.width).toBe(300);
   });
 
   it('reads a rule direction once, when it is built', () => {

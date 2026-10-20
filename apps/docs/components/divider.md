@@ -37,32 +37,26 @@ bound. Passing an Observable there gives you the rule it resolved to on
 the first frame and nothing after that, so a rule that turns has to be
 two rules chosen between.
 
-### Sizing, which the rule mostly does itself
+### Sizing, which the rule does itself
 
-A rule writes its own size after the caller's layout props, so three of
-them do not reach it:
+A rule has to find its length from whatever it sits in without knowing
+whether that is a row or a column, so it asks both ways: it grows along
+its parent's main axis and stretches across its cross axis. Its
+thickness is pinned with a maximum as well as a size, so the growth
+never swells it past one pixel.
 
-- A horizontal rule sets `height: 1` and `flexGrow: 1`, and clears
-  `width`.
-- A vertical rule sets `width: 1`, and clears `height` and `flexGrow`.
+- A horizontal rule is `height: 1` and spans the width of a row or a
+  column alike, whether the column stretches its children or aligns
+  them to the start, and however much spare height the column has.
+- A vertical rule is `width: 1` and takes the full height of the row it
+  is in, including a row that centres its children, such as the one a
+  [Toolbar](/components/toolbar) lays its controls in.
 
-Everything else on the shared layout props does arrive, margins
-included, which is the usual way to inset a rule from the edge of what
-it is dividing.
-
-Two consequences to hold on to, both of which the spec pins down:
-
-- **A vertical rule takes its height from the row it is in.** It asks
-  for none of its own, so a row that centres its children leaves it
-  nothing to stretch into and it disappears. Put it in a row that
-  stretches, which is what the example does, or give the row a definite
-  height.
-- **A horizontal rule grows on the main axis, whichever that is.**
-  Inside a row, `flexGrow: 1` is what spans it across. Inside a column
-  with spare height, that same growth claims the spare height and the
-  rule becomes a block. Keep a horizontal rule in a column that is
-  sized by its content, which is the ordinary case, or put it in a row
-  of its own.
+The caller's layout props are applied after these, so a `width`,
+`height` or `flexGrow` passed in wins: `width: 50` with `flexGrow: 0`
+is a short rule.
+Margins arrive too, which is the usual way to inset a rule from the edge
+of what it is dividing.
 
 `rootModifiers` is declared on the shared props type but is not attached
 by this component, so a modifier passed there does nothing.

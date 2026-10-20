@@ -41,6 +41,29 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
     query.value = value;
     find.search(value);
   };
+  // The field echoes what is typed at once, and follows the service as
+  // well: closing a session clears the query, and a field that kept its
+  // own copy reopened showing the old words over "No results".
+  ctx.effect(find.query, value => {
+    query.value = value;
+  });
+
+  // The node this bar handed the service, so unmounting takes back its
+  // own registration and never another bar's.
+  let field: UiNode | null = null;
+  const register = (node: UiNode | null): void => {
+    if (node !== null) {
+      field = node;
+      registered.set(find, node);
+      find.setField(node);
+      return;
+    }
+    if (field !== null && registered.get(find) === field) {
+      registered.delete(find);
+      find.setField(null);
+    }
+    field = null;
+  };
 
   const counter = combineLatest([find.activeMatch, find.matchCount]).pipe(
     map(([active, total]) => (total === 0 ? 'No results' : `${active} of ${total}`))
@@ -68,7 +91,7 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
       // here on the frame it opens.
       ref: (node: UiNode | null) => {
         focus.ref(node);
-        find.setField(node);
+        register(node);
       },
       modifiers: [CONTROL_FOCUS_RING],
       value: query,
@@ -97,6 +120,16 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
     step('✕', 'Close find', () => find.close())
   );
 }
+
+/**
+ * Which field each session's service was last handed by a bar.
+ *
+ * `FindService` keeps one field and offers no way to ask whose it is,
+ * so the bars keep the answer between them. Without it a bar that
+ * unmounted cleared the field whoever had registered it, and the bar
+ * still on screen no longer took the caret when a session opened.
+ */
+const registered = new WeakMap<FindService, UiNode>();
 
 function step(glyph: string, label: string, press: () => void) {
   return Button({

@@ -131,7 +131,11 @@ function Changing(_inputs: Inputs<{}>, _ctx: ComponentContext) {
         <Button
           label="Remove selected"
           variant="outlined"
-          onClick={() => (tabs.value = tabs.value.filter(tab => tab.value !== selected.value))}
+          onClick={() => {
+            // Tabs leaves a removed value alone, so its owner moves it.
+            tabs.value = tabs.value.filter(tab => tab.value !== selected.value);
+            selected.value = tabs.value[0]?.value ?? '';
+          }}
         />
       </row>
       <Tabs tabs={tabs} value={selected} onChange={value => (selected.value = value)}>
@@ -162,7 +166,7 @@ export const tabsFixture: WorkbenchFixture = {
     },
     {
       name: 'Fifteen tabs',
-      try: 'The strip does not draw past the card: it wraps, clips or scrolls. Arrow to Tab 15: it is visible when selected, and Tab 7 is skipped.',
+      try: 'The strip wraps onto more lines inside the card rather than drawing past it. Arrow to Tab 15: it is visible when selected, and Tab 7 is skipped.',
       stretch: true,
       render: () => <Owned tabs={MANY} defaultValue="Tab 1" />
     },
@@ -194,7 +198,7 @@ export const tabsFixture: WorkbenchFixture = {
     },
     {
       name: 'Tabs added and removed',
-      try: 'Add two tabs: they appear at the end without the strip flickering. Select one and Remove selected: another tab becomes selected and the panel names it, rather than nothing being selected over a stale panel.',
+      try: 'Add two tabs: they appear at the end without the strip flickering. Select one and Remove selected: the app, which owns the value, picks the first tab that is left, and the strip and the panel both follow it.',
       width: 360,
       stretch: true,
       render: () => <Changing />

@@ -188,7 +188,7 @@ export const findBarFixture: WorkbenchFixture = {
     },
     {
       name: 'Reopened',
-      try: 'Search for the first word of the text (2 matches), Escape, then Find here again: the field and the counter agree (both the old query with its count, or both empty), never the old text over No results.',
+      try: 'Search for the first word of the text (2 matches), Escape, then Find here again: the field is empty and the counter says No results, never the old text over No results.',
       width: 360,
       stretch: true,
       render: () => <Searchable id="reopened" paragraphs={CHUTNEY} />
