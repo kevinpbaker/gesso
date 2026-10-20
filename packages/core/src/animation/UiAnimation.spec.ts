@@ -199,6 +199,33 @@ describe('a spring', () => {
     expect(animation.isFinished).toBe(false);
   });
 
+  it('moves on the first frame of a retarget that continues the clock of the one it replaces', () => {
+    const spec = { stiffness: 900, damping: 60, mass: 1 };
+    const target = cell(0);
+    const first = new UiSpring(target, 100, { spring: spec });
+    for (let t = 0; t <= 48; t += 16) {
+      first.advance(t);
+    }
+    const where = target.value;
+    const begun = new UiSpring(target, 200, { spring: spec, velocity: first.currentVelocity });
+    begun.continueFrom(first);
+    begun.advance(64);
+    expect(target.value).toBeGreaterThan(where);
+    // Without it, the first frame samples at zero elapsed and stands still.
+    const still = cell(where);
+    const fresh = new UiSpring(still, 200, { spring: spec, velocity: first.currentVelocity });
+    fresh.advance(64);
+    expect(still.value).toBe(where);
+  });
+
+  it('begins on its own first frame when the one it replaces never drew', () => {
+    const target = cell(0);
+    const never = new UiSpring(target, 100, { spring: defaultMotion.springs.snappy });
+    const next = new UiSpring(target, 200, { spring: defaultMotion.springs.snappy });
+    next.continueFrom(never);
+    expect(next.hasBegun).toBe(false);
+  });
+
   it('hands its velocity to whatever retargets it', () => {
     const target = cell(0);
     const animation = new UiSpring(target, 100, { spring: defaultMotion.springs.snappy });

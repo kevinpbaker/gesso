@@ -113,6 +113,23 @@ describe('GessoRuntime smooth scrolling', () => {
     expect(offset()).toBeCloseTo(300, 0);
   });
 
+  it('keeps moving on the frame after each notch, not standing still for it', () => {
+    const { frame, offset, notch } = mount();
+    notch(100);
+    frame();
+    frame();
+    // Notches a frame apart, as a wheel spun quickly sends them: each one
+    // retargets the spring, and each frame after one has to move. Begun
+    // on its own first frame, a retargeted spring sampled at zero and
+    // drew where the last one stopped, so a fast spin barely moved.
+    for (let n = 0; n < 6; n++) {
+      const before = offset();
+      notch(100);
+      frame();
+      expect(offset()).toBeGreaterThan(before + 1);
+    }
+  });
+
   it('clamps the destination to the content', () => {
     const { drain, offset, notch } = mount();
     for (let i = 0; i < 20; i++) {

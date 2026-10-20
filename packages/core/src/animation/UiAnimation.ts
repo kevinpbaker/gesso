@@ -94,6 +94,8 @@ export abstract class UiAnimation<T> {
   /** When the first tick reached it, on the frame clock. */
   protected startedAt = 0;
   private begun = false;
+  /** The frame time it was last advanced at, or null before its first; see `continueFrom`. */
+  private lastAdvancedAt: number | null = null;
   private readonly subject = new Subject<T>();
   /**
    * When this animation next *wants* a sample, on the ideal timeline.
@@ -198,6 +200,29 @@ export abstract class UiAnimation<T> {
     return this.begun;
   }
 
+  /**
+   * Begins on the frame the animation it replaces last drew, rather than
+   * on the next one.
+   *
+   * For a retarget that carries the motion on: a spring aimed further
+   * along while it moves, as each notch of a wheel aims a scroll. Begun
+   * on its first frame, as `begin` would, the new one samples at zero
+   * elapsed time and draws where the old one stopped, so the motion
+   * stood still for a frame at every notch — a scroll that hitched ten
+   * times a second on a wheel spun steadily. Begun where the old one
+   * last advanced, its first frame moves by a frame's worth, at the
+   * velocity it was handed.
+   *
+   * Does nothing for an animation that has begun or has a delay, or
+   * when the one it replaces never drew.
+   */
+  continueFrom(previous: UiAnimation<T>): void {
+    if (this.begun || this.delayMs > 0 || previous.lastAdvancedAt === null) {
+      return;
+    }
+    this.begin(previous.lastAdvancedAt);
+  }
+
   protected onBegin(): void {}
 
   advance(now: number): void {
@@ -205,6 +230,7 @@ export abstract class UiAnimation<T> {
       return;
     }
     this.begin(now);
+    this.lastAdvancedAt = now;
     const elapsed = now - this.startedAt;
     if (elapsed < this.delayMs) {
       // Waiting. The cell is deliberately not written: whoever asked

@@ -183,6 +183,11 @@ export class AnimationService {
       reducedMotion: options.reducedMotion,
       delay: options.delay
     });
+    // The motion goes on from where the one it replaces was, in time as
+    // well as in place and speed; see `continueFrom`.
+    if (previous instanceof UiSpring) {
+      animation.continueFrom(previous);
+    }
     if (driver === null) {
       animation.snap();
       return animation.values;
