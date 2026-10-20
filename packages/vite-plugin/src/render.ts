@@ -38,7 +38,9 @@ const MARKER = '/* gesso-vite-plugin: hot replacement */';
  * What is deliberately *not* wired is `useRoutes`: routes are read once
  * when the runtime is built, so a change to the route table is a full
  * reload and saying so is better than replacing a tree that still
- * resolves the old routes.
+ * resolves the old routes. That includes a route table declared in the
+ * module the root or a service comes from, which is the common case:
+ * accepting that module would accept the routes along with it.
  */
 export function transformRenderWorker(code: string): RenderWiring {
   if (code.includes(MARKER)) {
@@ -68,6 +70,31 @@ export function transformRenderWorker(code: string): RenderWiring {
       code: null,
       skipped: `${root} is declared in the worker entry itself rather than imported, so replacing it would replace the entry and reload the page.`
     };
+  }
+
+  // A route table read from a module this would accept. `reload` hands
+  // over a new root and new services but never new routes, so accepting
+  // that module would put the new root over routes that still resolve
+  // the old screens: a page half replaced, with no error to say so. A
+  // full reload is the honest answer, and a route table kept in a module
+  // of its own gets hot replacement back for everything else.
+  const accepted = new Set([rootSource]);
+  for (const site of findCalls(code, '.useService', blank)) {
+    const name = firstArgumentName(code, site, blank);
+    const source = name === null ? undefined : imports.get(name);
+    if (source !== undefined) {
+      accepted.add(source);
+    }
+  }
+  for (const site of findCalls(code, '.useRoutes', blank)) {
+    const name = firstArgumentName(code, site, blank);
+    const source = name === null ? undefined : imports.get(name);
+    if (name !== null && source !== undefined && accepted.has(source)) {
+      return {
+        code: null,
+        skipped: `${name} is imported from ${source}, which would be hot-replaced, and routes are read once when the runtime is built, so a replaced tree would still resolve the old routes. Declare the route table in a module of its own to get hot replacement back.`
+      };
+    }
   }
 
   // Every service the chain registers, paired with the module it came
