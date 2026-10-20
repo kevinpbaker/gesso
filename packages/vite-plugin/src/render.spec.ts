@@ -6,7 +6,8 @@ import { transformRenderWorker } from './render.ts';
 const ENTRY = [
   "import { renderRoot } from 'gesso-framework';",
   '',
-  "import { ROUTES, SluiceApp } from './SluiceApp';",
+  "import { SluiceApp } from './SluiceApp';",
+  "import { ROUTES } from './routes';",
   '',
   'renderRoot(SluiceApp).useRoutes(ROUTES);',
   ''
@@ -53,6 +54,27 @@ describe('transformRenderWorker', () => {
     const wiring = transformRenderWorker(inline);
     expect(wiring.code).toBeNull();
     expect(wiring.skipped).toContain('App');
+  });
+
+  it('reloads the page when the route table comes from a module it would accept', () => {
+    // `reload` replaces the root and the services, never the routes, so
+    // accepting the module the routes live in would leave the new tree
+    // resolving the old screens.
+    const shared = ENTRY.replace(
+      "import { SluiceApp } from './SluiceApp';\nimport { ROUTES } from './routes';",
+      "import { ROUTES, SluiceApp } from './SluiceApp';"
+    );
+    const wiring = transformRenderWorker(shared);
+    expect(wiring.code).toBeNull();
+    expect(wiring.skipped).toContain('ROUTES is imported from ./SluiceApp');
+
+    const fromService = [
+      "import { renderRoot } from 'gesso-framework';",
+      "import { LiveApp } from './LiveApp';",
+      "import { Feed, ROUTES } from './feed';",
+      'renderRoot(LiveApp).useService(Feed).useRoutes(ROUTES);'
+    ].join('\n');
+    expect(transformRenderWorker(fromService).code).toBeNull();
   });
 
   it('does not rewrite a module it has already rewritten', () => {
