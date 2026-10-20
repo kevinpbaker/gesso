@@ -312,7 +312,10 @@ export function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContex
       role: 'navigation',
       label
     },
-    Row({ y: 'center', role: 'list' }, crumbs)
+    // A trail longer than its strip wraps between crumbs rather than
+    // running off the side of whatever holds it. The mark lives inside
+    // the crumb it follows, so a line never starts with a separator.
+    Row({ y: 'center', flexWrap: 'wrap', flexShrink: 1, minWidth: 0, role: 'list' }, crumbs)
   );
 }
 

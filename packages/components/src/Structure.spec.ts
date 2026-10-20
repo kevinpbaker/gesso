@@ -6,6 +6,7 @@ import { renderTest } from 'gesso-testing';
 import {
   Box,
   Column,
+  Row,
   ScrollView,
   Text,
   UiNodeType,
@@ -98,6 +99,30 @@ describe('Tabs', () => {
     );
     expect(ui.getLayout(ui.getByRole('tabpanel'))!.height).toBe(40);
   });
+  it('wraps a strip wider than its room, so the selected tab is never off screen', () => {
+    const many = Array.from({ length: 15 }, (_, at) => ({ value: `t${at + 1}`, label: `Tab ${at + 1}` }));
+    const ui = mount(Column({ width: 280, x: 'stretch' }, createComponent(Tabs, { tabs: many, defaultValue: 't15' })));
+    const strip = ui.getLayout(ui.getByRole('tablist'))!;
+    const last = ui.getLayout(ui.getAllByRole('tab')[14])!;
+    // Fifteen tabs drew in one line out to x 630 of a 280 strip, the
+    // selected one among those nobody could see.
+    expect(last.x + last.width).toBeLessThanOrEqual(strip.x + strip.width);
+    expect(last.y).toBeGreaterThan(strip.y);
+  });
+
+  it('stops naming the panel after a tab that was taken away', () => {
+    const list = new BehaviorSubject<readonly { value: string; label: string }[]>(tabs.slice(0, 2));
+    const ui = mount(createComponent(Tabs, { tabs: list, defaultValue: 'props' }));
+    expect(ui.recordsFor('tabpanel')[0].label).toBe('Props');
+
+    list.next(tabs.slice(0, 1));
+    ui.frame();
+
+    // The value is the caller's to move, and is left alone; the panel
+    // no longer claims a tab that is not there.
+    expect(ui.recordsFor('tab').map(record => record.states)).toEqual([undefined]);
+    expect(ui.recordsFor('tabpanel')[0].label ?? '').toBe('');
+  });
 });
 
 describe('Accordion', () => {
@@ -156,6 +181,47 @@ describe('Card, Divider and Toolbar', () => {
   it('a toolbar groups its controls under one name', () => {
     const ui = mount(createComponent(Toolbar, { label: 'Formatting', children: Text({ text: 'B' }) }));
     expect(ui.recordsFor('toolbar')[0].label).toBe('Formatting');
+  });
+
+  it('follows its padding as it changes, rather than reading it once', () => {
+    const padding = new BehaviorSubject(16);
+    const ui = mount(
+      Column(
+        { x: 'start' },
+        createComponent(Card, { label: 'Storage', padding, children: Box({ role: 'region', label: 'body' }) })
+      )
+    );
+    const inset = () => ui.getLayout(ui.getByRole('region', { name: 'body' }))!.x;
+    expect(inset()).toBe(16);
+
+    padding.next(32);
+    ui.frame();
+
+    expect(inset()).toBe(32);
+  });
+
+  it('a horizontal divider spans a column that aligns to the start, and stays one pixel thick', () => {
+    const ui = mount(
+      Column({ width: 300, height: 128, x: 'start' }, Text({ text: 'Account' }), createComponent(Divider, {}))
+    );
+    // It was zero wide and as tall as the spare height: invisible, and
+    // pushing everything after it to the bottom.
+    expect(ui.getLayout(ui.getByRole('separator'))).toMatchObject({ width: 300, height: 1 });
+  });
+
+  it('a horizontal divider fills the rest of a row it sits in', () => {
+    const ui = mount(
+      Row({ width: 300, y: 'center', gap: 8 }, Box({ width: 60, height: 10 }), createComponent(Divider, {}))
+    );
+    expect(ui.getLayout(ui.getByRole('separator'))).toMatchObject({ x: 68, width: 232, height: 1 });
+  });
+
+  it('a vertical divider is as tall as a row that centres its children', () => {
+    const ui = mount(
+      Row({ height: 28, y: 'center' }, Text({ text: 'Bold' }), createComponent(Divider, { direction: 'column' }))
+    );
+    // A Toolbar's row: with no height of its own the rule was zero tall.
+    expect(ui.getLayout(ui.getByRole('separator'))).toMatchObject({ width: 1, height: 28 });
   });
 });
 

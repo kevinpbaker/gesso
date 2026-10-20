@@ -183,11 +183,14 @@ import { followRoute, middlePress, opensElsewhere } from './follow';
  * link is a theme provider around it.
  *
  * `disabled` refuses everything: no `onPress`, no navigation, no rule on
- * hover, and the disabled ink. It stays focusable, as every disabled
- * control in this library does, because a control the keyboard cannot
- * reach is a control whose disabled state nobody is told about. It is
- * the element's own `disabled` property rather than a semantic state,
- * which is where the accessibility mirror reads it from.
+ * hover, and the disabled ink. Tab skips it, as it skips every
+ * disabled control in this library: the runtime treats a disabled node
+ * as inert whatever it declares, so `focusable` stays set and the link
+ * is a tab stop again the moment it is enabled. It is still on the
+ * semantics tree, and a screen reader browsing the page is told it is
+ * disabled, because `disabled` is the element's own property rather
+ * than a semantic state, which is where the accessibility mirror reads
+ * it from.
  *
  * ## Nothing here is read once
  *

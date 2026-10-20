@@ -115,7 +115,7 @@ export const breadcrumbFixture: WorkbenchFixture = {
     },
     {
       name: 'Many crumbs, no collapse',
-      try: 'Fifteen crumbs in a 360 cell: note whether they wrap or run off the card. Crumbs must never overlap one another.',
+      try: 'Fifteen crumbs in a 360 cell wrap onto more lines inside the card, each line starting with a crumb rather than a separator. Crumbs never overlap one another.',
       width: 360,
       render: () => <Reporting items={VERY_DEEP} />
     },

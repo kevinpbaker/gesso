@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { BehaviorSubject } from 'rxjs';
 
 import { createComponent, route, RouterService, to, type ShellRequest } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
@@ -194,6 +195,29 @@ describe('Link', () => {
     expect(decorationOn(ui, 'Read the docs')).toBe('none');
     // `disabled` is the element's own property, never a semantic state.
     expect(ui.getSemantics(ui.getByRole('link')).states ?? []).toEqual([]);
+  });
+
+  it('is skipped by Tab when it is disabled, and is a stop again once enabled', () => {
+    const disabled = new BehaviorSubject(true);
+    const ui = renderTest(
+      Column(
+        { x: 'start' },
+        createComponent(Link, { label: 'Before', href: 'https://gesso.dev' }),
+        createComponent(Link, { label: 'Off', href: 'https://gesso.dev', disabled }),
+        createComponent(Link, { label: 'After', href: 'https://gesso.dev' })
+      ),
+      { width: 400, height: 200 }
+    );
+    const stop = () => ui.querySemantics(ui.runtime.input.focus.focusedNode!)?.label;
+
+    ui.fireEvent.tab();
+    ui.fireEvent.tab();
+    expect(stop()).toBe('After');
+
+    disabled.next(false);
+    ui.frame();
+    ui.fireEvent.shiftTab();
+    expect(stop()).toBe('Off');
   });
 
   it('takes children in place of the label, and keeps the label as the name', () => {

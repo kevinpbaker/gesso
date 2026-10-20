@@ -298,6 +298,29 @@ describe('Breadcrumb: collapsing', () => {
     expect(ui.getByRole('button')).toHaveSemantics({ role: 'button', name: 'Show 3 hidden steps' });
   });
 
+  it('wraps a long trail inside its box rather than running off the side', () => {
+    const long = trail(...Array.from({ length: 15 }, (_, at) => `Crumb ${at + 1}`));
+    const ui = renderTest(Column({ width: 360, x: 'start' }, createComponent(Breadcrumb, { items: long })), {
+      width: 640,
+      height: 300
+    });
+    const nav = ui.getLayout(ui.getByRole('navigation'))!;
+    // Fifteen crumbs drew one line 1385 pixels long in a 360 box.
+    expect(nav.width).toBeLessThanOrEqual(360);
+    for (const crumb of ui.getAllByRole('listitem')) {
+      const box = ui.getLayout(crumb)!;
+      expect(box.x + box.width).toBeLessThanOrEqual(360);
+    }
+    // And a line never starts with a mark: it travels with its crumb.
+    const lines = new Map<number, number>();
+    for (const crumb of ui.getAllByRole('listitem')) {
+      const box = ui.getLayout(crumb)!;
+      lines.set(box.y, Math.min(lines.get(box.y) ?? Infinity, box.x));
+    }
+    expect(lines.size).toBeGreaterThan(1);
+    expect([...lines.values()].every(x => x === 0)).toBe(true);
+  });
+
   it('draws no fold when there is nothing between the ends to fold', () => {
     // `maxItems` below 3 asks for a trail shorter than the collapsed
     // form, which is itself three crumbs. It collapses as far as it
