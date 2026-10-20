@@ -128,7 +128,7 @@ export const segmentedControlFixture: WorkbenchFixture = {
     },
     {
       name: 'Long labels in a narrow box',
-      try: 'Words are never cut in half. Note whether the track runs past the card’s right edge; segments must not overlap each other.',
+      try: 'Words are never cut in half, so the track runs past the card’s right edge rather than squeeze them: by design, see the segment note in SegmentedControl.ts. Segments must not overlap each other.',
       width: 200,
       render: () => <SegmentedControl label="Density" options={LONG} defaultValue="compact" size="small" />
     }

@@ -1,5 +1,6 @@
 import { combineLatest, map, type Observable } from 'rxjs';
 import {
+  type UiNodeRef,
   Row,
   Text,
   defaultSpacing,
@@ -172,6 +173,8 @@ export interface SegmentedOption {
  * with nothing chosen rather than with its first segment lit.
  */
 export interface SegmentedControlProps extends ControlLayoutProps {
+  /** Receives the node that *is* the control, for focus and anchoring. */
+  ref?: UiNodeRef;
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
@@ -186,7 +189,7 @@ export interface SegmentedControlProps extends ControlLayoutProps {
 export function SegmentedControl(inputs: Inputs<SegmentedControlProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const disabled = input(inputs.disabled, false);
-  const focus = trackFocus(ctx);
+  const focus = trackFocus(ctx, inputs.ref);
 
   // Read once, as `Button` reads its size and `Chip` its variant: a
   // size picks one row of the token table, every metric on the track

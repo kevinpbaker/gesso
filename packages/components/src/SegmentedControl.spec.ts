@@ -317,3 +317,23 @@ describe('SegmentedControl', () => {
     }
   });
 });
+
+describe('SegmentedControl, ref', () => {
+  it('hands its ref the track, the node that is the control', () => {
+    // Every other control takes a `ref`; this one did not, so a form
+    // could not focus it after a failed validation or anchor to it.
+    let held: UiNode | null = null;
+    const ui = mount(
+      createComponent(SegmentedControl, {
+        label: 'View',
+        options: VIEWS,
+        defaultValue: 'day',
+        ref: (node: UiNode | null) => {
+          held = node;
+        }
+      })
+    );
+
+    expect(held).toBe(ui.getByRole('radiogroup'));
+  });
+});

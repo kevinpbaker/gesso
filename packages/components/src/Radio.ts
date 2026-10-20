@@ -1,5 +1,15 @@
 import { combineLatest, map, type Observable } from 'rxjs';
-import { type UiNodeRef, Box, Column, Row, Text, type UiChild, type UiElement, type UiSemanticState } from 'gesso-core';
+import {
+  type UiNodeRef,
+  Box,
+  Column,
+  resolveString,
+  Row,
+  Text,
+  type UiChild,
+  type UiElement,
+  type UiSemanticState
+} from 'gesso-core';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { controlled, type ControlledValue } from './controlled';
@@ -49,7 +59,14 @@ export interface RadioGroupProps extends ControlLayoutProps {
   /** What is wrong with the choice, shown under the options. */
   error?: string;
   required?: boolean;
-  /** How the options stack. Default `column`. */
+  /**
+   * How the options stack. Default `column`.
+   *
+   * **Read once, when the group renders**, as `SegmentedControl` reads
+   * its `size`: a row and a column are different elements, and swapping
+   * one for the other under a group that has focus would take the focus
+   * with it. A group that has to change direction changes its `key`.
+   */
   direction?: 'row' | 'column';
 }
 
@@ -87,6 +104,19 @@ export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContex
     value.change(options[next].value);
   };
 
+  /**
+   * Whether the group reads right to left, asked when a key arrives.
+   *
+   * A row of options lays out from the right under `textDirection:
+   * 'rtl'`, so the next option is to the left of the chosen one and
+   * Right has to mean the previous one, as it does in `Slider`. Up and
+   * Down are not about reading direction and stay as they are.
+   */
+  const rtl = (): boolean => {
+    const node = focus.node();
+    return node !== null && resolveString(node, 'textDirection') === 'rtl';
+  };
+
   const edge = (which: 'first' | 'last'): void => {
     const options = enabled();
     if (options.length > 0) {
@@ -103,7 +133,7 @@ export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContex
   };
 
   const rows = inputs.options.pipe(
-    map(options => options.map(option => radio(option, value, disabled, focus.focused, select)))
+    map(options => options.map(option => radio(option, value, disabled, invalid, focus.focused, select)))
   );
 
   const group = {
@@ -118,9 +148,9 @@ export function RadioGroup(inputs: Inputs<RadioGroupProps>, ctx: ComponentContex
     states: states(invalid, required),
     onKeyDown: keymap({
       ArrowDown: () => step(1),
-      ArrowRight: () => step(1),
+      ArrowRight: () => step(rtl() ? -1 : 1),
       ArrowUp: () => step(-1),
-      ArrowLeft: () => step(-1),
+      ArrowLeft: () => step(rtl() ? 1 : -1),
       Home: () => edge('first'),
       End: () => edge('last')
     })
@@ -144,6 +174,7 @@ function radio(
   option: RadioOption,
   value: ControlledValue<string>,
   groupDisabled: Observable<boolean>,
+  invalid: Observable<boolean>,
   groupFocused: Observable<boolean>,
   select: (option: RadioOption) => void
 ): UiElement {
@@ -171,7 +202,14 @@ function radio(
         flexShrink: 0,
         borderRadius: 9,
         borderWidth: 1,
-        borderColor: active.pipe(map(on => (on ? 'controlAccent' : 'controlBorder'))),
+        // Invalid rings every circle in the danger colour, as `Checkbox`
+        // rings its box: without it a group marked wrong drew exactly as
+        // a valid one, and only the message under it said otherwise.
+        // The focused choice keeps the accent, since where the arrows
+        // will land is what focus has to show.
+        borderColor: combineLatest([active, invalid]).pipe(
+          map(([on, bad]) => (on ? 'controlAccent' : bad ? 'danger' : 'controlBorder'))
+        ),
         backgroundColor: 'controlBackground',
         x: 'center',
         y: 'center',

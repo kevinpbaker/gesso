@@ -64,7 +64,12 @@ export interface TextInputProps extends ControlLayoutProps {
    * line, whatever `multiline` says.
    */
   secret?: boolean;
-  /** Enter in a single-line field. */
+  /**
+   * Enter in a single-line field. In a multiline one Enter is a new
+   * line, so it is Command-Enter or Control-Enter there, either on every
+   * platform as `Mod` is in `UiShortcuts`: the convention a comment box
+   * or a chat composer has taught.
+   */
   onSubmit?: () => void;
   /**
    * The label is the field's name and is not drawn above it: for a
@@ -146,9 +151,11 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       states: states(invalid, required, readOnly),
       onInput: (event: UiTextChangeEvent) => value.change(event.value),
       // Enter belongs to the app in a single-line field; in a
-      // multiline one it belongs to the text.
+      // multiline one it belongs to the text, and the app has it only
+      // with Command or Control held. Without that a TextArea, whose
+      // props carry `onSubmit` like any field's, never called it.
       onKeyDown: (event: UiKeyboardEvent) => {
-        if (!lines.value || secret.value) {
+        if (!lines.value || secret.value || event.modifiers.meta || event.modifiers.ctrl) {
           submit(event);
         }
       }

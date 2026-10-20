@@ -68,13 +68,13 @@ export const numberInputFixture: WorkbenchFixture = {
     },
     {
       name: 'Bounded 1 to 8, set from outside',
-      try: 'Press + until 8: it stops there and the next press does nothing. Press Eight and One: the field follows. Type 20: it shows 8 at once, and the line says 8.',
+      try: 'Press + until 8: it stops there and the next press does nothing. Press Eight and One: the field follows. Type 20: the field keeps 20 while you type, and Tab or Enter turns it into 8, with the line saying 8.',
       stretch: true,
       render: () => <Guests />
     },
     {
       name: 'Typing past the minimum',
-      try: 'Min is 10. Select the text and type 15: the field should end up at 15. Watch whether the first key (1) is snapped up to 10 before the 5 arrives.',
+      try: 'Min is 10. Select the text and type 15: the field shows 1, then 15, never 10, and the line says 15. Type 5 and Tab away: it becomes 10.',
       stretch: true,
       render: () => <Echoed label="Age" start={18} min={10} max={99} />
     },
@@ -98,7 +98,7 @@ export const numberInputFixture: WorkbenchFixture = {
     },
     {
       name: 'Leaving the field empty or wrong',
-      try: 'Select all, delete, and Tab away: the field fills with the minimum (5), not 0 and not blank. Then type abc and Tab away: the same.',
+      try: 'Select all, delete, and Tab away: the field goes back to the value it had (7), not 0, not the minimum and not blank, and the line does not move. Then type abc and Tab away: the same.',
       stretch: true,
       render: () => <Echoed label="Retries" start={7} min={5} max={10} />
     },

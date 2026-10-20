@@ -121,9 +121,9 @@ export const sliderFixture: WorkbenchFixture = {
     },
     {
       name: 'Mirrored',
-      try: 'Switch the toolbar to Right to left: note whether the fill grows from the right, and whether Right arrow and a click near the right edge agree with what is drawn.',
+      try: 'Switch the toolbar to Right to left: the fill grows from the right, Left makes it longer and Right shorter, and a click near the right edge sets a low value, where the fill then ends. The handle stays centred on the end of the fill.',
       stretch: true,
-      render: () => <Slider label="Volume" defaultValue={25} />
+      render: () => <Slider label="Volume" thumb defaultValue={25} />
     }
   ]
 };

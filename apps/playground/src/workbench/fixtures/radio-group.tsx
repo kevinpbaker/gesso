@@ -116,7 +116,7 @@ export const radioGroupFixture: WorkbenchFixture = {
     },
     {
       name: 'Required with an error',
-      try: 'The message shows under the options. Choose any option: the message goes, and the options do not jump up by more than the message’s height.',
+      try: 'The message shows under the options and every circle is ringed in red. Choose any option: the message and the red rings go, and the options do not jump up by more than the message’s height.',
       render: () => <Required />
     },
     {

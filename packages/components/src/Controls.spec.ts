@@ -455,20 +455,24 @@ describe('NumberInput', () => {
     expect(type('a')).toEqual([]);
   });
 
-  it('shows its bound when typed past it, whoever owns the value', () => {
-    const typedPast = (props: { defaultValue: number } | { value: number }): unknown => {
+  it('shows its bound when left past it, whoever owns the value', () => {
+    const typedPast = (props: { defaultValue: number } | { value: number }): unknown[] => {
       const ui = mount(createComponent(NumberInput, { label: 'Guests', max: 3, ...props }));
-      ui.focusRole('spinbutton');
+      const field = ui.focusRole('spinbutton');
       ui.fireEvent.keyDown('End');
       ui.fireEvent.type('9');
       ui.frame();
-      return ui.getByRole('spinbutton').properties.get('value');
+      const typed = field.properties.get('value');
+      ui.fireEvent.blur();
+      ui.frame();
+      return [typed, field.properties.get('value')];
     };
 
-    // The field holds "3" and typing makes "39": the value stays 3, so
-    // nothing else tells the field to put it back.
-    expect(typedPast({ defaultValue: 3 })).toBe('3');
-    expect(typedPast({ value: 3 })).toBe('3');
+    // The field holds "3" and typing makes "39", which it keeps while it
+    // is being typed into (see NumberInput.spec.ts for why). Left, the
+    // value stays 3, so nothing else tells the field to put it back.
+    expect(typedPast({ defaultValue: 3 })).toEqual(['39', '3']);
+    expect(typedPast({ value: 3 })).toEqual(['39', '3']);
   });
 });
 

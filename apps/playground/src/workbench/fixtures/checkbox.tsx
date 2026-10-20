@@ -24,7 +24,7 @@ function SetFromOutside(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const checked = internalState(true);
   return (
     <column gap={8} x="start">
-      <Checkbox label="Email me a receipt" {...bind(checked, 'checked', 'onChange')} />
+      <Checkbox label="Email me a receipt" {...bind(checked, 'checked')} />
       <row gap={8} y="center">
         <Button
           label="Flip from outside"
@@ -46,7 +46,7 @@ function Refusing(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const updates = internalState(false);
   return (
     <column gap={8} x="start">
-      <Checkbox label="Accept the terms" {...bind(terms, 'checked', 'onChange')} />
+      <Checkbox label="Accept the terms" {...bind(terms, 'checked')} />
       <Checkbox
         label="Send me product updates"
         checked={updates}
@@ -67,7 +67,7 @@ function RequiredWithError(_inputs: Inputs<{}>, _ctx: ComponentContext) {
     <Checkbox
       label="I have read the safety notes"
       required
-      {...bind(agreed, 'checked', 'onChange')}
+      {...bind(agreed, 'checked')}
       error={agreed.pipe(map(on => (on ? '' : 'Tick this to continue')))}
     />
   );
