@@ -285,11 +285,10 @@ export function Meter(inputs: Inputs<MeterProps>, _ctx: ComponentContext): UiChi
       // fraction, which is what `ProgressBar` does and for the reason it
       // does it: the fill is then layout, so it follows the track when
       // the meter is resized, and a fraction of 0 is an absent box
-      // rather than a flex child that still claims its basis.
+      // rather than a flex child that still claims its basis. In flow
+      // rather than pinned to `left: 0`, so the track's start alignment
+      // places it and mirrors it under a right-to-left reading.
       Box({
-        position: 'absolute',
-        top: 0,
-        left: 0,
         height: THICKNESS,
         borderRadius: RADIUS,
         width: fraction.pipe(map(part => percent(part * 100))),

@@ -288,7 +288,7 @@ function PlayerCard(inputs: Inputs<{ cues: readonly VttCue[] }>, _ctx: Component
       <VideoPlayer
         src={`${CLIP}?player`}
         alt="A test pattern with a frame counter"
-        captions={inputs.cues.value}
+        captions={inputs.cues}
         loop={true}
         width={PICTURE + 40}
         height={PICTURE_HEIGHT}

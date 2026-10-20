@@ -4,7 +4,16 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent, type ComponentProps } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Column, percent, type UiChild, type UiNode, UiNodeType, defineModifier } from 'gesso-core';
+import {
+  Column,
+  percent,
+  type UiChild,
+  type UiNode,
+  UiNodeType,
+  defineModifier,
+  lightTheme,
+  type UiTheme
+} from 'gesso-core';
 
 import { Meter } from './Meter';
 
@@ -101,12 +110,15 @@ describe('Meter', () => {
   });
 
   it('draws the fill as a percentage of the track, so it follows a resize', () => {
-    const { root } = mount({ value: 0.25 });
+    const { ui, root } = mount({ value: 0.25 });
 
     const bar = fill(root());
     expect(bar.properties.get('width')).toEqual(percent(25));
-    expect(bar.properties.get('position')).toBe('absolute');
-    expect(bar.properties.get('left')).toBe(0);
+    // From the track's start edge, which is its left in a reading that
+    // runs that way; see the right-to-left case at the end.
+    const track = ui.getLayout(root().firstChild!);
+    expect(ui.getLayout(bar).x).toBe(track.x);
+    expect(ui.getLayout(bar).width).toBeCloseTo(track.width / 4);
   });
 
   it('paints one band in the accent when no edge was named', () => {
@@ -227,5 +239,38 @@ describe('Meter', () => {
     // A component's own node is its anchor fragment, which takes no
     // modifier, so this is the only way a `motion` reaches the bar.
     expect(attachedTo).toContain(root());
+  });
+});
+
+describe('Meter, right to left', () => {
+  it('fills from the right, the way the reading runs', () => {
+    const rtl: UiTheme = {
+      ...lightTheme,
+      typography: Object.fromEntries(
+        Object.entries(lightTheme.typography).map(([role, style]) => [role, { ...style, textDirection: 'rtl' }])
+      ) as unknown as UiTheme['typography']
+    };
+    let host: UiNode | null = null;
+    const ui = renderTest(
+      Column(
+        {
+          ref: (node: UiNode | null) => (host = node),
+          width: 240,
+          padding: 8,
+          theme: rtl,
+          textStyle: rtl.typography.body
+        },
+        createComponent(Meter, { value: 0.25, label: 'Disk' })
+      ),
+      { width: 240, height: 120 }
+    );
+    ui.frame();
+    const track = firstElement(host!).firstChild!;
+    const part = fill(firstElement(host!));
+    const box = ui.getLayout(track);
+    // A meter in an Arabic or Hebrew interface fills from the right, as
+    // the browser's own meter does; pinned to `left: 0` it did not.
+    expect(ui.getLayout(part).width).toBeCloseTo(box.width / 4);
+    expect(ui.getLayout(part).x + ui.getLayout(part).width).toBeCloseTo(box.x + box.width);
   });
 });

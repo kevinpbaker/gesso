@@ -1,6 +1,14 @@
 import { combineLatest, filter, map, type Observable } from 'rxjs';
 
-import { computed, createComponent, input, show, type ComponentContext, type Inputs } from 'gesso-framework';
+import {
+  computed,
+  createComponent,
+  input,
+  internalState,
+  show,
+  type ComponentContext,
+  type Inputs
+} from 'gesso-framework';
 import { Box, nextGraphemeEnd, Text, type UiChild, type UiNodeRef } from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import { Icon, Image } from './Media';
@@ -26,22 +34,16 @@ import { Icon, Image } from './Media';
  * without rebuilding anything else, and one whose url merely changes
  * keeps the same `Image` and lets it follow the new source.
  *
- * **The chain cannot include a failed load, and this is the reason.**
- * `Image` is handed an `onState` by `imageSource` and hears `loading`,
- * `loaded` and `failed` — but it keeps that in an `internalState` of
- * its own and spends it on the placeholder tint. `ImageProps` has no
- * `onError`, no `onState` and no status output of any kind, so nothing
- * outside an `Image` can learn that its source did not resolve; the
- * `Image` documentation page says as much, in the words "there is no
- * error slot: draw your own beside it". So this component falls back
- * on an **absent or empty `src` only**, which is a question it can
- * actually answer, rather than pretending to a recovery it has no way
- * to trigger. A url that 404s leaves the avatar showing the
- * `placeholder` ground the `Image` is tinted with, which is the same
- * ground the initials would have stood on, so the failure degrades to
- * a blank disc rather than to a hole. If `ImageProps` ever grows a
- * status output, the third branch of `layer` below is the one line
- * that changes.
+ * **A picture that will not load counts as no picture.** A url that
+ * 404s is the commonest broken avatar there is (an account whose
+ * picture was deleted, a CDN that expired it), and it used to leave a
+ * blank disc where the person's initials belonged, because `Image`
+ * had no way to say it had failed. It has `onState` now, and a failed
+ * load drops the avatar to the next link of the chain. The failure is
+ * remembered against the sources that failed, not as a flag, so a new
+ * `src` is tried afresh rather than written off with the old one.
+ * While a picture is still loading, the disc shows the `placeholder`
+ * ground the initials stand on, which is the same colour either way.
  *
  * ## Nothing here is a colour prop
  *
@@ -185,13 +187,15 @@ const PERSON =
   'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z';
 
 export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiChild {
-  // Normalised to a candidate list, so the two places that ask
-  // "is there a picture?" and the one that hands it to `Image` all
-  // read the same shape, and a list of nothing but blanks counts as
-  // no picture rather than as a fetch that can only fail.
-  const source = input(inputs.src, '' as string | readonly string[]).pipe(
-    map(value => (typeof value === 'string' ? [value] : value).map(url => url.trim()).filter(url => url.length > 0))
-  );
+  const source = input(inputs.src, '' as string | readonly string[]).pipe(map(candidatesOf));
+  // Which sources failed, as one key, so that a `src` which changes is
+  // a new chance rather than a picture already given up on.
+  const failed = internalState<string | null>(null, 'Avatar.failed');
+  const onState = (state: 'loading' | 'loaded' | 'failed'): void => {
+    if (state === 'failed') {
+      failed.value = keyOf(candidatesOf(inputs.src.value ?? ''));
+    }
+  };
   const name = input(inputs.name, '').pipe(map(person => person.trim()));
   const given = input(inputs.initials, '').pipe(map(text => text.trim()));
 
@@ -212,8 +216,10 @@ export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiC
     map(([explicit, person]) => (explicit.length > 0 ? explicit : deriveInitials(person)))
   );
 
-  const layer: Observable<AvatarLayer> = combineLatest([source, initials]).pipe(
-    map(([candidates, text]) => (candidates.length > 0 ? 'picture' : text.length > 0 ? 'initials' : 'glyph'))
+  const layer: Observable<AvatarLayer> = combineLatest([source, initials, failed]).pipe(
+    map(([candidates, text, lost]) =>
+      candidates.length > 0 && keyOf(candidates) !== lost ? 'picture' : text.length > 0 ? 'initials' : 'glyph'
+    )
   );
   const showing = (which: AvatarLayer): Observable<boolean> => layer.pipe(map(current => current === which));
 
@@ -267,7 +273,8 @@ export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiC
         objectFit: 'cover',
         // The same ground the initials stand on, so the disc does not
         // change colour between waiting for a picture and having none.
-        placeholderColor: 'placeholder'
+        placeholderColor: 'placeholder',
+        onState
         // No `alt`: the avatar itself carries the role and the name,
         // and a second record inside it would announce the person
         // twice.
@@ -296,6 +303,21 @@ export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiC
       })
     )
   );
+}
+
+/**
+ * `src` as a candidate list, so the places that ask "is there a
+ * picture?" and the one that hands it to `Image` all read the same
+ * shape, and a list of nothing but blanks counts as no picture rather
+ * than as a fetch that can only fail.
+ */
+function candidatesOf(value: string | readonly string[]): readonly string[] {
+  return (typeof value === 'string' ? [value] : value).map(url => url.trim()).filter(url => url.length > 0);
+}
+
+/** One string for a candidate list, to remember which one failed. */
+function keyOf(candidates: readonly string[]): string {
+  return candidates.join('\n');
 }
 
 /** A named step's side, or the number the caller gave. */

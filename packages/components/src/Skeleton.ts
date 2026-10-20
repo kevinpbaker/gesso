@@ -102,6 +102,10 @@ export interface SkeletonProps extends ControlLayoutProps {
    * grey is a page that is harder to read past than a page of still
    * grey. Turn it on where the wait is long enough that a still block
    * starts to read as a broken layout.
+   *
+   * Read once, when the skeleton is built: a stand-in that has to start
+   * or stop breathing changes its `key`, or is built again under a
+   * `show`. See `breath` below for why.
    */
   shimmer?: boolean;
   /** A round stand-in, for an avatar's place. */
@@ -183,6 +187,7 @@ export interface SkeletonTextProps extends ControlLayoutProps {
   lineHeight?: number;
   /** The space between bars. */
   gap?: number;
+  /** As `Skeleton`'s: breathe rather than stand still. Read once. */
   shimmer?: boolean;
   label?: string;
   announce?: boolean;

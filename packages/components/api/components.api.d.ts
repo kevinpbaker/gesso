@@ -163,6 +163,7 @@ interface SegmentedOption {
   readonly disabled?: boolean;
 }
 interface SegmentedControlProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
@@ -816,6 +817,7 @@ interface ImageProps extends ControlLayoutProps, MediaPlaceholderProps {
   alt?: string;
   objectFit?: ObjectFit;
   borderRadius?: number;
+  onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 declare function Image(inputs: Inputs<ImageProps>, ctx: ComponentContext): UiChild;
 interface VideoProps extends ControlLayoutProps, MediaPlaceholderProps {
@@ -1037,7 +1039,7 @@ interface CaptionsProps extends ControlLayoutProps {
   color?: UiColorValue;
 }
 declare function Captions(inputs: Inputs<CaptionsProps>, _ctx: ComponentContext): UiChild;
-interface VideoPlayerProps extends ControlLayoutProps {
+interface VideoPlayerProps extends ControlLayoutProps, MediaPlaceholderProps {
   src: string;
   alt?: string;
   captions?: readonly VttCue[];
@@ -1047,6 +1049,11 @@ interface VideoPlayerProps extends ControlLayoutProps {
   borderRadius?: number;
   onTransport?: (transport: VideoTransport) => void;
   onVolume?: (volume: number, muted: boolean) => void;
+  onState?: (state: VideoState, error?: unknown) => void;
+  poster?: string;
+  volume?: number;
+  muted?: boolean;
+  rate?: number;
 }
 declare function VideoPlayer(inputs: Inputs<VideoPlayerProps>, ctx: ComponentContext): UiChild;
 export {

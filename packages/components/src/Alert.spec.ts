@@ -149,6 +149,28 @@ describe('Alert', () => {
     expect(banner(ui).properties.get('borderColor')).toBe('controlBorder');
   });
 
+  it('draws no title line while a bound title is empty, and one once it is not', () => {
+    const title = internalState('');
+    const ui = mount({ title, message: 'These numbers are an hour old.' });
+    const bare = mount({ message: 'These numbers are an hour old.' });
+    const height = (mounted: ReturnType<typeof mount>) => mounted.getLayout(banner(mounted)).height;
+
+    // A title bound to a cell that starts empty is a title that has not
+    // arrived yet, not one the caller declined, and the line it would
+    // stand on was drawn blank above the message.
+    expect(height(ui)).toBe(height(bare));
+    expect(texts(ui)).toEqual(['These numbers are an hour old.']);
+
+    title.value = 'Stale data';
+    ui.frame();
+    expect(texts(ui)).toEqual(['Stale data', 'These numbers are an hour old.']);
+    expect(height(ui)).toBeGreaterThan(height(bare));
+
+    title.value = '';
+    ui.frame();
+    expect(height(ui)).toBe(height(bare));
+  });
+
   it('keeps the role it was built with, so a tone that turns dangerous changes the key instead', () => {
     const tone = internalState<'neutral' | 'accent' | 'danger'>('neutral');
     const ui = mount({ title: 'Syncing', tone });

@@ -117,7 +117,7 @@ export const avatarFixture: WorkbenchFixture = {
     },
     {
       name: 'Broken picture',
-      try: 'The source 404s. Look at what is left: today it is an empty placeholder disc, not the GH initials beside it. Decide whether that is acceptable.',
+      try: 'The source 404s. After a moment on the plain disc the avatar falls back to the initials, GH, exactly like the one beside it; never an empty disc.',
       render: () => (
         <row gap={10} y="center">
           <Avatar src="/no-such-avatar.png" name="Grace Hopper" size="large" />

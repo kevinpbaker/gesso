@@ -18,6 +18,7 @@ import {
   controlled,
   createComponent,
   input,
+  show,
   type ComponentContext,
   type ControlledValue,
   type Inputs
@@ -164,17 +165,23 @@ export function Chip(inputs: Inputs<ChipProps>, ctx: ComponentContext): UiChild 
     value.change(!value.current());
   };
 
-  const children: UiChild[] = [];
-  if (inputs.icon.value !== undefined) {
-    children.push(
-      createComponent(Icon, {
-        path: input(inputs.icon, ''),
-        size: metrics.icon,
-        color: foreground
-      })
-    );
-  }
-  children.push(
+  // The glyph and the figure are followed rather than read once. A
+  // filter row is drawn before the counts behind it come back, so a
+  // count that started undefined is the usual case, and one read at
+  // build was never drawn although the name above already said it.
+  // Each is in the tree only while it has something to show, so a chip
+  // without one keeps no gap for it.
+  const icon = input(inputs.icon, undefined);
+  const children: UiChild[] = [
+    show(
+      computed(() => (icon.value ?? '') !== ''),
+      () =>
+        createComponent(Icon, {
+          path: computed(() => icon.value ?? ''),
+          size: metrics.icon,
+          color: foreground
+        })
+    ),
     Text({
       text: label,
       // A role rather than a size and a weight, so the word on a chip is
@@ -184,19 +191,19 @@ export function Chip(inputs: Inputs<ChipProps>, ctx: ComponentContext): UiChild 
       color: foreground,
       textWrap: 'none',
       selectable: false
-    })
-  );
-  if (count.value !== undefined) {
-    children.push(
-      Text({
-        text: computed(() => String(count.value ?? '')),
-        textStyle,
-        color: foreground,
-        textWrap: 'none',
-        selectable: false
-      })
-    );
-  }
+    }),
+    show(
+      computed(() => count.value !== undefined),
+      () =>
+        Text({
+          text: computed(() => String(count.value ?? '')),
+          textStyle,
+          color: foreground,
+          textWrap: 'none',
+          selectable: false
+        })
+    )
+  ];
 
   return ButtonElement(
     {
