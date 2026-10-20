@@ -820,3 +820,97 @@ describe('a sheet with a frozen pane', () => {
     expect(rows(sheet)).toContain(0);
   });
 });
+
+describe('a sheet that recycles its rows', () => {
+  /** The slot each row was last built in, by row, as the renderer was told it. */
+  const recycled = (options: Partial<ConstructorParameters<typeof UiVirtualSheet>[0]> = {}) => {
+    const told = new Map<number, number | undefined>();
+    const sheet = new UiVirtualSheet(
+      {
+        rowCount: 10_000,
+        columnCount: 100,
+        rowHeight: ROW,
+        columnWidth: COLUMN,
+        rowOverscan: 1,
+        columnOverscan: 1,
+        initialViewport: { width: 500, height: 240 },
+        recycleRows: true,
+        ...options
+      },
+      (row, first, last, slot) => {
+        told.set(row, slot);
+        return renderRow(row, first, last);
+      }
+    );
+    return { sheet, told };
+  };
+  const slotKeys = (sheet: UiVirtualSheet): string[] =>
+    sheet.children$.value.map(child => String(child.props.key)).filter(key => key.startsWith('sheet:slot:'));
+  const at = (scrollY: number) => ({ scrollX: 0, scrollY, width: 500, height: 240 });
+
+  it('keys each row by its slot and tells the renderer which', () => {
+    const { sheet, told } = recycled();
+    expect(slotKeys(sheet)).toEqual(Array.from({ length: 12 }, (_, slot) => `sheet:slot:${slot}`));
+    expect(told.get(0)).toBe(0);
+    expect(told.get(11)).toBe(11);
+  });
+
+  it('mounts a jump in the slots the rows it replaced gave up', () => {
+    const { sheet, told } = recycled();
+    sheet.update(at(100 * ROW));
+    const before = new Set(slotKeys(sheet));
+    sheet.update(at(5_000 * ROW));
+    // The same slots, so the same nodes, holding other rows.
+    expect(new Set(slotKeys(sheet))).toEqual(before);
+    expect(told.get(5_000)).toBeDefined();
+    expect(sheet.range$.value.firstRow).toBeGreaterThan(4_000);
+  });
+
+  it('keeps a row in its slot while it stays in view, and moves one slot for a one-row scroll', () => {
+    const { sheet, told } = recycled();
+    sheet.update(at(100 * ROW));
+    const first = sheet.range$.value.firstRow;
+    const last = sheet.range$.value.lastRow;
+    const leaving = told.get(first);
+    const staying = told.get(first + 1);
+    const size = slotKeys(sheet).length;
+    told.clear();
+    sheet.update(at(101 * ROW));
+    // The row that came in took the slot the row that left gave up.
+    expect(told.get(last + 1)).toBe(leaving);
+    // The rows still in view were not built again, and kept their slots.
+    expect(told.has(first + 1)).toBe(false);
+    expect(slotKeys(sheet)).toContain(`sheet:slot:${staying}`);
+    expect(slotKeys(sheet)).toHaveLength(size);
+  });
+
+  it('keeps the slots through a change of columns, which rebuilds the rows in them', () => {
+    const { sheet, told } = recycled();
+    const slotOfRow3 = told.get(3);
+    told.clear();
+    sheet.update({ scrollX: 5 * COLUMN, scrollY: 0, width: 500, height: 240 });
+    expect(told.get(3)).toBe(slotOfRow3);
+  });
+
+  it('grows the pool only when the window does', () => {
+    const { sheet } = recycled();
+    sheet.update({ scrollX: 0, scrollY: 100 * ROW, width: 500, height: 480 });
+    const tall = slotKeys(sheet).length;
+    sheet.update(at(3_000 * ROW));
+    const short = slotKeys(sheet).length;
+    expect(short).toBeLessThan(tall);
+    sheet.update({ scrollX: 0, scrollY: 6_000 * ROW, width: 500, height: 480 });
+    // Back to the tall window, in the slots it had before.
+    expect(slotKeys(sheet).every(key => Number(key.slice('sheet:slot:'.length)) < tall)).toBe(true);
+  });
+
+  it('keys a frozen row by its row, with no slot', () => {
+    const { sheet, told } = recycled({ frozenRows: 2 });
+    sheet.update(at(80 * ROW));
+    const keys = sheet.children$.value.map(child => String(child.props.key));
+    expect(keys).toContain('sheet:row:0');
+    expect(keys).toContain('sheet:row:1');
+    expect(told.get(0)).toBeUndefined();
+    expect(told.get(80)).toBeDefined();
+  });
+});
