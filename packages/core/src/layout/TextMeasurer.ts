@@ -410,8 +410,10 @@ class ParagraphCache {
 
 /** A least-recently-used map of paragraphs, bounded by count and by text; see `PARAGRAPH_CACHE_ENTRIES`. */
 class ParagraphLru {
-  private readonly entries = new Map<string, { paragraph: ParagraphLayout; text: number }>();
+  private readonly entries = new Map<string, { paragraph: ParagraphLayout; text: number; at: number }>();
   private text = 0;
+  /** Counts insertions, so an entry knows how far back in the map's order it sits. */
+  private tick = 0;
 
   constructor(
     private readonly maxEntries: number,
@@ -427,9 +429,19 @@ class ParagraphLru {
     if (entry === undefined) {
       return undefined;
     }
-    // Re-inserted so the map's order is recency, which eviction reads.
-    this.entries.delete(key);
-    this.entries.set(key, entry);
+    // Re-inserted so the map's order is recency, which eviction reads —
+    // but only once it has aged into the older half, where eviction could
+    // reach it. Re-inserting on every hit was a delete and a set per text
+    // leaf per measure: a scrollbar drag through a sheet asks this ~500
+    // times a frame, and the touches alone cost 4.5 ms of a 21 ms frame,
+    // though the same calls take a third of a microsecond each out of a
+    // frame. An entry asked for while still in the newer half is at
+    // least half the cap from the front, so it is not the next to go.
+    if (this.tick - entry.at > this.entries.size / 2) {
+      this.entries.delete(key);
+      entry.at = ++this.tick;
+      this.entries.set(key, entry);
+    }
     return entry.paragraph;
   }
 
@@ -446,7 +458,7 @@ class ParagraphLru {
       this.entries.delete(oldest);
       this.text -= entry.text;
     }
-    this.entries.set(key, { paragraph, text });
+    this.entries.set(key, { paragraph, text, at: ++this.tick });
     this.text += text;
   }
 
