@@ -579,10 +579,11 @@ interface FanOutOptions<S, V, D> {
 }
 declare class FanCell<V, D = unknown> extends Observable<V> implements ReadableCell<V> {
   readonly key: FanKey;
-  readonly datum: D;
   readonly label: string | undefined;
   readonly subject: BehaviorSubject<V>;
+  held: D;
   constructor(initial: V, key: FanKey, datum: D, label: string | undefined);
+  get datum(): D;
   get value(): V;
 }
 declare function fanOut<S, V, D = undefined>(source: Observable<S>, read: (snapshot: S, key: FanKey, datum: D) => V, options: FanOutOptions<S, V, D>): FanOut<S, V, D>;
@@ -604,6 +605,7 @@ declare class FanOut<S, V, D = undefined> {
   get size(): number;
   for(key: FanKey, datum?: D): FanCell<V, D>;
   peek(key: FanKey): FanCell<V, D> | undefined;
+  move(key: FanKey, datum: D): FanCell<V, D>;
   release(key: FanKey): void;
   releaseAll(): void;
   close(): void;

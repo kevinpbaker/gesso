@@ -114,9 +114,8 @@ describe('fanOut', () => {
   });
 
   it('makes a key that is not live when asked to move it', () => {
-    const cells = fanOut<Grid, number, string>(new BehaviorSubject<Grid>({ r1: 1 }), (grid, _key, row) => grid[row] ?? 0, {
-      initial: 0
-    });
+    const source = new BehaviorSubject<Grid>({ r1: 1 });
+    const cells = fanOut<Grid, number, string>(source, (grid, _key, row) => grid[row] ?? 0, { initial: 0 });
     expect(cells.move('slot0', 'r1').value).toBe(1);
     expect(cells.size).toBe(1);
   });
