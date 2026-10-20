@@ -36,6 +36,7 @@ object.
 | `objectFit`        | `'fill' \| 'cover' \| 'contain' \| 'none'` | `'cover'`           | How the bitmap meets a box that is not its shape.                                         |
 | `borderRadius`     | `number`                                   | `0`                 | Rounds the box, and clips the picture to it.                                              |
 | `placeholderColor` | `UiColorValue`                             | `controlBackground` | The tint while the bitmap decodes, and after it fails.                                    |
+| `onState`          | `(state, error?) => void`                  | none                | Told when the picture starts loading, arrives, or fails, with the last error.             |
 | `ref`              | `UiNodeRef`                                | none                | Receives the node the picture is drawn on, for measuring it or anchoring something to it. |
 
 `src` is read once because a component's body runs once, and an image
@@ -114,13 +115,18 @@ is the theme's `controlBackground` unless the call site named another,
 and the fill is dropped when the bitmap arrives, so a list of
 thumbnails holds its shape instead of jumping as they land.
 
-A source that fails keeps that same tint and nothing else happens:
-there is no error slot, no retry, and no callback to hang one on. The
-broken picture in the example above is tinted `danger`, which is a
-placeholder colour doing the only thing a placeholder colour can do
-about a failure. What to do instead is draw your own beside it, and
-decide with the resolver whether to ask again. A rejection is not
-cached, so the next component that names the source does try again.
+A source that fails keeps that same tint, and `Image` draws nothing
+else: there is no error slot and no retry. What to show instead belongs
+to whatever holds the picture. [Avatar](/components/avatar) falls back
+to the person's initials; a gallery might draw a broken-picture glyph.
+`onState` is how they find out, called with `loading`, `loaded` or
+`failed`, the same as [Video](/components/video)'s. A failure is
+reported once every candidate in `src` has failed, and carries the last
+error. The broken picture in the example above is tinted `danger`,
+which is a placeholder colour doing the only thing a placeholder colour
+can do about a failure on its own. Whether to ask again is decided with
+the resolver. A rejection is not cached, so the next component that
+names the source does try again.
 
 ## Fits
 

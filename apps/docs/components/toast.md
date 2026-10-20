@@ -33,7 +33,7 @@ seconds; the second is an error, has no duration, and stays until the
 | `onClose`     | `() => void`                                 | none             | Called when the timer expires or the ✕ is pressed. Write `open` back here.      |
 | `message`     | `string`                                     | `''`             | The text, and the accessible name of the box.                                   |
 | `tone`        | `'info' \| 'error'`                          | `'info'`         | `info` waits its turn; `error` interrupts. See the semantics below.             |
-| `duration`    | `number`                                     | `4000`           | Milliseconds before it dismisses itself. `0` keeps it up.                       |
+| `duration`    | `number`                                     | `4000`           | Milliseconds before it dismisses itself, paused while hovered. `0` keeps it up. |
 | `dismissible` | `boolean`                                    | `true`           | Shows the ✕ that closes it.                                                     |
 | `action`      | `string`                                     | `''`             | The text of a button that acts on the notice: `Undo`, `Retry`. None when empty. |
 | `onAction`    | `() => void`                                 | none             | Called when the action is pressed. The toast then closes, through `onClose`.    |
@@ -53,13 +53,28 @@ message that changes while a toast is up changes what is on screen but
 not what was announced; raise a new toast instead of editing an open
 one. The spec beside the example measures both halves of that.
 
+Writing `open` true again while a toast is up is not a change, so it
+does not restart the timer: an input passes on a value only when it
+differs from the last, and there is nothing to hear. To raise a notice
+anew, close the toast first or mount a fresh one keyed by the notice.
+
+## The timer waits for the reader
+
+A toast with a `duration` waits while the pointer is on it or focus is
+in it, and when they leave starts its time again from the whole
+`duration`. Someone reading it, or tabbing to Undo as the seconds run
+out, would otherwise have it close under them, and focus would go with
+it.
+
 ## Where it is drawn
 
 A `Toast` returns a zero-size, invisible placeholder where you declare
 it, and its box is drawn in the overlay layer the runtime mounts above
 the app root, pinned 24 pixels off the bottom left corner of the
 viewport. Nothing in your layout moves when one opens, and nothing in
-your layout decides where it goes.
+your layout decides where it goes. `bottom-start` is the left corner in
+right-to-left text too, and `bottom-end` the right: the overlay layer
+places by the window's physical edges, not by reading direction.
 
 `placement` and `offset` move the pin, not the layout: `'bottom'`
 centres the toast along the bottom edge and `'bottom-end'` puts it in

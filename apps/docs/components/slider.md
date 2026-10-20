@@ -103,8 +103,8 @@ than on anything inside.
 
 | Key                | What it does                                           |
 | ------------------ | ------------------------------------------------------ |
-| Right, Up          | One step up                                            |
-| Left, Down         | One step down                                          |
+| Right, Up          | One step up (Right is one step down right to left)     |
+| Left, Down         | One step down (Left is one step up right to left)      |
 | Page Up, Page Down | A tenth of the range, or one step, whichever is larger |
 | Home               | `min`                                                  |
 | End                | `max`                                                  |
@@ -113,6 +113,12 @@ Every one of them clamps, so a step past the end of the range is the
 end of the range. A key that is bound here is consumed; anything else
 is left for whatever is listening above, which is what lets a slider
 sit inside a dialog that closes on Escape.
+
+Under `textDirection: 'rtl'` the track fills from the right, so Left and
+Right swap: Left makes the fill longer and Right makes it shorter, the
+way the eye reads the bar. Up and Down are not about reading direction
+and stay as they are. The direction is asked when the key arrives, so a
+slider moved into a right-to-left subtree follows it.
 
 ## Pointer
 
@@ -127,7 +133,10 @@ scroll container above from scrolling under the same finger.
 The strip you can grab is 20 pixels tall while the track drawn inside
 it is 6, so the target is bigger than the line. The filled part is a
 percentage of the track's width, which means the position of the value
-is laid out rather than computed per frame.
+is laid out rather than computed per frame. Right to left, a press is
+counted from where the track starts, its right edge, so a press near
+the right sets nearly the minimum; the thumb sits centred on the end of
+the fill either way.
 
 Touch was exercised in Chrome on Linux with synthetic pointers of
 `pointerType: 'touch'`, and on no physical touchscreen.

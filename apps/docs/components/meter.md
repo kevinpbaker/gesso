@@ -61,7 +61,8 @@ opposite order.
 Every prop takes a plain value or an Observable of one, and the layout
 props on [the library page](/components/) apply here too. The meter has
 no width of its own: the bar fills what it is given, so pass a `width`
-or a `flex`.
+or a `flex`. The fill grows from where the track starts, so under a
+right-to-left reading it fills from the right, the way the line reads.
 
 `value` is the only required prop, which is the difference from a
 progress bar in the type system as well as on the page. There is no

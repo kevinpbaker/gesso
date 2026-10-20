@@ -40,6 +40,16 @@ there.
 | `locale`       | `string`                  | runtime's   | A language tag for the names of days and months.                                       |
 | `ref`          | `UiNodeRef`               | none        | Receives the trigger.                                                                  |
 
+`min` and `max` are followed while the calendar is open, not worked
+out once for each month shown, so a bound that moves, a due date's
+`min` following its start, dims and announces the right days at once.
+
+In a narrow row the trigger gives way, as a select does: a long date or
+placeholder is cut short with an ellipsis before the chevron instead of
+running past the border. A value that isn't a real date shows the
+placeholder, muted the same as an empty one, rather than text that looks
+chosen.
+
 The date arithmetic is exported for an application that works in the
 same strings: `parseIsoDate`, `isoDate`, `todayIso`, `addDays`,
 `addMonths`, `monthGrid` and `formatDate`.
@@ -62,6 +72,8 @@ that traps focus, and focus starts in the grid of days.
 | `Tab`                | The month buttons, the grid, then Today and Clear |
 
 The cursor never leaves `min` and `max`; a move past either stops on it.
+Its ring is drawn in the focus ring's colour, so it still shows on the
+chosen day, whose fill is the accent.
 A month move keeps the day where the month has it and takes the month's
 last day where it doesn't. Closing, for any reason, hands focus back to
 the trigger.

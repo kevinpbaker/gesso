@@ -94,9 +94,9 @@ edge of the viewport without anything here watching layout.
 
 ## Keyboard
 
-`Tooltip` binds no keys, and neither the tooltip nor the wrapper is a
-tab stop. A tooltip that could be tabbed into would be a trap with no
-way out.
+`Tooltip` binds one key, Escape, and neither the tooltip nor the
+wrapper is a tab stop. A tooltip that could be tabbed into would be a
+trap with no way out.
 
 | Event          | What happens                                              |
 | -------------- | --------------------------------------------------------- |
@@ -105,6 +105,17 @@ way out.
 | Pointer down   | Closes                                                    |
 | Keyboard focus | Opens at once, with no delay, so a keyboard reaches it    |
 | Blur           | Closes                                                    |
+| Escape         | Closes, wherever focus is, until pointer or focus returns |
+
+Escape is there because what appears on hover has to be dismissable
+without moving the pointer or the focus (WCAG 1.4.13); otherwise a
+tooltip over what somebody wanted to read stays there. It is heard at
+the root rather than on the trigger, because a tooltip the pointer
+opened sits over an element that need not have focus, and in the
+capture phase, so an Escape that closes a tooltip inside a dialog does
+not close the dialog with it. It is spent only when it closed
+something: with no tooltip open, Escape goes on to the page as before.
+The `tooltip()` modifier behaves the same way.
 
 Focus opening it is why the trigger should be focusable in the first
 place. A tooltip on a box nothing can reach with Tab is a tooltip half

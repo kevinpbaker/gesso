@@ -12,7 +12,8 @@ no picture, which is the part an application otherwise writes again at
 every call site.
 
 The fallback chain is the whole component. A `src` draws the picture; no
-`src` and a `name` draws the initials derived from that name; neither
+`src`, or one that fails to load, and a `name` draws the initials
+derived from that name; neither
 draws a generic glyph. All three stand on the theme's `placeholder`
 token, so a row of them does not change colour as the data fills in.
 
@@ -42,7 +43,7 @@ Every prop takes a plain value or an Observable of one, and the layout
 props on [the library page](/components/) apply here too. There is no
 colour prop, here or anywhere else in the library.
 
-## The fallback chain, and the one link it cannot have
+## The fallback chain
 
 ```tsx
 <Avatar src={account.avatar} name={account.name} />
@@ -55,26 +56,23 @@ written around it by hand. A list is tried in order, as
 [Image](/components/image) tries one, and a list of nothing but blanks
 counts as no picture rather than as a fetch that can only fail.
 
-That single line is the whole of it. `src` empty or absent moves to the
-initials, and no initials moves to the glyph. Empty counts as absent on
+That single line is the whole of it. `src` empty or absent, or a
+picture that will not load, moves to the initials, and no initials
+moves to the glyph. Empty counts as absent on
 purpose: the shape an application actually holds is a string that is
 sometimes `''`, and making the caller turn that into `undefined` is the
 guard this component exists to absorb.
 
-What the chain cannot include is a **failed load**, and the reason is
-worth stating plainly rather than leaving as a surprise.
-[`Image`](/components/image) is told by its modifier when a
-source fails, but it keeps that to itself and spends it on the
-placeholder tint; `ImageProps` has no `onError`, no `onState` and no
-status output of any kind. So nothing outside an `Image`, including this
-component, can learn that a url did not resolve. `Avatar` therefore
-falls back on an absent or empty `src` only, which is a question it can
-answer, rather than pretending to a recovery it has no way to trigger.
-
-A url that 404s leaves the avatar showing the `placeholder` disc, which
-is the same ground the initials would have stood on, so a broken picture
-degrades to a blank face rather than to a hole. If an application needs
-more than that today, it has to know the url is bad before it passes it.
+**A picture that will not load counts as no picture.** A url that 404s
+is the commonest broken avatar there is, an account whose picture was
+deleted or a CDN that expired it, and the person's initials belong in
+its place rather than a blank disc. [`Image`](/components/image) says
+when every candidate in its `src` has failed, through `onState`, and
+`Avatar` listens: a failed load drops it to the next link of the chain.
+The failure is remembered against the sources that failed rather than
+as a flag, so a new `src` is tried afresh instead of being written off
+with the old one. While a picture is still loading, the disc shows the
+`placeholder` ground the initials stand on, the same colour either way.
 
 ## Initials
 
@@ -189,7 +187,8 @@ that the derivation takes the first and last parts and never cuts a
 grapheme, that the labelled case is an `image` named by the person and
 `label=""` is silent while still drawn, that the picture inside adds no
 second record, that each named step and a number give their own side,
-that a size which changes is followed, that a circle and a square differ
+that a picture which fails to load falls back to the initials and a new
+`src` is tried again, that a size which changes is followed, that a circle and a square differ
 only in radius, and that the ground is `placeholder`.
 `AvatarExample.spec.ts` asserts what the example above claims, by role
 and name.
@@ -197,4 +196,4 @@ and name.
 ## Next
 
 [Image](/components/image) is the picture underneath this one,
-and says what a source that fails does and does not report.
+and says how a source that fails is reported.

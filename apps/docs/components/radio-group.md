@@ -35,15 +35,28 @@ rather than down.
 | `onChange`     | `(value: string) => void` | none       | Called with the value the group would take, on a click and on a bound key.                 |
 | `label`        | `string`                  | `''`       | The group's accessible name. It is not drawn: see below.                                   |
 | `disabled`     | `boolean`                 | `false`    | Refuses clicks and keys for the whole group, and marks the subtree unavailable.            |
-| `invalid`      | `boolean`                 | `false`    | Adds the `invalid` state to the group.                                                     |
+| `invalid`      | `boolean`                 | `false`    | Adds the `invalid` state to the group and rings each circle in `danger`.                   |
+| `error`        | `string`                  | `''`       | What is wrong with the choice, drawn under the options. Non-empty, it implies `invalid`.   |
 | `required`     | `boolean`                 | `false`    | Adds the `required` state to the group.                                                    |
-| `direction`    | `'row' \| 'column'`       | `'column'` | How the options stack. The keyboard works the same either way.                             |
+| `direction`    | `'row' \| 'column'`       | `'column'` | How the options stack. Read once, when the group renders. The keyboard works either way.   |
 | `ref`          | `UiNodeRef`               | none       | Receives the node that is the group, for focusing it or anchoring something to it.         |
 
 `options` is the one required prop in the library's input tier, because a
 group with no options is not a control. Values are strings; a form whose
 options are keyed by something else maps them at that boundary, which is
 where a mapping belongs anyway.
+
+`direction` is read once, when the group renders, as a segmented
+control reads its `size`: a row and a column are different elements,
+and swapping one for the other under a group that has focus would take
+the focus with it. A group that has to change direction changes its
+`key`.
+
+An invalid group, whether marked `invalid` or given an `error`, rings
+every circle in the `danger` colour, as a checkbox rings its box, so
+the group itself says it is wrong and not only the message under it.
+The circle the arrows are on keeps the accent while the group has
+focus, because where the next key will land is what focus has to show.
 
 Supplying neither `value` nor `defaultValue` leaves the group
 self-managing with nothing chosen. Supplying both throws, naming the
@@ -95,7 +108,11 @@ listbox pattern ARIA allows and which needs no per-option focus juggling.
 | `Tab`                     | Not bound: focus leaves the group                    |
 
 Both axes are bound whichever way the group is laid out, so a reader who
-reaches for the arrow that matches the layout finds it. Every binding
+reaches for the arrow that matches the layout finds it. Under
+`textDirection: 'rtl'` a row lays out from the right, so Left and Right
+swap: Left chooses the next option and Right the previous one, as they
+do on a slider. Up and Down are not about reading direction and stay as
+they are. Every binding
 skips options marked `disabled`, and Home and End go to the first and
 last option that can actually be chosen rather than the first and last
 drawn. A disabled group answers no key at all.

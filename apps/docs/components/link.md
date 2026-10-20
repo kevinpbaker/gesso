@@ -221,9 +221,12 @@ element that is the link, the accessibility mirror reads it there, and
 saying it twice would be the empty `states` array the library already
 had to fix once.
 
-A disabled link stays focusable, as every disabled control in this
-library does, because a control the keyboard cannot reach is a control
-whose disabled state nobody is ever told about.
+Tab skips a disabled link, as it skips every disabled control in this
+library: the runtime treats a disabled node as inert whatever it
+declares, so the link keeps `focusable` and is a tab stop again the
+moment it is enabled. It stays on the semantics tree all the while, so a
+screen reader browsing the page is still told the link is there and
+disabled.
 
 ## Colour is a palette name, not a prop
 
@@ -260,7 +263,7 @@ the router would build, that `to` wins over `href`, that an `href`
 opens the same way with a modifier held or the middle button pressed,
 that Enter activates it exactly once, that Space activates it
 through the runtime default the component leaves alone, that Tab
-reaches it, that the rule appears and disappears with the pointer and
+reaches it and skips it while disabled, that the rule appears and disappears with the pointer and
 that `always` and `none` behave, that the ink is `controlAccent` and
 the disabled ink is `controlForegroundDisabled`, that a disabled link
 refuses the pointer, the key and the rule and declares no semantic

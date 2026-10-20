@@ -113,7 +113,10 @@ const value = controlled({
 
 For the plain case where the owner is a local cell, `bind` is the
 spread: `<Slider {...bind(volume)} />` passes the cell as `value` and
-writes changes back into it. When the value belongs to a store or a
+writes changes back into it. A control whose value has another name
+takes that name as the second argument, and the handler stays
+`onChange`: `<Switch label="Sync" {...bind(on, 'checked')} />` spreads
+beside the props around it. When the value belongs to a store or a
 channel, pass the cell and a handler that sends the command instead.
 
 ## Where the framework helps you

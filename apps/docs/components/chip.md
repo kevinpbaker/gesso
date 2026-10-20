@@ -93,6 +93,13 @@ drawn after the word at the normal weight, so it reads as a count beside
 a word rather than as a second word, and it joins the accessible name
 as "Metal, 119,205" unless `name` replaces it.
 
+`count` and `icon` are followed rather than read once. A filter row is
+usually drawn before the counts behind it come back, so a count that
+starts `undefined` and arrives later is drawn when it does, and the
+screen agrees with the name, which already included it. Each is in the
+chip only while it has something to show, so a chip without one keeps
+no gap for it.
+
 ## The two axes
 
 | Axis      | Values               | What it says             |

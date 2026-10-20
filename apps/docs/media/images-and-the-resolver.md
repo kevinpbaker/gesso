@@ -195,7 +195,9 @@ does, leave the `alt` off.
 - **A failed load is a tinted box.** While the bitmap is decoding, and
   after a failure, the node paints `controlBackground` from the theme,
   or whatever `placeholderColor` names, so a grid of thumbnails does not
-  jump as they arrive. There is no error slot on the component.
+  jump as they arrive. There is no error slot on the component;
+  `onState` says when a picture has failed, so whatever holds it can
+  draw something else, as `Avatar` falls back to initials.
 
 ## What this page was checked against
 

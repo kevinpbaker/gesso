@@ -74,6 +74,10 @@ fill it: a sidebar of tabs holding a tree, or a list that scrolls,
 needs nothing more. A strip given no height is as tall as its tab list
 and its panel's content, as before.
 
+A strip with more tabs than room wraps onto further lines rather than
+running off the side of whatever holds it, so the selected tab is
+always on screen.
+
 ## Controlled and uncontrolled
 
 ```tsx
@@ -141,6 +145,13 @@ and no `setSize`, so nothing announces "2 of 4"; the spec asserts both
 absences, so they are documented rather than accidental. The panel is
 tied to its tab by sharing its name and by nothing else: the semantics
 record has no owns relationship to express.
+
+A panel whose tab is removed from `tabs` stops being named after it and
+goes back to an empty name, since there is no longer a tab for it to be
+the panel of. Nothing is selected, and an arrow starts again from the
+first tab. The value itself is left alone: it is its owner's to move,
+as [Pagination](/components/pagination) leaves a page it did not
+choose.
 
 ## Next
 

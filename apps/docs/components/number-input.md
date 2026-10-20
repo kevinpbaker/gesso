@@ -16,7 +16,7 @@ and the clipboard is true here too.
 
 Guests is controlled, capped at 8, and the line beside it is derived
 from the value. Tip is uncontrolled and steps by a half. Type a letter
-into either and watch what is not reported; then move focus away and
+into either and watch what is not reported; then move focus away, or press Enter, and
 watch the field tidy itself up.
 
 <<< @/src/examples/NumberInputExample.tsx#numbers
@@ -27,7 +27,7 @@ watch the field tidy itself up.
 | -------------- | ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `value`        | `number`                  | none      | The value to show. Supplying it makes the field controlled.                                                            |
 | `defaultValue` | `number`                  | `0`       | The value to start at, for a field that owns its own. Supplying both throws, naming the component.                     |
-| `onChange`     | `(value: number) => void` | none      | Called with a value already clamped to the range and snapped to the step. Text that is not a number reports nothing.   |
+| `onChange`     | `(value: number) => void` | none      | Called with a value inside the range and on the step. Typed text outside them waits for blur or Enter to be bounded.   |
 | `min`          | `number`                  | unbounded | The bottom of the range. Left out, nothing clamps downwards.                                                           |
 | `max`          | `number`                  | unbounded | The top of the range. Left out, nothing clamps upwards.                                                                |
 | `step`         | `number`                  | `1`       | What an arrow key and each button move by, and the grid a value is snapped to, counted from `min`.                     |
@@ -74,15 +74,23 @@ The two are not the same thing while someone is typing, and the
 component keeps them apart on purpose. A half-written `-` or `1.` is
 not a number yet, so:
 
-- Every keystroke goes into the field's text.
-- A number is reported only when the text parses and is not blank, and
-  it is clamped and snapped before it goes out.
-- Text that does not parse leaves the value alone, so a stray letter
-  costs you nothing but the letter.
-- When the field loses focus it commits what it is holding: the text
+- Every keystroke goes into the field's text, and stays there as typed.
+- A number is reported only when the text parses, is not blank, and is
+  one the field could hold: inside the range and on the step.
+- Text that does not parse, or parses to a number outside the range or
+  off the step, leaves the value alone. A keystroke is not a decision:
+  with `min: 10`, the `1` on the way to `15` is out of range, and
+  clamping it there would turn it into `10` under the caret, so the `5`
+  made `105`.
+- When the field loses focus, or Enter is pressed, it settles what it is
+  holding: a number is clamped and snapped and reported, and the text
   becomes the value's own spelling again, which is what stops a field
-  being left showing `2.50` or `12abc`. Text that is not a number at
-  all commits as `0`, clamped into the range.
+  being left showing `2.50` or `120` above a `max` of 99. Text that is
+  blank or not a number at all goes back to the value the field had,
+  and nothing is reported, because nothing changed: a number field has
+  no empty value to report, and inventing `0` would be a number nobody
+  typed, often not even in range. Enter goes on to the form after
+  settling, so a form listening for it still hears it.
 
 ## Keyboard
 
@@ -94,10 +102,12 @@ past two buttons to leave a number field.
 | --------------- | ------------------------------------------------------------------------ |
 | Up              | One step up, clamped to `max`                                            |
 | Down            | One step down, clamped to `min`                                          |
+| Enter           | Settles the text as a blur does, then goes on to the form                |
 | Everything else | The field's own: the caret, selection, deletion and undo of a text field |
 
 Up and Down are taken by the component, so they step the value rather
-than moving the caret between lines. Every other key in
+than moving the caret between lines. Enter is not taken: it settles the
+field and travels on, because Enter in a form is also the form's. Every other key in
 [TextInput's table](/components/text-input#keyboard) behaves here
 exactly as it does there, including Home, End, the word modifier, and
 select-all.

@@ -41,6 +41,14 @@ it costs one press however many menus it grows. That is `tabStop` and
 `focusable` doing their two different jobs: the strip is focusable and
 the titles are not stops of their own.
 
+Because the highlight lives in the bar's state rather than on a node,
+the runtime's focus ring can only go round the whole strip; it cannot
+say which title the arrows are on. So the title draws that itself, a
+ring in the focus ring's colour inside its own box, while the bar has
+focus a key put there. Left and Right then visibly move along a closed
+bar. A click on a title is not a reason to mark it, as it is not a
+reason to draw a ring.
+
 ## Props
 
 | Prop            | What it is                                                                             |
@@ -76,6 +84,8 @@ leave it to the tick. Like `labelOf`, it is read when the menu opens.
 
 **Choosing also dismisses.** `onChoose` is followed by `onDismiss`,
 because picking a command closes the bar and gives the keyboard back.
+That holds whichever way the command was chosen, with the keys or with
+the pointer.
 They are two different facts and an application that wires both to the
 same place will see the second overwrite the first.
 

@@ -139,6 +139,8 @@ A page is ten rows rather than a viewport's worth, because rows are of
 unknown height until they are mounted and a viewport's worth of them is
 not a number the list can know for the part of the data it has never
 seen. Every key clamps: a step past the end is the end, never the start.
+In an empty list there is no row to step to, so every key leaves the
+choice where it was and reports nothing: Home does not report row 0.
 
 A key that is bound is consumed; a key that is not is left for whatever
 is listening above, which is what keeps Tab, and an application's own

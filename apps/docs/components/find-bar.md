@@ -74,7 +74,13 @@ is out of the semantics tree as well.
 
 Opening a session also puts the caret in the query field. The bar
 registers that field with `FindService` through a `ref`, which is why
-the caret lands there on the frame the session opens.
+the caret lands there on the frame the session opens. A bar that
+unmounts takes back only its own registration, so it never takes the
+caret away from another bar.
+
+The field follows the session as well as echoing what is typed.
+Closing a session clears its query, so opening another shows an empty
+field rather than the old words over "No results".
 
 An application can open one itself:
 

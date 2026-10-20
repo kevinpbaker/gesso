@@ -65,7 +65,9 @@ its tone from `accent` to `danger`, or stop being live, changes its
 [Button](/components/button), [Chip](/components/chip) and
 [Badge](/components/badge) state for their own axes. The text of
 `title` and `message` and the paint of `tone` are bound and follow a
-cell.
+cell. A title or message line is drawn only while its text is not
+empty, so a bound `title` that starts as `''` leaves no blank line
+above the message, and the line appears when the title does.
 
 ## The three tones
 
