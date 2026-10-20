@@ -39,9 +39,9 @@ export class UiBinding<T> {
    * the question they answer — "is this prop bound, to what, and is it
    * still emitting" — is asked *after* something has already gone
    * wrong, and a counter that only starts when the panel opens would
-   * answer it about a different run. The cost is an increment and one
-   * `performance.now()` per emission, against a write that already
-   * walks the override cascade and marks a node dirty.
+   * answer it about a different run. The cost is an increment and a
+   * read of `turnNow`, against a write that already walks the override
+   * cascade and marks a node dirty.
    *
    * `emittedAt` is on the emitting thread's clock, which is why the
    * node report sends an age rather than the reading itself: a panel
@@ -61,7 +61,7 @@ export class UiBinding<T> {
       next: value => {
         this.currentValue = value;
         this.emissions++;
-        this.lastEmittedAt = now();
+        this.lastEmittedAt = turnNow();
         this.graph.updateNodeProperty(this.node, this.property, value, this.dirtyFlags);
       },
       error: error => {
@@ -109,4 +109,29 @@ export class UiBinding<T> {
 
 function now(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now();
+}
+
+/** The clock as `turnNow` last read it, or -1 when it is to be read again. */
+let turnTime = -1;
+
+/**
+ * The clock, read once per turn of the event loop.
+ *
+ * `performance.now()` per emission was 6% of a scrollbar drag through a
+ * sheet: a window jump connects about five thousand bindings a frame and
+ * each emits at once, so the clock was read eleven thousand times to
+ * stamp the same frame. An age a panel reports is good to a turn, which
+ * is a frame at worst, so the first emission of a turn reads the clock
+ * and the rest share it.
+ */
+function turnNow(): number {
+  if (turnTime < 0) {
+    turnTime = now();
+    queueMicrotask(forgetTurnTime);
+  }
+  return turnTime;
+}
+
+function forgetTurnTime(): void {
+  turnTime = -1;
 }
