@@ -49,8 +49,8 @@
  *
  *   node scripts/check-route-screenshots.ts             # verify
  *   node scripts/check-route-screenshots.ts --update    # rewrite baselines
- *   node scripts/check-route-screenshots.ts --route framework
- *   node scripts/check-route-screenshots.ts --route modifiers,compare
+ *   node scripts/check-route-screenshots.ts --route framework-worker
+ *   node scripts/check-route-screenshots.ts --route example-modifiers,renderers-compare
  *   node scripts/check-route-screenshots.ts --app playground
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
@@ -70,7 +70,7 @@ import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { DevTools, findChrome, openPage, waitFor, WEBGPU_FLAGS } from './lib/devtools.ts';
-import { ROUTES } from '../apps/playground/src/shell/routes.ts';
+import { allViews } from '../apps/playground/src/shell/routes.ts';
 
 /**
  * The applications this gate photographs, and how a route in each is
@@ -196,7 +196,7 @@ const NOT_GATED: Record<string, string> = {
  * Known headroom, so the next person to see one of these is not
  * surprised by it.
  *
- * `compare` carries a scrollbar thumb that used to be captured
+ * `renderers-compare` carries a scrollbar thumb that used to be captured
  * sometimes visible and sometimes faded, about 381 pixels either way,
  * because both states are still and six captures could fall inside the
  * thumb's 1.55 s. `QUIESCE_MIN_HOLD_MS` outlasts the thumb, so it is
@@ -631,12 +631,12 @@ async function main(): Promise<void> {
   const failures: string[] = [];
   let captured = 0;
   for (const [name, app] of wanted) {
-    const all: Route[] = ROUTES.filter(
-      route => CANNOT_SETTLE[route.id] === undefined && NOT_GATED[route.id] === undefined
-    ).map(route => ({
-      id: route.id,
-      address: route.id
-    }));
+    // One per view, not per route: each mode of a route with modes
+    // draws something different, so each is photographed, as
+    // `route-mode.png` from `#route/mode`.
+    const all: Route[] = allViews()
+      .filter(view => CANNOT_SETTLE[view.route.id] === undefined && NOT_GATED[view.route.id] === undefined)
+      .map(view => ({ id: view.id.replace('/', '-'), address: view.id }));
     const routes = all.filter(route => onlyRoutes === undefined || onlyRoutes.has(route.id));
     if (routes.length === 0) {
       if (onlyRoutes !== undefined) {

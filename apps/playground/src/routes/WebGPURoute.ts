@@ -21,7 +21,7 @@ import { createPreviewCanvas, observeSize } from '../shell/dom';
  */
 export function mountWebGPURoute(host: HTMLElement): () => void {
   const state = new PlaygroundState();
-  const panel = mountPlaygroundPanel(host, 'webgpu', state);
+  const panel = mountPlaygroundPanel(host, 'renderers/webgpu', state);
   const canvas = createPreviewCanvas(panel.preview);
 
   const preview = new WebGPUPreview(canvas);

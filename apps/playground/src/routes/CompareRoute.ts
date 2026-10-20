@@ -162,7 +162,7 @@ export function countDifferingPixels(
  */
 export function mountCompareRoute(host: HTMLElement): () => void {
   const state = new PlaygroundState();
-  const panel = mountPlaygroundPanel(host, 'compare', state);
+  const panel = mountPlaygroundPanel(host, 'renderers/compare', state);
   panel.preview.classList.add('pg-preview-split');
 
   const canvasElement = createPreviewCanvas(panel.preview, { focusable: false });

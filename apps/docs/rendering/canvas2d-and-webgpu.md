@@ -273,7 +273,7 @@ working switch would fall back and show Canvas2D twice.
 
 The checks live in this repository instead: `RendererParity.spec` under
 `pnpm test:run`, and `pnpm parity:webgpu` against the playground's
-compare route, which is also viewable by hand at `#compare` with the
+compare route, which is also viewable by hand at `#renderers/compare` with the
 playground running.
 
 ## Next

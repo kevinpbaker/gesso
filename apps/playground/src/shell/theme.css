@@ -254,6 +254,46 @@ body {
   color: var(--accent);
 }
 
+/* A route's modes: one segmented control, so it reads as a choice */
+/* within the page rather than as more of the nav beside it. */
+.pg-modes {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.pg-mode {
+  padding: 3px var(--space-3);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--duration) var(--ease),
+    color var(--duration) var(--ease);
+}
+
+.pg-mode:hover {
+  background: var(--surface-overlay);
+  color: var(--text);
+}
+
+.pg-mode[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pg-mode:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .pg-main {
   display: flex;
   flex: 1;

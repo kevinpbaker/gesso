@@ -26,7 +26,7 @@ import { DevTools, findChrome, openPage, waitFor, WEBGPU_FLAGS } from './lib/dev
 
 const VITE_PORT = 5187;
 const DEVTOOLS_PORT = 9337;
-const PAGE_URL = `http://localhost:${VITE_PORT}/#compare`;
+const PAGE_URL = `http://localhost:${VITE_PORT}/#renderers/compare`;
 /**
  * Differing pixels as a fraction of the compared ones.
  *

@@ -34,7 +34,7 @@ const RENDERER_STORAGE_KEY = 'gesso.playground.renderer';
  * so a focus ring that is right on Canvas2D says nothing about WebGPU.
  */
 export function mountModifiersRoute(host: HTMLElement): () => void {
-  const shell = mountShell(host, { routeId: 'modifiers', metrics: true });
+  const shell = mountShell(host, { routeId: 'example-modifiers', metrics: true });
   const errors = mountRouteErrors(shell);
 
   const start = (renderer: RendererChoice): { dispose: () => void } => {
@@ -53,7 +53,7 @@ export function mountModifiersRoute(host: HTMLElement): () => void {
         'framework, and no wrapper component around any of them.'
     );
     const dispose = app.mount(shell.preview);
-    const disconnectDevtools = connectRouteDevtools(app, 'modifiers');
+    const disconnectDevtools = connectRouteDevtools(app, 'example-modifiers');
     return {
       dispose: () => {
         disconnectDevtools();

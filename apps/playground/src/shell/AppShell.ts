@@ -1,5 +1,5 @@
 import { createElement, requireElement } from './dom';
-import { findRoute, ROUTES } from './routes';
+import { findView, ROUTES, type RouteView } from './routes';
 
 /** One labelled reading in the status bar's metric row. */
 export interface ShellMetric {
@@ -8,7 +8,10 @@ export interface ShellMetric {
 }
 
 export interface ShellOptions {
-  /** Route being mounted. Selects the title and the active nav item. */
+  /**
+   * View being mounted: a route id, or `route/mode` for a route with
+   * modes. Selects the title, the active nav item and the active mode.
+   */
   readonly routeId: string;
   /** Render the control sidebar. Routes with no controls omit it. */
   readonly sidebar?: boolean;
@@ -52,13 +55,13 @@ export interface AppShell {
  * cannot come to depend on the chrome's internal structure.
  */
 export function mountShell(host: HTMLElement, options: ShellOptions): AppShell {
-  const route = findRoute(options.routeId);
+  const view = findView(options.routeId);
   const withSidebar = options.sidebar ?? false;
 
   host.replaceChildren();
   const root = createElement('div', { className: 'pg-app' });
   root.append(
-    renderHeader(options.routeId, route?.title ?? options.routeId),
+    renderHeader(view, view?.title ?? options.routeId),
     renderMain(withSidebar),
     createElement('section', { className: 'pg-devtools', attrs: { hidden: '' } }),
     renderStatusBar(options.metrics ?? false)
@@ -137,7 +140,7 @@ export function mountShell(host: HTMLElement, options: ShellOptions): AppShell {
   };
 }
 
-function renderHeader(routeId: string, title: string): HTMLElement {
+function renderHeader(view: RouteView | undefined, title: string): HTMLElement {
   const header = createElement('header', { className: 'pg-header' });
 
   const brand = createElement('div', { className: 'pg-brand' });
@@ -146,11 +149,14 @@ function renderHeader(routeId: string, title: string): HTMLElement {
 
   const titleEl = createElement('div', { className: 'pg-title' });
   titleEl.appendChild(createElement('span', { className: 'pg-title-text', text: title }));
+  header.append(brand, titleEl);
+  if (view?.mode !== undefined) {
+    header.appendChild(renderModes(view));
+  }
 
   const nav = createElement('nav', { className: 'pg-nav', attrs: { 'aria-label': 'Playground routes' } });
   // A child route (an example page) highlights its parent's nav item.
-  const current = findRoute(routeId);
-  const currentNavId = current?.parent ?? routeId;
+  const currentNavId = view?.route.parent ?? view?.route.id;
   for (const route of ROUTES) {
     // A child route is represented by its parent's item; a hidden one
     // is represented by nothing at all.
@@ -168,8 +174,35 @@ function renderHeader(routeId: string, title: string): HTMLElement {
     nav.appendChild(link);
   }
 
-  header.append(brand, titleEl, nav);
+  header.appendChild(nav);
   return header;
+}
+
+/**
+ * The switch between a route's modes: one link per mode, so each is
+ * addressable and opens in a new tab like any other link.
+ *
+ * In the header rather than above the preview, which keeps the
+ * preview the size it was when each mode was a route of its own, and
+ * with it every screenshot baseline taken of it.
+ */
+function renderModes(view: RouteView): HTMLElement {
+  const modes = createElement('nav', {
+    className: 'pg-modes',
+    attrs: { 'aria-label': view.route.modesLabel ?? 'Mode' }
+  });
+  for (const mode of view.route.modes ?? []) {
+    const link = createElement('a', {
+      className: 'pg-mode',
+      text: mode.label,
+      attrs: { href: `#${view.route.id}/${mode.id}` }
+    });
+    if (mode.id === view.mode?.id) {
+      link.setAttribute('aria-current', 'page');
+    }
+    modes.appendChild(link);
+  }
+  return modes;
 }
 
 function renderMain(withSidebar: boolean): HTMLElement {
