@@ -179,10 +179,10 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
 
   /** Where the colour now is, so the keyboard starts on it. */
   const startAt = (): At => {
-    const value = (inputs.value.value ?? '').toLowerCase();
+    const value = inputs.value.value ?? '';
     const all = rows();
     for (let row = all.length - 1; row >= 0; row--) {
-      const column = all[row].findIndex(color => color.value.toLowerCase() === value);
+      const column = all[row].findIndex(color => sameColor(color.value, value));
       if (column !== -1) {
         return { row, column };
       }
@@ -192,7 +192,7 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
 
   const swatch = (color: PaletteColor, row: number, column: number): UiElement => {
     const lit = active.pipe(map(at => at.row === row && at.column === column));
-    const chosen = input(inputs.value, '').pipe(map(value => value.toLowerCase() === color.value.toLowerCase()));
+    const chosen = input(inputs.value, '').pipe(map(value => sameColor(value, color.value)));
     return Box({
       key: `${row}-${column}`,
       // No hover background: on a swatch the background *is* the colour,
@@ -320,6 +320,15 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
   });
 
   return Row({ ref: (node: UiNode | null) => (placeholder = node), visible: false, width: 0, height: 0 });
+}
+
+/**
+ * Whether two values name the same colour: `#F00` is `#ff0000`, as a
+ * value written by hand or kept from a stylesheet often is. Anything
+ * that isn't a hex colour (the automatic `''`) is compared as written.
+ */
+function sameColor(a: string, b: string): boolean {
+  return (normalizeHex(a) ?? a.toLowerCase()) === (normalizeHex(b) ?? b.toLowerCase());
 }
 
 /** A colour's value as `#rrggbb`, lower case, or null when it is not one. */

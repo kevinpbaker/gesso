@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Column, type UiNode } from 'gesso-core';
+import { Column, Row, type UiNode } from 'gesso-core';
 import { DatePicker } from './DatePicker';
 
 let ui: Rendered;
@@ -150,5 +150,63 @@ describe('DatePicker', () => {
     expect(headers[0]).toBe('Sun');
     await press('Home');
     expect(cursor()).toBe('Sunday, September 27, 2026');
+  });
+});
+
+/** Found while writing the workbench: the cursor and the chosen day, on the same day. */
+describe('a date picker’s cursor on the chosen day', () => {
+  it('rings it in a colour that shows against the chosen day’s fill', async () => {
+    mount({ defaultValue: '2026-10-20' });
+    await open();
+    const chosen = ui.getByRole('gridcell', { name: 'Tuesday, October 20, 2026' });
+    expect(chosen.properties.get('borderWidth')).toBe(2);
+    expect(chosen.properties.get('borderColor')).not.toBe(chosen.properties.get('backgroundColor'));
+  });
+});
+
+describe('a date picker in a narrow row', () => {
+  it('cuts a long placeholder short inside the trigger, before the chevron', () => {
+    ui = renderTest(
+      Row(
+        { width: 140 },
+        createComponent(DatePicker, {
+          label: 'Due date',
+          placeholder: 'Pick the day this is due by',
+          flexGrow: 1,
+          flexBasis: 0
+        })
+      ),
+      { width: 400, height: 200 }
+    );
+    ui.frame();
+    const box = ui.getLayout(trigger());
+    expect(box.x + box.width).toBeLessThanOrEqual(140);
+    const text = ui.getLayout(ui.getByText('Pick the day this is due by'));
+    expect(text.x + text.width).toBeLessThanOrEqual(box.x + box.width - 16);
+  });
+});
+
+describe('a date picker given a value that is not a date', () => {
+  it('shows the placeholder muted, as it does with no value', () => {
+    mount({ value: '2026-02-30' });
+    expect(ui.getByText('No date').properties.get('color')).toBe('textMuted');
+  });
+});
+
+describe('a date picker whose bounds move while it is open', () => {
+  it('disables the days the new bounds leave out, and enables the ones they let in', async () => {
+    const min = new BehaviorSubject('2026-10-10');
+    mount({ defaultValue: '2026-10-20', min });
+    await open();
+    const day = (name: string) => ui.getSemantics(ui.getByRole('gridcell', { name })).disabled === true;
+    expect(day('Monday, October 5, 2026')).toBe(true);
+    expect(day('Thursday, October 15, 2026')).toBe(false);
+    min.next('2026-10-16');
+    await ui.settle();
+    expect(day('Monday, October 5, 2026')).toBe(true);
+    expect(day('Thursday, October 15, 2026')).toBe(true);
+    min.next('');
+    await ui.settle();
+    expect(day('Monday, October 5, 2026')).toBe(false);
   });
 });

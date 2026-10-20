@@ -75,6 +75,29 @@ describe('ColorPicker', () => {
     ui.fireEvent.type('#1a2B3c');
     expect(changes.at(-1)).toBe('#1a2b3c');
   });
+
+  /**
+   * Found while writing the workbench: a colour typed reached `onChange`
+   * and the square, but the swatch beside the field stayed on the old
+   * one, and the value echoed back was dropped as the picker's own.
+   */
+  it('shows a colour typed in its own swatch, and leaves the typing alone', () => {
+    const value = new BehaviorSubject('#ff0000');
+    const ui = renderTest(
+      createComponent(ColorPicker, { value, label: 'Fill', onChange: (hex: string) => value.next(hex) }),
+      { width: 400, height: 400 }
+    );
+    const field = ui.getByRole('textbox', { name: 'Fill as hex' });
+    ui.fireEvent.focus(field);
+    ui.fireEvent.press('a', { ctrl: true });
+    ui.fireEvent.type('#1a2b3c');
+    ui.frame();
+    const swatch = ui.getByRole('image');
+    expect(ui.getSemantics(swatch).label).toBe('Fill: #1a2b3c');
+    expect(swatch.properties.get('backgroundColor')).toBe('#1a2b3c');
+    // "#1a2" is a colour on the way to "#1a2b3c"; the field kept what was typed.
+    expect(field.properties.get('value')).toBe('#1a2b3c');
+  });
 });
 
 describe('a palette with somewhere to go for a custom colour', () => {
