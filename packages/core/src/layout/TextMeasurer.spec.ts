@@ -110,6 +110,25 @@ describe('ParagraphTextMeasurer', () => {
     expect(measurer.runs).toBeGreaterThan(before);
   });
 
+  it('keeps a paragraph that is still being asked for once the cap is reached', () => {
+    const measurer = new CountingMeasurer();
+    const row = (n: number) => measurer.layout({ text: `row ${n}`, fontSize: 10, maxWidth: 100 });
+    const first = row(0);
+    const second = row(1);
+    for (let n = 2; n < 16_384; n++) {
+      row(n);
+    }
+    // The oldest, asked for again from the front of the order.
+    expect(row(0)).toBe(first);
+    for (let n = 16_384; n < 16_484; n++) {
+      row(n);
+    }
+    expect(measurer.cachedParagraphs).toBe(16_384);
+    // A hundred newer ones pushed out a hundred, and not the one asked for.
+    expect(row(0)).toBe(first);
+    expect(row(1)).not.toBe(second);
+  });
+
   it('remembers long texts by their length, not their number', () => {
     const measurer = new CountingMeasurer();
     // Each one a keystroke into a 100,000-character field: a new
