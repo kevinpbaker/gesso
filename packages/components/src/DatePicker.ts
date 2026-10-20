@@ -127,6 +127,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
 
   const inRange = (day: string): boolean =>
     (min.value === '' || day >= min.value) && (max.value === '' || day <= max.value);
+  const bounds = combineLatest([min, max]);
 
   const release = (): void => {
     if (trapped) {
@@ -264,7 +265,11 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
                     today(),
                     cursor,
                     value.value,
-                    inRange(day),
+                    // Followed rather than read here: the grid is built
+                    // once a month, and bounds that move while it is
+                    // open (a due date's, as its start changes) must
+                    // move the disabled days with them.
+                    bounds.pipe(map(() => inRange(day))),
                     choose,
                     locale,
                     (node: UiNode | null) => {
@@ -327,7 +332,11 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
   );
 
   return Column(
-    { ...layoutOf(inputs), gap: 4 },
+    // A least width of nothing, as Select has: in a row with less room
+    // than the trigger's text needs, the picker gives way and the text
+    // truncates, rather than the row running past its edge. A
+    // `minWidth` passed in still wins.
+    { minWidth: 0, ...layoutOf(inputs), gap: 4 },
     label.pipe(
       map(text =>
         text.length === 0 || labelHidden
@@ -366,9 +375,17 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
       },
       Text({
         text: shown,
-        color: value.value.pipe(map(chosen => (chosen === '' ? 'textMuted' : 'controlForeground'))),
+        // Muted whenever the placeholder is what shows, which is for a
+        // value that isn't a date as much as for no value.
+        color: value.value.pipe(map(chosen => (parseIsoDate(chosen) === null ? 'textMuted' : 'controlForeground'))),
         flexGrow: 1,
-        textWrap: 'none',
+        // One line, cut short with an ellipsis where the trigger is given
+        // less room than a long placeholder needs, before the chevron
+        // rather than over it.
+        flexShrink: 1,
+        minWidth: 0,
+        maxLines: 1,
+        textOverflow: 'ellipsis',
         selectable: false
       }),
       chevron(CHEVRON_DOWN, foregroundToken(disabled))
@@ -383,7 +400,7 @@ function dayCell(
   todayIs: string,
   cursor: Observable<string>,
   chosen: Observable<string>,
-  enabled: boolean,
+  enabled: Observable<boolean>,
   choose: (day: string) => void,
   locale: string | undefined,
   track: (node: UiNode | null) => void
@@ -398,7 +415,7 @@ function dayCell(
       ref: track,
       role: 'gridcell',
       label: formatDate(day, DAY_NAME, locale),
-      disabled: !enabled,
+      disabled: enabled.pipe(map(on => !on)),
       states: selected.pipe(map(on => (on ? (['selected'] as UiSemanticState[]) : []))),
       modifiers: [CONTROL_INTERACTION],
       width: 34,
@@ -407,22 +424,22 @@ function dayCell(
       y: 'center',
       borderRadius: 6,
       borderWidth: atCursor.pipe(map(on => (on ? 2 : today ? 1 : 0))),
-      borderColor: atCursor.pipe(map(on => (on ? 'controlAccent' : 'controlBorder'))),
+      // The cursor's ring is the accent, except on the chosen day, whose
+      // fill is the accent too and would swallow it: there it is the
+      // focus ring's colour, which marks focus everywhere else and is
+      // not the accent.
+      borderColor: combineLatest([atCursor, selected]).pipe(
+        map(([on, picked]) => (on ? (picked ? 'focusRing' : 'controlAccent') : 'controlBorder'))
+      ),
       backgroundColor: selected.pipe(map(on => (on ? 'controlAccent' : 'transparent'))),
       onClick: () => choose(day)
     },
     Text({
       text: String(Number(day.slice(8))),
       fontWeight: today ? 700 : 400,
-      color: combineLatest([selected]).pipe(
-        map(([on]) =>
-          on
-            ? 'controlBackground'
-            : !enabled
-              ? 'controlForegroundDisabled'
-              : outside
-                ? 'textMuted'
-                : 'controlForeground'
+      color: combineLatest([selected, enabled]).pipe(
+        map(([on, can]) =>
+          on ? 'controlBackground' : !can ? 'controlForegroundDisabled' : outside ? 'textMuted' : 'controlForeground'
         )
       ),
       selectable: false

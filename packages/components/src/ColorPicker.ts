@@ -72,7 +72,7 @@ export interface ColorPickerProps {
   onChange?: (color: string) => void;
   /** What the picker is called, for a screen reader. */
   label?: string;
-  /** The square's width; the bar and the field follow it. */
+  /** The square's width; the bar and the field follow it. Read once, when the picker is built. */
   width?: number;
 }
 
@@ -81,7 +81,10 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
   const width = inputs.width?.value ?? 200;
   const height = Math.round(width * 0.62);
   const hsv = new BehaviorSubject<Hsv>(hsvOfHex(inputs.value?.value ?? '#000000'));
-  const draft = new BehaviorSubject(normalizeHex(inputs.value?.value ?? '') ?? '#000000');
+  /** The colour now, for the swatch; apart from the field's text, which may be on its way to one. */
+  const color = new BehaviorSubject(normalizeHex(inputs.value?.value ?? '') ?? '#000000');
+  /** The field's text. */
+  const draft = new BehaviorSubject(color.value);
   const square = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   const bar = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -93,6 +96,7 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
     const normal = normalizeHex(value);
     if (normal !== null && normal !== reported) {
       hsv.next(hsvOfHex(normal));
+      color.next(normal);
       draft.next(normal);
     }
   });
@@ -101,6 +105,7 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
     const bounded = { h: ((next.h % 360) + 360) % 360, s: clamp(next.s), v: clamp(next.v) };
     hsv.next(bounded);
     const hex = hexOfHsv(bounded);
+    color.next(hex);
     draft.next(hex);
     reported = hex;
     inputs.onChange.value?.(hex);
@@ -158,8 +163,12 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
   };
 
   const typed = (event: UiTextChangeEvent): void => {
+    // The field keeps what was typed: "#1a2" is a colour on the way to
+    // "#1a2b3c", and writing it back as "#11aa22" would wreck the typing.
+    draft.next(event.value);
     const normal = normalizeHex(event.value);
     if (normal !== null) {
+      color.next(normal);
       const next = hsvOfHex(normal);
       // A grey has no hue of its own; the one somebody was on is kept.
       hsv.next(next.s === 0 ? { ...next, h: hsv.value.h } : next);
@@ -253,9 +262,9 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
         borderRadius: 4,
         borderColor: 'border',
         borderWidth: 1,
-        backgroundColor: draft,
+        backgroundColor: color,
         role: 'image',
-        label: draft.pipe(map(hex => `${label.value}: ${hex}`))
+        label: color.pipe(map(hex => `${label.value}: ${hex}`))
       }),
       EditableText({
         value: draft,

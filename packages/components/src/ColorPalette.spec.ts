@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, map } from 'rxjs';
 
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
@@ -115,5 +115,45 @@ describe('ColorPalette', () => {
     expect(normalizeHex('#ABC')).toBe('#aabbcc');
     expect(normalizeHex('12ab9F')).toBe('#12ab9f');
     expect(normalizeHex('red')).toBeNull();
+  });
+});
+
+describe('a palette given a colour written short', () => {
+  it('rings the swatch it names, and opens there', () => {
+    const open = new BehaviorSubject(true);
+    const chosen: string[] = [];
+    const ui = renderTest(
+      Column(
+        createComponent(ColorPalette, {
+          open,
+          value: '#F00',
+          onOpenChange: (next: boolean) => open.next(next),
+          onSelect: (color: string) => chosen.push(color)
+        })
+      ),
+      { width: 500, height: 500 }
+    );
+    ui.frame();
+    expect(ui.getSemantics(ui.getByRole('option', { name: 'red' })).states ?? []).toContain('selected');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(chosen).toEqual(['#ff0000']);
+  });
+});
+
+describe('a palette taken out of the tree', () => {
+  it('stops following open', () => {
+    const shown = new BehaviorSubject(true);
+    const open = new BehaviorSubject(false);
+    const ui = renderTest(Column(shown.pipe(map(on => (on ? [createComponent(ColorPalette, { open })] : [])))), {
+      width: 500,
+      height: 500
+    });
+    ui.frame();
+    shown.next(false);
+    ui.frame();
+    open.next(true);
+    ui.frame();
+    expect(ui.runtime.services.get(OverlayService).entries.value).toHaveLength(0);
   });
 });
