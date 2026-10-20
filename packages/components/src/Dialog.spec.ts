@@ -18,6 +18,7 @@ import { AnimationService, createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 
 import { Dialog } from './Dialog';
+import { Menu } from './Menu';
 
 describe('Dialog on a narrow screen', () => {
   it('fits a dialog wider than the screen inside it, with a margin each side', () => {
@@ -294,5 +295,125 @@ describe("Dialog's scrim", () => {
     ui.fireEvent.pointerDown(5, 5);
     ui.fireEvent.pointerUp(5, 5);
     expect(pressed).toEqual([]);
+  });
+});
+
+describe('Dialog closed from code under something open over it', () => {
+  // A dialog released "the innermost trap", whoever had taken it. Closed
+  // by its owner while a menu or a second dialog sat over it — a timer,
+  // a save that finished — it ended that one's trap instead of its own,
+  // and the keyboard left the window still open on top.
+  const focusedLabel = (ui: ReturnType<typeof renderTest>) =>
+    ui.runtime.input.focus.focusedNode?.properties.get('label');
+
+  it('leaves a second dialog over it trapping the keyboard', () => {
+    const outer = new BehaviorSubject(true);
+    const inner = new BehaviorSubject(false);
+    const ui = renderTest(
+      Column(
+        Button({ text: 'Page', label: 'Page' }),
+        createComponent(Dialog, { open: outer, title: 'Outer', content: Button({ text: 'a', label: 'a' }) }),
+        createComponent(Dialog, {
+          open: inner,
+          title: 'Inner',
+          content: Column(Button({ text: 'b', label: 'b' }), Button({ text: 'c', label: 'c' }))
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    ui.frame();
+    inner.next(true);
+    ui.frame();
+    expect(focusedLabel(ui)).toBe('b');
+
+    outer.next(false);
+    ui.frame();
+
+    expect(ui.runtime.input.focus.trapped).toBe(true);
+    expect(focusedLabel(ui)).toBe('b');
+    ui.fireEvent.keyDown('Tab');
+    ui.fireEvent.keyDown('Tab');
+    expect(focusedLabel(ui)).toBe('b');
+  });
+
+  it('leaves a menu over it trapping the keyboard', () => {
+    const dialog = new BehaviorSubject(true);
+    const menu = new BehaviorSubject(false);
+    const ui = renderTest(
+      Column(
+        Button({ text: 'Page', label: 'Page' }),
+        createComponent(Dialog, { open: dialog, title: 'Outer', content: Button({ text: 'a', label: 'a' }) }),
+        createComponent(Menu, {
+          open: menu,
+          at: { x: 20, y: 20 },
+          items: [{ value: 'copy', label: 'Copy' }],
+          onOpenChange: (next: boolean) => menu.next(next)
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    ui.frame();
+    menu.next(true);
+    ui.frame();
+    const inMenu = () => {
+      for (let at = ui.runtime.input.focus.focusedNode; at !== null; at = at.parent) {
+        if (at === ui.getByRole('menu')) return true;
+      }
+      return false;
+    };
+    expect(inMenu()).toBe(true);
+
+    dialog.next(false);
+    ui.frame();
+
+    expect(ui.runtime.input.focus.trapped).toBe(true);
+    expect(inMenu()).toBe(true);
+    // Escape still reaches the menu, and closing it then hands the keyboard back.
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(menu.value).toBe(false);
+    expect(ui.runtime.input.focus.trapped).toBe(false);
+  });
+
+  it('hands the keyboard back to its opener when it goes with a menu of its own open', () => {
+    // The workbench's self-closing dialog: a timer closes it while the
+    // menu inside it is open, and both go.
+    const dialog = new BehaviorSubject(false);
+    const menu = new BehaviorSubject(false);
+    const anchor = new BehaviorSubject<UiNode | null>(null);
+    const ui = renderTest(
+      Column(
+        Button({ text: 'Open', label: 'Open' }),
+        Button({ text: 'After', label: 'After' }),
+        createComponent(Dialog, {
+          open: dialog,
+          title: 'Going away',
+          content: Column(
+            Button({ text: 'Menu', label: 'Menu', ref: (node: UiNode | null) => anchor.next(node) }),
+            createComponent(Menu, {
+              open: menu,
+              anchor,
+              items: [{ value: 'copy', label: 'Copy' }],
+              onOpenChange: (next: boolean) => menu.next(next)
+            })
+          )
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    const opener = ui.getByLabel('Open');
+    ui.fireEvent.focus(opener);
+    dialog.next(true);
+    ui.frame();
+    menu.next(true);
+    ui.frame();
+
+    dialog.next(false);
+    ui.frame();
+
+    expect(ui.runtime.input.focus.trapped).toBe(false);
+    expect(ui.runtime.input.focus.focusedNode).toBe(opener);
+    ui.fireEvent.keyDown('Tab');
+    expect(focusedLabel(ui)).toBe('After');
   });
 });

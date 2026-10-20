@@ -1,7 +1,17 @@
 import { combineLatest } from 'rxjs';
 
 import { FocusService, input, type ComponentContext, type Inputs } from 'gesso-framework';
-import { Box, Text, UiEventType, defineModifier, type UiChild, type UiModifier, type UiNode } from 'gesso-core';
+import {
+  Box,
+  Text,
+  UiEventType,
+  defineModifier,
+  type UiChild,
+  type UiInputEvent,
+  type UiKeyboardEvent,
+  type UiModifier,
+  type UiNode
+} from 'gesso-core';
 import { useOverlay, type OverlayHandle, type OverlayPlacement } from './overlay';
 import { followedChildren } from './internals';
 
@@ -43,6 +53,11 @@ export function tooltipContent(text: string): UiChild {
  *
  * It never takes focus: a tooltip that could be tabbed into would be a
  * trap with no way out. It is described, not visited.
+ *
+ * Escape closes it, wherever focus is, and leaves it closed until the
+ * pointer or the focus arrives again: what appears on hover has to be
+ * dismissable without moving either (WCAG 1.4.13), or a tooltip over
+ * what somebody wanted to read stays there.
  */
 export interface TooltipProps {
   text?: string;
@@ -102,6 +117,7 @@ export function Tooltip(inputs: Inputs<TooltipProps>, ctx: ComponentContext): Ui
   return Box(
     {
       ref: (node: UiNode | null) => (anchor = node),
+      modifiers: [escapeCloses({ isOpen: () => overlay.isOpen(), close: hide })],
       onPointerEnter: () => {
         cancel();
         timer = setTimeout(show, delay.value);
@@ -219,6 +235,10 @@ const tooltipKind = defineModifier<TooltipArgs>({
         hide();
       }
     });
+    // Escape closes it, as the component's does: see `escapeCloses`.
+    host.onRoot(UiEventType.KeyDown, event =>
+      closeOnEscape(event, () => current.overlay.isOpen() && openedOn.get(current.overlay) === host.node, hide)
+    );
     // The element can go while the component that rendered it stays —
     // a Run button that turns into Cancel — and an open tooltip is
     // then anchored to nothing, with no pointer left to leave and no
@@ -235,6 +255,33 @@ const tooltipKind = defineModifier<TooltipArgs>({
     tooltipArgs.get(host)?.(args);
   }
 });
+
+/**
+ * Escape, heard at the root, closes an open tooltip.
+ *
+ * At the root because a tooltip the pointer opened is over an element
+ * that need not have focus, and a key goes to whatever does: a listener
+ * on the trigger would hear Escape only for the tooltips focus opened.
+ * In the capture phase, so it is the tooltip's before it is anything
+ * underneath: an Escape that closed a tooltip inside a dialog closed
+ * the dialog with it. Spent only when it closed something, so with no
+ * tooltip open the key goes on to the page as before.
+ */
+const escapeCloses = defineModifier<{ readonly isOpen: () => boolean; readonly close: () => void }>({
+  name: 'tooltipEscape',
+  attach(host, args) {
+    host.onRoot(UiEventType.KeyDown, event => closeOnEscape(event, args.isOpen, args.close));
+  }
+});
+
+function closeOnEscape(event: UiInputEvent, isOpen: () => boolean, close: () => void): void {
+  if ((event as UiKeyboardEvent).key !== 'Escape' || event.defaultPrevented || !isOpen()) {
+    return;
+  }
+  close();
+  event.preventDefault();
+  event.stopPropagation();
+}
 
 const tooltipArgs = new WeakMap<object, (args: TooltipArgs) => void>();
 

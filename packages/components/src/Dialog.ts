@@ -65,7 +65,8 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
   const animations = ctx.inject(AnimationService);
   const overlay = useOverlay(ctx, 'dialog');
   const tokens = themeTokenCell(controlTokens);
-  let trapped = false;
+  /** The dialog's node while focus is trapped in it. */
+  let trapped: UiNode | null = null;
   let placeholder: UiNode | null = null;
   /**
    * How far in the dialog is: 0 as it mounts, 1 when it has arrived.
@@ -89,11 +90,21 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
     }
   };
 
-  /** The trap is released here rather than in `close`, so a dialog that closes because it unmounted releases too. */
+  /**
+   * The trap is released here rather than in `close`, so a dialog that
+   * closes because it unmounted releases too.
+   *
+   * Its own trap, named, and not whichever is innermost. A dialog its
+   * owner closes while a menu or another dialog is open over it would
+   * otherwise end that one's trap, and the keyboard would leave the
+   * window still on top. Closing may also have ended this one already,
+   * by taking its node out of the tree, which the name makes harmless.
+   */
   const release = (): void => {
-    if (trapped) {
-      trapped = false;
-      focus.releaseTrap();
+    if (trapped !== null) {
+      const scope = trapped;
+      trapped = null;
+      focus.releaseTrap(scope);
     }
   };
   ctx.onUnmount(release);
@@ -106,8 +117,8 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
         // its children exist ().
         modifiers: [tokens.modifier],
         ref: (node: UiNode | null) => {
-          if (node !== null && !trapped) {
-            trapped = true;
+          if (node !== null && trapped === null) {
+            trapped = node;
             focus.trap(node);
           }
         },

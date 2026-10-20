@@ -175,3 +175,62 @@ describe('MenuBar in a short window', () => {
     expect(last.y + last.height).toBeLessThanOrEqual(panel().y + panel().height);
   });
 });
+
+describe('MenuBar under the keyboard, with nothing open', () => {
+  function bar(said: string[] = []) {
+    const ui = renderTest(
+      Column(
+        createComponent(MenuBar<string>, {
+          menus: [
+            { label: 'File', entries: ['New', 'Open'] },
+            { label: 'Edit', entries: ['Undo', 'Redo'] }
+          ],
+          labelOf: (item: string) => item,
+          onChoose: (item: string) => said.push(`chose ${item}`),
+          onDismiss: () => said.push('dismissed')
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    const ringed = () =>
+      ['File', 'Edit'].filter(title => ui.getByText(title).parent!.properties.get('borderColor') === 'focusRing');
+    return { ui, ringed };
+  }
+
+  it('marks the title the arrows are on', () => {
+    // Left and Right moved the bar's focus between titles with nothing
+    // on screen to say so: the title was lit only while its menu was
+    // open or the pointer was on it.
+    const { ui, ringed } = bar();
+    expect(ringed()).toEqual([]);
+    ui.fireEvent.tab();
+    ui.frame();
+    expect(ringed()).toEqual(['File']);
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(ringed()).toEqual(['Edit']);
+    // Gone with the focus.
+    ui.fireEvent.blur();
+    ui.frame();
+    expect(ringed()).toEqual([]);
+  });
+
+  it('dismisses after a choice made with the pointer, as after one made with the keys', () => {
+    // The docs say choosing is followed by `onDismiss`; a click on a row
+    // reported the choice and never gave the keyboard back.
+    const said: string[] = [];
+    const { ui } = bar(said);
+    ui.fireEvent.click(ui.getByText('Edit').parent!);
+    ui.frame();
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'Redo' }));
+    ui.frame();
+    expect(said).toEqual(['chose Redo', 'dismissed']);
+
+    said.length = 0;
+    ui.fireEvent.focus(ui.getByLabel('Main menu'));
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(said).toEqual(['chose Undo', 'dismissed']);
+  });
+});

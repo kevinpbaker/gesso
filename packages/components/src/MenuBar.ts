@@ -1,6 +1,6 @@
 import { BehaviorSubject, combineLatest, map, Subject, type Observable } from 'rxjs';
 
-import { input, ScrollService, type ComponentContext, type Inputs } from 'gesso-framework';
+import { FocusService, input, ScrollService, type ComponentContext, type Inputs } from 'gesso-framework';
 import {
   Box,
   Column,
@@ -117,6 +117,21 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   const hoveredTitle = new BehaviorSubject(-1);
 
   /**
+   * Whether the bar has focus the keyboard can see.
+   *
+   * The bar is one stop, and the arrows move a focus that lives in the
+   * state rather than on a node, so nothing the runtime draws for focus
+   * can say which title it is on. The title draws it instead, in the
+   * focus ring's colour, and only for focus a key put there, as a ring
+   * is: a click on a title is not a reason to mark it.
+   */
+  const focus = ctx.inject(FocusService);
+  let barNode: UiNode | null = null;
+  const barFocused: Observable<boolean> = combineLatest([focus.focused, focus.focusVisible]).pipe(
+    map(([node, visible]) => visible && node !== null && node === barNode)
+  );
+
+  /**
    * True while `show` is taking a panel down in order to put another
    * one up.
    *
@@ -195,6 +210,9 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     }
     show({ ...state.value, open: false, active: -1 });
     inputs.onChoose.value?.(item);
+    // A choice closes the bar, whichever way it was made, and the docs
+    // promise `onDismiss` after it: the keys' choice has always said so.
+    inputs.onDismiss.value?.();
   };
 
   const onKeyDown = (event: UiKeyboardEvent): void => {
@@ -413,7 +431,10 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
 
   return Row(
     {
-      ref: inputs.barRef.value ?? undefined,
+      ref: (node: UiNode | null) => {
+        barNode = node;
+        inputs.barRef.value?.(node);
+      },
       gap: 2,
       paddingLeft: 4,
       paddingRight: 4,
@@ -435,6 +456,11 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
           paddingTop: 4,
           paddingBottom: 4,
           borderRadius: 5,
+          // Paint only, inside the box: marking the title moves nothing.
+          borderWidth: 2,
+          borderColor: combineLatest([state, barFocused]).pipe(
+            map(([current, focused]) => (focused && current.focused === index ? 'focusRing' : 'transparent'))
+          ),
           cursor: 'pointer',
           backgroundColor: combineLatest([state, hoveredTitle]).pipe(
             map(([current, hovered]) =>
