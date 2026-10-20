@@ -309,3 +309,25 @@ describe('Combobox', () => {
     });
   });
 });
+
+/**
+ * Found reading the source for the component workbench: an option's
+ * label was one line that could not shrink below its own width, so a
+ * label longer than the list ran past the list's edge and pushed the
+ * tick out after it.
+ */
+describe('a combobox option longer than its list', () => {
+  it('is cut short inside the list, with its tick still in it', async () => {
+    const long = 'A label far longer than the list it sits in can ever show on one line';
+    mount({ defaultValue: 'long', width: 200, options: [{ value: 'long', label: long }, ...PEOPLE] });
+    await focus();
+    await key('ArrowDown');
+    const list = ui.getLayout(ui.getByRole('listbox'));
+    // The field draws the label too; this is the one on the option's row.
+    const row = ui.getByRole('option', { name: long });
+    const text = ui.getLayout(ui.getAllByText(long).find(node => node.parent === row)!);
+    expect(text.x + text.width).toBeLessThanOrEqual(list.x + list.width);
+    const tick = ui.getLayout(ui.getByText('✓'));
+    expect(tick.x + tick.width).toBeLessThanOrEqual(list.x + list.width);
+  });
+});
