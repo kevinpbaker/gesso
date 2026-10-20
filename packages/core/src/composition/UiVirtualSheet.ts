@@ -64,8 +64,11 @@ export interface SheetRange {
  * Keys are absolute rather than positional on purpose: a scroll of one
  * row then reconciles to one row built and one dropped, instead of
  * every mounted cell being rewritten to hold its neighbour's value.
+ *
+ * With `recycleRows`, `slot` is the place on screen the row is mounted
+ * in; see there. A frozen row has none.
  */
-export type SheetRowRenderer = (row: number, firstColumn: number, lastColumn: number) => UiChild;
+export type SheetRowRenderer = (row: number, firstColumn: number, lastColumn: number, slot?: number) => UiChild;
 
 export interface UiVirtualSheetOptions {
   readonly rowCount: Reactive<number>;
@@ -164,6 +167,31 @@ export interface UiVirtualSheetOptions {
   readonly extendRange?: (range: SheetRange) => SheetRange;
   /** Viewport assumed before the first layout. */
   readonly initialViewport?: { readonly width: number; readonly height: number };
+  /**
+   * Mount each row in a slot that outlives it, and key the row by the
+   * slot rather than by the row.
+   *
+   * A row keyed by its index is a new node when it comes into view and
+   * gone when it leaves, with every cell in it. That is right for a
+   * scroll of a row a frame and ruinous for a jump: a scrollbar thumb on
+   * a long sheet moves a dozen rows a pixel, so every frame of a drag
+   * replaces the whole window, builds every cell and binding in it and
+   * tears the last frame's down. Measured in gessosheet, that was ~900
+   * cells and ~5,000 bindings each way, every frame.
+   *
+   * With this, the window keeps one slot per row in view, and a row
+   * that arrives takes a slot a row leaving has just given up, so its
+   * node is reused. The row renderer is told the slot; a renderer that
+   * keeps its cells by slot instead of by row, and repoints them at the
+   * row they now show, hands back the same cell elements, and the
+   * reconciler passes them over without touching their nodes. What a
+   * jump then costs is what the cells' own bindings push.
+   *
+   * A row keeps its slot for as long as it stays in view, so a scroll
+   * of one row moves one node from the top to the bottom. Frozen rows
+   * never leave and are keyed by row as before.
+   */
+  readonly recycleRows?: boolean;
 }
 
 /**
@@ -231,6 +259,19 @@ export class UiVirtualSheet {
   private readonly mountedRows = new Map<number, UiElement>();
   /** The frozen rows, kept separately because they never leave. */
   private readonly frozenMounted = new Map<number, UiElement>();
+  /** Whether rows are mounted in slots; see `recycleRows`. */
+  private readonly recycleRows: boolean;
+  /**
+   * The slot each row in view is mounted in, kept apart from
+   * `mountedRows` because a row keeps its slot through a change of
+   * columns or an `invalidate`, which rebuild its element and not its
+   * place.
+   */
+  private readonly rowSlots = new Map<number, number>();
+  /** Slots given up by rows that left, for the next rows to take. */
+  private readonly freeSlots: number[] = [];
+  /** How many slots there have ever been: the next new one. */
+  private slotCount = 0;
   private mountedHeader: UiElement | undefined;
 
   constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer, renderHeader?: SheetHeaderRenderer) {
@@ -247,6 +288,7 @@ export class UiVirtualSheet {
     this.renderRow = renderRow;
     this.renderHeader = renderHeader;
     this.extendRange = options.extendRange;
+    this.recycleRows = options.recycleRows === true;
     this.adoptWidths(options.columnWidth);
     this.viewport = {
       scrollX: 0,
@@ -718,16 +760,41 @@ export class UiVirtualSheet {
         this.mountedRows.delete(row);
       }
     }
+    if (this.recycleRows) {
+      this.assignSlots(firstRow, lastRow);
+    }
     for (let row = firstRow; row <= lastRow; row++) {
       let built = this.mountedRows.get(row);
       if (built === undefined) {
-        built = this.wrap(row, width, lead);
+        built = this.wrap(row, width, lead, this.rowSlots.get(row));
         this.mountedRows.set(row, built);
       }
       children.push(built);
     }
     children.push(spacer('sheet:bottom', this.rowsHeight - this.rowOffsetOf(lastRow + 1)));
     return children;
+  }
+
+  /**
+   * Gives every row in `[firstRow, lastRow]` a slot, keeping the slot of
+   * one that already has one.
+   *
+   * Every row that left gives its slot up before any row arriving takes
+   * one, so a jump that replaces the whole window takes back exactly the
+   * slots it gave up and the pool grows only when the window does.
+   */
+  private assignSlots(firstRow: number, lastRow: number): void {
+    for (const [row, slot] of this.rowSlots) {
+      if (row < firstRow || row > lastRow) {
+        this.rowSlots.delete(row);
+        this.freeSlots.push(slot);
+      }
+    }
+    for (let row = firstRow; row <= lastRow; row++) {
+      if (!this.rowSlots.has(row)) {
+        this.rowSlots.set(row, this.freeSlots.pop() ?? this.slotCount++);
+      }
+    }
   }
 
   /**
@@ -779,8 +846,8 @@ export class UiVirtualSheet {
    * what puts column `firstColumn` at its own offset without the row
    * holding the columns to its left.
    */
-  private wrap(row: number, width: number, lead: number): UiElement {
-    const built = this.renderRow(row, this.range.firstColumn, this.range.lastColumn);
+  private wrap(row: number, width: number, lead: number, slot?: number): UiElement {
+    const built = this.renderRow(row, this.range.firstColumn, this.range.lastColumn, slot);
     if (!isRowElement(built)) {
       throw new Error(
         `A sheet row must be a Row element; row ${row} rendered something else. ` +
@@ -791,7 +858,7 @@ export class UiVirtualSheet {
       ...built,
       props: {
         ...built.props,
-        key: `sheet:row:${row}`,
+        key: slot === undefined ? `sheet:row:${row}` : `sheet:slot:${slot}`,
         width,
         height: this.rowHeightOf(row),
         flexShrink: 0
@@ -927,6 +994,7 @@ export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): U
     frozenColumns,
     header,
     extendRange,
+    recycleRows,
     modifiers,
     sheetRef,
     ...rest
@@ -944,7 +1012,8 @@ export function LazySheet(props: LazySheetProps, renderRow: SheetRowRenderer): U
       headerHeight,
       frozenRows,
       frozenColumns,
-      extendRange
+      extendRange,
+      recycleRows
     },
     renderRow,
     header
